@@ -1,0 +1,68 @@
+{
+  "title": "系统管理",
+  "menu": {
+    "title": "菜单管理",
+    "addMenu": "新增菜单",
+    "editMenu": "编辑菜单",
+    "addChildMenu": "添加子菜单",
+    "menuName": "菜单名称",
+    "routeName": "路由名称",
+    "routePath": "路由地址",
+    "componentPath": "组件路径",
+    "icon": "图标",
+    "order": "排序",
+    "parentMenu": "上级菜单",
+    "selectParentMenu": "请选择上级菜单",
+    "topMenu": "顶级菜单（无上级）"
+  },
+  "aiSettings": {
+    "title": "AI 设置",
+    "infrastructure": "AI 基础设施设置",
+    "configDesc": "配置说明",
+    "configHelp": "您可以为不同的 AI 供应商配置独立的 API Key 和接口地址。系统将使用当前选中的供应商作为全局默认模型。",
+    "providerSettings": "AI 模型供应商设置",
+    "currentProvider": "当前激活的模型供应商 (全局默认)",
+    "detailConfig": "{provider} 详细配置",
+    "apiKey": "API Key",
+    "apiKeyTooltip": "每个供应商使用各自独立的 API Key",
+    "baseUrl": "Base URL",
+    "defaultModel": "默认使用的模型",
+    "availableModels": "可用模型列表 (逗号分隔)",
+    "saveConfig": "保存所有配置",
+    "testConnection": "测试当前连接",
+    "commonUrlRef": "常用地址参考"
+  },
+  "user": {
+    "title": "用户管理",
+    "addUser": "新增用户",
+    "editUser": "编辑用户",
+    "username": "用户名",
+    "realName": "姓名",
+    "email": "邮箱",
+    "phone": "手机号",
+    "deptName": "所属部门",
+    "createTime": "创建时间",
+    "remark": "备注",
+    "remarkPlaceholder": "请输入备注",
+    "selectDept": "请选择所属部门"
+  },
+  "role": {
+    "title": "角色管理",
+    "addRole": "新增角色",
+    "editRole": "编辑角色",
+    "roleName": "角色名称",
+    "roleValue": "角色值",
+    "permSettings": "权限设置"
+  },
+  "dept": {
+    "title": "部门管理",
+    "addDept": "新增部门",
+    "editDept": "编辑部门",
+    "addChildDept": "添加子部门",
+    "deptName": "部门名称",
+    "parentDept": "上级部门",
+    "topDept": "顶级部门（无上级）",
+    "purchase": "采购",
+    "production": "履约"
+  }
+}

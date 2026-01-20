@@ -1,0 +1,163 @@
+{
+  "title": "Quality Management System",
+  "common": {
+    "portrait": "Portrait",
+    "overallScore": "Overall Score",
+    "scoreDesc": "Based on whole supply chain data",
+    "riskOverview": "Quality Risk Overview",
+    "batchCount": "Batch",
+    "totalQuantity": "Total Quantity",
+    "passRate": "Pass Rate",
+    "engLoss": "Eng. Loss",
+    "afterSalesLoss": "After-Sales Loss",
+    "tabs": {
+      "basic": "Basic Profile",
+      "engineering": "Eng. Quality Records",
+      "afterSales": "After-Sales Records",
+      "incoming": "Incoming Inspection History"
+    }
+  },
+  "task": {
+    "status": {
+      "pending": "Pending",
+      "dispatched": "Dispatched",
+      "processing": "Processing",
+      "completed": "Completed",
+      "overdue": "Overdue"
+    },
+    "detail": {
+      "content": "Task Content Details",
+      "items": "Assigned Items"
+    }
+  },
+  "workOrder": {
+    "status": {
+      "pending": "Pending",
+      "inProgress": "In Progress",
+      "completed": "Completed",
+      "closed": "Closed"
+    }
+  },
+  "qualityLoss": {
+    "status": {
+      "confirmed": "Confirmed",
+      "pending": "Pending",
+      "processing": "Processing"
+    }
+  },
+  "inspection": {
+    "issues": {
+      "status": {
+        "open": "Open",
+        "inProgress": "In Progress",
+        "closed": "Closed",
+        "resolved": "Resolved"
+      },
+      "statusLabel": "Status",
+      "totalCount": "Total Engineering Issues",
+      "closedRate": "Closure Rate",
+      "aiInsightReport": "AI Quality Insights",
+      "trendAnalysis": "Quality Trend Analysis",
+      "createIssue": "New Issue",
+      "editIssue": "Edit Issue",
+      "settleToKnowledge": "Cases",
+      "aiAnalyze": "AI Analyze",
+      "aiAnalyzeTooltip": "Auto analyze root cause and solution based on description",
+      "matchCases": "Match Cases",
+      "matchHistoryTooltip": "Find similar historical issues",
+      "descriptionPlaceholder": "Describe the issue...",
+      "similarCases": "Similar Cases Recommendation",
+      "caseReferenced": "Referenced case solution",
+      "similarity": "Similarity",
+      "defectType": "Defect Category",
+      "defectSubtype": "Defect Subtype",
+      "responsibleUnit": "Resp. Unit",
+      "responsibleDepartment": "Resp. Dept.",
+      "ncNumber": "NC Number",
+      "reportDate": "Report Date",
+      "workOrderNumber": "Work Order No.",
+      "projectName": "Project Name",
+      "partName": "Part Name",
+      "quantity": "Quantity",
+      "description": "Description",
+      "rootCause": "Root Cause",
+      "solution": "Solution",
+      "lossAmount": "Loss Amount",
+      "reportedBy": "Inspector",
+      "claim": "Claim",
+      "photos": "Photos",
+      "updatedAt": "Last Updated",
+      "severity": "Severity",
+      "severityLevel": {
+        "critical": "Critical",
+        "major": "Major",
+        "minor": "Minor"
+      },
+      "generateNumber": "Gen. Number",
+      "generateNumberPlaceholder": "Click button to generate if needed",
+      "upload-error": "Upload Failed",
+      "upload-urls": "Upload URLs",
+      "file": "File",
+      "upload-image": "Click to upload image",
+      "selectWorkOrder": "Select Work Order",
+      "inputPartName": "Input Part Name",
+      "inputSupplier": "Select Unit",
+      "saveSuccess": "Save Success",
+      "aiAnalysisComplete": "AI Analysis Complete",
+      "matchCasesSuccess": "Cases Matched Successfully",
+      "deleteConfirm": "Confirm Delete",
+      "deleteContent": "Are you sure to delete {ncNumber}?",
+      "defects": {
+        "design": "Design Defect",
+        "process": "Process Defect",
+        "manufacturing": "Manufacturing Defect",
+        "part": "Part Defect",
+        "other": "Other Defect"
+      }
+    },
+    "records": {
+      "title": "Inspection Records",
+      "statsYear": "Statistical Year",
+      "itpPlan": "ITP Plan",
+      "inspectionCount": "{count} Items",
+      "autoMatchedItp": "Auto Matched ITP: {name}",
+      "measuredValue": "Value/Result",
+      "standard": "Standard",
+      "reference": "Reference",
+      "activity": "Activity",
+      "controlPoint": "CP",
+      "itpDataEntry": "ITP Data Entry",
+      "tab": {
+        "incoming": "Incoming",
+        "process": "In-Process",
+        "shipment": "Shipment"
+      },
+      "result": {
+        "pass": "Pass",
+        "fail": "Fail"
+      }
+    }
+  },
+  "supplier": {
+    "title": "Supplier Management",
+    "entityName": "Supplier",
+    "code": "Supplier Code",
+    "name": "Supplier Name",
+    "stats": "Supplier Stats",
+    "status": {
+      "active": "Active",
+      "blacklisted": "Blacklisted",
+      "underReview": "Under Review",
+      "qualified": "Qualified",
+      "trial": "Trial",
+      "observation": "Observation",
+      "frozen": "Frozen"
+    }
+  },
+  "knowledge": {
+    "title": "Knowledge Base",
+    "allKnowledge": "All Knowledge",
+    "latestUpdate": "Last Updated",
+    "categories": "Categories"
+  }
+}

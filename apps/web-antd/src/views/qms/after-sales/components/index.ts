@@ -1,0 +1,11 @@
+export { default as AfterSalesAttachments } from './AfterSalesAttachments.vue';
+export { default as AfterSalesBasicInfo } from './AfterSalesBasicInfo.vue';
+export { default as AfterSalesCharts } from './AfterSalesCharts.vue';
+export { default as AfterSalesDescription } from './AfterSalesDescription.vue';
+export { default as AfterSalesIssueDetails } from './AfterSalesIssueDetails.vue';
+export { default as AfterSalesModal } from './AfterSalesModal.vue';
+export { default as AfterSalesProductInfo } from './AfterSalesProductInfo.vue';
+export { default as AfterSalesResponsibility } from './AfterSalesResponsibility.vue';
+export { default as AfterSalesStatus } from './AfterSalesStatus.vue';
+export { default as CustomChartBuilderModal } from './CustomChartBuilderModal.vue';
+export { default as CustomChartItem } from './CustomChartItem.vue';

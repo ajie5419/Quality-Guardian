@@ -1,0 +1,26 @@
+{
+  "name": "@vben/backend",
+  "version": "0.0.1",
+  "description": "",
+  "private": true,
+  "license": "MIT",
+  "author": "",
+  "scripts": {
+    "build": "nitro build",
+    "dev": "cross-env PORT=5320 nitro dev",
+    "start": "nitro dev"
+  },
+  "dependencies": {
+    "@faker-js/faker": "catalog:",
+    "@prisma/client": "^5.22.0",
+    "bcrypt": "^6.0.0",
+    "jsonwebtoken": "catalog:",
+    "nitropack": "catalog:",
+    "prisma": "^5.22.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/jsonwebtoken": "catalog:",
+    "h3": "catalog:"
+  }
+}

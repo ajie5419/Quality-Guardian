@@ -1,0 +1,605 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model after_sales {
+  id                  String                  @id
+  serialNumber        Int
+  occurDate           DateTime
+  claimStatus         after_sales_claimStatus
+  projectName         String
+  productType         String?
+  shipDate            DateTime?
+  warrantyStatus      String?
+  issueDescription    String?                 @db.Text
+  quantity            Int
+  feedbackDept        String?
+  solution            String?                 @db.Text
+  actualSolution      String?                 @db.Text
+  qualityLoss         Decimal                 @default(0.00) @db.Decimal(10, 2)
+  actualClaim         Decimal                 @default(0.00) @db.Decimal(10, 2)
+  respDept            String?
+  supplierBrand       String?
+  photos              String?                 @db.LongText
+  isClaim             Boolean                 @default(false)
+  remarks             String?                 @db.Text
+  failureType         String?
+  failureCause        String?
+  linkedEngineeringId String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime
+  version             Int                     @default(1)
+  isDeleted           Boolean                 @default(false)
+  workOrderNumber     String
+  customerName        String?
+  location            String?
+  factoryDate         DateTime?
+  handler             String?
+  materialCost        Decimal?                @default(0.00) @db.Decimal(10, 2)
+  laborTravelCost     Decimal?                @default(0.00) @db.Decimal(10, 2)
+  closeDate           DateTime?
+  defectType          String?
+  defectSubtype       String?
+  severity            String?
+  productSubtype      String?
+  runningHours        Decimal?
+  division            String?
+  partName            String?
+  work_orders         work_orders             @relation(fields: [workOrderNumber], references: [workOrderNumber])
+
+  @@index([claimStatus])
+  @@index([occurDate])
+  @@index([supplierBrand])
+  @@index([workOrderNumber])
+}
+
+model audit_logs {
+  id         String            @id
+  userId     String
+  action     audit_logs_action
+  targetType String
+  targetId   String
+  details    String?           @db.Text
+  ipAddress  String?
+  userAgent  String?
+  timestamp  BigInt            @default(autoincrement())
+  createdAt  DateTime          @default(now())
+  users      users             @relation(fields: [userId], references: [id])
+
+  @@index([timestamp])
+  @@index([userId])
+}
+
+model departments {
+  id           String   @id
+  name         String
+  businessUnit String?
+  description  String?
+  status       Int      @default(1)
+  parentId     String   @default("0")
+  sort         Int      @default(0)
+  isDeleted    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+  version      Int      @default(1)
+}
+
+model dfmea_projects {
+  id              String       @id @default(cuid())
+  projectName     String
+  workOrderId     String?
+  version         String       @default("V1.0")
+  status          String       @default("draft") // draft, active, archived
+  description     String?      @db.Text
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  createdBy       String       @default("admin")
+  isDeleted       Boolean      @default(false)
+  
+  items           dfmea[]
+  work_orders     work_orders? @relation(fields: [workOrderId], references: [workOrderNumber])
+  task_dispatches qms_task_dispatches[]
+
+  @@index([workOrderId])
+}
+
+model dfmea {
+  id                String       @id @default(cuid())
+  serialNumber      Int?
+  projectId         String
+  item              String
+  failureMode       String
+  effect            String?      @db.Text
+  severity          Int
+  cause             String?      @db.Text
+  occurrence        Int
+  detection         Int
+  rpn               Int
+  preventionControl String?      @db.Text
+  detectionControl  String?      @db.Text
+  recommendedAction String?      @db.Text
+  status            dfmea_status @default(OPEN)
+  responsibility    String?
+  targetDate        DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  version           Int          @default(1)
+  isDeleted         Boolean      @default(false)
+  order             Int          @default(0)
+  
+  dfmea_projects    dfmea_projects @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+}
+
+model inspections {
+  id                  String                 @id
+  serialNumber        Int
+  date                DateTime
+  category            inspections_category
+  result              inspections_result     @default(PASS)
+  docStatus           inspections_docStatus?
+  inspector           String
+  quantity            Int
+  details             String?                @db.LongText
+  remarks             String?                @db.Text
+  processName         String?
+  firstLevelPartName  String?
+  partName            String?
+  team                String?
+  qualityRecordFilled Boolean                @default(false)
+  incomingType        String?
+  supplierName        String?
+  itemName            String?
+  projectName         String?
+  shippingDocs        String?
+  packingList         String?
+  packingListPhotos   String?                @db.LongText
+  reporter            String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime
+  version             Int                    @default(1)
+  isDeleted           Boolean                @default(false)
+  workOrderNumber     String
+  documentStatus      String?
+  inspectionDate      DateTime?
+  isArchived          Boolean                @default(false)
+  vehicularInfo       String?
+  itpItemId           String?
+  qualityPlanId       String?
+  subPartName         String?
+  bom_item_id         String?
+  project_boms        project_boms?          @relation(fields: [bom_item_id], references: [id])
+  users               users                  @relation(fields: [inspector], references: [username])
+  quality_plans       quality_plans?         @relation(fields: [qualityPlanId], references: [id])
+  work_orders         work_orders            @relation(fields: [workOrderNumber], references: [workOrderNumber])
+
+  @@index([bom_item_id])
+  @@index([category])
+  @@index([date])
+  @@index([inspector], map: "inspections_inspector_fkey")
+  @@index([qualityPlanId], map: "inspections_qualityPlanId_fkey")
+  @@index([result])
+  @@index([workOrderNumber])
+}
+
+model permissions {
+  id          String   @id
+  code        String   @unique
+  name        String
+  description String?
+  module      String
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+}
+
+model project_boms {
+  id                String        @id
+  work_order_number String
+  part_name         String
+  part_number       String?
+  material          String?
+  quantity          Int           @default(1)
+  unit              String        @default("pcs")
+  remarks           String?       @db.Text
+  created_by        String?
+  created_at        DateTime      @default(now())
+  updated_at        DateTime
+  inspections       inspections[]
+  work_orders       work_orders   @relation(fields: [work_order_number], references: [workOrderNumber])
+}
+
+model quality_plans {
+  id              String                   @id
+  projectName     String
+  customer        String
+  documents       String?                  @db.LongText
+  itpItems        String?                  @db.LongText
+  planStatus      quality_plans_planStatus @default(DRAFT)
+  preparedBy      String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime
+  version         Int                      @default(1)
+  isDeleted       Boolean                  @default(false)
+  workOrderNumber String
+  inspections     inspections[]
+  work_orders     work_orders              @relation(fields: [workOrderNumber], references: [workOrderNumber])
+  task_dispatches qms_task_dispatches[]
+
+  @@index([planStatus])
+  @@index([workOrderNumber])
+}
+
+model quality_records {
+  id                                      String                      @id
+  serialNumber                            Int
+  date                                    DateTime
+  status                                  quality_records_status
+  partName                                String
+  description                             String?                     @db.Text
+  quantity                                Int
+  lossHours                               Decimal                     @default(0.00) @db.Decimal(10, 2)
+  lossAmount                              Decimal                     @default(0.00) @db.Decimal(10, 2)
+  projectName                             String?
+  division                                String?
+  responsibleDepartment                   String
+  responsibleBU                           String?
+  inspector                               String?
+  analysis                                String?                     @db.Text
+  solution                                String?                     @db.Text
+  issuePhoto                              String?                     @db.Text
+  rectificationPhoto                      String?                     @db.Text
+  isClaim                                 Boolean                     @default(false)
+  nonConformanceNumber                    String?
+  lastEditor                              String?
+  sourceAfterSalesId                      String?
+  createdAt                               DateTime                    @default(now())
+  updatedAt                               DateTime
+  version                                 Int                         @default(1)
+  isDeleted                               Boolean                     @default(false)
+  workOrderNumber                         String?
+  claimNotes                              String?                     @db.Text
+  claimStatus                             quality_records_claimStatus @default(OPEN)
+  recoveredAmount                         Decimal                     @default(0.00) @db.Decimal(10, 2)
+  hourlyRate                              Decimal                     @default(0.00) @db.Decimal(10, 2)
+  supplierName                            String?
+  category                                String?
+  processName                             String?
+  defectType                              String?
+  defectSubtype                           String?
+  rootCause                               String?                     @db.Text
+  users_quality_records_inspectorTousers  users?                      @relation("quality_records_inspectorTousers", fields: [inspector], references: [username])
+  users_quality_records_lastEditorTousers users?                      @relation("quality_records_lastEditorTousers", fields: [lastEditor], references: [username])
+  work_orders                             work_orders?                @relation(fields: [workOrderNumber], references: [workOrderNumber])
+
+  @@index([createdAt])
+  @@index([date])
+  @@index([inspector], map: "quality_records_inspector_fkey")
+  @@index([lastEditor], map: "quality_records_lastEditor_fkey")
+  @@index([partName])
+  @@index([serialNumber])
+  @@index([status])
+  @@index([status, isDeleted])
+  @@index([workOrderNumber])
+}
+
+model roles {
+  id          String   @id
+  name        String   @unique
+  description String?
+  permissions String   @db.LongText
+  status      Int      @default(1)
+  isSystem    Boolean  @default(false)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       users[]
+}
+
+model sequences {
+  name         String  @id
+  currentValue Int     @default(0)
+  prefix       String?
+}
+
+model standard_documents {
+  id          String   @id
+  name        String
+  category    String
+  path        String
+  size        Int
+  uploadedBy  String
+  description String?  @db.Text
+  tags        String   @db.LongText
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  version     Int      @default(1)
+  isDeleted   Boolean  @default(false)
+
+  @@index([category])
+  @@index([name])
+}
+
+model suppliers {
+  id                    String   @id @default(cuid())
+  category              String?
+  name                  String   @unique
+  productName           String?
+  brand                 String?
+  origin                String?
+  project               String?
+  buyer                 String?
+  score2025             Float?
+  qualityScore          Float    @default(100.0)
+  status                String   @default("Qualified") // Qualified, Trial, Registered, Frozen
+  rating                String   @default("A") // A, B, C, D
+  contact               String?
+  phone                 String?
+  email                 String?
+  address               String?
+  isDeleted             Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  version               Int      @default(1)
+}
+
+model system_settings {
+  key         String   @id
+  value       String?  @db.Text
+  description String?
+  updatedAt   DateTime
+}
+
+model users {
+  id                                                String            @id
+  username                                          String            @unique
+  password                                          String
+  email                                             String?
+  realName                                          String?
+  phone                                             String?
+  roleId                                            String
+  department                                        String
+  status                                            users_status      @default(ACTIVE)
+  isDeleted                                         Boolean           @default(false)
+  createdAt                                         DateTime          @default(now())
+  updatedAt                                         DateTime          @updatedAt
+  version                                           Int               @default(1)
+  audit_logs                                        audit_logs[]
+  inspections                                       inspections[]
+  quality_records_quality_records_inspectorTousers  quality_records[] @relation("quality_records_inspectorTousers")
+  quality_records_quality_records_lastEditorTousers quality_records[] @relation("quality_records_lastEditorTousers")
+  qms_task_dispatches_assignor                     qms_task_dispatches[] @relation("qms_task_dispatches_assignorIdTousers")
+  qms_task_dispatches_assignee                     qms_task_dispatches[] @relation("qms_task_dispatches_assigneeIdTousers")
+  roles                                             roles             @relation(fields: [roleId], references: [id])
+
+  @@index([roleId], map: "users_roleId_fkey")
+}
+
+model work_orders {
+  workOrderNumber String             @id
+  customerName    String
+  projectName     String?
+  division        String?
+  quantity        Int
+  deliveryDate    DateTime
+  effectiveTime   DateTime?
+  status          work_orders_status @default(OPEN)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime
+  version         Int                @default(1)
+  isDeleted       Boolean            @default(false)
+  after_sales     after_sales[]
+  dfmea_projects  dfmea_projects[]
+  inspections     inspections[]
+  quality_plans   quality_plans[]
+  quality_records quality_records[]
+  project_boms    project_boms[]
+
+  @@index([customerName])
+  @@index([deliveryDate])
+}
+
+enum audit_logs_action {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  BACKUP
+  RESTORE
+  EXPORT
+}
+
+enum quality_records_status {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  CLAIMING
+}
+
+enum after_sales_claimStatus {
+  OPEN
+  IN_PROGRESS
+  SUBMITTED
+  NEGOTIATING
+  RESOLVED
+  COMPLETED
+  CLOSED
+  CANCELLED
+}
+
+enum inspections_category {
+  INCOMING
+  PROCESS
+  FINAL
+  OUTGOING
+}
+
+enum inspections_result {
+  PASS
+  FAIL
+  CONDITIONAL
+}
+
+enum work_orders_status {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum inspections_docStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum quality_plans_planStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  ACTIVE
+  ARCHIVED
+}
+
+enum users_status {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+enum dfmea_status {
+  OPEN
+  IN_REVIEW
+  APPROVED
+  CLOSED
+}
+
+enum quality_records_claimStatus {
+  OPEN
+  IN_PROGRESS
+  SUBMITTED
+  NEGOTIATING
+  RESOLVED
+  COMPLETED
+  CLOSED
+  CANCELLED
+}
+
+model menus {
+  id        String   @id @default(cuid())
+  pid       String   @default("0")
+  name      String
+  path      String?
+  component String?
+  icon      String?
+  type      String   @default("menu")
+  status    Int      @default(1)
+  sort      Int      @default(0)
+  meta      Json?
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sys_menu")
+}
+
+model quality_losses {
+  id          String   @id @default(cuid())
+  lossId      String?  @unique
+  occurDate   DateTime
+  type        String
+  amount      Decimal  @default(0.00) @db.Decimal(10, 2)
+  actualClaim Decimal  @default(0.00) @db.Decimal(10, 2)
+  description String?  @db.Text
+  respDept    String?
+  status      String   @default("Pending")
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  version     Int      @default(1)
+}
+
+model knowledge_categories {
+  id          String   @id @default(cuid())
+  parentId    String?
+  name        String
+  description String?  @db.Text
+  sort        Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
+  items       knowledge_base[]
+}
+
+model knowledge_base {
+  id          String   @id @default(cuid())
+  docId       String?  @unique
+  title       String
+  categoryId  String?
+  author      String?
+  publishDate DateTime?
+  summary     String?  @db.Text
+  content     String?  @db.LongText
+  attachment  String?  @db.LongText
+  tags        String?  @db.Text
+  status      String   @default("Published")
+  version     String   @default("V1.0")
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  category    knowledge_categories? @relation(fields: [categoryId], references: [id])
+
+  @@index([categoryId])
+}
+
+model daily_reports {
+  id        String   @id @default(cuid())
+  date      DateTime
+  reporter  String
+  summary   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([date, reporter])
+}
+
+enum qms_task_dispatches_type {
+  ITP_INSPECTION
+  DFMEA_ACTION
+}
+
+model qms_task_dispatches {
+  id              String                   @id @default(cuid())
+  type            qms_task_dispatches_type
+  title           String
+  level           Int                      @default(1)
+  parentId        String?
+  itpProjectId    String?
+  dfmeaId         String?
+  assignorId      String
+  assigneeId      String
+  content         Json?
+  status          String                   @default("PENDING")
+  priority        Int                      @default(2)
+  deadline        DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  
+  users_qms_task_dispatches_assignorIdTousers users @relation("qms_task_dispatches_assignorIdTousers", fields: [assignorId], references: [id])
+  users_qms_task_dispatches_assigneeIdTousers users @relation("qms_task_dispatches_assigneeIdTousers", fields: [assigneeId], references: [id])
+  itp_project                                 quality_plans? @relation(fields: [itpProjectId], references: [id])
+  dfmea_project                               dfmea_projects? @relation(fields: [dfmeaId], references: [id])
+
+  @@index([assigneeId])
+  @@index([status])
+}
