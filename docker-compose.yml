@@ -1,0 +1,27 @@
+services:
+  backend:
+    # 生产环境部署建议在 ECS 上将此地址改为 VPC 内网地址以加速
+    image: crpi-jy3d0qwkxxv0twpn.cn-beijing.personal.cr.aliyuncs.com/ajie5419/qms:backend-latest
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - NODE_ENV=production
+    restart: always
+    expose:
+      - "3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    image: crpi-jy3d0qwkxxv0twpn.cn-beijing.personal.cr.aliyuncs.com/ajie5419/qms:frontend-latest
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
