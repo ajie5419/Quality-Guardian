@@ -40,3 +40,20 @@ jobs:
           push: true
           tags: ${{ secrets.ACR_REGISTRY }}/ajie5419/qms:frontend-latest
           platforms: linux/amd64
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to ECS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/qms
+            docker login --username=${{ secrets.ACR_USERNAME }} --password=${{ secrets.ACR_PASSWORD }} ${{ secrets.ACR_REGISTRY }}
+            docker-compose pull
+            docker-compose up -d
+            docker image prune -f
