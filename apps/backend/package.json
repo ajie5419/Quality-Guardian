@@ -22,5 +22,8 @@
     "@types/bcrypt": "^6.0.0",
     "@types/jsonwebtoken": "catalog:",
     "h3": "catalog:"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   }
 }
