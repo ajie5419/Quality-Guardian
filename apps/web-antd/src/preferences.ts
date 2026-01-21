@@ -8,8 +8,14 @@ import { defineOverridesPreferences } from '@vben/preferences';
 export const overridesPreferences = defineOverridesPreferences({
   // overrides
   app: {
-    name: import.meta.env.VITE_APP_TITLE,
     accessMode: 'mixed',
+    name: import.meta.env.VITE_APP_TITLE,
+  },
+  copyright: {
+    companyName: '质量管理系统',
+    companySiteLink: '',
+    date: '2026',
+    enable: true,
   },
   widget: {
     globalSearch: true,

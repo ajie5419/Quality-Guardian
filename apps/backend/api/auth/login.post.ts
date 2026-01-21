@@ -81,7 +81,18 @@ export default defineEventHandler(async (event) => {
     return forbiddenResponse(event, 'Username or password is incorrect.');
   }
 
-  // 4. Construct payload compatible with structure expected by frontend
+  // 4. Fetch department name
+  let deptName = '';
+  if (user.department) {
+    const dept = await prisma.departments.findUnique({
+      where: { id: user.department },
+    });
+    if (dept) {
+      deptName = dept.name;
+    }
+  }
+
+  // 5. Construct payload compatible with structure expected by frontend
   const userPayload = {
     avatar: '/uploads/avatar-v1.svg',
     id: user.id,
@@ -89,6 +100,7 @@ export default defineEventHandler(async (event) => {
     roles: [user.roles?.name || 'user'], // Use role name, not ID
     userId: user.id,
     username: user.username,
+    deptName, // Include department name
   };
 
   const accessToken = generateAccessToken(userPayload as unknown as UserInfo);

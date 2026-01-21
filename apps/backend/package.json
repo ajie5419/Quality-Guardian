@@ -1,10 +1,16 @@
 {
-  "name": "@vben/backend",
-  "version": "0.0.1",
-  "description": "",
+  "name": "@qgs/backend",
+  "version": "1.0.0",
+  "description": "Backend service for Quality Guardian System",
   "private": true,
+  "homepage": "https://www.tolian-tech.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ajie5419/Quality-Guardian.git",
+    "directory": "apps/backend"
+  },
   "license": "MIT",
-  "author": "",
+  "author": "Zhao XiaoJie",
   "scripts": {
     "build": "nitro build",
     "dev": "cross-env PORT=5320 nitro dev",

@@ -1,7 +1,7 @@
 {
-  "name": "@vben/web-antd",
-  "version": "5.5.9",
-  "homepage": "https://vben.pro",
+  "name": "@qgs/web-antd",
+  "version": "1.0.0",
+  "homepage": "https://www.tolian-tech.com",
   "bugs": "https://github.com/ajie5419/Quality-Guardian/issues",
   "repository": {
     "type": "git",
@@ -9,11 +9,7 @@
     "directory": "apps/web-antd"
   },
   "license": "MIT",
-  "author": {
-    "name": "vben",
-    "email": "ann.vben@gmail.com",
-    "url": "https://github.com/anncwb"
-  },
+  "author": "Zhao XiaoJie",
   "type": "module",
   "scripts": {
     "build": "pnpm vite build --mode production",

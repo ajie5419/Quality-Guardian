@@ -31,12 +31,24 @@ export default eventHandler(async (event) => {
         }
       }
 
+      // Fetch department name
+      let deptName = '';
+      if (dbUser.department) {
+        const dept = await prisma.departments.findUnique({
+          where: { id: dbUser.department },
+        });
+        if (dept) {
+          deptName = dept.name;
+        }
+      }
+
       // Return updated user info with fresh roles from DB
       return useResponseSuccess({
         ...userinfo,
         id: dbUser.id,
         realName: dbUser.realName || userinfo.realName,
         roles,
+        deptName, // Include department name
         avatar: dbUser.avatar || userinfo.avatar,
       });
     }

@@ -1,28 +1,22 @@
 {
-  "name": "vben-admin-monorepo",
-  "version": "5.5.9",
+  "name": "quality-guardian-system",
+  "version": "1.0.0",
   "private": true,
   "keywords": [
-    "monorepo",
-    "turbo",
-    "vben",
-    "vben admin",
-    "vben pro",
-    "vue",
-    "vue admin",
-    "vue vben admin",
-    "vue vben admin pro",
-    "vue3"
+    "quality",
+    "management",
+    "system",
+    "qms",
+    "quality guardian"
   ],
-  "homepage": "https://github.com/ajie5419/Quality-Guardian",
+  "homepage": "https://www.tolian-tech.com",
   "bugs": "https://github.com/ajie5419/Quality-Guardian/issues",
-  "repository": "ajie5419/Quality-Guardian.git",
-  "license": "MIT",
-  "author": {
-    "name": "vben",
-    "email": "ann.vben@gmail.com",
-    "url": "https://github.com/anncwb"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ajie5419/Quality-Guardian.git"
   },
+  "license": "MIT",
+  "author": "Zhao XiaoJie",
   "type": "module",
   "scripts": {
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 turbo build",

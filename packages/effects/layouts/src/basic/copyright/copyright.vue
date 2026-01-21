@@ -12,9 +12,9 @@ defineOptions({
 });
 
 withDefaults(defineProps<Props>(), {
-  companyName: 'Vben Admin',
+  companyName: '质量管理系统',
   companySiteLink: '',
-  date: '2024',
+  date: '2026',
   icp: '',
   icpLink: '',
 });

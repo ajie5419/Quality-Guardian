@@ -4,11 +4,21 @@ import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const { username, password } = await readBody(event);
+  const { deptId, password, username } = await readBody(event);
 
-  if (!username || !password) {
+  if (!username || !password || !deptId) {
     setResponseStatus(event, 400);
-    return useResponseError('BadRequest', '用户名和密码不能为空');
+    return useResponseError('BadRequest', '用户名、密码和部门均为必填项');
+  }
+
+  // 检查部门是否存在
+  const dept = await prisma.departments.findUnique({
+    where: { id: deptId },
+  });
+
+  if (!dept) {
+    setResponseStatus(event, 400);
+    return useResponseError('BadRequest', '所选部门不存在');
   }
 
   // 检查用户名是否已存在
@@ -66,7 +76,7 @@ export default defineEventHandler(async (event) => {
       password: hashedPassword,
       realName: username,
       roleId: defaultRole.id,
-      department: defaultDept.id,
+      department: deptId,
       status: 'ACTIVE',
     },
   });

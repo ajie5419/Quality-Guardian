@@ -10,6 +10,7 @@ import { $t } from '@vben/locales';
 
 import { message } from 'ant-design-vue';
 
+import { getPublicDepartmentsApi } from '#/api/core/auth';
 import { requestClient } from '#/api/request';
 
 defineOptions({ name: 'Register' });
@@ -27,6 +28,28 @@ const formSchema = computed((): VbenFormSchema[] => {
       fieldName: 'username',
       label: $t('authentication.username'),
       rules: z.string().min(1, { message: $t('authentication.usernameTip') }),
+    },
+    {
+      component: 'ApiTreeSelect',
+      componentProps: {
+        allowClear: true,
+        api: getPublicDepartmentsApi,
+        fieldNames: {
+          children: 'children',
+          label: 'name',
+          value: 'id',
+        },
+        placeholder: '请选择所属部门',
+        style: {
+          width: '100%',
+        },
+      },
+      defaultValue: undefined,
+      fieldName: 'deptId',
+      label: '所属部门',
+      rules: z
+        .string({ required_error: '请选择所属部门' })
+        .min(1, { message: '请选择所属部门' }),
     },
     {
       component: 'VbenInputPassword',
@@ -92,6 +115,7 @@ async function handleSubmit(value: Recordable<unknown>) {
   try {
     const val = value as Record<string, any>;
     await requestClient.post('/auth/register', {
+      deptId: val.deptId,
       password: val.password,
       username: val.username,
     });
@@ -107,9 +131,18 @@ async function handleSubmit(value: Recordable<unknown>) {
 </script>
 
 <template>
-  <AuthenticationRegister
-    :form-schema="formSchema"
-    :loading="loading"
-    @submit="handleSubmit"
-  />
+  <div class="registration-page">
+    <AuthenticationRegister
+      :form-schema="formSchema"
+      :loading="loading"
+      @submit="handleSubmit"
+    />
+  </div>
 </template>
+
+<style scoped>
+:deep(.ant-select-selection-placeholder) {
+  color: hsl(var(--muted-foreground)) !important;
+  opacity: 0.8;
+}
+</style>

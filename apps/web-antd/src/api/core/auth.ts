@@ -54,3 +54,10 @@ export async function logoutApi() {
 export async function getAccessCodesApi() {
   return requestClient.get<string[]>(CORE_API.CODES);
 }
+
+/**
+ * 获取公开部门列表（注册使用）
+ */
+export async function getPublicDepartmentsApi() {
+  return requestClient.get<any[]>('/auth/departments');
+}
