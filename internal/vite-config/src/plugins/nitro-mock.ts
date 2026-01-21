@@ -10,7 +10,7 @@ import { build, createDevServer, createNitro, prepare } from 'nitropack';
 const hmrKeyRe = /^runtimeConfig\.|routeRules\./;
 
 export const viteNitroMockPlugin = ({
-  mockServerPackage = '@vben/backend-mock',
+  mockServerPackage = '@qgs/backend',
   port = 5320,
   verbose = true,
 }: NitroMockPluginOptions = {}): PluginOption => {

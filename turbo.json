@@ -31,7 +31,7 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
-    "@vben/backend#build": {
+    "@qgs/backend#build": {
       "dependsOn": ["^build"],
       "outputs": [".nitro/**", ".output/**"]
     },

@@ -15,11 +15,11 @@ COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install
 
 # 2. 在构建阶段生成 Prisma Client
-# 使用 --filter @vben/backend 确保 pnpm 在正确的模块上下文中查找并执行 prisma 二进制文件
-RUN pnpm --filter @vben/backend exec prisma generate --schema=prisma/schema.prisma
+# 使用 --filter @qgs/backend 确保 pnpm 在正确的模块上下文中查找并执行 prisma 二进制文件
+RUN pnpm --filter @qgs/backend exec prisma generate --schema=prisma/schema.prisma
 
 # 3. 构建后端产物
-RUN pnpm run build --filter=@vben/backend
+RUN pnpm run build --filter=@qgs/backend
 
 # 生产阶段
 FROM node:22-slim AS production

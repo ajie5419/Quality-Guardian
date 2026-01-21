@@ -10,7 +10,7 @@ COPY . .
 
 # Install dependencies and build the frontend
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install
-RUN pnpm run build --filter=@vben/web-antd
+RUN pnpm run build --filter=@qgs/web-antd
 
 # Production stage
 FROM nginx:stable-alpine AS production
