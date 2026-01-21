@@ -22,11 +22,16 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event);
 
     const updateData: Record<string, unknown> = {
-      description: body.remark || body.description,
-      name: body.name,
+      description: body.name || body.remark || body.description, // Use 'name' from FE as description
       updatedAt: new Date(),
-      value: body.value,
     };
+
+    // Only update name (identifier) if provided and we really want to allow it
+    // But usually identifier shouldn't change.
+    // In our DB mapping, name = role value.
+    if (body.value) {
+      updateData.name = body.value;
+    }
 
     if (body.status !== undefined) {
       updateData.status = body.status;

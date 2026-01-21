@@ -46,8 +46,9 @@ export default defineEventHandler(async (event) => {
         createTime: role.createdAt
           ? new Date(role.createdAt).toLocaleString('zh-CN')
           : '',
+        name: role.description || role.name, // Map description back to name for display
+        value: role.name, // Internal identifier
         remark: role.description || '',
-        value: role.name, // Frontend expects 'value' for role identifier
       };
     });
 

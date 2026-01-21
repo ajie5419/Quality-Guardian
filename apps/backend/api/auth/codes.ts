@@ -15,30 +15,46 @@ export default eventHandler(async (event) => {
     return useResponseSuccess([]);
   }
 
-  // Fetch user and role-based permissions from Database
+  // Fetch user and role-based permissions from Database (fresh data, not from token)
   try {
-    const user = await prisma.users.findUnique({
-      where: { id: String(userId) },
-      include: {
-        roles: true,
+    // First find the user to get their current roleId
+    const user = await prisma.users.findFirst({
+      where: {
+        OR: [{ id: String(userId) }, { username: userinfo.username }],
       },
     });
 
-    if (!user || !user.roles || !user.roles.permissions) {
+    if (!user || !user.roleId) {
       return useResponseSuccess([]);
     }
 
+    // Fetch the role with its permissions
+    const role = await prisma.roles.findFirst({
+      where: { id: user.roleId },
+    });
+
+    if (!role || !role.permissions) {
+      return useResponseSuccess([]);
+    }
+
+    // Check for super admin role or '*' permission
     let codes: string[] = [];
     try {
-      codes = JSON.parse(user.roles.permissions);
+      codes = JSON.parse(role.permissions);
     } catch (error) {
       console.error('Failed to parse permissions:', error);
     }
 
-    // Special handling for Super Admin (if needed, or rely on DB data)
-    // If the permission is ["*"], it usually implies all access,
-    // but the frontend might need specific codes.
-    // For now, we trust the DB contains the correct list of codes.
+    if (
+      role.name === 'super' ||
+      role.name === 'Super Admin' ||
+      codes.includes('*')
+    ) {
+      // Return all permissions
+      const { MOCK_CODES } = await import('~/utils/mock-data');
+      const superCodes = MOCK_CODES.find((c) => c.username === 'vben');
+      return useResponseSuccess(superCodes?.codes || []);
+    }
 
     return useResponseSuccess(codes);
   } catch (error) {

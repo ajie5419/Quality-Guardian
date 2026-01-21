@@ -624,4 +624,11 @@ model menus {
   component String?
   redirect  String?
   meta      String?  @db.Text
+  icon      String?
+  type      String?  @default("menu")
+  sort      Int      @default(0)
+  status    Int      @default(1)
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

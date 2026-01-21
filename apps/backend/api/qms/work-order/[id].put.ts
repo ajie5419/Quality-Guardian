@@ -64,7 +64,7 @@ export default defineEventHandler(async (event) => {
         }
         case 'pending':
         case '未开始': {
-          updateData.status = 'PENDING';
+          updateData.status = 'OPEN';
           break;
         }
         default: {

@@ -86,7 +86,7 @@ export default defineEventHandler(async (event) => {
     avatar: '/uploads/avatar-v1.svg',
     id: user.id,
     realName: user.realName,
-    roles: [user.roles?.id || user.roleId], // Map roleId to roles array
+    roles: [user.roles?.name || 'user'], // Use role name, not ID
     userId: user.id,
     username: user.username,
   };

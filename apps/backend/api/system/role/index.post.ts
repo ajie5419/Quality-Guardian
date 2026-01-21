@@ -25,8 +25,8 @@ export default defineEventHandler(async (event) => {
     const newRole = await prisma.roles.create({
       data: {
         id: `role-${Date.now()}`,
-        name: body.name,
-        description: body.remark || body.description || null,
+        name: body.value || body.name, // Use 'value' as the unique name identifier
+        description: body.remark || body.description || body.name, // Use 'name' as description/display name
         status: body.status ?? 1,
         permissions: permissionsStr,
         isSystem: false,

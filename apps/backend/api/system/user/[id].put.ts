@@ -30,9 +30,24 @@ export default defineEventHandler(async (event) => {
     };
 
     if (body.username) updateData.username = body.username;
-    if (body.roleIds && body.roleIds.length > 0) {
-      updateData.roleId = body.roleIds[0];
+
+    // Handle roles or roleIds - frontend sends 'roles' array
+    const rolesArray = body.roles || body.roleIds;
+    if (rolesArray && rolesArray.length > 0) {
+      const roleIdOrName = rolesArray[0];
+
+      // Try to find role by ID first, then by name
+      const role = await prisma.roles.findFirst({
+        where: {
+          OR: [{ id: String(roleIdOrName) }, { name: String(roleIdOrName) }],
+        },
+      });
+
+      if (role) {
+        updateData.roleId = role.id;
+      }
     }
+
     if (body.status !== undefined) {
       updateData.status = body.status === 1 ? 'ACTIVE' : 'INACTIVE';
     }
