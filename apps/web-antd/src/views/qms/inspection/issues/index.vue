@@ -7,6 +7,7 @@ import type { VxeGridProps } from '#/adapter/vxe-table';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
@@ -44,9 +45,23 @@ import { getStatusColor, getStatusLabel } from './utils/statusHelper';
 
 const router = useRouter();
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
 
 // ================= 权限与数据管理 =================
 const { invalidateInspectionIssues } = useInvalidateQmsQueries();
+
+const canExport = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Issues:Export']),
+);
+const canEdit = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Issues:Edit']),
+);
+const canDelete = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Issues:Delete']),
+);
+const canSettle = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Issues:Settle']),
+);
 
 // 使用数据加载 composable
 const {
@@ -77,7 +92,7 @@ const yearOptions = computed(() => {
 
 const gridOptions = computed<VxeGridProps>(() => ({
   toolbarConfig: {
-    export: true,
+    export: canExport.value,
     slots: { buttons: 'toolbar-actions' },
   },
   exportConfig: {
@@ -398,7 +413,7 @@ function handleSettleToKnowledge(row: InspectionIssue) {
       </template>
       <template #action="{ row }">
         <Button
-          v-access:code="'QMS:Inspection:Issues:Edit'"
+          v-if="canEdit"
           type="link"
           size="small"
           @click="handleEdit(row)"
@@ -406,7 +421,7 @@ function handleSettleToKnowledge(row: InspectionIssue) {
           {{ t('common.edit') }}
         </Button>
         <Button
-          v-access:code="'QMS:Inspection:Issues:Settle'"
+          v-if="canSettle"
           type="link"
           size="small"
           @click="handleSettleToKnowledge(row)"
@@ -414,7 +429,7 @@ function handleSettleToKnowledge(row: InspectionIssue) {
           {{ t('qms.inspection.issues.settleToKnowledge') }}
         </Button>
         <Button
-          v-access:code="'QMS:Inspection:Issues:Delete'"
+          v-if="canDelete"
           type="link"
           size="small"
           danger

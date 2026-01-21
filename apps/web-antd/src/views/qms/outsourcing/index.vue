@@ -3,8 +3,9 @@ import type { VxeGridListeners, VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsSupplierApi } from '#/api/qms/supplier';
 import type { VxeCheckboxChangeParams } from '#/types';
 
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
@@ -33,6 +34,9 @@ import SupplierStats from '../supplier/components/SupplierStats.vue';
 import { getColumns, getSearchFormSchema } from '../supplier/data';
 
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
+
+const canExport = computed(() => hasAccessByCodes(['QMS:Outsourcing:Export']));
 
 const checkedRows = ref<QmsSupplierApi.SupplierItem[]>([]);
 const editModalRef = ref();
@@ -71,7 +75,7 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
   toolbarConfig: {
     slots: { buttons: 'toolbar-actions' },
     custom: true,
-    export: true,
+    export: canExport.value,
     import: true,
     zoom: true,
     refresh: true,

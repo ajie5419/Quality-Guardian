@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsPlanningApi } from '#/api/qms/planning';
 
 import { computed, onMounted, ref } from 'vue';
@@ -25,6 +26,7 @@ const { hasAccessByCodes } = useAccess();
 const canCreate = computed(() => hasAccessByCodes(['QMS:Planning:BOM:Create']));
 const canEdit = computed(() => hasAccessByCodes(['QMS:Planning:BOM:Edit']));
 const canDelete = computed(() => hasAccessByCodes(['QMS:Planning:BOM:Delete']));
+const canExport = computed(() => hasAccessByCodes(['QMS:Planning:BOM:Export']));
 
 // ================= Data State =================
 const allProjects = ref<QmsPlanningApi.BomTreeNode[]>([]);
@@ -141,39 +143,53 @@ async function handleDeleteItem(row: QmsPlanningApi.BomTreeNode) {
   });
 }
 
-const columns: any[] = [
-  {
-    title: t('qms.planning.bom.partName'),
-    dataIndex: 'name',
-    minWidth: 150,
-    fixed: 'left',
+const gridOptions = computed<VxeGridProps>(() => ({
+  columns: [
+    {
+      title: t('qms.planning.bom.partName'),
+      dataIndex: 'name',
+      minWidth: 150,
+      fixed: 'left',
+    },
+    {
+      title: t('qms.planning.bom.partNumber'),
+      dataIndex: 'partNumber',
+      width: 150,
+    },
+    {
+      title: t('qms.planning.bom.material'),
+      dataIndex: 'material',
+      width: 150,
+    },
+    {
+      title: t('qms.planning.bom.quantity'),
+      dataIndex: 'quantity',
+      width: 80,
+      align: 'center',
+    },
+    {
+      title: t('qms.planning.bom.unit'),
+      dataIndex: 'unit',
+      width: 80,
+      align: 'center',
+    },
+    {
+      title: t('qms.planning.bom.remarks'),
+      dataIndex: 'remarks',
+      minWidth: 150,
+      ellipsis: true,
+    },
+    { title: t('common.action'), key: 'action', width: 120, fixed: 'right' },
+  ],
+  toolbarConfig: {
+    export: canExport.value,
   },
-  {
-    title: t('qms.planning.bom.partNumber'),
-    dataIndex: 'partNumber',
-    width: 150,
+  exportConfig: {
+    remote: false,
+    types: ['xlsx', 'csv'],
+    modes: ['current', 'selected', 'all'],
   },
-  { title: t('qms.planning.bom.material'), dataIndex: 'material', width: 150 },
-  {
-    title: t('qms.planning.bom.quantity'),
-    dataIndex: 'quantity',
-    width: 80,
-    align: 'center',
-  },
-  {
-    title: t('qms.planning.bom.unit'),
-    dataIndex: 'unit',
-    width: 80,
-    align: 'center',
-  },
-  {
-    title: t('qms.planning.bom.remarks'),
-    dataIndex: 'remarks',
-    minWidth: 150,
-    ellipsis: true,
-  },
-  { title: t('common.action'), key: 'action', width: 120, fixed: 'right' },
-];
+}));
 
 onMounted(() => {
   loadData();
@@ -190,7 +206,7 @@ onMounted(() => {
         v-model:selected-id="selectedProjectId"
         v-model:active-tab="activeTab"
         v-model:search-text="searchText"
-        :show-create="true"
+        auth-prefix="QMS:Planning:BOM"
         @change="handleTabChange"
         @archive="(proj: any) => handleArchive(proj)"
         @create="handleCreateProject"
@@ -243,7 +259,7 @@ onMounted(() => {
 
           <div class="flex-1 overflow-hidden p-4">
             <Table
-              :columns="columns"
+              :columns="gridOptions.columns as any"
               :data-source="currentProject.children"
               :pagination="false"
               size="middle"

@@ -38,6 +38,8 @@ const { hasAccessByCodes } = useAccess();
 const canCreate = computed(() => hasAccessByCodes(['QMS:AfterSales:Create']));
 const canEdit = computed(() => hasAccessByCodes(['QMS:AfterSales:Edit']));
 const canDelete = computed(() => hasAccessByCodes(['QMS:AfterSales:Delete']));
+const canExport = computed(() => hasAccessByCodes(['QMS:AfterSales:Export']));
+const canSettle = computed(() => hasAccessByCodes(['QMS:AfterSales:Settle']));
 
 // 状态选项
 const { getStatusInfo } = useStatusOptions();
@@ -223,7 +225,7 @@ const gridOptions: VxeGridProps = {
     },
   ],
   toolbarConfig: {
-    export: true,
+    export: canExport.value,
     slots: {
       buttons: 'toolbar-actions',
     },
@@ -440,7 +442,7 @@ function handleModalSuccess() {
               {{ t('common.edit') }}
             </Button>
             <Button
-              v-access:code="'QMS:AfterSales:Settle'"
+              v-if="canSettle"
               type="link"
               size="small"
               @click="handleSettleToKnowledge(row)"

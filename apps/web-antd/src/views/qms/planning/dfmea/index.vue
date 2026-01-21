@@ -3,8 +3,9 @@ import type { QmsPlanningApi } from '#/api/qms/planning';
 import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 import type { SystemUserApi } from '#/api/system/user';
 
-import { nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
@@ -37,6 +38,15 @@ import DfmeaItemModal from './components/DfmeaItemModal.vue';
 import DfmeaProjectModal from './components/DfmeaProjectModal.vue';
 
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
+
+const canCreate = computed(() =>
+  hasAccessByCodes(['QMS:Planning:DFMEA:Create']),
+);
+const canEdit = computed(() => hasAccessByCodes(['QMS:Planning:DFMEA:Edit']));
+const canDelete = computed(() =>
+  hasAccessByCodes(['QMS:Planning:DFMEA:Delete']),
+);
 
 // ================= Data State =================
 const allProjects = ref<QmsPlanningApi.DfmeaTreeNode[]>([]);
@@ -273,7 +283,7 @@ onMounted(async () => {
         v-model:active-tab="activeTab"
         v-model:search-text="searchText"
         show-dispatch
-        show-create
+        auth-prefix="QMS:Planning:DFMEA"
         @change="handleTabChange"
         @archive="(proj: any) => handleArchive(proj)"
         @dispatch="(proj: any) => handleDispatch(proj)"
@@ -300,6 +310,7 @@ onMounted(async () => {
                 >
                 <Divider type="vertical" />
                 <Button
+                  v-if="canEdit"
                   type="link"
                   size="small"
                   class="h-auto p-0"
@@ -308,6 +319,7 @@ onMounted(async () => {
                   {{ t('common.edit') }}
                 </Button>
                 <Button
+                  v-if="canDelete"
                   type="link"
                   danger
                   size="small"
@@ -318,7 +330,11 @@ onMounted(async () => {
                 </Button>
               </div>
             </div>
-            <Button type="primary" @click="openItemModal('create')">
+            <Button
+              v-if="canCreate"
+              type="primary"
+              @click="openItemModal('create')"
+            >
               + {{ t('common.add') }}
             </Button>
           </div>
@@ -340,12 +356,14 @@ onMounted(async () => {
                 <template v-if="column.key === 'action'">
                   <Space>
                     <Button
+                      v-if="canEdit"
                       type="link"
                       size="small"
                       @click="openItemModal('edit', record as any)"
                       >{{ t('common.edit') }}</Button
                     >
                     <Button
+                      v-if="canDelete"
                       type="link"
                       size="small"
                       danger

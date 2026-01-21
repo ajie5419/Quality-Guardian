@@ -3,8 +3,9 @@ import type { Dayjs } from 'dayjs';
 
 import type { QualityReportSummary } from '#/api/qms/reports';
 
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
@@ -27,7 +28,11 @@ import dayjs from 'dayjs';
 import { getSummaryReport } from '#/api/qms/reports';
 
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
 const loading = ref(false);
+
+const canExport = computed(() => hasAccessByCodes(['QMS:Reports:Export']));
+
 const reportType = ref<'monthly' | 'weekly'>('weekly');
 const targetDate = ref<Dayjs>(dayjs());
 const reportData = ref<null | QualityReportSummary>(null);
@@ -111,7 +116,7 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
               />
             </div>
           </Space>
-          <Button @click="handlePrint" type="primary">
+          <Button v-if="canExport" @click="handlePrint" type="primary">
             <span class="i-lucide-printer mr-1"></span>
             {{ t('qms.reports.summary.generatePdf') }}
           </Button>

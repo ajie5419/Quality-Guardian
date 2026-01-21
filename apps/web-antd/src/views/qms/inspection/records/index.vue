@@ -8,6 +8,7 @@ import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 import { computed, onMounted, reactive, ref, toRaw, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
@@ -46,6 +47,17 @@ import { useAvailableYears } from '#/hooks/useAvailableYears';
 const userStore = useUserStore();
 const route = useRoute();
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
+
+const canExport = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Records:Export']),
+);
+const canEdit = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Records:Edit']),
+);
+const canDelete = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Records:Delete']),
+);
 
 // ================= 1. 响应式状态声明 =================
 const { years: dynamicYears } = useAvailableYears();
@@ -502,7 +514,7 @@ const commonFormOptions = {
 
 const incomingGridOptions = computed<VxeGridProps>(() => ({
   toolbarConfig: {
-    export: true,
+    export: canExport.value,
     slots: { buttons: 'toolbar-actions' },
   },
   exportConfig: {
@@ -586,7 +598,7 @@ const incomingGridOptions = computed<VxeGridProps>(() => ({
 
 const processGridOptions = computed<VxeGridProps>(() => ({
   toolbarConfig: {
-    export: true,
+    export: canExport.value,
     slots: { buttons: 'toolbar-actions' },
   },
   exportConfig: {
@@ -680,7 +692,7 @@ const processGridOptions = computed<VxeGridProps>(() => ({
 
 const shipmentGridOptions = computed<VxeGridProps>(() => ({
   toolbarConfig: {
-    export: true,
+    export: canExport.value,
     slots: { buttons: 'toolbar-actions' },
   },
   exportConfig: {
@@ -961,7 +973,7 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
             </template>
             <template #action="{ row }">
               <Button
-                v-access:code="'QMS:Inspection:Records:Edit'"
+                v-if="canEdit"
                 type="link"
                 size="small"
                 @click="openModal('edit', row)"
@@ -969,7 +981,7 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
                 {{ t('common.edit') }}
               </Button>
               <Button
-                v-access:code="'QMS:Inspection:Records:Delete'"
+                v-if="canDelete"
                 type="link"
                 danger
                 size="small"
@@ -1014,7 +1026,7 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
             </template>
             <template #action="{ row }">
               <Button
-                v-access:code="'QMS:Inspection:Records:Edit'"
+                v-if="canEdit"
                 type="link"
                 size="small"
                 @click="openModal('edit', row)"
@@ -1022,7 +1034,7 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
                 {{ t('common.edit') }}
               </Button>
               <Button
-                v-access:code="'QMS:Inspection:Records:Delete'"
+                v-if="canDelete"
                 type="link"
                 danger
                 size="small"
@@ -1048,7 +1060,7 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
             </template>
             <template #action="{ row }">
               <Button
-                v-access:code="'QMS:Inspection:Records:Edit'"
+                v-if="canEdit"
                 type="link"
                 size="small"
                 @click="openModal('edit', row)"
@@ -1056,7 +1068,7 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
                 {{ t('common.edit') }}
               </Button>
               <Button
-                v-access:code="'QMS:Inspection:Records:Delete'"
+                v-if="canDelete"
                 type="link"
                 danger
                 size="small"

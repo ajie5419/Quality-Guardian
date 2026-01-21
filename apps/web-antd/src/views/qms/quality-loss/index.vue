@@ -4,8 +4,9 @@ import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
 import type { SystemDeptApi } from '#/api/system/dept';
 import type { TreeSelectNode } from '#/types';
 
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
@@ -27,7 +28,10 @@ import { SOURCE_STYLE_MAP, STATUS_OPTIONS } from './constants';
 import { LossSource } from './types';
 
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
 const { invalidateQualityLoss } = useInvalidateQmsQueries();
+
+const canExport = computed(() => hasAccessByCodes(['QMS:LossAnalysis:Export']));
 
 // ================= 状态管理 =================
 const allLossData = ref<QmsQualityLossApi.QualityLossItem[]>([]);
@@ -38,10 +42,10 @@ const deptTreeData = ref<TreeSelectNode[]>([]);
 const { stats } = useLossStatistics(allLossData);
 
 // ================= 表格配置 =================
-const gridOptions: VxeGridProps = {
+const gridOptions = computed<VxeGridProps>(() => ({
   toolbarConfig: {
     slots: { buttons: 'toolbar-actions' },
-    export: true,
+    export: canExport.value,
   },
   exportConfig: {
     remote: false,
@@ -121,9 +125,9 @@ const gridOptions: VxeGridProps = {
       },
     },
   },
-};
+}));
 
-const [Grid, gridApi] = useVbenVxeGrid({ gridOptions });
+const [Grid, gridApi] = useVbenVxeGrid({ gridOptions: gridOptions as any });
 
 // ================= 弹窗表单逻辑 =================
 const modalVisible = ref(false);

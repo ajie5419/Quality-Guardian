@@ -6,6 +6,7 @@ import type { SystemUserApi } from '#/api/system/user';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
@@ -39,7 +40,12 @@ import ItpItemModal from './components/ItpItemModal.vue';
 import ItpProjectModal from './components/ItpProjectModal.vue';
 
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
 const router = useRouter();
+
+const canCreate = computed(() => hasAccessByCodes(['QMS:Planning:ITP:Create']));
+const canEdit = computed(() => hasAccessByCodes(['QMS:Planning:ITP:Edit']));
+const canDelete = computed(() => hasAccessByCodes(['QMS:Planning:ITP:Delete']));
 
 // ================= Data State =================
 const allProjects = ref<QmsPlanningApi.ItpTreeNode[]>([]);
@@ -298,7 +304,7 @@ onMounted(async () => {
         v-model:active-tab="activeTab"
         v-model:search-text="searchText"
         show-dispatch
-        :show-create="true"
+        auth-prefix="QMS:Planning:ITP"
         @change="handleTabChange"
         @archive="(proj: any) => handleArchive(proj)"
         @dispatch="(proj: any) => handleDispatch(proj)"
@@ -325,6 +331,7 @@ onMounted(async () => {
                 >
                 <Divider type="vertical" />
                 <Button
+                  v-if="canEdit"
                   type="link"
                   size="small"
                   class="h-auto p-0"
@@ -333,6 +340,7 @@ onMounted(async () => {
                   {{ t('common.edit') }}
                 </Button>
                 <Button
+                  v-if="canDelete"
                   type="link"
                   danger
                   size="small"
@@ -344,10 +352,18 @@ onMounted(async () => {
               </div>
             </div>
             <Space>
-              <Button type="dashed" @click="handleGoToGenerator">
+              <Button
+                v-if="canCreate"
+                type="dashed"
+                @click="handleGoToGenerator"
+              >
                 <span class="i-lucide-sparkles mr-1"></span> AI 生成
               </Button>
-              <Button type="primary" @click="openItemModal('create')">
+              <Button
+                v-if="canCreate"
+                type="primary"
+                @click="openItemModal('create')"
+              >
                 + {{ t('qms.planning.itp.addStep') }}
               </Button>
             </Space>
@@ -375,12 +391,14 @@ onMounted(async () => {
                 <template v-if="column.key === 'action'">
                   <Space>
                     <Button
+                      v-if="canEdit"
                       type="link"
                       size="small"
                       @click="openItemModal('edit', record as any)"
                       >{{ t('common.edit') }}</Button
                     >
                     <Button
+                      v-if="canDelete"
                       type="link"
                       size="small"
                       danger

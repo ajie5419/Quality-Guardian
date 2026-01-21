@@ -120,6 +120,7 @@ const allPermissions = [
           { title: '新增', key: 'QMS:WorkOrder:Create' },
           { title: '编辑', key: 'QMS:WorkOrder:Edit' },
           { title: '删除', key: 'QMS:WorkOrder:Delete' },
+          { title: '导出', key: 'QMS:WorkOrder:Export' },
         ],
       },
       {
@@ -134,6 +135,9 @@ const allPermissions = [
               { title: '新增', key: 'QMS:Planning:DFMEA:Create' },
               { title: '编辑', key: 'QMS:Planning:DFMEA:Edit' },
               { title: '删除', key: 'QMS:Planning:DFMEA:Delete' },
+              { title: '归档', key: 'QMS:Planning:DFMEA:Archive' },
+              { title: '指派', key: 'QMS:Planning:DFMEA:Dispatch' },
+              { title: '导出', key: 'QMS:Planning:DFMEA:Export' },
             ],
           },
           {
@@ -142,6 +146,7 @@ const allPermissions = [
             children: [
               { title: '查看', key: 'QMS:Planning:ProjectDocs:View' },
               { title: '归档', key: 'QMS:Planning:ProjectDocs:Archive' },
+              { title: '导出', key: 'QMS:Planning:ProjectDocs:Export' },
             ],
           },
           {
@@ -152,6 +157,8 @@ const allPermissions = [
               { title: '新增', key: 'QMS:Planning:BOM:Create' },
               { title: '编辑', key: 'QMS:Planning:BOM:Edit' },
               { title: '删除', key: 'QMS:Planning:BOM:Delete' },
+              { title: '归档', key: 'QMS:Planning:BOM:Archive' },
+              { title: '导出', key: 'QMS:Planning:BOM:Export' },
             ],
           },
           {
@@ -162,6 +169,9 @@ const allPermissions = [
               { title: '新增', key: 'QMS:Planning:ITP:Create' },
               { title: '编辑', key: 'QMS:Planning:ITP:Edit' },
               { title: '删除', key: 'QMS:Planning:ITP:Delete' },
+              { title: '归档', key: 'QMS:Planning:ITP:Archive' },
+              { title: '指派', key: 'QMS:Planning:ITP:Dispatch' },
+              { title: '导出', key: 'QMS:Planning:ITP:Export' },
             ],
           },
         ],
@@ -178,6 +188,7 @@ const allPermissions = [
               { title: '新增', key: 'QMS:Inspection:Issues:Create' },
               { title: '编辑', key: 'QMS:Inspection:Issues:Edit' },
               { title: '删除', key: 'QMS:Inspection:Issues:Delete' },
+              { title: '导出', key: 'QMS:Inspection:Issues:Export' },
               { title: '沉淀案例', key: 'QMS:Inspection:Issues:Settle' },
             ],
           },
@@ -189,6 +200,7 @@ const allPermissions = [
               { title: '新增', key: 'QMS:Inspection:Records:Create' },
               { title: '编辑', key: 'QMS:Inspection:Records:Edit' },
               { title: '删除', key: 'QMS:Inspection:Records:Delete' },
+              { title: '导出', key: 'QMS:Inspection:Records:Export' },
             ],
           },
         ],
@@ -201,6 +213,7 @@ const allPermissions = [
           { title: '新增', key: 'QMS:AfterSales:Create' },
           { title: '编辑', key: 'QMS:AfterSales:Edit' },
           { title: '删除', key: 'QMS:AfterSales:Delete' },
+          { title: '导出', key: 'QMS:AfterSales:Export' },
           { title: '沉淀案例', key: 'QMS:AfterSales:Settle' },
         ],
       },
@@ -212,6 +225,7 @@ const allPermissions = [
           { title: '新增', key: 'QMS:Supplier:Create' },
           { title: '编辑', key: 'QMS:Supplier:Edit' },
           { title: '删除', key: 'QMS:Supplier:Delete' },
+          { title: '导出', key: 'QMS:Supplier:Export' },
         ],
       },
       {
@@ -222,6 +236,7 @@ const allPermissions = [
           { title: '新增', key: 'QMS:Outsourcing:Create' },
           { title: '编辑', key: 'QMS:Outsourcing:Edit' },
           { title: '删除', key: 'QMS:Outsourcing:Delete' },
+          { title: '导出', key: 'QMS:Outsourcing:Export' },
         ],
       },
       {
@@ -241,6 +256,7 @@ const allPermissions = [
           { title: '新增', key: 'QMS:LossAnalysis:Create' },
           { title: '编辑', key: 'QMS:LossAnalysis:Edit' },
           { title: '删除', key: 'QMS:LossAnalysis:Delete' },
+          { title: '导出', key: 'QMS:LossAnalysis:Export' },
         ],
       },
       {
@@ -251,6 +267,7 @@ const allPermissions = [
           { title: '新增', key: 'QMS:Knowledge:Create' },
           { title: '编辑', key: 'QMS:Knowledge:Edit' },
           { title: '删除', key: 'QMS:Knowledge:Delete' },
+          { title: '导出', key: 'QMS:Knowledge:Export' },
         ],
       },
     ],

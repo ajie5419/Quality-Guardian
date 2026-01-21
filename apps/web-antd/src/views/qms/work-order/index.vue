@@ -7,6 +7,7 @@ import type { TreeSelectNode } from '#/types';
 
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
@@ -39,7 +40,13 @@ import { getGridColumns } from './data';
 
 // 1. 基础状态
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
 const { invalidateWorkOrders } = useInvalidateQmsQueries();
+
+const canCreate = computed(() => hasAccessByCodes(['QMS:WorkOrder:Create']));
+const canEdit = computed(() => hasAccessByCodes(['QMS:WorkOrder:Edit']));
+const canDelete = computed(() => hasAccessByCodes(['QMS:WorkOrder:Delete']));
+const canExport = computed(() => hasAccessByCodes(['QMS:WorkOrder:Export']));
 
 const getStatusInfo = (s: string) => {
   const status = s || WorkOrderStatusEnum.PENDING;
@@ -192,7 +199,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
     return col;
   }),
   toolbarConfig: {
-    export: true,
+    export: canExport.value,
     refresh: true,
     slots: {
       buttons: 'toolbar-actions',
@@ -478,7 +485,7 @@ function handleDelete(row: QmsWorkOrderApi.WorkOrderItem) {
         <Grid>
           <!-- 核心修复：Toolbar 内部也保留按钮作为备份 -->
           <template #toolbar-actions>
-            <Button type="primary" @click="handleAdd">
+            <Button v-if="canCreate" type="primary" @click="handleAdd">
               <span class="i-lucide-plus mr-1"></span>
               {{ t('qms.workOrder.createWorkOrder') }}
             </Button>
@@ -518,10 +525,21 @@ function handleDelete(row: QmsWorkOrderApi.WorkOrderItem) {
           </template>
 
           <template #action="{ row }">
-            <Button type="link" size="small" @click="handleEdit(row)">
+            <Button
+              v-if="canEdit"
+              type="link"
+              size="small"
+              @click="handleEdit(row)"
+            >
               {{ t('common.edit') }}
             </Button>
-            <Button type="link" size="small" danger @click="handleDelete(row)">
+            <Button
+              v-if="canDelete"
+              type="link"
+              size="small"
+              danger
+              @click="handleDelete(row)"
+            >
               {{ t('common.delete') }}
             </Button>
           </template>

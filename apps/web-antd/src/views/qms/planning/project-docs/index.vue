@@ -5,6 +5,7 @@ import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 
 import { computed, onMounted, ref, watch } from 'vue';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
@@ -17,6 +18,11 @@ import { getWorkOrderList, updateWorkOrder } from '#/api/qms/work-order';
 import PlanningSidebar from '../components/PlanningSidebar.vue';
 
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
+
+const canExport = computed(() =>
+  hasAccessByCodes(['QMS:Planning:ProjectDocs:Export']),
+);
 
 // ================= Left Column: Project List =================
 const projectList = ref<QmsWorkOrderApi.WorkOrderItem[]>([]);
@@ -135,7 +141,7 @@ const gridOptions = computed(() => ({
     },
   ],
   minHeight: 500,
-  toolbarConfig: { export: true },
+  toolbarConfig: { export: canExport.value },
   proxyConfig: {
     autoLoad: false,
     ajax: {
@@ -234,6 +240,7 @@ onMounted(() => loadProjects());
         v-model:selected-id="selectedProjectId"
         v-model:active-tab="activeTab"
         v-model:search-text="searchTerm"
+        auth-prefix="QMS:Planning:ProjectDocs"
         @archive="handleArchiveProject"
       />
 

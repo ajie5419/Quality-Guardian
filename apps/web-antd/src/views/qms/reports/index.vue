@@ -1,8 +1,9 @@
 <script lang="ts" setup>
 import type { DailySummaryData } from '#/api/qms/reports';
 
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
@@ -15,7 +16,11 @@ import { getDeptList } from '#/api/system/dept';
 import { findNameById } from '#/types';
 
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
 const userStore = useUserStore();
+
+const canExport = computed(() => hasAccessByCodes(['QMS:Reports:Export']));
+
 const currentDate = ref<string>(new Date().toISOString().split('T')[0] ?? '');
 const loading = ref(false);
 const summary = ref('');
@@ -259,7 +264,7 @@ onMounted(() => {
     </div>
 
     <!-- Footer Actions (Outside of screenshot area to avoid capturing buttons) -->
-    <div class="space-x-4 pt-4 text-center">
+    <div v-if="canExport" class="space-x-4 pt-4 text-center">
       <Button class="mr-4" @click="handleExportImage" :loading="loading">
         导出图片
       </Button>

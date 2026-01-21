@@ -1,11 +1,16 @@
 <script lang="ts" setup generic="T extends PlanningTreeNode">
 import type { PlanningTreeNode } from '../types';
 
+import { computed } from 'vue';
+
+import { useAccess } from '@vben/access';
 import { useI18n } from '@vben/locales';
 
 import { Button, Empty, Input, Tabs, Tag } from 'ant-design-vue';
 
-defineProps<{
+const props = defineProps<{
+  /** 权限前缀，用于自动生成权限码，如 'QMS:Planning:BOM' */
+  authPrefix?: string;
   loading?: boolean;
   projects: T[];
   selectedId: null | string;
@@ -27,6 +32,23 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
+
+const canCreate = computed(() => {
+  if (!props.authPrefix) return props.showCreate;
+  return hasAccessByCodes([`${props.authPrefix}:Create`]);
+});
+
+const canDispatch = computed(() => {
+  if (!props.showDispatch) return false;
+  if (!props.authPrefix) return true;
+  return hasAccessByCodes([`${props.authPrefix}:Dispatch`]);
+});
+
+const canArchive = computed(() => {
+  if (!props.authPrefix) return true;
+  return hasAccessByCodes([`${props.authPrefix}:Archive`]);
+});
 
 const activeTab = defineModel<string>('activeTab', { default: 'active' });
 const searchText = defineModel<string>('searchText', { default: '' });
@@ -56,7 +78,7 @@ function handleSelect(id: string) {
         title
       }}</span>
       <Button
-        v-if="showCreate"
+        v-if="canCreate"
         type="primary"
         size="small"
         @click="emit('create')"
@@ -149,7 +171,7 @@ function handleSelect(id: string) {
           ]"
         >
           <Button
-            v-if="showDispatch && !isArchived(proj.status)"
+            v-if="canDispatch && !isArchived(proj.status)"
             type="link"
             size="small"
             class="h-auto p-0 text-[11px] font-bold text-blue-600 hover:underline"
@@ -158,6 +180,7 @@ function handleSelect(id: string) {
             {{ t('common.dispatch') }}
           </Button>
           <Button
+            v-if="canArchive"
             type="link"
             size="small"
             class="h-auto p-0 text-[11px] font-bold"

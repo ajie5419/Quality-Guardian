@@ -4,6 +4,7 @@ import type { UploadFileWithResponse } from '#/types';
 
 import { computed, nextTick, onMounted, ref } from 'vue';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
@@ -21,7 +22,9 @@ import {
   Space,
   Spin,
   Tag,
+  Tooltip,
   Tree,
+  TreeSelect,
   Upload,
 } from 'ant-design-vue';
 
@@ -38,7 +41,12 @@ import {
 } from '#/api/qms/knowledge';
 
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
 const userStore = useUserStore();
+
+const canCreate = computed(() => hasAccessByCodes(['QMS:Knowledge:Create']));
+const canEdit = computed(() => hasAccessByCodes(['QMS:Knowledge:Edit']));
+const canDelete = computed(() => hasAccessByCodes(['QMS:Knowledge:Delete']));
 
 // ================= 状态管理 =================
 const categoryTree = ref<QmsKnowledgeApi.Category[]>([]);
@@ -451,7 +459,7 @@ onMounted(async () => {
         >
           <span class="font-bold text-gray-700">知识分类</span>
           <Space :size="8">
-            <Tooltip title="新增分类">
+            <Tooltip v-if="canCreate" title="新增分类">
               <Button
                 type="primary"
                 size="small"
@@ -497,16 +505,17 @@ onMounted(async () => {
 
                 <!-- 操作区：默认半透明，悬浮高亮 -->
                 <div
+                  v-if="canEdit || canCreate || canDelete"
                   class="flex items-center gap-1 opacity-20 transition-opacity group-hover/node:opacity-100"
                 >
-                  <Tooltip title="增加子类">
+                  <Tooltip v-if="canCreate" title="增加子类">
                     <span
                       class="cursor-pointer rounded px-1 text-sm font-bold text-blue-500 hover:bg-blue-100"
                       @click.stop="openCategoryModal(node.id)"
                       >+</span
                     >
                   </Tooltip>
-                  <Tooltip title="重命名">
+                  <Tooltip v-if="canEdit" title="重命名">
                     <span
                       class="cursor-pointer rounded border border-orange-200 px-1 text-[10px] text-orange-500 hover:bg-orange-100"
                       @click.stop="openCategoryModal(undefined, node)"
@@ -514,7 +523,7 @@ onMounted(async () => {
                       编辑
                     </span>
                   </Tooltip>
-                  <Tooltip title="删除分类">
+                  <Tooltip v-if="canDelete" title="删除分类">
                     <span
                       class="cursor-pointer rounded border border-red-200 px-1 text-[10px] text-red-500 hover:bg-red-100"
                       @click.stop="handleDeleteCategory(node)"
@@ -553,7 +562,12 @@ onMounted(async () => {
                 >{{ selectedCategoryName }}</span
               >
             </div>
-            <Button type="primary" size="small" @click="openModal()">
+            <Button
+              v-if="canCreate"
+              type="primary"
+              size="small"
+              @click="openModal()"
+            >
               + 发布
             </Button>
           </div>
@@ -623,8 +637,14 @@ onMounted(async () => {
                 {{ articleDetail.title }}
               </h1>
               <Space>
-                <Button @click="openModal(articleDetail!)">编辑</Button>
-                <Button danger @click="handleDelete(articleDetail!.id)">
+                <Button v-if="canEdit" @click="openModal(articleDetail!)"
+                  >编辑</Button
+                >
+                <Button
+                  v-if="canDelete"
+                  danger
+                  @click="handleDelete(articleDetail!.id)"
+                >
                   删除
                 </Button>
               </Space>

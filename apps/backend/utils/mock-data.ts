@@ -83,25 +83,35 @@ export const MOCK_CODES = [
       'QMS:WorkOrder:Edit',
       'QMS:WorkOrder:Delete',
       'QMS:WorkOrder:View',
+      'QMS:WorkOrder:Export',
 
       // QMS Planning
       'QMS:Planning:DFMEA:View',
       'QMS:Planning:DFMEA:Create',
       'QMS:Planning:DFMEA:Edit',
       'QMS:Planning:DFMEA:Delete',
+      'QMS:Planning:DFMEA:Archive',
+      'QMS:Planning:DFMEA:Dispatch',
+      'QMS:Planning:DFMEA:Export',
 
       'QMS:Planning:ProjectDocs:View',
       'QMS:Planning:ProjectDocs:Archive',
+      'QMS:Planning:ProjectDocs:Export',
 
       'QMS:Planning:BOM:View',
       'QMS:Planning:BOM:Create',
       'QMS:Planning:BOM:Edit',
       'QMS:Planning:BOM:Delete',
+      'QMS:Planning:BOM:Archive',
+      'QMS:Planning:BOM:Export',
 
       'QMS:Planning:ITP:View',
       'QMS:Planning:ITP:Create',
       'QMS:Planning:ITP:Edit',
       'QMS:Planning:ITP:Delete',
+      'QMS:Planning:ITP:Archive',
+      'QMS:Planning:ITP:Dispatch',
+      'QMS:Planning:ITP:Export',
 
       // QMS Inspection
       'QMS:Inspection:Issues:View',
@@ -109,11 +119,13 @@ export const MOCK_CODES = [
       'QMS:Inspection:Issues:Edit',
       'QMS:Inspection:Issues:Delete',
       'QMS:Inspection:Issues:Settle',
+      'QMS:Inspection:Issues:Export',
 
       'QMS:Inspection:Records:View',
       'QMS:Inspection:Records:Create',
       'QMS:Inspection:Records:Edit',
       'QMS:Inspection:Records:Delete',
+      'QMS:Inspection:Records:Export',
 
       // Others
       'QMS:AfterSales:Create',
@@ -121,16 +133,19 @@ export const MOCK_CODES = [
       'QMS:AfterSales:Delete',
       'QMS:AfterSales:View',
       'QMS:AfterSales:Settle',
+      'QMS:AfterSales:Export',
 
       'QMS:Supplier:Create',
       'QMS:Supplier:Edit',
       'QMS:Supplier:Delete',
       'QMS:Supplier:View',
+      'QMS:Supplier:Export',
 
       'QMS:Outsourcing:View',
       'QMS:Outsourcing:Create',
       'QMS:Outsourcing:Edit',
       'QMS:Outsourcing:Delete',
+      'QMS:Outsourcing:Export',
 
       'QMS:Reports:Daily:View',
       'QMS:Reports:Summary:View',
@@ -140,11 +155,13 @@ export const MOCK_CODES = [
       'QMS:LossAnalysis:Create',
       'QMS:LossAnalysis:Edit',
       'QMS:LossAnalysis:Delete',
+      'QMS:LossAnalysis:Export',
 
       'QMS:Knowledge:Create',
       'QMS:Knowledge:Edit',
       'QMS:Knowledge:Delete',
       'QMS:Knowledge:View',
+      'QMS:Knowledge:Export',
 
       // 旧版兼容 (Legacy compatibility)
       'QMS:Inspection:Create',
@@ -152,10 +169,6 @@ export const MOCK_CODES = [
       'QMS:Inspection:Delete',
       'QMS:Inspection:View',
       'QMS:Reports:View',
-      'AC_100100',
-      'AC_100110',
-      'AC_100120',
-      'AC_100010',
     ],
     username: 'vben',
   },
@@ -182,56 +195,87 @@ export const MOCK_CODES = [
       // QMS 模块权限 (Same as super for admin in this context)
       'QMS:Workspace:View',
       'QMS:Dashboard:View',
+
       'QMS:WorkOrder:Create',
       'QMS:WorkOrder:Edit',
       'QMS:WorkOrder:Delete',
       'QMS:WorkOrder:View',
+      'QMS:WorkOrder:Export',
+
       'QMS:Planning:DFMEA:View',
       'QMS:Planning:DFMEA:Create',
       'QMS:Planning:DFMEA:Edit',
       'QMS:Planning:DFMEA:Delete',
+      'QMS:Planning:DFMEA:Archive',
+      'QMS:Planning:DFMEA:Dispatch',
+      'QMS:Planning:DFMEA:Export',
+
       'QMS:Planning:ProjectDocs:View',
       'QMS:Planning:ProjectDocs:Archive',
+      'QMS:Planning:ProjectDocs:Export',
+
       'QMS:Planning:BOM:View',
       'QMS:Planning:BOM:Create',
       'QMS:Planning:BOM:Edit',
       'QMS:Planning:BOM:Delete',
+      'QMS:Planning:BOM:Archive',
+      'QMS:Planning:BOM:Export',
+
       'QMS:Planning:ITP:View',
       'QMS:Planning:ITP:Create',
       'QMS:Planning:ITP:Edit',
       'QMS:Planning:ITP:Delete',
+      'QMS:Planning:ITP:Archive',
+      'QMS:Planning:ITP:Dispatch',
+      'QMS:Planning:ITP:Export',
+
       'QMS:Inspection:Issues:View',
       'QMS:Inspection:Issues:Create',
       'QMS:Inspection:Issues:Edit',
       'QMS:Inspection:Issues:Delete',
       'QMS:Inspection:Issues:Settle',
+      'QMS:Inspection:Issues:Export',
+
       'QMS:Inspection:Records:View',
       'QMS:Inspection:Records:Create',
       'QMS:Inspection:Records:Edit',
       'QMS:Inspection:Records:Delete',
+      'QMS:Inspection:Records:Export',
+
       'QMS:AfterSales:Create',
       'QMS:AfterSales:Edit',
       'QMS:AfterSales:Delete',
       'QMS:AfterSales:View',
       'QMS:AfterSales:Settle',
+      'QMS:AfterSales:Export',
+
       'QMS:Supplier:Create',
       'QMS:Supplier:Edit',
       'QMS:Supplier:Delete',
       'QMS:Supplier:View',
+      'QMS:Supplier:Export',
+
       'QMS:Outsourcing:View',
       'QMS:Outsourcing:Create',
       'QMS:Outsourcing:Edit',
       'QMS:Outsourcing:Delete',
+      'QMS:Outsourcing:Export',
+
       'QMS:Reports:Daily:View',
       'QMS:Reports:Summary:View',
       'QMS:Reports:Export',
+
       'QMS:LossAnalysis:View',
       'QMS:LossAnalysis:Create',
       'QMS:LossAnalysis:Edit',
       'QMS:LossAnalysis:Delete',
+      'QMS:LossAnalysis:Export',
+
       'QMS:Knowledge:Create',
       'QMS:Knowledge:Edit',
-      'QMS:Knowledge:View', // Admin can't delete knowledge? Let's assume standard
+      'QMS:Knowledge:Delete',
+      'QMS:Knowledge:View',
+      'QMS:Knowledge:Export',
 
       // 旧版兼容
       'QMS:Inspection:Create',
@@ -239,25 +283,20 @@ export const MOCK_CODES = [
       'QMS:Inspection:Delete',
       'QMS:Inspection:View',
       'QMS:Reports:View',
-      'AC_100010',
-      'AC_100020',
-      'AC_100030',
     ],
     username: 'admin',
   },
-  // user - 普通用户: 只能查看和基本操作，不能看质量损失
+  // user - 普通用户: 只能查看，不能做关键业务变更
   {
     codes: [
       // 系统管理权限 - 只有查看
       'System:Dept:List',
       'System:Role:List',
 
-      // QMS 模块权限 - 主要是 View 和 Create/Edit, 无 Delete
+      // QMS 模块权限 - 主要是 View
       'QMS:Workspace:View',
       'QMS:Dashboard:View',
       'QMS:WorkOrder:View',
-      'QMS:WorkOrder:Create',
-      'QMS:WorkOrder:Edit',
 
       'QMS:Planning:DFMEA:View',
       'QMS:Planning:ProjectDocs:View',
@@ -265,11 +304,7 @@ export const MOCK_CODES = [
       'QMS:Planning:ITP:View',
 
       'QMS:Inspection:Issues:View',
-      'QMS:Inspection:Issues:Create',
-      'QMS:Inspection:Issues:Edit',
       'QMS:Inspection:Records:View',
-      'QMS:Inspection:Records:Create',
-      'QMS:Inspection:Records:Edit',
 
       'QMS:AfterSales:View',
       'QMS:Supplier:View',
@@ -280,12 +315,8 @@ export const MOCK_CODES = [
       'QMS:Knowledge:View',
 
       // 旧版兼容
-      'QMS:Inspection:Create',
-      'QMS:Inspection:Edit',
       'QMS:Inspection:View',
       'QMS:Reports:View',
-      'AC_1000001',
-      'AC_1000002',
     ],
     username: 'jack',
   },
