@@ -1,28 +1,40 @@
 <script lang="ts" setup>
-import { computed, onMounted, ref, nextTick } from 'vue';
-import { Page } from '@vben/common-ui';
-import { useI18n } from '@vben/locales';
-import { Empty, Table, Tag, message, Modal, Divider, Button, Space } from 'ant-design-vue';
-
-import { 
-  getDfmeaTree, 
-  updateDfmeaProject, 
-  deleteDfmeaProject, 
-  deleteDfmea
-} from '#/api/qms/planning';
-import { getWorkOrderList } from '#/api/qms/work-order';
 import type { QmsPlanningApi } from '#/api/qms/planning';
 import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 import type { SystemUserApi } from '#/api/system/user';
+
+import { nextTick, onMounted, ref } from 'vue';
+
+import { Page } from '@vben/common-ui';
+import { useI18n } from '@vben/locales';
+
+import {
+  Button,
+  Divider,
+  Empty,
+  message,
+  Modal,
+  Space,
+  Table,
+  Tag,
+} from 'ant-design-vue';
+
 import { ProjectStatusEnum } from '#/api/qms/enums';
+import {
+  deleteDfmea,
+  deleteDfmeaProject,
+  getDfmeaTree,
+  updateDfmeaProject,
+} from '#/api/qms/planning';
+import { getWorkOrderList } from '#/api/qms/work-order';
 import { getUserList } from '#/api/system/user';
 
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
-import DfmeaAssignModal from './components/DfmeaAssignModal.vue';
-import DfmeaProjectModal from './components/DfmeaProjectModal.vue';
-import DfmeaItemModal from './components/DfmeaItemModal.vue';
 import { useProjectManager } from '../composables/useProjectManager';
+import DfmeaAssignModal from './components/DfmeaAssignModal.vue';
+import DfmeaItemModal from './components/DfmeaItemModal.vue';
+import DfmeaProjectModal from './components/DfmeaProjectModal.vue';
 
 const { t } = useI18n();
 
@@ -38,7 +50,7 @@ const {
   filteredProjects,
   currentProject,
   handleTabChange,
-} = useProjectManager(allProjects);
+} = useProjectManager(allProjects as any);
 
 const userList = ref<SystemUserApi.User[]>([]);
 
@@ -48,7 +60,7 @@ async function loadData(idToSelect?: string) {
   try {
     const data = await getDfmeaTree();
     allProjects.value = data;
-    
+
     if (idToSelect) {
       selectedProjectId.value = idToSelect;
       if (activeTab.value !== ProjectStatusEnum.ACTIVE) {
@@ -57,8 +69,8 @@ async function loadData(idToSelect?: string) {
     } else if (data.length > 0 && !selectedProjectId.value) {
       selectedProjectId.value = data[0]?.id ?? null;
     }
-  } catch (err) {
-    console.error('DFMEA Load Error:', err);
+  } catch (error) {
+    console.error('DFMEA Load Error:', error);
   } finally {
     loading.value = false;
   }
@@ -84,13 +96,18 @@ async function handleArchive(proj: QmsPlanningApi.DfmeaTreeNode) {
       : `${t('common.confirmArchiveContent')} "${proj.name}" ?`,
     onOk: async () => {
       try {
-        await updateDfmeaProject(proj.id, { ...proj, status: newStatus as any });
-        message.success(isArchived ? t('common.restoreSuccess') : t('common.archiveSuccess'));
+        await updateDfmeaProject(proj.id, {
+          ...proj,
+          status: newStatus as any,
+        });
+        message.success(
+          isArchived ? t('common.restoreSuccess') : t('common.archiveSuccess'),
+        );
         if (selectedProjectId.value === proj.id) {
-            selectedProjectId.value = null;
+          selectedProjectId.value = null;
         }
         await loadData();
-      } catch (err) {
+      } catch {
         message.error(t('common.actionFailed'));
       }
     },
@@ -108,7 +125,7 @@ async function handleDeleteProject(proj: QmsPlanningApi.DfmeaTreeNode) {
         message.success(t('common.deleteSuccess'));
         if (selectedProjectId.value === proj.id) selectedProjectId.value = null;
         await loadData();
-      } catch (err) {
+      } catch {
         message.error(t('common.actionFailed'));
       }
     },
@@ -125,7 +142,7 @@ async function handleDeleteItem(record: QmsPlanningApi.DfmeaTreeNode) {
         await deleteDfmea(record.id);
         message.success(t('common.deleteSuccess'));
         await loadData();
-      } catch (err) {
+      } catch {
         message.error(t('common.actionFailed'));
       }
     },
@@ -151,21 +168,33 @@ const projectModalVisible = ref(false);
 const projectEditMode = ref(false);
 const projectInitialData = ref({});
 
-function openProjectModal(mode: 'create' | 'edit', proj?: QmsPlanningApi.DfmeaTreeNode) {
+function openProjectModal(
+  mode: 'create' | 'edit',
+  proj?: QmsPlanningApi.DfmeaTreeNode,
+) {
   projectEditMode.value = mode === 'edit';
-  projectInitialData.value = mode === 'edit' && proj 
-    ? { projectName: proj.name, workOrderId: (proj as any).workOrderNumber, version: proj.version, status: proj.status }
-    : { version: 'V1.0', status: 'active' };
+  projectInitialData.value =
+    mode === 'edit' && proj
+      ? {
+          projectName: proj.name,
+          workOrderId: (proj as any).workOrderNumber,
+          version: proj.version,
+          status: proj.status,
+        }
+      : { version: 'V1.0', status: 'active' };
   projectModalVisible.value = true;
   if (workOrderList.value.length === 0) loadWorkOrders();
 }
 
 const itemModalVisible = ref(false);
 const itemEditMode = ref(false);
-const currentItemId = ref<string | null>(null);
+const currentItemId = ref<null | string>(null);
 const itemInitialData = ref({});
 
-function openItemModal(mode: 'create' | 'edit', item?: QmsPlanningApi.DfmeaTreeNode) {
+function openItemModal(
+  mode: 'create' | 'edit',
+  item?: QmsPlanningApi.DfmeaTreeNode,
+) {
   itemEditMode.value = mode === 'edit';
   currentItemId.value = item?.id || null;
   itemInitialData.value = mode === 'edit' && item ? { ...item } : {};
@@ -182,15 +211,50 @@ function handleDispatch(proj: QmsPlanningApi.DfmeaTreeNode) {
   if (userList.value.length === 0) loadUsers();
 }
 
-const columns = [
-  { title: t('qms.planning.dfmea.item'), dataIndex: 'name', key: 'name', width: 150, fixed: 'left' },
-  { title: t('qms.planning.dfmea.failureMode'), dataIndex: 'failureMode', width: 150 },
+const columns: any[] = [
+  {
+    title: t('qms.planning.dfmea.item'),
+    dataIndex: 'name',
+    key: 'name',
+    width: 150,
+    fixed: 'left',
+  },
+  {
+    title: t('qms.planning.dfmea.failureMode'),
+    dataIndex: 'failureMode',
+    width: 150,
+  },
   { title: t('qms.planning.dfmea.effects'), dataIndex: 'effects', width: 200 },
-  { title: t('qms.planning.dfmea.severity'), dataIndex: 'severity', width: 50, align: 'center' },
-  { title: t('qms.planning.dfmea.occurrence'), dataIndex: 'occurrence', width: 50, align: 'center' },
-  { title: t('qms.planning.dfmea.detection'), dataIndex: 'detection', width: 50, align: 'center' },
-  { title: t('qms.planning.dfmea.rpn'), key: 'rpn', width: 80, align: 'center' },
-  { title: t('common.action'), key: 'action', width: 120, fixed: 'right' },
+  {
+    title: t('qms.planning.dfmea.severity'),
+    dataIndex: 'severity',
+    width: 50,
+    align: 'center',
+  },
+  {
+    title: t('qms.planning.dfmea.occurrence'),
+    dataIndex: 'occurrence',
+    width: 50,
+    align: 'center',
+  },
+  {
+    title: t('qms.planning.dfmea.detection'),
+    dataIndex: 'detection',
+    width: 50,
+    align: 'center',
+  },
+  {
+    title: t('qms.planning.dfmea.rpn'),
+    key: 'rpn',
+    width: 80,
+    align: 'center',
+  },
+  {
+    title: t('common.action'),
+    key: 'action',
+    width: 120,
+    fixed: 'right' as any,
+  },
 ];
 
 onMounted(async () => {
@@ -205,30 +269,52 @@ onMounted(async () => {
       <PlanningSidebar
         :title="t('qms.planning.dfmea.projectList')"
         :projects="filteredProjects"
-        v-model:selectedId="selectedProjectId"
-        v-model:activeTab="activeTab"
-        v-model:searchText="searchText"
+        v-model:selected-id="selectedProjectId"
+        v-model:active-tab="activeTab"
+        v-model:search-text="searchText"
         show-dispatch
         show-create
         @change="handleTabChange"
-        @archive="handleArchive"
-        @dispatch="handleDispatch"
+        @archive="(proj: any) => handleArchive(proj)"
+        @dispatch="(proj: any) => handleDispatch(proj)"
         @create="openProjectModal('create')"
       />
 
-      <div class="flex flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div
+        class="flex flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+      >
         <div v-if="currentProject" class="flex h-full flex-col overflow-hidden">
-          <div class="flex items-center justify-between border-b border-gray-100 bg-gray-50/30 p-4">
+          <div
+            class="flex items-center justify-between border-b border-gray-100 bg-gray-50/30 p-4"
+          >
             <div>
-              <h2 class="text-xl font-bold text-gray-800">{{ currentProject.name }}</h2>
+              <h2 class="text-xl font-bold text-gray-800">
+                {{ currentProject.name }}
+              </h2>
               <div class="mt-1 flex items-center gap-3 text-xs text-gray-500">
-                <span>{{ t('qms.planning.bom.workOrderNo') }}: <b class="text-gray-700">{{ currentProject.workOrderNumber || '-' }}</b></span>
+                <span
+                  >{{ t('qms.planning.bom.workOrderNo') }}:
+                  <b class="text-gray-700">{{
+                    currentProject.workOrderNumber || '-'
+                  }}</b></span
+                >
                 <Divider type="vertical" />
-                <Button type="link" size="small" class="p-0 h-auto" @click="openProjectModal('edit', currentProject)">
-                   {{ t('common.edit') }}
+                <Button
+                  type="link"
+                  size="small"
+                  class="h-auto p-0"
+                  @click="openProjectModal('edit', currentProject as any)"
+                >
+                  {{ t('common.edit') }}
                 </Button>
-                <Button type="link" danger size="small" class="p-0 h-auto" @click="handleDeleteProject(currentProject)">
-                   {{ t('common.delete') }}
+                <Button
+                  type="link"
+                  danger
+                  size="small"
+                  class="h-auto p-0"
+                  @click="handleDeleteProject(currentProject as any)"
+                >
+                  {{ t('common.delete') }}
                 </Button>
               </div>
             </div>
@@ -247,19 +333,35 @@ onMounted(async () => {
             >
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'rpn'">
-                  <Tag :color="(record.rpn || 0) > 100 ? 'red' : 'green'">{{ record.rpn || 0 }}</Tag>
+                  <Tag :color="(record.rpn || 0) > 100 ? 'red' : 'green'">{{
+                    record.rpn || 0
+                  }}</Tag>
                 </template>
                 <template v-if="column.key === 'action'">
                   <Space>
-                    <Button type="link" size="small" @click="openItemModal('edit', record)">{{ t('common.edit') }}</Button>
-                    <Button type="link" size="small" danger @click="handleDeleteItem(record)">{{ t('common.delete') }}</Button>
+                    <Button
+                      type="link"
+                      size="small"
+                      @click="openItemModal('edit', record as any)"
+                      >{{ t('common.edit') }}</Button
+                    >
+                    <Button
+                      type="link"
+                      size="small"
+                      danger
+                      @click="handleDeleteItem(record as any)"
+                      >{{ t('common.delete') }}</Button
+                    >
                   </Space>
                 </template>
               </template>
             </Table>
           </div>
         </div>
-        <div v-else class="flex flex-1 flex-col items-center justify-center bg-gray-50/20 text-gray-400">
+        <div
+          v-else
+          class="flex flex-1 flex-col items-center justify-center bg-gray-50/20 text-gray-400"
+        >
           <Empty :description="t('qms.planning.dfmea.selectProjectHint')" />
         </div>
       </div>

@@ -21,7 +21,8 @@ export default defineEventHandler(async (event) => {
     let status = 'OPEN';
     const statusBody = String(body.status || '').toUpperCase();
     if (statusBody === 'CLOSED' || statusBody === '已关闭') status = 'CLOSED';
-    else if (statusBody === 'IN_PROGRESS' || statusBody === '进行中') status = 'IN_PROGRESS';
+    else if (statusBody === 'IN_PROGRESS' || statusBody === '进行中')
+      status = 'IN_PROGRESS';
     else status = 'OPEN';
 
     // Ensure ID logic is clean

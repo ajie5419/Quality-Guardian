@@ -1,24 +1,20 @@
 import type { Ref } from 'vue';
 
 import type { InspectionIssue, IssueFormState } from '../types';
-import { Severity } from '../types';
 
 import { ref, watch } from 'vue';
 
+import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
 import { message } from 'ant-design-vue';
-
-import { useI18n } from '@vben/locales';
 
 import {
   createInspectionIssue,
   updateInspectionIssue,
 } from '#/api/qms/inspection';
 
-import {
-  DEFAULT_VALUES,
-} from '../constants';
+import { DEFAULT_VALUES } from '../constants';
 
 /**
  * 创建初始表单状态
@@ -86,12 +82,14 @@ export function useIssueForm(options: UseIssueFormOptions) {
    */
   function initFromData(data: Partial<InspectionIssue>) {
     const { photos, ...rest } = data;
-    // 兼容字符串和数组格式
-    const photoArray = Array.isArray(photos)
-      ? photos
-      : photos
-        ? [photos as unknown as string]
-        : [];
+
+    // 修复嵌套三元运算符以满足 unicorn/no-nested-ternary 和 prettier 格式
+    let photoArray: string[] = [];
+    if (Array.isArray(photos)) {
+      photoArray = photos;
+    } else if (photos) {
+      photoArray = [photos as unknown as string];
+    }
 
     formState.value = {
       ...(rest as IssueFormState),
@@ -130,10 +128,7 @@ export function useIssueForm(options: UseIssueFormOptions) {
       };
 
       if (isEditMode.value && data.id) {
-        await updateInspectionIssue(
-          data.id,
-          data as InspectionIssue,
-        );
+        await updateInspectionIssue(data.id, data as InspectionIssue);
         message.success(t('common.saveSuccess'));
       } else {
         await createInspectionIssue(data as InspectionIssue);

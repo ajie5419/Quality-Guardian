@@ -23,7 +23,6 @@ import {
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { requestClient } from '#/api/request';
-import { SYSTEM_API } from '#/api/system/constants';
 import { SysStatusEnum } from '#/api/system/enums';
 import { getRoleList } from '#/api/system/role';
 
@@ -274,13 +273,18 @@ const gridOptions: VxeGridProps = {
     },
     { field: 'createTime', title: t('sys.user.createTime'), width: 180 },
     { field: 'remark', title: t('sys.user.remark'), minWidth: 150 },
-    { title: t('common.action'), width: 250, fixed: 'right', slots: { default: 'action' } },
+    {
+      title: t('common.action'),
+      width: 250,
+      fixed: 'right',
+      slots: { default: 'action' },
+    },
   ],
   toolbarConfig: {
     export: true,
     slots: {
-      buttons: 'toolbar-actions'
-    }
+      buttons: 'toolbar-actions',
+    },
   },
   exportConfig: {
     remote: true,
@@ -300,10 +304,10 @@ const gridOptions: VxeGridProps = {
         });
         return res;
       },
-      queryAll: async ({ formValues }) => {
+      queryAll: async ({ formValues }: any) => {
         const res = await getRoleList({
           page: 1,
-          pageSize: 100000,
+          pageSize: 100_000,
           ...formValues,
         });
         return { items: res.items || [] };
@@ -422,7 +426,11 @@ const canDelete = computed(
         </Button>
       </template>
       <template #status="{ row }">
-        <span v-if="row.status === SysStatusEnum.ENABLED" class="text-green-500">{{ t('common.enabled') }}</span>
+        <span
+          v-if="row.status === SysStatusEnum.ENABLED"
+          class="text-green-500"
+          >{{ t('common.enabled') }}</span
+        >
         <span v-else class="text-red-500">{{ t('common.disabled') }}</span>
       </template>
       <template #action="{ row }">
@@ -432,10 +440,12 @@ const canDelete = computed(
           @click="handlePermissions(row)"
           >{{ t('sys.role.permSettings') }}</a
         >
-        <a v-if="canEdit" class="mr-2" @click="handleEdit(row)">{{ t('common.edit') }}</a>
-        <a v-if="canDelete" class="text-red-500" @click="handleDelete(row)"
-          >{{ t('common.delete') }}</a
-        >
+        <a v-if="canEdit" class="mr-2" @click="handleEdit(row)">{{
+          t('common.edit')
+        }}</a>
+        <a v-if="canDelete" class="text-red-500" @click="handleDelete(row)">{{
+          t('common.delete')
+        }}</a>
       </template>
     </Grid>
 
@@ -448,7 +458,10 @@ const canDelete = computed(
     >
       <Form layout="vertical" class="pt-4">
         <FormItem :label="t('sys.role.roleName')" required>
-          <Input v-model:value="formState.name" :placeholder="`${t('common.pleaseInput')}${t('sys.role.roleName')}`" />
+          <Input
+            v-model:value="formState.name"
+            :placeholder="`${t('common.pleaseInput')}${t('sys.role.roleName')}`"
+          />
         </FormItem>
         <FormItem :label="t('sys.role.roleValue')" required>
           <Input
@@ -459,12 +472,19 @@ const canDelete = computed(
         </FormItem>
         <FormItem :label="t('common.status')">
           <Select v-model:value="formState.status">
-            <SelectOption :value="SysStatusEnum.ENABLED">{{ t('common.enabled') }}</SelectOption>
-            <SelectOption :value="SysStatusEnum.DISABLED">{{ t('common.disabled') }}</SelectOption>
+            <SelectOption :value="SysStatusEnum.ENABLED">{{
+              t('common.enabled')
+            }}</SelectOption>
+            <SelectOption :value="SysStatusEnum.DISABLED">{{
+              t('common.disabled')
+            }}</SelectOption>
           </Select>
         </FormItem>
         <FormItem :label="t('sys.user.remark')">
-          <Input v-model:value="formState.remark" :placeholder="t('sys.user.remarkPlaceholder')" />
+          <Input
+            v-model:value="formState.remark"
+            :placeholder="t('sys.user.remarkPlaceholder')"
+          />
         </FormItem>
       </Form>
     </Modal>

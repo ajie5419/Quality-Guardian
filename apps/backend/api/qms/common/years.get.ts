@@ -15,12 +15,13 @@ export default defineEventHandler(async () => {
 
     // 如果数据库为空，默认返回当前年份，确保 UI 稳定性
     const currentYear = new Date().getFullYear();
-    const years = result.length > 0 
-      ? result.map(r => Number(r.year)).filter(y => y > 0)
-      : [currentYear];
+    const years =
+      result.length > 0
+        ? result.map((r) => Number(r.year)).filter((y) => y > 0)
+        : [currentYear];
 
     // 再次去重并排序（防御性处理）
-    const uniqueYears = Array.from(new Set(years)).sort((a, b) => b - a);
+    const uniqueYears = [...new Set(years)].sort((a, b) => b - a);
 
     return useResponseSuccess(uniqueYears);
   } catch (error) {

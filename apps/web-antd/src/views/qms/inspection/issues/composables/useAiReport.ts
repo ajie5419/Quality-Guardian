@@ -1,11 +1,10 @@
-import type { Ref } from 'vue';
 import type { StatisticsData } from '../types';
 
 import { ref } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
-import { Modal, message } from 'ant-design-vue';
+import { message, Modal } from 'ant-design-vue';
 
 import { generateQualityInsight } from '#/api/ai';
 

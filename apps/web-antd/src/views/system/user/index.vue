@@ -107,16 +107,26 @@ const gridOptions: VxeGridProps = {
     { field: 'email', title: t('sys.user.email'), width: 180 },
     { field: 'phone', title: t('sys.user.phone'), width: 130 },
     { field: 'deptName', title: t('sys.user.deptName'), width: 120 },
-    { field: 'status', title: t('common.status'), width: 80, slots: { default: 'status' } },
+    {
+      field: 'status',
+      title: t('common.status'),
+      width: 80,
+      slots: { default: 'status' },
+    },
     { field: 'createTime', title: t('sys.user.createTime'), width: 160 },
     { field: 'remark', title: t('sys.user.remark'), minWidth: 150 },
-    { title: t('common.action'), width: 150, fixed: 'right', slots: { default: 'action' } },
+    {
+      title: t('common.action'),
+      width: 150,
+      fixed: 'right',
+      slots: { default: 'action' },
+    },
   ],
   toolbarConfig: {
     export: true,
     slots: {
-      buttons: 'toolbar-actions'
-    }
+      buttons: 'toolbar-actions',
+    },
   },
   exportConfig: {
     remote: true,
@@ -136,10 +146,10 @@ const gridOptions: VxeGridProps = {
         });
         return res;
       },
-      queryAll: async ({ formValues }) => {
+      queryAll: async ({ formValues }: any) => {
         const res = await getUserList({
           page: 1,
-          pageSize: 100000,
+          pageSize: 100_000,
           ...formValues,
         });
         return { items: res.items || [] };
@@ -225,7 +235,9 @@ async function handleSubmit() {
     isModalVisible.value = false;
     gridApi.reload();
   } catch {
-    message.error(isEditMode.value ? t('common.saveFailed') : t('common.createFailed'));
+    message.error(
+      isEditMode.value ? t('common.saveFailed') : t('common.createFailed'),
+    );
   }
 }
 
@@ -256,14 +268,20 @@ const canDelete = computed(
         </Button>
       </template>
       <template #status="{ row }">
-        <span v-if="row.status === SysStatusEnum.ENABLED" class="text-green-500">{{ t('common.enabled') }}</span>
+        <span
+          v-if="row.status === SysStatusEnum.ENABLED"
+          class="text-green-500"
+          >{{ t('common.enabled') }}</span
+        >
         <span v-else class="text-red-500">{{ t('common.disabled') }}</span>
       </template>
       <template #action="{ row }">
-        <a v-if="canEdit" class="mr-2" @click="handleEdit(row)">{{ t('common.edit') }}</a>
-        <a v-if="canDelete" class="text-red-500" @click="handleDelete(row)"
-          >{{ t('common.delete') }}</a
-        >
+        <a v-if="canEdit" class="mr-2" @click="handleEdit(row)">{{
+          t('common.edit')
+        }}</a>
+        <a v-if="canDelete" class="text-red-500" @click="handleDelete(row)">{{
+          t('common.delete')
+        }}</a>
       </template>
     </Grid>
 
@@ -289,10 +307,16 @@ const canDelete = computed(
             />
           </FormItem>
           <FormItem :label="t('sys.user.email')">
-            <Input v-model:value="formState.email" :placeholder="`${t('common.pleaseInput')}${t('sys.user.email')}`" />
+            <Input
+              v-model:value="formState.email"
+              :placeholder="`${t('common.pleaseInput')}${t('sys.user.email')}`"
+            />
           </FormItem>
           <FormItem :label="t('sys.user.phone')">
-            <Input v-model:value="formState.phone" :placeholder="`${t('common.pleaseInput')}${t('sys.user.phone')}`" />
+            <Input
+              v-model:value="formState.phone"
+              :placeholder="`${t('common.pleaseInput')}${t('sys.user.phone')}`"
+            />
           </FormItem>
           <FormItem :label="t('sys.user.deptName')">
             <TreeSelect
@@ -315,13 +339,20 @@ const canDelete = computed(
           </FormItem>
           <FormItem :label="t('common.status')">
             <Select v-model:value="formState.status">
-              <SelectOption :value="SysStatusEnum.ENABLED">{{ t('common.enabled') }}</SelectOption>
-              <SelectOption :value="SysStatusEnum.DISABLED">{{ t('common.disabled') }}</SelectOption>
+              <SelectOption :value="SysStatusEnum.ENABLED">{{
+                t('common.enabled')
+              }}</SelectOption>
+              <SelectOption :value="SysStatusEnum.DISABLED">{{
+                t('common.disabled')
+              }}</SelectOption>
             </Select>
           </FormItem>
         </div>
         <FormItem :label="t('sys.user.remark')">
-          <Input v-model:value="formState.remark" :placeholder="t('sys.user.remarkPlaceholder')" />
+          <Input
+            v-model:value="formState.remark"
+            :placeholder="t('sys.user.remarkPlaceholder')"
+          />
         </FormItem>
       </Form>
     </Modal>

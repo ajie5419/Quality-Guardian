@@ -72,7 +72,9 @@ export default defineEventHandler(async () => {
           parentId: project.id,
           executionStatus,
           executionCount: history.length,
-          quantitativeItems: item.quantitativeItems ? JSON.parse(item.quantitativeItems) : [],
+          quantitativeItems: item.quantitativeItems
+            ? JSON.parse(item.quantitativeItems)
+            : [],
         };
       });
 

@@ -23,13 +23,12 @@ import {
   Select,
   Statistic,
   Tag,
-  Space,
 } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
+import { WorkOrderStatusEnum } from '#/api/qms/enums';
 import { deleteWorkOrder, getWorkOrderList } from '#/api/qms/work-order';
 import { getDeptList } from '#/api/system/dept';
-import { WorkOrderStatusEnum } from '#/api/qms/enums';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData, findNameById } from '#/types';
@@ -73,37 +72,40 @@ const { years: dynamicYears } = useAvailableYears();
 const currentYear = ref<number>(new Date().getFullYear());
 
 const yearOptions = computed(() => {
-  return dynamicYears.value.map(y => ({ label: `${y}${t('common.unit.year')}`, value: y }));
+  return dynamicYears.value.map((y) => ({
+    label: `${y}${t('common.unit.year')}`,
+    value: y,
+  }));
 });
 
 const dashboardStats = computed(() => {
   const data = allWorkOrders.value || [];
-  
-  const stats = data.reduce(
-    (acc, item) => {
-      acc.total++;
-      const s = String(item.status).toUpperCase();
-      if (s === 'IN_PROGRESS' || s === '进行中') acc.inProgress++;
-      if (s === 'COMPLETED' || s === '已完成') acc.completed++;
 
-      const rawDiv = String(item.division || '其他').trim();
-      const divName = findNameById(deptRawData.value, rawDiv) || rawDiv;
-      
-      acc.divisionProjectMap[divName] = (acc.divisionProjectMap[divName] || 0) + 1;
-      acc.divisionQuantityMap[divName] = (acc.divisionQuantityMap[divName] || 0) + (Number(item.quantity) || 0);
-      
-      return acc;
-    },
-    { 
-      total: 0, 
-      inProgress: 0, 
-      completed: 0, 
-      divisionProjectMap: {} as Record<string, number>,
-      divisionQuantityMap: {} as Record<string, number>
-    }
-  );
+  const stats = {
+    total: 0,
+    inProgress: 0,
+    completed: 0,
+    divisionProjectMap: {} as Record<string, number>,
+    divisionQuantityMap: {} as Record<string, number>,
+  };
 
-  const progressPercent = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+  for (const item of data) {
+    stats.total++;
+    const s = String(item.status).toUpperCase();
+    if (s === 'IN_PROGRESS' || s === '进行中') stats.inProgress++;
+    if (s === 'COMPLETED' || s === '已完成') stats.completed++;
+
+    const rawDiv = String(item.division || '其他').trim();
+    const divName = findNameById(deptRawData.value, rawDiv) || rawDiv;
+
+    stats.divisionProjectMap[divName] =
+      (stats.divisionProjectMap[divName] || 0) + 1;
+    stats.divisionQuantityMap[divName] =
+      (stats.divisionQuantityMap[divName] || 0) + (Number(item.quantity) || 0);
+  }
+
+  const progressPercent =
+    stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
 
   const pieData = Object.entries(stats.divisionProjectMap)
     .map(([name, value]) => ({ name, value }))
@@ -176,7 +178,7 @@ watch(
 
 // 5. Grid 表格配置
 const gridOptions = computed<VxeGridProps>(() => ({
-  columns: getGridColumns().map((col) => {
+  columns: (getGridColumns() as any[]).map((col) => {
     // 关键修复：通过 formatter 实现事业部名称的响应式转换
     if (col.field === 'division') {
       return {
@@ -203,11 +205,13 @@ const gridOptions = computed<VxeGridProps>(() => ({
   proxyConfig: {
     ajax: {
       query: async (
-        { page: pageParams }: { page?: { currentPage?: number; pageSize?: number } },
+        {
+          page: pageParams,
+        }: { page?: { currentPage?: number; pageSize?: number } },
         formValues: Record<string, any>,
       ) => {
         const { currentPage = 1, pageSize = 20 } = pageParams || {};
-        
+
         // 向后端发送分页与过滤参数
         const response = await getWorkOrderList({
           year: currentYear.value,
@@ -215,23 +219,30 @@ const gridOptions = computed<VxeGridProps>(() => ({
           pageSize,
           ...formValues,
         });
-        
+
         const { items, total, summary } = response;
-        
+
         // 关键修复：将全量概要数据交给 dashboard 计算
         allWorkOrders.value = summary || [];
-        
+
         return {
           items,
           total,
         };
+      },
+      queryAll: async ({ formValues }: any) => {
+        const response = await getWorkOrderList({
+          year: currentYear.value,
+          ...formValues,
+        });
+        return { items: response.items };
       },
     },
   },
 }));
 
 const [Grid, gridApi] = useVbenVxeGrid({
-  gridOptions,
+  gridOptions: gridOptions as any,
   formOptions: {
     schema: [
       {
@@ -239,13 +250,13 @@ const [Grid, gridApi] = useVbenVxeGrid({
         label: t('qms.workOrder.workOrderNumber'),
         component: 'Input',
         colProps: { span: 6 },
-      },
+      } as any,
       {
         fieldName: 'projectName',
         label: t('qms.workOrder.projectName'),
         component: 'Input',
         colProps: { span: 6 },
-      },
+      } as any,
       {
         fieldName: 'status',
         label: t('common.status'),
@@ -254,22 +265,31 @@ const [Grid, gridApi] = useVbenVxeGrid({
         componentProps: {
           options: [
             { label: t('common.all'), value: '' },
-            { label: t('qms.workOrder.status.pending'), value: WorkOrderStatusEnum.PENDING },
-            { label: t('qms.workOrder.status.inProgress'), value: WorkOrderStatusEnum.IN_PROGRESS },
-            { label: t('qms.workOrder.status.completed'), value: WorkOrderStatusEnum.COMPLETED },
+            {
+              label: t('qms.workOrder.status.pending'),
+              value: WorkOrderStatusEnum.PENDING,
+            },
+            {
+              label: t('qms.workOrder.status.inProgress'),
+              value: WorkOrderStatusEnum.IN_PROGRESS,
+            },
+            {
+              label: t('qms.workOrder.status.completed'),
+              value: WorkOrderStatusEnum.COMPLETED,
+            },
           ],
         },
-      },
+      } as any,
     ],
     submitOnChange: true,
   },
-});
+} as any);
 
 // 6. 业务操作
 const editModalRef = ref<any>(null);
+const showDashboard = ref(true);
 
 function handleAdd() {
-  console.log('WorkOrder: handleAdd clicked');
   if (editModalRef.value) {
     editModalRef.value.open(null, deptTreeData.value);
   } else {
@@ -309,9 +329,13 @@ function handleDelete(row: QmsWorkOrderApi.WorkOrderItem) {
   <Page>
     <div class="flex flex-col gap-4 p-4">
       <!-- 数字化仪表盘 -->
-      <Row :gutter="16">
+      <Row v-show="showDashboard" :gutter="16">
         <Col :span="8">
-          <Card :title="t('qms.workOrder.divisionRatio')" size="small" class="h-full shadow-sm">
+          <Card
+            :title="t('qms.workOrder.divisionRatio')"
+            size="small"
+            class="h-full shadow-sm"
+          >
             <div class="relative flex h-[300px] items-center justify-center">
               <EchartsUI
                 v-show="dashboardStats.pieData.length > 0"
@@ -328,8 +352,12 @@ function handleDelete(row: QmsWorkOrderApi.WorkOrderItem) {
         </Col>
 
         <Col :span="10">
-          <Card :title="t('qms.workOrder.outputRanking')" size="small" class="h-full shadow-sm">
-            <div class="h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+          <Card
+            :title="t('qms.workOrder.outputRanking')"
+            size="small"
+            class="h-full shadow-sm"
+          >
+            <div class="custom-scrollbar h-[300px] overflow-y-auto pr-2">
               <div class="space-y-1.5 py-1">
                 <div
                   v-for="(rank, idx) in dashboardStats.rankings"
@@ -343,17 +371,25 @@ function handleDelete(row: QmsWorkOrderApi.WorkOrderItem) {
                         idx === 0 ? 'bg-yellow-400 text-white' : '',
                         idx === 1 ? 'bg-slate-300 text-white' : '',
                         idx === 2 ? 'bg-orange-300 text-white' : '',
-                        idx > 2 ? 'bg-gray-100 text-gray-400' : ''
+                        idx > 2 ? 'bg-gray-100 text-gray-400' : '',
                       ]"
                     >
                       {{ idx + 1 }}
                     </div>
-                    <span class="text-sm font-bold text-gray-700">{{ rank.division }}</span>
+                    <span class="text-sm font-bold text-gray-700">{{
+                      rank.division
+                    }}</span>
                   </div>
                   <div class="flex items-center gap-2">
-                    <span class="text-[11px] text-gray-400">{{ t('qms.workOrder.totalOutput') }}</span>
-                    <span class="font-mono text-base font-bold text-blue-600">{{ rank.totalQuantity }}</span>
-                    <span class="text-[11px] text-gray-400">{{ t('common.unit.piece') }}</span>
+                    <span class="text-[11px] text-gray-400">{{
+                      t('qms.workOrder.totalOutput')
+                    }}</span>
+                    <span class="font-mono text-base font-bold text-blue-600">{{
+                      rank.totalQuantity
+                    }}</span>
+                    <span class="text-[11px] text-gray-400">{{
+                      t('common.unit.piece')
+                    }}</span>
                   </div>
                 </div>
               </div>
@@ -366,11 +402,18 @@ function handleDelete(row: QmsWorkOrderApi.WorkOrderItem) {
         </Col>
 
         <Col :span="6">
-          <Card :title="t('qms.workOrder.executionOverview')" size="small" class="h-full shadow-sm">
+          <Card
+            :title="t('qms.workOrder.executionOverview')"
+            size="small"
+            class="h-full shadow-sm"
+          >
             <div class="flex h-[300px] flex-col justify-between py-2">
               <Row :gutter="8">
                 <Col :span="8">
-                  <Statistic :title="t('qms.workOrder.totalProjects')" :value="dashboardStats.total" />
+                  <Statistic
+                    :title="t('qms.workOrder.totalProjects')"
+                    :value="dashboardStats.total"
+                  />
                 </Col>
                 <Col :span="8">
                   <Statistic
@@ -389,7 +432,9 @@ function handleDelete(row: QmsWorkOrderApi.WorkOrderItem) {
               </Row>
               <div class="mt-4">
                 <div class="mb-1 flex justify-between text-xs">
-                  <span class="font-medium text-gray-400">{{ t('qms.workOrder.completionRate') }}</span>
+                  <span class="font-medium text-gray-400">{{
+                    t('qms.workOrder.completionRate')
+                  }}</span>
                   <span class="font-bold text-green-600">
                     {{ dashboardStats.completed }} / {{ dashboardStats.total }}
                   </span>
@@ -401,8 +446,12 @@ function handleDelete(row: QmsWorkOrderApi.WorkOrderItem) {
                   status="active"
                 />
               </div>
-              <div class="mt-4 flex items-center gap-3 rounded-lg bg-blue-50 p-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+              <div
+                class="mt-4 flex items-center gap-3 rounded-lg bg-blue-50 p-3"
+              >
+                <div
+                  class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600"
+                >
                   <span class="i-lucide-activity text-xl"></span>
                 </div>
                 <div>
@@ -420,39 +469,54 @@ function handleDelete(row: QmsWorkOrderApi.WorkOrderItem) {
       </Row>
 
       <!-- 表格区域 -->
-      <Card size="small" :bordered="false" class="shadow-sm" :title="t('qms.workOrder.title')">
-        <template #extra>
-            <div class="flex items-center gap-4">
-                <div class="flex items-center gap-2">
-                  <span class="text-gray-500 text-xs">{{ t('qms.inspection.records.statsYear') }}:</span>
-                  <Select
-                    v-model:value="currentYear"
-                    :options="yearOptions"
-                    size="small"
-                    class="w-[100px]"
-                    @change="() => gridApi.reload()"
-                  />
-                </div>
-                <Button type="primary" size="small" @click="handleAdd">
-                    <span class="i-lucide-plus mr-1"></span> {{ t('qms.workOrder.createWorkOrder') }}
-                </Button>
-            </div>
-        </template>
-
+      <Card
+        size="small"
+        :bordered="false"
+        class="shadow-sm"
+        :title="t('qms.workOrder.title')"
+      >
         <Grid>
           <!-- 核心修复：Toolbar 内部也保留按钮作为备份 -->
           <template #toolbar-actions>
-             <Button type="primary" @click="handleAdd">
-                <span class="i-lucide-plus mr-1"></span> {{ t('qms.workOrder.createWorkOrder') }}
-             </Button>
+            <Button type="primary" @click="handleAdd">
+              <span class="i-lucide-plus mr-1"></span>
+              {{ t('qms.workOrder.createWorkOrder') }}
+            </Button>
+            <Button class="ml-2" @click="showDashboard = !showDashboard">
+              <span
+                :class="
+                  showDashboard
+                    ? 'i-lucide-layout-panel-top'
+                    : 'i-lucide-layout-panel-off'
+                "
+                class="mr-1"
+              ></span>
+              {{ showDashboard ? '隐藏图表' : '显示图表' }}
+            </Button>
+            <div class="ml-4 flex items-center gap-2">
+              <span class="text-xs text-gray-500"
+                >{{ t('qms.inspection.records.statsYear') }}:</span
+              >
+              <Select
+                v-model:value="currentYear"
+                :options="yearOptions"
+                size="small"
+                class="w-[100px]"
+                @change="() => gridApi.reload()"
+              />
+            </div>
           </template>
-          
+
           <template #status="{ row }">
             <Tag :color="getStatusInfo(row.status).color">
-              {{ getStatusInfo(row.status).textKey ? t(getStatusInfo(row.status).textKey) : row.status }}
+              {{
+                getStatusInfo(row.status).textKey
+                  ? t(getStatusInfo(row.status).textKey)
+                  : row.status
+              }}
             </Tag>
           </template>
-          
+
           <template #action="{ row }">
             <Button type="link" size="small" @click="handleEdit(row)">
               {{ t('common.edit') }}
@@ -473,10 +537,12 @@ function handleDelete(row: QmsWorkOrderApi.WorkOrderItem) {
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #e5e7eb;
   border-radius: 4px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }

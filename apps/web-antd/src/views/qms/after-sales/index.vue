@@ -1,8 +1,6 @@
 <script lang="ts" setup>
+import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
-import type { QmsSupplierApi } from '#/api/qms/supplier';
-import type { QmsWorkOrderApi } from '#/api/qms/work-order';
-import type { TreeSelectNode } from '#/types';
 
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -13,15 +11,14 @@ import { useI18n } from '@vben/locales';
 
 import { Button, message, Modal, Select, Tag } from 'ant-design-vue';
 
-import { type VbenFormProps } from '#/adapter/form';
-import { useVbenVxeGrid, type VxeGridProps } from '#/adapter/vxe-table';
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { deleteAfterSales, getAfterSalesList } from '#/api/qms/after-sales';
 import { getSupplierList } from '#/api/qms/supplier';
 import { getWorkOrderList } from '#/api/qms/work-order';
 import { getDeptList } from '#/api/system/dept';
+import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData, findNameById } from '#/types';
-import { useAvailableYears } from '#/hooks/useAvailableYears';
 
 import AfterSalesCharts from './components/AfterSalesCharts.vue';
 import AfterSalesModal from './components/AfterSalesModal.vue';
@@ -71,14 +68,27 @@ onMounted(() => loadData());
 const { years: dynamicYears } = useAvailableYears();
 const currentYear = ref<number>(new Date().getFullYear());
 const yearOptions = computed(() => {
-  return dynamicYears.value.map(y => ({ label: `${y}${t('common.unit.year')}`, value: y }));
+  return dynamicYears.value.map((y) => ({
+    label: `${y}${t('common.unit.year')}`,
+    value: y,
+  }));
 });
 
 // 表格列配置
 const gridOptions: VxeGridProps = {
   columns: [
-    { type: 'seq', title: t('qms.afterSales.columns.seq'), width: 60, fixed: 'left' },
-    { field: 'workOrderNumber', title: t('qms.afterSales.form.workOrderNumber'), minWidth: 120, fixed: 'left' },
+    {
+      type: 'seq',
+      title: t('qms.afterSales.columns.seq'),
+      width: 60,
+      fixed: 'left',
+    },
+    {
+      field: 'workOrderNumber',
+      title: t('qms.afterSales.form.workOrderNumber'),
+      minWidth: 120,
+      fixed: 'left',
+    },
     {
       field: 'division',
       title: t('qms.afterSales.form.division'),
@@ -89,24 +99,85 @@ const gridOptions: VxeGridProps = {
         return name || cellValue;
       },
     },
-    { field: 'isClaim', title: t('qms.afterSales.columns.isClaim'), width: 100, slots: { default: 'isClaim' } },
-    { field: 'projectName', title: t('qms.afterSales.form.projectName'), minWidth: 150 },
-    { field: 'partName', title: t('qms.afterSales.form.partName'), minWidth: 150 },
-    { field: 'customerName', title: t('qms.afterSales.form.customerName'), minWidth: 150 },
-    { field: 'location', title: t('qms.afterSales.form.location'), minWidth: 120 },
-    { field: 'factoryDate', title: t('qms.afterSales.form.factoryDate'), width: 120 },
-    { field: 'warrantyStatus', title: t('qms.afterSales.form.warrantyStatus'), width: 100 },
-    { field: 'issueDescription', title: t('qms.afterSales.form.issueDescription'), minWidth: 200 },
-    { field: 'productType', title: t('qms.afterSales.form.productType'), minWidth: 120 },
-    { field: 'productSubtype', title: t('qms.afterSales.form.productSubtype'), minWidth: 120 },
-    { field: 'runningHours', title: t('qms.afterSales.form.runningHours'), width: 100 },
-    { field: 'defectType', title: t('qms.afterSales.form.defectType'), minWidth: 120 },
-    { field: 'defectSubtype', title: t('qms.afterSales.form.defectSubtype'), minWidth: 120 },
+    {
+      field: 'isClaim',
+      title: t('qms.afterSales.columns.isClaim'),
+      width: 100,
+      slots: { default: 'isClaim' },
+    },
+    {
+      field: 'projectName',
+      title: t('qms.afterSales.form.projectName'),
+      minWidth: 150,
+    },
+    {
+      field: 'partName',
+      title: t('qms.afterSales.form.partName'),
+      minWidth: 150,
+    },
+    {
+      field: 'customerName',
+      title: t('qms.afterSales.form.customerName'),
+      minWidth: 150,
+    },
+    {
+      field: 'location',
+      title: t('qms.afterSales.form.location'),
+      minWidth: 120,
+    },
+    {
+      field: 'factoryDate',
+      title: t('qms.afterSales.form.factoryDate'),
+      width: 120,
+    },
+    {
+      field: 'warrantyStatus',
+      title: t('qms.afterSales.form.warrantyStatus'),
+      width: 100,
+    },
+    {
+      field: 'issueDescription',
+      title: t('qms.afterSales.form.issueDescription'),
+      minWidth: 200,
+    },
+    {
+      field: 'productType',
+      title: t('qms.afterSales.form.productType'),
+      minWidth: 120,
+    },
+    {
+      field: 'productSubtype',
+      title: t('qms.afterSales.form.productSubtype'),
+      minWidth: 120,
+    },
+    {
+      field: 'runningHours',
+      title: t('qms.afterSales.form.runningHours'),
+      width: 100,
+    },
+    {
+      field: 'defectType',
+      title: t('qms.afterSales.form.defectType'),
+      minWidth: 120,
+    },
+    {
+      field: 'defectSubtype',
+      title: t('qms.afterSales.form.defectSubtype'),
+      minWidth: 120,
+    },
     { field: 'severity', title: t('qms.afterSales.form.severity'), width: 100 },
     { field: 'quantity', title: t('qms.afterSales.form.quantity'), width: 80 },
-    { field: 'issueDate', title: t('qms.afterSales.form.issueDate'), width: 120 },
+    {
+      field: 'issueDate',
+      title: t('qms.afterSales.form.issueDate'),
+      width: 120,
+    },
     { field: 'handler', title: t('qms.afterSales.form.handler'), width: 100 },
-    { field: 'resolutionPlan', title: t('qms.afterSales.form.resolutionPlan'), minWidth: 200 },
+    {
+      field: 'resolutionPlan',
+      title: t('qms.afterSales.form.resolutionPlan'),
+      minWidth: 200,
+    },
     {
       field: 'responsibleDept',
       title: t('qms.afterSales.form.responsibleDept'),
@@ -117,18 +188,45 @@ const gridOptions: VxeGridProps = {
         return name || cellValue;
       },
     },
-    { field: 'supplierBrand', title: t('qms.afterSales.form.supplierBrand'), width: 150 },
-    { field: 'materialCost', title: t('qms.afterSales.form.materialCost'), width: 100 },
-    { field: 'laborTravelCost', title: t('qms.afterSales.form.laborTravelCost'), width: 120 },
-    { field: 'closeDate', title: t('qms.afterSales.form.closeDate'), width: 120 },
-    { field: 'status', title: t('qms.afterSales.form.status'), width: 100, fixed: 'right', slots: { default: 'status' } },
-    { title: t('qms.afterSales.columns.action'), width: 150, fixed: 'right', slots: { default: 'action' } },
+    {
+      field: 'supplierBrand',
+      title: t('qms.afterSales.form.supplierBrand'),
+      width: 150,
+    },
+    {
+      field: 'materialCost',
+      title: t('qms.afterSales.form.materialCost'),
+      width: 100,
+    },
+    {
+      field: 'laborTravelCost',
+      title: t('qms.afterSales.form.laborTravelCost'),
+      width: 120,
+    },
+    {
+      field: 'closeDate',
+      title: t('qms.afterSales.form.closeDate'),
+      width: 120,
+    },
+    {
+      field: 'status',
+      title: t('qms.afterSales.form.status'),
+      width: 100,
+      fixed: 'right',
+      slots: { default: 'status' },
+    },
+    {
+      title: t('qms.afterSales.columns.action'),
+      width: 150,
+      fixed: 'right',
+      slots: { default: 'action' },
+    },
   ],
   toolbarConfig: {
     export: true,
     slots: {
-      buttons: 'toolbar-actions'
-    }
+      buttons: 'toolbar-actions',
+    },
   },
   exportConfig: {
     remote: true,
@@ -147,7 +245,7 @@ const gridOptions: VxeGridProps = {
         } as any);
         return { items: data, total: data.length };
       },
-      queryAll: async ({ formValues }) => {
+      queryAll: async ({ formValues }: any) => {
         const data = await getAfterSalesList({
           year: currentYear.value,
           ...formValues,
@@ -159,7 +257,7 @@ const gridOptions: VxeGridProps = {
 };
 
 const [Grid, gridApi] = useVbenVxeGrid({
-  gridOptions,
+  gridOptions: gridOptions as any,
   formOptions: {
     schema: [
       {
@@ -167,13 +265,13 @@ const [Grid, gridApi] = useVbenVxeGrid({
         label: t('qms.afterSales.form.workOrderNumber'),
         component: 'Input',
         colProps: { span: 6 },
-      },
+      } as any,
       {
         fieldName: 'projectName',
         label: t('qms.afterSales.form.projectName'),
         component: 'Input',
         colProps: { span: 6 },
-      },
+      } as any,
       {
         fieldName: 'status',
         label: t('qms.afterSales.form.status'),
@@ -187,7 +285,7 @@ const [Grid, gridApi] = useVbenVxeGrid({
           ],
         },
         colProps: { span: 4 },
-      },
+      } as any,
     ],
     submitOnChange: true,
   },
@@ -201,7 +299,9 @@ watch(deptRawData, () => {
 // Modal 状态
 const isModalVisible = ref(false);
 const isEditMode = ref(false);
-const currentRecord = ref<QmsAfterSalesApi.AfterSalesItem | undefined>(undefined);
+const currentRecord = ref<QmsAfterSalesApi.AfterSalesItem | undefined>(
+  undefined,
+);
 
 function handleOpenModal() {
   isEditMode.value = false;
@@ -238,15 +338,22 @@ function handleSettleToKnowledge(row: QmsAfterSalesApi.AfterSalesItem) {
   let attachments: any[] = [];
   try {
     if (row.photos) {
-      const photoArray = typeof row.photos === 'string' ? JSON.parse(row.photos) : row.photos;
+      const photoArray =
+        typeof row.photos === 'string' ? JSON.parse(row.photos) : row.photos;
       if (Array.isArray(photoArray)) {
-        attachments = photoArray.map((url, idx) => ({ name: `售后图片_${idx + 1}`, url, type: 'image' }));
+        attachments = photoArray.map((url, idx) => ({
+          name: `售后图片_${idx + 1}`,
+          url,
+          type: 'image',
+        }));
       } else if (photoArray) {
-        attachments = [{ name: '售后图片', url: String(photoArray), type: 'image' }];
+        attachments = [
+          { name: '售后图片', url: String(photoArray), type: 'image' },
+        ];
       }
     }
-  } catch (e) {
-    console.error('Failed to parse after-sales photos', e);
+  } catch (error) {
+    console.error('Failed to parse after-sales photos', error);
   }
 
   router.push({
@@ -301,13 +408,19 @@ function handleModalSuccess() {
                   <span class="i-lucide-bar-chart-3 mr-1"></span>
                   {{ showCharts ? '隐藏看板' : '数据看板' }}
                 </Button>
-                <Button v-if="canCreate" type="primary" @click="handleOpenModal">
+                <Button
+                  v-if="canCreate"
+                  type="primary"
+                  @click="handleOpenModal"
+                >
                   {{ t('qms.inspection.issues.createIssue') }}
                 </Button>
               </div>
 
               <div class="flex items-center gap-2">
-                <span class="text-gray-500">{{ t('qms.inspection.records.statsYear') }}:</span>
+                <span class="text-gray-500"
+                  >{{ t('qms.inspection.records.statsYear') }}:</span
+                >
                 <Select
                   v-model:value="currentYear"
                   :options="yearOptions"
@@ -318,13 +431,29 @@ function handleModalSuccess() {
             </div>
           </template>
           <template #action="{ row }">
-            <Button v-if="canEdit" type="link" size="small" @click="handleEdit(row)">
+            <Button
+              v-if="canEdit"
+              type="link"
+              size="small"
+              @click="handleEdit(row)"
+            >
               {{ t('common.edit') }}
             </Button>
-            <Button v-access:code="'QMS:AfterSales:Settle'" type="link" size="small" @click="handleSettleToKnowledge(row)">
+            <Button
+              v-access:code="'QMS:AfterSales:Settle'"
+              type="link"
+              size="small"
+              @click="handleSettleToKnowledge(row)"
+            >
               {{ t('qms.inspection.issues.settleToKnowledge') }}
             </Button>
-            <Button v-if="canDelete" type="link" size="small" danger @click="handleDelete(row)">
+            <Button
+              v-if="canDelete"
+              type="link"
+              size="small"
+              danger
+              @click="handleDelete(row)"
+            >
               {{ t('common.delete') }}
             </Button>
           </template>

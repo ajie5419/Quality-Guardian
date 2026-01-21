@@ -3,6 +3,7 @@ import type { ChartConfig } from '#/components/Qms/ChartBuilder/types';
 
 import { aggregateChartData } from '#/components/Qms/ChartBuilder/composables/useChartCore';
 import { findNameById } from '#/types';
+
 import { CHART_DIMENSIONS, CHART_METRICS } from '../constants';
 
 export { type ChartConfig };
@@ -20,7 +21,9 @@ export function getAfterSalesChartOption(
     // Value Calculator
     (item, metric) => {
       if (metric === 'totalLoss') {
-        return (Number(item.materialCost) || 0) + (Number(item.laborTravelCost) || 0);
+        return (
+          (Number(item.materialCost) || 0) + (Number(item.laborTravelCost) || 0)
+        );
       }
       return Number((item as any)[metric]) || 0;
     },
@@ -28,18 +31,21 @@ export function getAfterSalesChartOption(
     (item, dimension) => {
       if (dimension === 'reportMonth') {
         // issueDate: YYYY-MM-DD
-        return (item.issueDate || '').substring(0, 7);
+        return (item.issueDate || '').slice(0, 7);
       }
-      
+
       const val = (item as any)[dimension];
       if (!val) return '未分类';
 
-      if ((dimension === 'division' || dimension === 'responsibleDept') && deptData) {
+      if (
+        (dimension === 'division' || dimension === 'responsibleDept') &&
+        deptData
+      ) {
         return findNameById(deptData, val) || String(val);
       }
 
       return String(val);
-    }
+    },
   );
 }
 

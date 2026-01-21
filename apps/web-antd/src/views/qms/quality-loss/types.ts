@@ -1,11 +1,11 @@
-import type { QualityLossStatusEnum } from '#/api/qms/enums';
-
 /**
  * 损失来源枚举
  */
+import type { SystemDeptApi } from '#/api/system/dept';
+
 export enum LossSource {
-  INTERNAL = 'Internal',
   EXTERNAL = 'External',
+  INTERNAL = 'Internal',
   MANUAL = 'Manual',
 }
 
@@ -13,11 +13,11 @@ export enum LossSource {
  * 损失类型枚举
  */
 export enum LossType {
-  SCRAP = 'Scrap',
-  REWORK = 'Rework',
-  RETURN = 'Return',
-  TRANSPORT = 'Transport',
   OTHER = 'Other',
+  RETURN = 'Return',
+  REWORK = 'Rework',
+  SCRAP = 'Scrap',
+  TRANSPORT = 'Transport',
 }
 
 /**
@@ -29,8 +29,6 @@ export interface LossStatistics {
   recoveryRate: string;
   pendingAmount: number;
 }
-
-import type { SystemDeptApi } from '#/api/system/dept';
 
 /**
  * 部门节点别名

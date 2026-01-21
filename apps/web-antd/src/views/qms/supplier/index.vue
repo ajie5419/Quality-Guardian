@@ -5,7 +5,6 @@ import type { VxeCheckboxChangeParams } from '#/types';
 
 import { reactive, ref } from 'vue';
 
-import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
@@ -34,9 +33,6 @@ import SupplierStats from './components/SupplierStats.vue';
 import { getColumns, getSearchFormSchema } from './data';
 
 const { t } = useI18n();
-
-// 权限控制
-const { hasAccessByCodes } = useAccess();
 
 const checkedRows = ref<QmsSupplierApi.SupplierItem[]>([]);
 const editModalRef = ref();
@@ -117,12 +113,12 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
           return { items: [], total: 0 };
         }
       },
-      queryAll: async ({ formValues }) => {
+      queryAll: async ({ formValues }: any) => {
         try {
           const params: QmsSupplierApi.SupplierListParams = {
             category: 'Supplier',
             page: 1,
-            pageSize: 100000,
+            pageSize: 100_000,
             ...formValues,
           };
           const response = await getSupplierList(params);
@@ -157,7 +153,11 @@ function handleOpenModal() {
 }
 
 function handleEdit(row: QmsSupplierApi.SupplierItem) {
-  editModalRef.value?.open({ isUpdate: true, record: row, category: 'Supplier' });
+  editModalRef.value?.open({
+    isUpdate: true,
+    record: row,
+    category: 'Supplier',
+  });
 }
 
 function handleDelete(row: QmsSupplierApi.SupplierItem) {
@@ -180,7 +180,9 @@ function handleBatchDelete() {
   if (checkedRows.value.length === 0) return;
   Modal.confirm({
     title: t('common.confirmDelete'),
-    content: t('common.confirmBatchDelete', { count: checkedRows.value.length }),
+    content: t('common.confirmBatchDelete', {
+      count: checkedRows.value.length,
+    }),
     onOk: async () => {
       try {
         const ids = checkedRows.value.map((row) => row.id);
@@ -263,18 +265,32 @@ function handleSuccess() {
 
           <template #status_badge="{ row }">
             <Badge
-              :status="SUPPLIER_STATUS_UI_MAP[row.status]?.status || 'default'"
+              :status="
+                row.status
+                  ? (SUPPLIER_STATUS_UI_MAP as any)[row.status]?.status
+                  : 'default'
+              "
               :text="
-                t(
-                  SUPPLIER_STATUS_UI_MAP[row.status]?.textKey,
-                  SUPPLIER_STATUS_UI_MAP[row.status]?.defaultText,
-                )
+                row.status
+                  ? t(
+                      (SUPPLIER_STATUS_UI_MAP as any)[row.status]?.textKey,
+                      (SUPPLIER_STATUS_UI_MAP as any)[row.status]?.defaultText,
+                    )
+                  : '-'
               "
             />
           </template>
 
           <template #level_tag="{ row }">
-            <Tag :color="RATING_COLORS[row.level || row.rating] || 'default'">
+            <Tag
+              :color="
+                row.level
+                  ? (RATING_COLORS as any)[row.level]
+                  : row.rating
+                    ? (RATING_COLORS as any)[row.rating]
+                    : 'default'
+              "
+            >
               {{ row.level || row.rating || '-' }} {{ t('common.level') }}
             </Tag>
           </template>
@@ -296,7 +312,8 @@ function handleSuccess() {
           <template #eng_issue="{ row }">
             <span
               :class="{
-                'font-bold text-orange-500': (row.engineeringIssueCount ?? 0) > 0,
+                'font-bold text-orange-500':
+                  (row.engineeringIssueCount ?? 0) > 0,
                 'text-gray-400': (row.engineeringIssueCount ?? 0) <= 0,
               }"
             >

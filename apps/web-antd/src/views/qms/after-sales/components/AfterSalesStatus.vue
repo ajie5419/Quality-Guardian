@@ -4,18 +4,15 @@ import type { StatusOption } from '../constants';
 
 import { useI18n } from '@vben/locales';
 
-import {
-  DatePicker,
-  FormItem,
-  Select,
-  SelectOption,
-} from 'ant-design-vue';
+import { DatePicker, FormItem, Select, SelectOption } from 'ant-design-vue';
 
 defineProps<{
   statusOptions: StatusOption[];
 }>();
 
-const formState = defineModel<AfterSalesFormState>('formState', { required: true });
+const formState = defineModel<AfterSalesFormState>('formState', {
+  required: true,
+});
 
 const { t } = useI18n();
 </script>
@@ -27,7 +24,11 @@ const { t } = useI18n();
     </div>
     <div class="space-y-3">
       <div class="grid grid-cols-2 gap-2">
-        <FormItem :label="t('qms.afterSales.form.status')" class="mb-0" name="status">
+        <FormItem
+          :label="t('qms.afterSales.form.status')"
+          class="mb-0"
+          name="status"
+        >
           <Select v-model:value="formState.status">
             <SelectOption
               v-for="opt in statusOptions"

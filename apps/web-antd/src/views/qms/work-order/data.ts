@@ -1,7 +1,10 @@
-import { z } from '#/adapter/form';
 import type { VbenFormSchema } from '#/adapter/form';
 import type { VxeGridProps } from '#/adapter/vxe-table';
+
 import { $t } from '@vben/locales';
+
+import { z } from '#/adapter/form';
+
 import { WORK_ORDER_STATUS_UI_MAP } from './constants';
 
 /**
@@ -13,8 +16,12 @@ export const workOrderSchema = z.object({
   projectName: z.string().min(1, { message: $t('ui.formRules.required') }),
   customerName: z.string().min(1, { message: $t('ui.formRules.required') }),
   quantity: z.number({ required_error: $t('ui.formRules.required') }).min(1),
-  deliveryDate: z.string().min(1, { message: $t('ui.formRules.selectRequired') }),
-  effectiveTime: z.string().min(1, { message: $t('ui.formRules.selectRequired') }),
+  deliveryDate: z
+    .string()
+    .min(1, { message: $t('ui.formRules.selectRequired') }),
+  effectiveTime: z
+    .string()
+    .min(1, { message: $t('ui.formRules.selectRequired') }),
   status: z.string().min(1, { message: $t('ui.formRules.selectRequired') }),
 });
 
@@ -33,7 +40,7 @@ export const getFormSchema = (deptTreeData: any[]): VbenFormSchema[] => [
       placeholder: $t('common.pleaseInput'),
     },
     colProps: { span: 24 },
-  },
+  } as any,
   {
     fieldName: 'division',
     label: $t('qms.workOrder.division'),
@@ -45,19 +52,19 @@ export const getFormSchema = (deptTreeData: any[]): VbenFormSchema[] => [
       allowClear: true,
     },
     colProps: { span: 24 },
-  },
+  } as any,
   {
     fieldName: 'customerName',
     label: $t('qms.workOrder.customerName'),
     component: 'Input',
     colProps: { span: 24 },
-  },
+  } as any,
   {
     fieldName: 'projectName',
     label: $t('qms.workOrder.projectName'),
     component: 'Input',
     colProps: { span: 24 },
-  },
+  } as any,
   {
     fieldName: 'quantity',
     label: $t('qms.workOrder.quantity'),
@@ -67,20 +74,20 @@ export const getFormSchema = (deptTreeData: any[]): VbenFormSchema[] => [
       style: { width: '100%' },
     },
     colProps: { span: 12 },
-  },
+  } as any,
   {
     fieldName: 'status',
     label: $t('common.status'),
     component: 'Select',
     componentProps: {
       options: Object.keys(WORK_ORDER_STATUS_UI_MAP).map((key) => ({
-        label: $t(WORK_ORDER_STATUS_UI_MAP[key]!.textKey),
+        label: $t(WORK_ORDER_STATUS_UI_MAP[key]?.textKey || ''),
         value: key,
       })),
       placeholder: $t('common.pleaseSelect'),
     },
     colProps: { span: 12 },
-  },
+  } as any,
   {
     fieldName: 'deliveryDate',
     label: $t('qms.workOrder.deliveryDate'),
@@ -90,7 +97,7 @@ export const getFormSchema = (deptTreeData: any[]): VbenFormSchema[] => [
       style: { width: '100%' },
     },
     colProps: { span: 12 },
-  },
+  } as any,
   {
     fieldName: 'effectiveTime',
     label: $t('qms.workOrder.effectiveTime'),
@@ -100,7 +107,7 @@ export const getFormSchema = (deptTreeData: any[]): VbenFormSchema[] => [
       style: { width: '100%' },
     },
     colProps: { span: 12 },
-  },
+  } as any,
 ];
 
 /**
@@ -108,18 +115,38 @@ export const getFormSchema = (deptTreeData: any[]): VbenFormSchema[] => [
  */
 export const getGridColumns = (): VxeGridProps['columns'] => [
   { type: 'seq', title: $t('common.seq'), width: 60 },
-  { field: 'workOrderNumber', title: $t('qms.workOrder.workOrderNumber'), minWidth: 120 },
+  {
+    field: 'workOrderNumber',
+    title: $t('qms.workOrder.workOrderNumber'),
+    minWidth: 120,
+  },
   {
     field: 'division',
     title: $t('qms.workOrder.division'),
     minWidth: 120,
     slots: { default: 'division' },
   },
-  { field: 'projectName', title: $t('qms.workOrder.projectName'), minWidth: 150 },
-  { field: 'customerName', title: $t('qms.workOrder.customerName'), minWidth: 150 },
+  {
+    field: 'projectName',
+    title: $t('qms.workOrder.projectName'),
+    minWidth: 150,
+  },
+  {
+    field: 'customerName',
+    title: $t('qms.workOrder.customerName'),
+    minWidth: 150,
+  },
   { field: 'quantity', title: $t('qms.workOrder.quantity'), width: 80 },
-  { field: 'deliveryDate', title: $t('qms.workOrder.deliveryDate'), width: 120 },
-  { field: 'effectiveTime', title: $t('qms.workOrder.effectiveTime'), width: 120 },
+  {
+    field: 'deliveryDate',
+    title: $t('qms.workOrder.deliveryDate'),
+    width: 120,
+  },
+  {
+    field: 'effectiveTime',
+    title: $t('qms.workOrder.effectiveTime'),
+    width: 120,
+  },
   {
     field: 'status',
     title: $t('common.status'),
@@ -127,5 +154,10 @@ export const getGridColumns = (): VxeGridProps['columns'] => [
     slots: { default: 'status' },
   },
   { field: 'createTime', title: $t('qms.workOrder.createTime'), width: 160 },
-  { title: $t('common.action'), width: 150, fixed: 'right', slots: { default: 'action' } },
+  {
+    title: $t('common.action'),
+    width: 150,
+    fixed: 'right',
+    slots: { default: 'action' },
+  },
 ];

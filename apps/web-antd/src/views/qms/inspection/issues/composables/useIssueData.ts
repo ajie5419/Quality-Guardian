@@ -1,4 +1,4 @@
-import type { DeptNode, WorkOrderItem, SupplierItem } from '../types';
+import type { SupplierItem, WorkOrderItem } from '../types';
 
 import { ref } from 'vue';
 
@@ -6,9 +6,9 @@ import { useI18n } from '@vben/locales';
 
 import { message } from 'ant-design-vue';
 
-import { getDeptList } from '#/api/system/dept';
-import { getWorkOrderList } from '#/api/qms/work-order';
 import { getSupplierList } from '#/api/qms/supplier';
+import { getWorkOrderList } from '#/api/qms/work-order';
+import { getDeptList } from '#/api/system/dept';
 import { convertToTreeSelectData } from '#/types';
 
 import { UI_CONSTANTS } from '../constants';
@@ -19,8 +19,8 @@ import { UI_CONSTANTS } from '../constants';
 export function useIssueData() {
   const { t } = useI18n();
 
-  const deptTreeData = ref<DeptNode[]>([]);
-  const deptRawData = ref<DeptNode[]>([]);
+  const deptTreeData = ref<any[]>([]);
+  const deptRawData = ref<any[]>([]);
   const workOrderList = ref<WorkOrderItem[]>([]);
   const supplierList = ref<SupplierItem[]>([]);
   const isLoading = ref(false);
@@ -37,8 +37,8 @@ export function useIssueData() {
         getSupplierList({ pageSize: UI_CONSTANTS.SUPPLIER_PAGE_SIZE }),
       ]);
 
-      deptRawData.value = deptRes as DeptNode[];
-      deptTreeData.value = convertToTreeSelectData(deptRes);
+      deptRawData.value = deptRes as any[];
+      deptTreeData.value = convertToTreeSelectData(deptRes) as any[];
       workOrderList.value = (workOrderRes as any).items || [];
       // 包含所有类型的供应商和外协单位
       supplierList.value = (supplierRes as any).items || [];

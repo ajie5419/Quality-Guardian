@@ -12,13 +12,13 @@ export const QMS_API = {
   SUPPLIER: '/qms/supplier',
   SUPPLIER_BATCH: '/qms/supplier/batch',
   SUPPLIER_BATCH_DELETE: '/qms/supplier/batch-delete',
-  
+
   // Inspection & Quality
   INSPECTION_ISSUES: '/qms/inspection/issues',
   INSPECTION_RECORDS: '/qms/inspection/records',
   QUALITY_LOSS: '/qms/quality-loss',
   WORK_ORDER: '/qms/work-order',
-  
+
   // Planning & Knowledge
   PLANNING_DFMEA: '/qms/planning/dfmea',
   PLANNING_BOM: '/qms/planning/bom',
@@ -27,7 +27,7 @@ export const QMS_API = {
   AI_GENERATE_ITP: '/qms/ai/generate-itp',
   KNOWLEDGE: '/qms/knowledge',
   KNOWLEDGE_CATEGORIES: '/qms/knowledge/categories',
-  
+
   // Reports
   REPORTS: '/qms/reports',
   REPORTS_SUMMARY: '/qms/reports/summary',

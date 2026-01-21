@@ -16,7 +16,9 @@ export default defineEventHandler(async (event) => {
   const year = query.year;
   const projectName = query.projectName ? String(query.projectName) : undefined;
   const statusFilter = query.status ? String(query.status) : undefined;
-  const workOrderNumber = query.workOrderNumber ? String(query.workOrderNumber) : undefined;
+  const workOrderNumber = query.workOrderNumber
+    ? String(query.workOrderNumber)
+    : undefined;
 
   // 年份过滤逻辑
   let dateFilter: Record<string, Date> | undefined;
@@ -34,7 +36,9 @@ export default defineEventHandler(async (event) => {
       isDeleted: false,
       ...(dateFilter ? { deliveryDate: dateFilter } : {}),
       ...(projectName ? { projectName: { contains: projectName } } : {}),
-      ...(workOrderNumber ? { workOrderNumber: { contains: workOrderNumber } } : {}),
+      ...(workOrderNumber
+        ? { workOrderNumber: { contains: workOrderNumber } }
+        : {}),
       ...(statusFilter ? { status: statusFilter } : {}),
     };
 
@@ -71,9 +75,15 @@ export default defineEventHandler(async (event) => {
       return {
         ...wo,
         id: wo.workOrderNumber,
-        deliveryDate: wo.deliveryDate ? wo.deliveryDate.toISOString().split('T')[0] : null,
-        effectiveTime: wo.effectiveTime ? wo.effectiveTime.toISOString().split('T')[0] : null,
-        createTime: wo.createdAt ? wo.createdAt.toISOString().replace('T', ' ').split('.')[0] : null,
+        deliveryDate: wo.deliveryDate
+          ? wo.deliveryDate.toISOString().split('T')[0]
+          : null,
+        effectiveTime: wo.effectiveTime
+          ? wo.effectiveTime.toISOString().split('T')[0]
+          : null,
+        createTime: wo.createdAt
+          ? wo.createdAt.toISOString().replace('T', ' ').split('.')[0]
+          : null,
         status: displayStatus,
       };
     });

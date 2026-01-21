@@ -73,7 +73,12 @@ const gridOptions: VxeGridProps = {
     { field: 'path', title: t('sys.menu.routePath'), width: 180 },
     { field: 'meta.icon', title: t('sys.menu.icon'), width: 100 },
     { field: 'meta.orderNo', title: t('sys.menu.order'), width: 80 },
-    { title: t('common.action'), width: 200, fixed: 'right', slots: { default: 'action' } },
+    {
+      title: t('common.action'),
+      width: 200,
+      fixed: 'right',
+      slots: { default: 'action' },
+    },
   ],
   toolbarConfig: {
     export: true,
@@ -226,10 +231,12 @@ const canDelete = computed(
           @click="handleAddChild(row)"
           >{{ t('sys.menu.addChildMenu') }}</a
         >
-        <a v-if="canEdit" class="mr-2" @click="handleEdit(row)">{{ t('common.edit') }}</a>
-        <a v-if="canDelete" class="text-red-500" @click="handleDelete(row)"
-          >{{ t('common.delete') }}</a
-        >
+        <a v-if="canEdit" class="mr-2" @click="handleEdit(row)">{{
+          t('common.edit')
+        }}</a>
+        <a v-if="canDelete" class="text-red-500" @click="handleDelete(row)">{{
+          t('common.delete')
+        }}</a>
       </template>
     </Grid>
 

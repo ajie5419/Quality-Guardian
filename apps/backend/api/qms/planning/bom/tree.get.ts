@@ -9,15 +9,15 @@ export default defineEventHandler(async (event) => {
 
   try {
     const workOrders = await prisma.work_orders.findMany({
-        where: { isDeleted: false },
-        include: { project_boms: true },
-        orderBy: { createdAt: 'desc' },
+      where: { isDeleted: false },
+      include: { project_boms: true },
+      orderBy: { createdAt: 'desc' },
     });
 
     const treeData = workOrders.map((wo) => {
       // 将数据库状态映射为前端 Tab 可识别的状态
       // COMPLETED/CLOSED 映射为 archived，其余为 active
-      const isArchived = ['COMPLETED', 'CLOSED'].includes(wo.status);
+      const isArchived = ['CLOSED', 'COMPLETED'].includes(wo.status);
       const status = isArchived ? 'archived' : 'active';
 
       return {

@@ -3,18 +3,17 @@ import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import { ref, watch } from 'vue';
 
+import { useI18n } from '@vben/locales';
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
 
-import { useI18n } from '@vben/locales';
-
 import { Card, Col, Row } from 'ant-design-vue';
-
-const { t } = useI18n();
 
 const props = defineProps<{
   pieData: { name: string; value: number }[];
   trendData: [string, number][];
 }>();
+
+const { t } = useI18n();
 
 // 1. 饼图配置
 const pieChartRef = ref<EchartsUIType>();
@@ -67,7 +66,7 @@ watch(
         },
         xAxis: {
           type: 'category',
-          data: props.trendData.map((d) => d[0].split('-')[1] + '月'),
+          data: props.trendData.map((d) => `${d[0].split('-')[1]}月`),
         },
         yAxis: { type: 'value', name: '损失金额' },
         series: [

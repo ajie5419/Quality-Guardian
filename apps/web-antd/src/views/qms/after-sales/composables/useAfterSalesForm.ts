@@ -8,10 +8,7 @@ import { reactive, ref, watch } from 'vue';
 
 import { message } from 'ant-design-vue';
 
-import {
-  createAfterSales,
-  updateAfterSales,
-} from '#/api/qms/after-sales';
+import { createAfterSales, updateAfterSales } from '#/api/qms/after-sales';
 
 import {
   createInitialFormState,
@@ -97,10 +94,15 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
    * 重置表单
    */
   function resetForm() {
-    Object.keys(formState).forEach((key) => {
-      delete formState[key as keyof QmsAfterSalesApi.AfterSalesItem];
-    });
-    Object.assign(formState, createInitialFormState());
+    // 使用 Object.assign 直接覆盖，而不是逐个 delete
+    const initialState = createInitialFormState();
+    // 清除旧属性
+    for (const key in formState) {
+      if (Object.prototype.hasOwnProperty.call(formState, key)) {
+        (formState as any)[key] = undefined;
+      }
+    }
+    Object.assign(formState, initialState);
     currentId.value = null;
     updateDefectSubtypes();
     updateProductSubtypes();
@@ -110,9 +112,12 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
    * 从数据初始化表单
    */
   function initFromData(row: QmsAfterSalesApi.AfterSalesItem) {
-    Object.keys(formState).forEach((key) => {
-      delete formState[key as keyof QmsAfterSalesApi.AfterSalesItem];
-    });
+    // 同理，清理后赋值
+    for (const key in formState) {
+      if (Object.prototype.hasOwnProperty.call(formState, key)) {
+        (formState as any)[key] = undefined;
+      }
+    }
     Object.assign(formState, row);
     currentId.value = row.id;
     updateDefectSubtypes();

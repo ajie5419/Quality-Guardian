@@ -15,11 +15,14 @@ export default defineEventHandler(async (event) => {
       updatedAt: new Date(),
     };
 
-    if (body.projectName !== undefined) updateData.projectName = body.projectName;
-    if (body.workOrderId !== undefined) updateData.workOrderId = body.workOrderId;
+    if (body.projectName !== undefined)
+      updateData.projectName = body.projectName;
+    if (body.workOrderId !== undefined)
+      updateData.workOrderId = body.workOrderId;
     if (body.version !== undefined) updateData.version = body.version;
     if (body.status !== undefined) updateData.status = body.status;
-    if (body.description !== undefined) updateData.description = body.description;
+    if (body.description !== undefined)
+      updateData.description = body.description;
 
     const updatedProject = await prisma.dfmea_projects.update({
       where: { id },

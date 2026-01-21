@@ -14,17 +14,23 @@ import {
   Tooltip,
 } from 'ant-design-vue';
 
-import { DEFECT_OPTIONS, SEVERITY_OPTIONS, SEVERITY_TOOLTIPS } from '../constants';
+import {
+  DEFECT_OPTIONS,
+  SEVERITY_OPTIONS,
+  SEVERITY_TOOLTIPS,
+} from '../constants';
 
 defineProps<{
   defectSubtypes: string[];
 }>();
 
-const formState = defineModel<AfterSalesFormState>('formState', { required: true });
-
 const emit = defineEmits<{
   defectTypeChange: [];
 }>();
+
+const formState = defineModel<AfterSalesFormState>('formState', {
+  required: true,
+});
 
 const { t } = useI18n();
 const HelpIcon = createIconifyIcon('lucide:circle-help');
@@ -37,18 +43,26 @@ const HelpIcon = createIconifyIcon('lucide:circle-help');
     </div>
     <div class="space-y-3">
       <div class="grid grid-cols-2 gap-2">
-        <FormItem :label="t('qms.afterSales.form.issueDate')" class="mb-0" name="issueDate">
+        <FormItem
+          :label="t('qms.afterSales.form.issueDate')"
+          class="mb-0"
+          name="issueDate"
+        >
           <DatePicker
             v-model:value="formState.issueDate"
             value-format="YYYY-MM-DD"
             class="w-full"
           />
         </FormItem>
-        <FormItem :label="t('qms.afterSales.form.location')" class="mb-0" name="location">
+        <FormItem
+          :label="t('qms.afterSales.form.location')"
+          class="mb-0"
+          name="location"
+        >
           <Input v-model:value="formState.location" />
         </FormItem>
       </div>
-      
+
       <FormItem class="mb-0" name="severity">
         <template #label>
           <span class="flex items-center gap-1">
@@ -56,8 +70,13 @@ const HelpIcon = createIconifyIcon('lucide:circle-help');
             <Tooltip placement="top">
               <template #title>
                 <div class="text-xs">
-                  <p v-for="tip in SEVERITY_TOOLTIPS" :key="tip.level" class="mb-1">
-                    <strong>{{ tip.level }}</strong>：{{ tip.desc }}
+                  <p
+                    v-for="tip in SEVERITY_TOOLTIPS"
+                    :key="tip.level"
+                    class="mb-1"
+                  >
+                    <strong>{{ tip.level }}</strong
+                    >：{{ tip.desc }}
                   </p>
                 </div>
               </template>
@@ -71,9 +90,13 @@ const HelpIcon = createIconifyIcon('lucide:circle-help');
           </SelectOption>
         </Select>
       </FormItem>
-      
+
       <div class="grid grid-cols-2 gap-2">
-        <FormItem :label="t('qms.afterSales.form.defectType')" class="mb-0" name="defectType">
+        <FormItem
+          :label="t('qms.afterSales.form.defectType')"
+          class="mb-0"
+          name="defectType"
+        >
           <Select
             v-model:value="formState.defectType"
             @change="emit('defectTypeChange')"
@@ -91,9 +114,13 @@ const HelpIcon = createIconifyIcon('lucide:circle-help');
           </Select>
         </FormItem>
       </div>
-      
+
       <div class="grid grid-cols-2 gap-2">
-        <FormItem :label="t('qms.afterSales.form.quantity')" class="mb-0" name="quantity">
+        <FormItem
+          :label="t('qms.afterSales.form.quantity')"
+          class="mb-0"
+          name="quantity"
+        >
           <InputNumber v-model:value="formState.quantity" class="w-full" />
         </FormItem>
         <FormItem :label="t('qms.afterSales.form.handler')" class="mb-0">

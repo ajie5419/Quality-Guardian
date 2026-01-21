@@ -44,11 +44,9 @@ async function handleSubmit() {
     const values = await formApi.getValues();
     modalApi.setState({ confirmLoading: true });
 
-    if (isUpdate.value && recordId.value) {
-      await updateSupplier(recordId.value, values);
-    } else {
-      await createSupplier({ ...values, category: currentCategory.value });
-    }
+    await (isUpdate.value && recordId.value
+      ? updateSupplier(recordId.value, values)
+      : createSupplier({ ...values, category: currentCategory.value }));
 
     message.success(t('common.saveSuccess'));
     modalApi.close();

@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   try {
     const plan = await prisma.quality_plans.findUnique({
       where: { id: projectId },
-      include: { items: true }
+      include: { items: true },
     });
 
     if (!plan) {

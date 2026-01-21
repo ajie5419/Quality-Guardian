@@ -5,18 +5,20 @@ import type { UploadFileWithResponse } from '../types';
 
 import { computed } from 'vue';
 
-import { useAccessStore } from '@vben/stores';
 import { useI18n } from '@vben/locales';
+import { useAccessStore } from '@vben/stores';
 
 import { message, Upload } from 'ant-design-vue';
 
 import { UI_CONSTANTS } from '../constants';
 
-const photos = defineModel<UploadFileWithResponse[]>('photos', { default: () => [] });
-
 const props = defineProps<{
   maxCount?: number;
 }>();
+
+const photos = defineModel<UploadFileWithResponse[]>('photos', {
+  default: () => [],
+});
 
 const { t } = useI18n();
 const accessStore = useAccessStore();
@@ -27,7 +29,10 @@ const uploadHeaders = computed(() => {
   };
 });
 
-const maxImages = computed(() => photos.value.length < (props?.maxCount ?? UI_CONSTANTS.MAX_UPLOAD_IMAGES));
+const maxImages = computed(
+  () =>
+    photos.value.length < (props?.maxCount ?? UI_CONSTANTS.MAX_UPLOAD_IMAGES),
+);
 
 function handleUploadChange(info: UploadChangeParam<UploadFile>) {
   if (info.file.status === 'done') {
@@ -53,7 +58,9 @@ function handleUploadChange(info: UploadChangeParam<UploadFile>) {
     >
       <div v-if="maxImages">
         <span class="i-lucide-plus text-xl"></span>
-        <div style="margin-top: 8px">{{ t('qms.inspection.issues.upload-image') }}</div>
+        <div style="margin-top: 8px">
+          {{ t('qms.inspection.issues.upload-image') }}
+        </div>
       </div>
     </Upload>
   </div>

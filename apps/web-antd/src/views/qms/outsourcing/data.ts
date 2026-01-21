@@ -1,4 +1,3 @@
-import type { VbenFormSchema } from '#/adapter/form';
 import type { VxeGridProps } from '#/adapter/vxe-table';
 
 import { $t } from '@vben/locales';
@@ -82,7 +81,7 @@ export const columns: VxeGridProps['columns'] = [
   },
 ];
 
-export const formSchema: VbenFormSchema[] = [
+export const formSchema: any[] = [
   {
     fieldName: 'name',
     label: '名称',
@@ -132,7 +131,7 @@ export const formSchema: VbenFormSchema[] = [
   },
 ];
 
-export const searchFormSchema: VbenFormSchema[] = [
+export const searchFormSchema: any[] = [
   {
     fieldName: 'name',
     label: $t('qms.outsourcing.unitName'),

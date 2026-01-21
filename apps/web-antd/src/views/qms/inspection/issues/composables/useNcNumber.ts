@@ -1,11 +1,16 @@
 import type { Ref } from 'vue';
+
 import type { IssueFormState } from '../types';
 
 import { ref, watch } from 'vue';
 
 import { getInspectionIssues } from '#/api/qms/inspection';
 
-import { NC_NUMBER_PREFIX, NC_NUMBER_SUFFIX, NC_NUMBER_SEQUENCE_LENGTH } from '../constants';
+import {
+  NC_NUMBER_PREFIX,
+  NC_NUMBER_SEQUENCE_LENGTH,
+  NC_NUMBER_SUFFIX,
+} from '../constants';
 
 interface UseNcNumberOptions {
   formState: Ref<IssueFormState>;
@@ -45,7 +50,9 @@ export function useNcNumber(options: UseNcNumberOptions) {
         }
       });
 
-      const nextSeq = (maxSeq + 1).toString().padStart(NC_NUMBER_SEQUENCE_LENGTH, '0');
+      const nextSeq = (maxSeq + 1)
+        .toString()
+        .padStart(NC_NUMBER_SEQUENCE_LENGTH, '0');
       return `${prefix}${nextSeq}`;
     } catch (error) {
       console.error('Failed to generate NC sequence', error);

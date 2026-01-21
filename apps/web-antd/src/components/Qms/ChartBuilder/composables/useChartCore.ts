@@ -1,24 +1,30 @@
-import type { EChartsOption } from 'echarts';
+import type { ECOption as EChartsOption } from '@vben/plugins/echarts';
+
 import type { ChartConfig, ChartOptionItem } from '../types';
 
 // Simple GroupBy implementation
-function groupBy<T>(array: T[], keyFn: (item: T) => string): Record<string, T[]> {
-  return array.reduce(
-    (result, item) => {
-      const key = keyFn(item);
-      if (!result[key]) {
-        result[key] = [];
-      }
-      result[key].push(item);
-      return result;
-    },
-    {} as Record<string, T[]>,
-  );
+function groupBy<T>(
+  array: T[],
+  keyFn: (item: T) => string,
+): Record<string, T[]> {
+  const result: Record<string, T[]> = {};
+  for (const item of array) {
+    const key = keyFn(item);
+    if (!result[key]) {
+      result[key] = [];
+    }
+    result[key].push(item);
+  }
+  return result;
 }
 
 // Simple SumBy implementation
 function sumBy<T>(array: T[], fn: (item: T) => number): number {
-  return array.reduce((sum, item) => sum + fn(item), 0);
+  let sum = 0;
+  for (const item of array) {
+    sum += fn(item);
+  }
+  return sum;
 }
 
 /**
@@ -41,23 +47,19 @@ export function aggregateChartData<T>(
     if (dimensionExtractor) {
       return dimensionExtractor(item, config.dimension);
     }
-    const val = item[config.dimension];
-    return String(val || 'Unknown');
+    return String(item[config.dimension] || 'Unknown');
   });
 
   // 2. Aggregate Metric
   const result = Object.entries(grouped).map(([key, items]) => {
-    let value = 0;
-    if (config.metric === 'count') {
-      value = items.length;
-    } else {
-      // Use the provided calculator for specific metrics
-      value = sumBy(items, (i) => valueCalculator(i, config.metric));
-    }
-    
     // Round to 2 decimal places
-    value = Math.round(value * 100) / 100;
-    
+    const value =
+      Math.round(
+        (config.metric === 'count'
+          ? items.length
+          : sumBy(items, (i) => valueCalculator(i, config.metric))) * 100,
+      ) / 100;
+
     return { name: key, value };
   });
 
@@ -73,8 +75,16 @@ export function aggregateChartData<T>(
 
 // Modern color palette
 const COLOR_PALETTE = [
-  '#3b82f6', '#06b6d4', '#8b5cf6', '#ec4899', '#f59e0b',
-  '#10b981', '#6366f1', '#14b8a6', '#f43f5e', '#f97316'
+  '#3b82f6',
+  '#06b6d4',
+  '#8b5cf6',
+  '#ec4899',
+  '#f59e0b',
+  '#10b981',
+  '#6366f1',
+  '#14b8a6',
+  '#f43f5e',
+  '#f97316',
 ];
 
 /**
@@ -84,7 +94,7 @@ function generateChartOption(
   data: { name: string; value: number }[],
   config: ChartConfig,
   metricOptions: ChartOptionItem[],
-): EChartsOption {
+): any {
   const metricLabel =
     metricOptions.find((m) => m.value === config.metric)?.label ||
     config.metric;
@@ -103,7 +113,7 @@ function generateChartOption(
     color: '#6b7280',
     formatter: (value: string) => {
       // 超过 6 个字符截断，防止 X 轴标签过长导致显示不全
-      return value.length > 6 ? `${value.substring(0, 6)}...` : value;
+      return value.length > 6 ? `${value.slice(0, 6)}...` : value;
     },
   };
 
@@ -115,16 +125,17 @@ function generateChartOption(
     borderWidth: 1,
     padding: [8, 12],
     textStyle: { color: '#374151' },
-    extraCssText: 'box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); border-radius: 8px;',
+    extraCssText:
+      'box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); border-radius: 8px;',
   };
 
   const commonAxis = {
     axisLine: { show: false }, // Hide axis line
     axisTick: { show: false }, // Hide ticks
     axisLabel: { color: '#6b7280', fontSize: 12 },
-    splitLine: { 
-      show: true, 
-      lineStyle: { type: 'dashed', color: '#f3f4f6' } 
+    splitLine: {
+      show: true,
+      lineStyle: { type: 'dashed', color: '#f3f4f6' },
     },
   };
 
@@ -144,7 +155,11 @@ function generateChartOption(
       yAxis: {
         type: 'value',
         name: metricLabel,
-        nameTextStyle: { color: '#9ca3af', align: 'right', padding: [0, 10, 0, 0] },
+        nameTextStyle: {
+          color: '#9ca3af',
+          align: 'right',
+          padding: [0, 10, 0, 0],
+        },
         ...commonAxis,
       },
       series: [
@@ -157,18 +172,21 @@ function generateChartOption(
             borderRadius: [4, 4, 0, 0], // Top rounded corners
             color: {
               type: 'linear',
-              x: 0, y: 0, x2: 0, y2: 1,
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
               colorStops: [
                 { offset: 0, color: '#60a5fa' }, // Light Blue
-                { offset: 1, color: '#2563eb' }  // Dark Blue
-              ]
-            }
+                { offset: 1, color: '#2563eb' }, // Dark Blue
+              ],
+            },
           },
-          label: { 
-            show: true, 
+          label: {
+            show: true,
             position: 'top',
             color: '#6b7280',
-            fontWeight: 500
+            fontWeight: 500,
           },
         },
       ],
@@ -192,7 +210,11 @@ function generateChartOption(
       yAxis: {
         type: 'value',
         name: metricLabel,
-        nameTextStyle: { color: '#9ca3af', align: 'right', padding: [0, 10, 0, 0] },
+        nameTextStyle: {
+          color: '#9ca3af',
+          align: 'right',
+          padding: [0, 10, 0, 0],
+        },
         ...commonAxis,
       },
       series: [
@@ -208,12 +230,15 @@ function generateChartOption(
           areaStyle: {
             color: {
               type: 'linear',
-              x: 0, y: 0, x2: 0, y2: 1,
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
               colorStops: [
                 { offset: 0, color: 'rgba(59, 130, 246, 0.2)' },
-                { offset: 1, color: 'rgba(59, 130, 246, 0)' }
-              ]
-            }
+                { offset: 1, color: 'rgba(59, 130, 246, 0)' },
+              ],
+            },
           },
           label: { show: false },
         },
@@ -250,7 +275,7 @@ function generateChartOption(
           type: 'pie',
           radius: isRing ? ['50%', '75%'] : ['0%', '75%'],
           center: ['40%', '50%'], // Shift left to make room for legend
-          data: data,
+          data,
           itemStyle: {
             borderRadius: 5,
             borderColor: '#fff',

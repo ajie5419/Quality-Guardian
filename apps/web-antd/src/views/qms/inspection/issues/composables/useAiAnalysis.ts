@@ -1,7 +1,6 @@
 import type { Ref } from 'vue';
 
-import type { IssueFormState } from './useIssueForm';
-import type { MatchedCase } from '../types';
+import type { IssueFormState, MatchedCase } from '../types';
 
 import { ref } from 'vue';
 

@@ -29,6 +29,7 @@ export namespace QmsAfterSalesApi {
     isClaim?: boolean; // 是否索赔
     supplierBrand?: string; // 供应商名称/品牌
     partName?: string; // 部件名称
+    photos?: string[]; // 现场照片
   }
 
   export interface AfterSalesParams {
@@ -41,23 +42,23 @@ export namespace QmsAfterSalesApi {
 
   export interface AfterSalesStats {
     kpi: {
-      total: number;
-      open: number;
-      cost: number;
       avgTime: number;
+      cost: number;
+      open: number;
+      total: number;
     };
     trend: {
       category: string[];
-      issues: number[];
       closed: number[];
       costs: number[];
+      issues: number[];
     };
-    defectDistribution: { value: number; name: string }[];
+    defectDistribution: { name: string; value: number }[];
     supplierRanking: {
       categories: string[];
       data: number[];
     };
-    deptDistribution: { value: number; name: string }[];
+    deptDistribution: { name: string; value: number }[];
   }
 }
 
@@ -76,9 +77,7 @@ export async function getAfterSalesList(
 /**
  * Get After-sales statistics
  */
-export async function getAfterSalesStats(
-  params?: { year?: number },
-) {
+export async function getAfterSalesStats(params?: { year?: number }) {
   return requestClient.get<QmsAfterSalesApi.AfterSalesStats>(
     '/qms/after-sales/stats',
     { params },

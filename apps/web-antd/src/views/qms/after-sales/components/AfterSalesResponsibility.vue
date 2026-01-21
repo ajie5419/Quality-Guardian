@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { AfterSalesFormState } from '../composables/useAfterSalesForm';
+
 import type { QmsSupplierApi } from '#/api/qms/supplier';
 import type { TreeSelectNode } from '#/types';
 
@@ -15,11 +16,13 @@ import {
 
 defineProps<{
   deptTreeData: TreeSelectNode[];
-  supplierList: QmsSupplierApi.SupplierItem[];
   isPurchasingDept: boolean;
+  supplierList: QmsSupplierApi.SupplierItem[];
 }>();
 
-const formState = defineModel<AfterSalesFormState>('formState', { required: true });
+const formState = defineModel<AfterSalesFormState>('formState', {
+  required: true,
+});
 
 const { t } = useI18n();
 </script>
@@ -30,7 +33,11 @@ const { t } = useI18n();
       {{ t('qms.afterSales.form.responsibility') }}
     </div>
     <div class="space-y-3">
-      <FormItem :label="t('qms.afterSales.form.responsibleDept')" class="mb-0" name="responsibleDept">
+      <FormItem
+        :label="t('qms.afterSales.form.responsibleDept')"
+        class="mb-0"
+        name="responsibleDept"
+      >
         <TreeSelect
           v-model:value="formState.responsibleDept"
           :tree-data="deptTreeData"
@@ -66,7 +73,10 @@ const { t } = useI18n();
             class="w-full"
           />
         </FormItem>
-        <FormItem :label="t('qms.afterSales.form.laborTravelCost')" class="mb-0">
+        <FormItem
+          :label="t('qms.afterSales.form.laborTravelCost')"
+          class="mb-0"
+        >
           <InputNumber
             v-model:value="formState.laborTravelCost"
             prefix="¥"

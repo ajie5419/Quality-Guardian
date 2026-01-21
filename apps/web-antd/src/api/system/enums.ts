@@ -6,6 +6,6 @@
  * System Status (Enabled/Disabled)
  */
 export enum SysStatusEnum {
-  ENABLED = 1,
   DISABLED = 0,
+  ENABLED = 1,
 }

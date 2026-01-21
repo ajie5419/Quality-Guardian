@@ -1,7 +1,7 @@
 import type { InspectionIssue } from '../types';
-import { IssueStatus } from '../types';
 
 import { ISSUE_STATUS_UI_MAP } from '../constants';
+import { IssueStatus } from '../types';
 
 /**
  * 状态映射表：支持多种格式（中英文）到枚举的转换
@@ -22,7 +22,7 @@ const STATUS_KEY_MAP: Record<string, IssueStatus> = {
 /**
  * 获取状态枚举值
  */
-export function getStatusKey(status: string | IssueStatus): IssueStatus {
+export function getStatusKey(status: IssueStatus | string): IssueStatus {
   const s = String(status || '').toUpperCase();
   return STATUS_KEY_MAP[s] || STATUS_KEY_MAP[status] || (s as IssueStatus);
 }
@@ -30,7 +30,7 @@ export function getStatusKey(status: string | IssueStatus): IssueStatus {
 /**
  * 获取状态颜色
  */
-export function getStatusColor(status: string | IssueStatus): string {
+export function getStatusColor(status: IssueStatus | string): string {
   const key = getStatusKey(status);
   return ISSUE_STATUS_UI_MAP[key]?.color || 'default';
 }
@@ -38,7 +38,7 @@ export function getStatusColor(status: string | IssueStatus): string {
 /**
  * 获取状态标签文本
  */
-export function getStatusLabel(status: string | IssueStatus): string {
+export function getStatusLabel(status: IssueStatus | string): string {
   const key = getStatusKey(status);
   const config = ISSUE_STATUS_UI_MAP[key];
   return config?.label || String(status);

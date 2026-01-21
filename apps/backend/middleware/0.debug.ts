@@ -6,7 +6,7 @@ export default defineEventHandler((event) => {
   const timestamp = new Date().toISOString();
 
   // 记录所有 API 请求
-  console.log(`[API-Request] ${timestamp} ${method} ${path}`);
+  console.warn(`[API-Request] ${timestamp} ${method} ${path}`);
 
   // 不返回任何值，让请求继续执行
 });

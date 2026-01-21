@@ -18,11 +18,13 @@ defineProps<{
   productSubtypes: string[];
 }>();
 
-const formState = defineModel<AfterSalesFormState>('formState', { required: true });
-
 const emit = defineEmits<{
   productTypeChange: [];
 }>();
+
+const formState = defineModel<AfterSalesFormState>('formState', {
+  required: true,
+});
 
 const { t } = useI18n();
 </script>
@@ -34,7 +36,11 @@ const { t } = useI18n();
     </div>
     <div class="space-y-3">
       <div class="grid grid-cols-2 gap-2">
-        <FormItem :label="t('qms.afterSales.form.partName')" class="mb-0" name="partName">
+        <FormItem
+          :label="t('qms.afterSales.form.partName')"
+          class="mb-0"
+          name="partName"
+        >
           <Input v-model:value="formState.partName" />
         </FormItem>
         <FormItem :label="t('qms.afterSales.form.factoryDate')" class="mb-0">
@@ -52,7 +58,11 @@ const { t } = useI18n();
             @change="emit('productTypeChange')"
             :placeholder="t('qms.afterSales.placeholder.selectType')"
           >
-            <SelectOption v-for="opt in PRODUCT_OPTIONS" :key="opt" :value="opt">
+            <SelectOption
+              v-for="opt in PRODUCT_OPTIONS"
+              :key="opt"
+              :value="opt"
+            >
               {{ opt }}
             </SelectOption>
           </Select>
@@ -62,7 +72,11 @@ const { t } = useI18n();
             v-model:value="formState.productSubtype"
             :placeholder="t('qms.afterSales.placeholder.selectSubtype')"
           >
-            <SelectOption v-for="opt in productSubtypes" :key="opt" :value="opt">
+            <SelectOption
+              v-for="opt in productSubtypes"
+              :key="opt"
+              :value="opt"
+            >
               {{ opt }}
             </SelectOption>
           </Select>
@@ -71,8 +85,12 @@ const { t } = useI18n();
       <div class="grid grid-cols-2 gap-2">
         <FormItem :label="t('qms.afterSales.form.warrantyStatus')" class="mb-0">
           <Select v-model:value="formState.warrantyStatus">
-            <SelectOption value="在保">{{ t('qms.afterSales.options.underWarranty') }}</SelectOption>
-            <SelectOption value="过保">{{ t('qms.afterSales.options.expired') }}</SelectOption>
+            <SelectOption value="在保">{{
+              t('qms.afterSales.options.underWarranty')
+            }}</SelectOption>
+            <SelectOption value="过保">{{
+              t('qms.afterSales.options.expired')
+            }}</SelectOption>
           </Select>
         </FormItem>
         <FormItem :label="t('qms.afterSales.form.runningHours')" class="mb-0">

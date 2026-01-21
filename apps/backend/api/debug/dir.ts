@@ -1,5 +1,6 @@
 import { readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { defineEventHandler } from 'h3';

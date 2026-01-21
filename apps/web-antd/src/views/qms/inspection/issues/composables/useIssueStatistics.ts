@@ -1,5 +1,12 @@
 import type { Ref } from 'vue';
-import type { InspectionIssue, StatisticsData, PieDataItem, TrendDataItem, ParetoDataItem } from '../types';
+
+import type {
+  InspectionIssue,
+  ParetoDataItem,
+  PieDataItem,
+  StatisticsData,
+  TrendDataItem,
+} from '../types';
 
 import { computed } from 'vue';
 
@@ -42,7 +49,7 @@ export function useIssueStatistics(
       typeMap.set(type, (typeMap.get(type) || 0) + 1);
     });
 
-    const pieData: PieDataItem[] = Array.from(typeMap.entries())
+    const pieData: PieDataItem[] = [...typeMap.entries()]
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
 
@@ -61,7 +68,7 @@ export function useIssueStatistics(
       }
     });
 
-    const trendData: TrendDataItem[] = Array.from(trendMap.entries())
+    const trendData: TrendDataItem[] = [...trendMap.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([period, value]) => ({ period, value }));
 
@@ -72,7 +79,8 @@ export function useIssueStatistics(
       return {
         label: item.name,
         value: item.value,
-        percent: totalCount > 0 ? Math.round((item.value / totalCount) * 100) : 0,
+        percent:
+          totalCount > 0 ? Math.round((item.value / totalCount) * 100) : 0,
         cumulativePercent:
           totalCount > 0 ? Math.round((cumulativeCount / totalCount) * 100) : 0,
       };

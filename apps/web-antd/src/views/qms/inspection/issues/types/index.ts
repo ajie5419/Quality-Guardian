@@ -16,25 +16,25 @@ export type IssueStatus = InspectionIssueStatusEnum;
  * 索赔状态枚举
  */
 export enum ClaimStatus {
-  YES = 'Yes',
   NO = 'No',
+  YES = 'Yes',
 }
 
 /**
  * 严重程度枚举
  */
 export enum Severity {
-  MINOR = 'Minor',
-  MAJOR = 'Major',
   CRITICAL = 'Critical',
+  MAJOR = 'Major',
+  MINOR = 'Minor',
 }
 
 /**
  * 部门类型枚举
  */
 export enum DeptType {
-  PURCHASE = '采购',
   PRODUCTION = '履约',
+  PURCHASE = '采购',
 }
 
 /**
@@ -42,10 +42,10 @@ export enum DeptType {
  */
 export enum DefectType {
   DESIGN = '设计缺陷',
-  PROCESS = '工艺缺陷',
   MANUFACTURING = '制造缺陷',
-  PART = '零部件缺陷',
   OTHER = '其他缺陷',
+  PART = '零部件缺陷',
+  PROCESS = '工艺缺陷',
 }
 
 /**
@@ -67,7 +67,7 @@ export interface InspectionIssue {
   lossAmount: number;
   responsibleDepartment: string;
   supplierName?: string;
-  status: IssueStatus;
+  status: 'Closed' | 'Open' | 'Resolved' | IssueStatus;
   claim: ClaimStatus;
   photos: string[];
   severity: Severity;
@@ -173,8 +173,8 @@ export interface MatchedCase {
   id: string;
   title: string;
   description: string;
-  rootCause: string;
-  solution: string;
+  rootCause?: string;
+  solution?: string;
   similarity: number;
 }
 
@@ -186,9 +186,9 @@ export interface GenerateQualityInsightParams {
     passRate: number;
     qualityLoss: number;
     topDefects: Array<{
-      type: string;
       count: number;
       percentage: number;
+      type: string;
     }>;
     totalInspections: number;
     trendData: Array<{

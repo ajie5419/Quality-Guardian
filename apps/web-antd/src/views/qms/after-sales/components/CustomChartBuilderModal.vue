@@ -1,10 +1,13 @@
 <script lang="ts" setup>
-import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
+import type { EchartsUIType } from '@vben/plugins/echarts';
+
 import type { ChartConfig } from '../composables/useChartAggregation';
+
+import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
 
 import { reactive, ref, watch } from 'vue';
 
-import { EchartsUI, useEcharts, type EchartsUIType } from '@vben/plugins/echarts';
+import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
 
 import {
   Form,
@@ -17,19 +20,19 @@ import {
   SelectOption,
 } from 'ant-design-vue';
 
-import { CHART_DIMENSIONS, CHART_METRICS } from '../constants';
 import { renderCustomChart } from '../composables/useChartAggregation';
+import { CHART_DIMENSIONS, CHART_METRICS } from '../constants';
 
 const props = defineProps<{
+  deptData?: any[];
+  initialConfig?: ChartConfig;
   open: boolean;
   sourceData: QmsAfterSalesApi.AfterSalesItem[];
-  initialConfig?: ChartConfig;
-  deptData?: any[];
 }>();
 
 const emit = defineEmits<{
-  'update:open': [boolean];
   save: [config: ChartConfig];
+  'update:open': [boolean];
 }>();
 
 const formState = reactive<Omit<ChartConfig, 'id'>>({
@@ -70,7 +73,9 @@ const { renderEcharts } = useEcharts(previewChartRef);
 
 // 生成标题的辅助函数
 function autoGenerateTitle() {
-  const dim = CHART_DIMENSIONS.find((d) => d.value === formState.dimension)?.label;
+  const dim = CHART_DIMENSIONS.find(
+    (d) => d.value === formState.dimension,
+  )?.label;
   const met = CHART_METRICS.find((m) => m.value === formState.metric)?.label;
   if (dim && met) {
     formState.title = `${dim} - ${met}分析`;
@@ -79,12 +84,22 @@ function autoGenerateTitle() {
 
 // 监听配置变化，实时渲染预览
 watch(
-  [() => formState.dimension, () => formState.metric, () => formState.chartType, () => props.open],
+  [
+    () => formState.dimension,
+    () => formState.metric,
+    () => formState.chartType,
+    () => props.open,
+  ],
   () => {
     if (props.open) {
       // 简单防抖或直接调用
       setTimeout(() => {
-        renderCustomChart(renderEcharts, props.sourceData, { id: 'preview', ...formState }, props.deptData);
+        renderCustomChart(
+          renderEcharts,
+          props.sourceData,
+          { id: 'preview', ...formState },
+          props.deptData,
+        );
       }, 100);
     }
   },
@@ -124,7 +139,7 @@ function handleCancel() {
       <!-- 左侧：预览区域 -->
       <div class="flex-1 rounded border border-gray-200 bg-gray-50 p-2">
         <div class="h-full w-full">
-           <EchartsUI ref="previewChartRef" height="100%" width="100%" />
+          <EchartsUI ref="previewChartRef" height="100%" width="100%" />
         </div>
       </div>
 
@@ -136,7 +151,10 @@ function handleCancel() {
           </FormItem>
 
           <FormItem label="分析维度 (X轴/分类)">
-            <Select v-model:value="formState.dimension" @change="handleDimensionChange">
+            <Select
+              v-model:value="formState.dimension"
+              @change="handleDimensionChange"
+            >
               <SelectOption
                 v-for="opt in CHART_DIMENSIONS"
                 :key="opt.value"
@@ -148,7 +166,10 @@ function handleCancel() {
           </FormItem>
 
           <FormItem label="统计指标 (Y轴/数值)">
-            <Select v-model:value="formState.metric" @change="handleMetricChange">
+            <Select
+              v-model:value="formState.metric"
+              @change="handleMetricChange"
+            >
               <SelectOption
                 v-for="opt in CHART_METRICS"
                 :key="opt.value"
@@ -160,7 +181,10 @@ function handleCancel() {
           </FormItem>
 
           <FormItem label="图表类型">
-            <RadioGroup v-model:value="formState.chartType" button-style="solid">
+            <RadioGroup
+              v-model:value="formState.chartType"
+              button-style="solid"
+            >
               <RadioButton value="bar">柱状图</RadioButton>
               <RadioButton value="line">折线图</RadioButton>
               <RadioButton value="pie">饼图</RadioButton>

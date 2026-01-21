@@ -16,7 +16,10 @@ export default defineEventHandler(async (event) => {
         severity: Number(body.severity || 5),
         occurrence: Number(body.occurrence || 5),
         detection: Number(body.detection || 5),
-        rpn: Number(body.severity || 5) * Number(body.occurrence || 5) * Number(body.detection || 5),
+        rpn:
+          Number(body.severity || 5) *
+          Number(body.occurrence || 5) *
+          Number(body.detection || 5),
         order: Number(body.order || 0),
         status: 'OPEN',
         updatedAt: new Date(),

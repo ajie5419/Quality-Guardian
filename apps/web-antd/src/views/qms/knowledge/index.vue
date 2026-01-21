@@ -64,7 +64,8 @@ const categoryForm = ref({
 
 // 选中的分类名称（用于面包屑）
 const selectedCategoryName = computed(() => {
-  if (selectedCategoryId.value.length === 0) return t('qms.knowledge.allKnowledge');
+  if (selectedCategoryId.value.length === 0)
+    return t('qms.knowledge.allKnowledge');
   const findName = (list: QmsKnowledgeApi.Category[], id: string): string => {
     for (const item of list) {
       if (item.id === id) return item.name;
@@ -76,7 +77,9 @@ const selectedCategoryName = computed(() => {
     return '';
   };
   const id = selectedCategoryId.value[0];
-  return id ? findName(categoryTree.value, id) : t('qms.knowledge.allKnowledge');
+  return id
+    ? findName(categoryTree.value, id)
+    : t('qms.knowledge.allKnowledge');
 });
 
 // ================= 数据加载 =================
@@ -215,7 +218,7 @@ const formState = ref<Partial<QmsKnowledgeApi.KnowledgeItem>>({
   version: 'V1.0',
 });
 
-function openModal(item?: QmsKnowledgeApi.KnowledgeItem | any) {
+function openModal(item?: any | QmsKnowledgeApi.KnowledgeItem) {
   if (item && item.id) {
     editMode.value = true;
     formState.value = { ...item };
@@ -230,22 +233,22 @@ function openModal(item?: QmsKnowledgeApi.KnowledgeItem | any) {
   } else {
     editMode.value = false;
     // 如果是预填模式（没有 id 但有 attachments）
-    if (item && item.attachments) {
-      fileList.value = item.attachments.map((att: any) => ({
-        name: att.name,
-        status: 'done',
-        type: att.type,
-        uid: att.name,
-        url: att.url,
-      }));
-    } else {
-      fileList.value = [];
-    }
-    
+    fileList.value =
+      item && item.attachments
+        ? item.attachments.map((att: any) => ({
+            name: att.name,
+            status: 'done',
+            type: att.type,
+            uid: att.name,
+            url: att.url,
+          }))
+        : [];
+
     formState.value = {
       attachments: (item && item.attachments) || [],
       author: userStore.userInfo?.realName || 'Admin',
-      categoryId: (item && item.categoryId) || selectedCategoryId.value[0] || '',
+      categoryId:
+        (item && item.categoryId) || selectedCategoryId.value[0] || '',
       content: (item && item.content) || '',
       status: (item && item.status) || 'published',
       summary: (item && item.summary) || '',

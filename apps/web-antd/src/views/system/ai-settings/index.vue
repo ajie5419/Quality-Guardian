@@ -137,7 +137,11 @@ onMounted(() => {
           </FormItem>
 
           <Divider orientation="left">
-            {{ t('sys.aiSettings.detailConfig', { provider: formState.provider.toUpperCase() }) }}
+            {{
+              t('sys.aiSettings.detailConfig', {
+                provider: formState.provider.toUpperCase(),
+              })
+            }}
           </Divider>
 
           <FormItem

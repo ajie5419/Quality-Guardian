@@ -3,7 +3,7 @@ export interface ChartConfig {
   title: string;
   dimension: string;
   metric: string;
-  chartType: 'bar' | 'pie' | 'line' | 'ring';
+  chartType: 'bar' | 'line' | 'pie' | 'ring';
   colSpan?: number; // 1-12
 }
 

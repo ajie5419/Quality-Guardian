@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
+import process from 'node:process';
 
 import { createError, defineEventHandler } from 'h3';
 

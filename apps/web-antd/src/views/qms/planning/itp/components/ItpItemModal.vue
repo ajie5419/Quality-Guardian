@@ -1,35 +1,65 @@
 <script lang="ts" setup>
-import { reactive, watch, ref, computed } from 'vue';
-import { useI18n } from '@vben/locales';
-import { Modal, Form, Input, InputNumber, Select, Switch, Button, message } from 'ant-design-vue';
 import type { QmsPlanningApi } from '#/api/qms/planning';
+
+import { computed, reactive, ref, watch } from 'vue';
+
+import { useI18n } from '@vben/locales';
+
+import {
+  Button,
+  Form,
+  Input,
+  InputNumber,
+  message,
+  Modal,
+  Select,
+  Switch,
+} from 'ant-design-vue';
+
 import { createItp, updateItp } from '#/api/qms/planning';
+
 import { CONTROL_POINT_MAP } from '../../constants';
 
 const props = defineProps<{
-  open: boolean;
-  isEditMode: boolean;
+  currentItemId: null | string;
   initialData: Partial<QmsPlanningApi.ItpItem>;
-  currentItemId: string | null;
-  selectedProjectId: string | null;
+  isEditMode: boolean;
+  open: boolean;
+  selectedProjectId: null | string;
 }>();
 
 const emit = defineEmits<{
-  'update:open': [boolean];
   success: [];
+  'update:open': [boolean];
 }>();
 
 const { t } = useI18n();
 const confirmLoading = ref(false);
 const formRef = ref();
 
-const processOptions = ['外购件', '原材料', '辅材', '机加成品件', '下料', '组对', '焊接', '焊后尺寸', '外观', '整体拼装', '组装', '装配', '组拼', '打砂', '喷漆'].map(opt => ({ label: opt, value: opt }));
+const processOptions = [
+  '外购件',
+  '原材料',
+  '辅材',
+  '机加成品件',
+  '下料',
+  '组对',
+  '焊接',
+  '焊后尺寸',
+  '外观',
+  '整体拼装',
+  '组装',
+  '装配',
+  '组拼',
+  '打砂',
+  '喷漆',
+].map((opt) => ({ label: opt, value: opt }));
 
-const controlPointOptions = computed(() => 
+const controlPointOptions = computed(() =>
   Object.entries(CONTROL_POINT_MAP).map(([key, val]) => ({
     label: val.label,
-    value: key
-  }))
+    value: key,
+  })),
 );
 
 const formState = reactive<Partial<QmsPlanningApi.ItpItem>>({
@@ -40,18 +70,28 @@ const formState = reactive<Partial<QmsPlanningApi.ItpItem>>({
   frequency: '100%',
   verifyingDocument: '',
   acceptanceCriteria: '',
-  quantitativeItems: [{ standardValue: 0, upperTolerance: 0, lowerTolerance: 0, unit: '' }],
+  quantitativeItems: [
+    { standardValue: 0, upperTolerance: 0, lowerTolerance: 0, unit: '' },
+  ],
 });
 
-const rules = {
-  processStep: [{ required: true, message: t('common.pleaseSelect'), trigger: 'change' }],
-  activity: [{ required: true, message: t('common.pleaseInput'), trigger: 'blur' }],
-  controlPoint: [{ required: true, message: t('common.pleaseSelect'), trigger: 'change' }],
+const rules: any = {
+  processStep: [
+    { required: true, message: t('common.pleaseSelect'), trigger: 'change' },
+  ],
+  activity: [
+    { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
+  ],
+  controlPoint: [
+    { required: true, message: t('common.pleaseSelect'), trigger: 'change' },
+  ],
 };
 
-watch(() => props.open, (val) => {
-  if (val) {
-    Object.assign(formState, {
+watch(
+  () => props.open,
+  (val) => {
+    if (val) {
+      Object.assign(formState, {
         processStep: props.initialData.processStep || '组对',
         activity: props.initialData.activity || '',
         controlPoint: props.initialData.controlPoint || 'W',
@@ -59,16 +99,24 @@ watch(() => props.open, (val) => {
         frequency: props.initialData.frequency || '100%',
         verifyingDocument: props.initialData.verifyingDocument || '',
         acceptanceCriteria: props.initialData.acceptanceCriteria || '',
-        quantitativeItems: props.initialData.quantitativeItems || [{ standardValue: 0, upperTolerance: 0, lowerTolerance: 0, unit: '' }],
-    });
-  } else {
-    formRef.value?.resetFields();
-  }
-});
+        quantitativeItems: props.initialData.quantitativeItems || [
+          { standardValue: 0, upperTolerance: 0, lowerTolerance: 0, unit: '' },
+        ],
+      });
+    } else {
+      formRef.value?.resetFields();
+    }
+  },
+);
 
 function addQuantitativeItem() {
   if (!formState.quantitativeItems) formState.quantitativeItems = [];
-  formState.quantitativeItems.push({ standardValue: 0, upperTolerance: 0, lowerTolerance: 0, unit: '' });
+  formState.quantitativeItems.push({
+    standardValue: 0,
+    upperTolerance: 0,
+    lowerTolerance: 0,
+    unit: '',
+  });
 }
 
 function removeQuantitativeItem(index: number) {
@@ -80,13 +128,11 @@ async function handleOk() {
   try {
     await formRef.value?.validate();
     confirmLoading.value = true;
-    
+
     const payload = { ...formState, projectId: props.selectedProjectId };
-    if (props.isEditMode && props.currentItemId) {
-      await updateItp(props.currentItemId, payload as QmsPlanningApi.ItpItem);
-    } else {
-      await createItp(payload as QmsPlanningApi.ItpItem);
-    }
+    await (props.isEditMode && props.currentItemId
+      ? updateItp(props.currentItemId, payload as QmsPlanningApi.ItpItem)
+      : createItp(payload as QmsPlanningApi.ItpItem));
     message.success(t('common.saveSuccess'));
     emit('success');
     emit('update:open', false);
@@ -103,48 +149,94 @@ async function handleOk() {
 <template>
   <Modal
     :open="open"
-    :title="isEditMode ? t('qms.planning.itp.editStep') : t('qms.planning.itp.addStep')"
+    :title="
+      isEditMode
+        ? t('qms.planning.itp.editStep')
+        : t('qms.planning.itp.addStep')
+    "
     :confirm-loading="confirmLoading"
     @ok="handleOk"
     @cancel="emit('update:open', false)"
     width="800px"
     destroy-on-close
   >
-    <Form ref="formRef" :model="formState" :rules="rules" layout="vertical" class="pt-4">
+    <Form
+      ref="formRef"
+      :model="formState"
+      :rules="rules"
+      layout="vertical"
+      class="pt-4"
+    >
       <div class="grid grid-cols-2 gap-4">
-        <Form.Item :label="t('qms.planning.itp.processStep')" name="processStep">
-          <Select v-model:value="formState.processStep" :options="processOptions" />
+        <Form.Item
+          :label="t('qms.planning.itp.processStep')"
+          name="processStep"
+        >
+          <Select
+            v-model:value="formState.processStep"
+            :options="processOptions"
+          />
         </Form.Item>
-        <Form.Item :label="t('qms.planning.itp.controlPoint.label')" name="controlPoint">
-          <Select v-model:value="formState.controlPoint" :options="controlPointOptions" />
+        <Form.Item
+          :label="t('qms.planning.itp.controlPoint.label')"
+          name="controlPoint"
+        >
+          <Select
+            v-model:value="formState.controlPoint"
+            :options="controlPointOptions"
+          />
         </Form.Item>
       </div>
 
       <Form.Item :label="t('qms.planning.itp.activity')" name="activity">
-        <Input v-model:value="formState.activity" :placeholder="t('common.pleaseInput')" />
+        <Input
+          v-model:value="formState.activity"
+          :placeholder="t('common.pleaseInput')"
+        />
       </Form.Item>
 
-      <Form.Item :label="t('qms.planning.itp.criteria')" name="acceptanceCriteria">
-        <Input.TextArea v-model:value="formState.acceptanceCriteria" :placeholder="t('common.pleaseInput')" />
+      <Form.Item
+        :label="t('qms.planning.itp.criteria')"
+        name="acceptanceCriteria"
+      >
+        <Input.TextArea
+          v-model:value="formState.acceptanceCriteria"
+          :placeholder="t('common.pleaseInput')"
+        />
       </Form.Item>
 
       <div class="grid grid-cols-2 gap-4">
         <Form.Item :label="t('qms.planning.itp.frequency')" name="frequency">
           <Input v-model:value="formState.frequency" />
         </Form.Item>
-        <Form.Item :label="t('qms.planning.itp.verifyingDocument')" name="verifyingDocument">
+        <Form.Item
+          :label="t('qms.planning.itp.verifyingDocument')"
+          name="verifyingDocument"
+        >
           <Input v-model:value="formState.verifyingDocument" />
         </Form.Item>
       </div>
 
-      <Form.Item :label="t('qms.planning.itp.quantitative')" name="isQuantitative">
+      <Form.Item
+        :label="t('qms.planning.itp.quantitative')"
+        name="isQuantitative"
+      >
         <Switch v-model:checked="formState.isQuantitative" />
       </Form.Item>
 
-      <div v-if="formState.isQuantitative" class="space-y-2 border rounded p-4 bg-gray-50">
-        <div v-for="(item, index) in formState.quantitativeItems" :key="index" class="grid grid-cols-5 gap-2 items-end">
+      <div
+        v-if="formState.isQuantitative"
+        class="space-y-2 rounded border bg-gray-50 p-4"
+      >
+        <div
+          v-for="(item, index) in formState.quantitativeItems"
+          :key="index"
+          class="grid grid-cols-5 items-end gap-2"
+        >
           <div>
-            <label class="text-xs text-gray-500">{{ t('qms.planning.itp.standardValue') }}</label>
+            <label class="text-xs text-gray-500">{{
+              t('qms.planning.itp.standardValue')
+            }}</label>
             <InputNumber v-model:value="item.standardValue" class="w-full" />
           </div>
           <div>
@@ -161,7 +253,9 @@ async function handleOk() {
           </div>
           <Button danger @click="removeQuantitativeItem(index)">-</Button>
         </div>
-        <Button type="dashed" block @click="addQuantitativeItem">+ {{ t('qms.planning.itp.quantitative') }}</Button>
+        <Button type="dashed" block @click="addQuantitativeItem"
+          >+ {{ t('qms.planning.itp.quantitative') }}</Button
+        >
       </div>
     </Form>
   </Modal>

@@ -12,7 +12,9 @@ export type { QmsSupplierApi };
 export async function getSupplierList(
   params?: QmsSupplierApi.SupplierListParams,
 ) {
-  const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+  const query = params
+    ? `?${new URLSearchParams(params as any).toString()}`
+    : '';
   return requestClient.get<QmsSupplierApi.SupplierListResponse>(
     `${QMS_API.SUPPLIER}${query}`,
   );
@@ -24,7 +26,10 @@ export async function getSupplierList(
 export async function createSupplier(
   data: Partial<QmsSupplierApi.SupplierItem>,
 ) {
-  return requestClient.post<QmsSupplierApi.SupplierItem>(QMS_API.SUPPLIER, data);
+  return requestClient.post<QmsSupplierApi.SupplierItem>(
+    QMS_API.SUPPLIER,
+    data,
+  );
 }
 
 export async function updateSupplier(

@@ -53,8 +53,8 @@ export default defineEventHandler(async (event) => {
       updatedAt: new Date(),
     };
 
-    if (bodyRecord.ncNumber)
-      updateData.nonConformanceNumber = bodyRecord.ncNumber;
+    if (bodyRecord.ncNumber !== undefined)
+      updateData.nonConformanceNumber = bodyRecord.ncNumber || null;
     if (bodyRecord.projectName) updateData.projectName = bodyRecord.projectName; // Added projectName
     if (bodyRecord.partName) updateData.partName = bodyRecord.partName;
     if (bodyRecord.description) updateData.description = bodyRecord.description;
@@ -82,10 +82,26 @@ export default defineEventHandler(async (event) => {
 
     if (bodyRecord.status) {
       const statusBody = String(bodyRecord.status).toUpperCase();
-      if (statusBody === 'CLOSED' || statusBody === '已关闭') updateData.status = 'CLOSED';
-      else if (statusBody === 'OPEN' || statusBody === '开启') updateData.status = 'OPEN';
-      else if (statusBody === 'IN_PROGRESS' || statusBody === '进行中') updateData.status = 'IN_PROGRESS';
-      else updateData.status = bodyRecord.status;
+      switch (statusBody) {
+        case 'CLOSED':
+        case '已关闭': {
+          updateData.status = 'CLOSED';
+          break;
+        }
+        case 'IN_PROGRESS':
+        case '进行中': {
+          updateData.status = 'IN_PROGRESS';
+          break;
+        }
+        case 'OPEN':
+        case '开启': {
+          updateData.status = 'OPEN';
+          break;
+        }
+        default: {
+          updateData.status = bodyRecord.status;
+        }
+      }
     }
 
     await prisma.quality_records.update({

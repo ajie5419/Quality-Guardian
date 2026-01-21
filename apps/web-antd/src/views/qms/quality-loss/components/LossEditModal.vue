@@ -1,27 +1,44 @@
 <script lang="ts" setup>
-import { computed, reactive, watch, ref } from 'vue';
-import { useI18n } from '@vben/locales';
-import { 
-  Modal, Form, FormItem, Input, InputNumber, 
-  Select, TreeSelect, Alert, message, Row, Col
-} from 'ant-design-vue';
 import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
-import type { DeptNode } from '../types';
-import { LossSource } from '../types';
-import { LOSS_TYPE_OPTIONS, STATUS_OPTIONS, SOURCE_STYLE_MAP } from '../constants';
+
+import { computed, reactive, ref, watch } from 'vue';
+
+import { useI18n } from '@vben/locales';
+
+import {
+  Alert,
+  Col,
+  Form,
+  FormItem,
+  Input,
+  InputNumber,
+  message,
+  Modal,
+  Row,
+  Select,
+  TreeSelect,
+} from 'ant-design-vue';
+
 import { createQualityLoss, updateQualityLoss } from '#/api/qms/quality-loss';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 
+import {
+  LOSS_TYPE_OPTIONS,
+  SOURCE_STYLE_MAP,
+  STATUS_OPTIONS,
+} from '../constants';
+import { LossSource } from '../types';
+
 const props = defineProps<{
-  open: boolean;
-  isEditMode: boolean;
+  deptTreeData: any[];
   initialData: Partial<QmsQualityLossApi.QualityLossItem>;
-  deptTreeData: DeptNode[];
+  isEditMode: boolean;
+  open: boolean;
 }>();
 
 const emit = defineEmits<{
-  'update:open': [boolean];
   success: [];
+  'update:open': [boolean];
 }>();
 
 const { t } = useI18n();
@@ -31,13 +48,16 @@ const formState = reactive<Partial<QmsQualityLossApi.QualityLossItem>>({});
 const confirmLoading = ref(false);
 
 // 监听数据初始化
-watch(() => props.open, (val) => {
-  if (val) {
-    // 清除旧数据并合并新数据
-    Object.keys(formState).forEach(key => delete (formState as any)[key]);
-    Object.assign(formState, props.initialData);
-  }
-});
+watch(
+  () => props.open,
+  (val) => {
+    if (val) {
+      // 清除旧数据并合并新数据
+      Object.keys(formState).forEach((key) => delete (formState as any)[key]);
+      Object.assign(formState, props.initialData);
+    }
+  },
+);
 
 /**
  * 提交表单
@@ -45,11 +65,9 @@ watch(() => props.open, (val) => {
 async function handleOk() {
   confirmLoading.value = true;
   try {
-    if (props.isEditMode && formState.id) {
-      await updateQualityLoss(formState.id, formState);
-    } else {
-      await createQualityLoss(formState);
-    }
+    await (props.isEditMode && formState.id
+      ? updateQualityLoss(formState.id, formState)
+      : createQualityLoss(formState));
     message.success(t('common.saveSuccess'));
     emit('success');
     emit('update:open', false);
@@ -61,7 +79,9 @@ async function handleOk() {
   }
 }
 
-const isManualSource = computed(() => formState.lossSource === LossSource.MANUAL || !formState.lossSource);
+const isManualSource = computed(
+  () => formState.lossSource === LossSource.MANUAL || !formState.lossSource,
+);
 </script>
 
 <template>
@@ -88,20 +108,20 @@ const isManualSource = computed(() => formState.lossSource === LossSource.MANUAL
       <Row :gutter="16">
         <Col :span="12">
           <FormItem label="日期" name="date">
-            <Input 
-              v-model:value="formState.date" 
-              type="date" 
+            <Input
+              v-model:value="formState.date"
+              type="date"
               class="w-full"
-              :disabled="!isManualSource" 
+              :disabled="!isManualSource"
             />
           </FormItem>
         </Col>
         <Col :span="12">
           <FormItem label="损失类型" name="type">
-            <Select 
-              v-model:value="formState.type" 
-              :options="LOSS_TYPE_OPTIONS" 
-              :disabled="!isManualSource" 
+            <Select
+              v-model:value="formState.type"
+              :options="LOSS_TYPE_OPTIONS"
+              :disabled="!isManualSource"
             />
           </FormItem>
         </Col>
@@ -110,20 +130,20 @@ const isManualSource = computed(() => formState.lossSource === LossSource.MANUAL
       <Row :gutter="16">
         <Col :span="12">
           <FormItem label="预计损失金额 (¥)" name="amount">
-            <InputNumber 
-              v-model:value="formState.amount" 
-              class="w-full" 
+            <InputNumber
+              v-model:value="formState.amount"
+              class="w-full"
               :min="0"
               :precision="2"
-              :disabled="!isManualSource" 
+              :disabled="!isManualSource"
             />
           </FormItem>
         </Col>
         <Col :span="12">
           <FormItem label="实际索赔金额 (¥)" name="actualClaim">
-            <InputNumber 
-              v-model:value="formState.actualClaim" 
-              class="w-full" 
+            <InputNumber
+              v-model:value="formState.actualClaim"
+              class="w-full"
               :min="0"
               :precision="2"
             />
@@ -142,9 +162,14 @@ const isManualSource = computed(() => formState.lossSource === LossSource.MANUAL
       </FormItem>
 
       <FormItem label="当前状态" name="status">
-        <Select 
+        <Select
           v-model:value="formState.status"
-          :options="STATUS_OPTIONS.map(opt => ({ value: opt.value, label: t(opt.label) }))"
+          :options="
+            STATUS_OPTIONS.map((opt) => ({
+              value: opt.value,
+              label: t(opt.label),
+            }))
+          "
         />
       </FormItem>
 

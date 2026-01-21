@@ -74,78 +74,78 @@ export const MOCK_CODES = [
       'System:User:List',
       'System:AiSettings:View',
       'System:AiSettings:Edit',
-      
+
       // QMS 模块权限
       'QMS:Workspace:View',
       'QMS:Dashboard:View',
-      
+
       'QMS:WorkOrder:Create',
       'QMS:WorkOrder:Edit',
       'QMS:WorkOrder:Delete',
       'QMS:WorkOrder:View',
-      
+
       // QMS Planning
       'QMS:Planning:DFMEA:View',
       'QMS:Planning:DFMEA:Create',
       'QMS:Planning:DFMEA:Edit',
       'QMS:Planning:DFMEA:Delete',
-      
+
       'QMS:Planning:ProjectDocs:View',
       'QMS:Planning:ProjectDocs:Archive',
-      
+
       'QMS:Planning:BOM:View',
       'QMS:Planning:BOM:Create',
       'QMS:Planning:BOM:Edit',
       'QMS:Planning:BOM:Delete',
-      
+
       'QMS:Planning:ITP:View',
       'QMS:Planning:ITP:Create',
       'QMS:Planning:ITP:Edit',
       'QMS:Planning:ITP:Delete',
-      
+
       // QMS Inspection
       'QMS:Inspection:Issues:View',
       'QMS:Inspection:Issues:Create',
       'QMS:Inspection:Issues:Edit',
       'QMS:Inspection:Issues:Delete',
       'QMS:Inspection:Issues:Settle',
-      
+
       'QMS:Inspection:Records:View',
       'QMS:Inspection:Records:Create',
       'QMS:Inspection:Records:Edit',
       'QMS:Inspection:Records:Delete',
-      
+
       // Others
       'QMS:AfterSales:Create',
       'QMS:AfterSales:Edit',
       'QMS:AfterSales:Delete',
       'QMS:AfterSales:View',
       'QMS:AfterSales:Settle',
-      
+
       'QMS:Supplier:Create',
       'QMS:Supplier:Edit',
       'QMS:Supplier:Delete',
       'QMS:Supplier:View',
-      
+
       'QMS:Outsourcing:View',
       'QMS:Outsourcing:Create',
       'QMS:Outsourcing:Edit',
       'QMS:Outsourcing:Delete',
-      
+
       'QMS:Reports:Daily:View',
       'QMS:Reports:Summary:View',
       'QMS:Reports:Export',
-      
+
       'QMS:LossAnalysis:View',
       'QMS:LossAnalysis:Create',
       'QMS:LossAnalysis:Edit',
       'QMS:LossAnalysis:Delete',
-      
+
       'QMS:Knowledge:Create',
       'QMS:Knowledge:Edit',
       'QMS:Knowledge:Delete',
       'QMS:Knowledge:View',
-      
+
       // 旧版兼容 (Legacy compatibility)
       'QMS:Inspection:Create',
       'QMS:Inspection:Edit',
@@ -178,7 +178,7 @@ export const MOCK_CODES = [
       'System:User:List',
       'System:AiSettings:View',
       'System:AiSettings:Edit',
-      
+
       // QMS 模块权限 (Same as super for admin in this context)
       'QMS:Workspace:View',
       'QMS:Dashboard:View',
@@ -232,7 +232,7 @@ export const MOCK_CODES = [
       'QMS:Knowledge:Create',
       'QMS:Knowledge:Edit',
       'QMS:Knowledge:View', // Admin can't delete knowledge? Let's assume standard
-      
+
       // 旧版兼容
       'QMS:Inspection:Create',
       'QMS:Inspection:Edit',
@@ -251,34 +251,34 @@ export const MOCK_CODES = [
       // 系统管理权限 - 只有查看
       'System:Dept:List',
       'System:Role:List',
-      
+
       // QMS 模块权限 - 主要是 View 和 Create/Edit, 无 Delete
       'QMS:Workspace:View',
       'QMS:Dashboard:View',
       'QMS:WorkOrder:View',
       'QMS:WorkOrder:Create',
       'QMS:WorkOrder:Edit',
-      
+
       'QMS:Planning:DFMEA:View',
       'QMS:Planning:ProjectDocs:View',
       'QMS:Planning:BOM:View',
       'QMS:Planning:ITP:View',
-      
+
       'QMS:Inspection:Issues:View',
       'QMS:Inspection:Issues:Create',
       'QMS:Inspection:Issues:Edit',
       'QMS:Inspection:Records:View',
       'QMS:Inspection:Records:Create',
       'QMS:Inspection:Records:Edit',
-      
+
       'QMS:AfterSales:View',
       'QMS:Supplier:View',
       'QMS:Outsourcing:View',
       'QMS:Reports:Daily:View',
       // No Summary View, No Loss Analysis
-      
+
       'QMS:Knowledge:View',
-      
+
       // 旧版兼容
       'QMS:Inspection:Create',
       'QMS:Inspection:Edit',
@@ -306,217 +306,6 @@ export const MOCK_CODES = [
 ];
 
 const dashboardMenus: any[] = [];
-
-const qmsMenus = [
-  {
-    component: 'BasicLayout',
-    meta: {
-      icon: 'lucide:layout-dashboard',
-      order: 1000,
-      title: 'qms.title',
-    },
-    name: 'QMS',
-    path: '/qms',
-    children: [
-      {
-        name: 'QMSWorkspace',
-        path: '/qms/workspace',
-        component: 'qms/workspace/index',
-        meta: {
-          icon: 'lucide:briefcase',
-          title: 'qms.workspace.title',
-        },
-      },
-      {
-        name: 'QMSDashboard',
-        path: '/qms/dashboard',
-        component: 'qms/dashboard/index',
-        meta: {
-          icon: 'lucide:layout-template',
-          title: 'qms.dashboard.title',
-        },
-      },
-      {
-        name: 'QMSQualityLoss',
-        path: '/qms/quality-loss',
-        component: 'qms/quality-loss/index',
-        meta: {
-          icon: 'lucide:trending-down',
-          title: 'qms.qualityLoss.title',
-        },
-      },
-      {
-        name: 'QMSWorkOrder',
-        path: '/qms/work-order',
-        component: 'qms/work-order/index',
-        meta: {
-          icon: 'lucide:clipboard-list',
-          title: 'qms.workOrder.title',
-        },
-      },
-      {
-        name: 'QMSInspection',
-        path: '/qms/inspection',
-        meta: {
-          icon: 'lucide:inspection-panel',
-          title: 'qms.inspection.title',
-        },
-        children: [
-          {
-            name: 'QMSInspectionIssues',
-            path: '/qms/inspection/issues',
-            component: 'qms/inspection/issues/index',
-            meta: {
-              title: 'qms.inspection.issues.title',
-            },
-          },
-          {
-            name: 'QMSInspectionRecords',
-            path: '/qms/inspection/records',
-            component: 'qms/inspection/records/index',
-            meta: {
-              title: 'qms.inspection.records.title',
-            },
-          },
-        ],
-      },
-      {
-        name: 'QMSPlanning',
-        path: '/qms/planning',
-        meta: {
-          icon: 'lucide:notebook-pen',
-          title: 'qms.planning.title',
-        },
-        children: [
-          {
-            name: 'QMSPlanningDFMEA',
-            path: '/qms/planning/dfmea',
-            component: 'qms/planning/dfmea/index',
-            meta: {
-              title: 'qms.planning.dfmea.title',
-            },
-          },
-          {
-            name: 'QMSPlanningBOM',
-            path: '/qms/planning/bom',
-            component: 'qms/planning/bom/index',
-            meta: {
-              title: 'qms.planning.bom.title',
-            },
-          },
-          {
-            name: 'QMSPlanningITP',
-            path: '/qms/planning/itp',
-            component: 'qms/planning/itp/index',
-            meta: {
-              title: 'qms.planning.itp.title',
-            },
-          },
-        ],
-      },
-      {
-        name: 'QMSAfterSales',
-        path: '/qms/after-sales',
-        component: 'qms/after-sales/index',
-        meta: {
-          icon: 'lucide:phone-call',
-          title: 'qms.afterSales.title',
-        },
-      },
-      {
-        name: 'QMSSupplier',
-        path: '/qms/supplier',
-        component: 'qms/supplier/index',
-        meta: {
-          icon: 'lucide:truck',
-          title: 'qms.supplier.title',
-        },
-      },
-      {
-        name: 'QMSOutsourcing',
-        path: '/qms/outsourcing',
-        component: 'qms/outsourcing/index',
-        meta: {
-          icon: 'lucide:factory',
-          title: 'qms.outsourcing.title',
-        },
-      },
-      {
-        name: 'QMSKnowledge',
-        path: '/qms/knowledge',
-        component: 'qms/knowledge/index',
-        meta: {
-          icon: 'lucide:book-open',
-          title: 'qms.knowledge.title',
-        },
-      },
-      {
-        name: 'QMSDailyReports',
-        path: '/qms/daily-reports',
-        component: 'qms/reports/index',
-        meta: {
-          icon: 'lucide:file-bar-chart',
-          title: 'qms.reports.daily.title',
-        },
-      },
-    ],
-  },
-];
-
-const systemMenus = [
-  {
-    component: 'BasicLayout',
-    meta: {
-      icon: 'lucide:settings',
-      title: 'sys.title',
-      order: 1100,
-    },
-    name: 'System',
-    path: '/system',
-    children: [
-      {
-        name: 'SystemDept',
-        path: '/system/dept',
-        component: 'system/dept/index',
-        meta: {
-          title: 'sys.dept.title',
-        },
-      },
-      {
-        name: 'SystemRole',
-        path: '/system/role',
-        component: 'system/role/index',
-        meta: {
-          title: 'sys.role.title',
-        },
-      },
-      {
-        name: 'SystemMenu',
-        path: '/system/menu',
-        component: 'system/menu/index',
-        meta: {
-          title: 'sys.menu.title',
-        },
-      },
-      {
-        name: 'SystemUser',
-        path: '/system/user',
-        component: 'system/user/index',
-        meta: {
-          title: 'sys.user.title',
-        },
-      },
-      {
-        name: 'AiSettings',
-        path: '/system/ai-settings',
-        component: 'system/ai-settings/index',
-        meta: {
-          title: 'sys.aiSettings.title',
-        },
-      },
-    ],
-  },
-];
 
 const _createDemosMenus = (role: 'admin' | 'super' | 'user') => {
   const roleWithMenus = {

@@ -16,15 +16,15 @@ export default defineEventHandler(async (event) => {
 
       return {
         code: 0,
-        data: items.map(item => ({
-            id: item.id,
-            name: item.part_name,
-            partNumber: item.part_number,
-            quantity: item.quantity,
-            unit: item.unit,
-            material: item.material,
-            remarks: item.remarks,
-            parentId: item.work_order_number
+        data: items.map((item) => ({
+          id: item.id,
+          name: item.part_name,
+          partNumber: item.part_number,
+          quantity: item.quantity,
+          unit: item.unit,
+          material: item.material,
+          remarks: item.remarks,
+          parentId: item.work_order_number,
         })),
         message: 'ok',
       };

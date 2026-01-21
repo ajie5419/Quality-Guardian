@@ -1,11 +1,12 @@
 <script lang="ts" setup>
-import { computed, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import type { InspectionIssue } from './types';
+// Types
 
 import type { VxeGridProps } from '#/adapter/vxe-table';
-import type { InspectionIssue } from './types';
 
-import { useAccess } from '@vben/access';
+import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
+
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
@@ -21,37 +22,30 @@ import {
   Statistic,
   Tag,
 } from 'ant-design-vue';
-
 import dayjs from 'dayjs';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { InspectionIssueStatusEnum } from '#/api/qms/enums';
 import {
   deleteInspectionIssue,
   getInspectionIssues,
 } from '#/api/qms/inspection';
+import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { findNameById } from '#/types';
-import { useAvailableYears } from '#/hooks/useAvailableYears';
 
 import IssueChartDashboard from './components/IssueChartDashboard.vue';
 import IssueEditModal from './components/IssueEditModal.vue';
-import { gridColumns, searchFormSchema } from './data';
-
+import { useAiReport } from './composables/useAiReport';
 // Composables
 import { useIssueData } from './composables/useIssueData';
 import { useIssueStatistics } from './composables/useIssueStatistics';
-import { useAiReport } from './composables/useAiReport';
+import { gridColumns, searchFormSchema } from './data';
 import { getStatusColor, getStatusLabel } from './utils/statusHelper';
-
-// Types
-import type { DeptNode, WorkOrderItem, SupplierItem } from './types';
 
 const router = useRouter();
 const { t } = useI18n();
 
 // ================= 权限与数据管理 =================
-const { hasAccessByCodes } = useAccess();
 const { invalidateInspectionIssues } = useInvalidateQmsQueries();
 
 // 使用数据加载 composable
@@ -60,7 +54,6 @@ const {
   deptRawData,
   workOrderList,
   supplierList,
-  isLoading: isDataLoading,
   loadInitialData,
 } = useIssueData();
 
@@ -76,7 +69,10 @@ const currentYear = ref<number>(new Date().getFullYear());
 const filteredIssues = ref<InspectionIssue[]>([]);
 
 const yearOptions = computed(() => {
-  return dynamicYears.value.map(y => ({ label: `${y}${t('common.unit.year')}`, value: y }));
+  return dynamicYears.value.map((y) => ({
+    label: `${y}${t('common.unit.year')}`,
+    value: y,
+  }));
 });
 
 const gridOptions = computed<VxeGridProps>(() => ({
@@ -85,11 +81,11 @@ const gridOptions = computed<VxeGridProps>(() => ({
     slots: { buttons: 'toolbar-actions' },
   },
   exportConfig: {
-    remote: true,
+    remote: false,
     types: ['xlsx', 'csv'],
     modes: ['current', 'selected', 'all'],
   },
-  columns: gridColumns.map((col) => {
+  columns: (gridColumns || []).map((col) => {
     // 处理部门/事业部名称映射
     if (col.field === 'division' || col.field === 'responsibleDepartment') {
       return {
@@ -108,9 +104,11 @@ const gridOptions = computed<VxeGridProps>(() => ({
         ...col,
         formatter: ({ cellValue }) => {
           if (!cellValue) return '';
+          const format =
+            col.field === 'reportDate' ? 'YYYY-MM-DD' : 'YYYY-MM-DD HH:mm:ss';
           // 使用 dayjs 转换 UTC 到本地时区
           const date = dayjs(cellValue);
-          return date.isValid() ? date.format('YYYY-MM-DD HH:mm:ss') : cellValue;
+          return date.isValid() ? date.format(format) : cellValue;
         },
       };
     }
@@ -141,7 +139,9 @@ const gridOptions = computed<VxeGridProps>(() => ({
         const sortBy = sortParam?.field;
         const sortOrder = sortParam?.order;
 
-        let allData = await getInspectionIssues({ year: currentYear.value });
+        let allData = (await getInspectionIssues({
+          year: currentYear.value,
+        })) as InspectionIssue[];
 
         // 前端过滤
         if (formValues?.workOrderNumber) {
@@ -175,8 +175,10 @@ const gridOptions = computed<VxeGridProps>(() => ({
         const items = allData.slice(start, start + pageSize);
         return { items, total: allData.length };
       },
-      queryAll: async ({ formValues }) => {
-        let allData = await getInspectionIssues({ year: currentYear.value });
+      queryAll: async ({ formValues }: any) => {
+        let allData = (await getInspectionIssues({
+          year: currentYear.value,
+        })) as InspectionIssue[];
 
         if (formValues?.workOrderNumber) {
           allData = allData.filter((item) =>
@@ -199,10 +201,10 @@ const gridOptions = computed<VxeGridProps>(() => ({
 
 const [Grid, gridApi] = useVbenVxeGrid({
   formOptions: {
-    schema: searchFormSchema,
+    schema: searchFormSchema as any,
     submitOnChange: true,
   },
-  gridOptions,
+  gridOptions: gridOptions as any,
 });
 
 // ================= 统计逻辑 =================
@@ -238,7 +240,9 @@ function handleEdit(row: InspectionIssue) {
 async function handleDelete(row: InspectionIssue) {
   Modal.confirm({
     title: t('qms.inspection.issues.deleteConfirm'),
-    content: t('qms.inspection.issues.deleteContent', { ncNumber: row.ncNumber }),
+    content: t('qms.inspection.issues.deleteContent', {
+      ncNumber: row.ncNumber,
+    }),
     onOk: async () => {
       try {
         await deleteInspectionIssue(row.id);
@@ -256,9 +260,16 @@ async function handleDelete(row: InspectionIssue) {
 
 function handleSettleToKnowledge(row: InspectionIssue) {
   // 转换照片为知识库附件格式
-  const attachments = Array.isArray(row.photos) 
-    ? row.photos.map((url, idx) => ({ name: `现场图片_${idx + 1}`, url, type: 'image' }))
-    : row.photos ? [{ name: '现场图片', url: row.photos, type: 'image' }] : [];
+  let attachments: any[] = [];
+  if (Array.isArray(row.photos)) {
+    attachments = row.photos.map((url, idx) => ({
+      name: `现场图片_${idx + 1}`,
+      url,
+      type: 'image',
+    }));
+  } else if (row.photos) {
+    attachments = [{ name: '现场图片', url: row.photos, type: 'image' }];
+  }
 
   router.push({
     path: '/qms/knowledge',
@@ -287,7 +298,10 @@ function handleSettleToKnowledge(row: InspectionIssue) {
     <Card size="small" class="mb-4 border-none bg-gray-50 shadow-sm">
       <Row :gutter="16" class="items-center text-center">
         <Col :span="5">
-          <Statistic :title="t('qms.inspection.issues.totalCount')" :value="statistics.totalCount" />
+          <Statistic
+            :title="t('qms.inspection.issues.totalCount')"
+            :value="statistics.totalCount"
+          />
         </Col>
         <Col :span="5">
           <Statistic
@@ -319,7 +333,8 @@ function handleSettleToKnowledge(row: InspectionIssue) {
             :loading="isGeneratingInsight"
             @click="handleGenerateInsight"
           >
-            <span class="i-lucide-scroll-text mr-1"></span> {{ t('qms.inspection.issues.aiInsightReport') }}
+            <span class="i-lucide-scroll-text mr-1"></span>
+            {{ t('qms.inspection.issues.aiInsightReport') }}
           </Button>
         </Col>
       </Row>
@@ -335,11 +350,18 @@ function handleSettleToKnowledge(row: InspectionIssue) {
         <Tag
           :color="row.claim === 'Yes' || row.claim === true ? 'red' : 'green'"
         >
-          {{ row.claim === 'Yes' || row.claim === true ? t('common.yes') : t('common.no') }}
+          {{
+            row.claim === 'Yes' || row.claim === true
+              ? t('common.yes')
+              : t('common.no')
+          }}
         </Tag>
       </template>
       <template #photos="{ row }">
-        <div v-if="row.photos && row.photos.length > 0" class="flex items-center justify-center">
+        <div
+          v-if="row.photos && row.photos.length > 0"
+          class="flex items-center justify-center"
+        >
           <Image
             :width="40"
             :height="40"
@@ -351,7 +373,11 @@ function handleSettleToKnowledge(row: InspectionIssue) {
       <template #toolbar-actions>
         <div class="flex items-center gap-4">
           <div class="flex gap-2">
-            <Button v-access:code="'QMS:Inspection:Issues:Create'" type="primary" @click="handleOpenModal">
+            <Button
+              v-access:code="'QMS:Inspection:Issues:Create'"
+              type="primary"
+              @click="handleOpenModal"
+            >
               {{ t('qms.inspection.issues.createIssue') }}
             </Button>
             <Button type="link" @click="showCharts = !showCharts">
@@ -379,7 +405,12 @@ function handleSettleToKnowledge(row: InspectionIssue) {
         >
           {{ t('common.edit') }}
         </Button>
-        <Button v-access:code="'QMS:Inspection:Issues:Settle'" type="link" size="small" @click="handleSettleToKnowledge(row)">
+        <Button
+          v-access:code="'QMS:Inspection:Issues:Settle'"
+          type="link"
+          size="small"
+          @click="handleSettleToKnowledge(row)"
+        >
           {{ t('qms.inspection.issues.settleToKnowledge') }}
         </Button>
         <Button
@@ -397,7 +428,7 @@ function handleSettleToKnowledge(row: InspectionIssue) {
     <IssueEditModal
       v-model:open="modalVisible"
       :is-edit-mode="isEditMode"
-      :initial-data="currentRecord"
+      :initial-data="currentRecord || undefined"
       :dept-tree-data="deptTreeData"
       :work-order-list="workOrderList"
       :supplier-list="supplierList"

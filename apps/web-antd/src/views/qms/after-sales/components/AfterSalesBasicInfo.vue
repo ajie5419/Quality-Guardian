@@ -1,26 +1,35 @@
 <script lang="ts" setup>
 import type { AfterSalesFormState } from '../composables/useAfterSalesForm';
+
 import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 import type { SelectOption as AntSelectOption, TreeSelectNode } from '#/types';
 
 import { useI18n } from '@vben/locales';
 
-import { FormItem, Input, Select, SelectOption, TreeSelect } from 'ant-design-vue';
+import {
+  FormItem,
+  Input,
+  Select,
+  SelectOption,
+  TreeSelect,
+} from 'ant-design-vue';
 
 defineProps<{
   deptTreeData: TreeSelectNode[];
   workOrderList: QmsWorkOrderApi.WorkOrderItem[];
 }>();
 
-const formState = defineModel<AfterSalesFormState>('formState', { required: true });
-
 const emit = defineEmits<{
-  workOrderChange: [val: string | number];
+  workOrderChange: [val: number | string];
 }>();
+
+const formState = defineModel<AfterSalesFormState>('formState', {
+  required: true,
+});
 
 const { t } = useI18n();
 
-function handleWorkOrderChange(val: string | number) {
+function handleWorkOrderChange(val: number | string) {
   emit('workOrderChange', val);
 }
 </script>
@@ -31,7 +40,11 @@ function handleWorkOrderChange(val: string | number) {
       {{ t('qms.afterSales.form.baseInfo') }}
     </div>
     <div class="space-y-3">
-      <FormItem :label="t('qms.afterSales.form.workOrderNumber')" class="mb-0" name="workOrderNumber">
+      <FormItem
+        :label="t('qms.afterSales.form.workOrderNumber')"
+        class="mb-0"
+        name="workOrderNumber"
+      >
         <Select
           v-model:value="formState.workOrderNumber"
           show-search
@@ -66,7 +79,11 @@ function handleWorkOrderChange(val: string | number) {
           <Input v-model:value="formState.projectName" />
         </FormItem>
       </div>
-      <FormItem :label="t('qms.afterSales.form.customerName')" class="mb-0" name="customerName">
+      <FormItem
+        :label="t('qms.afterSales.form.customerName')"
+        class="mb-0"
+        name="customerName"
+      >
         <Input v-model:value="formState.customerName" />
       </FormItem>
     </div>

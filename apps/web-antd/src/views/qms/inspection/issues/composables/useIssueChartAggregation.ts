@@ -1,6 +1,9 @@
 // import type { EChartsOption } from 'echarts';
 import type { QmsInspectionApi } from '#/api/qms/inspection';
-import type { ChartConfig, ChartOptionItem } from '#/components/Qms/ChartBuilder/types';
+import type {
+  ChartConfig,
+  ChartOptionItem,
+} from '#/components/Qms/ChartBuilder/types';
 
 import { aggregateChartData } from '#/components/Qms/ChartBuilder/composables/useChartCore';
 import { findNameById } from '#/types';
@@ -47,17 +50,20 @@ export function getIssueChartOption(
     (item, dimension) => {
       if (dimension === 'reportMonth') {
         // reportDate 格式通常是 YYYY-MM-DD
-        return (item.reportDate || '').substring(0, 7);
+        return (item.reportDate || '').slice(0, 7);
       }
-      
+
       const val = (item as any)[dimension];
       if (!val) return '未分类';
 
-      if ((dimension === 'division' || dimension === 'responsibleDepartment') && deptData) {
+      if (
+        (dimension === 'division' || dimension === 'responsibleDepartment') &&
+        deptData
+      ) {
         return findNameById(deptData, val) || String(val);
       }
 
       return String(val);
-    }
+    },
   );
 }

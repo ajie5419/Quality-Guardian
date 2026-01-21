@@ -1,3 +1,5 @@
+import type { InspectionIssueStatusEnum } from './enums';
+
 import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
@@ -11,7 +13,7 @@ export namespace QmsInspectionApi {
     ncNumber: string; // 不合格编号
     title: string;
     severity: 'Critical' | 'Major' | 'Minor';
-    status: 'Closed' | 'Open' | 'Resolved';
+    status: 'Closed' | 'Open' | 'Resolved' | InspectionIssueStatusEnum;
     quantity: number; // 数量
     reportedBy: string; // 检验员
     responsibleDepartment: string; // 责任部门
@@ -109,7 +111,9 @@ export async function getInspectionIssues(params?: {
   supplierName?: string;
   year?: number;
 }) {
-  const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+  const query = params
+    ? `?${new URLSearchParams(params as any).toString()}`
+    : '';
   return requestClient.get<QmsInspectionApi.InspectionIssue[]>(
     `${QMS_API.INSPECTION_ISSUES}${query}`,
   );
@@ -150,7 +154,9 @@ export async function getInspectionRecords(params?: {
   type?: string;
   year?: number;
 }) {
-  const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+  const query = params
+    ? `?${new URLSearchParams(params as any).toString()}`
+    : '';
   return requestClient.get<QmsInspectionApi.InspectionRecord[]>(
     `${QMS_API.INSPECTION_RECORDS}${query}`,
   );

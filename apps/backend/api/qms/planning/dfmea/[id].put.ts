@@ -19,7 +19,10 @@ export default defineEventHandler(async (event) => {
         severity: Number(body.severity),
         occurrence: Number(body.occurrence),
         detection: Number(body.detection),
-        rpn: Number(body.severity) * Number(body.occurrence) * Number(body.detection),
+        rpn:
+          Number(body.severity) *
+          Number(body.occurrence) *
+          Number(body.detection),
         order: Number(body.order || 0),
         updatedAt: new Date(),
       },

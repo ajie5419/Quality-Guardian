@@ -1,11 +1,16 @@
 <script lang="ts" setup>
-import type { InspectionIssue, IssueFormState, DeptNode, SupplierItem, WorkOrderItem } from '../types';
+import type {
+  DeptNode,
+  InspectionIssue,
+  SupplierItem,
+  WorkOrderItem,
+} from '../types';
 
-import { computed, toRef, watch, ref } from 'vue';
+import { computed, ref, toRef, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
-import { Modal, Form } from 'ant-design-vue';
+import { Form, Modal } from 'ant-design-vue';
 
 import { useAiAnalysis } from '../composables/useAiAnalysis';
 import { useIssueForm } from '../composables/useIssueForm';
@@ -33,17 +38,84 @@ const { t } = useI18n();
 const formRef = ref();
 
 const rules = computed(() => ({
-  ncNumber: [{ required: true, message: t('ui.formRules.required', [t('qms.inspection.issues.ncNumber')]) }],
-  reportDate: [{ required: true, message: t('ui.formRules.required', [t('qms.inspection.issues.reportDate')]) }],
-  workOrderNumber: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.workOrder.workOrderNumber')]) }],
-  partName: [{ required: true, message: t('ui.formRules.required', [t('qms.inspection.issues.partName')]) }],
-  quantity: [{ required: true, message: t('ui.formRules.required', [t('qms.workOrder.quantity')]) }],
-  responsibleDepartment: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.inspection.issues.responsibleDepartment')]) }],
-  status: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.inspection.issues.statusLabel')]) }],
-  defectType: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.inspection.issues.defectType')]) }],
-  defectSubtype: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.inspection.issues.defectSubtype')]) }],
-  description: [{ required: true, message: t('ui.formRules.required', [t('qms.inspection.issues.description')]) }],
-  severity: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.inspection.issues.severity')]) }],
+  reportDate: [
+    {
+      required: true,
+      message: t('ui.formRules.required', [
+        t('qms.inspection.issues.reportDate'),
+      ]),
+    },
+  ],
+  workOrderNumber: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [
+        t('qms.workOrder.workOrderNumber'),
+      ]),
+    },
+  ],
+  partName: [
+    {
+      required: true,
+      message: t('ui.formRules.required', [
+        t('qms.inspection.issues.partName'),
+      ]),
+    },
+  ],
+  quantity: [
+    {
+      required: true,
+      message: t('ui.formRules.required', [t('qms.workOrder.quantity')]),
+    },
+  ],
+  responsibleDepartment: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [
+        t('qms.inspection.issues.responsibleDepartment'),
+      ]),
+    },
+  ],
+  status: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [
+        t('qms.inspection.issues.statusLabel'),
+      ]),
+    },
+  ],
+  defectType: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [
+        t('qms.inspection.issues.defectType'),
+      ]),
+    },
+  ],
+  defectSubtype: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [
+        t('qms.inspection.issues.defectSubtype'),
+      ]),
+    },
+  ],
+  description: [
+    {
+      required: true,
+      message: t('ui.formRules.required', [
+        t('qms.inspection.issues.description'),
+      ]),
+    },
+  ],
+  severity: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [
+        t('qms.inspection.issues.severity'),
+      ]),
+    },
+  ],
 }));
 
 // Refs for composables
@@ -89,7 +161,7 @@ async function handleOk() {
   try {
     await formRef.value.validate();
     validateAndSubmit();
-  } catch (error) {
+  } catch {
     // validation failed
   }
 }
@@ -103,7 +175,11 @@ function handleCancel() {
   <Modal
     :confirm-loading="false"
     :open="open"
-    :title="isEditMode ? t('qms.inspection.issues.editIssue') : t('qms.inspection.issues.createIssue')"
+    :title="
+      isEditMode
+        ? t('qms.inspection.issues.editIssue')
+        : t('qms.inspection.issues.createIssue')
+    "
     width="900px"
     @cancel="handleCancel"
     @ok="handleOk"
@@ -137,10 +213,7 @@ function handleCancel() {
         </div>
 
         <!-- 相似案例推荐 -->
-        <IssueSimilarCases
-          :cases="matchedCases"
-          @apply="applyCaseSolution"
-        />
+        <IssueSimilarCases :cases="matchedCases" @apply="applyCaseSolution" />
       </div>
     </Form>
   </Modal>

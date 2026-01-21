@@ -140,15 +140,15 @@ export namespace QmsPlanningApi {
     upperTolerance?: number;
     lowerTolerance?: number;
     unit?: string;
-    
+
     // New array field
     quantitativeItems?: {
       id?: string; // Optional for new items
+      lowerTolerance: number;
       name?: string; // Optional name/description of the dimension (e.g. "Length", "Diameter")
       standardValue: number;
-      upperTolerance: number;
-      lowerTolerance: number;
       unit: string;
+      upperTolerance: number;
     }[];
 
     // 联动信息
@@ -169,6 +169,7 @@ export namespace QmsPlanningApi {
     itemCount?: number;
     progress?: number;
     workOrderId?: string;
+    workOrderNumber?: string;
     children?: ItpTreeNode[];
     // ... include other ItpItem fields for node data
     activity?: string;
@@ -180,11 +181,11 @@ export namespace QmsPlanningApi {
     // Updated to match ItpItem
     quantitativeItems?: {
       id?: string;
+      lowerTolerance: number;
       name?: string;
       standardValue: number;
-      upperTolerance: number;
-      lowerTolerance: number;
       unit: string;
+      upperTolerance: number;
     }[];
     // Legacy fields
     standardValue?: number;

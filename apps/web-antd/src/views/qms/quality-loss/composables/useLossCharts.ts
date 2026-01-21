@@ -1,7 +1,9 @@
 import type { Ref } from 'vue';
-import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
+
 import type { DeptNode } from '../types';
-import type { EChartsOption } from 'echarts';
+
+import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
+
 import { findNameById } from '#/types';
 
 /**
@@ -14,7 +16,7 @@ export function useLossCharts(
   /**
    * 生成责任部门分布饼图配置
    */
-  function getDeptDistributionOption(): EChartsOption {
+  function getDeptDistributionOption(): any {
     const data = allLossData.value;
     const deptMap: Record<string, number> = {};
 
@@ -35,32 +37,48 @@ export function useLossCharts(
           avoidLabelOverlap: false,
           itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
           label: { show: false, position: 'center' },
-          emphasis: { label: { show: true, fontSize: '16', fontWeight: 'bold' } },
-          data: Object.entries(deptMap).map(([name, value]) => ({ name, value })),
+          emphasis: {
+            label: { show: true, fontSize: '16', fontWeight: 'bold' },
+          },
+          data: Object.entries(deptMap).map(([name, value]) => ({
+            name,
+            value,
+          })),
         },
       ],
-    };
+    } as any;
   }
 
   /**
    * 生成月度趋势图配置
    */
-  function getTrendOption(): EChartsOption {
+  function getTrendOption(): any {
     const data = allLossData.value;
     const monthNames = [
-      '1月', '2月', '3月', '4月', '5月', '6月',
-      '7月', '8月', '9月', '10月', '11月', '12月',
+      '1月',
+      '2月',
+      '3月',
+      '4月',
+      '5月',
+      '6月',
+      '7月',
+      '8月',
+      '9月',
+      '10月',
+      '11月',
+      '12月',
     ];
-    const lossTrend: number[] = new Array(12).fill(0);
-    const claimTrend: number[] = new Array(12).fill(0);
+    const lossTrend: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    const claimTrend: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
     data.forEach((item) => {
       if (!item.date) return;
       const date = new Date(item.date);
       const month = date.getMonth();
       if (month >= 0 && month < 12) {
-        lossTrend[month] += Number(item.amount) || 0;
-        claimTrend[month] += Number(item.actualClaim) || 0;
+        lossTrend[month] = (lossTrend[month] || 0) + (Number(item.amount) || 0);
+        claimTrend[month] =
+          (claimTrend[month] || 0) + (Number(item.actualClaim) || 0);
       }
     });
 
@@ -76,7 +94,7 @@ export function useLossCharts(
       },
       yAxis: {
         type: 'value',
-        splitLine: { lineStyle: { type: 'dashed', color: '#f5f5f5' } },
+        splitLine: { lineStyle: { type: 'dashed' as const, color: '#f5f5f5' } },
       },
       series: [
         {

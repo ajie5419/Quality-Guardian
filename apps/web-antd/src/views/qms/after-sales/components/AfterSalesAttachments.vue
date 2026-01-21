@@ -10,9 +10,9 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  'update:fileList': [files: UploadFile[]];
   preview: [file: UploadFile];
   remove: [file: UploadFile];
+  'update:fileList': [files: UploadFile[]];
 }>();
 
 const { t } = useI18n();

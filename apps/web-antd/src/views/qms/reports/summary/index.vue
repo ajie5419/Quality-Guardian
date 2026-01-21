@@ -83,18 +83,26 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
         <div class="flex items-center justify-between">
           <Space size="large">
             <div class="flex items-center gap-2">
-              <span class="font-medium text-gray-500">{{ t('qms.reports.summary.reportType') }}:</span>
+              <span class="font-medium text-gray-500"
+                >{{ t('qms.reports.summary.reportType') }}:</span
+              >
               <RadioGroup
                 v-model:value="reportType"
                 button-style="solid"
                 size="small"
               >
-                <RadioButton value="weekly">{{ t('qms.reports.summary.weekly') }}</RadioButton>
-                <RadioButton value="monthly">{{ t('qms.reports.summary.monthly') }}</RadioButton>
+                <RadioButton value="weekly">{{
+                  t('qms.reports.summary.weekly')
+                }}</RadioButton>
+                <RadioButton value="monthly">{{
+                  t('qms.reports.summary.monthly')
+                }}</RadioButton>
               </RadioGroup>
             </div>
             <div class="flex items-center gap-2">
-              <span class="font-medium text-gray-500">{{ t('qms.reports.summary.selectPeriod') }}:</span>
+              <span class="font-medium text-gray-500"
+                >{{ t('qms.reports.summary.selectPeriod') }}:</span
+              >
               <DatePicker
                 v-model:value="targetDate"
                 :picker="reportType === 'weekly' ? 'week' : 'month'"
@@ -104,7 +112,8 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
             </div>
           </Space>
           <Button @click="handlePrint" type="primary">
-            <span class="i-lucide-printer mr-1"></span> {{ t('qms.reports.summary.generatePdf') }}
+            <span class="i-lucide-printer mr-1"></span>
+            {{ t('qms.reports.summary.generatePdf') }}
           </Button>
         </div>
       </Card>
@@ -137,7 +146,9 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
               </div>
             </div>
             <div class="text-right">
-              <div class="font-bold text-gray-700">{{ t('qms.reports.summary.qmDept') }}</div>
+              <div class="font-bold text-gray-700">
+                {{ t('qms.reports.summary.qmDept') }}
+              </div>
               <div class="mt-1 text-xs italic text-gray-400">
                 {{ t('qms.reports.summary.internalOnly') }}
               </div>
@@ -261,7 +272,8 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
                   <div
                     class="mb-3 flex items-center gap-1 text-xs font-bold text-green-700"
                   >
-                    <span class="i-lucide-thumbs-up"></span> {{ t('qms.reports.summary.topPerformers') }}
+                    <span class="i-lucide-thumbs-up"></span>
+                    {{ t('qms.reports.summary.topPerformers') }}
                   </div>
                   <div
                     v-for="s in reportData.suppliers.best"
@@ -270,7 +282,8 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
                   >
                     <span class="text-gray-700">{{ s.name }}</span>
                     <Tag color="success" class="m-0 scale-75">
-                      {{ s.issues }} {{ t('common.unit.item') }}{{ t('qms.inspection.issues.status.resolved') }}
+                      {{ s.issues }} {{ t('common.unit.item')
+                      }}{{ t('qms.inspection.issues.status.resolved') }}
                     </Tag>
                   </div>
                 </div>
@@ -279,7 +292,8 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
                   <div
                     class="mb-3 flex items-center gap-1 text-xs font-bold text-red-700"
                   >
-                    <span class="i-lucide-alert-octagon"></span> {{ t('qms.reports.summary.atRiskPerformers') }}
+                    <span class="i-lucide-alert-octagon"></span>
+                    {{ t('qms.reports.summary.atRiskPerformers') }}
                   </div>
                   <div
                     v-for="s in reportData.suppliers.worst"
@@ -288,7 +302,8 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
                   >
                     <span class="text-gray-700">{{ s.name }}</span>
                     <Tag color="error" class="m-0 scale-75">
-                      {{ s.issues }} {{ t('common.unit.item') }}{{ t('common.status') }}
+                      {{ s.issues }} {{ t('common.unit.item')
+                      }}{{ t('common.status') }}
                     </Tag>
                   </div>
                 </div>
@@ -317,7 +332,9 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
                   <div class="text-lg font-black text-red-600">
                     ¥{{ (event.loss / 1000).toFixed(1) }}k
                   </div>
-                  <div class="text-[10px] text-gray-400">{{ t('qms.inspection.issues.lossAmount') }}</div>
+                  <div class="text-[10px] text-gray-400">
+                    {{ t('qms.inspection.issues.lossAmount') }}
+                  </div>
                 </div>
                 <div class="flex-1">
                   <div class="mb-2 flex items-start justify-between">
@@ -358,7 +375,8 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
             </div>
             <div class="relative z-10">
               <div class="mb-4 flex items-center gap-2 text-xl font-bold">
-                <span class="i-lucide-lightbulb"></span> {{ t('qms.reports.summary.managementInsights') }}
+                <span class="i-lucide-lightbulb"></span>
+                {{ t('qms.reports.summary.managementInsights') }}
               </div>
               <div class="grid grid-cols-2 gap-10">
                 <div class="space-y-4">

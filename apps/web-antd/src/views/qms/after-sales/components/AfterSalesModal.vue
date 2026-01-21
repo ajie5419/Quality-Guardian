@@ -4,7 +4,7 @@ import type { QmsSupplierApi } from '#/api/qms/supplier';
 import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 import type { TreeSelectNode } from '#/types';
 
-import { computed, toRef, watch, ref } from 'vue';
+import { computed, ref, toRef, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
@@ -38,17 +38,88 @@ const { statusOptions } = useStatusOptions();
 const formRef = ref();
 
 const rules = computed(() => ({
-  workOrderNumber: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.afterSales.form.workOrderNumber')]) }],
-  customerName: [{ required: true, message: t('ui.formRules.required', [t('qms.afterSales.form.customerName')]) }],
-  partName: [{ required: true, message: t('ui.formRules.required', [t('qms.afterSales.form.partName')]) }],
-  issueDate: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.afterSales.form.issueDate')]) }],
-  location: [{ required: true, message: t('ui.formRules.required', [t('qms.afterSales.form.location')]) }],
-  severity: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.afterSales.form.severity')]) }],
-  defectType: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.afterSales.form.defectType')]) }],
-  quantity: [{ required: true, message: t('ui.formRules.required', [t('qms.afterSales.form.quantity')]) }],
-  responsibleDept: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.afterSales.form.responsibleDept')]) }],
-  status: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.afterSales.form.status')]) }],
-  issueDescription: [{ required: true, message: t('ui.formRules.required', [t('qms.afterSales.form.issueDescription')]) }],
+  workOrderNumber: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [
+        t('qms.afterSales.form.workOrderNumber'),
+      ]),
+    },
+  ],
+  customerName: [
+    {
+      required: true,
+      message: t('ui.formRules.required', [
+        t('qms.afterSales.form.customerName'),
+      ]),
+    },
+  ],
+  partName: [
+    {
+      required: true,
+      message: t('ui.formRules.required', [t('qms.afterSales.form.partName')]),
+    },
+  ],
+  issueDate: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [
+        t('qms.afterSales.form.issueDate'),
+      ]),
+    },
+  ],
+  location: [
+    {
+      required: true,
+      message: t('ui.formRules.required', [t('qms.afterSales.form.location')]),
+    },
+  ],
+  severity: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [
+        t('qms.afterSales.form.severity'),
+      ]),
+    },
+  ],
+  defectType: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [
+        t('qms.afterSales.form.defectType'),
+      ]),
+    },
+  ],
+  quantity: [
+    {
+      required: true,
+      message: t('ui.formRules.required', [t('qms.afterSales.form.quantity')]),
+    },
+  ],
+  responsibleDept: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [
+        t('qms.afterSales.form.responsibleDept'),
+      ]),
+    },
+  ],
+  status: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [
+        t('qms.afterSales.form.status'),
+      ]),
+    },
+  ],
+  issueDescription: [
+    {
+      required: true,
+      message: t('ui.formRules.required', [
+        t('qms.afterSales.form.issueDescription'),
+      ]),
+    },
+  ],
 }));
 
 const openRef = toRef(props, 'open');
@@ -72,7 +143,9 @@ const {
 });
 
 // 是否为采购部门
-const isPurchasingDept = computed(() => checkIsPurchasingDept(props.deptTreeData));
+const isPurchasingDept = computed(() =>
+  checkIsPurchasingDept(props.deptTreeData),
+);
 
 // 监听编辑模式数据
 watch(
@@ -88,7 +161,7 @@ async function handleOk() {
   try {
     await formRef.value.validate();
     submit();
-  } catch (error) {
+  } catch {
     // validation failed
   }
 }
@@ -97,7 +170,7 @@ function handleCancel() {
   emit('update:open', false);
 }
 
-function onWorkOrderChange(val: string | number) {
+function onWorkOrderChange(val: number | string) {
   handleWorkOrderChange(val, props.workOrderList);
 }
 </script>
@@ -105,13 +178,25 @@ function onWorkOrderChange(val: string | number) {
 <template>
   <Modal
     :open="open"
-    :title="isEditMode ? t('qms.afterSales.form.edit') : t('qms.afterSales.form.create')"
+    :title="
+      isEditMode
+        ? t('qms.afterSales.form.edit')
+        : t('qms.afterSales.form.create')
+    "
     width="1000px"
     @cancel="handleCancel"
     @ok="handleOk"
   >
-    <Form ref="formRef" :model="formState" :rules="rules" layout="vertical" class="pt-2">
-      <div class="grid max-h-[650px] grid-cols-1 gap-4 overflow-y-auto p-1 md:grid-cols-2">
+    <Form
+      ref="formRef"
+      :model="formState"
+      :rules="rules"
+      layout="vertical"
+      class="pt-2"
+    >
+      <div
+        class="grid max-h-[650px] grid-cols-1 gap-4 overflow-y-auto p-1 md:grid-cols-2"
+      >
         <!-- 左侧列 -->
         <div class="space-y-4">
           <AfterSalesBasicInfo

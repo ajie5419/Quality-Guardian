@@ -25,9 +25,18 @@ export const searchFormSchema: VbenFormProps['schema'] = [
     componentProps: {
       options: [
         { label: $t('common.all'), value: '' },
-        { label: $t('qms.inspection.issues.status.open'), value: InspectionIssueStatusEnum.OPEN },
-        { label: $t('qms.inspection.issues.status.inProgress'), value: InspectionIssueStatusEnum.IN_PROGRESS },
-        { label: $t('qms.inspection.issues.status.closed'), value: InspectionIssueStatusEnum.CLOSED },
+        {
+          label: $t('qms.inspection.issues.status.open'),
+          value: InspectionIssueStatusEnum.OPEN,
+        },
+        {
+          label: $t('qms.inspection.issues.status.inProgress'),
+          value: InspectionIssueStatusEnum.IN_PROGRESS,
+        },
+        {
+          label: $t('qms.inspection.issues.status.closed'),
+          value: InspectionIssueStatusEnum.CLOSED,
+        },
       ],
     },
     colProps: { span: 4 },
@@ -35,7 +44,7 @@ export const searchFormSchema: VbenFormProps['schema'] = [
 ] as any;
 
 export const gridColumns: VxeGridProps['columns'] = [
-  { type: 'seq', title: $t('common.seq'), width: 60, fixed: 'left' },
+  { type: 'seq', title: $t('common.seq'), width: 60, fixed: 'left' as const },
   {
     field: 'reportDate',
     title: $t('qms.inspection.issues.reportDate'),
@@ -48,9 +57,23 @@ export const gridColumns: VxeGridProps['columns'] = [
     width: 140,
     sortable: true,
   },
-  { field: 'division', title: $t('qms.workOrder.division'), width: 120, sortable: true },
-  { field: 'defectType', title: $t('qms.inspection.issues.defectType'), width: 120, sortable: true },
-  { field: 'defectSubtype', title: $t('qms.inspection.issues.defectSubtype'), width: 120 },
+  {
+    field: 'division',
+    title: $t('qms.workOrder.division'),
+    width: 120,
+    sortable: true,
+  },
+  {
+    field: 'defectType',
+    title: $t('qms.inspection.issues.defectType'),
+    width: 120,
+    sortable: true,
+  },
+  {
+    field: 'defectSubtype',
+    title: $t('qms.inspection.issues.defectSubtype'),
+    width: 120,
+  },
   {
     field: 'status',
     title: $t('common.status'),
@@ -108,7 +131,11 @@ export const gridColumns: VxeGridProps['columns'] = [
     title: $t('qms.inspection.issues.responsibleDepartment'),
     width: 120,
   },
-  { field: 'supplierName', title: $t('qms.inspection.issues.responsibleUnit'), width: 180 },
+  {
+    field: 'supplierName',
+    title: $t('qms.inspection.issues.responsibleUnit'),
+    width: 180,
+  },
   {
     field: 'reportedBy',
     title: $t('qms.inspection.issues.reportedBy'),
@@ -135,7 +162,7 @@ export const gridColumns: VxeGridProps['columns'] = [
   {
     title: $t('common.action'),
     width: 150,
-    fixed: 'right',
+    fixed: 'right' as const,
     slots: { default: 'action' },
   },
 ];

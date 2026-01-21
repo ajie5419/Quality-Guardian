@@ -20,9 +20,12 @@ export default defineEventHandler(async (event) => {
         referenceDoc: body.referenceDoc,
         frequency: body.frequency,
         verifyingDocument: body.verifyingDocument,
-        isQuantitative: body.isQuantitative !== undefined ? !!body.isQuantitative : undefined,
-        quantitativeItems: body.quantitativeItems ? JSON.stringify(body.quantitativeItems) : undefined,
-        order: body.order !== undefined ? Number(body.order) : undefined,
+        isQuantitative:
+          body.isQuantitative === undefined ? undefined : !!body.isQuantitative,
+        quantitativeItems: body.quantitativeItems
+          ? JSON.stringify(body.quantitativeItems)
+          : undefined,
+        order: body.order === undefined ? undefined : Number(body.order),
       },
     });
 
@@ -30,7 +33,9 @@ export default defineEventHandler(async (event) => {
       code: 0,
       data: {
         ...updated,
-        quantitativeItems: updated.quantitativeItems ? JSON.parse(updated.quantitativeItems) : []
+        quantitativeItems: updated.quantitativeItems
+          ? JSON.parse(updated.quantitativeItems)
+          : [],
       },
       message: 'updated',
     };

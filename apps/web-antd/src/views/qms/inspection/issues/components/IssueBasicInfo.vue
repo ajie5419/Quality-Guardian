@@ -1,12 +1,25 @@
 <script lang="ts" setup>
-import type { IssueFormState } from '../types';
-import type { DeptNode, SupplierItem, WorkOrderItem } from '../types';
+import type {
+  DeptNode,
+  IssueFormState,
+  SupplierItem,
+  WorkOrderItem,
+} from '../types';
 
 import { computed } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
-import { Select, Switch, TreeSelect, FormItem, Input, InputNumber, FormItemRest } from 'ant-design-vue';
+import {
+  DatePicker,
+  FormItem,
+  FormItemRest,
+  Input,
+  InputNumber,
+  Select,
+  Switch,
+  TreeSelect,
+} from 'ant-design-vue';
 
 import { DEPT_TYPE_KEYWORDS } from '../constants';
 
@@ -17,13 +30,12 @@ const props = defineProps<{
   workOrderList: WorkOrderItem[];
 }>();
 
-const formState = defineModel<IssueFormState>('formState', { required: true });
-const isAutoNc = defineModel<boolean>('isAutoNc', { default: false });
-
 const emit = defineEmits<{
   'update:isAutoNc': [boolean];
   workOrderChange: [string];
 }>();
+const formState = defineModel<IssueFormState>('formState', { required: true });
+const isAutoNc = defineModel<boolean>('isAutoNc', { default: false });
 
 const { t } = useI18n();
 
@@ -43,7 +55,10 @@ function findDeptTitle(tree: DeptNode[], value?: string): string | undefined {
 }
 
 const selectedDeptName = computed(() => {
-  return findDeptTitle(props.deptTreeData, formState.value.responsibleDepartment);
+  return findDeptTitle(
+    props.deptTreeData,
+    formState.value.responsibleDepartment,
+  );
 });
 
 const isPurchaseDept = computed(() => {
@@ -84,7 +99,7 @@ function handleWorkOrderChange(val: unknown) {
           />
         </div>
         <FormItemRest v-if="!isEditMode">
-          <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="flex flex-shrink-0 items-center gap-2">
             <span class="text-xs text-gray-400">自动生成</span>
             <Switch v-model:checked="isAutoNc" size="small" />
           </div>
@@ -94,21 +109,24 @@ function handleWorkOrderChange(val: unknown) {
 
     <!-- 报告日期 -->
     <FormItem :label="t('qms.inspection.issues.reportDate')" name="reportDate">
-      <Input
+      <DatePicker
         v-model:value="formState.reportDate"
-        type="date"
+        value-format="YYYY-MM-DD"
         class="w-full"
       />
     </FormItem>
 
     <!-- 关联工单 -->
-    <FormItem :label="t('qms.workOrder.workOrderNumber')" name="workOrderNumber">
+    <FormItem
+      :label="t('qms.workOrder.workOrderNumber')"
+      name="workOrderNumber"
+    >
       <Select
         v-model:value="formState.workOrderNumber"
         :options="
           workOrderList.map((w) => ({
             value: w.workOrderNumber,
-            label: w.workOrderNumber + ' - ' + w.projectName,
+            label: `${w.workOrderNumber} - ${w.projectName}`,
           }))
         "
         class="w-full"
@@ -120,11 +138,7 @@ function handleWorkOrderChange(val: unknown) {
 
     <!-- 项目名称 (自动填充) -->
     <FormItem :label="t('qms.workOrder.projectName')">
-      <Input
-        v-model:value="formState.projectName"
-        readonly
-        disabled
-      />
+      <Input v-model:value="formState.projectName" readonly disabled />
     </FormItem>
 
     <!-- 部件名称 -->
@@ -137,24 +151,19 @@ function handleWorkOrderChange(val: unknown) {
 
     <!-- 数量 -->
     <FormItem :label="t('qms.workOrder.quantity')" name="quantity">
-      <InputNumber
-        v-model:value="formState.quantity"
-        class="w-full"
-        :min="1"
-      />
+      <InputNumber v-model:value="formState.quantity" class="w-full" :min="1" />
     </FormItem>
 
     <!-- 事业部 -->
     <FormItem :label="t('qms.workOrder.division')">
-      <Input
-        v-model:value="formState.division"
-        readonly
-        disabled
-      />
+      <Input v-model:value="formState.division" readonly disabled />
     </FormItem>
 
     <!-- 责任部门 (TreeSelect) -->
-    <FormItem :label="t('qms.inspection.issues.responsibleDepartment')" name="responsibleDepartment">
+    <FormItem
+      :label="t('qms.inspection.issues.responsibleDepartment')"
+      name="responsibleDepartment"
+    >
       <TreeSelect
         v-model:value="formState.responsibleDepartment"
         :dropdown-style="{ maxHeight: '400px', overflow: 'auto' }"
@@ -166,7 +175,11 @@ function handleWorkOrderChange(val: unknown) {
     </FormItem>
 
     <!-- 责任单位/供应商 -->
-    <FormItem v-if="isPurchaseDept || isProductionDept" :label="t('qms.inspection.issues.responsibleUnit')" name="supplierName">
+    <FormItem
+      v-if="isPurchaseDept || isProductionDept"
+      :label="t('qms.inspection.issues.responsibleUnit')"
+      name="supplierName"
+    >
       <Select
         v-model:value="formState.supplierName"
         :options="supplierList.map((s) => ({ value: s.name, label: s.name }))"

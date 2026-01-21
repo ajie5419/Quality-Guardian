@@ -1,5 +1,4 @@
 import type { ProjectStatusEnum } from '#/api/qms/enums';
-import type { QmsPlanningApi } from '#/api/qms/planning';
 
 /**
  * 统一种类树节点基础接口
@@ -10,7 +9,7 @@ export interface PlanningTreeNode {
   status: ProjectStatusEnum | string;
   version?: string;
   workOrderNumber?: string;
-  parentId?: string | null;
+  parentId?: null | string;
   children?: PlanningTreeNode[];
   itemCount?: number;
   [key: string]: unknown;
@@ -38,7 +37,6 @@ export interface ItpProjectForm {
   version: string;
   status: 'active' | 'archived' | 'draft';
 }
-
 
 /**
  * 项目过滤参数
@@ -74,4 +72,4 @@ export interface InspectionDocItem {
 /**
  * 侧边栏项点击回调
  */
-export type OnSelectProject = (id: string | null) => void;
+export type OnSelectProject = (id: null | string) => void;

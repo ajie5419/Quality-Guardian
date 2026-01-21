@@ -5,13 +5,13 @@ import { ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
-import { Button, Select, Tooltip, FormItem, Tag, Input } from 'ant-design-vue';
+import { Button, FormItem, Input, Select, Tag, Tooltip } from 'ant-design-vue';
 
 import {
-  useDefectOptions,
-  useStatusOptions,
-  useSeverityOptions,
   useClaimOptions,
+  useDefectOptions,
+  useSeverityOptions,
+  useStatusOptions,
 } from '../constants';
 
 defineProps<{
@@ -19,12 +19,12 @@ defineProps<{
   isMatchingCases: boolean;
 }>();
 
-const formState = defineModel<IssueFormState>('formState', { required: true });
-
 const emit = defineEmits<{
   aiAnalyze: [];
   matchHistory: [];
 }>();
+
+const formState = defineModel<IssueFormState>('formState', { required: true });
 
 const { t } = useI18n();
 const { defectOptions, defectSubtypes } = useDefectOptions();
@@ -36,7 +36,8 @@ const currentSubtypeOptions = ref<{ label: string; value: string }[]>([]);
 
 function updateSubtypes() {
   currentSubtypeOptions.value =
-    formState.value.defectType && defectSubtypes.value[formState.value.defectType]
+    formState.value.defectType &&
+    defectSubtypes.value[formState.value.defectType]
       ? defectSubtypes.value[formState.value.defectType as string] || []
       : [];
 }
@@ -80,7 +81,10 @@ watch(
 
     <!-- 缺陷分类 -->
     <div class="grid grid-cols-2 gap-2">
-      <FormItem :label="t('qms.inspection.issues.defectType')" name="defectType">
+      <FormItem
+        :label="t('qms.inspection.issues.defectType')"
+        name="defectType"
+      >
         <Select
           v-model:value="formState.defectType"
           :options="defectOptions"
@@ -88,7 +92,10 @@ watch(
           @change="handleDefectTypeChange"
         />
       </FormItem>
-      <FormItem :label="t('qms.inspection.issues.defectSubtype')" name="defectSubtype">
+      <FormItem
+        :label="t('qms.inspection.issues.defectSubtype')"
+        name="defectSubtype"
+      >
         <Select
           v-model:value="formState.defectSubtype"
           :options="currentSubtypeOptions"
@@ -117,7 +124,10 @@ watch(
     </FormItem>
 
     <!-- 问题描述 -->
-    <FormItem :label="t('qms.inspection.issues.description')" name="description">
+    <FormItem
+      :label="t('qms.inspection.issues.description')"
+      name="description"
+    >
       <template #label>
         <div class="flex w-full items-center justify-between">
           <span>{{ t('qms.inspection.issues.description') }}</span>
@@ -156,18 +166,12 @@ watch(
 
     <!-- 根本原因 -->
     <FormItem :label="t('qms.inspection.issues.rootCause')">
-      <Input.TextArea
-        v-model:value="formState.rootCause"
-        :rows="2"
-      />
+      <Input.TextArea v-model:value="formState.rootCause" :rows="2" />
     </FormItem>
 
     <!-- 解决方案 -->
     <FormItem :label="t('qms.inspection.issues.solution')">
-      <Input.TextArea
-        v-model:value="formState.solution"
-        :rows="2"
-      />
+      <Input.TextArea v-model:value="formState.solution" :rows="2" />
     </FormItem>
   </div>
 </template>

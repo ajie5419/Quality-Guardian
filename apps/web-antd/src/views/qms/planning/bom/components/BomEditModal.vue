@@ -1,27 +1,41 @@
 <script lang="ts" setup>
-import { reactive, watch, ref } from 'vue';
-import { useI18n } from '@vben/locales';
-import { Modal, Form, Input, InputNumber, Row, Col, message } from 'ant-design-vue';
 import type { QmsPlanningApi } from '#/api/qms/planning';
+
+import { reactive, ref, watch } from 'vue';
+
+import { useI18n } from '@vben/locales';
+
+import {
+  Col,
+  Form,
+  Input,
+  InputNumber,
+  message,
+  Modal,
+  Row,
+} from 'ant-design-vue';
+
 import { createBom, updateBom } from '#/api/qms/planning';
 
 const props = defineProps<{
-  open: boolean;
-  isEditMode: boolean;
+  currentId: null | string;
   initialData: Partial<QmsPlanningApi.BomItem> & { workOrderNumber?: string };
-  currentId: string | null;
+  isEditMode: boolean;
+  open: boolean;
 }>();
 
 const emit = defineEmits<{
-  'update:open': [boolean];
   success: [];
+  'update:open': [boolean];
 }>();
 
 const { t } = useI18n();
 const confirmLoading = ref(false);
 const formRef = ref();
 
-const formState = reactive<Partial<QmsPlanningApi.BomItem> & { workOrderNumber?: string }>({
+const formState = reactive<
+  Partial<QmsPlanningApi.BomItem> & { workOrderNumber?: string }
+>({
   material: '',
   partName: '',
   partNumber: '',
@@ -31,15 +45,36 @@ const formState = reactive<Partial<QmsPlanningApi.BomItem> & { workOrderNumber?:
   workOrderNumber: '',
 });
 
-const rules = {
-  partName: [{ required: true, message: t('qms.planning.bom.placeholder.partName'), trigger: 'blur' }],
-  partNumber: [{ required: true, message: t('qms.planning.bom.placeholder.partNumber'), trigger: 'blur' }],
-  quantity: [{ required: true, type: 'number', message: t('common.pleaseInput'), trigger: 'change' }],
+const rules: any = {
+  partName: [
+    {
+      required: true,
+      message: t('qms.planning.bom.placeholder.partName'),
+      trigger: 'blur',
+    },
+  ],
+  partNumber: [
+    {
+      required: true,
+      message: t('qms.planning.bom.placeholder.partNumber'),
+      trigger: 'blur',
+    },
+  ],
+  quantity: [
+    {
+      required: true,
+      type: 'number',
+      message: t('common.pleaseInput'),
+      trigger: 'change',
+    },
+  ],
 };
 
-watch(() => props.open, (val) => {
-  if (val) {
-    Object.assign(formState, {
+watch(
+  () => props.open,
+  (val) => {
+    if (val) {
+      Object.assign(formState, {
         material: props.initialData.material || '',
         partName: props.initialData.partName || '',
         partNumber: props.initialData.partNumber || '',
@@ -47,17 +82,18 @@ watch(() => props.open, (val) => {
         remarks: props.initialData.remarks || '',
         unit: props.initialData.unit || 'PCS',
         workOrderNumber: props.initialData.workOrderNumber || '',
-    });
-  } else {
-    formRef.value?.resetFields();
-  }
-});
+      });
+    } else {
+      formRef.value?.resetFields();
+    }
+  },
+);
 
 async function handleOk() {
   try {
     await formRef.value?.validate();
     confirmLoading.value = true;
-    
+
     const payload = { ...formState };
     if (props.isEditMode && props.currentId) {
       await updateBom(props.currentId, payload as QmsPlanningApi.BomItem);
@@ -81,36 +117,65 @@ async function handleOk() {
 <template>
   <Modal
     :open="open"
-    :title="isEditMode ? t('qms.planning.bom.editItem') : t('qms.planning.bom.addItem')"
+    :title="
+      isEditMode
+        ? t('qms.planning.bom.editItem')
+        : t('qms.planning.bom.addItem')
+    "
     :confirm-loading="confirmLoading"
     @ok="handleOk"
     @cancel="emit('update:open', false)"
     width="700px"
     destroy-on-close
   >
-    <Form ref="formRef" :model="formState" :rules="rules" layout="vertical" class="pt-4">
+    <Form
+      ref="formRef"
+      :model="formState"
+      :rules="rules"
+      layout="vertical"
+      class="pt-4"
+    >
       <Row :gutter="16">
         <Col :span="12">
-          <Form.Item :label="t('qms.planning.bom.workOrderNo')" name="workOrderNumber">
-            <Input v-model:value="formState.workOrderNumber" disabled class="bg-gray-50" />
+          <Form.Item
+            :label="t('qms.planning.bom.workOrderNo')"
+            name="workOrderNumber"
+          >
+            <Input
+              v-model:value="formState.workOrderNumber"
+              disabled
+              class="bg-gray-50"
+            />
           </Form.Item>
         </Col>
         <Col :span="12">
           <Form.Item :label="t('qms.planning.bom.partName')" name="partName">
-            <Input v-model:value="formState.partName" :placeholder="t('qms.planning.bom.placeholder.partName')" />
+            <Input
+              v-model:value="formState.partName"
+              :placeholder="t('qms.planning.bom.placeholder.partName')"
+            />
           </Form.Item>
         </Col>
       </Row>
 
       <Row :gutter="16">
         <Col :span="12">
-          <Form.Item :label="t('qms.planning.bom.partNumber')" name="partNumber">
-            <Input v-model:value="formState.partNumber" :placeholder="t('qms.planning.bom.placeholder.partNumber')" />
+          <Form.Item
+            :label="t('qms.planning.bom.partNumber')"
+            name="partNumber"
+          >
+            <Input
+              v-model:value="formState.partNumber"
+              :placeholder="t('qms.planning.bom.placeholder.partNumber')"
+            />
           </Form.Item>
         </Col>
         <Col :span="12">
           <Form.Item :label="t('qms.planning.bom.material')" name="material">
-            <Input v-model:value="formState.material" :placeholder="t('qms.planning.bom.placeholder.material')" />
+            <Input
+              v-model:value="formState.material"
+              :placeholder="t('qms.planning.bom.placeholder.material')"
+            />
           </Form.Item>
         </Col>
       </Row>
@@ -118,18 +183,29 @@ async function handleOk() {
       <Row :gutter="16">
         <Col :span="12">
           <Form.Item :label="t('qms.planning.bom.quantity')" name="quantity">
-            <InputNumber v-model:value="formState.quantity" class="w-full" :min="1" />
+            <InputNumber
+              v-model:value="formState.quantity"
+              class="w-full"
+              :min="1"
+            />
           </Form.Item>
         </Col>
         <Col :span="12">
           <Form.Item :label="t('qms.planning.bom.unit')" name="unit">
-            <Input v-model:value="formState.unit" :placeholder="t('qms.planning.bom.placeholder.unit')" />
+            <Input
+              v-model:value="formState.unit"
+              :placeholder="t('qms.planning.bom.placeholder.unit')"
+            />
           </Form.Item>
         </Col>
       </Row>
 
       <Form.Item :label="t('qms.planning.bom.remarks')" name="remarks">
-        <Input.TextArea v-model:value="formState.remarks" :rows="3" :placeholder="t('qms.planning.bom.placeholder.remarks')" />
+        <Input.TextArea
+          v-model:value="formState.remarks"
+          :rows="3"
+          :placeholder="t('qms.planning.bom.placeholder.remarks')"
+        />
       </Form.Item>
     </Form>
   </Modal>

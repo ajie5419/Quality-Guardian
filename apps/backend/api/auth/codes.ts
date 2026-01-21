@@ -36,8 +36,8 @@ export default eventHandler(async (event) => {
     }
 
     // Special handling for Super Admin (if needed, or rely on DB data)
-    // If the permission is ["*"], it usually implies all access, 
-    // but the frontend might need specific codes. 
+    // If the permission is ["*"], it usually implies all access,
+    // but the frontend might need specific codes.
     // For now, we trust the DB contains the correct list of codes.
 
     return useResponseSuccess(codes);

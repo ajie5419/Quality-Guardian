@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   try {
     const plan = await prisma.quality_plans.findUnique({
       where: { id: projectId },
-      include: { items: true }
+      include: { items: true },
     });
 
     if (!plan) {
@@ -36,7 +36,9 @@ export default defineEventHandler(async (event) => {
         frequency: itemData.frequency,
         verifyingDocument: itemData.verifyingDocument,
         isQuantitative: !!itemData.isQuantitative,
-        quantitativeItems: itemData.quantitativeItems ? JSON.stringify(itemData.quantitativeItems) : '[]',
+        quantitativeItems: itemData.quantitativeItems
+          ? JSON.stringify(itemData.quantitativeItems)
+          : '[]',
         order: itemData.order || maxOrder + 1,
       },
     });
@@ -45,7 +47,7 @@ export default defineEventHandler(async (event) => {
       code: 0,
       data: {
         ...newItem,
-        quantitativeItems: JSON.parse(newItem.quantitativeItems || '[]')
+        quantitativeItems: JSON.parse(newItem.quantitativeItems || '[]'),
       },
       message: 'created',
     };

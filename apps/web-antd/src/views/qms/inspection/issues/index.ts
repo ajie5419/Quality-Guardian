@@ -2,14 +2,14 @@
  * 质量问题管理模块导出
  */
 
-// Types
-export * from './types';
+// Composables
+export * from './composables';
 
 // Constants
 export * from './constants';
 
-// Composables
-export * from './composables';
+// Types
+export * from './types';
 
 // Utils
 export * from './utils/statusHelper';

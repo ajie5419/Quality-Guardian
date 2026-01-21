@@ -21,21 +21,18 @@ export namespace QmsWorkOrderApi {
  * Get Work Order list (Paginated with Summary)
  */
 export async function getWorkOrderList(params?: {
+  page?: number;
+  pageSize?: number;
   projectName?: string;
   status?: string;
   workOrderNumber?: string;
   year?: number;
-  page?: number;
-  pageSize?: number;
 }) {
-  return requestClient.get<{ 
-    items: QmsWorkOrderApi.WorkOrderItem[]; 
+  return requestClient.get<{
+    items: QmsWorkOrderApi.WorkOrderItem[];
+    summary: Array<{ division: string; quantity: number; status: string }>;
     total: number;
-    summary: Array<{ status: string; division: string; quantity: number }>;
-  }>(
-    QMS_API.WORK_ORDER,
-    { params },
-  );
+  }>(QMS_API.WORK_ORDER, { params });
 }
 
 /**

@@ -1,3 +1,5 @@
+import process from 'node:process';
+
 import { PrismaClient } from '@prisma/client';
 
 // Create a singleton instance of PrismaClient

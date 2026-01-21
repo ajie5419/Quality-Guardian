@@ -10,11 +10,11 @@ interface Props {
   type?: 'Outsourcing' | 'Supplier';
 }
 
-const { t } = useI18n();
-
 withDefaults(defineProps<Props>(), {
   type: 'Supplier',
 });
+
+const { t } = useI18n();
 </script>
 
 <template>

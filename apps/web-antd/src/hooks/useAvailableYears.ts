@@ -1,4 +1,5 @@
-import { ref, onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
+
 import { requestClient } from '#/api/request';
 
 /**
@@ -14,8 +15,8 @@ export function useAvailableYears() {
       // 调用后端动态发现接口
       const res = await requestClient.get<number[]>('/qms/common/years');
       years.value = res;
-    } catch (err) {
-      console.error('获取统计年份失败', err);
+    } catch (error) {
+      console.error('获取统计年份失败', error);
       // 容错处理：显示当前年份及前一年
       const current = new Date().getFullYear();
       years.value = [current, current - 1];
@@ -29,6 +30,6 @@ export function useAvailableYears() {
   return {
     years,
     loading,
-    refreshYears: fetchYears
+    refreshYears: fetchYears,
   };
 }

@@ -2,6 +2,8 @@ import type { EventHandlerRequest, H3Event } from 'h3';
 
 import type { UserInfo } from './mock-data';
 
+import process from 'node:process';
+
 import { getHeader } from 'h3';
 import jwt from 'jsonwebtoken';
 

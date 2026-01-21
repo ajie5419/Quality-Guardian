@@ -13,20 +13,23 @@ export const RATING_COLORS: Record<string, string> = {
 /**
  * Supplier Status UI Map
  */
-export const STATUS_UI_MAP: Record<string, { status: string; textKey: string; defaultText: string }> = {
-  [SupplierStatusEnum.QUALIFIED]: { 
-    status: 'success', 
+export const STATUS_UI_MAP: Record<
+  string,
+  { defaultText: string; status: string; textKey: string }
+> = {
+  [SupplierStatusEnum.QUALIFIED]: {
+    status: 'success',
     textKey: 'qms.outsourcing.status.qualified',
-    defaultText: '已准入'
+    defaultText: '已准入',
   },
-  [SupplierStatusEnum.OBSERVATION]: { 
-    status: 'warning', 
+  [SupplierStatusEnum.OBSERVATION]: {
+    status: 'warning',
     textKey: 'qms.outsourcing.status.observation',
-    defaultText: '质量观察'
+    defaultText: '质量观察',
   },
-  [SupplierStatusEnum.FROZEN]: { 
-    status: 'error', 
+  [SupplierStatusEnum.FROZEN]: {
+    status: 'error',
     textKey: 'qms.outsourcing.status.frozen',
-    defaultText: '已冻结'
+    defaultText: '已冻结',
   },
 };

@@ -1,20 +1,23 @@
 <script lang="ts" setup>
-import { reactive, watch, ref } from 'vue';
+import { reactive, ref, watch } from 'vue';
+
 import { useI18n } from '@vben/locales';
-import { Modal, Form, Input, InputNumber, Select, message } from 'ant-design-vue';
+
+import { Form, Input, InputNumber, message, Modal } from 'ant-design-vue';
+
 import { createDfmea, updateDfmea } from '#/api/qms/planning';
 
 const props = defineProps<{
-  open: boolean;
-  isEditMode: boolean;
+  currentItemId: null | string;
   initialData: any;
-  selectedProjectId: string | null;
-  currentItemId: string | null;
+  isEditMode: boolean;
+  open: boolean;
+  selectedProjectId: null | string;
 }>();
 
 const emit = defineEmits<{
-  'update:open': [boolean];
   success: [];
+  'update:open': [boolean];
 }>();
 
 const { t } = useI18n();
@@ -30,44 +33,47 @@ const formState = reactive({
   detection: 5,
 });
 
-const rules = {
+const rules: any = {
   item: [{ required: true, message: t('common.pleaseInput'), trigger: 'blur' }],
-  failureMode: [{ required: true, message: t('common.pleaseInput'), trigger: 'blur' }],
+  failureMode: [
+    { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
+  ],
 };
 
-watch(() => props.open, (val) => {
-  if (val) {
-    Object.assign(formState, {
+watch(
+  () => props.open,
+  (val) => {
+    if (val) {
+      Object.assign(formState, {
         item: props.initialData.item || props.initialData.name || '',
         failureMode: props.initialData.failureMode || '',
         effects: props.initialData.effects || '',
         severity: props.initialData.severity || 5,
         occurrence: props.initialData.occurrence || 5,
         detection: props.initialData.detection || 5,
-    });
-  } else {
-    formRef.value?.resetFields();
-  }
-});
+      });
+    } else {
+      formRef.value?.resetFields();
+    }
+  },
+);
 
 async function handleOk() {
   if (!props.selectedProjectId) return;
   try {
     await formRef.value?.validate();
     confirmLoading.value = true;
-    
-    const payload = { 
-        ...formState, 
-        projectId: props.selectedProjectId,
-        effect: formState.effects // 后端 schema 字段是 effect (单数)
+
+    const payload = {
+      ...formState,
+      projectId: props.selectedProjectId,
+      effect: formState.effects, // 后端 schema 字段是 effect (单数)
     };
-    
-    if (props.isEditMode && props.currentItemId) {
-      await updateDfmea(props.currentItemId, payload);
-    } else {
-      await createDfmea(payload);
-    }
-    
+
+    await (props.isEditMode && props.currentItemId
+      ? updateDfmea(props.currentItemId, payload)
+      : createDfmea(payload));
+
     message.success(t('common.saveSuccess'));
     emit('success');
     emit('update:open', false);
@@ -90,26 +96,53 @@ async function handleOk() {
     width="600px"
     destroy-on-close
   >
-    <Form ref="formRef" :model="formState" :rules="rules" layout="vertical" class="pt-4">
+    <Form
+      ref="formRef"
+      :model="formState"
+      :rules="rules"
+      layout="vertical"
+      class="pt-4"
+    >
       <Form.Item :label="t('qms.planning.dfmea.item')" name="item">
         <Input v-model:value="formState.item" />
       </Form.Item>
-      <Form.Item :label="t('qms.planning.dfmea.failureMode')" name="failureMode">
+      <Form.Item
+        :label="t('qms.planning.dfmea.failureMode')"
+        name="failureMode"
+      >
         <Input v-model:value="formState.failureMode" />
       </Form.Item>
       <Form.Item :label="t('qms.planning.dfmea.effects')" name="effects">
         <Input.TextArea v-model:value="formState.effects" />
       </Form.Item>
       <div class="grid grid-cols-3 gap-4">
-          <Form.Item :label="t('qms.planning.dfmea.severity')" name="severity">
-            <InputNumber v-model:value="formState.severity" :min="1" :max="10" class="w-full" />
-          </Form.Item>
-          <Form.Item :label="t('qms.planning.dfmea.occurrence')" name="occurrence">
-            <InputNumber v-model:value="formState.occurrence" :min="1" :max="10" class="w-full" />
-          </Form.Item>
-          <Form.Item :label="t('qms.planning.dfmea.detection')" name="detection">
-            <InputNumber v-model:value="formState.detection" :min="1" :max="10" class="w-full" />
-          </Form.Item>
+        <Form.Item :label="t('qms.planning.dfmea.severity')" name="severity">
+          <InputNumber
+            v-model:value="formState.severity"
+            :min="1"
+            :max="10"
+            class="w-full"
+          />
+        </Form.Item>
+        <Form.Item
+          :label="t('qms.planning.dfmea.occurrence')"
+          name="occurrence"
+        >
+          <InputNumber
+            v-model:value="formState.occurrence"
+            :min="1"
+            :max="10"
+            class="w-full"
+          />
+        </Form.Item>
+        <Form.Item :label="t('qms.planning.dfmea.detection')" name="detection">
+          <InputNumber
+            v-model:value="formState.detection"
+            :min="1"
+            :max="10"
+            class="w-full"
+          />
+        </Form.Item>
       </div>
     </Form>
   </Modal>

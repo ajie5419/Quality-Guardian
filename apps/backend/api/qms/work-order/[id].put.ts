@@ -1,4 +1,9 @@
-import { defineEventHandler, getRouterParam, readBody, setResponseStatus } from 'h3';
+import {
+  defineEventHandler,
+  getRouterParam,
+  readBody,
+  setResponseStatus,
+} from 'h3';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -26,21 +31,46 @@ export default defineEventHandler(async (event) => {
       updatedAt: new Date(),
     };
 
-    if (body.customerName !== undefined) updateData.customerName = body.customerName;
+    if (body.customerName !== undefined)
+      updateData.customerName = body.customerName;
     if (body.division !== undefined) updateData.division = body.division;
-    if (body.projectName !== undefined) updateData.projectName = body.projectName;
-    if (body.quantity !== undefined && body.quantity !== null) updateData.quantity = Number(body.quantity);
-    if (body.deliveryDate) updateData.deliveryDate = new Date(body.deliveryDate);
-    if (body.effectiveTime) updateData.effectiveTime = new Date(body.effectiveTime);
+    if (body.projectName !== undefined)
+      updateData.projectName = body.projectName;
+    if (body.quantity !== undefined && body.quantity !== null)
+      updateData.quantity = Number(body.quantity);
+    if (body.deliveryDate)
+      updateData.deliveryDate = new Date(body.deliveryDate);
+    if (body.effectiveTime)
+      updateData.effectiveTime = new Date(body.effectiveTime);
 
     if (body.status) {
       // 统一映射前端状态到数据库 Enum
       const s = body.status.toLowerCase();
-      if (s === 'completed' || s === '已完成' || s === '已结束') updateData.status = 'COMPLETED';
-      else if (s === 'in progress' || s === '进行中') updateData.status = 'IN_PROGRESS';
-      else if (s === 'pending' || s === '未开始') updateData.status = 'PENDING';
-      else if (s === 'closed') updateData.status = 'COMPLETED';
-      else updateData.status = 'OPEN';
+      switch (s) {
+        case 'closed': {
+          updateData.status = 'COMPLETED';
+          break;
+        }
+        case 'completed':
+        case '已完成':
+        case '已结束': {
+          updateData.status = 'COMPLETED';
+          break;
+        }
+        case 'in progress':
+        case '进行中': {
+          updateData.status = 'IN_PROGRESS';
+          break;
+        }
+        case 'pending':
+        case '未开始': {
+          updateData.status = 'PENDING';
+          break;
+        }
+        default: {
+          updateData.status = 'OPEN';
+        }
+      }
     }
 
     await (prisma.work_orders as any).update({

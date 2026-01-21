@@ -1,5 +1,6 @@
-import { LossSource, LossType } from './types';
 import { QualityLossStatusEnum } from '#/api/qms/enums';
+
+import { LossSource, LossType } from './types';
 
 /**
  * 损失类型选项
@@ -37,7 +38,16 @@ export const STATUS_OPTIONS = [
  * 损失来源样式映射
  */
 export const SOURCE_STYLE_MAP = {
-  [LossSource.INTERNAL]: { color: 'blue', labelKey: 'qms.qualityLoss.source.internal' },
-  [LossSource.EXTERNAL]: { color: 'red', labelKey: 'qms.qualityLoss.source.external' },
-  [LossSource.MANUAL]: { color: 'default', labelKey: 'qms.qualityLoss.source.manual' },
+  [LossSource.INTERNAL]: {
+    color: 'blue',
+    labelKey: 'qms.qualityLoss.source.internal',
+  },
+  [LossSource.EXTERNAL]: {
+    color: 'red',
+    labelKey: 'qms.qualityLoss.source.external',
+  },
+  [LossSource.MANUAL]: {
+    color: 'default',
+    labelKey: 'qms.qualityLoss.source.manual',
+  },
 };

@@ -1,3 +1,5 @@
+import process from 'node:process';
+
 import errorHandler from './error';
 
 process.env.COMPATIBILITY_DATE = new Date().toISOString();

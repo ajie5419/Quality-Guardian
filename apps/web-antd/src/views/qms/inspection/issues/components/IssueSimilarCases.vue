@@ -32,7 +32,8 @@ const { t } = useI18n();
           <div class="mb-2 flex items-center justify-between">
             <span class="font-medium text-blue-800">{{ item.title }}</span>
             <Tag color="blue">
-              {{ t('qms.inspection.issues.similarity') }}: {{ Math.round(item.similarity * 100) }}%
+              {{ t('qms.inspection.issues.similarity') }}:
+              {{ Math.round(item.similarity * 100) }}%
             </Tag>
           </div>
           <div class="text-xs text-gray-500">{{ item.description }}</div>

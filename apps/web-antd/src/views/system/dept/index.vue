@@ -73,13 +73,18 @@ const gridOptions: VxeGridProps = {
     },
     { field: 'createTime', title: t('sys.user.createTime'), width: 180 },
     { field: 'remark', title: t('sys.user.remark'), minWidth: 150 },
-    { title: t('common.action'), width: 200, fixed: 'right', slots: { default: 'action' } },
+    {
+      title: t('common.action'),
+      width: 200,
+      fixed: 'right',
+      slots: { default: 'action' },
+    },
   ],
   toolbarConfig: {
     export: true,
     slots: {
-      buttons: 'toolbar-actions'
-    }
+      buttons: 'toolbar-actions',
+    },
   },
   exportConfig: {
     remote: true,
@@ -207,7 +212,11 @@ const canDelete = computed(
         </Button>
       </template>
       <template #status="{ row }">
-        <span v-if="row.status === SysStatusEnum.ENABLED" class="text-green-500">{{ t('common.enabled') }}</span>
+        <span
+          v-if="row.status === SysStatusEnum.ENABLED"
+          class="text-green-500"
+          >{{ t('common.enabled') }}</span
+        >
         <span v-else class="text-red-500">{{ t('common.disabled') }}</span>
       </template>
       <template #action="{ row }">
@@ -217,10 +226,12 @@ const canDelete = computed(
           @click="handleAddChild(row)"
           >{{ t('sys.dept.addChildDept') }}</a
         >
-        <a v-if="canEdit" class="mr-2" @click="handleEdit(row)">{{ t('common.edit') }}</a>
-        <a v-if="canDelete" class="text-red-500" @click="handleDelete(row)"
-          >{{ t('common.delete') }}</a
-        >
+        <a v-if="canEdit" class="mr-2" @click="handleEdit(row)">{{
+          t('common.edit')
+        }}</a>
+        <a v-if="canDelete" class="text-red-500" @click="handleDelete(row)">{{
+          t('common.delete')
+        }}</a>
       </template>
     </Grid>
 
@@ -241,16 +252,26 @@ const canDelete = computed(
           />
         </FormItem>
         <FormItem :label="t('sys.dept.deptName')" required>
-          <Input v-model:value="formState.name" :placeholder="`${t('common.pleaseInput')}${t('sys.dept.deptName')}`" />
+          <Input
+            v-model:value="formState.name"
+            :placeholder="`${t('common.pleaseInput')}${t('sys.dept.deptName')}`"
+          />
         </FormItem>
         <FormItem :label="t('common.status')">
           <Select v-model:value="formState.status">
-            <SelectOption :value="SysStatusEnum.ENABLED">{{ t('common.enabled') }}</SelectOption>
-            <SelectOption :value="SysStatusEnum.DISABLED">{{ t('common.disabled') }}</SelectOption>
+            <SelectOption :value="SysStatusEnum.ENABLED">{{
+              t('common.enabled')
+            }}</SelectOption>
+            <SelectOption :value="SysStatusEnum.DISABLED">{{
+              t('common.disabled')
+            }}</SelectOption>
           </Select>
         </FormItem>
         <FormItem :label="t('sys.user.remark')">
-          <Input v-model:value="formState.remark" :placeholder="t('sys.user.remarkPlaceholder')" />
+          <Input
+            v-model:value="formState.remark"
+            :placeholder="t('sys.user.remarkPlaceholder')"
+          />
         </FormItem>
       </Form>
     </Modal>

@@ -5,10 +5,10 @@ import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('开始初始化基础数据...');
+  console.warn('开始初始化基础数据...');
 
   // 1. 创建角色
-  console.log('创建角色...');
+  console.warn('创建角色...');
   const adminRole = await prisma.roles.upsert({
     where: { id: '1' },
     update: {},
@@ -34,10 +34,10 @@ async function main() {
       isSystem: false,
     },
   });
-  console.log('角色创建完成:', adminRole.name, userRole.name);
+  console.warn('角色创建完成:', adminRole.name, userRole.name);
 
   // 2. 创建部门
-  console.log('创建部门...');
+  console.warn('创建部门...');
   const rootDept = await prisma.departments.upsert({
     where: { id: '1' },
     update: {},
@@ -50,10 +50,10 @@ async function main() {
       updatedAt: new Date(),
     },
   });
-  console.log('部门创建完成:', rootDept.name);
+  console.warn('部门创建完成:', rootDept.name);
 
   // 3. 创建用户
-  console.log('创建用户...');
+  console.warn('创建用户...');
 
   const adminPassword = await bcrypt.hash('admin', 12);
   const vbenPassword = await bcrypt.hash('123456', 12);
@@ -89,9 +89,9 @@ async function main() {
       status: 'ACTIVE',
     },
   });
-  console.log('用户创建完成:', adminUser.username, vbenUser.username);
+  console.warn('用户创建完成:', adminUser.username, vbenUser.username);
 
-  console.log('✅ 所有基础数据初始化完成!');
+  console.warn('✅ 所有基础数据初始化完成!');
 }
 
 main()

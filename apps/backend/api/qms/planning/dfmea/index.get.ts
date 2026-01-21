@@ -10,9 +10,9 @@ export default defineEventHandler(async (event) => {
   try {
     if (projectId) {
       const items = await prisma.dfmea.findMany({
-        where: { 
-            projectId,
-            isDeleted: false 
+        where: {
+          projectId,
+          isDeleted: false,
         },
         orderBy: { order: 'asc' },
       });

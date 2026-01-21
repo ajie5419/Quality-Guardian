@@ -1,4 +1,3 @@
-import type { VbenFormSchema } from '#/adapter/form';
 import type { VxeGridProps } from '#/adapter/vxe-table';
 
 import { $t } from '@vben/locales';
@@ -17,12 +16,17 @@ export const getStatusOptions = () => [
  * 获取表格列配置
  * @param category 类型
  */
-export const getColumns = (category: 'Outsourcing' | 'Supplier'): VxeGridProps['columns'] => [
+export const getColumns = (
+  category: 'Outsourcing' | 'Supplier',
+): VxeGridProps['columns'] => [
   { type: 'checkbox', width: 60, fixed: 'left' },
   { type: 'seq', title: $t('common.seq'), width: 60, fixed: 'left' },
   {
     field: 'name',
-    title: category === 'Supplier' ? $t('qms.supplier.name') : $t('qms.outsourcing.unitName'),
+    title:
+      category === 'Supplier'
+        ? $t('qms.supplier.name')
+        : $t('qms.outsourcing.unitName'),
     minWidth: 200,
     sortable: true,
     fixed: 'left',
@@ -30,7 +34,10 @@ export const getColumns = (category: 'Outsourcing' | 'Supplier'): VxeGridProps['
   },
   {
     field: 'brand',
-    title: category === 'Supplier' ? $t('qms.supplier.brand') : $t('qms.outsourcing.serviceRange'),
+    title:
+      category === 'Supplier'
+        ? $t('qms.supplier.brand')
+        : $t('qms.outsourcing.serviceRange'),
     width: 120,
     sortable: true,
   },
@@ -78,7 +85,10 @@ export const getColumns = (category: 'Outsourcing' | 'Supplier'): VxeGridProps['
   },
   {
     field: 'buyer',
-    title: category === 'Supplier' ? $t('qms.supplier.buyer') : $t('common.responsible'),
+    title:
+      category === 'Supplier'
+        ? $t('qms.supplier.buyer')
+        : $t('common.responsible'),
     width: 100,
     sortable: true,
   },
@@ -94,17 +104,23 @@ export const getColumns = (category: 'Outsourcing' | 'Supplier'): VxeGridProps['
  * 获取表单配置
  * @param category 类型
  */
-export const getFormSchema = (category: 'Outsourcing' | 'Supplier'): VbenFormSchema[] => [
+export const getFormSchema = (category: 'Outsourcing' | 'Supplier'): any[] => [
   {
     fieldName: 'name',
-    label: category === 'Supplier' ? $t('qms.supplier.name') : $t('qms.outsourcing.unitName'),
+    label:
+      category === 'Supplier'
+        ? $t('qms.supplier.name')
+        : $t('qms.outsourcing.unitName'),
     component: 'Input',
     rules: 'required',
     colProps: { span: 12 },
   },
   {
     fieldName: 'brand',
-    label: category === 'Supplier' ? $t('qms.supplier.brand') : $t('qms.outsourcing.serviceRange'),
+    label:
+      category === 'Supplier'
+        ? $t('qms.supplier.brand')
+        : $t('qms.outsourcing.serviceRange'),
     component: 'Input',
     colProps: { span: 12 },
   },
@@ -120,7 +136,10 @@ export const getFormSchema = (category: 'Outsourcing' | 'Supplier'): VbenFormSch
   },
   {
     fieldName: 'productName',
-    label: category === 'Supplier' ? $t('qms.supplier.mainProduct') : $t('qms.outsourcing.mainProcessing'),
+    label:
+      category === 'Supplier'
+        ? $t('qms.supplier.mainProduct')
+        : $t('qms.outsourcing.mainProcessing'),
     component: 'Input',
     colProps: { span: 12 },
   },
@@ -136,7 +155,10 @@ export const getFormSchema = (category: 'Outsourcing' | 'Supplier'): VbenFormSch
   },
   {
     fieldName: 'buyer',
-    label: category === 'Supplier' ? $t('qms.supplier.buyer') : $t('common.responsible'),
+    label:
+      category === 'Supplier'
+        ? $t('qms.supplier.buyer')
+        : $t('common.responsible'),
     component: 'Input',
     colProps: { span: 12 },
   },
@@ -146,10 +168,15 @@ export const getFormSchema = (category: 'Outsourcing' | 'Supplier'): VbenFormSch
  * 获取搜索表单配置
  * @param category 类型
  */
-export const getSearchFormSchema = (category: 'Outsourcing' | 'Supplier'): VbenFormSchema[] => [
+export const getSearchFormSchema = (
+  category: 'Outsourcing' | 'Supplier',
+): any[] => [
   {
     fieldName: 'name',
-    label: category === 'Supplier' ? $t('qms.supplier.name') : $t('qms.outsourcing.unitName'),
+    label:
+      category === 'Supplier'
+        ? $t('qms.supplier.name')
+        : $t('qms.outsourcing.unitName'),
     component: 'Input',
     colProps: { span: 6 },
   },

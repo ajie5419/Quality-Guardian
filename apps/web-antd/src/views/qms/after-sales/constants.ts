@@ -67,36 +67,60 @@ export function useStatusOptions() {
   const { t } = useI18n();
 
   const statusOptions: ComputedRef<StatusOption[]> = computed(() => [
-    { value: '处理中', label: t('qms.afterSales.status.processing'), color: 'blue' },
-    { value: '已结束', label: t('qms.afterSales.status.resolved'), color: 'green' },
-    { value: '待处理', label: t('qms.afterSales.status.pending'), color: 'orange' },
+    {
+      value: '处理中',
+      label: t('qms.afterSales.status.processing'),
+      color: 'blue',
+    },
+    {
+      value: '已结束',
+      label: t('qms.afterSales.status.resolved'),
+      color: 'green',
+    },
+    {
+      value: '待处理',
+      label: t('qms.afterSales.status.pending'),
+      color: 'orange',
+    },
   ]);
 
   const statusMap = computed(() => {
-    const processing = { label: t('qms.afterSales.status.processing'), color: 'blue' };
-    const pending = { label: t('qms.afterSales.status.pending'), color: 'orange' };
-    const resolved = { label: t('qms.afterSales.status.resolved'), color: 'green' };
+    const processing = {
+      label: t('qms.afterSales.status.processing'),
+      color: 'blue',
+    };
+    const pending = {
+      label: t('qms.afterSales.status.pending'),
+      color: 'orange',
+    };
+    const resolved = {
+      label: t('qms.afterSales.status.resolved'),
+      color: 'green',
+    };
     const closed = { label: t('qms.afterSales.status.closed'), color: 'gray' };
 
     return {
-      'PENDING': pending,
-      'IN_PROGRESS': processing,
+      PENDING: pending,
+      IN_PROGRESS: processing,
       'IN PROGRESS': processing,
-      'PROCESSING': processing,
-      'RESOLVED': resolved,
-      'CLOSED': closed,
-      'OPEN': pending,
-      '待处理': pending,
-      '处理中': processing,
-      '已结束': resolved,
-      '已关闭': closed,
-    } as Record<string, { label: string; color: string }>;
+      PROCESSING: processing,
+      RESOLVED: resolved,
+      CLOSED: closed,
+      OPEN: pending,
+      待处理: pending,
+      处理中: processing,
+      已结束: resolved,
+      已关闭: closed,
+    } as Record<string, { color: string; label: string }>;
   });
 
   function getStatusInfo(status: string) {
     if (!status) return { label: '-', color: 'default' };
     const key = String(status).toUpperCase();
-    return statusMap.value[status] || statusMap.value[key] || { label: status, color: 'default' };
+    return (
+      statusMap.value[status] ||
+      statusMap.value[key] || { label: status, color: 'default' }
+    );
   }
 
   return { statusOptions, statusMap, getStatusInfo };
@@ -145,4 +169,3 @@ export function createInitialFormState() {
     warrantyStatus: '在保',
   };
 }
-

@@ -1,7 +1,5 @@
 import { requestClient } from '#/api/request';
 
-import { SYSTEM_API } from './constants';
-
 export namespace SystemDeptApi {
   export interface Dept {
     id: string;

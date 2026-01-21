@@ -11,6 +11,8 @@ import { Button, DatePicker, Input, message, Tag } from 'ant-design-vue';
 import html2canvas from 'html2canvas';
 
 import { getDailySummary } from '#/api/qms/reports';
+import { getDeptList } from '#/api/system/dept';
+import { findNameById } from '#/types';
 
 const { t } = useI18n();
 const userStore = useUserStore();
@@ -18,6 +20,7 @@ const currentDate = ref<string>(new Date().toISOString().split('T')[0] ?? '');
 const loading = ref(false);
 const summary = ref('');
 const reportRef = ref<HTMLElement | null>(null); // Ref for screenshot area
+const deptRawData = ref<any[]>([]);
 const reportData = ref<DailySummaryData>({
   reporter: '',
   date: '',
@@ -25,6 +28,14 @@ const reportData = ref<DailySummaryData>({
   issues: [],
   summary: '',
 });
+
+async function loadDeptData() {
+  try {
+    deptRawData.value = await getDeptList();
+  } catch (error) {
+    console.error('Failed to load department data', error);
+  }
+}
 
 async function loadData() {
   loading.value = true;
@@ -84,6 +95,7 @@ watch(currentDate, () => {
 
 onMounted(() => {
   loadData();
+  loadDeptData();
 });
 </script>
 
@@ -93,12 +105,16 @@ onMounted(() => {
       <!-- Header -->
       <div class="flex items-center justify-between border-b pb-4">
         <div>
-          <h1 class="mb-2 text-4xl font-bold">{{ t('qms.reports.dailyTitle') }}</h1>
+          <h1 class="mb-2 text-4xl font-bold">
+            {{ t('qms.reports.dailyTitle') }}
+          </h1>
           <div class="text-xl text-gray-500">DAILY QUALITY REPORT</div>
         </div>
         <div class="space-y-2 text-right">
           <div>
-            <span class="mr-2 text-xl font-bold">{{ t('qms.reports.reporter') }}:</span>
+            <span class="mr-2 text-xl font-bold"
+              >{{ t('qms.reports.reporter') }}:</span
+            >
             <span class="text-xl">{{
               reportData.reporter || userStore.userInfo?.realName
             }}</span>
@@ -220,7 +236,9 @@ onMounted(() => {
                   }}
                 </Tag>
               </td>
-              <td class="border p-2 text-center">{{ item.dept }}</td>
+              <td class="border p-2 text-center">
+                {{ findNameById(deptRawData, item.dept) || item.dept }}
+              </td>
             </tr>
           </tbody>
         </table>

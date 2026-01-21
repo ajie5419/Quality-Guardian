@@ -1,20 +1,24 @@
 <script lang="ts" setup>
-import { reactive, watch, ref, computed } from 'vue';
-import { useI18n } from '@vben/locales';
-import { Modal, Form, Input, Select, message } from 'ant-design-vue';
 import type { SystemUserApi } from '#/api/system/user';
+
+import { computed, reactive, ref, watch } from 'vue';
+
+import { useI18n } from '@vben/locales';
+
+import { Form, Input, message, Modal, Select } from 'ant-design-vue';
+
 import { createTask } from '#/api/qms/task-dispatch';
 
 const props = defineProps<{
   open: boolean;
-  userList: SystemUserApi.User[];
-  targetId: string | null;
+  targetId: null | string;
   targetName: string;
+  userList: SystemUserApi.User[];
 }>();
 
 const emit = defineEmits<{
-  'update:open': [boolean];
   success: [];
+  'update:open': [boolean];
 }>();
 
 const { t } = useI18n();
@@ -26,34 +30,45 @@ const formState = reactive({
   leaderId: '',
 });
 
-const rules = {
-  title: [{ required: true, message: t('common.pleaseInput'), trigger: 'blur' }],
-  leaderId: [{ required: true, message: t('ui.formRules.selectRequired', [t('common.responsible')]), trigger: 'change' }],
+const rules: any = {
+  title: [
+    { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
+  ],
+  leaderId: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [t('common.responsible')]),
+      trigger: 'change',
+    },
+  ],
 };
 
-const userOptions = computed(() => 
-  props.userList.map(user => ({
+const userOptions = computed(() =>
+  props.userList.map((user) => ({
     label: user.realName || user.username,
-    value: user.id
-  }))
+    value: user.id,
+  })),
 );
 
-watch(() => props.open, (val) => {
-  if (val) {
-    const now = new Date();
-    formState.title = `${props.targetName} - ${now.getMonth() + 1}${now.getDate()} 批次`;
-    formState.leaderId = '';
-  } else {
-    formRef.value?.resetFields();
-  }
-});
+watch(
+  () => props.open,
+  (val) => {
+    if (val) {
+      const now = new Date();
+      formState.title = `${props.targetName} - ${now.getMonth() + 1}${now.getDate()} 批次`;
+      formState.leaderId = '';
+    } else {
+      formRef.value?.resetFields();
+    }
+  },
+);
 
 async function handleOk() {
   if (!props.targetId) return;
   try {
     await formRef.value?.validate();
     confirmLoading.value = true;
-    
+
     await createTask({
       assigneeId: formState.leaderId,
       dfmeaId: props.targetId,
@@ -84,15 +99,21 @@ async function handleOk() {
     @cancel="emit('update:open', false)"
     destroy-on-close
   >
-    <Form ref="formRef" :model="formState" :rules="rules" layout="vertical" class="pt-4">
+    <Form
+      ref="formRef"
+      :model="formState"
+      :rules="rules"
+      layout="vertical"
+      class="pt-4"
+    >
       <Form.Item :label="t('qms.planning.itp.taskSubject')" name="title">
         <Input v-model:value="formState.title" />
       </Form.Item>
       <Form.Item :label="t('common.responsible')" name="leaderId">
-        <Select 
-          v-model:value="formState.leaderId" 
-          class="w-full" 
-          show-search 
+        <Select
+          v-model:value="formState.leaderId"
+          class="w-full"
+          show-search
           option-filter-prop="label"
           :options="userOptions"
         />

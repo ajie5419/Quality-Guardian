@@ -94,7 +94,8 @@ const routes: RouteRecordRaw[] = [
           {
             name: 'QMSPlanningProjectDocs',
             path: 'project-docs',
-            component: () => import('#/views/qms/planning/project-docs/index.vue'),
+            component: () =>
+              import('#/views/qms/planning/project-docs/index.vue'),
             meta: {
               title: '项目资料',
             },

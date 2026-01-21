@@ -8,7 +8,6 @@ import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 import { computed, onMounted, reactive, ref, toRaw, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
-import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
@@ -78,7 +77,6 @@ interface InspectionRecordFormState {
   lossAmount?: number;
   materialName?: string;
   ncNumber?: string;
-  outsourcingName?: string;
   packingListArchived?: string;
   photos?: string[];
   process?: string;
@@ -108,7 +106,6 @@ const formState = reactive<InspectionRecordFormState>({
   itpProjectId: undefined,
   level1Component: '',
   materialName: '',
-  outsourcingName: '', // 外协单位
   packingListArchived: '是',
   process: undefined,
   projectName: '',
@@ -122,30 +119,103 @@ const formState = reactive<InspectionRecordFormState>({
 
 const rules = computed(() => {
   const commonRules = {
-    inspector: [{ required: true, message: t('ui.formRules.required', [t('qms.inspection.records.form.inspector')]) }],
-    quantity: [{ required: true, message: t('ui.formRules.required', [t('qms.inspection.records.form.quantity')]) }],
-    reportDate: [{ required: true, message: t('ui.formRules.required', [t('qms.inspection.records.form.reportDate')]) }],
-    workOrderNumber: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.workOrder.workOrderNumber')]) }],
+    inspector: [
+      {
+        required: true,
+        message: t('ui.formRules.required', [
+          t('qms.inspection.records.form.inspector'),
+        ]),
+      },
+    ],
+    quantity: [
+      {
+        required: true,
+        message: t('ui.formRules.required', [
+          t('qms.inspection.records.form.quantity'),
+        ]),
+      },
+    ],
+    reportDate: [
+      {
+        required: true,
+        message: t('ui.formRules.required', [
+          t('qms.inspection.records.form.reportDate'),
+        ]),
+      },
+    ],
+    workOrderNumber: [
+      {
+        required: true,
+        message: t('ui.formRules.selectRequired', [
+          t('qms.workOrder.workOrderNumber'),
+        ]),
+      },
+    ],
   };
 
-  if (activeKey.value === 'incoming') {
-    return {
-      ...commonRules,
-      incomingType: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.inspection.records.form.incomingType')]) }],
-      materialName: [{ required: true, message: t('ui.formRules.required', [t('qms.inspection.records.form.materialName')]) }],
-      supplierName: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.supplier.name')]) }],
-    };
-  } else if (activeKey.value === 'process') {
-    return {
-      ...commonRules,
-      componentName: [{ required: true, message: t('ui.formRules.required', [t('qms.inspection.records.form.componentName')]) }],
-      process: [{ required: true, message: t('ui.formRules.selectRequired', [t('qms.inspection.records.form.process')]) }],
-    };
-  } else if (activeKey.value === 'shipment') {
-    return {
-      ...commonRules,
-      documents: [{ required: true, message: t('ui.formRules.required', [t('qms.inspection.records.form.documents')]) }],
-    };
+  switch (activeKey.value) {
+    case 'incoming': {
+      return {
+        ...commonRules,
+        incomingType: [
+          {
+            required: true,
+            message: t('ui.formRules.selectRequired', [
+              t('qms.inspection.records.form.incomingType'),
+            ]),
+          },
+        ],
+        materialName: [
+          {
+            required: true,
+            message: t('ui.formRules.required', [
+              t('qms.inspection.records.form.materialName'),
+            ]),
+          },
+        ],
+        supplierName: [
+          {
+            required: true,
+            message: t('ui.formRules.selectRequired', [t('qms.supplier.name')]),
+          },
+        ],
+      };
+    }
+    case 'process': {
+      return {
+        ...commonRules,
+        componentName: [
+          {
+            required: true,
+            message: t('ui.formRules.required', [
+              t('qms.inspection.records.form.componentName'),
+            ]),
+          },
+        ],
+        process: [
+          {
+            required: true,
+            message: t('ui.formRules.selectRequired', [
+              t('qms.inspection.records.form.process'),
+            ]),
+          },
+        ],
+      };
+    }
+    case 'shipment': {
+      return {
+        ...commonRules,
+        documents: [
+          {
+            required: true,
+            message: t('ui.formRules.required', [
+              t('qms.inspection.records.form.documents'),
+            ]),
+          },
+        ],
+      };
+    }
+    // No default
   }
   return commonRules;
 });
@@ -159,9 +229,6 @@ const projectItpItems = ref<QmsPlanningApi.ItpItem[]>([]); // 缓存当前项目
 const inspectionTasks = ref<QmsInspectionApi.InspectionTaskResult[]>([]);
 const currentYear = ref<number>(new Date().getFullYear());
 
-// ================= 2. 权限控制 =================
-const { hasAccessByCodes } = useAccess();
-
 // ================= 3. 业务配置 =================
 const segmentedOptions = computed(() => [
   { label: t('qms.inspection.records.tab.incoming'), value: 'incoming' },
@@ -170,25 +237,67 @@ const segmentedOptions = computed(() => [
 ]);
 
 const processOptions = computed(() => [
-  { label: t('qms.inspection.records.options.process.outsourced'), value: '外购件' },
-  { label: t('qms.inspection.records.options.process.rawMaterial'), value: '原材料' },
-  { label: t('qms.inspection.records.options.process.auxiliary'), value: '辅材' },
-  { label: t('qms.inspection.records.options.process.machined'), value: '机加成品件' },
+  {
+    label: t('qms.inspection.records.options.process.outsourced'),
+    value: '外购件',
+  },
+  {
+    label: t('qms.inspection.records.options.process.rawMaterial'),
+    value: '原材料',
+  },
+  {
+    label: t('qms.inspection.records.options.process.auxiliary'),
+    value: '辅材',
+  },
+  {
+    label: t('qms.inspection.records.options.process.machined'),
+    value: '机加成品件',
+  },
   { label: t('qms.inspection.records.options.process.cutting'), value: '下料' },
-  { label: t('qms.inspection.records.options.process.assembly'), value: '组对' },
+  {
+    label: t('qms.inspection.records.options.process.assembly'),
+    value: '组对',
+  },
   { label: t('qms.inspection.records.options.process.welding'), value: '焊接' },
-  { label: t('qms.inspection.records.options.process.weldSize'), value: '焊后尺寸' },
-  { label: t('qms.inspection.records.options.process.appearance'), value: '外观' },
-  { label: t('qms.inspection.records.options.process.overallAssembly'), value: '整体拼装' },
-  { label: t('qms.inspection.records.options.process.assembling'), value: '组装' },
-  { label: t('qms.inspection.records.options.process.mounting'), value: '装配' },
-  { label: t('qms.inspection.records.options.process.grouping'), value: '组拼' },
-  { label: t('qms.inspection.records.options.process.sandblasting'), value: '打砂' },
-  { label: t('qms.inspection.records.options.process.painting'), value: '喷漆' },
+  {
+    label: t('qms.inspection.records.options.process.weldSize'),
+    value: '焊后尺寸',
+  },
+  {
+    label: t('qms.inspection.records.options.process.appearance'),
+    value: '外观',
+  },
+  {
+    label: t('qms.inspection.records.options.process.overallAssembly'),
+    value: '整体拼装',
+  },
+  {
+    label: t('qms.inspection.records.options.process.assembling'),
+    value: '组装',
+  },
+  {
+    label: t('qms.inspection.records.options.process.mounting'),
+    value: '装配',
+  },
+  {
+    label: t('qms.inspection.records.options.process.grouping'),
+    value: '组拼',
+  },
+  {
+    label: t('qms.inspection.records.options.process.sandblasting'),
+    value: '打砂',
+  },
+  {
+    label: t('qms.inspection.records.options.process.painting'),
+    value: '喷漆',
+  },
 ]);
 
 const yearOptions = computed(() => {
-  return dynamicYears.value.map(y => ({ label: `${y}${t('common.unit.year')}`, value: y }));
+  return dynamicYears.value.map((y) => ({
+    label: `${y}${t('common.unit.year')}`,
+    value: y,
+  }));
 });
 
 // 递归查找部门
@@ -206,17 +315,17 @@ function findDeptByName(tree: any[], name: string): any {
 // 班组/外协选项
 const teamOptions = computed(() => {
   const options = [];
-  
+
   // 1. 内部班组 (生产 OBU 下属)
   const productionDept = findDeptByName(deptList.value, '生产 OBU');
   if (productionDept && productionDept.children) {
     options.push({
       label: '生产班组',
-      options: productionDept.children.map((d: any) => ({ 
-        label: d.name, 
-        value: d.name, 
-        isOutsourcing: false 
-      }))
+      options: productionDept.children.map((d: any) => ({
+        label: d.name,
+        value: d.name,
+        isOutsourcing: false,
+      })),
     });
   }
 
@@ -224,14 +333,14 @@ const teamOptions = computed(() => {
   if (outsourcingList.value.length > 0) {
     options.push({
       label: '外协单位',
-      options: outsourcingList.value.map(o => ({ 
-        label: o.name, 
-        value: o.name, 
-        isOutsourcing: true 
-      }))
+      options: outsourcingList.value.map((o) => ({
+        label: o.name,
+        value: o.name,
+        isOutsourcing: true,
+      })),
     });
   }
-  
+
   return options;
 });
 
@@ -344,7 +453,7 @@ async function handleWorkOrderChange(val: unknown) {
     (item) => item.workOrderNumber === valStr,
   );
   if (wo) {
-    formState.projectName = wo.projectName || wo.productName || '';
+    formState.projectName = wo.projectName || '';
     const matchedItp = itpProjectList.value.find(
       (itp) =>
         itp.workOrderId === wo.id ||
@@ -353,7 +462,11 @@ async function handleWorkOrderChange(val: unknown) {
     );
     if (matchedItp) {
       formState.itpProjectId = matchedItp.id;
-      message.info(t('qms.inspection.records.autoMatchedItp', { name: matchedItp.projectName }));
+      message.info(
+        t('qms.inspection.records.autoMatchedItp', {
+          name: matchedItp.projectName,
+        }),
+      );
       loadItpRequirements();
     }
   }
@@ -393,28 +506,61 @@ const incomingGridOptions = computed<VxeGridProps>(() => ({
     slots: { buttons: 'toolbar-actions' },
   },
   exportConfig: {
-    remote: true,
+    remote: false,
     types: ['xlsx', 'csv'],
     modes: ['current', 'selected', 'all'],
   },
   columns: [
     { type: 'seq', title: t('common.seq'), width: 60 },
-    { field: 'workOrderNumber', title: t('qms.workOrder.workOrderNumber'), width: 150 },
-    { field: 'projectName', title: t('qms.workOrder.projectName'), minWidth: 150 },
-    { field: 'incomingType', title: t('qms.inspection.records.form.incomingType'), width: 120 },
+    {
+      field: 'workOrderNumber',
+      title: t('qms.workOrder.workOrderNumber'),
+      width: 150,
+    },
+    {
+      field: 'projectName',
+      title: t('qms.workOrder.projectName'),
+      minWidth: 150,
+    },
+    {
+      field: 'incomingType',
+      title: t('qms.inspection.records.form.incomingType'),
+      width: 120,
+    },
     { field: 'supplierName', title: t('qms.supplier.name'), minWidth: 150 },
-    { field: 'materialName', title: t('qms.inspection.records.form.materialName'), minWidth: 150 },
-    { field: 'quantity', title: t('qms.inspection.records.form.quantity'), width: 100 },
+    {
+      field: 'materialName',
+      title: t('qms.inspection.records.form.materialName'),
+      minWidth: 150,
+    },
+    {
+      field: 'quantity',
+      title: t('qms.inspection.records.form.quantity'),
+      width: 100,
+    },
     {
       field: 'result',
       title: t('qms.inspection.records.form.result'),
       width: 100,
       slots: { default: 'result' },
     },
-    { field: 'hasDocuments', title: t('qms.inspection.records.form.hasDocuments'), width: 100 },
-    { field: 'inspector', title: t('qms.inspection.records.form.inspector'), width: 120 },
+    {
+      field: 'hasDocuments',
+      title: t('qms.inspection.records.form.hasDocuments'),
+      width: 100,
+    },
+    {
+      field: 'inspector',
+      title: t('qms.inspection.records.form.inspector'),
+      width: 120,
+    },
     { field: 'reportDate', title: t('common.date'), width: 120 },
-    { title: t('common.action'), width: 150, fixed: 'right', slots: { default: 'action' } },
+    {
+      title: t('common.action'),
+      width: 150,
+      fixed: 'right',
+      slots: { default: 'action' },
+    },
   ],
   proxyConfig: {
     ajax: {
@@ -426,7 +572,7 @@ const incomingGridOptions = computed<VxeGridProps>(() => ({
         });
         return { items: data, total: data.length };
       },
-      queryAll: async ({ formValues }) => {
+      queryAll: async ({ formValues }: any) => {
         const data = await getInspectionRecords({
           type: 'incoming',
           year: currentYear.value,
@@ -444,42 +590,71 @@ const processGridOptions = computed<VxeGridProps>(() => ({
     slots: { buttons: 'toolbar-actions' },
   },
   exportConfig: {
-    remote: true,
+    remote: false,
     types: ['xlsx', 'csv'],
     modes: ['current', 'selected', 'all'],
   },
   columns: [
     { type: 'seq', title: t('common.seq'), width: 60 },
-    { field: 'workOrderNumber', title: t('qms.workOrder.workOrderNumber'), width: 150 },
-    { field: 'projectName', title: t('qms.workOrder.projectName'), minWidth: 150 },
+    {
+      field: 'workOrderNumber',
+      title: t('qms.workOrder.workOrderNumber'),
+      width: 150,
+    },
+    {
+      field: 'projectName',
+      title: t('qms.workOrder.projectName'),
+      minWidth: 150,
+    },
     {
       field: 'process',
       title: t('qms.inspection.records.form.process'),
       width: 150,
       formatter: ({ row }) =>
-        row.process || (row.itpProjectId ? t('qms.inspection.records.itpPlan') : '-'),
+        row.process ||
+        (row.itpProjectId ? t('qms.inspection.records.itpPlan') : '-'),
     },
-    { field: 'level1Component', title: t('qms.inspection.records.form.level1'), width: 120 },
+    {
+      field: 'level1Component',
+      title: t('qms.inspection.records.form.level1'),
+      width: 120,
+    },
     {
       field: 'componentName',
       title: t('qms.inspection.records.form.componentName'),
       minWidth: 150,
       formatter: ({ row }) =>
         row.componentName ||
-        (row.results ? t('qms.inspection.records.inspectionCount', { count: row.results.length }) : '-'),
+        (row.results
+          ? t('qms.inspection.records.inspectionCount', {
+              count: row.results.length,
+            })
+          : '-'),
     },
-    { field: 'quantity', title: t('qms.inspection.records.form.quantity'), width: 80 },
+    {
+      field: 'quantity',
+      title: t('qms.inspection.records.form.quantity'),
+      width: 80,
+    },
     {
       field: 'result',
       title: t('qms.inspection.records.form.result'),
       width: 100,
       slots: { default: 'result' },
     },
-    { field: 'inspector', title: t('qms.inspection.records.form.inspector'), width: 120 },
+    {
+      field: 'inspector',
+      title: t('qms.inspection.records.form.inspector'),
+      width: 120,
+    },
     { field: 'team', title: t('qms.inspection.records.form.team'), width: 100 },
-    { field: 'outsourcingName', title: t('qms.inspection.records.form.outsourcing'), width: 150 },
     { field: 'reportDate', title: t('common.date'), width: 120 },
-    { title: t('common.action'), width: 150, fixed: 'right', slots: { default: 'action' } },
+    {
+      title: t('common.action'),
+      width: 150,
+      fixed: 'right',
+      slots: { default: 'action' },
+    },
   ],
   proxyConfig: {
     ajax: {
@@ -491,7 +666,7 @@ const processGridOptions = computed<VxeGridProps>(() => ({
         });
         return { items: data, total: data.length };
       },
-      queryAll: async ({ formValues }) => {
+      queryAll: async ({ formValues }: any) => {
         const data = await getInspectionRecords({
           type: 'process',
           year: currentYear.value,
@@ -509,20 +684,61 @@ const shipmentGridOptions = computed<VxeGridProps>(() => ({
     slots: { buttons: 'toolbar-actions' },
   },
   exportConfig: {
-    remote: true,
+    remote: false,
     types: ['xlsx', 'csv'],
     modes: ['current', 'selected', 'all'],
   },
   columns: [
     { type: 'seq', title: t('common.seq'), width: 60 },
-    { field: 'workOrderNumber', title: t('qms.workOrder.workOrderNumber'), width: 150 },
-    { field: 'projectName', title: t('qms.workOrder.projectName'), minWidth: 150 },
-    { field: 'quantity', title: t('qms.inspection.records.form.quantity'), width: 100 },
-    { field: 'inspector', title: t('qms.inspection.records.form.inspector'), width: 120 },
+    {
+      field: 'workOrderNumber',
+      title: t('qms.workOrder.workOrderNumber'),
+      width: 150,
+    },
+    {
+      field: 'projectName',
+      title: t('qms.workOrder.projectName'),
+      minWidth: 150,
+    },
+    {
+      field: 'componentName',
+      title: t('qms.inspection.records.form.componentName'),
+      minWidth: 150,
+      formatter: ({ row }) =>
+        row.componentName ||
+        (row.results
+          ? t('qms.inspection.records.inspectionCount', {
+              count: row.results.length,
+            })
+          : '-'),
+    },
+    {
+      field: 'quantity',
+      title: t('qms.inspection.records.form.quantity'),
+      width: 100,
+    },
+    {
+      field: 'inspector',
+      title: t('qms.inspection.records.form.inspector'),
+      width: 120,
+    },
     { field: 'reportDate', title: t('common.date'), width: 120 },
-    { field: 'documents', title: t('qms.inspection.records.form.documents'), width: 150 },
-    { field: 'packingListArchived', title: t('qms.inspection.records.form.packingListArchived'), width: 100 },
-    { title: t('common.action'), width: 150, fixed: 'right', slots: { default: 'action' } },
+    {
+      field: 'documents',
+      title: t('qms.inspection.records.form.documents'),
+      width: 150,
+    },
+    {
+      field: 'packingListArchived',
+      title: t('qms.inspection.records.form.packingListArchived'),
+      width: 100,
+    },
+    {
+      title: t('common.action'),
+      width: 150,
+      fixed: 'right',
+      slots: { default: 'action' },
+    },
   ],
   proxyConfig: {
     ajax: {
@@ -534,7 +750,7 @@ const shipmentGridOptions = computed<VxeGridProps>(() => ({
         });
         return { items: data, total: data.length };
       },
-      queryAll: async ({ formValues }) => {
+      queryAll: async ({ formValues }: any) => {
         const data = await getInspectionRecords({
           type: 'shipment',
           year: currentYear.value,
@@ -547,16 +763,16 @@ const shipmentGridOptions = computed<VxeGridProps>(() => ({
 }));
 
 const [IncomingGrid, incomingApi] = useVbenVxeGrid({
-  gridOptions: incomingGridOptions,
-  formOptions: commonFormOptions,
+  gridOptions: incomingGridOptions as any,
+  formOptions: commonFormOptions as any,
 });
 const [ProcessGrid, processApi] = useVbenVxeGrid({
-  gridOptions: processGridOptions,
-  formOptions: commonFormOptions,
+  gridOptions: processGridOptions as any,
+  formOptions: commonFormOptions as any,
 });
 const [ShipmentGrid, shipmentApi] = useVbenVxeGrid({
-  gridOptions: shipmentGridOptions,
-  formOptions: commonFormOptions,
+  gridOptions: shipmentGridOptions as any,
+  formOptions: commonFormOptions as any,
 });
 
 // ================= 6. 初始化与弹窗处理 =================
@@ -616,7 +832,9 @@ function openModal(
     Object.assign(formState, row);
     if (row.results)
       inspectionTasks.value = structuredClone(
-        toRaw(row.results) as unknown as QmsInspectionApi.InspectionTaskResult[],
+        toRaw(
+          row.results,
+        ) as unknown as QmsInspectionApi.InspectionTaskResult[],
       );
   } else {
     formState.inspector =
@@ -691,7 +909,9 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
       <div class="mb-4 flex flex-shrink-0 items-center justify-between">
         <Segmented v-model:value="activeKey" :options="segmentedOptions" />
         <div class="flex items-center gap-2">
-          <span class="text-gray-500">{{ t('qms.inspection.records.statsYear') }}:</span>
+          <span class="text-gray-500"
+            >{{ t('qms.inspection.records.statsYear') }}:</span
+          >
           <Select
             v-model:value="currentYear"
             :options="yearOptions"
@@ -853,14 +1073,21 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
     <!-- 录入弹窗 -->
     <Modal
       v-model:open="isModalVisible"
-      :title="isEditMode ? t('qms.inspection.records.editRecord') : t('qms.inspection.records.createRecord')"
+      :title="
+        isEditMode
+          ? t('qms.inspection.records.editRecord')
+          : t('qms.inspection.records.createRecord')
+      "
       @ok="handleSubmit"
       width="1050px"
       style="top: 20px"
     >
       <Form layout="vertical" :model="formState" :rules="rules" ref="formRef">
         <div class="mb-4 grid grid-cols-3 gap-4 border-b pb-4">
-          <FormItem :label="t('qms.workOrder.workOrderNumber')" name="workOrderNumber">
+          <FormItem
+            :label="t('qms.workOrder.workOrderNumber')"
+            name="workOrderNumber"
+          >
             <Select
               v-model:value="formState.workOrderNumber"
               show-search
@@ -879,7 +1106,10 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
           <FormItem :label="t('qms.workOrder.projectName')" name="projectName">
             <Input v-model:value="formState.projectName" />
           </FormItem>
-          <FormItem :label="t('qms.inspection.records.form.relatedItp')" name="itpProjectId">
+          <FormItem
+            :label="t('qms.inspection.records.form.relatedItp')"
+            name="itpProjectId"
+          >
             <Select
               v-model:value="formState.itpProjectId"
               :placeholder="t('qms.inspection.records.form.placeholder.itp')"
@@ -899,7 +1129,10 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
         <div class="mb-4">
           <!-- 进货录入项 -->
           <div v-if="activeKey === 'incoming'" class="grid grid-cols-4 gap-4">
-            <FormItem :label="t('qms.inspection.records.form.incomingType')" name="incomingType">
+            <FormItem
+              :label="t('qms.inspection.records.form.incomingType')"
+              name="incomingType"
+            >
               <Select v-model:value="formState.incomingType">
                 <SelectOption
                   v-for="p in processOptions.slice(0, 4)"
@@ -921,7 +1154,10 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
                 </SelectOption>
               </Select>
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.materialName')" name="materialName">
+            <FormItem
+              :label="t('qms.inspection.records.form.materialName')"
+              name="materialName"
+            >
               <AutoComplete
                 v-model:value="formState.materialName"
                 :options="availableComponents"
@@ -929,33 +1165,55 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
                 allow-clear
               />
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.quantity')" name="quantity">
+            <FormItem
+              :label="t('qms.inspection.records.form.quantity')"
+              name="quantity"
+            >
               <InputNumber v-model:value="formState.quantity" class="w-full" />
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.hasDocuments')" name="hasDocuments">
+            <FormItem
+              :label="t('qms.inspection.records.form.hasDocuments')"
+              name="hasDocuments"
+            >
               <Select v-model:value="formState.hasDocuments">
-                <SelectOption value="有">{{ t('qms.inspection.records.options.have') }}</SelectOption>
-                <SelectOption value="无">{{ t('qms.inspection.records.options.none') }}</SelectOption>
+                <SelectOption value="有">{{
+                  t('qms.inspection.records.options.have')
+                }}</SelectOption>
+                <SelectOption value="无">{{
+                  t('qms.inspection.records.options.none')
+                }}</SelectOption>
               </Select>
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.reportDate')" name="reportDate">
+            <FormItem
+              :label="t('qms.inspection.records.form.reportDate')"
+              name="reportDate"
+            >
               <DatePicker
                 v-model:value="formState.reportDate"
                 value-format="YYYY-MM-DD"
                 class="w-full"
               />
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.inspector')" name="inspector">
+            <FormItem
+              :label="t('qms.inspection.records.form.inspector')"
+              name="inspector"
+            >
               <Input v-model:value="formState.inspector" />
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.reporter')" name="reporter">
+            <FormItem
+              :label="t('qms.inspection.records.form.reporter')"
+              name="reporter"
+            >
               <Input v-model:value="formState.reporter" />
             </FormItem>
           </div>
 
           <!-- 过程录入项 -->
           <div v-if="activeKey === 'process'" class="grid grid-cols-4 gap-4">
-            <FormItem :label="t('qms.inspection.records.form.process')" name="process">
+            <FormItem
+              :label="t('qms.inspection.records.form.process')"
+              name="process"
+            >
               <Select v-model:value="formState.process">
                 <SelectOption
                   v-for="p in processOptions.slice(4)"
@@ -966,114 +1224,144 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
                 </SelectOption>
               </Select>
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.level1')" name="level1Component">
+            <FormItem
+              :label="t('qms.inspection.records.form.level1')"
+              name="level1Component"
+            >
               <AutoComplete
                 v-model:value="formState.level1Component"
                 :options="availableComponents"
-                :placeholder="t('qms.inspection.records.form.placeholder.level1')"
+                :placeholder="
+                  t('qms.inspection.records.form.placeholder.level1')
+                "
                 allow-clear
               />
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.componentName')" name="componentName">
+            <FormItem
+              :label="t('qms.inspection.records.form.componentName')"
+              name="componentName"
+            >
               <Input
                 v-model:value="formState.componentName"
-                :placeholder="t('qms.inspection.records.form.placeholder.component')"
+                :placeholder="
+                  t('qms.inspection.records.form.placeholder.component')
+                "
               />
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.quantity')" name="quantity">
+            <FormItem
+              :label="t('qms.inspection.records.form.quantity')"
+              name="quantity"
+            >
               <InputNumber v-model:value="formState.quantity" class="w-full" />
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.teamOrOutsourcing')" name="team">
+            <FormItem
+              :label="t('qms.inspection.records.form.team')"
+              name="team"
+            >
               <Select
                 v-model:value="formState.team"
                 show-search
                 :placeholder="t('qms.inspection.records.form.placeholder.team')"
-                @change="
-                  (value: string, option: any) => {
-                    const isOutsourcing = option.isOutsourcing || (option.value && outsourcingList.some(o => o.name === option.value));
-                    if (isOutsourcing) {
-                      formState.outsourcingName = value;
-                    } else {
-                      formState.outsourcingName = '';
-                    }
-                  }
-                "
               >
-                <Select.OptGroup v-for="group in teamOptions" :key="group.label" :label="group.label">
-                  <Select.Option v-for="opt in group.options" :key="opt.value" :value="opt.value" :isOutsourcing="opt.isOutsourcing">
+                <Select.OptGroup
+                  v-for="group in teamOptions"
+                  :key="group.label"
+                  :label="group.label"
+                >
+                  <Select.Option
+                    v-for="opt in group.options"
+                    :key="opt.value"
+                    :value="opt.value"
+                  >
                     {{ opt.label }}
                   </Select.Option>
                 </Select.OptGroup>
               </Select>
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.archived')" name="archived">
+            <FormItem
+              :label="t('qms.inspection.records.form.archived')"
+              name="archived"
+            >
               <Select v-model:value="formState.archived">
-                <SelectOption value="是">{{ t('qms.inspection.records.options.yes') }}</SelectOption>
-                <SelectOption value="否">{{ t('qms.inspection.records.options.no') }}</SelectOption>
+                <SelectOption value="是">{{
+                  t('qms.inspection.records.options.yes')
+                }}</SelectOption>
+                <SelectOption value="否">{{
+                  t('qms.inspection.records.options.no')
+                }}</SelectOption>
               </Select>
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.inspector')" name="inspector">
+            <FormItem
+              :label="t('qms.inspection.records.form.inspector')"
+              name="inspector"
+            >
               <Input v-model:value="formState.inspector" />
             </FormItem>
           </div>
 
           <!-- 发货录入项 -->
           <div v-if="activeKey === 'shipment'" class="grid grid-cols-4 gap-4">
-            <FormItem :label="t('qms.inspection.records.form.quantity')" name="quantity">
-              <InputNumber v-model:value="formState.quantity" class="w-full" />
-            </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.documents')" name="documents">
+            <FormItem
+              :label="t('qms.inspection.records.form.componentName')"
+              name="componentName"
+            >
               <Input
-                v-model:value="formState.documents"
-                :placeholder="t('qms.inspection.records.form.placeholder.documents')"
+                v-model:value="formState.componentName"
+                :placeholder="
+                  t('qms.inspection.records.form.placeholder.component')
+                "
               />
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.packingListArchived')" name="packingListArchived">
+            <FormItem
+              :label="t('qms.inspection.records.form.quantity')"
+              name="quantity"
+            >
+              <InputNumber v-model:value="formState.quantity" class="w-full" />
+            </FormItem>
+            <FormItem
+              :label="t('qms.inspection.records.form.documents')"
+              name="documents"
+            >
+              <Input
+                v-model:value="formState.documents"
+                :placeholder="
+                  t('qms.inspection.records.form.placeholder.documents')
+                "
+              />
+            </FormItem>
+            <FormItem
+              :label="t('qms.inspection.records.form.packingListArchived')"
+              name="packingListArchived"
+            >
               <Select v-model:value="formState.packingListArchived">
-                <SelectOption value="是">{{ t('qms.inspection.records.options.yes') }}</SelectOption>
-                <SelectOption value="否">{{ t('qms.inspection.records.options.no') }}</SelectOption>
+                <SelectOption value="是">{{
+                  t('qms.inspection.records.options.yes')
+                }}</SelectOption>
+                <SelectOption value="否">{{
+                  t('qms.inspection.records.options.no')
+                }}</SelectOption>
               </Select>
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.reportDate')" name="reportDate">
+            <FormItem
+              :label="t('qms.inspection.records.form.reportDate')"
+              name="reportDate"
+            >
               <DatePicker
                 v-model:value="formState.reportDate"
                 value-format="YYYY-MM-DD"
                 class="w-full"
               />
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.inspector')" name="inspector">
+            <FormItem
+              :label="t('qms.inspection.records.form.inspector')"
+              name="inspector"
+            >
               <Input v-model:value="formState.inspector" />
             </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.reportTeam')" name="team">
-              <Input
-                v-model:value="formState.team"
-                :placeholder="t('qms.inspection.records.form.placeholder.team')"
-                @change="
-                  (e: Event) => {
-                    const target = e.target as HTMLInputElement;
-                    if (target.value !== '生产履约部')
-                      formState.outsourcingName = '';
-                  }
-                "
-              />
-            </FormItem>
-            <FormItem v-if="formState.team === '生产履约部'" :label="t('qms.inspection.records.form.outsourcing')" name="outsourcingName">
-              <Select
-                v-model:value="formState.outsourcingName"
-                show-search
-                :placeholder="t('qms.inspection.records.form.placeholder.outsourcing')"
-                allow-clear
-              >
-                <SelectOption
-                  v-for="o in outsourcingList"
-                  :key="o.id"
-                  :value="o.name"
-                >
-                  {{ o.name }}
-                </SelectOption>
-              </Select>
-            </FormItem>
-            <FormItem :label="t('qms.inspection.records.form.reporter')" name="reporter">
+            <FormItem
+              :label="t('qms.inspection.records.form.reporter')"
+              name="reporter"
+            >
               <Input v-model:value="formState.reporter" />
             </FormItem>
           </div>
@@ -1094,7 +1382,11 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
             row-key="itpItemId"
             class="border"
           >
-            <Table.Column :title="t('qms.inspection.records.activity')" data-index="activity" width="180" />
+            <Table.Column
+              :title="t('qms.inspection.records.activity')"
+              data-index="activity"
+              width="180"
+            />
             <Table.Column
               :title="t('qms.inspection.records.controlPoint')"
               data-index="controlPoint"
@@ -1111,10 +1403,14 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
                 </Tag>
               </template>
             </Table.Column>
-            <Table.Column :title="t('qms.inspection.records.standard')" width="220">
+            <Table.Column
+              :title="t('qms.inspection.records.standard')"
+              width="220"
+            >
               <template #default="{ record }">
                 <div v-if="record.isQuantitative" class="text-xs">
-                  {{ t('qms.planning.itpGenerator.std') }}: <b>{{ record.standardValue }}</b> (+{{
+                  {{ t('qms.planning.itpGenerator.std') }}:
+                  <b>{{ record.standardValue }}</b> (+{{
                     record.upperTolerance
                   }}/-{{ record.lowerTolerance }}) {{ record.unit }}
                 </div>
@@ -1124,12 +1420,16 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
                     v-if="record.referenceDoc"
                     class="mt-1 text-[10px] text-gray-400"
                   >
-                    [{{ t('qms.inspection.records.reference') }}: {{ record.referenceDoc }}]
+                    [{{ t('qms.inspection.records.reference') }}:
+                    {{ record.referenceDoc }}]
                   </div>
                 </div>
               </template>
             </Table.Column>
-            <Table.Column :title="t('qms.inspection.records.measuredValue')" width="220">
+            <Table.Column
+              :title="t('qms.inspection.records.measuredValue')"
+              width="220"
+            >
               <template #default="{ record }">
                 <div class="flex items-center gap-2">
                   <InputNumber
@@ -1144,19 +1444,30 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
                     size="small"
                     class="w-24"
                   >
-                    <SelectOption value="PASS">{{ t('qms.inspection.records.result.pass') }}</SelectOption>
-                    <SelectOption value="FAIL">{{ t('qms.inspection.records.result.fail') }}</SelectOption>
-                    <SelectOption value="NA">{{ t('qms.inspection.records.result.na') }}</SelectOption>
+                    <SelectOption value="PASS">{{
+                      t('qms.inspection.records.result.pass')
+                    }}</SelectOption>
+                    <SelectOption value="FAIL">{{
+                      t('qms.inspection.records.result.fail')
+                    }}</SelectOption>
+                    <SelectOption value="NA">{{
+                      t('qms.inspection.records.result.na')
+                    }}</SelectOption>
                   </Select>
                 </div>
               </template>
             </Table.Column>
-            <Table.Column :title="t('qms.planning.bom.remarks')" data-index="remarks">
+            <Table.Column
+              :title="t('qms.planning.bom.remarks')"
+              data-index="remarks"
+            >
               <template #default="{ record }">
                 <Input
                   v-model:value="record.remarks"
                   size="small"
-                  :placeholder="t('qms.inspection.records.form.placeholder.remarks')"
+                  :placeholder="
+                    t('qms.inspection.records.form.placeholder.remarks')
+                  "
                 />
               </template>
             </Table.Column>
@@ -1167,14 +1478,26 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
         <div
           class="mt-4 grid grid-cols-3 gap-4 rounded-b-lg border-t bg-gray-50 p-4 pt-4"
         >
-          <FormItem :label="t('qms.inspection.records.form.singleResult')" class="mb-0">
+          <FormItem
+            :label="t('qms.inspection.records.form.singleResult')"
+            class="mb-0"
+          >
             <Select v-model:value="formState.result">
-              <SelectOption value="PASS">{{ t('qms.inspection.records.result.pass') }}</SelectOption
-              ><SelectOption value="FAIL">{{ t('qms.inspection.records.result.fail') }}</SelectOption
-              ><SelectOption value="CONDITIONAL">{{ t('qms.inspection.records.result.concession') }}</SelectOption>
+              <SelectOption value="PASS">{{
+                t('qms.inspection.records.result.pass')
+              }}</SelectOption
+              ><SelectOption value="FAIL">{{
+                t('qms.inspection.records.result.fail')
+              }}</SelectOption
+              ><SelectOption value="CONDITIONAL">{{
+                t('qms.inspection.records.result.concession')
+              }}</SelectOption>
             </Select>
           </FormItem>
-          <FormItem :label="t('qms.inspection.records.form.overallResult')" class="mb-0">
+          <FormItem
+            :label="t('qms.inspection.records.form.overallResult')"
+            class="mb-0"
+          >
             <Tag
               :color="
                 calculatedOverallResult === 'PASS'
@@ -1194,7 +1517,10 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
               }}
             </Tag>
           </FormItem>
-          <FormItem :label="t('qms.inspection.records.form.auditor')" class="mb-0">
+          <FormItem
+            :label="t('qms.inspection.records.form.auditor')"
+            class="mb-0"
+          >
             <Input v-model:value="formState.inspector" />
           </FormItem>
         </div>

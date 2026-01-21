@@ -1,23 +1,24 @@
 <script lang="ts" setup>
+import type { QmsPlanningApi } from '#/api/qms/planning';
+
 import { computed, onMounted, ref } from 'vue';
+
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
-import { useAccess } from '@vben/access';
-import { Button, Empty, Table, Space, message, Modal } from 'ant-design-vue';
 
-import {
-  deleteBom,
-  getBomTree,
-} from '#/api/qms/planning';
-import { updateWorkOrder, getWorkOrderList } from '#/api/qms/work-order';
-import type { QmsPlanningApi } from '#/api/qms/planning';
+import { Button, Empty, message, Modal, Space, Table } from 'ant-design-vue';
+
+import { deleteBom, getBomTree } from '#/api/qms/planning';
+import { updateWorkOrder } from '#/api/qms/work-order';
+import { getDeptList } from '#/api/system/dept';
+import { convertToTreeSelectData } from '#/types';
+import WorkOrderEditModal from '#/views/qms/work-order/components/WorkOrderEditModal.vue';
 
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
-import BomEditModal from './components/BomEditModal.vue';
-import WorkOrderEditModal from '#/views/qms/work-order/components/WorkOrderEditModal.vue';
 import { useProjectManager } from '../composables/useProjectManager';
-import { getDeptList } from '#/api/system/dept';
+import BomEditModal from './components/BomEditModal.vue';
 
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
@@ -38,7 +39,7 @@ const {
   filteredProjects,
   currentProject,
   handleTabChange,
-} = useProjectManager(allProjects);
+} = useProjectManager(allProjects as any);
 
 // ================= Methods =================
 async function loadData() {
@@ -57,11 +58,11 @@ async function loadData() {
 }
 
 async function loadDepts() {
-    try {
-        const data = await getDeptList();
-        deptData.value = data;
-        deptTreeData.value = convertToTreeSelectData(data);
-    } catch {}
+  try {
+    const data = await getDeptList();
+    deptData.value = data;
+    deptTreeData.value = convertToTreeSelectData(data);
+  } catch {}
 }
 
 async function handleArchive(proj: QmsPlanningApi.BomTreeNode) {
@@ -77,14 +78,16 @@ async function handleArchive(proj: QmsPlanningApi.BomTreeNode) {
       try {
         // 直接更新工单状态以实现归档，保持持久化一致性
         await updateWorkOrder(proj.id, { status: newStatus as any });
-        message.success(isArchived ? t('common.restoreSuccess') : t('common.archiveSuccess'));
-        
+        message.success(
+          isArchived ? t('common.restoreSuccess') : t('common.archiveSuccess'),
+        );
+
         if (selectedProjectId.value === proj.id) {
-            selectedProjectId.value = null;
+          selectedProjectId.value = null;
         }
         await loadData();
-      } catch (err) {
-        console.error('BOM Archive Error:', err);
+      } catch (error) {
+        console.error('BOM Archive Error:', error);
         message.error(t('common.actionFailed'));
       }
     },
@@ -94,23 +97,32 @@ async function handleArchive(proj: QmsPlanningApi.BomTreeNode) {
 // ================= Modal =================
 const modalVisible = ref(false);
 const isEditMode = ref(false);
-const currentItemId = ref<string | null>(null);
+const currentItemId = ref<null | string>(null);
 const initialFormData = ref<any>({});
 const woModalRef = ref();
 
 function openModal(mode: 'create' | 'edit', row?: QmsPlanningApi.BomTreeNode) {
   isEditMode.value = mode === 'edit';
   currentItemId.value = row?.id || null;
-  initialFormData.value = mode === 'edit' && row 
-    ? { ...row, partName: row.name, workOrderNumber: row.parentId || currentProject.value?.id } 
-    : { quantity: 1, unit: 'PCS', workOrderNumber: currentProject.value?.workOrderNumber || currentProject.value?.id };
+  initialFormData.value =
+    mode === 'edit' && row
+      ? {
+          ...row,
+          partName: row.name,
+          workOrderNumber: row.parentId || currentProject.value?.id,
+        }
+      : {
+          quantity: 1,
+          unit: 'PCS',
+          workOrderNumber:
+            currentProject.value?.workOrderNumber || currentProject.value?.id,
+        };
   modalVisible.value = true;
 }
 
 function handleCreateProject() {
-    console.log('BOM: handleCreateProject clicked');
-    if (deptTreeData.value.length === 0) loadDepts();
-    woModalRef.value?.open(undefined, deptTreeData.value);
+  if (deptTreeData.value.length === 0) loadDepts();
+  woModalRef.value?.open(undefined, deptTreeData.value);
 }
 
 async function handleDeleteItem(row: QmsPlanningApi.BomTreeNode) {
@@ -122,26 +134,50 @@ async function handleDeleteItem(row: QmsPlanningApi.BomTreeNode) {
         await deleteBom(row.id);
         message.success(t('common.deleteSuccess'));
         await loadData();
-      } catch (err) {
+      } catch {
         message.error(t('common.actionFailed'));
       }
     },
   });
 }
 
-const columns = [
-  { title: t('qms.planning.bom.partName'), dataIndex: 'name', minWidth: 150, fixed: 'left' },
-  { title: t('qms.planning.bom.partNumber'), dataIndex: 'partNumber', width: 150 },
+const columns: any[] = [
+  {
+    title: t('qms.planning.bom.partName'),
+    dataIndex: 'name',
+    minWidth: 150,
+    fixed: 'left',
+  },
+  {
+    title: t('qms.planning.bom.partNumber'),
+    dataIndex: 'partNumber',
+    width: 150,
+  },
   { title: t('qms.planning.bom.material'), dataIndex: 'material', width: 150 },
-  { title: t('qms.planning.bom.quantity'), dataIndex: 'quantity', width: 80, align: 'center' },
-  { title: t('qms.planning.bom.unit'), dataIndex: 'unit', width: 80, align: 'center' },
-  { title: t('qms.planning.bom.remarks'), dataIndex: 'remarks', minWidth: 150, ellipsis: true },
+  {
+    title: t('qms.planning.bom.quantity'),
+    dataIndex: 'quantity',
+    width: 80,
+    align: 'center',
+  },
+  {
+    title: t('qms.planning.bom.unit'),
+    dataIndex: 'unit',
+    width: 80,
+    align: 'center',
+  },
+  {
+    title: t('qms.planning.bom.remarks'),
+    dataIndex: 'remarks',
+    minWidth: 150,
+    ellipsis: true,
+  },
   { title: t('common.action'), key: 'action', width: 120, fixed: 'right' },
 ];
 
 onMounted(() => {
-    loadData();
-    loadDepts();
+  loadData();
+  loadDepts();
 });
 </script>
 
@@ -151,34 +187,56 @@ onMounted(() => {
       <PlanningSidebar
         :title="t('qms.planning.bom.projectList')"
         :projects="filteredProjects"
-        v-model:selectedId="selectedProjectId"
-        v-model:activeTab="activeTab"
-        v-model:searchText="searchText"
+        v-model:selected-id="selectedProjectId"
+        v-model:active-tab="activeTab"
+        v-model:search-text="searchText"
         :show-create="true"
         @change="handleTabChange"
-        @archive="handleArchive"
+        @archive="(proj: any) => handleArchive(proj)"
         @create="handleCreateProject"
       >
         <template #projectInfo="{ project }">
-            <div class="flex flex-col gap-0.5">
-                <span>{{ t('qms.workOrder.workOrderNumber') }}: {{ project.workOrderNumber }}</span>
-                <span class="opacity-70 text-[10px]">{{ (project as any).itemCount }} {{ t('qms.planning.bom.itemCountUnit') }}</span>
-            </div>
+          <div class="flex flex-col gap-0.5">
+            <span
+              >{{ t('qms.workOrder.workOrderNumber') }}:
+              {{ project.workOrderNumber }}</span
+            >
+            <span class="text-[10px] opacity-70"
+              >{{ (project as any).itemCount }}
+              {{ t('qms.planning.bom.itemCountUnit') }}</span
+            >
+          </div>
         </template>
       </PlanningSidebar>
 
       <!-- Right Side: BOM Detail -->
-      <div class="flex flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div
+        class="flex flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+      >
         <div v-if="currentProject" class="flex h-full flex-col overflow-hidden">
-          <div class="flex items-center justify-between border-b border-gray-100 bg-gray-50/30 p-4">
+          <div
+            class="flex items-center justify-between border-b border-gray-100 bg-gray-50/30 p-4"
+          >
             <div>
-              <h2 class="text-xl font-bold text-gray-800">{{ currentProject.name }}</h2>
+              <h2 class="text-xl font-bold text-gray-800">
+                {{ currentProject.name }}
+              </h2>
               <div class="mt-1 text-xs text-gray-500">
-                {{ t('qms.planning.bom.workOrderNo') }}: <b class="text-gray-700">{{ currentProject.workOrderNumber }}</b> | 
-                {{ t('qms.planning.bom.materialItems') }}: <b class="text-blue-600">{{ (currentProject as any).itemCount }}</b>
+                {{ t('qms.planning.bom.workOrderNo') }}:
+                <b class="text-gray-700">{{
+                  currentProject.workOrderNumber
+                }}</b>
+                | {{ t('qms.planning.bom.materialItems') }}:
+                <b class="text-blue-600">{{
+                  (currentProject as any).itemCount
+                }}</b>
               </div>
             </div>
-            <Button v-if="canCreate" type="primary" @click="openModal('create')">
+            <Button
+              v-if="canCreate"
+              type="primary"
+              @click="openModal('create')"
+            >
               + {{ t('qms.planning.bom.addItem') }}
             </Button>
           </div>
@@ -195,10 +253,21 @@ onMounted(() => {
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'action'">
                   <Space>
-                    <Button v-if="canEdit" type="link" size="small" @click="openModal('edit', record)">
+                    <Button
+                      v-if="canEdit"
+                      type="link"
+                      size="small"
+                      @click="openModal('edit', record as any)"
+                    >
                       {{ t('common.edit') }}
                     </Button>
-                    <Button v-if="canDelete" type="link" size="small" danger @click="handleDeleteItem(record)">
+                    <Button
+                      v-if="canDelete"
+                      type="link"
+                      size="small"
+                      danger
+                      @click="handleDeleteItem(record as any)"
+                    >
                       {{ t('common.delete') }}
                     </Button>
                   </Space>
@@ -207,7 +276,10 @@ onMounted(() => {
             </Table>
           </div>
         </div>
-        <div v-else class="flex flex-1 flex-col items-center justify-center bg-gray-50/20 text-gray-300">
+        <div
+          v-else
+          class="flex flex-1 flex-col items-center justify-center bg-gray-50/20 text-gray-300"
+        >
           <Empty :description="t('qms.planning.bom.selectProjectHint')" />
         </div>
       </div>

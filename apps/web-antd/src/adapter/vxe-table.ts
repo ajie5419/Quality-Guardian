@@ -1,4 +1,7 @@
-import type { VxeGridProps, VxeTableGridOptions } from '@vben/plugins/vxe-table';
+import type {
+  VxeGridProps,
+  VxeTableGridOptions,
+} from '@vben/plugins/vxe-table';
 
 import { h } from 'vue';
 
@@ -95,7 +98,9 @@ setupVbenVxeTable({
 });
 
 // Wrapper to set default options
-function useVbenVxeGrid<T extends Record<string, any> = any>(options: VxeGridProps<T>) {
+function useVbenVxeGrid<T extends Record<string, any> = any>(
+  options: VxeGridProps<T>,
+) {
   // Default showSearchForm to false if not explicitly set
   // This satisfies the user requirement to have search form collapsed/hidden by default
   const mergedOptions = {

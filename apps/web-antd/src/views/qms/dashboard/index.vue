@@ -7,18 +7,17 @@ import type { EChartsClickParams } from '#/types';
 
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
-import { AnalysisChartCard, AnalysisOverview } from '@vben/common-ui';
-import { useI18n } from '@vben/locales';
+import { AnalysisOverview } from '@vben/common-ui';
 import {
   SvgBellIcon,
   SvgCakeIcon,
   SvgCardIcon,
   SvgDownloadIcon,
 } from '@vben/icons';
-import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
+import { useI18n } from '@vben/locales';
+import { useEcharts } from '@vben/plugins/echarts';
 
 import {
-  List,
   Modal,
   Segmented,
   Spin,
@@ -175,7 +174,10 @@ function updatePassRateChart() {
   // Mini Chart Render Logic (keep this for the small chart at bottom)
   const chartOption = {
     title: {
-      text: granularity.value === 'week' ? t('qms.dashboard.weeklyPassRateTrend') : t('qms.dashboard.monthlyPassRateTrend'),
+      text:
+        granularity.value === 'week'
+          ? t('qms.dashboard.weeklyPassRateTrend')
+          : t('qms.dashboard.monthlyPassRateTrend'),
       left: 'center',
     },
     tooltip: {
@@ -221,26 +223,58 @@ function updatePassRateChart() {
 
 // 下钻表格列配置
 const drillDownColumns = computed(() => [
-  { title: t('qms.planning.itp.processStep'), dataIndex: 'process', key: 'process' },
+  {
+    title: t('qms.planning.itp.processStep'),
+    dataIndex: 'process',
+    key: 'process',
+  },
   { title: t('common.category'), dataIndex: 'category', key: 'category' },
-  { title: t('qms.dashboard.passRate'), dataIndex: 'passRate', key: 'passRate' },
-  { title: t('qms.dashboard.totalInspection'), dataIndex: 'totalCount', key: 'totalCount' },
-  { title: t('qms.dashboard.qualifiedCount'), dataIndex: 'passCount', key: 'passCount' },
+  {
+    title: t('qms.dashboard.passRate'),
+    dataIndex: 'passRate',
+    key: 'passRate',
+  },
+  {
+    title: t('qms.dashboard.totalInspection'),
+    dataIndex: 'totalCount',
+    key: 'totalCount',
+  },
+  {
+    title: t('qms.dashboard.qualifiedCount'),
+    dataIndex: 'passCount',
+    key: 'passCount',
+  },
 ]);
 
 // 质量损失下钻表格列配置
 const qualityLossDrillDownColumns = computed(() => [
-  { title: t('qms.inspection.issues.reportDate'), dataIndex: 'date', key: 'date', width: 120 },
+  {
+    title: t('qms.inspection.issues.reportDate'),
+    dataIndex: 'date',
+    key: 'date',
+    width: 120,
+  },
   { title: t('common.type'), dataIndex: 'type', key: 'type', width: 100 },
-  { title: t('qms.qualityLoss.amountLabel'), dataIndex: 'amount', key: 'amount', width: 120 },
+  {
+    title: t('qms.qualityLoss.amountLabel'),
+    dataIndex: 'amount',
+    key: 'amount',
+    width: 120,
+  },
   {
     title: t('qms.inspection.issues.responsibleDepartment'),
     dataIndex: 'dept',
     key: 'dept',
     width: 150,
-    customRender: ({ text }: { text: string }) => findNameById(deptRawData.value, text) || text,
+    customRender: ({ text }: { text: string }) =>
+      findNameById(deptRawData.value, text) || text,
   },
-  { title: t('qms.inspection.issues.description'), dataIndex: 'desc', key: 'desc', ellipsis: true },
+  {
+    title: t('qms.inspection.issues.description'),
+    dataIndex: 'desc',
+    key: 'desc',
+    ellipsis: true,
+  },
 ]);
 
 const currentDrillDownType = ref<'passRate' | 'qualityLoss'>('passRate');
@@ -346,7 +380,10 @@ watch(activeTab, (val) => {
             </div>
           </TabPane>
 
-          <TabPane key="vehicleFailure" :tab="t('qms.dashboard.vehicleFailureRate')">
+          <TabPane
+            key="vehicleFailure"
+            :tab="t('qms.dashboard.vehicleFailureRate')"
+          >
             <div class="pt-2">
               <VehicleFailureChart :active="activeTab === 'vehicleFailure'" />
             </div>

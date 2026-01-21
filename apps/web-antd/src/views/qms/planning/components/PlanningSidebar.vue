@@ -1,27 +1,29 @@
 <script lang="ts" setup generic="T extends PlanningTreeNode">
-import { useI18n } from '@vben/locales';
-import { Tabs, Input, Empty, Button, Tag } from 'ant-design-vue';
 import type { PlanningTreeNode } from '../types';
 
-const props = defineProps<{
-  title: string;
-  projects: T[];
-  selectedId: string | null;
+import { useI18n } from '@vben/locales';
+
+import { Button, Empty, Input, Tabs, Tag } from 'ant-design-vue';
+
+defineProps<{
   loading?: boolean;
-  /** 显式控制是否显示分派按钮 */
-  showDispatch?: boolean;
+  projects: T[];
+  selectedId: null | string;
   /** 显式控制是否显示新建按钮 */
   showCreate?: boolean;
+  /** 显式控制是否显示分派按钮 */
+  showDispatch?: boolean;
+  title: string;
 }>();
 
 const emit = defineEmits<{
-  'update:selectedId': [string | null];
+  archive: [T];
+  change: [];
+  create: [];
+  dispatch: [T];
   'update:activeTab': [string];
   'update:searchText': [string];
-  archive: [T];
-  dispatch: [T];
-  create: [];
-  change: [];
+  'update:selectedId': [null | string];
 }>();
 
 const { t } = useI18n();
@@ -29,31 +31,52 @@ const { t } = useI18n();
 const activeTab = defineModel<string>('activeTab', { default: 'active' });
 const searchText = defineModel<string>('searchText', { default: '' });
 
+/**
+ * 判断是否为归档状态
+ */
+function isArchived(status?: string) {
+  const s = String(status || '').toLowerCase();
+  return ['archived', 'closed', 'completed', '已完成', '已归档'].includes(s);
+}
+
 function handleSelect(id: string) {
   emit('update:selectedId', id);
 }
 </script>
 
 <template>
-  <div class="flex w-80 flex-shrink-0 flex-col rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden select-none">
+  <div
+    class="flex w-80 flex-shrink-0 select-none flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+  >
     <!-- Header: Professional Typography & Modern Button -->
-    <div class="flex items-center justify-between border-b border-gray-100 bg-gray-50/20 px-4 py-4">
-      <span class="text-base font-bold text-gray-800 tracking-tight">{{ title }}</span>
-      <Button 
-        v-if="showCreate" 
-        type="primary" 
-        size="small" 
-        @click="emit('create')" 
-        class="flex items-center gap-1.5 px-3 h-8 rounded-md shadow-sm transition-all border-none bg-blue-600 hover:bg-blue-700 active:scale-95"
+    <div
+      class="flex items-center justify-between border-b border-gray-100 bg-gray-50/20 px-4 py-4"
+    >
+      <span class="text-base font-bold tracking-tight text-gray-800">{{
+        title
+      }}</span>
+      <Button
+        v-if="showCreate"
+        type="primary"
+        size="small"
+        @click="emit('create')"
+        class="flex h-8 items-center gap-1.5 rounded-md border-none bg-blue-600 px-3 shadow-sm transition-all hover:bg-blue-700 active:scale-95"
       >
         <span class="i-lucide-plus text-sm text-white"></span>
-        <span class="text-xs font-semibold text-white">{{ t('common.add') }}</span>
+        <span class="text-xs font-semibold text-white">{{
+          t('common.add')
+        }}</span>
       </Button>
     </div>
 
     <!-- Navigation & Search -->
     <div class="px-3 pt-2">
-      <Tabs v-model:active-key="activeTab" size="small" class="sidebar-tabs" @change="emit('change')">
+      <Tabs
+        v-model:active-key="activeTab"
+        size="small"
+        class="sidebar-tabs"
+        @change="emit('change')"
+      >
         <Tabs.TabPane key="active" :tab="t('qms.planning.status.active')" />
         <Tabs.TabPane key="archived" :tab="t('qms.planning.status.archived')" />
       </Tabs>
@@ -69,7 +92,7 @@ function handleSelect(id: string) {
     </div>
 
     <!-- Modern Project List -->
-    <div class="flex-1 space-y-1.5 overflow-y-auto p-2 scroll-smooth">
+    <div class="flex-1 space-y-1.5 overflow-y-auto scroll-smooth p-2">
       <div
         v-for="proj in projects"
         :key="proj.id"
@@ -83,56 +106,82 @@ function handleSelect(id: string) {
       >
         <!-- Content Area with Safe Right Padding -->
         <div class="relative z-10 pr-24">
-            <div class="mb-1.5 line-clamp-1 font-bold text-gray-800 transition-colors group-hover:text-blue-700">
-                {{ proj.name }}
-            </div>
-            
-            <div class="flex flex-col gap-1 text-[11px] text-gray-500">
-                <slot name="projectInfo" :project="proj">
-                    <div v-if="proj.workOrderNumber || proj.workOrderId" class="flex items-center gap-1.5">
-                        <span class="i-lucide-hash opacity-60 text-[10px]"></span>
-                        <span class="truncate">{{ t('qms.workOrder.workOrderNumber') }}: {{ proj.workOrderNumber || proj.workOrderId }}</span>
-                    </div>
-                </slot>
-            </div>
+          <div
+            class="mb-1.5 line-clamp-1 font-bold text-gray-800 transition-colors group-hover:text-blue-700"
+          >
+            {{ proj.name }}
+          </div>
+
+          <div class="flex flex-col gap-1 text-[11px] text-gray-500">
+            <slot name="projectInfo" :project="proj">
+              <div
+                v-if="proj.workOrderNumber || proj.workOrderId"
+                class="flex items-center gap-1.5"
+              >
+                <span class="i-lucide-hash text-[10px] opacity-60"></span>
+                <span class="truncate"
+                  >{{ t('qms.workOrder.workOrderNumber') }}:
+                  {{ proj.workOrderNumber || proj.workOrderId }}</span
+                >
+              </div>
+            </slot>
+          </div>
         </div>
 
         <!-- Status Tag (Top Right) -->
         <div class="absolute right-2 top-3">
-            <Tag v-if="proj.status === 'archived' || proj.status === 'Completed'" color="default" class="m-0 scale-90 border-none bg-gray-100 text-gray-500">
-                {{ t('qms.planning.status.archived') }}
-            </Tag>
+          <Tag
+            v-if="isArchived(proj.status)"
+            color="default"
+            class="m-0 scale-90 border-none bg-gray-100 text-gray-500"
+          >
+            {{ t('qms.planning.status.archived') }}
+          </Tag>
         </div>
 
         <!-- Float Actions: No background, Absolute Right-Bottom -->
-        <div 
-          class="absolute right-2 bottom-2.5 flex items-center gap-3 transition-all duration-300 z-20"
+        <div
+          class="absolute bottom-2.5 right-2 z-20 flex items-center gap-3 transition-all duration-300"
           :class="[
-            selectedId === proj.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            selectedId === proj.id
+              ? 'opacity-100'
+              : 'opacity-0 group-hover:opacity-100',
           ]"
         >
-          <Button 
-            v-if="showDispatch && proj.status !== 'archived' && proj.status !== 'Completed'" 
-            type="link" 
-            size="small" 
-            class="p-0 h-auto text-[11px] font-bold text-blue-600 hover:underline" 
+          <Button
+            v-if="showDispatch && !isArchived(proj.status)"
+            type="link"
+            size="small"
+            class="h-auto p-0 text-[11px] font-bold text-blue-600 hover:underline"
             @click.stop="emit('dispatch', proj)"
           >
             {{ t('common.dispatch') }}
           </Button>
-          <Button 
-            type="link" 
-            size="small" 
-            class="p-0 h-auto text-[11px] font-bold"
-            :class="proj.status === 'archived' || proj.status === 'Completed' ? 'text-gray-500 hover:text-blue-600' : 'text-orange-500 hover:text-orange-600'"
+          <Button
+            type="link"
+            size="small"
+            class="h-auto p-0 text-[11px] font-bold"
+            :class="
+              isArchived(proj.status)
+                ? 'text-gray-500 hover:text-blue-600'
+                : 'text-orange-500 hover:text-orange-600'
+            "
             @click.stop="emit('archive', proj)"
           >
-            {{ (proj.status === 'archived' || proj.status === 'Completed') ? t('common.restore') : t('common.archive') }}
+            {{
+              isArchived(proj.status)
+                ? t('common.restore')
+                : t('common.archive')
+            }}
           </Button>
         </div>
       </div>
 
-      <Empty v-if="projects.length === 0" :image="Empty.PRESENTED_IMAGE_SIMPLE" class="py-12 opacity-60" />
+      <Empty
+        v-if="projects.length === 0"
+        :image="Empty.PRESENTED_IMAGE_SIMPLE"
+        class="py-12 opacity-60"
+      />
     </div>
   </div>
 </template>
@@ -146,21 +195,23 @@ function handleSelect(id: string) {
 }
 
 .sidebar-tabs :deep(.ant-tabs-nav) {
-    margin-bottom: 8px !important;
+  margin-bottom: 8px !important;
 }
 
 .sidebar-search :deep(.ant-input-affix-wrapper) {
-    border-radius: 6px;
-    background-color: #f9fafb;
+  background-color: #f9fafb;
+  border-radius: 6px;
 }
 
 .overflow-y-auto::-webkit-scrollbar {
   width: 4px;
 }
+
 .overflow-y-auto::-webkit-scrollbar-thumb {
   background-color: transparent;
   border-radius: 10px;
 }
+
 .overflow-y-auto:hover::-webkit-scrollbar-thumb {
   background-color: #e5e7eb;
 }

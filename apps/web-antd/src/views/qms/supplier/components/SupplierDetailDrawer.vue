@@ -77,7 +77,11 @@ defineExpose({
     <div v-if="selectedSupplier" class="space-y-6">
       <Row :gutter="12">
         <Col :span="6">
-          <Card size="small" :title="t('qms.common.overallScore')" class="bg-gray-50">
+          <Card
+            size="small"
+            :title="t('qms.common.overallScore')"
+            class="bg-gray-50"
+          >
             <div class="py-2 text-center">
               <div
                 class="text-3xl font-bold"
@@ -96,7 +100,11 @@ defineExpose({
           </Card>
         </Col>
         <Col :span="18">
-          <Card size="small" :title="t('qms.common.riskOverview')" class="bg-gray-50">
+          <Card
+            size="small"
+            :title="t('qms.common.riskOverview')"
+            class="bg-gray-50"
+          >
             <Row :gutter="8">
               <Col :span="4">
                 <Statistic
@@ -160,7 +168,9 @@ defineExpose({
               {{ selectedSupplier.buyer }}
             </Descriptions.Item>
             <Descriptions.Item :label="t('qms.supplier.qualityLevel')">
-              <Tag color="purple"> {{ selectedSupplier.level ?? '-' }} {{ t('common.level') }} </Tag>
+              <Tag color="purple">
+                {{ selectedSupplier.level ?? '-' }} {{ t('common.level') }}
+              </Tag>
             </Descriptions.Item>
           </Descriptions>
         </TabPane>
@@ -173,7 +183,11 @@ defineExpose({
               row-key="id"
               :loading="isDetailLoading"
             >
-              <Table.Column :title="t('common.date')" data-index="reportDate" width="110" />
+              <Table.Column
+                :title="t('common.date')"
+                data-index="reportDate"
+                width="110"
+              />
               <Table.Column
                 :title="t('qms.workOrder.workOrderNumber')"
                 data-index="workOrderNumber"
@@ -189,9 +203,15 @@ defineExpose({
                 data-index="description"
                 ellipsis
               />
-              <Table.Column :title="t('qms.inspection.issues.lossAmount')" data-index="lossAmount" width="100">
+              <Table.Column
+                :title="t('qms.inspection.issues.lossAmount')"
+                data-index="lossAmount"
+                width="100"
+              >
                 <template #default="{ text }">
-                  <span class="font-bold text-orange-600">¥{{ text ?? 0 }}</span>
+                  <span class="font-bold text-orange-600"
+                    >¥{{ text ?? 0 }}</span
+                  >
                 </template>
               </Table.Column>
             </Table>
@@ -206,7 +226,11 @@ defineExpose({
               row-key="id"
               :loading="isDetailLoading"
             >
-              <Table.Column :title="t('common.date')" data-index="issueDate" width="110" />
+              <Table.Column
+                :title="t('common.date')"
+                data-index="issueDate"
+                width="110"
+              />
               <Table.Column
                 :title="t('qms.workOrder.workOrderNumber')"
                 data-index="workOrderNumber"
@@ -242,10 +266,24 @@ defineExpose({
             row-key="id"
             :loading="isDetailLoading"
           >
-            <Table.Column :title="t('qms.inspection.records.form.reportDate')" data-index="reportDate" width="120" />
-            <Table.Column :title="t('qms.inspection.records.form.materialName')" data-index="materialName" />
-            <Table.Column :title="t('qms.inspection.records.form.quantity')" data-index="quantity" width="80" />
-            <Table.Column :title="t('qms.inspection.records.form.result')" data-index="result">
+            <Table.Column
+              :title="t('qms.inspection.records.form.reportDate')"
+              data-index="reportDate"
+              width="120"
+            />
+            <Table.Column
+              :title="t('qms.inspection.records.form.materialName')"
+              data-index="materialName"
+            />
+            <Table.Column
+              :title="t('qms.inspection.records.form.quantity')"
+              data-index="quantity"
+              width="80"
+            />
+            <Table.Column
+              :title="t('qms.inspection.records.form.result')"
+              data-index="result"
+            >
               <template #default="{ text }">
                 <Tag :color="text === 'PASS' ? 'green' : 'red'">
                   {{ text ?? '-' }}

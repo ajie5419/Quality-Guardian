@@ -144,7 +144,8 @@ export default defineEventHandler(async (event) => {
         }
         case 'OUTGOING': {
           proc = '发货检验';
-          name = item.projectName || item.partName || '';
+          // 对应组件名称 (partName)
+          name = item.partName || item.projectName || '';
 
           break;
         }

@@ -1,9 +1,9 @@
-import { defineEventHandler, getRequestURL, getHeaders } from 'h3';
+import { defineEventHandler, getHeaders, getRequestURL } from 'h3';
 
 export default defineEventHandler((event) => {
   const url = getRequestURL(event);
   const headers = getHeaders(event);
-  
+
   return {
     message: 'Debug route info',
     timestamp: new Date().toISOString(),

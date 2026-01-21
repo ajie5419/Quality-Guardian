@@ -302,13 +302,15 @@ function navTo(nav: WorkbenchProjectItem | WorkbenchQuickNavItem) {
 }
 
 // 任务状态映射
-const statusMap = computed<Record<string, { color: string; label: string }>>(() => ({
-  PENDING: { label: t('qms.task.status.pending'), color: 'default' },
-  DISPATCHED: { label: t('qms.task.status.dispatched'), color: 'blue' },
-  PROCESSING: { label: t('qms.task.status.processing'), color: 'orange' },
-  COMPLETED: { label: t('qms.task.status.completed'), color: 'green' },
-  OVERDUE: { label: t('qms.task.status.overdue'), color: 'red' },
-}));
+const statusMap = computed<Record<string, { color: string; label: string }>>(
+  () => ({
+    PENDING: { label: t('qms.task.status.pending'), color: 'default' },
+    DISPATCHED: { label: t('qms.task.status.dispatched'), color: 'blue' },
+    PROCESSING: { label: t('qms.task.status.processing'), color: 'orange' },
+    COMPLETED: { label: t('qms.task.status.completed'), color: 'green' },
+    OVERDUE: { label: t('qms.task.status.overdue'), color: 'red' },
+  }),
+);
 
 function getStatusLabel(status: string) {
   return statusMap.value[status]?.label || status;
@@ -323,7 +325,8 @@ const isTaskDetailVisible = ref(false);
 const taskDetailContent = ref<string[]>([]);
 
 function handleViewDetails(task: QmsTaskDispatchApi.TaskDispatch) {
-  taskDetailContent.value = task.content?.items || [];
+  taskDetailContent.value =
+    (task.content as any)?.items || task.content?.requirements || [];
   isTaskDetailVisible.value = true;
 }
 
@@ -361,14 +364,20 @@ function getGreeting(): string {
     >
       <template #title>
         {{ getGreeting() }},
-        {{ t('qms.workspace.startWork', { user: userStore.userInfo?.realName || t('common.user') }) }}
+        {{
+          t('qms.workspace.startWork', {
+            user: userStore.userInfo?.realName || t('common.user'),
+          })
+        }}
       </template>
       <template #description>
         <span class="mr-4"
-          >📋 {{ t('qms.workspace.todayWorkOrders') }}: <strong>{{ stats.todayWorkOrders }}</strong></span
+          >📋 {{ t('qms.workspace.todayWorkOrders') }}:
+          <strong>{{ stats.todayWorkOrders }}</strong></span
         >
         <span class="mr-4"
-          >🔍 {{ t('qms.workspace.todayInspections') }}: <strong>{{ stats.todayInspections }}</strong></span
+          >🔍 {{ t('qms.workspace.todayInspections') }}:
+          <strong>{{ stats.todayInspections }}</strong></span
         >
         <span class="mr-4"
           >⚠️ {{ t('qms.workspace.openIssues') }}:
@@ -411,7 +420,9 @@ function getGreeting(): string {
       <Col :span="6">
         <Card size="small" class="bg-blue-50/30 shadow-sm">
           <div class="flex h-[56px] items-center justify-between px-2">
-            <div class="text-gray-500">{{ t('qms.workspace.taskStats.closureRate') }}</div>
+            <div class="text-gray-500">
+              {{ t('qms.workspace.taskStats.closureRate') }}
+            </div>
             <Progress
               type="circle"
               :percent="85"
@@ -426,9 +437,15 @@ function getGreeting(): string {
     <div class="mt-5 flex flex-col lg:flex-row">
       <div class="mr-4 w-full lg:w-3/5">
         <!-- 待我派发的任务列表 -->
-        <Card :title="t('qms.workspace.taskWorkbench')" size="small" class="mb-5 shadow-sm">
+        <Card
+          :title="t('qms.workspace.taskWorkbench')"
+          size="small"
+          class="mb-5 shadow-sm"
+        >
           <template #extra>
-            <Button type="link" size="small" @click="loadTaskData">{{ t('common.refresh') }}</Button>
+            <Button type="link" size="small" @click="loadTaskData">{{
+              t('common.refresh')
+            }}</Button>
           </template>
           <List :data-source="myTasks" size="small">
             <template #renderItem="{ item }">
@@ -457,7 +474,8 @@ function getGreeting(): string {
                         >{{ t('qms.workspace.myTask') }}</Tag
                       >
                       <span v-else class="text-gray-400"
-                        >{{ t('common.responsible') }}: {{ item.assigneeName || t('common.notSet') }}</span
+                        >{{ t('common.responsible') }}:
+                        {{ item.assigneeName || t('common.notSet') }}</span
                       >
                     </span>
 
@@ -626,11 +644,7 @@ function getGreeting(): string {
       :footer="null"
     >
       <div class="py-4">
-        <List
-          size="small"
-          bordered
-          :data-source="taskDetailContent"
-        >
+        <List size="small" bordered :data-source="taskDetailContent">
           <template #renderItem="{ item }">
             <List.Item>{{ item }}</List.Item>
           </template>
@@ -640,7 +654,10 @@ function getGreeting(): string {
             </div>
           </template>
         </List>
-        <div v-if="taskDetailContent.length === 0" class="text-center text-gray-400 py-4">
+        <div
+          v-if="taskDetailContent.length === 0"
+          class="py-4 text-center text-gray-400"
+        >
           {{ t('common.noData') }}
         </div>
       </div>

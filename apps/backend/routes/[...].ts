@@ -1,10 +1,10 @@
-import { defineEventHandler, setResponseStatus, setHeader } from 'h3';
+import { defineEventHandler, setHeader, setResponseStatus } from 'h3';
 
 export default defineEventHandler((event) => {
   const path = event.path;
 
   // 在控制台打印未匹配的请求路径，方便调试
-  console.log(`[404] API not found: ${path}`);
+  console.warn(`[404] API not found: ${path}`);
 
   // 设置 HTTP 状态码为 404
   setResponseStatus(event, 404);

@@ -40,14 +40,12 @@ async function handleSubmit() {
     modalApi.setState({ confirmLoading: true });
     const values = await formApi.getValues();
 
-    if (isUpdate.value && recordId.value) {
-      await updateWorkOrder(recordId.value, values);
-    } else {
-      await createWorkOrder({
-        ...values,
-        createTime: new Date().toLocaleString(),
-      });
-    }
+    await (isUpdate.value && recordId.value
+      ? updateWorkOrder(recordId.value, values)
+      : createWorkOrder({
+          ...values,
+          createTime: new Date().toLocaleString(),
+        }));
 
     message.success(t('common.saveSuccess'));
     modalApi.close();
@@ -64,12 +62,10 @@ async function handleSubmit() {
  * 健壮的打开逻辑
  */
 async function open(record?: any, deptData?: any[]) {
-  console.log('WorkOrderModal: open triggered', { isUpdate: !!record });
-  
   try {
     // 1. 优先打开容器，给用户视觉反馈
     modalApi.open();
-    
+
     isUpdate.value = !!record;
     recordId.value = record?.id || null;
 
@@ -93,10 +89,10 @@ async function open(record?: any, deptData?: any[]) {
 
     // 3. 设置标题
     modalApi.setState({
-      title: isUpdate.value ? t('common.edit') : t('qms.workOrder.createWorkOrder'),
+      title: isUpdate.value
+        ? t('common.edit')
+        : t('qms.workOrder.createWorkOrder'),
     });
-    
-    console.log('WorkOrderModal: init success');
   } catch (error) {
     console.error('WorkOrderModal Open Error:', error);
     message.error('工单编辑器初始化失败，请检查控制台日志');
