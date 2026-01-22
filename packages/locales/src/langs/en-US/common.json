@@ -24,5 +24,13 @@
   "yes": "Yes",
   "no": "No",
   "showSearchPanel": "Show search panel",
-  "hideSearchPanel": "Hide search panel"
+  "hideSearchPanel": "Hide search panel",
+  "confirmDelete": "Confirm Delete",
+  "confirmDeleteContent": "Are you sure you want to delete?",
+  "confirmBatchDelete": "Confirm Batch Delete",
+  "confirmBatchDeleteContent": "Are you sure you want to delete {count} selected records?",
+  "deleteSuccess": "Deleted successfully",
+  "deleteSuccessCount": "Successfully deleted {count} records",
+  "deleteFailed": "Delete failed",
+  "pleaseSelectData": "Please select data first"
 }

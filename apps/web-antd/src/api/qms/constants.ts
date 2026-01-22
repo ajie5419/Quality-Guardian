@@ -15,9 +15,16 @@ export const QMS_API = {
 
   // Inspection & Quality
   INSPECTION_ISSUES: '/qms/inspection/issues',
+  INSPECTION_ISSUES_BATCH_DELETE: '/qms/inspection/issues/batch-delete',
   INSPECTION_RECORDS: '/qms/inspection/records',
+  INSPECTION_RECORDS_BATCH_DELETE: '/qms/inspection/records/batch-delete',
   QUALITY_LOSS: '/qms/quality-loss',
   WORK_ORDER: '/qms/work-order',
+  WORK_ORDER_BATCH_DELETE: '/qms/work-order/batch-delete',
+
+  // After Sales
+  AFTER_SALES: '/qms/after-sales',
+  AFTER_SALES_BATCH_DELETE: '/qms/after-sales/batch-delete',
 
   // Planning & Knowledge
   PLANNING_DFMEA: '/qms/planning/dfmea',

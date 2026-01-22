@@ -77,8 +77,65 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
     custom: true,
     export: canExport.value,
     import: true,
+    search: true,
     zoom: true,
     refresh: true,
+  },
+  importConfig: {
+    remote: true,
+    importMethod: async ({ file }: { file: File }) => {
+      const { requestClient } = await import('#/api/request');
+      const XLSX = await import('xlsx');
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, {
+          type: 'array',
+          cellDates: true,
+        });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) return;
+        const worksheet = workbook.Sheets[sheetName]!;
+        const results = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        const columns = gridApi.grid.getColumns();
+        const mappedItems = results.map((row: any) => {
+          const item: any = {};
+          columns.forEach((c: any) => {
+            if (!c.field || !c.title) return;
+            const excelKey = Object.keys(row).find(
+              (k) =>
+                String(k).replaceAll(/\s+/g, '') ===
+                String(c.title).replaceAll(/\s+/g, ''),
+            );
+            if (excelKey) {
+              let val = row[excelKey];
+              if (val instanceof Date) {
+                val = val.toISOString().split('T')[0];
+              }
+              item[c.field] = val;
+            }
+          });
+          return item;
+        });
+        const res = await requestClient.post(
+          '/qms/supplier/import',
+          {
+            items: mappedItems,
+            category: 'Supplier',
+          },
+          { timeout: 120_000 },
+        );
+        if (res.successCount > 0) {
+          message.success(
+            t('common.importSuccessCount', { count: res.successCount }),
+          );
+          gridApi.reload();
+        }
+      } catch (error) {
+        console.error('Import Error:', error);
+        message.error(t('common.importFailed'));
+      }
+    },
   },
   exportConfig: {
     remote: false,

@@ -9,7 +9,8 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const { supplierName, year } = getQuery(event);
+  const { projectName, status, supplierName, workOrderNumber, year } =
+    getQuery(event);
 
   // Date Logic
   let dateFilter: Record<string, Date> = {};
@@ -26,11 +27,20 @@ export default defineEventHandler(async (event) => {
       where: {
         isDeleted: false,
         ...(year ? { date: dateFilter } : {}),
-        ...(supplierName
+        ...(status && String(status).trim() !== ''
+          ? { status: String(status) as any }
+          : {}),
+        ...(projectName && String(projectName).trim() !== ''
+          ? { projectName: { contains: String(projectName).trim() } }
+          : {}),
+        ...(workOrderNumber && String(workOrderNumber).trim() !== ''
+          ? { workOrderNumber: { contains: String(workOrderNumber).trim() } }
+          : {}),
+        ...(supplierName && String(supplierName).trim() !== ''
           ? {
               OR: [
-                { supplierName: String(supplierName) },
-                { supplierName: { contains: String(supplierName) } },
+                { supplierName: String(supplierName).trim() },
+                { supplierName: { contains: String(supplierName).trim() } },
               ],
             }
           : {}),

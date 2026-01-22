@@ -27,6 +27,7 @@ import dayjs from 'dayjs';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
+  batchDeleteInspectionIssues,
   deleteInspectionIssue,
   getInspectionIssues,
 } from '#/api/qms/inspection';
@@ -91,44 +92,118 @@ const yearOptions = computed(() => {
 });
 
 const gridOptions = computed<VxeGridProps>(() => ({
+  checkboxConfig: {
+    reserve: true,
+    highlight: true,
+  },
   toolbarConfig: {
     export: canExport.value,
+    import: true,
+    search: true,
     slots: { buttons: 'toolbar-actions' },
+  },
+  importConfig: {
+    remote: true,
+    importMethod: async ({ file }: { file: File }) => {
+      const { requestClient } = await import('#/api/request');
+      const XLSX = await import('xlsx');
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, {
+          type: 'array',
+          cellDates: true,
+        });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) return;
+        const worksheet = workbook.Sheets[sheetName]!;
+        const results = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        if (!results || results.length === 0) return;
+
+        const columns = gridApi.grid.getColumns();
+        const mappedItems = results.map((row: any) => {
+          const item: Record<string, any> = {};
+          columns.forEach((col: any) => {
+            const field = col.field;
+            const title = col.title;
+            if (field && title) {
+              const excelKey = Object.keys(row).find(
+                (k) =>
+                  String(k).replaceAll(/\s+/g, '') ===
+                  String(title).replaceAll(/\s+/g, ''),
+              );
+              if (excelKey) {
+                let val = row[excelKey];
+                if (val instanceof Date) {
+                  val = val.toISOString().split('T')[0];
+                }
+                item[field] = val;
+              }
+            }
+          });
+          return item;
+        });
+
+        const res = await requestClient.post(
+          '/qms/inspection/issues/import',
+          {
+            items: mappedItems,
+          },
+          { timeout: 120_000 },
+        );
+
+        if (res.successCount > 0) {
+          message.success(
+            t('common.importSuccessCount', { count: res.successCount }),
+          );
+          gridApi.reload();
+        } else {
+          message.error(t('common.importFailed'));
+        }
+      } catch (error) {
+        console.error('Import Error:', error);
+        message.error(t('common.importFailed'));
+      }
+    },
   },
   exportConfig: {
     remote: false,
     types: ['xlsx', 'csv'],
     modes: ['current', 'selected', 'all'],
   },
-  columns: (gridColumns || []).map((col) => {
-    // 处理部门/事业部名称映射
-    if (col.field === 'division' || col.field === 'responsibleDepartment') {
-      return {
-        ...col,
-        formatter: ({ cellValue }) => {
-          if (!cellValue) return '';
-          // 确保从响应式的 deptRawData 中查找
-          const name = findNameById(deptRawData.value, cellValue);
-          return name || cellValue;
-        },
-      };
-    }
-    // 处理时间格式化和时区
-    if (col.field === 'updatedAt' || col.field === 'reportDate') {
-      return {
-        ...col,
-        formatter: ({ cellValue }) => {
-          if (!cellValue) return '';
-          const format =
-            col.field === 'reportDate' ? 'YYYY-MM-DD' : 'YYYY-MM-DD HH:mm:ss';
-          // 使用 dayjs 转换 UTC 到本地时区
-          const date = dayjs(cellValue);
-          return date.isValid() ? date.format(format) : cellValue;
-        },
-      };
-    }
-    return col;
-  }),
+  columns: [
+    { type: 'checkbox', width: 50 },
+    ...(gridColumns || []).map((col) => {
+      // 处理部门/事业部名称映射
+      if (col.field === 'division' || col.field === 'responsibleDepartment') {
+        return {
+          ...col,
+          formatter: ({ cellValue }: { cellValue: any }) => {
+            if (!cellValue) return '';
+            // 确保从响应式的 deptRawData 中查找
+            const name = findNameById(deptRawData.value, cellValue);
+            return name || cellValue;
+          },
+        };
+      }
+      // 处理时间格式化和时区
+      if (col.field === 'updatedAt' || col.field === 'reportDate') {
+        return {
+          ...col,
+          formatter: ({ cellValue }: { cellValue: any }) => {
+            if (!cellValue) return '';
+            const format =
+              col.field === 'reportDate' ? 'YYYY-MM-DD' : 'YYYY-MM-DD HH:mm:ss';
+            // 使用 dayjs 转换 UTC 到本地时区
+            const date = dayjs(cellValue);
+            return date.isValid() ? date.format(format) : cellValue;
+          },
+        };
+      }
+      return col;
+    }),
+  ],
   pagerConfig: {
     enabled: true,
     pageSize: 20,
@@ -215,11 +290,11 @@ const gridOptions = computed<VxeGridProps>(() => ({
 }));
 
 const [Grid, gridApi] = useVbenVxeGrid({
+  gridOptions: gridOptions as any,
   formOptions: {
     schema: searchFormSchema as any,
     submitOnChange: true,
   },
-  gridOptions: gridOptions as any,
 });
 
 // ================= 统计逻辑 =================
@@ -268,6 +343,31 @@ async function handleDelete(row: InspectionIssue) {
         const errorMessage =
           error instanceof Error ? error.message : t('common.deleteFailed');
         message.error(errorMessage);
+      }
+    },
+  });
+}
+
+function handleBatchDelete() {
+  const records = gridApi.grid.getCheckboxRecords();
+  if (records.length === 0) {
+    message.warning(t('common.pleaseSelectData'));
+    return;
+  }
+  Modal.confirm({
+    title: t('common.confirmBatchDelete'),
+    content: t('common.confirmBatchDeleteContent', { count: records.length }),
+    onOk: async () => {
+      try {
+        const ids = records.map((r: any) => r.id);
+        const res = await batchDeleteInspectionIssues(ids);
+        message.success(
+          t('common.deleteSuccessCount', { count: res.successCount }),
+        );
+        invalidateInspectionIssues();
+        gridApi.reload();
+      } catch {
+        message.error(t('common.deleteFailed'));
       }
     },
   });
@@ -394,6 +494,10 @@ function handleSettleToKnowledge(row: InspectionIssue) {
               @click="handleOpenModal"
             >
               {{ t('qms.inspection.issues.createIssue') }}
+            </Button>
+            <Button v-if="canDelete" danger @click="handleBatchDelete">
+              <span class="i-lucide-trash-2 mr-1"></span>
+              {{ t('common.batchDelete') }}
             </Button>
             <Button type="link" @click="showCharts = !showCharts">
               {{ showCharts ? t('common.hideChart') : t('common.showChart') }}

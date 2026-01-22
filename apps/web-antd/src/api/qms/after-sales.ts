@@ -109,3 +109,13 @@ export async function updateAfterSales(
 export async function deleteAfterSales(id: string) {
   return requestClient.delete(`/qms/after-sales/${id}`);
 }
+
+/**
+ * Batch delete after-sales records
+ */
+export async function batchDeleteAfterSales(ids: string[]) {
+  return requestClient.post<{ successCount: number }>(
+    '/qms/after-sales/batch-delete',
+    { ids },
+  );
+}

@@ -27,18 +27,20 @@ export default defineEventHandler(async (event) => {
       where: {
         isDeleted: false,
         ...(year ? { occurDate: dateFilter } : {}),
-        ...(workOrderNumber
-          ? { workOrderNumber: String(workOrderNumber) }
+        ...(workOrderNumber && String(workOrderNumber).trim() !== ''
+          ? { workOrderNumber: String(workOrderNumber).trim() }
           : {}),
-        ...(projectName
-          ? { projectName: { contains: String(projectName) } }
+        ...(projectName && String(projectName).trim() !== ''
+          ? { projectName: { contains: String(projectName).trim() } }
           : {}),
-        ...(status ? { claimStatus: String(status) } : {}),
-        ...(supplierBrand
+        ...(status && String(status).trim() !== ''
+          ? { claimStatus: String(status).trim() }
+          : {}),
+        ...(supplierBrand && String(supplierBrand).trim() !== ''
           ? {
               OR: [
-                { supplierBrand: { contains: String(supplierBrand) } },
-                { projectName: { contains: String(supplierBrand) } },
+                { supplierBrand: { contains: String(supplierBrand).trim() } },
+                { projectName: { contains: String(supplierBrand).trim() } },
               ],
             }
           : {}),

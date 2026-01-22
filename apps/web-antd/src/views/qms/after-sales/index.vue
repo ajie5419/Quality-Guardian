@@ -12,7 +12,11 @@ import { useI18n } from '@vben/locales';
 import { Button, message, Modal, Select, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { deleteAfterSales, getAfterSalesList } from '#/api/qms/after-sales';
+import {
+  batchDeleteAfterSales,
+  deleteAfterSales,
+  getAfterSalesList,
+} from '#/api/qms/after-sales';
 import { getSupplierList } from '#/api/qms/supplier';
 import { getWorkOrderList } from '#/api/qms/work-order';
 import { getDeptList } from '#/api/system/dept';
@@ -78,7 +82,12 @@ const yearOptions = computed(() => {
 
 // 表格列配置
 const gridOptions: VxeGridProps = {
+  checkboxConfig: {
+    reserve: true,
+    highlight: true,
+  },
   columns: [
+    { type: 'checkbox', width: 50, fixed: 'left' },
     {
       type: 'seq',
       title: t('qms.afterSales.columns.seq'),
@@ -226,8 +235,83 @@ const gridOptions: VxeGridProps = {
   ],
   toolbarConfig: {
     export: canExport.value,
+    import: true,
+    search: true,
     slots: {
       buttons: 'toolbar-actions',
+    },
+  },
+  importConfig: {
+    remote: true,
+    importMethod: async ({ file }: { file: File }) => {
+      const { requestClient } = await import('#/api/request');
+      const XLSX = await import('xlsx');
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, {
+          type: 'array',
+          cellDates: true,
+        });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) return;
+        const worksheet = workbook.Sheets[sheetName]!;
+        const results = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        const columns = gridApi.grid.getColumns();
+        const statusValueMap: Record<string, string> = {
+          待处理: 'OPEN',
+          处理中: 'IN_PROGRESS',
+          已解决: 'RESOLVED',
+          已结束: 'CLOSED',
+          已完结: 'CLOSED',
+          已完成: 'COMPLETED',
+          已取消: 'CANCELLED',
+        };
+
+        const mappedItems = results.map((row: any) => {
+          const item: any = {};
+          columns.forEach((c: any) => {
+            if (!c.field || !c.title) return;
+
+            const excelKey = Object.keys(row).find(
+              (k) =>
+                String(k).replaceAll(/\s+/g, '') ===
+                String(c.title).replaceAll(/\s+/g, ''),
+            );
+
+            if (excelKey) {
+              let val = row[excelKey];
+
+              if (val instanceof Date) {
+                val = val.toISOString().split('T')[0];
+              }
+
+              if (c.field === 'status' && statusValueMap[val]) {
+                val = statusValueMap[val];
+              }
+
+              item[c.field] = val;
+            }
+          });
+          return item;
+        });
+        const res = await requestClient.post(
+          '/qms/after-sales/import',
+          {
+            items: mappedItems,
+          },
+          { timeout: 120_000 },
+        );
+        if (res.successCount > 0) {
+          message.success(
+            t('common.importSuccessCount', { count: res.successCount }),
+          );
+          gridApi.reload();
+        }
+      } catch (error) {
+        console.error('Import Error:', error);
+        message.error(t('common.importFailed'));
+      }
     },
   },
   exportConfig: {
@@ -267,13 +351,13 @@ const [Grid, gridApi] = useVbenVxeGrid({
         label: t('qms.afterSales.form.workOrderNumber'),
         component: 'Input',
         colProps: { span: 6 },
-      } as any,
+      },
       {
         fieldName: 'projectName',
         label: t('qms.afterSales.form.projectName'),
         component: 'Input',
         colProps: { span: 6 },
-      } as any,
+      },
       {
         fieldName: 'status',
         label: t('qms.afterSales.form.status'),
@@ -287,8 +371,8 @@ const [Grid, gridApi] = useVbenVxeGrid({
           ],
         },
         colProps: { span: 4 },
-      } as any,
-    ],
+      },
+    ] as any,
     submitOnChange: true,
   },
 });
@@ -319,17 +403,43 @@ function handleEdit(row: QmsAfterSalesApi.AfterSalesItem) {
 
 function handleDelete(row: QmsAfterSalesApi.AfterSalesItem) {
   Modal.confirm({
-    title: '确认删除',
-    content: '确定要删除此条记录吗？',
+    title: t('common.confirmDelete'),
+    content: t('common.confirmDeleteContent'),
     onOk: async () => {
       try {
         await deleteAfterSales(row.id);
-        message.success('删除成功');
+        message.success(t('common.deleteSuccess'));
         invalidateAfterSales();
         chartRefreshKey.value++;
         gridApi.reload();
       } catch {
-        message.error('删除失败');
+        message.error(t('common.deleteFailed'));
+      }
+    },
+  });
+}
+
+function handleBatchDelete() {
+  const records = gridApi.grid.getCheckboxRecords();
+  if (records.length === 0) {
+    message.warning(t('common.pleaseSelectData'));
+    return;
+  }
+  Modal.confirm({
+    title: t('common.confirmBatchDelete'),
+    content: t('common.confirmBatchDeleteContent', { count: records.length }),
+    onOk: async () => {
+      try {
+        const ids = records.map((r: any) => r.id);
+        const res = await batchDeleteAfterSales(ids);
+        message.success(
+          t('common.deleteSuccessCount', { count: res.successCount }),
+        );
+        invalidateAfterSales();
+        chartRefreshKey.value++;
+        gridApi.reload();
+      } catch {
+        message.error(t('common.deleteFailed'));
       }
     },
   });
@@ -416,6 +526,10 @@ function handleModalSuccess() {
                   @click="handleOpenModal"
                 >
                   {{ t('qms.inspection.issues.createIssue') }}
+                </Button>
+                <Button v-if="canDelete" danger @click="handleBatchDelete">
+                  <span class="i-lucide-trash-2 mr-1"></span>
+                  {{ t('common.batchDelete') }}
                 </Button>
               </div>
 

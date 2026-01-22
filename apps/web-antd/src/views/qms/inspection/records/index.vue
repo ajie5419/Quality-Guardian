@@ -33,6 +33,7 @@ import {
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
+  batchDeleteInspectionRecords,
   createInspectionRecord,
   deleteInspectionRecord,
   getInspectionRecords,
@@ -513,9 +514,71 @@ const commonFormOptions = {
 };
 
 const incomingGridOptions = computed<VxeGridProps>(() => ({
+  checkboxConfig: {
+    reserve: true,
+    highlight: true,
+  },
   toolbarConfig: {
     export: canExport.value,
+    import: true,
+    search: true,
     slots: { buttons: 'toolbar-actions' },
+  },
+  importConfig: {
+    remote: true,
+    importMethod: async ({ file }: { file: File }) => {
+      const { requestClient } = await import('#/api/request');
+      const XLSX = await import('xlsx');
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, {
+          type: 'array',
+          cellDates: true,
+        });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) return;
+        const worksheet = workbook.Sheets[sheetName]!;
+        const results = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        const columns = incomingApi.grid.getColumns();
+        const mappedItems = results.map((row: any) => {
+          const item: any = {};
+          columns.forEach((c: any) => {
+            if (!c.field || !c.title) return;
+            const excelKey = Object.keys(row).find(
+              (k) =>
+                String(k).replaceAll(/\s+/g, '') ===
+                String(c.title).replaceAll(/\s+/g, ''),
+            );
+            if (excelKey) {
+              let val = row[excelKey];
+              if (val instanceof Date) {
+                val = val.toISOString().split('T')[0];
+              }
+              item[c.field] = val;
+            }
+          });
+          return item;
+        });
+        const res = await requestClient.post(
+          '/qms/inspection/records/import',
+          {
+            items: mappedItems,
+            type: 'incoming',
+          },
+          { timeout: 120_000 },
+        );
+        if (res.successCount > 0) {
+          message.success(
+            t('common.importSuccessCount', { count: res.successCount }),
+          );
+          incomingApi.reload();
+        }
+      } catch (error) {
+        console.error('Import Error:', error);
+        message.error(t('common.importFailed'));
+      }
+    },
   },
   exportConfig: {
     remote: false,
@@ -523,6 +586,7 @@ const incomingGridOptions = computed<VxeGridProps>(() => ({
     modes: ['current', 'selected', 'all'],
   },
   columns: [
+    { type: 'checkbox', width: 50 },
     { type: 'seq', title: t('common.seq'), width: 60 },
     {
       field: 'workOrderNumber',
@@ -597,9 +661,71 @@ const incomingGridOptions = computed<VxeGridProps>(() => ({
 }));
 
 const processGridOptions = computed<VxeGridProps>(() => ({
+  checkboxConfig: {
+    reserve: true,
+    highlight: true,
+  },
   toolbarConfig: {
     export: canExport.value,
+    import: true,
+    search: true,
     slots: { buttons: 'toolbar-actions' },
+  },
+  importConfig: {
+    remote: true,
+    importMethod: async ({ file }: { file: File }) => {
+      const { requestClient } = await import('#/api/request');
+      const XLSX = await import('xlsx');
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, {
+          type: 'array',
+          cellDates: true,
+        });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) return;
+        const worksheet = workbook.Sheets[sheetName]!;
+        const results = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        const columns = processApi.grid.getColumns();
+        const mappedItems = results.map((row: any) => {
+          const item: any = {};
+          columns.forEach((c: any) => {
+            if (!c.field || !c.title) return;
+            const excelKey = Object.keys(row).find(
+              (k) =>
+                String(k).replaceAll(/\s+/g, '') ===
+                String(c.title).replaceAll(/\s+/g, ''),
+            );
+            if (excelKey) {
+              let val = row[excelKey];
+              if (val instanceof Date) {
+                val = val.toISOString().split('T')[0];
+              }
+              item[c.field] = val;
+            }
+          });
+          return item;
+        });
+        const res = await requestClient.post(
+          '/qms/inspection/records/import',
+          {
+            items: mappedItems,
+            type: 'process',
+          },
+          { timeout: 120_000 },
+        );
+        if (res.successCount > 0) {
+          message.success(
+            t('common.importSuccessCount', { count: res.successCount }),
+          );
+          processApi.reload();
+        }
+      } catch (error) {
+        console.error('Import Error:', error);
+        message.error(t('common.importFailed'));
+      }
+    },
   },
   exportConfig: {
     remote: false,
@@ -607,6 +733,7 @@ const processGridOptions = computed<VxeGridProps>(() => ({
     modes: ['current', 'selected', 'all'],
   },
   columns: [
+    { type: 'checkbox', width: 50 },
     { type: 'seq', title: t('common.seq'), width: 60 },
     {
       field: 'workOrderNumber',
@@ -691,9 +818,71 @@ const processGridOptions = computed<VxeGridProps>(() => ({
 }));
 
 const shipmentGridOptions = computed<VxeGridProps>(() => ({
+  checkboxConfig: {
+    reserve: true,
+    highlight: true,
+  },
   toolbarConfig: {
     export: canExport.value,
+    import: true,
+    search: true,
     slots: { buttons: 'toolbar-actions' },
+  },
+  importConfig: {
+    remote: true,
+    importMethod: async ({ file }: { file: File }) => {
+      const { requestClient } = await import('#/api/request');
+      const XLSX = await import('xlsx');
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, {
+          type: 'array',
+          cellDates: true,
+        });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) return;
+        const worksheet = workbook.Sheets[sheetName]!;
+        const results = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        const columns = shipmentApi.grid.getColumns();
+        const mappedItems = results.map((row: any) => {
+          const item: any = {};
+          columns.forEach((c: any) => {
+            if (!c.field || !c.title) return;
+            const excelKey = Object.keys(row).find(
+              (k) =>
+                String(k).replaceAll(/\s+/g, '') ===
+                String(c.title).replaceAll(/\s+/g, ''),
+            );
+            if (excelKey) {
+              let val = row[excelKey];
+              if (val instanceof Date) {
+                val = val.toISOString().split('T')[0];
+              }
+              item[c.field] = val;
+            }
+          });
+          return item;
+        });
+        const res = await requestClient.post(
+          '/qms/inspection/records/import',
+          {
+            items: mappedItems,
+            type: 'outgoing',
+          },
+          { timeout: 120_000 },
+        );
+        if (res.successCount > 0) {
+          message.success(
+            t('common.importSuccessCount', { count: res.successCount }),
+          );
+          shipmentApi.reload();
+        }
+      } catch (error) {
+        console.error('Import Error:', error);
+        message.error(t('common.importFailed'));
+      }
+    },
   },
   exportConfig: {
     remote: false,
@@ -701,6 +890,7 @@ const shipmentGridOptions = computed<VxeGridProps>(() => ({
     modes: ['current', 'selected', 'all'],
   },
   columns: [
+    { type: 'checkbox', width: 50 },
     { type: 'seq', title: t('common.seq'), width: 60 },
     {
       field: 'workOrderNumber',
@@ -776,15 +966,15 @@ const shipmentGridOptions = computed<VxeGridProps>(() => ({
 
 const [IncomingGrid, incomingApi] = useVbenVxeGrid({
   gridOptions: incomingGridOptions as any,
-  formOptions: commonFormOptions as any,
+  formOptions: { ...commonFormOptions },
 });
 const [ProcessGrid, processApi] = useVbenVxeGrid({
   gridOptions: processGridOptions as any,
-  formOptions: commonFormOptions as any,
+  formOptions: { ...commonFormOptions },
 });
 const [ShipmentGrid, shipmentApi] = useVbenVxeGrid({
   gridOptions: shipmentGridOptions as any,
-  formOptions: commonFormOptions as any,
+  formOptions: { ...commonFormOptions },
 });
 
 // ================= 6. 初始化与弹窗处理 =================
@@ -913,6 +1103,44 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
     },
   });
 }
+
+function handleBatchDelete() {
+  let grid;
+  if (activeKey.value === 'incoming') {
+    grid = incomingApi.grid;
+  } else if (activeKey.value === 'process') {
+    grid = processApi.grid;
+  } else {
+    grid = shipmentApi.grid;
+  }
+
+  const records = grid.getCheckboxRecords();
+  if (records.length === 0) {
+    message.warning(t('common.pleaseSelectData'));
+    return;
+  }
+
+  Modal.confirm({
+    title: t('common.confirmBatchDelete'),
+    content: t('common.confirmBatchDeleteContent', { count: records.length }),
+    okText: t('common.confirm'),
+    cancelText: t('common.cancel'),
+    onOk: async () => {
+      try {
+        const ids = records.map((r: any) => r.id);
+        const res = await batchDeleteInspectionRecords(ids);
+        message.success(
+          t('common.deleteSuccessCount', { count: res.successCount }),
+        );
+        incomingApi.reload();
+        processApi.reload();
+        shipmentApi.reload();
+      } catch {
+        message.error(t('common.deleteFailed'));
+      }
+    },
+  });
+}
 </script>
 
 <template>
@@ -950,6 +1178,15 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
                 @click="openModal('create')"
               >
                 {{ t('qms.inspection.records.createIncoming') }}
+              </Button>
+              <Button
+                v-if="canDelete"
+                class="ml-2"
+                danger
+                @click="handleBatchDelete"
+              >
+                <span class="i-lucide-trash-2 mr-1"></span>
+                {{ t('common.batchDelete') }}
               </Button>
             </template>
             <template #result="{ row }">
@@ -1004,6 +1241,15 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
               >
                 {{ t('qms.inspection.records.createProcess') }}
               </Button>
+              <Button
+                v-if="canDelete"
+                class="ml-2"
+                danger
+                @click="handleBatchDelete"
+              >
+                <span class="i-lucide-trash-2 mr-1"></span>
+                {{ t('common.batchDelete') }}
+              </Button>
             </template>
             <template #result="{ row }">
               <Tag
@@ -1056,6 +1302,15 @@ function handleDelete(row: QmsInspectionApi.DetailedInspectionRecord) {
                 @click="openModal('create')"
               >
                 {{ t('qms.inspection.records.createShipment') }}
+              </Button>
+              <Button
+                v-if="canDelete"
+                class="ml-2"
+                danger
+                @click="handleBatchDelete"
+              >
+                <span class="i-lucide-trash-2 mr-1"></span>
+                {{ t('common.batchDelete') }}
               </Button>
             </template>
             <template #action="{ row }">

@@ -60,3 +60,13 @@ export async function updateWorkOrder(
 export async function deleteWorkOrder(id: string) {
   return requestClient.delete(`${QMS_API.WORK_ORDER}/${id}`);
 }
+
+/**
+ * Batch delete work orders
+ */
+export async function batchDeleteWorkOrders(ids: string[]) {
+  return requestClient.post<{ successCount: number }>(
+    QMS_API.WORK_ORDER_BATCH_DELETE,
+    { ids },
+  );
+}

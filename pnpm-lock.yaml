@@ -619,6 +619,9 @@ importers:
       prisma:
         specifier: ^5.22.0
         version: 5.22.0
+      xlsx:
+        specifier: ^0.18.5
+        version: 0.18.5
     devDependencies:
       '@types/bcrypt':
         specifier: ^6.0.0

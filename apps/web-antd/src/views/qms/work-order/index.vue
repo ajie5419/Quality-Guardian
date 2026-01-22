@@ -28,7 +28,11 @@ import {
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { WorkOrderStatusEnum } from '#/api/qms/enums';
-import { deleteWorkOrder, getWorkOrderList } from '#/api/qms/work-order';
+import {
+  batchDeleteWorkOrders,
+  deleteWorkOrder,
+  getWorkOrderList,
+} from '#/api/qms/work-order';
 import { getDeptList } from '#/api/system/dept';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
@@ -185,24 +189,146 @@ watch(
 
 // 5. Grid 表格配置
 const gridOptions = computed<VxeGridProps>(() => ({
-  columns: (getGridColumns() as any[]).map((col) => {
-    // 关键修复：通过 formatter 实现事业部名称的响应式转换
-    if (col.field === 'division') {
-      return {
-        ...col,
-        slots: {}, // 禁用 slot，改用更稳定的 formatter
-        formatter: ({ cellValue }) => {
-          return findNameById(deptRawData.value, cellValue) || cellValue || '-';
-        },
-      };
-    }
-    return col;
-  }),
+  columns: [
+    { type: 'checkbox', width: 50 },
+    ...(getGridColumns() as any[]).map((col) => {
+      // 关键修复：通过 formatter 实现事业部名称的响应式转换
+      if (col.field === 'division') {
+        return {
+          ...col,
+          slots: {}, // 禁用 slot，改用更稳定的 formatter
+          formatter: ({ cellValue }: { cellValue: any }) => {
+            return (
+              findNameById(deptRawData.value, cellValue) || cellValue || '-'
+            );
+          },
+        };
+      }
+      return col;
+    }),
+  ],
+  checkboxConfig: {
+    reserve: true,
+    highlight: true,
+  },
   toolbarConfig: {
     export: canExport.value,
     refresh: true,
+    import: true,
+    search: true,
     slots: {
       buttons: 'toolbar-actions',
+    },
+  },
+  importConfig: {
+    remote: true,
+    importMethod: async ({ file }: { file: File }) => {
+      const { requestClient } = await import('#/api/request');
+      const XLSX = await import('xlsx');
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        // 1. 开启 cellDates 确保日期被解析为 Date 对象，避免序列号问题
+        const workbook = XLSX.read(arrayBuffer, {
+          type: 'array',
+          cellDates: true,
+        });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) {
+          message.warning(t('common.noData'));
+          return;
+        }
+        const worksheet = workbook.Sheets[sheetName]!;
+        const results = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        if (!results || results.length === 0) {
+          message.warning(t('common.noData'));
+          return;
+        }
+
+        // 2. 定义增强的映射逻辑（同义词 + 类型转换）
+        const fieldMap: Record<string, string[]> = {
+          customerName: ['客户名称', '客户', 'Customer'],
+          deliveryDate: ['交货日期', '计划交期', '交货时间', 'Delivery Date'],
+          division: ['事业部', '部门', 'Division'],
+          effectiveTime: [
+            '生效日期',
+            '合同生效日期',
+            '生效时间',
+            'Effective Date',
+          ],
+          projectName: ['项目名称', '项目', 'Project Name'],
+          quantity: ['数量', '工单数量', 'Quantity'],
+          status: ['状态', '工单状态', 'Status'],
+          workOrderNumber: ['工单号', '工单编号', 'Work Order Number'],
+        };
+
+        const statusValueMap: Record<string, string> = {
+          已取消: 'CANCELLED',
+          已完成: 'COMPLETED',
+          进行中: 'IN_PROGRESS',
+          处理中: 'IN_PROGRESS',
+          未开始: 'OPEN',
+          待处理: 'OPEN',
+        };
+
+        const mappedItems = results.map((row: any) => {
+          const item: Record<string, any> = {};
+
+          Object.keys(fieldMap).forEach((field) => {
+            const possibleHeaders = fieldMap[field]!;
+            const excelKey = Object.keys(row).find((k) =>
+              possibleHeaders.some(
+                (h) =>
+                  String(k).replaceAll(/\s+/g, '') ===
+                  String(h).replaceAll(/\s+/g, ''),
+              ),
+            );
+
+            if (excelKey !== undefined) {
+              let val = row[excelKey];
+
+              // 日期对象转 YYYY-MM-DD
+              if (val instanceof Date) {
+                const y = val.getFullYear();
+                const m = String(val.getMonth() + 1).padStart(2, '0');
+                const d = String(val.getDate()).padStart(2, '0');
+                val = `${y}-${m}-${d}`;
+              }
+
+              // 状态值转换
+              if (field === 'status' && typeof val === 'string') {
+                const mappedStatus = statusValueMap[val.trim()];
+                if (mappedStatus) val = mappedStatus;
+              }
+
+              item[field] = val;
+            }
+          });
+          return item;
+        });
+
+        // 3. 发送 JSON 数据
+        const res = await requestClient.post(
+          '/qms/work-order/import',
+          {
+            items: mappedItems,
+          },
+          { timeout: 120_000 },
+        );
+
+        if (res.successCount > 0) {
+          message.success(
+            t('common.importSuccessCount', { count: res.successCount }),
+          );
+          gridApi.reload();
+        } else {
+          message.error(t('common.importFailed'));
+        }
+      } catch (error: any) {
+        console.error('Import Error:', error);
+        message.error(t('common.importFailed'));
+      }
     },
   },
   exportConfig: {
@@ -257,13 +383,13 @@ const [Grid, gridApi] = useVbenVxeGrid({
         label: t('qms.workOrder.workOrderNumber'),
         component: 'Input',
         colProps: { span: 6 },
-      } as any,
+      },
       {
         fieldName: 'projectName',
         label: t('qms.workOrder.projectName'),
         component: 'Input',
         colProps: { span: 6 },
-      } as any,
+      },
       {
         fieldName: 'status',
         label: t('common.status'),
@@ -286,7 +412,7 @@ const [Grid, gridApi] = useVbenVxeGrid({
             },
           ],
         },
-      } as any,
+      },
     ],
     submitOnChange: true,
   },
@@ -323,6 +449,30 @@ function handleDelete(row: QmsWorkOrderApi.WorkOrderItem) {
       try {
         await deleteWorkOrder(row.id);
         message.success(t('common.deleteSuccess'));
+        handleSuccess();
+      } catch {
+        message.error(t('common.deleteFailed'));
+      }
+    },
+  });
+}
+
+function handleBatchDelete() {
+  const records = gridApi.grid.getCheckboxRecords();
+  if (records.length === 0) {
+    message.warning(t('common.pleaseSelectData'));
+    return;
+  }
+  Modal.confirm({
+    title: t('common.confirmBatchDelete'),
+    content: t('common.confirmBatchDeleteContent', { count: records.length }),
+    onOk: async () => {
+      try {
+        const ids = records.map((r: any) => r.id);
+        const res = await batchDeleteWorkOrders(ids);
+        message.success(
+          t('common.deleteSuccessCount', { count: res.successCount }),
+        );
         handleSuccess();
       } catch {
         message.error(t('common.deleteFailed'));
@@ -488,6 +638,15 @@ function handleDelete(row: QmsWorkOrderApi.WorkOrderItem) {
             <Button v-if="canCreate" type="primary" @click="handleAdd">
               <span class="i-lucide-plus mr-1"></span>
               {{ t('qms.workOrder.createWorkOrder') }}
+            </Button>
+            <Button
+              v-if="canDelete"
+              class="ml-2"
+              danger
+              @click="handleBatchDelete"
+            >
+              <span class="i-lucide-trash-2 mr-1"></span>
+              {{ t('common.batchDelete') }}
             </Button>
             <Button class="ml-2" @click="showDashboard = !showDashboard">
               <span

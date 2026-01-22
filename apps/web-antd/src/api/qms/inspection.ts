@@ -146,6 +146,16 @@ export async function deleteInspectionIssue(id: string) {
 }
 
 /**
+ * Batch delete inspection issues
+ */
+export async function batchDeleteInspectionIssues(ids: string[]) {
+  return requestClient.post<{ successCount: number }>(
+    QMS_API.INSPECTION_ISSUES_BATCH_DELETE,
+    { ids },
+  );
+}
+
+/**
  * Get Inspection Records
  */
 export async function getInspectionRecords(params?: {
@@ -186,4 +196,14 @@ export async function updateInspectionRecord(
 
 export async function deleteInspectionRecord(id: string) {
   return requestClient.delete(`${QMS_API.INSPECTION_RECORDS}/${id}`);
+}
+
+/**
+ * Batch delete inspection records
+ */
+export async function batchDeleteInspectionRecords(ids: string[]) {
+  return requestClient.post<{ successCount: number }>(
+    QMS_API.INSPECTION_RECORDS_BATCH_DELETE,
+    { ids },
+  );
 }
