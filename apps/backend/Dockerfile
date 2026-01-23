@@ -24,21 +24,24 @@ RUN pnpm run build --filter=@qgs/backend
 # 生产阶段
 FROM node:22-slim AS production
 
-# 生产环境运行也需要 OpenSSL
+# 安装 OpenSSL (Prisma 运行必需)
 RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 从 builder 阶段复制构建产物和已经生成的 node_modules
+# 1. 复制构建产物
 COPY --from=builder /app/apps/backend/.output /app/.output
 COPY --from=builder /app/apps/backend/prisma /app/prisma
-COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/apps/backend/package.json /app/package.json
+
+# 2. 关键修复：直接安装生产环境所需的 Prisma 二进制包，彻底解决 monorepo 软链接失效问题
+# 这样 npx prisma db seed 运行时就能在容器本地找到完整环境
+RUN npm install @prisma/client@6.2.1 prisma@6.2.1 --omit=dev
 
 EXPOSE 3000
 
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# 启动前自动同步数据库结构。加上 --skip-generate 跳过在容器运行时尝试 npm install 的行为
-CMD ["sh", "-c", "npx prisma@6.2.1 db push --accept-data-loss --skip-generate --schema=prisma/schema.prisma && node .output/server/index.mjs"]
+# 自动化序列：同步结构 -> 填充菜单数据 -> 启动服务
+CMD ["sh", "-c", "npx prisma@6.2.1 db push --accept-data-loss --skip-generate --schema=prisma/schema.prisma && npx prisma@6.2.1 db seed && node .output/server/index.mjs"]
