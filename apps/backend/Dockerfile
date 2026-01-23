@@ -40,5 +40,5 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# 启动前自动同步数据库结构。明确指定 @6.2.1 避免 npx 自动拉取不兼容的 v7 版本
-CMD ["sh", "-c", "npx prisma@6.2.1 db push --accept-data-loss --schema=prisma/schema.prisma && node .output/server/index.mjs"]
+# 启动前自动同步数据库结构。加上 --skip-generate 跳过在容器运行时尝试 npm install 的行为
+CMD ["sh", "-c", "npx prisma@6.2.1 db push --accept-data-loss --skip-generate --schema=prisma/schema.prisma && node .output/server/index.mjs"]
