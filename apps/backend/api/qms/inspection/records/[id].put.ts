@@ -1,7 +1,6 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { DETAILED_INSPECTIONS_LIST } from '~/utils/qms-data';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -18,19 +17,7 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody(event);
 
-  // 1. Check if it's a Detailed Mock Record (memory list - legacy compatibility)
-  const mockIndex = DETAILED_INSPECTIONS_LIST.findIndex((i) => i.id === id);
-  if (mockIndex !== -1) {
-    const updatedItem = {
-      ...DETAILED_INSPECTIONS_LIST[mockIndex],
-      ...body,
-      updatedAt: new Date().toISOString(),
-    };
-    DETAILED_INSPECTIONS_LIST[mockIndex] = updatedItem;
-    return useResponseSuccess(updatedItem);
-  }
-
-  // 2. Update database via Prisma
+  // 1. Update database via Prisma
   const dataUpdate: Record<string, unknown> = {};
 
   if (body.result) dataUpdate.result = body.result;

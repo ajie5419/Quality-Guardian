@@ -1,47 +1,91 @@
 import { eventHandler } from 'h3';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { MOCK_MENU_LIST } from '~/utils/mock-data';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
 
 /**
- * Recursively filter menus based on user permission codes
- * Excludes button-type items from the menu tree (they are for permission control only)
+ * 将平铺的菜单数据转换为树形结构
+ */
+function buildMenuTree(menus: any[], parentId: number = 0): any[] {
+  return menus
+    .filter((menu) => (menu.parentId || 0) === parentId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .map((menu) => {
+      const children = buildMenuTree(menus, menu.id);
+      const meta =
+        typeof menu.meta === 'string' ? JSON.parse(menu.meta) : menu.meta;
+
+      return {
+        ...menu,
+        meta,
+        children: children.length > 0 ? children : undefined,
+      };
+    });
+}
+
+/**
+ * 收集菜单及其所有子按钮的权限码
+ */
+function collectMenuAuthCodes(menu: any): string[] {
+  const codes: string[] = [];
+  if (menu.authCode) {
+    codes.push(menu.authCode);
+  }
+  if (menu.children) {
+    for (const child of menu.children) {
+      codes.push(...collectMenuAuthCodes(child));
+    }
+  }
+  return codes;
+}
+
+/**
+ * 检查用户是否有权限访问菜单
+ * 规则：用户拥有菜单本身的权限码 OR 菜单下任意子按钮的权限码
+ */
+function hasMenuAccess(menu: any, userCodesSet: Set<string>): boolean {
+  // 如果菜单本身没有权限码要求，直接通过
+  if (!menu.authCode && menu.type !== 'menu') {
+    return true;
+  }
+
+  // 收集该菜单及其所有子节点的权限码
+  const menuCodes = collectMenuAuthCodes(menu);
+
+  // 只要用户拥有其中任意一个权限码，就允许访问
+  return menuCodes.some((code) => userCodesSet.has(code));
+}
+
+/**
+ * 递归过滤菜单 (针对侧边栏显示)
  */
 function filterMenus(
   menus: any[],
-  userCodes: string[],
+  userCodesSet: Set<string>,
   skipAuthCheck = false,
 ): any[] {
-  const hasStar = userCodes.includes('*');
-
   return menus
     .filter((menu) => {
-      // 1. Skip button type - they should not appear in navigation menu
+      // 1. 过滤掉按钮类型 - 侧边栏不显示按钮
       if (menu.type === 'button') {
         return false;
       }
 
-      // 2. If it has an authCode, user must have it (unless skipAuthCheck or user has '*')
-      if (
-        !skipAuthCheck &&
-        !hasStar &&
-        menu.authCode &&
-        !userCodes.includes(menu.authCode)
-      ) {
+      // 2. 权限校验逻辑
+      if (!skipAuthCheck && !hasMenuAccess(menu, userCodesSet)) {
         return false;
       }
 
-      // 3. If it has children, filter them and see if any remain
+      // 3. 递归处理子级
       if (menu.children && menu.children.length > 0) {
         const visibleChildren = filterMenus(
           menu.children,
-          userCodes,
+          userCodesSet,
           skipAuthCheck,
         );
         menu.children = visibleChildren;
 
-        // If it's a catalog (folder) and has no visible children, hide the folder
+        // 如果是目录类型且没有任何可见的子页面，则该目录也应该隐藏
         if (menu.type === 'catalog' && visibleChildren.length === 0) {
           return false;
         }
@@ -58,84 +102,53 @@ export default eventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  // 1. Get fresh role information from database (not from token)
-  let roleNames: string[] = [];
+  // 1. 获取所有状态正常的菜单
+  const allDbMenus = await prisma.menus.findMany({
+    where: { status: 1 },
+    orderBy: { order: 'asc' },
+  });
+
+  // 2. 获取用户真实权限
+  let userPermissions: string[] = [];
+  let roleName = '';
+
+  const uid = userinfo.userId || userinfo.id;
 
   try {
-    // Find user in database
     const dbUser = await prisma.users.findFirst({
       where: {
-        OR: [{ id: String(userinfo.id) }, { username: userinfo.username }],
+        OR: [{ id: String(uid) }, { username: userinfo.username }],
+      },
+      include: {
+        roles: true,
       },
     });
 
-    if (dbUser && dbUser.roleId) {
-      // Fetch the role from database
-      const role = await prisma.roles.findFirst({
-        where: { id: dbUser.roleId },
-      });
-
-      if (role) {
-        roleNames = [role.name];
+    if (dbUser && dbUser.roles) {
+      roleName = dbUser.roles.name;
+      try {
+        userPermissions = JSON.parse(dbUser.roles.permissions || '[]');
+      } catch {
+        console.error('Permissions parse error');
       }
     }
   } catch (error) {
-    console.error('Failed to fetch user role from DB:', error);
+    console.error('Menu auth sync error:', error);
   }
 
-  // Fallback to token roles if DB lookup fails
-  if (roleNames.length === 0) {
-    roleNames = userinfo.roles || [];
-  }
+  // 3. 构建完整树
+  const fullMenuTree = buildMenuTree(allDbMenus);
 
-  // 2. Check for super admin - return all menus (but still filter out buttons)
-  // Check both 'super' and 'Super Admin' for compatibility
-  if (roleNames.includes('super') || roleNames.includes('Super Admin')) {
-    const fullMenuList = structuredClone(MOCK_MENU_LIST);
-    const filteredMenus = filterMenus(fullMenuList, [], true); // skipAuthCheck = true
-    return useResponseSuccess(filteredMenus);
-  }
+  // 4. 执行过滤
+  const isSuper =
+    roleName === 'super' ||
+    roleName === 'Super Admin' ||
+    userPermissions.includes('*');
 
-  // 3. Fetch all permission codes for these roles from DB
-  let userPermissions: string[] = [];
-  try {
-    const roleRecords = await prisma.roles.findMany({
-      where: {
-        OR: [
-          { id: { in: roleNames.map(String) } },
-          { name: { in: roleNames.map(String) } },
-        ],
-      },
-    });
+  // 将权限列表转为 Set 提高查询效率
+  const userCodesSet = new Set(userPermissions);
 
-    // Aggregate all permissions from all roles
-    userPermissions = [
-      ...new Set(
-        roleRecords.flatMap((role) => {
-          try {
-            // If permissions is stored as a JSON string, parse it
-            const perms =
-              typeof role.permissions === 'string'
-                ? JSON.parse(role.permissions)
-                : role.permissions;
-            return Array.isArray(perms) ? perms : [];
-          } catch (error) {
-            console.error(
-              `Failed to parse permissions for role ${role.id}`,
-              error,
-            );
-            return [];
-          }
-        }),
-      ),
-    ];
-  } catch (error) {
-    console.error('Failed to fetch role permissions from DB', error);
-  }
-
-  // 4. Dynamic Filtering: Use the full MOCK_MENU_LIST and filter by permissions
-  const fullMenuList = structuredClone(MOCK_MENU_LIST);
-  const filteredMenus = filterMenus(fullMenuList, userPermissions);
+  const filteredMenus = filterMenus(fullMenuTree, userCodesSet, isSuper);
 
   return useResponseSuccess(filteredMenus);
 });

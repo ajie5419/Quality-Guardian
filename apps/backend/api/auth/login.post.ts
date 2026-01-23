@@ -74,6 +74,12 @@ export default defineEventHandler(async (event) => {
     return forbiddenResponse(event, 'Username or password is incorrect.');
   }
 
+  // Security: Check user status
+  if (user.status !== 'ACTIVE') {
+    clearRefreshTokenCookie(event);
+    return forbiddenResponse(event, '账号已被禁用，请联系管理员。');
+  }
+
   const isValid = await bcrypt.compare(password, user.password);
 
   if (!isValid) {
@@ -103,8 +109,12 @@ export default defineEventHandler(async (event) => {
     deptName, // Include department name
   };
 
-  const accessToken = generateAccessToken(userPayload as unknown as UserInfo);
-  const refreshToken = generateRefreshToken(userPayload as unknown as UserInfo);
+  const accessToken = generateAccessToken(
+    userPayload as unknown as UserSession,
+  );
+  const refreshToken = generateRefreshToken(
+    userPayload as unknown as UserSession,
+  );
 
   setRefreshTokenCookie(event, refreshToken);
 

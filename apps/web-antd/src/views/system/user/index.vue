@@ -19,6 +19,7 @@ import {
   Select,
   SelectOption,
   TreeSelect,
+  Tooltip,
 } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
@@ -119,7 +120,16 @@ const gridOptions: VxeGridProps = {
       title: t('common.action'),
       width: 150,
       fixed: 'right',
-      slots: { default: 'action' },
+      cellRender: {
+        name: 'CellOperation',
+        props: {
+          options: ['edit', 'delete'],
+          onClick: ({ code, row }) => {
+            if (code === 'edit') handleEdit(row);
+            if (code === 'delete') handleDelete(row);
+          },
+        },
+      },
     },
   ],
   toolbarConfig: {
@@ -274,14 +284,6 @@ const canDelete = computed(
           >{{ t('common.enabled') }}</span
         >
         <span v-else class="text-red-500">{{ t('common.disabled') }}</span>
-      </template>
-      <template #action="{ row }">
-        <a v-if="canEdit" class="mr-2" @click="handleEdit(row)">{{
-          t('common.edit')
-        }}</a>
-        <a v-if="canDelete" class="text-red-500" @click="handleDelete(row)">{{
-          t('common.delete')
-        }}</a>
       </template>
     </Grid>
 

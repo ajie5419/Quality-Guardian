@@ -81,7 +81,7 @@ const yearOptions = computed(() => {
 });
 
 // 表格列配置
-const gridOptions: VxeGridProps = {
+const gridOptions = computed<VxeGridProps>(() => ({
   checkboxConfig: {
     reserve: true,
     highlight: true,
@@ -230,7 +230,29 @@ const gridOptions: VxeGridProps = {
       title: t('qms.afterSales.columns.action'),
       width: 150,
       fixed: 'right',
-      slots: { default: 'action' },
+      cellRender: {
+        name: 'CellOperation',
+        props: {
+          options: [
+            ...(canEdit.value ? ['edit'] : []),
+            ...(canSettle.value
+              ? [
+                  {
+                    code: 'settle',
+                    icon: 'lucide:book-check',
+                    title: t('qms.inspection.issues.settleToKnowledge'),
+                  },
+                ]
+              : []),
+            ...(canDelete.value ? ['delete'] : []),
+          ],
+          onClick: ({ code, row }: { code: string; row: any }) => {
+            if (code === 'edit') handleEdit(row);
+            if (code === 'delete') handleDelete(row);
+            if (code === 'settle') handleSettleToKnowledge(row);
+          },
+        },
+      },
     },
   ],
   toolbarConfig: {
@@ -340,7 +362,7 @@ const gridOptions: VxeGridProps = {
       },
     },
   },
-};
+}));
 
 const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions: gridOptions as any,
@@ -545,33 +567,6 @@ function handleModalSuccess() {
                 />
               </div>
             </div>
-          </template>
-          <template #action="{ row }">
-            <Button
-              v-if="canEdit"
-              type="link"
-              size="small"
-              @click="handleEdit(row)"
-            >
-              {{ t('common.edit') }}
-            </Button>
-            <Button
-              v-if="canSettle"
-              type="link"
-              size="small"
-              @click="handleSettleToKnowledge(row)"
-            >
-              {{ t('qms.inspection.issues.settleToKnowledge') }}
-            </Button>
-            <Button
-              v-if="canDelete"
-              type="link"
-              size="small"
-              danger
-              @click="handleDelete(row)"
-            >
-              {{ t('common.delete') }}
-            </Button>
           </template>
         </Grid>
       </div>

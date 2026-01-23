@@ -8,25 +8,33 @@ export default defineEventHandler(async (event) => {
   if (!userinfo) return unAuthorizedResponse(event);
 
   try {
-    const workOrders = await prisma.work_orders.findMany({
+    // 🛠️ 关键改进：从 bom_projects 表获取，实现“手动添加”逻辑
+    const projects = await prisma.bom_projects.findMany({
       where: { isDeleted: false },
-      include: { project_boms: true },
+      include: {
+        work_order: {
+          include: {
+            project_boms: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
-    const treeData = workOrders.map((wo) => {
-      // 将数据库状态映射为前端 Tab 可识别的状态
-      // COMPLETED/CLOSED 映射为 archived，其余为 active
-      const isArchived = ['CLOSED', 'COMPLETED'].includes(wo.status);
+    const treeData = projects.map((p) => {
+      const wo = p.work_order;
+      const isArchived =
+        ['CLOSED', 'COMPLETED'].includes(wo.status) || p.status === 'archived';
       const status = isArchived ? 'archived' : 'active';
 
       return {
-        id: wo.workOrderNumber,
+        id: p.id,
+        projectId: p.id,
         type: 'project',
-        name: wo.projectName || wo.workOrderNumber,
+        name: p.projectName || wo.projectName || wo.workOrderNumber,
         workOrderNumber: wo.workOrderNumber,
         itemCount: wo.project_boms.length,
-        status, // 关键：必须返回正确的 status 以供前端过滤
+        status,
         children: wo.project_boms.map((bom) => ({
           id: bom.id,
           type: 'item',
@@ -36,7 +44,7 @@ export default defineEventHandler(async (event) => {
           unit: bom.unit,
           material: bom.material,
           remarks: bom.remarks,
-          parentId: wo.workOrderNumber,
+          parentId: p.id,
         })),
       };
     });

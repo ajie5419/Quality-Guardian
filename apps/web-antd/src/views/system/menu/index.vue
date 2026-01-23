@@ -32,6 +32,23 @@ const isEditMode = ref(false);
 const currentId = ref<null | string>(null);
 const menuTreeData = ref<TreeSelectNode[]>([]);
 
+// Permission check helpers
+const canCreate = computed(
+  () =>
+    hasAccessByCodes(['System:Menu:Create']) ||
+    hasAccessByRoles(['super', 'admin']),
+);
+const canEdit = computed(
+  () =>
+    hasAccessByCodes(['System:Menu:Edit']) ||
+    hasAccessByRoles(['super', 'admin']),
+);
+const canDelete = computed(
+  () =>
+    hasAccessByCodes(['System:Menu:Delete']) ||
+    hasAccessByRoles(['super', 'admin']),
+);
+
 const formState = reactive({
   pid: '0',
   name: '',
@@ -60,7 +77,7 @@ async function loadMenuTree(excludeId?: string) {
 
 onMounted(() => loadMenuTree());
 
-const gridOptions: VxeGridProps = {
+const gridOptions = computed<VxeGridProps>(() => ({
   columns: [
     {
       field: 'meta.title',
@@ -77,7 +94,29 @@ const gridOptions: VxeGridProps = {
       title: t('common.action'),
       width: 200,
       fixed: 'right',
-      slots: { default: 'action' },
+      cellRender: {
+        name: 'CellOperation',
+        props: {
+          options: [
+            ...(canCreate.value
+              ? [
+                  {
+                    code: 'addChild',
+                    icon: 'lucide:list-plus',
+                    title: t('sys.menu.addChildMenu'),
+                  },
+                ]
+              : []),
+            'edit',
+            'delete',
+          ],
+          onClick: ({ code, row }) => {
+            if (code === 'edit') handleEdit(row);
+            if (code === 'delete') handleDelete(row);
+            if (code === 'addChild') handleAddChild(row);
+          },
+        },
+      },
     },
   ],
   toolbarConfig: {
@@ -109,9 +148,9 @@ const gridOptions: VxeGridProps = {
       },
     },
   },
-};
+}));
 
-const [Grid, gridApi] = useVbenVxeGrid({ gridOptions });
+const [Grid, gridApi] = useVbenVxeGrid({ gridOptions: gridOptions as any });
 
 function handleOpenModal(parentId?: string) {
   isEditMode.value = false;
@@ -198,22 +237,6 @@ async function handleSubmit() {
   }
 }
 
-// Permission check helpers
-const canCreate = computed(
-  () =>
-    hasAccessByCodes(['System:Menu:Create']) ||
-    hasAccessByRoles(['super', 'admin']),
-);
-const canEdit = computed(
-  () =>
-    hasAccessByCodes(['System:Menu:Edit']) ||
-    hasAccessByRoles(['super', 'admin']),
-);
-const canDelete = computed(
-  () =>
-    hasAccessByCodes(['System:Menu:Delete']) ||
-    hasAccessByRoles(['super', 'admin']),
-);
 </script>
 
 <template>
@@ -223,22 +246,7 @@ const canDelete = computed(
         {{ t('sys.menu.addMenu') }}
       </Button>
     </template>
-    <Grid>
-      <template #action="{ row }">
-        <a
-          v-if="canCreate"
-          class="mr-2 text-blue-500"
-          @click="handleAddChild(row)"
-          >{{ t('sys.menu.addChildMenu') }}</a
-        >
-        <a v-if="canEdit" class="mr-2" @click="handleEdit(row)">{{
-          t('common.edit')
-        }}</a>
-        <a v-if="canDelete" class="text-red-500" @click="handleDelete(row)">{{
-          t('common.delete')
-        }}</a>
-      </template>
-    </Grid>
+    <Grid />
 
     <Modal
       v-model:open="isModalVisible"

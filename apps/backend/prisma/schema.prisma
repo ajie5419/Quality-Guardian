@@ -7,6 +7,37 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model menus {
+  id        Int      @id
+  path      String?
+  name      String?  @unique
+  component String?
+  redirect  String?
+  meta      String?  @db.Text
+  createdAt DateTime @default(now())
+  status    Int      @default(1)
+  type      String   @default("menu")
+  updatedAt DateTime @updatedAt
+  authCode  String?
+  order     Int      @default(0)
+  parentId  Int?     @default(0)
+
+  @@index([parentId])
+}
+
+model reports {
+  id               String   @id @default(cuid())
+  date             DateTime
+  totalInspections Int      @default(0)
+  passRate         Float    @default(0)
+  majorDefects     Int      @default(0)
+  minorDefects     Int      @default(0)
+  status           String   @default("Draft")
+  author           String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 model after_sales {
   id                  String                  @id
   serialNumber        Int
@@ -94,19 +125,18 @@ model departments {
 }
 
 model dfmea_projects {
-  id              String       @id @default(cuid())
+  id              String                @id @default(cuid())
   projectName     String
   workOrderId     String?
-  version         String       @default("V1.0")
-  status          String       @default("draft") // draft, active, archived
-  description     String?      @db.Text
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  createdBy       String       @default("admin")
-  isDeleted       Boolean      @default(false)
-  
+  version         String                @default("V1.0")
+  status          String                @default("draft")
+  description     String?               @db.Text
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  createdBy       String                @default("admin")
+  isDeleted       Boolean               @default(false)
   items           dfmea[]
-  work_orders     work_orders? @relation(fields: [workOrderId], references: [workOrderNumber])
+  work_orders     work_orders?          @relation(fields: [workOrderId], references: [workOrderNumber])
   task_dispatches qms_task_dispatches[]
 
   @@index([workOrderId])
@@ -115,29 +145,28 @@ model dfmea_projects {
 }
 
 model dfmea {
-  id                String       @id @default(cuid())
+  id                String         @id @default(cuid())
   serialNumber      Int?
-  projectId         String
   item              String
   failureMode       String
-  effect            String?      @db.Text
+  effect            String?        @db.Text
   severity          Int
-  cause             String?      @db.Text
+  cause             String?        @db.Text
   occurrence        Int
   detection         Int
   rpn               Int
-  preventionControl String?      @db.Text
-  detectionControl  String?      @db.Text
-  recommendedAction String?      @db.Text
-  status            dfmea_status @default(OPEN)
+  preventionControl String?        @db.Text
+  detectionControl  String?        @db.Text
+  recommendedAction String?        @db.Text
+  status            dfmea_status   @default(OPEN)
   responsibility    String?
   targetDate        DateTime?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  version           Int          @default(1)
-  isDeleted         Boolean      @default(false)
-  order             Int          @default(0)
-  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  version           Int            @default(1)
+  isDeleted         Boolean        @default(false)
+  order             Int            @default(0)
+  projectId         String
   dfmea_projects    dfmea_projects @relation(fields: [projectId], references: [id])
 
   @@index([projectId])
@@ -224,12 +253,34 @@ model project_boms {
   @@index([work_order_number])
 }
 
+model bom_projects {
+  id              String      @id @default(cuid())
+  workOrderNumber String      @unique
+  projectName     String
+  status          String      @default("active")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  isDeleted       Boolean     @default(false)
+  work_order      work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber])
+}
+
+model doc_projects {
+  id              String      @id @default(cuid())
+  workOrderNumber String      @unique
+  projectName     String
+  status          String      @default("active")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  isDeleted       Boolean     @default(false)
+  work_order      work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber])
+}
+
 model quality_plans {
   id              String                   @id
   projectName     String
   customer        String
   documents       String?                  @db.LongText
-  itpItems        String?                  @db.LongText // 弃用，迁移至 itp_items
+  itpItems        String?                  @db.LongText
   planStatus      quality_plans_planStatus @default(DRAFT)
   preparedBy      String?
   createdAt       DateTime                 @default(now())
@@ -237,12 +288,10 @@ model quality_plans {
   version         Int                      @default(1)
   isDeleted       Boolean                  @default(false)
   workOrderNumber String
-  
-  items           itp_items[]              @relation("PlanToItems")
-  
   inspections     inspections[]
-  work_orders     work_orders              @relation(fields: [workOrderNumber], references: [workOrderNumber])
+  items           itp_items[]              @relation("PlanToItems")
   task_dispatches qms_task_dispatches[]
+  work_orders     work_orders              @relation(fields: [workOrderNumber], references: [workOrderNumber])
 
   @@index([planStatus])
   @@index([workOrderNumber])
@@ -259,12 +308,11 @@ model itp_items {
   frequency          String?
   verifyingDocument  String?
   isQuantitative     Boolean       @default(false)
-  quantitativeItems  String?       @db.LongText // 存储定量指标明细 JSON
+  quantitativeItems  String?       @db.LongText
   order              Int           @default(0)
   isDeleted          Boolean       @default(false)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
-
   quality_plan       quality_plans @relation("PlanToItems", fields: [projectId], references: [id])
 
   @@index([projectId])
@@ -363,26 +411,26 @@ model standard_documents {
 }
 
 model suppliers {
-  id                    String   @id @default(cuid())
-  category              String?
-  name                  String   @unique
-  productName           String?
-  brand                 String?
-  origin                String?
-  project               String?
-  buyer                 String?
-  score2025             Float?
-  qualityScore          Float    @default(100.0)
-  status                String   @default("Qualified") // Qualified, Trial, Registered, Frozen
-  rating                String   @default("A") // A, B, C, D
-  contact               String?
-  phone                 String?
-  email                 String?
-  address               String?
-  isDeleted             Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  version               Int      @default(1)
+  id           String   @id @default(cuid())
+  category     String?
+  name         String   @unique
+  productName  String?
+  brand        String?
+  origin       String?
+  project      String?
+  buyer        String?
+  score2025    Float?
+  contact      String?
+  phone        String?
+  email        String?
+  address      String?
+  isDeleted    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  version      Int      @default(1)
+  qualityScore Float    @default(100)
+  rating       String   @default("A")
+  status       String   @default("Qualified")
 
   @@index([status])
 }
@@ -395,26 +443,26 @@ model system_settings {
 }
 
 model users {
-  id                                                String            @id
-  username                                          String            @unique
+  id                                                String                @id
+  username                                          String                @unique
   password                                          String
   email                                             String?
   realName                                          String?
   phone                                             String?
   roleId                                            String
   department                                        String
-  status                                            users_status      @default(ACTIVE)
-  isDeleted                                         Boolean           @default(false)
-  createdAt                                         DateTime          @default(now())
-  updatedAt                                         DateTime          @updatedAt
-  version                                           Int               @default(1)
+  status                                            users_status          @default(ACTIVE)
+  isDeleted                                         Boolean               @default(false)
+  createdAt                                         DateTime              @default(now())
+  updatedAt                                         DateTime              @updatedAt
+  version                                           Int                   @default(1)
   audit_logs                                        audit_logs[]
   inspections                                       inspections[]
-  quality_records_quality_records_inspectorTousers  quality_records[] @relation("quality_records_inspectorTousers")
-  quality_records_quality_records_lastEditorTousers quality_records[] @relation("quality_records_lastEditorTousers")
-  qms_task_dispatches_assignor                     qms_task_dispatches[] @relation("qms_task_dispatches_assignorIdTousers")
-  qms_task_dispatches_assignee                     qms_task_dispatches[] @relation("qms_task_dispatches_assigneeIdTousers")
-  roles                                             roles             @relation(fields: [roleId], references: [id])
+  qms_task_dispatches_assignee                      qms_task_dispatches[] @relation("qms_task_dispatches_assigneeIdTousers")
+  qms_task_dispatches_assignor                      qms_task_dispatches[] @relation("qms_task_dispatches_assignorIdTousers")
+  quality_records_quality_records_inspectorTousers  quality_records[]     @relation("quality_records_inspectorTousers")
+  quality_records_quality_records_lastEditorTousers quality_records[]     @relation("quality_records_lastEditorTousers")
+  roles                                             roles                 @relation(fields: [roleId], references: [id])
 
   @@index([roleId], map: "users_roleId_fkey")
 }
@@ -426,18 +474,20 @@ model work_orders {
   division        String?
   quantity        Int
   deliveryDate    DateTime
-  effectiveTime   DateTime?
   status          work_orders_status @default(OPEN)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   version         Int                @default(1)
   isDeleted       Boolean            @default(false)
+  effectiveTime   DateTime?
   after_sales     after_sales[]
+  bom_projects    bom_projects?
   dfmea_projects  dfmea_projects[]
+  doc_projects    doc_projects?
   inspections     inspections[]
+  project_boms    project_boms[]
   quality_plans   quality_plans[]
   quality_records quality_records[]
-  project_boms    project_boms[]
 
   @@index([customerName])
   @@index([deliveryDate])
@@ -445,26 +495,30 @@ model work_orders {
 }
 
 model qms_task_dispatches {
-  id           String             @id
-  title        String
-  type         String
-  status       String             @default("PENDING")
-  priority     Int                @default(3)
-  level        Int                @default(1)
-  assignorId   String
-  assigneeId   String
-  itpProjectId String?
-  dfmeaId      String?
-  dueDate      DateTime?
-  parentId     String?
-  content      String?            @db.Text
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  
-  users_qms_task_dispatches_assignorIdTousers users @relation("qms_task_dispatches_assignorIdTousers", fields: [assignorId], references: [id])
-  users_qms_task_dispatches_assigneeIdTousers users @relation("qms_task_dispatches_assigneeIdTousers", fields: [assigneeId], references: [id])
-  itp_project quality_plans?      @relation(fields: [itpProjectId], references: [id])
-  dfmea_project dfmea_projects?   @relation(fields: [dfmeaId], references: [id])
+  id                                          String          @id
+  type                                        String
+  title                                       String
+  level                                       Int             @default(1)
+  itpProjectId                                String?
+  dfmeaId                                     String?
+  assignorId                                  String
+  assigneeId                                  String
+  status                                      String          @default("PENDING")
+  priority                                    Int             @default(3)
+  createdAt                                   DateTime        @default(now())
+  updatedAt                                   DateTime        @updatedAt
+  dueDate                                     DateTime?
+  content                                     String?         @db.Text
+  parentId                                    String?
+  users_qms_task_dispatches_assigneeIdTousers users           @relation("qms_task_dispatches_assigneeIdTousers", fields: [assigneeId], references: [id])
+  users_qms_task_dispatches_assignorIdTousers users           @relation("qms_task_dispatches_assignorIdTousers", fields: [assignorId], references: [id])
+  dfmea_project                               dfmea_projects? @relation(fields: [dfmeaId], references: [id])
+  itp_project                                 quality_plans?  @relation(fields: [itpProjectId], references: [id])
+
+  @@index([assigneeId])
+  @@index([assignorId], map: "qms_task_dispatches_assignorId_fkey")
+  @@index([dfmeaId], map: "qms_task_dispatches_dfmeaId_fkey")
+  @@index([itpProjectId], map: "qms_task_dispatches_itpProjectId_fkey")
 }
 
 model quality_losses {
@@ -495,22 +549,22 @@ model knowledge_categories {
 }
 
 model knowledge_base {
-  id           String                @id @default(cuid())
-  docId        String?               @unique
-  title        String
-  summary      String?               @db.Text
-  content      String?               @db.LongText
-  categoryId   String?
-  category     knowledge_categories? @relation(fields: [categoryId], references: [id])
-  author       String?
-  publishDate  DateTime?
-  tags         String?               @db.Text
-  attachment   String?               @db.LongText
-  status       String?               @default("Published")
-  version      String?               @default("V1.0")
-  isDeleted    Boolean               @default(false)
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
+  id          String                @id @default(cuid())
+  title       String
+  summary     String?               @db.Text
+  content     String?               @db.LongText
+  categoryId  String?
+  publishDate DateTime?
+  tags        String?               @db.Text
+  attachment  String?               @db.LongText
+  isDeleted   Boolean               @default(false)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  author      String?
+  docId       String?               @unique
+  status      String?               @default("Published")
+  version     String?               @default("V1.0")
+  category    knowledge_categories? @relation(fields: [categoryId], references: [id])
 
   @@index([categoryId])
 }
@@ -614,21 +668,4 @@ enum quality_records_claimStatus {
   COMPLETED
   CLOSED
   CANCELLED
-}
-
-model menus {
-  id        String   @id @default(cuid())
-  pid       String   @default("0")
-  path      String?
-  name      String?
-  component String?
-  redirect  String?
-  meta      String?  @db.Text
-  icon      String?
-  type      String?  @default("menu")
-  sort      Int      @default(0)
-  status    Int      @default(1)
-  isDeleted Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }

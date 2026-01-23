@@ -32,6 +32,8 @@ const { hasAccessByCodes } = useAccess();
 const { invalidateQualityLoss } = useInvalidateQmsQueries();
 
 const canExport = computed(() => hasAccessByCodes(['QMS:LossAnalysis:Export']));
+const canEdit = computed(() => hasAccessByCodes(['QMS:LossAnalysis:Edit']));
+const canDelete = computed(() => hasAccessByCodes(['QMS:LossAnalysis:Delete']));
 
 // ================= 状态管理 =================
 const allLossData = ref<QmsQualityLossApi.QualityLossItem[]>([]);
@@ -108,7 +110,19 @@ const gridOptions = computed<VxeGridProps>(() => ({
       title: t('common.action'),
       width: 130,
       fixed: 'right',
-      slots: { default: 'action' },
+      cellRender: {
+        name: 'CellOperation',
+        props: {
+          options: [
+            ...(canEdit.value ? ['edit'] : []),
+            ...(canDelete.value ? ['delete'] : []),
+          ],
+          onClick: ({ code, row }: { code: string; row: any }) => {
+            if (code === 'edit') handleEdit(row);
+            if (code === 'delete') handleDelete(row);
+          },
+        },
+      },
     },
   ],
   proxyConfig: {
@@ -227,27 +241,6 @@ function getStatusConfig(s: string) {
               @click="handleOpenModal"
             >
               新增损失录入
-            </Button>
-          </template>
-
-          <!-- 操作列 -->
-          <template #action="{ row }">
-            <Button
-              v-access:code="'QMS:LossAnalysis:Edit'"
-              type="link"
-              size="small"
-              @click="handleEdit(row)"
-            >
-              {{ t('common.edit') }}
-            </Button>
-            <Button
-              v-access:code="'QMS:LossAnalysis:Delete'"
-              type="link"
-              size="small"
-              danger
-              @click="handleDelete(row)"
-            >
-              {{ t('common.delete') }}
             </Button>
           </template>
         </Grid>

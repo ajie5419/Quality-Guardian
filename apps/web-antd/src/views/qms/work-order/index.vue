@@ -204,6 +204,25 @@ const gridOptions = computed<VxeGridProps>(() => ({
           },
         };
       }
+      if (col.slots?.default === 'action') {
+        return {
+          ...col,
+          slots: undefined,
+          cellRender: {
+            name: 'CellOperation',
+            props: {
+              options: [
+                ...(canEdit.value ? ['edit'] : []),
+                ...(canDelete.value ? ['delete'] : []),
+              ],
+              onClick: ({ code, row }: { code: string; row: any }) => {
+                if (code === 'edit') handleEdit(row);
+                if (code === 'delete') handleDelete(row);
+              },
+            },
+          },
+        };
+      }
       return col;
     }),
   ],
@@ -681,26 +700,6 @@ function handleBatchDelete() {
                   : row.status
               }}
             </Tag>
-          </template>
-
-          <template #action="{ row }">
-            <Button
-              v-if="canEdit"
-              type="link"
-              size="small"
-              @click="handleEdit(row)"
-            >
-              {{ t('common.edit') }}
-            </Button>
-            <Button
-              v-if="canDelete"
-              type="link"
-              size="small"
-              danger
-              @click="handleDelete(row)"
-            >
-              {{ t('common.delete') }}
-            </Button>
           </template>
         </Grid>
       </Card>

@@ -5,6 +5,7 @@ import type { SystemUserApi } from '#/api/system/user';
 
 import { computed, nextTick, onMounted, ref } from 'vue';
 
+import { IconifyIcon } from '@vben/icons';
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
@@ -18,6 +19,7 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
 } from 'ant-design-vue';
 
 import { ProjectStatusEnum } from '#/api/qms/enums';
@@ -355,21 +357,25 @@ onMounted(async () => {
                 </template>
                 <template v-if="column.key === 'action'">
                   <Space>
-                    <Button
-                      v-if="canEdit"
-                      type="link"
-                      size="small"
-                      @click="openItemModal('edit', record as any)"
-                      >{{ t('common.edit') }}</Button
-                    >
-                    <Button
-                      v-if="canDelete"
-                      type="link"
-                      size="small"
-                      danger
-                      @click="handleDeleteItem(record as any)"
-                      >{{ t('common.delete') }}</Button
-                    >
+                    <Tooltip v-if="canEdit" :title="t('common.edit')">
+                      <Button
+                        type="link"
+                        size="small"
+                        @click="openItemModal('edit', record as any)"
+                      >
+                        <IconifyIcon icon="lucide:edit" class="size-4" />
+                      </Button>
+                    </Tooltip>
+                    <Tooltip v-if="canDelete" :title="t('common.delete')">
+                      <Button
+                        type="link"
+                        size="small"
+                        danger
+                        @click="handleDeleteItem(record as any)"
+                      >
+                        <IconifyIcon icon="lucide:trash-2" class="size-4" />
+                      </Button>
+                    </Tooltip>
                   </Space>
                 </template>
               </template>

@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event);
 
   try {
-    const updated = await prisma.bom_projects.update({
+    const updated = await prisma.doc_projects.update({
       where: { id },
       data: {
         status: body.status,

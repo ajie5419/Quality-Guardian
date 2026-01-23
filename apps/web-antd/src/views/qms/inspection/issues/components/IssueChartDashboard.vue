@@ -3,8 +3,9 @@ import type { InspectionIssue } from '../types';
 
 import type { ChartConfig } from '#/components/Qms/ChartBuilder/types';
 
-import { onUnmounted, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 
+import { useAccess } from '@vben/access';
 import { useI18n } from '@vben/locales';
 
 import { useStorage } from '@vueuse/core';
@@ -29,6 +30,11 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
+
+const canAdd = computed(() => hasAccessByCodes(['QMS:Inspection:Issues:ChartAdd']));
+const canEdit = computed(() => hasAccessByCodes(['QMS:Inspection:Issues:ChartEdit']));
+const canDelete = computed(() => hasAccessByCodes(['QMS:Inspection:Issues:ChartDelete']));
 
 const loading = ref(false);
 const fullDataList = ref<InspectionIssue[]>([]);
@@ -207,7 +213,7 @@ watch(
 <template>
   <div class="mb-4 flex flex-col gap-4">
     <div class="flex items-center justify-end border-b pb-2">
-      <Button type="dashed" size="small" @click="handleAddCustomChart">
+      <Button v-if="canAdd" type="dashed" size="small" @click="handleAddCustomChart">
         <span class="i-lucide-plus mr-1"></span>{{ t('common.create') }}
       </Button>
     </div>
@@ -242,6 +248,7 @@ watch(
           <template #extra>
             <div class="flex gap-2">
               <Button
+                v-if="canEdit"
                 type="link"
                 size="small"
                 @click="handleEditCustomChart(chart)"
@@ -249,6 +256,7 @@ watch(
                 {{ t('common.edit') }}
               </Button>
               <Button
+                v-if="canDelete"
                 type="link"
                 danger
                 size="small"

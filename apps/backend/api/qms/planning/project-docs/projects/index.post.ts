@@ -19,7 +19,6 @@ export default defineEventHandler(async (event) => {
       return useResponseError('工单号不能为空');
     }
 
-    // 检查工单是否存在
     const wo = await prisma.work_orders.findUnique({
       where: { workOrderNumber },
     });
@@ -28,25 +27,22 @@ export default defineEventHandler(async (event) => {
       return useResponseError('工单不存在');
     }
 
-    // 检查是否已在 BOM 策划中
-    const existing = await prisma.bom_projects.findUnique({
+    const existing = await prisma.doc_projects.findUnique({
       where: { workOrderNumber },
     });
 
     if (existing) {
       if (existing.isDeleted) {
-        // 恢复
-        const updated = await prisma.bom_projects.update({
+        await prisma.doc_projects.update({
           where: { id: existing.id },
           data: { isDeleted: false, updatedAt: new Date() },
         });
-        return useResponseSuccess(updated);
+        return useResponseSuccess(existing);
       }
-      return useResponseError('该工单已在 BOM 策划列表中');
+      return useResponseError('该工单已在项目资料列表中');
     }
 
-    // 创建 BOM 项目
-    const newProject = await prisma.bom_projects.create({
+    const newProject = await prisma.doc_projects.create({
       data: {
         workOrderNumber,
         projectName: wo.projectName || workOrderNumber,
@@ -56,7 +52,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newProject);
   } catch (error) {
-    console.error('Create BOM project error:', error);
-    return useResponseError('添加 BOM 项目失败');
+    console.error('Create Doc project error:', error);
+    return useResponseError('添加项目资料失败');
   }
 });

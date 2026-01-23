@@ -1,22 +1,38 @@
-import { defineEventHandler, readBody } from 'h3';
-
-import { MOCK_DELAY, REPORTS_LIST } from '../../../utils';
+import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import prisma from '~/utils/prisma';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
-  const id = event.context.params?.id;
-  if (!id) {
-    return { code: -1, message: 'id required' };
-  }
+  const id = getRouterParam(event, 'id');
+  if (!id) return useResponseError('id required');
+
   const body = await readBody(event);
-  const index = REPORTS_LIST.findIndex((item) => item.id === id);
-  if (index !== -1) {
-    REPORTS_LIST[index] = { ...REPORTS_LIST[index], ...body };
-    return {
-      code: 0,
-      data: REPORTS_LIST[index],
-      message: 'updated',
-    };
+
+  try {
+    const dataUpdate: any = {};
+    if (body.status) dataUpdate.status = body.status;
+    if (body.totalInspections !== undefined)
+      dataUpdate.totalInspections = Number(body.totalInspections);
+    if (body.passRate !== undefined)
+      dataUpdate.passRate = Number(body.passRate);
+    if (body.majorDefects !== undefined)
+      dataUpdate.majorDefects = Number(body.majorDefects);
+    if (body.minorDefects !== undefined)
+      dataUpdate.minorDefects = Number(body.minorDefects);
+    if (body.date) dataUpdate.date = new Date(body.date);
+    if (body.author) dataUpdate.author = body.author;
+
+    const updated = await prisma.reports.update({
+      where: { id },
+      data: dataUpdate,
+    });
+
+    return useResponseSuccess({
+      ...updated,
+      date: updated.date.toISOString().split('T')[0],
+    });
+  } catch (error) {
+    console.error('Update report failed:', error);
+    return useResponseError(`Update failed: ${error.message}`);
   }
-  return { code: -1, message: 'not found' };
 });

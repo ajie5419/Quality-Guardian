@@ -1,7 +1,6 @@
 import { defineEventHandler, getRouterParam } from 'h3';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { DETAILED_INSPECTIONS_LIST } from '~/utils/qms-data';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -17,14 +16,7 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id');
   if (!id) return useResponseError('id required');
 
-  // 1. Check if it's in Detailed Mock List
-  const mockIndex = DETAILED_INSPECTIONS_LIST.findIndex((i) => i.id === id);
-  if (mockIndex !== -1) {
-    DETAILED_INSPECTIONS_LIST.splice(mockIndex, 1);
-    return useResponseSuccess({ message: 'Deleted from mock' });
-  }
-
-  // 2. Otherwise, update database via Prisma
+  // 1. Update database via Prisma
   try {
     await prisma.inspections.update({
       where: { id },

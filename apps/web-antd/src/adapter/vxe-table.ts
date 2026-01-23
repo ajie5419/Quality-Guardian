@@ -5,12 +5,13 @@ import type {
 
 import { h } from 'vue';
 
+import { IconifyIcon } from '@vben/icons';
 import {
   useVbenVxeGrid as _useVbenVxeGrid,
   setupVbenVxeTable,
 } from '@vben/plugins/vxe-table';
 
-import { Button, Image } from 'ant-design-vue';
+import { Button, Image, Tooltip } from 'ant-design-vue';
 import ExcelJS from 'exceljs';
 import VXETable from 'vxe-table';
 import VXETablePluginExportXLSX from 'vxe-table-plugin-export-xlsx';
@@ -88,6 +89,72 @@ setupVbenVxeTable({
           { size: 'small', type: 'link' },
           { default: () => props?.text },
         );
+      },
+    });
+
+    // 注册 CellOperation 渲染器
+    vxeUI.renderer.add('CellOperation', {
+      renderTableDefault(renderOpts, params) {
+        const { props } = renderOpts;
+        const { row } = params;
+        const { options = [], onClick } = props || {};
+        const buttons = [];
+
+        // 预设配置
+        const presets: Record<string, any> = {
+          edit: {
+            text: '编辑',
+            icon: 'lucide:edit',
+            code: 'edit',
+            title: '编辑',
+          },
+          delete: {
+            text: '删除',
+            icon: 'lucide:trash-2',
+            danger: true,
+            code: 'delete',
+            title: '删除',
+          },
+        };
+
+        for (const item of options) {
+          let opt = item;
+          // 如果是字符串，使用预设
+          if (typeof item === 'string') {
+            opt = presets[item] || { text: item, code: item };
+          }
+
+          // 创建按钮内容（图标）
+          const content: any[] = [];
+          if (opt.icon) {
+            content.push(h(IconifyIcon, { class: 'size-4', icon: opt.icon }));
+          } else {
+            content.push(opt.text);
+          }
+
+          // 按钮属性
+          const btnProps: any = {
+            danger: opt.danger,
+            onClick: () => {
+              if (onClick) {
+                onClick({ code: opt.code, row });
+              }
+            },
+            size: 'small',
+            type: 'link',
+          };
+
+          // 包装 Tooltip
+          const btn = h(Button, btnProps, { default: () => content });
+          
+          if (opt.title) {
+            buttons.push(h(Tooltip, { title: opt.title }, { default: () => btn }));
+          } else {
+            buttons.push(btn);
+          }
+        }
+        
+        return buttons;
       },
     });
 

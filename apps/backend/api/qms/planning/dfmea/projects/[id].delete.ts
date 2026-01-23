@@ -1,32 +1,28 @@
 import { defineEventHandler, getRouterParam } from 'h3';
-import { MOCK_DELAY } from '~/utils/index';
-import { DFMEA_LIST, DFMEA_PROJECTS_LIST } from '~/utils/qms-data';
+import prisma from '~/utils/prisma';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
   const id = getRouterParam(event, 'id');
+  if (!id) return useResponseError('id required');
 
-  const projectIndex = DFMEA_PROJECTS_LIST.findIndex((p) => p.id === id);
-  if (projectIndex === -1) {
-    throw createError({
-      statusCode: 404,
-      statusMessage: 'Project not found',
-    });
+  try {
+    // 使用 Prisma 事务或级联删除（如果配置了）
+    // 这里我们手动将项目及其关联条目标记为已删除
+    await prisma.$transaction([
+      prisma.dfmea.updateMany({
+        where: { projectId: id },
+        data: { isDeleted: true },
+      }),
+      prisma.dfmea_projects.update({
+        where: { id },
+        data: { isDeleted: true },
+      }),
+    ]);
+
+    return useResponseSuccess({ message: 'Deleted' });
+  } catch (error) {
+    console.error('Delete DFMEA project failed:', error);
+    return useResponseError(`Delete failed: ${error.message}`);
   }
-
-  // 删除项目及其所有关联的 DFMEA 条目
-  DFMEA_PROJECTS_LIST.splice(projectIndex, 1);
-  const itemIndices = DFMEA_LIST.filter((item) => item.projectId === id);
-  itemIndices.forEach((item) => {
-    const idx = DFMEA_LIST.indexOf(item);
-    if (idx !== -1) {
-      DFMEA_LIST.splice(idx, 1);
-    }
-  });
-
-  return {
-    code: 0,
-    data: null,
-    message: 'ok',
-  };
 });

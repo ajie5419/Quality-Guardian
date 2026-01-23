@@ -10,14 +10,11 @@ export default eventHandler(async (event) => {
   }
 
   const userId = userinfo.userId || userinfo.id;
-
   if (!userId) {
     return useResponseSuccess([]);
   }
 
-  // Fetch user and role-based permissions from Database (fresh data, not from token)
   try {
-    // First find the user to get their current roleId
     const user = await prisma.users.findFirst({
       where: {
         OR: [{ id: String(userId) }, { username: userinfo.username }],
@@ -28,7 +25,6 @@ export default eventHandler(async (event) => {
       return useResponseSuccess([]);
     }
 
-    // Fetch the role with its permissions
     const role = await prisma.roles.findFirst({
       where: { id: user.roleId },
     });
@@ -37,23 +33,30 @@ export default eventHandler(async (event) => {
       return useResponseSuccess([]);
     }
 
-    // Check for super admin role or '*' permission
+    // 解析角色中存储的权限列表（即您在 UI 权限树勾选的结果）
     let codes: string[] = [];
     try {
-      codes = JSON.parse(role.permissions);
-    } catch (error) {
-      console.error('Failed to parse permissions:', error);
+      codes = JSON.parse(role.permissions || '[]');
+    } catch {
+      codes = [];
     }
 
-    if (
-      role.name === 'super' ||
-      role.name === 'Super Admin' ||
-      codes.includes('*')
-    ) {
-      // Return all permissions
-      const { MOCK_CODES } = await import('~/utils/mock-data');
-      const superCodes = MOCK_CODES.find((c) => c.username === 'vben');
-      return useResponseSuccess(superCodes?.codes || []);
+    // 🔴 关键修复：让超级管理员也遵循勾选逻辑
+    // 如果 codes 数组不为空，说明管理员已经在 UI 上进行了显式分配，我们直接返回勾选的列表
+    if (codes.length > 0) {
+      return useResponseSuccess(codes);
+    }
+
+    // 只有在权限列表完全为空，且是超级管理员时，才执行全量下发（兜底逻辑）
+    if (role.name === 'super' || role.name === 'Super Admin') {
+      const allMenus = await prisma.menus.findMany({
+        where: { authCode: { not: null }, status: 1 },
+        select: { authCode: true },
+      });
+      const allSystemCodes = [
+        ...new Set(allMenus.map((m) => m.authCode as string)),
+      ];
+      return useResponseSuccess(allSystemCodes);
     }
 
     return useResponseSuccess(codes);

@@ -20,6 +20,7 @@ export default eventHandler(async (event) => {
     if (dbUser) {
       // Fetch the role name from the roles table
       let roles: string[] = userinfo.roles || [];
+      let permissions: string[] = [];
 
       if (dbUser.roleId) {
         const role = await prisma.roles.findFirst({
@@ -28,6 +29,15 @@ export default eventHandler(async (event) => {
         if (role) {
           // Use the role's name as the role identifier
           roles = [role.name];
+          try {
+            // Parse permissions from JSON string
+            const perms = role.permissions ? JSON.parse(role.permissions as string) : [];
+            if (Array.isArray(perms)) {
+              permissions = perms;
+            }
+          } catch (e) {
+            console.error('Failed to parse permissions:', e);
+          }
         }
       }
 
@@ -48,6 +58,7 @@ export default eventHandler(async (event) => {
         id: dbUser.id,
         realName: dbUser.realName || userinfo.realName,
         roles,
+        permissions, // Return permissions list
         deptName, // Include department name
         avatar: dbUser.avatar || userinfo.avatar,
       });

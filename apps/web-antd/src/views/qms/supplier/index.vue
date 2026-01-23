@@ -37,6 +37,9 @@ const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
 
 const canExport = computed(() => hasAccessByCodes(['QMS:Supplier:Export']));
+const canImport = computed(() => hasAccessByCodes(['QMS:Supplier:Import']));
+const canEdit = computed(() => hasAccessByCodes(['QMS:Supplier:Edit']));
+const canDelete = computed(() => hasAccessByCodes(['QMS:Supplier:Delete']));
 
 const checkedRows = ref<QmsSupplierApi.SupplierItem[]>([]);
 const editModalRef = ref();
@@ -76,7 +79,7 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
     slots: { buttons: 'toolbar-actions' },
     custom: true,
     export: canExport.value,
-    import: true,
+    import: canImport.value,
     search: true,
     zoom: true,
     refresh: true,
@@ -148,7 +151,28 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
     highlight: true,
     range: true,
   },
-  columns: getColumns('Supplier'),
+  columns: (getColumns('Supplier') ?? []).map((col) => {
+    if (col.slots?.default === 'action') {
+      return {
+        ...col,
+        slots: undefined,
+        cellRender: {
+          name: 'CellOperation',
+          props: {
+            options: [
+              ...(canEdit.value ? ['edit'] : []),
+              ...(canDelete.value ? ['delete'] : []),
+            ],
+            onClick: ({ code, row }: { code: string; row: any }) => {
+              if (code === 'edit') handleEdit(row);
+              if (code === 'delete') handleDelete(row);
+            },
+          },
+        },
+      };
+    }
+    return col;
+  }),
   proxyConfig: {
     autoLoad: true,
     sort: true,
@@ -391,30 +415,6 @@ function handleSuccess() {
             >
               {{ row.afterSalesIssueCount ?? 0 }} {{ t('common.unit.item') }}
             </span>
-          </template>
-
-          <template #action="{ row }">
-            <Space>
-              <Button
-                v-access:code="'QMS:Supplier:Edit'"
-                :key="`edit-${row.id}`"
-                size="small"
-                type="link"
-                @click="handleEdit(row)"
-              >
-                {{ t('common.edit') }}
-              </Button>
-              <Button
-                v-access:code="'QMS:Supplier:Delete'"
-                :key="`del-${row.id}`"
-                danger
-                size="small"
-                type="link"
-                @click="handleDelete(row)"
-              >
-                {{ t('common.delete') }}
-              </Button>
-            </Space>
           </template>
         </Grid>
       </Card>

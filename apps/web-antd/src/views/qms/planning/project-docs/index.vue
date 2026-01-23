@@ -13,9 +13,14 @@ import { Card, message, Modal, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getInspectionRecords } from '#/api/qms/inspection';
-import { getWorkOrderList, updateWorkOrder } from '#/api/qms/work-order';
+import {
+  createProjectDocProject,
+  getProjectDocProjects,
+  updateProjectDocProject,
+} from '#/api/qms/planning';
 
 import PlanningSidebar from '../components/PlanningSidebar.vue';
+import WorkOrderSelectModal from '../components/WorkOrderSelectModal.vue';
 
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
@@ -38,13 +43,29 @@ const selectedProject = computed(
 async function loadProjects() {
   isProjectsLoading.value = true;
   try {
-    const res = await getWorkOrderList();
-    projectList.value = res.items || [];
+    const res = await getProjectDocProjects();
+    projectList.value = res || [];
     if (projectList.value.length > 0 && !selectedProjectId.value) {
       selectedProjectId.value = projectList.value[0]?.id || null;
     }
   } finally {
     isProjectsLoading.value = false;
+  }
+}
+
+const woSelectModalRef = ref();
+
+function handleCreateProject() {
+  woSelectModalRef.value?.open();
+}
+
+async function handleWorkOrderSelected(workOrderNumber: string) {
+  try {
+    await createProjectDocProject({ workOrderNumber });
+    message.success('已成功将工单添加到项目资料列表');
+    await loadProjects();
+  } catch (error: any) {
+    message.error(error.message || '添加失败');
   }
 }
 
@@ -83,7 +104,7 @@ const filteredProjects = computed(() => {
 
 async function handleArchiveProject(project: any) {
   const isArchived = isArchivedStatus(project.status);
-  const newStatus = isArchived ? 'IN_PROGRESS' : 'COMPLETED';
+  const newStatus = isArchived ? 'active' : 'archived';
 
   Modal.confirm({
     title: isArchived ? t('common.restore') : t('common.archive'),
@@ -92,9 +113,7 @@ async function handleArchiveProject(project: any) {
       : `${t('common.confirmArchiveContent')} "${project.projectName || project.name}" ?`,
     onOk: async () => {
       try {
-        // 修复 Prisma 报错：传递完整对象以满足 quantity 等必填项校验
-        await updateWorkOrder(project.id, {
-          ...project,
+        await updateProjectDocProject(project.id, {
           status: newStatus,
         });
         message.success(
@@ -106,7 +125,7 @@ async function handleArchiveProject(project: any) {
         }
         await loadProjects();
       } catch (error) {
-        console.error('Archive Work Order Error:', error);
+        console.error('Archive Project Error:', error);
         message.error(t('common.actionFailed'));
       }
     },
@@ -242,6 +261,7 @@ onMounted(() => loadProjects());
         v-model:search-text="searchTerm"
         auth-prefix="QMS:Planning:ProjectDocs"
         @archive="handleArchiveProject"
+        @create="handleCreateProject"
       />
 
       <!-- Right: Documents List -->
@@ -270,5 +290,9 @@ onMounted(() => loadProjects());
         </Grid>
       </Card>
     </div>
+    <WorkOrderSelectModal
+      ref="woSelectModalRef"
+      @success="handleWorkOrderSelected"
+    />
   </Page>
 </template>

@@ -1,13 +1,26 @@
 import type { EventHandlerRequest, H3Event } from 'h3';
 
-import type { UserInfo } from './mock-data';
-
 import process from 'node:process';
 
 import { getHeader } from 'h3';
 import jwt from 'jsonwebtoken';
 
-import { MOCK_USERS } from './mock-data';
+// 定义通用的用户信息接口
+export interface UserSession {
+  id: number | string;
+  userId?: number | string;
+  username: string;
+  realName: string;
+  roles: string[];
+  password?: string;
+  homePath?: string;
+  avatar?: string;
+}
+
+export interface UserPayload extends UserSession {
+  iat: number;
+  exp: number;
+}
 
 // Load secrets from environment variables
 const ACCESS_TOKEN_SECRET =
@@ -21,16 +34,11 @@ const REFRESH_TOKEN_SECRET =
     throw new Error('JWT_REFRESH_SECRET not set');
   })();
 
-export interface UserPayload extends UserInfo {
-  iat: number;
-  exp: number;
-}
-
-export function generateAccessToken(user: UserInfo) {
+export function generateAccessToken(user: any) {
   return jwt.sign(user, ACCESS_TOKEN_SECRET, { expiresIn: '7d' });
 }
 
-export function generateRefreshToken(user: UserInfo) {
+export function generateRefreshToken(user: any) {
   return jwt.sign(user, REFRESH_TOKEN_SECRET, {
     expiresIn: '30d',
   });
@@ -38,7 +46,7 @@ export function generateRefreshToken(user: UserInfo) {
 
 export function verifyAccessToken(
   event: H3Event<EventHandlerRequest>,
-): null | Omit<UserInfo, 'password'> {
+): null | UserSession {
   const authHeader = getHeader(event, 'Authorization');
   if (!authHeader?.startsWith('Bearer')) {
     return null;
@@ -61,24 +69,10 @@ export function verifyAccessToken(
   }
 }
 
-export function verifyRefreshToken(
-  token: string,
-): null | Omit<UserInfo, 'password'> {
+export function verifyRefreshToken(token: string): null | UserSession {
   try {
     const decoded = jwt.verify(token, REFRESH_TOKEN_SECRET) as UserPayload;
-    const username = decoded.username;
-    const user = MOCK_USERS.find(
-      (item) => item.username === username,
-    ) as UserInfo;
-    if (!user) {
-      return null;
-    }
-    const { password: _pwd, ...userinfo } = user;
-    // 确保返回 userId 字段
-    if (!userinfo.userId) {
-      userinfo.userId = userinfo.id;
-    }
-    return userinfo;
+    return decoded;
   } catch {
     return null;
   }

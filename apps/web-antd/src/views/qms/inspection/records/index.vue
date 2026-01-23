@@ -59,6 +59,9 @@ const canEdit = computed(() =>
 const canDelete = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Records:Delete']),
 );
+const canImport = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Records:Import']),
+);
 
 // ================= 1. 响应式状态声明 =================
 const { years: dynamicYears } = useAvailableYears();
@@ -520,7 +523,7 @@ const incomingGridOptions = computed<VxeGridProps>(() => ({
   },
   toolbarConfig: {
     export: canExport.value,
-    import: true,
+    import: canImport.value,
     search: true,
     slots: { buttons: 'toolbar-actions' },
   },
@@ -635,7 +638,19 @@ const incomingGridOptions = computed<VxeGridProps>(() => ({
       title: t('common.action'),
       width: 150,
       fixed: 'right',
-      slots: { default: 'action' },
+      cellRender: {
+        name: 'CellOperation',
+        props: {
+          options: [
+            ...(canEdit.value ? ['edit'] : []),
+            ...(canDelete.value ? ['delete'] : []),
+          ],
+          onClick: ({ code, row }: { code: string; row: any }) => {
+            if (code === 'edit') openModal('edit', row);
+            if (code === 'delete') handleDelete(row);
+          },
+        },
+      },
     },
   ],
   proxyConfig: {
@@ -667,7 +682,7 @@ const processGridOptions = computed<VxeGridProps>(() => ({
   },
   toolbarConfig: {
     export: canExport.value,
-    import: true,
+    import: canImport.value,
     search: true,
     slots: { buttons: 'toolbar-actions' },
   },
@@ -792,7 +807,19 @@ const processGridOptions = computed<VxeGridProps>(() => ({
       title: t('common.action'),
       width: 150,
       fixed: 'right',
-      slots: { default: 'action' },
+      cellRender: {
+        name: 'CellOperation',
+        props: {
+          options: [
+            ...(canEdit.value ? ['edit'] : []),
+            ...(canDelete.value ? ['delete'] : []),
+          ],
+          onClick: ({ code, row }: { code: string; row: any }) => {
+            if (code === 'edit') openModal('edit', row);
+            if (code === 'delete') handleDelete(row);
+          },
+        },
+      },
     },
   ],
   proxyConfig: {
@@ -824,7 +851,7 @@ const shipmentGridOptions = computed<VxeGridProps>(() => ({
   },
   toolbarConfig: {
     export: canExport.value,
-    import: true,
+    import: canImport.value,
     search: true,
     slots: { buttons: 'toolbar-actions' },
   },
@@ -939,7 +966,19 @@ const shipmentGridOptions = computed<VxeGridProps>(() => ({
       title: t('common.action'),
       width: 150,
       fixed: 'right',
-      slots: { default: 'action' },
+      cellRender: {
+        name: 'CellOperation',
+        props: {
+          options: [
+            ...(canEdit.value ? ['edit'] : []),
+            ...(canDelete.value ? ['delete'] : []),
+          ],
+          onClick: ({ code, row }: { code: string; row: any }) => {
+            if (code === 'edit') openModal('edit', row);
+            if (code === 'delete') handleDelete(row);
+          },
+        },
+      },
     },
   ],
   proxyConfig: {
@@ -1208,25 +1247,7 @@ function handleBatchDelete() {
                 }}
               </Tag>
             </template>
-            <template #action="{ row }">
-              <Button
-                v-if="canEdit"
-                type="link"
-                size="small"
-                @click="openModal('edit', row)"
-              >
-                {{ t('common.edit') }}
-              </Button>
-              <Button
-                v-if="canDelete"
-                type="link"
-                danger
-                size="small"
-                @click="handleDelete(row)"
-              >
-                {{ t('common.delete') }}
-              </Button>
-            </template>
+
           </IncomingGrid>
         </div>
 
@@ -1270,25 +1291,7 @@ function handleBatchDelete() {
                 }}
               </Tag>
             </template>
-            <template #action="{ row }">
-              <Button
-                v-if="canEdit"
-                type="link"
-                size="small"
-                @click="openModal('edit', row)"
-              >
-                {{ t('common.edit') }}
-              </Button>
-              <Button
-                v-if="canDelete"
-                type="link"
-                danger
-                size="small"
-                @click="handleDelete(row)"
-              >
-                {{ t('common.delete') }}
-              </Button>
-            </template>
+
           </ProcessGrid>
         </div>
 
@@ -1313,25 +1316,7 @@ function handleBatchDelete() {
                 {{ t('common.batchDelete') }}
               </Button>
             </template>
-            <template #action="{ row }">
-              <Button
-                v-if="canEdit"
-                type="link"
-                size="small"
-                @click="openModal('edit', row)"
-              >
-                {{ t('common.edit') }}
-              </Button>
-              <Button
-                v-if="canDelete"
-                type="link"
-                danger
-                size="small"
-                @click="handleDelete(row)"
-              >
-                {{ t('common.delete') }}
-              </Button>
-            </template>
+
           </ShipmentGrid>
         </div>
       </div>

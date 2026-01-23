@@ -5,7 +5,7 @@ import {
   setRefreshTokenCookie,
 } from '~/utils/cookie-utils';
 import { generateAccessToken, verifyRefreshToken } from '~/utils/jwt-utils';
-import { MOCK_USERS } from '~/utils/mock-data';
+import prisma from '~/utils/prisma';
 import { forbiddenResponse } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -21,13 +21,30 @@ export default defineEventHandler(async (event) => {
     return forbiddenResponse(event);
   }
 
-  const findUser = MOCK_USERS.find(
-    (item) => item.username === userinfo.username,
-  );
-  if (!findUser) {
+  // 从数据库查询真实用户
+  const dbUser = await prisma.users.findUnique({
+    where: { username: userinfo.username },
+    include: { roles: true },
+  });
+
+  if (!dbUser) {
     return forbiddenResponse(event);
   }
-  const accessToken = generateAccessToken(findUser);
+
+  // Security: Check user status during refresh
+  if (dbUser.status !== 'ACTIVE') {
+    return forbiddenResponse(event);
+  }
+
+  // 构造与 generateAccessToken 兼容的负载
+  const userPayload = {
+    id: dbUser.id,
+    realName: dbUser.realName,
+    roles: [dbUser.roles?.name || 'user'],
+    username: dbUser.username,
+  };
+
+  const accessToken = generateAccessToken(userPayload);
 
   setRefreshTokenCookie(event, refreshToken);
 

@@ -201,6 +201,35 @@ const gridOptions = computed<VxeGridProps>(() => ({
           },
         };
       }
+      if (col.slots?.default === 'action') {
+        return {
+          ...col,
+          slots: undefined,
+        cellRender: {
+          name: 'CellOperation',
+          props: {
+            options: [
+              ...(canEdit.value ? ['edit'] : []),
+              ...(canSettle.value
+                ? [
+                    {
+                      code: 'settle',
+                      icon: 'lucide:book-check',
+                      title: t('qms.inspection.issues.settleToKnowledge'),
+                    },
+                  ]
+                : []),
+              ...(canDelete.value ? ['delete'] : []),
+            ],
+            onClick: ({ code, row }: { code: string; row: any }) => {
+              if (code === 'edit') handleEdit(row);
+              if (code === 'delete') handleDelete(row);
+              if (code === 'settle') handleSettleToKnowledge(row);
+            },
+          },
+        },
+        };
+      }
       return col;
     }),
   ],
@@ -514,33 +543,6 @@ function handleSettleToKnowledge(row: InspectionIssue) {
             />
           </div>
         </div>
-      </template>
-      <template #action="{ row }">
-        <Button
-          v-if="canEdit"
-          type="link"
-          size="small"
-          @click="handleEdit(row)"
-        >
-          {{ t('common.edit') }}
-        </Button>
-        <Button
-          v-if="canSettle"
-          type="link"
-          size="small"
-          @click="handleSettleToKnowledge(row)"
-        >
-          {{ t('qms.inspection.issues.settleToKnowledge') }}
-        </Button>
-        <Button
-          v-if="canDelete"
-          type="link"
-          size="small"
-          danger
-          @click="handleDelete(row)"
-        >
-          {{ t('common.delete') }}
-        </Button>
       </template>
     </Grid>
 

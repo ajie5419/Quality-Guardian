@@ -161,13 +161,13 @@ function handleSelect(id: string) {
           </Tag>
         </div>
 
-        <!-- Float Actions: No background, Absolute Right-Bottom -->
+        <!-- Float Actions: Always visible when selected, and always semi-visible or on hover -->
         <div
           class="absolute bottom-2.5 right-2 z-20 flex items-center gap-3 transition-all duration-300"
           :class="[
             selectedId === proj.id
-              ? 'opacity-100'
-              : 'opacity-0 group-hover:opacity-100',
+              ? 'scale-100 opacity-100'
+              : 'scale-95 opacity-40 group-hover:scale-100 group-hover:opacity-100',
           ]"
         >
           <Button
@@ -191,6 +191,14 @@ function handleSelect(id: string) {
             "
             @click.stop="emit('archive', proj)"
           >
+            <span
+              :class="
+                isArchived(proj.status)
+                  ? 'i-lucide-rotate-ccw'
+                  : 'i-lucide-archive'
+              "
+              class="mr-0.5"
+            ></span>
             {{
               isArchived(proj.status)
                 ? t('common.restore')

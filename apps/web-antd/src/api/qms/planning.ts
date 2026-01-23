@@ -304,6 +304,23 @@ export async function deleteBomProject(id: string) {
 }
 
 /**
+ * Project Documents APIs
+ */
+export async function getProjectDocProjects() {
+  return requestClient.get<any[]>('/qms/planning/project-docs/projects');
+}
+
+export async function createProjectDocProject(data: {
+  workOrderNumber: string;
+}) {
+  return requestClient.post('/qms/planning/project-docs/projects', data);
+}
+
+export async function updateProjectDocProject(id: string, data: any) {
+  return requestClient.put(`/qms/planning/project-docs/projects/${id}`, data);
+}
+
+/**
  * BOM Item APIs
  */
 export async function getBomTree() {

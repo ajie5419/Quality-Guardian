@@ -1,20 +1,21 @@
-import { defineEventHandler } from 'h3';
-
-import { MOCK_DELAY, REPORTS_LIST } from '../../../utils';
+import { defineEventHandler, getRouterParam } from 'h3';
+import prisma from '~/utils/prisma';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
-  const id = event.context.params?.id;
-  if (!id) {
-    return { code: -1, message: 'id required' };
+  const id = getRouterParam(event, 'id');
+  if (!id) return useResponseError('id required');
+
+  try {
+    await prisma.reports.delete({
+      where: { id },
+    });
+    return useResponseSuccess({ message: 'Deleted' });
+  } catch (error) {
+    console.error('Delete report failed:', error);
+    if (error.code === 'P2025') {
+      return useResponseError('Report not found');
+    }
+    return useResponseError(`Delete failed: ${error.message}`);
   }
-  const index = REPORTS_LIST.findIndex((item) => item.id === id);
-  if (index !== -1) {
-    REPORTS_LIST.splice(index, 1);
-    return {
-      code: 0,
-      message: 'deleted',
-    };
-  }
-  return { code: -1, message: 'not found' };
 });

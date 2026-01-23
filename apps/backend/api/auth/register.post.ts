@@ -77,13 +77,13 @@ export default defineEventHandler(async (event) => {
       realName: username,
       roleId: defaultRole.id,
       department: deptId,
-      status: 'ACTIVE',
+      status: 'INACTIVE', // 默认禁用，需审核
     },
   });
 
   return useResponseSuccess({
     id: newUser.id,
     username: newUser.username,
-    message: '注册成功',
+    message: '注册成功，请等待管理员审核开通账号',
   });
 });

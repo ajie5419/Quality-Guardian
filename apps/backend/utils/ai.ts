@@ -1,4 +1,5 @@
 import prisma from './prisma';
+import { AI_SETTINGS } from './system-data';
 
 export interface AiMessage {
   role: 'assistant' | 'system' | 'user';
@@ -9,17 +10,27 @@ export async function getAiConfig() {
   const settings = await prisma.system_settings.findUnique({
     where: { key: 'AI_CONFIGURATION' },
   });
+
+  let config;
   if (settings && settings.value) {
-    const config = JSON.parse(settings.value);
+    config = JSON.parse(settings.value);
     // 如果是新版多供应商结构
     if (config.configs && config.provider) {
       const activeProvider = config.provider;
-      return config.configs[activeProvider];
+      config = config.configs[activeProvider];
     }
-    // 兼容旧版扁平结构
-    return config;
   }
-  return null;
+
+  // 如果数据库没有配置，或者配置是空的/占位符，则回退到环境变量 (AI_SETTINGS)
+  if (!config || !config.apiKey || config.apiKey.includes('xxx')) {
+    return {
+      apiKey: AI_SETTINGS.apiKey,
+      baseUrl: AI_SETTINGS.baseUrl,
+      model: AI_SETTINGS.model,
+    };
+  }
+
+  return config;
 }
 
 export async function callAi(

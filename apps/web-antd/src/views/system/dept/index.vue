@@ -34,6 +34,23 @@ const isEditMode = ref(false);
 const currentId = ref<null | string>(null);
 const deptTreeData = ref<TreeSelectNode[]>([]);
 
+// Permission check helpers
+const canCreate = computed(
+  () =>
+    hasAccessByCodes(['System:Dept:Create']) ||
+    hasAccessByRoles(['super', 'admin']),
+);
+const canEdit = computed(
+  () =>
+    hasAccessByCodes(['System:Dept:Edit']) ||
+    hasAccessByRoles(['super', 'admin']),
+);
+const canDelete = computed(
+  () =>
+    hasAccessByCodes(['System:Dept:Delete']) ||
+    hasAccessByRoles(['super', 'admin']),
+);
+
 const formState = reactive({
   name: '',
   pid: '0',
@@ -56,7 +73,7 @@ async function loadDeptTree(excludeId?: string) {
 
 onMounted(() => loadDeptTree());
 
-const gridOptions: VxeGridProps = {
+const gridOptions = computed<VxeGridProps>(() => ({
   columns: [
     {
       field: 'name',
@@ -77,7 +94,29 @@ const gridOptions: VxeGridProps = {
       title: t('common.action'),
       width: 200,
       fixed: 'right',
-      slots: { default: 'action' },
+      cellRender: {
+        name: 'CellOperation',
+        props: {
+          options: [
+            ...(canCreate.value
+              ? [
+                  {
+                    code: 'addChild',
+                    icon: 'lucide:list-plus',
+                    title: t('sys.dept.addChildDept'),
+                  },
+                ]
+              : []),
+            'edit',
+            'delete',
+          ],
+          onClick: ({ code, row }) => {
+            if (code === 'edit') handleEdit(row);
+            if (code === 'delete') handleDelete(row);
+            if (code === 'addChild') handleAddChild(row);
+          },
+        },
+      },
     },
   ],
   toolbarConfig: {
@@ -109,9 +148,9 @@ const gridOptions: VxeGridProps = {
       },
     },
   },
-};
+}));
 
-const [Grid, gridApi] = useVbenVxeGrid({ gridOptions });
+const [Grid, gridApi] = useVbenVxeGrid({ gridOptions: gridOptions as any });
 
 function handleOpenModal(parentId?: string) {
   isEditMode.value = false;
@@ -185,22 +224,6 @@ async function handleSubmit() {
   }
 }
 
-// Permission check helpers
-const canCreate = computed(
-  () =>
-    hasAccessByCodes(['System:Dept:Create']) ||
-    hasAccessByRoles(['super', 'admin']),
-);
-const canEdit = computed(
-  () =>
-    hasAccessByCodes(['System:Dept:Edit']) ||
-    hasAccessByRoles(['super', 'admin']),
-);
-const canDelete = computed(
-  () =>
-    hasAccessByCodes(['System:Dept:Delete']) ||
-    hasAccessByRoles(['super', 'admin']),
-);
 </script>
 
 <template>
@@ -218,20 +241,6 @@ const canDelete = computed(
           >{{ t('common.enabled') }}</span
         >
         <span v-else class="text-red-500">{{ t('common.disabled') }}</span>
-      </template>
-      <template #action="{ row }">
-        <a
-          v-if="canCreate"
-          class="mr-2 text-blue-500"
-          @click="handleAddChild(row)"
-          >{{ t('sys.dept.addChildDept') }}</a
-        >
-        <a v-if="canEdit" class="mr-2" @click="handleEdit(row)">{{
-          t('common.edit')
-        }}</a>
-        <a v-if="canDelete" class="text-red-500" @click="handleDelete(row)">{{
-          t('common.delete')
-        }}</a>
       </template>
     </Grid>
 
