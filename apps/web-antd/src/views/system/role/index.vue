@@ -52,8 +52,6 @@ const isEditMode = ref(false);
 const currentId = ref<null | string>(null);
 const currentRoleName = ref('');
 
-
-
 const formState = reactive({
   name: '',
   value: '',
@@ -79,8 +77,6 @@ onMounted(() => {
 
 const checkedKeys = ref<string[]>([]);
 const expandedKeys = ref<string[]>(['System', 'QMS']);
-
-
 
 const gridOptions = computed<VxeGridProps>(() => ({
   columns: [
@@ -113,9 +109,15 @@ const gridOptions = computed<VxeGridProps>(() => ({
                   'edit',
                 ]
               : []),
-            'delete',
+            ...(canDelete.value ? ['delete'] : []),
           ],
-          onClick: ({ code, row }) => {
+          onClick: ({
+            code,
+            row,
+          }: {
+            code: string;
+            row: SystemRoleApi.Role;
+          }) => {
             if (code === 'edit') handleEdit(row);
             if (code === 'delete') handleDelete(row);
             if (code === 'permissions') handlePermissions(row);
@@ -242,7 +244,6 @@ async function handleSubmit() {
     message.error(isEditMode.value ? '保存失败' : '创建失败');
   }
 }
-
 </script>
 
 <template>

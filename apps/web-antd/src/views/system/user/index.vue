@@ -19,7 +19,6 @@ import {
   Select,
   SelectOption,
   TreeSelect,
-  Tooltip,
 } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
@@ -36,6 +35,23 @@ import { convertToTreeSelectData, findNameById } from '#/types';
 
 const { t } = useI18n();
 const { hasAccessByCodes, hasAccessByRoles } = useAccess();
+
+// Permission check helpers
+const canCreate = computed(
+  () =>
+    hasAccessByCodes(['System:User:Create']) ||
+    hasAccessByRoles(['super', 'admin']),
+);
+const canEdit = computed(
+  () =>
+    hasAccessByCodes(['System:User:Edit']) ||
+    hasAccessByRoles(['super', 'admin']),
+);
+const canDelete = computed(
+  () =>
+    hasAccessByCodes(['System:User:Delete']) ||
+    hasAccessByRoles(['super', 'admin']),
+);
 
 const isModalVisible = ref(false);
 const isEditMode = ref(false);
@@ -85,7 +101,7 @@ onMounted(() => {
   loadRoles();
 });
 
-const gridOptions: VxeGridProps = {
+const gridOptions = computed<VxeGridProps>(() => ({
   columns: [
     { type: 'seq', title: t('common.seq'), width: 60 },
     { field: 'username', title: t('sys.user.username'), width: 120 },
@@ -123,8 +139,17 @@ const gridOptions: VxeGridProps = {
       cellRender: {
         name: 'CellOperation',
         props: {
-          options: ['edit', 'delete'],
-          onClick: ({ code, row }) => {
+          options: [
+            ...(canEdit.value ? ['edit'] : []),
+            ...(canDelete.value ? ['delete'] : []),
+          ],
+          onClick: ({
+            code,
+            row,
+          }: {
+            code: string;
+            row: SystemUserApi.User;
+          }) => {
             if (code === 'edit') handleEdit(row);
             if (code === 'delete') handleDelete(row);
           },
@@ -166,9 +191,9 @@ const gridOptions: VxeGridProps = {
       },
     },
   },
-};
+}));
 
-const [Grid, gridApi] = useVbenVxeGrid({ gridOptions });
+const [Grid, gridApi] = useVbenVxeGrid({ gridOptions: gridOptions as any });
 
 function handleOpenModal() {
   isEditMode.value = false;
@@ -250,23 +275,6 @@ async function handleSubmit() {
     );
   }
 }
-
-// Permission check helpers
-const canCreate = computed(
-  () =>
-    hasAccessByCodes(['System:User:Create']) ||
-    hasAccessByRoles(['super', 'admin']),
-);
-const canEdit = computed(
-  () =>
-    hasAccessByCodes(['System:User:Edit']) ||
-    hasAccessByRoles(['super', 'admin']),
-);
-const canDelete = computed(
-  () =>
-    hasAccessByCodes(['System:User:Delete']) ||
-    hasAccessByRoles(['super', 'admin']),
-);
 </script>
 
 <template>

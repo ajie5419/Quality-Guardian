@@ -107,10 +107,16 @@ const gridOptions = computed<VxeGridProps>(() => ({
                   },
                 ]
               : []),
-            'edit',
-            'delete',
+            ...(canEdit.value ? ['edit'] : []),
+            ...(canDelete.value ? ['delete'] : []),
           ],
-          onClick: ({ code, row }) => {
+          onClick: ({
+            code,
+            row,
+          }: {
+            code: string;
+            row: SystemMenuApi.Menu;
+          }) => {
             if (code === 'edit') handleEdit(row);
             if (code === 'delete') handleDelete(row);
             if (code === 'addChild') handleAddChild(row);
@@ -236,7 +242,6 @@ async function handleSubmit() {
     message.error(isEditMode.value ? '保存失败' : '创建失败');
   }
 }
-
 </script>
 
 <template>

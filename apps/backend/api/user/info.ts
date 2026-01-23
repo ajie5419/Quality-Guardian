@@ -31,12 +31,14 @@ export default eventHandler(async (event) => {
           roles = [role.name];
           try {
             // Parse permissions from JSON string
-            const perms = role.permissions ? JSON.parse(role.permissions as string) : [];
+            const perms = role.permissions
+              ? JSON.parse(role.permissions as string)
+              : [];
             if (Array.isArray(perms)) {
               permissions = perms;
             }
-          } catch (e) {
-            console.error('Failed to parse permissions:', e);
+          } catch (error) {
+            console.error('Failed to parse permissions:', error);
           }
         }
       }

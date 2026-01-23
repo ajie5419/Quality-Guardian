@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -9,7 +10,9 @@ async function main() {
     console.log('Inspection Issues found:', issues.name);
     const children = await prisma.menus.findMany({ where: { parentId: 42 } });
     console.log(`Children for ID 42 (${children.length}):`);
-    children.forEach(c => console.log(` - ${c.name} (${c.type}) auth: ${c.authCode}`));
+    children.forEach((c) =>
+      console.log(` - ${c.name} (${c.type}) auth: ${c.authCode}`),
+    );
   }
 
   // Check QMS After Sales (ID 50)
@@ -18,10 +21,12 @@ async function main() {
     console.log('After Sales found:', afterSales.name);
     const children = await prisma.menus.findMany({ where: { parentId: 50 } });
     console.log(`Children for ID 50 (${children.length}):`);
-    children.forEach(c => console.log(` - ${c.name} (${c.type}) auth: ${c.authCode}`));
+    children.forEach((c) =>
+      console.log(` - ${c.name} (${c.type}) auth: ${c.authCode}`),
+    );
   }
 }
 
 main()
-  .catch(e => console.error(e))
+  .catch((error) => console.error(error))
   .finally(async () => await prisma.$disconnect());

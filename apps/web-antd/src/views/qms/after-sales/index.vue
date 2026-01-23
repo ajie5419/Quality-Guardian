@@ -246,7 +246,13 @@ const gridOptions = computed<VxeGridProps>(() => ({
               : []),
             ...(canDelete.value ? ['delete'] : []),
           ],
-          onClick: ({ code, row }: { code: string; row: any }) => {
+          onClick: ({
+            code,
+            row,
+          }: {
+            code: string;
+            row: QmsAfterSalesApi.AfterSalesItem;
+          }) => {
             if (code === 'edit') handleEdit(row);
             if (code === 'delete') handleDelete(row);
             if (code === 'settle') handleSettleToKnowledge(row);

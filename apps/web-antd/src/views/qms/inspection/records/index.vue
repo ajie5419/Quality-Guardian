@@ -1247,7 +1247,6 @@ function handleBatchDelete() {
                 }}
               </Tag>
             </template>
-
           </IncomingGrid>
         </div>
 
@@ -1291,7 +1290,6 @@ function handleBatchDelete() {
                 }}
               </Tag>
             </template>
-
           </ProcessGrid>
         </div>
 
@@ -1316,7 +1314,6 @@ function handleBatchDelete() {
                 {{ t('common.batchDelete') }}
               </Button>
             </template>
-
           </ShipmentGrid>
         </div>
       </div>

@@ -3,9 +3,10 @@ import type { ChartConfig } from '../composables/useChartAggregation';
 
 import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
 
-import { onUnmounted, ref, watch, computed } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 
 import { useAccess } from '@vben/access';
+
 import { useStorage } from '@vueuse/core';
 import { Button, Card, message, Modal } from 'ant-design-vue';
 
@@ -25,7 +26,9 @@ const props = defineProps<{
 const { hasAccessByCodes } = useAccess();
 const canAdd = computed(() => hasAccessByCodes(['QMS:AfterSales:ChartAdd']));
 const canEdit = computed(() => hasAccessByCodes(['QMS:AfterSales:ChartEdit']));
-const canDelete = computed(() => hasAccessByCodes(['QMS:AfterSales:ChartDelete']));
+const canDelete = computed(() =>
+  hasAccessByCodes(['QMS:AfterSales:ChartDelete']),
+);
 
 const loading = ref(false);
 
@@ -206,7 +209,12 @@ watch(
   <div class="mb-4 flex flex-col gap-4">
     <!-- 4. Custom Charts Section -->
     <div class="flex items-center justify-end border-b pb-2">
-      <Button v-if="canAdd" type="dashed" size="small" @click="handleAddCustomChart">
+      <Button
+        v-if="canAdd"
+        type="dashed"
+        size="small"
+        @click="handleAddCustomChart"
+      >
         <span class="i-lucide-plus mr-1"></span>添加图表
       </Button>
     </div>

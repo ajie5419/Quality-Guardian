@@ -146,14 +146,16 @@ setupVbenVxeTable({
 
           // 包装 Tooltip
           const btn = h(Button, btnProps, { default: () => content });
-          
+
           if (opt.title) {
-            buttons.push(h(Tooltip, { title: opt.title }, { default: () => btn }));
+            buttons.push(
+              h(Tooltip, { title: opt.title }, { default: () => btn }),
+            );
           } else {
             buttons.push(btn);
           }
         }
-        
+
         return buttons;
       },
     });

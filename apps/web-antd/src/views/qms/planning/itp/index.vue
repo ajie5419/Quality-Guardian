@@ -6,9 +6,9 @@ import type { SystemUserApi } from '#/api/system/user';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { IconifyIcon } from '@vben/icons';
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
+import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
 import {

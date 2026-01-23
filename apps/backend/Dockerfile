@@ -40,5 +40,5 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# 直接启动
-CMD ["node", ".output/server/index.mjs"]
+# 启动前自动同步数据库结构
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss --schema=prisma/schema.prisma && node .output/server/index.mjs"]

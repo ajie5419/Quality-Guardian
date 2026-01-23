@@ -205,29 +205,29 @@ const gridOptions = computed<VxeGridProps>(() => ({
         return {
           ...col,
           slots: undefined,
-        cellRender: {
-          name: 'CellOperation',
-          props: {
-            options: [
-              ...(canEdit.value ? ['edit'] : []),
-              ...(canSettle.value
-                ? [
-                    {
-                      code: 'settle',
-                      icon: 'lucide:book-check',
-                      title: t('qms.inspection.issues.settleToKnowledge'),
-                    },
-                  ]
-                : []),
-              ...(canDelete.value ? ['delete'] : []),
-            ],
-            onClick: ({ code, row }: { code: string; row: any }) => {
-              if (code === 'edit') handleEdit(row);
-              if (code === 'delete') handleDelete(row);
-              if (code === 'settle') handleSettleToKnowledge(row);
+          cellRender: {
+            name: 'CellOperation',
+            props: {
+              options: [
+                ...(canEdit.value ? ['edit'] : []),
+                ...(canSettle.value
+                  ? [
+                      {
+                        code: 'settle',
+                        icon: 'lucide:book-check',
+                        title: t('qms.inspection.issues.settleToKnowledge'),
+                      },
+                    ]
+                  : []),
+                ...(canDelete.value ? ['delete'] : []),
+              ],
+              onClick: ({ code, row }: { code: string; row: any }) => {
+                if (code === 'edit') handleEdit(row);
+                if (code === 'delete') handleDelete(row);
+                if (code === 'settle') handleSettleToKnowledge(row);
+              },
             },
           },
-        },
         };
       }
       return col;

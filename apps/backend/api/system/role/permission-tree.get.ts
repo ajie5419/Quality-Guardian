@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
     });
 
     // 2. 解析菜单标题
-    const getTitle = (metaStr: string | null): string => {
+    const getTitle = (metaStr: null | string): string => {
       if (!metaStr) return '未命名';
       try {
         const meta = JSON.parse(metaStr);
@@ -32,14 +32,18 @@ export default defineEventHandler(async (event) => {
     // 3. 获取类型标签
     const getTypeLabel = (type: string): string => {
       switch (type) {
-        case 'catalog':
-          return '[目录]';
-        case 'menu':
-          return '[页面]';
-        case 'button':
+        case 'button': {
           return '[按钮]';
-        default:
+        }
+        case 'catalog': {
+          return '[目录]';
+        }
+        case 'menu': {
+          return '[页面]';
+        }
+        default: {
           return '';
+        }
       }
     };
 
@@ -74,7 +78,7 @@ export default defineEventHandler(async (event) => {
 
     const permissionTree = buildTree(0);
 
-    console.log(
+    console.warn(
       `[permission-tree] 返回 ${allMenus.length} 个菜单，树形节点数: ${JSON.stringify(permissionTree).length} bytes`,
     );
 
