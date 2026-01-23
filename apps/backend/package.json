@@ -18,11 +18,11 @@
     "stub": "nitro prepare"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "6.2.1",
     "bcrypt": "^6.0.0",
     "jsonwebtoken": "catalog:",
     "nitropack": "catalog:",
-    "prisma": "^5.22.0",
+    "prisma": "6.2.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
