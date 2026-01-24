@@ -13,12 +13,19 @@ ENV TURBO_DAEMON=false
 ENV TURBO_TELEMETRY_DISABLED=1
 ENV TURBO_UI=false
 
-# 🌟 关键：设置国内镜像源，防止 pnpm install 超时
+# 🌟 关键：设置国内镜像源
 RUN pnpm config set registry https://registry.npmmirror.com
 
-# Install dependencies and build the frontend
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install
-RUN pnpm run build --filter=@qgs/web-antd -- --log-order=stream --concurrency=1
+# Install dependencies
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+# 🌟 核心修复：
+# 1. 移除多余的 "--" 参数
+# 2. 显式设置 1.5GB 内存限制，覆盖根目录 package.json 可能存在的 8GB 限制
+# 3. 采用分步串行构建，确保稳定性
+RUN export NODE_OPTIONS="--max-old-space-size=1536" && \
+    pnpm turbo build --filter="@vben/*" --concurrency=1 --log-order=stream && \
+    pnpm turbo build --filter=@qgs/web-antd --concurrency=1 --log-order=stream
 
 # Production stage
 FROM nginx:stable-alpine AS production
