@@ -336,6 +336,50 @@ async function main() {
       meta: { title: '查看' },
     },
 
+    // --- 工单管理 ---
+    {
+      id: 23,
+      parentId: 20,
+      path: '/qms/work-order',
+      name: 'QMSWorkOrder',
+      component: 'qms/work-order/index',
+      type: 'menu',
+      authCode: 'QMS:WorkOrder:List',
+      meta: { title: '工单管理', icon: 'carbon:document-order' },
+    },
+    {
+      id: 2301,
+      parentId: 23,
+      name: 'QMSWorkOrderCreate',
+      type: 'button',
+      authCode: 'QMS:WorkOrder:Create',
+      meta: { title: '新增' },
+    },
+    {
+      id: 2302,
+      parentId: 23,
+      name: 'QMSWorkOrderEdit',
+      type: 'button',
+      authCode: 'QMS:WorkOrder:Edit',
+      meta: { title: '编辑' },
+    },
+    {
+      id: 2303,
+      parentId: 23,
+      name: 'QMSWorkOrderDelete',
+      type: 'button',
+      authCode: 'QMS:WorkOrder:Delete',
+      meta: { title: '删除' },
+    },
+    {
+      id: 2304,
+      parentId: 23,
+      name: 'QMSWorkOrderExport',
+      type: 'button',
+      authCode: 'QMS:WorkOrder:Export',
+      meta: { title: '导出' },
+    },
+
     // ===================== 质量策划 =====================
     {
       id: 30,

@@ -22,9 +22,9 @@ ENV NODE_ENV=production
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 # 🌟 核心优化 2：
-# 1. 调优内存限制至 1792MB (接近 2GB 极限)
-# 2. 依然分步构建，但主应用直接调用 Vite 并强制关闭 Sourcemap 参数
-RUN export NODE_OPTIONS="--max-old-space-size=1792" && \
+# 1. 调优内存限制至 4096MB (本地构建有充足内存)
+# 2. 依然分步构建，但主应用直接调用 Vite
+RUN export NODE_OPTIONS="--max-old-space-size=4096" && \
     pnpm turbo build --filter="@vben/*" --concurrency=1 --log-order=stream && \
     cd apps/web-antd && \
     pnpm vite build --mode production --sourcemap false
