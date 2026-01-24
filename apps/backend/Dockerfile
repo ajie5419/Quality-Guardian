@@ -33,8 +33,9 @@ COPY --from=builder /app/apps/backend/.output /app/.output
 COPY --from=builder /app/apps/backend/prisma /app/prisma
 COPY --from=builder /app/apps/backend/package.json /app/package.json
 
-# 2. 关键修复：在生产阶段安装专门的 Prisma 运行环境
-# 使用 npmmirror 镜像确保下载成功，解决 deploy 失败和联网下载失败问题
+# 2. 关键修复：安装生产环境所需的 Prisma。
+# 设置 PRISMA_ENGINES_MIRROR 解决 binaries.prisma.sh 在国内下载慢/失败导致的构建中断
+ENV PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma
 RUN npm config set registry https://registry.npmmirror.com && \
     npm install prisma@6.2.1 @prisma/client@6.2.1 --omit=dev
 
