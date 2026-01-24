@@ -13,6 +13,9 @@ ENV TURBO_DAEMON=false
 ENV TURBO_TELEMETRY_DISABLED=1
 ENV TURBO_UI=false
 
+# 🌟 关键：设置国内镜像源，防止 pnpm install 超时
+RUN pnpm config set registry https://registry.npmmirror.com
+
 # Install dependencies and build the frontend
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install
 RUN pnpm run build --filter=@qgs/web-antd -- --log-order=stream --concurrency=1
