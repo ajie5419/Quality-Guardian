@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: macOS
+    env:
+      # 使用标准 Socket 路径，配合 Docker Desktop 的 Advanced 设置
+      DOCKER_HOST: unix:///var/run/docker.sock
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
