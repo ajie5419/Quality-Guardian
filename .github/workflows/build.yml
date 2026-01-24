@@ -21,11 +21,11 @@ jobs:
   post-update:
     if: github.repository == 'ajie5419/Quality-Guardian'
     # if: ${{ github.actor == 'dependabot[bot]' }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         os:
-          - [self-hosted, macOS]
+          - ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

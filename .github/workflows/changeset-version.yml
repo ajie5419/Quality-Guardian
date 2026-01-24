@@ -21,7 +21,7 @@ jobs:
     if: (github.event.pull_request.merged || github.event_name == 'workflow_dispatch') && github.actor != 'dependabot[bot]' && !contains(github.event.head_commit.message, '[skip ci]') && github.repository == 'ajie5419/Quality-Guardian'
     # if: github.repository == 'ajie5419/Quality-Guardian'
     timeout-minutes: 15
-    runs-on: [self-hosted, macOS]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
