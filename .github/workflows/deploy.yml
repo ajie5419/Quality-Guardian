@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted,macos
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
           platforms: linux/amd64
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted,macos
     needs: build
     steps:
       - name: Deploy to ECS via SSH
