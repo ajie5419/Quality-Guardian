@@ -21,10 +21,6 @@ RUN pnpm --filter @qgs/backend exec prisma generate --schema=prisma/schema.prism
 # 3. 构建后端产物
 RUN pnpm run build --filter=@qgs/backend
 
-# 4. 关键：提取自包含的后端环境（解决软链接问题）
-# 这会将 @qgs/backend 及其依赖平铺到 /app/standalone 目录
-RUN pnpm --filter @qgs/backend deploy standalone
-
 # 生产阶段
 FROM node:22-slim AS production
 
@@ -32,10 +28,15 @@ RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /v
 
 WORKDIR /app
 
-# 1. 从提取好的 standalone 目录复制完整依赖和代码
-COPY --from=builder /app/standalone /app
-# 2. 复制 Nitro 构建后的生产产物（覆盖源码中的 output）
+# 1. 复制构建产物和 Prisma 定义
 COPY --from=builder /app/apps/backend/.output /app/.output
+COPY --from=builder /app/apps/backend/prisma /app/prisma
+COPY --from=builder /app/apps/backend/package.json /app/package.json
+
+# 2. 关键修复：在生产阶段安装专门的 Prisma 运行环境
+# 使用 npmmirror 镜像确保下载成功，解决 deploy 失败和联网下载失败问题
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm install prisma@6.2.1 @prisma/client@6.2.1 --omit=dev
 
 EXPOSE 3000
 
@@ -43,5 +44,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 # 自动化序列：
-# 使用容器本地的 prisma 二进制文件，确保版本 6.2.1 且无需联网
-CMD ["sh", "-c", "./node_modules/.bin/prisma db push --accept-data-loss --skip-generate --schema=prisma/schema.prisma && ./node_modules/.bin/prisma db seed && node .output/server/index.mjs"]
+# 1. db push: 同步表结构
+# 2. db seed: 自动填充菜单数据，彻底解决 404 问题
+# 3. node start: 运行服务
+CMD ["sh", "-c", "npx prisma@6.2.1 db push --accept-data-loss --skip-generate --schema=prisma/schema.prisma && npx prisma@6.2.1 db seed && node .output/server/index.mjs"]

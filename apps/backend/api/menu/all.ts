@@ -150,16 +150,11 @@ export default eventHandler(async (event) => {
   // 将权限列表转为 Set 提高查询效率
   const userCodesSet = new Set(userPermissions);
 
-  // 如果是超级管理员，直接返回所有菜单，不需要经过 filterMenus 的繁琐校验
-  // 这样可以确保哪怕是坏数据，管理员也能进得去
-  let filteredMenus: any[] = [];
-  if (isSuper) {
-    filteredMenus = fullMenuTree.map(m => ({ ...m }));
-  } else {
-    filteredMenus = filterMenus(fullMenuTree, userCodesSet, false);
-  }
+  // 关键修复：即便为超级管理员，也必须调用 filterMenus 过滤掉 type === 'button' 的项
+  // 否则 Vue Router 会因为按钮没有 path 字段而崩溃（path is null 报错）
+  const filteredMenus = filterMenus(fullMenuTree, userCodesSet, isSuper);
 
-  // 额外调试日志 (Docker 生产环境下会输出到 docker logs)
+  // 额外调试日志
   console.warn(`[Menu] User: ${userinfo.username}, isSuper: ${isSuper}, Count: ${filteredMenus.length}`);
 
   return useResponseSuccess(filteredMenus);
