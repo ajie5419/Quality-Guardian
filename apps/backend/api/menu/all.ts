@@ -155,7 +155,9 @@ export default eventHandler(async (event) => {
   const filteredMenus = filterMenus(fullMenuTree, userCodesSet, isSuper);
 
   // 额外调试日志
-  console.warn(`[Menu] User: ${userinfo.username}, isSuper: ${isSuper}, Count: ${filteredMenus.length}`);
+  console.warn(
+    `[Menu] User: ${userinfo.username}, isSuper: ${isSuper}, Count: ${filteredMenus.length}`,
+  );
 
   return useResponseSuccess(filteredMenus);
 });
