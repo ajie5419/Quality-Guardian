@@ -13,19 +13,21 @@ ENV TURBO_DAEMON=false
 ENV TURBO_TELEMETRY_DISABLED=1
 ENV TURBO_UI=false
 
-# 🌟 关键：设置国内镜像源
+# 🌟 核心优化 1：设置国内镜像源并禁用 Source Map (极致节省内存)
 RUN pnpm config set registry https://registry.npmmirror.com
+ENV GENERATE_SOURCEMAP=false
+ENV NODE_ENV=production
 
 # Install dependencies
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
-# 🌟 核心修复：
-# 1. 移除多余的 "--" 参数
-# 2. 显式设置 1.5GB 内存限制，覆盖根目录 package.json 可能存在的 8GB 限制
-# 3. 采用分步串行构建，确保稳定性
-RUN export NODE_OPTIONS="--max-old-space-size=1536" && \
+# 🌟 核心优化 2：
+# 1. 调优内存限制至 1792MB (接近 2GB 极限)
+# 2. 依然分步构建，但主应用直接调用 Vite 并强制关闭 Sourcemap 参数
+RUN export NODE_OPTIONS="--max-old-space-size=1792" && \
     pnpm turbo build --filter="@vben/*" --concurrency=1 --log-order=stream && \
-    pnpm turbo build --filter=@qgs/web-antd --concurrency=1 --log-order=stream
+    cd apps/web-antd && \
+    pnpm vite build --mode production --sourcemap false
 
 # Production stage
 FROM nginx:stable-alpine AS production
