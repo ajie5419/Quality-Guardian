@@ -36,10 +36,13 @@ RUN npm config set registry https://registry.npmmirror.com && \
     npm install prisma@6.2.1 @prisma/client@6.2.1 bcrypt@6.0.0 --omit=dev
 
 # 2. 复制构建产物、Prisma 定义和 package.json
-# 将 COPY 移到 install 之后，这样 npm 就不会报错 EUNSUPPORTEDPROTOCOL
 COPY --from=builder /app/apps/backend/.output /app/.output
 COPY --from=builder /app/apps/backend/prisma /app/prisma
 COPY --from=builder /app/apps/backend/package.json /app/package.json
+
+# 3. 核心修复：在生产环境 node_modules 中生成 Prisma Client
+# 这一步不可或缺，否则会报 "@prisma/client did not initialize yet"
+RUN npx prisma generate --schema=prisma/schema.prisma
 
 EXPOSE 3000
 
