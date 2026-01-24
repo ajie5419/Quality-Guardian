@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    runs-on: macOS
+    runs-on: [self-hosted, macOS]
     env:
       # 使用标准 Socket 路径，配合 Docker Desktop 的 Advanced 设置
       DOCKER_HOST: unix:///var/run/docker.sock
@@ -45,7 +45,7 @@ jobs:
           platforms: linux/amd64
 
   deploy:
-    runs-on: macOS
+    runs-on: [self-hosted, macOS]
     needs: build
     steps:
       - name: Deploy to ECS via SSH

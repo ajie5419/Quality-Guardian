@@ -18,11 +18,11 @@ jobs:
   test:
     name: Test
     if: github.repository == 'ajie5419/Quality-Guardian'
-    runs-on: ${{ matrix.os }}
+    runs-on: [self-hosted, macOS]
     strategy:
       matrix:
         os:
-          - macOS
+          - [self-hosted, macOS]
     timeout-minutes: 20
     steps:
       - name: Checkout code
@@ -59,7 +59,7 @@ jobs:
     strategy:
       matrix:
         os:
-          - MacBook-Air
+          - [self-hosted, macOS]
 
     steps:
       - name: Checkout code
@@ -81,7 +81,7 @@ jobs:
     strategy:
       matrix:
         os:
-          - MacBook-Air
+          - [self-hosted, macOS]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -104,7 +104,7 @@ jobs:
   ci-ok:
     name: CI OK
     if: github.repository == 'ajie5419/Quality-Guardian'
-    runs-on: macOS
+    runs-on: [self-hosted, macOS]
     needs: [test, check, lint]
     env:
       FAILURE: ${{ contains(join(needs.*.result, ','), 'failure') }}

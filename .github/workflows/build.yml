@@ -25,7 +25,7 @@ jobs:
     strategy:
       matrix:
         os:
-          - macOS
+          - [self-hosted, macOS]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

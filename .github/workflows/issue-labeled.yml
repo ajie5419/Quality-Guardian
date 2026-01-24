@@ -14,7 +14,7 @@ permissions:
 jobs:
   reply-labeled:
     if: github.repository == 'ajie5419/Quality-Guardian'
-    runs-on: macOS
+    runs-on: [self-hosted, macOS]
     steps:
       - name: remove enhancement pending
         if: github.event.label.name == 'enhancement'

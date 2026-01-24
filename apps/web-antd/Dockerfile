@@ -8,12 +8,14 @@ WORKDIR /app
 
 COPY . .
 
-# Disable Turbo daemon to avoid "Interrupted system call" errors in Docker
+# Disable Turbo features that cause issues in Docker environments
 ENV TURBO_DAEMON=false
+ENV TURBO_TELEMETRY_DISABLED=1
+ENV TURBO_UI=false
 
 # Install dependencies and build the frontend
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install
-RUN pnpm run build --filter=@qgs/web-antd -- --log-order=stream
+RUN pnpm run build --filter=@qgs/web-antd -- --log-order=stream --concurrency=1
 
 # Production stage
 FROM nginx:stable-alpine AS production

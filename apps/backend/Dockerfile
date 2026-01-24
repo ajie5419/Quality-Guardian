@@ -11,8 +11,10 @@ WORKDIR /app
 
 COPY . .
 
-# Disable Turbo daemon to avoid "Interrupted system call" errors in Docker
+# Disable Turbo features that cause issues in Docker environments
 ENV TURBO_DAEMON=false
+ENV TURBO_TELEMETRY_DISABLED=1
+ENV TURBO_UI=false
 
 # 1. 设置镜像源并安装完整依赖
 RUN pnpm config set registry https://registry.npmmirror.com
@@ -22,7 +24,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install
 RUN pnpm --filter @qgs/backend exec prisma generate --schema=prisma/schema.prisma
 
 # 3. 构建后端产物
-RUN pnpm run build --filter=@qgs/backend -- --log-order=stream
+RUN pnpm run build --filter=@qgs/backend -- --log-order=stream --concurrency=1
 
 # 生产阶段
 FROM node:22-slim AS production

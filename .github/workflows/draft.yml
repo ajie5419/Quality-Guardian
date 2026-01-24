@@ -18,7 +18,7 @@ jobs:
       # otherwise, read permission is required at least
       pull-requests: write
     if: github.repository == 'ajie5419/Quality-Guardian'
-    runs-on: macOS
+    runs-on: [self-hosted, macOS]
     steps:
       - uses: release-drafter/release-drafter@v6
         env:
