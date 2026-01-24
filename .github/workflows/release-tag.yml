@@ -16,7 +16,7 @@ jobs:
   build:
     name: Create Release
     if: github.repository == 'ajie5419/Quality-Guardian'
-    runs-on: [self-hosted, MacBook-Air]
+    runs-on: MacBook-Air
     strategy:
       matrix:
         node-version: [20]
