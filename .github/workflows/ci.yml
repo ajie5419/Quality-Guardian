@@ -22,7 +22,7 @@ jobs:
     strategy:
       matrix:
         os:
-          - MacBook-Air
+          - macOS
     timeout-minutes: 20
     steps:
       - name: Checkout code
@@ -104,7 +104,7 @@ jobs:
   ci-ok:
     name: CI OK
     if: github.repository == 'ajie5419/Quality-Guardian'
-    runs-on: MacBook-Air
+    runs-on: macOS
     needs: [test, check, lint]
     env:
       FAILURE: ${{ contains(join(needs.*.result, ','), 'failure') }}

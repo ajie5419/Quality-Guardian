@@ -11,7 +11,7 @@ jobs:
   main:
     name: Semantic Pull Request
     if: github.repository == 'ajie5419/Quality-Guardian'
-    runs-on: MacBook-Air
+    runs-on: macOS
     steps:
       - name: Validate PR title
         uses: amannn/action-semantic-pull-request@v5

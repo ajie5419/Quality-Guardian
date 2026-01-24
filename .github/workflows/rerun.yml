@@ -8,7 +8,7 @@ on:
         required: true
 jobs:
   rerun:
-    runs-on: MacBook-Air
+    runs-on: macOS
     steps:
       - name: rerun ${{ inputs.run_id }}
         env:
