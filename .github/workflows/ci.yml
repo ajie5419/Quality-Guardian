@@ -19,10 +19,6 @@ jobs:
     name: Test
     if: github.repository == 'ajie5419/Quality-Guardian'
     runs-on: [self-hosted, macOS]
-    strategy:
-      matrix:
-        os:
-          - [self-hosted, macOS]
     timeout-minutes: 20
     steps:
       - name: Checkout code
@@ -38,29 +34,14 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node
 
-      # - name: Check Git version
-      #   run: git --version
-
-      # - name: Setup mock Git user
-      #   run: git config --global user.email "you@example.com" && git config --global user.name "Your Name"
-
       - name: Vitest tests
         run: pnpm run test:unit
 
-      # - name: Upload coverage
-      #   uses: codecov/codecov-action@v4
-      #   with:
-      #     token: ${{ secrets.CODECOV_TOKEN }}
-
   lint:
     name: Lint
+    needs: test
     if: github.repository == 'ajie5419/Quality-Guardian'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os:
-          - [self-hosted, macOS]
-
+    runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -75,13 +56,10 @@ jobs:
 
   check:
     name: Check
+    needs: lint
     if: github.repository == 'ajie5419/Quality-Guardian'
-    runs-on: ${{ matrix.os }}
+    runs-on: [self-hosted, macOS]
     timeout-minutes: 20
-    strategy:
-      matrix:
-        os:
-          - [self-hosted, macOS]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
