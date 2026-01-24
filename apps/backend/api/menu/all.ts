@@ -141,14 +141,26 @@ export default eventHandler(async (event) => {
 
   // 4. 执行过滤
   const isSuper =
-    roleName === 'super' ||
-    roleName === 'Super Admin' ||
-    userPermissions.includes('*');
+    roleName.toLowerCase().includes('super') ||
+    userPermissions.includes('*') ||
+    userPermissions.includes('["*"]') ||
+    uid === '1' ||
+    uid === 'USR-ADMIN';
 
   // 将权限列表转为 Set 提高查询效率
   const userCodesSet = new Set(userPermissions);
 
-  const filteredMenus = filterMenus(fullMenuTree, userCodesSet, isSuper);
+  // 如果是超级管理员，直接返回所有菜单，不需要经过 filterMenus 的繁琐校验
+  // 这样可以确保哪怕是坏数据，管理员也能进得去
+  let filteredMenus: any[] = [];
+  if (isSuper) {
+    filteredMenus = fullMenuTree.map(m => ({ ...m }));
+  } else {
+    filteredMenus = filterMenus(fullMenuTree, userCodesSet, false);
+  }
+
+  // 额外调试日志 (Docker 生产环境下会输出到 docker logs)
+  console.warn(`[Menu] User: ${userinfo.username}, isSuper: ${isSuper}, Count: ${filteredMenus.length}`);
 
   return useResponseSuccess(filteredMenus);
 });
