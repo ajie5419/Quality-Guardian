@@ -22,9 +22,7 @@ jobs:
     strategy:
       matrix:
         os:
-          - self-hosted,macos 
-          - self-hosted,ubuntu
-          - self-hosted,windows
+          - [self-hosted, MacBook-Air]
     timeout-minutes: 20
     steps:
       - name: Checkout code
@@ -61,9 +59,7 @@ jobs:
     strategy:
       matrix:
         os:
-          - self-hosted,macos
-          - self-hosted,ubuntu
-          - self-hosted,windows
+          - [self-hosted, MacBook-Air]
 
     steps:
       - name: Checkout code
@@ -85,9 +81,7 @@ jobs:
     strategy:
       matrix:
         os:
-          - self-hosted,ubuntu
-          - self-hosted,macos
-          - self-hosted,windows
+          - [self-hosted, MacBook-Air]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -110,7 +104,7 @@ jobs:
   ci-ok:
     name: CI OK
     if: github.repository == 'ajie5419/Quality-Guardian'
-    runs-on: self-hosted,ubuntu
+    runs-on: [self-hosted, MacBook-Air]
     needs: [test, check, lint]
     env:
       FAILURE: ${{ contains(join(needs.*.result, ','), 'failure') }}

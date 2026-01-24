@@ -15,7 +15,7 @@ permissions:
 jobs:
   close-issues:
     if: github.repository == 'ajie5419/Quality-Guardian'
-    runs-on: self-hosted,macos
+    runs-on: [self-hosted, MacBook-Air]
     steps:
       # 关闭未活动的 Issues
       - name: Close Inactive Issues

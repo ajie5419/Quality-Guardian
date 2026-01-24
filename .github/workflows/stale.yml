@@ -7,7 +7,7 @@ on:
 jobs:
   stale:
     if: github.repository == 'ajie5419/Quality-Guardian'
-    runs-on: self-hosted,macos
+    runs-on: [self-hosted, MacBook-Air]
     steps:
       - uses: actions/stale@v9
         with:
