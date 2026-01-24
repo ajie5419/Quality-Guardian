@@ -8,9 +8,12 @@ WORKDIR /app
 
 COPY . .
 
+# Disable Turbo daemon to avoid "Interrupted system call" errors in Docker
+ENV TURBO_DAEMON=false
+
 # Install dependencies and build the frontend
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install
-RUN pnpm run build --filter=@qgs/web-antd
+RUN pnpm run build --filter=@qgs/web-antd -- --log-order=stream
 
 # Production stage
 FROM nginx:stable-alpine AS production
