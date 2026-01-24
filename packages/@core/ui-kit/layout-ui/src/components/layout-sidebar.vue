@@ -7,6 +7,8 @@ import { VbenScrollbar } from '@vben-core/shadcn-ui';
 
 import { useScrollLock } from '@vueuse/core';
 
+import { version } from '../../../../../../package.json';
+
 import { SidebarCollapseButton, SidebarFixedButton } from './widgets';
 
 interface Props {
@@ -282,6 +284,13 @@ function handleMouseleave() {
     <VbenScrollbar :style="contentStyle" shadow shadow-border>
       <slot></slot>
     </VbenScrollbar>
+
+    <div
+      v-if="!collapse"
+      class="text-muted-foreground flex-center mb-1 p-2 text-[10px] opacity-40 transition-all"
+    >
+      v{{ version }}
+    </div>
 
     <div :style="collapseStyle"></div>
     <SidebarCollapseButton

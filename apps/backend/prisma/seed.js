@@ -345,7 +345,7 @@ async function main() {
       component: 'qms/work-order/index',
       type: 'menu',
       authCode: 'QMS:WorkOrder:List',
-      meta: { title: '工单管理', icon: 'carbon:document-order' },
+      meta: { title: '工单管理', icon: 'carbon:list-boxes' },
     },
     {
       id: 2301,
