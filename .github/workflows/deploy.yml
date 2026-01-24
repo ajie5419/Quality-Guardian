@@ -27,7 +27,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: apps/backend/Dockerfile
+          file: Dockerfile.backend
           push: true
           # 🌟 使用您的 qms 仓库，通过 tag 区分前后端
           tags: ${{ secrets.ACR_REGISTRY }}/ajie5419/qms:backend-latest
@@ -40,7 +40,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: apps/web-antd/Dockerfile
+          file: Dockerfile.frontend
           push: true
           # 🌟 使用您的 qms 仓库，通过 tag 区分前后端
           tags: ${{ secrets.ACR_REGISTRY }}/ajie5419/qms:frontend-latest
