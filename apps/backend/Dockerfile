@@ -28,16 +28,17 @@ RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /v
 
 WORKDIR /app
 
-# 1. 复制构建产物和 Prisma 定义
-COPY --from=builder /app/apps/backend/.output /app/.output
-COPY --from=builder /app/apps/backend/prisma /app/prisma
-COPY --from=builder /app/apps/backend/package.json /app/package.json
-
-# 2. 关键修复：安装生产环境所需的 Prisma。
+# 1. 关键修复：先在空目录安装 Prisma 运行环境，避开对 catalog: 协议的解析
 # 设置 PRISMA_ENGINES_MIRROR 解决 binaries.prisma.sh 在国内下载慢/失败导致的构建中断
 ENV PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma
 RUN npm config set registry https://registry.npmmirror.com && \
     npm install prisma@6.2.1 @prisma/client@6.2.1 --omit=dev
+
+# 2. 复制构建产物、Prisma 定义和 package.json
+# 将 COPY 移到 install 之后，这样 npm 就不会报错 EUNSUPPORTEDPROTOCOL
+COPY --from=builder /app/apps/backend/.output /app/.output
+COPY --from=builder /app/apps/backend/prisma /app/prisma
+COPY --from=builder /app/apps/backend/package.json /app/package.json
 
 EXPOSE 3000
 
