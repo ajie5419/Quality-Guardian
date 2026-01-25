@@ -2,7 +2,7 @@ import type { Ref } from 'vue';
 
 import type { DeptNode } from '../types';
 
-import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
+import type { QualityLossItem } from '@qgs/shared';
 
 import { findNameById } from '#/types';
 
@@ -10,7 +10,7 @@ import { findNameById } from '#/types';
  * 质量损失图表配置 Hooks
  */
 export function useLossCharts(
-  allLossData: Ref<QmsQualityLossApi.QualityLossItem[]>,
+  allLossData: Ref<QualityLossItem[]>,
   deptRawData: Ref<DeptNode[]>,
 ) {
   /**

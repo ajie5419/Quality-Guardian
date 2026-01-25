@@ -1,0 +1,49 @@
+/**
+ * QMS Business Logic Enums
+ */
+
+/**
+ * QMS Supplier Status
+ */
+export enum SupplierStatusEnum {
+  FROZEN = 'Frozen',
+  OBSERVATION = 'Observation',
+  QUALIFIED = 'Qualified',
+}
+
+/**
+ * QMS Work Order Status
+ */
+export enum WorkOrderStatusEnum {
+  CLOSED = 'Closed',
+  COMPLETED = 'Completed',
+  IN_PROGRESS = 'In Progress',
+  PENDING = 'Pending',
+}
+
+/**
+ * QMS Inspection Issue Status
+ */
+export enum InspectionIssueStatusEnum {
+  CLOSED = 'CLOSED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  OPEN = 'OPEN',
+}
+
+/**
+ * QMS Quality Loss Status
+ */
+export enum QualityLossStatusEnum {
+  CONFIRMED = 'Confirmed',
+  PENDING = 'Pending',
+  PROCESSING = 'Processing',
+  RESOLVED = 'Resolved',
+}
+
+/**
+ * QMS Project Status (Planning)
+ */
+export enum ProjectStatusEnum {
+  ACTIVE = 'active',
+  ARCHIVED = 'archived',
+}

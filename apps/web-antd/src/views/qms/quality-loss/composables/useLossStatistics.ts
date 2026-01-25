@@ -1,6 +1,6 @@
 import type { Ref } from 'vue';
 
-import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
+import type { QualityLossItem } from '@qgs/shared';
 
 import { computed } from 'vue';
 
@@ -10,7 +10,7 @@ import { QualityLossStatusEnum } from '#/api/qms/enums';
  * 质量损失统计逻辑 Hooks
  */
 export function useLossStatistics(
-  allLossData: Ref<QmsQualityLossApi.QualityLossItem[]>,
+  allLossData: Ref<QualityLossItem[]>,
 ) {
   const stats = computed(() => {
     const data = allLossData.value;

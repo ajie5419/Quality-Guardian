@@ -1,27 +1,13 @@
 import { requestClient } from '#/api/request';
-
 import { SYSTEM_API } from './constants';
+import type { PageResult, Role } from '@qgs/shared';
 
-export namespace SystemRoleApi {
-  export interface Role {
-    id: string;
-    name: string;
-    value: string;
-    status: number;
-    createTime: string;
-    remark?: string;
-    permissions?: string[];
-  }
-
-  export interface PageResult<T> {
-    items: T[];
-    total: number;
-  }
-}
+// Re-export for compatibility
+export * from '@qgs/shared';
 
 export const getRoleList = (params?: { page?: number; pageSize?: number }) => {
   const { page = 1, pageSize = 20 } = params || {};
-  return requestClient.get<SystemRoleApi.PageResult<SystemRoleApi.Role>>(
+  return requestClient.get<PageResult<Role>>(
     `${SYSTEM_API.ROLE_LIST}?page=${page}&pageSize=${pageSize}`,
   );
 };

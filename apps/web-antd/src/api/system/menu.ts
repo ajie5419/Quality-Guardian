@@ -1,23 +1,9 @@
 import { requestClient } from '#/api/request';
+import type { Menu } from '@qgs/shared';
 
-export namespace SystemMenuApi {
-  export interface Menu {
-    id: string;
-    pid: string;
-    path: string;
-    name: string;
-    component: string;
-    redirect?: string;
-    meta: {
-      hideMenu?: boolean;
-      icon?: string;
-      orderNo?: number;
-      title: string;
-    };
-    children?: Menu[];
-  }
-}
+// Re-export for compatibility
+export * from '@qgs/shared';
 
 export const getMenuList = () => {
-  return requestClient.get<SystemMenuApi.Menu[]>('/system/menu/list');
+  return requestClient.get<Menu[]>('/system/menu/list');
 };

@@ -1,52 +1,18 @@
 import { requestClient } from '#/api/request';
+import type { 
+  KnowledgeCategory, 
+  KnowledgeItem, 
+  KnowledgeQueryParams 
+} from '@qgs/shared';
 
-export namespace QmsKnowledgeApi {
-  // 知识分类
-  export interface Category {
-    id: string;
-    name: string;
-    description?: string;
-    parentId?: string;
-    children?: Category[];
-  }
-
-  // 知识条目
-  export interface KnowledgeItem {
-    id: string;
-    title: string;
-    categoryId: string;
-    categoryName?: string;
-    tags: string[];
-    author: string;
-    publishDate: string;
-    summary: string;
-    content?: string; // 富文本或Markdown
-    status: 'archived' | 'draft' | 'published';
-    version: string;
-    attachments?: Attachment[];
-    updatedAt: string;
-  }
-
-  export interface Attachment {
-    name: string;
-    url: string;
-    size: number;
-    type: string;
-  }
-
-  export interface QueryParams {
-    categoryId?: string;
-    keyword?: string;
-    tag?: string;
-    status?: string;
-  }
-}
+// Re-export shared types
+export * from '@qgs/shared';
 
 /**
  * 获取分类树
  */
 export async function getCategoryTree() {
-  return requestClient.get<QmsKnowledgeApi.Category[]>(
+  return requestClient.get<KnowledgeCategory[]>(
     '/qms/knowledge/categories',
   );
 }
@@ -54,8 +20,8 @@ export async function getCategoryTree() {
 /**
  * 创建分类
  */
-export async function createCategory(data: Partial<QmsKnowledgeApi.Category>) {
-  return requestClient.post<QmsKnowledgeApi.Category>(
+export async function createCategory(data: Partial<KnowledgeCategory>) {
+  return requestClient.post<KnowledgeCategory>(
     '/qms/knowledge/categories',
     data,
   );
@@ -66,9 +32,9 @@ export async function createCategory(data: Partial<QmsKnowledgeApi.Category>) {
  */
 export async function updateCategory(
   id: string,
-  data: Partial<QmsKnowledgeApi.Category>,
+  data: Partial<KnowledgeCategory>,
 ) {
-  return requestClient.put<QmsKnowledgeApi.Category>(
+  return requestClient.put<KnowledgeCategory>(
     `/qms/knowledge/categories/${id}`,
     data,
   );
@@ -84,8 +50,8 @@ export async function deleteCategory(id: string) {
 /**
  * 获取知识列表
  */
-export async function getKnowledgeList(params?: QmsKnowledgeApi.QueryParams) {
-  return requestClient.get<QmsKnowledgeApi.KnowledgeItem[]>('/qms/knowledge', {
+export async function getKnowledgeList(params?: KnowledgeQueryParams) {
+  return requestClient.get<KnowledgeItem[]>('/qms/knowledge', {
     params,
   });
 }
@@ -94,7 +60,7 @@ export async function getKnowledgeList(params?: QmsKnowledgeApi.QueryParams) {
  * 获取知识详情
  */
 export async function getKnowledgeDetail(id: string) {
-  return requestClient.get<QmsKnowledgeApi.KnowledgeItem>(
+  return requestClient.get<KnowledgeItem>(
     `/qms/knowledge/${id}`,
   );
 }
@@ -103,9 +69,9 @@ export async function getKnowledgeDetail(id: string) {
  * 创建知识条目
  */
 export async function createKnowledge(
-  data: Partial<QmsKnowledgeApi.KnowledgeItem>,
+  data: Partial<KnowledgeItem>,
 ) {
-  return requestClient.post<QmsKnowledgeApi.KnowledgeItem>(
+  return requestClient.post<KnowledgeItem>(
     '/qms/knowledge',
     data,
   );
@@ -116,9 +82,9 @@ export async function createKnowledge(
  */
 export async function updateKnowledge(
   id: string,
-  data: Partial<QmsKnowledgeApi.KnowledgeItem>,
+  data: Partial<KnowledgeItem>,
 ) {
-  return requestClient.put<QmsKnowledgeApi.KnowledgeItem>(
+  return requestClient.put<KnowledgeItem>(
     `/qms/knowledge/${id}`,
     data,
   );

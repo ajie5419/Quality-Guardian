@@ -1,7 +1,7 @@
 /**
  * 损失来源枚举
  */
-import type { SystemDeptApi } from '#/api/system/dept';
+import type { Dept } from '@qgs/shared';
 
 export enum LossSource {
   EXTERNAL = 'External',
@@ -33,4 +33,4 @@ export interface LossStatistics {
 /**
  * 部门节点别名
  */
-export type DeptNode = SystemDeptApi.Dept;
+export type DeptNode = Dept;

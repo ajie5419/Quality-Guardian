@@ -1,6 +1,8 @@
 import process from 'node:process';
 
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+
+const { PrismaClient } = pkg;
 
 // Create a singleton instance of PrismaClient
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };

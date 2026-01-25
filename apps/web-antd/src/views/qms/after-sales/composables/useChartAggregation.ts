@@ -1,4 +1,4 @@
-import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
+import type { AfterSalesItem } from '@qgs/shared';
 import type { ChartConfig } from '#/components/Qms/ChartBuilder/types';
 
 import { aggregateChartData } from '#/components/Qms/ChartBuilder/composables/useChartCore';
@@ -9,7 +9,7 @@ import { CHART_DIMENSIONS, CHART_METRICS } from '../constants';
 export { type ChartConfig };
 
 export function getAfterSalesChartOption(
-  data: QmsAfterSalesApi.AfterSalesItem[],
+  data: AfterSalesItem[],
   config: ChartConfig,
   deptData?: any[],
 ): any {
@@ -51,7 +51,7 @@ export function getAfterSalesChartOption(
 
 export function renderCustomChart(
   renderFn: (option: any) => void,
-  data: QmsAfterSalesApi.AfterSalesItem[],
+  data: AfterSalesItem[],
   config: ChartConfig,
   deptData?: any[],
 ) {

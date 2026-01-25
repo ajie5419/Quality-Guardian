@@ -1,21 +1,25 @@
-import type { QmsSupplierApi } from '#/types/api/supplier';
-
 import { requestClient } from '#/api/request';
-
 import { QMS_API } from './constants';
+import type { 
+  SupplierItem, 
+  SupplierListParams, 
+  SupplierListResponse,
+  ImportSupplierItem
+} from '@qgs/shared';
 
-export type { QmsSupplierApi };
+// Re-export shared types
+export * from '@qgs/shared';
 
 /**
  * Get Supplier list
  */
 export async function getSupplierList(
-  params?: QmsSupplierApi.SupplierListParams,
+  params?: SupplierListParams,
 ) {
   const query = params
     ? `?${new URLSearchParams(params as any).toString()}`
     : '';
-  return requestClient.get<QmsSupplierApi.SupplierListResponse>(
+  return requestClient.get<SupplierListResponse>(
     `${QMS_API.SUPPLIER}${query}`,
   );
 }
@@ -24,9 +28,9 @@ export async function getSupplierList(
  * Create Supplier
  */
 export async function createSupplier(
-  data: Partial<QmsSupplierApi.SupplierItem>,
+  data: Partial<SupplierItem>,
 ) {
-  return requestClient.post<QmsSupplierApi.SupplierItem>(
+  return requestClient.post<SupplierItem>(
     QMS_API.SUPPLIER,
     data,
   );
@@ -34,9 +38,9 @@ export async function createSupplier(
 
 export async function updateSupplier(
   id: string,
-  data: Partial<QmsSupplierApi.SupplierItem>,
+  data: Partial<SupplierItem>,
 ) {
-  return requestClient.put<QmsSupplierApi.SupplierItem>(
+  return requestClient.put<SupplierItem>(
     `${QMS_API.SUPPLIER}/${id}`,
     data,
   );
@@ -57,9 +61,9 @@ export async function batchDeleteSuppliers(ids: string[]) {
  * Batch import suppliers
  */
 export async function batchImportSuppliers(
-  items: QmsSupplierApi.ImportSupplierItem[],
+  items: ImportSupplierItem[],
 ) {
-  // 设置 2 分钟超时，防止大数据量导入中断
+  // Set 2 minute timeout to prevent interruption during large data imports
   return requestClient.post(
     QMS_API.SUPPLIER_BATCH,
     { items },

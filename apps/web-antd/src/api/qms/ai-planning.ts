@@ -1,6 +1,6 @@
 import type { UploadFile } from 'ant-design-vue';
 
-import type { QmsPlanningApi } from './planning';
+import type { ItpItem } from '@qgs/shared';
 
 import { requestClient } from '#/api/request';
 
@@ -15,7 +15,7 @@ export async function generateItpFromFiles(data: {
   prompt?: string;
 }) {
   // AI 生成可能较慢，设置更长的超时时间（如 5 分钟）
-  return requestClient.post<QmsPlanningApi.ItpItem[]>(
+  return requestClient.post<ItpItem[]>(
     QMS_API.AI_GENERATE_ITP,
     data,
     {
@@ -29,7 +29,7 @@ export async function generateItpFromFiles(data: {
  */
 export async function importGeneratedItp(
   projectId: string,
-  items: Partial<QmsPlanningApi.ItpItem>[],
+  items: Partial<ItpItem>[],
 ) {
   return requestClient.post(QMS_API.PLANNING_ITP_IMPORT, { projectId, items });
 }

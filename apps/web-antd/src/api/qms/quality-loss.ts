@@ -1,27 +1,14 @@
 import { requestClient } from '#/api/request';
+import type { QualityLossItem } from '@qgs/shared';
 
-export namespace QmsQualityLossApi {
-  export interface QualityLossItem {
-    id: string;
-    date: string;
-    type: string;
-    amount: number;
-    description: string;
-    responsibleDepartment: string;
-    status: string;
-    workOrderNumber?: string;
-    projectName?: string;
-    partName?: string;
-    lossSource?: string;
-    actualClaim?: number;
-  }
-}
+// Re-export types
+export * from '@qgs/shared';
 
 /**
  * Get Quality Loss list
  */
 export async function getQualityLossList() {
-  return requestClient.get<QmsQualityLossApi.QualityLossItem[]>(
+  return requestClient.get<QualityLossItem[]>(
     '/qms/quality-loss',
   );
 }
@@ -30,9 +17,9 @@ export async function getQualityLossList() {
  * Create Quality Loss record
  */
 export async function createQualityLoss(
-  data: Partial<QmsQualityLossApi.QualityLossItem>,
+  data: Partial<QualityLossItem>,
 ) {
-  return requestClient.post<QmsQualityLossApi.QualityLossItem>(
+  return requestClient.post<QualityLossItem>(
     '/qms/quality-loss',
     data,
   );
@@ -40,9 +27,9 @@ export async function createQualityLoss(
 
 export async function updateQualityLoss(
   id: string,
-  data: Partial<QmsQualityLossApi.QualityLossItem>,
+  data: Partial<QualityLossItem>,
 ) {
-  return requestClient.put<QmsQualityLossApi.QualityLossItem>(
+  return requestClient.put<QualityLossItem>(
     `/qms/quality-loss/${id}`,
     data,
   );

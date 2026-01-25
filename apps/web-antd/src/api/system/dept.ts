@@ -1,17 +1,9 @@
 import { requestClient } from '#/api/request';
+import type { Dept } from '@qgs/shared';
 
-export namespace SystemDeptApi {
-  export interface Dept {
-    id: string;
-    pid: string;
-    name: string;
-    status: number;
-    createTime: string;
-    remark?: string;
-    children?: Dept[];
-  }
-}
+// Re-export for compatibility
+export * from '@qgs/shared';
 
 export const getDeptList = () => {
-  return requestClient.get<SystemDeptApi.Dept[]>('/system/dept/list');
+  return requestClient.get<Dept[]>('/system/dept/list');
 };

@@ -1,16 +1,20 @@
-import type { QmsDashboardApi } from '#/types/api/dashboard';
-
 import { requestClient } from '#/api/request';
-
 import { QMS_API } from './constants';
+import type { 
+  DashboardData, 
+  PassRateTrendResponse, 
+  QualityLossTrendResponse,
+  VehicleFailureResponse
+} from '@qgs/shared';
 
-export type { QmsDashboardApi };
+// Re-export shared types
+export * from '@qgs/shared';
 
 /**
  * Get QMS Dashboard data
  */
 export async function getQmsDashboardData() {
-  return requestClient.get<QmsDashboardApi.DashboardData>(QMS_API.DASHBOARD);
+  return requestClient.get<DashboardData>(QMS_API.DASHBOARD);
 }
 
 /**
@@ -27,7 +31,7 @@ export async function getPassRateTrend(
     params.period = period;
   }
   const query = new URLSearchParams(params).toString();
-  return requestClient.get<QmsDashboardApi.PassRateTrendResponse>(
+  return requestClient.get<PassRateTrendResponse>(
     `${QMS_API.PASS_RATE_TREND}?${query}`,
   );
 }
@@ -46,7 +50,7 @@ export async function getQualityLossTrend(
     params.period = period;
   }
   const query = new URLSearchParams(params).toString();
-  return requestClient.get<QmsDashboardApi.QualityLossTrendResponse>(
+  return requestClient.get<QualityLossTrendResponse>(
     `${QMS_API.QUALITY_LOSS_TREND}?${query}`,
   );
 }
@@ -66,5 +70,5 @@ export async function getVehicleFailureRate(params?: {
     const query = new URLSearchParams(params as any).toString();
     if (query) url += `?${query}`;
   }
-  return requestClient.get<QmsDashboardApi.VehicleFailureResponse>(url);
+  return requestClient.get<VehicleFailureResponse>(url);
 }

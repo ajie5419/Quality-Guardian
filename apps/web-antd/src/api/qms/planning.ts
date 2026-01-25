@@ -1,215 +1,33 @@
 import { requestClient } from '#/api/request';
+import type { 
+  DfmeaProject, 
+  DfmeaProjectStats, 
+  DfmeaTreeNode, 
+  DfmeaItem,
+  BomProject,
+  BomItem,
+  BomTreeNode,
+  ItpProject,
+  ItpItem,
+  ItpTreeNode
+} from '@qgs/shared';
 
-export namespace QmsPlanningApi {
-  // DFMEA 项目
-  export interface DfmeaProject {
-    id: string;
-    projectName: string;
-    workOrderId?: string;
-    version: string;
-    status: 'active' | 'archived' | 'draft';
-    description?: string;
-    createdAt: Date;
-    updatedAt: Date;
-    createdBy: string;
-  }
-
-  // DFMEA 条目
-  export interface DfmeaItem {
-    id: string;
-    projectId: string;
-    item: string;
-    function: string;
-    failureMode: string;
-    effects: string;
-    severity: number;
-    occurrence: number;
-    detection: number;
-    rpn: number;
-    order: number;
-  }
-
-  // 树形表格节点（用于前端显示）
-  export interface DfmeaTreeNode {
-    id: string;
-    type: 'item' | 'project';
-    parentId?: string;
-    name: string;
-    projectName?: string;
-    failureMode?: string;
-    effects?: string;
-    severity?: number;
-    occurrence?: number;
-    detection?: number;
-    rpn?: number;
-    order?: number;
-    // 项目级别统计
-    itemCount?: number;
-    avgRpn?: number;
-    maxRpn?: number;
-    riskLevel?: 'high' | 'low' | 'medium';
-    // 项目信息
-    version?: string;
-    status?: string;
-    children?: DfmeaTreeNode[];
-  }
-
-  // 项目统计
-  export interface DfmeaProjectStats {
-    projectId: string;
-    projectName: string;
-    itemCount: number;
-    avgRpn: number;
-    maxRpn: number;
-    highRiskCount: number; // RPN > 100
-    mediumRiskCount: number; // 50 < RPN <= 100
-    lowRiskCount: number; // RPN <= 50
-  }
-
-  export interface BomProject {
-    id: string;
-    projectName: string;
-    workOrderNumber: string;
-    version: string;
-    status: 'active' | 'archived' | 'draft';
-    description?: string;
-    createdAt: string;
-    updatedAt: string;
-    createdBy: string;
-  }
-
-  export interface BomItem {
-    id: string;
-    projectId: string;
-    partNumber: string;
-    partName: string;
-    version: string;
-    quantity: number;
-    unit: string;
-    material: string;
-    remarks?: string;
-  }
-
-  export interface BomTreeNode {
-    id: string;
-    type: 'item' | 'project';
-    parentId?: string;
-    name: string;
-    projectName?: string;
-    workOrderNumber?: string;
-    version?: string;
-    status?: string;
-    itemCount?: number;
-    children?: BomTreeNode[];
-    // Item specific
-    partNumber?: string;
-    quantity?: number;
-    unit?: string;
-    material?: string;
-    remarks?: string;
-  }
-
-  export interface ItpProject {
-    id: string;
-    projectName: string;
-    workOrderId?: string;
-    customerName?: string;
-    version: string;
-    status: 'active' | 'archived' | 'draft';
-    description?: string;
-    createdAt: string;
-    updatedAt: string;
-    createdBy: string;
-  }
-
-  export interface ItpItem {
-    id: string;
-    projectId: string;
-    bomItemId?: string; // 关联的 BOM 部件 ID
-    processStep: string; // 工序/步骤
-    activity: string; // 检验活动
-    referenceDoc: string; // 参考文档/标准
-    acceptanceCriteria: string; // 验收标准
-    controlPoint: 'H' | 'R' | 'S' | 'W'; // 控制点类型
-    frequency: string; // 检验频次
-    verifyingDocument: string; // 验证记录
-    // 定量化判定
-    isQuantitative: boolean;
-    // Old singular fields (kept for backward compatibility)
-    standardValue?: number;
-    upperTolerance?: number;
-    lowerTolerance?: number;
-    unit?: string;
-
-    // New array field
-    quantitativeItems?: {
-      id?: string; // Optional for new items
-      lowerTolerance: number;
-      name?: string; // Optional name/description of the dimension (e.g. "Length", "Diameter")
-      standardValue: number;
-      unit: string;
-      upperTolerance: number;
-    }[];
-
-    // 联动信息
-    relatedKnowledgeId?: string;
-    order: number;
-  }
-
-  export interface ItpTreeNode {
-    id: string;
-    type: 'item' | 'project';
-    parentId?: string;
-    bomItemId?: string;
-    name: string;
-    processStep?: string;
-    controlPoint?: string;
-    status?: string;
-    version?: string;
-    itemCount?: number;
-    progress?: number;
-    workOrderId?: string;
-    workOrderNumber?: string;
-    children?: ItpTreeNode[];
-    // ... include other ItpItem fields for node data
-    activity?: string;
-    referenceDoc?: string;
-    acceptanceCriteria?: string;
-    frequency?: string;
-    verifyingDocument?: string;
-    isQuantitative?: boolean;
-    // Updated to match ItpItem
-    quantitativeItems?: {
-      id?: string;
-      lowerTolerance: number;
-      name?: string;
-      standardValue: number;
-      unit: string;
-      upperTolerance: number;
-    }[];
-    // Legacy fields
-    standardValue?: number;
-    upperTolerance?: number;
-    lowerTolerance?: number;
-    unit?: string;
-
-    relatedKnowledgeId?: string;
-  }
-}
+// Re-export shared types
+export * from '@qgs/shared';
 
 /**
  * DFMEA Project APIs
  */
 export async function getDfmeaProjectList() {
-  return requestClient.get<QmsPlanningApi.DfmeaProject[]>(
+  return requestClient.get<DfmeaProject[]>(
     '/qms/planning/dfmea/projects',
   );
 }
 
 export async function createDfmeaProject(
-  data: Partial<QmsPlanningApi.DfmeaProject>,
+  data: Partial<DfmeaProject>,
 ) {
-  return requestClient.post<QmsPlanningApi.DfmeaProject>(
+  return requestClient.post<DfmeaProject>(
     '/qms/planning/dfmea/projects',
     data,
   );
@@ -217,9 +35,9 @@ export async function createDfmeaProject(
 
 export async function updateDfmeaProject(
   id: string,
-  data: Partial<QmsPlanningApi.DfmeaProject>,
+  data: Partial<DfmeaProject>,
 ) {
-  return requestClient.put<QmsPlanningApi.DfmeaProject>(
+  return requestClient.put<DfmeaProject>(
     `/qms/planning/dfmea/projects/${id}`,
     data,
   );
@@ -230,7 +48,7 @@ export async function deleteDfmeaProject(id: string) {
 }
 
 export async function getDfmeaProjectStats(projectId: string) {
-  return requestClient.get<QmsPlanningApi.DfmeaProjectStats>(
+  return requestClient.get<DfmeaProjectStats>(
     `/qms/planning/dfmea/projects/${projectId}/stats`,
   );
 }
@@ -239,19 +57,19 @@ export async function getDfmeaProjectStats(projectId: string) {
  * DFMEA Item APIs
  */
 export async function getDfmeaTree() {
-  return requestClient.get<QmsPlanningApi.DfmeaTreeNode[]>(
+  return requestClient.get<DfmeaTreeNode[]>(
     '/qms/planning/dfmea/tree',
   );
 }
 
 export async function getDfmeaItemsByProject(projectId: string) {
-  return requestClient.get<QmsPlanningApi.DfmeaItem[]>(
+  return requestClient.get<DfmeaItem[]>(
     `/qms/planning/dfmea?projectId=${projectId}`,
   );
 }
 
-export async function createDfmea(data: Partial<QmsPlanningApi.DfmeaItem>) {
-  return requestClient.post<QmsPlanningApi.DfmeaItem>(
+export async function createDfmea(data: Partial<DfmeaItem>) {
+  return requestClient.post<DfmeaItem>(
     '/qms/planning/dfmea',
     data,
   );
@@ -259,9 +77,9 @@ export async function createDfmea(data: Partial<QmsPlanningApi.DfmeaItem>) {
 
 export async function updateDfmea(
   id: string,
-  data: Partial<QmsPlanningApi.DfmeaItem>,
+  data: Partial<DfmeaItem>,
 ) {
-  return requestClient.put<QmsPlanningApi.DfmeaItem>(
+  return requestClient.put<DfmeaItem>(
     `/qms/planning/dfmea/${id}`,
     data,
   );
@@ -275,15 +93,15 @@ export async function deleteDfmea(id: string) {
  * BOM Project APIs
  */
 export async function getBomProjectList() {
-  return requestClient.get<QmsPlanningApi.BomProject[]>(
+  return requestClient.get<BomProject[]>(
     '/qms/planning/bom/projects',
   );
 }
 
 export async function createBomProject(
-  data: Partial<QmsPlanningApi.BomProject>,
+  data: Partial<BomProject>,
 ) {
-  return requestClient.post<QmsPlanningApi.BomProject>(
+  return requestClient.post<BomProject>(
     '/qms/planning/bom/projects',
     data,
   );
@@ -291,9 +109,9 @@ export async function createBomProject(
 
 export async function updateBomProject(
   id: string,
-  data: Partial<QmsPlanningApi.BomProject>,
+  data: Partial<BomProject>,
 ) {
-  return requestClient.put<QmsPlanningApi.BomProject>(
+  return requestClient.put<BomProject>(
     `/qms/planning/bom/projects/${id}`,
     data,
   );
@@ -324,26 +142,26 @@ export async function updateProjectDocProject(id: string, data: any) {
  * BOM Item APIs
  */
 export async function getBomTree() {
-  return requestClient.get<QmsPlanningApi.BomTreeNode[]>(
+  return requestClient.get<BomTreeNode[]>(
     '/qms/planning/bom/tree',
   );
 }
 
 export async function getBomList(params?: { projectId?: string }) {
-  return requestClient.get<QmsPlanningApi.BomItem[]>('/qms/planning/bom', {
+  return requestClient.get<BomItem[]>('/qms/planning/bom', {
     params,
   });
 }
 
-export async function createBom(data: Partial<QmsPlanningApi.BomItem>) {
-  return requestClient.post<QmsPlanningApi.BomItem>('/qms/planning/bom', data);
+export async function createBom(data: Partial<BomItem>) {
+  return requestClient.post<BomItem>('/qms/planning/bom', data);
 }
 
 export async function updateBom(
   id: string,
-  data: Partial<QmsPlanningApi.BomItem>,
+  data: Partial<BomItem>,
 ) {
-  return requestClient.put<QmsPlanningApi.BomItem>(
+  return requestClient.put<BomItem>(
     `/qms/planning/bom/${id}`,
     data,
   );
@@ -357,15 +175,15 @@ export async function deleteBom(id: string) {
  * ITP Project APIs
  */
 export async function getItpProjectList() {
-  return requestClient.get<QmsPlanningApi.ItpProject[]>(
+  return requestClient.get<ItpProject[]>(
     '/qms/planning/itp/projects',
   );
 }
 
 export async function createItpProject(
-  data: Partial<QmsPlanningApi.ItpProject>,
+  data: Partial<ItpProject>,
 ) {
-  return requestClient.post<QmsPlanningApi.ItpProject>(
+  return requestClient.post<ItpProject>(
     '/qms/planning/itp/projects',
     data,
   );
@@ -373,9 +191,9 @@ export async function createItpProject(
 
 export async function updateItpProject(
   id: string,
-  data: Partial<QmsPlanningApi.ItpProject>,
+  data: Partial<ItpProject>,
 ) {
-  return requestClient.put<QmsPlanningApi.ItpProject>(
+  return requestClient.put<ItpProject>(
     `/qms/planning/itp/projects/${id}`,
     data,
   );
@@ -389,26 +207,26 @@ export async function deleteItpProject(id: string) {
  * ITP Item APIs
  */
 export async function getItpTree() {
-  return requestClient.get<QmsPlanningApi.ItpTreeNode[]>(
+  return requestClient.get<ItpTreeNode[]>(
     '/qms/planning/itp/tree',
   );
 }
 
 export async function getItpList(params?: { projectId?: string }) {
-  return requestClient.get<QmsPlanningApi.ItpItem[]>('/qms/planning/itp', {
+  return requestClient.get<ItpItem[]>('/qms/planning/itp', {
     params,
   });
 }
 
-export async function createItp(data: Partial<QmsPlanningApi.ItpItem>) {
-  return requestClient.post<QmsPlanningApi.ItpItem>('/qms/planning/itp', data);
+export async function createItp(data: Partial<ItpItem>) {
+  return requestClient.post<ItpItem>('/qms/planning/itp', data);
 }
 
 export async function updateItp(
   id: string,
-  data: Partial<QmsPlanningApi.ItpItem>,
+  data: Partial<ItpItem>,
 ) {
-  return requestClient.put<QmsPlanningApi.ItpItem>(
+  return requestClient.put<ItpItem>(
     `/qms/planning/itp/${id}`,
     data,
   );

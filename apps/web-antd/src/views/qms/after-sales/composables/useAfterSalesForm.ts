@@ -1,7 +1,6 @@
 import type { Ref } from 'vue';
 
-import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
-import type { QmsWorkOrderApi } from '#/api/qms/work-order';
+import type { AfterSalesItem, WorkOrderItem } from '@qgs/shared';
 import type { TreeSelectNode } from '#/types';
 
 import { reactive, ref, watch } from 'vue';
@@ -16,7 +15,7 @@ import {
   PRODUCT_SUBTYPES,
 } from '../constants';
 
-export type AfterSalesFormState = Partial<QmsAfterSalesApi.AfterSalesItem>;
+export type AfterSalesFormState = Partial<AfterSalesItem>;
 
 interface UseAfterSalesFormOptions {
   open: Ref<boolean>;
@@ -80,7 +79,7 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
    */
   function handleWorkOrderChange(
     val: number | string,
-    workOrderList: QmsWorkOrderApi.WorkOrderItem[],
+    workOrderList: WorkOrderItem[],
   ) {
     const wo = workOrderList.find((item) => item.workOrderNumber === val);
     if (wo) {
@@ -111,7 +110,7 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
   /**
    * 从数据初始化表单
    */
-  function initFromData(row: QmsAfterSalesApi.AfterSalesItem) {
+  function initFromData(row: AfterSalesItem) {
     // 同理，清理后赋值
     for (const key in formState) {
       if (Object.prototype.hasOwnProperty.call(formState, key)) {

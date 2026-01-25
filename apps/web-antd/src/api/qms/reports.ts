@@ -1,76 +1,13 @@
 import { requestClient } from '#/api/request';
-
 import { QMS_API } from './constants';
+import type { 
+  ReportItem, 
+  DailySummaryData, 
+  QualityReportSummary 
+} from '@qgs/shared';
 
-export namespace QmsReportsApi {
-  export interface ReportItem {
-    id: string;
-    date: string;
-    totalInspections: number;
-    passRate: number;
-    majorDefects: number;
-    minorDefects: number;
-    status: 'Draft' | 'Published';
-    author: string;
-  }
-}
-
-export interface DailySummaryData {
-  reporter: string;
-  date: string;
-  inspections: Array<{
-    partName: string;
-    process: string;
-    projectName: string;
-    quantity: number;
-    result: string;
-    seq: number;
-    workOrder: string;
-  }>;
-  issues: Array<{
-    dept: string;
-    description: string;
-    isToday: boolean;
-    partName: string;
-    seq: number;
-    solution: string;
-    status: string;
-    workOrder: string;
-  }>;
-  summary: string;
-}
-
-export interface QualityReportSummary {
-  defects: Array<{ name: string; value: number }>;
-  majorEvents: Array<{
-    date: string;
-    desc: string;
-    id: string;
-    loss: number;
-    project: string;
-    status: string;
-    title: string;
-  }>;
-  metrics: Array<{
-    desc: string;
-    history: number[];
-    label: string;
-    trend: number;
-    unit: string;
-    value: number;
-  }>;
-  period: string;
-  suppliers: {
-    best: Array<{ issues: number; name: string }>;
-    worst: Array<{ issues: number; name: string }>;
-  };
-  title: string;
-  topProjects: Array<{
-    issues: number;
-    loss: number;
-    name: string;
-  }>;
-}
+// Re-export shared types
+export * from '@qgs/shared';
 
 export function getSummaryReport(params: {
   date?: string;
@@ -91,21 +28,21 @@ export function getDailySummary(params: { date: string; user?: string }) {
  * Get Reports list
  */
 export async function getReportsList() {
-  return requestClient.get<QmsReportsApi.ReportItem[]>(QMS_API.REPORTS);
+  return requestClient.get<ReportItem[]>(QMS_API.REPORTS);
 }
 
 /**
  * Create Report
  */
-export async function createReport(data: Partial<QmsReportsApi.ReportItem>) {
-  return requestClient.post<QmsReportsApi.ReportItem>(QMS_API.REPORTS, data);
+export async function createReport(data: Partial<ReportItem>) {
+  return requestClient.post<ReportItem>(QMS_API.REPORTS, data);
 }
 
 export async function updateReport(
   id: string,
-  data: Partial<QmsReportsApi.ReportItem>,
+  data: Partial<ReportItem>,
 ) {
-  return requestClient.put<QmsReportsApi.ReportItem>(
+  return requestClient.put<ReportItem>(
     `/qms/reports/${id}`,
     data,
   );
