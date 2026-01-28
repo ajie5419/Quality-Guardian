@@ -15,7 +15,10 @@
     "build": "nitro build",
     "dev": "cross-env PORT=5320 nitro dev",
     "start": "nitro dev",
-    "stub": "nitro prepare"
+    "stub": "nitro prepare",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@prisma/client": "6.2.1",
