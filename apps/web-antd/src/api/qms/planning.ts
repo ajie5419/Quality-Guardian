@@ -1,16 +1,17 @@
-import { requestClient } from '#/api/request';
-import type { 
-  DfmeaProject, 
-  DfmeaProjectStats, 
-  DfmeaTreeNode, 
-  DfmeaItem,
-  BomProject,
+import type {
   BomItem,
+  BomProject,
   BomTreeNode,
-  ItpProject,
+  DfmeaItem,
+  DfmeaProject,
+  DfmeaProjectStats,
+  DfmeaTreeNode,
   ItpItem,
-  ItpTreeNode
+  ItpProject,
+  ItpTreeNode,
 } from '@qgs/shared';
+
+import { requestClient } from '#/api/request';
 
 // Re-export shared types
 export * from '@qgs/shared';
@@ -19,18 +20,11 @@ export * from '@qgs/shared';
  * DFMEA Project APIs
  */
 export async function getDfmeaProjectList() {
-  return requestClient.get<DfmeaProject[]>(
-    '/qms/planning/dfmea/projects',
-  );
+  return requestClient.get<DfmeaProject[]>('/qms/planning/dfmea/projects');
 }
 
-export async function createDfmeaProject(
-  data: Partial<DfmeaProject>,
-) {
-  return requestClient.post<DfmeaProject>(
-    '/qms/planning/dfmea/projects',
-    data,
-  );
+export async function createDfmeaProject(data: Partial<DfmeaProject>) {
+  return requestClient.post<DfmeaProject>('/qms/planning/dfmea/projects', data);
 }
 
 export async function updateDfmeaProject(
@@ -57,9 +51,7 @@ export async function getDfmeaProjectStats(projectId: string) {
  * DFMEA Item APIs
  */
 export async function getDfmeaTree() {
-  return requestClient.get<DfmeaTreeNode[]>(
-    '/qms/planning/dfmea/tree',
-  );
+  return requestClient.get<DfmeaTreeNode[]>('/qms/planning/dfmea/tree');
 }
 
 export async function getDfmeaItemsByProject(projectId: string) {
@@ -69,20 +61,11 @@ export async function getDfmeaItemsByProject(projectId: string) {
 }
 
 export async function createDfmea(data: Partial<DfmeaItem>) {
-  return requestClient.post<DfmeaItem>(
-    '/qms/planning/dfmea',
-    data,
-  );
+  return requestClient.post<DfmeaItem>('/qms/planning/dfmea', data);
 }
 
-export async function updateDfmea(
-  id: string,
-  data: Partial<DfmeaItem>,
-) {
-  return requestClient.put<DfmeaItem>(
-    `/qms/planning/dfmea/${id}`,
-    data,
-  );
+export async function updateDfmea(id: string, data: Partial<DfmeaItem>) {
+  return requestClient.put<DfmeaItem>(`/qms/planning/dfmea/${id}`, data);
 }
 
 export async function deleteDfmea(id: string) {
@@ -93,24 +76,14 @@ export async function deleteDfmea(id: string) {
  * BOM Project APIs
  */
 export async function getBomProjectList() {
-  return requestClient.get<BomProject[]>(
-    '/qms/planning/bom/projects',
-  );
+  return requestClient.get<BomProject[]>('/qms/planning/bom/projects');
 }
 
-export async function createBomProject(
-  data: Partial<BomProject>,
-) {
-  return requestClient.post<BomProject>(
-    '/qms/planning/bom/projects',
-    data,
-  );
+export async function createBomProject(data: Partial<BomProject>) {
+  return requestClient.post<BomProject>('/qms/planning/bom/projects', data);
 }
 
-export async function updateBomProject(
-  id: string,
-  data: Partial<BomProject>,
-) {
+export async function updateBomProject(id: string, data: Partial<BomProject>) {
   return requestClient.put<BomProject>(
     `/qms/planning/bom/projects/${id}`,
     data,
@@ -142,9 +115,7 @@ export async function updateProjectDocProject(id: string, data: any) {
  * BOM Item APIs
  */
 export async function getBomTree() {
-  return requestClient.get<BomTreeNode[]>(
-    '/qms/planning/bom/tree',
-  );
+  return requestClient.get<BomTreeNode[]>('/qms/planning/bom/tree');
 }
 
 export async function getBomList(params?: { projectId?: string }) {
@@ -157,14 +128,8 @@ export async function createBom(data: Partial<BomItem>) {
   return requestClient.post<BomItem>('/qms/planning/bom', data);
 }
 
-export async function updateBom(
-  id: string,
-  data: Partial<BomItem>,
-) {
-  return requestClient.put<BomItem>(
-    `/qms/planning/bom/${id}`,
-    data,
-  );
+export async function updateBom(id: string, data: Partial<BomItem>) {
+  return requestClient.put<BomItem>(`/qms/planning/bom/${id}`, data);
 }
 
 export async function deleteBom(id: string) {
@@ -175,24 +140,14 @@ export async function deleteBom(id: string) {
  * ITP Project APIs
  */
 export async function getItpProjectList() {
-  return requestClient.get<ItpProject[]>(
-    '/qms/planning/itp/projects',
-  );
+  return requestClient.get<ItpProject[]>('/qms/planning/itp/projects');
 }
 
-export async function createItpProject(
-  data: Partial<ItpProject>,
-) {
-  return requestClient.post<ItpProject>(
-    '/qms/planning/itp/projects',
-    data,
-  );
+export async function createItpProject(data: Partial<ItpProject>) {
+  return requestClient.post<ItpProject>('/qms/planning/itp/projects', data);
 }
 
-export async function updateItpProject(
-  id: string,
-  data: Partial<ItpProject>,
-) {
+export async function updateItpProject(id: string, data: Partial<ItpProject>) {
   return requestClient.put<ItpProject>(
     `/qms/planning/itp/projects/${id}`,
     data,
@@ -207,9 +162,7 @@ export async function deleteItpProject(id: string) {
  * ITP Item APIs
  */
 export async function getItpTree() {
-  return requestClient.get<ItpTreeNode[]>(
-    '/qms/planning/itp/tree',
-  );
+  return requestClient.get<ItpTreeNode[]>('/qms/planning/itp/tree');
 }
 
 export async function getItpList(params?: { projectId?: string }) {
@@ -222,16 +175,24 @@ export async function createItp(data: Partial<ItpItem>) {
   return requestClient.post<ItpItem>('/qms/planning/itp', data);
 }
 
-export async function updateItp(
-  id: string,
-  data: Partial<ItpItem>,
-) {
-  return requestClient.put<ItpItem>(
-    `/qms/planning/itp/${id}`,
-    data,
-  );
+export async function updateItp(id: string, data: Partial<ItpItem>) {
+  return requestClient.put<ItpItem>(`/qms/planning/itp/${id}`, data);
 }
 
 export async function deleteItp(id: string, projectId: string) {
   return requestClient.delete(`/qms/planning/itp/${id}?projectId=${projectId}`);
+}
+
+export namespace QmsPlanningApi {
+  export type ItpProject = import('@qgs/shared').ItpProject;
+  export type ItpItem = import('@qgs/shared').ItpItem;
+  export type ItpTreeNode = import('@qgs/shared').ItpTreeNode;
+  export type BomProject = import('@qgs/shared').BomProject;
+  export type BomItem = import('@qgs/shared').BomItem;
+  export type DfmeaProject = import('@qgs/shared').DfmeaProject;
+  export type DfmeaItem = import('@qgs/shared').DfmeaItem;
+}
+export namespace QmsPlanningApi {
+  export type BomTreeNode = import('@qgs/shared').BomTreeNode;
+  export type DfmeaTreeNode = import('@qgs/shared').DfmeaTreeNode;
 }

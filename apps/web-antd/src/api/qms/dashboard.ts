@@ -1,11 +1,13 @@
-import { requestClient } from '#/api/request';
-import { QMS_API } from './constants';
-import type { 
-  DashboardData, 
-  PassRateTrendResponse, 
+import type {
+  DashboardData,
+  PassRateTrendResponse,
   QualityLossTrendResponse,
-  VehicleFailureResponse
+  VehicleFailureResponse,
 } from '@qgs/shared';
+
+import { requestClient } from '#/api/request';
+
+import { QMS_API } from './constants';
 
 // Re-export shared types
 export * from '@qgs/shared';
@@ -71,4 +73,13 @@ export async function getVehicleFailureRate(params?: {
     if (query) url += `?${query}`;
   }
   return requestClient.get<VehicleFailureResponse>(url);
+}
+
+export namespace QmsDashboardApi {
+  export type PassRateTrendItem = import('@qgs/shared').PassRateTrendItem;
+  export type PassRateDrillDownItem =
+    import('@qgs/shared').PassRateDrillDownItem;
+  export type QualityLossTrendItem = import('@qgs/shared').QualityLossTrendItem;
+  export type QualityLossDrillDownItem =
+    import('@qgs/shared').QualityLossDrillDownItem;
 }

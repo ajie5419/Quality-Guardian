@@ -1,8 +1,8 @@
+import type { QualityLossItem } from '@qgs/shared';
+
 import type { Ref } from 'vue';
 
 import type { DeptNode } from '../types';
-
-import type { QualityLossItem } from '@qgs/shared';
 
 import { findNameById } from '#/types';
 

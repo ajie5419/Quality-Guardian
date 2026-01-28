@@ -1,6 +1,7 @@
+import type { AfterSalesItem, WorkOrderItem } from '@qgs/shared';
+
 import type { Ref } from 'vue';
 
-import type { AfterSalesItem, WorkOrderItem } from '@qgs/shared';
 import type { TreeSelectNode } from '#/types';
 
 import { reactive, ref, watch } from 'vue';

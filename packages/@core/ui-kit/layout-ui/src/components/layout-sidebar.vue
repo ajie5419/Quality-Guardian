@@ -8,7 +8,6 @@ import { VbenScrollbar } from '@vben-core/shadcn-ui';
 import { useScrollLock } from '@vueuse/core';
 
 import { version } from '../../../../../../package.json';
-
 import { SidebarCollapseButton, SidebarFixedButton } from './widgets';
 
 interface Props {

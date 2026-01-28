@@ -1,10 +1,12 @@
-import { requestClient } from '#/api/request';
-import { QMS_API } from './constants';
-import type { 
-  ReportItem, 
-  DailySummaryData, 
-  QualityReportSummary 
+import type {
+  DailySummaryData,
+  QualityReportSummary,
+  ReportItem,
 } from '@qgs/shared';
+
+import { requestClient } from '#/api/request';
+
+import { QMS_API } from './constants';
 
 // Re-export shared types
 export * from '@qgs/shared';
@@ -38,14 +40,8 @@ export async function createReport(data: Partial<ReportItem>) {
   return requestClient.post<ReportItem>(QMS_API.REPORTS, data);
 }
 
-export async function updateReport(
-  id: string,
-  data: Partial<ReportItem>,
-) {
-  return requestClient.put<ReportItem>(
-    `/qms/reports/${id}`,
-    data,
-  );
+export async function updateReport(id: string, data: Partial<ReportItem>) {
+  return requestClient.put<ReportItem>(`/qms/reports/${id}`, data);
 }
 
 export async function deleteReport(id: string) {

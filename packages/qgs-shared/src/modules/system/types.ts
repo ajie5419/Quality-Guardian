@@ -4,52 +4,52 @@ export interface PageResult<T> {
 }
 
 export interface User {
-  id: string;
-  username: string;
-  realName: string;
-  email?: string;
-  phone?: string;
+  createTime: string;
   deptId?: string;
   deptName?: string;
+  email?: string;
+  id: string;
+  phone?: string;
+  realName: string;
+  remark?: string;
   roleIds?: string[];
   roles?: string[];
   status: number;
-  createTime: string;
-  remark?: string;
+  username: string;
 }
 
 export interface Role {
+  createTime: string;
   id: string;
   name: string;
-  value: string;
-  status: number;
-  createTime: string;
-  remark?: string;
   permissions?: string[];
+  remark?: string;
+  status: number;
+  value: string;
 }
 
 export interface Dept {
-  id: string;
-  pid: string;
-  name: string;
-  status: number;
-  createTime: string;
-  remark?: string;
   children?: Dept[];
+  createTime: string;
+  id: string;
+  name: string;
+  pid: string;
+  remark?: string;
+  status: number;
 }
 
 export interface Menu {
-  id: string;
-  pid: string;
-  path: string;
-  name: string;
+  children?: Menu[];
   component: string;
-  redirect?: string;
+  id: string;
   meta: {
     hideMenu?: boolean;
     icon?: string;
     orderNo?: number;
     title: string;
   };
-  children?: Menu[];
+  name: string;
+  path: string;
+  pid: string;
+  redirect?: string;
 }

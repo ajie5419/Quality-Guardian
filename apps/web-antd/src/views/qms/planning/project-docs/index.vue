@@ -37,7 +37,9 @@ const searchTerm = ref('');
 const activeTab = ref('active');
 
 const selectedProject = computed(
-  () => projectList.value.find((p) => p.id === selectedProjectId.value) || null,
+  () =>
+    projectList.value.find((p: any) => p.id === selectedProjectId.value) ||
+    null,
 );
 
 async function loadProjects() {
@@ -85,7 +87,7 @@ const filteredProjects = computed(() => {
 
   // 1. 状态过滤
   const isArchivedTab = activeTab.value === 'archived';
-  list = list.filter((p) => {
+  list = list.filter((p: any) => {
     const isArchived = isArchivedStatus(p.status as string);
     return isArchivedTab ? isArchived : !isArchived;
   });
@@ -94,7 +96,7 @@ const filteredProjects = computed(() => {
   if (searchTerm.value) {
     const lower = searchTerm.value.toLowerCase();
     list = list.filter(
-      (p) =>
+      (p: any) =>
         p.projectName?.toLowerCase().includes(lower) ||
         p.workOrderNumber?.toLowerCase().includes(lower),
     );
@@ -248,7 +250,7 @@ onMounted(() => loadProjects());
       <PlanningSidebar
         :title="t('qms.planning.bom.projectList')"
         :projects="
-          filteredProjects.map((p) => ({
+          filteredProjects.map((p: any) => ({
             ...p,
             name: p.projectName || (p as any).name,
             status: isArchivedStatus(p.status as string)

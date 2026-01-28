@@ -1,11 +1,13 @@
-import { requestClient } from '#/api/request';
-import { QMS_API } from './constants';
-import type { 
-  SupplierItem, 
-  SupplierListParams, 
+import type {
+  ImportSupplierItem,
+  SupplierItem,
+  SupplierListParams,
   SupplierListResponse,
-  ImportSupplierItem
 } from '@qgs/shared';
+
+import { requestClient } from '#/api/request';
+
+import { QMS_API } from './constants';
 
 // Re-export shared types
 export * from '@qgs/shared';
@@ -13,37 +15,22 @@ export * from '@qgs/shared';
 /**
  * Get Supplier list
  */
-export async function getSupplierList(
-  params?: SupplierListParams,
-) {
+export async function getSupplierList(params?: SupplierListParams) {
   const query = params
     ? `?${new URLSearchParams(params as any).toString()}`
     : '';
-  return requestClient.get<SupplierListResponse>(
-    `${QMS_API.SUPPLIER}${query}`,
-  );
+  return requestClient.get<SupplierListResponse>(`${QMS_API.SUPPLIER}${query}`);
 }
 
 /**
  * Create Supplier
  */
-export async function createSupplier(
-  data: Partial<SupplierItem>,
-) {
-  return requestClient.post<SupplierItem>(
-    QMS_API.SUPPLIER,
-    data,
-  );
+export async function createSupplier(data: Partial<SupplierItem>) {
+  return requestClient.post<SupplierItem>(QMS_API.SUPPLIER, data);
 }
 
-export async function updateSupplier(
-  id: string,
-  data: Partial<SupplierItem>,
-) {
-  return requestClient.put<SupplierItem>(
-    `${QMS_API.SUPPLIER}/${id}`,
-    data,
-  );
+export async function updateSupplier(id: string, data: Partial<SupplierItem>) {
+  return requestClient.put<SupplierItem>(`${QMS_API.SUPPLIER}/${id}`, data);
 }
 
 export async function deleteSupplier(id: string) {
@@ -60,13 +47,17 @@ export async function batchDeleteSuppliers(ids: string[]) {
 /**
  * Batch import suppliers
  */
-export async function batchImportSuppliers(
-  items: ImportSupplierItem[],
-) {
+export async function batchImportSuppliers(items: ImportSupplierItem[]) {
   // Set 2 minute timeout to prevent interruption during large data imports
   return requestClient.post(
     QMS_API.SUPPLIER_BATCH,
     { items },
     { timeout: 120 * 1000 },
   );
+}
+
+export namespace QmsSupplierApi {
+  export type SupplierItem = import('@qgs/shared').SupplierItem;
+  export type SupplierStats = import('@qgs/shared').SupplierStats;
+  export type SupplierListParams = import('@qgs/shared').SupplierListParams;
 }

@@ -17,17 +17,17 @@ export interface DashboardChartItem {
 
 export interface DashboardWorkOrder {
   id: string;
-  title: string;
-  status: string;
   priority: string;
+  status: string;
+  title: string;
 }
 
 export interface DashboardData {
-  overview: DashboardOverview;
   chartData: {
     issueDistribution: DashboardChartItem[];
     monthlyQuality: DashboardChartItem[];
   };
+  overview: DashboardOverview;
   recentWorkOrders: DashboardWorkOrder[];
 }
 
@@ -35,11 +35,11 @@ export interface DashboardData {
  * Pass Rate Trend Item
  */
 export interface PassRateTrendItem {
-  period: string; // e.g., 'W1', '2024-01'
   label: string;
-  passRate: number;
-  totalCount: number;
   passCount: number;
+  passRate: number;
+  period: string; // e.g., 'W1', '2024-01'
+  totalCount: number;
 }
 
 /**
@@ -112,27 +112,27 @@ export interface VehicleRankingItem {
  */
 export interface VehicleTrendItem {
   period: string;
-  shipped: number;
   rate: number;
+  shipped: number;
 }
 
 /**
  * Vehicle Failure Item
  */
 export interface VehicleFailureItem {
-  model: string; // Model
-  failureRate: number; // Failure Rate
-  totalVehicles: number; // Total Vehicles
-  failedVehicles: number; // Failed Vehicles
   category?: string; // Failure Category
+  failedVehicles: number; // Failed Vehicles
+  failureRate: number; // Failure Rate
+  model: string; // Model
+  totalVehicles: number; // Total Vehicles
 }
 
 /**
  * Vehicle Failure Response
  */
 export interface VehicleFailureResponse {
-  range: string;
   data?: VehicleFailureItem[];
+  range: string;
   ranking?: VehicleRankingItem[];
   trend?: VehicleTrendItem[];
 }

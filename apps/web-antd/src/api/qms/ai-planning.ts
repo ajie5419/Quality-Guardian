@@ -1,6 +1,5 @@
-import type { UploadFile } from 'ant-design-vue';
-
 import type { ItpItem } from '@qgs/shared';
+import type { UploadFile } from 'ant-design-vue';
 
 import { requestClient } from '#/api/request';
 
@@ -15,13 +14,9 @@ export async function generateItpFromFiles(data: {
   prompt?: string;
 }) {
   // AI 生成可能较慢，设置更长的超时时间（如 5 分钟）
-  return requestClient.post<ItpItem[]>(
-    QMS_API.AI_GENERATE_ITP,
-    data,
-    {
-      timeout: 300_000,
-    },
-  );
+  return requestClient.post<ItpItem[]>(QMS_API.AI_GENERATE_ITP, data, {
+    timeout: 300_000,
+  });
 }
 
 /**

@@ -1,143 +1,137 @@
 // DFMEA Project
 export interface DfmeaProject {
+  createdAt: Date;
+  createdBy: string;
+  description?: string;
   id: string;
   projectName: string;
-  workOrderId?: string;
-  version: string;
   status: 'active' | 'archived' | 'draft';
-  description?: string;
-  createdAt: Date;
   updatedAt: Date;
-  createdBy: string;
+  version: string;
+  workOrderId?: string;
 }
 
 // DFMEA Item
 export interface DfmeaItem {
-  id: string;
-  projectId: string;
-  item: string;
-  function: string;
-  failureMode: string;
-  effects: string;
-  severity: number;
-  occurrence: number;
   detection: number;
-  rpn: number;
+  effects: string;
+  failureMode: string;
+  function: string;
+  id: string;
+  item: string;
+  occurrence: number;
   order: number;
+  projectId: string;
+  rpn: number;
+  severity: number;
 }
 
 // DFMEA Tree Node
 export interface DfmeaTreeNode {
-  id: string;
-  type: 'item' | 'project';
-  parentId?: string;
-  name: string;
-  projectName?: string;
-  failureMode?: string;
-  effects?: string;
-  severity?: number;
-  occurrence?: number;
+  avgRpn?: number;
+  children?: DfmeaTreeNode[];
   detection?: number;
-  rpn?: number;
-  order?: number;
+  effects?: string;
+  failureMode?: string;
+  id: string;
   // Project stats
   itemCount?: number;
-  avgRpn?: number;
   maxRpn?: number;
+  name: string;
+  occurrence?: number;
+  order?: number;
+  parentId?: string;
+  projectName?: string;
   riskLevel?: 'high' | 'low' | 'medium';
+  rpn?: number;
+  severity?: number;
+  status?: string;
+  type: 'item' | 'project';
   // Project info
   version?: string;
-  status?: string;
-  children?: DfmeaTreeNode[];
 }
 
 // DFMEA Project Stats
 export interface DfmeaProjectStats {
+  avgRpn: number;
+  highRiskCount: number; // RPN > 100
+  itemCount: number;
+  lowRiskCount: number; // RPN <= 50
+  maxRpn: number;
+  mediumRiskCount: number; // 50 < RPN <= 100
   projectId: string;
   projectName: string;
-  itemCount: number;
-  avgRpn: number;
-  maxRpn: number;
-  highRiskCount: number; // RPN > 100
-  mediumRiskCount: number; // 50 < RPN <= 100
-  lowRiskCount: number; // RPN <= 50
 }
 
 export interface BomProject {
+  createdAt: string;
+  createdBy: string;
+  description?: string;
   id: string;
   projectName: string;
-  workOrderNumber: string;
-  version: string;
   status: 'active' | 'archived' | 'draft';
-  description?: string;
-  createdAt: string;
   updatedAt: string;
-  createdBy: string;
+  version: string;
+  workOrderNumber: string;
 }
 
 export interface BomItem {
   id: string;
-  projectId: string;
-  partNumber: string;
-  partName: string;
-  version: string;
-  quantity: number;
-  unit: string;
   material: string;
+  partName: string;
+  partNumber: string;
+  projectId: string;
+  quantity: number;
   remarks?: string;
+  unit: string;
+  version: string;
 }
 
 export interface BomTreeNode {
-  id: string;
-  type: 'item' | 'project';
-  parentId?: string;
-  name: string;
-  projectName?: string;
-  workOrderNumber?: string;
-  version?: string;
-  status?: string;
-  itemCount?: number;
   children?: BomTreeNode[];
+  id: string;
+  itemCount?: number;
+  material?: string;
+  name: string;
+  parentId?: string;
   // Item specific
   partNumber?: string;
+  projectName?: string;
   quantity?: number;
-  unit?: string;
-  material?: string;
   remarks?: string;
+  status?: string;
+  type: 'item' | 'project';
+  unit?: string;
+  version?: string;
+  workOrderNumber?: string;
 }
 
 export interface ItpProject {
+  createdAt: string;
+  createdBy: string;
+  customerName?: string;
+  description?: string;
   id: string;
   projectName: string;
-  workOrderId?: string;
-  customerName?: string;
-  version: string;
   status: 'active' | 'archived' | 'draft';
-  description?: string;
-  createdAt: string;
   updatedAt: string;
-  createdBy: string;
+  version: string;
+  workOrderId?: string;
 }
 
 export interface ItpItem {
-  id: string;
-  projectId: string;
-  bomItemId?: string; // Related BOM ID
-  processStep: string; // Process/Step
-  activity: string; // Inspection Activity
-  referenceDoc: string; // Reference Doc
   acceptanceCriteria: string; // Acceptance Criteria
+  activity: string; // Inspection Activity
+  bomItemId?: string; // Related BOM ID
   controlPoint: 'H' | 'R' | 'S' | 'W'; // Control Point
   frequency: string; // Frequency
-  verifyingDocument: string; // Verifying Document
+  id: string;
   // Quantitative
   isQuantitative: boolean;
-  // Old fields
-  standardValue?: number;
-  upperTolerance?: number;
   lowerTolerance?: number;
-  unit?: string;
-
+  order: number;
+  processStep: string; // Process/Step
+  projectId: string;
   // New array field
   quantitativeItems?: {
     id?: string;
@@ -147,33 +141,33 @@ export interface ItpItem {
     unit: string;
     upperTolerance: number;
   }[];
-
+  referenceDoc: string; // Reference Doc
   // Linked info
   relatedKnowledgeId?: string;
-  order: number;
+  // Old fields
+  standardValue?: number;
+
+  unit?: string;
+
+  upperTolerance?: number;
+  verifyingDocument: string; // Verifying Document
 }
 
 export interface ItpTreeNode {
-  id: string;
-  type: 'item' | 'project';
-  parentId?: string;
-  bomItemId?: string;
-  name: string;
-  processStep?: string;
-  controlPoint?: string;
-  status?: string;
-  version?: string;
-  itemCount?: number;
-  progress?: number;
-  workOrderId?: string;
-  workOrderNumber?: string;
-  children?: ItpTreeNode[];
-  activity?: string;
-  referenceDoc?: string;
   acceptanceCriteria?: string;
+  activity?: string;
+  bomItemId?: string;
+  children?: ItpTreeNode[];
+  controlPoint?: string;
   frequency?: string;
-  verifyingDocument?: string;
+  id: string;
   isQuantitative?: boolean;
+  itemCount?: number;
+  lowerTolerance?: number;
+  name: string;
+  parentId?: string;
+  processStep?: string;
+  progress?: number;
   quantitativeItems?: {
     id?: string;
     lowerTolerance: number;
@@ -182,9 +176,15 @@ export interface ItpTreeNode {
     unit: string;
     upperTolerance: number;
   }[];
-  standardValue?: number;
-  upperTolerance?: number;
-  lowerTolerance?: number;
-  unit?: string;
+  referenceDoc?: string;
   relatedKnowledgeId?: string;
+  standardValue?: number;
+  status?: string;
+  type: 'item' | 'project';
+  unit?: string;
+  upperTolerance?: number;
+  verifyingDocument?: string;
+  version?: string;
+  workOrderId?: string;
+  workOrderNumber?: string;
 }

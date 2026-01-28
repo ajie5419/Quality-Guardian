@@ -336,7 +336,10 @@ loadProjects();
               class="w-80"
               :placeholder="t('qms.planning.itpGenerator.selectImportTarget')"
               :options="
-                itpProjects.map((p) => ({ label: p.projectName, value: p.id }))
+                itpProjects.map((p: any) => ({
+                  label: p.projectName,
+                  value: p.id,
+                }))
               "
             />
             <Button type="primary" @click="handleImport">{{

@@ -1,9 +1,10 @@
-import { requestClient } from '#/api/request';
-import type { 
-  KnowledgeCategory, 
-  KnowledgeItem, 
-  KnowledgeQueryParams 
+import type {
+  KnowledgeCategory,
+  KnowledgeItem,
+  KnowledgeQueryParams,
 } from '@qgs/shared';
+
+import { requestClient } from '#/api/request';
 
 // Re-export shared types
 export * from '@qgs/shared';
@@ -12,9 +13,7 @@ export * from '@qgs/shared';
  * 获取分类树
  */
 export async function getCategoryTree() {
-  return requestClient.get<KnowledgeCategory[]>(
-    '/qms/knowledge/categories',
-  );
+  return requestClient.get<KnowledgeCategory[]>('/qms/knowledge/categories');
 }
 
 /**
@@ -60,21 +59,14 @@ export async function getKnowledgeList(params?: KnowledgeQueryParams) {
  * 获取知识详情
  */
 export async function getKnowledgeDetail(id: string) {
-  return requestClient.get<KnowledgeItem>(
-    `/qms/knowledge/${id}`,
-  );
+  return requestClient.get<KnowledgeItem>(`/qms/knowledge/${id}`);
 }
 
 /**
  * 创建知识条目
  */
-export async function createKnowledge(
-  data: Partial<KnowledgeItem>,
-) {
-  return requestClient.post<KnowledgeItem>(
-    '/qms/knowledge',
-    data,
-  );
+export async function createKnowledge(data: Partial<KnowledgeItem>) {
+  return requestClient.post<KnowledgeItem>('/qms/knowledge', data);
 }
 
 /**
@@ -84,10 +76,7 @@ export async function updateKnowledge(
   id: string,
   data: Partial<KnowledgeItem>,
 ) {
-  return requestClient.put<KnowledgeItem>(
-    `/qms/knowledge/${id}`,
-    data,
-  );
+  return requestClient.put<KnowledgeItem>(`/qms/knowledge/${id}`, data);
 }
 
 /**
@@ -95,4 +84,14 @@ export async function updateKnowledge(
  */
 export async function deleteKnowledge(id: string) {
   return requestClient.delete(`/qms/knowledge/${id}`);
+}
+
+export namespace QmsKnowledgeApi {
+  export type Category = import('@qgs/shared').KnowledgeCategory;
+  export type QueryParams = import('@qgs/shared').KnowledgeQueryParams;
+  export type Attachment = import('@qgs/shared').KnowledgeAttachment;
+  export type Item = import('@qgs/shared').KnowledgeItem;
+}
+export namespace QmsKnowledgeApi {
+  export type KnowledgeItem = import('@qgs/shared').KnowledgeItem;
 }

@@ -286,6 +286,24 @@ function showDetail(row: QmsSupplierApi.SupplierItem) {
   detailDrawerRef.value?.open(row, t('qms.supplier.title'));
 }
 
+// Helper to get status config safely
+function getStatusConfig(status?: string) {
+  if (!status) {
+    return {
+      status: 'default',
+      textKey: '',
+      defaultText: '-',
+    };
+  }
+  return (
+    (SUPPLIER_STATUS_UI_MAP as any)[status] || {
+      status: 'default',
+      textKey: '',
+      defaultText: '-',
+    }
+  );
+}
+
 function handleSuccess() {
   gridApi.reload();
 }
@@ -349,53 +367,51 @@ function handleSuccess() {
           </template>
 
           <template #status_badge="{ row }">
-            <Badge
-              :status="
-                row.status
-                  ? (SUPPLIER_STATUS_UI_MAP as any)[row.status]?.status
-                  : 'default'
-              "
-              :text="
-                row.status
-                  ? t(
-                      (SUPPLIER_STATUS_UI_MAP as any)[row.status]?.textKey,
-                      (SUPPLIER_STATUS_UI_MAP as any)[row.status]?.defaultText,
-                    )
-                  : '-'
-              "
-            />
+            <div class="flex items-center">
+              <Badge
+                :status="getStatusConfig(row.status).status"
+                :text="
+                  getStatusConfig(row.status).textKey
+                    ? t(getStatusConfig(row.status).textKey)
+                    : '-'
+                "
+              />
+            </div>
           </template>
 
           <template #level_tag="{ row }">
-            <Tag
-              :color="
-                row.level
-                  ? (RATING_COLORS as any)[row.level]
-                  : row.rating
-                    ? (RATING_COLORS as any)[row.rating]
-                    : 'default'
-              "
-            >
-              {{ row.level || row.rating || '-' }} {{ t('common.level') }}
-            </Tag>
+            <div class="flex items-center">
+              <Tag
+                :color="
+                  row.level
+                    ? (RATING_COLORS as any)[row.level]
+                    : row.rating
+                      ? (RATING_COLORS as any)[row.rating]
+                      : 'default'
+                "
+              >
+                {{ row.level || row.rating || '-' }} {{ t('common.level') }}
+              </Tag>
+            </div>
           </template>
 
           <template #score_tag="{ row }">
-            <span
+            <div
               :class="{
                 'text-green-600': (row.qualityScore ?? 0) >= 90,
                 'text-blue-600':
                   (row.qualityScore ?? 0) >= 80 && (row.qualityScore ?? 0) < 90,
                 'text-red-600': (row.qualityScore ?? 0) < 80,
               }"
-              class="font-mono font-bold"
+              class="flex items-center font-mono font-bold"
             >
               {{ row.qualityScore ?? '-' }}
-            </span>
+            </div>
           </template>
 
           <template #eng_issue="{ row }">
-            <span
+            <div
+              class="flex items-center"
               :class="{
                 'font-bold text-orange-500':
                   (row.engineeringIssueCount ?? 0) > 0,
@@ -403,18 +419,19 @@ function handleSuccess() {
               }"
             >
               {{ row.engineeringIssueCount ?? 0 }} {{ t('common.unit.item') }}
-            </span>
+            </div>
           </template>
 
           <template #issue_count="{ row }">
-            <span
+            <div
+              class="flex items-center"
               :class="{
                 'font-bold text-red-500': (row.afterSalesIssueCount ?? 0) > 0,
                 'text-gray-400': (row.afterSalesIssueCount ?? 0) <= 0,
               }"
             >
               {{ row.afterSalesIssueCount ?? 0 }} {{ t('common.unit.item') }}
-            </span>
+            </div>
           </template>
         </Grid>
       </Card>

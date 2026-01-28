@@ -1,4 +1,5 @@
 import type { AfterSalesItem } from '@qgs/shared';
+
 import type { ChartConfig } from '#/components/Qms/ChartBuilder/types';
 
 import { aggregateChartData } from '#/components/Qms/ChartBuilder/composables/useChartCore';

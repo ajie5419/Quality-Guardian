@@ -22,6 +22,7 @@
     "#/*": "./src/*"
   },
   "dependencies": {
+    "@qgs/shared": "workspace:*",
     "@tanstack/vue-query": "catalog:",
     "@vben/access": "workspace:*",
     "@vben/common-ui": "workspace:*",
@@ -37,7 +38,6 @@
     "@vben/styles": "workspace:*",
     "@vben/types": "workspace:*",
     "@vben/utils": "workspace:*",
-    "@qgs/shared": "workspace:*",
     "@vueuse/core": "catalog:",
     "ant-design-vue": "catalog:",
     "dayjs": "catalog:",
@@ -48,6 +48,7 @@
     "pinia": "catalog:",
     "vue": "catalog:",
     "vue-router": "catalog:",
+    "vxe-pc-ui": "catalog:",
     "vxe-table": "catalog:",
     "vxe-table-plugin-export-xlsx": "^4.0.7",
     "xlsx": "^0.18.5"

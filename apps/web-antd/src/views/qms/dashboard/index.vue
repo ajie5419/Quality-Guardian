@@ -191,7 +191,7 @@ function updatePassRateChart() {
     },
     xAxis: {
       type: 'category' as const,
-      data: trendData.value.map((i) => i.period),
+      data: trendData.value.map((i: any) => i.period),
     },
     yAxis: {
       type: 'value' as const,
@@ -201,7 +201,7 @@ function updatePassRateChart() {
     },
     series: [
       {
-        data: trendData.value.map((i) => i.passRate),
+        data: trendData.value.map((i: any) => i.passRate),
         type: 'bar' as const,
         itemStyle: {
           color: '#5ab1ef',

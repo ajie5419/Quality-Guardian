@@ -1,95 +1,95 @@
 import { InspectionIssueStatusEnum } from './enums';
 
 export interface InspectionIssue {
+  claim: string; // 索赔
+  defectSubtype?: string;
+  defectType?: string;
+  description: string;
+  division?: string;
   id: string;
-  workOrderNumber: string; // 工单号
-  projectName: string; // 项目名称
-  partName: string; // 部件名称
+  lossAmount: number; // 损失金额
   ncNumber: string; // 不合格编号
-  title: string;
-  severity: 'Critical' | 'Major' | 'Minor';
-  status: 'Closed' | 'Open' | 'Resolved' | InspectionIssueStatusEnum;
+  partName: string; // 部件名称
+  photos: string[]; // 问题照片
+  projectName: string; // 项目名称
   quantity: number; // 数量
+  reportDate: string;
   reportedBy: string; // 检验员
   responsibleDepartment: string; // 责任部门
-  reportDate: string;
-  updatedAt: string; // 最后编辑时间
-  division?: string;
-  defectType?: string;
-  defectSubtype?: string;
-  description: string;
   rootCause: string; // 原因分析
+  severity: 'Critical' | 'Major' | 'Minor';
   solution: string; // 解决方案
-  lossAmount: number; // 损失金额
-  claim: string; // 索赔
-  photos: string[]; // 问题照片
+  status: 'Closed' | 'Open' | 'Resolved' | InspectionIssueStatusEnum;
   supplierName?: string; // 供应商名称
+  title: string;
+  updatedAt: string; // 最后编辑时间
+  workOrderNumber: string; // 工单号
 }
 
 export interface IncomingInspection {
+  hasDocuments: string;
   id: string;
-  supplierName: string;
+  inspector: string;
   materialName: string;
   quantity: number;
-  inspector: string;
-  reporter: string;
   reportDate: string;
-  hasDocuments: string;
+  reporter: string;
+  supplierName: string;
 }
 
 export interface ProcessInspection {
-  id: string;
-  workOrderNumber: string;
-  process: string;
-  level1Component: string;
+  archived: string;
   componentName: string;
-  quantity: number;
+  id: string;
   inspector: string;
+  level1Component: string;
+  process: string;
+  quantity: number;
   reporter: string;
   team: string;
-  archived: string;
+  workOrderNumber: string;
 }
 
 export interface ShipmentInspection {
+  documents: string;
   id: string;
-  workOrderNumber: string;
+  inspector: string;
+  packingListArchived: string;
   projectName: string;
   quantity: number;
-  reporter: string;
-  inspector: string;
   reportDate: string;
-  documents: string;
-  packingListArchived: string;
+  reporter: string;
+  workOrderNumber: string;
 }
 
 export interface InspectionTaskResult {
-  itpItemId: string;
   activity: string;
   controlPoint: string;
   isQuantitative: boolean;
-  standardValue?: number;
-  upperTolerance?: number;
+  itpItemId: string;
   lowerTolerance?: number;
-  unit?: string;
   measuredValue?: number;
-  result: 'FAIL' | 'NA' | 'PASS';
-  remarks?: string;
   photoUrl?: string;
+  remarks?: string;
+  result: 'FAIL' | 'NA' | 'PASS';
+  standardValue?: number;
+  unit?: string;
+  upperTolerance?: number;
 }
 
 export interface DetailedInspectionRecord {
-  id: string;
-  type: 'FINAL' | 'INCOMING' | 'OUTGOING' | 'PROCESS';
-  workOrderNumber: string;
-  projectName?: string;
-  itpProjectId?: string;
-  inspector: string;
-  reportDate: string;
-  status: 'COMPLETED' | 'DRAFT';
-  results: InspectionTaskResult[];
-  overallResult: 'FAIL' | 'PASS';
   createdAt: string;
+  id: string;
+  inspector: string;
+  itpProjectId?: string;
+  overallResult: 'FAIL' | 'PASS';
+  projectName?: string;
+  reportDate: string;
+  results: InspectionTaskResult[];
+  status: 'COMPLETED' | 'DRAFT';
+  type: 'FINAL' | 'INCOMING' | 'OUTGOING' | 'PROCESS';
   updatedAt: string;
+  workOrderNumber: string;
 }
 
 export type InspectionRecord =

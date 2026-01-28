@@ -1,12 +1,12 @@
 export interface WorkOrderItem {
-  id: string;
-  workOrderNumber: string;
-  division?: string;
+  createTime: string;
   customerName: string;
+  deliveryDate: string;
+  division?: string;
+  effectiveTime?: string;
+  id: string;
   projectName?: string;
   quantity: number;
-  deliveryDate: string;
   status: 'Closed' | 'Completed' | 'In Progress' | 'Pending';
-  createTime: string;
-  effectiveTime?: string;
+  workOrderNumber: string;
 }

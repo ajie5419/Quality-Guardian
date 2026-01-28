@@ -349,7 +349,7 @@ const teamOptions = computed(() => {
   if (outsourcingList.value.length > 0) {
     options.push({
       label: '外协单位',
-      options: outsourcingList.value.map((o) => ({
+      options: outsourcingList.value.map((o: any) => ({
         label: o.name,
         value: o.name,
         isOutsourcing: true,
@@ -368,9 +368,9 @@ const itpSuggestions = computed(() => {
 
   // 建议列表仅按工序过滤，不按名称过滤，以提供完整候选
   const filtered = projectItpItems.value.filter(
-    (item) => !currentProcess || item.processStep === currentProcess,
+    (item: any) => !currentProcess || item.processStep === currentProcess,
   );
-  const names = filtered.map((t) => t.activity);
+  const names = filtered.map((t: any) => t.activity);
   return [...new Set(names)].map((name) => ({ label: name, value: name }));
 });
 
@@ -402,7 +402,7 @@ async function loadItpRequirements() {
     }
 
     const items = projectItpItems.value;
-    const filteredItems = items.filter((item) => {
+    const filteredItems = items.filter((item: any) => {
       const matchProcess =
         !currentProcess || item.processStep === currentProcess;
       // 匹配逻辑：如果输入了内容，则尝试匹配；如果没输入，则加载该工序下的所有项
@@ -414,7 +414,7 @@ async function loadItpRequirements() {
     // ... (rest unchanged)
 
     if (filteredItems.length > 0) {
-      inspectionTasks.value = filteredItems.map((item) => ({
+      inspectionTasks.value = filteredItems.map((item: any) => ({
         itpItemId: item.id,
         activity: item.activity,
         controlPoint: item.controlPoint,
@@ -466,12 +466,12 @@ async function handleWorkOrderChange(val: unknown) {
   if (!val) return;
   const valStr = String(val);
   const wo = workOrderList.value.find(
-    (item) => item.workOrderNumber === valStr,
+    (item: any) => item.workOrderNumber === valStr,
   );
   if (wo) {
     formState.projectName = wo.projectName || '';
     const matchedItp = itpProjectList.value.find(
-      (itp) =>
+      (itp: any) =>
         itp.workOrderId === wo.id ||
         (formState.projectName &&
           itp.projectName.includes(formState.projectName)),
@@ -1090,7 +1090,7 @@ function openModal(
 }
 
 const calculatedOverallResult = computed(() => {
-  const hasFail = inspectionTasks.value.some((t) => t.result === 'FAIL');
+  const hasFail = inspectionTasks.value.some((t: any) => t.result === 'FAIL');
   if (hasFail) return 'FAIL';
   return formState.result || 'PASS';
 });
@@ -1409,7 +1409,7 @@ function handleBatchDelete() {
             >
               <AutoComplete
                 v-model:value="formState.materialName"
-                :options="availableComponents"
+                :options="availableComponents as any"
                 :placeholder="t('common.pleaseInput')"
                 allow-clear
               />
@@ -1479,7 +1479,7 @@ function handleBatchDelete() {
             >
               <AutoComplete
                 v-model:value="formState.level1Component"
-                :options="availableComponents"
+                :options="availableComponents as any"
                 :placeholder="
                   t('qms.inspection.records.form.placeholder.level1')
                 "

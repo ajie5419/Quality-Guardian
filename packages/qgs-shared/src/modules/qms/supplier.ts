@@ -10,64 +10,60 @@ export type SupplierCategory = 'Outsourcing' | 'Supplier' | string;
 /**
  * Supplier Status
  */
-export type SupplierStatus =
-  | 'Disqualified'
-  | 'Qualified'
-  | 'Warning'
-  | string;
+export type SupplierStatus = 'Disqualified' | 'Qualified' | 'Warning' | string;
 
 /**
  * Supplier Item
  */
 export interface SupplierItem {
-  id: string;
-  category: SupplierCategory;
-  name: string;
-  productName: string;
+  afterSalesIssueCount?: number;
   brand: string;
-  origin: string;
-  project: string;
   buyer: string;
-  score2025: number;
-  status?: SupplierStatus;
+  category: SupplierCategory;
   createdAt?: string;
-  updatedAt?: string;
+  engineeringIssueCount?: number;
+  id: string;
+  incomingBatchCount?: number;
+  incomingQualifiedRate?: number;
+  incomingTotalQuantity?: number;
+  isWarning?: boolean;
+  level?: string;
+  name: string;
+  origin: string;
+  productName: string;
+  project: string;
   // Quality Indicators
   qualityScore?: number;
-  incomingBatchCount?: number;
-  incomingTotalQuantity?: number;
-  incomingQualifiedRate?: number;
-  totalEngineeringLoss?: number;
-  totalAfterSalesLoss?: number;
-  level?: string;
   rating?: string;
-  isWarning?: boolean;
+  score2025: number;
+  status?: SupplierStatus;
+  totalAfterSalesLoss?: number;
+  totalEngineeringLoss?: number;
+  updatedAt?: string;
   warningReasons?: string[];
-  engineeringIssueCount?: number;
-  afterSalesIssueCount?: number;
 }
 
 /**
  * Supplier Statistics
  */
 export interface SupplierStats {
-  total: number;
-  qualified: number;
-  warning: number;
   avgScore: number | string;
+  qualified: number;
+  total: number;
+  warning: number;
 }
 
 /**
  * Supplier List Query Parameters
  */
 export interface SupplierListParams {
+  category?: SupplierCategory;
+  keyword?: string;
   page?: number;
   pageSize?: number;
-  category?: SupplierCategory;
-  status?: SupplierStatus;
-  keyword?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  status?: SupplierStatus;
 }
 
 /**
@@ -75,20 +71,20 @@ export interface SupplierListParams {
  */
 export interface SupplierListResponse {
   items: SupplierItem[];
-  total: number;
   stats?: SupplierStats;
+  total: number;
 }
 
 /**
  * Batch Import Supplier Data
  */
 export interface ImportSupplierItem {
-  name: string;
   brand?: string;
-  category?: SupplierCategory;
-  productName?: string;
   buyer?: string;
-  status?: SupplierStatus;
+  category?: SupplierCategory;
+  name: string;
   origin?: string;
+  productName?: string;
   project?: string;
+  status?: SupplierStatus;
 }

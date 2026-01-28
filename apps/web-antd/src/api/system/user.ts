@@ -1,6 +1,8 @@
-import { requestClient } from '#/api/request';
-import { SYSTEM_API } from './constants';
 import type { PageResult, User } from '@qgs/shared';
+
+import { requestClient } from '#/api/request';
+
+import { SYSTEM_API } from './constants';
 
 // Re-export for compatibility
 export * from '@qgs/shared';
@@ -23,3 +25,8 @@ export const updateUser = (id: string, data: Partial<User>) => {
 export const deleteUser = (id: string) => {
   return requestClient.delete(`${SYSTEM_API.USER}/${id}`);
 };
+
+export namespace SystemUserApi {
+  export type User = import('@qgs/shared').User;
+  export type PageResult<T> = import('@qgs/shared').PageResult<T>;
+}

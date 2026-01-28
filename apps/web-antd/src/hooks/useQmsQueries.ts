@@ -105,8 +105,7 @@ export function useWorkspaceQuery() {
 export function useDashboardQuery() {
   return useQuery({
     gcTime: 10 * 60 * 1000,
-    queryFn: () =>
-      requestClient.get<DashboardData>('/qms/dashboard'),
+    queryFn: () => requestClient.get<DashboardData>('/qms/dashboard'),
     queryKey: ['dashboard'],
     staleTime: 5 * 60 * 1000, // 5分钟缓存
   });

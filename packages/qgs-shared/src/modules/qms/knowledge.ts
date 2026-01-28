@@ -1,39 +1,39 @@
 // Knowledge Category
 export interface KnowledgeCategory {
+  children?: KnowledgeCategory[];
+  description?: string;
   id: string;
   name: string;
-  description?: string;
   parentId?: string;
-  children?: KnowledgeCategory[];
 }
 
 export interface KnowledgeAttachment {
   name: string;
-  url: string;
   size: number;
   type: string;
+  url: string;
 }
 
 // Knowledge Item
 export interface KnowledgeItem {
-  id: string;
-  title: string;
+  attachments?: KnowledgeAttachment[];
+  author: string;
   categoryId: string;
   categoryName?: string;
-  tags: string[];
-  author: string;
-  publishDate: string;
-  summary: string;
   content?: string; // Rich text or Markdown
+  id: string;
+  publishDate: string;
   status: 'archived' | 'draft' | 'published';
-  version: string;
-  attachments?: KnowledgeAttachment[];
+  summary: string;
+  tags: string[];
+  title: string;
   updatedAt: string;
+  version: string;
 }
 
 export interface KnowledgeQueryParams {
   categoryId?: string;
   keyword?: string;
-  tag?: string;
   status?: string;
+  tag?: string;
 }

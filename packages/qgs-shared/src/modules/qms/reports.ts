@@ -1,16 +1,15 @@
 export interface ReportItem {
-  id: string;
+  author: string;
   date: string;
-  totalInspections: number;
-  passRate: number;
+  id: string;
   majorDefects: number;
   minorDefects: number;
+  passRate: number;
   status: 'Draft' | 'Published';
-  author: string;
+  totalInspections: number;
 }
 
 export interface DailySummaryData {
-  reporter: string;
   date: string;
   inspections: Array<{
     partName: string;
@@ -31,6 +30,7 @@ export interface DailySummaryData {
     status: string;
     workOrder: string;
   }>;
+  reporter: string;
   summary: string;
 }
 

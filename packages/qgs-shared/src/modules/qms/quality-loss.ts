@@ -1,14 +1,14 @@
 export interface QualityLossItem {
-  id: string;
-  date: string;
-  type: string;
+  actualClaim?: number;
   amount: number;
+  date: string;
   description: string;
+  id: string;
+  lossSource?: string;
+  partName?: string;
+  projectName?: string;
   responsibleDepartment: string;
   status: string;
+  type: string;
   workOrderNumber?: string;
-  projectName?: string;
-  partName?: string;
-  lossSource?: string;
-  actualClaim?: number;
 }

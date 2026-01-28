@@ -10,41 +10,41 @@ export type TaskStatus =
  * Task Content Detail
  */
 export interface TaskContent {
+  [key: string]: unknown;
+  attachments?: string[];
   description?: string;
   requirements?: string[];
-  attachments?: string[];
-  [key: string]: unknown;
 }
 
 export interface TaskDispatch {
-  id: string;
-  type: TaskType;
-  title: string;
-  level: number;
-  parentId?: string;
-  itpProjectId?: string;
-  dfmeaId?: string;
-  assignorId: string;
-  assignorName?: string;
   assigneeId: string;
   assigneeName?: string;
+  assignorId: string;
+  assignorName?: string;
   content?: TaskContent;
-  status: TaskStatus;
-  priority: number;
-  deadline?: string;
   createdAt: string;
+  deadline?: string;
+  dfmeaId?: string;
+  id: string;
+  itpProjectId?: string;
+  level: number;
+  parentId?: string;
+  priority: number;
+  status: TaskStatus;
+  title: string;
+  type: TaskType;
   updatedAt: string;
 }
 
 export interface CreateTaskParams {
-  type: TaskType;
-  title: string;
-  level: number;
-  parentId?: string;
-  itpProjectId?: string;
-  dfmeaId?: string;
   assigneeId: string;
   content?: TaskContent;
-  priority?: number;
   deadline?: string;
+  dfmeaId?: string;
+  itpProjectId?: string;
+  level: number;
+  parentId?: string;
+  priority?: number;
+  title: string;
+  type: TaskType;
 }

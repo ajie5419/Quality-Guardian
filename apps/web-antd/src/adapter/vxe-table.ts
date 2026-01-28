@@ -12,15 +12,24 @@ import {
 } from '@vben/plugins/vxe-table';
 
 import { Button, Image, Tooltip } from 'ant-design-vue';
-import ExcelJS from 'exceljs';
-import VXETable from 'vxe-table';
-import VXETablePluginExportXLSX from 'vxe-table-plugin-export-xlsx';
 
 import { useVbenForm } from './form';
 
-// 注册导出插件，支持 Excel/CSV 导出
-// 需要传入 ExcelJS 库
-VXETable.use(VXETablePluginExportXLSX, { ExcelJS });
+// 引入 vxe-pc-ui 和 vxe-table 的样式，确保样式正确加载
+import 'vxe-pc-ui/lib/style.css';
+import 'vxe-table/lib/style.css';
+
+// ---------------------------------------------------------
+// 临时移除: VXETable.mixin 导致生产环境报错，回退到原生导出
+// ---------------------------------------------------------
+// import ExcelJS from 'exceljs';
+// import { VXETable } from 'vxe-table';
+// import { downloadFileFromBlob } from '@vben/utils';
+/*
+VXETable.mixin({
+  exportMethods: { ... }
+});
+*/
 
 setupVbenVxeTable({
   configVxeTable: (vxeUI) => {
@@ -62,7 +71,7 @@ setupVbenVxeTable({
         },
         // 全局导出配置
         exportConfig: {
-          types: ['xlsx', 'csv', 'html', 'txt'],
+          types: ['csv', 'html', 'txt'], // 暂时移除 xlsx
         },
         importConfig: {},
         printConfig: {},
@@ -76,7 +85,12 @@ setupVbenVxeTable({
     vxeUI.renderer.add('CellImage', {
       renderTableDefault(_renderOpts, params) {
         const { column, row } = params;
-        return h(Image, { src: row[column.field] });
+        // 包裹一层 div 避免 vxe-table 生产环境获取不到 DOM
+        return [
+          h('div', { class: 'flex justify-center items-center' }, [
+            h(Image, { src: row[column.field], height: 30 }),
+          ]),
+        ];
       },
     });
 
@@ -84,11 +98,16 @@ setupVbenVxeTable({
     vxeUI.renderer.add('CellLink', {
       renderTableDefault(renderOpts) {
         const { props } = renderOpts;
-        return h(
-          Button,
-          { size: 'small', type: 'link' },
-          { default: () => props?.text },
-        );
+        // 包裹一层 span 避免 vxe-table 生产环境获取不到 DOM
+        return [
+          h('span', {}, [
+            h(
+              Button,
+              { size: 'small', type: 'link' },
+              { default: () => props?.text },
+            ),
+          ]),
+        ];
       },
     });
 
@@ -156,7 +175,14 @@ setupVbenVxeTable({
           }
         }
 
-        return buttons;
+        // 包裹一层 div 避免 vxe-table 生产环境获取不到 DOM (关键修复)
+        return [
+          h(
+            'div',
+            { class: 'flex justify-center items-center gap-1' },
+            buttons,
+          ),
+        ];
       },
     });
 

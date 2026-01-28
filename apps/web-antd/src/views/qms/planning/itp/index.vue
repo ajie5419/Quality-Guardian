@@ -73,7 +73,7 @@ async function loadData(idToSelect?: string) {
     const enrichedData = (data || []).map((node) => {
       if (node.workOrderId && !node.workOrderNumber) {
         const wo = workOrderList.value.find(
-          (w) =>
+          (w: any) =>
             w.id === node.workOrderId || w.workOrderNumber === node.workOrderId,
         );
         if (wo) return { ...node, workOrderNumber: wo.workOrderNumber };
