@@ -112,6 +112,7 @@
     "recentOrders": "最近工单",
     "passRateDetail": "各工序合格率详情",
     "qualityLossDetail": "质量损失明细",
+    "targetPassRate": "目标合格率",
     "passRate": "合格率",
     "totalInspection": "检验数",
     "qualifiedCount": "合格数",

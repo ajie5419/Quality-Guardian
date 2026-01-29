@@ -1,0 +1,51 @@
+{
+  "inspection": {
+    "type": {
+      "incoming": "进货检验",
+      "process": "过程检验",
+      "shipment": "发货检验"
+    },
+    "fields": {
+      "incomingType": "进货类型",
+      "supplierName": "供应商",
+      "materialName": "物料名称",
+      "processName": "工序",
+      "level1Component": "一级部件",
+      "team": "班组",
+      "documents": "随箱资料",
+      "packingListArchived": "装箱单归档",
+      "quantity": "数量",
+      "inspector": "检验员",
+      "result": "结果",
+      "inspectionDate": "检验日期",
+      "checkItem": "检查项目",
+      "standard": "标准值",
+      "uom": "单位",
+      "measuredValue": "实测值",
+      "remarks": "备注"
+    },
+    "process": {
+      "outsourcing": "外购件",
+      "rawMaterial": "原材料",
+      "auxiliaryMaterial": "辅材",
+      "machinedPart": "机加成品件",
+      "materialCutting": "下料",
+      "fitUp": "组对",
+      "welding": "焊接",
+      "postWeldDimension": "焊后尺寸",
+      "appearance": "外观",
+      "overallAssembly": "整体拼装",
+      "assembly": "组装",
+      "fitting": "装配",
+      "grouping": "组拼",
+      "sandblasting": "打砂",
+      "painting": "喷漆"
+    },
+    "resultValue": {
+      "PASS": "合格",
+      "FAIL": "不合格",
+      "CONDITIONAL": "条件合格",
+      "NA": "不适用"
+    }
+  }
+}

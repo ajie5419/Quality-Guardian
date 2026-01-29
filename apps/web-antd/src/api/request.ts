@@ -67,6 +67,15 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
 
       config.headers.Authorization = formatToken(accessStore.accessToken);
       config.headers['Accept-Language'] = preferences.app.locale;
+
+      // 过滤无效参数 (undefined, null, '')，避免 URL 中出现 key=undefined
+      if (config.params) {
+        const cleanParams = Object.entries(config.params).filter(
+          ([_, v]) => v !== undefined && v !== null && v !== '',
+        );
+        config.params = Object.fromEntries(cleanParams);
+      }
+
       return config;
     },
   });

@@ -230,6 +230,11 @@ const drillDownColumns = computed(() => [
   },
   { title: t('common.category'), dataIndex: 'category', key: 'category' },
   {
+    title: t('qms.dashboard.targetPassRate'),
+    dataIndex: 'targetPassRate',
+    key: 'targetPassRate',
+  },
+  {
     title: t('qms.dashboard.passRate'),
     dataIndex: 'passRate',
     key: 'passRate',
@@ -411,6 +416,9 @@ watch(activeTab, (val) => {
         :scroll="{ x: 1000 }"
       >
         <template #bodyCell="{ column, text }">
+          <template v-if="column.key === 'targetPassRate'">
+            {{ text != null ? text + '%' : '-' }}
+          </template>
           <template v-if="column.key === 'passRate'">
             <Tag :color="text >= 98 ? 'green' : text >= 95 ? 'orange' : 'red'">
               {{ text }}%

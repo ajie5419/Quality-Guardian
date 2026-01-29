@@ -9,9 +9,9 @@ export * from '@qgs/shared';
 
 export const getUserList = (params?: { page?: number; pageSize?: number }) => {
   const { page = 1, pageSize = 20 } = params || {};
-  return requestClient.get<PageResult<User>>(
-    `${SYSTEM_API.USER_LIST}?page=${page}&pageSize=${pageSize}`,
-  );
+  return requestClient.get<PageResult<User>>(SYSTEM_API.USER_LIST, {
+    params: { page, pageSize },
+  });
 };
 
 export const createUser = (data: Partial<User>) => {

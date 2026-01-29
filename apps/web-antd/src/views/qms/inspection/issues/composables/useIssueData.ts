@@ -33,7 +33,8 @@ export function useIssueData() {
     try {
       const [deptRes, workOrderRes, supplierRes] = await Promise.all([
         getDeptList(),
-        getWorkOrderList(),
+        // 默认加载最近的 200 条工单，忽略年份限制，提高"不搜索"时的可见性
+        getWorkOrderList({ pageSize: 200, ignoreYearFilter: true }),
         getSupplierList({ pageSize: UI_CONSTANTS.SUPPLIER_PAGE_SIZE }),
       ]);
 
@@ -53,6 +54,25 @@ export function useIssueData() {
     }
   }
 
+  /**
+   * 搜索工单 (用于下拉框远程搜索)
+   */
+  async function searchWorkOrders(text: string) {
+    // console.log('Searching work orders with keyword:', text);
+    try {
+      // 如果关键词为空，加载默认列表 (使用更大的 pageSize)
+      const params = text.trim()
+        ? { keyword: text.trim(), pageSize: 50, ignoreYearFilter: true }
+        : { pageSize: 200, ignoreYearFilter: true };
+      
+      const res = await getWorkOrderList(params);
+      // console.log('Search results:', res.items?.length);
+      workOrderList.value = res.items || [];
+    } catch (error) {
+      console.error('Failed to search work orders', error);
+    }
+  }
+
   return {
     deptTreeData,
     deptRawData,
@@ -60,5 +80,6 @@ export function useIssueData() {
     supplierList,
     isLoading,
     loadInitialData,
+    searchWorkOrders,
   };
 }

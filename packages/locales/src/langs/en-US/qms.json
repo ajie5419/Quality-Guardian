@@ -1,0 +1,51 @@
+{
+  "inspection": {
+    "type": {
+      "incoming": "Incoming Inspection",
+      "process": "Process Inspection",
+      "shipment": "Shipment Inspection"
+    },
+    "fields": {
+      "incomingType": "Incoming Type",
+      "supplierName": "Supplier",
+      "materialName": "Material Name",
+      "processName": "Process",
+      "level1Component": "Level 1 Component",
+      "team": "Team",
+      "documents": "Documents",
+      "packingListArchived": "Packing List Archived",
+      "quantity": "Quantity",
+      "inspector": "Inspector",
+      "result": "Result",
+      "inspectionDate": "Inspection Date",
+      "checkItem": "Check Item",
+      "standard": "Standard Value",
+      "uom": "Unit",
+      "measuredValue": "Measured Value",
+      "remarks": "Remarks"
+    },
+    "process": {
+      "outsourcing": "Outsourcing",
+      "rawMaterial": "Raw Material",
+      "auxiliaryMaterial": "Auxiliary Material",
+      "machinedPart": "Machined Part",
+      "materialCutting": "Material Cutting",
+      "fitUp": "Fit Up",
+      "welding": "Welding",
+      "postWeldDimension": "Post-Weld Dimension",
+      "appearance": "Appearance",
+      "overallAssembly": "Overall Assembly",
+      "assembly": "Assembly",
+      "fitting": "Fitting",
+      "grouping": "Grouping",
+      "sandblasting": "Sandblasting",
+      "painting": "Painting"
+    },
+    "resultValue": {
+      "PASS": "PASS",
+      "FAIL": "FAIL",
+      "CONDITIONAL": "CONDITIONAL",
+      "NA": "N/A"
+    }
+  }
+}

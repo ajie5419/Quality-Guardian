@@ -9,6 +9,7 @@ import type {
 import { computed } from 'vue';
 
 import { useI18n } from '@vben/locales';
+import { useDebounceFn } from '@vueuse/core';
 
 import {
   DatePicker,
@@ -22,6 +23,7 @@ import {
 } from 'ant-design-vue';
 
 import { DEPT_TYPE_KEYWORDS } from '../constants';
+import WorkOrderSelect from './form/WorkOrderSelect.vue';
 
 const props = defineProps<{
   deptTreeData: DeptNode[];
@@ -33,6 +35,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:isAutoNc': [boolean];
   workOrderChange: [string];
+  searchWorkOrder: [string];
 }>();
 const formState = defineModel<IssueFormState>('formState', { required: true });
 const isAutoNc = defineModel<boolean>('isAutoNc', { default: false });
@@ -72,16 +75,25 @@ const isProductionDept = computed(() => {
   return name.includes(DEPT_TYPE_KEYWORDS.PRODUCTION) || name.includes('生产');
 });
 
-function handleWorkOrderChange(val: unknown) {
-  const strVal = String(val);
-  const wo = props.workOrderList.find(
-    (item) => item.workOrderNumber === strVal,
-  );
+function handleWorkOrderChange(val: any, option: any) {
+  // If WorkOrderSelect returns the full item via option.item, use it directly
+  let wo = option?.item;
+  
+  if (!wo) {
+    // Fallback: search in props list (legacy)
+    const strVal = String(val);
+    wo = props.workOrderList.find(
+      (item) => item.workOrderNumber === strVal || item.id === strVal,
+    );
+  }
+
   if (wo) {
     formState.value.projectName = wo.projectName || '';
     formState.value.division = wo.division || '';
+    emit('workOrderChange', wo.workOrderNumber);
+  } else {
+     emit('workOrderChange', String(val));
   }
-  emit('workOrderChange', strVal);
 }
 </script>
 
@@ -121,17 +133,9 @@ function handleWorkOrderChange(val: unknown) {
       :label="t('qms.workOrder.workOrderNumber')"
       name="workOrderNumber"
     >
-      <Select
+      <WorkOrderSelect
         v-model:value="formState.workOrderNumber"
-        :options="
-          workOrderList.map((w) => ({
-            value: w.workOrderNumber,
-            label: `${w.workOrderNumber} - ${w.projectName}`,
-          }))
-        "
-        class="w-full"
         :placeholder="t('qms.inspection.issues.selectWorkOrder')"
-        show-search
         @change="handleWorkOrderChange"
       />
     </FormItem>

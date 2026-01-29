@@ -50,9 +50,11 @@ async function handleSubmit() {
     message.success(t('common.saveSuccess'));
     modalApi.close();
     emit('success');
-  } catch (error) {
+  } catch (error: any) {
     console.error('Submit failed:', error);
-    message.error(t('common.actionFailed'));
+    // 优先显示后端返回的具体错误信息
+    const errorMsg = error?.response?.data?.message || error?.message || t('common.actionFailed');
+    message.error(errorMsg);
   } finally {
     modalApi.setState({ confirmLoading: false });
   }

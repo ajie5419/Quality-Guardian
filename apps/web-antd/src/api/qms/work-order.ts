@@ -17,6 +17,9 @@ export async function getWorkOrderList(params?: {
   status?: string;
   workOrderNumber?: string;
   year?: number;
+  ignoreYearFilter?: boolean;
+  keyword?: string;
+  ids?: string; // Comma separated IDs
 }) {
   return requestClient.get<{
     items: WorkOrderItem[];
@@ -36,11 +39,15 @@ export async function updateWorkOrder(
   id: string,
   data: Partial<WorkOrderItem>,
 ) {
-  return requestClient.put<WorkOrderItem>(`${QMS_API.WORK_ORDER}/${id}`, data);
+  // Fix: Encode ID to handle special characters like '/' in work order numbers (e.g. "23TL-CL/2501")
+  const encodedId = encodeURIComponent(id);
+  return requestClient.put<WorkOrderItem>(`${QMS_API.WORK_ORDER}/${encodedId}`, data);
 }
 
 export async function deleteWorkOrder(id: string) {
-  return requestClient.delete(`${QMS_API.WORK_ORDER}/${id}`);
+  // Fix: Encode ID to handle special characters
+  const encodedId = encodeURIComponent(id);
+  return requestClient.delete(`${QMS_API.WORK_ORDER}/${encodedId}`);
 }
 
 /**

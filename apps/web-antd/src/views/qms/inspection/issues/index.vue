@@ -71,6 +71,7 @@ const {
   workOrderList,
   supplierList,
   loadInitialData,
+  searchWorkOrders,
 } = useIssueData();
 
 // 加载初始数据
@@ -553,6 +554,7 @@ function handleSettleToKnowledge(row: InspectionIssue) {
       :dept-tree-data="deptTreeData"
       :work-order-list="workOrderList"
       :supplier-list="supplierList"
+      @search-work-order="searchWorkOrders"
       @success="() => gridApi.reload()"
     />
   </Page>

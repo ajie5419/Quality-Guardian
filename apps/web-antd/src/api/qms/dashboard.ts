@@ -32,10 +32,9 @@ export async function getPassRateTrend(
   if (period) {
     params.period = period;
   }
-  const query = new URLSearchParams(params).toString();
-  return requestClient.get<PassRateTrendResponse>(
-    `${QMS_API.PASS_RATE_TREND}?${query}`,
-  );
+  return requestClient.get<PassRateTrendResponse>(QMS_API.PASS_RATE_TREND, {
+    params,
+  });
 }
 
 /**
@@ -51,10 +50,9 @@ export async function getQualityLossTrend(
   if (period) {
     params.period = period;
   }
-  const query = new URLSearchParams(params).toString();
-  return requestClient.get<QualityLossTrendResponse>(
-    `${QMS_API.QUALITY_LOSS_TREND}?${query}`,
-  );
+  return requestClient.get<QualityLossTrendResponse>(QMS_API.QUALITY_LOSS_TREND, {
+    params,
+  });
 }
 
 /**
@@ -67,12 +65,10 @@ export async function getVehicleFailureRate(params?: {
   model?: string;
   range?: string;
 }) {
-  let url = QMS_API.VEHICLE_FAILURE_RATE;
-  if (params) {
-    const query = new URLSearchParams(params as any).toString();
-    if (query) url += `?${query}`;
-  }
-  return requestClient.get<VehicleFailureResponse>(url);
+  return requestClient.get<VehicleFailureResponse>(
+    QMS_API.VEHICLE_FAILURE_RATE,
+    { params },
+  );
 }
 
 export namespace QmsDashboardApi {

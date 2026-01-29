@@ -18,10 +18,12 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const id = getRouterParam(event, 'id');
-  if (!id) {
+  const rawId = getRouterParam(event, 'id');
+  if (!rawId) {
     return useResponseError('缺少工单号');
   }
+  // Ensure ID is decoded (e.g. if passed as 23TL-CL%2F2501)
+  const id = decodeURIComponent(rawId);
 
   try {
     const body = await readBody(event);
@@ -79,9 +81,13 @@ export default defineEventHandler(async (event) => {
     });
 
     return useResponseSuccess(null);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to update work order:', error);
-    setResponseStatus(event, 500); // 确保前端能捕获到异常
-    return useResponseError('更新工单失败');
+    // Return specific error message for debugging
+    // Check for "Record to update not found"
+    if (error.code === 'P2025') {
+       return useResponseError(`工单不存在: ${id}`);
+    }
+    return useResponseError(`更新工单失败: ${error.message}`);
   }
 });

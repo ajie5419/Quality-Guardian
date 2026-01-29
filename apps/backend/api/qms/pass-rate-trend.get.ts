@@ -7,6 +7,32 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+// Inlined constants to avoid module resolution issues during hot reload
+const PROCESS_DEFECT_TARGETS: Record<string, number> = {
+  原材料: 0.2,
+  辅材: 0.1,
+  外购件: 0.2,
+  机加件: 0.1,
+  下料: 0.1,
+  组对: 0.15,
+  焊接: 0.15,
+  机加: 0.1,
+  涂装: 0.15,
+  组装: 0.15,
+  装配: 0.15,
+  外协: 0.15,
+};
+const DEFAULT_DEFECT_TARGET = 0.15;
+
+const getTargetPassRate = (processName?: string): number => {
+  if (!processName) {
+    return Number((100 - DEFAULT_DEFECT_TARGET).toFixed(2));
+  }
+  const defectRate =
+    PROCESS_DEFECT_TARGETS[processName] ?? DEFAULT_DEFECT_TARGET;
+  return Number((100 - defectRate).toFixed(2));
+};
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
@@ -75,15 +101,15 @@ async function getTrendData(granularity: string) {
   const allInspections = await prisma.inspections.findMany({
     where: {
       isDeleted: false,
-      date: { gte: yearStart, lte: now },
-      category: { not: 'OUTGOING' },
+      inspectionDate: { gte: yearStart, lte: now },
+      category: { not: 'SHIPMENT' }, // Adjusted to match schema enum (INCOMING, PROCESS, SHIPMENT)
     },
-    select: { date: true, result: true },
+    select: { inspectionDate: true, result: true },
   });
 
   const trend = periods.map((p) => {
     const periodInspections = allInspections.filter((ins) => {
-      const d = new Date(ins.date);
+      const d = new Date(ins.inspectionDate);
       return d >= p.start && d <= p.end;
     });
 
@@ -114,11 +140,12 @@ async function getDrillDownData(period: string, granularity: string) {
     passCount: number;
     passRate: number;
     process: string;
+    targetPassRate: number;
     totalCount: number;
   }
   const drillDown: DrillDownItem[] = [];
   const inspections = await prisma.inspections.findMany({
-    where: { isDeleted: false, date: { gte: start, lte: end } },
+    where: { isDeleted: false, inspectionDate: { gte: start, lte: end } },
   });
 
   // 来料检验
@@ -139,29 +166,75 @@ async function getDrillDownData(period: string, granularity: string) {
       process: type,
       category: '来料检验',
       passRate: total > 0 ? Number(((passed / total) * 100).toFixed(1)) : 0,
+      targetPassRate: getTargetPassRate(type),
       totalCount: total,
       passCount: passed,
     });
   }
 
-  // 过程检验
-  const processes = [
-    ...new Set(
-      inspections
-        .filter((i) => i.category === 'PROCESS')
-        .map((i) => i.processName || '未指定'),
-    ),
-  ];
-  for (const proc of processes) {
-    const items = inspections.filter(
-      (i) => i.category === 'PROCESS' && (i.processName || '未指定') === proc,
-    );
-    const total = items.length;
-    const passed = items.filter((i) => i.result === 'PASS').length;
+  // 过程检验逻辑重构
+  const processItems = inspections.filter((i) => i.category === 'PROCESS');
+  
+  // 工序映射字典
+  const PROCESS_MAPPING: Record<string, string> = {
+    // 组焊 = 组对 + 焊接
+    '组对': '组焊',
+    '焊接': '组焊',
+    '焊后尺寸': '组焊',
+    
+    // 组装 = 组装 + 装配 + 组拼
+    '组装': '组装',
+    '装配': '组装',
+    '组拼': '组装',
+    
+    // 涂装 = 打砂 + 喷漆
+    '打砂': '涂装',
+    '喷漆': '涂装',
+    
+    // 单独统计
+    '下料': '下料',
+    '机加': '机加',
+    
+    // 不统计
+    '外观': '',
+    '整体拼装': '',
+  };
+
+  // 聚合数据
+  const processStats: Record<string, { total: number; passed: number }> = {};
+
+  for (const item of processItems) {
+    const rawProcess = item.processName || '';
+    // 如果没有映射规则，且不在排除列表，则保留原名？
+    // 需求：外购件、原材料、辅材、机加成品件（这些是INCOMING，上面已处理）
+    // 需求：下料、组焊、机加、组装、涂装
+    
+    let mappedName = PROCESS_MAPPING[rawProcess];
+    
+    // 如果不在映射表中，且不是我们明确要的工序，是否需要统计？
+    // 根据需求描述：“至此，需要统计和显示合格率的工序为...”
+    // 意味着只统计这些。
+    
+    if (!mappedName) continue; // 跳过不统计的工序
+
+    if (!processStats[mappedName]) {
+      processStats[mappedName] = { total: 0, passed: 0 };
+    }
+    
+    processStats[mappedName].total += 1;
+    if (item.result === 'PASS') {
+      processStats[mappedName].passed += 1;
+    }
+  }
+
+  // 生成 DrillDown Item
+  for (const [name, stats] of Object.entries(processStats)) {
+    const { total, passed } = stats;
     drillDown.push({
-      process: proc,
+      process: name,
       category: '过程检验',
       passRate: total > 0 ? Number(((passed / total) * 100).toFixed(1)) : 0,
+      targetPassRate: getTargetPassRate(name),
       totalCount: total,
       passCount: passed,
     });
@@ -176,10 +249,14 @@ async function getDrillDownData(period: string, granularity: string) {
       process: '成品检验',
       category: '成品检验',
       passRate: total > 0 ? Number(((passed / total) * 100).toFixed(1)) : 0,
+      targetPassRate: getTargetPassRate('成品检验'),
       totalCount: total,
       passCount: passed,
     });
   }
+
+  // DEBUG LOG
+  console.log('DrillDown Data Sample:', JSON.stringify(drillDown[0], null, 2));
 
   return { drillDown, period };
 }

@@ -1,6 +1,6 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { InspectionService } from '~/services/inspection.service';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -9,80 +9,24 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const { projectName, status, supplierName, workOrderNumber, year } =
-    getQuery(event);
-
-  // Date Logic
-  let dateFilter: Record<string, Date> = {};
-  if (year) {
-    const y = Number.parseInt(String(year));
-    dateFilter = {
-      gte: new Date(`${y}-01-01T00:00:00.000Z`),
-      lte: new Date(`${y}-12-31T23:59:59.999Z`),
-    };
-  }
+  const query = getQuery(event);
+  const year = query.year ? Number.parseInt(String(query.year)) : undefined;
+  const projectName = query.projectName ? String(query.projectName) : undefined;
+  const status = query.status ? String(query.status) : undefined;
+  const supplierName = query.supplierName
+    ? String(query.supplierName)
+    : undefined;
+  const workOrderNumber = query.workOrderNumber
+    ? String(query.workOrderNumber)
+    : undefined;
 
   try {
-    const records = await prisma.quality_records.findMany({
-      where: {
-        isDeleted: false,
-        ...(year ? { date: dateFilter } : {}),
-        ...(status && String(status).trim() !== ''
-          ? { status: String(status) as any }
-          : {}),
-        ...(projectName && String(projectName).trim() !== ''
-          ? { projectName: { contains: String(projectName).trim() } }
-          : {}),
-        ...(workOrderNumber && String(workOrderNumber).trim() !== ''
-          ? { workOrderNumber: { contains: String(workOrderNumber).trim() } }
-          : {}),
-        ...(supplierName && String(supplierName).trim() !== ''
-          ? {
-              OR: [
-                { supplierName: String(supplierName).trim() },
-                { supplierName: { contains: String(supplierName).trim() } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        work_orders: {
-          select: {
-            workOrderNumber: true,
-            customerName: true,
-            projectName: true,
-            division: true,
-            status: true,
-          },
-        },
-        users_quality_records_inspectorTousers: true, // Include inspector user
-      },
-    });
-
-    // Map fields to match frontend expectation (Mock structure)
-    const result = records.map((item) => {
-      let photos = [];
-      try {
-        if (item.issuePhoto) {
-          const parsed = JSON.parse(item.issuePhoto);
-          photos = Array.isArray(parsed) ? parsed : [];
-        }
-      } catch {
-        // Ignore parse errors
-      }
-
-      return {
-        ...item,
-        ncNumber: item.nonConformanceNumber,
-        reportDate: item.date.toISOString().split('T')[0],
-        reportedBy:
-          item.users_quality_records_inspectorTousers?.realName ||
-          item.users_quality_records_inspectorTousers?.username ||
-          '',
-        claim: item.isClaim ? 'Yes' : 'No',
-        photos,
-      };
+    const result = await InspectionService.getIssues({
+      year,
+      projectName,
+      status,
+      supplierName,
+      workOrderNumber,
     });
 
     return useResponseSuccess(result);

@@ -14,12 +14,9 @@ export async function getInspectionIssues(params?: {
   supplierName?: string;
   year?: number;
 }) {
-  const query = params
-    ? `?${new URLSearchParams(params as any).toString()}`
-    : '';
-  return requestClient.get<InspectionIssue[]>(
-    `${QMS_API.INSPECTION_ISSUES}${query}`,
-  );
+  return requestClient.get<InspectionIssue[]>(QMS_API.INSPECTION_ISSUES, {
+    params,
+  });
 }
 
 /**
@@ -53,26 +50,21 @@ export async function batchDeleteInspectionIssues(ids: string[]) {
   );
 }
 
-/**
- * Get Inspection Records
- */
+// --- Inspection Records APIs ---
+
 export async function getInspectionRecords(params?: {
-  brand?: string;
-  supplierName?: string;
   type?: string;
   year?: number;
+  keyword?: string;
+  page?: number;
+  pageSize?: number;
 }) {
-  const query = params
-    ? `?${new URLSearchParams(params as any).toString()}`
-    : '';
-  return requestClient.get<InspectionRecord[]>(
-    `${QMS_API.INSPECTION_RECORDS}${query}`,
+  return requestClient.get<{ items: InspectionRecord[]; total: number }>(
+    QMS_API.INSPECTION_RECORDS,
+    { params },
   );
 }
 
-/**
- * Create Inspection Record
- */
 export async function createInspectionRecord(data: Partial<InspectionRecord>) {
   return requestClient.post<InspectionRecord>(QMS_API.INSPECTION_RECORDS, data);
 }
@@ -91,9 +83,6 @@ export async function deleteInspectionRecord(id: string) {
   return requestClient.delete(`${QMS_API.INSPECTION_RECORDS}/${id}`);
 }
 
-/**
- * Batch delete inspection records
- */
 export async function batchDeleteInspectionRecords(ids: string[]) {
   return requestClient.post<{ successCount: number }>(
     QMS_API.INSPECTION_RECORDS_BATCH_DELETE,
@@ -104,9 +93,8 @@ export async function batchDeleteInspectionRecords(ids: string[]) {
 export namespace QmsInspectionApi {
   export type InspectionTaskResult = import('@qgs/shared').InspectionTaskResult;
   export type InspectionIssue = import('@qgs/shared').InspectionIssue;
-  export type DetailedInspectionRecord =
-    import('@qgs/shared').DetailedInspectionRecord;
-}
-export namespace QmsInspectionApi {
   export type InspectionRecord = import('@qgs/shared').InspectionRecord;
+  export type DetailedInspectionRecord = InspectionRecord & {
+    items: InspectionTaskResult[];
+  };
 }

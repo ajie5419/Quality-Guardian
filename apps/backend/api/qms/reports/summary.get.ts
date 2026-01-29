@@ -1,4 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { getTargetPassRate } from '~/constants/quality-standards';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -30,12 +31,14 @@ export default defineEventHandler(async (event) => {
       topRiskProjects,
       supplierRanking,
       majorEvents,
+      processPassRates,
     ] = await Promise.all([
       Promise.all(periods.map((p) => fetchPeriodMetrics(p.start, p.end))),
       fetchDefectDistribution(currentPeriod.start, currentPeriod.end),
       fetchTopRiskProjects(currentPeriod.start, currentPeriod.end),
       fetchSupplierPerformance(currentPeriod.start, currentPeriod.end),
       fetchMajorEvents(currentPeriod.start, currentPeriod.end),
+      fetchProcessPassRates(currentPeriod.start, currentPeriod.end),
     ]);
 
     const currData = historyMetrics[historyCount - 1];
@@ -50,7 +53,7 @@ export default defineEventHandler(async (event) => {
           value: currData.passRate,
           unit: '%',
           trend: calculateTrend(currData.passRate, prevData.passRate),
-          desc: '检验合格总数 / 检验总数',
+          desc: '检验合格总数 /检验总数',
           history: historyMetrics.map((h) => h.passRate),
         },
         {
@@ -91,6 +94,7 @@ export default defineEventHandler(async (event) => {
         name: d.defectType || '未分类',
         value: d._count,
       })),
+      processPassRates,
       topProjects: topRiskProjects.map((p) => ({
         name: p.projectName || '未知项目',
         issues: p._count,
@@ -112,7 +116,7 @@ export default defineEventHandler(async (event) => {
     };
 
     return useResponseSuccess(reportData);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Report generation failed:', error);
     return { code: -1, message: `报告生成失败: ${error.message}` };
   }
@@ -181,6 +185,40 @@ async function fetchPeriodMetrics(start: Date, end: Date) {
     internalLoss,
     externalLoss,
   };
+}
+
+async function fetchProcessPassRates(start: Date, end: Date) {
+  try {
+    const rows = (await prisma.$queryRaw`
+      SELECT 
+        processName,
+        category,
+        COUNT(*) as total,
+        SUM(CASE WHEN result = 'PASS' THEN 1 ELSE 0 END) as passed
+      FROM inspections
+      WHERE date >= ${start} AND date <= ${end} AND isDeleted = 0
+      GROUP BY processName, category
+    `) as any[];
+
+    return rows.map((row) => {
+      const total = Number(row.total);
+      const passed = Number(row.passed);
+      const passRate = total > 0 ? ((passed / total) * 100).toFixed(2) : '0.00';
+      const targetPassRate = getTargetPassRate(row.processName);
+
+      return {
+        processName: row.processName || '未知工序',
+        category: row.category || '其他',
+        total,
+        passed,
+        passRate: Number(passRate),
+        targetPassRate, // 新增：目标合格率
+      };
+    });
+  } catch (error) {
+    console.error('Fetch process pass rates failed:', error);
+    return [];
+  }
 }
 
 async function fetchDefectDistribution(start: Date, end: Date) {

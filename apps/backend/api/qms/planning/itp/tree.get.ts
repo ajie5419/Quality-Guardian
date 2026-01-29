@@ -18,50 +18,53 @@ export default defineEventHandler(async () => {
         orderBy: { createdAt: 'desc' },
       }),
       prisma.inspections.findMany({
-        where: { isDeleted: false, NOT: { details: null } },
-        select: { details: true, qualityPlanId: true, result: true },
+        where: { isDeleted: false },
+        include: {
+          items: true,
+        },
       }),
     ]);
 
-    // 预处理检验记录，建立 itpItemId -> results 映射
-    interface ExecutionInfo {
-      itpItemId: string;
-      result: string;
-      [key: string]: unknown;
-    }
-    const executionMap = new Map<
-      string,
-      Array<{ overallResult: string; result: string }>
-    >();
-    inspections.forEach((record) => {
-      if (!record.details || !record.qualityPlanId) return;
-      try {
-        const results = JSON.parse(record.details);
-        if (Array.isArray(results)) {
-          results.forEach((res: ExecutionInfo) => {
-            const key = `${record.qualityPlanId}_${res.itpItemId}`;
-            let list = executionMap.get(key);
-            if (!list) {
-              list = [];
-              executionMap.set(key, list);
-            }
-            list.push({
-              overallResult: record.result || 'PASS',
-              result: res.result,
-            });
-          });
-        }
-      } catch {}
+    // Build a map of WorkOrder -> Inspections for faster lookup
+    const inspectionMap = new Map<string, typeof inspections>();
+    inspections.forEach((insp) => {
+      const wo = insp.workOrderNumber;
+      if (!inspectionMap.has(wo)) {
+        inspectionMap.set(wo, []);
+      }
+      inspectionMap.get(wo)?.push(insp);
     });
 
     const treeData = projects.map((project) => {
+      // Get inspections for this project's work order
+      const projectInspections =
+        inspectionMap.get(project.workOrderNumber) || [];
+
       const processedItems = project.items.map((item) => {
-        const key = `${project.id}_${item.id}`;
-        const history = executionMap.get(key) || [];
+        // Find all inspection items that match this ITP item (by activity name)
+        // logic: for each inspection in this WO, check its items for a match
+        const matchedExecutionItems: {
+          overallResult: string;
+          result: string;
+        }[] = [];
+
+        projectInspections.forEach((insp) => {
+          const matchedItem = insp.items.find(
+            (i) => i.checkItem === item.activity,
+          );
+          if (matchedItem) {
+            matchedExecutionItems.push({
+              overallResult: insp.result || 'PASS',
+              result: matchedItem.result,
+            });
+          }
+        });
 
         let executionStatus = 'PENDING'; // 默认未开始
-        if (history.length > 0) {
-          const hasFail = history.some((h) => h.result === 'FAIL');
+        if (matchedExecutionItems.length > 0) {
+          const hasFail = matchedExecutionItems.some(
+            (h) => h.result === 'FAIL',
+          );
           executionStatus = hasFail ? 'FAILED' : 'COMPLETED';
         }
 
@@ -71,7 +74,7 @@ export default defineEventHandler(async () => {
           name: item.activity,
           parentId: project.id,
           executionStatus,
-          executionCount: history.length,
+          executionCount: matchedExecutionItems.length,
           quantitativeItems: item.quantitativeItems
             ? JSON.parse(item.quantitativeItems)
             : [],

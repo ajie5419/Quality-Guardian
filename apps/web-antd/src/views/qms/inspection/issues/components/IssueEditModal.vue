@@ -32,6 +32,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   success: [];
   'update:open': [boolean];
+  searchWorkOrder: [string];
 }>();
 
 const { t } = useI18n();
@@ -195,6 +196,7 @@ function handleCancel() {
             :is-edit-mode="isEditMode"
             :supplier-list="supplierList"
             :work-order-list="workOrderList"
+            @search-work-order="(val) => emit('searchWorkOrder', val)"
           />
 
           <!-- 右侧列：缺陷信息 -->

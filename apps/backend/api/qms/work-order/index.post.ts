@@ -16,11 +16,18 @@ export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
 
-    // Use existing ID logic or allow manual input?
-    // Mock used: `WO-${new Date().getFullYear()}${Math.floor(Math.random() * 1000)}`
     // Schema: workOrderNumber String @id
+    const rawWoNum = body.workOrderNumber;
+    const woNum = rawWoNum ? String(rawWoNum).trim() : `WO-${Date.now()}`;
 
-    const woNum = body.workOrderNumber || `WO-${Date.now()}`;
+    // Check for duplicate ID
+    const existing = await prisma.work_orders.findUnique({
+      where: { workOrderNumber: woNum },
+    });
+    
+    if (existing) {
+      return useResponseError(`工单号 ${woNum} 已存在，请使用其他编号`);
+    }
 
     let statusValue = 'OPEN';
     if (body.status === '已结束' || body.status === '已完成') {
@@ -45,8 +52,30 @@ export default defineEventHandler(async (event) => {
     });
 
     return useResponseSuccess({ ...newWO, id: newWO.workOrderNumber });
-  } catch (error) {
-    console.error('Failed to create work order:', error);
-    return useResponseError('创建工单失败');
+  } catch (error: any) {
+    console.error(
+      'Failed to create work order:',
+      JSON.stringify(
+        {
+          message: error.message,
+          code: error.code,
+          meta: error.meta,
+        },
+        null,
+        2,
+      ),
+    );
+
+    // Handle Prisma Unique Constraint Violation (P2002)
+    const isUniqueError =
+      error.code === 'P2002' ||
+      String(error.message).includes('Unique constraint failed') ||
+      String(error).includes('Unique constraint failed');
+
+    if (isUniqueError) {
+      return useResponseError('工单号已存在，请使用其他编号');
+    }
+
+    return useResponseError(`创建工单失败: ${error.message || String(error)}`);
   }
 });

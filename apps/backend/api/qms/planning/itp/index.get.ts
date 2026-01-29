@@ -10,15 +10,17 @@ export default defineEventHandler(async (event) => {
   if (!projectId) return { code: 0, data: [], message: 'projectId required' };
 
   try {
-    const project = await prisma.quality_plans.findUnique({
-      where: { id: projectId },
+    // Correctly fetch from the relation table instead of the legacy JSON column
+    const items = await prisma.itp_items.findMany({
+      where: {
+        projectId: projectId,
+        isDeleted: false,
+      },
+      orderBy: {
+        order: 'asc',
+      },
     });
 
-    if (!project || !project.itpItems) {
-      return { code: 0, data: [], message: 'ok' };
-    }
-
-    const items = JSON.parse(project.itpItems);
     return {
       code: 0,
       data: items,

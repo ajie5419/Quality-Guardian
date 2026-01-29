@@ -55,9 +55,9 @@ export async function getDfmeaTree() {
 }
 
 export async function getDfmeaItemsByProject(projectId: string) {
-  return requestClient.get<DfmeaItem[]>(
-    `/qms/planning/dfmea?projectId=${projectId}`,
-  );
+  return requestClient.get<DfmeaItem[]>('/qms/planning/dfmea', {
+    params: { projectId },
+  });
 }
 
 export async function createDfmea(data: Partial<DfmeaItem>) {
@@ -180,7 +180,9 @@ export async function updateItp(id: string, data: Partial<ItpItem>) {
 }
 
 export async function deleteItp(id: string, projectId: string) {
-  return requestClient.delete(`/qms/planning/itp/${id}?projectId=${projectId}`);
+  return requestClient.delete(`/qms/planning/itp/${id}`, {
+    params: { projectId },
+  });
 }
 
 export namespace QmsPlanningApi {

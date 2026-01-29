@@ -16,10 +16,7 @@ export * from '@qgs/shared';
  * Get Supplier list
  */
 export async function getSupplierList(params?: SupplierListParams) {
-  const query = params
-    ? `?${new URLSearchParams(params as any).toString()}`
-    : '';
-  return requestClient.get<SupplierListResponse>(`${QMS_API.SUPPLIER}${query}`);
+  return requestClient.get<SupplierListResponse>(QMS_API.SUPPLIER, { params });
 }
 
 /**

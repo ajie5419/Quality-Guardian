@@ -7,6 +7,69 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum inspection_category {
+  INCOMING
+  PROCESS
+  SHIPMENT
+}
+
+enum inspection_result {
+  PASS
+  FAIL
+  CONDITIONAL
+  NA
+}
+
+model inspections {
+  id                  String              @id @default(cuid())
+  serialNumber        String?             @unique
+  category            inspection_category
+  workOrderNumber     String
+  work_order          work_orders         @relation(fields: [workOrderNumber], references: [workOrderNumber])
+  projectName         String?
+  supplierName        String?
+  materialName        String?
+  incomingType        String?
+  processName         String?
+  level1Component     String?
+  team                String?
+  documents           String?
+  packingListArchived String?
+  quantity            Int                 @default(1)
+  inspector           String
+  inspectionDate      DateTime
+  reportDate          DateTime?
+  result              inspection_result   @default(PASS)
+  remarks             String?             @db.Text
+  isDeleted           Boolean             @default(false)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  items               inspection_items[]
+
+  @@index([workOrderNumber])
+  @@index([category])
+  @@index([inspectionDate])
+}
+
+model inspection_items {
+  id                 String            @id @default(cuid())
+  inspectionId       String
+  inspection         inspections       @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  checkItem          String
+  standardValue      String?
+  upperTolerance     String?
+  lowerTolerance     String?
+  uom                String?
+  acceptanceCriteria String?           @db.Text
+  referenceDoc       String?
+  measuredValue      String?
+  result             inspection_result @default(PASS)
+  remarks            String?
+  order              Int               @default(0)
+
+  @@index([inspectionId])
+}
+
 model menus {
   id        Int      @id
   path      String?
@@ -172,58 +235,6 @@ model dfmea {
   @@index([projectId])
 }
 
-model inspections {
-  id                  String                 @id
-  serialNumber        Int
-  date                DateTime
-  category            inspections_category
-  result              inspections_result     @default(PASS)
-  docStatus           inspections_docStatus?
-  inspector           String
-  quantity            Int
-  details             String?                @db.LongText
-  remarks             String?                @db.Text
-  processName         String?
-  firstLevelPartName  String?
-  partName            String?
-  team                String?
-  qualityRecordFilled Boolean                @default(false)
-  incomingType        String?
-  supplierName        String?
-  itemName            String?
-  projectName         String?
-  shippingDocs        String?
-  packingList         String?
-  packingListPhotos   String?                @db.LongText
-  reporter            String?
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
-  version             Int                    @default(1)
-  isDeleted           Boolean                @default(false)
-  workOrderNumber     String
-  documentStatus      String?
-  inspectionDate      DateTime?
-  isArchived          Boolean                @default(false)
-  vehicularInfo       String?
-  itpItemId           String?
-  qualityPlanId       String?
-  subPartName         String?
-  bom_item_id         String?
-  project_boms        project_boms?          @relation(fields: [bom_item_id], references: [id])
-  users               users                  @relation(fields: [inspector], references: [username])
-  quality_plans       quality_plans?         @relation(fields: [qualityPlanId], references: [id])
-  work_orders         work_orders            @relation(fields: [workOrderNumber], references: [workOrderNumber])
-
-  @@index([bom_item_id])
-  @@index([category])
-  @@index([date])
-  @@index([inspector], map: "inspections_inspector_fkey")
-  @@index([qualityPlanId], map: "inspections_qualityPlanId_fkey")
-  @@index([result])
-  @@index([workOrderNumber])
-  @@index([isArchived])
-}
-
 model permissions {
   id          String   @id
   code        String   @unique
@@ -247,7 +258,6 @@ model project_boms {
   created_by        String?
   created_at        DateTime      @default(now())
   updated_at        DateTime      @updatedAt
-  inspections       inspections[]
   work_orders       work_orders   @relation(fields: [work_order_number], references: [workOrderNumber])
 
   @@index([work_order_number])
@@ -288,7 +298,6 @@ model quality_plans {
   version         Int                      @default(1)
   isDeleted       Boolean                  @default(false)
   workOrderNumber String
-  inspections     inspections[]
   items           itp_items[]              @relation("PlanToItems")
   task_dispatches qms_task_dispatches[]
   work_orders     work_orders              @relation(fields: [workOrderNumber], references: [workOrderNumber])
@@ -457,7 +466,6 @@ model users {
   updatedAt                                         DateTime              @updatedAt
   version                                           Int                   @default(1)
   audit_logs                                        audit_logs[]
-  inspections                                       inspections[]
   qms_task_dispatches_assignee                      qms_task_dispatches[] @relation("qms_task_dispatches_assigneeIdTousers")
   qms_task_dispatches_assignor                      qms_task_dispatches[] @relation("qms_task_dispatches_assignorIdTousers")
   quality_records_quality_records_inspectorTousers  quality_records[]     @relation("quality_records_inspectorTousers")
@@ -484,10 +492,10 @@ model work_orders {
   bom_projects    bom_projects?
   dfmea_projects  dfmea_projects[]
   doc_projects    doc_projects?
-  inspections     inspections[]
   project_boms    project_boms[]
   quality_plans   quality_plans[]
   quality_records quality_records[]
+  inspections     inspections[]
 
   @@index([customerName])
   @@index([deliveryDate])
@@ -611,31 +619,11 @@ enum after_sales_claimStatus {
   CANCELLED
 }
 
-enum inspections_category {
-  INCOMING
-  PROCESS
-  FINAL
-  OUTGOING
-}
-
-enum inspections_result {
-  PASS
-  FAIL
-  CONDITIONAL
-}
-
 enum work_orders_status {
   OPEN
   IN_PROGRESS
   COMPLETED
   CANCELLED
-}
-
-enum inspections_docStatus {
-  DRAFT
-  PENDING_REVIEW
-  APPROVED
-  REJECTED
 }
 
 enum quality_plans_planStatus {
