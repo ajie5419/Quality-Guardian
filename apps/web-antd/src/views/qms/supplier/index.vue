@@ -326,22 +326,24 @@ function handleSuccess() {
             <Space>
               <Button
                 v-access:code="'QMS:Supplier:Create'"
-                shape="round"
                 type="primary"
                 @click="handleOpenModal"
               >
-                <span class="vxe-icon-add mr-1"></span>
+                <template #icon>
+                  <IconifyIcon icon="lucide:plus" />
+                </template>
                 {{ t('qms.supplier.addSupplier') }}
               </Button>
               <Button
                 v-if="checkedRows.length > 0"
                 v-access:code="'QMS:Supplier:Delete'"
                 danger
-                shape="round"
                 type="primary"
                 @click="handleBatchDelete"
               >
-                <span class="vxe-icon-delete mr-1"></span>
+                <template #icon>
+                  <IconifyIcon icon="lucide:trash-2" />
+                </template>
                 {{ t('common.batchDelete') }}
               </Button>
             </Space>

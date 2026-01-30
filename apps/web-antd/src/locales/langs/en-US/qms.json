@@ -15,6 +15,22 @@
       "engineering": "Eng. Quality Records",
       "afterSales": "After-Sales Records",
       "incoming": "Incoming Inspection History"
+    },
+    "saveSuccess": "Saved successfully",
+    "deleteSuccess": "Deleted successfully",
+    "deleteFailed": "Failed to delete",
+    "actionFailed": "Operation failed",
+    "loading": "Loading...",
+    "confirmDelete": "Confirm Delete",
+    "confirmBatchDelete": "Confirm Batch Delete",
+    "confirmBatchDeleteContent": "Are you sure to delete {count} selected records?",
+    "deleteSuccessCount": "Successfully deleted {count} records",
+    "confirmDeleteContent": "Are you sure to delete",
+    "batchDelete": "Batch Delete",
+    "dataLoadFailed": "Failed to load data",
+    "unit": {
+      "year": " Year",
+      "project": " Projects"
     }
   },
   "task": {
@@ -32,11 +48,15 @@
   },
   "workOrder": {
     "status": {
+      "open": "Open",
       "pending": "Pending",
       "inProgress": "In Progress",
       "completed": "Completed",
-      "closed": "Closed"
-    }
+      "cancelled": "Cancelled",
+      "unknown": "Unknown Status"
+    },
+    "showChart": "Show Chart",
+    "hideChart": "Hide Chart"
   },
   "qualityLoss": {
     "status": {

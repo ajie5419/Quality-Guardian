@@ -13,12 +13,13 @@ export enum SupplierStatusEnum {
 
 /**
  * QMS Work Order Status
+ * MUST match backend work_orders_status enum
  */
 export enum WorkOrderStatusEnum {
-  CLOSED = 'Closed',
-  COMPLETED = 'Completed',
-  IN_PROGRESS = 'In Progress',
-  PENDING = 'Pending',
+  OPEN = 'OPEN',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
 }
 
 /**

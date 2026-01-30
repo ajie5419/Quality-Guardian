@@ -6,6 +6,7 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+import { mapWorkOrderStatus } from '~/utils/work-order-status';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -29,12 +30,8 @@ export default defineEventHandler(async (event) => {
       return useResponseError(`工单号 ${woNum} 已存在，请使用其他编号`);
     }
 
-    let statusValue = 'OPEN';
-    if (body.status === '已结束' || body.status === '已完成') {
-      statusValue = 'COMPLETED';
-    } else if (body.status === '进行中') {
-      statusValue = 'IN_PROGRESS';
-    }
+    // 使用统一的状态映射工具
+    const statusValue = mapWorkOrderStatus(body.status);
 
     const newWO = await prisma.work_orders.create({
       data: {
@@ -51,7 +48,22 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    return useResponseSuccess({ ...newWO, id: newWO.workOrderNumber });
+    // 格式化返回数据，将 UTC 时间转换为本地时间
+    const formattedWO = {
+      ...newWO,
+      id: newWO.workOrderNumber,
+      createTime: newWO.createdAt.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      }).replace(/\//g, '-'),
+    };
+
+    return useResponseSuccess(formattedWO);
   } catch (error: any) {
     console.error(
       'Failed to create work order:',
@@ -74,6 +86,17 @@ export default defineEventHandler(async (event) => {
 
     if (isUniqueError) {
       return useResponseError('工单号已存在，请使用其他编号');
+    }
+
+    // Handle Prisma Validation Errors (Missing Arguments etc.)
+    if (error.code === 'P2011' || error.code === 'P2012' || String(error.message).includes('Argument')) {
+       // Try to extract the missing argument name if possible, or just give a generic validation error
+       // Example msg: "Argument `customerName` is missing."
+       const match = String(error.message).match(/Argument `(\w+)` is missing/);
+       if (match && match[1]) {
+         return useResponseError(`请求参数错误: 缺少必填字段 ${match[1]}`);
+       }
+       return useResponseError('请求参数错误: 数据格式不正确或缺少必填字段');
     }
 
     return useResponseError(`创建工单失败: ${error.message || String(error)}`);

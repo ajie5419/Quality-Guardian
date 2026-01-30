@@ -1,19 +1,11 @@
 import prisma from '~/utils/prisma';
+import { mapToDisplayStatus, WORK_ORDER_STATUS } from '~/utils/work-order-status';
 
 // 抽离常量
 const WO_CONSTANTS = {
   DEFAULT_PAGE: 1,
   DEFAULT_PAGE_SIZE: 20,
-  STATUS: {
-    OPEN: 'OPEN',
-    IN_PROGRESS: 'IN_PROGRESS',
-    COMPLETED: 'COMPLETED',
-  },
-  DISPLAY_STATUS: {
-    OPEN: '未开始',
-    IN_PROGRESS: '进行中',
-    COMPLETED: '已完成',
-  },
+  STATUS: WORK_ORDER_STATUS,
 };
 
 /**
@@ -27,18 +19,6 @@ const getYearDateRange = (year?: number) => {
   const end = new Date(`${targetYear}-12-31T23:59:59.999Z`);
 
   return { start, end, isCurrentYear: targetYear === now.getFullYear() };
-};
-
-/**
- * 状态映射辅助函数
- */
-const mapDisplayStatus = (status: string) => {
-  if (status === WO_CONSTANTS.STATUS.COMPLETED) {
-    return WO_CONSTANTS.DISPLAY_STATUS.COMPLETED;
-  } else if (status === WO_CONSTANTS.STATUS.IN_PROGRESS) {
-    return WO_CONSTANTS.DISPLAY_STATUS.IN_PROGRESS;
-  }
-  return WO_CONSTANTS.DISPLAY_STATUS.OPEN;
 };
 
 interface WorkOrderListParams {
@@ -154,10 +134,19 @@ export const WorkOrderService = {
           effectiveTime: wo.effectiveTime
             ? wo.effectiveTime.toISOString().split('T')[0]
             : null,
+          // 转换为本地时间格式：YYYY-MM-DD HH:mm:ss
           createTime: wo.createdAt
-            ? wo.createdAt.toISOString().replace('T', ' ').split('.')[0]
+            ? wo.createdAt.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+              }).replace(/\//g, '-')
             : null,
-          status: mapDisplayStatus(wo.status || ''),
+          status: mapToDisplayStatus(wo.status),
         };
       });
 

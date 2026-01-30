@@ -5,6 +5,7 @@ import errorHandler from './error';
 // Force restart timestamp: 2026-01-28 T06:00:00
 process.env.COMPATIBILITY_DATE = new Date().toISOString();
 export default defineNitroConfig({
+  ignore: ['node_modules', 'uploads', '.output', '.nitro', 'dist'],
   devErrorHandler: errorHandler,
   errorHandler: '~/error',
   // Serve static files from uploads directory

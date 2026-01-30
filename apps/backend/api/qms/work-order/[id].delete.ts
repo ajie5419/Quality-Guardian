@@ -13,12 +13,14 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const id = getRouterParam(event, 'id');
+  // 解码 URL 编码的参数（处理工单号中的特殊字符如 '/'）
+  const id = decodeURIComponent(getRouterParam(event, 'id') || '');
   if (!id) {
     return useResponseError('缺少工单号');
   }
 
   try {
+    // work_orders 表的主键是 workOrderNumber，不是 id
     await prisma.work_orders.update({
       where: { workOrderNumber: id },
       data: {
@@ -30,6 +32,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     console.error('Failed to delete work order:', error);
-    return useResponseError('删除工单失败');
+    return useResponseError('删除工单失败：记录不存在');
   }
 });

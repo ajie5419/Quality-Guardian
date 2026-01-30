@@ -21,6 +21,7 @@ export const QMS_API = {
   QUALITY_LOSS: '/qms/quality-loss',
   WORK_ORDER: '/qms/work-order',
   WORK_ORDER_BATCH_DELETE: '/qms/work-order/batch-delete',
+  WORK_ORDER_IMPORT: '/qms/work-order/import',
 
   // After Sales
   AFTER_SALES: '/qms/after-sales',

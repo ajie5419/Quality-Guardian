@@ -11,27 +11,28 @@
     "passRate": "合格率",
     "engLoss": "工程损失",
     "afterSalesLoss": "售后损失",
+    "fileTypeInvalid": "文件类型无效",
+    "importSuccessCount": "成功导入 {count} 条数据",
+    "importFailed": "导入失败",
+    "confirmDelete": "确认删除",
+    "confirmDeleteContent": "确认删除",
+    "deleteSuccess": "删除成功",
+    "deleteFailed": "删除失败",
+    "confirmBatchDelete": "确认批量删除",
+    "confirmBatchDeleteContent": "确认删除选中的 {count} 条数据吗？",
+    "deleteSuccessCount": "成功删除 {count} 条数据",
+    "loading": "加载中",
+    "saveSuccess": "保存成功",
+    "actionFailed": "操作失败",
+    "deptLoadFailed": "部门数据加载失败",
+    "dataLoadFailed": "数据加载失败",
+    "selectAtLeastOne": "请至少选择一条记录",
+    "other": "其他",
     "tabs": {
       "basic": "基本档案",
       "engineering": "工程质量记录",
       "afterSales": "售后质量记录",
       "incoming": "进货检验履历"
-    },
-    "saveSuccess": "保存成功",
-    "deleteSuccess": "删除成功",
-    "deleteFailed": "删除失败",
-    "actionFailed": "操作失败",
-    "loading": "加载中",
-    "confirmDelete": "确认删除",
-    "confirmBatchDelete": "确认批量删除",
-    "confirmBatchDeleteContent": "确定要删除选中的 {count} 条记录吗？",
-    "deleteSuccessCount": "成功删除 {count} 条记录",
-    "confirmDeleteContent": "确定要删除",
-    "batchDelete": "批量删除",
-    "dataLoadFailed": "数据加载失败",
-    "unit": {
-      "year": "年",
-      "project": "个项目"
     }
   },
   "workspace": {
@@ -94,13 +95,12 @@
   },
   "workOrder": {
     "title": "工单管理",
-    "status": {
-      "pending": "待处理",
-      "inProgress": "进行中",
-      "completed": "已完成",
-      "open": "未开始",
-      "cancelled": "已取消",
-      "unknown": "未知状态"
+    \"status\": {
+      \"open\": \"未开始\",
+      \"pending\": \"待处理\",
+      \"inProgress\": \"进行中\",
+      \"completed\": \"已完成\",
+      \"cancelled\": \"已取消\"
     },
     "workOrderNumber": "工单号",
     "division": "事业部",
@@ -121,7 +121,8 @@
     "excellent": "优秀",
     "createWorkOrder": "新建工单",
     "showChart": "显示图表",
-    "hideChart": "隐藏图表"
+    "hideChart": "隐藏图表",
+    "initFailed": "工单编辑器初始化失败，请检查控制台日志"
   },
   "dashboard": {
     "title": "质量看板",

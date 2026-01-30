@@ -30,6 +30,13 @@ export async function deleteQualityLoss(id: string) {
   return requestClient.delete(`/qms/quality-loss/${id}`);
 }
 
+export async function batchDeleteQualityLoss(ids: string[]) {
+  return requestClient.post<{ successCount: number }>(
+    '/qms/quality-loss/batch-delete',
+    { ids },
+  );
+}
+
 export namespace QmsQualityLossApi {
   export type QualityLossItem = import('@qgs/shared').QualityLossItem;
 }

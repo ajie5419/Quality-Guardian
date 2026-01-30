@@ -7,9 +7,10 @@ import { useRouter } from 'vue-router';
 
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
+import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
-import { Button, message, Modal, Select, Tag } from 'ant-design-vue';
+import { Button, message, Modal, Select, Tag, Space } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
@@ -42,7 +43,6 @@ const { hasAccessByCodes } = useAccess();
 const canCreate = computed(() => hasAccessByCodes(['QMS:AfterSales:Create']));
 const canEdit = computed(() => hasAccessByCodes(['QMS:AfterSales:Edit']));
 const canDelete = computed(() => hasAccessByCodes(['QMS:AfterSales:Delete']));
-const canExport = computed(() => hasAccessByCodes(['QMS:AfterSales:Export']));
 const canSettle = computed(() => hasAccessByCodes(['QMS:AfterSales:Settle']));
 
 // 状态选项
@@ -262,9 +262,12 @@ const gridOptions = computed<VxeGridProps>(() => ({
     },
   ],
   toolbarConfig: {
-    export: canExport.value,
+    export: true,
     import: true,
     search: true,
+    refresh: true,
+    zoom: true,
+    custom: true,
     slots: {
       buttons: 'toolbar-actions',
     },
@@ -343,21 +346,27 @@ const gridOptions = computed<VxeGridProps>(() => ({
     },
   },
   exportConfig: {
-    remote: true,
+    remote: false,
     types: ['xlsx', 'csv'],
     modes: ['current', 'selected', 'all'],
   },
   proxyConfig: {
     ajax: {
       query: async (
-        { page: _page }: { page?: { currentPage?: number; pageSize?: number } },
+        { page }: { page?: { currentPage?: number; pageSize?: number } },
         formValues: Record<string, unknown>,
       ) => {
         const data = await getAfterSalesList({
           year: currentYear.value,
           ...formValues,
         } as any);
-        return { items: data, total: data.length };
+
+        const { currentPage = 1, pageSize = 20 } = page || {};
+        const start = (currentPage - 1) * pageSize;
+        const end = start + pageSize;
+        const pageData = data.slice(start, end);
+
+        return { items: pageData, total: data.length };
       },
       queryAll: async ({ formValues }: any) => {
         const data = await getAfterSalesList({
@@ -370,8 +379,27 @@ const gridOptions = computed<VxeGridProps>(() => ({
   },
 }));
 
+import type { VxeCheckboxChangeParams } from '#/types';
+
+// ...
+
+const checkedRows = ref<any[]>([]);
+
+function onCheckChange(params: VxeCheckboxChangeParams) {
+  const records = params.$grid.getCheckboxRecords() || [];
+  checkedRows.value = records;
+}
+
+const gridEvents = {
+  checkboxChange: onCheckChange,
+  checkboxAll: onCheckChange,
+};
+
+// ...
+
 const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions: gridOptions as any,
+  gridEvents,
   formOptions: {
     schema: [
       {
@@ -381,8 +409,8 @@ const [Grid, gridApi] = useVbenVxeGrid({
         colProps: { span: 6 },
       },
       {
-        fieldName: 'projectName',
-        label: t('qms.afterSales.form.projectName'),
+        fieldName: 'customerName',
+        label: t('qms.afterSales.form.customerName'),
         component: 'Input',
         colProps: { span: 6 },
       },
@@ -391,19 +419,19 @@ const [Grid, gridApi] = useVbenVxeGrid({
         label: t('qms.afterSales.form.status'),
         component: 'Select',
         componentProps: {
-          options: [
-            { label: t('common.all'), value: '' },
-            { label: t('qms.afterSales.status.processing'), value: '处理中' },
-            { label: t('qms.afterSales.status.resolved'), value: '已结束' },
-            { label: t('qms.afterSales.status.pending'), value: '待处理' },
-          ],
+          options: Object.keys(useStatusOptions().statusMap).map((key) => ({
+            label: useStatusOptions().statusMap[key]?.label,
+            value: key,
+          })),
         },
-        colProps: { span: 4 },
+        colProps: { span: 6 },
       },
-    ] as any,
+    ],
+    showCollapseButton: true,
     submitOnChange: true,
+    submitOnEnter: true,
   },
-});
+} as any);
 
 // 监听部门数据变化，刷新表格显示
 watch(deptRawData, () => {
@@ -448,21 +476,20 @@ function handleDelete(row: QmsAfterSalesApi.AfterSalesItem) {
 }
 
 function handleBatchDelete() {
-  const records = gridApi.grid.getCheckboxRecords();
-  if (records.length === 0) {
-    message.warning(t('common.pleaseSelectData'));
+  if (checkedRows.value.length === 0) {
     return;
   }
   Modal.confirm({
     title: t('common.confirmBatchDelete'),
-    content: t('common.confirmBatchDeleteContent', { count: records.length }),
+    content: t('common.confirmBatchDeleteContent', { count: checkedRows.value.length }),
     onOk: async () => {
       try {
-        const ids = records.map((r: any) => r.id);
+        const ids = checkedRows.value.map((r: any) => r.id);
         const res = await batchDeleteAfterSales(ids);
         message.success(
           t('common.deleteSuccessCount', { count: res.successCount }),
         );
+        checkedRows.value = [];
         invalidateAfterSales();
         chartRefreshKey.value++;
         gridApi.reload();
@@ -539,40 +566,53 @@ function handleModalSuccess() {
             </Tag>
           </template>
           <template #toolbar-actions>
-            <div class="flex items-center gap-4">
-              <div class="flex gap-2">
-                <Button
-                  @click="showCharts = !showCharts"
-                  :type="showCharts ? 'primary' : 'default'"
-                >
-                  <span class="i-lucide-bar-chart-3 mr-1"></span>
-                  {{ showCharts ? '隐藏看板' : '数据看板' }}
-                </Button>
-                <Button
-                  v-if="canCreate"
-                  type="primary"
-                  @click="handleOpenModal"
-                >
-                  {{ t('qms.inspection.issues.createIssue') }}
-                </Button>
-                <Button v-if="canDelete" danger @click="handleBatchDelete">
-                  <span class="i-lucide-trash-2 mr-1"></span>
-                  {{ t('common.batchDelete') }}
-                </Button>
-              </div>
-
-              <div class="flex items-center gap-2">
-                <span class="text-gray-500"
+            <Space>
+              <Button
+                @click="showCharts = !showCharts"
+                shape="round"
+                :type="showCharts ? 'primary' : 'default'"
+              >
+                <template #icon>
+                  <IconifyIcon icon="lucide:bar-chart-3" />
+                </template>
+                {{ showCharts ? '隐藏看板' : '数据看板' }}
+              </Button>
+              <Button
+                v-if="canCreate"
+                shape="round"
+                type="primary"
+                @click="handleOpenModal"
+              >
+                <template #icon>
+                  <IconifyIcon icon="lucide:plus" />
+                </template>
+                {{ t('qms.inspection.issues.createIssue') }}
+              </Button>
+              <Button
+                v-if="checkedRows.length > 0 && canDelete"
+                danger
+                shape="round"
+                type="primary"
+                @click="handleBatchDelete"
+              >
+                <template #icon>
+                  <IconifyIcon icon="lucide:trash-2" />
+                </template>
+                {{ t('common.batchDelete') }}
+              </Button>
+              <div class="ml-2 flex items-center gap-2">
+                <span class="text-xs text-gray-500"
                   >{{ t('qms.inspection.records.statsYear') }}:</span
                 >
                 <Select
                   v-model:value="currentYear"
                   :options="yearOptions"
-                  class="w-[120px]"
+                  size="small"
+                  class="w-[100px]"
                   @change="() => gridApi.reload()"
                 />
               </div>
-            </div>
+            </Space>
           </template>
         </Grid>
       </div>

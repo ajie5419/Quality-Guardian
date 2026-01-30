@@ -21,9 +21,11 @@ export default defineEventHandler(async (event) => {
       return useResponseError('请提供有效的 ID 列表');
     }
 
-    await prisma.work_orders.updateMany({
+    // work_orders 表的主键是 workOrderNumber
+    const result = await prisma.work_orders.updateMany({
       where: {
         workOrderNumber: { in: ids },
+        isDeleted: false, // 只删除未删除的记录
       },
       data: {
         isDeleted: true,
@@ -31,7 +33,7 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    return useResponseSuccess({ successCount: ids.length });
+    return useResponseSuccess({ successCount: result.count });
   } catch (error) {
     console.error('Batch delete work orders failed:', error);
     return useResponseError('批量删除失败');

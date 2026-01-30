@@ -11,6 +11,7 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+import { mapWorkOrderStatus } from '~/utils/work-order-status';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -46,33 +47,8 @@ export default defineEventHandler(async (event) => {
       updateData.effectiveTime = new Date(body.effectiveTime);
 
     if (body.status) {
-      // 统一映射前端状态到数据库 Enum
-      const s = body.status.toLowerCase();
-      switch (s) {
-        case 'closed': {
-          updateData.status = 'COMPLETED';
-          break;
-        }
-        case 'completed':
-        case '已完成':
-        case '已结束': {
-          updateData.status = 'COMPLETED';
-          break;
-        }
-        case 'in progress':
-        case '进行中': {
-          updateData.status = 'IN_PROGRESS';
-          break;
-        }
-        case 'pending':
-        case '未开始': {
-          updateData.status = 'OPEN';
-          break;
-        }
-        default: {
-          updateData.status = 'OPEN';
-        }
-      }
+      // 使用统一的状态映射工具
+      updateData.status = mapWorkOrderStatus(body.status);
     }
 
     await (prisma.work_orders as any).update({

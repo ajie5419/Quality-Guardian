@@ -26,6 +26,20 @@ const QL_CONSTANTS = {
     INTERNAL: 'Internal',
     EXTERNAL: 'External',
   },
+  async batchDelete(ids: string[]) {
+    // Quality Loss records come from multiple sources.
+    // However, the `deleteQualityLoss` API only supports deleting from `quality_losses` (Manual).
+    // For batch delete, we should probably check the source or only delete manual ones for now,
+    // OR we assume the IDs passed are the primary keys (`pk`) of the manual records.
+    // Based on `getAllLosses`, `pk` is the real ID.
+    // Let's assume we are deleting manual records only for now as other sources are managed in their respective modules.
+    // If the ID exists in `quality_losses`, delete it.
+    
+    return prisma.quality_losses.updateMany({
+      where: { id: { in: ids } },
+      data: { isDeleted: true }
+    });
+  },
 };
 
 /**

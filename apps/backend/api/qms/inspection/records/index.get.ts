@@ -8,11 +8,21 @@ export default defineEventHandler(async (event) => {
   const pageSize = Number(query.pageSize) || 20;
   const type = String(query.type || 'incoming').toUpperCase();
   const year = Number(query.year);
+  const keyword = query.keyword ? String(query.keyword) : undefined;
 
   const where: any = {
     category: type,
     isDeleted: false,
   };
+
+  if (keyword) {
+    where.OR = [
+      { workOrderNumber: { contains: keyword } },
+      { projectName: { contains: keyword } },
+      { supplierName: { contains: keyword } },
+      { inspector: { contains: keyword } },
+    ];
+  }
 
   if (year) {
     where.inspectionDate = {

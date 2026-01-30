@@ -10,14 +10,16 @@ import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
-import { Button, Card, message, Modal, Tag } from 'ant-design-vue';
+import { IconifyIcon } from '@vben/icons';
+import { Button, Card, message, Modal, Tag, Space } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { QualityLossStatusEnum } from '#/api/qms/enums';
-import { deleteQualityLoss, getQualityLossList } from '#/api/qms/quality-loss';
+import { deleteQualityLoss, getQualityLossList, batchDeleteQualityLoss } from '#/api/qms/quality-loss';
 import { getDeptList } from '#/api/system/dept';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData, findNameById } from '#/types';
+import type { VxeCheckboxChangeParams } from '#/types';
 
 import LossCharts from './components/LossCharts.vue';
 import LossEditModal from './components/LossEditModal.vue';
@@ -43,11 +45,32 @@ const deptTreeData = ref<TreeSelectNode[]>([]);
 // 统计逻辑
 const { stats } = useLossStatistics(allLossData);
 
+const checkedRows = ref<any[]>([]);
+
+function onCheckChange(params: VxeCheckboxChangeParams) {
+  const records = params.$grid.getCheckboxRecords() || [];
+  checkedRows.value = records;
+}
+
+const gridEvents = {
+  checkboxChange: onCheckChange,
+  checkboxAll: onCheckChange,
+};
+
 // ================= 表格配置 =================
 const gridOptions = computed<VxeGridProps>(() => ({
+  checkboxConfig: {
+    reserve: true,
+    highlight: true,
+    range: true,
+  },
   toolbarConfig: {
     slots: { buttons: 'toolbar-actions' },
     export: canExport.value,
+    search: true,
+    zoom: true,
+    refresh: true,
+    custom: true,
   },
   exportConfig: {
     remote: false,
@@ -55,6 +78,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
     modes: ['current', 'selected', 'all'],
   },
   columns: [
+    { type: 'checkbox', width: 50, fixed: 'left' },
     { type: 'seq', title: t('common.seq'), width: 60, fixed: 'left' },
     {
       field: 'lossSource',
@@ -141,7 +165,44 @@ const gridOptions = computed<VxeGridProps>(() => ({
   },
 }));
 
-const [Grid, gridApi] = useVbenVxeGrid({ gridOptions: gridOptions as any });
+const [Grid, gridApi] = useVbenVxeGrid({ 
+  gridOptions: gridOptions as any,
+  gridEvents,
+  formOptions: {
+    schema: [
+      {
+        fieldName: 'workOrderNumber',
+        label: t('qms.workOrder.workOrderNumber'),
+        component: 'Input',
+        colProps: { span: 6 },
+      },
+      {
+        fieldName: 'lossSource',
+        label: t('qms.qualityLoss.source.label'),
+        component: 'Select',
+        componentProps: {
+          options: [
+            { label: t('common.all'), value: '' },
+            { label: t('qms.qualityLoss.source.manual'), value: LossSource.MANUAL },
+            { label: t('qms.qualityLoss.source.internal'), value: LossSource.INTERNAL },
+            { label: t('qms.qualityLoss.source.external'), value: LossSource.EXTERNAL },
+          ],
+        },
+        colProps: { span: 6 },
+      },
+      {
+        fieldName: 'status',
+        label: t('common.status'),
+        component: 'Select',
+        componentProps: {
+          options: STATUS_OPTIONS,
+        },
+        colProps: { span: 6 },
+      },
+    ],
+    submitOnChange: true,
+  },
+} as any);
 
 // ================= 弹窗表单逻辑 =================
 const modalVisible = ref(false);
@@ -194,6 +255,37 @@ async function handleDelete(row: QmsQualityLossApi.QualityLossItem) {
   });
 }
 
+function handleBatchDelete() {
+  if (checkedRows.value.length === 0) {
+    return;
+  }
+  // Optional: check if selection contains non-manual records
+  const hasAutoRecords = checkedRows.value.some(r => r.lossSource !== LossSource.MANUAL);
+  if (hasAutoRecords) {
+    message.warning('只能批量删除手动录入的损失记录');
+    return;
+  }
+
+  Modal.confirm({
+    title: t('common.confirmBatchDelete'),
+    content: t('common.confirmBatchDeleteContent', { count: checkedRows.value.length }),
+    onOk: async () => {
+      try {
+        const ids = checkedRows.value.map((r: any) => r.id);
+        const res = await batchDeleteQualityLoss(ids);
+        message.success(
+          t('common.deleteSuccessCount', { count: res.successCount }),
+        );
+        checkedRows.value = [];
+        invalidateQualityLoss();
+        gridApi.reload();
+      } catch {
+        message.error(t('common.deleteFailed'));
+      }
+    },
+  });
+}
+
 // 辅助函数
 function getStatusConfig(s: string) {
   return (
@@ -235,13 +327,29 @@ function getStatusConfig(s: string) {
 
           <!-- 工具栏 -->
           <template #toolbar-actions>
-            <Button
-              v-access:code="'QMS:LossAnalysis:Create'"
-              type="primary"
-              @click="handleOpenModal"
-            >
-              新增损失录入
-            </Button>
+            <Space>
+              <Button
+                v-access:code="'QMS:LossAnalysis:Create'"
+                type="primary"
+                @click="handleOpenModal"
+              >
+                <template #icon>
+                  <IconifyIcon icon="lucide:plus" />
+                </template>
+                新增损失录入
+              </Button>
+              <Button
+                v-if="checkedRows.length > 0 && canDelete"
+                danger
+                type="primary"
+                @click="handleBatchDelete"
+              >
+                <template #icon>
+                  <IconifyIcon icon="lucide:trash-2" />
+                </template>
+                {{ t('common.batchDelete') }}
+              </Button>
+            </Space>
           </template>
         </Grid>
       </Card>
