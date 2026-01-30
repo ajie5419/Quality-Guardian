@@ -37,8 +37,16 @@ export const getColumns = (
   const commonColumns: VxeGridPropTypes.Columns = [
     { type: 'checkbox', width: 50 },
     { type: 'seq', title: '#', width: 60 },
-    { field: 'workOrderNumber', title: t('qms.workOrder.workOrderNumber'), width: 150 },
-    { field: 'projectName', title: t('qms.workOrder.projectName'), minWidth: 150 },
+    {
+      field: 'workOrderNumber',
+      title: t('qms.workOrder.workOrderNumber'),
+      width: 150,
+    },
+    {
+      field: 'projectName',
+      title: t('qms.workOrder.projectName'),
+      minWidth: 150,
+    },
   ];
 
   const typeColumns: Record<string, VxeGridPropTypes.Columns> = {
@@ -61,9 +69,24 @@ export const getColumns = (
   const endColumns: VxeGridPropTypes.Columns = [
     { field: 'quantity', title: '数量', width: 80 },
     { field: 'inspector', title: '检验员', width: 100 },
-    { field: 'result', title: '结果', width: 100, slots: { default: 'result' } },
-    { field: 'inspectionDate', title: '检验日期', width: 120, formatter: 'formatDate' },
-    { title: t('common.action'), width: 150, fixed: 'right', slots: { default: 'action' } },
+    {
+      field: 'result',
+      title: '结果',
+      width: 100,
+      slots: { default: 'result' },
+    },
+    {
+      field: 'inspectionDate',
+      title: '检验日期',
+      width: 120,
+      formatter: 'formatDate',
+    },
+    {
+      title: t('common.action'),
+      width: 150,
+      fixed: 'right',
+      slots: { default: 'action' },
+    },
   ];
 
   return [...commonColumns, ...(typeColumns[type] || []), ...endColumns];
@@ -81,17 +104,28 @@ export const getFormConfig = (type: string) => {
     showPackingList: false,
   };
 
-  if (type === 'incoming') {
-    config.showSupplier = true;
-    config.showMaterial = true;
-    config.showIncomingType = true;
-  } else if (type === 'process') {
-    config.showProcess = true;
-    config.showLevel1 = true;
-    config.showTeam = true;
-  } else if (type === 'shipment') {
-    config.showDocuments = true;
-    config.showPackingList = true;
+  switch (type) {
+    case 'incoming': {
+      config.showSupplier = true;
+      config.showMaterial = true;
+      config.showIncomingType = true;
+
+      break;
+    }
+    case 'process': {
+      config.showProcess = true;
+      config.showLevel1 = true;
+      config.showTeam = true;
+
+      break;
+    }
+    case 'shipment': {
+      config.showDocuments = true;
+      config.showPackingList = true;
+
+      break;
+    }
+    // No default
   }
 
   return config;

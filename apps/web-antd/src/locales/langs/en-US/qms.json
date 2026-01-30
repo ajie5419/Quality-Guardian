@@ -47,6 +47,7 @@
     }
   },
   "workOrder": {
+    "statusLabel": "Status",
     "status": {
       "open": "Open",
       "pending": "Pending",

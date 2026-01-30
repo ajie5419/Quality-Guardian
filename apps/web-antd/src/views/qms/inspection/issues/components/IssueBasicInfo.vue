@@ -9,7 +9,6 @@ import type {
 import { computed } from 'vue';
 
 import { useI18n } from '@vben/locales';
-import { useDebounceFn } from '@vueuse/core';
 
 import {
   DatePicker,
@@ -33,9 +32,9 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  searchWorkOrder: [string];
   'update:isAutoNc': [boolean];
   workOrderChange: [string];
-  searchWorkOrder: [string];
 }>();
 const formState = defineModel<IssueFormState>('formState', { required: true });
 const isAutoNc = defineModel<boolean>('isAutoNc', { default: false });
@@ -78,7 +77,7 @@ const isProductionDept = computed(() => {
 function handleWorkOrderChange(val: any, option: any) {
   // If WorkOrderSelect returns the full item via option.item, use it directly
   let wo = option?.item;
-  
+
   if (!wo) {
     // Fallback: search in props list (legacy)
     const strVal = String(val);
@@ -92,7 +91,7 @@ function handleWorkOrderChange(val: any, option: any) {
     formState.value.division = wo.division || '';
     emit('workOrderChange', wo.workOrderNumber);
   } else {
-     emit('workOrderChange', String(val));
+    emit('workOrderChange', String(val));
   }
 }
 </script>

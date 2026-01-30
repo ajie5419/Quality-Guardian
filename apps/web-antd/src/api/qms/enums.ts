@@ -16,10 +16,10 @@ export enum SupplierStatusEnum {
  * MUST match backend work_orders_status enum
  */
 export enum WorkOrderStatusEnum {
-  OPEN = 'OPEN',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
+  COMPLETED = 'COMPLETED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  OPEN = 'OPEN',
 }
 
 /**

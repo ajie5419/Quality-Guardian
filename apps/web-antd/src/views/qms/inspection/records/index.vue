@@ -1,15 +1,25 @@
 <script lang="ts" setup>
 import { ref } from 'vue';
+
 import { Page } from '@vben/common-ui';
-import { Segmented, Select, Modal, message } from 'ant-design-vue';
-import { INSPECTION_TABS } from './config';
-import InspectionGrid from './components/InspectionGrid.vue';
+
+import { message, Modal, Segmented, Select } from 'ant-design-vue';
+
+import {
+  createInspectionRecord,
+  updateInspectionRecord,
+} from '#/api/qms/inspection';
+
 import InspectionForm from './components/InspectionForm.vue';
-import { createInspectionRecord, updateInspectionRecord } from '#/api/qms/inspection';
+import InspectionGrid from './components/InspectionGrid.vue';
+import { INSPECTION_TABS } from './config';
 
 const activeKey = ref('incoming');
 const currentYear = ref(new Date().getFullYear());
-const yearOptions = [2024, 2025, 2026].map(y => ({ label: `${y}年`, value: y }));
+const yearOptions = [2024, 2025, 2026].map((y) => ({
+  label: `${y}年`,
+  value: y,
+}));
 
 const gridRef = ref();
 const modalVisible = ref(false);
@@ -27,34 +37,36 @@ async function handleSubmit() {
   const values = formRef.value.getValues();
   // Transform category
   values.category = activeKey.value.toUpperCase();
-  
+
   try {
-    if (isEdit.value) {
-      await updateInspectionRecord(currentRecord.value.id, values);
-    } else {
-      await createInspectionRecord(values);
-    }
+    await (isEdit.value
+      ? updateInspectionRecord(currentRecord.value.id, values)
+      : createInspectionRecord(values));
     message.success('保存成功');
     modalVisible.value = false;
     gridRef.value?.reload();
-  } catch(e) {
-    console.error(e);
+  } catch (error) {
+    console.error(error);
   }
 }
 </script>
 
 <template>
   <Page>
-    <div class="p-4 bg-white h-full flex flex-col">
-      <div class="flex justify-between mb-4">
+    <div class="flex h-full flex-col bg-white p-4">
+      <div class="mb-4 flex justify-between">
         <Segmented v-model:value="activeKey" :options="INSPECTION_TABS" />
-        <Select v-model:value="currentYear" :options="yearOptions" class="w-32" />
+        <Select
+          v-model:value="currentYear"
+          :options="yearOptions"
+          class="w-32"
+        />
       </div>
 
       <div class="flex-1 overflow-hidden">
-        <InspectionGrid 
-          ref="gridRef" 
-          :type="activeKey" 
+        <InspectionGrid
+          ref="gridRef"
+          :type="activeKey"
           :year="currentYear"
           @create="openModal()"
           @edit="openModal"
@@ -62,17 +74,13 @@ async function handleSubmit() {
       </div>
     </div>
 
-    <Modal 
-      v-model:open="modalVisible" 
-      :title="isEdit ? '编辑记录' : '新建记录'" 
+    <Modal
+      v-model:open="modalVisible"
+      :title="isEdit ? '编辑记录' : '新建记录'"
       width="1000px"
       @ok="handleSubmit"
     >
-      <InspectionForm 
-        ref="formRef" 
-        :type="activeKey" 
-        :record="currentRecord" 
-      />
+      <InspectionForm ref="formRef" :type="activeKey" :record="currentRecord" />
     </Modal>
   </Page>
 </template>

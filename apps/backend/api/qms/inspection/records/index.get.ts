@@ -37,9 +37,9 @@ export default defineEventHandler(async (event) => {
       skip: (page - 1) * pageSize,
       take: pageSize,
       orderBy: { createdAt: 'desc' },
-      include: { items: true } // Include details for now, simplify frontend
+      include: { items: true }, // Include details for now, simplify frontend
     }),
-    prisma.inspections.count({ where })
+    prisma.inspections.count({ where }),
   ]);
 
   return useResponseSuccess({ items, total });

@@ -1,5 +1,8 @@
 import prisma from '~/utils/prisma';
-import { mapToDisplayStatus, WORK_ORDER_STATUS } from '~/utils/work-order-status';
+import {
+  mapToDisplayStatus,
+  WORK_ORDER_STATUS,
+} from '~/utils/work-order-status';
 
 // 抽离常量
 const WO_CONSTANTS = {
@@ -66,13 +69,15 @@ export const WorkOrderService = {
         // 忽略其他所有过滤条件
       } else {
         // 常规过滤
-        if (projectName?.trim()) whereCondition.projectName = { contains: projectName.trim() };
-        if (workOrderNumber?.trim()) whereCondition.workOrderNumber = { contains: workOrderNumber.trim() };
+        if (projectName?.trim())
+          whereCondition.projectName = { contains: projectName.trim() };
+        if (workOrderNumber?.trim())
+          whereCondition.workOrderNumber = { contains: workOrderNumber.trim() };
         if (status?.trim()) whereCondition.status = status.trim();
 
         // 2.2 综合搜索
         if (keyword?.trim()) {
-           whereCondition.OR = [
+          whereCondition.OR = [
             { workOrderNumber: { contains: keyword.trim() } },
             { projectName: { contains: keyword.trim() } },
           ];
@@ -88,18 +93,30 @@ export const WorkOrderService = {
                   { deliveryDate: { gte: startOfYear, lte: endOfYear } },
                   {
                     deliveryDate: { lt: startOfYear },
-                    status: { in: [WO_CONSTANTS.STATUS.OPEN, WO_CONSTANTS.STATUS.IN_PROGRESS] },
+                    status: {
+                      in: [
+                        WO_CONSTANTS.STATUS.OPEN,
+                        WO_CONSTANTS.STATUS.IN_PROGRESS,
+                      ],
+                    },
                   },
                 ],
               },
             ];
           } else if (year && year < new Date().getFullYear()) {
-             whereCondition.AND = [
+            whereCondition.AND = [
               { deliveryDate: { gte: startOfYear, lte: endOfYear } },
-              { status: { notIn: [WO_CONSTANTS.STATUS.OPEN, WO_CONSTANTS.STATUS.IN_PROGRESS] } },
+              {
+                status: {
+                  notIn: [
+                    WO_CONSTANTS.STATUS.OPEN,
+                    WO_CONSTANTS.STATUS.IN_PROGRESS,
+                  ],
+                },
+              },
             ];
           } else {
-             whereCondition.deliveryDate = { gte: startOfYear, lte: endOfYear };
+            whereCondition.deliveryDate = { gte: startOfYear, lte: endOfYear };
           }
         }
       }
@@ -136,15 +153,17 @@ export const WorkOrderService = {
             : null,
           // 转换为本地时间格式：YYYY-MM-DD HH:mm:ss
           createTime: wo.createdAt
-            ? wo.createdAt.toLocaleString('zh-CN', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false,
-              }).replace(/\//g, '-')
+            ? wo.createdAt
+                .toLocaleString('zh-CN', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false,
+                })
+                .replaceAll('/', '-')
             : null,
           status: mapToDisplayStatus(wo.status),
         };

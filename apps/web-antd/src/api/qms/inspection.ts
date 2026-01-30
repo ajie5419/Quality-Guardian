@@ -53,11 +53,11 @@ export async function batchDeleteInspectionIssues(ids: string[]) {
 // --- Inspection Records APIs ---
 
 export async function getInspectionRecords(params?: {
-  type?: string;
-  year?: number;
   keyword?: string;
   page?: number;
   pageSize?: number;
+  type?: string;
+  year?: number;
 }) {
   return requestClient.get<{ items: InspectionRecord[]; total: number }>(
     QMS_API.INSPECTION_RECORDS,

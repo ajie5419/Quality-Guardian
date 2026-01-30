@@ -4,24 +4,26 @@ export const InspectionService = {
   /**
    * Determine single item result
    */
-  determineItemResult(item: any): 'PASS' | 'FAIL' {
+  determineItemResult(item: any): 'FAIL' | 'PASS' {
     if (item.result === 'NA') return 'NA' as any; // Prisma enum issue if strict typing
     // If manual result is provided and valid, use it (especially for qualitative)
-    if (['PASS', 'FAIL', 'CONDITIONAL'].includes(item.result)) {
-        // If quantitative, we might want to double check, but trust frontend for now or implement strict check
-        if (item.standardValue && item.measuredValue) {
-             const val = parseFloat(item.measuredValue);
-             const std = parseFloat(item.standardValue);
-             const upper = parseFloat(item.upperTolerance || '0');
-             const lower = parseFloat(item.lowerTolerance || '0');
-             
-             if (!isNaN(val) && !isNaN(std)) {
-                 if (val > std + upper || val < std - lower) {
-                     return 'FAIL';
-                 }
-             }
+    if (['CONDITIONAL', 'FAIL', 'PASS'].includes(item.result)) {
+      // If quantitative, we might want to double check, but trust frontend for now or implement strict check
+      if (item.standardValue && item.measuredValue) {
+        const val = Number.parseFloat(item.measuredValue);
+        const std = Number.parseFloat(item.standardValue);
+        const upper = Number.parseFloat(item.upperTolerance || '0');
+        const lower = Number.parseFloat(item.lowerTolerance || '0');
+
+        if (
+          !Number.isNaN(val) &&
+          !Number.isNaN(std) &&
+          (val > std + upper || val < std - lower)
+        ) {
+          return 'FAIL';
         }
-        return item.result;
+      }
+      return item.result;
     }
     return 'PASS';
   },
@@ -29,7 +31,7 @@ export const InspectionService = {
   /**
    * Calculate overall result
    */
-  calculateOverallResult(items: any[]): 'PASS' | 'FAIL' | 'CONDITIONAL' {
+  calculateOverallResult(items: any[]): 'CONDITIONAL' | 'FAIL' | 'PASS' {
     let hasFail = false;
     let hasConditional = false;
 
@@ -48,26 +50,26 @@ export const InspectionService = {
    * Format: INS-YYYYMMDD-XXX
    */
   async generateSerialNumber() {
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const dateStr = new Date().toISOString().slice(0, 10).replaceAll('-', '');
     const prefix = `INS-${dateStr}-`;
-    
+
     // Find last record today
     const lastRecord = await prisma.inspections.findFirst({
       where: {
         serialNumber: {
-          startsWith: prefix
-        }
+          startsWith: prefix,
+        },
       },
       orderBy: {
-        serialNumber: 'desc'
-      }
+        serialNumber: 'desc',
+      },
     });
 
     let seq = 1;
     if (lastRecord && lastRecord.serialNumber) {
       const parts = lastRecord.serialNumber.split('-');
       if (parts.length === 3) {
-        seq = parseInt(parts[2]) + 1;
+        seq = Number.parseInt(parts[2]) + 1;
       }
     }
 
@@ -76,7 +78,7 @@ export const InspectionService = {
 
   async create(data: any) {
     const serialNumber = await this.generateSerialNumber();
-    
+
     // Calculate results just in case, or trust payload?
     // Let's trust payload for now but recalculate overall
     const overallResult = this.calculateOverallResult(data.items || []);
@@ -111,11 +113,13 @@ export const InspectionService = {
                   ? String(item.standardValue)
                   : null,
               upperTolerance:
-                item.upperTolerance !== undefined && item.upperTolerance !== null
+                item.upperTolerance !== undefined &&
+                item.upperTolerance !== null
                   ? String(item.upperTolerance)
                   : null,
               lowerTolerance:
-                item.lowerTolerance !== undefined && item.lowerTolerance !== null
+                item.lowerTolerance !== undefined &&
+                item.lowerTolerance !== null
                   ? String(item.lowerTolerance)
                   : null,
               uom: item.uom || item.unit,
@@ -130,7 +134,7 @@ export const InspectionService = {
               order: item.order || 0,
             })),
           },
-        }
+        },
       });
       return inspection;
     });
@@ -155,17 +159,19 @@ export const InspectionService = {
           packingListArchived: data.packingListArchived,
           quantity: Number(data.quantity),
           inspector: data.inspector,
-          inspectionDate: data.inspectionDate ? new Date(data.inspectionDate) : undefined,
+          inspectionDate: data.inspectionDate
+            ? new Date(data.inspectionDate)
+            : undefined,
           reportDate: data.reportDate ? new Date(data.reportDate) : null,
           result: overallResult,
           remarks: data.remarks,
-        }
+        },
       });
 
       // 2. Replace Items (Delete all & Create new)
       // This is simpler than diffing for this use case
       await tx.inspection_items.deleteMany({
-        where: { inspectionId: id }
+        where: { inspectionId: id },
       });
 
       if (data.items && data.items.length > 0) {
@@ -206,23 +212,23 @@ export const InspectionService = {
   async delete(id: string) {
     return prisma.inspections.update({
       where: { id },
-      data: { isDeleted: true }
+      data: { isDeleted: true },
     });
   },
 
   async batchDelete(ids: string[]) {
     return prisma.inspections.updateMany({
       where: { id: { in: ids } },
-      data: { isDeleted: true }
+      data: { isDeleted: true },
     });
   },
 
   async getIssues(params: {
-    year?: number;
     projectName?: string;
     status?: string;
     supplierName?: string;
     workOrderNumber?: string;
+    year?: number;
   }) {
     const where: any = { isDeleted: false };
 
@@ -262,5 +268,5 @@ export const InspectionService = {
       claim: issue.isClaim,
       photos: issue.issuePhoto ? issue.issuePhoto.split(',') : [], // Assuming comma separated or just return as is if frontend handles it
     }));
-  }
+  },
 };

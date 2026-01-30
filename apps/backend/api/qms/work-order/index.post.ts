@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
     const existing = await prisma.work_orders.findUnique({
       where: { workOrderNumber: woNum },
     });
-    
+
     if (existing) {
       return useResponseError(`工单号 ${woNum} 已存在，请使用其他编号`);
     }
@@ -52,15 +52,17 @@ export default defineEventHandler(async (event) => {
     const formattedWO = {
       ...newWO,
       id: newWO.workOrderNumber,
-      createTime: newWO.createdAt.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-      }).replace(/\//g, '-'),
+      createTime: newWO.createdAt
+        .toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        })
+        .replaceAll('/', '-'),
     };
 
     return useResponseSuccess(formattedWO);
@@ -89,14 +91,18 @@ export default defineEventHandler(async (event) => {
     }
 
     // Handle Prisma Validation Errors (Missing Arguments etc.)
-    if (error.code === 'P2011' || error.code === 'P2012' || String(error.message).includes('Argument')) {
-       // Try to extract the missing argument name if possible, or just give a generic validation error
-       // Example msg: "Argument `customerName` is missing."
-       const match = String(error.message).match(/Argument `(\w+)` is missing/);
-       if (match && match[1]) {
-         return useResponseError(`请求参数错误: 缺少必填字段 ${match[1]}`);
-       }
-       return useResponseError('请求参数错误: 数据格式不正确或缺少必填字段');
+    if (
+      error.code === 'P2011' ||
+      error.code === 'P2012' ||
+      String(error.message).includes('Argument')
+    ) {
+      // Try to extract the missing argument name if possible, or just give a generic validation error
+      // Example msg: "Argument `customerName` is missing."
+      const match = String(error.message).match(/Argument `(\w+)` is missing/);
+      if (match && match[1]) {
+        return useResponseError(`请求参数错误: 缺少必填字段 ${match[1]}`);
+      }
+      return useResponseError('请求参数错误: 数据格式不正确或缺少必填字段');
     }
 
     return useResponseError(`创建工单失败: ${error.message || String(error)}`);

@@ -417,7 +417,7 @@ watch(activeTab, (val) => {
       >
         <template #bodyCell="{ column, text }">
           <template v-if="column.key === 'targetPassRate'">
-            {{ text != null ? text + '%' : '-' }}
+            {{ text != null ? `${text}%` : '-' }}
           </template>
           <template v-if="column.key === 'passRate'">
             <Tag :color="text >= 98 ? 'green' : text >= 95 ? 'orange' : 'red'">

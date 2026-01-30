@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
+import type { VxeCheckboxChangeParams } from '#/types';
 
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -10,7 +11,7 @@ import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
-import { Button, message, Modal, Select, Tag, Space } from 'ant-design-vue';
+import { Button, message, Modal, Select, Space, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
@@ -379,8 +380,6 @@ const gridOptions = computed<VxeGridProps>(() => ({
   },
 }));
 
-import type { VxeCheckboxChangeParams } from '#/types';
-
 // ...
 
 const checkedRows = ref<any[]>([]);
@@ -419,10 +418,12 @@ const [Grid, gridApi] = useVbenVxeGrid({
         label: t('qms.afterSales.form.status'),
         component: 'Select',
         componentProps: {
-          options: Object.keys(useStatusOptions().statusMap).map((key) => ({
-            label: useStatusOptions().statusMap[key]?.label,
-            value: key,
-          })),
+          options: Object.keys(useStatusOptions().statusMap.value).map(
+            (key) => ({
+              label: useStatusOptions().statusMap.value[key]?.label,
+              value: key,
+            }),
+          ),
         },
         colProps: { span: 6 },
       },
@@ -481,7 +482,9 @@ function handleBatchDelete() {
   }
   Modal.confirm({
     title: t('common.confirmBatchDelete'),
-    content: t('common.confirmBatchDeleteContent', { count: checkedRows.value.length }),
+    content: t('common.confirmBatchDeleteContent', {
+      count: checkedRows.value.length,
+    }),
     onOk: async () => {
       try {
         const ids = checkedRows.value.map((r: any) => r.id);

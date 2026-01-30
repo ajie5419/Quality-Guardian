@@ -1,11 +1,18 @@
-import { describe, it, expect } from 'vitest';
-import { mapWorkOrderStatus, mapToDisplayStatus, WORK_ORDER_STATUS } from './work-order-status';
+import { describe, expect, it } from 'vitest';
 
-describe('WorkOrderStatus Mapping', () => {
+import {
+  mapToDisplayStatus,
+  mapWorkOrderStatus,
+  WORK_ORDER_STATUS,
+} from './work-order-status';
+
+describe('workOrderStatus Mapping', () => {
   describe('mapWorkOrderStatus', () => {
     it('should map database enum values', () => {
       expect(mapWorkOrderStatus(WORK_ORDER_STATUS.OPEN)).toBe('OPEN');
-      expect(mapWorkOrderStatus(WORK_ORDER_STATUS.IN_PROGRESS)).toBe('IN_PROGRESS');
+      expect(mapWorkOrderStatus(WORK_ORDER_STATUS.IN_PROGRESS)).toBe(
+        'IN_PROGRESS',
+      );
       expect(mapWorkOrderStatus(WORK_ORDER_STATUS.COMPLETED)).toBe('COMPLETED');
     });
 

@@ -21,9 +21,11 @@ export default defineEventHandler(async (event) => {
     : undefined;
   const ignoreYearFilter = query.ignoreYearFilter === 'true';
   const keyword = query.keyword ? String(query.keyword) : undefined;
-  
+
   // Parse ids from query (comma separated)
-  const ids = query.ids ? String(query.ids).split(',').filter(Boolean) : undefined;
+  const ids = query.ids
+    ? String(query.ids).split(',').filter(Boolean)
+    : undefined;
 
   try {
     const result = await WorkOrderService.getList({

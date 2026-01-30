@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import type { InspectionDocItem } from '../types';
 
+import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 
 import { computed, onMounted, ref, watch } from 'vue';
@@ -21,6 +22,14 @@ import {
 
 import PlanningSidebar from '../components/PlanningSidebar.vue';
 import WorkOrderSelectModal from '../components/WorkOrderSelectModal.vue';
+
+// Helper for strict type safe access
+function getField(record: unknown, field: string): string | undefined {
+  if (typeof record === 'object' && record !== null && field in record) {
+    return (record as Record<string, unknown>)[field] as string;
+  }
+  return undefined;
+}
 
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
@@ -170,21 +179,28 @@ const gridOptions = computed(() => ({
         if (!selectedProject.value) return { items: [], total: 0 };
         try {
           const res = await getInspectionRecords();
-          const filtered: InspectionDocItem[] = (res as any[])
+          const items = res.items || [];
+
+          const filtered: InspectionDocItem[] = items
             .filter((item) => {
               const pName = selectedProject.value?.projectName;
               const wNum = selectedProject.value?.workOrderNumber;
+
+              const itemProjectName = getField(item, 'projectName');
+              const itemWorkOrderNumber = getField(item, 'workOrderNumber');
+
               return (
-                (pName &&
-                  item.projectName &&
-                  item.projectName.includes(pName)) ||
+                (pName && itemProjectName && itemProjectName.includes(pName)) ||
                 (wNum &&
-                  item.workOrderNumber &&
-                  item.workOrderNumber.includes(wNum))
+                  itemWorkOrderNumber &&
+                  itemWorkOrderNumber.includes(wNum))
               );
             })
             .map((item) => {
-              const recordType = item.category || item.type;
+              const category = getField(item, 'category');
+              const type = getField(item, 'type');
+              const recordType = category || type; // fallback
+
               let displayCategory = t('common.other');
               switch (recordType) {
                 case 'FINAL': {
@@ -192,14 +208,15 @@ const gridOptions = computed(() => ({
                   break;
                 }
                 case 'INCOMING': {
+                  const incomingType = getField(item, 'incomingType');
                   displayCategory =
-                    item.incomingType ||
-                    t('qms.inspection.records.tab.incoming');
+                    incomingType || t('qms.inspection.records.tab.incoming');
                   break;
                 }
                 case 'PROCESS': {
+                  const processVal = getField(item, 'process');
                   displayCategory =
-                    item.process || t('qms.inspection.records.tab.process');
+                    processVal || t('qms.inspection.records.tab.process');
                   break;
                 }
                 default: {
@@ -211,14 +228,23 @@ const gridOptions = computed(() => ({
                 id: item.id,
                 category: displayCategory,
                 name:
-                  item.materialName ||
-                  item.componentName ||
-                  item.partName ||
+                  getField(item, 'materialName') ||
+                  getField(item, 'componentName') ||
+                  getField(item, 'partName') ||
                   '未命名',
-                inspector: item.inspector || item.reporter || '-',
-                supplier: item.supplierName || item.team || '-',
-                status: item.status || '已归档',
-                reportDate: item.reportDate || item.createTime || '-',
+                inspector:
+                  getField(item, 'inspector') ||
+                  getField(item, 'reporter') ||
+                  '-',
+                supplier:
+                  getField(item, 'supplierName') ||
+                  getField(item, 'team') ||
+                  '-',
+                status: getField(item, 'status') || '已归档',
+                reportDate:
+                  getField(item, 'reportDate') ||
+                  getField(item, 'createTime') ||
+                  '-',
               };
             });
           const { pageSize, currentPage } = page;
@@ -237,7 +263,9 @@ const gridOptions = computed(() => ({
   },
 }));
 
-const [Grid, gridApi] = useVbenVxeGrid({ gridOptions: gridOptions as any });
+const [Grid, gridApi] = useVbenVxeGrid({
+  gridOptions: gridOptions as unknown as VxeGridProps,
+});
 
 watch(selectedProject, () => gridApi.reload());
 onMounted(() => loadProjects());

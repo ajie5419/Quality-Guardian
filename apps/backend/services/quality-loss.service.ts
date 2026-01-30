@@ -34,10 +34,10 @@ const QL_CONSTANTS = {
     // Based on `getAllLosses`, `pk` is the real ID.
     // Let's assume we are deleting manual records only for now as other sources are managed in their respective modules.
     // If the ID exists in `quality_losses`, delete it.
-    
+
     return prisma.quality_losses.updateMany({
       where: { id: { in: ids } },
-      data: { isDeleted: true }
+      data: { isDeleted: true },
     });
   },
 };

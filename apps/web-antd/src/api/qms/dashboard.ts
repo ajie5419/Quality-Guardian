@@ -50,9 +50,12 @@ export async function getQualityLossTrend(
   if (period) {
     params.period = period;
   }
-  return requestClient.get<QualityLossTrendResponse>(QMS_API.QUALITY_LOSS_TREND, {
-    params,
-  });
+  return requestClient.get<QualityLossTrendResponse>(
+    QMS_API.QUALITY_LOSS_TREND,
+    {
+      params,
+    },
+  );
 }
 
 /**

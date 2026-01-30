@@ -7,8 +7,8 @@ import { WorkOrderStatusEnum as Status } from '#/api/qms/enums';
 type StatusConfig = {
   color: string;
   defaultText: string;
-  textKey: string;
   icon?: string;
+  textKey: string;
 };
 
 export const WORK_ORDER_STATUS_UI_MAP = {
@@ -36,7 +36,7 @@ export const WORK_ORDER_STATUS_UI_MAP = {
     defaultText: 'Cancelled',
     icon: 'lucide:ban',
   },
-} as const satisfies Record<WorkOrderStatusEnum, StatusConfig>;
+} as const satisfies Record<Status, StatusConfig>;
 
 /**
  * Safely get status UI configuration with fallback
@@ -81,7 +81,7 @@ export const QMS_API = {
  * Derived type for API path names
  */
 export type WorkOrderApiPath =
-  typeof QMS_API.WORK_ORDER[keyof typeof QMS_API.WORK_ORDER];
+  (typeof QMS_API.WORK_ORDER)[keyof typeof QMS_API.WORK_ORDER];
 
 // Chart Constants
 export const CHART_COLORS = [
@@ -113,12 +113,12 @@ export function getStableColor(name: string): string {
   // 简单的字符串哈希算法
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
-    const char = name.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    const char = name.codePointAt(i) ?? 0;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32bit integer
   }
   const index = Math.abs(hash) % CHART_COLORS.length;
-  return CHART_COLORS[index];
+  return CHART_COLORS[index] ?? CHART_COLORS[0] ?? '#000000';
 }
 
 export const CHART_CONFIG = {
@@ -162,27 +162,27 @@ export const WORK_ORDER_FIELD_MAP: Record<string, string[]> = {
 /** 导入状态值映射表（与 STATUS_MAPPING_TABLE 保持一致） */
 export const IMPORT_STATUS_MAP: Record<string, string> = {
   // 进行中
-  'IN_PROGRESS': 'IN_PROGRESS',
+  IN_PROGRESS: 'IN_PROGRESS',
   'IN PROGRESS': 'IN_PROGRESS',
-  '进行中': 'IN_PROGRESS',
-  '处理中': 'IN_PROGRESS',
+  进行中: 'IN_PROGRESS',
+  处理中: 'IN_PROGRESS',
   InProgress: 'IN_PROGRESS',
   PROCESSING: 'IN_PROGRESS',
   // 已完成
-  'COMPLETED': 'COMPLETED',
-  '已完成': 'COMPLETED',
+  COMPLETED: 'COMPLETED',
+  已完成: 'COMPLETED',
   Completed: 'COMPLETED',
   DONE: 'COMPLETED',
-  '已结束': 'COMPLETED',
+  已结束: 'COMPLETED',
   // 未开始/待处理 - 全部映射到 OPEN
-  'PENDING': 'OPEN',
-  '未开始': 'OPEN',
+  PENDING: 'OPEN',
+  未开始: 'OPEN',
   Pending: 'OPEN',
-  'OPEN': 'OPEN',
-  '待处理': 'OPEN',
+  OPEN: 'OPEN',
+  待处理: 'OPEN',
   // 已取消
-  'CANCELLED': 'CANCELLED',
-  '已取消': 'CANCELLED',
+  CANCELLED: 'CANCELLED',
+  已取消: 'CANCELLED',
   Cancelled: 'CANCELLED',
 };
 
@@ -190,6 +190,7 @@ export const IMPORT_STATUS_MAP: Record<string, string> = {
 export const SUPPORTED_IMPORT_TYPES = {
   extensions: ['.xlsx', '.xls'],
   mimeTypes: [
+    // cspell:disable-next-line
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'application/vnd.ms-excel',
     'application/vnd.ms-excel.sheet.macroEnabled.12',

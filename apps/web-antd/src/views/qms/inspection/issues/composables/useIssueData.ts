@@ -64,7 +64,7 @@ export function useIssueData() {
       const params = text.trim()
         ? { keyword: text.trim(), pageSize: 50, ignoreYearFilter: true }
         : { pageSize: 200, ignoreYearFilter: true };
-      
+
       const res = await getWorkOrderList(params);
       // console.log('Search results:', res.items?.length);
       workOrderList.value = res.items || [];

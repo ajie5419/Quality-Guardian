@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { SelectProps } from 'ant-design-vue';
+
 import type { BomItem } from '#/api/qms/planning';
 
 import { computed, ref, watch } from 'vue';
@@ -38,8 +39,8 @@ const loading = ref(false);
 
 const selectOptions = computed<SelectProps['options']>(() => {
   return options.value.map((item) => ({
-    label: `${item.name} ${item.partNumber ? `(${item.partNumber})` : ''}`,
-    value: item.name,
+    label: `${item.partName} ${item.partNumber ? `(${item.partNumber})` : ''}`,
+    value: item.partName,
     item,
   }));
 });

@@ -2,24 +2,27 @@
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
 import type { SystemDeptApi } from '#/api/system/dept';
-import type { TreeSelectNode } from '#/types';
+import type { TreeSelectNode, VxeCheckboxChangeParams } from '#/types';
 
 import { computed, onMounted, ref } from 'vue';
 
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
+import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
-import { IconifyIcon } from '@vben/icons';
-import { Button, Card, message, Modal, Tag, Space } from 'ant-design-vue';
+import { Button, Card, message, Modal, Space, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { QualityLossStatusEnum } from '#/api/qms/enums';
-import { deleteQualityLoss, getQualityLossList, batchDeleteQualityLoss } from '#/api/qms/quality-loss';
+import {
+  batchDeleteQualityLoss,
+  deleteQualityLoss,
+  getQualityLossList,
+} from '#/api/qms/quality-loss';
 import { getDeptList } from '#/api/system/dept';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData, findNameById } from '#/types';
-import type { VxeCheckboxChangeParams } from '#/types';
 
 import LossCharts from './components/LossCharts.vue';
 import LossEditModal from './components/LossEditModal.vue';
@@ -165,7 +168,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
   },
 }));
 
-const [Grid, gridApi] = useVbenVxeGrid({ 
+const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions: gridOptions as any,
   gridEvents,
   formOptions: {
@@ -183,9 +186,18 @@ const [Grid, gridApi] = useVbenVxeGrid({
         componentProps: {
           options: [
             { label: t('common.all'), value: '' },
-            { label: t('qms.qualityLoss.source.manual'), value: LossSource.MANUAL },
-            { label: t('qms.qualityLoss.source.internal'), value: LossSource.INTERNAL },
-            { label: t('qms.qualityLoss.source.external'), value: LossSource.EXTERNAL },
+            {
+              label: t('qms.qualityLoss.source.manual'),
+              value: LossSource.MANUAL,
+            },
+            {
+              label: t('qms.qualityLoss.source.internal'),
+              value: LossSource.INTERNAL,
+            },
+            {
+              label: t('qms.qualityLoss.source.external'),
+              value: LossSource.EXTERNAL,
+            },
           ],
         },
         colProps: { span: 6 },
@@ -260,7 +272,9 @@ function handleBatchDelete() {
     return;
   }
   // Optional: check if selection contains non-manual records
-  const hasAutoRecords = checkedRows.value.some(r => r.lossSource !== LossSource.MANUAL);
+  const hasAutoRecords = checkedRows.value.some(
+    (r) => r.lossSource !== LossSource.MANUAL,
+  );
   if (hasAutoRecords) {
     message.warning('只能批量删除手动录入的损失记录');
     return;
@@ -268,7 +282,9 @@ function handleBatchDelete() {
 
   Modal.confirm({
     title: t('common.confirmBatchDelete'),
-    content: t('common.confirmBatchDeleteContent', { count: checkedRows.value.length }),
+    content: t('common.confirmBatchDeleteContent', {
+      count: checkedRows.value.length,
+    }),
     onOk: async () => {
       try {
         const ids = checkedRows.value.map((r: any) => r.id);

@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { EchartsUIType } from '@vben/plugins/echarts';
+
 import type { SystemDeptApi } from '#/api/system/dept';
 
 import { computed, nextTick, ref, shallowRef, watch } from 'vue';
@@ -21,12 +22,12 @@ import { WorkOrderStatusEnum } from '#/api/qms/enums';
 import { findNameById } from '#/types';
 
 import { normalizeStatus } from '../composables/useWorkOrderStatus';
-import { CHART_COLORS, CHART_CONFIG, getStableColor } from '../constants';
+import { CHART_COLORS, getStableColor } from '../constants';
 
 const props = defineProps<{
-  summaryData: Array<{ division: string; quantity: number; status: string }>;
   deptData: SystemDeptApi.Dept[];
   loading?: boolean;
+  summaryData: Array<{ division: string; quantity: number; status: string }>;
 }>();
 
 const { t } = useI18n();
@@ -89,7 +90,7 @@ const { renderEcharts } = useEcharts(pieChartRef);
 
 const pieChartOptions = shallowRef({
   tooltip: {
-    trigger: 'item',
+    trigger: 'item' as const,
     formatter: `{b}: {c}${t('common.unit.project')} ({d}%)`,
     confine: true,
   },
@@ -101,7 +102,7 @@ const pieChartOptions = shallowRef({
   series: [
     {
       name: t('qms.workOrder.divisionRatio'),
-      type: 'pie',
+      type: 'pie' as const,
       // 半径调整：从 ['60%', '90%'] 缩小到 ['45%', '75%']
       // 这样既保证足够大清晰可见，又留有呼吸空间，不显得拥挤
       radius: ['45%', '75%'],
@@ -115,7 +116,7 @@ const pieChartOptions = shallowRef({
       },
       label: {
         show: false,
-        position: 'center',
+        position: 'center' as const,
       },
       emphasis: {
         scale: true,
@@ -123,11 +124,11 @@ const pieChartOptions = shallowRef({
         label: {
           show: true,
           fontSize: 18,
-          fontWeight: 'bold',
+          fontWeight: 'bold' as const,
           formatter: '{b}\n{d}%',
         },
       },
-      data: [],
+      data: [] as Array<{ color: string; name: string; value: number }>,
     },
   ],
 });
@@ -136,7 +137,7 @@ watch(
   () => dashboardStats.value.pieData,
   (newData) => {
     if (newData.length > 0) {
-      pieChartOptions.value.series[0].data = newData;
+      pieChartOptions.value.series[0]!.data = newData;
       nextTick(() => {
         renderEcharts(pieChartOptions.value);
       });

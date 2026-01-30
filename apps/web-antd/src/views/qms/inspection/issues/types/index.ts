@@ -92,8 +92,8 @@ export interface DeptNode {
 export interface WorkOrderItem {
   id: string;
   workOrderNumber: string;
-  projectName: string;
-  division: string;
+  projectName?: string;
+  division?: string;
 }
 
 /**

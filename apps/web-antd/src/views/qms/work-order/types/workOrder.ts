@@ -2,6 +2,8 @@
  * Work Order Import Types
  */
 
+import type { TreeSelectNode } from '#/types';
+
 /** 导入参数接口 */
 export interface ImportParams {
   file: File;
@@ -24,8 +26,8 @@ export interface ImportResponse {
   successCount: number;
   failCount: number;
   failItems?: Array<{
-    workOrderNumber: string;
     reason: string;
+    workOrderNumber: string;
   }>;
 }
 
@@ -46,8 +48,8 @@ export interface StatusUIConfig {
 export interface WorkOrderRecord {
   workOrderNumber: string;
   customerName: string;
-  projectName?: string | null;
-  division?: string | null;
+  projectName?: null | string;
+  division?: null | string;
   quantity: number;
   deliveryDate: string; // ISO 日期字符串
   status: string; // 前端接收的原始字符串，由 normalizeStatus 转换
@@ -55,12 +57,11 @@ export interface WorkOrderRecord {
   updatedAt?: string;
   version?: number;
   isDeleted?: boolean;
-  effectiveTime?: string | null;
+  effectiveTime?: null | string;
 }
 
 /** Modal 打开参数类型 */
 export interface OpenParams {
-  record?: WorkOrderRecord | null;
-  deptData?: Array<{ value: string; label: string }>;
+  record?: null | WorkOrderRecord;
+  deptData?: TreeSelectNode[];
 }
-

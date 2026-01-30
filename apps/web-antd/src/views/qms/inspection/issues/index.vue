@@ -3,6 +3,7 @@ import type { InspectionIssue } from './types';
 // Types
 
 import type { VxeGridProps } from '#/adapter/vxe-table';
+import type { VxeCheckboxChangeParams } from '#/types';
 
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -43,7 +44,6 @@ import { useIssueData } from './composables/useIssueData';
 import { useIssueStatistics } from './composables/useIssueStatistics';
 import { gridColumns, searchFormSchema } from './data';
 import { getStatusColor, getStatusLabel } from './utils/statusHelper';
-import type { VxeCheckboxChangeParams } from '#/types';
 
 const router = useRouter();
 const { t } = useI18n();
@@ -59,9 +59,6 @@ function onCheckChange(params: VxeCheckboxChangeParams) {
 // ================= 权限与数据管理 =================
 const { invalidateInspectionIssues } = useInvalidateQmsQueries();
 
-const canExport = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Issues:Export']),
-);
 const canEdit = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Issues:Edit']),
 );
@@ -400,7 +397,9 @@ function handleBatchDelete() {
   }
   Modal.confirm({
     title: t('common.confirmBatchDelete'),
-    content: t('common.confirmBatchDeleteContent', { count: checkedRows.value.length }),
+    content: t('common.confirmBatchDeleteContent', {
+      count: checkedRows.value.length,
+    }),
     onOk: async () => {
       try {
         const ids = checkedRows.value.map((r: any) => r.id);
@@ -529,51 +528,52 @@ function handleSettleToKnowledge(row: InspectionIssue) {
           />
         </div>
       </template>
-          <template #toolbar-actions>
-            <div class="flex flex-wrap items-center gap-2">
-              <Button
-                v-access:code="'QMS:Inspection:Issues:Create'"
-                shape="round"
-                type="primary"
-                @click="handleOpenModal"
-              >
-                <template #icon>
-                  <IconifyIcon icon="lucide:plus" />
-                </template>
-                {{ t('qms.inspection.issues.createIssue') }}
-              </Button>
-              <Button
-                v-if="checkedRows.length > 0 && canDelete"
-                danger
-                shape="round"
-                type="primary"
-                @click="handleBatchDelete"
-              >
-                <template #icon>
-                  <IconifyIcon icon="lucide:trash-2" />
-                </template>
-                {{ t('common.batchDelete') }}
-              </Button>
-              <Button
-                shape="round"
-                @click="showCharts = !showCharts"
-              >
-                <template #icon>
-                  <IconifyIcon :icon="showCharts ? 'lucide:bar-chart-3' : 'lucide:bar-chart-3'" />
-                </template>
-                {{ showCharts ? t('common.hideChart') : t('common.showChart') }}
-              </Button>
-              <div class="flex items-center gap-2">
-                <span class="text-gray-500">{{ t('qms.inspection.records.statsYear') }}:</span>
-                <Select
-                  v-model:value="currentYear"
-                  :options="yearOptions"
-                  class="w-[120px]"
-                  @change="() => gridApi.reload()"
-                />
-              </div>
-            </div>
-          </template>
+      <template #toolbar-actions>
+        <div class="flex flex-wrap items-center gap-2">
+          <Button
+            v-access:code="'QMS:Inspection:Issues:Create'"
+            shape="round"
+            type="primary"
+            @click="handleOpenModal"
+          >
+            <template #icon>
+              <IconifyIcon icon="lucide:plus" />
+            </template>
+            {{ t('qms.inspection.issues.createIssue') }}
+          </Button>
+          <Button
+            v-if="checkedRows.length > 0 && canDelete"
+            danger
+            shape="round"
+            type="primary"
+            @click="handleBatchDelete"
+          >
+            <template #icon>
+              <IconifyIcon icon="lucide:trash-2" />
+            </template>
+            {{ t('common.batchDelete') }}
+          </Button>
+          <Button shape="round" @click="showCharts = !showCharts">
+            <template #icon>
+              <IconifyIcon
+                :icon="showCharts ? 'lucide:bar-chart-3' : 'lucide:bar-chart-3'"
+              />
+            </template>
+            {{ showCharts ? t('common.hideChart') : t('common.showChart') }}
+          </Button>
+          <div class="flex items-center gap-2">
+            <span class="text-gray-500"
+              >{{ t('qms.inspection.records.statsYear') }}:</span
+            >
+            <Select
+              v-model:value="currentYear"
+              :options="yearOptions"
+              class="w-[120px]"
+              @change="() => gridApi.reload()"
+            />
+          </div>
+        </div>
+      </template>
     </Grid>
 
     <IssueEditModal

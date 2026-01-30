@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
     // Correctly fetch from the relation table instead of the legacy JSON column
     const items = await prisma.itp_items.findMany({
       where: {
-        projectId: projectId,
+        projectId,
         isDeleted: false,
       },
       orderBy: {

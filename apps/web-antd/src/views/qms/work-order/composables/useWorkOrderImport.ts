@@ -1,13 +1,17 @@
+import type { WorkOrderImportRow } from '../types/workOrder';
+
 import { ref } from 'vue';
+
 import { useI18n } from '@vben/locales';
+
 import { message } from 'ant-design-vue';
+
 import { importWorkOrders } from '#/api/qms/work-order';
-import type { WorkOrderImportRow, ImportResponse } from '../types/workOrder';
+
 import {
-  WORK_ORDER_FIELD_MAP,
   IMPORT_STATUS_MAP,
   SUPPORTED_IMPORT_TYPES,
-  IMPORT_TIMEOUT,
+  WORK_ORDER_FIELD_MAP,
 } from '../constants';
 
 interface ImportParams {
@@ -42,7 +46,7 @@ export function useWorkOrderImport(onSuccess: () => void) {
       let arrayBuffer: ArrayBuffer;
       try {
         arrayBuffer = await file.arrayBuffer();
-      } catch (err) {
+      } catch {
         message.error(t('qms.common.fileReadFailed'));
         loading.value = false;
         return;
@@ -62,9 +66,15 @@ export function useWorkOrderImport(onSuccess: () => void) {
       }
 
       const worksheet = workbook.Sheets[sheetName];
+      if (!worksheet) {
+        message.warning(t('common.noData'));
+        loading.value = false;
+        return;
+      }
+
       const rawData = XLSX.utils.sheet_to_json(worksheet) as Record<
         string,
-        any
+        unknown
       >[];
 
       if (rawData.length === 0) {
@@ -74,8 +84,8 @@ export function useWorkOrderImport(onSuccess: () => void) {
       }
 
       // 限制最大行数（防止浏览器崩溃）
-      if (rawData.length > 10000) {
-        message.warning(t('qms.common.fileTooLarge', { max: 10000 }));
+      if (rawData.length > 10_000) {
+        message.warning(t('qms.common.fileTooLarge', { max: 10_000 }));
         loading.value = false;
         return;
       }
@@ -91,25 +101,25 @@ export function useWorkOrderImport(onSuccess: () => void) {
             const excelKey = Object.keys(row).find((k) =>
               possibleHeaders.some(
                 (h) =>
-                  k.replace(/\s+/g, '').toLowerCase() ===
-                  h.replace(/\s+/g, '').toLowerCase(),
+                  k.replaceAll(/\s+/g, '').toLowerCase() ===
+                  h.replaceAll(/\s+/g, '').toLowerCase(),
               ),
             );
 
             if (!excelKey) return;
 
-            let val = row[excelKey];
+            const val = row[excelKey];
             if (val === undefined || val === null) return;
 
             // 日期转换（使用本地时间，避免时区陷阱）
             if (['deliveryDate', 'effectiveTime'].includes(field)) {
-              if (val instanceof Date && !isNaN(val.getTime())) {
+              if (val instanceof Date && !Number.isNaN(val.getTime())) {
                 const y = val.getFullYear();
                 const m = String(val.getMonth() + 1).padStart(2, '0');
                 const d = String(val.getDate()).padStart(2, '0');
-                item[field as keyof WorkOrderImportRow] = `${y}-${m}-${d}`;
+                (item as Record<string, unknown>)[field] = `${y}-${m}-${d}`;
               } else if (typeof val === 'string' && val.trim()) {
-                item[field as keyof WorkOrderImportRow] = val.trim();
+                (item as Record<string, unknown>)[field] = val.trim();
               }
             }
             // 数量转换
@@ -123,7 +133,7 @@ export function useWorkOrderImport(onSuccess: () => void) {
             }
             // 普通字段
             else {
-              item[field as keyof WorkOrderImportRow] =
+              (item as Record<string, unknown>)[field] =
                 String(val).trim() || undefined;
             }
           },
@@ -133,27 +143,31 @@ export function useWorkOrderImport(onSuccess: () => void) {
       });
 
       // 6. 提交导入
-      const res = await importWorkOrders(mappedItems);
+      const res = await importWorkOrders(
+        mappedItems as unknown as Record<string, unknown>[],
+      );
 
       // 7. 结果反馈
       if (res.successCount > 0) {
-        const failTip = res.failCount ? `，失败${res.failCount}条` : '';
+        const failTip = res.failedCount ? `，失败${res.failedCount}条` : '';
         message.success(
           t('qms.common.importSuccessCount', { count: res.successCount }) +
             failTip,
         );
         onSuccess();
       } else {
-        const failReason = res.failItems?.[0]?.reason || '';
+        const failReason = res.errors?.[0]?.message || '';
         message.error(
           t('qms.common.importFailed') + (failReason ? `：${failReason}` : ''),
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Import Error:', error);
       message.error(
         t('qms.common.importFailed') +
-          (error.message ? `: ${error.message}` : ''),
+          ((error as { message?: string }).message
+            ? `: ${(error as { message?: string }).message}`
+            : ''),
       );
     } finally {
       loading.value = false;

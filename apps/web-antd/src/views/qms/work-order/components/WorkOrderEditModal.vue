@@ -1,19 +1,23 @@
 <script lang="ts" setup>
-import { ref, nextTick } from 'vue';
+import type { OpenParams } from '../types/workOrder';
+
+import { nextTick, ref } from 'vue';
+
 import { useVbenModal } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
-import { message } from 'ant-design-vue';
-import { useVbenForm, z } from '#/adapter/form';
-import { createWorkOrder, updateWorkOrder } from '#/api/qms/work-order';
-import { getFormSchema, workOrderSchema } from '../data';
 
-import type { OpenParams, WorkOrderRecord } from '../types/workOrder';
+import { message } from 'ant-design-vue';
+
+import { useVbenForm } from '#/adapter/form';
+import { createWorkOrder, updateWorkOrder } from '#/api/qms/work-order';
+
+import { getFormSchema } from '../data';
 
 // ========== 2. 基础配置 ==========
 const emit = defineEmits(['success']);
 const { t } = useI18n();
 const isUpdate = ref(false);
-const recordId = ref<string | null>(null);
+const recordId = ref<null | string>(null);
 
 // ========== 3. 表单配置 ==========
 const [Form, formApi] = useVbenForm({
@@ -21,7 +25,6 @@ const [Form, formApi] = useVbenForm({
   showDefaultActions: false,
   commonConfig: { componentProps: { class: 'w-full' } },
   wrapperClass: 'grid-cols-1',
-  validationSchema: workOrderSchema,
 });
 
 // ========== 4. 弹窗配置 ==========
@@ -34,7 +37,7 @@ const [Modal, modalApi] = useVbenModal({
 async function handleSubmit() {
   try {
     // 1. 先验证表单
-    const { valid } = await formApi.validate(true);
+    const { valid } = await formApi.validate();
     if (!valid) return;
 
     // 2. 获取表单值
@@ -52,17 +55,22 @@ async function handleSubmit() {
     };
 
     // ✅ 修复：移除前端生成的 createTime，由后端统一生成
-    const submitApi = isUpdate.value && recordId.value
-      ? () => updateWorkOrder(recordId.value!, cleanedValues)
-      : () => createWorkOrder(cleanedValues);
+    const submitApi =
+      isUpdate.value && recordId.value
+        ? () => updateWorkOrder(recordId.value!, cleanedValues)
+        : () => createWorkOrder(cleanedValues);
 
     await submitApi();
 
     message.success(t('qms.common.saveSuccess'));
     modalApi.close();
     emit('success');
-  } catch (error: any) {
-    const errorMsg = error?.response?.data?.message || error?.message || t('qms.common.actionFailed');
+  } catch (error: unknown) {
+    const errorMsg =
+      (error as { response?: { data?: { message?: string } } })?.response?.data
+        ?.message ||
+      (error as { message?: string })?.message ||
+      t('qms.common.actionFailed');
     message.error(errorMsg);
   } finally {
     modalApi.setState({ confirmLoading: false });
@@ -78,7 +86,9 @@ async function open({ record, deptData = [] }: OpenParams = {}) {
 
     // 2. 弹窗配置
     modalApi.setState({
-      title: isUpdate.value ? t('common.edit') : t('qms.workOrder.createWorkOrder'),
+      title: isUpdate.value
+        ? t('common.edit')
+        : t('qms.workOrder.createWorkOrder'),
     });
     modalApi.open();
 
@@ -94,7 +104,9 @@ async function open({ record, deptData = [] }: OpenParams = {}) {
     // 4. 准备默认值
     const today = new Date();
     const defaultValues = {
-      workOrderNumber: isUpdate.value ? record?.workOrderNumber : `WO-${Date.now().toString().slice(-6)}`,
+      workOrderNumber: isUpdate.value
+        ? record?.workOrderNumber
+        : `WO-${Date.now().toString().slice(-6)}`,
       customerName: record?.customerName || '',
       projectName: record?.projectName || '',
       division: record?.division || undefined,

@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { SelectProps } from 'ant-design-vue';
+
 import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 
 import { computed, onMounted, reactive, ref, watch } from 'vue';
@@ -36,7 +37,7 @@ const emit = defineEmits(['update:value', 'change']);
 
 const options = ref<QmsWorkOrderApi.WorkOrderItem[]>([]);
 const loading = ref(false);
-const cachedSelectedItem = ref<QmsWorkOrderApi.WorkOrderItem | null>(null);
+const cachedSelectedItem = ref<null | QmsWorkOrderApi.WorkOrderItem>(null);
 
 const pagination = reactive({
   page: 1,
@@ -61,11 +62,11 @@ async function fetchWorkOrders(
   if (loading.value) return;
   loading.value = true;
   try {
-    if (!loadMore) {
+    if (loadMore) {
+      pagination.page += 1;
+    } else {
       pagination.page = 1;
       searchText.value = keyword.trim();
-    } else {
-      pagination.page += 1;
     }
 
     const params: any = {
@@ -78,8 +79,8 @@ async function fetchWorkOrders(
     const { items, total } = await getWorkOrderList(params);
     pagination.total = total;
 
-    let newItems = items || [];
-    let currentOptions = loadMore ? options.value : [];
+    const newItems = items || [];
+    const currentOptions = loadMore ? options.value : [];
 
     // Deduplicate
     const merged = [...currentOptions, ...newItems];
@@ -101,24 +102,26 @@ async function fetchWorkOrders(
           const { items: specificItems } = await getWorkOrderList({
             workOrderNumber: props.value, // Approximate fetch by WO number
             pageSize: 1,
-            ignoreYearFilter: true
+            ignoreYearFilter: true,
           });
           // Ideally we need an API to fetch by exact ID or WO number list, but this works for now
           // Or update backend getList to support `ids` (list of WO numbers)
           if (specificItems && specificItems.length > 0) {
-             const exactMatch = specificItems.find(i => i.workOrderNumber === props.value);
-             if (exactMatch) {
-                cachedSelectedItem.value = exactMatch;
-                uniqueMap.set(props.value, exactMatch);
-             }
+            const exactMatch = specificItems.find(
+              (i) => i.workOrderNumber === props.value,
+            );
+            if (exactMatch) {
+              cachedSelectedItem.value = exactMatch;
+              uniqueMap.set(props.value, exactMatch);
+            }
           }
-        } catch (err) {
-          console.error(err);
+        } catch (error) {
+          console.error(error);
         }
       }
     }
 
-    options.value = Array.from(uniqueMap.values());
+    options.value = [...uniqueMap.values()];
   } catch (error) {
     console.error(error);
     if (loadMore) pagination.page -= 1;
@@ -133,10 +136,12 @@ const handleSearch = useDebounceFn((val: string) => {
 
 const handlePopupScroll = (e: any) => {
   const { target } = e;
-  if (target.scrollTop + target.offsetHeight >= target.scrollHeight - 10) {
-    if (options.value.length < pagination.total && !loading.value) {
-      fetchWorkOrders(searchText.value, true);
-    }
+  if (
+    target.scrollTop + target.offsetHeight >= target.scrollHeight - 10 &&
+    options.value.length < pagination.total &&
+    !loading.value
+  ) {
+    fetchWorkOrders(searchText.value, true);
   }
 };
 
@@ -154,8 +159,8 @@ watch(
   () => props.value,
   (newVal) => {
     // Re-trigger fetch logic if needed to ensure echo, but fetchWorkOrders handles it
-    if (newVal && !options.value.find(o => o.workOrderNumber === newVal)) {
-        fetchWorkOrders(searchText.value, false);
+    if (newVal && !options.value.some((o) => o.workOrderNumber === newVal)) {
+      fetchWorkOrders(searchText.value, false);
     }
   },
 );
@@ -179,15 +184,15 @@ onMounted(() => {
     :options="selectOptions"
     @search="handleSearch"
     @change="handleChange"
-    @popupScroll="handlePopupScroll"
+    @popup-scroll="handlePopupScroll"
     style="width: 100%"
   >
     <template #option="{ item }">
-      <div class="flex justify-between items-center">
+      <div class="flex items-center justify-between">
         <span>{{ item?.workOrderNumber }}</span>
         <span
           v-if="item?.projectName"
-          class="text-gray-400 text-xs ml-2 truncate max-w-[150px]"
+          class="ml-2 max-w-[150px] truncate text-xs text-gray-400"
         >
           {{ item?.projectName }}
         </span>

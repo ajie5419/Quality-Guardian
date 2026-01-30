@@ -38,15 +38,15 @@ export default defineEventHandler(async (event) => {
   if (!userinfo) return unAuthorizedResponse(event);
 
   const query = getQuery(event);
-  const granularity = (query.granularity as string) || 'week';
-  const period = query.period as string;
+  const granularity = (query.granularity as unknown as string) || 'week';
+  const period = query.period as unknown as string;
 
   try {
     if (period)
       return useResponseSuccess(await getDrillDownData(period, granularity));
     return useResponseSuccess(await getTrendData(granularity));
   } catch (error) {
-    console.error('Failed to fetch pass rate trend:', error);
+    // console.error('Failed to fetch pass rate trend:', error);
     return useResponseError(
       `Failed to fetch pass rate trend: ${(error as Error).message}`,
     );
@@ -153,7 +153,7 @@ async function getDrillDownData(period: string, granularity: string) {
     ...new Set(
       inspections
         .filter((i) => i.category === 'INCOMING')
-        .map((i) => i.incomingType || '未分类'),
+        .map((i) => (i.incomingType || '未分类') as string),
     ),
   ];
   for (const type of incomingTypes) {
@@ -163,10 +163,10 @@ async function getDrillDownData(period: string, granularity: string) {
     const total = items.length;
     const passed = items.filter((i) => i.result === 'PASS').length;
     drillDown.push({
-      process: type,
+      process: String(type),
       category: '来料检验',
       passRate: total > 0 ? Number(((passed / total) * 100).toFixed(1)) : 0,
-      targetPassRate: getTargetPassRate(type),
+      targetPassRate: getTargetPassRate(String(type)),
       totalCount: total,
       passCount: passed,
     });
@@ -174,53 +174,53 @@ async function getDrillDownData(period: string, granularity: string) {
 
   // 过程检验逻辑重构
   const processItems = inspections.filter((i) => i.category === 'PROCESS');
-  
+
   // 工序映射字典
   const PROCESS_MAPPING: Record<string, string> = {
     // 组焊 = 组对 + 焊接
-    '组对': '组焊',
-    '焊接': '组焊',
-    '焊后尺寸': '组焊',
-    
+    组对: '组焊',
+    焊接: '组焊',
+    焊后尺寸: '组焊',
+
     // 组装 = 组装 + 装配 + 组拼
-    '组装': '组装',
-    '装配': '组装',
-    '组拼': '组装',
-    
+    组装: '组装',
+    装配: '组装',
+    组拼: '组装',
+
     // 涂装 = 打砂 + 喷漆
-    '打砂': '涂装',
-    '喷漆': '涂装',
-    
+    打砂: '涂装',
+    喷漆: '涂装',
+
     // 单独统计
-    '下料': '下料',
-    '机加': '机加',
-    
+    下料: '下料',
+    机加: '机加',
+
     // 不统计
-    '外观': '',
-    '整体拼装': '',
+    外观: '',
+    整体拼装: '',
   };
 
   // 聚合数据
-  const processStats: Record<string, { total: number; passed: number }> = {};
+  const processStats: Record<string, { passed: number; total: number }> = {};
 
   for (const item of processItems) {
     const rawProcess = item.processName || '';
     // 如果没有映射规则，且不在排除列表，则保留原名？
     // 需求：外购件、原材料、辅材、机加成品件（这些是INCOMING，上面已处理）
     // 需求：下料、组焊、机加、组装、涂装
-    
-    let mappedName = PROCESS_MAPPING[rawProcess];
-    
+
+    const mappedName = PROCESS_MAPPING[rawProcess];
+
     // 如果不在映射表中，且不是我们明确要的工序，是否需要统计？
     // 根据需求描述：“至此，需要统计和显示合格率的工序为...”
     // 意味着只统计这些。
-    
+
     if (!mappedName) continue; // 跳过不统计的工序
 
     if (!processStats[mappedName]) {
       processStats[mappedName] = { total: 0, passed: 0 };
     }
-    
+
     processStats[mappedName].total += 1;
     if (item.result === 'PASS') {
       processStats[mappedName].passed += 1;
@@ -254,9 +254,6 @@ async function getDrillDownData(period: string, granularity: string) {
       passCount: passed,
     });
   }
-
-  // DEBUG LOG
-  console.log('DrillDown Data Sample:', JSON.stringify(drillDown[0], null, 2));
 
   return { drillDown, period };
 }

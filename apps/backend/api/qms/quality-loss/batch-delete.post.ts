@@ -1,6 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { QualityLossService } from '~/services/quality-loss.service';
-import { useResponseSuccess, useResponseError } from '~/utils/response';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
     const { ids } = body;
     const result = await QualityLossService.batchDelete(ids);
     return useResponseSuccess({ successCount: result.count });
-  } catch (e: any) {
-    return useResponseError(e.message);
+  } catch (error: any) {
+    return useResponseError(error.message);
   }
 });

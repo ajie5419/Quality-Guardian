@@ -94,6 +94,7 @@
   },
   "workOrder": {
     "title": "工单管理",
+    "statusLabel": "状态",
     "status": {
       "pending": "待处理",
       "inProgress": "进行中",

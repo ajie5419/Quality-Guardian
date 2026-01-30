@@ -9,7 +9,8 @@ export const WORK_ORDER_STATUS = {
   COMPLETED: 'COMPLETED',
 } as const;
 
-export type WorkOrderStatus = (typeof WORK_ORDER_STATUS)[keyof typeof WORK_ORDER_STATUS];
+export type WorkOrderStatus =
+  (typeof WORK_ORDER_STATUS)[keyof typeof WORK_ORDER_STATUS];
 
 /**
  * 前端状态到数据库 Enum 的映射表
@@ -22,21 +23,21 @@ const STATUS_MAPPING_TABLE: Record<string, WorkOrderStatus> = {
   [WORK_ORDER_STATUS.COMPLETED]: WORK_ORDER_STATUS.COMPLETED,
 
   // Open / 未开始 / 待处理
-  'open': WORK_ORDER_STATUS.OPEN,
-  'pending': WORK_ORDER_STATUS.OPEN,
-  '未开始': WORK_ORDER_STATUS.OPEN,
-  '待处理': WORK_ORDER_STATUS.OPEN,
+  open: WORK_ORDER_STATUS.OPEN,
+  pending: WORK_ORDER_STATUS.OPEN,
+  未开始: WORK_ORDER_STATUS.OPEN,
+  待处理: WORK_ORDER_STATUS.OPEN,
 
   // In Progress / 进行中
-  'in_progress': WORK_ORDER_STATUS.IN_PROGRESS,
+  in_progress: WORK_ORDER_STATUS.IN_PROGRESS,
   'in progress': WORK_ORDER_STATUS.IN_PROGRESS,
-  '进行中': WORK_ORDER_STATUS.IN_PROGRESS,
+  进行中: WORK_ORDER_STATUS.IN_PROGRESS,
 
   // Completed / 已完成 / 已结束 / Closed
-  'completed': WORK_ORDER_STATUS.COMPLETED,
-  '已完成': WORK_ORDER_STATUS.COMPLETED,
-  '已结束': WORK_ORDER_STATUS.COMPLETED,
-  'closed': WORK_ORDER_STATUS.COMPLETED,
+  completed: WORK_ORDER_STATUS.COMPLETED,
+  已完成: WORK_ORDER_STATUS.COMPLETED,
+  已结束: WORK_ORDER_STATUS.COMPLETED,
+  closed: WORK_ORDER_STATUS.COMPLETED,
 };
 
 /**
@@ -52,7 +53,9 @@ const STATUS_MAPPING_TABLE: Record<string, WorkOrderStatus> = {
  * mapWorkOrderStatus('进行中')       // 'IN_PROGRESS'
  * mapWorkOrderStatus('UNKNOWN')      // 'OPEN' (默认值)
  */
-export function mapWorkOrderStatus(frontendStatus?: string | null): WorkOrderStatus {
+export function mapWorkOrderStatus(
+  frontendStatus?: null | string,
+): WorkOrderStatus {
   if (!frontendStatus) {
     return WORK_ORDER_STATUS.OPEN;
   }
@@ -61,7 +64,7 @@ export function mapWorkOrderStatus(frontendStatus?: string | null): WorkOrderSta
   const normalizedStatus = String(frontendStatus)
     .toLowerCase()
     .trim()
-    .replace(/s+/g, '_');
+    .replaceAll(/s+/g, '_');
 
   // 查找映射，如果找不到则默认返回 OPEN
   return STATUS_MAPPING_TABLE[normalizedStatus] || WORK_ORDER_STATUS.OPEN;
@@ -82,7 +85,7 @@ export const DISPLAY_STATUS_MAPPING: Record<WorkOrderStatus, string> = {
  * @param dbStatus 数据库 Enum 状态
  * @returns 前端显示文本
  */
-export function mapToDisplayStatus(dbStatus?: string | null): string {
+export function mapToDisplayStatus(dbStatus?: null | string): string {
   if (!dbStatus) return DISPLAY_STATUS_MAPPING[WORK_ORDER_STATUS.OPEN];
   return DISPLAY_STATUS_MAPPING[dbStatus as WorkOrderStatus] || dbStatus;
 }

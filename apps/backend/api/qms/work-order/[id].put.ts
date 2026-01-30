@@ -1,9 +1,4 @@
-import {
-  defineEventHandler,
-  getRouterParam,
-  readBody,
-  setResponseStatus,
-} from 'h3';
+import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -62,7 +57,7 @@ export default defineEventHandler(async (event) => {
     // Return specific error message for debugging
     // Check for "Record to update not found"
     if (error.code === 'P2025') {
-       return useResponseError(`工单不存在: ${id}`);
+      return useResponseError(`工单不存在: ${id}`);
     }
     return useResponseError(`更新工单失败: ${error.message}`);
   }

@@ -1,12 +1,27 @@
 <script lang="ts" setup>
-import { computed, watch, ref } from 'vue';
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { getColumns } from '../config';
-import { useI18n } from '@vben/locales';
-import { getInspectionRecords, deleteInspectionRecord, batchDeleteInspectionRecords } from '#/api/qms/inspection';
-import { Button, message, Modal, Space } from 'ant-design-vue';
-import { IconifyIcon } from '@vben/icons';
+import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { VxeCheckboxChangeParams } from '#/types';
+
+import { computed, ref, watch } from 'vue';
+
+import { IconifyIcon } from '@vben/icons';
+import { useI18n } from '@vben/locales';
+
+import { Button, message, Modal, Space } from 'ant-design-vue';
+
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
+import {
+  batchDeleteInspectionRecords,
+  deleteInspectionRecord,
+  getInspectionRecords,
+} from '#/api/qms/inspection';
+
+import { getColumns } from '../config';
+
+// Define strict type for schema item
+type GridFormSchema = NonNullable<
+  NonNullable<VxeGridProps['formOptions']>['schema']
+>[number];
 
 const props = defineProps<{
   type: string;
@@ -60,7 +75,10 @@ const gridOptions = computed(() => ({
   },
   proxyConfig: {
     ajax: {
-      query: async ({ page }, formValues) => {
+      query: async (
+        { page }: { page: { currentPage: number; pageSize: number } },
+        formValues: any,
+      ) => {
         return await getInspectionRecords({
           type: props.type,
           year: props.year,
@@ -69,7 +87,7 @@ const gridOptions = computed(() => ({
           keyword: formValues?.keyword,
         });
       },
-      queryAll: async ({ formValues }) => {
+      queryAll: async ({ formValues }: { formValues: any }) => {
         const res = await getInspectionRecords({
           type: props.type,
           year: props.year,
@@ -98,7 +116,7 @@ const gridEvents = {
 };
 
 const [Grid, gridApi] = useVbenVxeGrid({
-  gridOptions,
+  gridOptions: gridOptions as unknown as VxeGridProps,
   gridEvents,
   formOptions: {
     schema: [
@@ -112,7 +130,7 @@ const [Grid, gridApi] = useVbenVxeGrid({
         colProps: {
           span: 8,
         },
-      },
+      } as unknown as GridFormSchema,
     ],
     showCollapseButton: false,
     submitOnChange: true,
@@ -144,15 +162,19 @@ function handleBatchDelete() {
   if (checkedRows.value.length === 0) {
     return;
   }
-  
+
   Modal.confirm({
     title: t('common.confirmBatchDelete'),
-    content: t('common.confirmBatchDeleteContent', { count: checkedRows.value.length }),
+    content: t('common.confirmBatchDeleteContent', {
+      count: checkedRows.value.length,
+    }),
     onOk: async () => {
       try {
         const ids = checkedRows.value.map((r: any) => r.id);
         const res = await batchDeleteInspectionRecords(ids);
-        message.success(t('common.deleteSuccessCount', { count: res.successCount }));
+        message.success(
+          t('common.deleteSuccessCount', { count: res.successCount }),
+        );
         checkedRows.value = []; // clear
         reload();
       } catch {
@@ -176,7 +198,10 @@ watch(
   },
 );
 
-watch(() => props.year, () => reload());
+watch(
+  () => props.year,
+  () => reload(),
+);
 
 defineExpose({ reload });
 </script>
@@ -205,10 +230,10 @@ defineExpose({ reload });
         </Button>
       </Space>
     </template>
-    
+
     <template #result="{ row }">
       <span :class="row.result === 'PASS' ? 'text-green-500' : 'text-red-500'">
-        {{ t('qms.inspection.resultValue.' + row.result) }}
+        {{ t(`qms.inspection.resultValue.${row.result}`) }}
       </span>
     </template>
   </Grid>

@@ -30,9 +30,9 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  searchWorkOrder: [string];
   success: [];
   'update:open': [boolean];
-  searchWorkOrder: [string];
 }>();
 
 const { t } = useI18n();

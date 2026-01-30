@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { SelectProps } from 'ant-design-vue';
+
 import type { WorkOrderItem } from '#/api/qms/work-order';
 
 import { computed, onMounted, reactive, ref, watch } from 'vue';
@@ -36,7 +37,7 @@ const emit = defineEmits(['update:value', 'change']);
 
 const options = ref<WorkOrderItem[]>([]);
 const loading = ref(false);
-const cachedSelectedItem = ref<WorkOrderItem | null>(null);
+const cachedSelectedItem = ref<null | WorkOrderItem>(null);
 
 const pagination = reactive({
   page: 1,
@@ -62,11 +63,11 @@ async function fetchWorkOrders(
   if (loading.value) return;
   loading.value = true;
   try {
-    if (!loadMore) {
+    if (loadMore) {
+      pagination.page += 1;
+    } else {
       pagination.page = 1;
       searchText.value = keyword.trim();
-    } else {
-      pagination.page += 1;
     }
 
     const params: any = {
@@ -79,8 +80,8 @@ async function fetchWorkOrders(
     const { items, total } = await getWorkOrderList(params);
     pagination.total = total;
 
-    let newItems = items || [];
-    let currentOptions = loadMore ? options.value : [];
+    const newItems = items || [];
+    const currentOptions = loadMore ? options.value : [];
 
     // Combine and deduplicate options
     const merged = [...currentOptions, ...newItems];
@@ -105,16 +106,16 @@ async function fetchWorkOrders(
             ids: props.value,
           });
           if (specificItems && specificItems.length > 0) {
-            cachedSelectedItem.value = specificItems[0];
+            cachedSelectedItem.value = specificItems[0]!;
             uniqueMap.set(props.value, specificItems[0]);
           }
-        } catch (err) {
-          console.error('Failed to fetch selected work order details', err);
+        } catch (error) {
+          console.error('Failed to fetch selected work order details', error);
         }
       }
     }
 
-    options.value = Array.from(uniqueMap.values());
+    options.value = [...uniqueMap.values()];
   } catch (error) {
     console.error('Failed to fetch work orders', error);
     if (loadMore) pagination.page -= 1; // Revert page if failed
@@ -130,10 +131,12 @@ const handleSearch = useDebounceFn((val: string) => {
 const handlePopupScroll = (e: any) => {
   const { target } = e;
   // Threshold to trigger load more
-  if (target.scrollTop + target.offsetHeight >= target.scrollHeight - 10) {
-    if (options.value.length < pagination.total && !loading.value) {
-      fetchWorkOrders(searchText.value, true);
-    }
+  if (
+    target.scrollTop + target.offsetHeight >= target.scrollHeight - 10 &&
+    options.value.length < pagination.total &&
+    !loading.value
+  ) {
+    fetchWorkOrders(searchText.value, true);
   }
 };
 
@@ -161,13 +164,13 @@ watch(
         try {
           const { items } = await getWorkOrderList({ ids: newVal });
           if (items && items.length > 0) {
-            cachedSelectedItem.value = items[0];
+            cachedSelectedItem.value = items[0]!;
             if (!options.value.some((o) => o.id === newVal)) {
-              options.value.push(items[0]);
+              options.value.push(items[0]!);
             }
           }
-        } catch (e) {
-          console.error(e);
+        } catch (error) {
+          console.error(error);
         }
       }
     }
@@ -193,15 +196,15 @@ onMounted(() => {
     :options="selectOptions"
     @search="handleSearch"
     @change="handleChange"
-    @popupScroll="handlePopupScroll"
+    @popup-scroll="handlePopupScroll"
     style="width: 100%"
   >
     <template #option="{ item }">
-      <div class="flex justify-between items-center">
+      <div class="flex items-center justify-between">
         <span>{{ item?.workOrderNumber }}</span>
         <span
           v-if="item?.projectName"
-          class="text-gray-400 text-xs ml-2 truncate max-w-[150px]"
+          class="ml-2 max-w-[150px] truncate text-xs text-gray-400"
         >
           {{ item?.projectName }}
         </span>

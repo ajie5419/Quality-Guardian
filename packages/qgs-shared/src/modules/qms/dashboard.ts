@@ -49,8 +49,8 @@ export interface PassRateDrillDownItem {
   category: string;
   passCount: number;
   passRate: number;
-  targetPassRate?: number;
   process: string;
+  targetPassRate?: number;
   totalCount: number;
 }
 
