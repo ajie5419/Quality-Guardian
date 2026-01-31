@@ -34,11 +34,11 @@ const REFRESH_TOKEN_SECRET =
     throw new Error('JWT_REFRESH_SECRET not set');
   })();
 
-export function generateAccessToken(user: any) {
+export function generateAccessToken(user: UserSession) {
   return jwt.sign(user, ACCESS_TOKEN_SECRET, { expiresIn: '7d' });
 }
 
-export function generateRefreshToken(user: any) {
+export function generateRefreshToken(user: UserSession) {
   return jwt.sign(user, REFRESH_TOKEN_SECRET, {
     expiresIn: '30d',
   });

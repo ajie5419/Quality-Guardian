@@ -22,24 +22,38 @@ const columns = [
   { title: '备注', dataIndex: 'remarks' },
 ];
 
-function handleResultChange(record: any, val: string) {
+function handleResultChange(
+  record: QmsInspectionApi.InspectionTaskResult,
+  val: 'FAIL' | 'NA' | 'PASS',
+) {
   record.result = val;
   emit('change');
 }
 
-function handleValueChange(record: any) {
+function handleValueChange(record: QmsInspectionApi.InspectionTaskResult) {
   // Simple client-side auto-calc
-  // Check if standardValue exists (including 0)
   if (
     record.standardValue !== undefined &&
     record.standardValue !== null &&
     record.measuredValue !== undefined &&
     record.measuredValue !== null
   ) {
-    const val = Number.parseFloat(record.measuredValue);
-    const std = Number.parseFloat(record.standardValue);
-    const upper = Number.parseFloat(record.upperTolerance || '0');
-    const lower = Number.parseFloat(record.lowerTolerance || '0');
+    const val =
+      typeof record.measuredValue === 'number'
+        ? record.measuredValue
+        : Number.parseFloat(String(record.measuredValue));
+    const std =
+      typeof record.standardValue === 'number'
+        ? record.standardValue
+        : Number.parseFloat(String(record.standardValue));
+    const upper =
+      typeof record.upperTolerance === 'number'
+        ? record.upperTolerance
+        : Number.parseFloat(String(record.upperTolerance || '0'));
+    const lower =
+      typeof record.lowerTolerance === 'number'
+        ? record.lowerTolerance
+        : Number.parseFloat(String(record.lowerTolerance || '0'));
 
     if (!Number.isNaN(val) && !Number.isNaN(std)) {
       record.result = val > std + upper || val < std - lower ? 'FAIL' : 'PASS';
@@ -85,7 +99,9 @@ function handleValueChange(record: any) {
           v-model:value="record.measuredValue"
           size="small"
           class="w-full"
-          @change="handleValueChange(record)"
+          @change="
+            handleValueChange(record as QmsInspectionApi.InspectionTaskResult)
+          "
         />
         <Input v-else v-model:value="record.measuredValue" size="small" />
       </template>
@@ -95,7 +111,13 @@ function handleValueChange(record: any) {
           v-model:value="record.result"
           size="small"
           class="w-full"
-          @change="(val) => handleResultChange(record, val as string)"
+          @change="
+            (val) =>
+              handleResultChange(
+                record as QmsInspectionApi.InspectionTaskResult,
+                val as 'FAIL' | 'PASS' | 'NA',
+              )
+          "
         >
           <Select.Option value="PASS">
             <Tag color="green">{{ t('qms.inspection.resultValue.PASS') }}</Tag>

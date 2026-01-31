@@ -67,6 +67,18 @@ const isProductionDept = computed(() => {
   return name.includes(DEPT_TYPE_KEYWORDS.PRODUCTION) || name.includes('生产');
 });
 
+const isOutsourcedDept = computed(() => {
+  const name = selectedDeptName.value || '';
+  return name.includes(DEPT_TYPE_KEYWORDS.OUTSOURCED);
+});
+
+const targetUnitCategory = computed(() => {
+  if (isPurchaseDept.value) return 'Supplier';
+  // 生产部门与外协部门逻辑一致，都查询外协单位
+  if (isOutsourcedDept.value || isProductionDept.value) return 'Outsourcing';
+  return 'Supplier';
+});
+
 function handleWorkOrderChange(val: any, option: any) {
   // If WorkOrderSelect returns the full item via option.item, use it directly
   const wo = option?.item;
@@ -152,6 +164,14 @@ function handleWorkOrderChange(val: any, option: any) {
       <Input v-model:value="formState.division" readonly disabled />
     </FormItem>
 
+    <!-- 检验员 -->
+    <FormItem :label="t('qms.inspection.issues.reportedBy')" name="inspector">
+      <Input
+        v-model:value="formState.inspector"
+        :placeholder="t('common.pleaseInput')"
+      />
+    </FormItem>
+
     <!-- 责任部门 (TreeSelect) -->
     <FormItem
       :label="t('qms.inspection.issues.responsibleDepartment')"
@@ -168,14 +188,15 @@ function handleWorkOrderChange(val: any, option: any) {
     </FormItem>
 
     <FormItem
-      v-if="isPurchaseDept || isProductionDept"
+      v-if="isPurchaseDept || isProductionDept || isOutsourcedDept"
       :label="t('qms.inspection.issues.responsibleUnit')"
       name="supplierName"
     >
       <SupplierSelect
+        :key="targetUnitCategory"
         v-model:value="formState.supplierName"
         :placeholder="t('qms.inspection.issues.inputSupplier')"
-        :category="isPurchaseDept ? 'Supplier' : 'ProductionUnit'"
+        :category="targetUnitCategory"
       />
     </FormItem>
   </div>

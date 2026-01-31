@@ -1,54 +1,25 @@
 <script lang="ts" setup>
-import { ref } from 'vue';
-
 import { Page } from '@vben/common-ui';
 
-import { message, Modal, Segmented, Select } from 'ant-design-vue';
-
-import {
-  createInspectionRecord,
-  updateInspectionRecord,
-} from '#/api/qms/inspection';
+import { Modal, Segmented, Select } from 'ant-design-vue';
 
 import InspectionForm from './components/InspectionForm.vue';
 import InspectionGrid from './components/InspectionGrid.vue';
+import { useInspectionRecords } from './composables/useInspectionRecords';
 import { INSPECTION_TABS } from './config';
 
-const activeKey = ref('incoming');
-const currentYear = ref(new Date().getFullYear());
-const yearOptions = [2024, 2025, 2026].map((y) => ({
-  label: `${y}年`,
-  value: y,
-}));
-
-const gridRef = ref();
-const modalVisible = ref(false);
-const formRef = ref();
-const currentRecord = ref<any>(null);
-const isEdit = ref(false);
-
-function openModal(record?: any) {
-  isEdit.value = !!record;
-  currentRecord.value = record || null;
-  modalVisible.value = true;
-}
-
-async function handleSubmit() {
-  const values = formRef.value.getValues();
-  // Transform category
-  values.category = activeKey.value.toUpperCase();
-
-  try {
-    await (isEdit.value
-      ? updateInspectionRecord(currentRecord.value.id, values)
-      : createInspectionRecord(values));
-    message.success('保存成功');
-    modalVisible.value = false;
-    gridRef.value?.reload();
-  } catch (error) {
-    console.error(error);
-  }
-}
+const {
+  activeKey,
+  currentYear,
+  yearOptions,
+  gridRef,
+  formRef,
+  modalVisible,
+  currentRecord,
+  isEdit,
+  openModal,
+  handleSubmit,
+} = useInspectionRecords();
 </script>
 
 <template>

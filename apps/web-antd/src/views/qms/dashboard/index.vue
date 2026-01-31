@@ -1,11 +1,11 @@
 <script lang="ts" setup>
 import type { AnalysisOverviewItem } from '@vben/common-ui';
-import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import type { QmsDashboardApi } from '#/api/qms/dashboard';
+import type { SystemDeptApi } from '#/api/system/dept';
 import type { EChartsClickParams } from '#/types';
 
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
 
 import { AnalysisOverview } from '@vben/common-ui';
 import {
@@ -15,9 +15,9 @@ import {
   SvgDownloadIcon,
 } from '@vben/icons';
 import { useI18n } from '@vben/locales';
-import { useEcharts } from '@vben/plugins/echarts';
 
 import {
+  message,
   Modal,
   Segmented,
   Spin,
@@ -35,92 +35,162 @@ import { findNameById } from '#/types';
 import PassRateTrendChart from './components/PassRateTrendChart.vue';
 import QualityLossTrendChart from './components/QualityLossTrendChart.vue';
 import VehicleFailureChart from './components/VehicleFailureChart.vue';
+import { useDrillDown } from './composables/useDrillDown';
+import { useTrendLoader } from './composables/useTrendLoader';
 
 const { t } = useI18n();
-const { data: dashboardData, isLoading: loading } = useDashboardQuery();
+const { data: dashboardData, isLoading: dashboardLoading } =
+  useDashboardQuery();
 
-// ECharts refs
-// ECharts refs
-const pieChartRef = ref<EchartsUIType>();
-const miniPassRateChartRef = ref<EchartsUIType>();
+// ===================== 常量集中管理 =====================
+const CONSTANTS = {
+  CHART_RENDER_DELAY: 200,
+  DEFAULT_PAGE_SIZE: 10,
+  PASS_RATE_THRESHOLD: {
+    HIGH: 98,
+    MID: 95,
+  },
+};
 
-useEcharts(pieChartRef);
-
-const { renderEcharts: renderMiniPassRateChart } =
-  useEcharts(miniPassRateChartRef);
-
-// 合格率趋势状态
+// 合格率/质量损失粒度控制
 const granularity = ref<'month' | 'week'>('week');
-const trendData = ref<QmsDashboardApi.PassRateTrendItem[]>([]);
-const drillDownVisible = ref(false);
-const drillDownData = ref<
-  | QmsDashboardApi.PassRateDrillDownItem[]
-  | QmsDashboardApi.QualityLossDrillDownItem[]
->([]);
-const drillDownPeriod = ref('');
-
-// 质量损失统计状态
 const qualityLossGranularity = ref<'month' | 'week'>('week');
-const qualityLossData = ref<QmsDashboardApi.QualityLossTrendItem[]>([]);
 
-const deptRawData = ref<any[]>([]);
+// ===================== 数据获取 =====================
 
-onMounted(async () => {
+/** 1. 部门数据 */
+const deptRawData = ref<SystemDeptApi.Dept[]>([]);
+const deptLoading = ref(false);
+
+const loadDeptList = async () => {
+  deptLoading.value = true;
   try {
     deptRawData.value = await getDeptList();
   } catch (error) {
+    message.error(t('qms.dashboard.error.deptLoadFailed'));
     console.error('Failed to load dept list:', error);
+  } finally {
+    deptLoading.value = false;
   }
+};
+
+/** 2. 合格率趋势数据（基于useRequest的自定义Hook） */
+const {
+  data: trendData,
+  isLoading: passRateLoading,
+  load: loadPassRateTrend,
+} = useTrendLoader<QmsDashboardApi.PassRateTrendItem[]>(
+  (g, p) => getPassRateTrend(g, p).then((res) => res.trend || res.data || []),
+  granularity,
+  [],
+);
+
+/** 3. 质量损失趋势数据（基于useRequest的自定义Hook） */
+const {
+  data: qualityLossData,
+  isLoading: qualityLossLoading,
+  load: loadQualityLossTrend,
+} = useTrendLoader<QmsDashboardApi.QualityLossTrendItem[]>(
+  (g, p) =>
+    getQualityLossTrend(g, p).then((res) => res.trend || res.data || []),
+  qualityLossGranularity,
+  [],
+);
+
+// 缓存部门ID-名称映射（优化性能）
+const deptNameMap = computed(() => {
+  const map = new Map<string, string>();
+  deptRawData.value?.forEach((dept) => map.set(dept.id, dept.name));
+  return map;
 });
 
-// ... (keep existing computed overviewItems)
+// ===================== 下钻逻辑 =====================
+const currentDrillDownType = ref<'passRate' | 'qualityLoss'>('passRate');
 
-// 加载合格率趋势数据
-async function loadPassRateTrend() {
-  try {
-    const res = await getPassRateTrend(granularity.value);
-    if (res && res.trend) {
-      trendData.value = res.trend;
-      // Update mini chart after data load
-      nextTick(() => {
-        updatePassRateChart();
-      });
+// 合格率下钻
+const passRateDrillDown = useDrillDown<QmsDashboardApi.PassRateDrillDownItem>(
+  'passRate',
+  (period) =>
+    getPassRateTrend(granularity.value, period).then(
+      (res) => res.drillDown || [],
+    ),
+);
+
+// 质量损失下钻
+const qualityLossDrillDown =
+  useDrillDown<QmsDashboardApi.QualityLossDrillDownItem>(
+    'qualityLoss',
+    (period) =>
+      getQualityLossTrend(qualityLossGranularity.value, period).then(
+        (res) => res.drillDown || [],
+      ),
+  );
+
+// 下钻弹窗可见性（计算属性）
+const drillDownVisible = computed({
+  get: () =>
+    passRateDrillDown.visible.value || qualityLossDrillDown.visible.value,
+  set: (val) => {
+    if (!val) {
+      passRateDrillDown.visible.value && passRateDrillDown.close();
+      qualityLossDrillDown.visible.value && qualityLossDrillDown.close();
     }
-  } catch (error) {
-    console.error('Failed to load trend data:', error);
-  }
+  },
+});
+
+// 下钻弹窗标题
+const modalTitle = computed(() => {
+  const period =
+    currentDrillDownType.value === 'passRate'
+      ? passRateDrillDown.period.value
+      : qualityLossDrillDown.period.value;
+  const suffix =
+    currentDrillDownType.value === 'passRate'
+      ? t('qms.dashboard.passRateDetail')
+      : t('qms.dashboard.qualityLossDetail');
+  return `${period} ${suffix}`;
+});
+
+// ===================== 事件处理 =====================
+
+/** 合格率图表点击事件 */
+function handleChartClick(params: EChartsClickParams) {
+  currentDrillDownType.value = 'passRate';
+  passRateDrillDown.open(params.name);
 }
 
-// 加载质量损失趋势数据
-async function loadQualityLossTrend() {
-  try {
-    const res = await getQualityLossTrend(qualityLossGranularity.value);
-    if (res && res.trend) {
-      qualityLossData.value = res.trend;
-    }
-  } catch (error) {
-    console.error('Failed to load quality loss data:', error);
-  }
+/** 质量损失图表点击事件 */
+function handleQualityLossClick(params: EChartsClickParams) {
+  currentDrillDownType.value = 'qualityLoss';
+  qualityLossDrillDown.open(params.name);
 }
 
-// 监听粒度变化
-watch(granularity, () => {
-  loadPassRateTrend();
-});
+// ===================== 生命周期 =====================
+onMounted(async () => {
+  try {
+    // 启动部门加载
+    loadDeptList();
 
-watch(qualityLossGranularity, () => {
-  loadQualityLossTrend();
-});
-
-// 初始化
-onMounted(() => {
-  // 确保 DOM 准备好后再加载图表数据
-  nextTick(() => {
+    // 等待DOM就绪
+    await nextTick();
+    // 仅当核心数据加载完成后，加载图表数据
+    // 注意：由于是异步加载，这里主要是一个保险延迟
     setTimeout(() => {
       loadPassRateTrend();
       loadQualityLossTrend();
-    }, 200);
-  });
+    }, CONSTANTS.CHART_RENDER_DELAY);
+  } catch (error) {
+    message.error(t('qms.dashboard.error.chartLoadFailed'));
+    console.error('Failed to load chart data:', error);
+  }
+});
+
+// 监听粒度变化，重置下钻状态
+watch(granularity, () => {
+  passRateDrillDown.close();
+});
+watch(qualityLossGranularity, () => {
+  qualityLossDrillDown.close();
 });
 const overviewItems = computed<AnalysisOverviewItem[]>(() => {
   const data = dashboardData.value;
@@ -165,64 +235,8 @@ const overviewItems = computed<AnalysisOverviewItem[]>(() => {
   ];
 });
 
-// 更新合格率图表
-function updatePassRateChart() {
-  if (trendData.value.length === 0) {
-    return;
-  }
-
-  // Mini Chart Render Logic (keep this for the small chart at bottom)
-  const chartOption = {
-    title: {
-      text:
-        granularity.value === 'week'
-          ? t('qms.dashboard.weeklyPassRateTrend')
-          : t('qms.dashboard.monthlyPassRateTrend'),
-      left: 'center',
-    },
-    tooltip: {
-      trigger: 'axis' as const,
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      containLabel: true,
-    },
-    xAxis: {
-      type: 'category' as const,
-      data: trendData.value.map((i: any) => i.period),
-    },
-    yAxis: {
-      type: 'value' as const,
-      min: 0,
-      max: 100,
-      axisLabel: { formatter: '{value}%' },
-    },
-    series: [
-      {
-        data: trendData.value.map((i: any) => i.passRate),
-        type: 'bar' as const,
-        itemStyle: {
-          color: '#5ab1ef',
-          borderRadius: [4, 4, 0, 0],
-        },
-        label: {
-          show: true,
-          position: 'top' as const,
-          formatter: '{c}%',
-          color: '#666',
-        },
-        barWidth: '50%',
-      },
-    ],
-  };
-
-  renderMiniPassRateChart(chartOption);
-}
-
 // 下钻表格列配置
-const drillDownColumns = computed(() => [
+const drillDownColumns = shallowRef([
   {
     title: t('qms.planning.itp.processStep'),
     dataIndex: 'process',
@@ -252,7 +266,7 @@ const drillDownColumns = computed(() => [
 ]);
 
 // 质量损失下钻表格列配置
-const qualityLossDrillDownColumns = computed(() => [
+const qualityLossDrillDownColumns = shallowRef([
   {
     title: t('qms.inspection.issues.reportDate'),
     dataIndex: 'date',
@@ -282,55 +296,18 @@ const qualityLossDrillDownColumns = computed(() => [
   },
 ]);
 
-const currentDrillDownType = ref<'passRate' | 'qualityLoss'>('passRate');
-
-// 点击质量损失图表触发下钻
-async function handleQualityLossClick(params: EChartsClickParams) {
-  const period = params.name;
-  drillDownPeriod.value = period;
-  currentDrillDownType.value = 'qualityLoss';
-
-  try {
-    const result = await getQualityLossTrend(
-      qualityLossGranularity.value,
-      period,
-    );
-    drillDownData.value = result.drillDown || [];
-    drillDownVisible.value = true;
-  } catch (error) {
-    console.error('Failed to load quality loss drill-down:', error);
-  }
-}
-
-// 点击合格率图表触发下钻
-async function handleChartClick(params: EChartsClickParams) {
-  const period = params.name;
-  drillDownPeriod.value = period;
-  currentDrillDownType.value = 'passRate';
-
-  try {
-    const result = await getPassRateTrend(granularity.value, period);
-    drillDownData.value = result.drillDown || [];
-    drillDownVisible.value = true;
-  } catch (error) {
-    console.error('Failed to load drill-down data:', error);
-  }
-}
+// ... (removed redundant logic handled above)
 
 const activeTab = ref('trends');
-
-// 监听 Tab 切换
-watch(activeTab, (val) => {
-  if (val === 'trends') {
-    // Optional: explicit refresh if needed, but v-if handles it
-  }
-});
 </script>
 
 <template>
   <div class="p-5">
-    <div v-if="loading" class="flex justify-center p-12">
-      <Spin size="large" />
+    <div
+      v-if="dashboardLoading || deptLoading"
+      class="flex justify-center p-12"
+    >
+      <Spin size="large" :tip="t('common.loadingText')" />
     </div>
     <div v-else>
       <!-- 统计卡片 -->
@@ -353,13 +330,16 @@ watch(activeTab, (val) => {
                   ]"
                 />
               </div>
-              <PassRateTrendChart
-                v-if="activeTab === 'trends'"
-                :active="true"
-                :trend-data="trendData"
-                :granularity="granularity"
-                @chart-click="handleChartClick"
-              />
+              <div v-show="activeTab === 'trends'">
+                <Spin v-if="passRateLoading" tip="Loading pass rate data..." />
+                <PassRateTrendChart
+                  v-else
+                  :active="true"
+                  :trend-data="trendData"
+                  :granularity="granularity"
+                  @chart-click="handleChartClick"
+                />
+              </div>
             </div>
           </TabPane>
 
@@ -375,13 +355,20 @@ watch(activeTab, (val) => {
                   ]"
                 />
               </div>
-              <QualityLossTrendChart
-                v-if="activeTab === 'qualityLoss'"
-                :active="true"
-                :data="qualityLossData"
-                :granularity="qualityLossGranularity"
-                @chart-click="handleQualityLossClick"
-              />
+              <!-- 质量损失图表 -->
+              <div v-show="activeTab === 'qualityLoss'">
+                <Spin
+                  v-if="qualityLossLoading"
+                  tip="Loading quality loss data..."
+                />
+                <QualityLossTrendChart
+                  v-else
+                  :active="true"
+                  :data="qualityLossData"
+                  :granularity="qualityLossGranularity"
+                  @chart-click="handleQualityLossClick"
+                />
+              </div>
             </div>
           </TabPane>
 
@@ -400,19 +387,26 @@ watch(activeTab, (val) => {
     <!-- 下钻弹窗 -->
     <Modal
       v-model:open="drillDownVisible"
-      :title="`${drillDownPeriod} ${currentDrillDownType === 'passRate' ? t('qms.dashboard.passRateDetail') : t('qms.dashboard.qualityLossDetail')}`"
+      :title="modalTitle"
       width="1000px"
       :footer="null"
     >
       <Table
-        :data-source="drillDownData"
+        :data-source="
+          currentDrillDownType === 'passRate'
+            ? passRateDrillDown.data.value
+            : qualityLossDrillDown.data.value
+        "
         :columns="
           currentDrillDownType === 'passRate'
             ? drillDownColumns
             : qualityLossDrillDownColumns
         "
-        :pagination="{ pageSize: 10 }"
-        :row-key="currentDrillDownType === 'passRate' ? 'process' : 'id'"
+        :pagination="{
+          pageSize: CONSTANTS.DEFAULT_PAGE_SIZE,
+          showSizeChanger: true,
+        }"
+        :row-key="(record) => record.id || record.process"
         :scroll="{ x: 1000 }"
       >
         <template #bodyCell="{ column, text }">
@@ -420,21 +414,38 @@ watch(activeTab, (val) => {
             {{ text != null ? `${text}%` : '-' }}
           </template>
           <template v-if="column.key === 'passRate'">
-            <Tag :color="text >= 98 ? 'green' : text >= 95 ? 'orange' : 'red'">
+            <Tag
+              :color="
+                text >= CONSTANTS.PASS_RATE_THRESHOLD.HIGH
+                  ? 'green'
+                  : text >= CONSTANTS.PASS_RATE_THRESHOLD.MID
+                    ? 'orange'
+                    : 'red'
+              "
+            >
               {{ text }}%
             </Tag>
+          </template>
+          <template v-if="column.key === 'dept'">
+            {{ deptNameMap.get(text) || text }}
           </template>
           <template v-if="column.key === 'type'">
             <Tag
               :color="
-                text === '内部损失'
+                text === 'INTERNAL'
                   ? 'orange'
-                  : text === '外部损失'
+                  : text === 'EXTERNAL'
                     ? 'red'
                     : 'green'
               "
             >
-              {{ text }}
+              {{
+                text === 'INTERNAL'
+                  ? t('qms.qualityLoss.source.internal')
+                  : text === 'EXTERNAL'
+                    ? t('qms.qualityLoss.source.external')
+                    : t('qms.qualityLoss.source.manual')
+              }}
             </Tag>
           </template>
           <template v-if="column.key === 'amount'"> ¥{{ text }} </template>

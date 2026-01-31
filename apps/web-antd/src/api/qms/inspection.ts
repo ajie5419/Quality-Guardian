@@ -7,16 +7,31 @@ import { QMS_API } from './constants';
 // Re-export types for backward compatibility (optional, can be removed if views are updated)
 export * from '@qgs/shared';
 
-/**
- * Get Inspection Issues
- */
 export async function getInspectionIssues(params?: {
+  page?: number;
+  pageSize?: number;
+  projectName?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  status?: string;
   supplierName?: string;
+  workOrderNumber?: string;
   year?: number;
 }) {
-  return requestClient.get<InspectionIssue[]>(QMS_API.INSPECTION_ISSUES, {
-    params,
-  });
+  return requestClient.get<{ items: InspectionIssue[]; total: number }>(
+    QMS_API.INSPECTION_ISSUES,
+    { params },
+  );
+}
+
+export async function getInspectionIssueStats(params?: { year?: number }) {
+  return requestClient.get<any>(QMS_API.INSPECTION_ISSUES_STATS, { params });
+}
+
+export async function generateInspectionNcNumber() {
+  return requestClient.get<{ ncNumber: string }>(
+    QMS_API.INSPECTION_ISSUES_NC_NUMBER,
+  );
 }
 
 /**

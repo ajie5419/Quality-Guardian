@@ -75,6 +75,12 @@ export const gridColumns: VxeGridProps['columns'] = [
     width: 120,
   },
   {
+    field: 'severity',
+    title: $t('qms.inspection.issues.severity'),
+    width: 100,
+    slots: { default: 'severity' },
+  },
+  {
     field: 'status',
     title: $t('common.status'),
     width: 100,
@@ -137,7 +143,7 @@ export const gridColumns: VxeGridProps['columns'] = [
     width: 180,
   },
   {
-    field: 'reportedBy',
+    field: 'inspector',
     title: $t('qms.inspection.issues.reportedBy'),
     width: 120,
   },

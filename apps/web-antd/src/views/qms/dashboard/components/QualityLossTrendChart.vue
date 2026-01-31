@@ -5,7 +5,10 @@ import type { EChartsClickParams } from '#/types/common';
 
 import { computed, nextTick, ref, watch } from 'vue';
 
+import { useI18n } from '@vben/locales';
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
+
+import { tryOnUnmounted } from '@vueuse/core';
 
 /**
  * 质量损失趋势数据项
@@ -26,6 +29,7 @@ interface Props {
 const props = defineProps<Props>();
 
 const emit = defineEmits(['chartClick']);
+const { t } = useI18n();
 const chartRef = ref<EchartsUIType>();
 const { renderEcharts, resize, getChartInstance } = useEcharts(chartRef);
 
@@ -33,12 +37,14 @@ const { renderEcharts, resize, getChartInstance } = useEcharts(chartRef);
 const shouldRender = computed(() => props.active);
 
 function updateChart() {
-  if (props.data.length === 0 || !chartRef.value) return;
+  if (!props.data || props.data.length === 0 || !chartRef.value) return;
 
   const chartOption = {
     title: {
       text:
-        props.granularity === 'week' ? '周度质量损失统计' : '月度质量损失统计',
+        props.granularity === 'week'
+          ? t('qms.dashboard.weeklyQualityLossTrend')
+          : t('qms.dashboard.monthlyQualityLossTrend'),
       left: 'center',
     },
     tooltip: {
@@ -46,7 +52,11 @@ function updateChart() {
       axisPointer: { type: 'shadow' as const },
     },
     legend: {
-      data: ['内部损失', '外部损失', '其他损失'],
+      data: [
+        t('qms.qualityLoss.source.internal'),
+        t('qms.qualityLoss.source.external'),
+        t('qms.qualityLoss.source.manual'),
+      ],
       bottom: 0,
     },
     grid: {
@@ -61,25 +71,25 @@ function updateChart() {
     },
     yAxis: {
       type: 'value' as const,
-      name: '金额 (元)',
+      name: t('qms.qualityLoss.amountLabel'),
     },
     series: [
       {
-        name: '内部损失',
+        name: t('qms.qualityLoss.source.internal'),
         type: 'bar' as const,
         stack: 'total',
         data: props.data.map((i) => i.internalAmount),
         itemStyle: { color: '#FAC858' },
       },
       {
-        name: '外部损失',
+        name: t('qms.qualityLoss.source.external'),
         type: 'bar' as const,
         stack: 'total',
         data: props.data.map((i) => i.externalAmount),
         itemStyle: { color: '#EE6666' },
       },
       {
-        name: '其他损失',
+        name: t('qms.qualityLoss.source.manual'),
         type: 'bar' as const,
         stack: 'total',
         data: props.data.map((i) => i.manualAmount),
@@ -132,6 +142,11 @@ watch(
     }
   },
 );
+
+tryOnUnmounted(() => {
+  if (!getChartInstance) return;
+  getChartInstance()?.dispose();
+});
 </script>
 
 <template>
@@ -144,7 +159,7 @@ watch(
         height="100%"
       />
       <div v-else class="flex h-full w-full items-center justify-center">
-        <span class="text-gray-300">Loading Chart...</span>
+        <span class="text-gray-300">{{ t('common.loadingText') }}</span>
       </div>
     </div>
   </div>

@@ -87,13 +87,28 @@ async function getTrendData(granularity: string) {
       }
     }
   } else {
+    const months = [
+      '1月',
+      '2月',
+      '3月',
+      '4月',
+      '5月',
+      '6月',
+      '7月',
+      '8月',
+      '9月',
+      '10月',
+      '11月',
+      '12月',
+    ];
     for (let i = 0; i < 12; i++) {
       const monthStart = new Date(now.getFullYear(), i, 1);
       const monthEnd = new Date(now.getFullYear(), i + 1, 0, 23, 59, 59);
-      const monthName = monthStart.toLocaleDateString('zh-CN', {
-        month: 'short',
+      periods.push({
+        label: months[i] ?? '',
+        start: monthStart,
+        end: monthEnd,
       });
-      periods.push({ label: monthName, start: monthStart, end: monthEnd });
     }
   }
 
@@ -283,11 +298,25 @@ function getPeriodRangeFromTrend(periodLabel: string, granularity: string) {
       tempDate.setDate(tempDate.getDate() + 7);
     }
   } else {
-    for (let i = 0; i < 12; i++) {
-      const monthStart = new Date(now.getFullYear(), i, 1);
-      const monthEnd = new Date(now.getFullYear(), i + 1, 0, 23, 59, 59);
-      const label = monthStart.toLocaleDateString('zh-CN', { month: 'short' });
-      if (label === periodLabel) return { start: monthStart, end: monthEnd };
+    const months = [
+      '1月',
+      '2月',
+      '3月',
+      '4月',
+      '5月',
+      '6月',
+      '7月',
+      '8月',
+      '9月',
+      '10月',
+      '11月',
+      '12月',
+    ];
+    const index = months.indexOf(periodLabel);
+    if (index !== -1) {
+      const monthStart = new Date(now.getFullYear(), index, 1);
+      const monthEnd = new Date(now.getFullYear(), index + 1, 0, 23, 59, 59);
+      return { start: monthStart, end: monthEnd };
     }
   }
   return null;

@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
+import type { TreeSelectNode } from '#/types';
 
 import { computed, reactive, ref, watch } from 'vue';
 
@@ -30,7 +31,7 @@ import {
 import { LossSource } from '../types';
 
 const props = defineProps<{
-  deptTreeData: any[];
+  deptTreeData: TreeSelectNode[];
   initialData: Partial<QmsQualityLossApi.QualityLossItem>;
   isEditMode: boolean;
   open: boolean;

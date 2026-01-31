@@ -43,6 +43,7 @@
     "dayjs": "catalog:",
     "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
+    "lodash-es": "^4.17.23",
     "mammoth": "^1.11.0",
     "pdfjs-dist": "^5.4.530",
     "pinia": "catalog:",
@@ -52,5 +53,8 @@
     "vxe-table": "catalog:",
     "vxe-table-plugin-export-xlsx": "^4.0.7",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/lodash-es": "^4.17.12"
   }
 }

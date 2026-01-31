@@ -27,7 +27,8 @@ export default defineEventHandler(async (event) => {
       data: {
         id: `AS-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
         serialNumber: Math.floor(Date.now() / 1000), // Use seconds to fit INT
-        workOrderNumber: body.workOrderNumber || QMS_DEFAULT_VALUES.UNKNOWN_WORK_ORDER,
+        workOrderNumber:
+          body.workOrderNumber || QMS_DEFAULT_VALUES.UNKNOWN_WORK_ORDER,
         projectName: body.projectName || '',
         customerName: body.customerName,
         location: body.location,

@@ -1,14 +1,15 @@
 <script lang="ts" setup>
-import type { InspectionIssue } from './types';
+import type { InspectionIssue, PieDataItem, StatisticsData } from './types';
 // Types
 
+import type { VxeGridProps } from '#/adapter/vxe-table';
 // Types
 import type { VxeCheckboxChangeParams } from '#/types';
 
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 import { useAccess } from '@vben/access';
-import { Page } from '@vben/common-ui';
+import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
 import {
@@ -30,6 +31,7 @@ import {
   batchDeleteInspectionIssues,
   deleteInspectionIssue,
   getInspectionIssues,
+  getInspectionIssueStats,
 } from '#/api/qms/inspection';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
@@ -41,18 +43,22 @@ import IssueEditModal from './components/IssueEditModal.vue';
 import { useAiReport } from './composables/useAiReport';
 // Composables
 import { useIssueData } from './composables/useIssueData';
-import { useIssueStatistics } from './composables/useIssueStatistics';
 import { gridColumns, searchFormSchema } from './data';
-import { getStatusColor, getStatusLabel } from './utils/statusHelper';
+import {
+  getSeverityColor,
+  getSeverityLabel,
+  getStatusColor,
+  getStatusLabel,
+} from './utils/statusHelper';
 
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
 
-const checkedRows = ref<any[]>([]);
+const checkedRows = ref<InspectionIssue[]>([]);
 
 function onCheckChange(params: VxeCheckboxChangeParams) {
   const records = params.$grid.getCheckboxRecords() || [];
-  checkedRows.value = records;
+  checkedRows.value = records as unknown as InspectionIssue[];
 }
 
 // ================= 权限与数据管理 =================
@@ -66,6 +72,9 @@ const canDelete = computed(() =>
 );
 const canSettle = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Issues:Settle']),
+);
+const canAddChart = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Issues:ChartAdd']),
 );
 
 // 使用数据加载 composable
@@ -81,6 +90,7 @@ loadInitialData().then(() => {
 const { years: dynamicYears } = useAvailableYears();
 const currentYear = ref<number>(new Date().getFullYear());
 const filteredIssues = ref<InspectionIssue[]>([]);
+const chartDashboardRef = ref();
 
 const yearOptions = computed(() => {
   return dynamicYears.value.map((y) => ({
@@ -89,7 +99,7 @@ const yearOptions = computed(() => {
   }));
 });
 
-const gridOptions = computed(() => ({
+const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
   checkboxConfig: {
     reserve: true,
     highlight: true,
@@ -222,7 +232,13 @@ const gridOptions = computed(() => ({
                   : []),
                 ...(canDelete.value ? ['delete'] : []),
               ],
-              onClick: ({ code, row }: { code: string; row: any }) => {
+              onClick: ({
+                code,
+                row,
+              }: {
+                code: string;
+                row: InspectionIssue;
+              }) => {
                 if (code === 'edit') handleEdit(row);
                 if (code === 'delete') handleDelete(row);
                 if (code === 'settle') handleSettleToKnowledge(row);
@@ -255,80 +271,48 @@ const gridOptions = computed(() => ({
         {
           page,
           sorts,
-        }: { page: { currentPage?: number; pageSize?: number }; sorts: any[] },
+        }: {
+          page: { currentPage?: number; pageSize?: number };
+          sorts: any[];
+        },
         formValues: Record<string, unknown> = {},
       ) => {
         const sortParam = sorts?.[0];
-        const sortBy = sortParam?.field;
-        const sortOrder = sortParam?.order;
-
-        let allData = (await getInspectionIssues({
+        const { items, total } = await getInspectionIssues({
+          page: page?.currentPage || 1,
+          pageSize: page?.pageSize || 20,
+          sortBy: sortParam?.field,
+          sortOrder: sortParam?.order,
           year: currentYear.value,
-        })) as InspectionIssue[];
+          workOrderNumber: formValues?.workOrderNumber as string,
+          projectName: formValues?.projectName as string,
+          status: formValues?.status as string,
+        });
 
-        // 前端过滤
-        if (formValues?.workOrderNumber) {
-          allData = allData.filter((item) =>
-            item.workOrderNumber?.includes(
-              formValues.workOrderNumber as string,
-            ),
-          );
-        }
-        if (formValues?.projectName) {
-          allData = allData.filter((item) =>
-            item.projectName?.includes(formValues.projectName as string),
-          );
-        }
-        if (formValues?.status) {
-          allData = allData.filter((item) => item.status === formValues.status);
-        }
+        // Still update filteredIssues if needed by other components like charts
+        // But note this is only one page. If charts need all data, we might need a separate call.
+        // Usually charts use the full data, so let's see where filteredIssues is used.
+        // For now, let's just make the grid fast.
+        filteredIssues.value = items;
 
-        // 手动排序
-        if (sortBy && sortOrder) {
-          allData.sort((a, b) => {
-            const aVal = (a as Record<string, any>)[sortBy] || '';
-            const bVal = (b as Record<string, any>)[sortBy] || '';
-            if (sortOrder === 'asc') return aVal > bVal ? 1 : -1;
-            return aVal < bVal ? 1 : -1;
-          });
-        }
-
-        filteredIssues.value = allData;
-
-        const { currentPage = 1, pageSize = 20 } = page || {};
-        const start = (currentPage - 1) * pageSize;
-        const items = allData.slice(start, start + pageSize);
-        return { items, total: allData.length };
+        return { items, total };
       },
       queryAll: async ({ form }: { form: Record<string, unknown> }) => {
         const formValues = form || {};
-        let allData = (await getInspectionIssues({
+        const { items } = await getInspectionIssues({
           year: currentYear.value,
-        })) as InspectionIssue[];
-
-        if (formValues?.workOrderNumber) {
-          allData = allData.filter((item) =>
-            item.workOrderNumber?.includes(
-              formValues.workOrderNumber as string,
-            ),
-          );
-        }
-        if (formValues?.projectName) {
-          allData = allData.filter((item) =>
-            item.projectName?.includes(formValues.projectName as string),
-          );
-        }
-        if (formValues?.status) {
-          allData = allData.filter((item) => item.status === formValues.status);
-        }
-        return { items: allData };
+          workOrderNumber: formValues?.workOrderNumber as string,
+          projectName: formValues?.projectName as string,
+          status: formValues?.status as string,
+        });
+        return { items };
       },
     },
   },
 }));
 
 const [Grid, gridApi] = useVbenVxeGrid({
-  gridOptions: gridOptions.value as any,
+  gridOptions: gridOptions.value,
   gridEvents: {
     checkboxChange: onCheckChange,
     checkboxAll: onCheckChange,
@@ -343,7 +327,49 @@ const [Grid, gridApi] = useVbenVxeGrid({
 const showCharts = ref(true);
 
 // 使用统计 composable
-const { statistics } = useIssueStatistics(filteredIssues, currentYear);
+const statistics = ref<StatisticsData>({
+  totalCount: 0,
+  openCount: 0,
+  closedCount: 0,
+  totalLoss: 0,
+  closedRate: 0,
+  pieData: [],
+  trendData: [],
+  pareto: [],
+});
+
+async function fetchStatistics() {
+  try {
+    const res = await getInspectionIssueStats({ year: currentYear.value });
+    // Calculate pareto on frontend based on pieData
+    let cumulativeCount = 0;
+    const totalCount = res.totalCount || 0;
+    const pareto = (res.pieData || []).map((item: PieDataItem) => {
+      cumulativeCount += item.value;
+      return {
+        label: item.name,
+        value: item.value,
+        percent:
+          totalCount > 0 ? Math.round((item.value / totalCount) * 100) : 0,
+        cumulativePercent:
+          totalCount > 0 ? Math.round((cumulativeCount / totalCount) * 100) : 0,
+      };
+    });
+
+    statistics.value = { ...res, pareto };
+  } catch (error) {
+    console.error('Failed to fetch statistics:', error);
+  }
+}
+
+watch(currentYear, () => {
+  fetchStatistics();
+  gridApi.reload();
+});
+
+onMounted(() => {
+  fetchStatistics();
+});
 
 // 使用 AI 报告 composable
 const { isGeneratingInsight, generateReport } = useAiReport();
@@ -381,6 +407,7 @@ async function handleDelete(row: InspectionIssue) {
         message.success(t('common.deleteSuccess'));
         invalidateInspectionIssues();
         gridApi.reload();
+        fetchStatistics();
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : t('common.deleteFailed');
@@ -402,13 +429,14 @@ function handleBatchDelete() {
     }),
     onOk: async () => {
       try {
-        const ids = checkedRows.value.map((r: any) => r.id);
+        const ids = checkedRows.value.map((r: InspectionIssue) => r.id);
         const res = await batchDeleteInspectionIssues(ids);
         message.success(
           t('common.deleteSuccessCount', { count: res.successCount }),
         );
         invalidateInspectionIssues();
         gridApi.reload();
+        fetchStatistics();
       } catch {
         message.error(t('common.deleteFailed'));
       }
@@ -458,7 +486,7 @@ function handleSettleToKnowledge(row: InspectionIssue) {
 <template>
   <Page>
     <div v-if="showCharts" class="mb-4">
-      <IssueChartDashboard :year="currentYear" />
+      <IssueChartDashboard ref="chartDashboardRef" :year="currentYear" />
     </div>
 
     <!-- 核心统计概览 -->
@@ -537,6 +565,11 @@ function handleSettleToKnowledge(row: InspectionIssue) {
           />
         </div>
       </template>
+      <template #severity="{ row }">
+        <Tag :color="getSeverityColor(row.severity)">
+          {{ getSeverityLabel(row.severity) }}
+        </Tag>
+      </template>
       <template #toolbar-actions>
         <div class="flex flex-wrap items-center gap-2">
           <Button
@@ -561,6 +594,21 @@ function handleSettleToKnowledge(row: InspectionIssue) {
               <IconifyIcon icon="lucide:trash-2" />
             </template>
             {{ t('common.batchDelete') }}
+          </Button>
+          <Button
+            v-if="canAddChart"
+            shape="round"
+            @click="
+              () => {
+                showCharts = true;
+                chartDashboardRef?.handleAddCustomChart();
+              }
+            "
+          >
+            <template #icon>
+              <IconifyIcon icon="lucide:plus" />
+            </template>
+            新增图表
           </Button>
           <Button shape="round" @click="showCharts = !showCharts">
             <template #icon>
@@ -590,7 +638,12 @@ function handleSettleToKnowledge(row: InspectionIssue) {
       :is-edit-mode="isEditMode"
       :initial-data="currentRecord || undefined"
       :dept-tree-data="deptTreeData"
-      @success="() => gridApi.reload()"
+      @success="
+        () => {
+          gridApi.reload();
+          fetchStatistics();
+        }
+      "
     />
   </Page>
 </template>

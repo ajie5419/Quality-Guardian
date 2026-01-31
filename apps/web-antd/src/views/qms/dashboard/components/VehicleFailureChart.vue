@@ -7,6 +7,7 @@ import { nextTick, ref, watch } from 'vue';
 
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
 
+import { tryOnUnmounted } from '@vueuse/core';
 import { Spin } from 'ant-design-vue';
 
 import { getVehicleFailureRate } from '#/api/qms/dashboard';
@@ -216,6 +217,14 @@ watch(
   },
   { immediate: true },
 );
+
+tryOnUnmounted(() => {
+  if (getRankingInstance()) {
+    getRankingInstance()?.dispose();
+  }
+  // Trend chart handles its own lifecycle usually but explicit disposal is safer
+  // useEcharts composable from vben should handle it, but double safety as requested
+});
 </script>
 
 <template>

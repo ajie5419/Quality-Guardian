@@ -138,6 +138,9 @@
     "passRate": "合格率",
     "totalInspection": "检验数",
     "qualifiedCount": "合格数",
+    "chartClickTip": "点击柱状图查看详情",
+    "weeklyQualityLossTrend": "周度质量损失统计",
+    "monthlyQualityLossTrend": "月度质量损失统计",
     "overview": {
       "fieldIssues": "现场问题",
       "processIssues": "过程问题",

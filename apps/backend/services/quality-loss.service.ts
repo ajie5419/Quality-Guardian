@@ -3,18 +3,18 @@ import prisma from '~/utils/prisma';
 // 常量定义
 const QL_CONSTANTS = {
   MONTHS: [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
+    '1月',
+    '2月',
+    '3月',
+    '4月',
+    '5月',
+    '6月',
+    '7月',
+    '8月',
+    '9月',
+    '10月',
+    '11月',
+    '12月',
   ],
   STATUS: {
     CLOSED: 'CLOSED',
@@ -104,19 +104,38 @@ export const QualityLossService = {
 
       const merged = mergeTrendData(manual, internal, external);
 
-      const result = [...merged.entries()]
-        .sort((a, b) => a[0] - b[0])
-        .map(([k, v]) => {
+      let result;
+      if (isWeek) {
+        result = [...merged.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .map(([k, v]) => {
+            const total = v.manual + v.internal + v.external;
+            return {
+              period: `W${k}`,
+              totalAmount: Number(total.toFixed(2)),
+              manualAmount: Number(v.manual.toFixed(2)),
+              internalAmount: Number(v.internal.toFixed(2)),
+              externalAmount: Number(v.external.toFixed(2)),
+            };
+          });
+      } else {
+        result = [];
+        for (let k = 1; k <= 12; k++) {
+          const v = merged.get(k) || {
+            external: 0,
+            internal: 0,
+            manual: 0,
+          };
           const total = v.manual + v.internal + v.external;
-          const label = isWeek ? `W${k}` : QL_CONSTANTS.MONTHS[k - 1] || `${k}`;
-          return {
-            period: label,
+          result.push({
+            period: QL_CONSTANTS.MONTHS[k - 1] ?? `${k}月`,
             totalAmount: Number(total.toFixed(2)),
             manualAmount: Number(v.manual.toFixed(2)),
             internalAmount: Number(v.internal.toFixed(2)),
             externalAmount: Number(v.external.toFixed(2)),
-          };
-        });
+          });
+        }
+      }
 
       return { trend: result };
     } catch (error) {

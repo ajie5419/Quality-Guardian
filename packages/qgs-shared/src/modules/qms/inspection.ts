@@ -7,6 +7,7 @@ export interface InspectionIssue {
   description: string;
   division?: string;
   id: string;
+  inspector: string; // 检验员 (New standard)
   lossAmount: number; // 损失金额
   ncNumber: string; // 不合格编号
   partName: string; // 部件名称
@@ -14,7 +15,7 @@ export interface InspectionIssue {
   projectName: string; // 项目名称
   quantity: number; // 数量
   reportDate: string;
-  reportedBy: string; // 检验员
+  reportedBy: string; // 检验员 (Legacy?)
   responsibleDepartment: string; // 责任部门
   rootCause: string; // 原因分析
   severity: 'Critical' | 'Major' | 'Minor';

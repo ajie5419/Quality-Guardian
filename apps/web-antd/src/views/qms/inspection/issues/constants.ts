@@ -19,6 +19,7 @@ export const NC_NUMBER_SEQUENCE_LENGTH = 3;
 export const DEPT_TYPE_KEYWORDS = {
   PURCHASE: DeptType.PURCHASE,
   PRODUCTION: DeptType.PRODUCTION,
+  OUTSOURCED: DeptType.OUTSOURCED,
 } as const;
 
 /**

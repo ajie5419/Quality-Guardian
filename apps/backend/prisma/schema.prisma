@@ -7,25 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum inspection_category {
-  INCOMING
-  PROCESS
-  SHIPMENT
-}
-
-enum inspection_result {
-  PASS
-  FAIL
-  CONDITIONAL
-  NA
-}
-
 model inspections {
   id                  String              @id @default(cuid())
   serialNumber        String?             @unique
   category            inspection_category
   workOrderNumber     String
-  work_order          work_orders         @relation(fields: [workOrderNumber], references: [workOrderNumber])
   projectName         String?
   supplierName        String?
   materialName        String?
@@ -45,6 +31,7 @@ model inspections {
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   items               inspection_items[]
+  work_order          work_orders         @relation(fields: [workOrderNumber], references: [workOrderNumber])
 
   @@index([workOrderNumber])
   @@index([category])
@@ -54,7 +41,6 @@ model inspections {
 model inspection_items {
   id                 String            @id @default(cuid())
   inspectionId       String
-  inspection         inspections       @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   checkItem          String
   standardValue      String?
   upperTolerance     String?
@@ -66,6 +52,7 @@ model inspection_items {
   result             inspection_result @default(PASS)
   remarks            String?
   order              Int               @default(0)
+  inspection         inspections       @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
 
   @@index([inspectionId])
 }
@@ -247,18 +234,18 @@ model permissions {
 }
 
 model project_boms {
-  id                String        @id
+  id                String      @id
   work_order_number String
   part_name         String
   part_number       String?
   material          String?
-  quantity          Int           @default(1)
-  unit              String        @default("pcs")
-  remarks           String?       @db.Text
+  quantity          Int         @default(1)
+  unit              String      @default("pcs")
+  remarks           String?     @db.Text
   created_by        String?
-  created_at        DateTime      @default(now())
-  updated_at        DateTime      @updatedAt
-  work_orders       work_orders   @relation(fields: [work_order_number], references: [workOrderNumber])
+  created_at        DateTime    @default(now())
+  updated_at        DateTime    @updatedAt
+  work_orders       work_orders @relation(fields: [work_order_number], references: [workOrderNumber])
 
   @@index([work_order_number])
 }
@@ -366,6 +353,7 @@ model quality_records {
   defectType                              String?
   defectSubtype                           String?
   rootCause                               String?                     @db.Text
+  severity                                String?
   users_quality_records_inspectorTousers  users?                      @relation("quality_records_inspectorTousers", fields: [inspector], references: [username])
   users_quality_records_lastEditorTousers users?                      @relation("quality_records_lastEditorTousers", fields: [lastEditor], references: [username])
   work_orders                             work_orders?                @relation(fields: [workOrderNumber], references: [workOrderNumber])
@@ -492,10 +480,10 @@ model work_orders {
   bom_projects    bom_projects?
   dfmea_projects  dfmea_projects[]
   doc_projects    doc_projects?
+  inspections     inspections[]
   project_boms    project_boms[]
   quality_plans   quality_plans[]
   quality_records quality_records[]
-  inspections     inspections[]
 
   @@index([customerName])
   @@index([deliveryDate])
@@ -586,6 +574,19 @@ model daily_reports {
   updatedAt DateTime @updatedAt
 
   @@unique([date, reporter], name: "date_reporter")
+}
+
+enum inspection_category {
+  INCOMING
+  PROCESS
+  SHIPMENT
+}
+
+enum inspection_result {
+  PASS
+  FAIL
+  CONDITIONAL
+  NA
 }
 
 enum audit_logs_action {

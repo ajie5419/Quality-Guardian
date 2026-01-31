@@ -54,7 +54,7 @@ async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
     ]);
     supplierInspections.value = inspections.items || [];
     supplierAfterSales.value = afterSales;
-    supplierEngineeringIssues.value = engineering;
+    supplierEngineeringIssues.value = engineering.items || [];
   } catch (error) {
     console.error('Failed to load supplier detail:', error);
   } finally {

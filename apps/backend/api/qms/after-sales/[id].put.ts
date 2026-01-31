@@ -38,8 +38,7 @@ export default defineEventHandler(async (event) => {
       updateData.solution = bodyRecord.resolutionPlan;
     if (bodyRecord.status) {
       const status = bodyRecord.status as string;
-      if (QMS_STATUS_COLOR_MAP[status]) updateData.claimStatus = status;
-      else updateData.claimStatus = 'OPEN';
+      updateData.claimStatus = QMS_STATUS_COLOR_MAP[status] ? status : 'OPEN';
     }
 
     // Map other fields

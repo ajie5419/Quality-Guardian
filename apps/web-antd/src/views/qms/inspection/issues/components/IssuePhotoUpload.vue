@@ -36,6 +36,11 @@ const maxImages = computed(
 
 function handleUploadChange(info: UploadChangeParam<UploadFile>) {
   if (info.file.status === 'done') {
+    // Get URL from response
+    const response = info.file.response as any;
+    if (response?.code === 0 && response.data?.url) {
+      info.file.url = response.data.url;
+    }
     message.success(`${info.file.name} ${t('common.saveSuccess')}`);
   } else if (info.file.status === 'error') {
     message.error(`${info.file.name} ${t('common.loadFailed')}`);

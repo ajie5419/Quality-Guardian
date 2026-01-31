@@ -19,6 +19,12 @@ export default defineEventHandler(async (event) => {
   const workOrderNumber = query.workOrderNumber
     ? String(query.workOrderNumber)
     : undefined;
+  const page = query.page ? Number.parseInt(String(query.page)) : 1;
+  const pageSize = query.pageSize
+    ? Number.parseInt(String(query.pageSize))
+    : 20;
+  const sortBy = query.sortBy ? String(query.sortBy) : undefined;
+  const sortOrder = query.sortOrder as 'asc' | 'desc' | undefined;
 
   try {
     const result = await InspectionService.getIssues({
@@ -27,6 +33,10 @@ export default defineEventHandler(async (event) => {
       status,
       supplierName,
       workOrderNumber,
+      page,
+      pageSize,
+      sortBy,
+      sortOrder,
     });
 
     return useResponseSuccess(result);

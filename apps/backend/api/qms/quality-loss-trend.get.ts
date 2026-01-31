@@ -23,47 +23,58 @@ export default defineEventHandler(async (event) => {
       const { manualLosses, internalLosses, externalLosses } =
         await QualityLossService.getDrillDown(range.start, range.end);
 
-      const formatDate = (date: Date) => date.toISOString().split('T')[0];
+      const formatDate = (date: Date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
       const details: any[] = [];
 
       manualLosses.forEach((item) => {
+        const amount = Number(item.amount);
+        if (amount <= 0) return;
         details.push({
           id: item.lossId || item.id,
           date: formatDate(item.occurDate),
-          type: '其他损失',
-          amount: Number(item.amount),
+          type: 'MANUAL',
+          amount,
           dept: item.respDept || '-',
           desc: item.description || '-',
           source: 'Manual',
+          _ts: item.occurDate.getTime(),
         });
       });
       internalLosses.forEach((item) => {
+        const amount = Number(item.lossAmount);
+        if (amount <= 0) return;
         details.push({
           id: `INT-${item.serialNumber}`,
           date: formatDate(item.date),
-          type: '内部损失',
-          amount: Number(item.lossAmount),
-          dept: item.responsibleDepartment,
+          type: 'INTERNAL',
+          amount,
+          dept: item.responsibleDepartment || '-',
           desc: item.description || '-',
           source: 'Internal',
+          _ts: item.date.getTime(),
         });
       });
       externalLosses.forEach((item) => {
         const amount =
           Number(item.materialCost || 0) + Number(item.laborTravelCost || 0);
+        if (amount <= 0) return;
         details.push({
           id: `EXT-${item.serialNumber}`,
           date: formatDate(item.occurDate),
-          type: '外部损失',
+          type: 'EXTERNAL',
           amount: Number(amount.toFixed(2)),
           dept: item.respDept || '-',
           desc: item.issueDescription || '-',
           source: 'External',
+          _ts: item.occurDate.getTime(),
         });
       });
-      details.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-      );
+      details.sort((a, b) => b._ts - a._ts);
 
       return useResponseSuccess({ drillDown: details, period });
     }
@@ -102,14 +113,32 @@ function getPeriodRangeFromTrend(periodLabel: string, granularity: string) {
       tempDate.setDate(tempDate.getDate() + 7);
     }
   } else {
-    for (let i = 0; i < 12; i++) {
-      const monthStart = new Date(now.getFullYear(), i, 1);
-      const monthEnd = new Date(now.getFullYear(), i + 1, 0, 23, 59, 59);
-      if (
-        monthStart.toLocaleDateString('zh-CN', { month: 'short' }) ===
-        periodLabel
-      )
-        return { start: monthStart, end: monthEnd };
+    const months = [
+      '1月',
+      '2月',
+      '3月',
+      '4月',
+      '5月',
+      '6月',
+      '7月',
+      '8月',
+      '9月',
+      '10月',
+      '11月',
+      '12月',
+    ];
+    const monthIndex = months.indexOf(periodLabel);
+    if (monthIndex !== -1) {
+      const monthStart = new Date(now.getFullYear(), monthIndex, 1);
+      const monthEnd = new Date(
+        now.getFullYear(),
+        monthIndex + 1,
+        0,
+        23,
+        59,
+        59,
+      );
+      return { start: monthStart, end: monthEnd };
     }
   }
   return null;

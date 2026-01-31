@@ -5,8 +5,6 @@ import type { ECOption as EChartsOption } from '@vben/plugins/echarts';
 import type { ChartConfig } from '#/components/Qms/ChartBuilder/types';
 import type { DeptTreeNode } from '#/types';
 
-
-
 import { aggregateChartData } from '#/components/Qms/ChartBuilder/composables/useChartCore';
 import { findNameById } from '#/types';
 

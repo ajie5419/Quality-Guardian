@@ -14,10 +14,14 @@ export default defineEventHandler(async (event) => {
   // Transform query params to expected types
   const params = {
     year: query.year ? Number.parseInt(String(query.year)) : undefined,
-    workOrderNumber: query.workOrderNumber ? String(query.workOrderNumber) : undefined,
+    workOrderNumber: query.workOrderNumber
+      ? String(query.workOrderNumber)
+      : undefined,
     projectName: query.projectName ? String(query.projectName) : undefined,
     status: query.status ? String(query.status) : undefined,
-    supplierBrand: query.supplierBrand ? String(query.supplierBrand) : undefined,
+    supplierBrand: query.supplierBrand
+      ? String(query.supplierBrand)
+      : undefined,
   };
 
   const list = await AfterSalesService.getList(params);

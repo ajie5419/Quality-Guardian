@@ -20,27 +20,44 @@ export default defineEventHandler(async (event) => {
       Number.parseInt(String(query.pageSize || '20')) || 20,
     );
     const category = getSafe(query.category);
-    const nameFilter = getSafe(query.name);
     const statusFilter = getSafe(query.status);
+    // Support both 'keyword' (from SupplierSelect) and 'name' (legacy)
+    const keyword = getSafe(query.keyword) || getSafe(query.name);
 
     // 2. 构造极其稳健的过滤条件
     const where: any = { isDeleted: false };
 
+    // 2.1 分类过滤 logic (Category Logic)
     if (category) {
       const cat = category.toLowerCase();
-      if (cat === 'supplier') {
-        // 供应商：显示所有非明确标记为外协的数据（包含分类为空的数据）
-        where.NOT = { category: { contains: 'outsourcing' } };
+      if (cat === 'supplier' || cat === 'productionunit') {
+        // 供应商或生产单位：排除外协单位
+        // 因为数据库中目前只存了 Supplier 和 Outsourcing，
+        // 所以生产单位（ProductionUnit）被视为普通供应商处理，
+        // 关键是把它和“外协”区分开。
+        where.NOT = {
+          category: { contains: 'Outsourcing' },
+        };
       } else if (cat === 'outsourcing') {
-        // 外协单位：只显示包含关键字的数据
-        where.category = { contains: 'outsourcing' };
+        // 外协单位
+        where.category = { contains: 'Outsourcing' };
       } else {
         where.category = { contains: category };
       }
     }
 
-    if (nameFilter) where.name = { contains: nameFilter };
+    // 2.2 状态过滤
     if (statusFilter) where.status = statusFilter;
+
+    // 2.3 综合关键词搜索 (Keyword Search - mimicking WorkOrderService)
+    if (keyword) {
+      where.OR = [
+        { name: { contains: keyword } },
+        { contact: { contains: keyword } },
+        { email: { contains: keyword } },
+        { phone: { contains: keyword } },
+      ];
+    }
 
     // 3. 执行核心查询
     const [rawItems, totalCount] = await Promise.all([

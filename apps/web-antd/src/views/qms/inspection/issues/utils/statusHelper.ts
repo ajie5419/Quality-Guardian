@@ -1,7 +1,7 @@
 import type { InspectionIssue } from '../types';
 
-import { ISSUE_STATUS_UI_MAP } from '../constants';
-import { IssueStatus } from '../types';
+import { ISSUE_STATUS_UI_MAP, SEVERITY_OPTIONS } from '../constants';
+import { IssueStatus, Severity } from '../types';
 
 /**
  * 状态映射表：支持多种格式（中英文）到枚举的转换
@@ -17,6 +17,7 @@ const STATUS_KEY_MAP: Record<string, IssueStatus> = {
   已关闭: IssueStatus.CLOSED,
   待处理: IssueStatus.OPEN,
   处理中: IssueStatus.IN_PROGRESS,
+  // 兼容 IssueStatus 枚举本身可能有的其他变体
 };
 
 /**
@@ -42,6 +43,22 @@ export function getStatusLabel(status: IssueStatus | string): string {
   const key = getStatusKey(status);
   const config = ISSUE_STATUS_UI_MAP[key];
   return config?.label || String(status);
+}
+
+/**
+ * 获取严重程度颜色
+ */
+export function getSeverityColor(severity: Severity | string): string {
+  const option = SEVERITY_OPTIONS.find((o) => o.value === severity);
+  return option?.color || 'default';
+}
+
+/**
+ * 获取严重程度标签
+ */
+export function getSeverityLabel(severity: Severity | string): string {
+  const option = SEVERITY_OPTIONS.find((o) => o.value === severity);
+  return option?.label || String(severity || '');
 }
 
 /**

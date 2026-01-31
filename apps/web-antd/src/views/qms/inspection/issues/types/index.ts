@@ -33,6 +33,7 @@ export enum Severity {
  * 部门类型枚举
  */
 export enum DeptType {
+  OUTSOURCED = '外协',
   PRODUCTION = '履约',
   PURCHASE = '采购',
 }
@@ -60,18 +61,18 @@ export interface InspectionIssue {
   partName: string;
   description: string;
   quantity: number;
-  defectType: string;
-  defectSubtype: string;
+  defectType?: string;
+  defectSubtype?: string;
   rootCause?: string;
   solution?: string;
   lossAmount: number;
   responsibleDepartment: string;
   supplierName?: string;
   status: 'Closed' | 'Open' | 'Resolved' | IssueStatus;
-  claim: ClaimStatus;
+  claim: ClaimStatus | string;
   photos: string[];
-  severity: Severity;
-  reportedBy: string;
+  severity: 'Critical' | 'Major' | 'Minor' | Severity;
+  inspector: string;
   division: string;
   updatedAt?: string;
 }

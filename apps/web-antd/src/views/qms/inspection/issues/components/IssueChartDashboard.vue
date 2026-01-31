@@ -32,9 +32,6 @@ const props = defineProps<{
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
 
-const canAdd = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Issues:ChartAdd']),
-);
 const canEdit = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Issues:ChartEdit']),
 );
@@ -56,12 +53,14 @@ const customCharts = useStorage<ChartConfig[]>('qms-issues-custom-charts', []);
 async function fetchData() {
   loading.value = true;
   try {
-    const [res, deptRes] = await Promise.all([
-      getInspectionIssues({ year: props.year, pageSize: 10_000 } as any),
-      getDeptList(),
-    ]);
-    // Ensure we have an array (API might return { items: [] } or just [])
-    fullDataList.value = Array.isArray(res) ? res : (res as any).items || [];
+    const res = await getInspectionIssues({
+      year: props.year,
+      pageSize: 10_000,
+    });
+    const deptRes = await getDeptList();
+
+    // The API returns { items: [], total: number }
+    fullDataList.value = res.items || [];
     deptList.value = deptRes;
   } catch (error) {
     console.error('Failed to fetch inspection issues:', error);
@@ -214,21 +213,14 @@ watch(
   () => fetchData(),
   { immediate: true },
 );
+
+defineExpose({
+  handleAddCustomChart,
+});
 </script>
 
 <template>
   <div class="mb-4 flex flex-col gap-4">
-    <div class="flex items-center justify-end border-b pb-2">
-      <Button
-        v-if="canAdd"
-        type="dashed"
-        size="small"
-        @click="handleAddCustomChart"
-      >
-        <span class="i-lucide-plus mr-1"></span>{{ t('common.create') }}
-      </Button>
-    </div>
-
     <div
       class="issue-chart-grid mt-4 grid gap-4"
       :style="{

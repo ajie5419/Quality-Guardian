@@ -11,6 +11,8 @@ import { onMounted, ref, watch } from 'vue';
 import { useI18n } from '@vben/locales';
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
 
+import { tryOnUnmounted } from '@vueuse/core';
+
 import { renderCustomChart } from '../composables/useChartAggregation';
 
 const props = defineProps<{
@@ -53,6 +55,12 @@ watch(
 
 onMounted(() => {
   render();
+});
+
+tryOnUnmounted(() => {
+  if (!chartRef.value) return;
+  const instance = useEcharts(chartRef).getChartInstance();
+  instance?.dispose();
 });
 </script>
 

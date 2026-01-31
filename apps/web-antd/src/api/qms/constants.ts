@@ -16,6 +16,8 @@ export const QMS_API = {
   // Inspection & Quality
   INSPECTION_ISSUES: '/qms/inspection/issues',
   INSPECTION_ISSUES_BATCH_DELETE: '/qms/inspection/issues/batch-delete',
+  INSPECTION_ISSUES_STATS: '/qms/inspection/issues/stats',
+  INSPECTION_ISSUES_NC_NUMBER: '/qms/inspection/issues/nc-number',
   INSPECTION_RECORDS: '/qms/inspection/records',
   INSPECTION_RECORDS_BATCH_DELETE: '/qms/inspection/records/batch-delete',
   QUALITY_LOSS: '/qms/quality-loss',

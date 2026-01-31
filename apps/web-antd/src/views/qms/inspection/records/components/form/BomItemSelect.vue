@@ -13,24 +13,20 @@ defineOptions({
   name: 'BomItemSelect',
 });
 
-const props = defineProps({
-  value: {
-    type: String,
-    default: undefined,
+const props = withDefaults(
+  defineProps<{
+    disabled?: boolean;
+    placeholder?: string;
+    value?: string;
+    workOrderNumber?: string;
+  }>(),
+  {
+    value: undefined,
+    workOrderNumber: '',
+    placeholder: '请选择或输入一级部件',
+    disabled: false,
   },
-  workOrderNumber: {
-    type: String,
-    default: '',
-  },
-  placeholder: {
-    type: String,
-    default: '请选择或输入一级部件',
-  },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
-});
+);
 
 const emit = defineEmits(['update:value', 'change']);
 

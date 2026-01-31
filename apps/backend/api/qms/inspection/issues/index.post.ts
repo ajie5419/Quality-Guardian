@@ -55,25 +55,15 @@ export default defineEventHandler(async (event) => {
 
         responsibleDepartment: body.responsibleDepartment || 'Unknown',
         supplierName: body.supplierName || null,
+        severity: body.severity || 'Minor',
 
         // Logic to connect user by name (from Mock Data Era)
         // Since we migrated Auth to DB, userinfo.username exists in DB.
         // We should connect to EXISTING user if possible.
         // Using connectOrCreate for safety if logic differs.
-        users_quality_records_inspectorTousers: userinfo?.username
-          ? {
-              connectOrCreate: {
-                where: { username: userinfo.username },
-                create: {
-                  id: `USR-${Date.now()}`, // Fallback ID
-                  username: userinfo.username,
-                  password: 'password123',
-                  realName: userinfo.realName || userinfo.username,
-                  department: 'Quality Info',
-                  roles: { connect: { id: 'super' } }, // Assuming super role exists from fix-login
-                },
-              },
-            }
+        // Connect to inspector user (must be valid username)
+        users_quality_records_inspectorTousers: userinfo.username
+          ? { connect: { username: userinfo.username } }
           : undefined,
 
         isClaim: body.claim === 'Yes',

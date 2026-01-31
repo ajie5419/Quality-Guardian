@@ -5,7 +5,10 @@ import type { EChartsClickParams } from '#/types/common';
 
 import { computed, nextTick, ref, watch } from 'vue';
 
+import { useI18n } from '@vben/locales';
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
+
+import { tryOnUnmounted } from '@vueuse/core';
 
 /**
  * 合格率趋势数据项
@@ -24,6 +27,7 @@ interface Props {
 const props = defineProps<Props>();
 const emit = defineEmits(['chartClick']);
 
+const { t } = useI18n();
 const passRateChartRef = ref<EchartsUIType>();
 const { renderEcharts, getChartInstance, resize } =
   useEcharts(passRateChartRef);
@@ -33,13 +37,16 @@ const { renderEcharts, getChartInstance, resize } =
 const shouldRender = computed(() => props.active);
 
 function updatePassRateChart() {
-  if (props.trendData.length === 0) return;
+  if (!props.trendData || props.trendData.length === 0) return;
   // Safety check: if ref is missing (e.g. unmounted), stop
   if (!passRateChartRef.value) return;
 
   const chartOption = {
     title: {
-      text: props.granularity === 'week' ? '周度合格率趋势' : '月度合格率趋势',
+      text:
+        props.granularity === 'week'
+          ? t('qms.dashboard.weeklyPassRateTrend')
+          : t('qms.dashboard.monthlyPassRateTrend'),
       left: 'center',
     },
     tooltip: {
@@ -143,6 +150,11 @@ watch(
     }
   },
 );
+
+tryOnUnmounted(() => {
+  if (!getChartInstance) return;
+  getChartInstance()?.dispose();
+});
 </script>
 
 <template>
@@ -159,12 +171,12 @@ watch(
 
       <!-- Placeholder when inactive to keep layout stable if needed (optional) -->
       <div v-else class="flex h-full w-full items-center justify-center">
-        <span class="text-gray-300">Loading Chart...</span>
+        <span class="text-gray-300">{{ t('common.loadingText') }}</span>
       </div>
     </div>
 
     <div class="mt-2 text-center text-sm text-gray-400">
-      点击柱状图查看各工序合格率详情
+      {{ t('qms.dashboard.chartClickTip') }}
     </div>
   </div>
 </template>

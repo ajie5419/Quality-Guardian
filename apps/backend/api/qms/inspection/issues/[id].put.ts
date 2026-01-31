@@ -57,6 +57,7 @@ export default defineEventHandler(async (event) => {
       updateData.nonConformanceNumber = bodyRecord.ncNumber || null;
     if (bodyRecord.projectName) updateData.projectName = bodyRecord.projectName; // Added projectName
     if (bodyRecord.partName) updateData.partName = bodyRecord.partName;
+    if (bodyRecord.inspector) updateData.inspector = bodyRecord.inspector;
     if (bodyRecord.description) updateData.description = bodyRecord.description;
     if (bodyRecord.quantity) updateData.quantity = Number(bodyRecord.quantity);
     if (bodyRecord.lossAmount)
@@ -70,6 +71,9 @@ export default defineEventHandler(async (event) => {
     if (bodyRecord.defectType) updateData.defectType = bodyRecord.defectType;
     if (bodyRecord.defectSubtype)
       updateData.defectSubtype = bodyRecord.defectSubtype;
+    if (bodyRecord.severity) updateData.severity = bodyRecord.severity;
+    if (bodyRecord.reportDate)
+      updateData.date = new Date(bodyRecord.reportDate as string);
     // Fix for Photos Update
     if (bodyRecord.photos) {
       updateData.issuePhoto = JSON.stringify(bodyRecord.photos);

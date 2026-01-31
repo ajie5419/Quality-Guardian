@@ -6,6 +6,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
+import { useDebounceFn } from '@vueuse/core';
 import {
   DatePicker,
   Divider,
@@ -17,14 +18,15 @@ import {
   Tag,
 } from 'ant-design-vue';
 import dayjs from 'dayjs';
+import { cloneDeep } from 'lodash-es';
 
 import { getItpList, getItpProjectList } from '#/api/qms/planning';
 
+import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
+import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
 import { getFormConfig, PROCESS_OPTIONS } from '../config';
 import BomItemSelect from './form/BomItemSelect.vue';
-import SupplierSelect from './form/SupplierSelect.vue';
 import TeamSelect from './form/TeamSelect.vue';
-import WorkOrderSelect from './form/WorkOrderSelect.vue';
 import InspectionItemsTable from './InspectionItemsTable.vue';
 
 // Define local interface to match UI needs (checkItem/acceptanceCriteria are not in shared type)
@@ -35,7 +37,7 @@ interface LocalInspectionTaskResult
 }
 
 const props = defineProps<{
-  record?: Record<string, any>;
+  record?: QmsInspectionApi.InspectionRecord;
   type: string;
 }>();
 
@@ -54,8 +56,8 @@ const formState = reactive({
   // ... dynamic fields
   supplierName: '',
   materialName: '',
-  incomingType: undefined,
-  processName: undefined,
+  incomingType: undefined as string | undefined,
+  processName: undefined as string | undefined,
   level1Component: '',
   team: '',
   documents: '',
@@ -69,14 +71,37 @@ const config = computed(() => getFormConfig(props.type));
 // Store raw ITP items for filtering
 const rawItpItems = ref<any[]>([]);
 
+// Pre-parse quantitative items to avoid repeated JSON.parse inside filter loop
+const parsedItpItems = computed(() => {
+  return rawItpItems.value.map((item: any) => {
+    let qItems: any[] = [];
+    try {
+      if (
+        item.quantitativeItems &&
+        typeof item.quantitativeItems === 'string'
+      ) {
+        qItems = JSON.parse(item.quantitativeItems);
+      } else if (Array.isArray(item.quantitativeItems)) {
+        qItems = item.quantitativeItems;
+      }
+    } catch (error) {
+      console.error('Failed to parse quantitative items', error);
+    }
+    return {
+      ...item,
+      _parsedQItems: qItems,
+    };
+  });
+});
+
 // Filter items based on current form state
 function filterItpItems() {
-  if (rawItpItems.value.length === 0) {
+  if (parsedItpItems.value.length === 0) {
     formState.items = [];
     return;
   }
 
-  let filtered = rawItpItems.value;
+  let filtered = parsedItpItems.value;
 
   // Strict Filtering: If a filter criteria is enabled in config,
   // we require a value selected/entered to show matching items.
@@ -108,24 +133,11 @@ function filterItpItems() {
   const mappedItems: LocalInspectionTaskResult[] = [];
 
   filtered.forEach((item: any) => {
-    // Parse quantitative items if they exist
-    let qItems: any[] = [];
-    try {
-      if (
-        item.quantitativeItems &&
-        typeof item.quantitativeItems === 'string'
-      ) {
-        qItems = JSON.parse(item.quantitativeItems);
-      } else if (Array.isArray(item.quantitativeItems)) {
-        qItems = item.quantitativeItems;
-      }
-    } catch (error) {
-      console.error('Failed to parse quantitative items', error);
-    }
+    const qItems = (item._parsedQItems as any[]) || [];
 
     // Check if it's quantitative and has items
     if (item.isQuantitative && qItems.length > 0) {
-      qItems.forEach((qItem: any) => {
+      qItems.forEach((qItem) => {
         mappedItems.push({
           activity: item.activity,
           controlPoint: item.controlPoint,
@@ -133,10 +145,10 @@ function filterItpItems() {
           itpItemId: item.id,
           checkItem: item.activity,
           standardValue: qItem.standardValue,
-          upperTolerance: qItem.upperTolerance,
-          lowerTolerance: qItem.lowerTolerance,
-          unit: qItem.unit, // 'uom' to 'unit' or check interface? Shared has 'unit'.
-          acceptanceCriteria: item.acceptanceCriteria, // Include criteria as supplementary info
+          upperTolerance: qItem.upperTolerance || 0,
+          lowerTolerance: qItem.lowerTolerance || 0,
+          uom: qItem.unit,
+          acceptanceCriteria: item.acceptanceCriteria,
           result: 'PASS',
         } as LocalInspectionTaskResult);
       });
@@ -158,10 +170,15 @@ function filterItpItems() {
 }
 
 // Watchers for filtering
+// Watchers for filtering with debounce to improve performance
+const debouncedFilter = useDebounceFn(() => {
+  filterItpItems();
+}, 200);
+
 watch(
   () => [formState.processName, formState.level1Component],
   () => {
-    filterItpItems();
+    debouncedFilter();
   },
 );
 
@@ -207,7 +224,7 @@ watch(
   () => props.record,
   (val) => {
     if (val && Object.keys(val).length > 0) {
-      Object.assign(formState, val);
+      Object.assign(formState, cloneDeep(val));
     } else {
       // Reset defaults
       Object.assign(formState, {

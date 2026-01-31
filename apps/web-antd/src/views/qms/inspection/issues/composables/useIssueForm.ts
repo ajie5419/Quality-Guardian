@@ -19,7 +19,7 @@ import { DEFAULT_VALUES } from '../constants';
 /**
  * 创建初始表单状态
  */
-export function createInitialFormState(reportedBy = ''): IssueFormState {
+export function createInitialFormState(inspector = ''): IssueFormState {
   return {
     ncNumber: '',
     reportDate: new Date().toISOString().split('T')[0],
@@ -34,7 +34,7 @@ export function createInitialFormState(reportedBy = ''): IssueFormState {
     lossAmount: 0,
     responsibleDepartment: '',
     supplierName: '',
-    reportedBy,
+    inspector,
     claim: DEFAULT_VALUES.DEFAULT_CLAIM,
     photos: [],
     division: '',

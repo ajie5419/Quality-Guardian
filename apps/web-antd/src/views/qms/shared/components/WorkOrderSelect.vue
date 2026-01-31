@@ -3,191 +3,78 @@ import type { SelectProps } from 'ant-design-vue';
 
 import type { WorkOrderItem } from '#/api/qms/work-order';
 
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, toRef } from 'vue';
 
-import { useDebounceFn } from '@vueuse/core';
 import { Select } from 'ant-design-vue';
 
 import { getWorkOrderList } from '#/api/qms/work-order';
+
+import { useSelectPagination } from '../composables/useSelectPagination';
 
 defineOptions({
   name: 'WorkOrderSelect',
 });
 
-const props = defineProps({
-  value: {
-    type: String,
-    default: undefined,
+const props = withDefaults(
+  defineProps<{
+    allowClear?: boolean;
+    disabled?: boolean;
+    placeholder?: string;
+    value?: string;
+  }>(),
+  {
+    value: undefined,
+    placeholder: '请选择工单',
+    disabled: false,
+    allowClear: true,
   },
-  placeholder: {
-    type: String,
-    default: '请选择工单',
-  },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
-  allowClear: {
-    type: Boolean,
-    default: true,
-  },
-});
+);
 
 const emit = defineEmits(['update:value', 'change']);
 
-const options = ref<WorkOrderItem[]>([]);
-const loading = ref(false);
-const cachedSelectedItem = ref<null | WorkOrderItem>(null);
-
-const pagination = reactive({
-  page: 1,
-  pageSize: 20,
-  total: 0,
-});
-const searchText = ref('');
+const {
+  options,
+  loading,
+  handleSearch,
+  handlePopupScroll,
+  handleChange,
+  fetchItems,
+} = useSelectPagination<WorkOrderItem>(
+  {
+    fetchDataFn: getWorkOrderList,
+    getParams: (keyword) => ({
+      keyword,
+      ignoreYearFilter: true,
+    }),
+    valueKey: 'workOrderNumber', // Or 'id' depending on backend consistency
+    echoFetcher: async (val) => {
+      try {
+        const { items } = await getWorkOrderList({
+          ids: val,
+          workOrderNumber: val,
+        });
+        return items?.[0] || null;
+      } catch {
+        return null;
+      }
+    },
+  },
+  toRef(props, 'value'),
+  emit,
+);
 
 // Transform to Ant Design Select options
 const selectOptions = computed<SelectProps['options']>(() => {
   return options.value.map((item) => ({
-    ...item, // Spread all properties so they are available in the slot scope
-    item, // Ensure item is available as a property for slot and change handler
+    ...item,
+    item,
     label: item.workOrderNumber,
-    value: item.id || item.workOrderNumber, // Handle if ID is missing (backend sometimes uses number as primary key)
+    value: item.id || item.workOrderNumber,
   }));
 });
 
-async function fetchWorkOrders(
-  keyword: string = '',
-  loadMore: boolean = false,
-) {
-  if (loading.value) return;
-  loading.value = true;
-  try {
-    if (loadMore) {
-      pagination.page += 1;
-    } else {
-      pagination.page = 1;
-      searchText.value = keyword.trim();
-    }
-
-    const params: any = {
-      page: pagination.page,
-      pageSize: pagination.pageSize,
-      ignoreYearFilter: true,
-      keyword: searchText.value,
-    };
-
-    const { items, total } = await getWorkOrderList(params);
-    pagination.total = total;
-
-    const newItems = items || [];
-    const currentOptions = loadMore ? options.value : [];
-
-    // Combine and deduplicate options
-    const merged = [...currentOptions, ...newItems];
-    const uniqueMap = new Map();
-    merged.forEach((item) => {
-      const key = item.id || item.workOrderNumber;
-      uniqueMap.set(key, item);
-    });
-
-    // Ensure the currently selected item is in the options list so it displays correctly
-    if (props.value) {
-      if (uniqueMap.has(props.value)) {
-        cachedSelectedItem.value = uniqueMap.get(props.value);
-      } else if (
-        cachedSelectedItem.value &&
-        (cachedSelectedItem.value.id === props.value ||
-          cachedSelectedItem.value.workOrderNumber === props.value)
-      ) {
-        uniqueMap.set(props.value, cachedSelectedItem.value);
-      } else {
-        // Not in list and not in cache, fetch it
-        try {
-          const { items: specificItems } = await getWorkOrderList({
-            ids: props.value,
-            workOrderNumber: props.value,
-          });
-          if (specificItems && specificItems.length > 0) {
-            cachedSelectedItem.value = specificItems[0]!;
-            uniqueMap.set(props.value, specificItems[0]);
-          }
-        } catch (error) {
-          console.error('Failed to fetch selected work order details', error);
-        }
-      }
-    }
-
-    options.value = [...uniqueMap.values()];
-  } catch (error) {
-    console.error('Failed to fetch work orders', error);
-    if (loadMore) pagination.page -= 1; // Revert page if failed
-  } finally {
-    loading.value = false;
-  }
-}
-
-const handleSearch = useDebounceFn((val: string) => {
-  fetchWorkOrders(val, false);
-}, 300);
-
-const handlePopupScroll = (e: any) => {
-  const { target } = e;
-  if (
-    target.scrollTop + target.offsetHeight >= target.scrollHeight - 10 &&
-    options.value.length < pagination.total &&
-    !loading.value
-  ) {
-    fetchWorkOrders(searchText.value, true);
-  }
-};
-
-function handleChange(val: any, option: any) {
-  emit('update:value', val);
-  emit('change', val, option);
-
-  if (val && option) {
-    cachedSelectedItem.value = option.item || option;
-  } else if (!val) {
-    cachedSelectedItem.value = null;
-  }
-}
-
-watch(
-  () => props.value,
-  async (newVal) => {
-    if (newVal) {
-      const existing = options.value.find(
-        (o) => o.id === newVal || o.workOrderNumber === newVal,
-      );
-      if (existing) {
-        cachedSelectedItem.value = existing;
-      } else {
-        try {
-          const { items } = await getWorkOrderList({
-            ids: newVal,
-            workOrderNumber: newVal,
-          });
-          if (items && items.length > 0) {
-            cachedSelectedItem.value = items[0]!;
-            if (
-              !options.value.some(
-                (o) => o.id === newVal || o.workOrderNumber === newVal,
-              )
-            ) {
-              options.value.push(items[0]!);
-            }
-          }
-        } catch (error) {
-          console.error(error);
-        }
-      }
-    }
-  },
-);
-
 onMounted(() => {
-  fetchWorkOrders('', false);
+  fetchItems('', false);
 });
 </script>
 

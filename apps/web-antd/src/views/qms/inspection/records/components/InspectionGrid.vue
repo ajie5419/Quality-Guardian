@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { VxeGridProps } from '#/adapter/vxe-table';
+import type { QmsInspectionApi } from '#/api/qms/inspection';
 import type { VxeCheckboxChangeParams } from '#/types';
 
 import { computed, ref, watch } from 'vue';
@@ -31,8 +32,8 @@ const props = defineProps<{
 const emit = defineEmits(['create', 'edit']);
 const { t } = useI18n();
 
-const gridOptions = computed(() => ({
-  columns: getColumns(props.type, t).map((col) => {
+const processedColumns = (type: string) => {
+  return getColumns(type, t).map((col) => {
     if (col.slots?.default === 'action') {
       return {
         ...col,
@@ -41,7 +42,13 @@ const gridOptions = computed(() => ({
           name: 'CellOperation',
           props: {
             options: ['edit', 'delete'],
-            onClick: ({ code, row }: { code: string; row: any }) => {
+            onClick: ({
+              code,
+              row,
+            }: {
+              code: string;
+              row: QmsInspectionApi.InspectionRecord;
+            }) => {
               if (code === 'edit') handleEdit(row);
               if (code === 'delete') handleDelete(row);
             },
@@ -50,7 +57,10 @@ const gridOptions = computed(() => ({
       };
     }
     return col;
-  }),
+  });
+};
+const gridOptions = computed(() => ({
+  columns: processedColumns(props.type),
   toolbarConfig: {
     refresh: true,
     zoom: true,
@@ -77,7 +87,7 @@ const gridOptions = computed(() => ({
     ajax: {
       query: async (
         { page }: { page: { currentPage: number; pageSize: number } },
-        formValues: any,
+        formValues: Record<string, any>,
       ) => {
         return await getInspectionRecords({
           type: props.type,
@@ -87,7 +97,7 @@ const gridOptions = computed(() => ({
           keyword: formValues?.keyword,
         });
       },
-      queryAll: async ({ formValues }: { formValues: any }) => {
+      queryAll: async ({ formValues }: { formValues: Record<string, any> }) => {
         const res = await getInspectionRecords({
           type: props.type,
           year: props.year,
@@ -101,12 +111,12 @@ const gridOptions = computed(() => ({
   },
 }));
 
-// ...
-
-const checkedRows = ref<any[]>([]);
+const checkedRows = ref<QmsInspectionApi.InspectionRecord[]>([]);
 
 function onCheckChange(params: VxeCheckboxChangeParams) {
-  const records = params.$grid.getCheckboxRecords() || [];
+  const records =
+    (params.$grid.getCheckboxRecords() as unknown as QmsInspectionApi.InspectionRecord[]) ||
+    [];
   checkedRows.value = records;
 }
 
@@ -138,11 +148,11 @@ const [Grid, gridApi] = useVbenVxeGrid({
   },
 });
 
-function handleEdit(row: any) {
+function handleEdit(row: QmsInspectionApi.InspectionRecord) {
   emit('edit', row);
 }
 
-function handleDelete(row: any) {
+function handleDelete(row: QmsInspectionApi.InspectionRecord) {
   Modal.confirm({
     title: t('common.confirmDelete'),
     content: t('common.confirmDeleteContent'),
@@ -170,7 +180,7 @@ function handleBatchDelete() {
     }),
     onOk: async () => {
       try {
-        const ids = checkedRows.value.map((r: any) => r.id);
+        const ids = checkedRows.value.map((r) => r.id);
         const res = await batchDeleteInspectionRecords(ids);
         message.success(
           t('common.deleteSuccessCount', { count: res.successCount }),
@@ -192,7 +202,7 @@ watch(
   () => props.type,
   (newType) => {
     gridApi.setGridOptions({
-      columns: getColumns(newType, t),
+      columns: processedColumns(newType),
     });
     reload();
   },
