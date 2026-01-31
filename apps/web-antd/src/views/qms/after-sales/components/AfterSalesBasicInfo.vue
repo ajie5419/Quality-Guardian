@@ -1,26 +1,19 @@
 <script lang="ts" setup>
-import type { AfterSalesFormState } from '../composables/useAfterSalesForm';
-
-import type { QmsWorkOrderApi } from '#/api/qms/work-order';
-import type { SelectOption as AntSelectOption, TreeSelectNode } from '#/types';
+import type { WorkOrderItem } from '#/api/qms/work-order';
+import type { AfterSalesFormState, TreeSelectNode } from '#/types';
 
 import { useI18n } from '@vben/locales';
 
-import {
-  FormItem,
-  Input,
-  Select,
-  SelectOption,
-  TreeSelect,
-} from 'ant-design-vue';
+import { FormItem, Input, TreeSelect } from 'ant-design-vue';
+
+import WorkOrderSelect from '../../shared/components/WorkOrderSelect.vue';
 
 defineProps<{
   deptTreeData: TreeSelectNode[];
-  workOrderList: QmsWorkOrderApi.WorkOrderItem[];
 }>();
 
 const emit = defineEmits<{
-  workOrderChange: [val: number | string];
+  workOrderChange: [val: number | string, item?: WorkOrderItem];
 }>();
 
 const formState = defineModel<AfterSalesFormState>('formState', {
@@ -29,8 +22,11 @@ const formState = defineModel<AfterSalesFormState>('formState', {
 
 const { t } = useI18n();
 
-function handleWorkOrderChange(val: number | string) {
-  emit('workOrderChange', val);
+function handleWorkOrderChange(
+  val: number | string,
+  option: { item?: WorkOrderItem },
+) {
+  emit('workOrderChange', val, option?.item);
 }
 </script>
 
@@ -45,25 +41,11 @@ function handleWorkOrderChange(val: number | string) {
         class="mb-0"
         name="workOrderNumber"
       >
-        <Select
+        <WorkOrderSelect
           v-model:value="formState.workOrderNumber"
-          show-search
-          :filter-option="
-            (input: string, option: AntSelectOption) =>
-              String(option.value).toLowerCase().includes(input.toLowerCase())
-          "
-          @change="(val) => handleWorkOrderChange(val as string | number)"
           :placeholder="t('qms.afterSales.placeholder.inputWorkOrder')"
-          class="w-full"
-        >
-          <SelectOption
-            v-for="wo in workOrderList"
-            :key="wo.workOrderNumber"
-            :value="wo.workOrderNumber"
-          >
-            {{ wo.workOrderNumber }}
-          </SelectOption>
-        </Select>
+          @change="handleWorkOrderChange"
+        />
       </FormItem>
       <div class="grid grid-cols-2 gap-2">
         <FormItem :label="t('qms.afterSales.form.division')" class="mb-0">

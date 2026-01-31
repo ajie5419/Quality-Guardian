@@ -4,9 +4,12 @@ import type { EchartsUIType } from '@vben/plugins/echarts';
 import type { ChartConfig } from '../composables/useChartAggregation';
 
 import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
+import type { DeptTreeNode } from '#/types';
 
 import { reactive, ref, watch } from 'vue';
 
+import { useI18n } from '@vben/locales';
+// ... (abbreviated, actually I should include context to be safe)
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
 
 import {
@@ -24,7 +27,7 @@ import { renderCustomChart } from '../composables/useChartAggregation';
 import { CHART_DIMENSIONS, CHART_METRICS } from '../constants';
 
 const props = defineProps<{
-  deptData?: any[];
+  deptData?: DeptTreeNode[];
   initialConfig?: ChartConfig;
   open: boolean;
   sourceData: QmsAfterSalesApi.AfterSalesItem[];
@@ -35,8 +38,10 @@ const emit = defineEmits<{
   'update:open': [boolean];
 }>();
 
+const { t } = useI18n();
+
 const formState = reactive<Omit<ChartConfig, 'id'>>({
-  title: '自定义图表',
+  title: t('qms.afterSales.chart.defaultTitle'),
   dimension: 'defectType',
   metric: 'count',
   chartType: 'bar',
@@ -57,7 +62,7 @@ watch(
       } else {
         // Reset to defaults for new chart
         Object.assign(formState, {
-          title: '自定义图表',
+          title: t('qms.afterSales.chart.defaultTitle'),
           dimension: 'defectType',
           metric: 'count',
           chartType: 'bar',
@@ -78,7 +83,7 @@ function autoGenerateTitle() {
   )?.label;
   const met = CHART_METRICS.find((m) => m.value === formState.metric)?.label;
   if (dim && met) {
-    formState.title = `${dim} - ${met}分析`;
+    formState.title = t('qms.afterSales.chart.autoTitle', [dim, met]);
   }
 }
 
@@ -130,7 +135,11 @@ function handleCancel() {
 <template>
   <Modal
     :open="open"
-    :title="initialConfig ? '编辑图表' : '添加自定义图表'"
+    :title="
+      initialConfig
+        ? t('qms.afterSales.chart.editTitle')
+        : t('qms.afterSales.chart.addTitle')
+    "
     width="900px"
     @cancel="handleCancel"
     @ok="handleSave"
@@ -146,11 +155,11 @@ function handleCancel() {
       <!-- 右侧：配置区域 -->
       <div class="w-[300px] flex-shrink-0 space-y-4 pt-2">
         <Form layout="vertical">
-          <FormItem label="图表标题">
+          <FormItem :label="t('qms.afterSales.chart.form.title')">
             <Input v-model:value="formState.title" />
           </FormItem>
 
-          <FormItem label="分析维度 (X轴/分类)">
+          <FormItem :label="t('qms.afterSales.chart.form.dimension')">
             <Select
               v-model:value="formState.dimension"
               @change="handleDimensionChange"
@@ -160,12 +169,12 @@ function handleCancel() {
                 :key="opt.value"
                 :value="opt.value"
               >
-                {{ opt.label }}
+                {{ t(opt.label) }}
               </SelectOption>
             </Select>
           </FormItem>
 
-          <FormItem label="统计指标 (Y轴/数值)">
+          <FormItem :label="t('qms.afterSales.chart.form.metric')">
             <Select
               v-model:value="formState.metric"
               @change="handleMetricChange"
@@ -175,20 +184,28 @@ function handleCancel() {
                 :key="opt.value"
                 :value="opt.value"
               >
-                {{ opt.label }}
+                {{ t(opt.label) }}
               </SelectOption>
             </Select>
           </FormItem>
 
-          <FormItem label="图表类型">
+          <FormItem :label="t('qms.afterSales.chart.form.chartType')">
             <RadioGroup
               v-model:value="formState.chartType"
               button-style="solid"
             >
-              <RadioButton value="bar">柱状图</RadioButton>
-              <RadioButton value="line">折线图</RadioButton>
-              <RadioButton value="pie">饼图</RadioButton>
-              <RadioButton value="ring">环形图</RadioButton>
+              <RadioButton value="bar">{{
+                t('qms.afterSales.chart.type.bar')
+              }}</RadioButton>
+              <RadioButton value="line">{{
+                t('qms.afterSales.chart.type.line')
+              }}</RadioButton>
+              <RadioButton value="pie">{{
+                t('qms.afterSales.chart.type.pie')
+              }}</RadioButton>
+              <RadioButton value="ring">{{
+                t('qms.afterSales.chart.type.ring')
+              }}</RadioButton>
             </RadioGroup>
           </FormItem>
         </Form>

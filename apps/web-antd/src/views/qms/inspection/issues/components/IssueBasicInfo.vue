@@ -1,10 +1,5 @@
 <script lang="ts" setup>
-import type {
-  DeptNode,
-  IssueFormState,
-  SupplierItem,
-  WorkOrderItem,
-} from '../types';
+import type { DeptNode, IssueFormState } from '../types';
 
 import { computed } from 'vue';
 
@@ -16,19 +11,17 @@ import {
   FormItemRest,
   Input,
   InputNumber,
-  Select,
   Switch,
   TreeSelect,
 } from 'ant-design-vue';
 
+import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
+import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
 import { DEPT_TYPE_KEYWORDS } from '../constants';
-import WorkOrderSelect from './form/WorkOrderSelect.vue';
 
 const props = defineProps<{
   deptTreeData: DeptNode[];
   isEditMode: boolean;
-  supplierList: SupplierItem[];
-  workOrderList: WorkOrderItem[];
 }>();
 
 const emit = defineEmits<{
@@ -76,14 +69,11 @@ const isProductionDept = computed(() => {
 
 function handleWorkOrderChange(val: any, option: any) {
   // If WorkOrderSelect returns the full item via option.item, use it directly
-  let wo = option?.item;
+  const wo = option?.item;
 
   if (!wo) {
-    // Fallback: search in props list (legacy)
-    const strVal = String(val);
-    wo = props.workOrderList.find(
-      (item) => item.workOrderNumber === strVal || item.id === strVal,
-    );
+    // Search in local list is removed as we use the full item from selection component
+    // If needed, the WorkOrderSelect should be trusted
   }
 
   if (wo) {
@@ -177,18 +167,15 @@ function handleWorkOrderChange(val: any, option: any) {
       />
     </FormItem>
 
-    <!-- 责任单位/供应商 -->
     <FormItem
       v-if="isPurchaseDept || isProductionDept"
       :label="t('qms.inspection.issues.responsibleUnit')"
       name="supplierName"
     >
-      <Select
+      <SupplierSelect
         v-model:value="formState.supplierName"
-        :options="supplierList.map((s) => ({ value: s.name, label: s.name }))"
-        class="w-full"
         :placeholder="t('qms.inspection.issues.inputSupplier')"
-        show-search
+        :category="isPurchaseDept ? 'Supplier' : 'ProductionUnit'"
       />
     </FormItem>
   </div>

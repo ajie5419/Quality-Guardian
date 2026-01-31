@@ -176,12 +176,12 @@ export const DashboardService = {
       const [inspections, defects] = await Promise.all([
         prisma.$queryRaw`
           SELECT 
-            MONTH(date) as month, 
+            MONTH(inspectionDate) as month, 
             SUM(quantity) as totalQty,
             SUM(CASE WHEN result = 'PASS' THEN quantity ELSE 0 END) as qualifiedQty
           FROM inspections 
-          WHERE YEAR(date) = ${currentYear} AND isDeleted = 0
-          GROUP BY MONTH(date)
+          WHERE YEAR(inspectionDate) = ${currentYear} AND isDeleted = 0
+          GROUP BY MONTH(inspectionDate)
         `,
         prisma.$queryRaw`
           SELECT 

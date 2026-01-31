@@ -32,6 +32,7 @@ export interface DeptTreeNode extends BaseTreeNode {
 export interface TreeSelectNode {
   value: number | string;
   title: string;
+  label?: string;
   disabled?: boolean;
   selectable?: boolean;
   children?: TreeSelectNode[];

@@ -1,10 +1,13 @@
 <script lang="ts" setup>
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
-import type { VxeCheckboxChangeParams } from '#/types';
+import type {
+  DeptTreeNode,
+  TreeSelectNode,
+  VxeCheckboxChangeParams,
+} from '#/types';
 
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
 
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
@@ -18,11 +21,12 @@ import {
   batchDeleteAfterSales,
   deleteAfterSales,
   getAfterSalesList,
+  importAfterSalesExcel,
 } from '#/api/qms/after-sales';
-import { getSupplierList } from '#/api/qms/supplier';
-import { getWorkOrderList } from '#/api/qms/work-order';
 import { getDeptList } from '#/api/system/dept';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
+import { useGridImport } from '#/hooks/useGridImport';
+import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData, findNameById } from '#/types';
 
@@ -30,7 +34,6 @@ import AfterSalesCharts from './components/AfterSalesCharts.vue';
 import AfterSalesModal from './components/AfterSalesModal.vue';
 import { useStatusOptions } from './constants';
 
-const router = useRouter();
 const { t } = useI18n();
 
 const showCharts = ref(false);
@@ -49,27 +52,29 @@ const canSettle = computed(() => hasAccessByCodes(['QMS:AfterSales:Settle']));
 // 状态选项
 const { getStatusInfo } = useStatusOptions();
 
+// ...
+
 // 数据
-const deptTreeData = ref<any[]>([]);
-const deptRawData = ref<any[]>([]); // 保存原始部门数据用于 ID 转名称
-const workOrderList = ref<any[]>([]);
-const supplierList = ref<any[]>([]);
+const deptTreeData = ref<TreeSelectNode[]>([]);
+const deptRawData = ref<DeptTreeNode[]>([]); // 保存原始部门数据用于 ID 转名称
 
 async function loadData() {
   try {
     const data = await getDeptList();
     deptRawData.value = data;
     deptTreeData.value = convertToTreeSelectData(data);
-    const woRes = await getWorkOrderList();
-    workOrderList.value = woRes.items || [];
-    const res = await getSupplierList({ pageSize: 2000 });
-    supplierList.value = res.items || [];
   } catch (error) {
     console.error('Failed to load data', error);
+    message.error(t('common.dataLoadFailed'));
   }
 }
 
 onMounted(() => loadData());
+
+// Define strict type for schema item
+type GridFormSchema = NonNullable<
+  NonNullable<VxeGridProps['formOptions']>['schema']
+>[number];
 
 // Year Filter (Dynamic)
 const { years: dynamicYears } = useAvailableYears();
@@ -81,8 +86,29 @@ const yearOptions = computed(() => {
   }));
 });
 
+// 5. 导入功能
+const gridApiProxy =
+  ref<ReturnType<typeof useVbenVxeGrid<QmsAfterSalesApi.AfterSalesItem>>[1]>();
+const { handleImport } = useGridImport({
+  gridApi: gridApiProxy as any,
+  importApi: importAfterSalesExcel,
+  statusMap: {
+    待处理: 'OPEN',
+    处理中: 'IN_PROGRESS',
+    已解决: 'RESOLVED',
+    已结束: 'CLOSED',
+    已完结: 'CLOSED',
+    已完成: 'COMPLETED',
+    已取消: 'CANCELLED',
+  },
+  onSuccess: () => {
+    invalidateAfterSales();
+    chartRefreshKey.value++;
+  },
+});
+
 // 表格列配置
-const gridOptions = computed<VxeGridProps>(() => ({
+const gridOptions = computed(() => ({
   checkboxConfig: {
     reserve: true,
     highlight: true,
@@ -105,7 +131,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
       field: 'division',
       title: t('qms.afterSales.form.division'),
       width: 120,
-      formatter: ({ cellValue }) => {
+      formatter: ({ cellValue }: { cellValue: string }) => {
         if (!cellValue) return '';
         const name = findNameById(deptRawData.value, cellValue);
         return name || cellValue;
@@ -177,14 +203,26 @@ const gridOptions = computed<VxeGridProps>(() => ({
       title: t('qms.afterSales.form.defectSubtype'),
       minWidth: 120,
     },
-    { field: 'severity', title: t('qms.afterSales.form.severity'), width: 100 },
-    { field: 'quantity', title: t('qms.afterSales.form.quantity'), width: 80 },
+    {
+      field: 'severity',
+      title: t('qms.afterSales.form.severity'),
+      width: 100,
+    },
+    {
+      field: 'quantity',
+      title: t('qms.afterSales.form.quantity'),
+      width: 80,
+    },
     {
       field: 'issueDate',
       title: t('qms.afterSales.form.issueDate'),
       width: 120,
     },
-    { field: 'handler', title: t('qms.afterSales.form.handler'), width: 100 },
+    {
+      field: 'handler',
+      title: t('qms.afterSales.form.handler'),
+      width: 100,
+    },
     {
       field: 'resolutionPlan',
       title: t('qms.afterSales.form.resolutionPlan'),
@@ -194,7 +232,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
       field: 'responsibleDept',
       title: t('qms.afterSales.form.responsibleDept'),
       width: 120,
-      formatter: ({ cellValue }) => {
+      formatter: ({ cellValue }: { cellValue: string }) => {
         if (!cellValue) return '';
         const name = findNameById(deptRawData.value, cellValue);
         return name || cellValue;
@@ -275,76 +313,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
   },
   importConfig: {
     remote: true,
-    importMethod: async ({ file }: { file: File }) => {
-      const { requestClient } = await import('#/api/request');
-      const XLSX = await import('xlsx');
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, {
-          type: 'array',
-          cellDates: true,
-        });
-        const sheetName = workbook.SheetNames[0];
-        if (!sheetName) return;
-        const worksheet = workbook.Sheets[sheetName]!;
-        const results = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-        const columns = gridApi.grid.getColumns();
-        const statusValueMap: Record<string, string> = {
-          待处理: 'OPEN',
-          处理中: 'IN_PROGRESS',
-          已解决: 'RESOLVED',
-          已结束: 'CLOSED',
-          已完结: 'CLOSED',
-          已完成: 'COMPLETED',
-          已取消: 'CANCELLED',
-        };
-
-        const mappedItems = results.map((row: any) => {
-          const item: any = {};
-          columns.forEach((c: any) => {
-            if (!c.field || !c.title) return;
-
-            const excelKey = Object.keys(row).find(
-              (k) =>
-                String(k).replaceAll(/\s+/g, '') ===
-                String(c.title).replaceAll(/\s+/g, ''),
-            );
-
-            if (excelKey) {
-              let val = row[excelKey];
-
-              if (val instanceof Date) {
-                val = val.toISOString().split('T')[0];
-              }
-
-              if (c.field === 'status' && statusValueMap[val]) {
-                val = statusValueMap[val];
-              }
-
-              item[c.field] = val;
-            }
-          });
-          return item;
-        });
-        const res = await requestClient.post(
-          '/qms/after-sales/import',
-          {
-            items: mappedItems,
-          },
-          { timeout: 120_000 },
-        );
-        if (res.successCount > 0) {
-          message.success(
-            t('common.importSuccessCount', { count: res.successCount }),
-          );
-          gridApi.reload();
-        }
-      } catch (error) {
-        console.error('Import Error:', error);
-        message.error(t('common.importFailed'));
-      }
-    },
+    importMethod: handleImport,
   },
   exportConfig: {
     remote: false,
@@ -355,12 +324,12 @@ const gridOptions = computed<VxeGridProps>(() => ({
     ajax: {
       query: async (
         { page }: { page?: { currentPage?: number; pageSize?: number } },
-        formValues: Record<string, unknown>,
+        formValues: Record<string, unknown> = {},
       ) => {
         const data = await getAfterSalesList({
           year: currentYear.value,
           ...formValues,
-        } as any);
+        } as QmsAfterSalesApi.AfterSalesParams);
 
         const { currentPage = 1, pageSize = 20 } = page || {};
         const start = (currentPage - 1) * pageSize;
@@ -369,11 +338,15 @@ const gridOptions = computed<VxeGridProps>(() => ({
 
         return { items: pageData, total: data.length };
       },
-      queryAll: async ({ formValues }: any) => {
+      queryAll: async ({
+        formValues = {},
+      }: {
+        formValues?: Record<string, unknown>;
+      }) => {
         const data = await getAfterSalesList({
           year: currentYear.value,
           ...formValues,
-        } as any);
+        } as QmsAfterSalesApi.AfterSalesParams);
         return { items: data || [] };
       },
     },
@@ -382,10 +355,12 @@ const gridOptions = computed<VxeGridProps>(() => ({
 
 // ...
 
-const checkedRows = ref<any[]>([]);
+const checkedRows = ref<QmsAfterSalesApi.AfterSalesItem[]>([]);
 
-function onCheckChange(params: VxeCheckboxChangeParams) {
-  const records = params.$grid.getCheckboxRecords() || [];
+function onCheckChange(
+  params: VxeCheckboxChangeParams<QmsAfterSalesApi.AfterSalesItem>,
+) {
+  const records = params.$grid.getCheckboxRecords();
   checkedRows.value = records;
 }
 
@@ -396,43 +371,56 @@ const gridEvents = {
 
 // ...
 
+const { statusMap } = useStatusOptions();
+const statusOptionsList = computed(() =>
+  Object.entries(statusMap.value).map(([value, config]) => ({
+    label: config.label,
+    value,
+  })),
+);
+
+// ...
+// Define strict type for schema item with colProps extension
+// VxeFormSchema might be missing colProps in type definition but supports it in runtime/other types
+type ExtendedGridFormSchema = GridFormSchema & { colProps?: { span?: number } };
+
+const formSchema: ExtendedGridFormSchema[] = [
+  {
+    fieldName: 'workOrderNumber',
+    label: t('qms.afterSales.form.workOrderNumber'),
+    component: 'Input',
+    colProps: { span: 6 },
+  },
+  {
+    fieldName: 'customerName',
+    label: t('qms.afterSales.form.customerName'),
+    component: 'Input',
+    colProps: { span: 6 },
+  },
+  {
+    fieldName: 'status',
+    label: t('qms.afterSales.form.status'),
+    component: 'Select',
+    componentProps: {
+      options: statusOptionsList,
+    },
+    colProps: { span: 6 },
+  },
+];
+
 const [Grid, gridApi] = useVbenVxeGrid({
-  gridOptions: gridOptions as any,
+  gridOptions:
+    gridOptions.value as VxeGridProps<QmsAfterSalesApi.AfterSalesItem>,
   gridEvents,
   formOptions: {
-    schema: [
-      {
-        fieldName: 'workOrderNumber',
-        label: t('qms.afterSales.form.workOrderNumber'),
-        component: 'Input',
-        colProps: { span: 6 },
-      },
-      {
-        fieldName: 'customerName',
-        label: t('qms.afterSales.form.customerName'),
-        component: 'Input',
-        colProps: { span: 6 },
-      },
-      {
-        fieldName: 'status',
-        label: t('qms.afterSales.form.status'),
-        component: 'Select',
-        componentProps: {
-          options: Object.keys(useStatusOptions().statusMap.value).map(
-            (key) => ({
-              label: useStatusOptions().statusMap.value[key]?.label,
-              value: key,
-            }),
-          ),
-        },
-        colProps: { span: 6 },
-      },
-    ],
+    schema: formSchema,
     showCollapseButton: true,
     submitOnChange: true,
     submitOnEnter: true,
   },
-} as any);
+});
+
+gridApiProxy.value = gridApi;
 
 // 监听部门数据变化，刷新表格显示
 watch(deptRawData, () => {
@@ -487,7 +475,7 @@ function handleBatchDelete() {
     }),
     onOk: async () => {
       try {
-        const ids = checkedRows.value.map((r: any) => r.id);
+        const ids = checkedRows.value.map((r) => r.id);
         const res = await batchDeleteAfterSales(ids);
         message.success(
           t('common.deleteSuccessCount', { count: res.successCount }),
@@ -503,42 +491,60 @@ function handleBatchDelete() {
   });
 }
 
-function handleSettleToKnowledge(row: QmsAfterSalesApi.AfterSalesItem) {
-  // 转换照片为知识库附件格式
-  let attachments: any[] = [];
-  try {
-    if (row.photos) {
-      const photoArray =
-        typeof row.photos === 'string' ? JSON.parse(row.photos) : row.photos;
-      if (Array.isArray(photoArray)) {
-        attachments = photoArray.map((url, idx) => ({
-          name: `售后图片_${idx + 1}`,
-          url,
-          type: 'image',
-        }));
-      } else if (photoArray) {
-        attachments = [
-          { name: '售后图片', url: String(photoArray), type: 'image' },
-        ];
-      }
-    }
-  } catch (error) {
-    console.error('Failed to parse after-sales photos', error);
-  }
+const { settle: settleToKnowledge } = useKnowledgeSettlement();
 
-  router.push({
-    path: '/qms/knowledge',
-    state: {
-      prefill: {
-        title: `【售后案例】${row.workOrderNumber} - ${row.partName || row.projectName}`,
-        categoryId: 'CAT-DEFAULT',
-        summary: row.issueDescription,
-        content: `<h3>售后背景</h3><p>工单号：${row.workOrderNumber}</p><p>项目名称：${row.projectName}</p><p>部件名称：${row.partName || '-'}</p><p>客户名称：${row.customerName}</p><h3>问题描述</h3><p>${row.issueDescription}</p><h3>处理意见及方案</h3><p>${row.resolutionPlan || '待定'}</p><h3>相关费用</h3><p>材料费：¥${row.materialCost}</p><p>人工及差旅费：¥${row.laborTravelCost}</p>`,
-        tags: [row.defectType, row.productType].filter(Boolean),
-        version: 'V1.0',
-        attachments,
+function handleSettleToKnowledge(row: QmsAfterSalesApi.AfterSalesItem) {
+  settleToKnowledge({
+    title: `【${t('qms.afterSales.title')}】${row.workOrderNumber} - ${row.partName || row.projectName}`,
+    summary: row.issueDescription,
+    categoryId: 'CAT-DEFAULT',
+    photos: row.photos,
+    attachmentNamePrefix: t('qms.afterSales.title'),
+    tags: [row.defectType, row.productType],
+    sections: [
+      {
+        title: t('qms.afterSales.form.baseInfo'),
+        fields: [
+          {
+            label: t('qms.afterSales.form.workOrderNumber'),
+            value: row.workOrderNumber,
+          },
+          {
+            label: t('qms.afterSales.form.projectName'),
+            value: row.projectName,
+          },
+          {
+            label: t('qms.afterSales.form.partName'),
+            value: row.partName || '-',
+          },
+          {
+            label: t('qms.afterSales.form.customerName'),
+            value: row.customerName,
+          },
+        ],
       },
-    },
+      {
+        title: t('qms.afterSales.form.issueDetails'),
+        content: row.issueDescription,
+      },
+      {
+        title: t('qms.afterSales.form.resolutionPlan'),
+        content: row.resolutionPlan || t('common.notSet'),
+      },
+      {
+        title: t('qms.afterSales.form.responsibility'),
+        fields: [
+          {
+            label: t('qms.afterSales.form.materialCost'),
+            value: `¥${row.materialCost}`,
+          },
+          {
+            label: t('qms.afterSales.form.laborTravelCost'),
+            value: `¥${row.laborTravelCost}`,
+          },
+        ],
+      },
+    ],
   });
 }
 
@@ -565,7 +571,7 @@ function handleModalSuccess() {
           </template>
           <template #isClaim="{ row }">
             <Tag :color="row.isClaim ? 'red' : 'green'">
-              {{ row.isClaim ? '是' : '否' }}
+              {{ row.isClaim ? t('common.yes') : t('common.no') }}
             </Tag>
           </template>
           <template #toolbar-actions>
@@ -578,7 +584,7 @@ function handleModalSuccess() {
                 <template #icon>
                   <IconifyIcon icon="lucide:bar-chart-3" />
                 </template>
-                {{ showCharts ? '隐藏看板' : '数据看板' }}
+                {{ showCharts ? t('common.hideChart') : t('common.showChart') }}
               </Button>
               <Button
                 v-if="canCreate"
@@ -626,8 +632,6 @@ function handleModalSuccess() {
       :is-edit-mode="isEditMode"
       :initial-data="currentRecord"
       :dept-tree-data="deptTreeData"
-      :work-order-list="workOrderList"
-      :supplier-list="supplierList"
       @success="handleModalSuccess"
     />
   </Page>

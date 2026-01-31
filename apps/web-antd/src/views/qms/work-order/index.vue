@@ -84,12 +84,9 @@ const yearOptions = computed(() => {
   }));
 });
 
-// 4. Grid API 引用（提前声明，用于 handleImport 回调）
-const gridApi = ref<ReturnType<typeof useVbenVxeGrid>[1]>();
-
 // 5. 导入功能（使用 gridApi 引用）
-const { handleImport } = useWorkOrderImport(() => {
-  gridApi.value?.reload();
+const { handleImport, gridApi } = useWorkOrderImport(() => {
+  api.reload();
 });
 
 // 6. Grid 表格配置

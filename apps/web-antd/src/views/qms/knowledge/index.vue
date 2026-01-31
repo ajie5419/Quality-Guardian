@@ -18,6 +18,8 @@ import {
   Input,
   message,
   Modal,
+  RadioButton,
+  RadioGroup,
   Select,
   Space,
   Spin,
@@ -213,6 +215,7 @@ function handleDeleteCategory(category: QmsKnowledgeApi.Category) {
 // ================= 弹窗管理 =================
 const modalVisible = ref(false);
 const editMode = ref(false);
+const editorTab = ref<'edit' | 'preview'>('edit');
 const fileList = ref<UploadFileWithResponse[]>([]); // 附件上传列表
 
 const formState = ref<Partial<QmsKnowledgeApi.KnowledgeItem>>({
@@ -265,6 +268,7 @@ function openModal(item?: any | QmsKnowledgeApi.KnowledgeItem) {
       version: (item && item.version) || 'V1.0',
     };
   }
+  editorTab.value = 'edit';
   modalVisible.value = true;
 }
 
@@ -833,14 +837,37 @@ onMounted(async () => {
           />
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium"
-            >正文内容 (支持 HTML/Markdown)</label
+          <div class="mb-2 flex items-center justify-between">
+            <label class="text-sm font-medium">正文内容 (支持 HTML)</label>
+            <RadioGroup
+              v-model:value="editorTab"
+              size="small"
+              button-style="solid"
+            >
+              <RadioButton value="edit">编辑</RadioButton>
+              <RadioButton value="preview">预览</RadioButton>
+            </RadioGroup>
+          </div>
+          <div v-if="editorTab === 'edit'">
+            <Input.TextArea
+              v-model:value="formState.content"
+              :rows="12"
+              placeholder="输入详细知识内容 (支持 HTML 格式)..."
+              class="font-mono text-sm"
+            />
+          </div>
+          <div
+            v-else
+            class="max-h-[400px] min-h-[294px] overflow-y-auto rounded-md border border-gray-200 bg-gray-50 p-4"
           >
-          <Input.TextArea
-            v-model:value="formState.content"
-            :rows="8"
-            placeholder="输入详细知识内容..."
-          />
+            <div
+              class="prose prose-sm max-w-none"
+              v-html="
+                formState.content ||
+                '<p class=\'text-gray-400 italic\'>暂无内容预览</p>'
+              "
+            ></div>
+          </div>
         </div>
 
         <!-- 附件上传 -->

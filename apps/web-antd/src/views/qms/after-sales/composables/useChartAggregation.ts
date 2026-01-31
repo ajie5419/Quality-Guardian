@@ -1,6 +1,11 @@
 import type { AfterSalesItem } from '@qgs/shared';
 
+import type { ECOption as EChartsOption } from '@vben/plugins/echarts';
+
 import type { ChartConfig } from '#/components/Qms/ChartBuilder/types';
+import type { DeptTreeNode } from '#/types';
+
+import { useI18n } from '@vben/locales';
 
 import { aggregateChartData } from '#/components/Qms/ChartBuilder/composables/useChartCore';
 import { findNameById } from '#/types';
@@ -12,8 +17,10 @@ export { type ChartConfig };
 export function getAfterSalesChartOption(
   data: AfterSalesItem[],
   config: ChartConfig,
-  deptData?: any[],
-): any {
+  deptData?: DeptTreeNode[],
+): EChartsOption | null {
+  const { t } = useI18n();
+
   return aggregateChartData(
     data,
     config,
@@ -26,7 +33,7 @@ export function getAfterSalesChartOption(
           (Number(item.materialCost) || 0) + (Number(item.laborTravelCost) || 0)
         );
       }
-      return Number((item as any)[metric]) || 0;
+      return Number(item[metric as keyof AfterSalesItem]) || 0;
     },
     // Dimension Extractor
     (item, dimension) => {
@@ -35,14 +42,14 @@ export function getAfterSalesChartOption(
         return (item.issueDate || '').slice(0, 7);
       }
 
-      const val = (item as any)[dimension];
-      if (!val) return '未分类';
+      const val = item[dimension as keyof AfterSalesItem];
+      if (!val) return t('common.unclassified');
 
       if (
         (dimension === 'division' || dimension === 'responsibleDept') &&
         deptData
       ) {
-        return findNameById(deptData, val) || String(val);
+        return findNameById(deptData, val as string) || String(val);
       }
 
       return String(val);
@@ -51,10 +58,10 @@ export function getAfterSalesChartOption(
 }
 
 export function renderCustomChart(
-  renderFn: (option: any) => void,
+  renderFn: (option: any, clear?: boolean) => any,
   data: AfterSalesItem[],
   config: ChartConfig,
-  deptData?: any[],
+  deptData?: DeptTreeNode[],
 ) {
   if (!renderFn) return;
   const option = getAfterSalesChartOption(data, config, deptData);

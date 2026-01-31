@@ -53,6 +53,23 @@ export async function batchDeleteAfterSales(ids: string[]) {
   );
 }
 
+/**
+ * Import After-sales excel
+ */
+export async function importAfterSalesExcel(
+  items: Array<Record<string, unknown>>,
+  signal?: AbortSignal,
+) {
+  return requestClient.post<{ successCount: number }>(
+    '/qms/after-sales/import',
+    { items },
+    {
+      timeout: 120_000,
+      signal,
+    },
+  );
+}
+
 export namespace QmsAfterSalesApi {
   export type AfterSalesItem = import('@qgs/shared').AfterSalesItem;
   export type AfterSalesStats = import('@qgs/shared').AfterSalesStats;

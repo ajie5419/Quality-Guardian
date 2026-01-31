@@ -1,0 +1,67 @@
+src/views/qms/after-sales/components/AfterSalesStatus.vue(45,21): error TS2322: Type 'boolean | undefined' is not assignable to type 'SelectValue'.
+  Type 'false' is not assignable to type 'SelectValue'.
+src/views/qms/after-sales/components/AfterSalesStatus.vue(47,41): error TS2322: Type 'true' is not assignable to type 'string | number | null | undefined'.
+src/views/qms/after-sales/components/AfterSalesStatus.vue(48,40): error TS2322: Type 'false' is not assignable to type 'string | number | null | undefined'.
+src/views/qms/after-sales/components/CustomChartBuilderModal.vue(104,11): error TS2345: Argument of type '(options: EChartsOption, clear?: boolean) => Promise<Nullable<EChartsType>>' is not assignable to parameter of type '(option: ECOption) => void'.
+  Types of parameters 'options' and 'option' are incompatible.
+    Type 'ECOption' is not assignable to type 'EChartsOption'.
+      Types of property 'tooltip' are incompatible.
+        Type 'Arrayable<TooltipOption> | undefined' is not assignable to type 'TooltipOption | TooltipOption[] | undefined'.
+          Type 'TooltipOption' is not assignable to type 'TooltipOption | TooltipOption[] | undefined'.
+            Type 'import("/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/echarts@5.6.0/node_modules/echarts/types/dist/shared").TooltipOption' is not assignable to type 'echarts.TooltipComponentOption'.
+              Types of property 'position' are incompatible.
+                Type '(string | number)[] | TooltipBuiltinPosition | import("/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/echarts@5.6.0/node_modules/echarts/types/dist/shared").TooltipPositionCallback | TooltipBoxLayoutOption | undefined' is not assignable to type '(string | number)[] | TooltipBuiltinPosition | echarts.TooltipComponentPositionCallback | TooltipBoxLayoutOption | undefined'.
+                  Type 'TooltipPositionCallback' is not assignable to type '(string | number)[] | TooltipBuiltinPosition | TooltipPositionCallback | TooltipBoxLayoutOption | undefined'.
+                    Type 'import("/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/echarts@5.6.0/node_modules/echarts/types/dist/shared").TooltipPositionCallback' is not assignable to type 'echarts.TooltipComponentPositionCallback'.
+                      Types of parameters 'el' and 'el' are incompatible.
+                        Type 'HTMLDivElement | echarts.graphic.Text | null' is not assignable to type 'HTMLDivElement | ZRText | null'.
+                          Type 'ZRText' is not assignable to type 'HTMLDivElement | ZRText | null'.
+                            Type 'ZRText' is not assignable to type 'HTMLDivElement | ZRText'.
+                              Type 'echarts.graphic.Text' is not assignable to type 'ZRText'.
+                                The types of 'animate(...).animation' are incompatible between these types.
+                                  Type 'Animation | undefined' is not assignable to type 'Animation | undefined'. Two different types with this name exist, but they are unrelated.
+                                    Type 'Animation' is not assignable to type 'Animation'. Two different types with this name exist, but they are unrelated.
+                                      Types have separate declarations of a private property '_head'.
+src/views/qms/after-sales/components/CustomChartItem.vue(30,21): error TS2345: Argument of type '(options: EChartsOption, clear?: boolean) => Promise<Nullable<EChartsType>>' is not assignable to parameter of type '(option: ECOption) => void'.
+  Types of parameters 'options' and 'option' are incompatible.
+    Type 'ECOption' is not assignable to type 'EChartsOption'.
+      Types of property 'tooltip' are incompatible.
+        Type 'Arrayable<TooltipOption> | undefined' is not assignable to type 'TooltipOption | TooltipOption[] | undefined'.
+          Type 'TooltipOption' is not assignable to type 'TooltipOption | TooltipOption[] | undefined'.
+            Type 'import("/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/echarts@5.6.0/node_modules/echarts/types/dist/shared").TooltipOption' is not assignable to type 'echarts.TooltipComponentOption'.
+              Types of property 'position' are incompatible.
+                Type '(string | number)[] | TooltipBuiltinPosition | import("/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/echarts@5.6.0/node_modules/echarts/types/dist/shared").TooltipPositionCallback | TooltipBoxLayoutOption | undefined' is not assignable to type '(string | number)[] | TooltipBuiltinPosition | echarts.TooltipComponentPositionCallback | TooltipBoxLayoutOption | undefined'.
+                  Type 'TooltipPositionCallback' is not assignable to type '(string | number)[] | TooltipBuiltinPosition | TooltipPositionCallback | TooltipBoxLayoutOption | undefined'.
+                    Type 'import("/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/echarts@5.6.0/node_modules/echarts/types/dist/shared").TooltipPositionCallback' is not assignable to type 'echarts.TooltipComponentPositionCallback'.
+                      Types of parameters 'el' and 'el' are incompatible.
+                        Type 'HTMLDivElement | echarts.graphic.Text | null' is not assignable to type 'HTMLDivElement | ZRText | null'.
+                          Type 'ZRText' is not assignable to type 'HTMLDivElement | ZRText | null'.
+                            Type 'ZRText' is not assignable to type 'HTMLDivElement | ZRText'.
+                              Type 'echarts.graphic.Text' is not assignable to type 'ZRText'.
+                                The types of 'animate(...).animation' are incompatible between these types.
+                                  Type 'Animation | undefined' is not assignable to type 'Animation | undefined'. Two different types with this name exist, but they are unrelated.
+                                    Type 'Animation' is not assignable to type 'Animation'. Two different types with this name exist, but they are unrelated.
+                                      Types have separate declarations of a private property '_head'.
+src/views/qms/after-sales/index.vue(421,1): error TS2322: Type 'ExtendedVxeGridApi<AfterSalesItem, BaseFormComponentType>' is not assignable to type 'ExtendedVxeGridApi<Record<string, any>, BaseFormComponentType> | undefined'.
+  Type 'ExtendedVxeGridApi<AfterSalesItem, BaseFormComponentType>' is not assignable to type 'ExtendedVxeGridApi<Record<string, any>, BaseFormComponentType>'.
+    Type 'ExtendedVxeGridApi<AfterSalesItem, BaseFormComponentType>' is not assignable to type 'VxeGridApi<Record<string, any>>'.
+      Types of property 'grid' are incompatible.
+        Type 'VxeGridInstance<AfterSalesItem>' is not assignable to type 'VxeGridInstance<Record<string, any>>'.
+          Type 'VxeGridInstance<AfterSalesItem>' is not assignable to type '{ $: ComponentInternalInstance; $data: {}; $props: { layouts?: Layouts | undefined; columns?: Columns<Record<string, any>> | undefined; ... 100 more ...; delayHover?: number | undefined; }; ... 11 more ...; $watch<T extends string | ((...args: any) => any)>(source: T, cb: T extends (...args: any) => infer R ? (args_...'.
+            The types of '$props.columns' are incompatible between these types.
+              Type 'Columns<AfterSalesItem> | undefined' is not assignable to type 'Columns<Record<string, any>> | undefined'.
+                Type 'Columns<AfterSalesItem>' is not assignable to type 'Column<Record<string, any>>[]'.
+                  Type 'Column<AfterSalesItem>' is not assignable to type 'Column<Record<string, any>>'.
+                    Types of property 'slots' are incompatible.
+                      Type 'Slots<AfterSalesItem> | undefined' is not assignable to type 'Slots<Record<string, any>> | undefined'.
+                        Type 'Slots<AfterSalesItem>' is not assignable to type 'Slots<Record<string, any>>'.
+                          Types of property 'title' are incompatible.
+                            Type 'string | ((params: HeaderSlotParams<AfterSalesItem>) => VxeComponentSlotType | VxeComponentSlotType[]) | null | undefined' is not assignable to type 'string | ((params: HeaderSlotParams<Record<string, any>>) => VxeComponentSlotType | VxeComponentSlotType[]) | null | undefined'.
+                              Type '(params: HeaderSlotParams<AfterSalesItem>) => VxeComponentSlotType | VxeComponentSlotType[]' is not assignable to type 'string | ((params: HeaderSlotParams<Record<string, any>>) => VxeComponentSlotType | VxeComponentSlotType[]) | null | undefined'.
+                                Type '(params: HeaderSlotParams<AfterSalesItem>) => VxeComponentSlotType | VxeComponentSlotType[]' is not assignable to type '(params: HeaderSlotParams<Record<string, any>>) => VxeComponentSlotType | VxeComponentSlotType[]'.
+                                  Types of parameters 'params' and 'params' are incompatible.
+                                    Type 'HeaderSlotParams<Record<string, any>>' is not assignable to type 'HeaderSlotParams<AfterSalesItem>'.
+                                      The types of '$table.internalData.rowExpandedReserveRowMap' are incompatible between these types.
+                                        Type 'Record<string, Record<string, any>>' is not assignable to type 'Record<string, AfterSalesItem>'.
+                                          'string' index signatures are incompatible.
+                                            Type 'Record<string, any>' is missing the following properties from type 'AfterSalesItem': closeDate, customerName, defectType, factoryDate, and 15 more.

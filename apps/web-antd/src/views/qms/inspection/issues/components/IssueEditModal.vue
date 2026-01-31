@@ -1,10 +1,5 @@
 <script lang="ts" setup>
-import type {
-  DeptNode,
-  InspectionIssue,
-  SupplierItem,
-  WorkOrderItem,
-} from '../types';
+import type { DeptNode, InspectionIssue } from '../types';
 
 import { computed, ref, toRef, watch } from 'vue';
 
@@ -25,8 +20,6 @@ const props = defineProps<{
   initialData?: Partial<InspectionIssue>;
   isEditMode: boolean;
   open: boolean;
-  supplierList: SupplierItem[];
-  workOrderList: WorkOrderItem[];
 }>();
 
 const emit = defineEmits<{
@@ -194,8 +187,6 @@ function handleCancel() {
             v-model:is-auto-nc="isAutoNc"
             :dept-tree-data="deptTreeData"
             :is-edit-mode="isEditMode"
-            :supplier-list="supplierList"
-            :work-order-list="workOrderList"
             @search-work-order="(val) => emit('searchWorkOrder', val)"
           />
 

@@ -52,7 +52,7 @@ const selectOptions = computed<SelectProps['options']>(() => {
     ...item, // Spread all properties so they are available in the slot scope
     item, // Ensure item is available as a property for slot and change handler
     label: item.workOrderNumber,
-    value: item.id,
+    value: item.id || item.workOrderNumber, // Handle if ID is missing (backend sometimes uses number as primary key)
   }));
 });
 
@@ -86,24 +86,27 @@ async function fetchWorkOrders(
     // Combine and deduplicate options
     const merged = [...currentOptions, ...newItems];
     const uniqueMap = new Map();
-    merged.forEach((item) => uniqueMap.set(item.id, item));
+    merged.forEach((item) => {
+      const key = item.id || item.workOrderNumber;
+      uniqueMap.set(key, item);
+    });
 
     // Ensure the currently selected item is in the options list so it displays correctly
     if (props.value) {
-      // Check if currently selected item is in the unique map
       if (uniqueMap.has(props.value)) {
         cachedSelectedItem.value = uniqueMap.get(props.value);
       } else if (
         cachedSelectedItem.value &&
-        cachedSelectedItem.value.id === props.value
+        (cachedSelectedItem.value.id === props.value ||
+          cachedSelectedItem.value.workOrderNumber === props.value)
       ) {
-        // Restore from cache if not in current list
         uniqueMap.set(props.value, cachedSelectedItem.value);
       } else {
         // Not in list and not in cache, fetch it
         try {
           const { items: specificItems } = await getWorkOrderList({
             ids: props.value,
+            workOrderNumber: props.value,
           });
           if (specificItems && specificItems.length > 0) {
             cachedSelectedItem.value = specificItems[0]!;
@@ -130,7 +133,6 @@ const handleSearch = useDebounceFn((val: string) => {
 
 const handlePopupScroll = (e: any) => {
   const { target } = e;
-  // Threshold to trigger load more
   if (
     target.scrollTop + target.offsetHeight >= target.scrollHeight - 10 &&
     options.value.length < pagination.total &&
@@ -144,7 +146,6 @@ function handleChange(val: any, option: any) {
   emit('update:value', val);
   emit('change', val, option);
 
-  // Update cache if selected
   if (val && option) {
     cachedSelectedItem.value = option.item || option;
   } else if (!val) {
@@ -152,20 +153,28 @@ function handleChange(val: any, option: any) {
   }
 }
 
-// Watch value to ensure display if set programmatically
 watch(
   () => props.value,
   async (newVal) => {
     if (newVal) {
-      const existing = options.value.find((o) => o.id === newVal);
+      const existing = options.value.find(
+        (o) => o.id === newVal || o.workOrderNumber === newVal,
+      );
       if (existing) {
         cachedSelectedItem.value = existing;
       } else {
         try {
-          const { items } = await getWorkOrderList({ ids: newVal });
+          const { items } = await getWorkOrderList({
+            ids: newVal,
+            workOrderNumber: newVal,
+          });
           if (items && items.length > 0) {
             cachedSelectedItem.value = items[0]!;
-            if (!options.value.some((o) => o.id === newVal)) {
+            if (
+              !options.value.some(
+                (o) => o.id === newVal || o.workOrderNumber === newVal,
+              )
+            ) {
               options.value.push(items[0]!);
             }
           }

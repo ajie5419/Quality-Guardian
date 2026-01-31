@@ -563,6 +563,31 @@
       "seq": "序号",
       "isClaim": "是否索赔",
       "action": "操作"
+    },
+    "chart": {
+      "add": "添加图表",
+      "addTitle": "添加自定义图表",
+      "editTitle": "编辑图表",
+      "defaultTitle": "自定义图表",
+      "autoTitle": "{0} - {1}分析",
+      "empty": "暂无自定义图表，点击上方按钮添加",
+      "confirmDelete": "确定要删除此图表吗？",
+      "form": {
+        "title": "图表标题",
+        "dimension": "分析维度 (X轴/分类)",
+        "metric": "统计指标 (Y轴/数值)",
+        "chartType": "图表类型"
+      },
+      "type": {
+        "bar": "柱状图",
+        "line": "折线图",
+        "pie": "饼图",
+        "ring": "环形图"
+      },
+      "metrics": {
+        "count": "问题数量",
+        "totalLoss": "总损失金额"
+      }
     }
   },
   "supplier": {

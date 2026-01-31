@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { AfterSalesFormState } from '../composables/useAfterSalesForm';
+import type { AfterSalesFormState } from '#/types';
 
 import { useI18n } from '@vben/locales';
 
@@ -85,10 +85,10 @@ const { t } = useI18n();
       <div class="grid grid-cols-2 gap-2">
         <FormItem :label="t('qms.afterSales.form.warrantyStatus')" class="mb-0">
           <Select v-model:value="formState.warrantyStatus">
-            <SelectOption value="在保">{{
+            <SelectOption :value="t('qms.afterSales.options.underWarranty')">{{
               t('qms.afterSales.options.underWarranty')
             }}</SelectOption>
-            <SelectOption value="过保">{{
+            <SelectOption :value="t('qms.afterSales.options.expired')">{{
               t('qms.afterSales.options.expired')
             }}</SelectOption>
           </Select>

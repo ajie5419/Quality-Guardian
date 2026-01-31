@@ -2,9 +2,11 @@ import type { AfterSalesItem, WorkOrderItem } from '@qgs/shared';
 
 import type { Ref } from 'vue';
 
-import type { TreeSelectNode } from '#/types';
+import type { AfterSalesFormState, TreeSelectNode } from '#/types';
 
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
+
+import { useI18n } from '@vben/locales';
 
 import { message } from 'ant-design-vue';
 
@@ -15,8 +17,6 @@ import {
   DEFECT_SUBTYPES,
   PRODUCT_SUBTYPES,
 } from '../constants';
-
-export type AfterSalesFormState = Partial<AfterSalesItem>;
 
 interface UseAfterSalesFormOptions {
   open: Ref<boolean>;
@@ -30,6 +30,7 @@ interface UseAfterSalesFormOptions {
  */
 export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
   const { open, isEditMode, onSuccess, onClose } = options;
+  const { t } = useI18n();
 
   const formState = reactive<AfterSalesFormState>({});
   const currentId = ref<null | string>(null);
@@ -80,9 +81,12 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
    */
   function handleWorkOrderChange(
     val: number | string,
-    workOrderList: WorkOrderItem[],
+    workOrderListOrItem?: WorkOrderItem | WorkOrderItem[],
   ) {
-    const wo = workOrderList.find((item) => item.workOrderNumber === val);
+    const wo = Array.isArray(workOrderListOrItem)
+      ? workOrderListOrItem.find((item) => item.workOrderNumber === val)
+      : workOrderListOrItem;
+
     if (wo) {
       formState.projectName = wo.projectName || '';
       formState.customerName = wo.customerName || '';
@@ -93,15 +97,18 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
   /**
    * 重置表单
    */
+  /**
+   * 重置表单
+   */
   function resetForm() {
     // 使用 Object.assign 直接覆盖，而不是逐个 delete
     const initialState = createInitialFormState();
     // 清除旧属性
-    for (const key in formState) {
-      if (Object.prototype.hasOwnProperty.call(formState, key)) {
-        (formState as any)[key] = undefined;
-      }
-    }
+    (Object.keys(formState) as Array<keyof AfterSalesFormState>).forEach(
+      (key) => {
+        formState[key] = undefined;
+      },
+    );
     Object.assign(formState, initialState);
     currentId.value = null;
     updateDefectSubtypes();
@@ -113,11 +120,11 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
    */
   function initFromData(row: AfterSalesItem) {
     // 同理，清理后赋值
-    for (const key in formState) {
-      if (Object.prototype.hasOwnProperty.call(formState, key)) {
-        (formState as any)[key] = undefined;
-      }
-    }
+    (Object.keys(formState) as Array<keyof AfterSalesFormState>).forEach(
+      (key) => {
+        formState[key] = undefined;
+      },
+    );
     Object.assign(formState, row);
     currentId.value = row.id;
     updateDefectSubtypes();
@@ -131,15 +138,17 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
     try {
       if (isEditMode.value && currentId.value) {
         await updateAfterSales(currentId.value, formState);
-        message.success('保存成功');
+        message.success(t('common.saveSuccess'));
       } else {
         await createAfterSales(formState);
-        message.success('登记成功');
+        message.success(t('common.createSuccess'));
       }
       onClose();
       onSuccess();
     } catch {
-      message.error(isEditMode.value ? '保存失败' : '登记失败');
+      message.error(
+        isEditMode.value ? t('common.saveFailed') : t('common.createFailed'),
+      );
     }
   }
 
@@ -148,14 +157,15 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
    */
   function checkIsPurchasingDept(deptTreeData: TreeSelectNode[]): boolean {
     if (!formState.responsibleDept) return false;
-    if (String(formState.responsibleDept).includes('采购')) return true;
+    const KEYWORD = '采购';
+    if (String(formState.responsibleDept).includes(KEYWORD)) return true;
 
     const findDept = (nodes: TreeSelectNode[]): boolean => {
       for (const node of nodes) {
         if (node.value === formState.responsibleDept) {
           return (
-            (node.title as string)?.includes('采购') ||
-            ((node as any).label as string)?.includes('采购')
+            (node.title as string)?.includes(KEYWORD) ||
+            (node.label as string)?.includes(KEYWORD)
           );
         }
         if (node.children && findDept(node.children)) return true;
@@ -164,6 +174,98 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
     };
     return findDept(deptTreeData);
   }
+
+  // 表单校验规则
+  const rules = computed(() => ({
+    workOrderNumber: [
+      {
+        required: true,
+        message: t('ui.formRules.selectRequired', [
+          t('qms.afterSales.form.workOrderNumber'),
+        ]),
+      },
+    ],
+    customerName: [
+      {
+        required: true,
+        message: t('ui.formRules.required', [
+          t('qms.afterSales.form.customerName'),
+        ]),
+      },
+    ],
+    partName: [
+      {
+        required: true,
+        message: t('ui.formRules.required', [
+          t('qms.afterSales.form.partName'),
+        ]),
+      },
+    ],
+    issueDate: [
+      {
+        required: true,
+        message: t('ui.formRules.selectRequired', [
+          t('qms.afterSales.form.issueDate'),
+        ]),
+      },
+    ],
+    location: [
+      {
+        required: true,
+        message: t('ui.formRules.required', [
+          t('qms.afterSales.form.location'),
+        ]),
+      },
+    ],
+    severity: [
+      {
+        required: true,
+        message: t('ui.formRules.selectRequired', [
+          t('qms.afterSales.form.severity'),
+        ]),
+      },
+    ],
+    defectType: [
+      {
+        required: true,
+        message: t('ui.formRules.selectRequired', [
+          t('qms.afterSales.form.defectType'),
+        ]),
+      },
+    ],
+    quantity: [
+      {
+        required: true,
+        message: t('ui.formRules.required', [
+          t('qms.afterSales.form.quantity'),
+        ]),
+      },
+    ],
+    responsibleDept: [
+      {
+        required: true,
+        message: t('ui.formRules.selectRequired', [
+          t('qms.afterSales.form.responsibleDept'),
+        ]),
+      },
+    ],
+    status: [
+      {
+        required: true,
+        message: t('ui.formRules.selectRequired', [
+          t('qms.afterSales.form.status'),
+        ]),
+      },
+    ],
+    issueDescription: [
+      {
+        required: true,
+        message: t('ui.formRules.required', [
+          t('qms.afterSales.form.issueDescription'),
+        ]),
+      },
+    ],
+  }));
 
   // 监听弹窗打开
   watch(open, (val) => {
@@ -177,6 +279,7 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
     currentId,
     currentProductSubtypes,
     currentDefectSubtypes,
+    rules,
     resetForm,
     initFromData,
     submit,

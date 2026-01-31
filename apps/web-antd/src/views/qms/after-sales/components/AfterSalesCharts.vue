@@ -2,10 +2,12 @@
 import type { ChartConfig } from '../composables/useChartAggregation';
 
 import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
+import type { DeptTreeNode } from '#/types';
 
 import { computed, onUnmounted, ref, watch } from 'vue';
 
 import { useAccess } from '@vben/access';
+import { useI18n } from '@vben/locales';
 
 import { useStorage } from '@vueuse/core';
 import { Button, Card, message, Modal } from 'ant-design-vue';
@@ -24,6 +26,7 @@ const props = defineProps<{
 }>();
 
 const { hasAccessByCodes } = useAccess();
+const { t } = useI18n();
 const canAdd = computed(() => hasAccessByCodes(['QMS:AfterSales:ChartAdd']));
 const canEdit = computed(() => hasAccessByCodes(['QMS:AfterSales:ChartEdit']));
 const canDelete = computed(() =>
@@ -34,7 +37,7 @@ const loading = ref(false);
 
 // 全量列表数据，用于自定义图表计算
 const fullDataList = ref<QmsAfterSalesApi.AfterSalesItem[]>([]);
-const deptList = ref<any[]>([]);
+const deptList = ref<DeptTreeNode[]>([]);
 
 // Custom Charts
 const isBuilderOpen = ref(false);
@@ -51,7 +54,10 @@ async function fetchData() {
   try {
     // 获取全量数据用于自定义分析，pageSize 设大一点
     const [listRes, deptRes] = await Promise.all([
-      getAfterSalesList({ year: props.year, pageSize: 10_000 } as any),
+      getAfterSalesList({
+        year: props.year,
+        pageSize: 10_000,
+      } as QmsAfterSalesApi.AfterSalesParams),
       getDeptList(),
     ]);
     fullDataList.value = listRes;
@@ -175,24 +181,24 @@ function handleSaveCustomChart(config: ChartConfig) {
   if (index === -1) {
     // Create new
     customCharts.value.push({ ...config, colSpan: 4 });
-    message.success('图表添加成功');
+    message.success(t('common.addSuccess'));
   } else {
     // Update existing
     customCharts.value[index] = {
       ...customCharts.value[index],
       ...config,
     };
-    message.success('图表已更新');
+    message.success(t('common.updateSuccess'));
   }
 }
 
 function handleRemoveCustomChart(id: string) {
   Modal.confirm({
-    title: '确认删除',
-    content: '确定要删除此图表吗？',
+    title: t('common.confirmDelete'),
+    content: t('qms.afterSales.chart.confirmDelete'),
     onOk() {
       customCharts.value = customCharts.value.filter((c) => c.id !== id);
-      message.success('删除成功');
+      message.success(t('common.deleteSuccess'));
     },
   });
 }
@@ -215,7 +221,8 @@ watch(
         size="small"
         @click="handleAddCustomChart"
       >
-        <span class="i-lucide-plus mr-1"></span>添加图表
+        <span class="i-lucide-plus mr-1"></span
+        >{{ t('qms.afterSales.chart.add') }}
       </Button>
     </div>
 
@@ -253,7 +260,7 @@ watch(
                 size="small"
                 @click="handleEditCustomChart(chart)"
               >
-                设置
+                {{ t('common.settings') }}
               </Button>
               <Button
                 v-if="canDelete"
@@ -262,7 +269,7 @@ watch(
                 size="small"
                 @click="handleRemoveCustomChart(chart.id)"
               >
-                删除
+                {{ t('common.delete') }}
               </Button>
             </div>
           </template>
@@ -292,7 +299,7 @@ watch(
       v-if="customCharts.length === 0"
       class="mt-4 rounded border border-dashed border-gray-200 bg-gray-50 py-8 text-center text-gray-400"
     >
-      暂无自定义图表，点击上方按钮添加
+      {{ t('qms.afterSales.chart.empty') }}
     </div>
 
     <CustomChartBuilderModal

@@ -1,0 +1,275 @@
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/after-sales/components/index.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/after-sales/components/index.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/after-sales/composables/useAfterSalesForm.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/after-sales/composables/useAfterSalesForm.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/after-sales/composables/useChartAggregation.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/after-sales/composables/useChartAggregation.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/after-sales/constants.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/after-sales/constants.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/common-constants.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/common-constants.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/issues/composables/index.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/issues/composables/index.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/issues/composables/useAiAnalysis.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/issues/composables/useAiAnalysis.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/issues/composables/useAiReport.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/issues/composables/useAiReport.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/issues/composables/useIssueChartAggregation.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/issues/composables/useIssueChartAggregation.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/issues/composables/useIssueData.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/issues/composables/useIssueData.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/issues/composables/useIssueForm.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/issues/composables/useIssueForm.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/issues/composables/useIssueStatistics.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/issues/composables/useIssueStatistics.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/issues/composables/useNcNumber.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/issues/composables/useNcNumber.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/issues/constants.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/issues/constants.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/issues/data.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/issues/data.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/issues/index.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/issues/index.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/issues/types/index.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/issues/types/index.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/issues/utils/statusHelper.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/issues/utils/statusHelper.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/records/config.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/inspection/records/config.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/outsourcing/constants.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/outsourcing/constants.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/outsourcing/data.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/outsourcing/data.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/planning/composables/useProjectManager.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/planning/composables/useProjectManager.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/planning/constants.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/planning/constants.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/planning/types.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/planning/types.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/quality-loss/composables/useLossCharts.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/quality-loss/composables/useLossCharts.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/quality-loss/composables/useLossStatistics.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/quality-loss/composables/useLossStatistics.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/quality-loss/constants.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/quality-loss/constants.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/quality-loss/types.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/quality-loss/types.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/supplier/data.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/supplier/data.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/work-order/composables/useWorkOrderImport.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/work-order/composables/useWorkOrderImport.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/work-order/composables/useWorkOrderStatus.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/work-order/composables/useWorkOrderStatus.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/work-order/constants.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/work-order/constants.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/work-order/data.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/work-order/data.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/work-order/types/workOrder.ts
+  0:0  error  Parsing error: ESLint was configured to run on `<tsconfigRootDir>/src/views/qms/work-order/types/workOrder.ts` using `parserOptions.project`: <tsconfigRootDir>/tsconfig.node.json
+However, that TSConfig does not include this file. Either:
+- Change ESLint's list of included files to not include this file
+- Change that TSConfig to include this file
+- Create a new TSConfig that includes this file and include it in your parserOptions.project
+See the typescript-eslint docs for more info: https://typescript-eslint.io/troubleshooting/typed-linting#i-get-errors-telling-me-eslint-was-configured-to-run--however-that-tsconfig-does-not--none-of-those-tsconfigs-include-this-file
+
+✖ 34 problems (34 errors, 0 warnings)
+

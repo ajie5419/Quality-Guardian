@@ -2,11 +2,10 @@
 import type { InspectionIssue } from './types';
 // Types
 
-import type { VxeGridProps } from '#/adapter/vxe-table';
+// Types
 import type { VxeCheckboxChangeParams } from '#/types';
 
 import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
 
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
@@ -33,6 +32,7 @@ import {
   getInspectionIssues,
 } from '#/api/qms/inspection';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
+import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { findNameById } from '#/types';
 
@@ -45,7 +45,6 @@ import { useIssueStatistics } from './composables/useIssueStatistics';
 import { gridColumns, searchFormSchema } from './data';
 import { getStatusColor, getStatusLabel } from './utils/statusHelper';
 
-const router = useRouter();
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
 
@@ -70,14 +69,7 @@ const canSettle = computed(() =>
 );
 
 // 使用数据加载 composable
-const {
-  deptTreeData,
-  deptRawData,
-  workOrderList,
-  supplierList,
-  loadInitialData,
-  searchWorkOrders,
-} = useIssueData();
+const { deptTreeData, deptRawData, loadInitialData } = useIssueData();
 
 // 加载初始数据
 loadInitialData().then(() => {
@@ -97,7 +89,7 @@ const yearOptions = computed(() => {
   }));
 });
 
-const gridOptions = computed<VxeGridProps>(() => ({
+const gridOptions = computed(() => ({
   checkboxConfig: {
     reserve: true,
     highlight: true,
@@ -260,8 +252,11 @@ const gridOptions = computed<VxeGridProps>(() => ({
     },
     ajax: {
       query: async (
-        { page, sorts }: { page: any; sorts: any },
-        formValues: any,
+        {
+          page,
+          sorts,
+        }: { page: { currentPage?: number; pageSize?: number }; sorts: any[] },
+        formValues: Record<string, unknown> = {},
       ) => {
         const sortParam = sorts?.[0];
         const sortBy = sortParam?.field;
@@ -274,12 +269,14 @@ const gridOptions = computed<VxeGridProps>(() => ({
         // 前端过滤
         if (formValues?.workOrderNumber) {
           allData = allData.filter((item) =>
-            item.workOrderNumber?.includes(formValues.workOrderNumber),
+            item.workOrderNumber?.includes(
+              formValues.workOrderNumber as string,
+            ),
           );
         }
         if (formValues?.projectName) {
           allData = allData.filter((item) =>
-            item.projectName?.includes(formValues.projectName),
+            item.projectName?.includes(formValues.projectName as string),
           );
         }
         if (formValues?.status) {
@@ -303,19 +300,22 @@ const gridOptions = computed<VxeGridProps>(() => ({
         const items = allData.slice(start, start + pageSize);
         return { items, total: allData.length };
       },
-      queryAll: async ({ formValues }: any) => {
+      queryAll: async ({ form }: { form: Record<string, unknown> }) => {
+        const formValues = form || {};
         let allData = (await getInspectionIssues({
           year: currentYear.value,
         })) as InspectionIssue[];
 
         if (formValues?.workOrderNumber) {
           allData = allData.filter((item) =>
-            item.workOrderNumber?.includes(formValues.workOrderNumber),
+            item.workOrderNumber?.includes(
+              formValues.workOrderNumber as string,
+            ),
           );
         }
         if (formValues?.projectName) {
           allData = allData.filter((item) =>
-            item.projectName?.includes(formValues.projectName),
+            item.projectName?.includes(formValues.projectName as string),
           );
         }
         if (formValues?.status) {
@@ -328,13 +328,13 @@ const gridOptions = computed<VxeGridProps>(() => ({
 }));
 
 const [Grid, gridApi] = useVbenVxeGrid({
-  gridOptions: gridOptions as any,
+  gridOptions: gridOptions.value as any,
   gridEvents: {
     checkboxChange: onCheckChange,
     checkboxAll: onCheckChange,
   },
   formOptions: {
-    schema: searchFormSchema as any,
+    schema: searchFormSchema,
     submitOnChange: true,
   },
 });
@@ -416,32 +416,41 @@ function handleBatchDelete() {
   });
 }
 
-function handleSettleToKnowledge(row: InspectionIssue) {
-  // 转换照片为知识库附件格式
-  let attachments: any[] = [];
-  if (Array.isArray(row.photos)) {
-    attachments = row.photos.map((url, idx) => ({
-      name: `现场图片_${idx + 1}`,
-      url,
-      type: 'image',
-    }));
-  } else if (row.photos) {
-    attachments = [{ name: '现场图片', url: row.photos, type: 'image' }];
-  }
+const { settle: settleToKnowledge } = useKnowledgeSettlement();
 
-  router.push({
-    path: '/qms/knowledge',
-    state: {
-      prefill: {
-        categoryId: 'CAT-DEFAULT', // 默认分类
-        content: `<h3>${t('qms.inspection.issues.description')}</h3><p>${t('qms.workOrder.workOrderNumber')}：${row.workOrderNumber}</p><p>${t('qms.workOrder.projectName')}：${row.projectName}</p><p>${t('qms.inspection.issues.partName')}：${row.partName}</p><h3>${t('qms.inspection.issues.description')}</h3><p>${row.description}</p><h3>${t('qms.inspection.issues.rootCause')}</h3><p>${row.rootCause || t('common.unknown')}</p><h3>${t('qms.inspection.issues.solution')}</h3><p>${row.solution || t('common.notSet')}</p>`,
-        summary: row.description,
-        tags: [row.defectType, row.division].filter(Boolean),
-        title: `【${t('qms.inspection.issues.settleToKnowledge')}】${row.ncNumber} - ${row.partName}`,
-        version: 'V1.0',
-        attachments,
+function handleSettleToKnowledge(row: InspectionIssue) {
+  settleToKnowledge({
+    title: `【${t('qms.inspection.issues.settleToKnowledge')}】${row.ncNumber} - ${row.partName}`,
+    summary: row.description,
+    categoryId: 'CAT-DEFAULT',
+    photos: row.photos,
+    attachmentNamePrefix: '现场图片',
+    tags: [row.defectType, row.division],
+    sections: [
+      {
+        title: t('qms.inspection.issues.description'),
+        fields: [
+          {
+            label: t('qms.workOrder.workOrderNumber'),
+            value: row.workOrderNumber,
+          },
+          { label: t('qms.workOrder.projectName'), value: row.projectName },
+          { label: t('qms.inspection.issues.partName'), value: row.partName },
+        ],
       },
-    },
+      {
+        title: t('qms.inspection.issues.description'),
+        content: row.description,
+      },
+      {
+        title: t('qms.inspection.issues.rootCause'),
+        content: row.rootCause || t('common.unknown'),
+      },
+      {
+        title: t('qms.inspection.issues.solution'),
+        content: row.solution || t('common.notSet'),
+      },
+    ],
   });
 }
 </script>
@@ -581,9 +590,6 @@ function handleSettleToKnowledge(row: InspectionIssue) {
       :is-edit-mode="isEditMode"
       :initial-data="currentRecord || undefined"
       :dept-tree-data="deptTreeData"
-      :work-order-list="workOrderList"
-      :supplier-list="supplierList"
-      @search-work-order="searchWorkOrders"
       @success="() => gridApi.reload()"
     />
   </Page>

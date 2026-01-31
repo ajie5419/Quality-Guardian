@@ -1,6 +1,7 @@
 <script lang="ts" setup>
-import type { AfterSalesFormState } from '../composables/useAfterSalesForm';
 import type { StatusOption } from '../constants';
+
+import type { AfterSalesFormState } from '#/types';
 
 import { useI18n } from '@vben/locales';
 
@@ -41,18 +42,14 @@ const { t } = useI18n();
         </FormItem>
         <FormItem :label="t('qms.afterSales.form.isClaim')" class="mb-0">
           <Select
-            :value="
-              formState.isClaim === true
-                ? 'yes'
-                : formState.isClaim === false
-                  ? 'no'
-                  : undefined
+            :value="(formState.isClaim ? 'true' : 'false') as any"
+            @change="(val: any) => (formState.isClaim = val === 'true')"
+            :options="
+              [
+                { label: t('common.yes'), value: 'true' },
+                { label: t('common.no'), value: 'false' },
+              ] as any
             "
-            @change="(val: unknown) => (formState.isClaim = val === 'yes')"
-            :options="[
-              { label: t('qms.afterSales.options.yes'), value: 'yes' },
-              { label: t('qms.afterSales.options.no'), value: 'no' },
-            ]"
           />
         </FormItem>
       </div>

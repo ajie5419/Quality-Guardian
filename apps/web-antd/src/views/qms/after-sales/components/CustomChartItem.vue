@@ -4,6 +4,7 @@ import type { EchartsUIType } from '@vben/plugins/echarts';
 import type { ChartConfig } from '../composables/useChartAggregation';
 
 import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
+import type { DeptTreeNode } from '#/types';
 
 import { onMounted, ref, watch } from 'vue';
 
@@ -14,7 +15,7 @@ import { renderCustomChart } from '../composables/useChartAggregation';
 const props = defineProps<{
   config: ChartConfig;
   data: QmsAfterSalesApi.AfterSalesItem[];
-  deptData?: any[];
+  deptData?: DeptTreeNode[];
   loading?: boolean;
 }>();
 

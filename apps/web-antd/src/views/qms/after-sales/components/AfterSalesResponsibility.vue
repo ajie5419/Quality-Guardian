@@ -1,23 +1,15 @@
 <script lang="ts" setup>
-import type { AfterSalesFormState } from '../composables/useAfterSalesForm';
-
-import type { QmsSupplierApi } from '#/api/qms/supplier';
-import type { TreeSelectNode } from '#/types';
+import type { AfterSalesFormState, TreeSelectNode } from '#/types';
 
 import { useI18n } from '@vben/locales';
 
-import {
-  FormItem,
-  InputNumber,
-  Select,
-  SelectOption,
-  TreeSelect,
-} from 'ant-design-vue';
+import { FormItem, InputNumber, TreeSelect } from 'ant-design-vue';
+
+import SupplierSelect from '../../shared/components/SupplierSelect.vue';
 
 defineProps<{
   deptTreeData: TreeSelectNode[];
   isPurchasingDept: boolean;
-  supplierList: QmsSupplierApi.SupplierItem[];
 }>();
 
 const formState = defineModel<AfterSalesFormState>('formState', {
@@ -51,19 +43,10 @@ const { t } = useI18n();
         :label="t('qms.afterSales.form.supplierBrand')"
         class="mb-0"
       >
-        <Select
+        <SupplierSelect
           v-model:value="formState.supplierBrand"
-          show-search
           :placeholder="t('qms.afterSales.placeholder.selectSupplier')"
-        >
-          <SelectOption
-            v-for="sup in supplierList"
-            :key="sup.id"
-            :value="sup.name"
-          >
-            {{ sup.name }}
-          </SelectOption>
-        </Select>
+        />
       </FormItem>
       <div class="grid grid-cols-2 gap-2">
         <FormItem :label="t('qms.afterSales.form.materialCost')" class="mb-0">

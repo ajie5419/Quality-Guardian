@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { AfterSalesFormState } from '../composables/useAfterSalesForm';
+import type { AfterSalesFormState } from '#/types';
 
 import { useI18n } from '@vben/locales';
 
