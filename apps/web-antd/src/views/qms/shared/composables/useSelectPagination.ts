@@ -5,8 +5,12 @@ import { reactive, ref, watch } from 'vue';
 import { useDebounceFn } from '@vueuse/core';
 
 export interface UseSelectPaginationOptions<T> {
-  fetchDataFn: (params: any) => Promise<{ items: T[]; total: number }>;
-  getParams: (keyword: string) => Record<string, any>;
+  fetchDataFn: (params: {
+    [key: string]: any;
+    page: number;
+    pageSize: number;
+  }) => Promise<{ items: T[]; total: number }>;
+  getParams: (keyword: string) => Record<string, boolean | number | string>;
   valueKey: keyof T;
   echoFetcher?: (val: string) => Promise<null | T>;
 }
@@ -14,7 +18,7 @@ export interface UseSelectPaginationOptions<T> {
 export function useSelectPagination<T>(
   optionsConfig: UseSelectPaginationOptions<T>,
   propsValue: Ref<T[keyof T] | undefined>,
-  emit: (...args: any[]) => void,
+  emit: (event: any, ...args: any[]) => void,
 ) {
   const { fetchDataFn, getParams, valueKey, echoFetcher } = optionsConfig;
 
@@ -110,12 +114,13 @@ export function useSelectPagination<T>(
     }
   };
 
-  const handleChange = (val: any, option: any) => {
-    emit('update:value', val);
-    emit('change', val, option);
-    if (val && option) {
-      cachedSelectedItem.value = option.item || option;
-    } else if (!val) {
+  const handleChange = (val: unknown, option: any) => {
+    const castedVal = val as null | T[keyof T] | undefined;
+    emit('update:value', castedVal);
+    emit('change', castedVal, option);
+    if (castedVal && (option?.item || option)) {
+      cachedSelectedItem.value = (option?.item || option) as T;
+    } else if (!castedVal) {
       cachedSelectedItem.value = null;
     }
   };

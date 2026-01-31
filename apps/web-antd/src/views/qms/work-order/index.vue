@@ -49,6 +49,7 @@ const canCreate = computed(() => hasAccessByCodes(['QMS:WorkOrder:Create']));
 const canEdit = computed(() => hasAccessByCodes(['QMS:WorkOrder:Edit']));
 const canDelete = computed(() => hasAccessByCodes(['QMS:WorkOrder:Delete']));
 const canExport = computed(() => hasAccessByCodes(['QMS:WorkOrder:Export']));
+const canImport = computed(() => hasAccessByCodes(['QMS:WorkOrder:Import']));
 
 // 2. 部门树数据
 const deptTreeData = ref<TreeSelectNode[]>([]);
@@ -147,7 +148,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
   toolbarConfig: {
     export: canExport.value,
     refresh: true,
-    import: true,
+    import: canImport.value,
     search: true,
     zoom: true,
     custom: true,

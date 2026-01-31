@@ -1,11 +1,10 @@
-import type { VbenFormProps } from '@vben/common-ui';
-
+import type { VbenFormSchema } from '#/adapter/form';
 import type { VxeGridProps } from '#/adapter/vxe-table';
 
 import { InspectionIssueStatusEnum } from '#/api/qms/enums';
 import { $t } from '#/locales';
 
-export const searchFormSchema: VbenFormProps['schema'] = [
+export const searchFormSchema: VbenFormSchema[] = [
   {
     fieldName: 'workOrderNumber',
     label: $t('qms.workOrder.workOrderNumber'),
@@ -41,7 +40,7 @@ export const searchFormSchema: VbenFormProps['schema'] = [
     },
     colProps: { span: 4 },
   },
-] as any;
+] as unknown as VbenFormSchema[];
 
 export const gridColumns: VxeGridProps['columns'] = [
   { type: 'seq', title: $t('common.seq'), width: 60, fixed: 'left' as const },

@@ -16,6 +16,26 @@ interface InspectionItemInput {
   order?: number;
 }
 
+interface PieDataItem {
+  name: string;
+  value: number;
+}
+
+interface TrendDataItem {
+  period: string;
+  value: number;
+}
+
+interface IssueStats {
+  totalCount: number;
+  openCount: number;
+  closedCount: number;
+  totalLoss: number;
+  closedRate: number;
+  pieData: PieDataItem[];
+  trendData: TrendDataItem[];
+}
+
 interface InspectionRecordInput {
   category: 'INCOMING' | 'PROCESS' | 'SHIPMENT';
   workOrderNumber: string;
@@ -352,9 +372,9 @@ export const InspectionService = {
     return { items, total };
   },
 
-  async getIssueStats(params: { year?: number }) {
+  async getIssuesStats(year?: number): Promise<IssueStats> {
     const where: Record<string, any> = { isDeleted: false };
-    const currentYear = params.year || new Date().getFullYear();
+    const currentYear = year || new Date().getFullYear();
 
     if (currentYear) {
       const start = new Date(`${currentYear}-01-01`);

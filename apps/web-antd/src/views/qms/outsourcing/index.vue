@@ -37,6 +37,7 @@ const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
 
 const canExport = computed(() => hasAccessByCodes(['QMS:Outsourcing:Export']));
+const canImport = computed(() => hasAccessByCodes(['QMS:Outsourcing:Import']));
 const canEdit = computed(() => hasAccessByCodes(['QMS:Outsourcing:Edit']));
 const canDelete = computed(() => hasAccessByCodes(['QMS:Outsourcing:Delete']));
 
@@ -78,7 +79,7 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
     slots: { buttons: 'toolbar-actions' },
     custom: true,
     export: canExport.value,
-    import: true,
+    import: canImport.value,
     search: true,
     zoom: true,
     refresh: true,

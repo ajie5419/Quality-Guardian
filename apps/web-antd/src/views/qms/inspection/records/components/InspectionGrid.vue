@@ -5,6 +5,7 @@ import type { VxeCheckboxChangeParams } from '#/types';
 
 import { computed, ref, watch } from 'vue';
 
+import { useAccess } from '@vben/access';
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
@@ -15,6 +16,7 @@ import {
   batchDeleteInspectionRecords,
   deleteInspectionRecord,
   getInspectionRecords,
+  importInspectionRecords,
 } from '#/api/qms/inspection';
 
 import { getColumns } from '../config';
@@ -31,6 +33,23 @@ const props = defineProps<{
 
 const emit = defineEmits(['create', 'edit']);
 const { t } = useI18n();
+const { hasAccessByCodes } = useAccess();
+
+const canImport = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Records:Import']),
+);
+const canExport = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Records:Export']),
+);
+const canCreate = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Records:Create']),
+);
+const canEdit = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Records:Edit']),
+);
+const canDelete = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Records:Delete']),
+);
 
 const processedColumns = (type: string) => {
   return getColumns(type, t).map((col) => {
@@ -41,7 +60,10 @@ const processedColumns = (type: string) => {
         cellRender: {
           name: 'CellOperation',
           props: {
-            options: ['edit', 'delete'],
+            options: [
+              ...(canEdit.value ? ['edit'] : []),
+              ...(canDelete.value ? ['delete'] : []),
+            ],
             onClick: ({
               code,
               row,
@@ -65,10 +87,59 @@ const gridOptions = computed(() => ({
     refresh: true,
     zoom: true,
     custom: true,
-    export: true,
+    export: canExport.value,
+    import: canImport.value,
     search: true,
     slots: {
       buttons: 'toolbar-actions',
+    },
+  },
+  importConfig: {
+    remote: true,
+    importMethod: async ({ file }: { file: File }) => {
+      const XLSX = await import('xlsx');
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, {
+          type: 'array',
+          cellDates: true,
+        });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) return;
+        const worksheet = workbook.Sheets[sheetName]!;
+        const results = XLSX.utils.sheet_to_json(worksheet) as Record<
+          string,
+          any
+        >[];
+
+        if (!results || results.length === 0) return;
+
+        // Basic field mapping (In real scenarios, this would be more complex)
+        const mappedItems: Partial<QmsInspectionApi.InspectionRecord>[] =
+          results.map((row) => {
+            return {
+              ...row,
+              inspectionDate: (row.inspectionDate as string) || new Date(),
+            } as Partial<QmsInspectionApi.InspectionRecord>;
+          });
+
+        const res = await importInspectionRecords({
+          items: mappedItems,
+          category: props.type,
+        });
+
+        if (res.successCount > 0) {
+          message.success(
+            t('common.importSuccessCount', { count: res.successCount }),
+          );
+          reload();
+        } else {
+          message.error(t('common.importFailed'));
+        }
+      } catch (error) {
+        console.error('Import Error:', error);
+        message.error(t('common.importFailed'));
+      }
     },
   },
   exportConfig: {
@@ -220,14 +291,19 @@ defineExpose({ reload });
   <Grid>
     <template #toolbar-actions>
       <Space>
-        <Button shape="round" type="primary" @click="emit('create')">
+        <Button
+          v-if="canCreate"
+          shape="round"
+          type="primary"
+          @click="emit('create')"
+        >
           <template #icon>
             <IconifyIcon icon="lucide:plus" />
           </template>
           {{ t('common.add') }}
         </Button>
         <Button
-          v-if="checkedRows.length > 0"
+          v-if="checkedRows.length > 0 && canDelete"
           danger
           shape="round"
           type="primary"

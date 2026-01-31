@@ -48,6 +48,8 @@ const canCreate = computed(() => hasAccessByCodes(['QMS:AfterSales:Create']));
 const canEdit = computed(() => hasAccessByCodes(['QMS:AfterSales:Edit']));
 const canDelete = computed(() => hasAccessByCodes(['QMS:AfterSales:Delete']));
 const canSettle = computed(() => hasAccessByCodes(['QMS:AfterSales:Settle']));
+const canImport = computed(() => hasAccessByCodes(['QMS:AfterSales:Import']));
+const canExport = computed(() => hasAccessByCodes(['QMS:AfterSales:Export']));
 
 // 状态选项
 const { getStatusInfo } = useStatusOptions();
@@ -301,8 +303,8 @@ const gridOptions = computed(() => ({
     },
   ],
   toolbarConfig: {
-    export: true,
-    import: true,
+    export: canExport.value,
+    import: canImport.value,
     search: true,
     refresh: true,
     zoom: true,

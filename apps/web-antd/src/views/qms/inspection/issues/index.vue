@@ -76,6 +76,12 @@ const canSettle = computed(() =>
 const canAddChart = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Issues:ChartAdd']),
 );
+const canImport = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Issues:Import']),
+);
+const canExport = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Issues:Export']),
+);
 
 // 使用数据加载 composable
 const { deptTreeData, deptRawData, loadInitialData } = useIssueData();
@@ -105,9 +111,9 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
     highlight: true,
   },
   toolbarConfig: {
-    export: true,
+    export: canExport.value,
     refresh: true,
-    import: true,
+    import: canImport.value,
     search: true,
     zoom: true,
     custom: true,
@@ -133,9 +139,9 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
         if (!results || results.length === 0) return;
 
         const columns = gridApi.grid.getColumns();
-        const mappedItems = results.map((row: any) => {
-          const item: Record<string, any> = {};
-          columns.forEach((col: any) => {
+        const mappedItems = results.map((row) => {
+          const item: Record<string, unknown> = {};
+          columns.forEach((col) => {
             const field = col.field;
             const title = col.title;
             if (field && title) {
@@ -153,7 +159,7 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
               }
             }
           });
-          return item;
+          return item as unknown as Partial<InspectionIssue>;
         });
 
         const res = await requestClient.post(
@@ -190,11 +196,11 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
       if (col.field === 'division' || col.field === 'responsibleDepartment') {
         return {
           ...col,
-          formatter: ({ cellValue }: { cellValue: any }) => {
+          formatter: ({ cellValue }: { cellValue: string | unknown }) => {
             if (!cellValue) return '';
             // 确保从响应式的 deptRawData 中查找
-            const name = findNameById(deptRawData.value, cellValue);
-            return name || cellValue;
+            const name = findNameById(deptRawData.value, cellValue as string);
+            return name || (cellValue as string);
           },
         };
       }
@@ -202,13 +208,13 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
       if (col.field === 'updatedAt' || col.field === 'reportDate') {
         return {
           ...col,
-          formatter: ({ cellValue }: { cellValue: any }) => {
+          formatter: ({ cellValue }: { cellValue: string | unknown }) => {
             if (!cellValue) return '';
             const format =
               col.field === 'reportDate' ? 'YYYY-MM-DD' : 'YYYY-MM-DD HH:mm:ss';
             // 使用 dayjs 转换 UTC 到本地时区
-            const date = dayjs(cellValue);
-            return date.isValid() ? date.format(format) : cellValue;
+            const date = dayjs(cellValue as Date | number | string);
+            return date.isValid() ? date.format(format) : (cellValue as string);
           },
         };
       }

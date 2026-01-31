@@ -105,6 +105,16 @@ export async function batchDeleteInspectionRecords(ids: string[]) {
   );
 }
 
+export async function importInspectionRecords(data: {
+  category: string;
+  items: Partial<InspectionRecord>[];
+}) {
+  return requestClient.post<{ successCount: number }>(
+    `${QMS_API.INSPECTION_RECORDS}/import`,
+    data,
+  );
+}
+
 export namespace QmsInspectionApi {
   export type InspectionTaskResult = import('@qgs/shared').InspectionTaskResult;
   export type InspectionIssue = import('@qgs/shared').InspectionIssue;
