@@ -34,6 +34,8 @@ export interface KnowledgeItem {
 export interface KnowledgeQueryParams {
   categoryId?: string;
   keyword?: string;
+  page?: number;
+  pageSize?: number;
   status?: string;
   tag?: string;
 }

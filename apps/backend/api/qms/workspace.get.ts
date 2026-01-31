@@ -4,7 +4,7 @@ import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
+  const userinfo = await verifyAccessToken(event);
   if (!userinfo) {
     return unAuthorizedResponse(event);
   }
@@ -68,7 +68,7 @@ export default defineEventHandler(async (event) => {
       let color = '#999';
       if (wo.status === 'IN_PROGRESS') {
         color = '#1890ff';
-      } else if (wo.status === 'CLOSED') {
+      } else if (wo.status === 'COMPLETED') {
         color = '#52c41a';
       }
 

@@ -29,9 +29,11 @@
     "confirmDeleteContent": "确定要删除",
     "batchDelete": "批量删除",
     "dataLoadFailed": "数据加载失败",
+    "noData": "暂无数据",
     "unit": {
       "year": "年",
-      "project": "个项目"
+      "project": "个项目",
+      "decrease": "降幅"
     }
   },
   "workspace": {
@@ -645,10 +647,20 @@
     "dailyTitle": "每日质量报表",
     "summaryTitle": "周报/月报",
     "daily": {
-      "title": "日报"
+      "inspections": "今日检验工作",
+      "issues": "异常与问题 (NCR)",
+      "noInspections": "今日无检验记录",
+      "noIssues": "无异常与问题",
+      "summaryTitle": "个人成长/待办事项",
+      "summaryPlaceholder": "请输入今日总结...",
+      "date": "日期",
+      "export": "导出图片",
+      "exportSuccess": "图片导出成功",
+      "exportFailed": "图片导出失败"
     },
     "summary": {
       "title": "质量绩效分析报告 (专业版)",
+      "titleEn": "Quality Performance Report",
       "reportType": "报告类型",
       "weekly": "周报 (Weekly)",
       "monthly": "月报 (Monthly)",

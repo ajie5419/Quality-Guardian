@@ -167,7 +167,7 @@ export const InspectionService = {
                 item.measuredValue !== undefined && item.measuredValue !== null
                   ? String(item.measuredValue)
                   : null,
-              result: item.result || 'PASS',
+              result: (item.result as any) || 'PASS',
               remarks: item.remarks,
               order: item.order || 0,
             })),
@@ -236,7 +236,7 @@ export const InspectionService = {
               item.measuredValue !== undefined && item.measuredValue !== null
                 ? String(item.measuredValue)
                 : null,
-            result: item.result || 'PASS',
+            result: (item.result as any) || 'PASS',
             remarks: item.remarks,
             order: item.order || 0,
           })),

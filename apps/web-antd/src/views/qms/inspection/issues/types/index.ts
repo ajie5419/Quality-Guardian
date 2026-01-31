@@ -73,7 +73,7 @@ export interface InspectionIssue {
   photos: string[];
   severity: 'Critical' | 'Major' | 'Minor' | Severity;
   inspector: string;
-  division: string;
+  division?: string;
   updatedAt?: string;
 }
 

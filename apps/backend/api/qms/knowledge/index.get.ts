@@ -9,29 +9,38 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const { categoryId, keyword } = getQuery(event);
+  const { categoryId, keyword, page = 1, pageSize = 10 } = getQuery(event);
+  const skip = (Number(page) - 1) * Number(pageSize);
+  const take = Number(pageSize);
 
   try {
-    const list = await prisma.knowledge_base.findMany({
-      where: {
-        isDeleted: false,
-        ...(categoryId ? { categoryId: String(categoryId) } : {}),
-        ...(keyword
-          ? {
-              OR: [
-                { title: { contains: String(keyword) } },
-                { summary: { contains: String(keyword) } },
-              ],
-            }
-          : {}),
-      },
-      include: {
-        category: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const where = {
+      isDeleted: false,
+      ...(categoryId ? { categoryId: String(categoryId) } : {}),
+      ...(keyword
+        ? {
+            OR: [
+              { title: { contains: String(keyword) } },
+              { summary: { contains: String(keyword) } },
+            ],
+          }
+        : {}),
+    };
 
-    const result = list.map((item) => ({
+    const [list, total] = await Promise.all([
+      prisma.knowledge_base.findMany({
+        where,
+        include: {
+          category: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.knowledge_base.count({ where }),
+    ]);
+
+    const items = list.map((item) => ({
       ...item,
       categoryName: item.category?.name || '未分类',
       publishDate: item.publishDate
@@ -42,9 +51,9 @@ export default defineEventHandler(async (event) => {
       updatedAt: item.updatedAt.toLocaleString(),
     }));
 
-    return useResponseSuccess(result);
+    return useResponseSuccess({ items, total });
   } catch (error) {
     console.error('Failed to fetch knowledge items:', error);
-    return useResponseSuccess([]);
+    return useResponseSuccess({ items: [], total: 0 });
   }
 });

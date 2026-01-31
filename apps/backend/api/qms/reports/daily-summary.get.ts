@@ -32,14 +32,14 @@ export default defineEventHandler(async (event) => {
     const inspections = await prisma.inspections.findMany({
       where: {
         isDeleted: false,
-        date: {
+        inspectionDate: {
           gte: startDate,
           lte: endDate,
         },
-        inspector: queryUser,
+        OR: [{ inspector: queryUser }, { inspector: realName }],
       },
       include: {
-        work_orders: {
+        work_order: {
           select: {
             projectName: true,
             customerName: true,
@@ -138,33 +138,27 @@ export default defineEventHandler(async (event) => {
       switch (item.category) {
         case 'INCOMING': {
           proc = '进货检验';
-          name = item.itemName || item.partName || '';
-
-          break;
-        }
-        case 'OUTGOING': {
-          proc = '发货检验';
-          // 对应组件名称 (partName)
-          name = item.partName || item.projectName || '';
+          name = item.materialName || '';
 
           break;
         }
         case 'PROCESS': {
           proc = item.processName || '';
-          const compItem = item as unknown as {
-            componentName?: string;
-            itemName?: string;
-            partName?: string;
-          };
-          name =
-            compItem.componentName || item.partName || compItem.itemName || '';
+          name = item.level1Component || '';
+
+          break;
+        }
+        case 'SHIPMENT': {
+          proc = '发货检验';
+          // 对应组件名称
+          name = item.level1Component || item.projectName || '';
 
           break;
         }
         default: {
           // Fallback
           proc = item.processName || item.category || '';
-          name = item.partName || item.itemName || '';
+          name = item.materialName || item.level1Component || '';
         }
       }
 

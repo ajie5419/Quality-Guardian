@@ -39,6 +39,8 @@
     "@vben/types": "workspace:*",
     "@vben/utils": "workspace:*",
     "@vueuse/core": "catalog:",
+    "@wangeditor/editor": "^5.1.23",
+    "@wangeditor/editor-for-vue": "^1.0.2",
     "ant-design-vue": "catalog:",
     "dayjs": "catalog:",
     "exceljs": "^4.4.0",

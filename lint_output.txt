@@ -1,0 +1,49 @@
+
+> quality-guardian-system@1.0.13 lint /Users/zhaoxiaojie/Downloads/main/Quality-Guardian
+> vsh lint
+
+Checking formatting...
+[warn] apps/backend/api/qms/ai/extract-tags.post.ts
+[warn] apps/backend/api/qms/knowledge/index.get.ts
+[warn] apps/backend/api/qms/reports/summary.get.ts
+[warn] apps/backend/services/inspection.service.ts
+[warn] apps/web-antd/src/components/WangEditor/index.vue
+[warn] apps/web-antd/src/hooks/useKnowledgeSettlement.ts
+[warn] apps/web-antd/src/locales/langs/zh-CN/qms.json
+[warn] apps/web-antd/src/views/qms/knowledge/components/KnowledgeEditModal.vue
+[warn] apps/web-antd/src/views/qms/knowledge/index.vue
+[warn] apps/web-antd/src/views/qms/reports/index.vue
+[warn] apps/web-antd/src/views/qms/reports/summary/index.vue
+[warn] Code style issues found in 11 files. Run Prettier with --write to fix.
+file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/return/final-error.js:6
+	return new ErrorClass(message, options);
+	       ^
+
+ExecaError: Command failed with exit code 1: prettier . --ignore-unknown --check --cache
+    at getFinalError (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/return/final-error.js:6:9)
+    at makeError (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/return/result.js:108:16)
+    at getAsyncResult (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/methods/main-async.js:168:4)
+    at handlePromise (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/methods/main-async.js:151:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Promise.all (index 1)
+    at async CAC.runLint (/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/scripts/vsh/src/lint/index.ts:27:3) {
+  shortMessage: 'Command failed with exit code 1: prettier . --ignore-unknown --check --cache',
+  command: 'prettier . --ignore-unknown --check --cache',
+  escapedCommand: 'prettier . --ignore-unknown --check --cache',
+  cwd: '/Users/zhaoxiaojie/Downloads/main/Quality-Guardian',
+  durationMs: 2738.111792,
+  failed: true,
+  timedOut: false,
+  isCanceled: false,
+  isGracefullyCanceled: false,
+  isTerminated: false,
+  isMaxBuffer: false,
+  isForcefullyTerminated: false,
+  exitCode: 1,
+  stdio: [ undefined, undefined, undefined ],
+  ipcOutput: [],
+  pipedFrom: []
+}
+
+Node.js v24.10.0
+ ELIFECYCLE  Command failed with exit code 1.

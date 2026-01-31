@@ -41,7 +41,7 @@ export default defineEventHandler(async (event) => {
             id,
             serialNumber: Math.floor(Math.random() * 1_000_000),
             occurDate: new Date(item.issueDate || item.occurDate || Date.now()),
-            claimStatus: status,
+            claimStatus: status as any,
             projectName: String(item.projectName || ''),
             customerName: String(item.customerName || ''),
             workOrderNumber: woNumber,

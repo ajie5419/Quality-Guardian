@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
         id: newId,
         serialNumber: Math.floor(Date.now() / 1000),
         date: new Date(body.reportDate || Date.now()),
-        status,
+        status: status as any,
         nonConformanceNumber: body.ncNumber || null,
 
         work_orders: body.workOrderNumber
@@ -55,7 +55,6 @@ export default defineEventHandler(async (event) => {
 
         responsibleDepartment: body.responsibleDepartment || 'Unknown',
         supplierName: body.supplierName || null,
-        severity: body.severity || 'Minor',
 
         // Logic to connect user by name (from Mock Data Era)
         // Since we migrated Auth to DB, userinfo.username exists in DB.

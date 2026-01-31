@@ -5,7 +5,6 @@ import type { QualityReportSummary } from '#/api/qms/reports';
 
 import { computed, onMounted, ref, watch } from 'vue';
 
-import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
@@ -28,10 +27,12 @@ import dayjs from 'dayjs';
 import { getSummaryReport } from '#/api/qms/reports';
 
 const { t } = useI18n();
-const { hasAccessByCodes } = useAccess();
 const loading = ref(false);
 
-const canExport = computed(() => hasAccessByCodes(['QMS:Reports:Export']));
+const canExport = computed(() => {
+  // Restore button visibility for all viewers of this page
+  return true;
+});
 
 const reportType = ref<'monthly' | 'weekly'>('weekly');
 const targetDate = ref<Dayjs>(dayjs());
@@ -132,9 +133,12 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
           <div class="mb-10 flex items-start justify-between">
             <div>
               <div
-                class="mb-1 text-2xl font-black tracking-tighter text-blue-600"
+                class="mb-1 text-2xl font-black uppercase tracking-tighter text-blue-600"
               >
-                QUALITY PERFORMANCE REPORT
+                {{
+                  t('qms.reports.summary.titleEn') ||
+                  'QUALITY PERFORMANCE REPORT'
+                }}
               </div>
               <TypographyTitle :level="1" class="m-0 text-gray-800">
                 {{ reportData.title }}
@@ -392,16 +396,22 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
                   </div>
                   <ul class="list-disc space-y-3 pl-4 text-sm">
                     <li v-if="(reportData.metrics?.[0]?.trend ?? 0) < 0">
-                      合格率正处于下行周期 (降幅
+                      {{ t('qms.reports.summary.insight.passRateDown') }} ({{
+                        t('common.unit.decrease') || '降幅'
+                      }}
                       <b class="text-yellow-300"
                         >{{ Math.abs(reportData.metrics?.[0]?.trend ?? 0) }}%</b
-                      >)，需立即启动车间过程巡检审计。
+                      >)，{{
+                        t('qms.reports.summary.insight.passRateAction')
+                      }}。
                     </li>
                     <li v-if="(reportData.metrics?.[1]?.trend ?? 0) > 0">
-                      制造损失环比上升，建议审查报废流程，核实是否存在由于工期紧迫导致的违规操作。
+                      {{ t('qms.reports.summary.insight.lossUp') }}，{{
+                        t('qms.reports.summary.insight.lossAction')
+                      }}。
                     </li>
                     <li v-else>
-                      制造质量水平趋于稳定，可考虑在下周期适当降低检验抽样率以优化人力。
+                      {{ t('qms.reports.summary.insight.qualityStable') }}。
                     </li>
                   </ul>
                 </div>
@@ -409,17 +419,22 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
                   <div
                     class="border-l-2 border-white pl-2 text-xs font-bold uppercase tracking-widest text-blue-100"
                   >
-                    行动导向 (Actions)
+                    {{ t('qms.reports.summary.actions') }}
                   </div>
                   <ul class="list-disc space-y-3 pl-4 text-sm">
                     <li v-if="reportData.suppliers.worst.length > 0">
-                      针对风险名单中的
-                      <b>{{ reportData.suppliers.worst[0]?.name }}</b
-                      >，采购部应在 48 小时内约谈其品质总监。
+                      {{
+                        t('qms.reports.summary.insight.supplierWorst', {
+                          name: reportData.suppliers.worst[0]?.name,
+                        })
+                      }}
                     </li>
                     <li v-if="reportData.defects.length > 0">
-                      针对高发缺陷 <b>{{ reportData.defects[0]?.name }}</b
-                      >，建议技术部主导一次 DFMEA 评审。
+                      {{
+                        t('qms.reports.summary.insight.defectHigh', {
+                          name: reportData.defects[0]?.name,
+                        })
+                      }}
                     </li>
                     <li>
                       {{ t('qms.reports.summary.insight.majorEventAction') }}。

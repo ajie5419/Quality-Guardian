@@ -34,7 +34,7 @@ const getTargetPassRate = (processName?: string): number => {
 };
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
+  const userinfo = await verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
 
   const query = getQuery(event);
@@ -255,8 +255,8 @@ async function getDrillDownData(period: string, granularity: string) {
     });
   }
 
-  // 成品检验
-  const finals = inspections.filter((i) => i.category === 'FINAL');
+  // 成品检验 (发货检验)
+  const finals = inspections.filter((i) => i.category === 'SHIPMENT');
   if (finals.length > 0) {
     const total = finals.length;
     const passed = finals.filter((i) => i.result === 'PASS').length;

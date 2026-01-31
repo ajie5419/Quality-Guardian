@@ -448,12 +448,14 @@ const { settle: settleToKnowledge } = useKnowledgeSettlement();
 
 function handleSettleToKnowledge(row: InspectionIssue) {
   settleToKnowledge({
-    title: `【${t('qms.inspection.issues.settleToKnowledge')}】${row.ncNumber} - ${row.partName}`,
+    title: `【${t('qms.dashboard.overview.processIssues')}】${
+      row.workOrderNumber || ''
+    } - ${row.partName}`,
     summary: row.description,
     categoryId: 'CAT-DEFAULT',
     photos: row.photos,
     attachmentNamePrefix: '现场图片',
-    tags: [row.defectType, row.division],
+    tags: [row.defectType, row.division, row.partName, row.projectName],
     sections: [
       {
         title: t('qms.inspection.issues.description'),

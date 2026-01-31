@@ -233,7 +233,7 @@ watch(
         itpProjectId: undefined,
         quantity: 1,
         inspector:
-          userStore.userInfo?.realName || userStore.userInfo?.username || '',
+          userStore.userInfo?.username || userStore.userInfo?.realName || '',
         inspectionDate: dayjs().format('YYYY-MM-DD'),
         result: 'PASS',
         supplierName: '',

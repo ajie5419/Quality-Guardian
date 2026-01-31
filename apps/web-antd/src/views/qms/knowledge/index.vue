@@ -1,13 +1,11 @@
 <script lang="ts" setup>
 import type { QmsKnowledgeApi } from '#/api/qms/knowledge';
-import type { UploadFileWithResponse } from '#/types';
 
 import { computed, nextTick, onMounted, ref } from 'vue';
 
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
-import { useUserStore } from '@vben/stores';
 
 import {
   Button,
@@ -18,33 +16,27 @@ import {
   Input,
   message,
   Modal,
-  RadioButton,
-  RadioGroup,
-  Select,
+  Pagination,
   Space,
   Spin,
   Tag,
   Tooltip,
   Tree,
-  TreeSelect,
-  Upload,
 } from 'ant-design-vue';
 
 import {
-  createCategory,
-  createKnowledge,
   deleteCategory,
   deleteKnowledge,
   getCategoryTree,
   getKnowledgeDetail,
   getKnowledgeList,
-  updateCategory,
-  updateKnowledge,
 } from '#/api/qms/knowledge';
+
+import CategoryManageModal from './components/CategoryManageModal.vue';
+import KnowledgeEditModal from './components/KnowledgeEditModal.vue';
 
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
-const userStore = useUserStore();
 
 const canCreate = computed(() => hasAccessByCodes(['QMS:Knowledge:Create']));
 const canEdit = computed(() => hasAccessByCodes(['QMS:Knowledge:Edit']));
@@ -61,16 +53,14 @@ const detailLoading = ref(false);
 const searchText = ref('');
 const isSideBarCollapsed = ref(false); // 目录折叠状态
 
-// 分类管理弹窗
-const categoryModalVisible = ref(false);
-const categoryEditMode = ref(false);
-// const _currentParentCategoryId = ref<string | null>(null);
-const currentCategoryId = ref<null | string>(null);
-const categoryForm = ref({
-  name: '',
-  description: '',
-  parentId: undefined as string | undefined,
-});
+// 分页状态
+const currentPage = ref(1);
+const pageSize = ref(10);
+const totalCount = ref(0);
+
+// Component Refs
+const knowledgeEditModalRef = ref();
+const categoryManageModalRef = ref();
 
 // 选中的分类名称（用于面包屑）
 const selectedCategoryName = computed(() => {
@@ -108,14 +98,23 @@ async function loadKnowledgeList() {
     const params: QmsKnowledgeApi.QueryParams = {
       categoryId: selectedCategoryId.value[0],
       keyword: searchText.value,
+      page: currentPage.value,
+      pageSize: pageSize.value,
     };
-    const data = await getKnowledgeList(params);
-    knowledgeList.value = data;
+    const { items, total } = await getKnowledgeList(params);
+    knowledgeList.value = items;
+    totalCount.value = total;
   } catch {
     message.error('加载知识列表失败');
   } finally {
     loading.value = false;
   }
+}
+
+function handlePageChange(page: number, size: number) {
+  currentPage.value = page;
+  pageSize.value = size;
+  loadKnowledgeList();
 }
 
 async function loadArticleDetail(id: string) {
@@ -135,6 +134,7 @@ function handleCategorySelect(keys: unknown) {
   selectedCategoryId.value = keys as string[];
   selectedArticleId.value = null;
   articleDetail.value = null;
+  currentPage.value = 1; // 重置分页
   loadKnowledgeList();
 }
 
@@ -148,6 +148,7 @@ function handleArticleClick(id: string) {
 function handleSearch() {
   selectedArticleId.value = null;
   articleDetail.value = null;
+  currentPage.value = 1; // 重集分页
   loadKnowledgeList();
 }
 
@@ -156,41 +157,7 @@ function openCategoryModal(
   parentId?: string,
   category?: QmsKnowledgeApi.Category,
 ) {
-  if (category) {
-    categoryEditMode.value = true;
-    currentCategoryId.value = category.id;
-    categoryForm.value = {
-      name: category.name,
-      description: category.description || '',
-      parentId: category.parentId,
-    };
-  } else {
-    categoryEditMode.value = false;
-    currentCategoryId.value = null;
-    categoryForm.value = {
-      name: '',
-      description: '',
-      parentId,
-    };
-  }
-  categoryModalVisible.value = true;
-}
-
-async function handleSaveCategory() {
-  if (!categoryForm.value.name) return message.warning('请输入分类名称');
-  try {
-    if (categoryEditMode.value && currentCategoryId.value) {
-      await updateCategory(currentCategoryId.value, categoryForm.value);
-      message.success('分类更新成功');
-    } else {
-      await createCategory(categoryForm.value);
-      message.success('分类创建成功');
-    }
-    categoryModalVisible.value = false;
-    loadCategories();
-  } catch {
-    message.error('操作失败');
-  }
+  categoryManageModalRef.value?.open(parentId, category);
 }
 
 function handleDeleteCategory(category: QmsKnowledgeApi.Category) {
@@ -213,113 +180,8 @@ function handleDeleteCategory(category: QmsKnowledgeApi.Category) {
 }
 
 // ================= 弹窗管理 =================
-const modalVisible = ref(false);
-const editMode = ref(false);
-const editorTab = ref<'edit' | 'preview'>('edit');
-const fileList = ref<UploadFileWithResponse[]>([]); // 附件上传列表
-
-const formState = ref<Partial<QmsKnowledgeApi.KnowledgeItem>>({
-  attachments: [],
-  categoryId: '',
-  content: '',
-  status: 'published',
-  summary: '',
-  tags: [],
-  title: '',
-  version: 'V1.0',
-});
-
-function openModal(item?: any | QmsKnowledgeApi.KnowledgeItem) {
-  if (item && item.id) {
-    editMode.value = true;
-    formState.value = { ...item };
-    // 初始化已有的附件列表
-    fileList.value = (item.attachments || []).map((att: any) => ({
-      name: att.name,
-      status: 'done',
-      type: att.type,
-      uid: att.name,
-      url: att.url,
-    }));
-  } else {
-    editMode.value = false;
-    // 如果是预填模式（没有 id 但有 attachments）
-    fileList.value =
-      item && item.attachments
-        ? item.attachments.map((att: any) => ({
-            name: att.name,
-            status: 'done',
-            type: att.type,
-            uid: att.name,
-            url: att.url,
-          }))
-        : [];
-
-    formState.value = {
-      attachments: (item && item.attachments) || [],
-      author: userStore.userInfo?.realName || 'Admin',
-      categoryId:
-        (item && item.categoryId) || selectedCategoryId.value[0] || '',
-      content: (item && item.content) || '',
-      status: (item && item.status) || 'published',
-      summary: (item && item.summary) || '',
-      tags: (item && item.tags) || [],
-      title: (item && item.title) || '',
-      version: (item && item.version) || 'V1.0',
-    };
-  }
-  editorTab.value = 'edit';
-  modalVisible.value = true;
-}
-
-// 处理上传状态变化
-function handleUploadChange(info: any) {
-  const { file, fileList: newFileList } = info;
-  fileList.value = newFileList as UploadFileWithResponse[];
-
-  if (file.status === 'done' || (file as UploadFileWithResponse).response) {
-    // 模拟后端返回 URL
-    const f = file as UploadFileWithResponse;
-    const url = f.response?.data?.url || '#';
-    f.url = url;
-    message.success(`${f.name} 上传成功`);
-  } else if (file.status === 'error') {
-    message.error(`${file.name} 上传失败`);
-  }
-}
-
-async function handleSave() {
-  try {
-    // 转换上传列表为业务附件模型
-    const attachments: QmsKnowledgeApi.Attachment[] = fileList.value.map(
-      (f) => ({
-        name: f.name,
-        url: f.url || f.response?.data?.url || '#',
-        size: f.size || 0,
-        type: f.name.split('.').pop() || 'file',
-      }),
-    );
-
-    const payload = {
-      ...formState.value,
-      attachments,
-    };
-
-    if (editMode.value && formState.value.id) {
-      await updateKnowledge(formState.value.id, payload);
-      message.success('更新成功');
-    } else {
-      await createKnowledge(payload);
-      message.success('创建成功');
-    }
-    modalVisible.value = false;
-    loadKnowledgeList();
-    if (selectedArticleId.value === formState.value.id) {
-      loadArticleDetail(selectedArticleId.value!);
-    }
-  } catch {
-    message.error('保存失败');
-  }
+function openModal(item?: any) {
+  knowledgeEditModalRef.value?.open(item, selectedCategoryId.value[0]);
 }
 
 function handleDelete(id: string) {
@@ -620,6 +482,19 @@ onMounted(async () => {
             <Empty v-else :image="Empty.PRESENTED_IMAGE_SIMPLE" class="mt-10" />
           </Spin>
         </div>
+
+        <!-- 分页区 -->
+        <div class="border-t border-gray-100 bg-white p-3">
+          <Pagination
+            v-model:current="currentPage"
+            v-model:page-size="pageSize"
+            :total="totalCount"
+            :show-total="(total: number) => `共 ${total} 条`"
+            size="small"
+            show-size-changer
+            @change="handlePageChange"
+          />
+        </div>
       </div>
 
       <!-- 右侧详情/内容区 -->
@@ -785,140 +660,24 @@ onMounted(async () => {
       </div>
     </Modal>
 
-    <!-- 发布/编辑弹窗 -->
-    <Modal
-      v-model:open="modalVisible"
-      :title="editMode ? '修订知识文档' : '发布新知识'"
-      @ok="handleSave"
-      width="800px"
-    >
-      <div class="space-y-4 pt-4">
-        <div>
-          <label class="mb-1 block text-sm font-medium">标题</label>
-          <Input v-model:value="formState.title" placeholder="请输入文档标题" />
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="mb-1 block text-sm font-medium">分类</label>
-            <TreeSelect
-              v-model:value="formState.categoryId"
-              :tree-data="categoryTree"
-              :field-names="{
-                label: 'name',
-                value: 'id',
-                children: 'children',
-              }"
-              placeholder="请选择分类"
-              tree-default-expand-all
-              class="w-full"
-            />
-          </div>
-          <div>
-            <label class="mb-1 block text-sm font-medium">版本号</label>
-            <Input v-model:value="formState.version" placeholder="V1.0" />
-          </div>
-        </div>
-        <div>
-          <label class="mb-1 block text-sm font-medium">摘要 (200字以内)</label>
-          <Input.TextArea
-            v-model:value="formState.summary"
-            :rows="2"
-            placeholder="简要描述文档内容..."
-          />
-        </div>
-        <div>
-          <label class="mb-1 block text-sm font-medium">标签</label>
-          <Select
-            v-model:value="formState.tags"
-            mode="tags"
-            class="w-full"
-            placeholder="请输入标签并回车确认"
-            :options="[]"
-          />
-        </div>
-        <div>
-          <div class="mb-2 flex items-center justify-between">
-            <label class="text-sm font-medium">正文内容 (支持 HTML)</label>
-            <RadioGroup
-              v-model:value="editorTab"
-              size="small"
-              button-style="solid"
-            >
-              <RadioButton value="edit">编辑</RadioButton>
-              <RadioButton value="preview">预览</RadioButton>
-            </RadioGroup>
-          </div>
-          <div v-if="editorTab === 'edit'">
-            <Input.TextArea
-              v-model:value="formState.content"
-              :rows="12"
-              placeholder="输入详细知识内容 (支持 HTML 格式)..."
-              class="font-mono text-sm"
-            />
-          </div>
-          <div
-            v-else
-            class="max-h-[400px] min-h-[294px] overflow-y-auto rounded-md border border-gray-200 bg-gray-50 p-4"
-          >
-            <div
-              class="prose prose-sm max-w-none"
-              v-html="
-                formState.content ||
-                '<p class=\'text-gray-400 italic\'>暂无内容预览</p>'
-              "
-            ></div>
-          </div>
-        </div>
+    <!-- Component Modals -->
+    <KnowledgeEditModal
+      ref="knowledgeEditModalRef"
+      :category-tree="categoryTree"
+      @success="
+        (id: string) => {
+          loadKnowledgeList();
+          if (id && selectedArticleId === id) {
+            loadArticleDetail(id);
+          }
+        }
+      "
+    />
 
-        <!-- 附件上传 -->
-        <div>
-          <label class="mb-2 block text-sm font-medium"
-            >附件上传 (支持图片/PDF/Office)</label
-          >
-          <Upload.Dragger
-            v-model:file-list="fileList"
-            name="file"
-            action="/api/upload"
-            :multiple="true"
-            @change="handleUploadChange"
-          >
-            <p class="ant-upload-drag-icon">
-              <span class="i-lucide-inbox text-4xl text-blue-500"></span>
-            </p>
-            <p class="ant-upload-text">点击或将文件拖拽到此区域上传</p>
-            <p class="ant-upload-hint">
-              支持 PDF、Docx、Xlsx、Pptx 以及各种常用图片格式
-            </p>
-          </Upload.Dragger>
-        </div>
-      </div>
-    </Modal>
-
-    <!-- 分类管理弹窗 -->
-    <Modal
-      v-model:open="categoryModalVisible"
-      :title="categoryEditMode ? '修改分类' : '新建分类'"
-      @ok="handleSaveCategory"
-      width="400px"
-    >
-      <div class="space-y-4 pt-4">
-        <div>
-          <label class="mb-1 block text-sm font-medium">分类名称</label>
-          <Input
-            v-model:value="categoryForm.name"
-            placeholder="请输入分类名称"
-          />
-        </div>
-        <div>
-          <label class="mb-1 block text-sm font-medium">备注/描述</label>
-          <Input.TextArea
-            v-model:value="categoryForm.description"
-            :rows="2"
-            placeholder="请输入分类描述"
-          />
-        </div>
-      </div>
-    </Modal>
+    <CategoryManageModal
+      ref="categoryManageModalRef"
+      @success="loadCategories"
+    />
   </Page>
 </template>
 

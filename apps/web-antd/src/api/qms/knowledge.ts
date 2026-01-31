@@ -50,9 +50,12 @@ export async function deleteCategory(id: string) {
  * 获取知识列表
  */
 export async function getKnowledgeList(params?: KnowledgeQueryParams) {
-  return requestClient.get<KnowledgeItem[]>('/qms/knowledge', {
-    params,
-  });
+  return requestClient.get<{ items: KnowledgeItem[]; total: number }>(
+    '/qms/knowledge',
+    {
+      params,
+    },
+  );
 }
 
 /**

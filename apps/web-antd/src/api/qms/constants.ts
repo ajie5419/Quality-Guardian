@@ -35,6 +35,7 @@ export const QMS_API = {
   PLANNING_ITP: '/qms/planning/itp',
   PLANNING_ITP_IMPORT: '/qms/planning/itp/import',
   AI_GENERATE_ITP: '/qms/ai/generate-itp',
+  AI_EXTRACT_TAGS: '/qms/ai/extract-tags',
   KNOWLEDGE: '/qms/knowledge',
   KNOWLEDGE_CATEGORIES: '/qms/knowledge/categories',
 

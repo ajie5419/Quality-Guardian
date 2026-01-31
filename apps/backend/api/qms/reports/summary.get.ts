@@ -5,7 +5,7 @@ import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
+  const userinfo = await verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
 
   const query = getQuery(event);
@@ -134,13 +134,13 @@ async function fetchPeriodMetrics(start: Date, end: Date) {
   ] = await Promise.all([
     prisma.inspections.count({
       where: {
-        date: { gte: start, lte: end },
+        inspectionDate: { gte: start, lte: end },
         result: 'PASS',
         isDeleted: false,
       },
     }),
     prisma.inspections.count({
-      where: { date: { gte: start, lte: end }, isDeleted: false },
+      where: { inspectionDate: { gte: start, lte: end }, isDeleted: false },
     }),
     prisma.quality_records.count({
       where: { createdAt: { gte: start, lte: end }, isDeleted: false },
@@ -196,7 +196,7 @@ async function fetchProcessPassRates(start: Date, end: Date) {
         COUNT(*) as total,
         SUM(CASE WHEN result = 'PASS' THEN 1 ELSE 0 END) as passed
       FROM inspections
-      WHERE date >= ${start} AND date <= ${end} AND isDeleted = 0
+      WHERE inspectionDate >= ${start} AND inspectionDate <= ${end} AND isDeleted = 0
       GROUP BY processName, category
     `) as any[];
 

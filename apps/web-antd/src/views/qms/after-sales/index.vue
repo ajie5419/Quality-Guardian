@@ -500,7 +500,7 @@ function handleSettleToKnowledge(row: QmsAfterSalesApi.AfterSalesItem) {
     categoryId: 'CAT-DEFAULT',
     photos: row.photos,
     attachmentNamePrefix: t('qms.afterSales.title'),
-    tags: [row.defectType, row.productType],
+    tags: [row.defectType, row.productType, row.partName, row.projectName],
     sections: [
       {
         title: t('qms.afterSales.form.baseInfo'),

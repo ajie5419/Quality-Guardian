@@ -28,3 +28,11 @@ export async function importGeneratedItp(
 ) {
   return requestClient.post(QMS_API.PLANNING_ITP_IMPORT, { projectId, items });
 }
+
+/**
+ * AI 提取技术标签
+ */
+export async function extractAiTags(content: string) {
+  // AI 提取通常在 5-10 秒内
+  return requestClient.post<string[]>(QMS_API.AI_EXTRACT_TAGS, { content });
+}

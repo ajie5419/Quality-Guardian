@@ -1,0 +1,44 @@
+
+> quality-guardian-system@1.0.13 format /Users/zhaoxiaojie/Downloads/main/Quality-Guardian
+> vsh lint --format
+
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/components/WangEditor/index.vue
+  107:14  error  Expected '===' and instead saw '=='  eqeqeq
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/vite.config.mts
+  25:5  error  Parsing error: ',' expected
+
+✖ 2 problems (2 errors, 0 warnings)
+
+file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/return/final-error.js:6
+	return new ErrorClass(message, options);
+	       ^
+
+ExecaError: Command failed with exit code 1: eslint . --cache --fix
+    at getFinalError (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/return/final-error.js:6:9)
+    at makeError (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/return/result.js:108:16)
+    at getAsyncResult (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/methods/main-async.js:168:4)
+    at handlePromise (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/methods/main-async.js:151:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async CAC.runLint (/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/scripts/vsh/src/lint/index.ts:19:5) {
+  shortMessage: 'Command failed with exit code 1: eslint . --cache --fix',
+  command: 'eslint . --cache --fix',
+  escapedCommand: 'eslint . --cache --fix',
+  cwd: '/Users/zhaoxiaojie/Downloads/main/Quality-Guardian',
+  durationMs: 3522.631958,
+  failed: true,
+  timedOut: false,
+  isCanceled: false,
+  isGracefullyCanceled: false,
+  isTerminated: false,
+  isMaxBuffer: false,
+  isForcefullyTerminated: false,
+  exitCode: 1,
+  stdio: [ undefined, undefined, undefined ],
+  ipcOutput: [],
+  pipedFrom: []
+}
+
+Node.js v24.10.0
+ ELIFECYCLE  Command failed with exit code 1.

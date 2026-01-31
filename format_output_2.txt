@@ -1,0 +1,4 @@
+
+> quality-guardian-system@1.0.13 format /Users/zhaoxiaojie/Downloads/main/Quality-Guardian
+> vsh lint --format
+

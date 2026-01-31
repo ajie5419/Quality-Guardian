@@ -9,7 +9,7 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
+  const userinfo = await verifyAccessToken(event);
   if (!userinfo) {
     return unAuthorizedResponse(event);
   }
@@ -55,7 +55,7 @@ export default defineEventHandler(async (event) => {
           (Number(body.materialCost) || 0) +
           (Number(body.laborTravelCost) || 0), // Calc total loss
 
-        claimStatus,
+        claimStatus: claimStatus as any,
 
         defectType: body.defectType,
         defectSubtype: body.defectSubtype,

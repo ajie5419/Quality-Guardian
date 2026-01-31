@@ -1,0 +1,19 @@
+
+> quality-guardian-system@1.0.13 check:type /Users/zhaoxiaojie/Downloads/main/Quality-Guardian
+> turbo run typecheck
+
+turbo 2.5.4
+
+• Packages in scope: @qgs/backend, @qgs/shared, @qgs/web-antd, @vben-core/composables, @vben-core/design, @vben-core/form-ui, @vben-core/icons, @vben-core/layout-ui, @vben-core/menu-ui, @vben-core/popup-ui, @vben-core/preferences, @vben-core/shadcn-ui, @vben-core/shared, @vben-core/tabs-ui, @vben-core/typings, @vben/access, @vben/commitlint-config, @vben/common-ui, @vben/constants, @vben/eslint-config, @vben/hooks, @vben/icons, @vben/layouts, @vben/locales, @vben/node-utils, @vben/plugins, @vben/preferences, @vben/prettier-config, @vben/request, @vben/stores, @vben/stylelint-config, @vben/styles, @vben/tailwind-config, @vben/tsconfig, @vben/turbo-run, @vben/types, @vben/utils, @vben/vite-config, @vben/vsh
+• Running typecheck in 39 packages
+• Remote caching disabled
+@qgs/web-antd:typecheck: cache miss, executing 0cc1c0e33428f3d4
+@qgs/web-antd:typecheck: 
+@qgs/web-antd:typecheck: > @qgs/web-antd@1.0.0 typecheck /Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd
+@qgs/web-antd:typecheck: > vue-tsc --noEmit --skipLibCheck
+@qgs/web-antd:typecheck: 
+
+ Tasks:    1 successful, 1 total
+Cached:    0 cached, 1 total
+  Time:    10.154s 
+
