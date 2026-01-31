@@ -137,4 +137,4 @@ export {
   QMS_PRODUCT_OPTIONS as PRODUCT_OPTIONS,
   QMS_PRODUCT_SUBTYPES as PRODUCT_SUBTYPES,
   QMS_SEVERITY_OPTIONS as SEVERITY_OPTIONS,
-} from '../common/constants';
+} from '@qgs/shared';

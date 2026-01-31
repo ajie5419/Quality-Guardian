@@ -562,7 +562,8 @@
     "columns": {
       "seq": "序号",
       "isClaim": "是否索赔",
-      "action": "操作"
+      "action": "操作",
+      "reportMonth": "统计月份"
     },
     "chart": {
       "add": "添加图表",

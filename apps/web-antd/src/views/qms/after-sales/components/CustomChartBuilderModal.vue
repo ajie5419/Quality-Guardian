@@ -83,7 +83,7 @@ function autoGenerateTitle() {
   )?.label;
   const met = CHART_METRICS.find((m) => m.value === formState.metric)?.label;
   if (dim && met) {
-    formState.title = t('qms.afterSales.chart.autoTitle', [dim, met]);
+    formState.title = t('qms.afterSales.chart.autoTitle', [t(dim), t(met)]);
   }
 }
 
@@ -103,6 +103,7 @@ watch(
           renderEcharts,
           props.sourceData,
           { id: 'preview', ...formState },
+          t,
           props.deptData,
         );
       }, 100);

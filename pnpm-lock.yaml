@@ -607,6 +607,9 @@ importers:
       '@prisma/client':
         specifier: 6.2.1
         version: 6.2.1(prisma@6.2.1)
+      '@qgs/shared':
+        specifier: workspace:*
+        version: link:../../packages/qgs-shared
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0

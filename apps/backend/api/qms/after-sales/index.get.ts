@@ -1,6 +1,6 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
+import { AfterSalesService } from '~/services/after-sales.service';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -9,69 +9,18 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const { year, workOrderNumber, projectName, status, supplierBrand } =
-    getQuery(event);
+  const query = getQuery(event);
 
-  // Date Logic
-  let dateFilter: Record<string, Date> = {};
-  if (year) {
-    const y = Number.parseInt(String(year));
-    dateFilter = {
-      gte: new Date(`${y}-01-01T00:00:00.000Z`),
-      lte: new Date(`${y}-12-31T23:59:59.999Z`),
-    };
-  }
+  // Transform query params to expected types
+  const params = {
+    year: query.year ? Number.parseInt(String(query.year)) : undefined,
+    workOrderNumber: query.workOrderNumber ? String(query.workOrderNumber) : undefined,
+    projectName: query.projectName ? String(query.projectName) : undefined,
+    status: query.status ? String(query.status) : undefined,
+    supplierBrand: query.supplierBrand ? String(query.supplierBrand) : undefined,
+  };
 
-  try {
-    const list = await prisma.after_sales.findMany({
-      where: {
-        isDeleted: false,
-        ...(year ? { occurDate: dateFilter } : {}),
-        ...(workOrderNumber && String(workOrderNumber).trim() !== ''
-          ? { workOrderNumber: String(workOrderNumber).trim() }
-          : {}),
-        ...(projectName && String(projectName).trim() !== ''
-          ? { projectName: { contains: String(projectName).trim() } }
-          : {}),
-        ...(status && String(status).trim() !== ''
-          ? { claimStatus: String(status).trim() }
-          : {}),
-        ...(supplierBrand && String(supplierBrand).trim() !== ''
-          ? {
-              OR: [
-                { supplierBrand: { contains: String(supplierBrand).trim() } },
-                { projectName: { contains: String(supplierBrand).trim() } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  const list = await AfterSalesService.getList(params);
 
-    // Helper function to format date as YYYY-MM-DD
-    const formatDate = (date: Date | null | undefined) => {
-      if (!date) return null;
-      return date.toISOString().split('T')[0];
-    };
-
-    // Map to frontend expectation with formatted dates
-    const result = list.map((item) => ({
-      ...item,
-      issueDate: formatDate(item.occurDate),
-      occurDate: formatDate(item.occurDate),
-      factoryDate: formatDate(item.factoryDate),
-      closeDate: formatDate(item.closeDate),
-      shipDate: formatDate(item.shipDate),
-      createdAt: formatDate(item.createdAt),
-      responsibleDept: item.respDept,
-      resolutionPlan: item.solution,
-      status: item.claimStatus,
-      isClaim: item.isClaim,
-    }));
-
-    return useResponseSuccess(result);
-  } catch (error) {
-    console.error('Failed to fetch after sales:', error);
-    return useResponseSuccess([]);
-  }
+  return useResponseSuccess(list);
 });

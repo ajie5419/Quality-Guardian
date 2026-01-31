@@ -5,7 +5,7 @@ import type { ECOption as EChartsOption } from '@vben/plugins/echarts';
 import type { ChartConfig } from '#/components/Qms/ChartBuilder/types';
 import type { DeptTreeNode } from '#/types';
 
-import { useI18n } from '@vben/locales';
+
 
 import { aggregateChartData } from '#/components/Qms/ChartBuilder/composables/useChartCore';
 import { findNameById } from '#/types';
@@ -17,15 +17,14 @@ export { type ChartConfig };
 export function getAfterSalesChartOption(
   data: AfterSalesItem[],
   config: ChartConfig,
+  t: (key: string) => string,
   deptData?: DeptTreeNode[],
 ): EChartsOption | null {
-  const { t } = useI18n();
-
   return aggregateChartData(
     data,
     config,
-    CHART_DIMENSIONS,
-    CHART_METRICS,
+    CHART_DIMENSIONS.map((d) => ({ ...d, label: t(d.label) })),
+    CHART_METRICS.map((m) => ({ ...m, label: t(m.label) })),
     // Value Calculator
     (item, metric) => {
       if (metric === 'totalLoss') {
@@ -61,10 +60,11 @@ export function renderCustomChart(
   renderFn: (option: any, clear?: boolean) => any,
   data: AfterSalesItem[],
   config: ChartConfig,
+  t: (key: string) => string,
   deptData?: DeptTreeNode[],
 ) {
   if (!renderFn) return;
-  const option = getAfterSalesChartOption(data, config, deptData);
+  const option = getAfterSalesChartOption(data, config, t, deptData);
   if (option) {
     renderFn(option);
   }

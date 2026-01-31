@@ -15,7 +15,7 @@ import { Button, Card, message, Modal } from 'ant-design-vue';
 import { getAfterSalesList } from '#/api/qms/after-sales';
 import { getDeptList } from '#/api/system/dept';
 
-import { getAfterSalesChartOption } from '../composables/useChartAggregation';
+
 import { CHART_DIMENSIONS, CHART_METRICS } from '../constants';
 import CustomChartBuilderModal from './CustomChartBuilderModal.vue';
 import CustomChartItem from './CustomChartItem.vue';
@@ -309,7 +309,6 @@ watch(
       :dept-data="deptList"
       :dimension-options="CHART_DIMENSIONS"
       :metric-options="CHART_METRICS"
-      :get-option="getAfterSalesChartOption"
       @save="handleSaveCustomChart"
     />
   </div>

@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@prisma/client": "6.2.1",
+    "@qgs/shared": "workspace:*",
     "bcrypt": "^6.0.0",
     "jsonwebtoken": "catalog:",
     "nitropack": "catalog:",

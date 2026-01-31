@@ -1,3 +1,4 @@
+import { QMS_DEFAULT_VALUES, QMS_STATUS_COLOR_MAP } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -16,16 +17,17 @@ export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
 
-    // Map Status
+    // Standardized Status Mapping
     let claimStatus = 'OPEN';
-    if (body.status === '已结束') claimStatus = 'CLOSED';
-    else if (body.status === '处理中') claimStatus = 'IN_PROGRESS';
+    if (body.status && QMS_STATUS_COLOR_MAP[body.status]) {
+      claimStatus = body.status;
+    }
 
     const newItem = await prisma.after_sales.create({
       data: {
-        id: `AS-${Date.now()}`,
+        id: `AS-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
         serialNumber: Math.floor(Date.now() / 1000), // Use seconds to fit INT
-        workOrderNumber: body.workOrderNumber || 'UNKNOWN',
+        workOrderNumber: body.workOrderNumber || QMS_DEFAULT_VALUES.UNKNOWN_WORK_ORDER,
         projectName: body.projectName || '',
         customerName: body.customerName,
         location: body.location,

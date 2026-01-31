@@ -12,3 +12,4 @@ export * from './modules/qms/work-order';
 export * from './modules/system/enums';
 
 export * from './modules/system/types';
+export * from './modules/qms/constants';

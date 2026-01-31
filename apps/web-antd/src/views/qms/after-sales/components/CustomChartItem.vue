@@ -8,6 +8,7 @@ import type { DeptTreeNode } from '#/types';
 
 import { onMounted, ref, watch } from 'vue';
 
+import { useI18n } from '@vben/locales';
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
 
 import { renderCustomChart } from '../composables/useChartAggregation';
@@ -21,13 +22,14 @@ const props = defineProps<{
 
 const chartRef = ref<EchartsUIType>();
 const { renderEcharts } = useEcharts(chartRef);
+const { t } = useI18n();
 
 // 渲染图表
 function render() {
   if (!props.data || props.data.length === 0) return;
 
   // 使用标准的 renderEcharts 函数，它会自动处理 setOption 和 resize
-  renderCustomChart(renderEcharts, props.data, props.config, props.deptData);
+  renderCustomChart(renderEcharts, props.data, props.config, t, props.deptData);
 }
 
 // 监听数据或配置变化

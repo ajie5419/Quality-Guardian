@@ -1,3 +1,4 @@
+import { QMS_STATUS_COLOR_MAP } from '@qgs/shared';
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -28,7 +29,7 @@ export default defineEventHandler(async (event) => {
 
     // Map fields
     if (bodyRecord.issueDate)
-      updateData.occurDate = new Date(bodyRecord.issueDate);
+      updateData.occurDate = new Date(bodyRecord.issueDate as string);
     if (bodyRecord.responsibleDept) {
       updateData.respDept = bodyRecord.responsibleDept;
       updateData.feedbackDept = bodyRecord.responsibleDept;
@@ -36,9 +37,8 @@ export default defineEventHandler(async (event) => {
     if (bodyRecord.resolutionPlan)
       updateData.solution = bodyRecord.resolutionPlan;
     if (bodyRecord.status) {
-      if (bodyRecord.status === '已结束') updateData.claimStatus = 'CLOSED';
-      else if (bodyRecord.status === '处理中')
-        updateData.claimStatus = 'IN_PROGRESS';
+      const status = bodyRecord.status as string;
+      if (QMS_STATUS_COLOR_MAP[status]) updateData.claimStatus = status;
       else updateData.claimStatus = 'OPEN';
     }
 
@@ -73,9 +73,9 @@ export default defineEventHandler(async (event) => {
     if (bodyRecord.runningHours)
       updateData.runningHours = Number(bodyRecord.runningHours);
     if (bodyRecord.factoryDate)
-      updateData.factoryDate = new Date(bodyRecord.factoryDate);
+      updateData.factoryDate = new Date(bodyRecord.factoryDate as string);
     if (bodyRecord.closeDate)
-      updateData.closeDate = new Date(bodyRecord.closeDate);
+      updateData.closeDate = new Date(bodyRecord.closeDate as string);
 
     await prisma.after_sales.update({
       where: { id },

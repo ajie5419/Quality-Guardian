@@ -1,3 +1,4 @@
+import { QMS_STATUS_COLOR_MAP } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -25,14 +26,22 @@ export default defineEventHandler(async (event) => {
         const woNumber = String(item.workOrderNumber || '').trim();
         if (!woNumber) continue;
 
-        const id = `AS-${Date.now()}-${Math.random().toString(36).slice(-4)}`;
+        // Standardized ID Generation
+        const id = `AS-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+        // Validate Status using Shared Constants
+        let status = 'OPEN';
+        if (item.status && QMS_STATUS_COLOR_MAP[item.status]) {
+          // If the status key itself is passed (e.g. IN_PROGRESS)
+          status = item.status;
+        }
 
         await prisma.after_sales.create({
           data: {
             id,
             serialNumber: Math.floor(Math.random() * 1_000_000),
             occurDate: new Date(item.issueDate || item.occurDate || Date.now()),
-            claimStatus: (item.status || 'OPEN') as any,
+            claimStatus: status,
             projectName: String(item.projectName || ''),
             customerName: String(item.customerName || ''),
             workOrderNumber: woNumber,
