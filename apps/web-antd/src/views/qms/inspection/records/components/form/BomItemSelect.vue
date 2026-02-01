@@ -59,7 +59,7 @@ async function fetchBomItems() {
   }
 }
 
-function handleChange(val: any, option: any) {
+function handleChange(val: SelectProps['value'], option: any) {
   emit('update:value', val);
   emit('change', val, option);
 }

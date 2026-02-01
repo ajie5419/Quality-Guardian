@@ -1,71 +1,176 @@
 #!/bin/bash
 
-# 确保脚本在出错时立即停止
-set -e
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# --- 配置加载 ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/.env.deploy" ]; then
+    source "$SCRIPT_DIR/.env.deploy"
+else
+    echo -e "${RED}❌ 错误：缺少 .env.deploy 配置文件${NC}"
+    exit 1
+fi
+
+: "${REGISTRY:?未设置 REGISTRY}"
+: "${REPO:?未设置 REPO}"
+: "${ECS_IP:?未设置 ECS_IP}"
+: "${ECS_SSH_KEY:?未设置 ECS_SSH_KEY}"
 
 # --- 1. 版本管理 ---
 CURRENT_VERSION=$(node -p "require('./package.json').version")
-echo "📌 当前项目版本: $CURRENT_VERSION"
+echo -e "${BLUE}📌 当前项目版本: $CURRENT_VERSION${NC}"
 
-# 询问是否升级版本号以清除前端缓存 (Vben 机制)
-read -p "是否需要升级版本号? (y: 升级最后一位 / n: 保持当前) [y/n]: " IS_BUMP
-if [ "$IS_BUMP" == "y" ]; then
-    # 使用 npm version 自动升级补丁版本号 (patch)
-    npm version patch --no-git-tag-version
-    NEW_VERSION=$(node -p "require('./package.json').version")
-    echo "✅ 版本号已从 $CURRENT_VERSION 升级至: $NEW_VERSION"
+if [ -z "${AUTO_BUMP:-}" ]; then
+    read -p "是否需要升级版本号? (y: patch / m: minor / n: 保持) [y/m/n]: " IS_BUMP
 else
-    NEW_VERSION=$CURRENT_VERSION
-    echo "ℹ️ 保持当前版本号 $NEW_VERSION 进行构建。"
+    IS_BUMP="${AUTO_BUMP}"
 fi
+
+case "$IS_BUMP" in
+    y|Y) npm version patch --no-git-tag-version ;;
+    m|M) npm version minor --no-git-tag-version ;;
+    n|N|"") echo -e "${YELLOW}ℹ️ 保持当前版本号${NC}" ;;
+    *) echo -e "${RED}❌ 无效选项${NC}"; exit 1 ;;
+esac
+
+NEW_VERSION=$(node -p "require('./package.json').version")
+echo -e "${GREEN}✅ 版本: $NEW_VERSION${NC}"
 
 TAG="v$NEW_VERSION"
 
-# --- 配置区 ---
-REGISTRY="crpi-jy3d0qwkxxv0twpn.cn-beijing.personal.cr.aliyuncs.com"
-REPO="ajie5419/qms"
-ECS_IP="8.141.123.254" 
+# --- 2. 代码检查 ---
+echo -e "${BLUE}🧪 2. 代码质量检测...${NC}"
+FAIL=0
+pnpm run lint & LINT_PID=$!
+pnpm run check:type & TYPE_PID=$!
 
-echo "🧪 2. 启动本地代码质量检测..."
+wait $LINT_PID || { echo -e "${RED}❌ Lint 失败${NC}"; FAIL=1; }
+wait $TYPE_PID || { echo -e "${RED}❌ 类型检查失败${NC}"; FAIL=1; }
 
-# 2a. 代码风格校验 (Lint)
-echo "   🔍 正在运行 Lint 检查..."
-pnpm run lint
+if [ "$FAIL" -ne 0 ]; then
+    echo -e "${RED}❌ 检测未通过，终止部署${NC}"
+    exit 1
+fi
 
-# 2b. 类型检查 (Type Check)
-echo "   TypeScript 正在运行类型检查..."
-pnpm run check:type
+# --- 3. 登录 & 构建 ---
+echo -e "${BLUE}🔐 3. 登录阿里云镜像仓库...${NC}"
+echo "$REGISTRY_PASSWORD" | docker login --username="$REGISTRY_USERNAME" --password-stdin "$REGISTRY"
 
-# 2c. 单元测试 (Unit Test)
-echo "   🧪 正在运行单元测试..."
-# pnpm run test:unit # 如需提速可先注释
+echo -e "${BLUE}🏗️ 4. 构建镜像 (BuildKit)...${NC}"
+export DOCKER_BUILDKIT=1
+export BUILDKIT_PROGRESS=plain
 
-echo "✨ 代码质量检测通过！准备开始部署流程。"
+# 并行构建
+docker build --platform linux/amd64 \
+    --build-arg BUILDKIT_INLINE_CACHE=1 \
+    --cache-from "$REGISTRY/$REPO:backend-latest" \
+    -t "$REGISTRY/$REPO:backend-latest" \
+    -t "$REGISTRY/$REPO:backend-$TAG" \
+    -f Dockerfile.backend . &
 
-echo "🔐 3. 登录阿里云容器镜像服务..."
-docker login --username=赵小杰5419 $REGISTRY
+BACKEND_PID=$!
 
-echo "🏗️ 4. 开始本地构建镜像 (linux/amd64) - Tag: $TAG"
-docker build --platform linux/amd64 -t qms-backend -f Dockerfile.backend .
-docker build --platform linux/amd64 -t qms-frontend -f Dockerfile.frontend .
+docker build --platform linux/amd64 \
+    --build-arg BUILDKIT_INLINE_CACHE=1 \
+    --cache-from "$REGISTRY/$REPO:frontend-latest" \
+    -t "$REGISTRY/$REPO:frontend-latest" \
+    -t "$REGISTRY/$REPO:frontend-$TAG" \
+    -f Dockerfile.frontend . &
 
-echo "🏷️ 5. 为镜像打标签 (latest + $TAG)..."
-docker tag qms-backend $REGISTRY/$REPO:backend-latest
-docker tag qms-backend $REGISTRY/$REPO:backend-$TAG
-docker tag qms-frontend $REGISTRY/$REPO:frontend-latest
-docker tag qms-frontend $REGISTRY/$REPO:frontend-$TAG
+FRONTEND_PID=$!
 
-echo "📤 6. 推送镜像至阿里云 ACR..."
-docker push $REGISTRY/$REPO:backend-latest
-docker push $REGISTRY/$REPO:backend-$TAG
-docker push $REGISTRY/$REPO:frontend-latest
-docker push $REGISTRY/$REPO:frontend-$TAG
+wait $BACKEND_PID || { echo -e "${RED}❌ 后端构建失败${NC}"; exit 1; }
+wait $FRONTEND_PID || { echo -e "${RED}❌ 前端构建失败${NC}"; exit 1; }
 
-echo "🚀 7. 远程连接 ECS 执行更新..."
-# 使用您的 mac.pem 密钥进行登录
-ssh -i ~/.ssh/mac.pem root@$ECS_IP "cd /opt/qms && docker-compose pull && docker-compose up -d && docker image prune -f"
+# --- 5. 推送镜像 ---
+echo -e "${BLUE}📤 5. 推送镜像...${NC}"
+docker push "$REGISTRY/$REPO:backend-latest" & B_PUSH=$!
+docker push "$REGISTRY/$REPO:backend-$TAG" & B_TAG_PUSH=$!
+docker push "$REGISTRY/$REPO:frontend-latest" & F_PUSH=$!
+docker push "$REGISTRY/$REPO:frontend-$TAG" & F_TAG_PUSH=$!
+wait $B_PUSH $B_TAG_PUSH $F_PUSH $F_TAG_PUSH
 
-echo "✅ 部署完成！"
-echo "🌟 提示：若版本已升级，前端缓存将在用户下次登录时自动清理。"
+# --- 6. 远程部署（修复版）---
+echo -e "${BLUE}🚀 6. 执行远程部署...${NC}"
 
-echo "✅ 所有任务已完成！您的应用已在云端更新。"
+DEPLOY_SCRIPT=$(cat << EOF
+set -e
+cd /opt/qms
+
+echo "📝 备份当前运行版本（在拉取新镜像前）..."
+# 🌟 关键修复：先备份当前配置，再拉取镜像
+cp docker-compose.yml docker-compose.backup.yml
+
+echo "⬇️ 拉取新镜像..."
+docker-compose pull
+
+echo "🗄️ 数据库已存在，跳过迁移..."
+# 🌟 生产数据库已经存在且有数据，跳过 migrate deploy
+# 如果需要更新 schema，请手动执行 prisma db push 或创建新的 migration
+# set -a
+# source .env.production
+# set +a
+# if ! docker-compose run --rm -e DATABASE_URL="\$DATABASE_URL" backend sh -c "cd /app && ./apps/backend/node_modules/.bin/prisma migrate deploy --schema=./prisma/schema.prisma"; then
+#     echo "❌ 数据库迁移失败，执行回滚..."
+#     docker-compose -f docker-compose.backup.yml up -d
+#     exit 1
+# fi
+
+echo "🔄 更新后端服务..."
+# 🌟 关键修复：单台 ECS 不要用 scale=2，直接用 recreate
+docker-compose up -d --no-deps backend
+
+echo "⏳ 等待后端健康检查（10秒）..."
+sleep 10
+
+echo "🔄 更新前端..."
+docker-compose up -d --no-deps frontend
+
+echo "🧹 清理旧镜像..."
+docker image prune -af --filter "until=168h"
+
+echo "✅ 部署完成"
+EOF
+)
+
+# 6.0 上传配置（修复 env 丢失）
+echo -e "${BLUE}📤 上传最新配置...${NC}"
+scp -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no "$SCRIPT_DIR/docker-compose.yml" "root@$ECS_IP:/opt/qms/docker-compose.yml"
+scp -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no "$SCRIPT_DIR/.env" "root@$ECS_IP:/opt/qms/.env.production"
+
+if ssh -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10 "root@$ECS_IP" "$DEPLOY_SCRIPT"; then
+    echo -e "${GREEN}✅ 远程部署成功${NC}"
+else
+    echo -e "${RED}❌ 部署失败${NC}"
+    exit 1
+fi
+
+# --- 7. 健康检查 ---
+echo -e "${BLUE}🏥 7. 健康检查...${NC}"
+HEALTH_URL="http://$ECS_IP/api/status"
+MAX_RETRIES=6
+RETRY_COUNT=0
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if curl -sf "$HEALTH_URL" > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ 健康检查通过！${NC}"
+        break
+    else
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        echo -e "${YELLOW}⏳ 等待服务就绪... ($RETRY_COUNT/$MAX_RETRIES)${NC}"
+        sleep 5
+    fi
+done
+
+if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+    echo -e "${RED}❌ 健康检查失败，请检查: ssh root@$ECS_IP 'docker-compose logs backend'${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}🎉 部署完成！版本: $TAG${NC}"

@@ -320,11 +320,7 @@ function handleSuccess() {
       <SupplierStats :stats="stats" type="Outsourcing" />
 
       <!-- 表格 -->
-      <Card
-        :title="t('qms.outsourcing.performanceList')"
-        :bordered="false"
-        class="shadow-sm"
-      >
+      <Card :bordered="false" class="shadow-sm">
         <Grid>
           <template #toolbar-actions>
             <Space>

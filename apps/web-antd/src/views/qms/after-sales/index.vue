@@ -14,7 +14,7 @@ import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
-import { Button, message, Modal, Select, Space, Tag } from 'ant-design-vue';
+import { Button, message, Modal, Select, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
@@ -38,6 +38,7 @@ const { t } = useI18n();
 
 const showCharts = ref(false);
 const chartRefreshKey = ref(0);
+const chartsRef = ref<any>(null);
 
 // 缓存失效控制
 const { invalidateAfterSales } = useInvalidateQmsQueries();
@@ -50,6 +51,9 @@ const canDelete = computed(() => hasAccessByCodes(['QMS:AfterSales:Delete']));
 const canSettle = computed(() => hasAccessByCodes(['QMS:AfterSales:Settle']));
 const canImport = computed(() => hasAccessByCodes(['QMS:AfterSales:Import']));
 const canExport = computed(() => hasAccessByCodes(['QMS:AfterSales:Export']));
+const canAddChart = computed(() =>
+  hasAccessByCodes(['QMS:AfterSales:ChartAdd']),
+);
 
 // 状态选项
 const { getStatusInfo } = useStatusOptions();
@@ -114,6 +118,24 @@ const gridOptions = computed(() => ({
   checkboxConfig: {
     reserve: true,
     highlight: true,
+  },
+  toolbarConfig: {
+    export: canExport.value,
+    import: canImport.value,
+    refresh: true,
+    search: true,
+    zoom: true,
+    custom: true,
+    slots: { buttons: 'toolbar-actions' },
+  },
+  importConfig: {
+    remote: true,
+    importMethod: ({ file }: any) => handleImport({ file }),
+  },
+  exportConfig: {
+    remote: false,
+    types: ['xlsx', 'csv'],
+    modes: ['current', 'selected', 'all'],
   },
   columns: [
     { type: 'checkbox', width: 50, fixed: 'left' },
@@ -302,26 +324,6 @@ const gridOptions = computed(() => ({
       },
     },
   ],
-  toolbarConfig: {
-    export: canExport.value,
-    import: canImport.value,
-    search: true,
-    refresh: true,
-    zoom: true,
-    custom: true,
-    slots: {
-      buttons: 'toolbar-actions',
-    },
-  },
-  importConfig: {
-    remote: true,
-    importMethod: handleImport,
-  },
-  exportConfig: {
-    remote: false,
-    types: ['xlsx', 'csv'],
-    modes: ['current', 'selected', 'all'],
-  },
   proxyConfig: {
     ajax: {
       query: async (
@@ -561,7 +563,11 @@ function handleModalSuccess() {
   <Page>
     <div class="flex h-full flex-col">
       <div v-if="showCharts" class="mb-4 flex-shrink-0">
-        <AfterSalesCharts :year="currentYear" :refresh-key="chartRefreshKey" />
+        <AfterSalesCharts
+          ref="chartsRef"
+          :year="currentYear"
+          :refresh-key="chartRefreshKey"
+        />
       </div>
 
       <div class="flex-1 overflow-hidden rounded-lg bg-white">
@@ -577,17 +583,7 @@ function handleModalSuccess() {
             </Tag>
           </template>
           <template #toolbar-actions>
-            <Space>
-              <Button
-                @click="showCharts = !showCharts"
-                shape="round"
-                :type="showCharts ? 'primary' : 'default'"
-              >
-                <template #icon>
-                  <IconifyIcon icon="lucide:bar-chart-3" />
-                </template>
-                {{ showCharts ? t('common.hideChart') : t('common.showChart') }}
-              </Button>
+            <div class="flex flex-wrap items-center gap-2">
               <Button
                 v-if="canCreate"
                 shape="round"
@@ -611,7 +607,32 @@ function handleModalSuccess() {
                 </template>
                 {{ t('common.batchDelete') }}
               </Button>
-              <div class="ml-2 flex items-center gap-2">
+              <Button
+                v-if="canAddChart"
+                shape="round"
+                @click="
+                  () => {
+                    showCharts = true;
+                    chartsRef?.handleAddCustomChart();
+                  }
+                "
+              >
+                <template #icon>
+                  <IconifyIcon icon="lucide:plus" />
+                </template>
+                新增图表
+              </Button>
+              <Button shape="round" @click="showCharts = !showCharts">
+                <template #icon>
+                  <IconifyIcon
+                    :icon="
+                      showCharts ? 'lucide:bar-chart-3' : 'lucide:bar-chart-3'
+                    "
+                  />
+                </template>
+                {{ showCharts ? t('common.hideChart') : t('common.showChart') }}
+              </Button>
+              <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-500"
                   >{{ t('qms.inspection.records.statsYear') }}:</span
                 >
@@ -623,7 +644,7 @@ function handleModalSuccess() {
                   @change="() => gridApi.reload()"
                 />
               </div>
-            </Space>
+            </div>
           </template>
         </Grid>
       </div>

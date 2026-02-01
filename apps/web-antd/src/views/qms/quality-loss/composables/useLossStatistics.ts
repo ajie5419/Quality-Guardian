@@ -25,9 +25,12 @@ export function useLossStatistics(allLossData: Ref<QualityLossItem[]>) {
       0,
     );
 
-    // 挽回率 (百分比字符串)
-    const recoveryRate =
-      totalAmount > 0 ? ((totalClaim / totalAmount) * 100).toFixed(1) : '0';
+    // 挽回率 (保留一位小数的数字)
+    const numericRate =
+      totalAmount > 0 ? Math.round((totalClaim / totalAmount) * 1000) / 10 : 0;
+
+    // 显示时格式化
+    const displayRate = `${numericRate}%`;
 
     // 待处理损失额 (Pending 或 Processing 状态)
     const pendingAmount = data
@@ -41,7 +44,8 @@ export function useLossStatistics(allLossData: Ref<QualityLossItem[]>) {
     return {
       totalAmount,
       totalClaim,
-      recoveryRate,
+      recoveryRate: numericRate,
+      displayRate,
       pendingAmount,
     };
   });

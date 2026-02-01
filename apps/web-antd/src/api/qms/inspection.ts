@@ -65,6 +65,15 @@ export async function batchDeleteInspectionIssues(ids: string[]) {
   );
 }
 
+export async function importInspectionIssues(
+  items: Partial<InspectionIssue>[],
+) {
+  return requestClient.post<{ successCount: number }>(
+    `${QMS_API.INSPECTION_ISSUES}/import`,
+    { items },
+  );
+}
+
 // --- Inspection Records APIs ---
 
 export async function getInspectionRecords(params?: {

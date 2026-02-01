@@ -1,61 +1,66 @@
 FROM node:22-slim AS builder
 
-# 安装构建时需要的库
-RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+# 1. 系统依赖（变化最少，放最前）
+RUN apt-get update && apt-get install -y openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
+# 2. pnpm 环境（变化较少）
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN npm i -g corepack && corepack enable
+RUN npm i -g corepack && corepack enable \
+    && pnpm config set registry https://registry.npmmirror.com
+
+ENV TURBO_DAEMON=false \
+    TURBO_TELEMETRY_DISABLED=1 \
+    TURBO_UI=false
 
 WORKDIR /app
 
+# 3. 🌟 关键优化：先复制 workspace 定义和 lockfile
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+COPY apps/backend/package.json ./apps/backend/
+COPY packages ./packages
+COPY internal ./internal
+COPY scripts ./scripts
+COPY apps/backend/prisma ./apps/backend/prisma
+
+# 4. 安装依赖（利用缓存挂载 + 冻结 lockfile）
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+
+# 5. Prisma 引擎缓存（避免重复下载）
+RUN --mount=type=cache,id=prisma,target=/root/.cache/prisma \
+    pnpm --filter @qgs/backend exec prisma generate
+
+# 6. 复制源码（变化最频繁，放最后）
 COPY . .
 
-# Disable Turbo features that cause issues in Docker environments
-ENV TURBO_DAEMON=false
-ENV TURBO_TELEMETRY_DISABLED=1
-ENV TURBO_UI=false
+# 7. 构建
+RUN pnpm run build --filter=@qgs/backend --concurrency=2
 
-# 1. 设置镜像源并安装完整依赖
-RUN pnpm config set registry https://registry.npmmirror.com
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install
-
-# 2. 生成 Prisma Client
-RUN pnpm --filter @qgs/backend exec prisma generate --schema=prisma/schema.prisma
-
-# 3. 构建后端产物
-RUN pnpm run build --filter=@qgs/backend --log-order=stream --concurrency=1
-
-# 生产阶段
+# 生产阶段（单列重点优化项）
 FROM node:22-slim AS production
 
-RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 2. 关键修复：安装生产环境所需的运行时依赖
-# 除了 Prisma，还需要安装 bcrypt 供种子脚本加密密码使用
-# 设置 PRISMA_ENGINES_MIRROR 解决 binaries.prisma.sh 下载问题
-ENV PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma
-RUN npm config set registry https://registry.npmmirror.com && \
-    npm install prisma@6.2.1 @prisma/client@6.2.1 bcrypt@6.0.0 --omit=dev
+ENV NODE_ENV=production \
+    PORT=3000
 
-# 2. 复制构建产物、Prisma 定义和 package.json
-COPY --from=builder /app/apps/backend/.output /app/.output
-COPY --from=builder /app/apps/backend/prisma /app/prisma
-COPY --from=builder /app/apps/backend/package.json /app/package.json
+# 8. 🌟 关键优化：从构建阶段复制 node_modules（包含 bcrypt 和 prisma）
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/backend/node_modules ./apps/backend/node_modules
+COPY --from=builder /app/apps/backend/.output ./.output
+COPY --from=builder /app/apps/backend/prisma ./prisma
+COPY --from=builder /app/apps/backend/package.json ./package.json
 
-# 3. 核心修复：在生产环境 node_modules 中生成 Prisma Client
-# 这一步不可或缺，否则会报 "@prisma/client did not initialize yet"
-RUN npx prisma generate --schema=prisma/schema.prisma
+# 9. 不再重新生成 Prisma！也不再重新 npm install！
+# 构建阶段已经生成了，直接复制过来了
 
 EXPOSE 3000
 
-ENV NODE_ENV=production
-ENV PORT=3000
-
-# 自动化序列：
-# 1. db push: 同步表结构
-# 2. db seed: 自动填充菜单数据，彻底解决 404 问题
-# 3. node start: 运行服务
-CMD ["sh", "-c", "npx prisma@6.2.1 db push --accept-data-loss --skip-generate --schema=prisma/schema.prisma && npx prisma@6.2.1 db seed && node .output/server/index.mjs"]
+# 10. 🌟 关键修复：移除 db push！只启动服务
+# 数据库迁移应该在部署脚本中手动执行，而不是每次启动都执行
+CMD ["node", ".output/server/index.mjs"]

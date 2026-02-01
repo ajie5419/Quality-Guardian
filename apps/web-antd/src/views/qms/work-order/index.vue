@@ -331,12 +331,7 @@ function handleBatchDelete() {
       />
 
       <!-- 表格区域 -->
-      <Card
-        size="small"
-        :bordered="false"
-        class="shadow-sm"
-        :title="t('qms.workOrder.title')"
-      >
+      <Card size="small" :bordered="false" class="shadow-sm">
         <Grid>
           <!-- 核心修复：Toolbar 内部也保留按钮作为备份 -->
           <template #toolbar-actions>

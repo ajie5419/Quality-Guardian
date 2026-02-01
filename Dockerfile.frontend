@@ -2,42 +2,44 @@ FROM node:22-slim AS builder
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN npm i -g corepack && corepack enable
+
+# 镜像源和构建优化
+RUN npm i -g corepack && corepack enable \
+    && pnpm config set registry https://registry.npmmirror.com
+
+ENV TURBO_DAEMON=false \
+    TURBO_TELEMETRY_DISABLED=1 \
+    TURBO_UI=false \
+    GENERATE_SOURCEMAP=false \
+    NODE_ENV=production
 
 WORKDIR /app
 
+# 🌟 关键优化：分层复制依赖文件
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+COPY apps/web-antd/package.json ./apps/web-antd/
+# 如果有 vben 相关的 packages 也在这复制
+COPY packages ./packages
+COPY internal ./internal
+COPY scripts ./scripts
+
+# 安装依赖（缓存挂载）
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+
+# 复制源码
 COPY . .
 
-# Disable Turbo features that cause issues in Docker environments
-ENV TURBO_DAEMON=false
-ENV TURBO_TELEMETRY_DISABLED=1
-ENV TURBO_UI=false
-
-# 🌟 核心优化 1：设置国内镜像源并禁用 Source Map (极致节省内存)
-RUN pnpm config set registry https://registry.npmmirror.com
-ENV GENERATE_SOURCEMAP=false
-ENV NODE_ENV=production
-
-# Install dependencies
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
-
-# 🌟 核心优化 2：
-# 1. 调优内存限制至 4096MB (本地构建有充足内存)
-# 2. 依然分步构建，但主应用直接调用 Vite
-RUN export NODE_OPTIONS="--max-old-space-size=4096" && \
-    pnpm turbo build --filter="@vben/*" --concurrency=1 --log-order=stream && \
+# 构建（内存根据 Docker Desktop 实际分配调整，默认建议 2048）
+RUN NODE_OPTIONS="--max-old-space-size=4096" \
+    pnpm turbo run build --filter="!./apps/*" --concurrency=2 && \
     cd apps/web-antd && \
-    pnpm vite build --mode production --sourcemap false
+    pnpm vite build --mode production
 
-# Production stage
 FROM nginx:stable-alpine AS production
 
-# Copy custom nginx config
 COPY ./apps/web-antd/nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copy built static files
 COPY --from=builder /app/apps/web-antd/dist /usr/share/nginx/html
 
 EXPOSE 80
-
 CMD ["nginx", "-g", "daemon off;"]

@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { Rule } from 'ant-design-vue/es/form';
+
 import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
 import type { TreeSelectNode } from '#/types';
 
@@ -45,8 +47,27 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const { invalidateQualityLoss } = useInvalidateQmsQueries();
 
+const formRef = ref();
 const formState = reactive<Partial<QmsQualityLossApi.QualityLossItem>>({});
 const confirmLoading = ref(false);
+
+const rules: Record<string, Rule[]> = {
+  date: [{ required: true, message: '请选择日期', trigger: 'change' }],
+  type: [{ required: true, message: '请选择损失类型', trigger: 'change' }],
+  amount: [
+    {
+      required: true,
+      validator: (_: any, val: number | undefined) =>
+        val !== undefined && val >= 0
+          ? Promise.resolve()
+          : Promise.reject(new Error('金额不能为负数')),
+      trigger: 'blur',
+    },
+  ],
+  responsibleDepartment: [
+    { required: true, message: '请选择责任部门', trigger: 'change' },
+  ],
+};
 
 // 监听数据初始化
 watch(
@@ -54,7 +75,9 @@ watch(
   (val) => {
     if (val) {
       // 清除旧数据并合并新数据
-      Object.keys(formState).forEach((key) => delete (formState as any)[key]);
+      Object.keys(formState).forEach((key) => {
+        (formState as any)[key] = undefined;
+      });
       Object.assign(formState, props.initialData);
     }
   },
@@ -64,8 +87,9 @@ watch(
  * 提交表单
  */
 async function handleOk() {
-  confirmLoading.value = true;
   try {
+    await formRef.value.validate();
+    confirmLoading.value = true;
     await (props.isEditMode && formState.id
       ? updateQualityLoss(formState.id, formState)
       : createQualityLoss(formState));
@@ -74,6 +98,10 @@ async function handleOk() {
     emit('update:open', false);
     invalidateQualityLoss();
   } catch (error: any) {
+    if (error?.errorFields) {
+      console.warn('Validation failed:', error);
+      return;
+    }
     message.error(error.message || t('common.saveFailed'));
   } finally {
     confirmLoading.value = false;
@@ -95,7 +123,13 @@ const isManualSource = computed(
     width="640px"
     destroy-on-close
   >
-    <Form layout="vertical" class="pt-4">
+    <Form
+      ref="formRef"
+      :model="formState"
+      :rules="rules"
+      layout="vertical"
+      class="pt-4"
+    >
       <!-- 来源提示 -->
       <Alert
         v-if="!isManualSource"
@@ -108,7 +142,7 @@ const isManualSource = computed(
 
       <Row :gutter="16">
         <Col :span="12">
-          <FormItem label="日期" name="date">
+          <FormItem label="日期" name="date" required>
             <Input
               v-model:value="formState.date"
               type="date"
@@ -118,7 +152,7 @@ const isManualSource = computed(
           </FormItem>
         </Col>
         <Col :span="12">
-          <FormItem label="损失类型" name="type">
+          <FormItem label="损失类型" name="type" required>
             <Select
               v-model:value="formState.type"
               :options="LOSS_TYPE_OPTIONS"
@@ -130,7 +164,7 @@ const isManualSource = computed(
 
       <Row :gutter="16">
         <Col :span="12">
-          <FormItem label="预计损失金额 (¥)" name="amount">
+          <FormItem label="预计损失金额 (¥)" name="amount" required>
             <InputNumber
               v-model:value="formState.amount"
               class="w-full"
@@ -152,7 +186,7 @@ const isManualSource = computed(
         </Col>
       </Row>
 
-      <FormItem label="责任部门" name="responsibleDepartment">
+      <FormItem label="责任部门" name="responsibleDepartment" required>
         <TreeSelect
           v-model:value="formState.responsibleDepartment"
           :tree-data="deptTreeData"

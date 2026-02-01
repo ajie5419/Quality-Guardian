@@ -67,7 +67,7 @@ defineProps<{
               索赔挽回率
             </div>
             <div class="text-2xl font-bold text-gray-800">
-              {{ stats.recoveryRate }}%
+              {{ stats.displayRate }}
             </div>
           </div>
           <div

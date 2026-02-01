@@ -5,11 +5,27 @@ import { requestClient } from '#/api/request';
 // Re-export types
 export * from '@qgs/shared';
 
+export interface QualityLossPageResult {
+  items: QualityLossItem[];
+  total: number;
+}
+
 /**
- * Get Quality Loss list
+ * Get Quality Loss list (paginated)
  */
-export async function getQualityLossList() {
-  return requestClient.get<QualityLossItem[]>('/qms/quality-loss');
+export async function getQualityLossList(params?: any) {
+  return requestClient.get<QualityLossPageResult>('/qms/quality-loss', {
+    params,
+  });
+}
+
+/**
+ * Get Quality Loss summary (all records for KPIs and charts)
+ */
+export async function getQualityLossSummary(params?: any) {
+  return requestClient.get<QualityLossItem[]>('/qms/quality-loss/summary', {
+    params,
+  });
 }
 
 /**

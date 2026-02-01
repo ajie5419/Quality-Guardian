@@ -32,8 +32,10 @@ import {
   deleteInspectionIssue,
   getInspectionIssues,
   getInspectionIssueStats,
+  importInspectionIssues,
 } from '#/api/qms/inspection';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
+import { useGridImport } from '#/hooks/useGridImport';
 import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { findNameById } from '#/types';
@@ -98,6 +100,12 @@ const currentYear = ref<number>(new Date().getFullYear());
 const filteredIssues = ref<InspectionIssue[]>([]);
 const chartDashboardRef = ref();
 
+// Import Logic
+const { handleImport } = useGridImport({
+  gridApi: computed(() => gridApi),
+  importApi: importInspectionIssues,
+});
+
 const yearOptions = computed(() => {
   return dynamicYears.value.map((y) => ({
     label: `${y}${t('common.unit.year')}`,
@@ -121,68 +129,7 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
   },
   importConfig: {
     remote: true,
-    importMethod: async ({ file }: { file: File }) => {
-      const { requestClient } = await import('#/api/request');
-      const XLSX = await import('xlsx');
-
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, {
-          type: 'array',
-          cellDates: true,
-        });
-        const sheetName = workbook.SheetNames[0];
-        if (!sheetName) return;
-        const worksheet = workbook.Sheets[sheetName]!;
-        const results = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-        if (!results || results.length === 0) return;
-
-        const columns = gridApi.grid.getColumns();
-        const mappedItems = results.map((row) => {
-          const item: Record<string, unknown> = {};
-          columns.forEach((col) => {
-            const field = col.field;
-            const title = col.title;
-            if (field && title) {
-              const excelKey = Object.keys(row).find(
-                (k) =>
-                  String(k).replaceAll(/\s+/g, '') ===
-                  String(title).replaceAll(/\s+/g, ''),
-              );
-              if (excelKey) {
-                let val = row[excelKey];
-                if (val instanceof Date) {
-                  val = val.toISOString().split('T')[0];
-                }
-                item[field] = val;
-              }
-            }
-          });
-          return item as unknown as Partial<InspectionIssue>;
-        });
-
-        const res = await requestClient.post(
-          '/qms/inspection/issues/import',
-          {
-            items: mappedItems,
-          },
-          { timeout: 120_000 },
-        );
-
-        if (res.successCount > 0) {
-          message.success(
-            t('common.importSuccessCount', { count: res.successCount }),
-          );
-          gridApi.reload();
-        } else {
-          message.error(t('common.importFailed'));
-        }
-      } catch (error) {
-        console.error('Import Error:', error);
-        message.error(t('common.importFailed'));
-      }
-    },
+    importMethod: ({ file }: any) => handleImport({ file }),
   },
   exportConfig: {
     remote: false,
@@ -295,12 +242,7 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
           status: formValues?.status as string,
         });
 
-        // Still update filteredIssues if needed by other components like charts
-        // But note this is only one page. If charts need all data, we might need a separate call.
-        // Usually charts use the full data, so let's see where filteredIssues is used.
-        // For now, let's just make the grid fast.
         filteredIssues.value = items;
-
         return { items, total };
       },
       queryAll: async ({ form }: { form: Record<string, unknown> }) => {

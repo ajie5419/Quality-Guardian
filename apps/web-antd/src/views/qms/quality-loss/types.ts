@@ -26,7 +26,8 @@ export enum LossType {
 export interface LossStatistics {
   totalAmount: number;
   totalClaim: number;
-  recoveryRate: string;
+  recoveryRate: number;
+  displayRate: string;
   pendingAmount: number;
 }
 

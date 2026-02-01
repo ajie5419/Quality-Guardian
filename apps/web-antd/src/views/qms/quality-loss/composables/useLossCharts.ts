@@ -4,6 +4,8 @@ import type { Ref } from 'vue';
 
 import type { DeptNode } from '../types';
 
+import { computed, ref } from 'vue';
+
 import { findNameById } from '#/types';
 
 /**
@@ -13,11 +15,35 @@ export function useLossCharts(
   allLossData: Ref<QualityLossItem[]>,
   deptRawData: Ref<DeptNode[]>,
 ) {
+  // 获取可用的年份列表
+  const availableYears = computed(() => {
+    const years = new Set<number>();
+    allLossData.value.forEach((item) => {
+      if (item.date) {
+        years.add(new Date(item.date).getFullYear());
+      }
+    });
+
+    const yearList = [...years].sort((a, b) => b - a);
+    if (yearList.length === 0) {
+      yearList.push(new Date().getFullYear());
+    }
+    return yearList;
+  });
+
+  // 当前选中的年份
+  const selectedYear = ref<number>(new Date().getFullYear());
+
   /**
    * 生成责任部门分布饼图配置
    */
   function getDeptDistributionOption(): any {
-    const data = allLossData.value;
+    // 🌟 关键修复：只过滤选中年份的数据
+    const data = allLossData.value.filter((item) => {
+      if (!item.date) return false;
+      return new Date(item.date).getFullYear() === selectedYear.value;
+    });
+
     const deptMap: Record<string, number> = {};
 
     data.forEach((item) => {
@@ -53,7 +79,6 @@ export function useLossCharts(
    * 生成月度趋势图配置
    */
   function getTrendOption(): any {
-    const data = allLossData.value;
     const monthNames = [
       '1月',
       '2月',
@@ -68,21 +93,30 @@ export function useLossCharts(
       '11月',
       '12月',
     ];
-    const lossTrend: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    const claimTrend: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    const lossTrend: number[] = Array.from({ length: 12 }).fill(0) as number[];
+    const claimTrend: number[] = Array.from({ length: 12 }).fill(0) as number[];
 
-    data.forEach((item) => {
+    allLossData.value.forEach((item) => {
       if (!item.date) return;
       const date = new Date(item.date);
+      // 🌟 关键修复：只统计选中年份的数据
+      if (date.getFullYear() !== selectedYear.value) return;
+
       const month = date.getMonth();
-      if (month >= 0 && month < 12) {
-        lossTrend[month] = (lossTrend[month] || 0) + (Number(item.amount) || 0);
-        claimTrend[month] =
-          (claimTrend[month] || 0) + (Number(item.actualClaim) || 0);
-      }
+      if (month < 0 || month >= 12) return;
+
+      lossTrend[month] = (lossTrend[month] || 0) + (Number(item.amount) || 0);
+      claimTrend[month] =
+        (claimTrend[month] || 0) + (Number(item.actualClaim) || 0);
     });
 
     return {
+      title: {
+        text: `${selectedYear.value}年度 损益趋势`,
+        left: 'center',
+        top: 0,
+        textStyle: { fontSize: 13, color: '#666', fontWeight: 'normal' },
+      },
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       legend: { data: ['预计损失', '实际索赔'], bottom: 0 },
       grid: { left: '3%', right: '4%', bottom: '10%', containLabel: true },
@@ -119,5 +153,7 @@ export function useLossCharts(
   return {
     getDeptDistributionOption,
     getTrendOption,
+    availableYears,
+    selectedYear,
   };
 }

@@ -1,27 +1,56 @@
+version: '3.8'
+
 services:
   backend:
-    # 生产环境部署建议在 ECS 上将此地址改为 VPC 内网地址以加速
     image: crpi-jy3d0qwkxxv0twpn.cn-beijing.personal.cr.aliyuncs.com/ajie5419/qms:backend-latest
+    container_name: qms-backend
+    env_file:
+      - .env.production
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
       - NODE_ENV=production
+      - PORT=3000
     restart: always
-    expose:
-      - '3000'
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/status']
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    # 🌟 修复： expose 改为 ports，否则宿主机无法访问
+    ports:
+      - '127.0.0.1:3000:3000' # 仅监听本地，配合 Nginx 反向代理
+    networks:
+      - qms-network
+    # healthcheck:
+    #   test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/status']
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 60s # 给应用足够启动时间
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          memory: 512M
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '3'
 
   frontend:
     image: crpi-jy3d0qwkxxv0twpn.cn-beijing.personal.cr.aliyuncs.com/ajie5419/qms:frontend-latest
+    container_name: qms-frontend
     ports:
       - '80:80'
     depends_on:
-      - backend
+      - backend # 等待后端启动
     restart: always
+    networks:
+      - qms-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
+networks:
+  qms-network:
+    driver: bridge
+    name: qms-network

@@ -19,6 +19,7 @@ import {
   batchDeleteQualityLoss,
   deleteQualityLoss,
   getQualityLossList,
+  getQualityLossSummary,
 } from '#/api/qms/quality-loss';
 import { getDeptList } from '#/api/system/dept';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
@@ -154,19 +155,33 @@ const gridOptions = computed<VxeGridProps>(() => ({
   ],
   proxyConfig: {
     ajax: {
-      query: async ({ page }) => {
-        const data = await getQualityLossList();
-        allLossData.value = data;
-        const { currentPage = 1, pageSize = 20 } = page || {};
-        const start = (currentPage - 1) * pageSize;
-        return {
-          items: data.slice(start, start + pageSize),
-          total: data.length,
+      query: async ({ page, form }) => {
+        // 服务端分页：将分页参数和搜索表单同步传给后端
+        const params = {
+          page: page?.currentPage,
+          pageSize: page?.pageSize,
+          ...form,
         };
+        const result = await getQualityLossList(params);
+
+        // 注意：这里不再设置 allLossData，因为分页后的数据不适合做全量统计
+        return result;
       },
     },
   },
 }));
+
+/**
+ * 获取统计和图表所需的汇总数据（解耦分页）
+ */
+async function fetchSummaryData(filters: any = {}) {
+  try {
+    const data = await getQualityLossSummary(filters);
+    allLossData.value = data;
+  } catch (error) {
+    console.error('Failed to fetch summary data', error);
+  }
+}
 
 const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions: gridOptions as any,
@@ -213,8 +228,25 @@ const [Grid, gridApi] = useVbenVxeGrid({
       },
     ],
     submitOnChange: true,
+    submitButtonOptions: {
+      onClick: ({ formModel }: any) => {
+        // 点击搜索时，重新拉取统计数据
+        fetchSummaryData(formModel);
+      },
+    },
+    resetButtonOptions: {
+      onClick: () => {
+        fetchSummaryData();
+      },
+    },
   },
 } as any);
+
+// ================= 初始加载与联动 =================
+onMounted(async () => {
+  await loadInitialData();
+  fetchSummaryData(); // 初始拉取统计数据
+});
 
 // ================= 弹窗表单逻辑 =================
 const modalVisible = ref(false);
@@ -320,7 +352,7 @@ function getStatusConfig(s: string) {
       <LossCharts :data="allLossData" :departments="deptRawData" />
 
       <!-- 3. 明细列表区 -->
-      <Card title="质量损失明细清单" :bordered="false" class="shadow-sm">
+      <Card :bordered="false" class="shadow-sm">
         <Grid>
           <!-- 状态列 -->
           <template #status="{ row }">

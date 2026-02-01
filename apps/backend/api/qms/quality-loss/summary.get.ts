@@ -1,4 +1,4 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
 import { QualityLossService } from '~/services/quality-loss.service';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -11,18 +11,16 @@ export default defineEventHandler(async (event) => {
 
   const query = getQuery(event);
   const params = {
-    page: query.page ? Number(query.page) : undefined,
-    pageSize: query.pageSize ? Number(query.pageSize) : undefined,
     lossSource: query.lossSource as string,
     status: query.status as string,
     workOrderNumber: query.workOrderNumber as string,
   };
 
   try {
-    const result = await QualityLossService.getAllLosses(params);
+    const result = await QualityLossService.getLossSummary(params);
     return useResponseSuccess(result);
   } catch (error) {
-    console.error('Failed to fetch quality losses:', error);
-    return useResponseSuccess({ items: [], total: 0 });
+    console.error('Failed to fetch quality loss summary:', error);
+    return useResponseSuccess([]);
   }
 });

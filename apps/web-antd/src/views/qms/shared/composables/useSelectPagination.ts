@@ -115,7 +115,7 @@ export function useSelectPagination<T>(
   };
 
   const handleChange = (val: unknown, option: any) => {
-    const castedVal = val as null | T[keyof T] | undefined;
+    const castedVal = val as T[keyof T] | undefined;
     emit('update:value', castedVal);
     emit('change', castedVal, option);
     if (castedVal && (option?.item || option)) {
