@@ -37,9 +37,14 @@ export function useLossStatistics(allLossData: Ref<QualityLossItem[]>) {
       .filter(
         (item) =>
           item.status === QualityLossStatusEnum.PENDING ||
-          item.status === QualityLossStatusEnum.PROCESSING,
+          item.status === QualityLossStatusEnum.PROCESSING ||
+          item.status === QualityLossStatusEnum.RESOLVED,
       )
-      .reduce((acc, item) => acc + (Number(item.amount) || 0), 0);
+      .reduce(
+        (acc, item: any) =>
+          acc + (Number(item.amount) || 0) - (Number(item.actualClaim) || 0),
+        0,
+      );
 
     return {
       totalAmount,

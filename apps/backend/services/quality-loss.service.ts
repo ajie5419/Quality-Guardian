@@ -130,6 +130,7 @@ function formatManualLossItem(
     type: string;
     amount: unknown;
     actualClaim: unknown;
+    status?: string;
   } & { workOrderNumber?: string; projectName?: string },
 ): QualityLossResult {
   return {
@@ -143,6 +144,7 @@ function formatManualLossItem(
     partName: item.type,
     amount: safeNumber(item.amount),
     actualClaim: safeNumber(item.actualClaim),
+    status: item.status || QL_CONSTANTS.STATUS.PENDING,
   };
 }
 
@@ -151,7 +153,7 @@ function formatManualLossItem(
  */
 function formatInternalRecordItem(item: {
   id: string;
-  serialNumber: string;
+  serialNumber: number;
   date: Date;
   lossAmount: unknown;
   responsibleDepartment: string | null;
@@ -171,9 +173,13 @@ function formatInternalRecordItem(item: {
     responsibleDepartment: item.responsibleDepartment,
     description: item.description || undefined,
     status:
-      item.status === QL_CONSTANTS.STATUS.CLOSED
+      item.status === 'CLOSED'
         ? QL_CONSTANTS.STATUS.CONFIRMED
-        : QL_CONSTANTS.STATUS.PENDING,
+        : item.status === 'IN_PROGRESS' || item.status === 'CLAIMING'
+          ? 'Processing'
+          : item.status === 'RESOLVED'
+            ? 'Resolved'
+            : QL_CONSTANTS.STATUS.PENDING,
     type: QL_CONSTANTS.SOURCE.INTERNAL,
     lossSource: QL_CONSTANTS.SOURCE.INTERNAL,
     workOrderNumber: item.workOrderNumber,
@@ -216,9 +222,14 @@ function formatExternalSalesItem(item: {
     responsibleDepartment: item.respDept,
     description: item.issueDescription || undefined,
     status:
-      item.claimStatus === QL_CONSTANTS.STATUS.CLOSED
+      item.claimStatus === 'CLOSED' || item.claimStatus === 'COMPLETED'
         ? QL_CONSTANTS.STATUS.CONFIRMED
-        : QL_CONSTANTS.STATUS.PENDING,
+        : item.claimStatus === 'IN_PROGRESS' ||
+          ['SUBMITTED', 'NEGOTIATING'].includes(item.claimStatus)
+          ? 'Processing'
+          : item.claimStatus === 'RESOLVED'
+            ? 'Resolved'
+            : QL_CONSTANTS.STATUS.PENDING,
     type: QL_CONSTANTS.SOURCE.EXTERNAL,
     lossSource: QL_CONSTANTS.SOURCE.EXTERNAL,
     workOrderNumber: item.workOrderNumber || '-',
@@ -364,9 +375,9 @@ export const QualityLossService = {
       if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.MANUAL) {
         const filteredManual = workOrderNumber
           ? manualRecords.filter((r) => {
-              const record = r as typeof r & { workOrderNumber?: string };
-              return record.workOrderNumber?.includes(workOrderNumber);
-            })
+            const record = r as typeof r & { workOrderNumber?: string };
+            return record.workOrderNumber?.includes(workOrderNumber);
+          })
           : manualRecords;
 
         filteredManual.forEach((item) => {
@@ -427,5 +438,34 @@ export const QualityLossService = {
       where: { id: { in: ids } },
       data: { isDeleted: true },
     });
+  },
+
+  /**
+   * 获取钻取明细数据
+   */
+  async getDrillDown(start: Date, end: Date) {
+    const [manualLosses, internalLosses, externalLosses] = await Promise.all([
+      prisma.quality_losses.findMany({
+        where: {
+          isDeleted: false,
+          occurDate: { gte: start, lte: end },
+        },
+      }),
+      prisma.quality_records.findMany({
+        where: {
+          isDeleted: false,
+          date: { gte: start, lte: end },
+          lossAmount: { gt: 0 },
+        },
+      }),
+      prisma.after_sales.findMany({
+        where: {
+          isDeleted: false,
+          occurDate: { gte: start, lte: end },
+        },
+      }),
+    ]);
+
+    return { manualLosses, internalLosses, externalLosses };
   },
 };

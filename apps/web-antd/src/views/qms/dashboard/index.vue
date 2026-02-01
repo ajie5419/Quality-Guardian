@@ -100,7 +100,15 @@ const {
 // 缓存部门ID-名称映射（优化性能）
 const deptNameMap = computed(() => {
   const map = new Map<string, string>();
-  deptRawData.value?.forEach((dept) => map.set(dept.id, dept.name));
+  const traverse = (items: any[]) => {
+    items?.forEach((item) => {
+      map.set(item.id, item.name);
+      if (item.children && item.children.length > 0) {
+        traverse(item.children);
+      }
+    });
+  };
+  traverse(deptRawData.value);
   return map;
 });
 
