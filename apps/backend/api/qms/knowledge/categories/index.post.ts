@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -25,7 +26,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newCategory);
   } catch (error) {
-    console.error('Failed to create category:', error);
+    logApiError('categories', error);
     return useResponseError('创建分类失败');
   }
 });

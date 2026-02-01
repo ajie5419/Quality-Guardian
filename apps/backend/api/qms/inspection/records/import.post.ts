@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { InspectionService } from '~/services/inspection.service';
 import { useResponseSuccess } from '~/utils/response';
 
@@ -16,7 +17,7 @@ export default defineEventHandler(async (event) => {
         });
         successCount++;
       } catch (error) {
-        console.error('Failed to import inspection record:', error);
+        logApiError('import', error);
       }
     }
   }

@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseSuccess } from '~/utils/response';
 
@@ -25,7 +26,7 @@ export default defineEventHandler(async () => {
 
     return useResponseSuccess(uniqueYears);
   } catch (error) {
-    console.error('Fetch dynamic years error:', error);
+    logApiError('years', error);
     // 降级方案：返回当前年份
     return useResponseSuccess([new Date().getFullYear()]);
   }

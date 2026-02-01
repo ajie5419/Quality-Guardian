@@ -1,5 +1,6 @@
 import { defineEventHandler } from 'h3';
 import { DashboardService } from '~/services/dashboard.service';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
 
@@ -26,8 +27,8 @@ export default defineEventHandler(async (event) => {
         priority: 'Medium',
       })),
     });
-  } catch (error: any) {
-    console.error('Dashboard logic failed:', error);
+  } catch (error) {
+    logApiError('dashboard', error);
     return useResponseSuccess({
       overview: {
         fieldIssues: { open: 0, total: 0 },

@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -45,7 +46,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newMenu);
   } catch (error) {
-    console.error('Failed to create menu:', error);
+    logApiError('menu', error);
     return useResponseError('创建菜单失败');
   }
 });

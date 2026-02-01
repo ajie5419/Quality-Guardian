@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -90,7 +91,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ message: '更新成功', success: true });
   } catch (error: unknown) {
-    console.error('[QualityLoss-Update-Error]', error);
+    logApiError('quality-loss', error);
     const err = error as { message?: string };
     return useResponseError(`数据更新失败：${err.message || '数据库操作异常'}`);
   }

@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import { getMetadata, setMetadata } from '~/utils/metadata';
 import prisma from '~/utils/prisma';
@@ -31,7 +32,7 @@ export default defineEventHandler(async (event) => {
       message: 'ok',
     };
   } catch (error) {
-    console.error('Failed to delete BOM project:', error);
+    logApiError('projects', error);
     return { code: -1, message: 'Delete failed' };
   }
 });

@@ -1,4 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseSuccess } from '~/utils/response';
 
@@ -139,7 +140,7 @@ export default defineEventHandler(async (event) => {
       ranking,
     });
   } catch (error) {
-    console.error('Failed to get vehicle failure rate:', error);
+    logApiError('vehicle-failure-rate', error);
     return { trend: [], ranking: [] };
   }
 });

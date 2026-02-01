@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { getMetadata } from '~/utils/metadata';
 import prisma from '~/utils/prisma';
@@ -40,7 +41,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(data);
   } catch (error) {
-    console.error('Fetch BOM projects error', error);
+    logApiError('projects', error);
     return useResponseSuccess([]);
   }
 });

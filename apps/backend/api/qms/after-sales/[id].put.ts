@@ -1,5 +1,6 @@
 import { QMS_STATUS_COLOR_MAP } from '@qgs/shared';
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -83,7 +84,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    console.error('Failed to update after sales:', error);
+    logApiError('after-sales', error);
     return useResponseError('更新售后记录失败');
   }
 });

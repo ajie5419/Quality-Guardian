@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -51,7 +52,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(treeData);
   } catch (error) {
-    console.error('Fetch BOM tree error', error);
+    logApiError('tree', error);
     return useResponseSuccess([]);
   }
 });

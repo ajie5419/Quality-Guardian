@@ -1,4 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseSuccess } from '~/utils/response';
 
@@ -95,7 +96,7 @@ export default defineEventHandler(async (event) => {
       },
     });
   } catch (error: any) {
-    console.error('Supplier List API Error:', error);
+    logApiError('supplier', error);
     return useResponseSuccess({ items: [], total: 0, stats: { total: 0 } });
   }
 });

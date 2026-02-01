@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -42,13 +43,13 @@ export default defineEventHandler(async (event) => {
       });
     } else {
       const errorMsg = await response.text();
-      console.error('[AI-Test] Failed:', response.status, errorMsg);
+      logApiError('test', error);
       return useResponseError(
         `连接失败 (${response.status}): ${errorMsg.slice(0, 100)}`,
       );
     }
   } catch (error: unknown) {
-    console.error('[AI-Test] Error:', error);
+    logApiError('test', error);
     const err = error as { message?: string; name?: string };
     if (err.name === 'AbortError') {
       return useResponseError(

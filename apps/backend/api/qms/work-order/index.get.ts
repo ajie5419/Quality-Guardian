@@ -1,4 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { WorkOrderService } from '~/services/work-order.service';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -42,7 +43,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(result);
   } catch (error) {
-    console.error('Failed to fetch work orders with pagination:', error);
+    logApiError('work-order', error);
     return useResponseSuccess({ items: [], total: 0, summary: [] });
   }
 });

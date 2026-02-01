@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
 
@@ -69,7 +70,7 @@ export default defineEventHandler(async () => {
       message: 'ok',
     };
   } catch (error) {
-    console.error('Fetch DFMEA tree error:', error);
+    logApiError('tree', error);
     return { code: 0, data: [], message: 'error' };
   }
 });

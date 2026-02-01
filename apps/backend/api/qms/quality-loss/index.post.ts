@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -39,7 +40,7 @@ export default defineEventHandler(async (event) => {
       responsibleDepartment: newItem.respDept,
     });
   } catch (error) {
-    console.error('Failed to create quality loss:', error);
+    logApiError('quality-loss', error);
     return useResponseError('创建质量损失记录失败');
   }
 });

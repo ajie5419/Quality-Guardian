@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -51,7 +52,9 @@ export default defineEventHandler(async (event) => {
         where: { id: String(body.itpProjectId) },
       });
       if (!project) {
-        console.error('[Backend] Project not found:', body.itpProjectId);
+        logApiError('task-dispatch', new Error('Project not found'), {
+          itpProjectId: body.itpProjectId,
+        });
         return {
           code: -1,
           message: `关联的 ITP 计划 (ID: ${body.itpProjectId}) 不存在，请刷新后重试`,
@@ -102,7 +105,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newTask);
   } catch (error: unknown) {
-    console.error('[Backend] Create task failed:', error);
+    logApiError('task-dispatch', error);
     const err = error as { message?: string; meta?: unknown };
     // 返回具体错误信息
     return {

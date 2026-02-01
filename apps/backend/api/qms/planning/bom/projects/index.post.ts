@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -56,7 +57,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newProject);
   } catch (error) {
-    console.error('Create BOM project error:', error);
+    logApiError('projects', error);
     return useResponseError('添加 BOM 项目失败');
   }
 });

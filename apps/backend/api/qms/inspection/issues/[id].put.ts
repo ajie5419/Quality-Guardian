@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -41,7 +42,7 @@ export default defineEventHandler(async (event) => {
       return forbiddenResponse(event, '无权修改：您只能修改自己创建的数据');
     }
   } catch (error) {
-    console.error('Ownership check failed:', error);
+    logApiError('issues', error);
     return useResponseError('权限校验失败');
   }
 
@@ -115,7 +116,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    console.error('Failed to update inspection issue:', error);
+    logApiError('issues', error);
     return useResponseError('更新问题失败');
   }
 });

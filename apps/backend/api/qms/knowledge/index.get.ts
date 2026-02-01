@@ -1,4 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -53,7 +54,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ items, total });
   } catch (error) {
-    console.error('Failed to fetch knowledge items:', error);
+    logApiError('knowledge', error);
     return useResponseSuccess({ items: [], total: 0 });
   }
 });

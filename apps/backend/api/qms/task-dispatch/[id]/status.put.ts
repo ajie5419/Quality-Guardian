@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseSuccess } from '~/utils/response';
 
@@ -20,7 +21,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(updatedTask);
   } catch (error) {
-    console.error('Update task status error:', error);
+    logApiError('status', error);
     return { code: -1, message: 'Update failed' };
   }
 });

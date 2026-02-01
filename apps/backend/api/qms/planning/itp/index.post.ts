@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
 
@@ -52,7 +53,7 @@ export default defineEventHandler(async (event) => {
       message: 'created',
     };
   } catch (error) {
-    console.error('Create ITP item error:', error);
+    logApiError('itp', error);
     return { code: -1, message: '创建失败' };
   }
 });

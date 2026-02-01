@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -53,7 +54,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error: any) {
-    console.error('Failed to update work order:', error);
+    logApiError('work-order', error);
     // Return specific error message for debugging
     // Check for "Record to update not found"
     if (error.code === 'P2025') {

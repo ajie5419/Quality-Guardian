@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { nanoid } from 'nanoid';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
@@ -31,7 +32,7 @@ export default defineEventHandler(async (event) => {
       message: 'ok',
     };
   } catch (error) {
-    console.error('Create DFMEA project error:', error);
+    logApiError('projects', error);
     setResponseStatus(event, 500);
     return { code: -1, message: '创建项目失败，请检查工单号是否存在' };
   }

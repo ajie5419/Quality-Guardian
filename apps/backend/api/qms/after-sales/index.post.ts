@@ -1,5 +1,6 @@
 import { QMS_DEFAULT_VALUES, QMS_STATUS_COLOR_MAP } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -73,7 +74,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newItem);
   } catch (error) {
-    console.error('Failed to create after sales:', error);
+    logApiError('after-sales', error);
     return useResponseError('创建售后记录失败');
   }
 });

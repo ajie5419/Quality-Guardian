@@ -1,5 +1,6 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { getTargetPassRate } from '~/constants/quality-standards';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -117,7 +118,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(reportData);
   } catch (error: any) {
-    console.error('Report generation failed:', error);
+    logApiError('summary', error);
     return { code: -1, message: `报告生成失败: ${error.message}` };
   }
 });
@@ -216,7 +217,7 @@ async function fetchProcessPassRates(start: Date, end: Date) {
       };
     });
   } catch (error) {
-    console.error('Fetch process pass rates failed:', error);
+    logApiError('summary', error);
     return [];
   }
 }

@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseSuccess } from '~/utils/response';
 
@@ -48,7 +49,7 @@ export default defineEventHandler(async (event) => {
       lowRiskCount,
     });
   } catch (error) {
-    console.error('Fetch DFMEA stats failed:', error);
+    logApiError('stats', error);
     return useResponseSuccess({
       projectId,
       projectName: '',

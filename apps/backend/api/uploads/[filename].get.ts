@@ -3,6 +3,7 @@ import { extname, join, resolve } from 'node:path';
 import process from 'node:process';
 
 import { createError, defineEventHandler } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 
 // Robust path resolution - Must match upload.ts
 const cwd = process.cwd();
@@ -61,7 +62,7 @@ export default defineEventHandler((event) => {
 
     return fileBuffer;
   } catch (error) {
-    console.error('[Serving] Error reading file:', error);
+    logApiError('uploads', error);
     throw createError({
       statusCode: 500,
       message: 'Internal Server Error',

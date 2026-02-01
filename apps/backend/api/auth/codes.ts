@@ -1,4 +1,5 @@
 import { eventHandler } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -61,7 +62,7 @@ export default eventHandler(async (event) => {
 
     return useResponseSuccess(codes);
   } catch (error) {
-    console.error('Error fetching auth codes:', error);
+    logApiError('codes', error);
     return useResponseSuccess([]);
   }
 });

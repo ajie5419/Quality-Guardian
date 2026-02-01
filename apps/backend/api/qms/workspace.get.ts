@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -115,7 +116,7 @@ export default defineEventHandler(async (event) => {
       },
     });
   } catch (error) {
-    console.error('Failed to fetch workspace data:', error);
+    logApiError('workspace', error);
     return useResponseSuccess({
       projectItems: [],
       todoItems: [],

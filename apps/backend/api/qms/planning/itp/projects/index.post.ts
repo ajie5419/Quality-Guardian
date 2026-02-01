@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { nanoid } from 'nanoid';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
@@ -32,7 +33,7 @@ export default defineEventHandler(async (event) => {
       message: 'ok',
     };
   } catch (error) {
-    console.error('Create ITP project error:', error);
+    logApiError('projects', error);
     setResponseStatus(event, 500);
     return { code: -1, message: '创建失败，请检查关联工单' };
   }

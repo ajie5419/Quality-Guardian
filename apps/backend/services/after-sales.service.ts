@@ -1,5 +1,9 @@
 import { QMS_DEFAULT_VALUES, QMS_STATUS_OPEN_SET } from '@qgs/shared';
 import prisma from '~/utils/prisma';
+import { createModuleLogger } from '~/utils/logger';
+
+// 创建模块级 logger
+const logger = createModuleLogger('AfterSalesService');
 
 export const AfterSalesService = {
   /**
@@ -139,7 +143,7 @@ export const AfterSalesService = {
         deptDistribution,
       };
     } catch (error) {
-      console.error('AfterSalesService.getStats failed:', error);
+      logger.error({ err: error }, 'getStats failed');
       // Return empty structure on error
       return {
         kpi: { total: 0, open: 0, cost: 0, avgTime: 0 },

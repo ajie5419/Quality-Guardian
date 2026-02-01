@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { callAi, extractJson } from '~/utils/ai';
 import { useResponseSuccess } from '~/utils/response';
 
@@ -59,7 +60,7 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error: unknown) {
     // ... 原有的错误处理 logic
-    console.error('[AI-Analyze-Error]', error);
+    logApiError('analyze', error);
     const err = error as { message?: string };
     return {
       code: 500,

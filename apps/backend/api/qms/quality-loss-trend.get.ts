@@ -1,5 +1,6 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { QualityLossService } from '~/services/quality-loss.service';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   unAuthorizedResponse,
@@ -83,7 +84,7 @@ export default defineEventHandler(async (event) => {
       await QualityLossService.getTrendData(granularity as 'month' | 'week'),
     );
   } catch (error: any) {
-    console.error('Failed to fetch quality loss trend:', error);
+    logApiError('quality-loss-trend', error);
     return useResponseError(
       `Failed to fetch quality loss trend: ${error.message}`,
     );

@@ -1,21 +1,66 @@
-import prisma from '~/utils/prisma';
+/**
+ * Quality Loss Service
+ * 重构版本：使用 BaseService 工具函数，拆分为小型辅助函数
+ */
 
-// 常量定义
+import type {
+  after_sales_claimStatus,
+  quality_records_status,
+} from '@prisma/client';
+import prisma from '~/utils/prisma';
+import { MONTHS } from '~/constants/locale';
+import { createModuleLogger } from '~/utils/logger';
+import {
+  applyPagination,
+  formatDateString,
+  formatNumber,
+  safeNumber,
+  type PaginationParams,
+} from './base.service';
+
+// 创建模块级 logger
+const logger = createModuleLogger('QualityLossService');
+
+// ============ 类型定义 ============
+
+interface TrendRow {
+  a: number | string | null;
+  p: number | string;
+}
+
+interface TrendItem {
+  external: number;
+  internal: number;
+  manual: number;
+}
+
+interface QualityLossResult {
+  actualClaim: number;
+  amount: number;
+  createdAt?: Date;
+  date: string | null;
+  description?: string;
+  id: string;
+  lossSource: string;
+  partName: string;
+  pk: string;
+  projectName: string;
+  responsibleDepartment: string | null;
+  status?: string;
+  type?: string;
+  workOrderNumber: string;
+}
+
+interface QualityLossQueryParams extends PaginationParams {
+  lossSource?: string;
+  status?: string;
+  workOrderNumber?: string;
+}
+
+// ============ 常量定义 ============
+
 const QL_CONSTANTS = {
-  MONTHS: [
-    '1月',
-    '2月',
-    '3月',
-    '4月',
-    '5月',
-    '6月',
-    '7月',
-    '8月',
-    '9月',
-    '10月',
-    '11月',
-    '12月',
-  ],
+  MONTHS,
   STATUS: {
     CLOSED: 'CLOSED',
     CONFIRMED: 'Confirmed',
@@ -26,26 +71,188 @@ const QL_CONSTANTS = {
     INTERNAL: 'Internal',
     EXTERNAL: 'External',
   },
-};
+} as const;
+
+// ============ 辅助函数：Where 条件构建 ============
 
 /**
- * 格式化日期
+ * 构建 quality_losses 表的 where 条件
  */
-const formatDate = (date: Date | null) => {
-  if (!date) return null;
-  return date.toISOString().split('T')[0];
-};
+function buildManualLossesWhere(params: QualityLossQueryParams) {
+  return {
+    isDeleted: false,
+    ...(params.status ? { status: params.status } : {}),
+  };
+}
 
 /**
- * 合并统计数据
+ * 构建 quality_records 表的 where 条件
  */
-const mergeTrendData = (manual: any[], internal: any[], external: any[]) => {
-  const merged = new Map<
-    number,
-    { external: number; internal: number; manual: number }
-  >();
+function buildInternalRecordsWhere(params: QualityLossQueryParams) {
+  return {
+    isDeleted: false,
+    lossAmount: { gt: 0 },
+    ...(params.status
+      ? { status: params.status as quality_records_status }
+      : {}),
+    ...(params.workOrderNumber
+      ? { workOrderNumber: { contains: params.workOrderNumber } }
+      : {}),
+  };
+}
 
-  const process = (rows: any[], key: 'external' | 'internal' | 'manual') => {
+/**
+ * 构建 after_sales 表的 where 条件
+ */
+function buildExternalSalesWhere(params: QualityLossQueryParams) {
+  return {
+    isDeleted: false,
+    ...(params.status
+      ? { claimStatus: params.status as after_sales_claimStatus }
+      : {}),
+    ...(params.workOrderNumber
+      ? { workOrderNumber: { contains: params.workOrderNumber } }
+      : {}),
+  };
+}
+
+// ============ 辅助函数：响应格式化 ============
+
+/**
+ * 格式化手工录入的损失记录
+ */
+function formatManualLossItem(
+  item: {
+    id: string;
+    lossId: string;
+    occurDate: Date;
+    respDept: string | null;
+    type: string;
+    amount: unknown;
+    actualClaim: unknown;
+  } & { workOrderNumber?: string; projectName?: string },
+): QualityLossResult {
+  return {
+    id: item.lossId || item.id,
+    pk: item.id,
+    date: formatDateString(item.occurDate),
+    responsibleDepartment: item.respDept,
+    lossSource: QL_CONSTANTS.SOURCE.MANUAL,
+    workOrderNumber: item.workOrderNumber || '-',
+    projectName: item.projectName || '-',
+    partName: item.type,
+    amount: safeNumber(item.amount),
+    actualClaim: safeNumber(item.actualClaim),
+  };
+}
+
+/**
+ * 格式化内部质量记录
+ */
+function formatInternalRecordItem(item: {
+  id: string;
+  serialNumber: string;
+  date: Date;
+  lossAmount: unknown;
+  responsibleDepartment: string | null;
+  description: string | null;
+  status: string;
+  workOrderNumber: string;
+  projectName: string | null;
+  partName: string | null;
+  recoveredAmount: unknown;
+  createdAt: Date;
+}): QualityLossResult {
+  return {
+    id: `INT-${item.serialNumber}`,
+    pk: item.id,
+    date: formatDateString(item.date),
+    amount: safeNumber(item.lossAmount),
+    responsibleDepartment: item.responsibleDepartment,
+    description: item.description || undefined,
+    status:
+      item.status === QL_CONSTANTS.STATUS.CLOSED
+        ? QL_CONSTANTS.STATUS.CONFIRMED
+        : QL_CONSTANTS.STATUS.PENDING,
+    type: QL_CONSTANTS.SOURCE.INTERNAL,
+    lossSource: QL_CONSTANTS.SOURCE.INTERNAL,
+    workOrderNumber: item.workOrderNumber,
+    projectName: item.projectName || '-',
+    partName: item.partName || '-',
+    actualClaim: safeNumber(item.recoveredAmount),
+    createdAt: item.createdAt,
+  };
+}
+
+/**
+ * 格式化售后记录
+ */
+function formatExternalSalesItem(item: {
+  id: string;
+  serialNumber: number;
+  occurDate: Date;
+  materialCost: unknown;
+  laborTravelCost: unknown;
+  respDept: string | null;
+  issueDescription: string | null;
+  claimStatus: string;
+  workOrderNumber: string | null;
+  projectName: string | null;
+  partName: string | null;
+  productSubtype: string | null;
+  productType: string | null;
+  actualClaim: unknown;
+  createdAt: Date;
+}): QualityLossResult | null {
+  const amount =
+    safeNumber(item.materialCost) + safeNumber(item.laborTravelCost);
+  if (amount <= 0) return null;
+
+  return {
+    id: `EXT-${item.serialNumber}`,
+    pk: item.id,
+    date: formatDateString(item.occurDate),
+    amount,
+    responsibleDepartment: item.respDept,
+    description: item.issueDescription || undefined,
+    status:
+      item.claimStatus === QL_CONSTANTS.STATUS.CLOSED
+        ? QL_CONSTANTS.STATUS.CONFIRMED
+        : QL_CONSTANTS.STATUS.PENDING,
+    type: QL_CONSTANTS.SOURCE.EXTERNAL,
+    lossSource: QL_CONSTANTS.SOURCE.EXTERNAL,
+    workOrderNumber: item.workOrderNumber || '-',
+    projectName: item.projectName || '-',
+    partName: item.partName || item.productSubtype || item.productType || '-',
+    actualClaim: safeNumber(item.actualClaim),
+    createdAt: item.createdAt,
+  };
+}
+
+// ============ 辅助函数：排序 ============
+
+/**
+ * 按日期降序排序
+ */
+function sortByDateDesc(items: QualityLossResult[]): QualityLossResult[] {
+  return items.sort(
+    (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
+  );
+}
+
+// ============ 辅助函数：趋势数据处理 ============
+
+/**
+ * 合并多个来源的趋势数据
+ */
+function mergeTrendData(
+  manual: TrendRow[],
+  internal: TrendRow[],
+  external: TrendRow[],
+): Map<number, TrendItem> {
+  const merged = new Map<number, TrendItem>();
+
+  const process = (rows: TrendRow[], key: keyof TrendItem) => {
     rows.forEach((r) => {
       const p = Number(r.p);
       if (p === 0) return;
@@ -54,8 +261,7 @@ const mergeTrendData = (manual: any[], internal: any[], external: any[]) => {
         item = { external: 0, internal: 0, manual: 0 };
         merged.set(p, item);
       }
-      const v = Number(r.a) || 0;
-      item[key] += v;
+      item[key] += safeNumber(r.a);
     });
   };
 
@@ -64,9 +270,28 @@ const mergeTrendData = (manual: any[], internal: any[], external: any[]) => {
   process(external, 'external');
 
   return merged;
-};
+}
+
+/**
+ * 格式化趋势数据项
+ */
+function formatTrendItem(period: string, item: TrendItem) {
+  const total = item.manual + item.internal + item.external;
+  return {
+    period,
+    totalAmount: formatNumber(total),
+    manualAmount: formatNumber(item.manual),
+    internalAmount: formatNumber(item.internal),
+    externalAmount: formatNumber(item.external),
+  };
+}
+
+// ============ 主服务导出 ============
 
 export const QualityLossService = {
+  /**
+   * 获取趋势数据（按月或按周）
+   */
   async getTrendData(granularity: 'month' | 'week') {
     const year = new Date().getFullYear();
     const isWeek = granularity === 'week';
@@ -76,212 +301,115 @@ export const QualityLossService = {
       const timeFunc2 = isWeek ? 'WEEK(date, 3)' : 'MONTH(date)';
 
       const [manual, internal, external] = await Promise.all([
-        prisma.$queryRawUnsafe(
+        prisma.$queryRawUnsafe<TrendRow[]>(
           `SELECT ${timeFunc} as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
         ),
-        prisma.$queryRawUnsafe(
+        prisma.$queryRawUnsafe<TrendRow[]>(
           `SELECT ${timeFunc2} as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${year} AND isDeleted = 0 GROUP BY p`,
         ),
-        prisma.$queryRawUnsafe(
+        prisma.$queryRawUnsafe<TrendRow[]>(
           `SELECT ${timeFunc} as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
         ),
       ]);
 
-      const merged = mergeTrendData(
-        manual as any[],
-        internal as any[],
-        external as any[],
-      );
-      let result: any[] = [];
+      const merged = mergeTrendData(manual, internal, external);
+      const result: ReturnType<typeof formatTrendItem>[] = [];
 
       if (isWeek) {
-        result = [...merged.entries()]
+        [...merged.entries()]
           .sort((a, b) => a[0] - b[0])
-          .map(([k, v]) => {
-            const total = v.manual + v.internal + v.external;
-            return {
-              period: `W${k}`,
-              totalAmount: Number(total.toFixed(2)),
-              manualAmount: Number(v.manual.toFixed(2)),
-              internalAmount: Number(v.internal.toFixed(2)),
-              externalAmount: Number(v.external.toFixed(2)),
-            };
+          .forEach(([k, v]) => {
+            result.push(formatTrendItem(`W${k}`, v));
           });
       } else {
-        result = [];
         for (let k = 1; k <= 12; k++) {
-          const v = merged.get(k) || {
-            external: 0,
-            internal: 0,
-            manual: 0,
-          };
-          const total = v.manual + v.internal + v.external;
-          result.push({
-            period: QL_CONSTANTS.MONTHS[k - 1] ?? `${k}月`,
-            totalAmount: Number(total.toFixed(2)),
-            manualAmount: Number(v.manual.toFixed(2)),
-            internalAmount: Number(v.internal.toFixed(2)),
-            externalAmount: Number(v.external.toFixed(2)),
-          });
+          const v = merged.get(k) || { external: 0, internal: 0, manual: 0 };
+          result.push(
+            formatTrendItem(QL_CONSTANTS.MONTHS[k - 1] ?? `${k}月`, v),
+          );
         }
       }
 
       return { trend: result };
     } catch (error) {
-      console.error('QualityLossService.getTrendData 执行失败:', error);
+      logger.error({ err: error }, 'getTrendData 执行失败');
       return { trend: [] };
     }
   },
 
-  async getAllLosses(
-    params: {
-      lossSource?: string;
-      page?: number;
-      pageSize?: number;
-      status?: string;
-      workOrderNumber?: string;
-    } = {},
-  ) {
-    const {
-      lossSource,
-      page = 1,
-      pageSize = 20,
-      status,
-      workOrderNumber,
-    } = params;
+  /**
+   * 获取所有损失记录（分页）
+   */
+  async getAllLosses(params: QualityLossQueryParams = {}) {
+    const { lossSource, workOrderNumber } = params;
 
     try {
-      // 1. 获取所有来源的原始数据
+      // 1. 并行获取所有来源的原始数据
       const [manualRecords, internalRecords, externalRecords] =
         await Promise.all([
           prisma.quality_losses.findMany({
-            where: {
-              isDeleted: false,
-              ...(status ? { status } : {}),
-              // 注意：quality_losses 确实没有 workOrderNumber。我们在这里不做过滤，而是在后面 result 组装时处理
-            },
+            where: buildManualLossesWhere(params),
           }),
           prisma.quality_records.findMany({
-            where: {
-              isDeleted: false,
-              lossAmount: { gt: 0 },
-              ...(status ? { status: status as any } : {}),
-              ...(workOrderNumber
-                ? { workOrderNumber: { contains: workOrderNumber } }
-                : {}),
-            },
+            where: buildInternalRecordsWhere(params),
           }),
           prisma.after_sales.findMany({
-            where: {
-              isDeleted: false,
-              ...(status ? { claimStatus: status as any } : {}),
-              ...(workOrderNumber
-                ? { workOrderNumber: { contains: workOrderNumber } }
-                : {}),
-            },
+            where: buildExternalSalesWhere(params),
           }),
         ]);
 
-      const result: any[] = [];
+      const result: QualityLossResult[] = [];
 
-      // 逻辑处理：合并
+      // 2. 处理手工录入记录
       if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.MANUAL) {
-        // 对于手动增加的记录，如果指定了 workOrderNumber 且该记录没有（或不匹配），则过滤
         const filteredManual = workOrderNumber
-          ? manualRecords.filter((r) =>
-              (r as any).workOrderNumber?.includes(workOrderNumber),
-            )
+          ? manualRecords.filter((r) => {
+              const record = r as typeof r & { workOrderNumber?: string };
+              return record.workOrderNumber?.includes(workOrderNumber);
+            })
           : manualRecords;
 
-        filteredManual.forEach((item: any) => {
-          const amount = Number(item.amount || 0);
+        filteredManual.forEach((item) => {
+          const itemRecord = item as typeof item & {
+            workOrderNumber?: string;
+            projectName?: string;
+          };
+          const amount = safeNumber(item.amount);
           if (amount <= 0) return;
-          result.push({
-            ...item,
-            id: item.lossId || item.id,
-            pk: item.id,
-            date: formatDate(item.occurDate),
-            responsibleDepartment: item.respDept,
-            lossSource: QL_CONSTANTS.SOURCE.MANUAL,
-            workOrderNumber: item.workOrderNumber || '-',
-            projectName: item.projectName || '-',
-            partName: item.type,
-            amount,
-            actualClaim: Number(item.actualClaim || 0),
-          });
+          result.push(formatManualLossItem({ ...item, ...itemRecord }));
         });
       }
 
+      // 3. 处理内部质量记录
       if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.INTERNAL) {
         internalRecords.forEach((item) => {
-          result.push({
-            id: `INT-${item.serialNumber}`,
-            pk: item.id,
-            date: formatDate(item.date),
-            amount: Number(item.lossAmount),
-            responsibleDepartment: item.responsibleDepartment,
-            description: item.description,
-            status:
-              item.status === QL_CONSTANTS.STATUS.CLOSED
-                ? QL_CONSTANTS.STATUS.CONFIRMED
-                : QL_CONSTANTS.STATUS.PENDING,
-            type: QL_CONSTANTS.SOURCE.INTERNAL,
-            lossSource: QL_CONSTANTS.SOURCE.INTERNAL,
-            workOrderNumber: item.workOrderNumber,
-            projectName: item.projectName,
-            partName: item.partName,
-            actualClaim: Number(item.recoveredAmount || 0),
-            createdAt: item.createdAt,
-          });
+          result.push(formatInternalRecordItem(item));
         });
       }
 
+      // 4. 处理售后记录
       if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.EXTERNAL) {
         externalRecords.forEach((item) => {
-          const amount =
-            Number(item.materialCost || 0) + Number(item.laborTravelCost || 0);
-          if (amount <= 0) return;
-          result.push({
-            id: `EXT-${item.serialNumber}`,
-            pk: item.id,
-            date: formatDate(item.occurDate),
-            amount,
-            responsibleDepartment: item.respDept,
-            description: item.issueDescription,
-            status:
-              item.claimStatus === QL_CONSTANTS.STATUS.CLOSED
-                ? QL_CONSTANTS.STATUS.CONFIRMED
-                : QL_CONSTANTS.STATUS.PENDING,
-            type: QL_CONSTANTS.SOURCE.EXTERNAL,
-            lossSource: QL_CONSTANTS.SOURCE.EXTERNAL,
-            workOrderNumber: item.workOrderNumber,
-            projectName: item.projectName,
-            partName: item.partName || item.productSubtype || item.productType,
-            actualClaim: Number(item.actualClaim || 0),
-            createdAt: item.createdAt,
-          });
+          const formatted = formatExternalSalesItem(item);
+          if (formatted) result.push(formatted);
         });
       }
 
-      // 排序
-      result.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-      );
-
-      const total = result.length;
-      const items = result.slice((page - 1) * pageSize, page * pageSize);
-
-      return { items, total };
+      // 5. 排序并分页
+      const sorted = sortByDateDesc(result);
+      return applyPagination(sorted, params);
     } catch (error) {
-      console.error('QualityLossService.getAllLosses 执行失败:', error);
+      logger.error({ err: error }, 'getAllLosses 执行失败');
       return { items: [], total: 0 };
     }
   },
 
   /**
-   * 获取损益概览统计（全量数据集，不分页，仅用于图表和KPI）
+   * 获取损益概览统计（全量数据，不分页）
    */
-  async getLossSummary(filters: any) {
+  async getLossSummary(
+    filters: Omit<QualityLossQueryParams, 'page' | 'pageSize'>,
+  ) {
     const { items } = await this.getAllLosses({
       ...filters,
       page: 1,
@@ -290,7 +418,11 @@ export const QualityLossService = {
     return items;
   },
 
+  /**
+   * 批量删除记录
+   */
   async batchDelete(ids: string[]) {
+    if (ids.length === 0) return { count: 0 };
     return prisma.quality_losses.updateMany({
       where: { id: { in: ids } },
       data: { isDeleted: true },

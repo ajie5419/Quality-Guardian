@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { callAi } from '~/utils/ai';
 import { useResponseSuccess } from '~/utils/response';
 
@@ -35,7 +36,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ report: aiResponse });
   } catch (error: unknown) {
-    console.error('[AI-Report-Error]', error);
+    logApiError('generate-report', error);
     const axiosError = error as { message?: string };
     return {
       code: 500,

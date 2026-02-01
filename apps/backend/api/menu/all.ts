@@ -1,4 +1,5 @@
 import { eventHandler } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -129,11 +130,11 @@ export default eventHandler(async (event) => {
       try {
         userPermissions = JSON.parse(dbUser.roles.permissions || '[]');
       } catch {
-        console.error('Permissions parse error');
+        logApiError('all', error);
       }
     }
   } catch (error) {
-    console.error('Menu auth sync error:', error);
+    logApiError('all', error);
   }
 
   // 3. 构建完整树

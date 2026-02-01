@@ -1,4 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -46,7 +47,7 @@ export default defineEventHandler(async (event) => {
       return useResponseSuccess(await getDrillDownData(period, granularity));
     return useResponseSuccess(await getTrendData(granularity));
   } catch (error) {
-    // console.error('Failed to fetch pass rate trend:', error);
+    // logApiError('pass-rate-trend', error);
     return useResponseError(
       `Failed to fetch pass rate trend: ${(error as Error).message}`,
     );

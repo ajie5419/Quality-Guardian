@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -46,7 +47,7 @@ export default defineEventHandler(async (event) => {
       message: '导入成功',
     });
   } catch (error: unknown) {
-    console.error('Import generated ITP failed:', error);
+    logApiError('import', error);
     const axiosError = error as { message?: string };
     return useResponseError(`导入失败: ${axiosError.message}`);
   }

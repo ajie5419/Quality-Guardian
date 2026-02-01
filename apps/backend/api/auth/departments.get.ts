@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseSuccess } from '~/utils/response';
 
@@ -59,7 +60,7 @@ export default defineEventHandler(async () => {
     const tree = buildDeptTree(departments);
     return useResponseSuccess(tree);
   } catch (error) {
-    console.error('Failed to fetch public departments:', error);
+    logApiError('departments', error);
     return useResponseSuccess([]);
   }
 });

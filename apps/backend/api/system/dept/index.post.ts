@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -32,7 +33,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newDept);
   } catch (error) {
-    console.error('Failed to create department:', error);
+    logApiError('dept', error);
     return useResponseError('创建部门失败');
   }
 });

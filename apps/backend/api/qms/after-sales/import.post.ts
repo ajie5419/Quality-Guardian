@@ -1,5 +1,6 @@
 import { QMS_STATUS_COLOR_MAP } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -52,7 +53,7 @@ export default defineEventHandler(async (event) => {
         });
         successCount++;
       } catch (error) {
-        console.error('Import AS row failed:', error);
+        logApiError('import', error);
       }
     }
 

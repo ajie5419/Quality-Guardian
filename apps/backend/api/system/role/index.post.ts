@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -40,7 +41,7 @@ export default defineEventHandler(async (event) => {
       permissions: body.permissions || [],
     });
   } catch (error) {
-    console.error('Failed to create role:', error);
+    logApiError('role', error);
     // Check for unique constraint violation
     if (String(error).includes('Unique constraint')) {
       return useResponseError('角色值已存在');

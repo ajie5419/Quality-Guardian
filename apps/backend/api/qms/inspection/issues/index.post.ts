@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -80,7 +81,7 @@ export default defineEventHandler(async (event) => {
       ncNumber: newRecord.nonConformanceNumber,
     });
   } catch (error) {
-    console.error('Failed to create inspection issue:', error);
+    logApiError('issues', error);
     return useResponseError(`创建问题失败: ${error.message}`);
   }
 });

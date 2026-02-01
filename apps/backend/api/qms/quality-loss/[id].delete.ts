@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -31,7 +32,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    console.error('Failed to delete quality loss:', error);
+    logApiError('quality-loss', error);
     return useResponseError('删除质量损失记录失败');
   }
 });

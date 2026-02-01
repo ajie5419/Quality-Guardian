@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -65,7 +66,7 @@ export default defineEventHandler(async (event) => {
             });
             results.success++;
           } catch (error) {
-            console.error(`Failed to import supplier ${item.name}:`, error);
+            logApiError('batch', error);
             results.errors++;
           }
         }),
@@ -74,7 +75,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(results);
   } catch (error) {
-    console.error('Batch import suppliers failed:', error);
+    logApiError('batch', error);
     return useResponseError('批量导入失败');
   }
 });

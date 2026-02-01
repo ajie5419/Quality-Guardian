@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -86,7 +87,7 @@ export default defineEventHandler(async (event) => {
         });
         successCount++;
       } catch (error: any) {
-        console.error(`Import failed for WO: ${item.workOrderNumber}`, error);
+        logApiError('import', error);
         errors.push(`${item.workOrderNumber}: ${error.message}`);
       }
     }
@@ -98,7 +99,7 @@ export default defineEventHandler(async (event) => {
       errors: errors.slice(0, 10), // 返回前10条错误
     });
   } catch (error: any) {
-    console.error('Import API error:', error);
+    logApiError('import', error);
     return useResponseError('数据处理异常');
   }
 });

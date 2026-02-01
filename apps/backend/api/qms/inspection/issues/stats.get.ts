@@ -1,4 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { InspectionService } from '~/services/inspection.service';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -16,7 +17,7 @@ export default defineEventHandler(async (event) => {
     const result = await InspectionService.getIssueStats({ year });
     return useResponseSuccess(result);
   } catch (error) {
-    console.error('Failed to fetch inspection issue stats:', error);
+    logApiError('stats', error);
     return useResponseSuccess({
       totalCount: 0,
       openCount: 0,

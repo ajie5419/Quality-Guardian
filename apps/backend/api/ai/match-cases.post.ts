@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { callAi, extractJson } from '~/utils/ai';
 import prisma from '~/utils/prisma';
 import { useResponseSuccess } from '~/utils/response';
@@ -99,7 +100,7 @@ ${historyIssues.map((h) => `ID: ${h.id}, 部件: ${h.partName}, 描述: ${h.desc
 
     return useResponseSuccess(result);
   } catch (error: unknown) {
-    console.error('[AI-Match-Error]', error);
+    logApiError('match-cases', error);
     // 如果 AI 失败，降级返回简单的数据库匹配
     return useResponseSuccess(
       historyIssues.slice(0, 3).map((h) => ({

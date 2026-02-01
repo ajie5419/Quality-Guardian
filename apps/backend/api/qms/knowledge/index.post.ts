@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { nanoid } from 'nanoid';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -55,7 +56,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newItem);
   } catch (error) {
-    console.error('Failed to create knowledge item:', error);
+    logApiError('knowledge', error);
     return useResponseError(
       `沉淀失败: ${error instanceof Error ? error.message : '未知错误'}`,
     );

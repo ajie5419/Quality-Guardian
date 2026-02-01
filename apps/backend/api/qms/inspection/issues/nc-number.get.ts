@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { InspectionService } from '~/services/inspection.service';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -13,7 +14,7 @@ export default defineEventHandler(async (event) => {
     const ncNumber = await InspectionService.generateNextNcNumber();
     return useResponseSuccess({ ncNumber });
   } catch (error) {
-    console.error('Failed to generate NC number:', error);
+    logApiError('nc-number', error);
     throw error;
   }
 });

@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -59,7 +60,7 @@ export default defineEventHandler(async (event) => {
       status: newUser.status === 'ACTIVE' ? 1 : 0,
     });
   } catch (error) {
-    console.error('Failed to create user:', error);
+    logApiError('user', error);
     if (String(error).includes('Unique constraint')) {
       return useResponseError('用户名已存在');
     }

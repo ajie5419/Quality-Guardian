@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { defineEventHandler, readBody } from 'h3';
 import { nanoid } from 'nanoid';
 import { callAi, extractJson } from '~/utils/ai';
+import { logApiError } from '~/utils/api-logger';
 import { UPLOAD_DIR } from '~/utils/paths';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -151,7 +152,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(normalizedItems);
   } catch (error: unknown) {
-    console.error('[AI-Generate] Error:', error);
+    logApiError('generate-itp', error);
     const axiosError = error as { message?: string };
     return useResponseError(`AI 解析失败: ${axiosError.message}`);
   }

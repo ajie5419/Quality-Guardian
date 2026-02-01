@@ -1,5 +1,9 @@
 import { getTargetPassRate } from '~/constants/quality-standards';
 import prisma from '~/utils/prisma';
+import { createModuleLogger } from '~/utils/logger';
+
+// 创建模块级 logger
+const logger = createModuleLogger('DashboardService');
 
 // 抽离常量：集中管理可配置项
 const DASHBOARD_CONSTANTS = {
@@ -152,7 +156,7 @@ export const DashboardService = {
         recentWorkOrders: recentWorkOrders || [],
       };
     } catch (error) {
-      console.error('DashboardService.getStats 执行失败:', error);
+      logger.error({ err: error }, 'getStats 执行失败');
       // 兜底返回空数据
       return {
         overview: {
@@ -233,7 +237,7 @@ export const DashboardService = {
         };
       });
     } catch (error) {
-      console.error('DashboardService.getMonthlyTrend 执行失败:', error);
+      logger.error({ err: error }, 'getMonthlyTrend 执行失败');
       return [];
     }
   },
@@ -259,7 +263,7 @@ export const DashboardService = {
         value: s._count,
       }));
     } catch (error) {
-      console.error('DashboardService.getIssueDistribution 执行失败:', error);
+      logger.error({ err: error }, 'getIssueDistribution 执行失败');
       return [];
     }
   },

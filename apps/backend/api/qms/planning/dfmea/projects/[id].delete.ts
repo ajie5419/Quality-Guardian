@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -22,7 +23,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ message: 'Deleted' });
   } catch (error) {
-    console.error('Delete DFMEA project failed:', error);
+    logApiError('projects', error);
     return useResponseError(`Delete failed: ${error.message}`);
   }
 });

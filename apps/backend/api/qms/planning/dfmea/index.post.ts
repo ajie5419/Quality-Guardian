@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
 
@@ -32,7 +33,7 @@ export default defineEventHandler(async (event) => {
       message: 'ok',
     };
   } catch (error) {
-    console.error('Create DFMEA item error:', error);
+    logApiError('dfmea', error);
     return { code: -1, message: '添加条目失败' };
   }
 });

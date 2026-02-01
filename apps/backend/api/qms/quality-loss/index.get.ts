@@ -1,5 +1,6 @@
 import { defineEventHandler } from 'h3';
 import { QualityLossService } from '~/services/quality-loss.service';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
 
@@ -22,7 +23,7 @@ export default defineEventHandler(async (event) => {
     const result = await QualityLossService.getAllLosses(params);
     return useResponseSuccess(result);
   } catch (error) {
-    console.error('Failed to fetch quality losses:', error);
+    logApiError('quality-loss', error);
     return useResponseSuccess({ items: [], total: 0 });
   }
 });

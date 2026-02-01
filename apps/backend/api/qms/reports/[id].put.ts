@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -32,7 +33,7 @@ export default defineEventHandler(async (event) => {
       date: updated.date.toISOString().split('T')[0],
     });
   } catch (error) {
-    console.error('Update report failed:', error);
+    logApiError('reports', error);
     return useResponseError(`Update failed: ${error.message}`);
   }
 });

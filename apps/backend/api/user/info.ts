@@ -1,4 +1,5 @@
 import { eventHandler } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -38,7 +39,7 @@ export default eventHandler(async (event) => {
               permissions = perms;
             }
           } catch (error) {
-            console.error('Failed to parse permissions:', error);
+            logApiError('info', error);
           }
         }
       }
@@ -66,7 +67,7 @@ export default eventHandler(async (event) => {
       });
     }
   } catch (error) {
-    console.error('Failed to fetch user from DB:', error);
+    logApiError('info', error);
     // Fall back to token data if DB lookup fails
   }
 

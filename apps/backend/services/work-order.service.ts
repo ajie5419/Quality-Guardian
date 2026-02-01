@@ -3,6 +3,10 @@ import {
   mapToDisplayStatus,
   WORK_ORDER_STATUS,
 } from '~/utils/work-order-status';
+import { createModuleLogger } from '~/utils/logger';
+
+// 创建模块级 logger
+const logger = createModuleLogger('WorkOrderService');
 
 // 抽离常量
 const WO_CONSTANTS = {
@@ -175,7 +179,7 @@ export const WorkOrderService = {
         summary: summaryData,
       };
     } catch (error) {
-      console.error('WorkOrderService.getList 执行失败:', error);
+      logger.error({ err: error }, 'getList 执行失败');
       // 异常兜底
       return {
         items: [],

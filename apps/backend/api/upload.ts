@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { eventHandler, readMultipartFormData } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { UPLOAD_DIR } from '~/utils/paths';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -49,7 +50,7 @@ export default eventHandler(async (event) => {
       size: file.data.length,
     });
   } catch (error) {
-    console.error('Upload error:', error);
+    logApiError('upload', error);
     return useResponseError('Upload failed');
   }
 });

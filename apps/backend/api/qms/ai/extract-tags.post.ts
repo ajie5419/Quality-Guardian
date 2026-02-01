@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { callAi, extractJson } from '~/utils/ai';
+import { logApiError } from '~/utils/api-logger';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -44,7 +45,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(finalTags);
   } catch (error: any) {
-    console.error('[AI-Extract-Tags] Error:', error);
+    logApiError('extract-tags', error);
     return useResponseError(`AI 提取标签失败: ${error.message}`);
   }
 });

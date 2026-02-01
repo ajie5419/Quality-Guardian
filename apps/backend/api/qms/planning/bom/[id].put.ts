@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
 
@@ -29,7 +30,7 @@ export default defineEventHandler(async (event) => {
       message: 'ok',
     };
   } catch (error) {
-    console.error('Update BOM item error:', error);
+    logApiError('bom', error);
     return { code: -1, message: '更新失败' };
   }
 });

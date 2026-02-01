@@ -1,4 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -59,7 +60,7 @@ export default defineEventHandler(async (event) => {
       total,
     );
   } catch (error) {
-    console.error('Failed to fetch roles:', error);
+    logApiError('list', error);
     return useResponseSuccess([]); // Fail safe
   }
 });

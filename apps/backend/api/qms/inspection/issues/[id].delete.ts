@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -41,7 +42,7 @@ export default defineEventHandler(async (event) => {
       return forbiddenResponse(event, '无权删除：您只能删除自己创建的数据');
     }
   } catch (error) {
-    console.error('Ownership check failed:', error);
+    logApiError('issues', error);
     return useResponseError('权限校验失败');
   }
 
@@ -56,7 +57,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    console.error('Failed to delete inspection issue:', error);
+    logApiError('issues', error);
     return useResponseError('删除问题失败');
   }
 });

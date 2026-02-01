@@ -1,4 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -244,7 +245,7 @@ export default defineEventHandler(async (event) => {
       summary: existingReport?.summary || '',
     });
   } catch (error) {
-    console.error('Daily summary error', error);
+    logApiError('daily-summary', error);
     return useResponseSuccess({
       reporter: realName || queryUser,
       date: queryDate,

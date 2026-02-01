@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -12,7 +13,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess({ message: 'Deleted' });
   } catch (error) {
-    console.error('Delete report failed:', error);
+    logApiError('reports', error);
     if (error.code === 'P2025') {
       return useResponseError('Report not found');
     }

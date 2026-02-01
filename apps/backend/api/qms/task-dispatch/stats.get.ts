@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -68,7 +69,7 @@ export default defineEventHandler(async (event) => {
       overdue: 0,
     });
   } catch (error) {
-    console.error('Task stats error:', error);
+    logApiError('stats', error);
     return useResponseSuccess({
       pendingLevel1: 0,
       pendingLevel2: 0,
