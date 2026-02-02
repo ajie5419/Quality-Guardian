@@ -18,6 +18,7 @@ model inspections {
   incomingType        String?
   processName         String?
   level1Component     String?
+  level2Component     String?
   team                String?
   documents           String?
   packingListArchived String?

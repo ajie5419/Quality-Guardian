@@ -9,14 +9,7 @@ import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
-import {
-  Button,
-  Empty,
-  message,
-  Space,
-  Table,
-  Tooltip,
-} from 'ant-design-vue';
+import { Button, Empty, message, Space, Table, Tooltip } from 'ant-design-vue';
 
 import {
   createBomProject,
@@ -30,8 +23,8 @@ import { convertToTreeSelectData } from '#/types';
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
 import WorkOrderSelectModal from '../components/WorkOrderSelectModal.vue';
-import { useProjectManager } from '../composables/useProjectManager';
 import { useProjectActions } from '../composables/useProjectActions';
+import { useProjectManager } from '../composables/useProjectManager';
 import BomEditModal from './components/BomEditModal.vue';
 
 const { t } = useI18n();
@@ -57,10 +50,7 @@ const {
 } = useProjectManager(allProjects as any);
 
 // ================= Composables =================
-const {
-  handleArchiveProject,
-  handleDeleteItem,
-} = useProjectActions<any>({
+const { handleArchiveProject, handleDeleteItem } = useProjectActions<any>({
   archiveProject: async (id, status) => {
     await updateBomProject(id, { status: status as any });
   },

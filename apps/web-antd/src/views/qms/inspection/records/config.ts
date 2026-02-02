@@ -58,6 +58,7 @@ export const getColumns = (
     process: [
       { field: 'processName', title: '工序', width: 100 },
       { field: 'level1Component', title: '一级部件', width: 120 },
+      { field: 'level2Component', title: '二级部件', width: 120 },
       { field: 'team', title: '班组', width: 100 },
     ],
     shipment: [
@@ -99,6 +100,7 @@ export const getFormConfig = (type: string) => {
     showIncomingType: false,
     showProcess: false,
     showLevel1: false,
+    showLevel2: false,
     showTeam: false,
     showDocuments: false,
     showPackingList: false,
@@ -115,6 +117,7 @@ export const getFormConfig = (type: string) => {
     case 'process': {
       config.showProcess = true;
       config.showLevel1 = true;
+      config.showLevel2 = true;
       config.showTeam = true;
 
       break;

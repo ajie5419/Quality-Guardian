@@ -34,8 +34,8 @@ import { getUserList } from '#/api/system/user';
 
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
-import { useProjectManager } from '../composables/useProjectManager';
 import { useProjectActions } from '../composables/useProjectActions';
+import { useProjectManager } from '../composables/useProjectManager';
 import { CONTROL_POINT_MAP } from '../constants';
 import ItpAssignModal from './components/ItpAssignModal.vue';
 import ItpItemModal from './components/ItpItemModal.vue';
@@ -65,28 +65,25 @@ const {
 } = useProjectManager(allProjects as any);
 
 // ================= Composables =================
-const {
-  handleArchiveProject,
-  handleDeleteProject,
-  handleDeleteItem,
-} = useProjectActions<any>({
-  archiveProject: async (id, status, project) => {
-    await updateItpProject(id, {
-      ...(project as any),
-      status: status as any,
-    });
-  },
-  deleteItem: async (id, projectId) => {
-    await deleteItp(id, projectId!);
-  },
-  deleteProject: async (id) => {
-    await deleteItpProject(id);
-  },
-  loadData,
-  resetSelectionOnDelete: true,
-  selectedProjectId,
-  passFullProjectOnArchive: true,
-});
+const { handleArchiveProject, handleDeleteProject, handleDeleteItem } =
+  useProjectActions<any>({
+    archiveProject: async (id, status, project) => {
+      await updateItpProject(id, {
+        ...(project as any),
+        status: status as any,
+      });
+    },
+    deleteItem: async (id, projectId) => {
+      await deleteItp(id, projectId!);
+    },
+    deleteProject: async (id) => {
+      await deleteItpProject(id);
+    },
+    loadData,
+    resetSelectionOnDelete: true,
+    selectedProjectId,
+    passFullProjectOnArchive: true,
+  });
 
 // ================= Methods =================
 async function loadData(idToSelect?: string) {

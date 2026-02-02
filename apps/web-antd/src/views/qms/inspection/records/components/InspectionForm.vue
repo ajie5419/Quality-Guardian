@@ -61,6 +61,7 @@ const formState = reactive({
   incomingType: undefined as string | undefined,
   processName: undefined as string | undefined,
   level1Component: '',
+  level2Component: '',
   team: '',
   documents: '',
   packingListArchived: '是',
@@ -259,6 +260,7 @@ watch(
         incomingType: undefined,
         processName: undefined,
         level1Component: '',
+        level2Component: '',
         team: '',
         documents: '',
         packingListArchived: '是',
@@ -327,6 +329,9 @@ defineExpose({
           v-model:value="formState.level1Component"
           :work-order-number="formState.workOrderNumber"
         />
+      </Form.Item>
+      <Form.Item v-if="config.showLevel2" label="二级部件">
+        <Input v-model:value="formState.level2Component" />
       </Form.Item>
       <Form.Item v-if="config.showTeam" label="班组">
         <TeamSelect v-model:value="formState.team" />

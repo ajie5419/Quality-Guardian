@@ -45,6 +45,7 @@ export interface ProcessInspection {
   id: string;
   inspector: string;
   level1Component: string;
+  level2Component?: string;
   process: string;
   quantity: number;
   remarks?: string;

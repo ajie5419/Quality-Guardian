@@ -145,7 +145,7 @@ export default defineEventHandler(async (event) => {
         }
         case 'PROCESS': {
           proc = item.processName || '';
-          name = item.level1Component || '';
+          name = item.level2Component || item.level1Component || '';
 
           break;
         }

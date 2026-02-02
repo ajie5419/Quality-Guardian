@@ -29,14 +29,14 @@ export default defineEventHandler(async () => {
     });
 
     // 将BOM项目按工单号分组
-    const bomItemsByProject = allBomItems.reduce((acc, item) => {
+    const bomItemsByProject: Record<string, typeof allBomItems> = {};
+    for (const item of allBomItems) {
       const workOrderNumber = item.work_order_number;
-      if (!acc[workOrderNumber]) {
-        acc[workOrderNumber] = [];
+      if (!bomItemsByProject[workOrderNumber]) {
+        bomItemsByProject[workOrderNumber] = [];
       }
-      acc[workOrderNumber].push(item);
-      return acc;
-    }, {} as Record<string, typeof allBomItems>);
+      bomItemsByProject[workOrderNumber].push(item);
+    }
 
     const treeNodes = projects.map((project) => {
       const items = bomItemsByProject[project.workOrderNumber] || [];

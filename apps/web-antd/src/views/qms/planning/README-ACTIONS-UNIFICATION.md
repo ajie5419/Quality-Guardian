@@ -7,15 +7,18 @@
 ## 核心文件
 
 ### 1. `useProjectActions` Hook
+
 **位置**: `apps/web-antd/src/views/qms/planning/composables/useProjectActions.ts`
 
 提供统一的项目操作逻辑：
+
 - `handleArchiveProject()` - 归档/恢复项目
 - `handleDeleteProject()` - 删除项目
 - `handleDeleteItem()` - 删除项目明细
 - `isArchivedStatus()` - 判断是否归档状态
 
 **使用示例**:
+
 ```typescript
 const {
   handleArchiveProject,
@@ -39,14 +42,17 @@ const {
 ```
 
 ### 2. `ProjectActionButtons` 组件
+
 **位置**: `apps/web-antd/src/views/qms/planning/components/ProjectActionButtons.vue`
 
 统一的操作按钮下拉菜单，支持：
+
 - 权限控制（通过 `authPrefix`）
 - 状态判断（归档/活跃）
 - 自定义可见性（`canEdit`、`canDelete`、`canArchive`）
 
 **使用示例**:
+
 ```vue
 <ProjectActionButtons
   :project="project"
@@ -79,23 +85,20 @@ async function handleDeleteItem(row: QmsPlanningApi.BomTreeNode) {
 */
 
 // 替换为
-const {
-  handleArchiveProject,
-  handleDeleteProject,
-  handleDeleteItem,
-} = useProjectActions<QmsPlanningApi.BomTreeNode>({
-  archiveProject: async (id, status) => {
-    await updateYourProject(id, { status });
-  },
-  deleteItem: async (id, projectId) => {
-    await deleteYourItem(id, projectId);
-  },
-  deleteProject: async (id) => {
-    await deleteYourProject(id);
-  },
-  loadData,
-  selectedProjectId,
-});
+const { handleArchiveProject, handleDeleteProject, handleDeleteItem } =
+  useProjectActions<QmsPlanningApi.BomTreeNode>({
+    archiveProject: async (id, status) => {
+      await updateYourProject(id, { status });
+    },
+    deleteItem: async (id, projectId) => {
+      await deleteYourItem(id, projectId);
+    },
+    deleteProject: async (id) => {
+      await deleteYourProject(id);
+    },
+    loadData,
+    selectedProjectId,
+  });
 ```
 
 ### 步骤 2: 更新模板调用
@@ -107,21 +110,7 @@ const {
 <PlanningSidebar
   @archive="(proj) => handleArchiveProject(proj)"
   @delete="(proj) => handleDeleteProject(proj)"
->
-
-<!-- 列表删除 -->
-<Table>
-  <template #bodyCell="{ record }">
-    <Space>
-      <Tooltip :title="t('common.edit')">
-        <Button @click="openEditModal(record)">编辑</Button>
-      </Tooltip>
-      <Tooltip :title="t('common.delete')">
-        <Button danger @click="handleDeleteItem(record)">删除</Button>
-      </Tooltip>
-    </Space>
-  </template>
-</Table>
+></PlanningSidebar>
 ```
 
 ### 步骤 3: 可选 - 使用统一按钮组件
@@ -149,29 +138,33 @@ import ProjectActionButtons from '../components/ProjectActionButtons.vue';
 
 ## 各组件迁移状态
 
-| 组件 | 状态 | 说明 |
-|------|------|------|
-| BOM | ✅ 已更新 | 已引入 `useProjectActions` Hook |
-| DFMEA | ✅ 已更新 | 已引入 `useProjectActions` Hook |
-| ITP | ✅ 已更新 | 已引入 `useProjectActions` Hook |
+| 组件         | 状态      | 说明                            |
+| ------------ | --------- | ------------------------------- |
+| BOM          | ✅ 已更新 | 已引入 `useProjectActions` Hook |
+| DFMEA        | ✅ 已更新 | 已引入 `useProjectActions` Hook |
+| ITP          | ✅ 已更新 | 已引入 `useProjectActions` Hook |
 | Project Docs | ✅ 已更新 | 已引入 `useProjectActions` Hook |
 
 ## 优势
 
 ### 代码复用
+
 - 消除了约 80% 的重复代码
 - 统一的操作逻辑和错误处理
 
 ### 一致性
+
 - 所有组件的确认对话框样式一致
 - 操作反馈（消息提示）一致
 - 权限检查逻辑一致
 
 ### 可维护性
+
 - 修改一处即可影响所有组件
 - 易于添加新功能（如批量操作）
 
 ### 类型安全
+
 - 完整的 TypeScript 类型支持
 - 泛型支持不同组件的节点类型
 

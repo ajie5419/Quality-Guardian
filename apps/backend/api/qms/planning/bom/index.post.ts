@@ -24,7 +24,8 @@ export default defineEventHandler(async (event) => {
         data: {
           id: `BOM-PROJ-${nanoid(6).toUpperCase()}`,
           workOrderNumber: body.workOrderNumber,
-          projectName: body.projectName || workOrder?.projectName || body.workOrderNumber,
+          projectName:
+            body.projectName || workOrder?.projectName || body.workOrderNumber,
           status: 'active',
         },
       });

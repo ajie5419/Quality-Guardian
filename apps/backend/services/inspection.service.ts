@@ -45,6 +45,8 @@ interface InspectionRecordInput {
   incomingType?: string;
   processName?: string;
   level1Component?: string;
+  level2Component?: string;
+
   team?: string;
   documents?: string;
   packingListArchived?: string;
@@ -153,6 +155,7 @@ export const InspectionService = {
           incomingType: data.incomingType,
           processName: data.processName,
           level1Component: data.level1Component,
+          level2Component: data.level2Component,
           team: data.team,
           documents: data.documents,
           packingListArchived: data.packingListArchived,
@@ -212,6 +215,7 @@ export const InspectionService = {
           incomingType: data.incomingType,
           processName: data.processName,
           level1Component: data.level1Component,
+          level2Component: data.level2Component,
           team: data.team,
           documents: data.documents,
           packingListArchived: data.packingListArchived,

@@ -32,8 +32,8 @@ import { getUserList } from '#/api/system/user';
 
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
-import { useProjectManager } from '../composables/useProjectManager';
 import { useProjectActions } from '../composables/useProjectActions';
+import { useProjectManager } from '../composables/useProjectManager';
 import DfmeaAssignModal from './components/DfmeaAssignModal.vue';
 import DfmeaItemModal from './components/DfmeaItemModal.vue';
 import DfmeaProjectModal from './components/DfmeaProjectModal.vue';
@@ -66,24 +66,21 @@ const {
 const userList = ref<SystemUserApi.User[]>([]);
 
 // ================= Composables =================
-const {
-  handleArchiveProject,
-  handleDeleteProject,
-  handleDeleteItem,
-} = useProjectActions<any>({
-  archiveProject: async (id, status) => {
-    await updateDfmeaProject(id, { status: status as any });
-  },
-  deleteItem: async (id) => {
-    await deleteDfmea(id);
-  },
-  deleteProject: async (id) => {
-    await deleteDfmeaProject(id);
-  },
-  loadData,
-  resetSelectionOnDelete: true,
-  selectedProjectId,
-});
+const { handleArchiveProject, handleDeleteProject, handleDeleteItem } =
+  useProjectActions<any>({
+    archiveProject: async (id, status) => {
+      await updateDfmeaProject(id, { status: status as any });
+    },
+    deleteItem: async (id) => {
+      await deleteDfmea(id);
+    },
+    deleteProject: async (id) => {
+      await deleteDfmeaProject(id);
+    },
+    loadData,
+    resetSelectionOnDelete: true,
+    selectedProjectId,
+  });
 
 // ================= Methods =================
 async function loadData(idToSelect?: string) {
