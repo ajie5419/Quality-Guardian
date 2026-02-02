@@ -1,6 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
-import { logApiError } from '~/utils/api-logger';
 import { nanoid } from 'nanoid';
+import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
 

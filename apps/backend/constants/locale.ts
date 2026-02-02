@@ -80,7 +80,7 @@ export const i18n = {
    * 获取月份名称列表
    */
   getMonths(locale = CURRENT_LOCALE): string[] {
-    return MONTH_NAMES[locale] || MONTH_NAMES['zh-CN']!;
+    return MONTH_NAMES[locale] ?? MONTH_NAMES['zh-CN'] ?? [];
   },
 
   /**
@@ -102,11 +102,13 @@ export const i18n = {
    * 获取报告类型名称
    */
   getReportTypeName(
-    type: 'weekly' | 'monthly',
+    type: 'monthly' | 'weekly',
     locale = CURRENT_LOCALE,
   ): string {
     return (
-      REPORT_TYPE_NAMES[locale]?.[type] || REPORT_TYPE_NAMES['zh-CN']![type]!
+      REPORT_TYPE_NAMES[locale]?.[type] ??
+      REPORT_TYPE_NAMES['zh-CN']?.[type] ??
+      ''
     );
   },
 
@@ -124,5 +126,5 @@ export const i18n = {
 
 // 导出便捷常量（保持向后兼容）
 export const MONTHS = i18n.getMonths();
-export const MONTHS_ZH = MONTH_NAMES['zh-CN']!;
-export const MONTHS_EN = MONTH_NAMES['en-US']!;
+export const MONTHS_ZH = MONTH_NAMES['zh-CN'] ?? [];
+export const MONTHS_EN = MONTH_NAMES['en-US'] ?? [];

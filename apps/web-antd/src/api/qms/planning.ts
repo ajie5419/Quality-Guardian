@@ -24,7 +24,6 @@ export interface ProjectDocProject {
   workOrderNumber: string;
 }
 
-
 // Re-export shared types
 export * from '@qgs/shared';
 
@@ -110,20 +109,28 @@ export async function deleteBomProject(id: string) {
  * Project Documents APIs
  */
 export async function getProjectDocProjects() {
-  return requestClient.get<ProjectDocProject[]>('/qms/planning/project-docs/projects');
+  return requestClient.get<ProjectDocProject[]>(
+    '/qms/planning/project-docs/projects',
+  );
 }
 
 export async function createProjectDocProject(data: {
   workOrderNumber: string;
 }) {
-  return requestClient.post<ProjectDocProject>('/qms/planning/project-docs/projects', data);
+  return requestClient.post<ProjectDocProject>(
+    '/qms/planning/project-docs/projects',
+    data,
+  );
 }
 
 export async function updateProjectDocProject(
   id: string,
   data: Partial<ProjectDocProject>,
 ) {
-  return requestClient.put<ProjectDocProject>(`/qms/planning/project-docs/projects/${id}`, data);
+  return requestClient.put<ProjectDocProject>(
+    `/qms/planning/project-docs/projects/${id}`,
+    data,
+  );
 }
 
 /**

@@ -1,6 +1,7 @@
 import type { InspectionIssue, InspectionRecord } from '@qgs/shared';
 
 import { requestClient } from '#/api/request';
+
 import { QMS_API } from './constants';
 
 // Inspection Issue Stats type
@@ -11,7 +12,7 @@ export interface InspectionIssueStats {
   pieData: Array<{ name: string; value: number }>;
   totalCount: number;
   totalLoss: number;
-  trendData: Array<{ month: string; count: number }>;
+  trendData: Array<{ period: string; value: number }>;
 }
 
 // Re-export types for backward compatibility (optional, can be removed if views are updated)
@@ -35,7 +36,10 @@ export async function getInspectionIssues(params?: {
 }
 
 export async function getInspectionIssueStats(params?: { year?: number }) {
-  return requestClient.get<InspectionIssueStats>(QMS_API.INSPECTION_ISSUES_STATS, { params });
+  return requestClient.get<InspectionIssueStats>(
+    QMS_API.INSPECTION_ISSUES_STATS,
+    { params },
+  );
 }
 
 export async function generateInspectionNcNumber() {

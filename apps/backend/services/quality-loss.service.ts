@@ -7,15 +7,18 @@ import type {
   after_sales_claimStatus,
   quality_records_status,
 } from '@prisma/client';
-import prisma from '~/utils/prisma';
+
+import type { PaginationParams } from './base.service';
+
 import { MONTHS } from '~/constants/locale';
 import { createModuleLogger } from '~/utils/logger';
+import prisma from '~/utils/prisma';
+
 import {
   applyPagination,
   formatDateString,
   formatNumber,
   safeNumber,
-  type PaginationParams,
 } from './base.service';
 
 // 创建模块级 logger
@@ -24,7 +27,7 @@ const logger = createModuleLogger('QualityLossService');
 // ============ 类型定义 ============
 
 interface TrendRow {
-  a: number | string | null;
+  a: null | number | string;
   p: number | string;
 }
 
@@ -38,14 +41,14 @@ interface QualityLossResult {
   actualClaim: number;
   amount: number;
   createdAt?: Date;
-  date: string | null;
+  date: null | string;
   description?: string;
   id: string;
   lossSource: string;
   partName: string;
   pk: string;
   projectName: string;
-  responsibleDepartment: string | null;
+  responsibleDepartment: null | string;
   status?: string;
   type?: string;
   workOrderNumber: string;
@@ -123,15 +126,15 @@ function buildExternalSalesWhere(params: QualityLossQueryParams) {
  */
 function formatManualLossItem(
   item: {
+    actualClaim: unknown;
+    amount: unknown;
     id: string;
     lossId: string;
     occurDate: Date;
-    respDept: string | null;
-    type: string;
-    amount: unknown;
-    actualClaim: unknown;
+    respDept: null | string;
     status?: string;
-  } & { workOrderNumber?: string; projectName?: string },
+    type: string;
+  } & { projectName?: string; workOrderNumber?: string },
 ): QualityLossResult {
   return {
     id: item.lossId || item.id,
@@ -148,22 +151,40 @@ function formatManualLossItem(
   };
 }
 
+// ============ 状态映射处理 ============
+
+function mapInternalStatus(status: string): string {
+  if (status === 'CLOSED') return QL_CONSTANTS.STATUS.CONFIRMED;
+  if (status === 'IN_PROGRESS' || status === 'CLAIMING') return 'Processing';
+  if (status === 'RESOLVED') return 'Resolved';
+  return QL_CONSTANTS.STATUS.PENDING;
+}
+
+function mapExternalStatus(status: string): string {
+  if (status === 'CLOSED' || status === 'COMPLETED')
+    return QL_CONSTANTS.STATUS.CONFIRMED;
+  if (status === 'IN_PROGRESS' || ['NEGOTIATING', 'SUBMITTED'].includes(status))
+    return 'Processing';
+  if (status === 'RESOLVED') return 'Resolved';
+  return QL_CONSTANTS.STATUS.PENDING;
+}
+
 /**
  * 格式化内部质量记录
  */
 function formatInternalRecordItem(item: {
-  id: string;
-  serialNumber: number;
+  createdAt: Date;
   date: Date;
+  description: null | string;
+  id: string;
   lossAmount: unknown;
-  responsibleDepartment: string | null;
-  description: string | null;
+  partName: null | string;
+  projectName: null | string;
+  recoveredAmount: unknown;
+  responsibleDepartment: null | string;
+  serialNumber: number;
   status: string;
   workOrderNumber: string;
-  projectName: string | null;
-  partName: string | null;
-  recoveredAmount: unknown;
-  createdAt: Date;
 }): QualityLossResult {
   return {
     id: `INT-${item.serialNumber}`,
@@ -172,14 +193,7 @@ function formatInternalRecordItem(item: {
     amount: safeNumber(item.lossAmount),
     responsibleDepartment: item.responsibleDepartment,
     description: item.description || undefined,
-    status:
-      item.status === 'CLOSED'
-        ? QL_CONSTANTS.STATUS.CONFIRMED
-        : item.status === 'IN_PROGRESS' || item.status === 'CLAIMING'
-          ? 'Processing'
-          : item.status === 'RESOLVED'
-            ? 'Resolved'
-            : QL_CONSTANTS.STATUS.PENDING,
+    status: mapInternalStatus(item.status),
     type: QL_CONSTANTS.SOURCE.INTERNAL,
     lossSource: QL_CONSTANTS.SOURCE.INTERNAL,
     workOrderNumber: item.workOrderNumber,
@@ -194,22 +208,22 @@ function formatInternalRecordItem(item: {
  * 格式化售后记录
  */
 function formatExternalSalesItem(item: {
-  id: string;
-  serialNumber: number;
-  occurDate: Date;
-  materialCost: unknown;
-  laborTravelCost: unknown;
-  respDept: string | null;
-  issueDescription: string | null;
-  claimStatus: string;
-  workOrderNumber: string | null;
-  projectName: string | null;
-  partName: string | null;
-  productSubtype: string | null;
-  productType: string | null;
   actualClaim: unknown;
+  claimStatus: string;
   createdAt: Date;
-}): QualityLossResult | null {
+  id: string;
+  issueDescription: null | string;
+  laborTravelCost: unknown;
+  materialCost: unknown;
+  occurDate: Date;
+  partName: null | string;
+  productSubtype: null | string;
+  productType: null | string;
+  projectName: null | string;
+  respDept: null | string;
+  serialNumber: number;
+  workOrderNumber: null | string;
+}): null | QualityLossResult {
   const amount =
     safeNumber(item.materialCost) + safeNumber(item.laborTravelCost);
   if (amount <= 0) return null;
@@ -221,15 +235,7 @@ function formatExternalSalesItem(item: {
     amount,
     responsibleDepartment: item.respDept,
     description: item.issueDescription || undefined,
-    status:
-      item.claimStatus === 'CLOSED' || item.claimStatus === 'COMPLETED'
-        ? QL_CONSTANTS.STATUS.CONFIRMED
-        : item.claimStatus === 'IN_PROGRESS' ||
-          ['SUBMITTED', 'NEGOTIATING'].includes(item.claimStatus)
-          ? 'Processing'
-          : item.claimStatus === 'RESOLVED'
-            ? 'Resolved'
-            : QL_CONSTANTS.STATUS.PENDING,
+    status: mapExternalStatus(item.claimStatus),
     type: QL_CONSTANTS.SOURCE.EXTERNAL,
     lossSource: QL_CONSTANTS.SOURCE.EXTERNAL,
     workOrderNumber: item.workOrderNumber || '-',
@@ -375,15 +381,15 @@ export const QualityLossService = {
       if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.MANUAL) {
         const filteredManual = workOrderNumber
           ? manualRecords.filter((r) => {
-            const record = r as typeof r & { workOrderNumber?: string };
-            return record.workOrderNumber?.includes(workOrderNumber);
-          })
+              const record = r as typeof r & { workOrderNumber?: string };
+              return record.workOrderNumber?.includes(workOrderNumber);
+            })
           : manualRecords;
 
         filteredManual.forEach((item) => {
           const itemRecord = item as typeof item & {
-            workOrderNumber?: string;
             projectName?: string;
+            workOrderNumber?: string;
           };
           const amount = safeNumber(item.amount);
           if (amount <= 0) return;

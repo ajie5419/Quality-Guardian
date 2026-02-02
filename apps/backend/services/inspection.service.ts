@@ -172,12 +172,12 @@ export const InspectionService = {
                   : null,
               upperTolerance:
                 item.upperTolerance !== undefined &&
-                  item.upperTolerance !== null
+                item.upperTolerance !== null
                   ? String(item.upperTolerance)
                   : null,
               lowerTolerance:
                 item.lowerTolerance !== undefined &&
-                  item.lowerTolerance !== null
+                item.lowerTolerance !== null
                   ? String(item.lowerTolerance)
                   : null,
               uom: item.uom || item.unit,

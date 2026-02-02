@@ -59,7 +59,7 @@ export function parseSortOrder(
   sortBy?: string,
   sortOrder?: string,
   allowedFields: string[] = [],
-): { field: string; direction: SortDirection } | null {
+): null | { direction: SortDirection; field: string } {
   if (!sortBy) return null;
 
   // 安全检查：只允许预定义的字段
@@ -150,16 +150,17 @@ export function buildYearFilter(
 /**
  * 格式化日期为 ISO 字符串（仅日期部分）
  */
-export function formatDateString(date: Date | null | undefined): string | null {
+export function formatDateString(date: Date | null | undefined): null | string {
   if (!date) return null;
-  return date.toISOString().split('T')[0]!;
+  const isoString = date.toISOString();
+  return isoString.split('T')[0] ?? null;
 }
 
 /**
  * 格式化数字（保留2位小数）
  */
 export function formatNumber(
-  value: number | null | undefined,
+  value: null | number | undefined,
   decimals = 2,
 ): number {
   if (value === null || value === undefined) return 0;
@@ -186,7 +187,7 @@ export function formatPaginatedResponse<T, R>(
   const paginatedItems = items.slice(skip, skip + take);
 
   return {
-    items: paginatedItems.map(transformer),
+    items: paginatedItems.map((item) => transformer(item)),
     total: items.length,
   };
 }
@@ -232,8 +233,8 @@ export function buildWhereClause<T extends Record<string, unknown>>(
 export async function softDeleteMany(
   model: {
     updateMany: (args: {
-      where: { id: { in: string[] } };
       data: { isDeleted: boolean };
+      where: { id: { in: string[] } };
     }) => Promise<{ count: number }>;
   },
   ids: string[],

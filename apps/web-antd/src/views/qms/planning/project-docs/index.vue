@@ -2,7 +2,7 @@
 import type { InspectionDocItem } from '../types';
 
 import type { VxeGridProps } from '#/adapter/vxe-table';
-import type { QmsWorkOrderApi } from '#/api/qms/work-order';
+import type { ProjectDocProject } from '#/api/qms/planning';
 
 import { computed, onMounted, ref, watch } from 'vue';
 
@@ -39,7 +39,7 @@ const canExport = computed(() =>
 );
 
 // ================= Left Column: Project List =================
-const projectList = ref<QmsWorkOrderApi.WorkOrderItem[]>([]);
+const projectList = ref<ProjectDocProject[]>([]);
 const isProjectsLoading = ref(false);
 const selectedProjectId = ref<null | string>(null);
 const searchTerm = ref('');

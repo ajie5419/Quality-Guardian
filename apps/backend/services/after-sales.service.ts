@@ -1,6 +1,6 @@
 import { QMS_DEFAULT_VALUES, QMS_STATUS_OPEN_SET } from '@qgs/shared';
-import prisma from '~/utils/prisma';
 import { createModuleLogger } from '~/utils/logger';
+import prisma from '~/utils/prisma';
 
 // 创建模块级 logger
 const logger = createModuleLogger('AfterSalesService');

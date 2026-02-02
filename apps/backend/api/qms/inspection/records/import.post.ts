@@ -1,6 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
-import { logApiError } from '~/utils/api-logger';
 import { InspectionService } from '~/services/inspection.service';
+import { logApiError } from '~/utils/api-logger';
 import { useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {

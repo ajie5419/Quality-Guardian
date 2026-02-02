@@ -1,6 +1,6 @@
 import { getTargetPassRate } from '~/constants/quality-standards';
-import prisma from '~/utils/prisma';
 import { createModuleLogger } from '~/utils/logger';
+import prisma from '~/utils/prisma';
 
 // 创建模块级 logger
 const logger = createModuleLogger('DashboardService');

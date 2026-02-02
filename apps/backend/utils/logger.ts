@@ -9,6 +9,10 @@
  * - 备用 console 日志（当 pino 不可用时）
  */
 
+import process from 'node:process';
+
+import pino from 'pino';
+
 // ============ 配置 ============
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -26,35 +30,6 @@ interface LoggerLike {
   warn: (obj: unknown, msg?: string) => void;
 }
 
-const createConsoleLogger = (
-  bindings: Record<string, unknown> = {},
-): LoggerLike => ({
-  child: (newBindings: Record<string, unknown>) =>
-    createConsoleLogger({ ...bindings, ...newBindings }),
-  trace: (obj: unknown, msg?: string) => {
-    if (LOG_LEVEL === 'trace') {
-      console.debug('[TRACE]', { ...bindings, ...formatLogObj(obj) }, msg);
-    }
-  },
-  debug: (obj: unknown, msg?: string) => {
-    if (['trace', 'debug'].includes(LOG_LEVEL)) {
-      console.debug('[DEBUG]', { ...bindings, ...formatLogObj(obj) }, msg);
-    }
-  },
-  info: (obj: unknown, msg?: string) => {
-    console.info('[INFO]', { ...bindings, ...formatLogObj(obj) }, msg);
-  },
-  warn: (obj: unknown, msg?: string) => {
-    console.warn('[WARN]', { ...bindings, ...formatLogObj(obj) }, msg);
-  },
-  error: (obj: unknown, msg?: string) => {
-    console.error('[ERROR]', { ...bindings, ...formatLogObj(obj) }, msg);
-  },
-  fatal: (obj: unknown, msg?: string) => {
-    console.error('[FATAL]', { ...bindings, ...formatLogObj(obj) }, msg);
-  },
-});
-
 function formatLogObj(obj: unknown): Record<string, unknown> {
   if (obj && typeof obj === 'object') {
     return obj as Record<string, unknown>;
@@ -62,56 +37,93 @@ function formatLogObj(obj: unknown): Record<string, unknown> {
   return { value: obj };
 }
 
+const createConsoleLogger = (
+  bindings: Record<string, unknown> = {},
+): LoggerLike => ({
+  child: (newBindings: Record<string, unknown>) =>
+    createConsoleLogger({ ...bindings, ...newBindings }),
+  debug: (obj: unknown, msg?: string) => {
+    if (['debug', 'trace'].includes(LOG_LEVEL)) {
+      /* eslint-disable no-console */
+      console.debug('[DEBUG]', { ...bindings, ...formatLogObj(obj) }, msg);
+      /* eslint-enable no-console */
+    }
+  },
+  error: (obj: unknown, msg?: string) => {
+    console.error('[ERROR]', { ...bindings, ...formatLogObj(obj) }, msg);
+  },
+  fatal: (obj: unknown, msg?: string) => {
+    console.error('[FATAL]', { ...bindings, ...formatLogObj(obj) }, msg);
+  },
+  info: (obj: unknown, msg?: string) => {
+    /* eslint-disable no-console */
+    console.info('[INFO]', { ...bindings, ...formatLogObj(obj) }, msg);
+    /* eslint-enable no-console */
+  },
+  trace: (obj: unknown, msg?: string) => {
+    if (LOG_LEVEL === 'trace') {
+      /* eslint-disable no-console */
+      console.debug('[TRACE]', { ...bindings, ...formatLogObj(obj) }, msg);
+      /* eslint-enable no-console */
+    }
+  },
+  warn: (obj: unknown, msg?: string) => {
+    console.warn('[WARN]', { ...bindings, ...formatLogObj(obj) }, msg);
+  },
+});
+
 // ============ Logger 实例创建 ============
 
-let logger: LoggerLike;
-
-try {
-  // 尝试动态加载 pino
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pino = require('pino');
-
-  const baseOptions = {
-    level: LOG_LEVEL,
-    base: {
-      app: 'qgs-backend',
-      env: process.env.NODE_ENV || 'development',
-    },
-    timestamp: pino.stdTimeFunctions.isoTime,
-    formatters: {
-      level: (label: string) => ({ level: label }),
-    },
-  };
-
-  // 开发环境使用 pino-pretty（如果可用）
-  if (isDev) {
-    try {
-      logger = pino(
-        baseOptions,
-        pino.transport({
-          target: 'pino-pretty',
-          options: {
-            colorize: true,
-            translateTime: 'SYS:standard',
-            ignore: 'pid,hostname',
-          },
-        }),
-      );
-    } catch {
-      // pino-pretty 不可用，使用普通 pino
-      logger = pino(baseOptions);
-    }
-  } else {
-    logger = pino(baseOptions);
-  }
-} catch {
-  // pino 不可用，使用 console 备用方案
-  console.warn('[Logger] pino not available, using console fallback');
-  logger = createConsoleLogger({
+const getBaseOptions = () => ({
+  level: LOG_LEVEL,
+  base: {
     app: 'qgs-backend',
     env: process.env.NODE_ENV || 'development',
-  });
-}
+  },
+  timestamp: pino.stdTimeFunctions.isoTime,
+  formatters: {
+    level: (label: string) => ({ level: label }),
+  },
+});
+
+const createLogger = (): LoggerLike => {
+  try {
+    const baseOptions = getBaseOptions();
+
+    // 开发环境使用 pino-pretty（如果可用）
+    if (isDev) {
+      try {
+        return pino(
+          baseOptions,
+          pino.transport({
+            target: 'pino-pretty',
+            options: {
+              colorize: true,
+              ignore: 'pid,hostname',
+              translateTime: 'SYS:standard',
+            },
+          }),
+        ) as unknown as LoggerLike;
+      } catch {
+        // pino-pretty 不可用，使用普通 pino
+        return pino(baseOptions) as unknown as LoggerLike;
+      }
+    } else {
+      return pino(baseOptions) as unknown as LoggerLike;
+    }
+  } catch {
+    // pino 不可用，使用 console 备用方案
+
+    console.warn('[Logger] pino initialization failed, using console fallback');
+
+    return createConsoleLogger({
+      app: 'qgs-backend',
+      env: process.env.NODE_ENV || 'development',
+    });
+  }
+};
+
+const logger = createLogger();
 
 // ============ 导出 Logger ============
 
@@ -164,9 +176,9 @@ export function logPerformance(
   context?: Record<string, unknown>,
 ) {
   logger.info({
-    type: 'performance',
-    operation,
     durationMs,
+    operation,
+    type: 'performance',
     ...context,
   });
 }
@@ -179,8 +191,8 @@ export function logAudit(
   details?: Record<string, unknown>,
 ) {
   logger.info({
-    type: 'audit',
     action,
+    type: 'audit',
     userId,
     ...details,
   });
