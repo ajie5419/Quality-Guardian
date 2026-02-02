@@ -62,7 +62,8 @@
     "SOBU",
     "exceljs",
     "uncategorized",
-    "YYKJ"
+    "YYKJ",
+    "IFNULL"
   ],
   "ignorePaths": [
     "**/node_modules/**",

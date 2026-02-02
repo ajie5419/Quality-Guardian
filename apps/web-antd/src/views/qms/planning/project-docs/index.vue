@@ -10,7 +10,7 @@ import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
-import { Card, message, Modal, Tag } from 'ant-design-vue';
+import { Card, message, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getInspectionRecords } from '#/api/qms/inspection';
@@ -22,6 +22,7 @@ import {
 
 import PlanningSidebar from '../components/PlanningSidebar.vue';
 import WorkOrderSelectModal from '../components/WorkOrderSelectModal.vue';
+import { useProjectActions } from '../composables/useProjectActions';
 
 // Helper for strict type safe access
 function getField(record: unknown, field: string): string | undefined {
@@ -113,35 +114,15 @@ const filteredProjects = computed(() => {
   return list;
 });
 
-async function handleArchiveProject(project: any) {
-  const isArchived = isArchivedStatus(project.status);
-  const newStatus = isArchived ? 'active' : 'archived';
-
-  Modal.confirm({
-    title: isArchived ? t('common.restore') : t('common.archive'),
-    content: isArchived
-      ? `${t('common.confirmRestoreContent')} "${project.projectName || project.name}" ?`
-      : `${t('common.confirmArchiveContent')} "${project.projectName || project.name}" ?`,
-    onOk: async () => {
-      try {
-        await updateProjectDocProject(project.id, {
-          status: newStatus,
-        });
-        message.success(
-          isArchived ? t('common.restoreSuccess') : t('common.archiveSuccess'),
-        );
-
-        if (selectedProjectId.value === project.id) {
-          selectedProjectId.value = null;
-        }
-        await loadProjects();
-      } catch (error) {
-        console.error('Archive Project Error:', error);
-        message.error(t('common.actionFailed'));
-      }
-    },
-  });
-}
+// ================= Composables =================
+const { handleArchiveProject } = useProjectActions<any>({
+  archiveProject: async (id, status) => {
+    await updateProjectDocProject(id, { status: status as any });
+  },
+  loadData: loadProjects,
+  resetSelectionOnDelete: true,
+  selectedProjectId,
+});
 
 // ================= Right Column: Documents =================
 const gridOptions = computed(() => ({

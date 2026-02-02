@@ -16,7 +16,6 @@ import {
   Divider,
   Empty,
   message,
-  Modal,
   Space,
   Table,
   Tag,
@@ -36,6 +35,7 @@ import { getUserList } from '#/api/system/user';
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
 import { useProjectManager } from '../composables/useProjectManager';
+import { useProjectActions } from '../composables/useProjectActions';
 import { CONTROL_POINT_MAP } from '../constants';
 import ItpAssignModal from './components/ItpAssignModal.vue';
 import ItpItemModal from './components/ItpItemModal.vue';
@@ -63,6 +63,30 @@ const {
   currentProject,
   handleTabChange,
 } = useProjectManager(allProjects as any);
+
+// ================= Composables =================
+const {
+  handleArchiveProject,
+  handleDeleteProject,
+  handleDeleteItem,
+} = useProjectActions<any>({
+  archiveProject: async (id, status, project) => {
+    await updateItpProject(id, {
+      ...(project as any),
+      status: status as any,
+    });
+  },
+  deleteItem: async (id, projectId) => {
+    await deleteItp(id, projectId!);
+  },
+  deleteProject: async (id) => {
+    await deleteItpProject(id);
+  },
+  loadData,
+  resetSelectionOnDelete: true,
+  selectedProjectId,
+  passFullProjectOnArchive: true,
+});
 
 // ================= Methods =================
 async function loadData(idToSelect?: string) {
@@ -108,79 +132,6 @@ async function handleSuccess(id?: string) {
     activeTab.value = ProjectStatusEnum.ACTIVE;
   }
   await loadData(id);
-}
-
-async function handleArchive(proj: QmsPlanningApi.ItpTreeNode) {
-  if (!proj?.id) return;
-  const isArchived = proj.status === ProjectStatusEnum.ARCHIVED;
-  const newStatus = isArchived
-    ? ProjectStatusEnum.ACTIVE
-    : ProjectStatusEnum.ARCHIVED;
-
-  Modal.confirm({
-    title: isArchived ? t('common.restore') : t('common.archive'),
-    content: isArchived
-      ? `${t('common.confirmRestoreContent')} "${proj.name}" ?`
-      : `${t('common.confirmArchiveContent')} "${proj.name}" ?`,
-    onOk: async () => {
-      try {
-        // 关键修复：传递现有对象数据，防止后端 Prisma 校验必填项(如 quantity)报错
-        await updateItpProject(proj.id, {
-          ...proj,
-          status: newStatus as any,
-        });
-        message.success(
-          isArchived ? t('common.restoreSuccess') : t('common.archiveSuccess'),
-        );
-
-        // 归档后，如果当前项已不在当前 Tab，清除选中
-        if (selectedProjectId.value === proj.id) {
-          selectedProjectId.value = null;
-        }
-        await loadData();
-      } catch (error) {
-        console.error('Archive Error:', error);
-        message.error(t('common.actionFailed'));
-      }
-    },
-  });
-}
-
-async function handleDeleteProject(proj: QmsPlanningApi.ItpTreeNode) {
-  if (!proj?.id) return;
-  Modal.confirm({
-    title: t('qms.planning.itp.deleteProjectTitle'),
-    content: t('qms.planning.itp.deleteProjectContent', { name: proj.name }),
-    onOk: async () => {
-      try {
-        await deleteItpProject(proj.id);
-        message.success(t('common.deleteSuccess'));
-        if (selectedProjectId.value === proj.id) selectedProjectId.value = null;
-        await loadData();
-      } catch {
-        message.error(t('common.actionFailed'));
-      }
-    },
-  });
-}
-
-async function handleDeleteItem(record: QmsPlanningApi.ItpTreeNode) {
-  if (!record?.id || !selectedProjectId.value) return;
-  Modal.confirm({
-    title: t('qms.planning.itp.deleteStepTitle'),
-    content: t('qms.planning.itp.deleteStepContent', {
-      activity: record.activity || record.name,
-    }),
-    onOk: async () => {
-      try {
-        await deleteItp(record.id, selectedProjectId.value!);
-        message.success(t('common.deleteSuccess'));
-        await loadData();
-      } catch {
-        message.error(t('common.actionFailed'));
-      }
-    },
-  });
 }
 
 async function loadWorkOrders() {
@@ -308,7 +259,8 @@ onMounted(async () => {
         show-dispatch
         auth-prefix="QMS:Planning:ITP"
         @change="handleTabChange"
-        @archive="(proj: any) => handleArchive(proj)"
+        @archive="(proj: any) => handleArchiveProject(proj)"
+        @delete="(proj: any) => handleDeleteProject(proj)"
         @dispatch="(proj: any) => handleDispatch(proj)"
         @create="openProjectModal('create')"
       />

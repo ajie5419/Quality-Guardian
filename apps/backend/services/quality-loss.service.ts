@@ -1,3 +1,4 @@
+// cspell:ignore IFNULL
 /**
  * Quality Loss Service
  * 重构版本：使用 BaseService 工具函数，拆分为小型辅助函数

@@ -9,6 +9,28 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event);
 
   try {
+    // 检查是否已存在 bom_projects 记录，如果不存在则创建
+    let bomProject = await prisma.bom_projects.findUnique({
+      where: { workOrderNumber: body.workOrderNumber },
+    });
+
+    if (!bomProject) {
+      // 获取工单信息
+      const workOrder = await prisma.work_orders.findUnique({
+        where: { workOrderNumber: body.workOrderNumber },
+      });
+
+      bomProject = await prisma.bom_projects.create({
+        data: {
+          id: `BOM-PROJ-${nanoid(6).toUpperCase()}`,
+          workOrderNumber: body.workOrderNumber,
+          projectName: body.projectName || workOrder?.projectName || body.workOrderNumber,
+          status: 'active',
+        },
+      });
+    }
+
+    // 创建 BOM 物料明细
     const newItem = await prisma.project_boms.create({
       data: {
         id: `BOM-${nanoid(6).toUpperCase()}`,
@@ -25,7 +47,10 @@ export default defineEventHandler(async (event) => {
 
     return {
       code: 0,
-      data: newItem,
+      data: {
+        ...newItem,
+        projectId: bomProject.id,
+      },
       message: 'ok',
     };
   } catch (error) {

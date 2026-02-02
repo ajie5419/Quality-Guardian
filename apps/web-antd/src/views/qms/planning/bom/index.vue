@@ -13,7 +13,6 @@ import {
   Button,
   Empty,
   message,
-  Modal,
   Space,
   Table,
   Tooltip,
@@ -32,6 +31,7 @@ import { convertToTreeSelectData } from '#/types';
 import PlanningSidebar from '../components/PlanningSidebar.vue';
 import WorkOrderSelectModal from '../components/WorkOrderSelectModal.vue';
 import { useProjectManager } from '../composables/useProjectManager';
+import { useProjectActions } from '../composables/useProjectActions';
 import BomEditModal from './components/BomEditModal.vue';
 
 const { t } = useI18n();
@@ -56,6 +56,22 @@ const {
   handleTabChange,
 } = useProjectManager(allProjects as any);
 
+// ================= Composables =================
+const {
+  handleArchiveProject,
+  handleDeleteItem,
+} = useProjectActions<any>({
+  archiveProject: async (id, status) => {
+    await updateBomProject(id, { status: status as any });
+  },
+  deleteItem: async (id) => {
+    await deleteBom(id);
+  },
+  loadData,
+  resetSelectionOnDelete: true,
+  selectedProjectId,
+});
+
 // ================= Methods =================
 
 async function loadData() {
@@ -67,7 +83,7 @@ async function loadData() {
       selectedProjectId.value = data[0]?.id ?? null;
     }
   } catch {
-    message.error(t('common.loadFailed'));
+    // message.error(t('common.loadFailed'));
   } finally {
     loading.value = false;
   }
@@ -79,33 +95,6 @@ async function loadDepts() {
     deptData.value = data;
     deptTreeData.value = convertToTreeSelectData(data);
   } catch {}
-}
-
-async function handleArchive(proj: QmsPlanningApi.BomTreeNode) {
-  const isArchived = String(proj.status).toLowerCase() === 'archived';
-  const newStatus = isArchived ? 'active' : 'archived';
-
-  Modal.confirm({
-    title: isArchived ? t('common.restore') : t('common.archive'),
-    content: isArchived
-      ? `${t('common.confirmRestoreContent')} "${proj.name}" ?`
-      : `${t('common.confirmArchiveContent')} "${proj.name}" ?`,
-    onOk: async () => {
-      try {
-        await updateBomProject(proj.id, { status: newStatus as any });
-        message.success(
-          isArchived ? t('common.restoreSuccess') : t('common.archiveSuccess'),
-        );
-        if (selectedProjectId.value === proj.id) {
-          selectedProjectId.value = null;
-        }
-        await loadData();
-      } catch (error) {
-        console.error('BOM Archive Error:', error);
-        message.error(t('common.actionFailed'));
-      }
-    },
-  });
 }
 
 // ================= Modal =================
@@ -147,22 +136,6 @@ async function handleWorkOrderSelected(workOrderNumber: string) {
   } catch (error: any) {
     message.error(error.message || '添加失败');
   }
-}
-
-async function handleDeleteItem(row: QmsPlanningApi.BomTreeNode) {
-  Modal.confirm({
-    title: t('qms.planning.bom.deleteTitle'),
-    content: t('qms.planning.bom.deleteContent', { name: row.name }),
-    onOk: async () => {
-      try {
-        await deleteBom(row.id);
-        message.success(t('common.deleteSuccess'));
-        await loadData();
-      } catch {
-        message.error(t('common.actionFailed'));
-      }
-    },
-  });
 }
 
 const gridOptions = computed<VxeGridProps>(() => ({
@@ -236,7 +209,7 @@ onMounted(() => {
         v-model:search-text="searchText"
         auth-prefix="QMS:Planning:BOM"
         @change="handleTabChange"
-        @archive="(proj: any) => handleArchive(proj)"
+        @archive="(proj: any) => handleArchiveProject(proj)"
         @create="handleCreateProject"
       >
         <template #projectInfo="{ project }">

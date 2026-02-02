@@ -14,8 +14,6 @@ import {
   Button,
   Divider,
   Empty,
-  message,
-  Modal,
   Space,
   Table,
   Tag,
@@ -35,6 +33,7 @@ import { getUserList } from '#/api/system/user';
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
 import { useProjectManager } from '../composables/useProjectManager';
+import { useProjectActions } from '../composables/useProjectActions';
 import DfmeaAssignModal from './components/DfmeaAssignModal.vue';
 import DfmeaItemModal from './components/DfmeaItemModal.vue';
 import DfmeaProjectModal from './components/DfmeaProjectModal.vue';
@@ -66,6 +65,26 @@ const {
 
 const userList = ref<SystemUserApi.User[]>([]);
 
+// ================= Composables =================
+const {
+  handleArchiveProject,
+  handleDeleteProject,
+  handleDeleteItem,
+} = useProjectActions<any>({
+  archiveProject: async (id, status) => {
+    await updateDfmeaProject(id, { status: status as any });
+  },
+  deleteItem: async (id) => {
+    await deleteDfmea(id);
+  },
+  deleteProject: async (id) => {
+    await deleteDfmeaProject(id);
+  },
+  loadData,
+  resetSelectionOnDelete: true,
+  selectedProjectId,
+});
+
 // ================= Methods =================
 async function loadData(idToSelect?: string) {
   loading.value = true;
@@ -94,71 +113,6 @@ async function handleSuccess(id?: string) {
     activeTab.value = ProjectStatusEnum.ACTIVE;
   }
   await loadData(id);
-}
-
-async function handleArchive(proj: QmsPlanningApi.DfmeaTreeNode) {
-  if (!proj?.id) return;
-  const isArchived = String(proj.status).toLowerCase() === 'archived';
-  const newStatus = isArchived ? 'active' : 'archived';
-
-  Modal.confirm({
-    title: isArchived ? t('common.restore') : t('common.archive'),
-    content: isArchived
-      ? `${t('common.confirmRestoreContent')} "${proj.name}" ?`
-      : `${t('common.confirmArchiveContent')} "${proj.name}" ?`,
-    onOk: async () => {
-      try {
-        await updateDfmeaProject(proj.id, {
-          ...proj,
-          status: newStatus as any,
-        });
-        message.success(
-          isArchived ? t('common.restoreSuccess') : t('common.archiveSuccess'),
-        );
-        if (selectedProjectId.value === proj.id) {
-          selectedProjectId.value = null;
-        }
-        await loadData();
-      } catch {
-        message.error(t('common.actionFailed'));
-      }
-    },
-  });
-}
-
-async function handleDeleteProject(proj: QmsPlanningApi.DfmeaTreeNode) {
-  if (!proj?.id) return;
-  Modal.confirm({
-    title: t('qms.planning.itp.deleteProjectTitle'),
-    content: t('qms.planning.itp.deleteProjectContent', { name: proj.name }),
-    onOk: async () => {
-      try {
-        await deleteDfmeaProject(proj.id);
-        message.success(t('common.deleteSuccess'));
-        if (selectedProjectId.value === proj.id) selectedProjectId.value = null;
-        await loadData();
-      } catch {
-        message.error(t('common.actionFailed'));
-      }
-    },
-  });
-}
-
-async function handleDeleteItem(record: QmsPlanningApi.DfmeaTreeNode) {
-  if (!record?.id) return;
-  Modal.confirm({
-    title: t('common.confirmDelete'),
-    content: t('common.confirmDeleteContent'),
-    onOk: async () => {
-      try {
-        await deleteDfmea(record.id);
-        message.success(t('common.deleteSuccess'));
-        await loadData();
-      } catch {
-        message.error(t('common.actionFailed'));
-      }
-    },
-  });
 }
 
 async function loadWorkOrders() {
@@ -287,7 +241,8 @@ onMounted(async () => {
         show-dispatch
         auth-prefix="QMS:Planning:DFMEA"
         @change="handleTabChange"
-        @archive="(proj: any) => handleArchive(proj)"
+        @archive="(proj: any) => handleArchiveProject(proj)"
+        @delete="(proj: any) => handleDeleteProject(proj)"
         @dispatch="(proj: any) => handleDispatch(proj)"
         @create="openProjectModal('create')"
       />
