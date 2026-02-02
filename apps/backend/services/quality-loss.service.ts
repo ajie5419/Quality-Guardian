@@ -381,9 +381,9 @@ export const QualityLossService = {
       if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.MANUAL) {
         const filteredManual = workOrderNumber
           ? manualRecords.filter((r) => {
-              const record = r as typeof r & { workOrderNumber?: string };
-              return record.workOrderNumber?.includes(workOrderNumber);
-            })
+            const record = r as typeof r & { workOrderNumber?: string };
+            return record.workOrderNumber?.includes(workOrderNumber);
+          })
           : manualRecords;
 
         filteredManual.forEach((item) => {

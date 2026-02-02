@@ -33,6 +33,7 @@ export interface IncomingInspection {
   inspector: string;
   materialName: string;
   quantity: number;
+  remarks?: string;
   reportDate: string;
   reporter: string;
   supplierName: string;
@@ -46,6 +47,7 @@ export interface ProcessInspection {
   level1Component: string;
   process: string;
   quantity: number;
+  remarks?: string;
   reporter: string;
   team: string;
   workOrderNumber: string;
@@ -58,6 +60,7 @@ export interface ShipmentInspection {
   packingListArchived: string;
   projectName: string;
   quantity: number;
+  remarks?: string;
   reportDate: string;
   reporter: string;
   workOrderNumber: string;
@@ -85,6 +88,7 @@ export interface DetailedInspectionRecord {
   itpProjectId?: string;
   overallResult: 'FAIL' | 'PASS';
   projectName?: string;
+  remarks?: string;
   reportDate: string;
   results: InspectionTaskResult[];
   status: 'COMPLETED' | 'DRAFT';

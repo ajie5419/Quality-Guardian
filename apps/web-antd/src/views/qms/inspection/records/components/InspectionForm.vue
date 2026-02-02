@@ -16,6 +16,7 @@ import {
   message,
   Select,
   Tag,
+  Textarea,
 } from 'ant-design-vue';
 import dayjs from 'dayjs';
 import { cloneDeep } from 'lodash-es';
@@ -53,6 +54,7 @@ const formState = reactive({
   inspector: '',
   inspectionDate: '',
   result: 'PASS',
+  remarks: '',
   // ... dynamic fields
   supplierName: '',
   materialName: '',
@@ -67,6 +69,21 @@ const formState = reactive({
 });
 
 const config = computed(() => getFormConfig(props.type));
+
+// 根据进货类型决定供应商数据来源：机加成品件 -> 外协管理，其他 -> 供应商管理
+const supplierCategory = computed(() => {
+  return formState.incomingType === '机加成品件' ? 'Outsourcing' : 'Supplier';
+});
+
+// 进货类型变化时清空已选供应商，避免数据源不匹配
+watch(
+  () => formState.incomingType,
+  (newVal, oldVal) => {
+    if (oldVal !== undefined && newVal !== oldVal) {
+      formState.supplierName = '';
+    }
+  },
+);
 
 // Store raw ITP items for filtering
 const rawItpItems = ref<any[]>([]);
@@ -236,6 +253,7 @@ watch(
           userStore.userInfo?.username || userStore.userInfo?.realName || '',
         inspectionDate: dayjs().format('YYYY-MM-DD'),
         result: 'PASS',
+        remarks: '',
         supplierName: '',
         materialName: '',
         incomingType: undefined,
@@ -280,8 +298,19 @@ defineExpose({
           <Select.Option value="机加成品件">机加成品件</Select.Option>
         </Select>
       </Form.Item>
-      <Form.Item v-if="config.showSupplier" label="供应商">
-        <SupplierSelect v-model:value="formState.supplierName" />
+      <Form.Item
+        v-if="config.showSupplier"
+        :label="supplierCategory === 'Outsourcing' ? '外协单位' : '供应商'"
+      >
+        <SupplierSelect
+          v-model:value="formState.supplierName"
+          :category="supplierCategory"
+          :placeholder="
+            supplierCategory === 'Outsourcing'
+              ? '请选择外协单位'
+              : '请选择供应商'
+          "
+        />
       </Form.Item>
       <Form.Item v-if="config.showMaterial" label="物料名称">
         <Input v-model:value="formState.materialName" />
@@ -333,6 +362,15 @@ defineExpose({
       <Divider orientation="left">检验项目 (ITP)</Divider>
       <InspectionItemsTable v-model:data-source="formState.items" />
     </div>
+
+    <!-- 备注 -->
+    <Form.Item :label="t('qms.inspection.fields.remarks')">
+      <Textarea
+        v-model:value="formState.remarks"
+        :placeholder="t('qms.inspection.records.form.placeholder.remarks')"
+        :rows="2"
+      />
+    </Form.Item>
 
     <div class="mt-4 rounded bg-gray-50 p-4">
       <Form.Item label="最终结果">

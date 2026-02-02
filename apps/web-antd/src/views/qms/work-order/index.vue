@@ -24,6 +24,7 @@ import {
 } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
+import { WorkOrderStatusEnum } from '#/api/qms/enums';
 import {
   batchDeleteWorkOrders,
   deleteWorkOrder,
@@ -89,6 +90,48 @@ const yearOptions = computed(() => {
 const { handleImport, gridApi } = useWorkOrderImport(() => {
   api.reload();
 });
+
+// 5.1 搜索表单配置
+const statusOptions = computed(() =>
+  Object.values(WorkOrderStatusEnum).map((value) => {
+    const info = getStatusInfo(value);
+    return { label: info.defaultText, value };
+  }),
+);
+
+const formSchema = [
+  {
+    fieldName: 'workOrderNumber',
+    label: t('qms.workOrder.workOrderNumber'),
+    component: 'Input',
+    componentProps: {
+      placeholder: t('common.pleaseInput'),
+      allowClear: true,
+    },
+    colProps: { span: 6 },
+  },
+  {
+    fieldName: 'projectName',
+    label: t('qms.workOrder.projectName'),
+    component: 'Input',
+    componentProps: {
+      placeholder: t('common.pleaseInput'),
+      allowClear: true,
+    },
+    colProps: { span: 6 },
+  },
+  {
+    fieldName: 'status',
+    label: t('qms.workOrder.statusLabel'),
+    component: 'Select',
+    componentProps: {
+      options: statusOptions,
+      placeholder: t('common.pleaseSelect'),
+      allowClear: true,
+    },
+    colProps: { span: 6 },
+  },
+];
 
 // 6. Grid 表格配置
 const gridOptions = computed<VxeGridProps>(() => ({
@@ -243,6 +286,12 @@ const gridEvents = {
 const [Grid, api] = useVbenVxeGrid({
   gridOptions: gridOptions.value,
   gridEvents,
+  formOptions: {
+    schema: formSchema,
+    showCollapseButton: true,
+    submitOnChange: true,
+    submitOnEnter: true,
+  },
 });
 
 // 更新之前声明的 gridApi 引用
