@@ -1,91 +1,72 @@
 <script lang="ts" setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
-import { useVbenModal } from '@vben/common-ui';
+import { message, Modal } from 'ant-design-vue';
 
-import { useVbenForm } from '#/adapter/form';
-import { getWorkOrderList } from '#/api/qms/work-order';
+import WorkOrderSelect from '../../shared/components/WorkOrderSelect.vue';
 
-const emit = defineEmits(['success']);
+const props = defineProps<{
+  open: boolean;
+}>();
 
-const workOrders = ref<any[]>([]);
-const loading = ref(false);
+const emit = defineEmits<{
+  success: [string];
+  'update:open': [boolean];
+}>();
 
-const [Form, formApi] = useVbenForm({
-  schema: [
-    {
-      fieldName: 'workOrderNumber',
-      label: '选择工单',
-      component: 'Select',
-      rules: 'required',
-      componentProps: {
-        showSearch: true,
-        placeholder: '请搜索并选择一个工单',
-        filterOption: (input: string, option: any) => {
-          return option.label.toLowerCase().includes(input.toLowerCase());
-        },
-      },
-    },
-  ],
-  showDefaultActions: false,
-  wrapperClass: 'grid-cols-1',
-});
+const workOrderNumber = ref<string | undefined>(undefined);
+const confirmLoading = ref(false);
 
-const [Modal, modalApi] = useVbenModal({
-  onConfirm: handleSubmit,
-  title: '添加联动项目',
-});
+watch(
+  () => props.open,
+  (val) => {
+    if (val) {
+      workOrderNumber.value = undefined;
+    }
+  },
+);
 
-async function loadWorkOrders() {
-  loading.value = true;
+async function handleOk() {
+  if (!workOrderNumber.value) {
+    message.warning('请选择一个工单');
+    return;
+  }
+  confirmLoading.value = true;
   try {
-    const res = await getWorkOrderList();
-    workOrders.value = res.items || [];
-
-    await formApi.updateSchema([
-      {
-        fieldName: 'workOrderNumber',
-        componentProps: {
-          options: workOrders.value.map((wo) => ({
-            label: `${wo.workOrderNumber} - ${wo.projectName || '未命名项目'}`,
-            value: wo.workOrderNumber,
-          })),
-        },
-      },
-    ]);
+    emit('success', workOrderNumber.value);
+    emit('update:open', false);
   } finally {
-    loading.value = false;
+    confirmLoading.value = false;
   }
 }
 
-async function handleSubmit() {
-  try {
-    const { valid } = await formApi.validate();
-    if (!valid) return;
-
-    const values = await formApi.getValues();
-    emit('success', values.workOrderNumber);
-    modalApi.close();
-  } catch (error) {
-    console.error('Selection failed:', error);
-  }
+function handleCancel() {
+  emit('update:open', false);
 }
-
-function open() {
-  modalApi.open();
-  loadWorkOrders();
-}
-
-defineExpose({ open });
 </script>
 
 <template>
-  <Modal>
-    <div class="p-4">
+  <Modal
+    :open="open"
+    title="添加联动项目"
+    :confirm-loading="confirmLoading"
+    @ok="handleOk"
+    @cancel="handleCancel"
+    destroy-on-close
+  >
+    <div class="pt-4">
       <p class="mb-4 text-sm text-gray-500">
         此操作将手动将选定的工单加入到当前模块的策划列表中。
       </p>
-      <Form />
+      <div class="mb-8">
+        <label class="mb-1 block text-sm font-medium text-gray-700">
+          选择工单 <span class="text-red-500">*</span>
+        </label>
+        <WorkOrderSelect
+          v-model:value="workOrderNumber"
+          placeholder="请搜索并选择一个工单"
+        />
+      </div>
     </div>
   </Modal>
 </template>

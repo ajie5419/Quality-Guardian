@@ -1,5 +1,6 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { AfterSalesService } from '~/services/after-sales.service';
+import { mapAfterSalesStatus } from '~/utils/after-sales-status';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
 
@@ -18,7 +19,9 @@ export default defineEventHandler(async (event) => {
       ? String(query.workOrderNumber)
       : undefined,
     projectName: query.projectName ? String(query.projectName) : undefined,
-    status: query.status ? String(query.status) : undefined,
+    status: query.status
+      ? mapAfterSalesStatus(String(query.status))
+      : undefined,
     supplierBrand: query.supplierBrand
       ? String(query.supplierBrand)
       : undefined,

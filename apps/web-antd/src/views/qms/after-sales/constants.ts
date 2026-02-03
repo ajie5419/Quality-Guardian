@@ -29,19 +29,14 @@ export function useStatusOptions() {
 
   const statusOptions: ComputedRef<StatusOption[]> = computed(() => [
     {
-      value: '处理中',
+      value: 'IN_PROGRESS',
       label: t('qms.afterSales.status.processing'),
       color: 'blue',
     },
     {
-      value: '已结束',
-      label: t('qms.afterSales.status.resolved'),
+      value: 'COMPLETED',
+      label: t('qms.workOrder.status.completed'),
       color: 'green',
-    },
-    {
-      value: '待处理',
-      label: t('qms.afterSales.status.pending'),
-      color: 'orange',
     },
   ]);
 
@@ -59,6 +54,14 @@ export function useStatusOptions() {
       color: 'green',
     };
     const closed = { label: t('qms.afterSales.status.closed'), color: 'gray' };
+    const completed = {
+      label: t('qms.workOrder.status.completed'),
+      color: 'green',
+    };
+    const cancelled = {
+      label: t('workOrder.status.cancelled'),
+      color: 'red',
+    };
 
     return {
       PENDING: pending,
@@ -66,12 +69,16 @@ export function useStatusOptions() {
       'IN PROGRESS': processing,
       PROCESSING: processing,
       RESOLVED: resolved,
+      COMPLETED: completed,
       CLOSED: closed,
+      CANCELLED: cancelled,
       OPEN: pending,
       待处理: pending,
       处理中: processing,
       已结束: resolved,
+      已完成: completed,
       已关闭: closed,
+      已取消: cancelled,
     } as Record<string, { color: string; label: string }>;
   });
 
@@ -125,7 +132,7 @@ export function createInitialFormState() {
     quantity: 1,
     runningHours: 0,
     severity: 'P2 级',
-    status: 'PENDING',
+    status: 'IN_PROGRESS',
     supplierBrand: '',
     warrantyStatus: '在保',
   };

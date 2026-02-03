@@ -34,10 +34,34 @@ export function useGridImport<T = any>(options: ImportOptions<T>) {
     try {
       const XLSX = await import('xlsx');
       const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, {
+      let workbook = XLSX.read(arrayBuffer, {
         type: 'array',
         cellDates: true,
       });
+
+      // Special handling for CSV encoding issues (common in Chinese environments)
+      if (file.name.endsWith('.csv')) {
+        const firstSheetName = workbook.SheetNames[0];
+        if (firstSheetName) {
+          const firstSheet = workbook.Sheets[firstSheetName];
+          const firstKey = firstSheet ? Object.keys(firstSheet)[0] : null;
+          const firstCell =
+            firstSheet && firstKey ? firstSheet[firstKey] : null;
+
+          // If the first cell content looks like mangled UTF-8 (interpreted as Latin-1)
+          if (
+            firstCell &&
+            typeof firstCell.v === 'string' &&
+            /[\u0080-\u00FF]/.test(firstCell.v)
+          ) {
+            workbook = XLSX.read(arrayBuffer, {
+              type: 'array',
+              cellDates: true,
+              codepage: 65_001, // UTF-8
+            });
+          }
+        }
+      }
 
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) return;
@@ -70,8 +94,10 @@ export function useGridImport<T = any>(options: ImportOptions<T>) {
             ? Object.keys(row).find((k) =>
                 options.fieldMap?.[c.field]?.some(
                   (alias) =>
-                    String(k).replaceAll(/\s+/g, '').toLowerCase() ===
-                    String(alias).replaceAll(/\s+/g, '').toLowerCase(),
+                    String(alias).replaceAll(/\s+/g, '').toLowerCase() ===
+                      String(k).replaceAll(/\s+/g, '').toLowerCase() ||
+                    t(alias).replaceAll(/\s+/g, '').toLowerCase() ===
+                      String(k).replaceAll(/\s+/g, '').toLowerCase(),
                 ),
               )
             : undefined;
@@ -81,7 +107,9 @@ export function useGridImport<T = any>(options: ImportOptions<T>) {
             excelKey = Object.keys(row).find(
               (k) =>
                 String(k).replaceAll(/\s+/g, '').toLowerCase() ===
-                String(c.title).replaceAll(/\s+/g, '').toLowerCase(),
+                  String(c.title).replaceAll(/\s+/g, '').toLowerCase() ||
+                t(String(c.title)).replaceAll(/\s+/g, '').toLowerCase() ===
+                  String(k).replaceAll(/\s+/g, '').toLowerCase(),
             );
           }
 

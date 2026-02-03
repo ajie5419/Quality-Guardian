@@ -375,11 +375,11 @@ const gridEvents = {
 
 // ...
 
-const { statusMap } = useStatusOptions();
+const { statusOptions } = useStatusOptions();
 const statusOptionsList = computed(() =>
-  Object.entries(statusMap.value).map(([value, config]) => ({
-    label: config.label,
-    value,
+  statusOptions.value.map((opt) => ({
+    label: opt.label,
+    value: opt.value,
   })),
 );
 

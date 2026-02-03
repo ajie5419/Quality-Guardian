@@ -1,5 +1,5 @@
-import { QMS_STATUS_COLOR_MAP } from '@qgs/shared';
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { mapAfterSalesStatus } from '~/utils/after-sales-status';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
       updateData.solution = bodyRecord.resolutionPlan;
     if (bodyRecord.status) {
       const status = bodyRecord.status as string;
-      updateData.claimStatus = QMS_STATUS_COLOR_MAP[status] ? status : 'OPEN';
+      updateData.claimStatus = mapAfterSalesStatus(status);
     }
 
     // Map other fields

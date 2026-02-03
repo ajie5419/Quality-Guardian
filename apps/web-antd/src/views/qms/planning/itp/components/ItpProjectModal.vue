@@ -1,8 +1,6 @@
 <script lang="ts" setup>
 import type { ItpProjectForm } from '../../types';
 
-import type { QmsWorkOrderApi } from '#/api/qms/work-order';
-
 import { computed, reactive, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
@@ -11,17 +9,18 @@ import { Form, Input, message, Modal, Select } from 'ant-design-vue';
 
 import { createItpProject, updateItpProject } from '#/api/qms/planning';
 
+import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
+
 const props = defineProps<{
-  initialData: Partial<ItpProjectForm>;
+  initialData: Partial<ItpProjectForm> & { workOrderNumber?: string };
   isEditMode: boolean;
   open: boolean;
   selectedProjectId: null | string;
-  workOrderList: QmsWorkOrderApi.WorkOrderItem[];
 }>();
 
 const emit = defineEmits<{
-  success: [string?];
-  'update:open': [boolean];
+  (e: 'success', id?: string): void;
+  (e: 'update:open', val: boolean): void;
 }>();
 
 const { t } = useI18n();
@@ -30,10 +29,15 @@ const formRef = ref();
 
 const formState = reactive<ItpProjectForm>({
   projectName: '',
-  workOrderId: '',
+  workOrderId: '', // Use workOrderNumber directly
   version: 'V1.0',
   status: 'active',
 });
+
+const statusOptions = computed(() => [
+  { value: 'draft', label: t('qms.planning.status.draft') },
+  { value: 'active', label: t('qms.planning.status.active') },
+]);
 
 const rules: any = {
   projectName: [
@@ -50,20 +54,16 @@ const rules: any = {
   ],
 };
 
-const workOrderOptions = computed(() =>
-  (props.workOrderList || []).map((wo) => ({
-    label: `${wo.workOrderNumber} - ${wo.projectName}`,
-    value: wo.workOrderNumber, // 关键修复：改为使用 workOrderNumber
-  })),
-);
-
 watch(
   () => props.open,
   (val) => {
     if (val) {
       Object.assign(formState, {
         projectName: props.initialData.projectName || '',
-        workOrderId: props.initialData.workOrderId || '',
+        workOrderId:
+          props.initialData.workOrderNumber ||
+          props.initialData.workOrderId ||
+          '',
         version: props.initialData.version || 'V1.0',
         status: props.initialData.status || 'active',
       });
@@ -78,14 +78,22 @@ async function handleOk() {
     await formRef.value?.validate();
     confirmLoading.value = true;
 
-    const payload = { ...formState };
+    // Mapping: workOrderId field in form actually holds workOrderNumber suitable for backend
+    const payload = {
+      ...formState,
+      workOrderNumber: formState.workOrderId, // Backend expects workOrderNumber if creating
+    };
+
     let newId: string | undefined;
 
     if (props.isEditMode && props.selectedProjectId) {
       await updateItpProject(props.selectedProjectId, payload);
     } else {
-      const res = await createItpProject(payload);
-      newId = (res as any)?.id;
+      const res = await createItpProject({
+        ...payload,
+        workOrderNumber: formState.workOrderId,
+      });
+      newId = res?.id;
     }
 
     message.success(t('common.saveSuccess'));
@@ -131,13 +139,9 @@ async function handleOk() {
         :label="t('qms.planning.itp.relatedWorkOrder')"
         name="workOrderId"
       >
-        <Select
+        <WorkOrderSelect
           v-model:value="formState.workOrderId"
-          class="w-full"
-          show-search
-          option-filter-prop="label"
-          :options="workOrderOptions"
-          :placeholder="t('common.pleaseSelect')"
+          :disabled="isEditMode"
         />
       </Form.Item>
       <div class="grid grid-cols-2 gap-4">
@@ -145,14 +149,7 @@ async function handleOk() {
           <Input v-model:value="formState.version" />
         </Form.Item>
         <Form.Item :label="t('common.status')" name="status">
-          <Select v-model:value="formState.status">
-            <Select.Option value="draft">{{
-              t('qms.planning.status.draft')
-            }}</Select.Option>
-            <Select.Option value="active">{{
-              t('qms.planning.status.active')
-            }}</Select.Option>
-          </Select>
+          <Select v-model:value="formState.status" :options="statusOptions" />
         </Form.Item>
       </div>
     </Form>

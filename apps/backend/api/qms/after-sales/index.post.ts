@@ -1,5 +1,6 @@
-import { QMS_DEFAULT_VALUES, QMS_STATUS_COLOR_MAP } from '@qgs/shared';
+import { QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
+import { mapAfterSalesStatus } from '~/utils/after-sales-status';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -18,11 +19,7 @@ export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
 
-    // Standardized Status Mapping
-    let claimStatus = 'OPEN';
-    if (body.status && QMS_STATUS_COLOR_MAP[body.status]) {
-      claimStatus = body.status;
-    }
+    const claimStatus = mapAfterSalesStatus(body.status);
 
     const newItem = await prisma.after_sales.create({
       data: {

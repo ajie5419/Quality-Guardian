@@ -60,7 +60,7 @@ export default defineEventHandler(async () => {
           id: item.id,
           type: 'item',
           parentId: project.id,
-          name: item.part_name,
+          partName: item.part_name,
           partNumber: item.part_number,
           quantity: item.quantity,
           unit: item.unit,

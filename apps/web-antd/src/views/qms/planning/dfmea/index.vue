@@ -1,25 +1,19 @@
 <script lang="ts" setup>
+import type { PlanningTreeNode } from '../types';
+
 import type { QmsPlanningApi } from '#/api/qms/planning';
 import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 import type { SystemUserApi } from '#/api/system/user';
 
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
-import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
-import {
-  Button,
-  Divider,
-  Empty,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-} from 'ant-design-vue';
+import { Button, Empty, Tag } from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { ProjectStatusEnum } from '#/api/qms/enums';
 import {
   deleteDfmea,
@@ -32,6 +26,7 @@ import { getUserList } from '#/api/system/user';
 
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
+import ProjectActionButtons from '../components/ProjectActionButtons.vue';
 import { useProjectActions } from '../composables/useProjectActions';
 import { useProjectManager } from '../composables/useProjectManager';
 import DfmeaAssignModal from './components/DfmeaAssignModal.vue';
@@ -44,9 +39,8 @@ const { hasAccessByCodes } = useAccess();
 const canCreate = computed(() =>
   hasAccessByCodes(['QMS:Planning:DFMEA:Create']),
 );
-const canEdit = computed(() => hasAccessByCodes(['QMS:Planning:DFMEA:Edit']));
-const canDelete = computed(() =>
-  hasAccessByCodes(['QMS:Planning:DFMEA:Delete']),
+const canExport = computed(() =>
+  hasAccessByCodes(['QMS:Planning:DFMEA:Export']),
 );
 
 // ================= Data State =================
@@ -61,26 +55,11 @@ const {
   filteredProjects,
   currentProject,
   handleTabChange,
-} = useProjectManager(allProjects as any);
+} = useProjectManager(allProjects);
 
 const userList = ref<SystemUserApi.User[]>([]);
 
 // ================= Composables =================
-const { handleArchiveProject, handleDeleteProject, handleDeleteItem } =
-  useProjectActions<any>({
-    archiveProject: async (id, status) => {
-      await updateDfmeaProject(id, { status: status as any });
-    },
-    deleteItem: async (id) => {
-      await deleteDfmea(id);
-    },
-    deleteProject: async (id) => {
-      await deleteDfmeaProject(id);
-    },
-    loadData,
-    resetSelectionOnDelete: true,
-    selectedProjectId,
-  });
 
 // ================= Methods =================
 async function loadData(idToSelect?: string) {
@@ -97,12 +76,34 @@ async function loadData(idToSelect?: string) {
     } else if (data.length > 0 && !selectedProjectId.value) {
       selectedProjectId.value = data[0]?.id ?? null;
     }
+    await nextTick();
+    try {
+      gridApi.reload();
+    } catch (error) {
+      console.warn('Grid not ready for reload', error);
+    }
   } catch (error) {
     console.error('DFMEA Load Error:', error);
   } finally {
     loading.value = false;
   }
 }
+
+const { handleArchiveProject, handleDeleteProject, handleDeleteItem } =
+  useProjectActions<any>({
+    archiveProject: async (id, status) => {
+      await updateDfmeaProject(id, { status: status as any });
+    },
+    deleteItem: async (id) => {
+      await deleteDfmea(id);
+    },
+    deleteProject: async (id) => {
+      await deleteDfmeaProject(id);
+    },
+    loadData,
+    resetSelectionOnDelete: true,
+    selectedProjectId,
+  });
 
 async function handleSuccess(id?: string) {
   await nextTick();
@@ -167,58 +168,106 @@ function openItemModal(
 const assignModalVisible = ref(false);
 const assignTarget = ref<{ id: string; name: string }>({ id: '', name: '' });
 
-function handleDispatch(proj: QmsPlanningApi.DfmeaTreeNode) {
+function handleDispatch(proj: PlanningTreeNode) {
   if (!proj) return;
   assignTarget.value = { id: proj.id, name: proj.name };
   assignModalVisible.value = true;
   if (userList.value.length === 0) loadUsers();
 }
 
-const columns: any[] = [
-  {
-    title: t('qms.planning.dfmea.item'),
-    dataIndex: 'name',
-    key: 'name',
-    width: 150,
-    fixed: 'left',
+const [Grid, gridApi] = useVbenVxeGrid({
+  gridOptions: {
+    columns: [
+      {
+        title: t('qms.planning.dfmea.item'),
+        field: 'name',
+        width: 150,
+        fixed: 'left',
+      },
+      {
+        title: t('qms.planning.dfmea.failureMode'),
+        field: 'failureMode',
+        width: 150,
+      },
+      {
+        title: t('qms.planning.dfmea.effects'),
+        field: 'effects',
+        width: 200,
+      },
+      {
+        title: t('qms.planning.dfmea.severity'),
+        field: 'severity',
+        width: 50,
+        align: 'center',
+      },
+      {
+        title: t('qms.planning.dfmea.occurrence'),
+        field: 'occurrence',
+        width: 50,
+        align: 'center',
+      },
+      {
+        title: t('qms.planning.dfmea.detection'),
+        field: 'detection',
+        width: 50,
+        align: 'center',
+      },
+      {
+        title: t('qms.planning.dfmea.rpn'),
+        field: 'rpn',
+        width: 80,
+        align: 'center',
+        slots: { default: 'rpn' },
+      },
+      {
+        title: t('common.action'),
+        field: 'action',
+        width: 120,
+        fixed: 'right',
+        slots: { default: 'action' },
+      },
+    ],
+    proxyConfig: {
+      ajax: {
+        query: async () => {
+          return { items: currentProject.value?.children || [] };
+        },
+      },
+    },
+    toolbarConfig: {
+      refresh: true,
+      zoom: true,
+      custom: true,
+      export: canExport.value,
+    },
+    exportConfig: {
+      remote: false,
+      types: ['xlsx', 'csv'],
+      modes: ['current', 'selected', 'all'],
+    },
+    pagerConfig: {
+      enabled: false,
+    },
+    height: 'auto',
+    scrollX: { enabled: true, gt: 0 },
+    scrollY: { enabled: true, gt: 0 },
   },
-  {
-    title: t('qms.planning.dfmea.failureMode'),
-    dataIndex: 'failureMode',
-    width: 150,
+});
+
+// Avoid "datas.slice is not a function" error by ensuring grid reloads when project changes
+watch(
+  () => currentProject.value?.id,
+  async (id) => {
+    if (id) {
+      await nextTick();
+      try {
+        gridApi.reload();
+      } catch (error) {
+        console.warn('Grid not ready for reload', error);
+      }
+    }
   },
-  { title: t('qms.planning.dfmea.effects'), dataIndex: 'effects', width: 200 },
-  {
-    title: t('qms.planning.dfmea.severity'),
-    dataIndex: 'severity',
-    width: 50,
-    align: 'center',
-  },
-  {
-    title: t('qms.planning.dfmea.occurrence'),
-    dataIndex: 'occurrence',
-    width: 50,
-    align: 'center',
-  },
-  {
-    title: t('qms.planning.dfmea.detection'),
-    dataIndex: 'detection',
-    width: 50,
-    align: 'center',
-  },
-  {
-    title: t('qms.planning.dfmea.rpn'),
-    key: 'rpn',
-    width: 80,
-    align: 'center',
-  },
-  {
-    title: t('common.action'),
-    key: 'action',
-    width: 120,
-    fixed: 'right' as any,
-  },
-];
+);
 
 onMounted(async () => {
   await loadWorkOrders();
@@ -228,21 +277,30 @@ onMounted(async () => {
 
 <template>
   <Page content-class="p-4 h-full">
-    <div class="flex h-full gap-4 overflow-hidden">
+    <div class="flex h-[calc(100vh-130px)] min-h-0 gap-4 overflow-hidden">
       <PlanningSidebar
         :title="t('qms.planning.dfmea.projectList')"
         :projects="filteredProjects"
         v-model:selected-id="selectedProjectId"
         v-model:active-tab="activeTab"
         v-model:search-text="searchText"
-        show-dispatch
         auth-prefix="QMS:Planning:DFMEA"
         @change="handleTabChange"
-        @archive="(proj: any) => handleArchiveProject(proj)"
-        @delete="(proj: any) => handleDeleteProject(proj)"
-        @dispatch="(proj: any) => handleDispatch(proj)"
         @create="openProjectModal('create')"
-      />
+      >
+        <template #actions="{ project }">
+          <ProjectActionButtons
+            :project="project"
+            mode="dropdown"
+            auth-prefix="QMS:Planning:DFMEA"
+            :can-dispatch="true"
+            @archive="handleArchiveProject"
+            @delete="handleDeleteProject"
+            @edit="openProjectModal('edit', project as any)"
+            @dispatch="handleDispatch"
+          />
+        </template>
+      </PlanningSidebar>
 
       <div
         class="flex flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
@@ -256,89 +314,61 @@ onMounted(async () => {
                 {{ currentProject.name }}
               </h2>
               <div class="mt-1 flex items-center gap-3 text-xs text-gray-500">
-                <span
-                  >{{ t('qms.planning.bom.workOrderNo') }}:
+                <span>
+                  {{ t('qms.planning.bom.workOrderNo') }}:
                   <b class="text-gray-700">{{
                     currentProject.workOrderNumber || '-'
-                  }}</b></span
-                >
-                <Divider type="vertical" />
-                <Button
-                  v-if="canEdit"
-                  type="link"
-                  size="small"
-                  class="h-auto p-0"
-                  @click="openProjectModal('edit', currentProject as any)"
-                >
-                  {{ t('common.edit') }}
-                </Button>
-                <Button
-                  v-if="canDelete"
-                  type="link"
-                  danger
-                  size="small"
-                  class="h-auto p-0"
-                  @click="handleDeleteProject(currentProject as any)"
-                >
-                  {{ t('common.delete') }}
-                </Button>
+                  }}</b>
+                </span>
+                <span>
+                  {{ t('qms.planning.dfmea.itemCount') }}:
+                  <b class="text-blue-600">{{
+                    currentProject.children?.length || 0
+                  }}</b>
+                </span>
+                <span>
+                  {{ t('qms.planning.bom.version') }}:
+                  <b class="text-orange-600">{{
+                    currentProject.version || 'V1.0'
+                  }}</b>
+                </span>
               </div>
             </div>
-            <Button
-              v-if="canCreate"
-              type="primary"
-              @click="openItemModal('create')"
-            >
-              + {{ t('common.add') }}
-            </Button>
+            <div class="flex items-center gap-2">
+              <Button
+                v-if="canCreate"
+                type="primary"
+                @click="openItemModal('create')"
+              >
+                + {{ t('common.add') }}
+              </Button>
+            </div>
           </div>
           <div class="flex-1 overflow-hidden p-4">
-            <Table
-              :columns="columns"
-              :data-source="currentProject.children"
-              :pagination="false"
-              size="middle"
-              row-key="id"
-              :scroll="{ y: 'calc(100vh - 300px)' }"
-            >
-              <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'rpn'">
-                  <Tag :color="(record.rpn || 0) > 100 ? 'red' : 'green'">{{
-                    record.rpn || 0
-                  }}</Tag>
-                </template>
-                <template v-if="column.key === 'action'">
-                  <Space>
-                    <Tooltip v-if="canEdit" :title="t('common.edit')">
-                      <Button
-                        type="link"
-                        size="small"
-                        @click="openItemModal('edit', record as any)"
-                      >
-                        <IconifyIcon icon="lucide:edit" class="size-4" />
-                      </Button>
-                    </Tooltip>
-                    <Tooltip v-if="canDelete" :title="t('common.delete')">
-                      <Button
-                        type="link"
-                        size="small"
-                        danger
-                        @click="handleDeleteItem(record as any)"
-                      >
-                        <IconifyIcon icon="lucide:trash-2" class="size-4" />
-                      </Button>
-                    </Tooltip>
-                  </Space>
-                </template>
+            <Grid>
+              <template #rpn="{ row }">
+                <Tag :color="(row.rpn || 0) > 100 ? 'red' : 'green'">
+                  {{ row.rpn || 0 }}
+                </Tag>
               </template>
-            </Table>
+              <template #action="{ row }">
+                <ProjectActionButtons
+                  :project="row as any"
+                  mode="table"
+                  auth-prefix="QMS:Planning:DFMEA"
+                  :can-archive="false"
+                  @delete="handleDeleteItem(row as any)"
+                  @edit="openItemModal('edit', row as any)"
+                />
+              </template>
+            </Grid>
           </div>
         </div>
         <div
           v-else
           class="flex flex-1 flex-col items-center justify-center bg-gray-50/20 text-gray-400"
         >
-          <Empty :description="t('qms.planning.dfmea.selectProjectHint')" />
+          <Empty :description="t('qms.planning.common.selectProjectHint')" />
         </div>
       </div>
     </div>
@@ -347,7 +377,6 @@ onMounted(async () => {
       v-model:open="projectModalVisible"
       :is-edit-mode="projectEditMode"
       :initial-data="projectInitialData"
-      :work-order-list="workOrderList"
       :selected-project-id="selectedProjectId"
       @success="handleSuccess"
     />

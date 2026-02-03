@@ -6,12 +6,13 @@ import type { ProjectStatusEnum } from '#/api/qms/enums';
 export interface PlanningTreeNode {
   id: string;
   name: string;
-  status: ProjectStatusEnum | string;
+  status?: ProjectStatusEnum | string;
   version?: string;
   workOrderNumber?: string;
   parentId?: null | string;
   children?: PlanningTreeNode[];
   itemCount?: number;
+  type?: 'item' | 'project';
   [key: string]: unknown;
 }
 

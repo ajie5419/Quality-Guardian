@@ -133,6 +133,10 @@ export async function updateProjectDocProject(
   );
 }
 
+export async function deleteProjectDocProject(id: string) {
+  return requestClient.delete(`/qms/planning/project-docs/projects/${id}`);
+}
+
 /**
  * BOM Item APIs
  */
@@ -156,6 +160,13 @@ export async function updateBom(id: string, data: Partial<BomItem>) {
 
 export async function deleteBom(id: string) {
   return requestClient.delete(`/qms/planning/bom/${id}`);
+}
+
+export async function importBomItems(data: {
+  items: Partial<BomItem>[];
+  projectId: string;
+}) {
+  return requestClient.post('/qms/planning/bom/import', data);
 }
 
 /**

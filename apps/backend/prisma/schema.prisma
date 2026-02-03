@@ -32,7 +32,7 @@ model inspections {
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   items               inspection_items[]
-  work_order          work_orders         @relation(fields: [workOrderNumber], references: [workOrderNumber])
+  work_order          work_orders         @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([workOrderNumber])
   @@index([category])
@@ -132,7 +132,7 @@ model after_sales {
   runningHours        Decimal?
   division            String?
   partName            String?
-  work_orders         work_orders             @relation(fields: [workOrderNumber], references: [workOrderNumber])
+  work_orders         work_orders             @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([claimStatus])
   @@index([occurDate])
@@ -187,7 +187,7 @@ model dfmea_projects {
   createdBy       String                @default("admin")
   isDeleted       Boolean               @default(false)
   items           dfmea[]
-  work_orders     work_orders?          @relation(fields: [workOrderId], references: [workOrderNumber])
+  work_orders     work_orders?          @relation(fields: [workOrderId], references: [workOrderNumber], onUpdate: Cascade)
   task_dispatches qms_task_dispatches[]
 
   @@index([workOrderId])
@@ -246,7 +246,7 @@ model project_boms {
   created_by        String?
   created_at        DateTime    @default(now())
   updated_at        DateTime    @updatedAt
-  work_orders       work_orders @relation(fields: [work_order_number], references: [workOrderNumber])
+  work_orders       work_orders @relation(fields: [work_order_number], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([work_order_number])
 }
@@ -259,7 +259,7 @@ model bom_projects {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   isDeleted       Boolean     @default(false)
-  work_order      work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber])
+  work_order      work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 }
 
 model doc_projects {
@@ -270,7 +270,7 @@ model doc_projects {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   isDeleted       Boolean     @default(false)
-  work_order      work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber])
+  work_order      work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 }
 
 model quality_plans {
@@ -288,7 +288,7 @@ model quality_plans {
   workOrderNumber String
   items           itp_items[]              @relation("PlanToItems")
   task_dispatches qms_task_dispatches[]
-  work_orders     work_orders              @relation(fields: [workOrderNumber], references: [workOrderNumber])
+  work_orders     work_orders              @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([planStatus])
   @@index([workOrderNumber])
@@ -357,7 +357,7 @@ model quality_records {
   severity                                String?
   users_quality_records_inspectorTousers  users?                      @relation("quality_records_inspectorTousers", fields: [inspector], references: [username])
   users_quality_records_lastEditorTousers users?                      @relation("quality_records_lastEditorTousers", fields: [lastEditor], references: [username])
-  work_orders                             work_orders?                @relation(fields: [workOrderNumber], references: [workOrderNumber])
+  work_orders                             work_orders?                @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([createdAt])
   @@index([date])

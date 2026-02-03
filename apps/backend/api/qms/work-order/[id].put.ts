@@ -42,6 +42,10 @@ export default defineEventHandler(async (event) => {
     if (body.effectiveTime)
       updateData.effectiveTime = new Date(body.effectiveTime);
 
+    if (body.workOrderNumber && body.workOrderNumber !== id) {
+      updateData.workOrderNumber = body.workOrderNumber;
+    }
+
     if (body.status) {
       // 使用统一的状态映射工具
       updateData.status = mapWorkOrderStatus(body.status);

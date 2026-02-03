@@ -7,9 +7,6 @@ import { logApiError } from '~/utils/api-logger';
 import { UPLOAD_DIR } from '~/utils/paths';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
-// Hardcode backend port
-const BACKEND_HOST = 'http://localhost:5666';
-
 export default eventHandler(async (event) => {
   try {
     // Ensure upload directory exists
@@ -40,8 +37,8 @@ export default eventHandler(async (event) => {
     const filePath = join(UPLOAD_DIR, filename);
     await writeFile(filePath, file.data);
 
-    // Return the URL to access the file directly from backend
-    const url = `${BACKEND_HOST}/api/uploads/${filename}`;
+    // Return the relative URL to access the file via API
+    const url = `/api/uploads/${filename}`;
 
     return useResponseSuccess({
       url,

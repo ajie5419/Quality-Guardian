@@ -9,6 +9,7 @@ export interface DfmeaProject {
   updatedAt: Date;
   version: string;
   workOrderId?: string;
+  workOrderNumber?: string;
 }
 
 // DFMEA Item
@@ -117,6 +118,7 @@ export interface ItpProject {
   updatedAt: string;
   version: string;
   workOrderId?: string;
+  workOrderNumber?: string;
 }
 
 export interface ItpItem {

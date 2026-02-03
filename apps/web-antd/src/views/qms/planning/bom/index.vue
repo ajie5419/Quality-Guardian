@@ -1,38 +1,42 @@
 <script lang="ts" setup>
-import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsPlanningApi } from '#/api/qms/planning';
 
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
-import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
-import { Button, Empty, message, Space, Table, Tooltip } from 'ant-design-vue';
+import { Button, Empty, message } from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
   createBomProject,
   deleteBom,
+  deleteBomProject,
+  getBomList,
   getBomTree,
+  importBomItems,
   updateBomProject,
 } from '#/api/qms/planning';
 import { getDeptList } from '#/api/system/dept';
+import { useGridImport } from '#/hooks/useGridImport';
 import { convertToTreeSelectData } from '#/types';
 
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
+import ProjectActionButtons from '../components/ProjectActionButtons.vue';
 import WorkOrderSelectModal from '../components/WorkOrderSelectModal.vue';
 import { useProjectActions } from '../composables/useProjectActions';
 import { useProjectManager } from '../composables/useProjectManager';
 import BomEditModal from './components/BomEditModal.vue';
+import BomProjectModal from './components/BomProjectModal.vue';
 
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
 const canCreate = computed(() => hasAccessByCodes(['QMS:Planning:BOM:Create']));
-const canEdit = computed(() => hasAccessByCodes(['QMS:Planning:BOM:Edit']));
-const canDelete = computed(() => hasAccessByCodes(['QMS:Planning:BOM:Delete']));
 const canExport = computed(() => hasAccessByCodes(['QMS:Planning:BOM:Export']));
+const canImport = computed(() => hasAccessByCodes(['QMS:Planning:BOM:Import']));
 
 // ================= Data State =================
 const allProjects = ref<QmsPlanningApi.BomTreeNode[]>([]);
@@ -50,17 +54,6 @@ const {
 } = useProjectManager(allProjects as any);
 
 // ================= Composables =================
-const { handleArchiveProject, handleDeleteItem } = useProjectActions<any>({
-  archiveProject: async (id, status) => {
-    await updateBomProject(id, { status: status as any });
-  },
-  deleteItem: async (id) => {
-    await deleteBom(id);
-  },
-  loadData,
-  resetSelectionOnDelete: true,
-  selectedProjectId,
-});
 
 // ================= Methods =================
 
@@ -72,12 +65,34 @@ async function loadData() {
     if (data.length > 0 && !selectedProjectId.value) {
       selectedProjectId.value = data[0]?.id ?? null;
     }
+    await nextTick();
+    try {
+      gridApi.reload();
+    } catch (error) {
+      console.warn('Grid not ready for reload', error);
+    }
   } catch {
     // message.error(t('common.loadFailed'));
   } finally {
     loading.value = false;
   }
 }
+
+const { handleArchiveProject, handleDeleteProject, handleDeleteItem } =
+  useProjectActions<any>({
+    archiveProject: async (id, status) => {
+      await updateBomProject(id, { status: status as any });
+    },
+    deleteItem: async (id) => {
+      await deleteBom(id);
+    },
+    deleteProject: async (id) => {
+      await deleteBomProject(id);
+    },
+    loadData,
+    resetSelectionOnDelete: true,
+    selectedProjectId,
+  });
 
 async function loadDepts() {
   try {
@@ -93,6 +108,16 @@ const isEditMode = ref(false);
 const currentItemId = ref<null | string>(null);
 const initialFormData = ref<any>({});
 
+const projectModalVisible = ref(false);
+const projectEditMode = ref(false);
+const projectInitialData = ref({});
+
+function openProjectModal(_mode: 'edit', proj: any) {
+  projectEditMode.value = true;
+  projectInitialData.value = { ...proj };
+  projectModalVisible.value = true;
+}
+
 function openModal(mode: 'create' | 'edit', row?: QmsPlanningApi.BomTreeNode) {
   isEditMode.value = mode === 'edit';
   currentItemId.value = row?.id || null;
@@ -100,7 +125,7 @@ function openModal(mode: 'create' | 'edit', row?: QmsPlanningApi.BomTreeNode) {
     mode === 'edit' && row
       ? {
           ...row,
-          partName: row.name,
+          partName: (row as any).partName,
           workOrderNumber: row.parentId || currentProject.value?.id,
         }
       : {
@@ -112,10 +137,53 @@ function openModal(mode: 'create' | 'edit', row?: QmsPlanningApi.BomTreeNode) {
   modalVisible.value = true;
 }
 
-const woSelectModalRef = ref();
+const gridApiProxy = ref<ReturnType<typeof useVbenVxeGrid>[1]>();
+
+const { handleImport } = useGridImport({
+  gridApi: gridApiProxy as any,
+  // 显式配置映射规则，确保 CSV/Excel 表头即便有细微差异（如空格、斜杠）也能识别
+  fieldMap: {
+    partName: [
+      t('qms.planning.bom.partName'),
+      '部件名称',
+      '名称',
+      'name',
+      'partName',
+    ],
+    partNumber: [
+      t('qms.planning.bom.partNumber'),
+      '物料编码/图号',
+      '图号',
+      '物料编码',
+      'partNumber',
+      '图号/物料编码',
+    ],
+    material: [
+      t('qms.planning.bom.material'),
+      '规格/材质',
+      '规格',
+      '材质',
+      'material',
+    ],
+    quantity: [t('qms.planning.bom.quantity'), '用量', '数量', 'quantity'],
+    unit: [t('qms.planning.bom.unit'), '单位', 'unit'],
+    remarks: [t('qms.planning.bom.remarks'), '备注', 'remarks'],
+  },
+  importApi: (items: any[]) => {
+    return importBomItems({
+      items: items as any[],
+      projectId: currentProject.value?.id || '',
+    });
+  },
+  onSuccess: () => {
+    loadData();
+  },
+});
+
+const workOrderSelectVisible = ref(false);
 
 function handleCreateProject() {
-  woSelectModalRef.value?.open();
+  workOrderSelectVisible.value = true;
 }
 
 async function handleWorkOrderSelected(workOrderNumber: string) {
@@ -128,59 +196,103 @@ async function handleWorkOrderSelected(workOrderNumber: string) {
   }
 }
 
-const gridOptions = computed<VxeGridProps>(() => ({
-  columns: [
-    {
-      title: t('qms.planning.bom.partName'),
-      dataIndex: 'name',
-      width: 200,
-      fixed: 'left',
+const [Grid, gridApi] = useVbenVxeGrid({
+  gridOptions: {
+    columns: [
+      {
+        title: t('qms.planning.bom.partName'),
+        field: 'partName',
+        width: 200,
+        fixed: 'left',
+      },
+      {
+        title: t('qms.planning.bom.partNumber'),
+        field: 'partNumber',
+        width: 150,
+      },
+      {
+        title: t('qms.planning.bom.material'),
+        field: 'material',
+        width: 150,
+      },
+      {
+        title: t('qms.planning.bom.quantity'),
+        field: 'quantity',
+        width: 100,
+        align: 'center',
+      },
+      {
+        title: t('qms.planning.bom.unit'),
+        field: 'unit',
+        width: 100,
+        align: 'center',
+      },
+      {
+        title: t('qms.planning.bom.remarks'),
+        field: 'remarks',
+        minWidth: 200,
+      },
+      {
+        title: t('common.action'),
+        field: 'action',
+        width: 120,
+        fixed: 'right',
+        align: 'center',
+        slots: { default: 'action' },
+      },
+    ],
+    proxyConfig: {
+      ajax: {
+        query: async () => {
+          if (!currentProject.value?.id) return { items: [] };
+          const data = await getBomList({
+            projectId: currentProject.value.id,
+          });
+          return { items: data };
+        },
+      },
     },
-    {
-      title: t('qms.planning.bom.partNumber'),
-      dataIndex: 'partNumber',
-      width: 150,
+    toolbarConfig: {
+      refresh: true,
+      zoom: true,
+      custom: true,
+      export: canExport.value,
+      import: canImport.value,
     },
-    {
-      title: t('qms.planning.bom.material'),
-      dataIndex: 'material',
-      width: 150,
+    importConfig: {
+      remote: true,
+      importMethod: handleImport,
     },
-    {
-      title: t('qms.planning.bom.quantity'),
-      dataIndex: 'quantity',
-      width: 100,
-      align: 'center',
+    exportConfig: {
+      remote: false,
+      types: ['xlsx', 'csv'],
+      modes: ['current', 'selected', 'all'],
     },
-    {
-      title: t('qms.planning.bom.unit'),
-      dataIndex: 'unit',
-      width: 100,
-      align: 'center',
+    pagerConfig: {
+      enabled: false,
     },
-    {
-      title: t('qms.planning.bom.remarks'),
-      dataIndex: 'remarks',
-      minWidth: 200,
-      ellipsis: true,
-    },
-    {
-      title: t('common.action'),
-      key: 'action',
-      width: 120,
-      fixed: 'right',
-      align: 'center',
-    },
-  ],
-  toolbarConfig: {
-    export: canExport.value,
+    height: 'auto',
+    scrollX: { enabled: true, gt: 0 },
+    scrollY: { enabled: true, gt: 0 },
   },
-  exportConfig: {
-    remote: false,
-    types: ['xlsx', 'csv'],
-    modes: ['current', 'selected', 'all'],
+});
+
+gridApiProxy.value = gridApi;
+
+// Avoid "datas.slice is not a function" error by ensuring grid reloads when project changes
+watch(
+  () => currentProject.value?.id,
+  async (id) => {
+    if (id) {
+      await nextTick();
+      try {
+        gridApi.reload();
+      } catch (error) {
+        console.warn('Grid not ready for reload', error);
+      }
+    }
   },
-}));
+);
 
 onMounted(() => {
   loadData();
@@ -190,7 +302,7 @@ onMounted(() => {
 
 <template>
   <Page content-class="p-4 h-full">
-    <div class="flex h-full gap-4 overflow-hidden">
+    <div class="flex h-[calc(100vh-130px)] min-h-0 gap-4 overflow-hidden">
       <PlanningSidebar
         :title="t('qms.planning.bom.projectList')"
         :projects="filteredProjects"
@@ -199,9 +311,18 @@ onMounted(() => {
         v-model:search-text="searchText"
         auth-prefix="QMS:Planning:BOM"
         @change="handleTabChange"
-        @archive="(proj: any) => handleArchiveProject(proj)"
         @create="handleCreateProject"
       >
+        <template #actions="{ project }">
+          <ProjectActionButtons
+            :project="project"
+            mode="dropdown"
+            auth-prefix="QMS:Planning:BOM"
+            @archive="handleArchiveProject"
+            @delete="handleDeleteProject"
+            @edit="openProjectModal('edit', project as any)"
+          />
+        </template>
         <template #projectInfo="{ project }">
           <div class="flex flex-col gap-0.5">
             <span
@@ -228,15 +349,19 @@ onMounted(() => {
               <h2 class="text-xl font-bold text-gray-800">
                 {{ currentProject.name }}
               </h2>
-              <div class="mt-1 text-xs text-gray-500">
-                {{ t('qms.planning.bom.workOrderNo') }}:
-                <b class="text-gray-700">{{
-                  (currentProject as any).workOrderNumber
-                }}</b>
-                | {{ t('qms.planning.bom.materialItems') }}:
-                <b class="text-blue-600">{{
-                  (currentProject as any).itemCount || 0
-                }}</b>
+              <div class="mt-1 flex items-center gap-3 text-xs text-gray-500">
+                <span>
+                  {{ t('qms.planning.bom.workOrderNo') }}:
+                  <b class="text-gray-700">{{
+                    (currentProject as any).workOrderNumber
+                  }}</b>
+                </span>
+                <span>
+                  {{ t('qms.planning.bom.materialItems') }}:
+                  <b class="text-blue-600">{{
+                    (currentProject as any).itemCount || 0
+                  }}</b>
+                </span>
               </div>
             </div>
             <div class="flex items-center gap-2">
@@ -251,47 +376,25 @@ onMounted(() => {
           </div>
 
           <div class="flex-1 overflow-hidden p-4">
-            <Table
-              :columns="gridOptions.columns as any"
-              :data-source="currentProject.children"
-              :pagination="false"
-              size="middle"
-              row-key="id"
-              :scroll="{ x: 1000, y: 'calc(100vh - 280px)' }"
-            >
-              <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'action'">
-                  <Space>
-                    <Tooltip v-if="canEdit" :title="t('common.edit')">
-                      <Button
-                        type="link"
-                        size="small"
-                        @click="openModal('edit', record as any)"
-                      >
-                        <IconifyIcon icon="lucide:edit" class="size-4" />
-                      </Button>
-                    </Tooltip>
-                    <Tooltip v-if="canDelete" :title="t('common.delete')">
-                      <Button
-                        type="link"
-                        size="small"
-                        danger
-                        @click="handleDeleteItem(record as any)"
-                      >
-                        <IconifyIcon icon="lucide:trash-2" class="size-4" />
-                      </Button>
-                    </Tooltip>
-                  </Space>
-                </template>
+            <Grid>
+              <template #action="{ row }">
+                <ProjectActionButtons
+                  :project="row as any"
+                  mode="table"
+                  auth-prefix="QMS:Planning:BOM"
+                  :can-archive="false"
+                  @delete="handleDeleteItem(row as any)"
+                  @edit="openModal('edit', row as any)"
+                />
               </template>
-            </Table>
+            </Grid>
           </div>
         </div>
         <div
           v-else
-          class="flex flex-1 flex-col items-center justify-center bg-gray-50/20 text-gray-300"
+          class="flex flex-1 flex-col items-center justify-center bg-gray-50/20 text-gray-400"
         >
-          <Empty :description="t('qms.planning.bom.selectProjectHint')" />
+          <Empty :description="t('qms.planning.common.selectProjectHint')" />
         </div>
       </div>
     </div>
@@ -305,8 +408,15 @@ onMounted(() => {
     />
 
     <WorkOrderSelectModal
-      ref="woSelectModalRef"
+      v-model:open="workOrderSelectVisible"
       @success="handleWorkOrderSelected"
+    />
+
+    <BomProjectModal
+      v-model:open="projectModalVisible"
+      :initial-data="projectInitialData"
+      :project-id="(projectInitialData as any)?.id"
+      @success="loadData"
     />
   </Page>
 </template>

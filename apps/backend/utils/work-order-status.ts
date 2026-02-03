@@ -7,6 +7,7 @@ export const WORK_ORDER_STATUS = {
   OPEN: 'OPEN',
   IN_PROGRESS: 'IN_PROGRESS',
   COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
 } as const;
 
 export type WorkOrderStatus =
@@ -38,6 +39,8 @@ const STATUS_MAPPING_TABLE: Record<string, WorkOrderStatus> = {
   已完成: WORK_ORDER_STATUS.COMPLETED,
   已结束: WORK_ORDER_STATUS.COMPLETED,
   closed: WORK_ORDER_STATUS.COMPLETED,
+  cancelled: WORK_ORDER_STATUS.CANCELLED,
+  已取消: WORK_ORDER_STATUS.CANCELLED,
 };
 
 /**
@@ -64,7 +67,7 @@ export function mapWorkOrderStatus(
   const normalizedStatus = String(frontendStatus)
     .toLowerCase()
     .trim()
-    .replaceAll(/s+/g, '_');
+    .replaceAll(/\s+/g, '_');
 
   // 查找映射，如果找不到则默认返回 OPEN
   return STATUS_MAPPING_TABLE[normalizedStatus] || WORK_ORDER_STATUS.OPEN;
@@ -78,6 +81,7 @@ export const DISPLAY_STATUS_MAPPING: Record<WorkOrderStatus, string> = {
   [WORK_ORDER_STATUS.OPEN]: '未开始',
   [WORK_ORDER_STATUS.IN_PROGRESS]: '进行中',
   [WORK_ORDER_STATUS.COMPLETED]: '已完成',
+  [WORK_ORDER_STATUS.CANCELLED]: '已取消',
 };
 
 /**

@@ -110,17 +110,13 @@ cp docker-compose.yml docker-compose.backup.yml
 echo "⬇️ 拉取新镜像..."
 docker-compose pull
 
-echo "🗄️ 数据库已存在，跳过迁移..."
-# 🌟 生产数据库已经存在且有数据，跳过 migrate deploy
-# 如果需要更新 schema，请手动执行 prisma db push 或创建新的 migration
-# set -a
-# source .env.production
-# set +a
-# if ! docker-compose run --rm -e DATABASE_URL="\$DATABASE_URL" backend sh -c "cd /app && ./apps/backend/node_modules/.bin/prisma migrate deploy --schema=./prisma/schema.prisma"; then
-#     echo "❌ 数据库迁移失败，执行回滚..."
-#     docker-compose -f docker-compose.backup.yml up -d
-#     exit 1
-# fi
+echo "🔄 同步数据库 Schema (db push)..."
+# 自动同步数据库结构
+if ! docker-compose run --rm backend sh -c "cd /app && ./apps/backend/node_modules/.bin/prisma db push --schema=./prisma/schema.prisma --skip-generate"; then
+    echo "❌ 数据库同步失败，执行回滚..."
+    docker-compose -f docker-compose.backup.yml up -d
+    exit 1
+fi
 
 echo "🔄 更新后端服务..."
 # 🌟 关键修复：单台 ECS 不要用 scale=2，直接用 recreate

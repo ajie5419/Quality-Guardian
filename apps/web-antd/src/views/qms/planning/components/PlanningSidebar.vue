@@ -169,42 +169,45 @@ function handleSelect(id: string) {
               ? 'scale-100 opacity-100'
               : 'scale-95 opacity-40 group-hover:scale-100 group-hover:opacity-100',
           ]"
+          @click.stop
         >
-          <Button
-            v-if="canDispatch && !isArchived(proj.status)"
-            type="link"
-            size="small"
-            class="h-auto p-0 text-[11px] font-bold text-blue-600 hover:underline"
-            @click.stop="emit('dispatch', proj)"
-          >
-            {{ t('common.dispatch') }}
-          </Button>
-          <Button
-            v-if="canArchive"
-            type="link"
-            size="small"
-            class="h-auto p-0 text-[11px] font-bold"
-            :class="
-              isArchived(proj.status)
-                ? 'text-gray-500 hover:text-blue-600'
-                : 'text-orange-500 hover:text-orange-600'
-            "
-            @click.stop="emit('archive', proj)"
-          >
-            <span
+          <slot name="actions" :project="proj">
+            <Button
+              v-if="canDispatch && !isArchived(proj.status)"
+              type="link"
+              size="small"
+              class="h-auto p-0 text-[11px] font-bold text-blue-600 hover:underline"
+              @click.stop="emit('dispatch', proj)"
+            >
+              {{ t('common.dispatch') }}
+            </Button>
+            <Button
+              v-if="canArchive"
+              type="link"
+              size="small"
+              class="h-auto p-0 text-[11px] font-bold"
               :class="
                 isArchived(proj.status)
-                  ? 'i-lucide-rotate-ccw'
-                  : 'i-lucide-archive'
+                  ? 'text-gray-500 hover:text-blue-600'
+                  : 'text-orange-500 hover:text-orange-600'
               "
-              class="mr-0.5"
-            ></span>
-            {{
-              isArchived(proj.status)
-                ? t('common.restore')
-                : t('common.archive')
-            }}
-          </Button>
+              @click.stop="emit('archive', proj)"
+            >
+              <span
+                :class="
+                  isArchived(proj.status)
+                    ? 'i-lucide-rotate-ccw'
+                    : 'i-lucide-archive'
+                "
+                class="mr-0.5"
+              ></span>
+              {{
+                isArchived(proj.status)
+                  ? t('common.restore')
+                  : t('common.archive')
+              }}
+            </Button>
+          </slot>
         </div>
       </div>
 

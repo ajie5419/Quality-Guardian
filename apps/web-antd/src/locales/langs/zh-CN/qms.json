@@ -161,10 +161,14 @@
     "unit": {
       "steps": "个步骤"
     },
+    "common": {
+      "selectProjectHint": "请从左侧选择一个项目查看详情"
+    },
     "dfmea": {
       "title": "DFMEA",
       "projectList": "DFMEA 项目",
       "planning": "DFMEA 规划",
+      "itemCount": "条目数量",
       "item": "条目/功能",
       "failureMode": "失效模式",
       "effects": "后果/影响",
@@ -181,7 +185,10 @@
       "itemCount": "个组件",
       "itemCountUnit": "个组件",
       "workOrderNo": "工单编号",
-      "materialItems": "物料项",
+      "materialItems": "物料明细",
+      "version": "版本",
+      "editProject": "修改项目信息",
+      "projectName": "项目名称",
       "addItem": "新增物料条目",
       "editItem": "编辑物料条目",
       "selectProjectHint": "请从左侧选择一个项目查看 BOM 明细",
@@ -204,10 +211,12 @@
     },
     "projectDocs": {
       "title": "项目资料管理",
+      "recordCount": "资料数量",
       "documentList": "资料清单"
     },
     "itp": {
       "title": "检验 ITP",
+      "stepCount": "步骤数量",
       "processStep": "工序/步骤",
       "activity": "检验活动",
       "criteria": "判定标准",

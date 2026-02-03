@@ -47,5 +47,49 @@
       "CONDITIONAL": "条件合格",
       "NA": "不适用"
     }
+  },
+  "planning": {
+    "common": {
+      "selectProjectHint": "请从左侧选择一个项目查看详情"
+    },
+    "bom": {
+      "title": "项目 BOM 管理",
+      "projectList": "项目清单",
+      "itemCount": "个组件",
+      "itemCountUnit": "个组件",
+      "workOrderNo": "工单编号",
+      "materialItems": "物料明细",
+      "version": "版本",
+      "editProject": "修改项目信息",
+      "projectName": "项目名称",
+      "addItem": "新增物料条目",
+      "editItem": "编辑物料条目",
+      "selectProjectHint": "请从左侧选择一个项目查看 BOM 明细",
+      "partName": "部件名称",
+      "partNumber": "物料编码/图号",
+      "material": "规格/材质",
+      "quantity": "用量",
+      "unit": "单位",
+      "remarks": "备注",
+      "placeholder": {
+        "search": "搜索工单/项目...",
+        "partName": "请输入部件名称",
+        "partNumber": "请输入图号",
+        "material": "如：Q345B",
+        "unit": "如：PCS, SET, m",
+        "remarks": "其他补充信息"
+      },
+      "deleteTitle": "确认删除",
+      "deleteContent": "确定要删除部件 \"{name}\" 吗？"
+    },
+    "dfmea": {
+      "itemCount": "条目数量"
+    },
+    "projectDocs": {
+      "recordCount": "资料数量"
+    },
+    "itp": {
+      "stepCount": "步骤数量"
+    }
   }
 }

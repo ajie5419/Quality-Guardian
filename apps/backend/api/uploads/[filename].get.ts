@@ -1,15 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { extname, join, resolve } from 'node:path';
-import process from 'node:process';
+import { extname, join } from 'node:path';
 
 import { createError, defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-
-// Robust path resolution - Must match upload.ts
-const cwd = process.cwd();
-const isNitro = cwd.includes('.nitro') || cwd.includes('.output');
-const PROJECT_ROOT = isNitro ? resolve(cwd, '..') : cwd;
-const UPLOAD_DIR = process.env.UPLOAD_DIR || resolve(PROJECT_ROOT, 'uploads');
+import { UPLOAD_DIR } from '~/utils/paths';
 
 // MIME types mapping
 const MIME_TYPES: Record<string, string> = {
@@ -43,7 +37,8 @@ export default defineEventHandler((event) => {
   }
 
   if (!existsSync(filePath)) {
-    console.error(`[Serving] File not found: ${filePath}`);
+    // Log absolute path to help identify shared DB vs local storage discrepancies
+    console.error(`[Serving] File not found at absolute path: ${filePath}`);
     throw createError({
       statusCode: 404,
       message: 'File not found',
