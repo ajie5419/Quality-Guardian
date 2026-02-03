@@ -38,7 +38,8 @@ export default eventHandler(async (event) => {
     await writeFile(filePath, file.data);
 
     // Return the relative URL to access the file via API
-    const url = `/api/uploads/${filename}`;
+    // backend configured publicAssets to serve /uploads
+    const url = `/uploads/${filename}`;
 
     return useResponseSuccess({
       url,

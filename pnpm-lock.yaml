@@ -619,6 +619,9 @@ importers:
       jsonwebtoken:
         specifier: 'catalog:'
         version: 9.0.2
+      nanoid:
+        specifier: ^5.0.0
+        version: 5.1.5
       nitropack:
         specifier: 'catalog:'
         version: 2.11.13(@electric-sql/pglite@0.3.2)(@netlify/blobs@8.2.0)(encoding@0.1.13)(mysql2@3.15.3)
