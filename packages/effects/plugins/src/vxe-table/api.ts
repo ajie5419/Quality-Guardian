@@ -136,7 +136,7 @@ export class VxeGridApi<T extends Record<string, any> = any> {
 export type ExtendedVxeGridApi<
   D extends Record<string, any> = any,
   F extends
-  import('@vben-core/form-ui').BaseFormComponentType = import('@vben-core/form-ui').BaseFormComponentType,
+    import('@vben-core/form-ui').BaseFormComponentType = import('@vben-core/form-ui').BaseFormComponentType,
 > = VxeGridApi<D> & {
   useStore: <T = NoInfer<VxeGridProps<D, F>>>(
     selector?: (state: NoInfer<VxeGridProps<any, any>>) => T,

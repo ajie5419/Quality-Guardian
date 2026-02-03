@@ -11,6 +11,15 @@ export const overridesPreferences = defineOverridesPreferences({
     accessMode: 'mixed',
     name: import.meta.env.VITE_APP_TITLE,
   },
+  // --- 添加下面这段 ---
+  logo: {
+    enable: true,
+    source: '/logo.png', // 这里填写你想显示的图片路径
+  },
+  // --- 添加下面这段 ---
+  theme: {
+    mode: 'light', // 设置默认主题为浅色 (可选: 'dark' | 'light' | 'auto')
+  },
   copyright: {
     companyName: '质量管理系统',
     companySiteLink: '',

@@ -126,28 +126,22 @@ function filterItpItems() {
   // Otherwise, we show nothing to avoid confusion.
 
   // Filter by Process / Incoming Type
-  if (config.value.showProcess) {
-    if (formState.processName) {
-      filtered = filtered.filter(
-        (item) => item.processStep === formState.processName,
-      );
-    }
-  } else if (config.value.showIncomingType) {
-    if (formState.incomingType) {
-      // Map incoming type to ITP processStep
-      filtered = filtered.filter(
-        (item) => item.processStep === formState.incomingType,
-      );
-    }
+  if (config.value.showProcess && formState.processName) {
+    filtered = filtered.filter(
+      (item) => item.processStep === formState.processName,
+    );
+  } else if (config.value.showIncomingType && formState.incomingType) {
+    // Map incoming type to ITP processStep
+    filtered = filtered.filter(
+      (item) => item.processStep === formState.incomingType,
+    );
   }
 
   // Filter by Level 1 Component / Activity matching
-  if (config.value.showLevel1) {
-    if (formState.level1Component) {
-      filtered = filtered.filter((item) =>
-        item.activity.includes(formState.level1Component),
-      );
-    }
+  if (config.value.showLevel1 && formState.level1Component) {
+    filtered = filtered.filter((item) =>
+      item.activity.includes(formState.level1Component),
+    );
   }
 
   // Map to inspection items format
