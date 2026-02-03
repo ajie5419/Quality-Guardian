@@ -28,6 +28,8 @@ services:
           memory: 1G
         reservations:
           memory: 512M
+    volumes:
+      - qms-uploads:/app/uploads
     logging:
       driver: 'json-file'
       options:
@@ -42,6 +44,8 @@ services:
     depends_on:
       - backend # 等待后端启动
     restart: always
+    volumes:
+      - qms-uploads:/usr/share/nginx/html/uploads
     networks:
       - qms-network
     logging:
@@ -54,3 +58,7 @@ networks:
   qms-network:
     driver: bridge
     name: qms-network
+
+volumes:
+  qms-uploads:
+    driver: local
