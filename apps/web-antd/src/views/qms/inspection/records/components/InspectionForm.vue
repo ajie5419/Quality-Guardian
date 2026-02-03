@@ -125,26 +125,29 @@ function filterItpItems() {
   // we require a value selected/entered to show matching items.
   // Otherwise, we show nothing to avoid confusion.
 
-  // Filter by Process
+  // Filter by Process / Incoming Type
   if (config.value.showProcess) {
-    if (!formState.processName) {
-      formState.items = [];
-      return;
+    if (formState.processName) {
+      filtered = filtered.filter(
+        (item) => item.processStep === formState.processName,
+      );
     }
-    filtered = filtered.filter(
-      (item) => item.processStep === formState.processName,
-    );
+  } else if (config.value.showIncomingType) {
+    if (formState.incomingType) {
+      // Map incoming type to ITP processStep
+      filtered = filtered.filter(
+        (item) => item.processStep === formState.incomingType,
+      );
+    }
   }
 
   // Filter by Level 1 Component / Activity matching
   if (config.value.showLevel1) {
-    if (!formState.level1Component) {
-      formState.items = [];
-      return;
+    if (formState.level1Component) {
+      filtered = filtered.filter((item) =>
+        item.activity.includes(formState.level1Component),
+      );
     }
-    filtered = filtered.filter((item) =>
-      item.activity.includes(formState.level1Component),
-    );
   }
 
   // Map to inspection items format
@@ -194,10 +197,25 @@ const debouncedFilter = useDebounceFn(() => {
 }, 200);
 
 watch(
-  () => [formState.processName, formState.level1Component],
+  () => [
+    formState.processName,
+    formState.level1Component,
+    formState.incomingType,
+  ],
   () => {
     debouncedFilter();
   },
+);
+
+// Ensure ITP items are loaded if itpProjectId is already set (e.g. on edit)
+watch(
+  () => formState.itpProjectId,
+  (newId) => {
+    if (newId) {
+      loadItp();
+    }
+  },
+  { immediate: true },
 );
 
 // Load ITP Items Logic (Simplified)

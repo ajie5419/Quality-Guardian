@@ -71,7 +71,9 @@ export class VxeGridApi<T extends Record<string, any> = any> {
 
   async query(params: Record<string, any> = {}) {
     try {
-      await this.grid.commitProxy('query', toRaw(params));
+      if (this.grid?.commitProxy) {
+        await this.grid.commitProxy('query', toRaw(params));
+      }
     } catch (error) {
       console.error('Error occurred while querying:', error);
     }
@@ -79,7 +81,9 @@ export class VxeGridApi<T extends Record<string, any> = any> {
 
   async reload(params: Record<string, any> = {}) {
     try {
-      await this.grid.commitProxy('reload', toRaw(params));
+      if (this.grid?.commitProxy) {
+        await this.grid.commitProxy('reload', toRaw(params));
+      }
     } catch (error) {
       console.error('Error occurred while reloading:', error);
     }
@@ -132,7 +136,7 @@ export class VxeGridApi<T extends Record<string, any> = any> {
 export type ExtendedVxeGridApi<
   D extends Record<string, any> = any,
   F extends
-    import('@vben-core/form-ui').BaseFormComponentType = import('@vben-core/form-ui').BaseFormComponentType,
+  import('@vben-core/form-ui').BaseFormComponentType = import('@vben-core/form-ui').BaseFormComponentType,
 > = VxeGridApi<D> & {
   useStore: <T = NoInfer<VxeGridProps<D, F>>>(
     selector?: (state: NoInfer<VxeGridProps<any, any>>) => T,
