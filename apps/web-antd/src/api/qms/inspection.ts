@@ -94,7 +94,9 @@ export async function getInspectionRecords(params?: {
   keyword?: string;
   page?: number;
   pageSize?: number;
+  projectName?: string;
   type?: string;
+  workOrderNumber?: string;
   year?: number;
 }) {
   return requestClient.get<{ items: InspectionRecord[]; total: number }>(

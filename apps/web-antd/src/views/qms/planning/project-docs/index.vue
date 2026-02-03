@@ -196,7 +196,11 @@ async function loadRecords() {
   }
   isRecordsLoading.value = true;
   try {
-    const res = await getInspectionRecords();
+    const res = await getInspectionRecords({
+      workOrderNumber: selectedProject.value?.workOrderNumber,
+      type: 'ALL',
+      pageSize: 500, // Get all records for this project
+    });
     const items = res.items || [];
 
     const filtered: InspectionDocItem[] = items
