@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
       };
       const details: any[] = [];
 
-      manualLosses.forEach((item: any) => {
+      manualLosses.forEach((item) => {
         const amount = Number(item.amount);
         if (amount <= 0) return;
         details.push({
@@ -42,12 +42,12 @@ export default defineEventHandler(async (event) => {
           amount,
           dept: item.respDept || '-',
           desc: item.description || '-',
-          workOrderNumber: item.workOrderNumber || '-',
+          workOrderNumber: '-',
           source: 'Manual',
           _ts: item.occurDate.getTime(),
         });
       });
-      internalLosses.forEach((item: any) => {
+      internalLosses.forEach((item) => {
         const amount = Number(item.lossAmount);
         if (amount <= 0) return;
         details.push({
@@ -62,7 +62,7 @@ export default defineEventHandler(async (event) => {
           _ts: item.date.getTime(),
         });
       });
-      externalLosses.forEach((item: any) => {
+      externalLosses.forEach((item) => {
         const amount =
           Number(item.materialCost || 0) + Number(item.laborTravelCost || 0);
         if (amount <= 0) return;
