@@ -26,20 +26,19 @@ export default defineEventHandler(async (event) => {
     const newMenu = await prisma.menus.create({
       data: {
         id: `menu-${Date.now()}`,
-        pid,
+        parentId: pid,
         name: body.name,
         path: body.path || '',
         component: body.component || '',
-        icon: body.icon || body.meta?.icon,
         type: body.type || 'menu',
-        sort: Number(body.orderNo || body.meta?.orderNo || 0),
+        order: Number(body.orderNo || body.meta?.orderNo || 0),
         status: body.status ?? 1,
-        meta: {
+        meta: JSON.stringify({
           title: body.title || body.meta?.title,
           icon: body.icon || body.meta?.icon,
           orderNo: Number(body.orderNo || body.meta?.orderNo || 0),
           ...body.meta,
-        },
+        }),
         isDeleted: false,
       },
     });

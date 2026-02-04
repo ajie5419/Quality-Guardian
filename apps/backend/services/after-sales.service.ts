@@ -227,6 +227,8 @@ export const AfterSalesService = {
       resolutionPlan: item.solution,
       status: item.claimStatus,
       isClaim: item.isClaim,
+      qualityLoss:
+        (Number(item.materialCost) || 0) + (Number(item.laborTravelCost) || 0),
     }));
   },
 };

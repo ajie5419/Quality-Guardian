@@ -28,6 +28,7 @@ import {
 } from '#/api/qms/supplier';
 
 import { RATING_COLORS, SUPPLIER_STATUS_UI_MAP } from '../common-constants';
+import ScoringRulesModal from './components/ScoringRulesModal.vue';
 import SupplierDetailDrawer from './components/SupplierDetailDrawer.vue';
 import SupplierEditModal from './components/SupplierEditModal.vue';
 import SupplierStats from './components/SupplierStats.vue';
@@ -44,6 +45,7 @@ const canDelete = computed(() => hasAccessByCodes(['QMS:Supplier:Delete']));
 const checkedRows = ref<QmsSupplierApi.SupplierItem[]>([]);
 const editModalRef = ref();
 const detailDrawerRef = ref();
+const rulesModalRef = ref();
 
 // 统计数据
 const stats = ref<QmsSupplierApi.SupplierStats>({
@@ -320,6 +322,12 @@ function handleSuccess() {
         <Grid>
           <template #toolbar-actions>
             <Space>
+              <Button @click="() => rulesModalRef?.openModal()">
+                <template #icon>
+                  <IconifyIcon icon="lucide:book-open" />
+                </template>
+                {{ t('qms.supplier.scoringRules') }}
+              </Button>
               <Button
                 v-access:code="'QMS:Supplier:Create'"
                 type="primary"
@@ -437,6 +445,7 @@ function handleSuccess() {
 
     <SupplierEditModal ref="editModalRef" @success="handleSuccess" />
     <SupplierDetailDrawer ref="detailDrawerRef" />
+    <ScoringRulesModal ref="rulesModalRef" />
   </Page>
 </template>
 

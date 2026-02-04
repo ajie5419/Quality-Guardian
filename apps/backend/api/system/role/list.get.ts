@@ -57,7 +57,7 @@ export default defineEventHandler(async (event) => {
       page as string,
       pageSize as string,
       processedRoles,
-      total,
+      { total },
     );
   } catch (error) {
     logApiError('list', error);

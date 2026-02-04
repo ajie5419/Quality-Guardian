@@ -15,18 +15,21 @@ export function usePageResponseSuccess<T = unknown>(
   page: number | string,
   pageSize: number | string,
   list: T[],
-  { message = 'ok' } = {},
+  { total, message = 'ok' }: { message?: string; total?: number } = {},
 ) {
-  const pageData = pagination(
-    Number.parseInt(`${page}`),
-    Number.parseInt(`${pageSize}`),
-    list,
-  );
+  const pageData =
+    total === undefined
+      ? pagination(
+          Number.parseInt(`${page}`),
+          Number.parseInt(`${pageSize}`),
+          list,
+        )
+      : list;
 
   return {
     ...useResponseSuccess({
       items: pageData,
-      total: list.length,
+      total: total === undefined ? list.length : total,
     }),
     message,
   };

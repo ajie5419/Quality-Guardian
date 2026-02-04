@@ -19,7 +19,7 @@ export default defineEventHandler(async (_event) => {
           priority: 3,
           status: 'PENDING',
           itpProjectId: 'ITP-PRJ-001',
-          deadline: new Date('2026-06-30'),
+          dueDate: new Date('2026-06-30'),
           updatedAt: new Date(),
         },
         {
@@ -31,7 +31,7 @@ export default defineEventHandler(async (_event) => {
           priority: 2,
           status: 'PENDING',
           dfmeaId: 'DFM-001',
-          deadline: new Date('2026-03-15'),
+          dueDate: new Date('2026-03-15'),
           updatedAt: new Date(),
         },
       ],

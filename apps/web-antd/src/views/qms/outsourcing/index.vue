@@ -28,6 +28,7 @@ import {
 } from '#/api/qms/supplier';
 
 import { RATING_COLORS, SUPPLIER_STATUS_UI_MAP } from '../common-constants';
+import ScoringRulesModal from '../supplier/components/ScoringRulesModal.vue';
 import SupplierDetailDrawer from '../supplier/components/SupplierDetailDrawer.vue';
 import SupplierEditModal from '../supplier/components/SupplierEditModal.vue';
 import SupplierStats from '../supplier/components/SupplierStats.vue';
@@ -44,6 +45,7 @@ const canDelete = computed(() => hasAccessByCodes(['QMS:Outsourcing:Delete']));
 const checkedRows = ref<QmsSupplierApi.SupplierItem[]>([]);
 const editModalRef = ref();
 const detailDrawerRef = ref();
+const rulesModalRef = ref();
 
 // 统计数据
 const stats = ref<QmsSupplierApi.SupplierStats>({
@@ -333,6 +335,12 @@ function handleSuccess() {
                 <span class="vxe-icon-add mr-1"></span>
                 {{ t('qms.outsourcing.addUnit') }}
               </Button>
+              <Button @click="() => rulesModalRef?.openModal()">
+                <template #icon>
+                  <span class="i-lucide-book-open mr-1"></span>
+                </template>
+                {{ t('qms.supplier.scoringRules') }}
+              </Button>
               <Button
                 v-if="checkedRows.length > 0"
                 v-access:code="'QMS:Outsourcing:Delete'"
@@ -436,6 +444,7 @@ function handleSuccess() {
 
     <SupplierEditModal ref="editModalRef" @success="handleSuccess" />
     <SupplierDetailDrawer ref="detailDrawerRef" />
+    <ScoringRulesModal ref="rulesModalRef" />
   </Page>
 </template>
 

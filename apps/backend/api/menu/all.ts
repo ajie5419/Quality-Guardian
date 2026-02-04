@@ -7,12 +7,29 @@ import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
 /**
  * 将平铺的菜单数据转换为树形结构
  */
-function buildMenuTree(menus: any[], parentId: number = 0): any[] {
-  return menus
-    .filter((menu) => (menu.parentId || 0) === parentId)
+function buildMenuTree(menus: any[], parentId: string = '0'): any[] {
+  const filtered = menus.filter((menu) => {
+    const pid =
+      !menu.parentId ||
+      menu.parentId === null ||
+      menu.parentId === undefined ||
+      menu.parentId === '0' ||
+      menu.parentId === 0
+        ? '0'
+        : String(menu.parentId);
+    return pid === parentId;
+  });
+
+  if (parentId === '0' && filtered.length === 0 && menus.length > 0) {
+    console.warn(
+      `[Menu Debug] Root check failed. Sample parentId: '${menus[0].parentId}' Type: ${typeof menus[0].parentId}`,
+    );
+  }
+
+  return filtered
     .sort((a, b) => (a.order || 0) - (b.order || 0))
     .map((menu) => {
-      const children = buildMenuTree(menus, menu.id);
+      const children = buildMenuTree(menus, String(menu.id));
       const meta =
         typeof menu.meta === 'string' ? JSON.parse(menu.meta) : menu.meta;
 
@@ -113,12 +130,13 @@ export default eventHandler(async (event) => {
   let userPermissions: string[] = [];
   let roleName = '';
 
-  const uid = userinfo.userId || userinfo.id;
+  const userId =
+    userinfo.id ?? (userinfo as any).userId ?? (userinfo as any).sub;
 
   try {
     const dbUser = await prisma.users.findFirst({
       where: {
-        OR: [{ id: String(uid) }, { username: userinfo.username }],
+        OR: [{ id: String(userId) }, { username: userinfo.username }],
       },
       include: {
         roles: true,
@@ -129,8 +147,9 @@ export default eventHandler(async (event) => {
       roleName = dbUser.roles.name;
       try {
         userPermissions = JSON.parse(dbUser.roles.permissions || '[]');
-      } catch {
+      } catch (error) {
         logApiError('all', error);
+        return useResponseSuccess([]);
       }
     }
   } catch (error) {
@@ -145,8 +164,8 @@ export default eventHandler(async (event) => {
     roleName.toLowerCase().includes('super') ||
     userPermissions.includes('*') ||
     userPermissions.includes('["*"]') ||
-    uid === '1' ||
-    uid === 'USR-ADMIN';
+    userId === '1' ||
+    userId === 'USR-ADMIN';
 
   // 将权限列表转为 Set 提高查询效率
   const userCodesSet = new Set(userPermissions);
@@ -157,8 +176,13 @@ export default eventHandler(async (event) => {
 
   // 额外调试日志
   console.warn(
-    `[Menu] User: ${userinfo.username}, isSuper: ${isSuper}, Count: ${filteredMenus.length}`,
+    `[Menu Debug] User: ${userinfo.username}, ID: ${userinfo.id}, Role: ${roleName}, DB Menus: ${allDbMenus.length}, Full Tree: ${fullMenuTree.length}, isSuper: ${isSuper}, Final Count: ${filteredMenus.length}`,
   );
+  if (fullMenuTree.length > 0) {
+    console.warn(
+      `[Menu Debug] First Root: ${fullMenuTree[0].name}, PID: ${fullMenuTree[0].parentId}, Children: ${fullMenuTree[0].children?.length || 0}`,
+    );
+  }
 
   return useResponseSuccess(filteredMenus);
 });

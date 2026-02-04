@@ -43,7 +43,6 @@ export default defineEventHandler(async (event) => {
       });
     } else {
       const errorMsg = await response.text();
-      logApiError('test', error);
       return useResponseError(
         `连接失败 (${response.status}): ${errorMsg.slice(0, 100)}`,
       );

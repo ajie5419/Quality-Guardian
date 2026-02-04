@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
     };
 
     // 4. 递归构建树 - 不做任何过滤，显示所有节点
-    const buildTree = (parentId: number = 0): any[] => {
+    const buildTree = (parentId: string = '0'): any[] => {
       const children = allMenus.filter((m) => m.parentId === parentId);
 
       return children.map((menu) => {
@@ -77,7 +77,7 @@ export default defineEventHandler(async (event) => {
       });
     };
 
-    const permissionTree = buildTree(0);
+    const permissionTree = buildTree('0');
 
     console.warn(
       `[permission-tree] 返回 ${allMenus.length} 个菜单，树形节点数: ${JSON.stringify(permissionTree).length} bytes`,

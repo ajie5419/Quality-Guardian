@@ -59,7 +59,7 @@ model inspection_items {
 }
 
 model menus {
-  id        Int      @id
+  id        String   @id
   path      String?
   name      String?  @unique
   component String?
@@ -69,9 +69,10 @@ model menus {
   status    Int      @default(1)
   type      String   @default("menu")
   updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
   authCode  String?
   order     Int      @default(0)
-  parentId  Int?     @default(0)
+  parentId  String?  @default("0")
 
   @@index([parentId])
 }
@@ -199,6 +200,7 @@ model dfmea {
   id                String         @id @default(cuid())
   serialNumber      Int?
   item              String
+  function          String?        @db.Text
   failureMode       String
   effect            String?        @db.Text
   severity          Int
@@ -336,7 +338,7 @@ model quality_records {
   issuePhoto                              String?                     @db.Text
   rectificationPhoto                      String?                     @db.Text
   isClaim                                 Boolean                     @default(false)
-  nonConformanceNumber                    String?
+  nonConformanceNumber                    String?                     @unique
   lastEditor                              String?
   sourceAfterSalesId                      String?
   createdAt                               DateTime                    @default(now())
@@ -450,6 +452,7 @@ model users {
   roleId                                            String
   department                                        String
   status                                            users_status          @default(ACTIVE)
+  avatar                                            String?
   isDeleted                                         Boolean               @default(false)
   createdAt                                         DateTime              @default(now())
   updatedAt                                         DateTime              @updatedAt
@@ -492,7 +495,7 @@ model work_orders {
 }
 
 model qms_task_dispatches {
-  id                                          String          @id
+  id                                          String          @id @default(cuid())
   type                                        String
   title                                       String
   level                                       Int             @default(1)

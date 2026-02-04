@@ -13,9 +13,7 @@ export default defineEventHandler(async (event) => {
   const { all, level, parentId, status } = getQuery(event);
 
   // 确保 ID 类型为 String 且兼容 id/userId 字段
-  const currentUserId = String(
-    userinfo.id ?? (userinfo as Record<string, unknown>).userId,
-  );
+  const currentUserId = String(userinfo.id ?? (userinfo as any).userId);
   const isAdmin =
     userinfo.roles?.includes('super') || userinfo.roles?.includes('admin');
 
@@ -42,7 +40,7 @@ export default defineEventHandler(async (event) => {
         // 否则：如果是管理员且带了 all 参数，查询所有；否则只查指派给自己的
         ...assigneeFilter,
         ...(level ? { level: Number.parseInt(String(level)) } : {}),
-        ...(statusFilter ? { status: statusFilter } : {}),
+        ...(statusFilter ? { status: statusFilter as any } : {}),
 
         // 关键：联动过滤已归档项目 (利用 Prisma Relation)
         AND: [
@@ -69,7 +67,7 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    const result = tasks.map((t) => ({
+    const result = tasks.map((t: any) => ({
       ...t,
       assignorName:
         t.users_qms_task_dispatches_assignorIdTousers?.realName || t.assignorId,

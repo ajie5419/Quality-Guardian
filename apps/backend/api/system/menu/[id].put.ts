@@ -31,23 +31,21 @@ export default defineEventHandler(async (event) => {
     };
 
     if (bodyRecord.status !== undefined) updateData.status = bodyRecord.status;
-    if (bodyRecord.orderNo || bodyRecord.meta?.orderNo)
-      updateData.sort = Number(bodyRecord.orderNo || bodyRecord.meta?.orderNo);
+    if (bodyRecord.orderNo || (bodyRecord.meta as any)?.orderNo)
+      updateData.order = Number(
+        bodyRecord.orderNo || (bodyRecord.meta as any)?.orderNo,
+      );
 
     // Update meta
-    // Since we don't have the current meta easily without fetching, we might overwrite.
-    // Ideally we should merge. But for now, we construct from body.
     if (bodyRecord.meta || bodyRecord.title || bodyRecord.icon) {
-      updateData.meta = {
-        icon: bodyRecord.icon || bodyRecord.meta?.icon,
-        orderNo: Number(bodyRecord.orderNo || bodyRecord.meta?.orderNo || 0),
-        title: bodyRecord.title || bodyRecord.meta?.title,
-        ...bodyRecord.meta,
-      };
-      // Also update icon column if present
-      if (bodyRecord.icon || bodyRecord.meta?.icon) {
-        updateData.icon = bodyRecord.icon || bodyRecord.meta?.icon;
-      }
+      updateData.meta = JSON.stringify({
+        icon: bodyRecord.icon || (bodyRecord.meta as any)?.icon,
+        orderNo: Number(
+          bodyRecord.orderNo || (bodyRecord.meta as any)?.orderNo || 0,
+        ),
+        title: bodyRecord.title || (bodyRecord.meta as any)?.title,
+        ...(bodyRecord.meta as any),
+      });
     }
 
     await prisma.menus.update({

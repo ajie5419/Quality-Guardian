@@ -6,7 +6,7 @@ import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
 
 interface MenuItem {
   id: string;
-  pid?: null | string;
+  parentId?: null | string;
   [key: string]: unknown;
 }
 
@@ -27,8 +27,8 @@ function buildMenuTree(items: MenuItem[]) {
   // Second pass: attach to parents
   items.forEach((item) => {
     const node = map[item.id];
-    if (item.pid && item.pid !== '0' && map[item.pid]) {
-      map[item.pid].children.push(node);
+    if (item.parentId && item.parentId !== '0' && map[item.parentId]) {
+      map[item.parentId].children.push(node);
     } else {
       result.push(node);
     }
@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
   try {
     const menus = await prisma.menus.findMany({
       where: { isDeleted: false },
-      orderBy: { sort: 'asc' },
+      orderBy: { order: 'asc' },
     });
 
     const menuTree = buildMenuTree(menus);

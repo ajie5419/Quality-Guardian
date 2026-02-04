@@ -54,12 +54,9 @@ export default defineEventHandler(async (event) => {
       remark: '', // users table doesn't have remark field yet
     }));
 
-    return usePageResponseSuccess(
-      page as string,
-      pageSize as string,
-      result,
+    return usePageResponseSuccess(page as string, pageSize as string, result, {
       total,
-    );
+    });
   } catch (error) {
     logApiError('list', error);
     return useResponseSuccess([]);

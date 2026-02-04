@@ -199,6 +199,11 @@ defineExpose({
                 width="150"
               />
               <Table.Column
+                :title="t('qms.inspection.records.form.quantity')"
+                data-index="quantity"
+                width="80"
+              />
+              <Table.Column
                 :title="t('qms.inspection.issues.description')"
                 data-index="description"
                 ellipsis
@@ -242,6 +247,11 @@ defineExpose({
                 width="150"
               />
               <Table.Column
+                :title="t('qms.inspection.records.form.quantity')"
+                data-index="quantity"
+                width="80"
+              />
+              <Table.Column
                 :title="t('qms.inspection.issues.description')"
                 data-index="issueDescription"
                 ellipsis
@@ -267,9 +277,18 @@ defineExpose({
             :loading="isDetailLoading"
           >
             <Table.Column
-              :title="t('qms.inspection.records.form.reportDate')"
-              data-index="reportDate"
+              :title="t('qms.inspection.records.form.inspectionDate')"
+              data-index="inspectionDate"
               width="120"
+            >
+              <template #default="{ text }">
+                {{ text ? text.split('T')[0] : '-' }}
+              </template>
+            </Table.Column>
+            <Table.Column
+              :title="t('qms.workOrder.workOrderNumber')"
+              data-index="workOrderNumber"
+              width="140"
             />
             <Table.Column
               :title="t('qms.inspection.records.form.materialName')"

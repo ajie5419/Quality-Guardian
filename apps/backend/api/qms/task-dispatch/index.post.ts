@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (!currentUserId) {
-    const rawId = userinfo.id ?? (userinfo as Record<string, unknown>).userId;
+    const rawId = userinfo.id ?? (userinfo as any).userId;
     if (rawId !== undefined && rawId !== null) {
       currentUserId = String(rawId);
     }
@@ -90,9 +90,9 @@ export default defineEventHandler(async (event) => {
         assigneeId: finalAssigneeId,
         content: body.content,
         priority: body.priority || 2,
-        deadline: body.deadline ? new Date(body.deadline) : null,
+        dueDate: body.deadline ? new Date(body.deadline) : null,
         updatedAt: new Date(),
-      },
+      } as any,
     });
 
     // 如果是二级指派，更新父任务状态
