@@ -1,4 +1,3 @@
-import { getTargetPassRate } from '~/constants/quality-standards';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
@@ -184,7 +183,7 @@ export const DashboardService = {
             SUM(quantity) as totalQty,
             SUM(CASE WHEN result = 'PASS' THEN quantity ELSE 0 END) as qualifiedQty
           FROM inspections 
-          WHERE YEAR(inspectionDate) = ${currentYear} AND isDeleted = 0
+          WHERE YEAR(inspectionDate) = ${currentYear} AND isDeleted = ${false}
           GROUP BY MONTH(inspectionDate)
         `,
         prisma.$queryRaw`
@@ -192,7 +191,7 @@ export const DashboardService = {
             MONTH(date) as month, 
             SUM(quantity) as defectQty
           FROM quality_records
-          WHERE YEAR(date) = ${currentYear} AND isDeleted = 0
+          WHERE YEAR(date) = ${currentYear} AND isDeleted = ${false}
           GROUP BY MONTH(date)
         `,
       ]);
@@ -217,23 +216,31 @@ export const DashboardService = {
         const mIdx = idx + 1;
         // 注意：Prisma raw query 返回 BigInt，需转 Number
         const insp: any =
-          (inspections as any[]).find((r) => r.month === mIdx) || {};
-        const def: any = (defects as any[]).find((r) => r.month === mIdx) || {};
+          (inspections as any[]).find((r) => Number(r.month) === mIdx) || {};
+        const def: any =
+          (defects as any[]).find((r) => Number(r.month) === mIdx) || {};
 
         const total = Number(insp.totalQty) || 0;
         const qualified = Number(insp.qualifiedQty) || 0;
         const defect = Number(def.defectQty) || 0;
 
-        let passRate = getTargetPassRate(); // 使用配置的标准目标
-        if (total > 0) {
+        let passRate: null | number = 100; // Default to 100 if no data
+        if (total > 0 || defect > 0) {
+          // If we have NCRs but no inspections, the pass rate should be 0 or calculated against defects
+          const effectiveTotal = Math.max(total, defect);
           const netQualified = Math.max(0, qualified - defect);
-          passRate = Number(((netQualified / total) * 100).toFixed(1));
+          passRate = Number(((netQualified / effectiveTotal) * 100).toFixed(1));
+        } else if (idx > currentMonthIndex) {
+          // Future months
+          passRate = null;
+        } else {
+          // Current or past months with NO activity - show target or 100
+          passRate = 100;
         }
 
         return {
           period: m,
-          // 未来月份不显示数据
-          passRate: idx > currentMonthIndex ? null : passRate,
+          passRate,
         };
       });
     } catch (error) {

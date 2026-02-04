@@ -14,6 +14,7 @@ export default defineEventHandler(async (event) => {
   const year = query.year ? Number.parseInt(String(query.year)) : undefined;
   const projectName = query.projectName ? String(query.projectName) : undefined;
   const status = query.status ? String(query.status) : undefined;
+  const processName = query.processName ? String(query.processName) : undefined;
   const supplierName = query.supplierName
     ? String(query.supplierName)
     : undefined;
@@ -32,6 +33,7 @@ export default defineEventHandler(async (event) => {
       year,
       projectName,
       status,
+      processName,
       supplierName,
       workOrderNumber,
       page,

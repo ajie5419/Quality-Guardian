@@ -240,6 +240,7 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
           workOrderNumber: formValues?.workOrderNumber as string,
           projectName: formValues?.projectName as string,
           status: formValues?.status as string,
+          processName: formValues?.processName as string,
         });
 
         filteredIssues.value = items;
@@ -252,6 +253,7 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
           workOrderNumber: formValues?.workOrderNumber as string,
           projectName: formValues?.projectName as string,
           status: formValues?.status as string,
+          processName: formValues?.processName as string,
         });
         return { items };
       },

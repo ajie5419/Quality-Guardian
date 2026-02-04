@@ -12,22 +12,67 @@ export const INSPECTION_TABS = [
   { label: '发货检验', value: 'shipment' },
 ];
 
-export const PROCESS_OPTIONS = [
-  { label: '外购件', value: '外购件' },
-  { label: '原材料', value: '原材料' },
-  { label: '辅材', value: '辅材' },
-  { label: '机加成品件', value: '机加成品件' },
-  { label: '下料', value: '下料' },
-  { label: '组对', value: '组对' },
-  { label: '焊接', value: '焊接' },
-  { label: '焊后尺寸', value: '焊后尺寸' },
-  { label: '外观', value: '外观' },
-  { label: '整体拼装', value: '整体拼装' },
-  { label: '组装', value: '组装' },
-  { label: '装配', value: '装配' },
-  { label: '组拼', value: '组拼' },
-  { label: '打砂', value: '打砂' },
-  { label: '喷漆', value: '喷漆' },
+export const getProcessOptions = (t: (key: string) => string) => [
+  {
+    label: t('qms.inspection.records.options.process.outsourced'),
+    value: '外购件',
+  },
+  {
+    label: t('qms.inspection.records.options.process.rawMaterial'),
+    value: '原材料',
+  },
+  {
+    label: t('qms.inspection.records.options.process.auxiliary'),
+    value: '辅材',
+  },
+  {
+    label: t('qms.inspection.records.options.process.machined'),
+    value: '机加成品件',
+  },
+  {
+    label: t('qms.inspection.records.options.process.cutting'),
+    value: '下料',
+  },
+  {
+    label: t('qms.inspection.records.options.process.assembly'),
+    value: '组对',
+  },
+  {
+    label: t('qms.inspection.records.options.process.welding'),
+    value: '焊接',
+  },
+  {
+    label: t('qms.inspection.records.options.process.weldSize'),
+    value: '焊后尺寸',
+  },
+  {
+    label: t('qms.inspection.records.options.process.appearance'),
+    value: '外观',
+  },
+  {
+    label: t('qms.inspection.records.options.process.overallAssembly'),
+    value: '整体拼装',
+  },
+  {
+    label: t('qms.inspection.records.options.process.assembling'),
+    value: '组装',
+  },
+  {
+    label: t('qms.inspection.records.options.process.mounting'),
+    value: '装配',
+  },
+  {
+    label: t('qms.inspection.records.options.process.grouping'),
+    value: '组拼',
+  },
+  {
+    label: t('qms.inspection.records.options.process.sandblasting'),
+    value: '打砂',
+  },
+  {
+    label: t('qms.inspection.records.options.process.painting'),
+    value: '喷漆',
+  },
 ];
 
 export const getColumns = (
@@ -50,20 +95,57 @@ export const getColumns = (
   ];
 
   const typeColumns: Record<string, VxeGridPropTypes.Columns> = {
-    incoming: [
-      { field: 'incomingType', title: '进货类型', width: 100 },
+    [INSPECTION_TYPES.INCOMING.toLowerCase()]: [
+      {
+        field: 'incomingType',
+        title: t('qms.inspection.records.form.incomingType'),
+        width: 100,
+      },
       { field: 'supplierName', title: t('qms.supplier.name'), minWidth: 150 },
-      { field: 'materialName', title: '物料名称', minWidth: 150 },
+      {
+        field: 'materialName',
+        title: t('qms.inspection.records.form.materialName'),
+        minWidth: 150,
+      },
     ],
-    process: [
-      { field: 'processName', title: '工序', width: 100 },
-      { field: 'level1Component', title: '一级部件', width: 120 },
-      { field: 'level2Component', title: '二级部件', width: 120 },
-      { field: 'team', title: '班组', width: 100 },
+    [INSPECTION_TYPES.PROCESS.toLowerCase()]: [
+      {
+        field: 'processName',
+        title: t('qms.inspection.records.form.process'),
+        width: 100,
+      },
+      {
+        field: 'level1Component',
+        title: t('qms.inspection.records.form.level1'),
+        width: 120,
+      },
+      {
+        field: 'level2Component',
+        title: t('qms.inspection.records.form.componentName'),
+        width: 120,
+      },
+      {
+        field: 'team',
+        title: t('qms.inspection.records.form.team'),
+        width: 100,
+      },
     ],
-    shipment: [
-      { field: 'documents', title: '随箱资料', width: 150 },
-      { field: 'packingListArchived', title: '装箱单归档', width: 100 },
+    [INSPECTION_TYPES.SHIPMENT.toLowerCase()]: [
+      {
+        field: 'materialName',
+        title: t('qms.planning.bom.partName'),
+        minWidth: 150,
+      },
+      {
+        field: 'documents',
+        title: t('qms.inspection.records.form.documents'),
+        width: 150,
+      },
+      {
+        field: 'packingListArchived',
+        title: t('qms.inspection.records.form.packingListArchived'),
+        width: 100,
+      },
     ],
   };
 
@@ -93,7 +175,7 @@ export const getColumns = (
   return [...commonColumns, ...(typeColumns[type] || []), ...endColumns];
 };
 
-export const getFormConfig = (type: string) => {
+export const getFormConfig = (type: string, t: (key: string) => string) => {
   const config = {
     showSupplier: false,
     showMaterial: false,
@@ -104,31 +186,34 @@ export const getFormConfig = (type: string) => {
     showTeam: false,
     showDocuments: false,
     showPackingList: false,
+    labels: {
+      materialName: t('qms.inspection.records.form.materialName'),
+    },
   };
 
-  switch (type) {
-    case 'incoming': {
+  const normalizedType = type.toLowerCase();
+
+  switch (normalizedType) {
+    case INSPECTION_TYPES.INCOMING.toLowerCase(): {
       config.showSupplier = true;
       config.showMaterial = true;
       config.showIncomingType = true;
-
       break;
     }
-    case 'process': {
+    case INSPECTION_TYPES.PROCESS.toLowerCase(): {
       config.showProcess = true;
       config.showLevel1 = true;
       config.showLevel2 = true;
       config.showTeam = true;
-
       break;
     }
-    case 'shipment': {
+    case INSPECTION_TYPES.SHIPMENT.toLowerCase(): {
+      config.showMaterial = true;
       config.showDocuments = true;
       config.showPackingList = true;
-
+      config.labels.materialName = t('qms.planning.bom.partName');
       break;
     }
-    // No default
   }
 
   return config;

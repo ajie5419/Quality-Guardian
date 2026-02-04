@@ -289,6 +289,12 @@ const qualityLossDrillDownColumns = shallowRef([
     width: 120,
   },
   {
+    title: t('qms.workOrder.workOrderNumber'),
+    dataIndex: 'workOrderNumber',
+    key: 'workOrderNumber',
+    width: 150,
+  },
+  {
     title: t('qms.inspection.issues.responsibleDepartment'),
     dataIndex: 'dept',
     key: 'dept',

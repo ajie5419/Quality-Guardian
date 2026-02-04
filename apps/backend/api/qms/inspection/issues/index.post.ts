@@ -42,6 +42,7 @@ export default defineEventHandler(async (event) => {
           : undefined,
 
         projectName: body.projectName,
+        processName: body.processName,
         partName: body.partName || 'Unknown',
         division: body.division,
 

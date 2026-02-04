@@ -288,6 +288,7 @@ export const InspectionService = {
   async getIssues(params: {
     page?: number;
     pageSize?: number;
+    processName?: string;
     projectName?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
@@ -297,6 +298,10 @@ export const InspectionService = {
     year?: number;
   }) {
     const where: Record<string, any> = { isDeleted: false };
+
+    if (params.processName) {
+      where.processName = params.processName;
+    }
 
     if (params.year) {
       const start = new Date(`${params.year}-01-01`);

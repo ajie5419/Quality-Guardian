@@ -27,6 +27,7 @@ export function createInitialFormState(inspector = ''): IssueFormState {
     status: DEFAULT_VALUES.DEFAULT_STATUS,
     projectName: '',
     partName: '',
+    processName: '',
     description: '',
     quantity: DEFAULT_VALUES.DEFAULT_QUANTITY,
     rootCause: '',

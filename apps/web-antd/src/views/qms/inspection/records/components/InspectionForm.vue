@@ -25,7 +25,7 @@ import { getItpList, getItpProjectList } from '#/api/qms/planning';
 
 import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
-import { getFormConfig, PROCESS_OPTIONS } from '../config';
+import { getFormConfig, getProcessOptions } from '../config';
 import BomItemSelect from './form/BomItemSelect.vue';
 import TeamSelect from './form/TeamSelect.vue';
 import InspectionItemsTable from './InspectionItemsTable.vue';
@@ -69,7 +69,7 @@ const formState = reactive({
   items: [] as LocalInspectionTaskResult[],
 });
 
-const config = computed(() => getFormConfig(props.type));
+const config = computed(() => getFormConfig(props.type, t));
 
 // 根据进货类型决定供应商数据来源：机加成品件 -> 外协管理，其他 -> 供应商管理
 const supplierCategory = computed(() => {
@@ -294,89 +294,126 @@ defineExpose({
 <template>
   <Form layout="vertical" :model="formState">
     <div class="grid grid-cols-3 gap-4">
-      <Form.Item label="工单号" required>
+      <Form.Item :label="t('qms.workOrder.workOrderNumber')" required>
         <WorkOrderSelect
           v-model:value="formState.workOrderNumber"
           @change="handleWorkOrderChange"
         />
       </Form.Item>
-      <Form.Item label="项目名称">
+      <Form.Item :label="t('qms.workOrder.projectName')">
         <Input v-model:value="formState.projectName" disabled />
       </Form.Item>
       <!-- Dynamic Fields -->
-      <Form.Item v-if="config.showIncomingType" label="进货类型">
+      <Form.Item
+        v-if="config.showIncomingType"
+        :label="t('qms.inspection.records.form.incomingType')"
+      >
         <Select v-model:value="formState.incomingType">
-          <Select.Option value="原材料">原材料</Select.Option>
-          <Select.Option value="外购件">外购件</Select.Option>
-          <Select.Option value="辅材">辅材</Select.Option>
-          <Select.Option value="机加成品件">机加成品件</Select.Option>
+          <Select.Option value="原材料">{{
+            t('qms.inspection.records.options.process.rawMaterial')
+          }}</Select.Option>
+          <Select.Option value="外购件">{{
+            t('qms.inspection.records.options.process.outsourced')
+          }}</Select.Option>
+          <Select.Option value="辅材">{{
+            t('qms.inspection.records.options.process.auxiliary')
+          }}</Select.Option>
+          <Select.Option value="机加成品件">{{
+            t('qms.inspection.records.options.process.machined')
+          }}</Select.Option>
         </Select>
       </Form.Item>
       <Form.Item
         v-if="config.showSupplier"
-        :label="supplierCategory === 'Outsourcing' ? '外协单位' : '供应商'"
+        :label="
+          supplierCategory === 'Outsourcing'
+            ? t('qms.outsourcing.entityName')
+            : t('qms.supplier.name')
+        "
       >
         <SupplierSelect
           v-model:value="formState.supplierName"
           :category="supplierCategory"
           :placeholder="
             supplierCategory === 'Outsourcing'
-              ? '请选择外协单位'
-              : '请选择供应商'
+              ? t('afterSales.placeholder.selectSupplier')
+              : t('afterSales.placeholder.selectSupplier')
           "
         />
       </Form.Item>
-      <Form.Item v-if="config.showMaterial" label="物料名称">
+      <Form.Item v-if="config.showMaterial" :label="config.labels.materialName">
         <Input v-model:value="formState.materialName" />
       </Form.Item>
 
-      <Form.Item v-if="config.showProcess" label="工序">
+      <Form.Item
+        v-if="config.showProcess"
+        :label="t('qms.inspection.records.form.process')"
+      >
         <Select
           v-model:value="formState.processName"
-          :options="PROCESS_OPTIONS"
+          :options="getProcessOptions(t)"
         />
       </Form.Item>
-      <Form.Item v-if="config.showLevel1" label="一级部件">
+      <Form.Item
+        v-if="config.showLevel1"
+        :label="t('qms.inspection.records.form.level1')"
+      >
         <BomItemSelect
           v-model:value="formState.level1Component"
           :work-order-number="formState.workOrderNumber"
         />
       </Form.Item>
-      <Form.Item v-if="config.showLevel2" label="二级部件">
+      <Form.Item
+        v-if="config.showLevel2"
+        :label="t('qms.inspection.records.form.componentName')"
+      >
         <Input v-model:value="formState.level2Component" />
       </Form.Item>
-      <Form.Item v-if="config.showTeam" label="班组">
+      <Form.Item
+        v-if="config.showTeam"
+        :label="t('qms.inspection.records.form.team')"
+      >
         <TeamSelect v-model:value="formState.team" />
       </Form.Item>
 
-      <Form.Item v-if="config.showDocuments" label="随箱资料">
+      <Form.Item
+        v-if="config.showDocuments"
+        :label="t('qms.inspection.records.form.documents')"
+      >
         <Input v-model:value="formState.documents" />
       </Form.Item>
-      <Form.Item v-if="config.showPackingList" label="装箱单归档">
+      <Form.Item
+        v-if="config.showPackingList"
+        :label="t('qms.inspection.records.form.packingListArchived')"
+      >
         <Select v-model:value="formState.packingListArchived">
-          <Select.Option value="是">是</Select.Option>
-          <Select.Option value="否">否</Select.Option>
+          <Select.Option value="是">{{
+            t('common.yes') || '是'
+          }}</Select.Option>
+          <Select.Option value="否">{{ t('common.no') || '否' }}</Select.Option>
         </Select>
       </Form.Item>
 
       <!-- Common -->
-      <Form.Item label="数量">
+      <Form.Item :label="t('qms.workOrder.quantity')">
         <InputNumber v-model:value="formState.quantity" class="w-full" />
       </Form.Item>
-      <Form.Item label="检验日期">
+      <Form.Item :label="t('qms.inspection.issues.reportDate')">
         <DatePicker
           v-model:value="formState.inspectionDate"
           value-format="YYYY-MM-DD"
           class="w-full"
         />
       </Form.Item>
-      <Form.Item label="检验员">
+      <Form.Item :label="t('qms.inspection.issues.reportedBy')">
         <Input v-model:value="formState.inspector" />
       </Form.Item>
     </div>
 
     <div v-if="formState.items.length > 0">
-      <Divider orientation="left">检验项目 (ITP)</Divider>
+      <Divider orientation="left">{{
+        t('qms.inspection.records.relatedItp')
+      }}</Divider>
       <InspectionItemsTable v-model:data-source="formState.items" />
     </div>
 
@@ -390,7 +427,7 @@ defineExpose({
     </Form.Item>
 
     <div class="mt-4 rounded bg-gray-50 p-4">
-      <Form.Item label="最终结果">
+      <Form.Item :label="t('qms.inspection.records.form.overallResult')">
         <Select v-model:value="formState.result" class="w-32">
           <Select.Option value="PASS"
             ><Tag color="green">{{

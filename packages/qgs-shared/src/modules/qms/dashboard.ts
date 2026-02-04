@@ -88,6 +88,7 @@ export interface QualityLossDrillDownItem {
   desc: string;
   id: string;
   type: string;
+  workOrderNumber?: string;
 }
 
 /**

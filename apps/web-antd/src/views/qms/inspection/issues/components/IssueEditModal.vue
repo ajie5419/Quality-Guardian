@@ -56,6 +56,14 @@ const rules = computed(() => ({
       ]),
     },
   ],
+  processName: [
+    {
+      required: true,
+      message: t('ui.formRules.selectRequired', [
+        t('qms.inspection.issues.processName'),
+      ]),
+    },
+  ],
   quantity: [
     {
       required: true,

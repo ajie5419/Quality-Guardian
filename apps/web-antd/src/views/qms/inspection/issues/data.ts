@@ -40,6 +40,24 @@ export const searchFormSchema: VbenFormSchema[] = [
     },
     colProps: { span: 4 },
   },
+  {
+    fieldName: 'processName',
+    label: $t('qms.inspection.issues.processName'),
+    component: 'Select',
+    componentProps: {
+      options: [
+        { label: '设计', value: '设计' },
+        { label: '下料', value: '下料' },
+        { label: '组对', value: '组对' },
+        { label: '焊接', value: '焊接' },
+        { label: '机加', value: '机加' },
+        { label: '涂装', value: '涂装' },
+        { label: '组装', value: '组装' },
+        { label: '成品检验', value: '成品检验' },
+      ],
+    },
+    colProps: { span: 4 },
+  },
 ] as unknown as VbenFormSchema[];
 
 export const gridColumns: VxeGridProps['columns'] = [
@@ -65,6 +83,12 @@ export const gridColumns: VxeGridProps['columns'] = [
   {
     field: 'defectType',
     title: $t('qms.inspection.issues.defectType'),
+    width: 120,
+    sortable: true,
+  },
+  {
+    field: 'processName',
+    title: $t('qms.inspection.issues.processName'),
     width: 120,
     sortable: true,
   },

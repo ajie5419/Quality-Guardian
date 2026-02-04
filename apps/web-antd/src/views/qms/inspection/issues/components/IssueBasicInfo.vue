@@ -11,6 +11,7 @@ import {
   FormItemRest,
   Input,
   InputNumber,
+  Select,
   Switch,
   TreeSelect,
 } from 'ant-design-vue';
@@ -33,6 +34,17 @@ const formState = defineModel<IssueFormState>('formState', { required: true });
 const isAutoNc = defineModel<boolean>('isAutoNc', { default: false });
 
 const { t } = useI18n();
+
+const processOptions = [
+  { label: '设计', value: '设计' },
+  { label: '下料', value: '下料' },
+  { label: '组对', value: '组对' },
+  { label: '焊接', value: '焊接' },
+  { label: '机加', value: '机加' },
+  { label: '涂装', value: '涂装' },
+  { label: '组装', value: '组装' },
+  { label: '成品检验', value: '成品检验' },
+];
 
 // 辅助函数：根据 ID 查找部门名称
 function findDeptTitle(tree: DeptNode[], value?: string): string | undefined {
@@ -151,6 +163,20 @@ function handleWorkOrderChange(val: any, option: any) {
       <Input
         v-model:value="formState.partName"
         :placeholder="t('qms.inspection.issues.inputPartName')"
+      />
+    </FormItem>
+
+    <!-- 所属工序 -->
+    <FormItem
+      :label="t('qms.inspection.issues.processName')"
+      name="processName"
+    >
+      <Select
+        v-model:value="formState.processName"
+        :placeholder="t('common.pleaseSelect')"
+        :options="processOptions"
+        allow-clear
+        show-search
       />
     </FormItem>
 

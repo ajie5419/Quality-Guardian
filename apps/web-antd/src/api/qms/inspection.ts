@@ -21,6 +21,7 @@ export * from '@qgs/shared';
 export async function getInspectionIssues(params?: {
   page?: number;
   pageSize?: number;
+  processName?: string;
   projectName?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';

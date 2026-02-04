@@ -152,7 +152,7 @@ const [Grid, gridApi] = useVbenVxeGrid({
       },
       {
         field: 'status',
-        title: '资料情况',
+        title: t('qms.inspection.records.form.documents'),
         width: 100,
         slots: { default: 'status' },
       },
@@ -210,6 +210,10 @@ async function loadRecords() {
 
         const itemProjectName = getField(item, 'projectName');
         const itemWorkOrderNumber = getField(item, 'workOrderNumber');
+        const type = getField(item, 'type') || getField(item, 'category');
+
+        // Exclude Shipment records as per user request
+        if (type === 'SHIPMENT') return false;
 
         return (
           (pName && itemProjectName && itemProjectName.includes(pName)) ||
@@ -219,12 +223,12 @@ async function loadRecords() {
       .map((item) => {
         const category = getField(item, 'category');
         const type = getField(item, 'type');
-        const recordType = category || type;
+        const recordType = (category || type || '').toUpperCase();
 
         let displayCategory = t('common.other');
         switch (recordType) {
           case 'FINAL': {
-            displayCategory = '成品检验';
+            displayCategory = t('qms.inspection.records.tab.detailed');
             break;
           }
           case 'INCOMING': {
@@ -244,19 +248,29 @@ async function loadRecords() {
           }
         }
 
-        return {
-          id: item.id,
-          category: displayCategory,
-          name:
+        // Logic: INCOMING -> materialName, PROCESS -> level2Component
+        let displayName = '-';
+        if (recordType === 'INCOMING') {
+          displayName = getField(item, 'materialName') || '-';
+        } else if (recordType === 'PROCESS') {
+          displayName = getField(item, 'level2Component') || '-';
+        } else {
+          displayName =
             getField(item, 'materialName') ||
             getField(item, 'componentName') ||
             getField(item, 'partName') ||
-            '未命名',
+            '-';
+        }
+
+        return {
+          id: item.id,
+          category: displayCategory,
+          name: displayName,
           inspector:
             getField(item, 'inspector') || getField(item, 'reporter') || '-',
           supplier:
             getField(item, 'supplierName') || getField(item, 'team') || '-',
-          status: getField(item, 'status') || '已归档',
+          status: getField(item, 'status') || t('qms.planning.status.archived'),
           reportDate: (
             getField(item, 'reportDate') ||
             getField(item, 'inspectionDate') ||

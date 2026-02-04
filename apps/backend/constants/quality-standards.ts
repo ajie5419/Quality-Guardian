@@ -6,6 +6,7 @@
 // 工序默认缺陷率指标 (单位: %)
 export const PROCESS_DEFECT_TARGETS: Record<string, number> = {
   // 原材料/外购
+  设计: 0.1, // 新增：设计工序指标
   原材料: 0.2,
   辅材: 0.1,
   外购件: 0.2,

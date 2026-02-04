@@ -348,6 +348,7 @@
       "description": "问题描述",
       "rootCause": "原因分析",
       "solution": "解决方案",
+      "processName": "所属工序",
       "lossAmount": "损失金额",
       "reportedBy": "检验员",
       "claim": "索赔",

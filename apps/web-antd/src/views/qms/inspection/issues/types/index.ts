@@ -59,6 +59,7 @@ export interface InspectionIssue {
   workOrderNumber: string;
   projectName: string;
   partName: string;
+  processName?: string;
   description: string;
   quantity: number;
   defectType?: string;
