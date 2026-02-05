@@ -21,16 +21,27 @@ export default defineEventHandler(async (event) => {
       const range = getPeriodRangeFromTrend(period, granularity);
       if (!range) return useResponseSuccess({ drillDown: [], period });
 
-      const { manualLosses, internalLosses, externalLosses } =
-        await QualityLossService.getDrillDown(range.start, range.end);
-
       const formatDate = (date: Date) => {
         const y = date.getFullYear();
         const m = String(date.getMonth() + 1).padStart(2, '0');
         const d = String(date.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
       };
-      const details: any[] = [];
+      const { manualLosses, internalLosses, externalLosses } =
+        await QualityLossService.getDrillDown(range.start, range.end);
+
+      interface LossDetail {
+        id: string;
+        date: string;
+        type: 'EXTERNAL' | 'INTERNAL' | 'MANUAL';
+        amount: number;
+        dept: string;
+        desc: string;
+        workOrderNumber: string;
+        source: string;
+        _ts: number;
+      }
+      const details: LossDetail[] = [];
 
       manualLosses.forEach((item) => {
         const amount = Number(item.amount);
@@ -86,10 +97,12 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(
       await QualityLossService.getTrendData(granularity as 'month' | 'week'),
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
     logApiError('quality-loss-trend', error);
     return useResponseError(
-      `Failed to fetch quality loss trend: ${error.message}`,
+      `Failed to fetch quality loss trend: ${errorMessage}`,
     );
   }
 });

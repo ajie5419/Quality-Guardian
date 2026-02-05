@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     // 关键修复：改为局部更新逻辑，防止 undefined 覆盖原有数据库字段
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
     };
 
@@ -30,13 +30,11 @@ export default defineEventHandler(async (event) => {
       data: updateData,
     });
 
-    return {
-      code: 0,
-      data: updatedProject,
-      message: 'ok',
-    };
-  } catch (error) {
+    return useResponseSuccess(updatedProject);
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
     logApiError('projects', error);
-    return { code: -1, message: '更新失败' };
+    return useResponseError(`更新失败: ${errorMessage}`);
   }
 });

@@ -64,11 +64,10 @@ export default defineEventHandler(async (event) => {
     ];
     fields.forEach((f) => {
       if (bodyRecord[f] !== undefined) {
-        if (f === 'photos' && Array.isArray(bodyRecord[f])) {
-          updateData[f] = JSON.stringify(bodyRecord[f]);
-        } else {
-          updateData[f] = bodyRecord[f];
-        }
+        updateData[f] =
+          f === 'photos' && Array.isArray(bodyRecord[f])
+            ? JSON.stringify(bodyRecord[f])
+            : bodyRecord[f];
       }
     });
 

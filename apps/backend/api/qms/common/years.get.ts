@@ -7,12 +7,15 @@ export default defineEventHandler(async () => {
   try {
     // 使用原生 SQL 获取所有工单交付日期的去重年份
     // 之前已经在 schema.prisma 中为 deliveryDate 建立了索引，查询效率极高
-    const result: any[] = await prisma.$queryRaw`
+    interface YearRow {
+      year: bigint | number;
+    }
+    const result = (await prisma.$queryRaw`
       SELECT DISTINCT YEAR(deliveryDate) as year 
       FROM work_orders 
       WHERE isDeleted = false 
       ORDER BY year DESC
-    `;
+    `) as YearRow[];
 
     // 如果数据库为空，默认返回当前年份，确保 UI 稳定性
     const currentYear = new Date().getFullYear();

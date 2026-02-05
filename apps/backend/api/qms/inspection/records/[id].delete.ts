@@ -9,7 +9,9 @@ export default defineEventHandler(async (event) => {
   try {
     await InspectionService.delete(id);
     return useResponseSuccess(null);
-  } catch (error: any) {
-    return useResponseError(error.message);
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return useResponseError(errorMessage);
   }
 });

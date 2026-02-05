@@ -1,3 +1,5 @@
+import type { inspection_result } from '@prisma/client';
+
 import prisma from '~/utils/prisma';
 
 interface InspectionItemInput {
@@ -62,8 +64,8 @@ export const InspectionService = {
   /**
    * Determine single item result
    */
-  determineItemResult(item: InspectionItemInput): 'FAIL' | 'PASS' {
-    if (item.result === 'NA') return 'NA' as any; // Prisma enum issue if strict typing
+  determineItemResult(item: InspectionItemInput): inspection_result {
+    if (item.result === 'NA') return 'NA' as inspection_result;
     // If manual result is provided and valid, use it (especially for qualitative)
     if (['CONDITIONAL', 'FAIL', 'PASS'].includes(item.result || '')) {
       // If quantitative, we might want to double check, but trust frontend for now or implement strict check
@@ -81,7 +83,7 @@ export const InspectionService = {
           return 'FAIL';
         }
       }
-      return item.result as 'FAIL' | 'PASS';
+      return (item.result as inspection_result) || 'PASS';
     }
     return 'PASS';
   },
@@ -190,7 +192,7 @@ export const InspectionService = {
                 item.measuredValue !== undefined && item.measuredValue !== null
                   ? String(item.measuredValue)
                   : null,
-              result: (item.result as any) || 'PASS',
+              result: (item.result as inspection_result) || 'PASS',
               remarks: item.remarks,
               order: item.order || 0,
             })),
@@ -210,6 +212,8 @@ export const InspectionService = {
         where: { id },
         data: {
           // Update allowed fields
+          workOrderNumber: data.workOrderNumber,
+          projectName: data.projectName,
           supplierName: data.supplierName,
           materialName: data.materialName,
           incomingType: data.incomingType,
@@ -260,7 +264,7 @@ export const InspectionService = {
               item.measuredValue !== undefined && item.measuredValue !== null
                 ? String(item.measuredValue)
                 : null,
-            result: (item.result as any) || 'PASS',
+            result: (item.result as inspection_result) || 'PASS',
             remarks: item.remarks,
             order: item.order || 0,
           })),
@@ -297,7 +301,7 @@ export const InspectionService = {
     workOrderNumber?: string;
     year?: number;
   }) {
-    const where: Record<string, any> = { isDeleted: false };
+    const where: Record<string, unknown> = { isDeleted: false };
 
     if (params.processName) {
       where.processName = params.processName;
@@ -339,7 +343,7 @@ export const InspectionService = {
 
     // Map sortBy to actual prisma fields if necessary
     // For now we assume they match or handle specific ones
-    const orderBy: any = {};
+    const orderBy: Record<string, 'asc' | 'desc'> = {};
     if (sortBy === 'ncNumber') {
       orderBy.nonConformanceNumber = sortOrder;
     } else {
@@ -374,7 +378,7 @@ export const InspectionService = {
         reportDate: issue.date ? issue.date.toISOString().split('T')[0] : '',
         claim: issue.isClaim ? 'Yes' : 'No',
         photos,
-        severity: (issue as any).severity || 'Minor', // Default to Minor if null
+        severity: (issue.severity as 'Critical' | 'Major' | 'Minor') || 'Minor', // Default to Minor if null
       };
     });
 
@@ -382,7 +386,7 @@ export const InspectionService = {
   },
 
   async getIssueStats(year?: number): Promise<IssueStats> {
-    const where: Record<string, any> = { isDeleted: false };
+    const where: Record<string, unknown> = { isDeleted: false };
     const currentYear = year || new Date().getFullYear();
 
     if (currentYear) {

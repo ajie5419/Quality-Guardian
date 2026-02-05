@@ -31,7 +31,12 @@ export default defineEventHandler(async (event) => {
         const id = `QR-${Date.now()}-${Math.random().toString(36).slice(-4)}`;
 
         // 状态映射
-        let status: any = 'OPEN';
+        type QualityRecordStatus =
+          | 'CLOSED'
+          | 'IN_PROGRESS'
+          | 'OPEN'
+          | 'RESOLVED';
+        let status: QualityRecordStatus = 'OPEN';
         const s = String(item.status || '').toUpperCase();
         if (s.includes('CLOSE') || s.includes('解决')) status = 'RESOLVED';
         if (s.includes('PROGRESS') || s.includes('处理'))

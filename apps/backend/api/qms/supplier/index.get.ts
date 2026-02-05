@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
     const query = getQuery(event);
 
     // 1. 规范化参数 (防御所有非法输入)
-    const getSafe = (val: any) => {
+    const getSafe = (val: unknown): string | undefined => {
       const s = String(Array.isArray(val) ? val[0] : (val ?? '')).trim();
       if (!s || s === 'undefined' || s === 'null' || s === '[object Object]')
         return undefined;
@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
     const sortOrder = getSafe(query.sortOrder) as 'asc' | 'desc' | undefined;
 
     // 2. 构造极其稳健的过滤条件
-    const where: any = { isDeleted: false };
+    const where: Record<string, unknown> = { isDeleted: false };
     if (category) {
       const cat = category.toLowerCase();
       if (cat === 'supplier' || cat === 'productionunit') {
@@ -73,7 +73,7 @@ export default defineEventHandler(async (event) => {
     ]);
 
     // 4. 安全的数据映射
-    const listData = rawItems.map((item: any) => ({
+    const listData = rawItems.map((item) => ({
       ...item,
       qualityScore: item.qualityScore ?? 100,
       level: item.rating || 'A',
@@ -440,9 +440,16 @@ export default defineEventHandler(async (event) => {
       };
     });
 
+    interface SupplierListItem extends Record<string, unknown> {
+      name: string;
+      status: string;
+      qualityScore: number;
+      [key: string]: unknown;
+    }
+
     // 7. [Dynamic Sorting]
     if (sortBy && sortOrder) {
-      processedFullList.sort((a: any, b: any) => {
+      (processedFullList as SupplierListItem[]).sort((a, b) => {
         const valA = a[sortBy];
         const valB = b[sortBy];
 
@@ -487,7 +494,7 @@ export default defineEventHandler(async (event) => {
       total: totalCount,
       stats: globalStats,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logApiError('supplier', error);
     return useResponseSuccess({ items: [], total: 0, stats: { total: 0 } });
   }

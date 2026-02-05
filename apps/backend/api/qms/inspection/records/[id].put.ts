@@ -10,7 +10,9 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event);
     const result = await InspectionService.update(id, body);
     return useResponseSuccess(result);
-  } catch (error: any) {
-    return useResponseError(error.message);
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return useResponseError(errorMessage);
   }
 });

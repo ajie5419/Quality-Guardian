@@ -27,14 +27,15 @@ export default defineEventHandler(async (event) => {
     else status = 'OPEN';
 
     // Ensure ID logic is clean
-    const newId = `ISS-2024-${Date.now()}`;
+    const currentYear = new Date().getFullYear();
+    const newId = `ISS-${currentYear}-${Date.now()}`;
 
     const newRecord = await prisma.quality_records.create({
       data: {
         id: newId,
         serialNumber: Math.floor(Date.now() / 1000),
         date: new Date(body.reportDate || Date.now()),
-        status: status as any,
+        status: status as 'CLOSED' | 'IN_PROGRESS' | 'OPEN',
         nonConformanceNumber: body.ncNumber || null,
 
         work_orders: body.workOrderNumber

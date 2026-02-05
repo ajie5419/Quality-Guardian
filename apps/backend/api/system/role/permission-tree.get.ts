@@ -49,7 +49,15 @@ export default defineEventHandler(async (event) => {
     };
 
     // 4. 递归构建树 - 不做任何过滤，显示所有节点
-    const buildTree = (parentId: string = '0'): any[] => {
+    interface PermissionNode {
+      title: string;
+      key: string;
+      menuId: string;
+      type: string;
+      children?: PermissionNode[];
+    }
+
+    const buildTree = (parentId: string = '0'): PermissionNode[] => {
       const children = allMenus.filter((m) => m.parentId === parentId);
 
       return children.map((menu) => {
@@ -58,7 +66,7 @@ export default defineEventHandler(async (event) => {
 
         // 核心：每个节点都使用 authCode 作为 key（如果有）
         // 这样勾选时保存的就是权限码
-        const node: any = {
+        const node: PermissionNode = {
           title: `${typeLabel} ${title}`,
           // 如果有 authCode 就用它，没有就用 MENU_ID 前缀
           key: menu.authCode || `MENU_${menu.id}`,
@@ -84,7 +92,7 @@ export default defineEventHandler(async (event) => {
     );
 
     return useResponseSuccess(permissionTree);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logApiError('permission-tree', error);
     return useResponseSuccess([]);
   }

@@ -56,6 +56,8 @@ export default defineEventHandler(async (event) => {
 
     if (bodyRecord.ncNumber !== undefined)
       updateData.nonConformanceNumber = bodyRecord.ncNumber || null;
+    if (bodyRecord.workOrderNumber)
+      updateData.workOrderNumber = bodyRecord.workOrderNumber;
     if (bodyRecord.projectName) updateData.projectName = bodyRecord.projectName;
     if (bodyRecord.processName) updateData.processName = bodyRecord.processName; // Added processName
     if (bodyRecord.partName) updateData.partName = bodyRecord.partName;

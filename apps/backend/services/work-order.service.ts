@@ -63,7 +63,7 @@ export const WorkOrderService = {
       } = getYearDateRange(year);
 
       // 2. 构建基础查询条件
-      const whereCondition: any = {
+      const whereCondition: Record<string, unknown> = {
         isDeleted: false,
       };
 

@@ -117,9 +117,14 @@ export default defineEventHandler(async (event) => {
     };
 
     return useResponseSuccess(reportData);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
     logApiError('summary', error);
-    return { code: -1, message: `报告生成失败: ${error.message}` };
+    return useResponseSuccess({
+      code: -1,
+      message: `报告生成失败: ${errorMessage}`,
+    });
   }
 });
 
@@ -190,6 +195,12 @@ async function fetchPeriodMetrics(start: Date, end: Date) {
 
 async function fetchProcessPassRates(start: Date, end: Date) {
   try {
+    interface ProcessPassRateRow {
+      processName: null | string;
+      category: null | string;
+      total: bigint | number;
+      passed: bigint | number;
+    }
     const rows = (await prisma.$queryRaw`
       SELECT 
         processName,
@@ -199,7 +210,7 @@ async function fetchProcessPassRates(start: Date, end: Date) {
       FROM inspections
       WHERE inspectionDate >= ${start} AND inspectionDate <= ${end} AND isDeleted = 0
       GROUP BY processName, category
-    `) as any[];
+    `) as ProcessPassRateRow[];
 
     return rows.map((row) => {
       const total = Number(row.total);

@@ -73,12 +73,13 @@ export interface UploadChangeInfo {
 /**
  * 上传文件（带响应）
  */
-export interface UploadFileWithResponse extends UploadFile {
+export interface UploadFileWithResponse extends Omit<UploadFile, 'response'> {
   response?: {
     code?: number;
     data?: {
       url?: string;
     };
+    message?: string;
   };
 }
 

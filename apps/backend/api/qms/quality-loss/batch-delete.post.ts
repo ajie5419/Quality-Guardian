@@ -8,7 +8,9 @@ export default defineEventHandler(async (event) => {
     const { ids } = body;
     const result = await QualityLossService.batchDelete(ids);
     return useResponseSuccess({ successCount: result.count });
-  } catch (error: any) {
-    return useResponseError(error.message);
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return useResponseError(errorMessage);
   }
 });

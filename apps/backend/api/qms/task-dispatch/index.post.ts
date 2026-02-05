@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (!currentUserId) {
-    const rawId = userinfo.id ?? (userinfo as any).userId;
+    const rawId = userinfo.id ?? userinfo.userId;
     if (rawId !== undefined && rawId !== null) {
       currentUserId = String(rawId);
     }
@@ -80,19 +80,19 @@ export default defineEventHandler(async (event) => {
 
     const newTask = await prisma.qms_task_dispatches.create({
       data: {
-        type: body.type,
-        title: body.title,
-        level: body.level || 1,
-        parentId: body.parentId,
+        type: String(body.type),
+        title: String(body.title),
+        level: Number(body.level) || 1,
+        parentId: body.parentId ? String(body.parentId) : null,
         itpProjectId: body.itpProjectId ? String(body.itpProjectId) : null,
         dfmeaId: body.dfmeaId ? String(body.dfmeaId) : null,
         assignorId: finalAssignorId,
         assigneeId: finalAssigneeId,
-        content: body.content,
-        priority: body.priority || 2,
+        content: body.content ? String(body.content) : null,
+        priority: Number(body.priority) || 2,
         dueDate: body.deadline ? new Date(body.deadline) : null,
         updatedAt: new Date(),
-      } as any,
+      },
     });
 
     // 如果是二级指派，更新父任务状态

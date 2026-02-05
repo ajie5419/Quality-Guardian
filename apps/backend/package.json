@@ -16,6 +16,7 @@
     "dev": "cross-env PORT=5320 nitro dev",
     "start": "nitro dev",
     "stub": "nitro prepare",
+    "typecheck": "tsc --noEmit",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio"

@@ -1,3 +1,5 @@
+import type { UserSession } from '~/utils/jwt-utils';
+
 import bcrypt from 'bcrypt';
 import { generateAccessToken, generateRefreshToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -33,7 +35,7 @@ export const AuthService = {
     }
 
     // 3. Payload
-    const userPayload = {
+    const userPayload: UserSession = {
       avatar: '/uploads/avatar-v1.svg',
       id: user.id,
       realName: user.realName,
@@ -43,8 +45,8 @@ export const AuthService = {
       deptName,
     };
 
-    const accessToken = generateAccessToken(userPayload as any);
-    const refreshToken = generateRefreshToken(userPayload as any);
+    const accessToken = generateAccessToken(userPayload);
+    const refreshToken = generateRefreshToken(userPayload);
 
     return { userPayload, accessToken, refreshToken };
   },

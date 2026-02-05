@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event);
 
   try {
-    const dataUpdate: any = {};
+    const dataUpdate: Record<string, unknown> = {};
     if (body.status) dataUpdate.status = body.status;
     if (body.totalInspections !== undefined)
       dataUpdate.totalInspections = Number(body.totalInspections);
@@ -32,8 +32,10 @@ export default defineEventHandler(async (event) => {
       ...updated,
       date: updated.date.toISOString().split('T')[0],
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
     logApiError('reports', error);
-    return useResponseError(`Update failed: ${error.message}`);
+    return useResponseError(`Update failed: ${errorMessage}`);
   }
 });

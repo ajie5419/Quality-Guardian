@@ -15,6 +15,7 @@ export interface UserSession {
   password?: string;
   homePath?: string;
   avatar?: string;
+  deptName?: string;
 }
 
 export interface UserPayload extends UserSession {

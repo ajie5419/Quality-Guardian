@@ -11,6 +11,18 @@ export default defineEventHandler(async (event) => {
     return useResponseError('参数错误：需要 projectId 和 items 数组');
   }
 
+  interface ItpImportItem {
+    processStep?: string;
+    activity?: string;
+    controlPoint?: string;
+    acceptanceCriteria?: string;
+    referenceDoc?: string;
+    frequency?: string;
+    verifyingDocument?: string;
+    isQuantitative?: boolean | number;
+    quantitativeItems?: unknown[];
+  }
+
   try {
     const plan = await prisma.quality_plans.findUnique({
       where: { id: projectId },
@@ -24,7 +36,7 @@ export default defineEventHandler(async (event) => {
     const existingCount = plan.items.length;
 
     // 关键修复：改为向 itp_items 物理表批量插入数据
-    const newItems = items.map((item: any, index: number) => ({
+    const newItems = (items as ItpImportItem[]).map((item, index) => ({
       projectId,
       processStep: item.processStep || '组对',
       activity: item.activity || '',
@@ -48,7 +60,8 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error: unknown) {
     logApiError('import', error);
-    const axiosError = error as { message?: string };
-    return useResponseError(`导入失败: ${axiosError.message}`);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return useResponseError(`导入失败: ${errorMessage}`);
   }
 });

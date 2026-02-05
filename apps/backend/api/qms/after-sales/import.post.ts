@@ -31,10 +31,18 @@ export default defineEventHandler(async (event) => {
         const id = `AS-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
         // Validate Status using Shared Constants
-        let status = 'OPEN';
-        if (item.status && QMS_STATUS_COLOR_MAP[item.status]) {
+        type AfterSalesStatus =
+          | 'CANCELLED'
+          | 'COMPLETED'
+          | 'IN_PROGRESS'
+          | 'OPEN';
+        let status: AfterSalesStatus = 'OPEN';
+        if (
+          item.status &&
+          QMS_STATUS_COLOR_MAP[item.status as keyof typeof QMS_STATUS_COLOR_MAP]
+        ) {
           // If the status key itself is passed (e.g. IN_PROGRESS)
-          status = item.status;
+          status = item.status as AfterSalesStatus;
         }
 
         await prisma.after_sales.create({
@@ -42,7 +50,7 @@ export default defineEventHandler(async (event) => {
             id,
             serialNumber: Math.floor(Math.random() * 1_000_000),
             occurDate: new Date(item.issueDate || item.occurDate || Date.now()),
-            claimStatus: status as any,
+            claimStatus: status,
             projectName: String(item.projectName || ''),
             customerName: String(item.customerName || ''),
             workOrderNumber: woNumber,

@@ -44,8 +44,10 @@ export default defineEventHandler(async (event) => {
       .map((t) => t.trim());
 
     return useResponseSuccess(finalTags);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
     logApiError('extract-tags', error);
-    return useResponseError(`AI 提取标签失败: ${error.message}`);
+    return useResponseError(`AI 提取标签失败: ${errorMessage}`);
   }
 });

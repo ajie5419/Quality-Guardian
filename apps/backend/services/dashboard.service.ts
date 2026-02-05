@@ -175,8 +175,17 @@ export const DashboardService = {
   async getMonthlyTrend() {
     const currentYear = new Date().getFullYear();
     try {
+      interface MonthInspecResult {
+        month: bigint | number;
+        totalQty: bigint | number;
+        qualifiedQty: bigint | number;
+      }
+      interface MonthDefectResult {
+        month: bigint | number;
+        defectQty: bigint | number;
+      }
       // 使用 raw query 聚合按月统计，性能更佳
-      const [inspections, defects] = await Promise.all([
+      const [inspections, defects] = (await Promise.all([
         prisma.$queryRaw`
           SELECT 
             MONTH(inspectionDate) as month, 
@@ -194,7 +203,7 @@ export const DashboardService = {
           WHERE YEAR(date) = ${currentYear} AND isDeleted = ${false}
           GROUP BY MONTH(date)
         `,
-      ]);
+      ])) as [MonthInspecResult[], MonthDefectResult[]];
 
       const months = [
         '1月',
@@ -214,15 +223,12 @@ export const DashboardService = {
 
       return months.map((m, idx) => {
         const mIdx = idx + 1;
-        // 注意：Prisma raw query 返回 BigInt，需转 Number
-        const insp: any =
-          (inspections as any[]).find((r) => Number(r.month) === mIdx) || {};
-        const def: any =
-          (defects as any[]).find((r) => Number(r.month) === mIdx) || {};
+        const insp = inspections.find((r) => Number(r.month) === mIdx);
+        const def = defects.find((r) => Number(r.month) === mIdx);
 
-        const total = Number(insp.totalQty) || 0;
-        const qualified = Number(insp.qualifiedQty) || 0;
-        const defect = Number(def.defectQty) || 0;
+        const total = Number(insp?.totalQty || 0);
+        const qualified = Number(insp?.qualifiedQty || 0);
+        const defect = Number(def?.defectQty || 0);
 
         let passRate: null | number = 100; // Default to 100 if no data
         if (total > 0 || defect > 0) {

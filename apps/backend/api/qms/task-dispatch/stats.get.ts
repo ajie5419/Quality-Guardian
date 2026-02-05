@@ -10,21 +10,21 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const currentUserId = String(userinfo.id ?? (userinfo as any).userId);
+  const currentUserId = String(userinfo.id ?? userinfo.userId);
 
   // 定义归档项目过滤条件
-  const archiveFilter = {
+  const archiveFilter: any = {
     AND: [
       {
         OR: [
           { itpProjectId: null },
-          { itp_project: { planStatus: { not: 'ARCHIVED' as any } } },
+          { itp_project: { planStatus: { not: 'ARCHIVED' } } },
         ],
       },
       {
         OR: [
           { dfmeaId: null },
-          { dfmea_project: { status: { not: 'archived' as any } } },
+          { dfmea_project: { status: { not: 'archived' } } },
         ],
       },
     ],

@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event);
 
     // 局部更新逻辑
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
     };
 
@@ -51,19 +51,21 @@ export default defineEventHandler(async (event) => {
       updateData.status = mapWorkOrderStatus(body.status);
     }
 
-    await (prisma.work_orders as any).update({
+    await prisma.work_orders.update({
       where: { workOrderNumber: id },
       data: updateData,
     });
 
     return useResponseSuccess(null);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logApiError('work-order', error);
-    // Return specific error message for debugging
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    const errorCode = (error as { code?: string }).code;
     // Check for "Record to update not found"
-    if (error.code === 'P2025') {
+    if (errorCode === 'P2025') {
       return useResponseError(`工单不存在: ${id}`);
     }
-    return useResponseError(`更新工单失败: ${error.message}`);
+    return useResponseError(`更新工单失败: ${errorMessage}`);
   }
 });

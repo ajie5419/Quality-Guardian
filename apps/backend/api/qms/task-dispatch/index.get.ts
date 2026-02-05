@@ -13,19 +13,19 @@ export default defineEventHandler(async (event) => {
   const { all, level, parentId, status } = getQuery(event);
 
   // 确保 ID 类型为 String 且兼容 id/userId 字段
-  const currentUserId = String(userinfo.id ?? (userinfo as any).userId);
+  const currentUserId = String(userinfo.id ?? userinfo.userId);
   const isAdmin =
     userinfo.roles?.includes('super') || userinfo.roles?.includes('admin');
 
   // 解析状态过滤条件，支持逗号分隔的多个状态
-  let statusFilter: string | string[] | undefined | { in: string[] };
+  let statusFilter: string | undefined | { in: string[] };
   if (status) {
     const statusList = String(status).split(',');
     statusFilter = statusList.length > 1 ? { in: statusList } : statusList[0];
   }
 
   try {
-    let assigneeFilter = {};
+    let assigneeFilter: Record<string, unknown> = {};
     if (parentId) {
       assigneeFilter = { parentId: String(parentId) };
     } else if (isAdmin && all === 'true') {
@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
         // 否则：如果是管理员且带了 all 参数，查询所有；否则只查指派给自己的
         ...assigneeFilter,
         ...(level ? { level: Number.parseInt(String(level)) } : {}),
-        ...(statusFilter ? { status: statusFilter as any } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
 
         // 关键：联动过滤已归档项目 (利用 Prisma Relation)
         AND: [

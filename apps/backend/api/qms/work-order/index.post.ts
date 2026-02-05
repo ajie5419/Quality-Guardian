@@ -66,14 +66,17 @@ export default defineEventHandler(async (event) => {
     };
 
     return useResponseSuccess(formattedWO);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { code?: string; message?: string; meta?: unknown };
+    const errorMessage = err.message || String(error);
+
     console.error(
       'Failed to create work order:',
       JSON.stringify(
         {
-          message: error.message,
-          code: error.code,
-          meta: error.meta,
+          message: errorMessage,
+          code: err.code,
+          meta: err.meta,
         },
         null,
         2,
@@ -82,9 +85,7 @@ export default defineEventHandler(async (event) => {
 
     // Handle Prisma Unique Constraint Violation (P2002)
     const isUniqueError =
-      error.code === 'P2002' ||
-      String(error.message).includes('Unique constraint failed') ||
-      String(error).includes('Unique constraint failed');
+      err.code === 'P2002' || errorMessage.includes('Unique constraint failed');
 
     if (isUniqueError) {
       return useResponseError('工单号已存在，请使用其他编号');
@@ -92,19 +93,19 @@ export default defineEventHandler(async (event) => {
 
     // Handle Prisma Validation Errors (Missing Arguments etc.)
     if (
-      error.code === 'P2011' ||
-      error.code === 'P2012' ||
-      String(error.message).includes('Argument')
+      err.code === 'P2011' ||
+      err.code === 'P2012' ||
+      errorMessage.includes('Argument')
     ) {
       // Try to extract the missing argument name if possible, or just give a generic validation error
       // Example msg: "Argument `customerName` is missing."
-      const match = String(error.message).match(/Argument `(\w+)` is missing/);
+      const match = errorMessage.match(/Argument `(\w+)` is missing/);
       if (match && match[1]) {
         return useResponseError(`请求参数错误: 缺少必填字段 ${match[1]}`);
       }
       return useResponseError('请求参数错误: 数据格式不正确或缺少必填字段');
     }
 
-    return useResponseError(`创建工单失败: ${error.message || String(error)}`);
+    return useResponseError(`创建工单失败: ${errorMessage}`);
   }
 });

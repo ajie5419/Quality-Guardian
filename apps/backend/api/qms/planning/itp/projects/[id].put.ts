@@ -12,12 +12,12 @@ export default defineEventHandler(async (event) => {
 
   try {
     // 关键修复：改为局部更新逻辑
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
     };
 
     if (body.status !== undefined)
-      updateData.planStatus = body.status.toUpperCase();
+      updateData.planStatus = (body.status as string).toUpperCase();
     if (body.projectName !== undefined)
       updateData.projectName = body.projectName;
     if (body.workOrderId !== undefined)
@@ -30,13 +30,11 @@ export default defineEventHandler(async (event) => {
       data: updateData,
     });
 
-    return {
-      code: 0,
-      data: updated,
-      message: 'ok',
-    };
-  } catch (error) {
+    return useResponseSuccess(updated);
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
     logApiError('projects', error);
-    return { code: -1, message: '更新失败' };
+    return useResponseError(`更新失败: ${errorMessage}`);
   }
 });

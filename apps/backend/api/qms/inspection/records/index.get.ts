@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
     ? String(query.workOrderNumber)
     : undefined;
 
-  const where: any = {
+  const where: Record<string, unknown> = {
     isDeleted: false,
   };
 

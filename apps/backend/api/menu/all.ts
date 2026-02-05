@@ -4,10 +4,22 @@ import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
 
+interface Menu {
+  id: number | string;
+  parentId?: null | number | string;
+  name: string;
+  type: 'button' | 'catalog' | 'menu';
+  authCode?: string;
+  order?: number;
+  meta?: Record<string, unknown> | string;
+  children?: Menu[];
+  [key: string]: unknown;
+}
+
 /**
  * 将平铺的菜单数据转换为树形结构
  */
-function buildMenuTree(menus: any[], parentId: string = '0'): any[] {
+function buildMenuTree(menus: Menu[], parentId: string = '0'): Menu[] {
   const filtered = menus.filter((menu) => {
     const pid =
       !menu.parentId ||
@@ -44,7 +56,7 @@ function buildMenuTree(menus: any[], parentId: string = '0'): any[] {
 /**
  * 收集菜单及其所有子按钮的权限码
  */
-function collectMenuAuthCodes(menu: any): string[] {
+function collectMenuAuthCodes(menu: Menu): string[] {
   const codes: string[] = [];
   if (menu.authCode) {
     codes.push(menu.authCode);
@@ -61,7 +73,7 @@ function collectMenuAuthCodes(menu: any): string[] {
  * 检查用户是否有权限访问菜单
  * 规则：用户拥有菜单本身的权限码 OR 菜单下任意子按钮的权限码
  */
-function hasMenuAccess(menu: any, userCodesSet: Set<string>): boolean {
+function hasMenuAccess(menu: Menu, userCodesSet: Set<string>): boolean {
   // 如果菜单本身没有权限码要求，直接通过
   if (!menu.authCode && menu.type !== 'menu') {
     return true;
@@ -78,10 +90,10 @@ function hasMenuAccess(menu: any, userCodesSet: Set<string>): boolean {
  * 递归过滤菜单 (针对侧边栏显示)
  */
 function filterMenus(
-  menus: any[],
+  menus: Menu[],
   userCodesSet: Set<string>,
   skipAuthCheck = false,
-): any[] {
+): Menu[] {
   return menus
     .filter((menu) => {
       // 1. 过滤掉按钮类型 - 侧边栏不显示按钮
@@ -121,17 +133,16 @@ export default eventHandler(async (event) => {
   }
 
   // 1. 获取所有状态正常的菜单
-  const allDbMenus = await prisma.menus.findMany({
+  const allDbMenus = (await prisma.menus.findMany({
     where: { status: 1 },
     orderBy: { order: 'asc' },
-  });
+  })) as unknown as Menu[];
 
   // 2. 获取用户真实权限
   let userPermissions: string[] = [];
   let roleName = '';
 
-  const userId =
-    userinfo.id ?? (userinfo as any).userId ?? (userinfo as any).sub;
+  const userId = userinfo.id ?? userinfo.userId;
 
   try {
     const dbUser = await prisma.users.findFirst({

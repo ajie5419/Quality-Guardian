@@ -50,9 +50,14 @@ export default defineEventHandler(async (event) => {
         }
 
         // 处理状态
-        let status: any;
+        type WorkOrderStatus =
+          | 'CANCELLED'
+          | 'COMPLETED'
+          | 'IN_PROGRESS'
+          | 'OPEN';
+        let status: undefined | WorkOrderStatus;
         if (item.status) {
-          const s = String(item.status).toUpperCase();
+          const s = String(item.status).toUpperCase() as WorkOrderStatus;
           if (['CANCELLED', 'COMPLETED', 'IN_PROGRESS', 'OPEN'].includes(s)) {
             status = s;
           }
@@ -86,9 +91,11 @@ export default defineEventHandler(async (event) => {
           },
         });
         successCount++;
-      } catch (error: any) {
+      } catch (error: unknown) {
         logApiError('import', error);
-        errors.push(`${item.workOrderNumber}: ${error.message}`);
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`${item.workOrderNumber}: ${errorMessage}`);
       }
     }
 
@@ -98,7 +105,7 @@ export default defineEventHandler(async (event) => {
       errorCount: errors.length,
       errors: errors.slice(0, 10), // 返回前10条错误
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logApiError('import', error);
     return useResponseError('数据处理异常');
   }

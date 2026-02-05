@@ -152,7 +152,11 @@ export default defineEventHandler(async (event) => {
         case 'SHIPMENT': {
           proc = '发货检验';
           // 对应组件名称
-          name = item.level1Component || item.projectName || '';
+          name =
+            item.materialName ||
+            item.level2Component ||
+            item.level1Component ||
+            '';
 
           break;
         }
