@@ -12,20 +12,22 @@ export default defineEventHandler(async (event) => {
 
   const currentUserId = String(userinfo.id ?? (userinfo as any).userId);
 
-  // 定义归档项目过滤条件 (利用 Prisma Relation)
+  // 定义归档项目过滤条件
   const archiveFilter = {
-    itp_project: {
-      OR: [
-        { planStatus: { not: 'ARCHIVED' as any } },
-        { planStatus: { equals: null as any } }, // Just in case, though it shouldn't be null
-      ],
-    },
-    dfmea_project: {
-      OR: [
-        { status: { not: 'archived' as any } },
-        { status: { equals: null as any } },
-      ],
-    },
+    AND: [
+      {
+        OR: [
+          { itpProjectId: null },
+          { itp_project: { planStatus: { not: 'ARCHIVED' as any } } },
+        ],
+      },
+      {
+        OR: [
+          { dfmeaId: null },
+          { dfmea_project: { status: { not: 'archived' as any } } },
+        ],
+      },
+    ],
   };
 
   try {
