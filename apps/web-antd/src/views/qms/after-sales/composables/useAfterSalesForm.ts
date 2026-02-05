@@ -125,7 +125,27 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
         formState[key] = undefined;
       },
     );
-    Object.assign(formState, row);
+
+    const { photos, ...rest } = row;
+
+    // 处理照片数据转换
+    let photoArray: string[] = [];
+    if (Array.isArray(photos)) {
+      photoArray = photos;
+    } else if (photos) {
+      photoArray = [photos as unknown as string];
+    }
+
+    Object.assign(formState, {
+      ...rest,
+      photos: photoArray.map((url, index) => ({
+        uid: String(index),
+        name: `Photo ${index + 1}`,
+        status: 'done' as const,
+        url,
+      })),
+    });
+
     currentId.value = row.id;
     updateDefectSubtypes();
     updateProductSubtypes();
@@ -136,11 +156,30 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
    */
   async function submit() {
     try {
+      const rawData = { ...formState };
+
+      // 将照片转换回 URL 数组
+      const photos =
+        (rawData.photos as any[])
+          ?.map((f) => {
+            if (f.url) return f.url;
+            if (f.status === 'done' && f.response?.data?.url) {
+              return f.response.data.url;
+            }
+            return null;
+          })
+          .filter((url): url is string => !!url) || [];
+
+      const data = {
+        ...rawData,
+        photos,
+      };
+
       if (isEditMode.value && currentId.value) {
-        await updateAfterSales(currentId.value, formState);
+        await updateAfterSales(currentId.value, data);
         message.success(t('common.saveSuccess'));
       } else {
-        await createAfterSales(formState);
+        await createAfterSales(data);
         message.success(t('common.createSuccess'));
       }
       onClose();

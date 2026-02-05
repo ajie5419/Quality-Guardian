@@ -135,6 +135,7 @@ export function createInitialFormState() {
     status: 'IN_PROGRESS',
     supplierBrand: '',
     warrantyStatus: '在保',
+    photos: [],
   };
 }
 

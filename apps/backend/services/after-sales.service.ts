@@ -229,6 +229,7 @@ export const AfterSalesService = {
       isClaim: item.isClaim,
       qualityLoss:
         (Number(item.materialCost) || 0) + (Number(item.laborTravelCost) || 0),
+      photos: item.photos ? JSON.parse(item.photos as string) : [],
     }));
   },
 };

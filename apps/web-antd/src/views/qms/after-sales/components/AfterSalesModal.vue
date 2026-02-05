@@ -14,6 +14,7 @@ import { useStatusOptions } from '../constants';
 import AfterSalesBasicInfo from './AfterSalesBasicInfo.vue';
 import AfterSalesDescription from './AfterSalesDescription.vue';
 import AfterSalesIssueDetails from './AfterSalesIssueDetails.vue';
+import AfterSalesPhotoUpload from './AfterSalesPhotoUpload.vue';
 import AfterSalesProductInfo from './AfterSalesProductInfo.vue';
 import AfterSalesResponsibility from './AfterSalesResponsibility.vue';
 import AfterSalesStatus from './AfterSalesStatus.vue';
@@ -145,6 +146,8 @@ function onWorkOrderChange(val: number | string, item?: WorkOrderItem) {
           />
 
           <AfterSalesDescription v-model:form-state="formState" />
+
+          <AfterSalesPhotoUpload v-model:photos="formState.photos" />
         </div>
       </div>
     </Form>

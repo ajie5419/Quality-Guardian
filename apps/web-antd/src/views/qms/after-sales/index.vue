@@ -14,7 +14,7 @@ import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
-import { Button, message, Modal, Select, Tag } from 'ant-design-vue';
+import { Button, Image, message, Modal, Select, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
@@ -203,6 +203,12 @@ const gridOptions = computed(() => ({
       minWidth: 200,
     },
     {
+      field: 'photos',
+      title: t('qms.afterSales.form.photos'),
+      width: 80,
+      slots: { default: 'photos' },
+    },
+    {
       field: 'productType',
       title: t('qms.afterSales.form.productType'),
       minWidth: 120,
@@ -330,17 +336,33 @@ const gridOptions = computed(() => ({
         { page }: { page?: { currentPage?: number; pageSize?: number } },
         formValues: Record<string, unknown> = {},
       ) => {
-        const data = await getAfterSalesList({
+        const data = (await getAfterSalesList({
           year: currentYear.value,
           ...formValues,
-        } as QmsAfterSalesApi.AfterSalesParams);
+        } as QmsAfterSalesApi.AfterSalesParams)) as any[];
+
+        // 确保照片数据是数组格式
+        const items = (data || []).map((item) => {
+          let photos = item.photos;
+          if (typeof photos === 'string') {
+            try {
+              photos = JSON.parse(photos);
+            } catch {
+              photos = [];
+            }
+          }
+          return {
+            ...item,
+            photos: Array.isArray(photos) ? photos : [],
+          };
+        });
 
         const { currentPage = 1, pageSize = 20 } = page || {};
         const start = (currentPage - 1) * pageSize;
         const end = start + pageSize;
-        const pageData = data.slice(start, end);
+        const pageData = items.slice(start, end);
 
-        return { items: pageData, total: data.length };
+        return { items: pageData, total: items.length };
       },
       queryAll: async ({
         formValues = {},
@@ -582,6 +604,19 @@ function handleModalSuccess() {
               {{ row.isClaim ? t('common.yes') : t('common.no') }}
             </Tag>
           </template>
+          <template #photos="{ row }">
+            <div
+              v-if="row.photos && row.photos.length > 0"
+              class="flex items-center justify-center"
+            >
+              <Image
+                :width="40"
+                :height="40"
+                :src="row.photos[0]"
+                class="cursor-pointer rounded shadow-sm hover:scale-110"
+              />
+            </div>
+          </template>
           <template #toolbar-actions>
             <div class="flex flex-wrap items-center gap-2">
               <Button
@@ -659,3 +694,22 @@ function handleModalSuccess() {
     />
   </Page>
 </template>
+
+<style scoped>
+/* 针对表格内图片的样式优化 */
+:deep(.vxe-cell .ant-image) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px !important;
+  height: 40px !important;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+:deep(.vxe-cell .ant-image-img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+</style>

@@ -175,6 +175,24 @@
       "frozen": "Frozen"
     }
   },
+  "planning": {
+    "title": "Quality Planning",
+    "status": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "itp": {
+      "title": "Inspection ITP",
+      "overview": "ITP Overview",
+      "processStep": "Step",
+      "activity": "Activity",
+      "criteria": "Criteria",
+      "frequency": "Frequency",
+      "controlPoint": {
+        "label": "CP"
+      }
+    }
+  },
   "knowledge": {
     "title": "Knowledge Base",
     "allKnowledge": "All Knowledge",

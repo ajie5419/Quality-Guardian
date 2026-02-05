@@ -63,6 +63,7 @@ export default defineEventHandler(async (event) => {
         partName: body.partName,
         supplierBrand: body.supplierBrand || null,
         isClaim: body.isClaim || false,
+        photos: body.photos ? JSON.stringify(body.photos) : null,
 
         isDeleted: false,
         updatedAt: new Date(),

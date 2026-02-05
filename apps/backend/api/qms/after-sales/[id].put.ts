@@ -60,9 +60,16 @@ export default defineEventHandler(async (event) => {
       'isClaim',
       'supplierBrand',
       'partName',
+      'photos',
     ];
     fields.forEach((f) => {
-      if (bodyRecord[f] !== undefined) updateData[f] = bodyRecord[f];
+      if (bodyRecord[f] !== undefined) {
+        if (f === 'photos' && Array.isArray(bodyRecord[f])) {
+          updateData[f] = JSON.stringify(bodyRecord[f]);
+        } else {
+          updateData[f] = bodyRecord[f];
+        }
+      }
     });
 
     if (bodyRecord.quantity) updateData.quantity = Number(bodyRecord.quantity);
