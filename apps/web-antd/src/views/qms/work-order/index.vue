@@ -31,6 +31,7 @@ import {
   getWorkOrderList,
 } from '#/api/qms/work-order';
 import { getDeptList } from '#/api/system/dept';
+import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData, findNameById } from '#/types';
@@ -370,89 +371,93 @@ function handleBatchDelete() {
 
 <template>
   <Page>
-    <div class="flex flex-col gap-4 p-4">
-      <!-- 数字化仪表盘 -->
-      <WorkOrderCharts
-        v-if="showDashboard"
-        :summary-data="allWorkOrders"
-        :dept-data="deptRawData"
-        :loading="isStatsLoading || isDeptLoading"
-      />
+    <ErrorBoundary>
+      <div class="flex flex-col gap-4 p-4">
+        <!-- 数字化仪表盘 -->
+        <WorkOrderCharts
+          v-if="showDashboard"
+          :summary-data="allWorkOrders"
+          :dept-data="deptRawData"
+          :loading="isStatsLoading || isDeptLoading"
+        />
 
-      <!-- 表格区域 -->
-      <Card size="small" :bordered="false" class="shadow-sm">
-        <Grid>
-          <!-- 核心修复：Toolbar 内部也保留按钮作为备份 -->
-          <template #toolbar-actions>
-            <Space>
-              <Button
-                v-if="canCreate"
-                shape="round"
-                type="primary"
-                @click="handleAdd"
-              >
-                <template #icon>
-                  <IconifyIcon icon="lucide:plus" />
-                </template>
-                {{ t('qms.workOrder.createWorkOrder') }}
-              </Button>
-              <Button
-                v-if="checkedRows.length > 0 && canDelete"
-                danger
-                shape="round"
-                type="primary"
-                @click="handleBatchDelete"
-              >
-                <template #icon>
-                  <IconifyIcon icon="lucide:trash-2" />
-                </template>
-                {{ t('common.batchDelete') }}
-              </Button>
-              <Button @click="showDashboard = !showDashboard">
-                <template #icon>
-                  <IconifyIcon
-                    :icon="
-                      showDashboard
-                        ? 'lucide:layout-panel-top'
-                        : 'lucide:layout-panel-off'
-                    "
-                  />
-                </template>
-                {{
-                  showDashboard
-                    ? t('qms.workOrder.hideChart')
-                    : t('qms.workOrder.showChart')
-                }}
-              </Button>
-              <div class="ml-2 flex items-center gap-2">
-                <span class="text-xs text-gray-500"
-                  >{{ t('qms.inspection.records.statsYear') }}:</span
+        <!-- 表格区域 -->
+        <Card size="small" :bordered="false" class="shadow-sm">
+          <Grid>
+            <!-- 核心修复：Toolbar 内部也保留按钮作为备份 -->
+            <template #toolbar-actions>
+              <Space>
+                <Button
+                  v-if="canCreate"
+                  shape="round"
+                  type="primary"
+                  @click="handleAdd"
                 >
-                <Select
-                  v-model:value="currentYear"
-                  :options="yearOptions"
-                  size="small"
-                  class="w-[100px]"
-                  @change="() => gridApi && gridApi.reload()"
-                />
-              </div>
-            </Space>
-          </template>
+                  <template #icon>
+                    <IconifyIcon icon="lucide:plus" />
+                  </template>
+                  {{ t('qms.workOrder.createWorkOrder') }}
+                </Button>
+                <Button
+                  v-if="checkedRows.length > 0 && canDelete"
+                  danger
+                  shape="round"
+                  type="primary"
+                  @click="handleBatchDelete"
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:trash-2" />
+                  </template>
+                  {{ t('common.batchDelete') }}
+                </Button>
+                <Button @click="showDashboard = !showDashboard">
+                  <template #icon>
+                    <IconifyIcon
+                      :icon="
+                        showDashboard
+                          ? 'lucide:layout-panel-top'
+                          : 'lucide:layout-panel-off'
+                      "
+                    />
+                  </template>
+                  {{
+                    showDashboard
+                      ? t('qms.workOrder.hideChart')
+                      : t('qms.workOrder.showChart')
+                  }}
+                </Button>
+                <div class="ml-2 flex items-center gap-2">
+                  <span class="text-xs text-gray-500"
+                    >{{ t('qms.inspection.records.statsYear') }}:</span
+                  >
+                  <div class="flex items-center gap-2">
+                    <Select
+                      v-model:value="currentYear"
+                      :options="yearOptions"
+                      size="small"
+                      class="w-[100px]"
+                      @change="() => gridApi && gridApi.reload()"
+                    />
+                  </div>
+                </div>
+              </Space>
+            </template>
 
-          <template #status="{ row }">
-            <Tag :color="getStatusInfo(row.status).color">
-              {{
-                getStatusInfo(row.status).textKey
-                  ? t(getStatusInfo(row.status).textKey)
-                  : row.status
-              }}
-            </Tag>
-          </template>
-        </Grid>
-      </Card>
-    </div>
+            <template #status="{ row }">
+              <Tag :color="getStatusInfo(row.status).color">
+                {{
+                  getStatusInfo(row.status).textKey
+                    ? t(getStatusInfo(row.status).textKey)
+                    : row.status
+                }}
+              </Tag>
+            </template>
+          </Grid>
+        </Card>
+      </div>
 
-    <WorkOrderEditModal ref="editModalRef" @success="handleSuccess" />
+      <WorkOrderEditModal ref="editModalRef" @success="handleSuccess" />
+    </ErrorBoundary>
   </Page>
 </template>
 

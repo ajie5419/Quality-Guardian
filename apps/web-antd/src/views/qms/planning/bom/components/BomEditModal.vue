@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { Rule } from 'ant-design-vue/es/form';
+
 import type { QmsPlanningApi } from '#/api/qms/planning';
 
 import { reactive, ref, watch } from 'vue';
@@ -45,7 +47,7 @@ const formState = reactive<
   workOrderNumber: '',
 });
 
-const rules: any = {
+const rules: Record<string, Rule[]> = {
   partName: [
     {
       required: true,
@@ -104,10 +106,12 @@ async function handleOk() {
     }
     emit('success');
     emit('update:open', false);
-  } catch (error: any) {
-    if (error?.errorFields) return;
+  } catch (error: unknown) {
+    if ((error as any)?.errorFields) return;
     console.error('BOM Save Error:', error);
-    message.error(t('common.actionFailed'));
+    const errorMessage =
+      error instanceof Error ? error.message : t('common.actionFailed');
+    message.error(errorMessage);
   } finally {
     confirmLoading.value = false;
   }

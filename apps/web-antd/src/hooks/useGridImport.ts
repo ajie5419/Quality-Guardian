@@ -1,3 +1,5 @@
+import type { VxeTableDefines } from 'vxe-table';
+
 import type { Ref } from 'vue';
 
 import { ref } from 'vue';
@@ -8,11 +10,11 @@ import { message } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 
-interface ImportOptions<T = any> {
+interface ImportOptions<T = Record<string, any>> {
   /** Grid API instance ref */
   gridApi: Ref<ReturnType<typeof useVbenVxeGrid>[1] | undefined>;
   /** Import API function */
-  importApi: (items: T[]) => Promise<any>;
+  importApi: (items: T[]) => Promise<{ successCount: number }>;
   /** Optional status mapping */
   statusMap?: Record<string, string>;
   /** Optional field mapping for aliases (field -> possible headers) */
@@ -23,7 +25,9 @@ interface ImportOptions<T = any> {
   maxRows?: number;
 }
 
-export function useGridImport<T = any>(options: ImportOptions<T>) {
+export function useGridImport<T = Record<string, any>>(
+  options: ImportOptions<T>,
+) {
   const { t } = useI18n();
   const loading = ref(false);
 
@@ -86,7 +90,7 @@ export function useGridImport<T = any>(options: ImportOptions<T>) {
       if (!columns) return;
       const mappedItems = results.map((row) => {
         const item: Record<string, unknown> = {};
-        columns.forEach((c: any) => {
+        columns.forEach((c: VxeTableDefines.ColumnInfo) => {
           if (!c.field || !c.title) return;
 
           // 1. Try to find key in fieldMap (aliases)

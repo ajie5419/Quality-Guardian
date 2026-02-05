@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { Rule } from 'ant-design-vue/es/form';
+
 import type { DfmeaProject } from '#/api/qms/planning';
 
 import { computed, reactive, ref, watch } from 'vue';
@@ -39,7 +41,7 @@ const statusOptions = computed(() => [
   { value: 'active', label: t('qms.planning.status.active') },
 ]);
 
-const rules: any = {
+const rules: Record<string, Rule[]> = {
   projectName: [
     { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
   ],
@@ -93,16 +95,18 @@ async function handleOk() {
         ...payload,
         workOrderNumber: formState.workOrderId,
       });
-      newId = res?.id;
+      newId = (res as any)?.id;
     }
 
     message.success(t('common.saveSuccess'));
     emit('success', newId);
     emit('update:open', false);
-  } catch (error: any) {
-    if (error?.errorFields) return;
+  } catch (error: unknown) {
+    if ((error as any)?.errorFields) return;
     console.error('DFMEA Save Error:', error);
-    message.error(error?.message || t('common.actionFailed'));
+    const errorMessage =
+      error instanceof Error ? error.message : t('common.actionFailed');
+    message.error(errorMessage);
   } finally {
     confirmLoading.value = false;
   }

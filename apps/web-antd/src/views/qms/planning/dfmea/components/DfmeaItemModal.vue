@@ -1,4 +1,8 @@
 <script lang="ts" setup>
+import type { Rule } from 'ant-design-vue/es/form';
+
+import type { DfmeaItem } from '#/api/qms/planning';
+
 import { reactive, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
@@ -7,9 +11,11 @@ import { Form, Input, InputNumber, message, Modal } from 'ant-design-vue';
 
 import { createDfmea, updateDfmea } from '#/api/qms/planning';
 
+import { useErrorHandler } from '#/hooks/useErrorHandler';
+
 const props = defineProps<{
   currentItemId: null | string;
-  initialData: any;
+  initialData: Partial<DfmeaItem>;
   isEditMode: boolean;
   open: boolean;
   selectedProjectId: null | string;
@@ -21,6 +27,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
 
@@ -33,7 +40,7 @@ const formState = reactive({
   detection: 5,
 });
 
-const rules: any = {
+const rules: Record<string, Rule[]> = {
   item: [{ required: true, message: t('common.pleaseInput'), trigger: 'blur' }],
   failureMode: [
     { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
@@ -45,7 +52,7 @@ watch(
   (val) => {
     if (val) {
       Object.assign(formState, {
-        item: props.initialData.item || props.initialData.name || '',
+        item: props.initialData.item || (props.initialData as any).name || '',
         failureMode: props.initialData.failureMode || '',
         effects: props.initialData.effects || '',
         severity: props.initialData.severity || 5,
@@ -77,9 +84,8 @@ async function handleOk() {
     message.success(t('common.saveSuccess'));
     emit('success');
     emit('update:open', false);
-  } catch (error: any) {
-    if (error?.errorFields) return;
-    message.error(t('common.actionFailed'));
+  } catch (error: unknown) {
+    handleApiError(error, 'Save DFMEA Item');
   } finally {
     confirmLoading.value = false;
   }

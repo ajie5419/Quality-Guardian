@@ -1,3 +1,4 @@
+import { after_sales_claimStatus } from '@prisma/client';
 import { QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { mapAfterSalesStatus } from '~/utils/after-sales-status';
@@ -53,7 +54,7 @@ export default defineEventHandler(async (event) => {
           (Number(body.materialCost) || 0) +
           (Number(body.laborTravelCost) || 0), // Calc total loss
 
-        claimStatus: claimStatus as any,
+        claimStatus: claimStatus as after_sales_claimStatus,
 
         defectType: body.defectType,
         defectSubtype: body.defectSubtype,
@@ -71,8 +72,10 @@ export default defineEventHandler(async (event) => {
     });
 
     return useResponseSuccess(newItem);
-  } catch (error) {
-    logApiError('after-sales', error);
-    return useResponseError('创建售后记录失败');
+  } catch (error: unknown) {
+    logApiError('after-sales-create', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return useResponseError(`创建售后记录失败: ${errorMessage}`);
   }
 });

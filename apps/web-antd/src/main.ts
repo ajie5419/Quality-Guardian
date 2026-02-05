@@ -2,7 +2,10 @@ import { initPreferences } from '@vben/preferences';
 import { unmountGlobalLoading } from '@vben/utils';
 
 import { overridesPreferences } from './preferences';
+import { setupClientLogger } from './utils/client-logger';
 
+// 启动客户端错误记录
+setupClientLogger();
 /**
  * 应用初始化完成之后再进行页面加载渲染
  */

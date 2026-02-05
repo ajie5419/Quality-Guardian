@@ -24,6 +24,7 @@ import {
   importAfterSalesExcel,
 } from '#/api/qms/after-sales';
 import { getDeptList } from '#/api/system/dept';
+import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useGridImport } from '#/hooks/useGridImport';
 import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
@@ -583,115 +584,119 @@ function handleModalSuccess() {
 
 <template>
   <Page>
-    <div class="flex h-full flex-col">
-      <div v-if="showCharts" class="mb-4 flex-shrink-0">
-        <AfterSalesCharts
-          ref="chartsRef"
-          :year="currentYear"
-          :refresh-key="chartRefreshKey"
-        />
-      </div>
+    <ErrorBoundary>
+      <div class="flex h-full flex-col">
+        <div v-if="showCharts" class="mb-4 flex-shrink-0">
+          <AfterSalesCharts
+            ref="chartsRef"
+            :year="currentYear"
+            :refresh-key="chartRefreshKey"
+          />
+        </div>
 
-      <div class="flex-1 overflow-hidden rounded-lg bg-white">
-        <Grid>
-          <template #status="{ row }">
-            <Tag :color="getStatusInfo(row.status).color">
-              {{ getStatusInfo(row.status).label }}
-            </Tag>
-          </template>
-          <template #isClaim="{ row }">
-            <Tag :color="row.isClaim ? 'red' : 'green'">
-              {{ row.isClaim ? t('common.yes') : t('common.no') }}
-            </Tag>
-          </template>
-          <template #photos="{ row }">
-            <div
-              v-if="row.photos && row.photos.length > 0"
-              class="flex items-center justify-center"
-            >
-              <Image
-                :width="40"
-                :height="40"
-                :src="row.photos[0]"
-                class="cursor-pointer rounded shadow-sm hover:scale-110"
-              />
-            </div>
-          </template>
-          <template #toolbar-actions>
-            <div class="flex flex-wrap items-center gap-2">
-              <Button
-                v-if="canCreate"
-                shape="round"
-                type="primary"
-                @click="handleOpenModal"
+        <div class="flex-1 overflow-hidden rounded-lg bg-white">
+          <Grid>
+            <template #status="{ row }">
+              <Tag :color="getStatusInfo(row.status).color">
+                {{ getStatusInfo(row.status).label }}
+              </Tag>
+            </template>
+            <template #isClaim="{ row }">
+              <Tag :color="row.isClaim ? 'red' : 'green'">
+                {{ row.isClaim ? t('common.yes') : t('common.no') }}
+              </Tag>
+            </template>
+            <template #photos="{ row }">
+              <div
+                v-if="row.photos && row.photos.length > 0"
+                class="flex items-center justify-center"
               >
-                <template #icon>
-                  <IconifyIcon icon="lucide:plus" />
-                </template>
-                {{ t('qms.inspection.issues.createIssue') }}
-              </Button>
-              <Button
-                v-if="checkedRows.length > 0 && canDelete"
-                danger
-                shape="round"
-                type="primary"
-                @click="handleBatchDelete"
-              >
-                <template #icon>
-                  <IconifyIcon icon="lucide:trash-2" />
-                </template>
-                {{ t('common.batchDelete') }}
-              </Button>
-              <Button
-                v-if="canAddChart"
-                shape="round"
-                @click="
-                  () => {
-                    showCharts = true;
-                    chartsRef?.handleAddCustomChart();
-                  }
-                "
-              >
-                <template #icon>
-                  <IconifyIcon icon="lucide:plus" />
-                </template>
-                新增图表
-              </Button>
-              <Button shape="round" @click="showCharts = !showCharts">
-                <template #icon>
-                  <IconifyIcon
-                    :icon="
-                      showCharts ? 'lucide:bar-chart-3' : 'lucide:bar-chart-3'
-                    "
-                  />
-                </template>
-                {{ showCharts ? t('common.hideChart') : t('common.showChart') }}
-              </Button>
-              <div class="flex items-center gap-2">
-                <span class="text-xs text-gray-500"
-                  >{{ t('qms.inspection.records.statsYear') }}:</span
-                >
-                <Select
-                  v-model:value="currentYear"
-                  :options="yearOptions"
-                  size="small"
-                  class="w-[100px]"
-                  @change="() => gridApi.reload()"
+                <Image
+                  :width="40"
+                  :height="40"
+                  :src="row.photos[0]"
+                  class="cursor-pointer rounded shadow-sm hover:scale-110"
                 />
               </div>
-            </div>
-          </template>
-        </Grid>
+            </template>
+            <template #toolbar-actions>
+              <div class="flex flex-wrap items-center gap-2">
+                <Button
+                  v-if="canCreate"
+                  shape="round"
+                  type="primary"
+                  @click="handleOpenModal"
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:plus" />
+                  </template>
+                  {{ t('qms.inspection.issues.createIssue') }}
+                </Button>
+                <Button
+                  v-if="checkedRows.length > 0 && canDelete"
+                  danger
+                  shape="round"
+                  type="primary"
+                  @click="handleBatchDelete"
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:trash-2" />
+                  </template>
+                  {{ t('common.batchDelete') }}
+                </Button>
+                <Button
+                  v-if="canAddChart"
+                  shape="round"
+                  @click="
+                    () => {
+                      showCharts = true;
+                      chartsRef?.handleAddCustomChart();
+                    }
+                  "
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:plus" />
+                  </template>
+                  新增图表
+                </Button>
+                <Button shape="round" @click="showCharts = !showCharts">
+                  <template #icon>
+                    <IconifyIcon
+                      :icon="
+                        showCharts ? 'lucide:bar-chart-3' : 'lucide:bar-chart-3'
+                      "
+                    />
+                  </template>
+                  {{
+                    showCharts ? t('common.hideChart') : t('common.showChart')
+                  }}
+                </Button>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-gray-500"
+                    >{{ t('qms.inspection.records.statsYear') }}:</span
+                  >
+                  <Select
+                    v-model:value="currentYear"
+                    :options="yearOptions"
+                    size="small"
+                    class="w-[100px]"
+                    @change="() => gridApi.reload()"
+                  />
+                </div>
+              </div>
+            </template>
+          </Grid>
+        </div>
       </div>
-    </div>
 
-    <AfterSalesModal
-      v-model:open="isModalVisible"
-      :is-edit-mode="isEditMode"
-      :initial-data="currentRecord"
-      :dept-tree-data="deptTreeData"
-      @success="handleModalSuccess"
-    />
+      <AfterSalesModal
+        v-model:open="isModalVisible"
+        :is-edit-mode="isEditMode"
+        :initial-data="currentRecord"
+        :dept-tree-data="deptTreeData"
+        @success="handleModalSuccess"
+      />
+    </ErrorBoundary>
   </Page>
 </template>
 

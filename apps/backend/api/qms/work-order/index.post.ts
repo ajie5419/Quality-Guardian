@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -67,21 +68,9 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(formattedWO);
   } catch (error: unknown) {
+    logApiError('work-order-create', error);
     const err = error as { code?: string; message?: string; meta?: unknown };
     const errorMessage = err.message || String(error);
-
-    console.error(
-      'Failed to create work order:',
-      JSON.stringify(
-        {
-          message: errorMessage,
-          code: err.code,
-          meta: err.meta,
-        },
-        null,
-        2,
-      ),
-    );
 
     // Handle Prisma Unique Constraint Violation (P2002)
     const isUniqueError =

@@ -21,7 +21,16 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    const bodyRecord = body as Record<string, unknown>;
+    const bodyRecord = body as {
+      component?: string;
+      icon?: string;
+      meta?: Record<string, unknown>;
+      name?: string;
+      orderNo?: number | string;
+      path?: string;
+      status?: number;
+      title?: string;
+    };
 
     const updateData: Record<string, unknown> = {
       component: bodyRecord.component,
@@ -31,20 +40,22 @@ export default defineEventHandler(async (event) => {
     };
 
     if (bodyRecord.status !== undefined) updateData.status = bodyRecord.status;
-    if (bodyRecord.orderNo || (bodyRecord.meta as any)?.orderNo)
-      updateData.order = Number(
-        bodyRecord.orderNo || (bodyRecord.meta as any)?.orderNo,
-      );
 
-    // Update meta
+    // Resolve order and meta
+    const meta = (bodyRecord.meta || {}) as Record<string, unknown>;
+    const orderNo = Number(bodyRecord.orderNo || meta.orderNo || 0);
+
+    if (bodyRecord.orderNo !== undefined || meta.orderNo !== undefined) {
+      updateData.order = orderNo;
+    }
+
+    // Update meta stringified
     if (bodyRecord.meta || bodyRecord.title || bodyRecord.icon) {
       updateData.meta = JSON.stringify({
-        icon: bodyRecord.icon || (bodyRecord.meta as any)?.icon,
-        orderNo: Number(
-          bodyRecord.orderNo || (bodyRecord.meta as any)?.orderNo || 0,
-        ),
-        title: bodyRecord.title || (bodyRecord.meta as any)?.title,
-        ...(bodyRecord.meta as any),
+        ...meta,
+        icon: bodyRecord.icon || meta.icon,
+        orderNo,
+        title: bodyRecord.title || meta.title,
       });
     }
 
@@ -54,8 +65,10 @@ export default defineEventHandler(async (event) => {
     });
 
     return useResponseSuccess(null);
-  } catch (error) {
-    logApiError('menu', error);
-    return useResponseError('更新菜单失败');
+  } catch (error: unknown) {
+    logApiError('menu-update', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return useResponseError(`更新菜单失败: ${errorMessage}`);
   }
 });

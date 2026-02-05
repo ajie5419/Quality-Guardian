@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { Rule } from 'ant-design-vue/es/form';
+
 import type { SystemUserApi } from '#/api/system/user';
 
 import { computed, reactive, ref, watch } from 'vue';
@@ -30,7 +32,7 @@ const formState = reactive({
   leaderId: '',
 });
 
-const rules: any = {
+const rules: Record<string, Rule[]> = {
   title: [
     { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
   ],
@@ -80,8 +82,8 @@ async function handleOk() {
     message.success(t('qms.planning.itp.assignSuccess'));
     emit('success');
     emit('update:open', false);
-  } catch (error: any) {
-    if (error?.errorFields) return;
+  } catch (error: unknown) {
+    if ((error as any)?.errorFields) return;
     console.error('Assign DFMEA Error:', error);
     message.error(t('common.actionFailed'));
   } finally {

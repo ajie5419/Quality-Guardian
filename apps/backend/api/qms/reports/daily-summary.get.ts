@@ -23,13 +23,6 @@ export default defineEventHandler(async (event) => {
     const endDate = new Date(queryDate);
     endDate.setHours(23, 59, 59, 999);
 
-    // Find user first to get their real name if we are querying by username?
-    // Inspection records store 'inspector' as username usually or realname?
-    // Based on previous files, it seems to store username or realname depending on logic.
-    // Let's assume it stores username in 'inspector' field (relation in schema).
-
-    // Actually schema says: inspector String, relation to users via username.
-
     const inspections = await prisma.inspections.findMany({
       where: {
         isDeleted: false,
@@ -50,12 +43,6 @@ export default defineEventHandler(async (event) => {
     });
 
     // 2. Fetch Engineering Issues (Exceptions)
-    // Logic: Created on date OR (Status != Closed AND relevant to user)
-    // Relevant to user: reportedBy == queryUser (or realName?)
-    // Schema: reportedBy is String. API usually stores Real Name or Username.
-    // Let's filter by both just in case, or user needs to confirm.
-    // For now, assume reportedBy matches queryUser or realName.
-
     const issues = await prisma.quality_records.findMany({
       where: {
         isDeleted: false,
@@ -67,11 +54,7 @@ export default defineEventHandler(async (event) => {
               lte: endDate,
             },
             // And by this user
-            OR: [
-              { inspector: queryUser },
-              { lastEditor: queryUser },
-              // 'inspector' field in quality_records usually means who found it
-            ],
+            OR: [{ inspector: queryUser }, { lastEditor: queryUser }],
           },
           // OR Open and by this user
           {
@@ -99,22 +82,11 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    // 3. Fetch Report Metadata (Summary)
-    // We'll store report metadata in `after_sales`? No, we have `inspections`...
-    // Wait, do we have a `daily_reports` table?
-    // User didn't ask to create one, but `views/qms/reports/index.vue` implies one exists or is mocked.
-    // The mock `getReportsList` returned hardcoded data.
-    // We might need to create a simple table or file store for "Summary" if persistent.
-    // For now, let's look at `prisma/schema.prisma` again.
-    // There is NO `daily_reports` table in the schema I viewed earlier.
-    // I will return a placeholder summary or implement a quick storage if needed.
-    // For now, simple return.
-
-    // Process inspections
+    // 3. Process inspections
     interface ProcessItem {
       partNames: Set<string>;
-      projectName: string;
       process: string;
+      projectName: string;
       quantity: number;
       results: Set<string>;
       workOrder: string;
@@ -129,7 +101,6 @@ export default defineEventHandler(async (event) => {
       seq: number;
       workOrder: string;
     }> = [];
-    const _seq = 1;
 
     inspections.forEach((item) => {
       let proc = '';
@@ -151,7 +122,7 @@ export default defineEventHandler(async (event) => {
         }
         case 'SHIPMENT': {
           proc = '发货检验';
-          // 对应组件名称
+          // 对应组件名称 - 优先取 materialName
           name =
             item.materialName ||
             item.level2Component ||
@@ -171,12 +142,12 @@ export default defineEventHandler(async (event) => {
 
       if (!processMap.has(key)) {
         processMap.set(key, {
-          workOrder: item.workOrderNumber,
-          projectName: item.projectName || '', // Capture Project Name
           partNames: new Set<string>(),
           process: proc,
+          projectName: item.projectName || '', // Capture Project Name
           quantity: 0,
           results: new Set<string>(),
+          workOrder: item.workOrderNumber,
         });
       }
       const group = processMap.get(key);
@@ -194,20 +165,16 @@ export default defineEventHandler(async (event) => {
 
     // Convert grouped process inspections to array
     for (const group of processMap.values()) {
-      // Check result: if any fail, '不合格'? Or list all?
-      // Usually aggregation implies overall status. Let's list unique.
-      // If both present, show '合格/不合格'? Or if any fail -> fail.
-      // Let's assume strict: if set has '不合格' -> '不合格'. Else '合格'.
       const resultStatus = group.results.has('不合格') ? '不合格' : '合格';
 
       formattedInspections.push({
-        seq: 0,
-        workOrder: group.workOrder,
-        projectName: group.projectName,
         partName: [...group.partNames].join('、'),
         process: group.process, // Use the grouped process name
+        projectName: group.projectName,
         quantity: group.quantity,
         result: resultStatus,
+        seq: 0,
+        workOrder: group.workOrder,
       });
     }
 
@@ -220,14 +187,14 @@ export default defineEventHandler(async (event) => {
       const created = new Date(item.createdAt);
       const isToday = created >= startDate && created <= endDate;
       return {
-        seq: index + 1,
-        workOrder: item.workOrderNumber,
-        partName: item.partName,
-        description: item.description,
-        solution: item.solution || '待定',
         dept: item.responsibleDepartment,
+        description: item.description,
         isToday,
+        partName: item.partName,
+        seq: index + 1,
+        solution: item.solution || '待定',
         status: item.status,
+        workOrder: item.workOrderNumber,
       };
     });
 
@@ -242,19 +209,19 @@ export default defineEventHandler(async (event) => {
     });
 
     return useResponseSuccess({
-      reporter: realName || queryUser,
       date: queryDate,
       inspections: formattedInspections,
       issues: formattedIssues,
+      reporter: realName || queryUser,
       summary: existingReport?.summary || '',
     });
-  } catch (error) {
+  } catch (error: unknown) {
     logApiError('daily-summary', error);
     return useResponseSuccess({
-      reporter: realName || queryUser,
       date: queryDate,
       inspections: [],
       issues: [],
+      reporter: realName || queryUser,
       summary: '',
     });
   }

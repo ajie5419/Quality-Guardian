@@ -1,5 +1,5 @@
-import { defineEventHandler, getRouterParam } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
+import { logApiError } from '~/utils/api-logger';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -10,6 +10,7 @@ export default defineEventHandler(async (event) => {
     await InspectionService.delete(id);
     return useResponseSuccess(null);
   } catch (error: unknown) {
+    logApiError('inspection-delete', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return useResponseError(errorMessage);
