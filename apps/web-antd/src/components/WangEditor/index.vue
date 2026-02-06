@@ -46,11 +46,16 @@ const valueHtml = ref('');
 watch(
   () => props.value,
   (val) => {
-    if (editorRef.value && val !== editorRef.value.getHtml()) {
-      editorRef.value.setHtml(val);
+    const editor = editorRef.value;
+    if (editor && !editor.isDestroyed() && val !== editor.getHtml()) {
+      try {
+        editor.setHtml(val);
+      } catch (error) {
+        console.warn('WangEditor setHtml error:', error);
+      }
     }
   },
-); // immediate: true is handled in onMounted
+);
 
 onMounted(() => {
   if (!editorContainerRef.value || !toolbarContainerRef.value) return;
@@ -75,37 +80,49 @@ onMounted(() => {
       },
     },
     onChange(editor) {
-      const html = editor.getHtml();
-      valueHtml.value = html;
-      emit('update:value', html);
-      emit('change', html);
+      try {
+        const html = editor.getHtml();
+        valueHtml.value = html;
+        emit('update:value', html);
+        emit('change', html);
+      } catch (error) {
+        console.warn('WangEditor onChange error:', error);
+      }
     },
   };
 
-  const editor = createEditor({
-    selector: editorContainerRef.value,
-    html: props.value || '',
-    config: editorConfig,
-    mode: props.mode as any,
-  });
+  try {
+    const editor = createEditor({
+      config: editorConfig,
+      html: props.value || '',
+      mode: props.mode as any,
+      selector: editorContainerRef.value,
+    });
 
-  const toolbarConfig: Partial<IToolbarConfig> = {};
+    const toolbarConfig: Partial<IToolbarConfig> = {};
 
-  createToolbar({
-    editor,
-    selector: toolbarContainerRef.value,
-    config: toolbarConfig,
-    mode: props.mode as any,
-  });
+    createToolbar({
+      config: toolbarConfig,
+      editor,
+      mode: props.mode as any,
+      selector: toolbarContainerRef.value,
+    });
 
-  editorRef.value = editor;
+    editorRef.value = editor;
+  } catch (error) {
+    console.error('WangEditor creation error:', error);
+  }
 });
 
 // 组件销毁时，也及时销毁编辑器
 onBeforeUnmount(() => {
   const editor = editorRef.value;
   if (!editor) return;
-  editor.destroy();
+  try {
+    editor.destroy();
+  } catch (error) {
+    console.warn('WangEditor destruction error:', error);
+  }
 });
 </script>
 

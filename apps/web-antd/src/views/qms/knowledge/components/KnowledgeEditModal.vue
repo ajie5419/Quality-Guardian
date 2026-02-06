@@ -156,11 +156,11 @@ defineExpose({ open });
             <RadioButton value="preview">预览</RadioButton>
           </RadioGroup>
         </div>
-        <div v-if="editorTab === 'edit'">
+        <div v-show="editorTab === 'edit'">
           <WangEditor v-model:value="formState.content" height="400px" />
         </div>
         <div
-          v-else
+          v-show="editorTab === 'preview'"
           class="max-h-[400px] min-h-[294px] overflow-y-auto rounded-md border border-gray-200 bg-gray-50 p-4"
         >
           <!-- eslint-disable-next-line vue/no-v-html -->
