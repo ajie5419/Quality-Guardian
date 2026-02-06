@@ -29,6 +29,7 @@ import {
   createUser,
   deleteUser,
   getUserList,
+  resetPassword,
   updateUser,
 } from '#/api/system/user';
 import { convertToTreeSelectData, findNameById } from '#/types';
@@ -141,6 +142,15 @@ const gridOptions = computed<VxeGridProps>(() => ({
         props: {
           options: [
             ...(canEdit.value ? ['edit'] : []),
+            ...(canEdit.value
+              ? [
+                  {
+                    code: 'reset',
+                    icon: 'ant-design:key-outlined',
+                    label: '重置密码',
+                  },
+                ]
+              : []),
             ...(canDelete.value ? ['delete'] : []),
           ],
           onClick: ({
@@ -151,6 +161,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
             row: SystemUserApi.User;
           }) => {
             if (code === 'edit') handleEdit(row);
+            if (code === 'reset') handleResetPassword(row);
             if (code === 'delete') handleDelete(row);
           },
         },
@@ -235,6 +246,21 @@ function handleDeptChange(value: string) {
   // Also update deptName for display purposes
   getDeptList().then((data) => {
     formState.deptName = findNameById(data as unknown as DeptTreeNode[], value);
+  });
+}
+
+async function handleResetPassword(row: SystemUserApi.User) {
+  Modal.confirm({
+    title: '密码重置确认',
+    content: `确定要将用户 "${row.realName || row.username}" 的密码重置为 "123456" 吗？`,
+    onOk: async () => {
+      try {
+        await resetPassword(row.id);
+        message.success('密码维护成功，已重置为 123456');
+      } catch (error: any) {
+        message.error(error.message || '重置密码失败');
+      }
+    },
   });
 }
 

@@ -26,6 +26,10 @@ export const deleteUser = (id: string) => {
   return requestClient.delete(`${SYSTEM_API.USER}/${id}`);
 };
 
+export const resetPassword = (id: string) => {
+  return requestClient.post(`${SYSTEM_API.USER}/${id}/reset-password`);
+};
+
 export namespace SystemUserApi {
   export type User = import('@qgs/shared').User;
   export type PageResult<T> = import('@qgs/shared').PageResult<T>;

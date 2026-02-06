@@ -160,6 +160,19 @@ model audit_logs {
   @@index([userId])
 }
 
+model login_logs {
+  id        String   @id @default(cuid())
+  username  String
+  ip        String?
+  browser   String?
+  os        String?
+  device    String?
+  method    String?  @default("密码登录")
+  status    String?  @default("成功") // 成功 / 失败
+  message   String?  @db.Text
+  createdAt DateTime @default(now())
+}
+
 model departments {
   id           String   @id
   name         String

@@ -26,6 +26,7 @@ import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData, findNameById } from '#/types';
 
 import LossCharts from './components/LossCharts.vue';
+import LossClaimModal from './components/LossClaimModal.vue';
 import LossEditModal from './components/LossEditModal.vue';
 // 子组件与逻辑抽离
 import LossKpiCards from './components/LossKpiCards.vue';
@@ -142,10 +143,18 @@ const gridOptions = computed<VxeGridProps>(() => ({
         name: 'CellOperation',
         props: {
           options: [
+            {
+              code: 'claim',
+              icon: 'ant-design:solution-outlined',
+              label: '索赔',
+              type: 'primary',
+              ghost: true,
+            },
             ...(canEdit.value ? ['edit'] : []),
             ...(canDelete.value ? ['delete'] : []),
           ],
           onClick: ({ code, row }: { code: string; row: any }) => {
+            if (code === 'claim') handleClaim(row);
             if (code === 'edit') handleEdit(row);
             if (code === 'delete') handleDelete(row);
           },
@@ -286,6 +295,12 @@ function handleEdit(row: QmsQualityLossApi.QualityLossItem) {
   modalVisible.value = true;
 }
 
+const claimModalVisible = ref(false);
+function handleClaim(row: QmsQualityLossApi.QualityLossItem) {
+  currentRecord.value = { ...row };
+  claimModalVisible.value = true;
+}
+
 async function handleDelete(row: QmsQualityLossApi.QualityLossItem) {
   Modal.confirm({
     title: t('common.confirmDelete'),
@@ -410,6 +425,12 @@ function getStatusConfig(s: string) {
       :initial-data="currentRecord"
       :dept-tree-data="deptTreeData"
       @success="gridApi.reload()"
+    />
+
+    <!-- 索赔库单打印组件 -->
+    <LossClaimModal
+      v-model:open="claimModalVisible"
+      :initial-data="currentRecord"
     />
   </Page>
 </template>

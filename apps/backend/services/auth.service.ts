@@ -13,7 +13,7 @@ export const AuthService = {
     });
 
     if (!user) {
-      throw new Error('Username or password is incorrect.');
+      throw new Error('用户名或密码错误');
     }
 
     if (user.status !== 'ACTIVE') {
@@ -22,7 +22,7 @@ export const AuthService = {
 
     const isValid = await bcrypt.compare(pass, user.password);
     if (!isValid) {
-      throw new Error('Username or password is incorrect.');
+      throw new Error('用户名或密码错误');
     }
 
     // 2. Fetch Department

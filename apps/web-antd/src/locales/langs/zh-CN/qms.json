@@ -421,6 +421,7 @@
       "title": "检验记录",
       "statsYear": "统计年份",
       "itpPlan": "ITP 计划",
+      "relatedItp": "关联 ITP",
       "inspectionCount": "{count} 项检验",
       "autoMatchedItp": "已自动匹配 ITP 计划: {name}",
       "measuredValue": "实测值/判定",

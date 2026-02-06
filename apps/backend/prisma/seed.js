@@ -268,6 +268,34 @@ async function main() {
       meta: { title: '系统监控', icon: 'carbon:meter-alt' },
     },
 
+    // --- 登录日志 ---
+    {
+      id: 17,
+      parentId: 10,
+      path: '/system/login-log',
+      name: 'SystemLoginLog',
+      component: 'system/login-log/index',
+      type: 'menu',
+      authCode: 'System:LoginLog:List',
+      meta: { title: '登录日志', icon: 'carbon:list-boxes' },
+    },
+    {
+      id: 1700,
+      parentId: 17,
+      name: 'SystemLoginLogView',
+      type: 'button',
+      authCode: 'System:LoginLog:View',
+      meta: { title: '查看' },
+    },
+    {
+      id: 1701,
+      parentId: 17,
+      name: 'SystemLoginLogDelete',
+      type: 'button',
+      authCode: 'System:LoginLog:Delete',
+      meta: { title: '删除' },
+    },
+
     // ===================== QMS 质量管理 =====================
     {
       id: 20,
@@ -1190,8 +1218,8 @@ async function main() {
   for (const item of menuData) {
     await prisma.menus.create({
       data: {
-        id: item.id,
-        parentId: item.parentId,
+        id: String(item.id),
+        parentId: item.parentId ? String(item.parentId) : '0',
         path: item.path || null,
         name: item.name,
         component: item.component || null,
