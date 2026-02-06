@@ -585,8 +585,8 @@ function handleModalSuccess() {
 <template>
   <Page>
     <ErrorBoundary>
-      <div class="flex h-full flex-col">
-        <div v-if="showCharts" class="mb-4 flex-shrink-0">
+      <div class="p-4">
+        <div v-if="showCharts" class="mb-4">
           <AfterSalesCharts
             ref="chartsRef"
             :year="currentYear"
@@ -594,7 +594,7 @@ function handleModalSuccess() {
           />
         </div>
 
-        <div class="flex-1 overflow-hidden rounded-lg bg-white">
+        <div class="rounded-lg bg-white">
           <Grid>
             <template #status="{ row }">
               <Tag :color="getStatusInfo(row.status).color">

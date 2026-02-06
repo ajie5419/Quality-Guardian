@@ -3,7 +3,7 @@ import type {
   VxeTableGridOptions,
 } from '@vben/plugins/vxe-table';
 
-import { h } from 'vue';
+import { h, unref } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 import {
@@ -39,6 +39,9 @@ setupVbenVxeTable({
         border: false,
         columnConfig: {
           resizable: true,
+        },
+        rowConfig: {
+          isHover: true,
         },
         minHeight: 180,
         formConfig: {
@@ -78,6 +81,7 @@ setupVbenVxeTable({
         round: true,
         showOverflow: true,
         size: 'small',
+        scrollY: { enabled: true, gt: 0 },
       } as VxeTableGridOptions,
     });
 
@@ -198,9 +202,15 @@ function useVbenVxeGrid<T extends Record<string, any> = any>(
 ) {
   // Default showSearchForm to false if not explicitly set
   // This satisfies the user requirement to have search form collapsed/hidden by default
+  const gridOptions = unref(options.gridOptions) || {};
   const mergedOptions = {
-    showSearchForm: false, // Default to hidden
     ...options,
+    gridOptions: {
+      height: 600,
+      scrollY: { enabled: true, gt: 0 },
+      ...gridOptions,
+    },
+    showSearchForm: options.showSearchForm ?? false,
   };
   return _useVbenVxeGrid(mergedOptions);
 }

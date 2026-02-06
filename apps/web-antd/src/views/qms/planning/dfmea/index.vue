@@ -13,8 +13,6 @@ import { useI18n } from '@vben/locales';
 
 import { Button, Empty, Tag } from 'ant-design-vue';
 
-import ErrorBoundary from '#/components/ErrorBoundary.vue';
-
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { ProjectStatusEnum } from '#/api/qms/enums';
 import {
@@ -25,6 +23,7 @@ import {
 } from '#/api/qms/planning';
 import { getWorkOrderList } from '#/api/qms/work-order';
 import { getUserList } from '#/api/system/user';
+import ErrorBoundary from '#/components/ErrorBoundary.vue';
 
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
@@ -250,7 +249,6 @@ const [Grid, gridApi] = useVbenVxeGrid({
     pagerConfig: {
       enabled: false,
     },
-    height: 'auto',
     scrollX: { enabled: true, gt: 0 },
     scrollY: { enabled: true, gt: 0 },
   },
@@ -278,10 +276,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Page content-class="p-4 h-full">
+  <Page>
     <ErrorBoundary>
-      <div class="flex h-[calc(100vh-130px)] min-h-0 gap-4 overflow-hidden">
+      <div class="flex gap-4 p-4">
         <PlanningSidebar
+          class="flex-shrink-0"
           :title="t('qms.planning.dfmea.projectList')"
           :projects="filteredProjects"
           v-model:selected-id="selectedProjectId"
@@ -306,12 +305,9 @@ onMounted(async () => {
         </PlanningSidebar>
 
         <div
-          class="flex flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+          class="flex-1 rounded-lg border border-gray-200 bg-white shadow-sm"
         >
-          <div
-            v-if="currentProject"
-            class="flex h-full flex-col overflow-hidden"
-          >
+          <div v-if="currentProject">
             <div
               class="flex items-center justify-between border-b border-gray-100 bg-gray-50/30 p-4"
             >
@@ -350,7 +346,7 @@ onMounted(async () => {
                 </Button>
               </div>
             </div>
-            <div class="flex-1 overflow-hidden p-4">
+            <div class="p-4">
               <Grid>
                 <template #rpn="{ row }">
                   <Tag :color="(row.rpn || 0) > 100 ? 'red' : 'green'">
@@ -372,7 +368,7 @@ onMounted(async () => {
           </div>
           <div
             v-else
-            class="flex flex-1 flex-col items-center justify-center bg-gray-50/20 text-gray-400"
+            class="flex flex-col items-center justify-center bg-gray-50/20 py-20 text-gray-400"
           >
             <Empty :description="t('qms.planning.common.selectProjectHint')" />
           </div>

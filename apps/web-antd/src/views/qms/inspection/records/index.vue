@@ -27,7 +27,7 @@ const {
 <template>
   <Page>
     <ErrorBoundary>
-      <div class="flex h-full flex-col bg-white p-4">
+      <div class="bg-white p-4">
         <div class="mb-4 flex justify-between">
           <Segmented v-model:value="activeKey" :options="INSPECTION_TABS" />
           <Select
@@ -37,7 +37,7 @@ const {
           />
         </div>
 
-        <div class="flex-1 overflow-hidden">
+        <div>
           <InspectionGrid
             ref="gridRef"
             :type="activeKey"

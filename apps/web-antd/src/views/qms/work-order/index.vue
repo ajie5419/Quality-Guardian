@@ -13,15 +13,7 @@ import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
-import {
-  Button,
-  Card,
-  message,
-  Modal,
-  Select,
-  Space,
-  Tag,
-} from 'ant-design-vue';
+import { Button, message, Modal, Select, Space, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { WorkOrderStatusEnum } from '#/api/qms/enums';
@@ -382,7 +374,7 @@ function handleBatchDelete() {
         />
 
         <!-- 表格区域 -->
-        <Card size="small" :bordered="false" class="shadow-sm">
+        <div class="rounded-lg bg-white shadow-sm">
           <Grid>
             <!-- 核心修复：Toolbar 内部也保留按钮作为备份 -->
             <template #toolbar-actions>
@@ -453,7 +445,7 @@ function handleBatchDelete() {
               </Tag>
             </template>
           </Grid>
-        </Card>
+        </div>
       </div>
 
       <WorkOrderEditModal ref="editModalRef" @success="handleSuccess" />

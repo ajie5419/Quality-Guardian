@@ -108,8 +108,8 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
       const err = error as {
         config?: any;
         response?: {
-          status?: number;
           data?: { code?: number; error?: string; message?: string };
+          status?: number;
         };
       };
       const responseData = err?.response?.data ?? {};
