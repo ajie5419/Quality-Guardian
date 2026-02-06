@@ -81,9 +81,6 @@ const canAddChart = computed(() =>
 const canImport = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Issues:Import']),
 );
-const canExport = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Issues:Export']),
-);
 
 // 使用数据加载 composable
 const { deptTreeData, deptRawData, loadInitialData } = useIssueData();
@@ -119,7 +116,7 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
     highlight: true,
   },
   toolbarConfig: {
-    export: canExport.value,
+    export: true,
     refresh: true,
     import: canImport.value,
     search: true,

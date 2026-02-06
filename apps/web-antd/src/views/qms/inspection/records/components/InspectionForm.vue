@@ -1,36 +1,39 @@
 <script lang="ts" setup>
 import type { QmsInspectionApi } from '#/api/qms/inspection';
+import type { QmsPlanningApi } from '#/api/qms/planning';
 
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
-import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
 import { useDebounceFn } from '@vueuse/core';
-import {
-  DatePicker,
-  Divider,
-  Form,
-  Input,
-  InputNumber,
-  message,
-  Select,
-  Tag,
-  Textarea,
-} from 'ant-design-vue';
+import { Divider, message } from 'ant-design-vue';
 import dayjs from 'dayjs';
-import { cloneDeep } from 'lodash-es';
 
+import { useVbenForm } from '#/adapter/form';
 import { getItpList, getItpProjectList } from '#/api/qms/planning';
 
 import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
-import { getFormConfig, getProcessOptions } from '../config';
 import BomItemSelect from './form/BomItemSelect.vue';
 import TeamSelect from './form/TeamSelect.vue';
+import { getFormSchema } from './formData';
 import InspectionItemsTable from './InspectionItemsTable.vue';
 
-// Define local interface to match UI needs (checkItem/acceptanceCriteria are not in shared type)
+// Define local interface for quantitative items from ITP
+interface QuantitativeItem {
+  standardValue?: number;
+  upperTolerance?: number;
+  lowerTolerance?: number;
+  unit?: string;
+}
+
+// And ItpItem with parsed quantitative items
+interface ExtendedItpItem extends QmsPlanningApi.ItpItem {
+  _parsedQItems?: QuantitativeItem[];
+}
+
+// Define local interface to match UI needs
 interface LocalInspectionTaskResult
   extends QmsInspectionApi.InspectionTaskResult {
   checkItem?: string;
@@ -42,57 +45,34 @@ const props = defineProps<{
   type: string;
 }>();
 
-const { t } = useI18n();
 const userStore = useUserStore();
 
-const formState = reactive({
-  workOrderNumber: '',
-  projectName: '',
-  itpProjectId: undefined as string | undefined,
-  // ... common fields
-  quantity: 1,
-  inspector: '',
-  inspectionDate: '',
-  result: 'PASS',
-  remarks: '',
-  // ... dynamic fields
-  supplierName: '',
-  materialName: '',
-  incomingType: undefined as string | undefined,
-  processName: undefined as string | undefined,
-  level1Component: '',
-  level2Component: '',
-  team: '',
-  documents: '',
-  packingListArchived: '是',
+// Reactive items list that remains separate from Vben Form for easy filtering/management
+const inspectionItems = ref<LocalInspectionTaskResult[]>([]);
+const rawItpItems = ref<QmsPlanningApi.ItpItem[]>([]);
 
-  items: [] as LocalInspectionTaskResult[],
-});
+// Local reactive state for form values to ensure filtering logic is reactive
+const activeValues = ref<Record<string, unknown>>({});
 
-const config = computed(() => getFormConfig(props.type, t));
-
-// 根据进货类型决定供应商数据来源：机加成品件 -> 外协管理，其他 -> 供应商管理
-const supplierCategory = computed(() => {
-  return formState.incomingType === '机加成品件' ? 'Outsourcing' : 'Supplier';
-});
-
-// 进货类型变化时清空已选供应商，避免数据源不匹配
-watch(
-  () => formState.incomingType,
-  (newVal, oldVal) => {
-    if (oldVal !== undefined && newVal !== oldVal) {
-      formState.supplierName = '';
-    }
+const [Form, formApi] = useVbenForm({
+  handleSubmit: () => {}, // Handled by parent
+  schema: getFormSchema(props.type),
+  showDefaultActions: false,
+  wrapperClass: 'grid grid-cols-3 gap-x-4 gap-y-1',
+  commonConfig: {
+    componentProps: {
+      class: 'w-full',
+    },
   },
-);
+  handleValuesChange: (vals) => {
+    activeValues.value = vals;
+  },
+});
 
-// Store raw ITP items for filtering
-const rawItpItems = ref<any[]>([]);
-
-// Pre-parse quantitative items to avoid repeated JSON.parse inside filter loop
-const parsedItpItems = computed(() => {
-  return rawItpItems.value.map((item: any) => {
-    let qItems: any[] = [];
+// Pre-parse quantitative items
+const parsedItpItems = computed<ExtendedItpItem[]>(() => {
+  return (rawItpItems.value as ExtendedItpItem[]).map((item) => {
+    let qItems: QuantitativeItem[] = [];
     try {
       if (
         item.quantitativeItems &&
@@ -100,57 +80,52 @@ const parsedItpItems = computed(() => {
       ) {
         qItems = JSON.parse(item.quantitativeItems);
       } else if (Array.isArray(item.quantitativeItems)) {
-        qItems = item.quantitativeItems;
+        qItems = item.quantitativeItems as QuantitativeItem[];
       }
     } catch (error) {
       console.error('Failed to parse quantitative items', error);
     }
-    return {
-      ...item,
-      _parsedQItems: qItems,
-    };
+    return { ...item, _parsedQItems: qItems };
   });
 });
 
-// Filter items based on current form state
-function filterItpItems() {
-  if (parsedItpItems.value.length === 0) {
-    formState.items = [];
+// Filter items based on current form values
+async function filterItpItems() {
+  const values = activeValues.value;
+  if (!values || parsedItpItems.value.length === 0) {
+    inspectionItems.value = [];
     return;
   }
 
   let filtered = parsedItpItems.value;
 
-  // Strict Filtering: If a filter criteria is enabled in config,
-  // we require a value selected/entered to show matching items.
-  // Otherwise, we show nothing to avoid confusion.
-
-  // Filter by Process / Incoming Type
-  if (config.value.showProcess && formState.processName) {
+  // Relaxed filtering for ITP items
+  if (props.type === 'process' && values.processName) {
     filtered = filtered.filter(
-      (item) => item.processStep === formState.processName,
+      (item) => item.processStep === values.processName,
     );
-  } else if (config.value.showIncomingType && formState.incomingType) {
-    // Map incoming type to ITP processStep
-    filtered = filtered.filter(
-      (item) => item.processStep === formState.incomingType,
+  } else if (
+    props.type === 'incoming' && // Attempt to filter by incoming type
+    values.incomingType
+  ) {
+    const matched = filtered.filter(
+      (item) => item.processStep === values.incomingType,
     );
+    if (matched.length > 0) {
+      filtered = matched;
+    }
   }
 
-  // Filter by Level 1 Component / Activity matching
-  if (config.value.showLevel1 && formState.level1Component) {
+  // Level 1 Component filtering
+  if (props.type === 'process' && values.level1Component) {
     filtered = filtered.filter((item) =>
-      item.activity.includes(formState.level1Component),
+      item.activity?.includes(values.level1Component as string),
     );
   }
 
-  // Map to inspection items format
   const mappedItems: LocalInspectionTaskResult[] = [];
-
-  filtered.forEach((item: any) => {
-    const qItems = (item._parsedQItems as any[]) || [];
-
-    // Check if it's quantitative and has items
+  filtered.forEach((item) => {
+    const qItems = item._parsedQItems || [];
     if (item.isQuantitative && qItems.length > 0) {
       qItems.forEach((qItem) => {
         mappedItems.push({
@@ -168,7 +143,6 @@ function filterItpItems() {
         } as LocalInspectionTaskResult);
       });
     } else {
-      // Qualitative item
       mappedItems.push({
         activity: item.activity,
         controlPoint: item.controlPoint,
@@ -181,266 +155,211 @@ function filterItpItems() {
     }
   });
 
-  formState.items = mappedItems;
+  inspectionItems.value = mappedItems;
 }
 
-// Watchers for filtering
-// Watchers for filtering with debounce to improve performance
 const debouncedFilter = useDebounceFn(() => {
   filterItpItems();
 }, 200);
 
+// Watch for form state changes to refilter ITP items
 watch(
-  () => [
-    formState.processName,
-    formState.level1Component,
-    formState.incomingType,
-  ],
+  () => activeValues.value,
   () => {
     debouncedFilter();
   },
+  { deep: true },
 );
 
-// Ensure ITP items are loaded if itpProjectId is already set (e.g. on edit)
-watch(
-  () => formState.itpProjectId,
-  (newId) => {
-    if (newId) {
-      loadItp();
-    }
-  },
-  { immediate: true },
-);
-
-// Load ITP Items Logic (Simplified)
-async function loadItp() {
-  if (!formState.itpProjectId) return;
+async function loadItp(itpProjectId?: string) {
+  if (!itpProjectId) {
+    rawItpItems.value = [];
+    inspectionItems.value = [];
+    return;
+  }
   try {
-    const items = await getItpList({ projectId: formState.itpProjectId });
+    const items = await getItpList({ projectId: itpProjectId });
     rawItpItems.value = items || [];
-    filterItpItems();
+    await filterItpItems();
   } catch (error) {
     console.error(error);
   }
 }
 
-async function handleWorkOrderChange(val: any, opt: any) {
-  if (opt?.item) {
-    formState.projectName = opt.item.projectName;
-    // Auto-find ITP project
-    try {
-      // Find ITP project by Work Order Number
-      // Since current API returns all projects, we filter on client side
-      // Ideally backend should support filtering
-      const projects = await getItpProjectList();
-      const matchedProject = projects.find((p) => p.workOrderId === val);
+async function handleWorkOrderChange(
+  val: string | undefined,
+  option: { item?: { projectName: string; workOrderNumber: string } },
+) {
+  try {
+    // Explicitly set field value to ensure synchronization
+    formApi.setFieldValue('workOrderNumber', val);
 
-      if (matchedProject) {
-        formState.itpProjectId = matchedProject.id;
-        message.success(`已自动关联 ITP: ${matchedProject.projectName}`);
-        await loadItp();
-      } else {
-        formState.itpProjectId = undefined;
-        formState.items = [];
-        // message.info('未找到关联的 ITP 计划');
-      }
-    } catch (error) {
-      console.error(error);
+    const projects = await getItpProjectList();
+    const workOrderNumber = option?.item?.workOrderNumber;
+
+    // Primarily use project name from work order as requested
+    const projectNameFromWO = option?.item?.projectName || '';
+
+    // Robust matching for ITP plan
+    const matchedProject = projects.find(
+      (p) =>
+        p.workOrderId === val ||
+        (workOrderNumber && p.workOrderNumber === workOrderNumber) ||
+        p.workOrderNumber === val,
+    );
+
+    if (matchedProject) {
+      // Prioritize WO project name, fallback to ITP project name
+      await formApi.setValues({
+        projectName: projectNameFromWO || matchedProject.projectName,
+        itpProjectId: matchedProject.id,
+      });
+      message.success(`已自动关联 ITP: ${matchedProject.projectName}`);
+      await loadItp(matchedProject.id);
+    } else {
+      await formApi.setValues({
+        projectName: projectNameFromWO,
+        itpProjectId: undefined,
+      });
+      rawItpItems.value = [];
+      inspectionItems.value = [];
     }
+
+    // Clear validation error after setting values
+    setTimeout(() => {
+      formApi.validateField('workOrderNumber');
+    }, 200);
+  } catch (error) {
+    console.error(error);
   }
 }
 
+async function handleSupplierChange(val: string | undefined) {
+  formApi.setFieldValue('supplierName', val);
+  setTimeout(() => {
+    formApi.validateField('supplierName');
+  }, 200);
+}
+
+function clearFieldValidator(fieldName: string) {
+  setTimeout(() => {
+    formApi.validateField(fieldName);
+  }, 200);
+}
+
+watch(
+  () => props.type,
+  (newType) => {
+    formApi.setState({ schema: getFormSchema(newType) });
+  },
+  { immediate: true },
+);
+
 watch(
   () => props.record,
-  (val) => {
+  async (val) => {
     if (val && Object.keys(val).length > 0) {
-      Object.assign(formState, cloneDeep(val));
+      const record = val as QmsInspectionApi.DetailedInspectionRecord & {
+        itpProjectId?: string;
+      };
+      await formApi.setValues(val);
+      activeValues.value = val as unknown as Record<string, unknown>; // Sync local state
+      if (record.items)
+        inspectionItems.value = record.items as LocalInspectionTaskResult[];
+      if (record.itpProjectId) await loadItp(record.itpProjectId);
     } else {
-      // Reset defaults
-      Object.assign(formState, {
-        workOrderNumber: '',
-        projectName: '',
-        itpProjectId: undefined,
-        quantity: 1,
-        inspector:
-          userStore.userInfo?.username || userStore.userInfo?.realName || '',
+      await formApi.resetForm();
+      const defaultInspector =
+        userStore.userInfo?.username || userStore.userInfo?.realName || '';
+      const initialVals = {
+        inspector: defaultInspector,
         inspectionDate: dayjs().format('YYYY-MM-DD'),
+        quantity: 1,
         result: 'PASS',
-        remarks: '',
-        supplierName: '',
-        materialName: '',
-        incomingType: undefined,
-        processName: undefined,
-        level1Component: '',
-        level2Component: '',
-        team: '',
-        documents: '',
-        packingListArchived: '是',
-        items: [],
-      });
+      };
+      await formApi.setValues(initialVals);
+      activeValues.value = initialVals; // Sync local state
+      rawItpItems.value = [];
+      inspectionItems.value = [];
     }
   },
   { immediate: true },
 );
 
 defineExpose({
-  getValues: () => formState,
-  validate: () => {
-    /* ... */
+  getValues: async () => {
+    const values = await formApi.getValues();
+    return { ...values, items: inspectionItems.value };
+  },
+  validate: async () => {
+    const { valid } = await formApi.validate();
+    if (!valid) throw new Error('Form validation failed');
+
+    if (inspectionItems.value.length > 0) {
+      const unfilled = inspectionItems.value.filter(
+        (i) =>
+          i.measuredValue === undefined ||
+          i.measuredValue === null ||
+          String(i.measuredValue) === '' ||
+          !i.result,
+      );
+      if (unfilled.length > 0) {
+        message.warning(
+          `请补全关联 ITP 的实测值和判定结果 (剩余 ${unfilled.length} 项)`,
+        );
+        throw new Error('ITP items incomplete');
+      }
+    }
+    return true;
   },
 });
 </script>
 
 <template>
-  <Form layout="vertical" :model="formState">
-    <div class="grid grid-cols-3 gap-4">
-      <Form.Item :label="t('qms.workOrder.workOrderNumber')" required>
-        <WorkOrderSelect
-          v-model:value="formState.workOrderNumber"
-          @change="handleWorkOrderChange"
-        />
-      </Form.Item>
-      <Form.Item :label="t('qms.workOrder.projectName')">
-        <Input v-model:value="formState.projectName" disabled />
-      </Form.Item>
-      <!-- Dynamic Fields -->
-      <Form.Item
-        v-if="config.showIncomingType"
-        :label="t('qms.inspection.records.form.incomingType')"
-      >
-        <Select v-model:value="formState.incomingType">
-          <Select.Option value="原材料">{{
-            t('qms.inspection.records.options.process.rawMaterial')
-          }}</Select.Option>
-          <Select.Option value="外购件">{{
-            t('qms.inspection.records.options.process.outsourced')
-          }}</Select.Option>
-          <Select.Option value="辅材">{{
-            t('qms.inspection.records.options.process.auxiliary')
-          }}</Select.Option>
-          <Select.Option value="机加成品件">{{
-            t('qms.inspection.records.options.process.machined')
-          }}</Select.Option>
-        </Select>
-      </Form.Item>
-      <Form.Item
-        v-if="config.showSupplier"
-        :label="
-          supplierCategory === 'Outsourcing'
-            ? t('qms.outsourcing.entityName')
-            : t('qms.supplier.name')
+  <Form>
+    <!-- Slot for WorkOrderSelect -->
+    <template #workOrderNumber="slotProps">
+      <WorkOrderSelect v-bind="slotProps" @change="handleWorkOrderChange" />
+    </template>
+
+    <!-- Slot for SupplierSelect -->
+    <template #supplierName="slotProps">
+      <SupplierSelect v-bind="slotProps" @change="handleSupplierChange" />
+    </template>
+
+    <!-- Slot for BomItemSelect -->
+    <template #level1Component="slotProps">
+      <BomItemSelect
+        v-bind="slotProps"
+        :work-order-number="activeValues?.workOrderNumber"
+        @change="
+          (val) => {
+            formApi.setFieldValue('level1Component', val);
+            clearFieldValidator('level1Component');
+          }
         "
-      >
-        <SupplierSelect
-          v-model:value="formState.supplierName"
-          :category="supplierCategory"
-          :placeholder="
-            supplierCategory === 'Outsourcing'
-              ? t('afterSales.placeholder.selectSupplier')
-              : t('afterSales.placeholder.selectSupplier')
-          "
-        />
-      </Form.Item>
-      <Form.Item v-if="config.showMaterial" :label="config.labels.materialName">
-        <Input v-model:value="formState.materialName" />
-      </Form.Item>
-
-      <Form.Item
-        v-if="config.showProcess"
-        :label="t('qms.inspection.records.form.process')"
-      >
-        <Select
-          v-model:value="formState.processName"
-          :options="getProcessOptions(t)"
-        />
-      </Form.Item>
-      <Form.Item
-        v-if="config.showLevel1"
-        :label="t('qms.inspection.records.form.level1')"
-      >
-        <BomItemSelect
-          v-model:value="formState.level1Component"
-          :work-order-number="formState.workOrderNumber"
-        />
-      </Form.Item>
-      <Form.Item
-        v-if="config.showLevel2"
-        :label="t('qms.inspection.records.form.componentName')"
-      >
-        <Input v-model:value="formState.level2Component" />
-      </Form.Item>
-      <Form.Item
-        v-if="config.showTeam"
-        :label="t('qms.inspection.records.form.team')"
-      >
-        <TeamSelect v-model:value="formState.team" />
-      </Form.Item>
-
-      <Form.Item
-        v-if="config.showDocuments"
-        :label="t('qms.inspection.records.form.documents')"
-      >
-        <Input v-model:value="formState.documents" />
-      </Form.Item>
-      <Form.Item
-        v-if="config.showPackingList"
-        :label="t('qms.inspection.records.form.packingListArchived')"
-      >
-        <Select v-model:value="formState.packingListArchived">
-          <Select.Option value="是">{{
-            t('common.yes') || '是'
-          }}</Select.Option>
-          <Select.Option value="否">{{ t('common.no') || '否' }}</Select.Option>
-        </Select>
-      </Form.Item>
-
-      <!-- Common -->
-      <Form.Item :label="t('qms.workOrder.quantity')">
-        <InputNumber v-model:value="formState.quantity" class="w-full" />
-      </Form.Item>
-      <Form.Item :label="t('qms.inspection.issues.reportDate')">
-        <DatePicker
-          v-model:value="formState.inspectionDate"
-          value-format="YYYY-MM-DD"
-          class="w-full"
-        />
-      </Form.Item>
-      <Form.Item :label="t('qms.inspection.issues.reportedBy')">
-        <Input v-model:value="formState.inspector" />
-      </Form.Item>
-    </div>
-
-    <div v-if="formState.items.length > 0">
-      <Divider orientation="left">{{
-        t('qms.inspection.records.relatedItp')
-      }}</Divider>
-      <InspectionItemsTable v-model:data-source="formState.items" />
-    </div>
-
-    <!-- 备注 -->
-    <Form.Item :label="t('qms.inspection.fields.remarks')">
-      <Textarea
-        v-model:value="formState.remarks"
-        :placeholder="t('qms.inspection.records.form.placeholder.remarks')"
-        :rows="2"
       />
-    </Form.Item>
+    </template>
 
-    <div class="mt-4 rounded bg-gray-50 p-4">
-      <Form.Item :label="t('qms.inspection.records.form.overallResult')">
-        <Select v-model:value="formState.result" class="w-32">
-          <Select.Option value="PASS"
-            ><Tag color="green">{{
-              t('qms.inspection.resultValue.PASS')
-            }}</Tag></Select.Option
-          >
-          <Select.Option value="FAIL"
-            ><Tag color="red">{{
-              t('qms.inspection.resultValue.FAIL')
-            }}</Tag></Select.Option
-          >
-        </Select>
-      </Form.Item>
-    </div>
+    <!-- Slot for TeamSelect -->
+    <template #team="slotProps">
+      <TeamSelect
+        v-bind="slotProps"
+        @change="
+          (val) => {
+            formApi.setFieldValue('team', val);
+            clearFieldValidator('team');
+          }
+        "
+      />
+    </template>
+
+    <!-- Slot for the ITP items table -->
+    <template #itemsSlot>
+      <div v-if="inspectionItems.length > 0" class="mt-2">
+        <Divider orientation="left">关联 ITP</Divider>
+        <InspectionItemsTable v-model:data-source="inspectionItems" />
+      </div>
+    </template>
   </Form>
 </template>

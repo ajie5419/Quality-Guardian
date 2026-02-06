@@ -16,7 +16,7 @@ const props = defineProps<{
   maxCount?: number;
 }>();
 
-const photos = defineModel<UploadFileWithResponse[]>('photos', {
+const photos = defineModel<UploadFileWithResponse[]>('value', {
   default: () => [],
 });
 

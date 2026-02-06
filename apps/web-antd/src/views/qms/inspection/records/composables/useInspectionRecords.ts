@@ -34,20 +34,28 @@ export function useInspectionRecords() {
   async function handleSubmit() {
     if (!formRef.value) return;
 
-    const values = formRef.value.getValues();
-    // Transform category
-    values.category = activeKey.value.toUpperCase();
-
     try {
+      await formRef.value.validate();
+      const values = await formRef.value.getValues();
+      // Transform category
+      values.category = activeKey.value.toUpperCase();
+
       await (isEdit.value && currentRecord.value?.id
         ? updateInspectionRecord(currentRecord.value.id, values)
         : createInspectionRecord(values));
       message.success('保存成功');
       modalVisible.value = false;
+      currentRecord.value = undefined;
       gridRef.value?.reload();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Submit failed:', error);
-      message.error(error?.message || '提交失败，请重试');
+      let errorMsg = '提交失败，请重试';
+      if (error instanceof Error) {
+        errorMsg = error.message;
+      } else if (typeof error === 'string') {
+        errorMsg = error;
+      }
+      message.error(errorMsg);
     }
   }
 

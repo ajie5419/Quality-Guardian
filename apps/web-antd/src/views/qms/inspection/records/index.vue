@@ -52,6 +52,7 @@ const {
         v-model:open="modalVisible"
         :title="isEdit ? '编辑记录' : '新建记录'"
         width="1000px"
+        :destroy-on-close="true"
         @ok="handleSubmit"
       >
         <InspectionForm

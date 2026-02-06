@@ -320,88 +320,90 @@ onMounted(async () => {
             : 'w-64 opacity-100'
         "
       >
-        <div
-          class="flex items-center justify-between border-b border-gray-100 bg-gray-50/50 p-4"
-        >
-          <span class="font-bold text-gray-700">知识分类</span>
-          <Space :size="8">
-            <Tooltip v-if="canCreate" title="新增分类">
-              <Button
-                type="primary"
-                size="small"
-                @click="openCategoryModal()"
-                class="flex h-8 w-8 items-center justify-center p-0 shadow-sm"
-              >
-                <span
-                  class="text-xl font-bold text-white"
-                  style="display: block; margin-top: -2px; line-height: 1"
-                  >+</span
-                >
-              </Button>
-            </Tooltip>
-            <Button
-              type="text"
-              size="small"
-              class="flex h-7 items-center gap-1 px-2 text-gray-500 hover:text-gray-700"
-              @click="isSideBarCollapsed = true"
-            >
-              <span class="i-lucide-panel-left-close text-lg"></span>
-              <span class="text-xs">收起</span>
-            </Button>
-          </Space>
-        </div>
-        <div class="flex-1 overflow-y-auto p-2">
-          <Tree
-            :tree-data="categoryTree as any"
-            :field-names="{ title: 'name', key: 'id' }"
-            @select="handleCategorySelect"
-            :selected-keys="selectedCategoryId"
-            block-node
-            default-expand-all
+        <template v-if="!isSideBarCollapsed">
+          <div
+            class="flex items-center justify-between border-b border-gray-100 bg-gray-50/50 p-4"
           >
-            <template #title="node">
-              <div
-                class="group/node flex items-center justify-between py-1 pr-1"
+            <span class="font-bold text-gray-700">知识分类</span>
+            <Space :size="8">
+              <Tooltip v-if="canCreate" title="新增分类">
+                <Button
+                  type="primary"
+                  size="small"
+                  @click="openCategoryModal()"
+                  class="flex h-8 w-8 items-center justify-center p-0 shadow-sm"
+                >
+                  <span
+                    class="text-xl font-bold text-white"
+                    style="display: block; margin-top: -2px; line-height: 1"
+                    >+</span
+                  >
+                </Button>
+              </Tooltip>
+              <Button
+                type="text"
+                size="small"
+                class="flex h-7 items-center gap-1 px-2 text-gray-500 hover:text-gray-700"
+                @click="isSideBarCollapsed = true"
               >
-                <span
-                  class="flex-1 truncate text-gray-700"
-                  :title="node.name"
-                  >{{ node.name }}</span
-                >
-
-                <!-- 操作区：默认半透明，悬浮高亮 -->
+                <span class="i-lucide-panel-left-close text-lg"></span>
+                <span class="text-xs">收起</span>
+              </Button>
+            </Space>
+          </div>
+          <div class="flex-1 overflow-y-auto p-2">
+            <Tree
+              :tree-data="categoryTree as any"
+              :field-names="{ title: 'name', key: 'id' }"
+              @select="handleCategorySelect"
+              :selected-keys="selectedCategoryId"
+              block-node
+              default-expand-all
+            >
+              <template #title="node">
                 <div
-                  v-if="canEdit || canCreate || canDelete"
-                  class="flex items-center gap-1 opacity-20 transition-opacity group-hover/node:opacity-100"
+                  class="group/node flex items-center justify-between py-1 pr-1"
                 >
-                  <Tooltip v-if="canCreate" title="增加子类">
-                    <span
-                      class="cursor-pointer rounded px-1 text-sm font-bold text-blue-500 hover:bg-blue-100"
-                      @click.stop="openCategoryModal(node.id)"
-                      >+</span
-                    >
-                  </Tooltip>
-                  <Tooltip v-if="canEdit" title="重命名">
-                    <span
-                      class="cursor-pointer rounded border border-orange-200 px-1 text-[10px] text-orange-500 hover:bg-orange-100"
-                      @click.stop="openCategoryModal(undefined, node)"
-                    >
-                      编辑
-                    </span>
-                  </Tooltip>
-                  <Tooltip v-if="canDelete" title="删除分类">
-                    <span
-                      class="cursor-pointer rounded border border-red-200 px-1 text-[10px] text-red-500 hover:bg-red-100"
-                      @click.stop="handleDeleteCategory(node)"
-                    >
-                      删除
-                    </span>
-                  </Tooltip>
+                  <span
+                    class="flex-1 truncate text-gray-700"
+                    :title="node.name"
+                    >{{ node.name }}</span
+                  >
+
+                  <!-- 操作区：默认半透明，悬浮高亮 -->
+                  <div
+                    v-if="canEdit || canCreate || canDelete"
+                    class="flex items-center gap-1 opacity-20 transition-opacity group-hover/node:opacity-100"
+                  >
+                    <Tooltip v-if="canCreate" title="增加子类">
+                      <span
+                        class="cursor-pointer rounded px-1 text-sm font-bold text-blue-500 hover:bg-blue-100"
+                        @click.stop="openCategoryModal(node.id)"
+                        >+</span
+                      >
+                    </Tooltip>
+                    <Tooltip v-if="canEdit" title="重命名">
+                      <span
+                        class="cursor-pointer rounded border border-orange-200 px-1 text-[10px] text-orange-500 hover:bg-orange-100"
+                        @click.stop="openCategoryModal(undefined, node)"
+                      >
+                        编辑
+                      </span>
+                    </Tooltip>
+                    <Tooltip v-if="canDelete" title="删除分类">
+                      <span
+                        class="cursor-pointer rounded border border-red-200 px-1 text-[10px] text-red-500 hover:bg-red-100"
+                        @click.stop="handleDeleteCategory(node)"
+                      >
+                        删除
+                      </span>
+                    </Tooltip>
+                  </div>
                 </div>
-              </div>
-            </template>
-          </Tree>
-        </div>
+              </template>
+            </Tree>
+          </div>
+        </template>
       </div>
 
       <!-- 中间列表区 -->
@@ -469,7 +471,11 @@ onMounted(async () => {
                 </div>
                 <div class="flex items-center justify-between">
                   <div class="flex gap-1">
-                    <Tag v-for="tag in item.tags" :key="tag" size="small">
+                    <Tag
+                      v-for="(tag, tagIdx) in item.tags"
+                      :key="`${item.id}-tag-${tagIdx}`"
+                      size="small"
+                    >
                       {{ tag }}
                     </Tag>
                   </div>
@@ -564,8 +570,8 @@ onMounted(async () => {
               </div>
               <div class="grid grid-cols-2 gap-4">
                 <Card
-                  v-for="file in articleDetail.attachments"
-                  :key="file.name"
+                  v-for="(file, fileIdx) in articleDetail.attachments"
+                  :key="`attachment-${fileIdx}-${file.name}`"
                   size="small"
                   class="hover:bg-gray-50"
                 >

@@ -1,0 +1,44 @@
+
+> quality-guardian-system@1.1.9 lint /Users/zhaoxiaojie/Downloads/main/Quality-Guardian
+> vsh lint
+
+Checking formatting...
+
+/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd/src/views/qms/inspection/records/composables/useInspectionRecords.ts
+  55:13  error  Nest ternary expression should be parenthesized  unicorn/no-nested-ternary
+
+✖ 1 problem (1 error, 0 warnings)
+  1 error and 0 warnings potentially fixable with the `--fix` option.
+
+file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/return/final-error.js:6
+	return new ErrorClass(message, options);
+	       ^
+
+ExecaError: Command failed with exit code 1: eslint . --cache
+    at getFinalError (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/return/final-error.js:6:9)
+    at makeError (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/return/result.js:108:16)
+    at getAsyncResult (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/methods/main-async.js:168:4)
+    at handlePromise (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/execa@9.6.0/node_modules/execa/lib/methods/main-async.js:151:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Promise.all (index 0)
+    at async CAC.runLint (/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/scripts/vsh/src/lint/index.ts:27:3) {
+  shortMessage: 'Command failed with exit code 1: eslint . --cache',
+  command: 'eslint . --cache',
+  escapedCommand: 'eslint . --cache',
+  cwd: '/Users/zhaoxiaojie/Downloads/main/Quality-Guardian',
+  durationMs: 3404.22575,
+  failed: true,
+  timedOut: false,
+  isCanceled: false,
+  isGracefullyCanceled: false,
+  isTerminated: false,
+  isMaxBuffer: false,
+  isForcefullyTerminated: false,
+  exitCode: 1,
+  stdio: [ undefined, undefined, undefined ],
+  ipcOutput: [],
+  pipedFrom: []
+}
+
+Node.js v24.10.0
+ ELIFECYCLE  Command failed with exit code 1.

@@ -47,7 +47,12 @@ watch(
   () => props.value,
   (val) => {
     const editor = editorRef.value;
-    if (editor && !editor.isDestroyed() && val !== editor.getHtml()) {
+    // Check if editor exists and is not destroyed (handle both function and property access)
+    const isDestroyed =
+      typeof editor?.isDestroyed === 'function'
+        ? editor.isDestroyed()
+        : editor?.isDestroyed;
+    if (editor && !isDestroyed && val !== editor.getHtml()) {
       try {
         editor.setHtml(val);
       } catch (error) {

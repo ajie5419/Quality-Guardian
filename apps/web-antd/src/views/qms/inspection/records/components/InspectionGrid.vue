@@ -109,7 +109,7 @@ const gridOptions = computed(() => ({
         const worksheet = workbook.Sheets[sheetName]!;
         const results = XLSX.utils.sheet_to_json(worksheet) as Record<
           string,
-          any
+          unknown
         >[];
 
         if (!results || results.length === 0) return;
@@ -119,7 +119,10 @@ const gridOptions = computed(() => ({
           results.map((row) => {
             return {
               ...row,
-              inspectionDate: (row.inspectionDate as string) || new Date(),
+              inspectionDate:
+                typeof row.inspectionDate === 'string'
+                  ? row.inspectionDate
+                  : new Date().toISOString(),
             } as Partial<QmsInspectionApi.InspectionRecord>;
           });
 
@@ -158,23 +161,27 @@ const gridOptions = computed(() => ({
     ajax: {
       query: async (
         { page }: { page: { currentPage: number; pageSize: number } },
-        formValues: Record<string, any>,
+        formValues: Record<string, unknown>,
       ) => {
         return await getInspectionRecords({
           type: props.type,
           year: props.year,
           page: page.currentPage,
           pageSize: page.pageSize,
-          keyword: formValues?.keyword,
+          keyword: formValues?.keyword as string | undefined,
         });
       },
-      queryAll: async ({ formValues }: { formValues: Record<string, any> }) => {
+      queryAll: async ({
+        formValues,
+      }: {
+        formValues: Record<string, unknown>;
+      }) => {
         const res = await getInspectionRecords({
           type: props.type,
           year: props.year,
           page: 1,
           pageSize: 100_000,
-          keyword: formValues?.keyword,
+          keyword: formValues?.keyword as string | undefined,
         });
         return { items: res.items };
       },

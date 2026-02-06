@@ -5,13 +5,17 @@ import { computed, ref, toRef, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
-import { Form, Modal } from 'ant-design-vue';
+import { Button, Modal, Switch, Tooltip } from 'ant-design-vue';
 
+import { useVbenForm } from '#/adapter/form';
+
+import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
+import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
 import { useAiAnalysis } from '../composables/useAiAnalysis';
 import { useIssueForm } from '../composables/useIssueForm';
 import { useNcNumber } from '../composables/useNcNumber';
-import IssueBasicInfo from './IssueBasicInfo.vue';
-import IssueDefectInfo from './IssueDefectInfo.vue';
+import { DEPT_TYPE_KEYWORDS } from '../constants';
+import { getIssueFormSchema } from './issueFormData';
 import IssuePhotoUpload from './IssuePhotoUpload.vue';
 import IssueSimilarCases from './IssueSimilarCases.vue';
 
@@ -29,104 +33,34 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const formRef = ref();
 
-const rules = computed(() => ({
-  reportDate: [
-    {
-      required: true,
-      message: t('ui.formRules.required', [
-        t('qms.inspection.issues.reportDate'),
-      ]),
-    },
-  ],
-  workOrderNumber: [
-    {
-      required: true,
-      message: t('ui.formRules.selectRequired', [
-        t('qms.workOrder.workOrderNumber'),
-      ]),
-    },
-  ],
-  partName: [
-    {
-      required: true,
-      message: t('ui.formRules.required', [
-        t('qms.inspection.issues.partName'),
-      ]),
-    },
-  ],
-  processName: [
-    {
-      required: true,
-      message: t('ui.formRules.selectRequired', [
-        t('qms.inspection.issues.processName'),
-      ]),
-    },
-  ],
-  quantity: [
-    {
-      required: true,
-      message: t('ui.formRules.required', [t('qms.workOrder.quantity')]),
-    },
-  ],
-  responsibleDepartment: [
-    {
-      required: true,
-      message: t('ui.formRules.selectRequired', [
-        t('qms.inspection.issues.responsibleDepartment'),
-      ]),
-    },
-  ],
-  status: [
-    {
-      required: true,
-      message: t('ui.formRules.selectRequired', [
-        t('qms.inspection.issues.statusLabel'),
-      ]),
-    },
-  ],
-  defectType: [
-    {
-      required: true,
-      message: t('ui.formRules.selectRequired', [
-        t('qms.inspection.issues.defectType'),
-      ]),
-    },
-  ],
-  defectSubtype: [
-    {
-      required: true,
-      message: t('ui.formRules.selectRequired', [
-        t('qms.inspection.issues.defectSubtype'),
-      ]),
-    },
-  ],
-  description: [
-    {
-      required: true,
-      message: t('ui.formRules.required', [
-        t('qms.inspection.issues.description'),
-      ]),
-    },
-  ],
-  severity: [
-    {
-      required: true,
-      message: t('ui.formRules.selectRequired', [
-        t('qms.inspection.issues.severity'),
-      ]),
-    },
-  ],
-}));
+// Local reactive state for form values to ensure reactivity in slots and composables
+const formValues = ref<Record<string, any>>({});
 
-// Refs for composables
+const [Form, formApi] = useVbenForm({
+  commonConfig: {
+    // 统一布局配置
+    labelWidth: 100,
+    componentProps: {
+      class: 'w-full',
+    },
+  },
+  wrapperClass: 'grid grid-cols-2 gap-x-4 gap-y-0',
+  handleSubmit: () => submit(),
+  handleValuesChange: (vals) => {
+    formValues.value = vals;
+  },
+  schema: getIssueFormSchema(),
+  showDefaultActions: false, // Handle submit via Modal OK button
+});
+
+// Composable integration
 const openRef = toRef(props, 'open');
 const isEditModeRef = toRef(props, 'isEditMode');
 const initialDataRef = computed(() => props.initialData);
 
-// 表单逻辑
-const { formState, validateAndSubmit } = useIssueForm({
+const { submit } = useIssueForm({
+  formApi,
   initialData: initialDataRef,
   isEditMode: isEditModeRef,
   open: openRef,
@@ -134,13 +68,12 @@ const { formState, validateAndSubmit } = useIssueForm({
   onClose: () => emit('update:open', false),
 });
 
-// NC 编号生成
+// Composable integration using the synced formValues
 const { isAutoNc, resetAutoNc } = useNcNumber({
-  formState,
+  formApi,
   isEditMode: isEditModeRef,
 });
 
-// AI 分析
 const {
   isAiAnalyzing,
   isMatchingCases,
@@ -149,9 +82,80 @@ const {
   matchHistory,
   applyCaseSolution,
   clearMatchedCases,
-} = useAiAnalysis({ formState });
+} = useAiAnalysis({ formState: formValues as any });
 
-// 重置状态
+// Department finding logic
+function findDeptTitle(tree: DeptNode[], value?: string): string | undefined {
+  if (!value) return undefined;
+  for (const node of tree) {
+    const nodeTitle = (node as any).title || (node as any).label;
+    if (node.value === value) return nodeTitle;
+    if (node.children) {
+      const found = findDeptTitle(node.children, value);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+// Supplier category calculation
+const targetUnitCategory = computed(() => {
+  const deptId = formValues.value.responsibleDepartment as string;
+  const name = findDeptTitle(props.deptTreeData, deptId) || '';
+  if (name.includes(DEPT_TYPE_KEYWORDS.PURCHASE)) return 'Supplier';
+  if (
+    name.includes(DEPT_TYPE_KEYWORDS.PRODUCTION) ||
+    name.includes('生产') ||
+    name.includes(DEPT_TYPE_KEYWORDS.OUTSOURCED)
+  )
+    return 'Outsourcing';
+  return 'Supplier';
+});
+
+// Determine if supplier field should be visible
+const shouldShowSupplier = computed(() => {
+  const deptId = formValues.value.responsibleDepartment as string;
+  if (!deptId) return false;
+  const name = findDeptTitle(props.deptTreeData, deptId) || '';
+  return (
+    name.includes(DEPT_TYPE_KEYWORDS.PURCHASE) ||
+    name.includes(DEPT_TYPE_KEYWORDS.PRODUCTION) ||
+    name.includes(DEPT_TYPE_KEYWORDS.OUTSOURCED) ||
+    name.includes('生产')
+  );
+});
+
+// Watchers for initialization
+watch(
+  () => props.deptTreeData,
+  (data) => {
+    formApi.updateSchema([
+      {
+        fieldName: 'responsibleDepartment',
+        componentProps: { treeData: data },
+      },
+    ]);
+  },
+  { immediate: true },
+);
+
+// Watcher to update supplier field visibility based on department selection
+watch(
+  shouldShowSupplier,
+  (show) => {
+    formApi.updateSchema([
+      {
+        fieldName: 'supplierName',
+        dependencies: {
+          triggerFields: ['responsibleDepartment'],
+          show: () => show,
+        },
+      },
+    ]);
+  },
+  { immediate: true },
+);
+
 watch(openRef, (val) => {
   if (val && !props.isEditMode) {
     resetAutoNc();
@@ -159,13 +163,22 @@ watch(openRef, (val) => {
   }
 });
 
-async function handleOk() {
-  try {
-    await formRef.value.validate();
-    validateAndSubmit();
-  } catch {
-    // validation failed
+// Event Handlers
+function handleWorkOrderChange(val: any, option: any) {
+  const wo = option?.item;
+  if (wo) {
+    formApi.setValues({
+      projectName: wo.projectName || '',
+      division: wo.division || '',
+    });
+    emit('searchWorkOrder', wo.workOrderNumber);
+  } else {
+    emit('searchWorkOrder', String(val));
   }
+}
+
+async function handleOk() {
+  await submit();
 }
 
 function handleCancel() {
@@ -186,36 +199,94 @@ function handleCancel() {
     @cancel="handleCancel"
     @ok="handleOk"
   >
-    <Form ref="formRef" :model="formState" :rules="rules" layout="vertical">
-      <div class="max-h-[650px] overflow-y-auto p-2">
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <!-- 左侧列：基本信息 -->
-          <IssueBasicInfo
-            v-model:form-state="formState"
-            v-model:is-auto-nc="isAutoNc"
-            :dept-tree-data="deptTreeData"
-            :is-edit-mode="isEditMode"
-            @search-work-order="(val) => emit('searchWorkOrder', val)"
-          />
-
-          <!-- 右侧列：缺陷信息 -->
-          <div class="space-y-4">
-            <IssueDefectInfo
-              v-model:form-state="formState"
-              :is-ai-analyzing="isAiAnalyzing"
-              :is-matching-cases="isMatchingCases"
-              @ai-analyze="analyzeIssue"
-              @match-history="matchHistory"
-            />
-
-            <!-- 照片上传 -->
-            <IssuePhotoUpload v-model:photos="formState.photos" />
+    <div class="max-h-[700px] overflow-y-auto p-2">
+      <Form>
+        <!-- NC Number Slot: Add Auto Switch -->
+        <template #ncNumber="{ modelValue }">
+          <div class="flex items-center gap-2">
+            <div class="relative flex-1">
+              <span
+                class="ant-input ant-input-disabled inline-block w-full rounded border bg-gray-50 px-2 py-1"
+              >
+                {{
+                  modelValue ||
+                  t('qms.inspection.issues.generateNumberPlaceholder')
+                }}
+              </span>
+            </div>
+            <div
+              v-if="!isEditMode"
+              class="flex flex-shrink-0 items-center gap-2"
+            >
+              <span class="text-xs text-gray-400">自动生成</span>
+              <Switch v-model:checked="isAutoNc" size="small" />
+            </div>
           </div>
-        </div>
+        </template>
 
-        <!-- 相似案例推荐 -->
-        <IssueSimilarCases :cases="matchedCases" @apply="applyCaseSolution" />
-      </div>
-    </Form>
+        <!-- Work Order Slot -->
+        <template #workOrderNumber="slotProps">
+          <WorkOrderSelect v-bind="slotProps" @change="handleWorkOrderChange" />
+        </template>
+
+        <!-- Supplier Slot -->
+        <template #supplierName="slotProps">
+          <SupplierSelect
+            v-bind="slotProps"
+            :key="targetUnitCategory"
+            :category="targetUnitCategory"
+          />
+        </template>
+
+        <!-- Description Slot: AI Buttons in Label/Top -->
+        <template #description-label>
+          <div class="flex w-full items-center justify-between">
+            <span>{{ t('qms.inspection.issues.description') }}</span>
+            <div class="flex gap-2">
+              <Tooltip :title="t('qms.inspection.issues.aiAnalyzeTooltip')">
+                <Button
+                  :loading="isAiAnalyzing"
+                  size="small"
+                  type="link"
+                  @click="analyzeIssue"
+                >
+                  <span class="i-lucide-sparkles mr-1"></span>
+                  {{ t('qms.inspection.issues.aiAnalyze') }}
+                </Button>
+              </Tooltip>
+              <Tooltip :title="t('qms.inspection.issues.matchHistoryTooltip')">
+                <Button
+                  :loading="isMatchingCases"
+                  size="small"
+                  type="link"
+                  @click="matchHistory"
+                >
+                  <span class="i-lucide-history mr-1"></span>
+                  {{ t('qms.inspection.issues.matchCases') }}
+                </Button>
+              </Tooltip>
+            </div>
+          </div>
+        </template>
+
+        <!-- Photos Slot -->
+        <template #photos="slotProps">
+          <IssuePhotoUpload v-bind="slotProps" />
+        </template>
+      </Form>
+
+      <!-- Similar Cases: Outside the Form grid but inside the modal scroll -->
+      <IssueSimilarCases
+        v-if="matchedCases.length > 0"
+        :cases="matchedCases"
+        @apply="(solution) => applyCaseSolution(solution)"
+      />
+    </div>
   </Modal>
 </template>
+
+<style scoped>
+:deep(.ant-form-item) {
+  margin-bottom: 16px;
+}
+</style>

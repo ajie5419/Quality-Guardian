@@ -1,6 +1,6 @@
 import type { Ref } from 'vue';
 
-import type { IssueFormState, MatchedCase } from '../types';
+import type { MatchedCase } from '../types';
 
 import { ref } from 'vue';
 
@@ -11,7 +11,7 @@ import { message } from 'ant-design-vue';
 import { analyzeQualityIssue, matchHistoryCases } from '#/api/ai';
 
 interface UseAiAnalysisOptions {
-  formState: Ref<IssueFormState>;
+  formState: Ref<any>;
 }
 
 /**

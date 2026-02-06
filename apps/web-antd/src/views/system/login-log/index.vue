@@ -65,7 +65,9 @@ const gridOptions = computed<VxeGridProps>(() => ({
       width: 140,
       formatter: ({ cellValue }) => {
         if (!cellValue) return '';
-        return cellValue === '::1' ? '127.0.0.1' : cellValue.replace(/^::ffff:/, '');
+        return cellValue === '::1'
+          ? '127.0.0.1'
+          : cellValue.replace(/^::ffff:/, '');
       },
     },
     { field: 'browser', title: '浏览器', width: 120 },

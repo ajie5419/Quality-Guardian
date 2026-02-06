@@ -21,15 +21,18 @@ export default defineEventHandler(async (event) => {
   }
 
   // Data Ownership Check
+  let existingNcNumber: null | string = null;
   try {
     const existingRecord = await prisma.quality_records.findUnique({
       where: { id },
-      select: { inspector: true },
+      select: { inspector: true, nonConformanceNumber: true },
     });
 
     if (!existingRecord) {
       return useResponseError('记录不存在');
     }
+
+    existingNcNumber = existingRecord.nonConformanceNumber;
 
     const userRoles = userinfo.roles || [];
     const isAdmin =
@@ -54,8 +57,13 @@ export default defineEventHandler(async (event) => {
       updatedAt: new Date(),
     };
 
-    if (bodyRecord.ncNumber !== undefined)
+    // Only update NC number if it actually changed to avoid unique constraint issues
+    if (
+      bodyRecord.ncNumber !== undefined &&
+      bodyRecord.ncNumber !== existingNcNumber
+    ) {
       updateData.nonConformanceNumber = bodyRecord.ncNumber || null;
+    }
     if (bodyRecord.workOrderNumber)
       updateData.workOrderNumber = bodyRecord.workOrderNumber;
     if (bodyRecord.projectName) updateData.projectName = bodyRecord.projectName;

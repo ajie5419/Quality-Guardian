@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { Dept } from '#/api/system/dept';
+
 import { onMounted, ref } from 'vue';
 
 import { Select } from 'ant-design-vue';
@@ -35,33 +37,26 @@ async function loadData() {
       getSupplierList({ page: 1, pageSize: 1000, category: 'outsourcing' }),
     ]);
 
-    const targetDepts: any[] = [];
+    const targetDepts: Dept[] = [];
 
-    // 策略：精确定位 "生产 OBU" (或类似名称的部门)，然后只收集其【直接子节点】
-    // 假设 "生产 OBU" 的名称包含 "生产" 或 "制造"
-    // 辅助函数：收集指定节点下的所有叶子节点（即具体的班组）
-    const collectLeaves = (node: any, leaves: any[]) => {
+    // 精确类型定义
+    const collectLeaves = (node: Dept, leaves: Dept[]) => {
       if (!node.children || node.children.length === 0) {
         leaves.push(node);
       } else {
-        node.children.forEach((child: any) => collectLeaves(child, leaves));
+        node.children.forEach((child) => collectLeaves(child, leaves));
       }
     };
 
-    // 策略：精确定位 "生产 OBU" (或类似名称的部门)，然后收集其下所有的【叶子节点】
-    // 这样可以确保无论层级多深（OBU -> 车间 -> 班组），都能选到底层的班组
-    const findProductionObuAndCollectLeaves = (nodes: any[]) => {
+    const findProductionObuAndCollectLeaves = (nodes: Dept[]) => {
       for (const node of nodes) {
         // 判断当前节点是否是目标 OBU
         const isProductionObu =
           node.name.includes('生产') || node.name.includes('制造');
 
         if (isProductionObu) {
-          // 找到了 OBU，递归收集它下面所有的叶子节点（班组）
           collectLeaves(node, targetDepts);
-          // 找到当前分支的 OBU 后，不再深入寻找其他 OBU 标志，而是已经转为收集叶子了
         } else {
-          // 当前节点不是 OBU，继续在其子节点中寻找 OBU
           if (node.children && node.children.length > 0) {
             findProductionObuAndCollectLeaves(node.children);
           }
@@ -69,11 +64,11 @@ async function loadData() {
       }
     };
 
-    findProductionObuAndCollectLeaves(deptList as any[]);
+    findProductionObuAndCollectLeaves(deptList);
 
-    // 如果没有找到任何 OBU，作为兜底，还是显示所有叶子节点，避免空列表
+    // 如果没有找到任何 OBU，作为兜底，还是显示所有叶子节点
     if (targetDepts.length === 0) {
-      const findLeaves = (nodes: any[]) => {
+      const findLeaves = (nodes: Dept[]) => {
         nodes.forEach((node) => {
           if (node.children && node.children.length > 0) {
             findLeaves(node.children);
@@ -82,7 +77,7 @@ async function loadData() {
           }
         });
       };
-      findLeaves(deptList as any[]);
+      findLeaves(deptList);
     }
 
     const internalOptions = targetDepts.map((d) => ({

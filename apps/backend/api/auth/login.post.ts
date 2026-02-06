@@ -13,7 +13,8 @@ import {
 
 export default defineEventHandler(async (event) => {
   const { password, username } = await readBody(event);
-  let ip = getHeader(event, 'x-forwarded-for') || event.node.req.socket.remoteAddress;
+  let ip =
+    getHeader(event, 'x-forwarded-for') || event.node.req.socket.remoteAddress;
   if (typeof ip === 'string' && ip.includes(',')) {
     ip = ip.split(',')[0].trim();
   }

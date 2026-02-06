@@ -118,6 +118,13 @@ if ! docker-compose run --rm backend sh -c "cd /app && ./apps/backend/node_modul
     exit 1
 fi
 
+echo "🌱 执行数据库播种 (db seed)..."
+# 🌟 最终修复方案：
+# 1. 进入脚本所在目录 /app/prisma
+# 2. 建立指向后端完整 node_modules 的软链接
+# 3. 直接运行 seed.js。这样 Node 会在当前目录找依赖，且 pnpm 的相对路径软链接能保持生效。
+docker-compose run --rm backend sh -c "cd /app/prisma && ln -sfn ../apps/backend/node_modules node_modules && node seed.js"
+
 echo "🔄 更新后端服务..."
 # 🌟 关键修复：单台 ECS 不要用 scale=2，直接用 recreate
 docker-compose up -d --no-deps backend

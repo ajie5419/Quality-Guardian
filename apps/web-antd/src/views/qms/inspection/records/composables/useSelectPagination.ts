@@ -5,15 +5,17 @@ import { reactive, ref, watch } from 'vue';
 import { useDebounceFn } from '@vueuse/core';
 
 export interface UseSelectPaginationOptions<T> {
-  fetchDataFn: (params: any) => Promise<{ items: T[]; total: number }>;
-  getParams: (keyword: string) => Record<string, any>;
+  fetchDataFn: (
+    params: Record<string, unknown>,
+  ) => Promise<{ items: T[]; total: number }>;
+  getParams: (keyword: string) => Record<string, unknown>;
   valueKey: keyof T;
   echoFetcher?: (val: string) => Promise<null | T>;
 }
 
 export function useSelectPagination<T>(
   optionsConfig: UseSelectPaginationOptions<T>,
-  propsValue: Ref<any>,
+  propsValue: Ref<T[keyof T] | undefined>,
   emit: (event: string, ...args: any[]) => void,
 ) {
   const { fetchDataFn, getParams, valueKey, echoFetcher } = optionsConfig;
@@ -74,7 +76,7 @@ export function useSelectPagination<T>(
           // Fetch specific if missing
           if (echoFetcher) {
             try {
-              const exactMatch = await echoFetcher(currentVal);
+              const exactMatch = await echoFetcher(String(currentVal));
               if (exactMatch) {
                 cachedSelectedItem.value = exactMatch;
                 uniqueMap.set(currentVal, exactMatch);
@@ -110,11 +112,14 @@ export function useSelectPagination<T>(
     }
   };
 
-  const handleChange = (val: T[keyof T] | undefined, option: any) => {
+  const handleChange = (
+    val: T[keyof T] | undefined,
+    option: Record<string, unknown> & { item?: T },
+  ) => {
     emit('update:value', val);
     emit('change', val, option);
     if (val && option) {
-      cachedSelectedItem.value = option.item || option;
+      cachedSelectedItem.value = option.item || (option as unknown as T);
     } else if (!val) {
       cachedSelectedItem.value = null;
     }
@@ -123,7 +128,7 @@ export function useSelectPagination<T>(
   watch(
     () => propsValue.value,
     (newVal) => {
-      if (newVal && !options.value.some((o: any) => o[valueKey] === newVal)) {
+      if (newVal && !options.value.some((o) => o[valueKey] === newVal)) {
         // Trigger fetch (which handles echo) or specific echo fetch?
         // Original code re-fetches list. Let's keep it simple.
         fetchItems(searchText.value, false);

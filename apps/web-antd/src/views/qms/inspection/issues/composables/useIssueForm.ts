@@ -2,13 +2,14 @@ import type { Ref } from 'vue';
 
 import type { InspectionIssue, IssueFormState } from '../types';
 
-import { ref, watch } from 'vue';
+import { watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
 import { message } from 'ant-design-vue';
 
+import { useVbenForm } from '#/adapter/form';
 import {
   createInspectionIssue,
   updateInspectionIssue,
@@ -16,38 +17,29 @@ import {
 
 import { DEFAULT_VALUES } from '../constants';
 
+type FormApi = ReturnType<typeof useVbenForm>[1];
+
 /**
- * 创建初始表单状态
+ * 创建初始数据
  */
-export function createInitialFormState(inspector = ''): IssueFormState {
+export function createInitialData(inspector = ''): Partial<IssueFormState> {
   return {
-    ncNumber: '',
+    ncNumber: '', // Explicitly reset NC number for new issues
     reportDate: new Date().toISOString().split('T')[0],
-    workOrderNumber: '',
     status: DEFAULT_VALUES.DEFAULT_STATUS,
-    projectName: '',
-    partName: '',
-    processName: '',
-    description: '',
     quantity: DEFAULT_VALUES.DEFAULT_QUANTITY,
-    rootCause: '',
-    solution: '',
     lossAmount: 0,
-    responsibleDepartment: '',
-    supplierName: '',
     inspector,
     claim: DEFAULT_VALUES.DEFAULT_CLAIM,
     photos: [],
-    division: '',
     defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE,
     defectSubtype: DEFAULT_VALUES.DEFAULT_DEFECT_SUBTYPE,
     severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
-    divisionId: undefined,
-    responsibleDepartmentId: undefined,
   };
 }
 
 interface UseIssueFormOptions {
+  formApi: FormApi;
   initialData?: Ref<Partial<InspectionIssue> | undefined>;
   isEditMode: Ref<boolean>;
   open: Ref<boolean>;
@@ -56,35 +48,30 @@ interface UseIssueFormOptions {
 }
 
 /**
- * 问题表单 composable
+ * 问题表单 composable (Refactored for Vben Form)
  */
 export function useIssueForm(options: UseIssueFormOptions) {
-  const { initialData, isEditMode, open, onSuccess, onClose } = options;
+  const { formApi, initialData, isEditMode, open, onSuccess, onClose } =
+    options;
   const { t } = useI18n();
   const userStore = useUserStore();
-
-  const formState = ref<IssueFormState>(
-    createInitialFormState(
-      userStore.userInfo?.realName || userStore.userInfo?.username || '',
-    ),
-  );
 
   /**
    * 重置表单
    */
-  function resetForm() {
-    formState.value = createInitialFormState(
-      userStore.userInfo?.realName || userStore.userInfo?.username || '',
-    );
+  async function resetForm() {
+    await formApi.resetForm();
+    const defaultInspector =
+      userStore.userInfo?.realName || userStore.userInfo?.username || '';
+    await formApi.setValues(createInitialData(defaultInspector));
   }
 
   /**
    * 从数据初始化表单
    */
-  function initFromData(data: Partial<InspectionIssue>) {
+  async function initFromData(data: Partial<InspectionIssue>) {
     const { photos, ...rest } = data;
 
-    // 修复嵌套三元运算符以满足 unicorn/no-nested-ternary 和 prettier 格式
     let photoArray: string[] = [];
     if (Array.isArray(photos)) {
       photoArray = photos;
@@ -92,8 +79,8 @@ export function useIssueForm(options: UseIssueFormOptions) {
       photoArray = [photos as unknown as string];
     }
 
-    formState.value = {
-      ...(rest as IssueFormState),
+    const values = {
+      ...(rest as any),
       photos: photoArray.map((url, index) => ({
         uid: String(index),
         name: `Photo ${index + 1}`,
@@ -101,6 +88,7 @@ export function useIssueForm(options: UseIssueFormOptions) {
         url,
       })),
     };
+    await formApi.setValues(values);
   }
 
   /**
@@ -108,7 +96,10 @@ export function useIssueForm(options: UseIssueFormOptions) {
    */
   async function submit() {
     try {
-      const rawData = { ...formState.value };
+      const { valid } = await formApi.validate();
+      if (!valid) return;
+
+      const rawData = await formApi.getValues();
 
       // Transform photos to string[] (urls)
       const photos =
@@ -128,8 +119,8 @@ export function useIssueForm(options: UseIssueFormOptions) {
         severity: rawData.severity || DEFAULT_VALUES.DEFAULT_SEVERITY,
       };
 
-      if (isEditMode.value && data.id) {
-        await updateInspectionIssue(data.id, data as InspectionIssue);
+      if (isEditMode.value && (data as any).id) {
+        await updateInspectionIssue((data as any).id, data as InspectionIssue);
         message.success(t('common.saveSuccess'));
       } else {
         await createInspectionIssue(data as InspectionIssue);
@@ -143,37 +134,21 @@ export function useIssueForm(options: UseIssueFormOptions) {
       const errorMessage =
         error instanceof Error ? error.message : t('common.saveFailed');
       message.error(errorMessage);
-      throw error;
     }
-  }
-
-  /**
-   * 验证并提交
-   */
-  function validateAndSubmit() {
-    if (!formState.value.workOrderNumber) {
-      message.error(t('qms.inspection.issues.selectWorkOrder'));
-      return;
-    }
-    submit();
   }
 
   // 监听弹窗打开，初始化表单
-  watch(open, (val) => {
+  watch(open, async (val) => {
     if (val) {
-      if (isEditMode.value && initialData?.value) {
-        initFromData(initialData.value);
-      } else {
-        resetForm();
-      }
+      await (isEditMode.value && initialData?.value
+        ? initFromData(initialData.value)
+        : resetForm());
     }
   });
 
   return {
-    formState,
     resetForm,
     initFromData,
     submit,
-    validateAndSubmit,
   };
 }

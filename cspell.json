@@ -63,7 +63,14 @@
     "exceljs",
     "uncategorized",
     "YYKJ",
-    "IFNULL"
+    "IFNULL",
+    "fstype",
+    "apfs",
+    "pcpu",
+    "pmem",
+    "sout",
+    "Innodb",
+    "qqbrowser"
   ],
   "ignorePaths": [
     "**/node_modules/**",
