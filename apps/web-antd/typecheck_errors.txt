@@ -1,0 +1,22 @@
+(node:39641) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+> @qgs/web-antd@1.0.0 typecheck /Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/web-antd
+> vue-tsc --noEmit --skipLibCheck
+
+src/layouts/basic.vue(21,7): error TS6133: 'showDot' is declared but its value is never read.
+src/layouts/basic.vue(35,10): error TS6133: 'handleNoticeClear' is declared but its value is never read.
+src/layouts/basic.vue(39,10): error TS6133: 'handleMakeAll' is declared but its value is never read.
+src/views/system/monitor/index.vue(81,7): error TS6133: 'isServerMode' is declared but its value is never read.
+src/views/system/monitor/index.vue(90,24): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/views/system/monitor/index.vue(991,29): error TS2532: Object is possibly 'undefined'.
+src/views/system/monitor/index.vue(1238,25): error TS18048: 'val' is possibly 'undefined'.
+src/views/system/monitor/index.vue(1391,19): error TS2322: Type 'string' is not assignable to type 'number'.
+src/views/system/monitor/index.vue(1493,19): error TS2322: Type 'string' is not assignable to type 'number'.
+src/views/system/monitor/index.vue(1573,42): error TS2367: This comparison appears to be unintentional because the types '"已使用" | "缓存" | "活跃内存" | "非活跃内存" | "空闲内存"' and '"空闲内容"' have no overlap.
+src/views/system/monitor/index.vue(1724,21): error TS2322: Type 'string' is not assignable to type 'number'.
+src/views/system/monitor/index.vue(1943,57): error TS2353: Object literal may only specify known properties, and 'fontMono' does not exist in type 'CSSProperties'.
+src/views/system/monitor/index.vue(2207,48): error TS6133: 'record' is declared but its value is never read.
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @qgs/web-antd@1.0.0 typecheck: `vue-tsc --noEmit --skipLibCheck`
+Exit status 2

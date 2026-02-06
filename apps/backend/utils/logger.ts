@@ -80,7 +80,8 @@ const getBaseOptions = () => ({
     app: 'qgs-backend',
     env: process.env.NODE_ENV || 'development',
   },
-  timestamp: pino.stdTimeFunctions.isoTime,
+  timestamp: () =>
+    `,"time":"${new Date().toLocaleString('zh-CN', { hour12: false }).replaceAll('/', '-')}"`,
   formatters: {
     level: (label: string) => ({ level: label }),
   },

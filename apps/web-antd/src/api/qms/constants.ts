@@ -7,6 +7,7 @@ export const QMS_API = {
   PASS_RATE_TREND: '/qms/pass-rate-trend',
   QUALITY_LOSS_TREND: '/qms/quality-loss-trend',
   VEHICLE_FAILURE_RATE: '/qms/vehicle-failure-rate',
+  DASHBOARD_TARGETS: '/qms/dashboard/targets',
 
   // Supplier & Outsourcing
   SUPPLIER: '/qms/supplier',

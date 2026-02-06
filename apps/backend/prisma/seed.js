@@ -256,6 +256,18 @@ async function main() {
       meta: { title: '修改配置' },
     },
 
+    // --- 系统监控 ---
+    {
+      id: 16,
+      parentId: 10,
+      path: '/system/monitor',
+      name: 'SystemMonitor',
+      component: 'system/monitor/index',
+      type: 'menu',
+      authCode: 'System:Monitor:List',
+      meta: { title: '系统监控', icon: 'carbon:meter-alt' },
+    },
+
     // ===================== QMS 质量管理 =====================
     {
       id: 20,

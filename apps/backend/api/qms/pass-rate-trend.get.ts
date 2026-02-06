@@ -7,31 +7,24 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
-// Inlined constants to avoid module resolution issues during hot reload
-const PROCESS_DEFECT_TARGETS: Record<string, number> = {
-  原材料: 0.2,
-  辅材: 0.1,
-  外购件: 0.2,
-  机加件: 0.1,
-  下料: 0.1,
-  组对: 0.15,
-  焊接: 0.15,
-  机加: 0.1,
-  涂装: 0.15,
-  组装: 0.15,
-  装配: 0.15,
-  外协: 0.15,
+// Fallback constants
+const DEFAULT_PASS_RATE_TARGETS: Record<string, number> = {
+  原材料: 99.8,
+  辅材: 99.9,
+  外购件: 99.8,
+  机加件: 99.9,
+  下料: 99.9,
+  组对: 99.85,
+  焊接: 99.85,
+  机加: 99.9,
+  涂装: 99.85,
+  组装: 99.85,
+  装配: 99.85,
+  外协: 99.85,
+  成品检验: 99.85,
+  设计: 99.85,
 };
-const DEFAULT_DEFECT_TARGET = 0.15;
-
-const getTargetPassRate = (processName?: string): number => {
-  if (!processName) {
-    return Number((100 - DEFAULT_DEFECT_TARGET).toFixed(2));
-  }
-  const defectRate =
-    PROCESS_DEFECT_TARGETS[processName] ?? DEFAULT_DEFECT_TARGET;
-  return Number((100 - defectRate).toFixed(2));
-};
+const GLOBAL_DEFAULT_TARGET = 99.85;
 
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
@@ -42,8 +35,30 @@ export default defineEventHandler(async (event) => {
   const period = query.period as unknown as string;
 
   try {
+    // Fetch targets from DB
+    const setting = await prisma.system_settings.findUnique({
+      where: { key: 'QMS_PASS_RATE_TARGETS' },
+    });
+
+    let targets = { ...DEFAULT_PASS_RATE_TARGETS };
+    if (setting && setting.value) {
+      try {
+        const saved = JSON.parse(setting.value);
+        targets = { ...targets, ...saved };
+      } catch (error) {
+        console.error('Failed to parse QMS_PASS_RATE_TARGETS', error);
+      }
+    }
+
+    const getTargetPassRate = (processName?: string): number => {
+      if (!processName) return GLOBAL_DEFAULT_TARGET;
+      return targets[processName] ?? GLOBAL_DEFAULT_TARGET;
+    };
+
     if (period)
-      return useResponseSuccess(await getDrillDownData(period, granularity));
+      return useResponseSuccess(
+        await getDrillDownData(period, granularity, getTargetPassRate),
+      );
     return useResponseSuccess(await getTrendData(granularity));
   } catch (error) {
     // logApiError('pass-rate-trend', error);
@@ -173,7 +188,11 @@ async function getTrendData(granularity: string) {
   return { trend };
 }
 
-async function getDrillDownData(period: string, granularity: string) {
+async function getDrillDownData(
+  period: string,
+  granularity: string,
+  getTargetPassRate: (name?: string) => number,
+) {
   const range = getPeriodRangeFromTrend(period, granularity);
   if (!range) return { drillDown: [], period };
   const { start, end } = range;

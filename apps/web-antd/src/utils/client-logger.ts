@@ -11,6 +11,18 @@ export function setupClientLogger() {
 
   window.addEventListener('error', (event) => {
     const { colno, error, filename, lineno, message } = event;
+
+    // 过滤无害的浏览器底层噪声
+    const noisePatterns = [
+      'ResizeObserver loop completed with undelivered notifications',
+      'ResizeObserver loop limit exceeded',
+      'Script error.', // 通常是跨域脚本错误，没有有用堆栈
+    ];
+
+    if (noisePatterns.some((pattern) => String(message).includes(pattern))) {
+      return;
+    }
+
     sendClientLog({
       colno,
       lineno,

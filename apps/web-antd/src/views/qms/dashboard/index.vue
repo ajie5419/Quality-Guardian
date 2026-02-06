@@ -32,6 +32,7 @@ import { getDeptList } from '#/api/system/dept';
 import { useDashboardQuery } from '#/hooks/useQmsQueries';
 import { findNameById } from '#/types';
 
+import PassRateTargetModal from './components/PassRateTargetModal.vue';
 import PassRateTrendChart from './components/PassRateTrendChart.vue';
 import QualityLossTrendChart from './components/QualityLossTrendChart.vue';
 import VehicleFailureChart from './components/VehicleFailureChart.vue';
@@ -57,6 +58,13 @@ const granularity = ref<'month' | 'week'>('week');
 const qualityLossGranularity = ref<'month' | 'week'>('week');
 
 // ===================== 数据获取 =====================
+const targetModalRef = ref();
+
+function handleTargetSuccess() {
+  loadPassRateTrend();
+  // Optionally refetch dashboard query if overview cards depend on these targets
+  // queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+}
 
 /** 1. 部门数据 */
 const deptRawData = ref<SystemDeptApi.Dept[]>([]);
@@ -332,6 +340,18 @@ const activeTab = ref('trends');
         class="card-box bg-card mt-5 w-full rounded-md border px-4 pb-5 pt-3"
       >
         <Tabs v-model:active-key="activeTab">
+          <template #rightExtra>
+            <Button
+              v-if="activeTab === 'trends'"
+              type="link"
+              size="small"
+              class="flex items-center gap-1"
+              @click="targetModalRef?.open()"
+            >
+              <SvgCardIcon class="size-3" />
+              <span>指标配置</span>
+            </Button>
+          </template>
           <TabPane key="trends" :tab="t('qms.dashboard.passRateTrend')">
             <div class="pt-2">
               <!-- 粒度切换 -->
@@ -466,5 +486,8 @@ const activeTab = ref('trends');
         </template>
       </Table>
     </Modal>
+
+    <!-- 指标配置弹窗 -->
+    <PassRateTargetModal ref="targetModalRef" @success="handleTargetSuccess" />
   </div>
 </template>
