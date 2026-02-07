@@ -25,6 +25,7 @@
     "@prisma/client": "6.2.1",
     "@qgs/shared": "workspace:*",
     "bcrypt": "^6.0.0",
+    "ioredis": "^5.9.2",
     "jsonwebtoken": "catalog:",
     "nanoid": "^5.0.0",
     "nitropack": "catalog:",
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/ioredis": "^5.0.0",
     "@types/jsonwebtoken": "catalog:",
     "h3": "catalog:"
   },

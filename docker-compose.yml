@@ -54,6 +54,18 @@ services:
         max-size: '50m'
         max-file: '3'
 
+  redis:
+    image: redis:alpine
+    container_name: qms-redis
+    restart: always
+    ports:
+      - '6379:6379'
+    networks:
+      - qms-network
+    volumes:
+      - qms-redis-data:/data
+    command: redis-server --appendonly yes
+
 networks:
   qms-network:
     driver: bridge
@@ -61,4 +73,6 @@ networks:
 
 volumes:
   qms-uploads:
+    driver: local
+  qms-redis-data:
     driver: local

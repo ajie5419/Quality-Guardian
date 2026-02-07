@@ -3,6 +3,7 @@ import type { DashboardChartItem, DashboardOverview } from '@qgs/shared';
 import { safeNumber } from '@qgs/shared';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 
 // 创建模块级 logger
 const logger = createModuleLogger('DashboardService');
@@ -41,231 +42,228 @@ export const DashboardService = {
     overview: DashboardOverview;
     recentWorkOrders: any[];
   }> {
-    try {
-      const yearStart = getStartOfYear();
-      const weekStart = getStartOfWeek();
-      const baseWhere = { isDeleted: false };
+    const cacheKey = 'qms:dashboard:stats';
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      console.warn(`[Dashboard Cache] HIT - Key: ${cacheKey}`);
+      return cached;
+    }
 
-      // 1. 并行执行所有聚合查询
-      const [
-        // 年度累计数据
-        yearAfterSales,
-        yearQualityRecords,
-        yearWorkOrders,
-        yearQualityLosses,
-        // 本周新增数据
-        weekAfterSalesCount,
-        weekQualityRecordsCount,
-        weekWorkOrdersCount,
-        weekLossesAggregate,
-        // 最近工单
-        recentWorkOrders,
-      ] = await Promise.all([
-        // --- 年度数据 ---
-        prisma.after_sales.aggregate({
-          where: { ...baseWhere, occurDate: { gte: yearStart } },
-          _count: { id: true },
-          _sum: { materialCost: true, laborTravelCost: true },
-        }),
-        prisma.quality_records.aggregate({
-          where: { ...baseWhere, date: { gte: yearStart } },
-          _count: { id: true },
-          _sum: { lossAmount: true },
-        }),
-        prisma.work_orders.aggregate({
-          where: { ...baseWhere, createdAt: { gte: yearStart } },
-          _count: { workOrderNumber: true },
-        }),
-        prisma.quality_losses.aggregate({
-          where: { ...baseWhere, occurDate: { gte: yearStart } },
-          _sum: { amount: true },
-        }),
+    const result = await (async () => {
+      try {
+        const yearStart = getStartOfYear();
+        const weekStart = getStartOfWeek();
+        const baseWhere = { isDeleted: false };
 
-        // --- 本周数据 (仅需计数或部分聚合) ---
-        prisma.after_sales.count({
-          where: { ...baseWhere, occurDate: { gte: weekStart } },
-        }),
-        prisma.quality_records.count({
-          where: { ...baseWhere, date: { gte: weekStart } },
-        }),
-        prisma.work_orders.count({
-          where: { ...baseWhere, createdAt: { gte: weekStart } },
-        }),
-        // 本周损失合计 (并行查询三个表的本周金额)
-        Promise.all([
+        const [
+          yearAfterSales,
+          yearQualityRecords,
+          yearWorkOrders,
+          yearQualityLosses,
+          weekAfterSalesCount,
+          weekQualityRecordsCount,
+          weekWorkOrdersCount,
+          weekLossesAggregate,
+          recentWorkOrders,
+        ] = await Promise.all([
           prisma.after_sales.aggregate({
-            where: { ...baseWhere, occurDate: { gte: weekStart } },
+            where: { ...baseWhere, occurDate: { gte: yearStart } },
+            _count: { id: true },
             _sum: { materialCost: true, laborTravelCost: true },
           }),
           prisma.quality_records.aggregate({
-            where: { ...baseWhere, date: { gte: weekStart } },
+            where: { ...baseWhere, date: { gte: yearStart } },
+            _count: { id: true },
             _sum: { lossAmount: true },
           }),
+          prisma.work_orders.aggregate({
+            where: { ...baseWhere, createdAt: { gte: yearStart } },
+            _count: { workOrderNumber: true },
+          }),
           prisma.quality_losses.aggregate({
-            where: { ...baseWhere, occurDate: { gte: weekStart } },
+            where: { ...baseWhere, occurDate: { gte: yearStart } },
             _sum: { amount: true },
           }),
-        ]),
+          prisma.after_sales.count({
+            where: { ...baseWhere, occurDate: { gte: weekStart } },
+          }),
+          prisma.quality_records.count({
+            where: { ...baseWhere, date: { gte: weekStart } },
+          }),
+          prisma.work_orders.count({
+            where: { ...baseWhere, createdAt: { gte: weekStart } },
+          }),
+          Promise.all([
+            prisma.after_sales.aggregate({
+              where: { ...baseWhere, occurDate: { gte: weekStart } },
+              _sum: { materialCost: true, laborTravelCost: true },
+            }),
+            prisma.quality_records.aggregate({
+              where: { ...baseWhere, date: { gte: weekStart } },
+              _sum: { lossAmount: true },
+            }),
+            prisma.quality_losses.aggregate({
+              where: { ...baseWhere, occurDate: { gte: weekStart } },
+              _sum: { amount: true },
+            }),
+          ]),
+          prisma.work_orders.findMany({
+            where: baseWhere,
+            take: DASHBOARD_CONSTANTS.RECENT_WO_LIMIT,
+            orderBy: { createdAt: 'desc' },
+            select: {
+              workOrderNumber: true,
+              projectName: true,
+              status: true,
+              customerName: true,
+            },
+          }),
+        ]);
 
-        // --- 最近工单 ---
-        prisma.work_orders.findMany({
-          where: baseWhere,
-          take: DASHBOARD_CONSTANTS.RECENT_WO_LIMIT,
-          orderBy: { createdAt: 'desc' },
-          select: {
-            workOrderNumber: true,
-            projectName: true,
-            status: true,
-            customerName: true,
-          },
-        }),
-      ]);
+        const totalLoss =
+          safeNumber(yearAfterSales._sum.materialCost) +
+          safeNumber(yearAfterSales._sum.laborTravelCost) +
+          safeNumber(yearQualityRecords._sum.lossAmount) +
+          safeNumber(yearQualityLosses._sum.amount);
 
-      // 2. 数据计算与兜底
-      // 年度总损失
-      const totalLoss =
-        safeNumber(yearAfterSales._sum.materialCost) +
-        safeNumber(yearAfterSales._sum.laborTravelCost) +
-        safeNumber(yearQualityRecords._sum.lossAmount) +
-        safeNumber(yearQualityLosses._sum.amount);
+        const [weekAfterSalesSum, weekRecordsSum, weekManualSum] =
+          weekLossesAggregate;
+        const weeklyLossTotal =
+          safeNumber(weekAfterSalesSum._sum.materialCost) +
+          safeNumber(weekAfterSalesSum._sum.laborTravelCost) +
+          safeNumber(weekRecordsSum._sum.lossAmount) +
+          safeNumber(weekManualSum._sum.amount);
 
-      // 本周总损失
-      const [weekAfterSalesSum, weekRecordsSum, weekManualSum] =
-        weekLossesAggregate;
-      const weeklyLossTotal =
-        safeNumber(weekAfterSalesSum._sum.materialCost) +
-        safeNumber(weekAfterSalesSum._sum.laborTravelCost) +
-        safeNumber(weekRecordsSum._sum.lossAmount) +
-        safeNumber(weekManualSum._sum.amount);
+        return {
+          overview: {
+            fieldIssues: {
+              open: weekAfterSalesCount || 0,
+              total: yearAfterSales._count.id || 0,
+            },
+            processIssues: {
+              open: weekQualityRecordsCount || 0,
+              total: yearQualityRecords._count.id || 0,
+            },
+            qualityLoss: {
+              weekly: weeklyLossTotal,
+              total: totalLoss,
+            },
+            workOrders: {
+              weekly: weekWorkOrdersCount || 0,
+              total: yearWorkOrders._count.workOrderNumber || 0,
+            },
+            openIssues: weekAfterSalesCount + weekQualityRecordsCount,
+            passRate: 0,
+            totalInspections: 0,
+          },
+          recentWorkOrders: recentWorkOrders || [],
+        };
+      } catch (error) {
+        logger.error({ err: error }, 'getStats 执行失败');
+        return {
+          overview: {
+            fieldIssues: { open: 0, total: 0 },
+            processIssues: { open: 0, total: 0 },
+            qualityLoss: { weekly: 0, total: 0 },
+            workOrders: { weekly: 0, total: 0 },
+            openIssues: 0,
+            passRate: 0,
+            totalInspections: 0,
+          },
+          recentWorkOrders: [],
+        };
+      }
+    })();
 
-      // 3. 组装返回结构
-      return {
-        overview: {
-          fieldIssues: {
-            open: weekAfterSalesCount || 0, // 语义映射：open -> 本周新增
-            total: yearAfterSales._count.id || 0,
-          },
-          processIssues: {
-            open: weekQualityRecordsCount || 0,
-            total: yearQualityRecords._count.id || 0,
-          },
-          qualityLoss: {
-            weekly: weeklyLossTotal,
-            total: totalLoss,
-          },
-          workOrders: {
-            weekly: weekWorkOrdersCount || 0,
-            total: yearWorkOrders._count.workOrderNumber || 0,
-          },
-          openIssues: weekAfterSalesCount + weekQualityRecordsCount,
-          passRate: 0, // Placeholder, calculated via trend usually or separate API
-          totalInspections: 0, // Placeholder
-        },
-        recentWorkOrders: recentWorkOrders || [],
-      };
-    } catch (error) {
-      logger.error({ err: error }, 'getStats 执行失败');
-      // 兜底返回空数据
-      return {
-        overview: {
-          fieldIssues: { open: 0, total: 0 },
-          processIssues: { open: 0, total: 0 },
-          qualityLoss: { weekly: 0, total: 0 },
-          workOrders: { weekly: 0, total: 0 },
-          openIssues: 0,
-          passRate: 0,
-          totalInspections: 0,
-        },
-        recentWorkOrders: [],
-      };
-    }
+    console.warn(`[Dashboard Cache] MISS - Key: ${cacheKey}`);
+    await redis.set(cacheKey, result, 60 * 5); // 5 minutes
+    return result;
   },
 
   /**
    * 获取月度质量趋势 (合格率 & 缺陷数)
    */
   async getMonthlyTrend(): Promise<DashboardChartItem[]> {
-    const currentYear = new Date().getFullYear();
-    try {
-      interface MonthInspecResult {
-        month: bigint | number;
-        totalQty: bigint | number;
-        qualifiedQty: bigint | number;
-      }
-      interface MonthDefectResult {
-        month: bigint | number;
-        defectQty: bigint | number;
-      }
-      // 使用 raw query 聚合按月统计，性能更佳
-      const [inspections, defects] = (await Promise.all([
-        prisma.$queryRaw`
-          SELECT 
-            MONTH(inspectionDate) as month, 
-            SUM(quantity) as totalQty,
-            SUM(CASE WHEN result = 'PASS' THEN quantity ELSE 0 END) as qualifiedQty
-          FROM inspections 
-          WHERE YEAR(inspectionDate) = ${currentYear} AND isDeleted = ${false}
-          GROUP BY MONTH(inspectionDate)
-        `,
-        prisma.$queryRaw`
-          SELECT 
-            MONTH(date) as month, 
-            SUM(quantity) as defectQty
-          FROM quality_records
-          WHERE YEAR(date) = ${currentYear} AND isDeleted = ${false}
-          GROUP BY MONTH(date)
-        `,
-      ])) as [MonthInspecResult[], MonthDefectResult[]];
-
-      const months = [
-        '1月',
-        '2月',
-        '3月',
-        '4月',
-        '5月',
-        '6月',
-        '7月',
-        '8月',
-        '9月',
-        '10月',
-        '11月',
-        '12月',
-      ];
-      const currentMonthIndex = new Date().getMonth();
-
-      return months.map((m, idx) => {
-        const mIdx = idx + 1;
-        const insp = inspections.find((r) => Number(r.month) === mIdx);
-        const def = defects.find((r) => Number(r.month) === mIdx);
-
-        const total = safeNumber(insp?.totalQty);
-        const qualified = safeNumber(insp?.qualifiedQty);
-        const defect = safeNumber(def?.defectQty);
-
-        let passRate: null | number = 100; // Default to 100 if no data
-        if (total > 0 || defect > 0) {
-          // If we have NCRs but no inspections, the pass rate should be 0 or calculated against defects
-          const effectiveTotal = Math.max(total, defect);
-          const netQualified = Math.max(0, qualified - defect);
-          passRate = Number(((netQualified / effectiveTotal) * 100).toFixed(1));
-        } else if (idx > currentMonthIndex) {
-          // Future months
-          passRate = null;
-        } else {
-          // Current or past months with NO activity - show target or 100
-          passRate = 100;
-        }
-
-        return {
-          month: m,
-          value: passRate === null ? 0 : passRate,
-          rate: passRate ?? 0,
-        };
-      });
-    } catch (error) {
-      logger.error({ err: error }, 'getMonthlyTrend 执行失败');
-      return [];
+    const cacheKey = 'qms:dashboard:trend';
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      console.warn(`[Dashboard Cache] HIT - Key: ${cacheKey}`);
+      return cached;
     }
+
+    const result = await (async () => {
+      const currentYear = new Date().getFullYear();
+      try {
+        interface MonthInspecResult {
+          month: bigint | number;
+          totalQty: bigint | number;
+          qualifiedQty: bigint | number;
+        }
+        interface MonthDefectResult {
+          month: bigint | number;
+          defectQty: bigint | number;
+        }
+        const [inspections, defects] = (await Promise.all([
+          prisma.$queryRaw`
+            SELECT 
+              MONTH(inspectionDate) as month, 
+              SUM(quantity) as totalQty,
+              SUM(CASE WHEN result = 'PASS' THEN quantity ELSE 0 END) as qualifiedQty
+            FROM inspections 
+            WHERE YEAR(inspectionDate) = ${currentYear} AND isDeleted = ${false}
+            GROUP BY MONTH(inspectionDate)
+          `,
+          prisma.$queryRaw`
+            SELECT 
+              MONTH(date) as month, 
+              SUM(quantity) as defectQty
+            FROM quality_records
+            WHERE YEAR(date) = ${currentYear} AND isDeleted = ${false}
+            GROUP BY MONTH(date)
+          `,
+        ])) as [MonthInspecResult[], MonthDefectResult[]];
+
+        const months = [
+          '1月', '2月', '3月', '4月', '5月', '6月',
+          '7月', '8月', '9月', '10月', '11月', '12月'
+        ];
+        const currentMonthIndex = new Date().getMonth();
+
+        return months.map((m, idx) => {
+          const mIdx = idx + 1;
+          const insp = inspections.find((r) => Number(r.month) === mIdx);
+          const def = defects.find((r) => Number(r.month) === mIdx);
+
+          const total = safeNumber(insp?.totalQty);
+          const qualified = safeNumber(insp?.qualifiedQty);
+          const defect = safeNumber(def?.defectQty);
+
+          let passRate: null | number = 100;
+          if (total > 0 || defect > 0) {
+            const effectiveTotal = Math.max(total, defect);
+            const netQualified = Math.max(0, qualified - defect);
+            passRate = Number(((netQualified / effectiveTotal) * 100).toFixed(1));
+          } else if (idx > currentMonthIndex) {
+            passRate = null;
+          } else {
+            passRate = 100;
+          }
+
+          return {
+            month: m,
+            value: passRate === null ? 0 : passRate,
+            rate: passRate ?? 0,
+          };
+        });
+      } catch (error) {
+        logger.error({ err: error }, 'getMonthlyTrend 执行失败');
+        return [];
+      }
+    })();
+
+    console.warn(`[Dashboard Cache] MISS - Key: ${cacheKey}`);
+    await redis.set(cacheKey, result, 3600); // 1 hour cache
+    return result;
   },
 
   /**

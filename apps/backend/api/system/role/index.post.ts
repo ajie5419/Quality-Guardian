@@ -2,6 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -23,6 +24,7 @@ export default defineEventHandler(async (event) => {
       permissionsStr = JSON.stringify(body.permissions);
     }
 
+    await redis.delByPattern('qms:menu:*');
     const newRole = await prisma.roles.create({
       data: {
         id: `role-${Date.now()}`,

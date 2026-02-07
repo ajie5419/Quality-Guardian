@@ -1,4 +1,5 @@
 import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 
 export interface CreateDeptDto {
   name: string;
@@ -76,18 +77,32 @@ export const DeptService = {
    * Get all departments as a tree
    */
   async findAll() {
-    const departments = await prisma.departments.findMany({
-      where: { isDeleted: false },
-      orderBy: { sort: 'asc' },
-    });
+    // Cache key: qms:dept:tree
+    const cached = await redis.get('qms:dept:tree');
+    if (cached) {
+      console.warn('[Dept Cache] HIT - Key: qms:dept:tree');
+      return cached;
+    }
 
-    return buildDeptTree(departments);
+    const result = await (async () => {
+      const departments = await prisma.departments.findMany({
+        where: { isDeleted: false },
+        orderBy: { sort: 'asc' },
+      });
+
+      return buildDeptTree(departments);
+    })();
+
+    console.warn('[Dept Cache] MISS - Key: qms:dept:tree');
+    await redis.set('qms:dept:tree', result, 3600 * 24);
+    return result;
   },
 
   /**
    * Create a new department
    */
   async create(data: CreateDeptDto) {
+    await redis.del('qms:dept:tree');
     const newDept = await prisma.departments.create({
       data: {
         id: `dept-${Date.now()}`,
@@ -108,6 +123,7 @@ export const DeptService = {
    * Update a department
    */
   async update(id: string, data: UpdateDeptDto) {
+    await redis.del('qms:dept:tree');
     const updateData: Record<string, any> = {
       updatedAt: new Date(),
     };
@@ -135,6 +151,7 @@ export const DeptService = {
    * Soft delete a department
    */
   async delete(id: string) {
+    await redis.del('qms:dept:tree');
     await prisma.departments.update({
       where: { id },
       data: {

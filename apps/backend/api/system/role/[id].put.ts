@@ -2,6 +2,7 @@ import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -42,6 +43,7 @@ export default defineEventHandler(async (event) => {
       updateData.permissions = JSON.stringify(body.permissions);
     }
 
+    await redis.delByPattern('qms:menu:*');
     await prisma.roles.update({
       where: { id },
       data: updateData,

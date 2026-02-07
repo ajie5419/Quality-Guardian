@@ -23,10 +23,10 @@ function buildMenuTree(menus: Menu[], parentId: string = '0'): Menu[] {
   const filtered = menus.filter((menu) => {
     const pid =
       !menu.parentId ||
-      menu.parentId === null ||
-      menu.parentId === undefined ||
-      menu.parentId === '0' ||
-      menu.parentId === 0
+        menu.parentId === null ||
+        menu.parentId === undefined ||
+        menu.parentId === '0' ||
+        menu.parentId === 0
         ? '0'
         : String(menu.parentId);
     return pid === parentId;
@@ -126,74 +126,87 @@ function filterMenus(
     .map((menu) => ({ ...menu }));
 }
 
+import { redis } from '~/utils/redis';
+
+// ... imports
+
 export default eventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
     return unAuthorizedResponse(event);
   }
 
-  // 1. 获取所有状态正常的菜单
-  const allDbMenus = (await prisma.menus.findMany({
-    where: { status: 1 },
-    orderBy: { order: 'asc' },
-  })) as unknown as Menu[];
-
-  // 2. 获取用户真实权限
-  let userPermissions: string[] = [];
-  let roleName = '';
-
   const userId = userinfo.id ?? userinfo.userId;
+  // Cache key: qms:menu:{userId}
+  // We use userId because roles might change, but userId is stable for the session context
+  // Actually, better to include roleId in key if user has multiple roles, but for now 1:1 or 1:N roles are bound to user
+  const cacheKey = `qms:menu:${userId}`;
 
-  try {
-    const dbUser = await prisma.users.findFirst({
-      where: {
-        OR: [{ id: String(userId) }, { username: userinfo.username }],
-      },
-      include: {
-        roles: true,
-      },
-    });
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    console.warn(`[Menu Cache] HIT - User: ${userinfo.username}, Key: ${cacheKey}`);
+    return cached;
+  }
 
-    if (dbUser && dbUser.roles) {
-      roleName = dbUser.roles.name;
-      try {
-        userPermissions = JSON.parse(dbUser.roles.permissions || '[]');
-      } catch (error) {
-        logApiError('all', error);
-        return useResponseSuccess([]);
+  const result = await (async () => {
+    // 1. 获取所有状态正常的菜单
+    const allDbMenus = (await prisma.menus.findMany({
+      where: { status: 1 },
+      orderBy: { order: 'asc' },
+    })) as unknown as Menu[];
+
+    // 2. 获取用户真实权限
+    let userPermissions: string[] = [];
+    let roleName = '';
+
+    try {
+      const dbUser = await prisma.users.findFirst({
+        where: {
+          OR: [{ id: String(userId) }, { username: userinfo.username }],
+        },
+        include: {
+          roles: true,
+        },
+      });
+
+      if (dbUser && dbUser.roles) {
+        roleName = dbUser.roles.name;
+        try {
+          userPermissions = JSON.parse(dbUser.roles.permissions || '[]');
+        } catch (error) {
+          logApiError('all', error);
+          return useResponseSuccess([]);
+        }
       }
+    } catch (error) {
+      logApiError('all', error);
     }
-  } catch (error) {
-    logApiError('all', error);
-  }
 
-  // 3. 构建完整树
-  const fullMenuTree = buildMenuTree(allDbMenus);
+    // 3. 构建完整树
+    const fullMenuTree = buildMenuTree(allDbMenus);
 
-  // 4. 执行过滤
-  const isSuper =
-    roleName.toLowerCase().includes('super') ||
-    userPermissions.includes('*') ||
-    userPermissions.includes('["*"]') ||
-    userId === '1' ||
-    userId === 'USR-ADMIN';
+    // 4. 执行过滤
+    const isSuper =
+      roleName.toLowerCase().includes('super') ||
+      userPermissions.includes('*') ||
+      userPermissions.includes('["*"]') ||
+      userId === '1' ||
+      userId === 'USR-ADMIN';
 
-  // 将权限列表转为 Set 提高查询效率
-  const userCodesSet = new Set(userPermissions);
+    // 将权限列表转为 Set 提高查询效率
+    const userCodesSet = new Set(userPermissions);
 
-  // 关键修复：即便为超级管理员，也必须调用 filterMenus 过滤掉 type === 'button' 的项
-  // 否则 Vue Router 会因为按钮没有 path 字段而崩溃（path is null 报错）
-  const filteredMenus = filterMenus(fullMenuTree, userCodesSet, isSuper);
+    // 关键修复：即便为超级管理员，也必须调用 filterMenus 过滤掉 type === 'button' 的项
+    // 否则 Vue Router 会因为按钮没有 path 字段而崩溃（path is null 报错）
+    const filteredMenus = filterMenus(fullMenuTree, userCodesSet, isSuper);
 
-  // 额外调试日志
-  console.warn(
-    `[Menu Debug] User: ${userinfo.username}, ID: ${userinfo.id}, Role: ${roleName}, DB Menus: ${allDbMenus.length}, Full Tree: ${fullMenuTree.length}, isSuper: ${isSuper}, Final Count: ${filteredMenus.length}`,
-  );
-  if (fullMenuTree.length > 0) {
     console.warn(
-      `[Menu Debug] First Root: ${fullMenuTree[0].name}, PID: ${fullMenuTree[0].parentId}, Children: ${fullMenuTree[0].children?.length || 0}`,
+      `[Menu Cache] MISS - User: ${userinfo.username}, ID: ${userinfo.id}, Role: ${roleName}, IsSuper: ${isSuper}`,
     );
-  }
 
-  return useResponseSuccess(filteredMenus);
+    return useResponseSuccess(filteredMenus);
+  })();
+
+  await redis.set(cacheKey, result, 3600 * 24);
+  return result;
 });

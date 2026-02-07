@@ -25,6 +25,7 @@ package-lock.json
 
 # local env files
 .env
+.env.production
 .env.local
 .env.*.local
 .eslintcache
@@ -51,4 +52,11 @@ vite.config.ts.*
 *.sln
 *.sw?
 .history
-.cursor
+
+# Personal/Temporary files
+tea.yaml
+findings.md
+progress.md
+task_plan.md
+**/*_output.txt
+typecheck_errors.txt

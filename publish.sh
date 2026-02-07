@@ -110,6 +110,11 @@ cp docker-compose.yml docker-compose.backup.yml
 echo "⬇️ 拉取新镜像..."
 docker-compose pull
 
+echo "🚀 启动基础服务 (Redis)..."
+docker-compose up -d redis
+# 等待 Redis 就绪
+sleep 3
+
 echo "🔄 同步数据库 Schema (db push)..."
 # 自动同步数据库结构
 if ! docker-compose run --rm backend sh -c "cd /app && ./apps/backend/node_modules/.bin/prisma db push --schema=./prisma/schema.prisma --skip-generate"; then
@@ -145,7 +150,14 @@ EOF
 # 6.0 上传配置（修复 env 丢失）
 echo -e "${BLUE}📤 上传最新配置...${NC}"
 scp -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no "$SCRIPT_DIR/docker-compose.yml" "root@$ECS_IP:/opt/qms/docker-compose.yml"
-scp -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no "$SCRIPT_DIR/.env" "root@$ECS_IP:/opt/qms/.env.production"
+
+# 优先上传 .env.production，如果不存在则对应报警或回退
+if [ -f "$SCRIPT_DIR/.env.production" ]; then
+    scp -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no "$SCRIPT_DIR/.env.production" "root@$ECS_IP:/opt/qms/.env.production"
+else
+    echo -e "${YELLOW}⚠️ 本地未找到 .env.production，将使用 .env (可能导致 Redis 连接失败)${NC}"
+    scp -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no "$SCRIPT_DIR/.env" "root@$ECS_IP:/opt/qms/.env.production"
+fi
 
 if ssh -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10 "root@$ECS_IP" "$DEPLOY_SCRIPT"; then
     echo -e "${GREEN}✅ 远程部署成功${NC}"

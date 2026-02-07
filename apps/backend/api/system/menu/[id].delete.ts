@@ -2,6 +2,7 @@ import { defineEventHandler, getRouterParam } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -20,6 +21,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    await redis.delByPattern('qms:menu:*');
     await prisma.menus.update({
       where: { id },
       data: {

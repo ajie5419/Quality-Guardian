@@ -2,6 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -23,6 +24,7 @@ export default defineEventHandler(async (event) => {
       pid = String(body.pid);
     }
 
+
     const newMenu = await prisma.menus.create({
       data: {
         id: `menu-${Date.now()}`,
@@ -42,6 +44,9 @@ export default defineEventHandler(async (event) => {
         isDeleted: false,
       },
     });
+
+    // Clear menu cache
+    await redis.delByPattern('qms:menu:*');
 
     return useResponseSuccess(newMenu);
   } catch (error) {
