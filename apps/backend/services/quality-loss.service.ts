@@ -1,26 +1,21 @@
-// cspell:ignore IFNULL
-/**
- * Quality Loss Service
- * 重构版本：使用 BaseService 工具函数，拆分为小型辅助函数
- */
-
-import type {
-  after_sales_claimStatus,
-  quality_records_status,
-} from '@prisma/client';
-
-import type { PaginationParams } from './base.service';
-
-import { MONTHS } from '~/constants/locale';
-import { createModuleLogger } from '~/utils/logger';
-import prisma from '~/utils/prisma';
-
+import { Prisma, type after_sales_claimStatus, type quality_records_status } from '@prisma/client';
 import {
+  type PaginationParams,
   applyPagination,
   formatDateString,
   formatNumber,
   safeNumber,
 } from './base.service';
+
+import {
+  type QualityLossItem,
+  type QualityLossServiceTrendItem,
+  type PageResult,
+} from '@qgs/shared';
+
+import { MONTHS } from '~/constants/locale';
+import { createModuleLogger } from '~/utils/logger';
+import prisma from '~/utils/prisma';
 
 // 创建模块级 logger
 const logger = createModuleLogger('QualityLossService');
@@ -28,31 +23,14 @@ const logger = createModuleLogger('QualityLossService');
 // ============ 类型定义 ============
 
 interface TrendRow {
-  a: null | number | string;
-  p: number | string;
+  a: null | number | Prisma.Decimal | bigint;
+  p: number | bigint;
 }
 
 interface TrendItem {
   external: number;
   internal: number;
   manual: number;
-}
-
-interface QualityLossResult {
-  actualClaim: number;
-  amount: number;
-  createdAt?: Date;
-  date: null | string;
-  description?: string;
-  id: string;
-  lossSource: string;
-  partName: string;
-  pk: string;
-  projectName: string;
-  responsibleDepartment: null | string;
-  status?: string;
-  type?: string;
-  workOrderNumber: string;
 }
 
 interface QualityLossQueryParams extends PaginationParams {
@@ -82,7 +60,7 @@ const QL_CONSTANTS = {
 /**
  * 构建 quality_losses 表的 where 条件
  */
-function buildManualLossesWhere(params: QualityLossQueryParams) {
+function buildManualLossesWhere(params: QualityLossQueryParams): Prisma.quality_lossesWhereInput {
   return {
     isDeleted: false,
     ...(params.status ? { status: params.status } : {}),
@@ -92,7 +70,7 @@ function buildManualLossesWhere(params: QualityLossQueryParams) {
 /**
  * 构建 quality_records 表的 where 条件
  */
-function buildInternalRecordsWhere(params: QualityLossQueryParams) {
+function buildInternalRecordsWhere(params: QualityLossQueryParams): Prisma.quality_recordsWhereInput {
   return {
     isDeleted: false,
     lossAmount: { gt: 0 },
@@ -108,7 +86,7 @@ function buildInternalRecordsWhere(params: QualityLossQueryParams) {
 /**
  * 构建 after_sales 表的 where 条件
  */
-function buildExternalSalesWhere(params: QualityLossQueryParams) {
+function buildExternalSalesWhere(params: QualityLossQueryParams): Prisma.after_salesWhereInput {
   return {
     isDeleted: false,
     ...(params.status
@@ -135,8 +113,10 @@ function formatManualLossItem(
     respDept: null | string;
     status?: string;
     type: string;
-  } & { projectName?: string; workOrderNumber?: string },
-): QualityLossResult {
+    projectName?: string | null;
+    workOrderNumber?: string | null;
+  },
+): QualityLossItem {
   return {
     id: item.lossId || item.id,
     pk: item.id,
@@ -178,15 +158,15 @@ function formatInternalRecordItem(item: {
   date: Date;
   description: null | string;
   id: string;
-  lossAmount: unknown;
+  lossAmount: Prisma.Decimal | number | null;
   partName: null | string;
   projectName: null | string;
-  recoveredAmount: unknown;
+  recoveredAmount: Prisma.Decimal | number | null;
   responsibleDepartment: null | string;
   serialNumber: number;
   status: string;
-  workOrderNumber: string;
-}): QualityLossResult {
+  workOrderNumber: string | null;
+}): QualityLossItem {
   return {
     id: `INT-${item.serialNumber}`,
     pk: item.id,
@@ -197,11 +177,11 @@ function formatInternalRecordItem(item: {
     status: mapInternalStatus(item.status),
     type: QL_CONSTANTS.SOURCE.INTERNAL,
     lossSource: QL_CONSTANTS.SOURCE.INTERNAL,
-    workOrderNumber: item.workOrderNumber,
+    workOrderNumber: item.workOrderNumber || '-',
     projectName: item.projectName || '-',
     partName: item.partName || '-',
     actualClaim: safeNumber(item.recoveredAmount),
-    createdAt: item.createdAt,
+    createdAt: item.createdAt.toISOString(),
   };
 }
 
@@ -209,13 +189,13 @@ function formatInternalRecordItem(item: {
  * 格式化售后记录
  */
 function formatExternalSalesItem(item: {
-  actualClaim: unknown;
+  actualClaim: Prisma.Decimal | number | null;
   claimStatus: string;
   createdAt: Date;
   id: string;
   issueDescription: null | string;
-  laborTravelCost: unknown;
-  materialCost: unknown;
+  laborTravelCost: Prisma.Decimal | number | null;
+  materialCost: Prisma.Decimal | number | null;
   occurDate: Date;
   partName: null | string;
   productSubtype: null | string;
@@ -223,8 +203,8 @@ function formatExternalSalesItem(item: {
   projectName: null | string;
   respDept: null | string;
   serialNumber: number;
-  workOrderNumber: null | string;
-}): null | QualityLossResult {
+  workOrderNumber: string | null;
+}): null | QualityLossItem {
   const amount =
     safeNumber(item.materialCost) + safeNumber(item.laborTravelCost);
   if (amount <= 0) return null;
@@ -243,7 +223,7 @@ function formatExternalSalesItem(item: {
     projectName: item.projectName || '-',
     partName: item.partName || item.productSubtype || item.productType || '-',
     actualClaim: safeNumber(item.actualClaim),
-    createdAt: item.createdAt,
+    createdAt: item.createdAt.toISOString(),
   };
 }
 
@@ -252,7 +232,7 @@ function formatExternalSalesItem(item: {
 /**
  * 按日期降序排序
  */
-function sortByDateDesc(items: QualityLossResult[]): QualityLossResult[] {
+function sortByDateDesc(items: QualityLossItem[]): QualityLossItem[] {
   return items.sort(
     (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
   );
@@ -267,13 +247,14 @@ function mergeTrendData(
   manual: TrendRow[],
   internal: TrendRow[],
   external: TrendRow[],
+  granularity: 'month' | 'week',
 ): Map<number, TrendItem> {
   const merged = new Map<number, TrendItem>();
 
   const process = (rows: TrendRow[], key: keyof TrendItem) => {
     rows.forEach((r) => {
       const p = Number(r.p);
-      if (p === 0) return;
+      if (p === 0 && granularity !== 'week') return; // WEEK() can be 0, MONTH() is 1-12
       let item = merged.get(p);
       if (!item) {
         item = { external: 0, internal: 0, manual: 0 };
@@ -293,7 +274,7 @@ function mergeTrendData(
 /**
  * 格式化趋势数据项
  */
-function formatTrendItem(period: string, item: TrendItem) {
+function formatTrendItem(period: string, item: TrendItem): QualityLossServiceTrendItem {
   const total = item.manual + item.internal + item.external;
   return {
     period,
@@ -310,32 +291,30 @@ export const QualityLossService = {
   /**
    * 获取趋势数据（按月或按周）
    */
-  async getTrendData(granularity: 'month' | 'week') {
+  async getTrendData(granularity: 'month' | 'week'): Promise<{ trend: QualityLossServiceTrendItem[] }> {
     const year = new Date().getFullYear();
     const isWeek = granularity === 'week';
 
     try {
-      const timeFunc = isWeek ? 'WEEK(occurDate, 3)' : 'MONTH(occurDate)';
-      const timeFunc2 = isWeek ? 'WEEK(date, 3)' : 'MONTH(date)';
-
+      // Use Prisma.sql for safer raw queries
       const [manual, internal, external] = await Promise.all([
-        prisma.$queryRawUnsafe<TrendRow[]>(
-          `SELECT ${timeFunc} as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
-        ),
-        prisma.$queryRawUnsafe<TrendRow[]>(
-          `SELECT ${timeFunc2} as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${year} AND isDeleted = 0 GROUP BY p`,
-        ),
-        prisma.$queryRawUnsafe<TrendRow[]>(
-          `SELECT ${timeFunc} as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
-        ),
+        isWeek
+          ? prisma.$queryRaw<TrendRow[]>`SELECT WEEK(occurDate, 3) as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`
+          : prisma.$queryRaw<TrendRow[]>`SELECT MONTH(occurDate) as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
+        isWeek
+          ? prisma.$queryRaw<TrendRow[]>`SELECT WEEK(date, 3) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${year} AND isDeleted = 0 GROUP BY p`
+          : prisma.$queryRaw<TrendRow[]>`SELECT MONTH(date) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${year} AND isDeleted = 0 GROUP BY p`,
+        isWeek
+          ? prisma.$queryRaw<TrendRow[]>`SELECT WEEK(occurDate, 3) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`
+          : prisma.$queryRaw<TrendRow[]>`SELECT MONTH(occurDate) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`
       ]);
 
-      const merged = mergeTrendData(manual, internal, external);
-      const result: ReturnType<typeof formatTrendItem>[] = [];
+      const merged = mergeTrendData(manual, internal, external, granularity);
+      const result: QualityLossServiceTrendItem[] = [];
 
       if (isWeek) {
         [...merged.entries()]
-          .sort((a, b) => a[0] - b[0])
+          .sort((a, b) => Number(a[0]) - Number(b[0]))
           .forEach(([k, v]) => {
             result.push(formatTrendItem(`W${k}`, v));
           });
@@ -358,7 +337,7 @@ export const QualityLossService = {
   /**
    * 获取所有损失记录（分页）
    */
-  async getAllLosses(params: QualityLossQueryParams = {}) {
+  async getAllLosses(params: QualityLossQueryParams = {}): Promise<PageResult<QualityLossItem>> {
     const { lossSource, workOrderNumber } = params;
 
     try {
@@ -376,21 +355,21 @@ export const QualityLossService = {
           }),
         ]);
 
-      const result: QualityLossResult[] = [];
+      const result: QualityLossItem[] = [];
 
       // 2. 处理手工录入记录
       if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.MANUAL) {
         const filteredManual = workOrderNumber
           ? manualRecords.filter((r) => {
-              const record = r as typeof r & { workOrderNumber?: string };
-              return record.workOrderNumber?.includes(workOrderNumber);
-            })
+            const record = r as typeof r & { workOrderNumber?: string | null };
+            return record.workOrderNumber?.includes(workOrderNumber);
+          })
           : manualRecords;
 
         filteredManual.forEach((item) => {
           const itemRecord = item as typeof item & {
-            projectName?: string;
-            workOrderNumber?: string;
+            projectName?: string | null;
+            workOrderNumber?: string | null;
           };
           const amount = safeNumber(item.amount);
           if (amount <= 0) return;
@@ -427,7 +406,7 @@ export const QualityLossService = {
    */
   async getLossSummary(
     filters: Omit<QualityLossQueryParams, 'page' | 'pageSize'>,
-  ) {
+  ): Promise<QualityLossItem[]> {
     const { items } = await this.getAllLosses({
       ...filters,
       page: 1,
@@ -439,7 +418,7 @@ export const QualityLossService = {
   /**
    * 批量删除记录
    */
-  async batchDelete(ids: string[]) {
+  async batchDelete(ids: string[]): Promise<Prisma.BatchPayload> {
     if (ids.length === 0) return { count: 0 };
     return prisma.quality_losses.updateMany({
       where: { id: { in: ids } },

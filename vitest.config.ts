@@ -1,3 +1,4 @@
+import path from 'node:path';
 import Vue from '@vitejs/plugin-vue';
 import VueJsx from '@vitejs/plugin-vue-jsx';
 import { configDefaults, defineConfig } from 'vitest/config';
@@ -7,5 +8,8 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     exclude: [...configDefaults.exclude, '**/e2e/**'],
+    alias: {
+      '~': path.resolve(__dirname, './apps/backend'),
+    },
   },
 });

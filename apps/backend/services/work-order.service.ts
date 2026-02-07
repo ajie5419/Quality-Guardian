@@ -1,9 +1,17 @@
+import { Prisma } from '@prisma/client';
+import {
+  type WorkOrderItem,
+  type WorkOrderListResult,
+  type WorkOrderSummaryItem,
+} from '@qgs/shared';
+
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import {
   mapToDisplayStatus,
   WORK_ORDER_STATUS,
 } from '~/utils/work-order-status';
+import { formatDateString } from './base.service';
 
 // 创建模块级 logger
 const logger = createModuleLogger('WorkOrderService');
@@ -29,19 +37,22 @@ const getYearDateRange = (year?: number) => {
 };
 
 interface WorkOrderListParams {
-  page: number;
-  pageSize: number;
+  page?: number;
+  pageSize?: number;
   year?: number;
   projectName?: string;
   status?: string;
   workOrderNumber?: string;
-  ignoreYearFilter?: boolean; // 新增参数：是否忽略年份过滤
-  keyword?: string; // 新增参数：综合搜索关键词
-  ids?: string[]; // 新增参数：用于精确查找一组 ID（回显）
+  ignoreYearFilter?: boolean;
+  keyword?: string;
+  ids?: string[];
 }
 
 export const WorkOrderService = {
-  async getList(params: WorkOrderListParams) {
+  /**
+   * 获取工单列表（分页）
+   */
+  async getList(params: WorkOrderListParams): Promise<WorkOrderListResult> {
     const {
       page = WO_CONSTANTS.DEFAULT_PAGE,
       pageSize = WO_CONSTANTS.DEFAULT_PAGE_SIZE,
@@ -63,21 +74,24 @@ export const WorkOrderService = {
       } = getYearDateRange(year);
 
       // 2. 构建基础查询条件
-      const whereCondition: Record<string, unknown> = {
+      const whereCondition: Prisma.work_ordersWhereInput = {
         isDeleted: false,
       };
 
       // 2.1 精确 ID 查找 (最高优先级，用于回显)
       if (ids && ids.length > 0) {
         whereCondition.workOrderNumber = { in: ids };
-        // 忽略其他所有过滤条件
       } else {
         // 常规过滤
-        if (projectName?.trim())
+        if (projectName?.trim()) {
           whereCondition.projectName = { contains: projectName.trim() };
-        if (workOrderNumber?.trim())
+        }
+        if (workOrderNumber?.trim()) {
           whereCondition.workOrderNumber = { contains: workOrderNumber.trim() };
-        if (status?.trim()) whereCondition.status = status.trim();
+        }
+        if (status?.trim()) {
+          whereCondition.status = status.trim() as Prisma.Enumwork_orders_statusFilter<"work_orders"> | any;
+        }
 
         // 2.2 综合搜索
         if (keyword?.trim()) {
@@ -89,7 +103,6 @@ export const WorkOrderService = {
 
         // 3. 应用跨年逻辑 (仅在不忽略年份过滤时应用)
         if (!ignoreYearFilter) {
-          // ... (existing logic)
           if (isCurrentYear) {
             whereCondition.AND = [
               {
@@ -145,42 +158,34 @@ export const WorkOrderService = {
       ]);
 
       // 5. 数据映射与返回
-      const items = workOrders.map((wo) => {
+      const items: WorkOrderItem[] = workOrders.map((wo) => {
         return {
           ...wo,
           id: wo.workOrderNumber,
-          deliveryDate: wo.deliveryDate
-            ? wo.deliveryDate.toISOString().split('T')[0]
-            : null,
-          effectiveTime: wo.effectiveTime
-            ? wo.effectiveTime.toISOString().split('T')[0]
-            : null,
-          // 转换为本地时间格式：YYYY-MM-DD HH:mm:ss
-          createTime: wo.createdAt
-            ? wo.createdAt
-                .toLocaleString('zh-CN', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false,
-                })
-                .replaceAll('/', '-')
-            : null,
+          deliveryDate: formatDateString(wo.deliveryDate),
+          effectiveTime: formatDateString(wo.effectiveTime),
+          createTime: wo.createdAt ? wo.createdAt.toISOString() : null,
           status: mapToDisplayStatus(wo.status),
+          projectName: wo.projectName || null,
+          customerName: wo.customerName || null,
+          division: wo.division || null,
+          quantity: wo.quantity || 0,
         };
       });
+
+      const summary: WorkOrderSummaryItem[] = summaryData.map(s => ({
+        status: s.status,
+        division: s.division || null,
+        quantity: s.quantity || 0
+      }));
 
       return {
         items,
         total,
-        summary: summaryData,
+        summary,
       };
     } catch (error) {
       logger.error({ err: error }, 'getList 执行失败');
-      // 异常兜底
       return {
         items: [],
         total: 0,

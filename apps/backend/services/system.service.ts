@@ -1,6 +1,9 @@
-import { execSync } from 'node:child_process';
-import os from 'node:os';
-import process from 'node:process';
+import { execSync } from 'child_process';
+import os from 'os';
+import process from 'process';
+
+import { Prisma } from '@prisma/client';
+import { type DatabaseMetrics, type ServerMetrics } from '@qgs/shared';
 
 import prisma from '~/utils/prisma';
 
@@ -8,7 +11,7 @@ export const SystemService = {
   /**
    * Get application server metrics (Local)
    */
-  async getServerMetrics() {
+  async getServerMetrics(): Promise<ServerMetrics> {
     // Get IP Address
     const interfaces = os.networkInterfaces();
     let ip = '127.0.0.1';
@@ -37,7 +40,7 @@ export const SystemService = {
     // CPU Times and Cores Usage
     const cpus = os.cpus();
     const cores_usage = cpus.map((cpu) => {
-      const times = cpu.times as any;
+      const times = cpu.times;
       const total = (Object.values(times) as number[]).reduce(
         (acc, tv) => acc + tv,
         0,
@@ -109,7 +112,7 @@ export const SystemService = {
     }
 
     // Disk Mounts (df)
-    let mounts: any[] = [];
+    let mounts: ServerMetrics['disk']['mounts'] = [];
     try {
       const dfOut = execSync('df -kP').toString().split('\n').slice(1);
       mounts = dfOut
@@ -136,11 +139,11 @@ export const SystemService = {
     }
 
     // Network Interfaces (netstat)
-    let netInterfaces: any[] = [];
+    let netInterfaces: ServerMetrics['network']['interfaces'] = [];
     try {
       if (os.platform() === 'darwin') {
         const netStat = execSync('netstat -ib').toString().split('\n');
-        const uniqueIfs = new Map();
+        const uniqueIfs = new Map<string, ServerMetrics['network']['interfaces'][0]>();
         netStat.slice(1).forEach((line) => {
           const parts = line.split(/\s+/);
           if (parts[0] && !uniqueIfs.has(parts[0])) {
@@ -171,7 +174,7 @@ export const SystemService = {
     }
 
     // Process List (ps)
-    let processList: any[] = [];
+    let processList: ServerMetrics['processes']['list'] = [];
     try {
       const psOut = execSync('ps -ax -o pid,pcpu,pmem,state,comm')
         .toString()
@@ -262,35 +265,32 @@ export const SystemService = {
   /**
    * Get database server metrics (Remote MySQL)
    */
-  async getDatabaseMetrics() {
+  async getDatabaseMetrics(): Promise<DatabaseMetrics> {
     try {
       const startTime = Date.now();
+      const dbName = process.env.DATABASE_NAME || 'quality_guard';
 
       // Ping and get basic status from MySQL
-      const [statusData, versionData, uptimeData, sizeData, varsData]: any[] =
+      const [statusData, versionData, uptimeData, sizeData, varsData] =
         await Promise.all([
-          prisma.$queryRawUnsafe(
-            'SHOW GLOBAL STATUS WHERE Variable_name IN ("Threads_connected", "Threads_running", "Max_used_connections", "Questions", "Innodb_buffer_pool_read_requests", "Innodb_buffer_pool_reads", "Com_commit", "Com_rollback", "Handler_write", "Handler_update", "Handler_delete", "Handler_read_first", "Handler_read_key", "Handler_read_next", "Handler_read_prev", "Innodb_buffer_pool_pages_total", "Innodb_buffer_pool_pages_free", "Innodb_page_size")',
+          prisma.$queryRaw<Array<{ Variable_name: string; Value: string }>>`SHOW GLOBAL STATUS WHERE Variable_name IN ("Threads_connected", "Threads_running", "Max_used_connections", "Questions", "Innodb_buffer_pool_read_requests", "Innodb_buffer_pool_reads", "Com_commit", "Com_rollback", "Handler_write", "Handler_update", "Handler_delete", "Handler_read_first", "Handler_read_key", "Handler_read_next", "Handler_read_prev", "Innodb_buffer_pool_pages_total", "Innodb_buffer_pool_pages_free", "Innodb_page_size")`,
+          prisma.$queryRaw<Array<{ version: string }>>`SELECT VERSION() as version`,
+          prisma.$queryRaw<Array<{ Variable_name: string; Value: string }>>`SHOW GLOBAL STATUS LIKE "Uptime"`,
+          prisma.$queryRawUnsafe<Array<{ size: string }>>(
+            `SELECT SUM(data_length + index_length) AS size FROM information_schema.TABLES WHERE table_schema = "${dbName}"`
           ),
-          prisma.$queryRawUnsafe('SELECT VERSION() as version'),
-          prisma.$queryRawUnsafe('SHOW GLOBAL STATUS LIKE "Uptime"'),
-          prisma.$queryRawUnsafe(
-            'SELECT SUM(data_length + index_length) AS size FROM information_schema.TABLES WHERE table_schema = "quality_guard"',
-          ),
-          prisma.$queryRawUnsafe(
-            'SHOW VARIABLES WHERE Variable_name IN ("character_set_database", "time_zone")',
-          ),
+          prisma.$queryRaw<Array<{ Variable_name: string; Value: string }>>`SHOW VARIABLES WHERE Variable_name IN ("character_set_database", "time_zone")`,
         ]);
 
       const latency = Date.now() - startTime;
 
-      const metrics: any = {
+      const metrics: DatabaseMetrics = {
         latency,
         status: 'Healthy',
         version: versionData[0]?.version || 'Unknown',
         uptime: Number.parseInt(uptimeData[0]?.Value || '0', 10),
         size: Number.parseInt(sizeData[0]?.size || '0', 10),
-        databaseName: 'quality_guard',
+        databaseName: dbName,
         resource: {
           cpuUsage: 0,
           ramUsed: 0,
@@ -303,7 +303,7 @@ export const SystemService = {
       let bpFreePages = 0;
       let pageSize = 16_384;
 
-      statusData.forEach((item: any) => {
+      statusData.forEach((item) => {
         const val = Number.parseInt(item.Value, 10);
         if (item.Variable_name === 'Threads_connected')
           metrics.activeConnections = val;
@@ -349,9 +349,9 @@ export const SystemService = {
       });
 
       // Calculate Resource Proxy (Buffer Pool as RAM proxy)
-      // User confirmed RDS is 2 Core 2G
-      const RDS_RAM_TOTAL = 2 * 1024 * 1024 * 1024;
-      const RDS_CPU_CORES = 2;
+      // Configurable specs
+      const RDS_RAM_TOTAL = Number(process.env.DB_RAM_TOTAL) || 2 * 1024 * 1024 * 1024;
+      const RDS_CPU_CORES = Number(process.env.DB_CPU_CORES) || 2;
 
       metrics.resource.ramTotal = RDS_RAM_TOTAL;
       if (bpTotalPages > 0) {
@@ -370,14 +370,13 @@ export const SystemService = {
         );
       }
 
-      // CPU proxy based on Thread Load relative to 2 Cores
-      // threadsRunning > 2 means 100% saturation on 2 cores
+      // CPU proxy based on Thread Load relative to configured Cores
       metrics.resource.cpuUsage = Number(
-        ((metrics.threadsRunning / RDS_CPU_CORES) * 100).toFixed(1),
+        (((metrics.threadsRunning || 0) / RDS_CPU_CORES) * 100).toFixed(1),
       );
       if (metrics.resource.cpuUsage > 100) metrics.resource.cpuUsage = 99.9;
 
-      varsData.forEach((item: any) => {
+      varsData.forEach((item) => {
         if (item.Variable_name === 'character_set_database')
           metrics.charset = item.Value;
         if (item.Variable_name === 'time_zone') metrics.timezone = item.Value;
@@ -385,13 +384,13 @@ export const SystemService = {
 
       // Calculate Hit Rate: (1 - physical_reads / logical_requests) * 100
       metrics.cacheHitRate =
-        metrics.bufferReadRequests > 0
+        (metrics.bufferReadRequests || 0) > 0
           ? Number(
-              (
-                (1 - metrics.bufferReadPhysical / metrics.bufferReadRequests) *
-                100
-              ).toFixed(2),
-            )
+            (
+              (1 - (metrics.bufferReadPhysical || 0) / (metrics.bufferReadRequests || 1)) *
+              100
+            ).toFixed(2),
+          )
           : 100;
 
       // Calculate Commit Rate
@@ -399,7 +398,7 @@ export const SystemService = {
         (metrics.comCommit || 0) + (metrics.comRollback || 0);
       metrics.commitRate =
         totalTransactions > 0
-          ? Number(((metrics.comCommit / totalTransactions) * 100).toFixed(2))
+          ? Number(((metrics.comCommit || 0) / totalTransactions * 100).toFixed(2))
           : 100;
 
       metrics.idleConnections =
@@ -411,6 +410,16 @@ export const SystemService = {
         status: 'Unhealthy',
         error: (error as Error).message,
         latency: -1,
+        version: 'Unknown',
+        uptime: 0,
+        size: 0,
+        databaseName: process.env.DATABASE_NAME || 'quality_guard',
+        resource: {
+          cpuUsage: 0,
+          ramUsed: 0,
+          ramTotal: 0,
+          ramUsagePercent: 0,
+        }
       };
     }
   },

@@ -1,3 +1,12 @@
+import { Prisma } from '@prisma/client';
+import {
+  LoginMethodEnum,
+  LoginStatusEnum,
+  type LoginLog,
+  type LoginLogPageResult,
+  type LoginLogParams,
+} from '@qgs/shared';
+
 import prisma from '~/utils/prisma';
 import { parseUA } from '~/utils/ua-parser';
 
@@ -9,10 +18,10 @@ export const SystemLogService = {
     ip?: string;
     message?: string;
     method?: string;
-    status: '失败' | '成功';
+    status: LoginStatusEnum;
     userAgent?: string;
     username: string;
-  }) {
+  }): Promise<LoginLog> {
     const { browser, os, device } = parseUA(params.userAgent);
 
     return prisma.login_logs.create({
@@ -25,8 +34,8 @@ export const SystemLogService = {
         status: params.status,
         message:
           params.message ||
-          (params.status === '成功' ? '登录成功' : '登录失败'),
-        method: params.method || '密码登录',
+          (params.status === LoginStatusEnum.SUCCESS ? '登录成功' : '登录失败'),
+        method: params.method || LoginMethodEnum.PASSWORD,
       },
     });
   },
@@ -34,24 +43,17 @@ export const SystemLogService = {
   /**
    * Get paginated login logs
    */
-  async getLoginLogs(params: {
-    endDate?: string;
-    page?: number;
-    pageSize?: number;
-    startDate?: string;
-    status?: string;
-    username?: string;
-  }) {
+  async getLoginLogs(params: LoginLogParams): Promise<LoginLogPageResult> {
     const page = Number(params.page) || 1;
     const pageSize = Number(params.pageSize) || 20;
     const skip = (page - 1) * pageSize;
 
-    const where: any = {};
-    if (params.username) {
-      where.username = { contains: params.username };
+    const where: Prisma.login_logsWhereInput = {};
+    if (params.username?.trim()) {
+      where.username = { contains: params.username.trim() };
     }
-    if (params.status) {
-      where.status = params.status;
+    if (params.status?.trim()) {
+      where.status = params.status.trim();
     }
     if (params.startDate || params.endDate) {
       where.createdAt = {};
@@ -69,20 +71,23 @@ export const SystemLogService = {
       prisma.login_logs.count({ where }),
     ]);
 
-    return { items, total };
+    return {
+      items: items as any as LoginLog[],
+      total,
+    };
   },
 
   /**
    * Delete a log
    */
-  async deleteLog(id: string) {
+  async deleteLog(id: string): Promise<LoginLog> {
     return prisma.login_logs.delete({ where: { id } });
   },
 
   /**
    * Batch delete logs
    */
-  async batchDeleteLogs(ids: string[]) {
+  async batchDeleteLogs(ids: string[]): Promise<Prisma.BatchPayload> {
     return prisma.login_logs.deleteMany({
       where: { id: { in: ids } },
     });

@@ -1,3 +1,9 @@
+import {
+  type DashboardChartItem,
+  type DashboardData,
+  type DashboardOverview,
+} from '@qgs/shared';
+
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
@@ -12,7 +18,7 @@ const DASHBOARD_CONSTANTS = {
 /**
  * 获取当前年份的起始时间 (YYYY-01-01 00:00:00)
  */
-const getStartOfYear = (date: Date = new Date()) => {
+const getStartOfYear = (date: Date = new Date()): Date => {
   const start = new Date(date.getFullYear(), 0, 1);
   start.setHours(0, 0, 0, 0);
   return start;
@@ -21,7 +27,7 @@ const getStartOfYear = (date: Date = new Date()) => {
 /**
  * 获取本周起始时间 (周一)
  */
-const getStartOfWeek = (date: Date = new Date()) => {
+const getStartOfWeek = (date: Date = new Date()): Date => {
   const start = new Date(date);
   const day = start.getDay();
   const diff = start.getDate() - (day === 0 ? 6 : day - 1); // Adjust when day is sunday
@@ -34,7 +40,10 @@ export const DashboardService = {
   /**
    * 获取仪表盘核心统计数据 (包含年度总计和本周新增)
    */
-  async getStats() {
+  async getStats(): Promise<{
+    overview: DashboardOverview;
+    recentWorkOrders: any[];
+  }> {
     try {
       const yearStart = getStartOfYear();
       const weekStart = getStartOfWeek();
@@ -151,6 +160,9 @@ export const DashboardService = {
             weekly: weekWorkOrdersCount || 0,
             total: yearWorkOrders._count.workOrderNumber || 0,
           },
+          openIssues: weekAfterSalesCount + weekQualityRecordsCount,
+          passRate: 0, // Placeholder, calculated via trend usually or separate API
+          totalInspections: 0, // Placeholder
         },
         recentWorkOrders: recentWorkOrders || [],
       };
@@ -163,6 +175,9 @@ export const DashboardService = {
           processIssues: { open: 0, total: 0 },
           qualityLoss: { weekly: 0, total: 0 },
           workOrders: { weekly: 0, total: 0 },
+          openIssues: 0,
+          passRate: 0,
+          totalInspections: 0,
         },
         recentWorkOrders: [],
       };
@@ -172,7 +187,7 @@ export const DashboardService = {
   /**
    * 获取月度质量趋势 (合格率 & 缺陷数)
    */
-  async getMonthlyTrend() {
+  async getMonthlyTrend(): Promise<DashboardChartItem[]> {
     const currentYear = new Date().getFullYear();
     try {
       interface MonthInspecResult {
@@ -245,8 +260,9 @@ export const DashboardService = {
         }
 
         return {
-          period: m,
-          passRate,
+          month: m,
+          value: passRate === null ? 0 : passRate,
+          rate: passRate ?? 0,
         };
       });
     } catch (error) {
@@ -258,7 +274,7 @@ export const DashboardService = {
   /**
    * 获取缺陷类型分布
    */
-  async getIssueDistribution() {
+  async getIssueDistribution(): Promise<DashboardChartItem[]> {
     try {
       const currentYearStart = getStartOfYear();
 

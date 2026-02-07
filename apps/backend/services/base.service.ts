@@ -3,23 +3,19 @@
  * 用于减少代码重复，提高可维护性
  */
 
-import type { Prisma } from '@prisma/client';
+import { type Prisma } from '@prisma/client';
+import { type PageResult } from '@qgs/shared';
 
 // ============ 类型定义 ============
 
 export interface PaginationParams {
-  page?: number;
-  pageSize?: number;
+  page?: number | string;
+  pageSize?: number | string;
 }
 
 export interface SortParams {
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-}
-
-export interface PaginatedResult<T> {
-  items: T[];
-  total: number;
+  sortOrder?: 'asc' | 'desc' | string;
 }
 
 // ============ 分页工具 ============
@@ -27,9 +23,14 @@ export interface PaginatedResult<T> {
 /**
  * 解析分页参数
  */
-export function parsePagination(params: PaginationParams = {}) {
-  const page = Math.max(1, params.page || 1);
-  const pageSize = Math.min(100, Math.max(1, params.pageSize || 20));
+export function parsePagination(params: PaginationParams = {}): {
+  page: number;
+  pageSize: number;
+  skip: number;
+  take: number;
+} {
+  const page = Math.max(1, Number(params.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 20));
   const skip = (page - 1) * pageSize;
   return { page, pageSize, skip, take: pageSize };
 }
@@ -40,7 +41,7 @@ export function parsePagination(params: PaginationParams = {}) {
 export function applyPagination<T>(
   items: T[],
   params: PaginationParams,
-): PaginatedResult<T> {
+): PageResult<T> {
   const { skip, take } = parsePagination(params);
   return {
     items: items.slice(skip, skip + take),
@@ -50,7 +51,7 @@ export function applyPagination<T>(
 
 // ============ 排序工具 ============
 
-type SortDirection = 'asc' | 'desc';
+export type SortDirection = 'asc' | 'desc';
 
 /**
  * 解析排序参数
@@ -89,14 +90,15 @@ export function buildOrderBy(
 /**
  * 构建软删除过滤条件
  */
-export function withSoftDelete<T extends { isDeleted?: boolean }>(
+export function withSoftDelete<T extends Record<string, any>>(
   where: T,
   includeDeleted = false,
-): T & { isDeleted: boolean } {
-  return {
-    ...where,
-    isDeleted: includeDeleted ? undefined : false,
-  } as T & { isDeleted: boolean };
+): T & { isDeleted?: boolean } {
+  const result: T & { isDeleted?: boolean } = { ...where };
+  if (!includeDeleted) {
+    result.isDeleted = false;
+  }
+  return result;
 }
 
 /**
@@ -120,8 +122,8 @@ export function buildExactFilter<T>(value?: T): T | undefined {
  * 构建日期范围条件
  */
 export function buildDateRangeFilter(
-  startDate?: Date | string,
-  endDate?: Date | string,
+  startDate?: Date | string | null,
+  endDate?: Date | string | null,
 ): Prisma.DateTimeFilter | undefined {
   if (!startDate && !endDate) return undefined;
 
@@ -136,12 +138,13 @@ export function buildDateRangeFilter(
  * 构建年份过滤条件
  */
 export function buildYearFilter(
-  year?: number,
+  year?: number | string | null,
 ): Prisma.DateTimeFilter | undefined {
-  if (!year) return undefined;
+  const y = Number(year);
+  if (!y || Number.isNaN(y)) return undefined;
   return {
-    gte: new Date(`${year}-01-01`),
-    lt: new Date(`${year + 1}-01-01`),
+    gte: new Date(`${y}-01-01`),
+    lt: new Date(`${y + 1}-01-01`),
   };
 }
 
@@ -150,9 +153,11 @@ export function buildYearFilter(
 /**
  * 格式化日期为 ISO 字符串（仅日期部分）
  */
-export function formatDateString(date: Date | null | undefined): null | string {
+export function formatDateString(date: Date | string | null | undefined): null | string {
   if (!date) return null;
-  const isoString = date.toISOString();
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return null;
+  const isoString = d.toISOString();
   return isoString.split('T')[0] ?? null;
 }
 
@@ -160,11 +165,13 @@ export function formatDateString(date: Date | null | undefined): null | string {
  * 格式化数字（保留2位小数）
  */
 export function formatNumber(
-  value: null | number | undefined,
+  value: null | number | string | undefined,
   decimals = 2,
 ): number {
   if (value === null || value === undefined) return 0;
-  return Number(Number(value).toFixed(decimals));
+  const num = Number(value);
+  if (Number.isNaN(num)) return 0;
+  return Number(num.toFixed(decimals));
 }
 
 /**
@@ -182,7 +189,7 @@ export function formatPaginatedResponse<T, R>(
   items: T[],
   params: PaginationParams,
   transformer: (item: T) => R,
-): PaginatedResult<R> {
+): PageResult<R> {
   const { skip, take } = parsePagination(params);
   const paginatedItems = items.slice(skip, skip + take);
 
@@ -194,30 +201,33 @@ export function formatPaginatedResponse<T, R>(
 
 // ============ 通用 Where 条件构建器 ============
 
-type WhereClauseBuilder<T> = {
-  [K in keyof T]?: (value: NonNullable<T[K]>) => unknown;
+export type BuilderFn<V> = (value: V) => any;
+
+export type WhereClauseBuilder<T> = {
+  [K in keyof T]?: BuilderFn<NonNullable<T[K]>>;
 };
 
 /**
  * 通用 where 条件构建器
  * 根据参数和构建器函数自动构建 where 对象
  */
-export function buildWhereClause<T extends Record<string, unknown>>(
+export function buildWhereClause<T extends Record<string, any>>(
   params: T,
   builders: WhereClauseBuilder<T>,
-  baseWhere: Record<string, unknown> = {},
-): Record<string, unknown> {
+  baseWhere: Record<string, any> = {},
+): Record<string, any> {
   const where = { ...baseWhere };
 
-  for (const [key, builder] of Object.entries(builders)) {
-    const value = params[key];
+  for (const [key, value] of Object.entries(params)) {
+    const builder = builders[key as keyof T];
     if (value !== undefined && value !== null && value !== '' && builder) {
-      const result = (builder as (v: unknown) => unknown)(value);
+      const result = builder(value as NonNullable<T[keyof T]>);
       if (result !== undefined) {
-        Object.assign(
-          where,
-          typeof result === 'object' ? result : { [key]: result },
-        );
+        if (typeof result === 'object' && result !== null && !Array.isArray(result) && !(result instanceof Date)) {
+          Object.assign(where, result);
+        } else {
+          where[key] = result;
+        }
       }
     }
   }

@@ -1,4 +1,5 @@
 import { defineEventHandler, getHeader, readBody, setResponseStatus } from 'h3';
+import { LoginStatusEnum } from '@qgs/shared';
 import { AuthService } from '~/services/auth.service';
 import { SystemLogService } from '~/services/system-log.service';
 import {
@@ -39,7 +40,7 @@ export default defineEventHandler(async (event) => {
       username,
       ip: String(ip),
       userAgent,
-      status: '成功',
+      status: LoginStatusEnum.SUCCESS,
     });
 
     setRefreshTokenCookie(event, refreshToken);
@@ -54,7 +55,7 @@ export default defineEventHandler(async (event) => {
       username,
       ip: String(ip),
       userAgent,
-      status: '失败',
+      status: LoginStatusEnum.FAIL,
       message: error.message,
     });
 

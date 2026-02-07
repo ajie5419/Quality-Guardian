@@ -1,5 +1,8 @@
 export interface AfterSalesItem {
   closeDate: string; // 问题关闭日期
+  createdAt: string; // 创建日期
+  occurDate: string; // 发生日期
+  shipDate?: string; // 发货日期
   customerName: string; // 客户名称
   defectSubtype?: string; // 缺陷二级分类
   defectType: string; // 缺陷分类
@@ -22,6 +25,7 @@ export interface AfterSalesItem {
   resolutionPlan: string; // 处理意见及方案
   responsibleDept: string; // 责任部门
   runningHours?: number; // 运行小时数
+  qualityLoss?: number; // 质量损失金
   severity: string; // 严重程度
   status: string; // 状态
   supplierBrand?: string; // 供应商名称/品牌

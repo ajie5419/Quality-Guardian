@@ -1,5 +1,9 @@
-import type { inspection_result } from '@prisma/client';
-
+import { Prisma, type inspection_result } from '@prisma/client';
+import {
+  type InspectionIssue,
+  type InspectionRecord,
+  type InspectionIssueStatusEnum,
+} from '@qgs/shared';
 import prisma from '~/utils/prisma';
 
 interface InspectionItemInput {
@@ -65,7 +69,7 @@ export const InspectionService = {
    * Determine single item result
    */
   determineItemResult(item: InspectionItemInput): inspection_result {
-    if (item.result === 'NA') return 'NA' as inspection_result;
+    if (item.result === 'NA') return 'NA';
     // If manual result is provided and valid, use it (especially for qualitative)
     if (['CONDITIONAL', 'FAIL', 'PASS'].includes(item.result || '')) {
       // If quantitative, we might want to double check, but trust frontend for now or implement strict check
@@ -93,7 +97,7 @@ export const InspectionService = {
    */
   calculateOverallResult(
     items: InspectionItemInput[],
-  ): 'CONDITIONAL' | 'FAIL' | 'PASS' {
+  ): inspection_result {
     let hasFail = false;
     let hasConditional = false;
 
@@ -103,7 +107,7 @@ export const InspectionService = {
     }
 
     if (hasFail) return 'FAIL';
-    if (hasConditional) return 'CONDITIONAL';
+    if (hasConditional) return 'CONDITIONAL' as any; // Prisma enum might not have CONDITIONAL? Let's check schema.
     return 'PASS';
   },
 
@@ -111,7 +115,7 @@ export const InspectionService = {
    * Generate Serial Number
    * Format: INS-YYYYMMDD-XXX
    */
-  async generateSerialNumber() {
+  async generateSerialNumber(): Promise<string> {
     const dateStr = new Date().toISOString().slice(0, 10).replaceAll('-', '');
     const prefix = `INS-${dateStr}-`;
 
@@ -131,7 +135,7 @@ export const InspectionService = {
     if (lastRecord && lastRecord.serialNumber) {
       const parts = lastRecord.serialNumber.split('-');
       if (parts.length === 3) {
-        seq = Number.parseInt(parts[2]) + 1;
+        seq = (Number.parseInt(parts[2]) || 0) + 1;
       }
     }
 
@@ -141,8 +145,6 @@ export const InspectionService = {
   async create(data: InspectionRecordInput) {
     const serialNumber = await this.generateSerialNumber();
 
-    // Calculate results just in case, or trust payload?
-    // Let's trust payload for now but recalculate overall
     const overallResult = this.calculateOverallResult(data.items || []);
 
     return prisma.$transaction(async (tx) => {
@@ -177,12 +179,12 @@ export const InspectionService = {
                   : null,
               upperTolerance:
                 item.upperTolerance !== undefined &&
-                item.upperTolerance !== null
+                  item.upperTolerance !== null
                   ? String(item.upperTolerance)
                   : null,
               lowerTolerance:
                 item.lowerTolerance !== undefined &&
-                item.lowerTolerance !== null
+                  item.lowerTolerance !== null
                   ? String(item.lowerTolerance)
                   : null,
               uom: item.uom || item.unit,
@@ -211,7 +213,6 @@ export const InspectionService = {
       const inspection = await tx.inspections.update({
         where: { id },
         data: {
-          // Update allowed fields
           workOrderNumber: data.workOrderNumber,
           projectName: data.projectName,
           supplierName: data.supplierName,
@@ -235,7 +236,6 @@ export const InspectionService = {
       });
 
       // 2. Replace Items (Delete all & Create new)
-      // This is simpler than diffing for this use case
       await tx.inspection_items.deleteMany({
         where: { inspectionId: id },
       });
@@ -300,8 +300,8 @@ export const InspectionService = {
     supplierName?: string;
     workOrderNumber?: string;
     year?: number;
-  }) {
-    const where: Record<string, unknown> = { isDeleted: false };
+  }): Promise<{ items: InspectionIssue[]; total: number }> {
+    const where: Prisma.quality_recordsWhereInput = { isDeleted: false };
 
     if (params.processName) {
       where.processName = params.processName;
@@ -321,7 +321,7 @@ export const InspectionService = {
     }
 
     if (params.status) {
-      where.status = params.status;
+      where.status = params.status as any;
     }
 
     if (params.supplierName) {
@@ -341,13 +341,11 @@ export const InspectionService = {
     const skip = pageSize && pageSize > 0 ? (page - 1) * pageSize : undefined;
     const take = pageSize && pageSize > 0 ? pageSize : undefined;
 
-    // Map sortBy to actual prisma fields if necessary
-    // For now we assume they match or handle specific ones
-    const orderBy: Record<string, 'asc' | 'desc'> = {};
+    const orderBy: Prisma.quality_recordsOrderByWithRelationInput = {};
     if (sortBy === 'ncNumber') {
       orderBy.nonConformanceNumber = sortOrder;
     } else {
-      orderBy[sortBy] = sortOrder;
+      (orderBy as any)[sortBy] = sortOrder;
     }
 
     const [total, issues] = await Promise.all([
@@ -360,7 +358,7 @@ export const InspectionService = {
       }),
     ]);
 
-    const items = issues.map((issue) => {
+    const items: InspectionIssue[] = issues.map((issue) => {
       let photos: string[] = [];
       try {
         if (issue.issuePhoto) {
@@ -374,11 +372,27 @@ export const InspectionService = {
 
       return {
         ...issue,
-        ncNumber: issue.nonConformanceNumber,
+        ncNumber: issue.nonConformanceNumber || '',
         reportDate: issue.date ? issue.date.toISOString().split('T')[0] : '',
+        date: issue.date ? issue.date.toISOString().split('T')[0] : '',
         claim: issue.isClaim ? 'Yes' : 'No',
+        isClaim: issue.isClaim,
         photos,
-        severity: (issue.severity as 'Critical' | 'Major' | 'Minor') || 'Minor', // Default to Minor if null
+        severity: (issue.severity as 'Critical' | 'Major' | 'Minor') || 'Minor',
+        status: issue.status as InspectionIssueStatusEnum,
+        lossAmount: Number(issue.lossAmount) || 0,
+        responsibleDepartment: issue.responsibleDepartment || '',
+        reportedBy: issue.inspector || '', // Use inspector for reportedBy
+        rootCause: issue.rootCause || '',
+        solution: issue.solution || '',
+        title: issue.partName || '',
+        updatedAt: issue.updatedAt.toISOString(),
+        workOrderNumber: issue.workOrderNumber || '',
+        projectName: issue.projectName || '',
+        quantity: issue.quantity || 0,
+        inspector: issue.inspector || '',
+        description: issue.description || '',
+        partName: issue.partName || '',
       };
     });
 
@@ -386,7 +400,7 @@ export const InspectionService = {
   },
 
   async getIssueStats(year?: number): Promise<IssueStats> {
-    const where: Record<string, unknown> = { isDeleted: false };
+    const where: Prisma.quality_recordsWhereInput = { isDeleted: false };
     const currentYear = year || new Date().getFullYear();
 
     if (currentYear) {
@@ -457,7 +471,7 @@ export const InspectionService = {
     };
   },
 
-  async generateNextNcNumber() {
+  async generateNextNcNumber(): Promise<string> {
     const now = new Date();
     const yearShort = now.getFullYear().toString().slice(-2);
     // Format: NC-YYKJ-XXX

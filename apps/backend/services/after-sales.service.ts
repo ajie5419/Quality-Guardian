@@ -1,4 +1,11 @@
-import { QMS_DEFAULT_VALUES, QMS_STATUS_OPEN_SET } from '@qgs/shared';
+import { Prisma } from '@prisma/client';
+import {
+  QMS_DEFAULT_VALUES,
+  QMS_STATUS_OPEN_SET,
+  type AfterSalesItem,
+  type AfterSalesParams,
+  type AfterSalesStats,
+} from '@qgs/shared';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
@@ -9,7 +16,7 @@ export const AfterSalesService = {
   /**
    * Calculate After-Sales KPI and Statistics
    */
-  async getStats(year?: number) {
+  async getStats(year?: number): Promise<AfterSalesStats> {
     const currentYear = year || new Date().getFullYear();
 
     // Local date range for the specified year
@@ -145,13 +152,14 @@ export const AfterSalesService = {
     } catch (error) {
       logger.error({ err: error }, 'getStats failed');
       // Return empty structure on error
+      const emptyMonthly = (): number[] => Array.from<number>({ length: 12 }).fill(0);
       return {
         kpi: { total: 0, open: 0, cost: 0, avgTime: 0 },
         trend: {
           category: months,
-          issues: Array.from({ length: 12 }).fill(0),
-          closed: Array.from({ length: 12 }).fill(0),
-          costs: Array.from({ length: 12 }).fill(0),
+          issues: emptyMonthly(),
+          closed: emptyMonthly(),
+          costs: emptyMonthly(),
         },
         defectDistribution: [],
         supplierRanking: { categories: [], data: [] },
@@ -163,30 +171,22 @@ export const AfterSalesService = {
   /**
    * Get List of After-Sales Records with filtering
    */
-  async getList(params: {
-    projectName?: string;
-    status?: string;
-    supplierBrand?: string;
-    workOrderNumber?: string;
-    year?: number;
-  }) {
+  async getList(params: AfterSalesParams): Promise<AfterSalesItem[]> {
     const { year, workOrderNumber, projectName, status, supplierBrand } =
       params;
 
+    const where: Prisma.after_salesWhereInput = {
+      isDeleted: false,
+    };
+
     // Date Logic
-    let dateFilter: Record<string, Date> = {};
     if (year) {
-      dateFilter = {
+      where.occurDate = {
         gte: new Date(`${year}-01-01T00:00:00.000Z`),
         lte: new Date(`${year}-12-31T23:59:59.999Z`),
       };
     }
 
-    const where: Record<string, any> = {
-      isDeleted: false,
-    };
-
-    if (year) where.occurDate = dateFilter;
     if (workOrderNumber && String(workOrderNumber).trim() !== '') {
       where.workOrderNumber = String(workOrderNumber).trim();
     }
@@ -194,7 +194,7 @@ export const AfterSalesService = {
       where.projectName = { contains: String(projectName).trim() };
     }
     if (status && String(status).trim() !== '') {
-      where.claimStatus = String(status).trim();
+      where.claimStatus = String(status).trim() as any;
     }
     if (supplierBrand && String(supplierBrand).trim() !== '') {
       where.OR = [
@@ -209,27 +209,53 @@ export const AfterSalesService = {
     });
 
     // Helper function to format date as YYYY-MM-DD
-    const formatDate = (date: Date | null | undefined) => {
-      if (!date) return null;
-      return date.toISOString().split('T')[0];
+    const formatDate = (date: Date | null | undefined): string => {
+      if (!date) return '';
+      try {
+        return date.toISOString().split('T')[0];
+      } catch {
+        return '';
+      }
+    };
+
+    const tryParsePhotos = (photosStr: string | null | undefined): string[] => {
+      if (!photosStr) return [];
+      try {
+        const parsed = JSON.parse(photosStr);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
     };
 
     // Map to frontend expectation with formatted dates
-    return list.map((item) => ({
-      ...item,
-      issueDate: formatDate(item.occurDate),
-      occurDate: formatDate(item.occurDate),
-      factoryDate: formatDate(item.factoryDate),
-      closeDate: formatDate(item.closeDate),
-      shipDate: formatDate(item.shipDate),
-      createdAt: formatDate(item.createdAt),
-      responsibleDept: item.respDept,
-      resolutionPlan: item.solution,
-      status: item.claimStatus,
-      isClaim: item.isClaim,
-      qualityLoss:
-        (Number(item.materialCost) || 0) + (Number(item.laborTravelCost) || 0),
-      photos: item.photos ? JSON.parse(item.photos as string) : [],
-    }));
+    return list.map((item) => {
+      const materialCost = Number(item.materialCost) || 0;
+      const laborTravelCost = Number(item.laborTravelCost) || 0;
+
+      return {
+        ...item,
+        issueDate: formatDate(item.occurDate),
+        occurDate: formatDate(item.occurDate),
+        factoryDate: formatDate(item.factoryDate),
+        closeDate: formatDate(item.closeDate),
+        shipDate: formatDate(item.shipDate),
+        createdAt: formatDate(item.createdAt),
+        responsibleDept: item.respDept || '',
+        resolutionPlan: item.solution || '',
+        status: item.claimStatus,
+        isClaim: item.isClaim || false,
+        materialCost,
+        laborTravelCost,
+        qualityLoss: materialCost + laborTravelCost,
+        photos: tryParsePhotos(item.photos as string),
+        productType: item.productType || '',
+        productSubtype: item.productSubtype || '',
+        division: item.division || '',
+        partName: item.partName || '',
+        supplierBrand: item.supplierBrand || '',
+        runningHours: Number(item.runningHours) || 0,
+      } as AfterSalesItem;
+    });
   },
 };
