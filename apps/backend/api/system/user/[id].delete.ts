@@ -1,7 +1,7 @@
 import { defineEventHandler, getRouterParam } from 'h3';
+import { UserService } from '~/services/user.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -20,14 +20,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    await prisma.users.update({
-      where: { id },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-      },
-    });
-
+    await UserService.delete(id);
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('user', error);

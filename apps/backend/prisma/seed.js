@@ -296,6 +296,34 @@ async function main() {
       meta: { title: '删除' },
     },
 
+    // --- 审计日志 ---
+    {
+      id: 18,
+      parentId: 10,
+      path: '/system/audit-log',
+      name: 'SystemAuditLog',
+      component: 'system/audit-log/index',
+      type: 'menu',
+      authCode: 'System:AuditLog:List',
+      meta: { title: '审计日志', icon: 'carbon:list-boxes' },
+    },
+    {
+      id: 1800,
+      parentId: 18,
+      name: 'SystemAuditLogView',
+      type: 'button',
+      authCode: 'System:AuditLog:View',
+      meta: { title: '查看' },
+    },
+    {
+      id: 1801,
+      parentId: 18,
+      name: 'SystemAuditLogDelete',
+      type: 'button',
+      authCode: 'System:AuditLog:Delete',
+      meta: { title: '删除' },
+    },
+
     // ===================== QMS 质量管理 =====================
     {
       id: 20,

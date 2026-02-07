@@ -1,7 +1,7 @@
 import { defineEventHandler, getRouterParam } from 'h3';
+import { DeptService } from '~/services/dept.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -20,15 +20,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // Soft delete - set isDeleted to true and update timestamp
-    await prisma.departments.update({
-      where: { id },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-      },
-    });
-
+    await DeptService.delete(id);
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('dept', error);

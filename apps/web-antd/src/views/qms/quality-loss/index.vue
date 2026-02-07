@@ -2,7 +2,7 @@
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
 import type { SystemDeptApi } from '#/api/system/dept';
-import type { TreeSelectNode, VxeCheckboxChangeParams } from '#/types';
+import type { TreeSelectNode } from '#/types';
 
 import { computed, onMounted, ref } from 'vue';
 
@@ -11,13 +11,11 @@ import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
-import { Button, Card, message, Modal, Space, Tag } from 'ant-design-vue';
+import { PERMISSION_CODES } from '@qgs/shared';
+import { Button, Card, Space, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { QualityLossStatusEnum } from '#/api/qms/enums';
 import {
-  batchDeleteQualityLoss,
-  deleteQualityLoss,
   getQualityLossList,
   getQualityLossSummary,
 } from '#/api/qms/quality-loss';
@@ -31,6 +29,7 @@ import LossEditModal from './components/LossEditModal.vue';
 // 子组件与逻辑抽离
 import LossKpiCards from './components/LossKpiCards.vue';
 import { useLossStatistics } from './composables/useLossStatistics';
+import { useQualityLossActions } from './composables/useQualityLossActions';
 import { SOURCE_STYLE_MAP, STATUS_OPTIONS } from './constants';
 import { LossSource } from './types';
 
@@ -38,9 +37,10 @@ const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
 const { invalidateQualityLoss } = useInvalidateQmsQueries();
 
-const canExport = computed(() => hasAccessByCodes(['QMS:LossAnalysis:Export']));
-const canEdit = computed(() => hasAccessByCodes(['QMS:LossAnalysis:Edit']));
-const canDelete = computed(() => hasAccessByCodes(['QMS:LossAnalysis:Delete']));
+const { LOSS_ANALYSIS } = PERMISSION_CODES.QMS;
+const canExport = computed(() => hasAccessByCodes([LOSS_ANALYSIS.EXPORT]));
+const canEdit = computed(() => hasAccessByCodes([LOSS_ANALYSIS.EDIT]));
+const canDelete = computed(() => hasAccessByCodes([LOSS_ANALYSIS.DELETE]));
 
 // ================= 状态管理 =================
 const allLossData = ref<QmsQualityLossApi.QualityLossItem[]>([]);
@@ -49,18 +49,6 @@ const deptTreeData = ref<TreeSelectNode[]>([]);
 
 // 统计逻辑
 const { stats } = useLossStatistics(allLossData);
-
-const checkedRows = ref<any[]>([]);
-
-function onCheckChange(params: VxeCheckboxChangeParams) {
-  const records = params.$grid.getCheckboxRecords() || [];
-  checkedRows.value = records;
-}
-
-const gridEvents = {
-  checkboxChange: onCheckChange,
-  checkboxAll: onCheckChange,
-};
 
 // ================= 表格配置 =================
 const gridOptions = computed<VxeGridProps>(() => ({
@@ -165,15 +153,12 @@ const gridOptions = computed<VxeGridProps>(() => ({
   proxyConfig: {
     ajax: {
       query: async ({ page, form }) => {
-        // 服务端分页：将分页参数和搜索表单同步传给后端
         const params = {
           page: page?.currentPage,
           pageSize: page?.pageSize,
           ...form,
         };
         const result = await getQualityLossList(params);
-
-        // 注意：这里不再设置 allLossData，因为分页后的数据不适合做全量统计
         return result;
       },
     },
@@ -194,7 +179,10 @@ async function fetchSummaryData(filters: any = {}) {
 
 const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions: gridOptions as any,
-  gridEvents,
+  gridEvents: {
+    checkboxChange: (p: any) => actions.onCheckChange(p),
+    checkboxAll: (p: any) => actions.onCheckChange(p),
+  },
   formOptions: {
     schema: [
       {
@@ -239,7 +227,6 @@ const [Grid, gridApi] = useVbenVxeGrid({
     submitOnChange: true,
     submitButtonOptions: {
       onClick: ({ formModel }: any) => {
-        // 点击搜索时，重新拉取统计数据
         fetchSummaryData(formModel);
       },
     },
@@ -251,16 +238,19 @@ const [Grid, gridApi] = useVbenVxeGrid({
   },
 } as any);
 
-// ================= 初始加载与联动 =================
-onMounted(async () => {
-  await loadInitialData();
-  fetchSummaryData(); // 初始拉取统计数据
-});
-
-// ================= 弹窗表单逻辑 =================
-const modalVisible = ref(false);
-const isEditMode = ref(false);
-const currentRecord = ref<Partial<QmsQualityLossApi.QualityLossItem>>({});
+const actions = useQualityLossActions(gridApi, invalidateQualityLoss);
+const {
+  checkedRows,
+  modalVisible,
+  isEditMode,
+  claimModalVisible,
+  currentRecord,
+  handleOpenModal,
+  handleEdit,
+  handleClaim,
+  handleDelete,
+  handleBatchDelete,
+} = actions;
 
 async function loadInitialData() {
   try {
@@ -272,82 +262,11 @@ async function loadInitialData() {
   }
 }
 
-onMounted(() => loadInitialData());
-
-function handleOpenModal() {
-  isEditMode.value = false;
-  currentRecord.value = {
-    actualClaim: 0,
-    amount: 0,
-    date: new Date().toISOString().split('T')[0],
-    description: '',
-    responsibleDepartment: undefined,
-    status: QualityLossStatusEnum.PENDING,
-    type: 'Scrap',
-    lossSource: LossSource.MANUAL,
-  };
-  modalVisible.value = true;
-}
-
-function handleEdit(row: QmsQualityLossApi.QualityLossItem) {
-  isEditMode.value = true;
-  currentRecord.value = { ...row };
-  modalVisible.value = true;
-}
-
-const claimModalVisible = ref(false);
-function handleClaim(row: QmsQualityLossApi.QualityLossItem) {
-  currentRecord.value = { ...row };
-  claimModalVisible.value = true;
-}
-
-async function handleDelete(row: QmsQualityLossApi.QualityLossItem) {
-  Modal.confirm({
-    title: t('common.confirmDelete'),
-    content: t('common.confirmDeleteContent'),
-    onOk: async () => {
-      await deleteQualityLoss(row.id);
-      message.success(t('common.deleteSuccess'));
-      invalidateQualityLoss();
-      gridApi.reload();
-    },
-  });
-}
-
-function handleBatchDelete() {
-  if (checkedRows.value.length === 0) {
-    return;
-  }
-  // Optional: check if selection contains non-manual records
-  const hasAutoRecords = checkedRows.value.some(
-    (r) => r.lossSource !== LossSource.MANUAL,
-  );
-  if (hasAutoRecords) {
-    message.warning('只能批量删除手动录入的损失记录');
-    return;
-  }
-
-  Modal.confirm({
-    title: t('common.confirmBatchDelete'),
-    content: t('common.confirmBatchDeleteContent', {
-      count: checkedRows.value.length,
-    }),
-    onOk: async () => {
-      try {
-        const ids = checkedRows.value.map((r: any) => r.id);
-        const res = await batchDeleteQualityLoss(ids);
-        message.success(
-          t('common.deleteSuccessCount', { count: res.successCount }),
-        );
-        checkedRows.value = [];
-        invalidateQualityLoss();
-        gridApi.reload();
-      } catch {
-        message.error(t('common.deleteFailed'));
-      }
-    },
-  });
-}
+// ================= 初始加载与联动 =================
+onMounted(async () => {
+  await loadInitialData();
+  fetchSummaryData();
+});
 
 // 辅助函数
 function getStatusConfig(s: string) {

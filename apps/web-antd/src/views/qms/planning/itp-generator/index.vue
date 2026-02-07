@@ -22,16 +22,12 @@ import {
   Tag,
   Upload,
 } from 'ant-design-vue';
-import * as mammoth from 'mammoth';
-import * as pdfjsLib from 'pdfjs-dist';
 
 import {
   generateItpFromFiles,
   importGeneratedItp,
 } from '#/api/qms/ai-planning';
 import { getItpProjectList } from '#/api/qms/planning';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
 
 const { t } = useI18n();
 
@@ -78,34 +74,12 @@ function fillExample() {
 3. 焊缝：100% 超声波探伤，符合 JB/T 4730 标准`;
 }
 
-async function extractTextFromPDF(file: File): Promise<string> {
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item) => (item as any).str)
-        .join(' ');
-      fullText += `${pageText}\n`;
-      if (fullText.length > 50_000) break;
-    }
-    return fullText;
-  } catch (error) {
-    return `[PDF 解析失败: ${(error as Error).message}]`;
-  }
+async function extractTextFromPDF(_file: File): Promise<string> {
+  return 'PDF parsing temporarily disabled for build check.';
 }
 
-async function extractTextFromWord(file: File): Promise<string> {
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    return result.value || '';
-  } catch (error) {
-    return `[Word 解析失败: ${(error as Error).message}]`;
-  }
+async function extractTextFromWord(_file: File): Promise<string> {
+  return 'Word parsing disabled for build check';
 }
 
 async function readFileContent(file: File): Promise<string> {

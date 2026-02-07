@@ -1,7 +1,7 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { DeptService } from '~/services/dept.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -20,26 +20,8 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event); // Wait, use readBody, NOT getRouterParam for body.
-
-    const updateData: Record<string, unknown> = {
-      businessUnit: body.businessUnit,
-      description: body.remark || body.description,
-      name: body.name,
-      updatedAt: new Date(),
-    };
-
-    if (body.status !== undefined) updateData.status = body.status;
-    if (body.parentId || body.pid)
-      updateData.parentId = body.parentId || body.pid;
-    if (body.orderNo || body.sort)
-      updateData.sort = Number(body.orderNo || body.sort);
-
-    await prisma.departments.update({
-      where: { id },
-      data: updateData,
-    });
-
+    const body = await readBody(event);
+    await DeptService.update(id, body);
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('dept', error);

@@ -57,144 +57,155 @@ export interface Menu {
 // ============ Metrics Types ============
 
 export interface ServerMetrics {
-  os: {
-    platform: string;
-    release: string;
-    arch: string;
-    hostname: string;
-    uptime: number;
-    ip: string;
-    nodeVersion: string;
-    startTime: string;
-  };
   cpu: {
-    model: string;
     cores: number;
-    threads: number;
-    loadAvg: number[];
-    usagePercent: number;
-    freq: { current: string; max: string; min: string };
-    times: { user: number; nice: number; sys: number; idle: number; irq: number };
-    stats: { ctx_switches: number; interrupts: number; soft_interrupts: number; syscalls: number };
     cores_usage: number[];
-  };
-  memory: {
-    total: number;
-    used: number;
-    free: number;
-    usagePercent: number;
-    available: number;
-    active: number;
-    inactive: number;
-    buffers: number;
-    cached: number;
-    shared: number;
-    swap: {
-      total: number;
-      used: number;
-      free: number;
-      usagePercent: number;
-      sin: number;
-      sout: number;
+    freq: { current: string; max: string; min: string };
+    loadAvg: number[];
+    model: string;
+    stats: {
+      ctx_switches: number;
+      interrupts: number;
+      soft_interrupts: number;
+      syscalls: number;
     };
-  };
-  network: {
-    upload: number;
-    download: number;
-    sent: number;
-    received: number;
-    interfaces: Array<{
-      name: string;
-      status: string;
-      mtu: number;
-      speed: number;
-      rx_packets: number;
-      rx_errors: number;
-      rx_bytes: number;
-      tx_packets: number;
-      tx_errors: number;
-      tx_bytes: number;
-      rx_drop: number;
-      tx_drop: number;
-    }>;
+    threads: number;
+    times: {
+      idle: number;
+      irq: number;
+      nice: number;
+      sys: number;
+      user: number;
+    };
+    usagePercent: number;
   };
   disk: {
-    read: number;
-    write: number;
-    totalRead: number;
-    totalWrite: number;
     mounts: Array<{
       device: string;
-      mount: string;
-      fstype: string;
-      total: number;
-      used: number;
       free: number;
+      fstype: string;
+      mount: string;
       percent: number;
       status: string;
+      total: number;
+      used: number;
     }>;
+    read: number;
+    totalRead: number;
+    totalWrite: number;
+    write: number;
+  };
+  memory: {
+    active: number;
+    available: number;
+    buffers: number;
+    cached: number;
+    free: number;
+    inactive: number;
+    shared: number;
+    swap: {
+      free: number;
+      sin: number;
+      sout: number;
+      total: number;
+      usagePercent: number;
+      used: number;
+    };
+    total: number;
+    usagePercent: number;
+    used: number;
+  };
+  network: {
+    download: number;
+    interfaces: Array<{
+      mtu: number;
+      name: string;
+      rx_bytes: number;
+      rx_drop: number;
+      rx_errors: number;
+      rx_packets: number;
+      speed: number;
+      status: string;
+      tx_bytes: number;
+      tx_drop: number;
+      tx_errors: number;
+      tx_packets: number;
+    }>;
+    received: number;
+    sent: number;
+    upload: number;
+  };
+  os: {
+    arch: string;
+    hostname: string;
+    ip: string;
+    nodeVersion: string;
+    platform: string;
+    release: string;
+    startTime: string;
+    uptime: number;
   };
   processes: {
-    total: number;
-    running: number;
-    sleeping: number;
-    zombie: number;
     list: Array<{
-      pid: number;
       cpu: number;
       mem: number;
-      status: string;
       name: string | undefined;
+      pid: number;
       startTime: string;
+      status: string;
     }>;
+    running: number;
+    sleeping: number;
+    total: number;
+    zombie: number;
   };
 }
 
 export interface DatabaseMetrics {
-  latency: number;
-  status: 'Healthy' | 'Unhealthy';
-  version: string;
-  uptime: number;
-  size: number;
+  activeConnections?: number;
+  bufferReadPhysical?: number;
+  bufferReadRequests?: number;
+  cacheHitRate?: number;
+  charset?: string;
+  comCommit?: number;
+  commitRate?: number;
+  comRollback?: number;
   databaseName: string;
+  error?: string;
+  handlerDelete?: number;
+  handlerReadKey?: number;
+  handlerReadNext?: number;
+  handlerUpdate?: number;
+  handlerWrite?: number;
+  idleConnections?: number;
+  latency: number;
+  maxConnections?: number;
   resource: {
     cpuUsage: number;
-    ramUsed: number;
     ramTotal: number;
     ramUsagePercent: number;
+    ramUsed: number;
   };
-  activeConnections?: number;
+  size: number;
+  status: 'Healthy' | 'Unhealthy';
   threadsRunning?: number;
-  maxConnections?: number;
-  totalQueries?: number;
-  bufferReadRequests?: number;
-  bufferReadPhysical?: number;
-  comCommit?: number;
-  comRollback?: number;
-  handlerWrite?: number;
-  handlerUpdate?: number;
-  handlerDelete?: number;
-  handlerReadNext?: number;
-  handlerReadKey?: number;
-  charset?: string;
   timezone?: string;
-  cacheHitRate?: number;
-  commitRate?: number;
-  idleConnections?: number;
-  error?: string;
+  totalQueries?: number;
+  uptime: number;
+  version: string;
 }
 
 // ============ Login Log Types ============
 
 export interface LoginLog {
-  browser: string | null;
-  createdAt: string | Date;
-  device: string | null;
+  browser: null | string;
+  createdAt: Date | string;
+  device: null | string;
   id: string;
-  ip: string | null;
-  message: string | null;
-  method: string | null;
-  os: string | null;
+  ip: null | string;
+  message: null | string;
+  method: null | string;
+  os: null | string;
   status: string;
   username: string;
 }
@@ -210,5 +221,35 @@ export interface LoginLogParams {
 
 export interface LoginLogPageResult {
   items: LoginLog[];
+  total: number;
+}
+// ============ Audit Log Types ============
+
+export interface AuditLog {
+  action: string;
+  createdAt: Date | string;
+  details: null | string;
+  id: string;
+  ipAddress: null | string;
+  targetId: string;
+  targetType: string;
+  timestamp?: bigint | number | string;
+  userAgent: null | string;
+  userId: string;
+  username?: string; // Optional: for display purposes
+}
+
+export interface AuditLogParams {
+  action?: string;
+  endDate?: string;
+  page?: number;
+  pageSize?: number;
+  startDate?: string;
+  targetType?: string;
+  userId?: string;
+}
+
+export interface AuditLogPageResult {
+  items: AuditLog[];
   total: number;
 }

@@ -5,7 +5,6 @@ import type { VxeCheckboxChangeParams } from '#/types';
 
 import { computed, ref, watch } from 'vue';
 
-import { useAccess } from '@vben/access';
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
@@ -18,6 +17,8 @@ import {
   getInspectionRecords,
   importInspectionRecords,
 } from '#/api/qms/inspection';
+import { QmsStatusTag } from '#/components/Qms';
+import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 
 import { getColumns } from '../config';
 
@@ -33,23 +34,8 @@ const props = defineProps<{
 
 const emit = defineEmits(['create', 'edit']);
 const { t } = useI18n();
-const { hasAccessByCodes } = useAccess();
-
-const canImport = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Records:Import']),
-);
-const canExport = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Records:Export']),
-);
-const canCreate = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Records:Create']),
-);
-const canEdit = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Records:Edit']),
-);
-const canDelete = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Records:Delete']),
-);
+const { canCreate, canEdit, canDelete, canExport, canImport } =
+  useQmsPermissions('QMS:Inspection:Records');
 
 const processedColumns = (type: string) => {
   return getColumns(type, t).map((col) => {
@@ -325,9 +311,7 @@ defineExpose({ reload });
     </template>
 
     <template #result="{ row }">
-      <span :class="row.result === 'PASS' ? 'text-green-500' : 'text-red-500'">
-        {{ t(`qms.inspection.resultValue.${row.result}`) }}
-      </span>
+      <QmsStatusTag :status="row.result" type="inspection" />
     </template>
   </Grid>
 </template>

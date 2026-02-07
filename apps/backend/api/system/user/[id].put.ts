@@ -1,7 +1,7 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { UserService } from '~/services/user.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -21,43 +21,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-
-    const updateData: Record<string, unknown> = {
-      department: body.deptId,
-      email: body.email,
-      phone: body.phone,
-      realName: body.realName,
-      updatedAt: new Date(),
-    };
-
-    if (body.username) updateData.username = body.username;
-
-    // Handle roles or roleIds - frontend sends 'roles' array
-    const rolesArray = body.roles || body.roleIds;
-    if (rolesArray && rolesArray.length > 0) {
-      const roleIdOrName = rolesArray[0];
-
-      // Try to find role by ID first, then by name
-      const role = await prisma.roles.findFirst({
-        where: {
-          OR: [{ id: String(roleIdOrName) }, { name: String(roleIdOrName) }],
-        },
-      });
-
-      if (role) {
-        updateData.roleId = role.id;
-      }
-    }
-
-    if (body.status !== undefined) {
-      updateData.status = body.status === 1 ? 'ACTIVE' : 'INACTIVE';
-    }
-
-    await prisma.users.update({
-      where: { id },
-      data: updateData,
-    });
-
+    await UserService.update(id, body);
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('user', error);

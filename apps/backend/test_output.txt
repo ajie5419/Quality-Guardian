@@ -1,0 +1,42 @@
+ DEPRECATED  The workspace file is deprecated and will be removed in the next major. Please, use the `test.projects` field in /Users/zhaoxiaojie/Downloads/main/Quality-Guardian/vitest.config.ts instead.
+
+ RUN  v3.2.4 /Users/zhaoxiaojie/Downloads/main/Quality-Guardian
+
+stderr | apps/backend/services/__tests__/after-sales.service.test.ts > AfterSalesService > getStats > should correctly aggregate after-sales statistics
+DEBUG: getStats error: TypeError: Cannot read properties of undefined (reading 'includes')
+    at Object.<anonymous> [90m(/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/[39mapps/backend/services/__tests__/after-sales.service.test.ts:32:30[90m)[39m
+    at Object.mockCall [90m(file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/[39mnode_modules/[4m.pnpm[24m/@vitest+spy@3.2.4/node_modules/[4m@vitest/spy[24m/dist/index.js:96:15[90m)[39m
+    at Object.spy [as $queryRaw] [90m(file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/[39mnode_modules/[4m.pnpm[24m/tinyspy@4.0.3/node_modules/[4mtinyspy[24m/dist/index.js:47:103[90m)[39m
+    at Object.getStats [90m(/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/[39mapps/backend/services/after-sales.service.ts:40:16[90m)[39m
+    at [90m/Users/zhaoxiaojie/Downloads/main/Quality-Guardian/[39mapps/backend/services/__tests__/after-sales.service.test.ts:49:51
+    at [90mfile:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@3.2.4/node_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:155:11
+    at [90mfile:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@3.2.4/node_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:752:26
+    at [90mfile:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@3.2.4/node_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/[39mnode_modules/[4m.pnpm[24m/@vitest+runner@3.2.4/node_modules/[4m@vitest/runner[24m/dist/chunk-hooks.js:1863:10[90m)[39m
+
+ ❯ apps/backend/services/__tests__/after-sales.service.test.ts (2 tests | 1 failed) 5ms
+   × AfterSalesService > getStats > should correctly aggregate after-sales statistics 4ms
+     → expected "spy" to be called at least once
+   ✓ AfterSalesService > getList > should correctly map database records to frontend items 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/backend/services/__tests__/after-sales.service.test.ts > AfterSalesService > getStats > should correctly aggregate after-sales statistics
+AssertionError: expected "spy" to be called at least once
+ ❯ apps/backend/services/__tests__/after-sales.service.test.ts:53:48
+     51|             expect(prisma.after_sales.aggregate).toHaveBeenCalled();
+     52|             expect(prisma.after_sales.count).toHaveBeenCalled();
+     53|             expect(prisma.after_sales.groupBy).toHaveBeenCalled();
+       |                                                ^
+     54|             expect(prisma.$queryRaw).toHaveBeenCalled();
+     55| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  11:06:42
+   Duration  438ms (transform 32ms, setup 0ms, collect 54ms, tests 5ms, environment 126ms, prepare 38ms)
+

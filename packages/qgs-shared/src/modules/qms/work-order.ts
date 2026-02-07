@@ -1,24 +1,24 @@
 export interface WorkOrderItem {
-  createTime: string | null;
-  customerName: string | null;
-  deliveryDate: string | null;
-  division?: string | null;
-  effectiveTime?: string | null;
+  createTime: null | string;
+  customerName: null | string;
+  deliveryDate: null | string;
+  division?: null | string;
+  effectiveTime?: null | string;
   id: string; // workOrderNumber
-  projectName?: string | null;
-  quantity: number | null;
+  projectName?: null | string;
+  quantity: null | number;
   status: string;
   workOrderNumber: string;
 }
 
 export interface WorkOrderSummaryItem {
+  division?: null | string;
+  quantity: null | number;
   status: string;
-  division?: string | null;
-  quantity: number | null;
 }
 
 export interface WorkOrderListResult {
   items: WorkOrderItem[];
-  total: number;
   summary: WorkOrderSummaryItem[];
+  total: number;
 }

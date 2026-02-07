@@ -1,10 +1,15 @@
-import { Prisma, type inspection_result } from '@prisma/client';
-import {
-  type InspectionIssue,
-  type InspectionRecord,
-  type InspectionIssueStatusEnum,
-} from '@qgs/shared';
+import type { inspection_result } from '@prisma/client';
+import type { InspectionIssue, InspectionIssueStatusEnum } from '@qgs/shared';
+
+import { Prisma } from '@prisma/client';
+import { formatDate, tryParsePhotos } from '@qgs/shared';
+import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+
+import { BaseService } from './base.service';
+import { SystemLogService } from './system-log.service';
+
+const logger = createModuleLogger('InspectionService');
 
 interface InspectionItemInput {
   result?: string;
@@ -66,6 +71,72 @@ interface InspectionRecordInput {
 
 export const InspectionService = {
   /**
+   * Find all inspections with pagination, filtering and sorting
+   */
+  async findAll(params: {
+    keyword?: string;
+    page?: number;
+    pageSize?: number;
+    projectName?: string;
+    type?: string;
+    workOrderNumber?: string;
+    year?: number;
+  }) {
+    const {
+      page = 1,
+      pageSize = 100,
+      type = 'INCOMING',
+      year,
+      keyword,
+      projectName,
+      workOrderNumber,
+    } = params;
+
+    // Build Where Clause
+    const where: Prisma.inspectionsWhereInput = {
+      isDeleted: false,
+    };
+
+    // Category Filter
+    if (type !== 'ALL') {
+      where.category = type as any;
+    }
+
+    // Specific Filters
+    if (workOrderNumber) where.workOrderNumber = workOrderNumber;
+    if (projectName) where.projectName = { contains: projectName };
+
+    // Keyword Search
+    if (keyword) {
+      where.OR = [
+        { workOrderNumber: { contains: keyword } },
+        { projectName: { contains: keyword } },
+        { supplierName: { contains: keyword } },
+        { inspector: { contains: keyword } },
+      ];
+    }
+
+    // Date Range (Year)
+    if (year) {
+      where.inspectionDate = BaseService.buildYearFilter(year);
+    }
+
+    // Execute Query
+    const { skip, take } = BaseService.parsePagination({ page, pageSize });
+    const [items, total] = await Promise.all([
+      prisma.inspections.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+        include: { items: true },
+      }),
+      prisma.inspections.count({ where }),
+    ]);
+
+    return { items, total };
+  },
+  /**
    * Determine single item result
    */
   determineItemResult(item: InspectionItemInput): inspection_result {
@@ -95,9 +166,7 @@ export const InspectionService = {
   /**
    * Calculate overall result
    */
-  calculateOverallResult(
-    items: InspectionItemInput[],
-  ): inspection_result {
+  calculateOverallResult(items: InspectionItemInput[]): inspection_result {
     let hasFail = false;
     let hasConditional = false;
 
@@ -179,12 +248,12 @@ export const InspectionService = {
                   : null,
               upperTolerance:
                 item.upperTolerance !== undefined &&
-                  item.upperTolerance !== null
+                item.upperTolerance !== null
                   ? String(item.upperTolerance)
                   : null,
               lowerTolerance:
                 item.lowerTolerance !== undefined &&
-                  item.lowerTolerance !== null
+                item.lowerTolerance !== null
                   ? String(item.lowerTolerance)
                   : null,
               uom: item.uom || item.unit,
@@ -359,22 +428,13 @@ export const InspectionService = {
     ]);
 
     const items: InspectionIssue[] = issues.map((issue) => {
-      let photos: string[] = [];
-      try {
-        if (issue.issuePhoto) {
-          photos = issue.issuePhoto.startsWith('[')
-            ? JSON.parse(issue.issuePhoto)
-            : issue.issuePhoto.split(',').filter(Boolean);
-        }
-      } catch {
-        photos = [];
-      }
+      const photos = tryParsePhotos(issue.issuePhoto as string);
 
       return {
         ...issue,
         ncNumber: issue.nonConformanceNumber || '',
-        reportDate: issue.date ? issue.date.toISOString().split('T')[0] : '',
-        date: issue.date ? issue.date.toISOString().split('T')[0] : '',
+        reportDate: formatDate(issue.date),
+        date: formatDate(issue.date),
         claim: issue.isClaim ? 'Yes' : 'No',
         isClaim: issue.isClaim,
         photos,
@@ -400,75 +460,95 @@ export const InspectionService = {
   },
 
   async getIssueStats(year?: number): Promise<IssueStats> {
-    const where: Prisma.quality_recordsWhereInput = { isDeleted: false };
     const currentYear = year || new Date().getFullYear();
+    const start = new Date(`${currentYear}-01-01`);
+    const end = new Date(`${currentYear + 1}-01-01`);
+    const where: Prisma.quality_recordsWhereInput = {
+      isDeleted: false,
+      date: { gte: start, lt: end },
+    };
 
-    if (currentYear) {
-      const start = new Date(`${currentYear}-01-01`);
-      const end = new Date(`${currentYear + 1}-01-01`);
-      where.date = {
-        gte: start,
-        lt: end,
+    try {
+      // 1. Core aggregations (Total, Loss, Status counts)
+      const [stats, closedCount] = await Promise.all([
+        prisma.quality_records.aggregate({
+          where,
+          _count: { id: true },
+          _sum: { lossAmount: true },
+        }),
+        prisma.quality_records.count({
+          where: { ...where, status: 'CLOSED' },
+        }),
+      ]);
+
+      const totalCount = stats._count.id || 0;
+      const totalLoss = Number(stats._sum.lossAmount) || 0;
+      const closedRate =
+        totalCount > 0 ? Math.round((closedCount / totalCount) * 100) : 0;
+
+      // 2. Defect Type Distribution
+      const typeStats = await prisma.quality_records.groupBy({
+        by: ['defectType'],
+        where,
+        _count: { id: true },
+        orderBy: { _count: { id: 'desc' } },
+      });
+
+      const pieData: PieDataItem[] = typeStats.map((s) => ({
+        name: s.defectType || 'Unknown',
+        value: s._count.id,
+      }));
+
+      // 3. Monthly Trend (Using Raw Query for efficiency)
+      const trendResults = await prisma.$queryRaw<
+        Array<{ amount: number; month: number }>
+      >`
+        SELECT 
+          MONTH(date) as month,
+          SUM(IFNULL(lossAmount, 0)) as amount
+        FROM quality_records
+        WHERE isDeleted = 0 AND date >= ${start} AND date < ${end}
+        GROUP BY month
+      `;
+
+      const trendMap = new Map<string, number>();
+      for (let i = 1; i <= 12; i++) {
+        const monthKey = `${currentYear}-${String(i).padStart(2, '0')}`;
+        trendMap.set(monthKey, 0);
+      }
+
+      trendResults.forEach((r) => {
+        const monthKey = `${currentYear}-${String(r.month).padStart(2, '0')}`;
+        if (trendMap.has(monthKey)) {
+          trendMap.set(monthKey, Number(Number(r.amount).toFixed(2)));
+        }
+      });
+
+      const trendData: TrendDataItem[] = [...trendMap.entries()].map(
+        ([period, value]) => ({ period, value }),
+      );
+
+      return {
+        totalCount,
+        openCount: totalCount - closedCount,
+        closedCount,
+        totalLoss,
+        closedRate,
+        pieData,
+        trendData,
+      };
+    } catch (error) {
+      logger.error({ err: error }, 'getIssueStats failed');
+      return {
+        totalCount: 0,
+        openCount: 0,
+        closedCount: 0,
+        totalLoss: 0,
+        closedRate: 0,
+        pieData: [],
+        trendData: [],
       };
     }
-
-    const issues = await prisma.quality_records.findMany({
-      where,
-      select: {
-        status: true,
-        lossAmount: true,
-        defectType: true,
-        date: true,
-      },
-    });
-
-    const totalCount = issues.length;
-    const closedCount = issues.filter((i) => i.status === 'CLOSED').length;
-    const openCount = totalCount - closedCount;
-    const totalLoss = issues.reduce(
-      (sum, i) => sum + (Number(i.lossAmount) || 0),
-      0,
-    );
-    const closedRate =
-      totalCount > 0 ? Math.round((closedCount / totalCount) * 100) : 0;
-
-    // Defect Type distribution
-    const typeMap = new Map<string, number>();
-    issues.forEach((i) => {
-      const type = i.defectType || 'Unknown';
-      typeMap.set(type, (typeMap.get(type) || 0) + 1);
-    });
-    const pieData = [...typeMap.entries()]
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-
-    // Monthly trend
-    const trendMap = new Map<string, number>();
-    for (let i = 1; i <= 12; i++) {
-      const monthKey = `${currentYear}-${String(i).padStart(2, '0')}`;
-      trendMap.set(monthKey, 0);
-    }
-
-    issues.forEach((i) => {
-      const month = i.date.toISOString().slice(0, 7);
-      if (trendMap.has(month)) {
-        trendMap.set(month, (trendMap.get(month) || 0) + Number(i.lossAmount));
-      }
-    });
-
-    const trendData = [...trendMap.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([period, value]) => ({ period, value }));
-
-    return {
-      totalCount,
-      openCount,
-      closedCount,
-      totalLoss,
-      closedRate,
-      pieData,
-      trendData,
-    };
   },
 
   async generateNextNcNumber(): Promise<string> {
@@ -506,5 +586,27 @@ export const InspectionService = {
 
     const sequenceStr = sequence.toString().padStart(3, '0');
     return `${prefix}${sequenceStr}`;
+  },
+
+  /**
+   * Soft delete a record with audit logging
+   */
+  async deleteRecord(id: string, userId: string): Promise<void> {
+    await prisma.quality_records.update({
+      where: { id },
+      data: {
+        isDeleted: true,
+        updatedAt: new Date(),
+      },
+    });
+
+    // Record audit log
+    await SystemLogService.recordAuditLog({
+      userId,
+      action: 'DELETE',
+      targetType: 'inspection_issue',
+      targetId: id,
+      details: 'Soft deleted inspection issue record',
+    });
   },
 };

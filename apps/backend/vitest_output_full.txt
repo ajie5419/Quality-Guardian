@@ -1,0 +1,17 @@
+ DEPRECATED  The workspace file is deprecated and will be removed in the next major. Please, use the `test.projects` field in /Users/zhaoxiaojie/Downloads/main/Quality-Guardian/vitest.config.ts instead.
+
+⎯⎯⎯⎯⎯⎯⎯ Startup Error ⎯⎯⎯⎯⎯⎯⎯⎯
+Error: Workspace config file "../../vitest.workspace.ts" references a non-existing file or a directory: /Users/zhaoxiaojie/Downloads/main/Quality-Guardian/apps/backend/vitest.config.ts
+    at resolveTestProjectConfigs (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/vitest@3.2.4_@types+node@22.16.0_happy-dom@17.6.3_jiti@2.4.2_less@4.3.0_sass@1.89.2_terser@5.39.0_tsx@4.21.0_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.BkDphVBG.js:7622:11)
+    at resolveProjects (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/vitest@3.2.4_@types+node@22.16.0_happy-dom@17.6.3_jiti@2.4.2_less@4.3.0_sass@1.89.2_terser@5.39.0_tsx@4.21.0_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.BkDphVBG.js:7409:70)
+    at Vitest.resolveProjects (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/vitest@3.2.4_@types+node@22.16.0_happy-dom@17.6.3_jiti@2.4.2_less@4.3.0_sass@1.89.2_terser@5.39.0_tsx@4.21.0_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.BkDphVBG.js:9438:10)
+    at async Vitest._setServer (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/vitest@3.2.4_@types+node@22.16.0_happy-dom@17.6.3_jiti@2.4.2_less@4.3.0_sass@1.89.2_terser@5.39.0_tsx@4.21.0_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.BkDphVBG.js:9319:20)
+    at async handler (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/vitest@3.2.4_@types+node@22.16.0_happy-dom@17.6.3_jiti@2.4.2_less@4.3.0_sass@1.89.2_terser@5.39.0_tsx@4.21.0_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.BkDphVBG.js:10169:6)
+    at async _createServer (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/vite@6.3.5_@types+node@22.16.0_jiti@2.4.2_less@4.3.0_sass@1.89.2_terser@5.39.0_tsx@4.21.0_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-DBxKXgDP.js:38657:20)
+    at async createViteServer (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/vitest@3.2.4_@types+node@22.16.0_happy-dom@17.6.3_jiti@2.4.2_less@4.3.0_sass@1.89.2_terser@5.39.0_tsx@4.21.0_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.BkDphVBG.js:6911:17)
+    at async createVitest (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/vitest@3.2.4_@types+node@22.16.0_happy-dom@17.6.3_jiti@2.4.2_less@4.3.0_sass@1.89.2_terser@5.39.0_tsx@4.21.0_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.BkDphVBG.js:10202:17)
+    at async prepareVitest (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/vitest@3.2.4_@types+node@22.16.0_happy-dom@17.6.3_jiti@2.4.2_less@4.3.0_sass@1.89.2_terser@5.39.0_tsx@4.21.0_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.BkDphVBG.js:10541:14)
+    at async startVitest (file:///Users/zhaoxiaojie/Downloads/main/Quality-Guardian/node_modules/.pnpm/vitest@3.2.4_@types+node@22.16.0_happy-dom@17.6.3_jiti@2.4.2_less@4.3.0_sass@1.89.2_terser@5.39.0_tsx@4.21.0_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.BkDphVBG.js:10488:14)
+
+
+

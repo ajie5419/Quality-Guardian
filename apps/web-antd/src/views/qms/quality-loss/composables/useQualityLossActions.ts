@@ -1,0 +1,116 @@
+import { ref } from 'vue';
+
+import { useI18n } from '@vben/locales';
+
+import { message, Modal } from 'ant-design-vue';
+
+import {
+  batchDeleteQualityLoss,
+  deleteQualityLoss,
+} from '#/api/qms/quality-loss';
+
+import { LossSource } from '../types';
+
+export function useQualityLossActions(gridApi: any, invalidateFn: () => void) {
+  const { t } = useI18n();
+  const checkedRows = ref<any[]>([]);
+  const modalVisible = ref(false);
+  const isEditMode = ref(false);
+  const claimModalVisible = ref(false);
+  const currentRecord = ref<any>({});
+
+  function onCheckChange(params: any) {
+    const records = params.$grid.getCheckboxRecords() || [];
+    checkedRows.value = records;
+  }
+
+  function handleOpenModal() {
+    isEditMode.value = false;
+    currentRecord.value = {
+      actualClaim: 0,
+      amount: 0,
+      date: new Date().toISOString().split('T')[0],
+      description: '',
+      responsibleDepartment: undefined,
+      status: 'PENDING',
+      type: 'Scrap',
+      lossSource: LossSource.MANUAL,
+    };
+    modalVisible.value = true;
+  }
+
+  function handleEdit(row: any) {
+    isEditMode.value = true;
+    currentRecord.value = { ...row };
+    modalVisible.value = true;
+  }
+
+  function handleClaim(row: any) {
+    currentRecord.value = { ...row };
+    claimModalVisible.value = true;
+  }
+
+  async function handleDelete(row: any) {
+    Modal.confirm({
+      title: t('common.confirmDelete'),
+      content: t('common.confirmDeleteContent'),
+      onOk: async () => {
+        try {
+          await deleteQualityLoss(row.id);
+          message.success(t('common.deleteSuccess'));
+          invalidateFn();
+          gridApi.reload();
+        } catch {
+          message.error(t('common.deleteFailed'));
+        }
+      },
+    });
+  }
+
+  function handleBatchDelete() {
+    if (checkedRows.value.length === 0) return;
+
+    const hasAutoRecords = checkedRows.value.some(
+      (r) => r.lossSource !== LossSource.MANUAL,
+    );
+    if (hasAutoRecords) {
+      message.warning('只能批量删除手动录入的损失记录');
+      return;
+    }
+
+    Modal.confirm({
+      title: t('common.confirmBatchDelete'),
+      content: t('common.confirmBatchDeleteContent', {
+        count: checkedRows.value.length,
+      }),
+      onOk: async () => {
+        try {
+          const ids = checkedRows.value.map((r: any) => r.id);
+          const res = await batchDeleteQualityLoss(ids);
+          message.success(
+            t('common.deleteSuccessCount', { count: res.successCount }),
+          );
+          checkedRows.value = [];
+          invalidateFn();
+          gridApi.reload();
+        } catch {
+          message.error(t('common.deleteFailed'));
+        }
+      },
+    });
+  }
+
+  return {
+    checkedRows,
+    modalVisible,
+    isEditMode,
+    claimModalVisible,
+    currentRecord,
+    onCheckChange,
+    handleOpenModal,
+    handleEdit,
+    handleClaim,
+    handleDelete,
+    handleBatchDelete,
+  };
+}

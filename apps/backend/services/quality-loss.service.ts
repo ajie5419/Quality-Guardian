@@ -1,21 +1,27 @@
-import { Prisma, type after_sales_claimStatus, type quality_records_status } from '@prisma/client';
+import type {
+  after_sales_claimStatus,
+  quality_records_status,
+} from '@prisma/client';
+import type {
+  PageResult,
+  QualityLossItem,
+  QualityLossServiceTrendItem,
+} from '@qgs/shared';
+
+import type { PaginationParams } from './base.service';
+
+import { Prisma } from '@prisma/client';
+import { MONTHS } from '~/constants/locale';
+import { createModuleLogger } from '~/utils/logger';
+import prisma from '~/utils/prisma';
+
 import {
-  type PaginationParams,
   applyPagination,
   formatDateString,
   formatNumber,
   safeNumber,
 } from './base.service';
-
-import {
-  type QualityLossItem,
-  type QualityLossServiceTrendItem,
-  type PageResult,
-} from '@qgs/shared';
-
-import { MONTHS } from '~/constants/locale';
-import { createModuleLogger } from '~/utils/logger';
-import prisma from '~/utils/prisma';
+import { SystemLogService } from './system-log.service';
 
 // 创建模块级 logger
 const logger = createModuleLogger('QualityLossService');
@@ -23,8 +29,8 @@ const logger = createModuleLogger('QualityLossService');
 // ============ 类型定义 ============
 
 interface TrendRow {
-  a: null | number | Prisma.Decimal | bigint;
-  p: number | bigint;
+  a: bigint | null | number | Prisma.Decimal;
+  p: bigint | number;
 }
 
 interface TrendItem {
@@ -60,7 +66,9 @@ const QL_CONSTANTS = {
 /**
  * 构建 quality_losses 表的 where 条件
  */
-function buildManualLossesWhere(params: QualityLossQueryParams): Prisma.quality_lossesWhereInput {
+function buildManualLossesWhere(
+  params: QualityLossQueryParams,
+): Prisma.quality_lossesWhereInput {
   return {
     isDeleted: false,
     ...(params.status ? { status: params.status } : {}),
@@ -70,7 +78,9 @@ function buildManualLossesWhere(params: QualityLossQueryParams): Prisma.quality_
 /**
  * 构建 quality_records 表的 where 条件
  */
-function buildInternalRecordsWhere(params: QualityLossQueryParams): Prisma.quality_recordsWhereInput {
+function buildInternalRecordsWhere(
+  params: QualityLossQueryParams,
+): Prisma.quality_recordsWhereInput {
   return {
     isDeleted: false,
     lossAmount: { gt: 0 },
@@ -86,7 +96,9 @@ function buildInternalRecordsWhere(params: QualityLossQueryParams): Prisma.quali
 /**
  * 构建 after_sales 表的 where 条件
  */
-function buildExternalSalesWhere(params: QualityLossQueryParams): Prisma.after_salesWhereInput {
+function buildExternalSalesWhere(
+  params: QualityLossQueryParams,
+): Prisma.after_salesWhereInput {
   return {
     isDeleted: false,
     ...(params.status
@@ -103,20 +115,18 @@ function buildExternalSalesWhere(params: QualityLossQueryParams): Prisma.after_s
 /**
  * 格式化手工录入的损失记录
  */
-function formatManualLossItem(
-  item: {
-    actualClaim: unknown;
-    amount: unknown;
-    id: string;
-    lossId: string;
-    occurDate: Date;
-    respDept: null | string;
-    status?: string;
-    type: string;
-    projectName?: string | null;
-    workOrderNumber?: string | null;
-  },
-): QualityLossItem {
+function formatManualLossItem(item: {
+  actualClaim: unknown;
+  amount: unknown;
+  id: string;
+  lossId: string;
+  occurDate: Date;
+  projectName?: null | string;
+  respDept: null | string;
+  status?: string;
+  type: string;
+  workOrderNumber?: null | string;
+}): QualityLossItem {
   return {
     id: item.lossId || item.id,
     pk: item.id,
@@ -158,14 +168,14 @@ function formatInternalRecordItem(item: {
   date: Date;
   description: null | string;
   id: string;
-  lossAmount: Prisma.Decimal | number | null;
+  lossAmount: null | number | Prisma.Decimal;
   partName: null | string;
   projectName: null | string;
-  recoveredAmount: Prisma.Decimal | number | null;
+  recoveredAmount: null | number | Prisma.Decimal;
   responsibleDepartment: null | string;
   serialNumber: number;
   status: string;
-  workOrderNumber: string | null;
+  workOrderNumber: null | string;
 }): QualityLossItem {
   return {
     id: `INT-${item.serialNumber}`,
@@ -189,13 +199,13 @@ function formatInternalRecordItem(item: {
  * 格式化售后记录
  */
 function formatExternalSalesItem(item: {
-  actualClaim: Prisma.Decimal | number | null;
+  actualClaim: null | number | Prisma.Decimal;
   claimStatus: string;
   createdAt: Date;
   id: string;
   issueDescription: null | string;
-  laborTravelCost: Prisma.Decimal | number | null;
-  materialCost: Prisma.Decimal | number | null;
+  laborTravelCost: null | number | Prisma.Decimal;
+  materialCost: null | number | Prisma.Decimal;
   occurDate: Date;
   partName: null | string;
   productSubtype: null | string;
@@ -203,7 +213,7 @@ function formatExternalSalesItem(item: {
   projectName: null | string;
   respDept: null | string;
   serialNumber: number;
-  workOrderNumber: string | null;
+  workOrderNumber: null | string;
 }): null | QualityLossItem {
   const amount =
     safeNumber(item.materialCost) + safeNumber(item.laborTravelCost);
@@ -274,7 +284,10 @@ function mergeTrendData(
 /**
  * 格式化趋势数据项
  */
-function formatTrendItem(period: string, item: TrendItem): QualityLossServiceTrendItem {
+function formatTrendItem(
+  period: string,
+  item: TrendItem,
+): QualityLossServiceTrendItem {
   const total = item.manual + item.internal + item.external;
   return {
     period,
@@ -291,7 +304,9 @@ export const QualityLossService = {
   /**
    * 获取趋势数据（按月或按周）
    */
-  async getTrendData(granularity: 'month' | 'week'): Promise<{ trend: QualityLossServiceTrendItem[] }> {
+  async getTrendData(
+    granularity: 'month' | 'week',
+  ): Promise<{ trend: QualityLossServiceTrendItem[] }> {
     const year = new Date().getFullYear();
     const isWeek = granularity === 'week';
 
@@ -299,14 +314,26 @@ export const QualityLossService = {
       // Use Prisma.sql for safer raw queries
       const [manual, internal, external] = await Promise.all([
         isWeek
-          ? prisma.$queryRaw<TrendRow[]>`SELECT WEEK(occurDate, 3) as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`
-          : prisma.$queryRaw<TrendRow[]>`SELECT MONTH(occurDate) as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
+          ? prisma.$queryRaw<
+              TrendRow[]
+            >`SELECT WEEK(occurDate, 3) as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`
+          : prisma.$queryRaw<
+              TrendRow[]
+            >`SELECT MONTH(occurDate) as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
         isWeek
-          ? prisma.$queryRaw<TrendRow[]>`SELECT WEEK(date, 3) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${year} AND isDeleted = 0 GROUP BY p`
-          : prisma.$queryRaw<TrendRow[]>`SELECT MONTH(date) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${year} AND isDeleted = 0 GROUP BY p`,
+          ? prisma.$queryRaw<
+              TrendRow[]
+            >`SELECT WEEK(date, 3) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${year} AND isDeleted = 0 GROUP BY p`
+          : prisma.$queryRaw<
+              TrendRow[]
+            >`SELECT MONTH(date) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${year} AND isDeleted = 0 GROUP BY p`,
         isWeek
-          ? prisma.$queryRaw<TrendRow[]>`SELECT WEEK(occurDate, 3) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`
-          : prisma.$queryRaw<TrendRow[]>`SELECT MONTH(occurDate) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`
+          ? prisma.$queryRaw<
+              TrendRow[]
+            >`SELECT WEEK(occurDate, 3) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`
+          : prisma.$queryRaw<
+              TrendRow[]
+            >`SELECT MONTH(occurDate) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
       ]);
 
       const merged = mergeTrendData(manual, internal, external, granularity);
@@ -337,7 +364,9 @@ export const QualityLossService = {
   /**
    * 获取所有损失记录（分页）
    */
-  async getAllLosses(params: QualityLossQueryParams = {}): Promise<PageResult<QualityLossItem>> {
+  async getAllLosses(
+    params: QualityLossQueryParams = {},
+  ): Promise<PageResult<QualityLossItem>> {
     const { lossSource, workOrderNumber } = params;
 
     try {
@@ -361,15 +390,17 @@ export const QualityLossService = {
       if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.MANUAL) {
         const filteredManual = workOrderNumber
           ? manualRecords.filter((r) => {
-            const record = r as typeof r & { workOrderNumber?: string | null };
-            return record.workOrderNumber?.includes(workOrderNumber);
-          })
+              const record = r as typeof r & {
+                workOrderNumber?: null | string;
+              };
+              return record.workOrderNumber?.includes(workOrderNumber);
+            })
           : manualRecords;
 
         filteredManual.forEach((item) => {
           const itemRecord = item as typeof item & {
-            projectName?: string | null;
-            workOrderNumber?: string | null;
+            projectName?: null | string;
+            workOrderNumber?: null | string;
           };
           const amount = safeNumber(item.amount);
           if (amount <= 0) return;
@@ -416,14 +447,45 @@ export const QualityLossService = {
   },
 
   /**
+   * Delete a single record with audit logging
+   */
+  async deleteRecord(id: string, userId: string): Promise<void> {
+    await prisma.quality_losses.update({
+      where: { id },
+      data: { isDeleted: true },
+    });
+
+    await SystemLogService.recordAuditLog({
+      userId,
+      action: 'DELETE',
+      targetType: 'quality_loss',
+      targetId: id,
+      details: 'Soft deleted quality loss record',
+    });
+  },
+
+  /**
    * 批量删除记录
    */
-  async batchDelete(ids: string[]): Promise<Prisma.BatchPayload> {
+  async batchDelete(
+    ids: string[],
+    userId: string,
+  ): Promise<Prisma.BatchPayload> {
     if (ids.length === 0) return { count: 0 };
-    return prisma.quality_losses.updateMany({
+    const result = await prisma.quality_losses.updateMany({
       where: { id: { in: ids } },
       data: { isDeleted: true },
     });
+
+    await SystemLogService.recordAuditLog({
+      userId,
+      action: 'DELETE',
+      targetType: 'quality_loss',
+      targetId: ids.join(','),
+      details: `Batch soft deleted ${result.count} quality loss records`,
+    });
+
+    return result;
   },
 
   /**

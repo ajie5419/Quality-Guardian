@@ -1,23 +1,25 @@
-import { defineEventHandler, getRouterParam } from 'h3';
+import { createError, defineEventHandler, getRouterParam } from 'h3';
+import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import {
-  forbiddenResponse,
-  unAuthorizedResponse,
-  useResponseError,
-  useResponseSuccess,
-} from '~/utils/response';
+import { useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
-    return unAuthorizedResponse(event);
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Unauthorized',
+    });
   }
 
   const id = getRouterParam(event, 'id');
   if (!id) {
-    return useResponseError('缺少ID');
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Missing ID',
+    });
   }
 
   // Data Ownership Check
@@ -28,7 +30,10 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!existingRecord) {
-      return useResponseError('记录不存在');
+      throw createError({
+        statusCode: 404,
+        statusMessage: 'Record not found',
+      });
     }
 
     const userRoles = userinfo.roles || [];
@@ -39,25 +44,28 @@ export default defineEventHandler(async (event) => {
     const isOwner = existingRecord.inspector === userinfo.username;
 
     if (!isAdmin && !isOwner) {
-      return forbiddenResponse(event, '无权删除：您只能删除自己创建的数据');
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Forbidden: You can only delete your own data',
+      });
     }
-  } catch (error) {
+  } catch (error: any) {
+    if (error.statusCode) throw error;
     logApiError('issues', error);
-    return useResponseError('权限校验失败');
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Internal Server Error',
+    });
   }
 
   try {
-    await prisma.quality_records.update({
-      where: { id },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-      },
-    });
-
+    await InspectionService.deleteRecord(id, String(userinfo.id));
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('issues', error);
-    return useResponseError('删除问题失败');
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Internal Server Error',
+    });
   }
 });

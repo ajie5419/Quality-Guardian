@@ -144,7 +144,7 @@ const isManualSource = computed(
         <Col :span="12">
           <FormItem label="日期" name="date" required>
             <Input
-              v-model:value="formState.date"
+              v-model:value="formState.date as any"
               type="date"
               class="w-full"
               :disabled="!isManualSource"

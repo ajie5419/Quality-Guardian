@@ -1,8 +1,6 @@
 export interface AfterSalesItem {
   closeDate: string; // 问题关闭日期
   createdAt: string; // 创建日期
-  occurDate: string; // 发生日期
-  shipDate?: string; // 发货日期
   customerName: string; // 客户名称
   defectSubtype?: string; // 缺陷二级分类
   defectType: string; // 缺陷分类
@@ -16,17 +14,19 @@ export interface AfterSalesItem {
   laborTravelCost: number; // 人工及差旅费
   location: string; // 项目地点
   materialCost: number; // 材料费
+  occurDate: string; // 发生日期
   partName?: string; // 部件名称
   photos?: string[]; // 现场照片
   productSubtype?: string; // 产品二级分类
   productType?: string; // 产品类型
   projectName: string; // 项目名称
+  qualityLoss?: number; // 质量损失金
   quantity: number; // 数量
   resolutionPlan: string; // 处理意见及方案
   responsibleDept: string; // 责任部门
   runningHours?: number; // 运行小时数
-  qualityLoss?: number; // 质量损失金
   severity: string; // 严重程度
+  shipDate?: string; // 发货日期
   status: string; // 状态
   supplierBrand?: string; // 供应商名称/品牌
   warrantyStatus: string; // 在保状态

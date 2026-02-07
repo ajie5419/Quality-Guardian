@@ -9,9 +9,7 @@ import type {
 
 import { computed, onMounted, ref, watch } from 'vue';
 
-import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
-import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
 import { Button, Image, message, Modal, Select, Tag } from 'ant-design-vue';
@@ -25,9 +23,11 @@ import {
 } from '#/api/qms/after-sales';
 import { getDeptList } from '#/api/system/dept';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
+import { QmsStatusTag } from '#/components/Qms';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useGridImport } from '#/hooks/useGridImport';
 import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
+import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData, findNameById } from '#/types';
 
@@ -45,19 +45,22 @@ const chartsRef = ref<any>(null);
 const { invalidateAfterSales } = useInvalidateQmsQueries();
 
 // 权限控制
-const { hasAccessByCodes } = useAccess();
-const canCreate = computed(() => hasAccessByCodes(['QMS:AfterSales:Create']));
-const canEdit = computed(() => hasAccessByCodes(['QMS:AfterSales:Edit']));
-const canDelete = computed(() => hasAccessByCodes(['QMS:AfterSales:Delete']));
+const {
+  canCreate,
+  canEdit,
+  canDelete,
+  canExport,
+  canImport,
+  hasAccessByCodes,
+} = useQmsPermissions('QMS:AfterSales');
+
 const canSettle = computed(() => hasAccessByCodes(['QMS:AfterSales:Settle']));
-const canImport = computed(() => hasAccessByCodes(['QMS:AfterSales:Import']));
-const canExport = computed(() => hasAccessByCodes(['QMS:AfterSales:Export']));
 const canAddChart = computed(() =>
   hasAccessByCodes(['QMS:AfterSales:ChartAdd']),
 );
 
 // 状态选项
-const { getStatusInfo } = useStatusOptions();
+// Status options moved to later in file
 
 // ...
 
@@ -597,9 +600,7 @@ function handleModalSuccess() {
         <div class="rounded-lg bg-white">
           <Grid>
             <template #status="{ row }">
-              <Tag :color="getStatusInfo(row.status).color">
-                {{ getStatusInfo(row.status).label }}
-              </Tag>
+              <QmsStatusTag :status="row.status" type="after-sales" />
             </template>
             <template #isClaim="{ row }">
               <Tag :color="row.isClaim ? 'red' : 'green'">

@@ -1,36 +1,34 @@
-import { defineEventHandler, getRouterParam } from 'h3';
+import { createError, defineEventHandler, getRouterParam } from 'h3';
+import { AfterSalesService } from '~/services/after-sales.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
-import {
-  unAuthorizedResponse,
-  useResponseError,
-  useResponseSuccess,
-} from '~/utils/response';
+import { useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
-    return unAuthorizedResponse(event);
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Unauthorized',
+    });
   }
 
   const id = getRouterParam(event, 'id');
   if (!id) {
-    return useResponseError('缺少ID');
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Missing ID',
+    });
   }
 
   try {
-    await prisma.after_sales.update({
-      where: { id },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-      },
-    });
-
+    await AfterSalesService.deleteRecord(id, String(userinfo.id));
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('after-sales', error);
-    return useResponseError('删除售后记录失败');
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Internal Server Error',
+    });
   }
 });

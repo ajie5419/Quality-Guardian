@@ -1,16 +1,17 @@
-import { Prisma } from '@prisma/client';
-import {
-  type WorkOrderItem,
-  type WorkOrderListResult,
-  type WorkOrderSummaryItem,
+import type {
+  WorkOrderItem,
+  WorkOrderListResult,
+  WorkOrderSummaryItem,
 } from '@qgs/shared';
 
+import { Prisma } from '@prisma/client';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import {
   mapToDisplayStatus,
   WORK_ORDER_STATUS,
 } from '~/utils/work-order-status';
+
 import { formatDateString } from './base.service';
 
 // 创建模块级 logger
@@ -90,7 +91,9 @@ export const WorkOrderService = {
           whereCondition.workOrderNumber = { contains: workOrderNumber.trim() };
         }
         if (status?.trim()) {
-          whereCondition.status = status.trim() as Prisma.Enumwork_orders_statusFilter<"work_orders"> | any;
+          whereCondition.status = status.trim() as
+            | any
+            | Prisma.Enumwork_orders_statusFilter<'work_orders'>;
         }
 
         // 2.2 综合搜索
@@ -173,10 +176,10 @@ export const WorkOrderService = {
         };
       });
 
-      const summary: WorkOrderSummaryItem[] = summaryData.map(s => ({
+      const summary: WorkOrderSummaryItem[] = summaryData.map((s) => ({
         status: s.status,
         division: s.division || null,
-        quantity: s.quantity || 0
+        quantity: s.quantity || 0,
       }));
 
       return {

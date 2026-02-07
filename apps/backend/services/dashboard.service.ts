@@ -1,9 +1,6 @@
-import {
-  type DashboardChartItem,
-  type DashboardData,
-  type DashboardOverview,
-} from '@qgs/shared';
+import type { DashboardChartItem, DashboardOverview } from '@qgs/shared';
 
+import { safeNumber } from '@qgs/shared';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
@@ -127,19 +124,19 @@ export const DashboardService = {
       // 2. 数据计算与兜底
       // 年度总损失
       const totalLoss =
-        (Number(yearAfterSales._sum.materialCost) || 0) +
-        (Number(yearAfterSales._sum.laborTravelCost) || 0) +
-        (Number(yearQualityRecords._sum.lossAmount) || 0) +
-        (Number(yearQualityLosses._sum.amount) || 0);
+        safeNumber(yearAfterSales._sum.materialCost) +
+        safeNumber(yearAfterSales._sum.laborTravelCost) +
+        safeNumber(yearQualityRecords._sum.lossAmount) +
+        safeNumber(yearQualityLosses._sum.amount);
 
       // 本周总损失
       const [weekAfterSalesSum, weekRecordsSum, weekManualSum] =
         weekLossesAggregate;
       const weeklyLossTotal =
-        (Number(weekAfterSalesSum._sum.materialCost) || 0) +
-        (Number(weekAfterSalesSum._sum.laborTravelCost) || 0) +
-        (Number(weekRecordsSum._sum.lossAmount) || 0) +
-        (Number(weekManualSum._sum.amount) || 0);
+        safeNumber(weekAfterSalesSum._sum.materialCost) +
+        safeNumber(weekAfterSalesSum._sum.laborTravelCost) +
+        safeNumber(weekRecordsSum._sum.lossAmount) +
+        safeNumber(weekManualSum._sum.amount);
 
       // 3. 组装返回结构
       return {
@@ -241,9 +238,9 @@ export const DashboardService = {
         const insp = inspections.find((r) => Number(r.month) === mIdx);
         const def = defects.find((r) => Number(r.month) === mIdx);
 
-        const total = Number(insp?.totalQty || 0);
-        const qualified = Number(insp?.qualifiedQty || 0);
-        const defect = Number(def?.defectQty || 0);
+        const total = safeNumber(insp?.totalQty);
+        const qualified = safeNumber(insp?.qualifiedQty);
+        const defect = safeNumber(def?.defectQty);
 
         let passRate: null | number = 100; // Default to 100 if no data
         if (total > 0 || defect > 0) {

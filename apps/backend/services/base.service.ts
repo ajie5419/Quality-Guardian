@@ -3,8 +3,10 @@
  * 用于减少代码重复，提高可维护性
  */
 
-import { type Prisma } from '@prisma/client';
-import { type PageResult } from '@qgs/shared';
+import type { Prisma } from '@prisma/client';
+import type { PageResult } from '@qgs/shared';
+
+import { formatDate, safeNumber } from '@qgs/shared';
 
 // ============ 类型定义 ============
 
@@ -122,8 +124,8 @@ export function buildExactFilter<T>(value?: T): T | undefined {
  * 构建日期范围条件
  */
 export function buildDateRangeFilter(
-  startDate?: Date | string | null,
-  endDate?: Date | string | null,
+  startDate?: Date | null | string,
+  endDate?: Date | null | string,
 ): Prisma.DateTimeFilter | undefined {
   if (!startDate && !endDate) return undefined;
 
@@ -138,7 +140,7 @@ export function buildDateRangeFilter(
  * 构建年份过滤条件
  */
 export function buildYearFilter(
-  year?: number | string | null,
+  year?: null | number | string,
 ): Prisma.DateTimeFilter | undefined {
   const y = Number(year);
   if (!y || Number.isNaN(y)) return undefined;
@@ -153,12 +155,11 @@ export function buildYearFilter(
 /**
  * 格式化日期为 ISO 字符串（仅日期部分）
  */
-export function formatDateString(date: Date | string | null | undefined): null | string {
-  if (!date) return null;
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return null;
-  const isoString = d.toISOString();
-  return isoString.split('T')[0] ?? null;
+export function formatDateString(
+  date: Date | null | string | undefined,
+): null | string {
+  const formatted = formatDate(date);
+  return formatted || null;
 }
 
 /**
@@ -168,19 +169,11 @@ export function formatNumber(
   value: null | number | string | undefined,
   decimals = 2,
 ): number {
-  if (value === null || value === undefined) return 0;
-  const num = Number(value);
-  if (Number.isNaN(num)) return 0;
+  const num = safeNumber(value);
   return Number(num.toFixed(decimals));
 }
 
-/**
- * 安全获取数字值
- */
-export function safeNumber(value: unknown, defaultValue = 0): number {
-  const num = Number(value);
-  return Number.isNaN(num) ? defaultValue : num;
-}
+export { safeNumber };
 
 /**
  * 构建分页响应
@@ -223,7 +216,12 @@ export function buildWhereClause<T extends Record<string, any>>(
     if (value !== undefined && value !== null && value !== '' && builder) {
       const result = builder(value as NonNullable<T[keyof T]>);
       if (result !== undefined) {
-        if (typeof result === 'object' && result !== null && !Array.isArray(result) && !(result instanceof Date)) {
+        if (
+          typeof result === 'object' &&
+          result !== null &&
+          !Array.isArray(result) &&
+          !(result instanceof Date)
+        ) {
           Object.assign(where, result);
         } else {
           where[key] = result;

@@ -1,9 +1,8 @@
-import { execSync } from 'child_process';
-import os from 'os';
-import process from 'process';
+import type { DatabaseMetrics, ServerMetrics } from '@qgs/shared';
 
-import { Prisma } from '@prisma/client';
-import { type DatabaseMetrics, type ServerMetrics } from '@qgs/shared';
+import { execSync } from 'node:child_process';
+import os from 'node:os';
+import process from 'node:process';
 
 import prisma from '~/utils/prisma';
 
@@ -143,7 +142,10 @@ export const SystemService = {
     try {
       if (os.platform() === 'darwin') {
         const netStat = execSync('netstat -ib').toString().split('\n');
-        const uniqueIfs = new Map<string, ServerMetrics['network']['interfaces'][0]>();
+        const uniqueIfs = new Map<
+          string,
+          ServerMetrics['network']['interfaces'][0]
+        >();
         netStat.slice(1).forEach((line) => {
           const parts = line.split(/\s+/);
           if (parts[0] && !uniqueIfs.has(parts[0])) {
@@ -273,13 +275,21 @@ export const SystemService = {
       // Ping and get basic status from MySQL
       const [statusData, versionData, uptimeData, sizeData, varsData] =
         await Promise.all([
-          prisma.$queryRaw<Array<{ Variable_name: string; Value: string }>>`SHOW GLOBAL STATUS WHERE Variable_name IN ("Threads_connected", "Threads_running", "Max_used_connections", "Questions", "Innodb_buffer_pool_read_requests", "Innodb_buffer_pool_reads", "Com_commit", "Com_rollback", "Handler_write", "Handler_update", "Handler_delete", "Handler_read_first", "Handler_read_key", "Handler_read_next", "Handler_read_prev", "Innodb_buffer_pool_pages_total", "Innodb_buffer_pool_pages_free", "Innodb_page_size")`,
-          prisma.$queryRaw<Array<{ version: string }>>`SELECT VERSION() as version`,
-          prisma.$queryRaw<Array<{ Variable_name: string; Value: string }>>`SHOW GLOBAL STATUS LIKE "Uptime"`,
+          prisma.$queryRaw<
+            Array<{ Value: string; Variable_name: string }>
+          >`SHOW GLOBAL STATUS WHERE Variable_name IN ("Threads_connected", "Threads_running", "Max_used_connections", "Questions", "Innodb_buffer_pool_read_requests", "Innodb_buffer_pool_reads", "Com_commit", "Com_rollback", "Handler_write", "Handler_update", "Handler_delete", "Handler_read_first", "Handler_read_key", "Handler_read_next", "Handler_read_prev", "Innodb_buffer_pool_pages_total", "Innodb_buffer_pool_pages_free", "Innodb_page_size")`,
+          prisma.$queryRaw<
+            Array<{ version: string }>
+          >`SELECT VERSION() as version`,
+          prisma.$queryRaw<
+            Array<{ Value: string; Variable_name: string }>
+          >`SHOW GLOBAL STATUS LIKE "Uptime"`,
           prisma.$queryRawUnsafe<Array<{ size: string }>>(
-            `SELECT SUM(data_length + index_length) AS size FROM information_schema.TABLES WHERE table_schema = "${dbName}"`
+            `SELECT SUM(data_length + index_length) AS size FROM information_schema.TABLES WHERE table_schema = "${dbName}"`,
           ),
-          prisma.$queryRaw<Array<{ Variable_name: string; Value: string }>>`SHOW VARIABLES WHERE Variable_name IN ("character_set_database", "time_zone")`,
+          prisma.$queryRaw<
+            Array<{ Value: string; Variable_name: string }>
+          >`SHOW VARIABLES WHERE Variable_name IN ("character_set_database", "time_zone")`,
         ]);
 
       const latency = Date.now() - startTime;
@@ -350,7 +360,8 @@ export const SystemService = {
 
       // Calculate Resource Proxy (Buffer Pool as RAM proxy)
       // Configurable specs
-      const RDS_RAM_TOTAL = Number(process.env.DB_RAM_TOTAL) || 2 * 1024 * 1024 * 1024;
+      const RDS_RAM_TOTAL =
+        Number(process.env.DB_RAM_TOTAL) || 2 * 1024 * 1024 * 1024;
       const RDS_CPU_CORES = Number(process.env.DB_CPU_CORES) || 2;
 
       metrics.resource.ramTotal = RDS_RAM_TOTAL;
@@ -386,11 +397,13 @@ export const SystemService = {
       metrics.cacheHitRate =
         (metrics.bufferReadRequests || 0) > 0
           ? Number(
-            (
-              (1 - (metrics.bufferReadPhysical || 0) / (metrics.bufferReadRequests || 1)) *
-              100
-            ).toFixed(2),
-          )
+              (
+                (1 -
+                  (metrics.bufferReadPhysical || 0) /
+                    (metrics.bufferReadRequests || 1)) *
+                100
+              ).toFixed(2),
+            )
           : 100;
 
       // Calculate Commit Rate
@@ -398,7 +411,9 @@ export const SystemService = {
         (metrics.comCommit || 0) + (metrics.comRollback || 0);
       metrics.commitRate =
         totalTransactions > 0
-          ? Number(((metrics.comCommit || 0) / totalTransactions * 100).toFixed(2))
+          ? Number(
+              (((metrics.comCommit || 0) / totalTransactions) * 100).toFixed(2),
+            )
           : 100;
 
       metrics.idleConnections =
@@ -419,7 +434,7 @@ export const SystemService = {
           ramUsed: 0,
           ramTotal: 0,
           ramUsagePercent: 0,
-        }
+        },
       };
     }
   },

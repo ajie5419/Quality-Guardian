@@ -141,10 +141,12 @@ model after_sales {
   @@index([workOrderNumber])
   @@index([projectName])
   @@index([isDeleted])
+  @@index([respDept])
+  @@index([defectType])
 }
 
 model audit_logs {
-  id         String            @id
+  id         String            @id @default(cuid())
   userId     String
   action     audit_logs_action
   targetType String
@@ -383,6 +385,9 @@ model quality_records {
   @@index([status])
   @@index([status, isDeleted])
   @@index([workOrderNumber])
+  @@index([responsibleDepartment])
+  @@index([defectType])
+  @@index([processName])
 }
 
 model roles {

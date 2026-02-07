@@ -1,12 +1,14 @@
-import { Prisma } from '@prisma/client';
-import {
-  LoginMethodEnum,
-  LoginStatusEnum,
-  type LoginLog,
-  type LoginLogPageResult,
-  type LoginLogParams,
+import type {
+  AuditLog,
+  AuditLogPageResult,
+  AuditLogParams,
+  LoginLog,
+  LoginLogPageResult,
+  LoginLogParams,
 } from '@qgs/shared';
 
+import { Prisma } from '@prisma/client';
+import { LoginMethodEnum, LoginStatusEnum } from '@qgs/shared';
 import prisma from '~/utils/prisma';
 import { parseUA } from '~/utils/ua-parser';
 
@@ -89,6 +91,99 @@ export const SystemLogService = {
    */
   async batchDeleteLogs(ids: string[]): Promise<Prisma.BatchPayload> {
     return prisma.login_logs.deleteMany({
+      where: { id: { in: ids } },
+    });
+  },
+
+  /**
+   * Record an audit log for business operations
+   */
+  async recordAuditLog(params: {
+    action: any;
+    details?: string;
+    ipAddress?: string;
+    targetId: string;
+    targetType: string;
+    userAgent?: string;
+    userId: string;
+  }): Promise<any> {
+    return (prisma.audit_logs as any).create({
+      data: {
+        userId: params.userId,
+        action: params.action,
+        targetType: params.targetType,
+        targetId: params.targetId,
+        details: params.details,
+        ipAddress: params.ipAddress || 'Unknown',
+        userAgent: params.userAgent || 'Unknown',
+      } as any,
+    });
+  },
+
+  /**
+   * Get paginated audit logs
+   */
+  async getAuditLogs(params: AuditLogParams): Promise<AuditLogPageResult> {
+    const page = Number(params.page) || 1;
+    const pageSize = Number(params.pageSize) || 20;
+    const skip = (page - 1) * pageSize;
+
+    const where: Prisma.audit_logsWhereInput = {};
+    if (params.userId) {
+      where.userId = params.userId;
+    }
+    if (params.action) {
+      where.action = params.action as any;
+    }
+    if (params.targetType) {
+      where.targetType = { contains: params.targetType };
+    }
+    if (params.startDate || params.endDate) {
+      where.createdAt = {};
+      if (params.startDate) where.createdAt.gte = new Date(params.startDate);
+      if (params.endDate) where.createdAt.lte = new Date(params.endDate);
+    }
+
+    const [items, total] = await Promise.all([
+      prisma.audit_logs.findMany({
+        where,
+        include: {
+          users: {
+            select: {
+              username: true,
+              realName: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize,
+      }),
+      prisma.audit_logs.count({ where }),
+    ]);
+
+    return {
+      items: items.map((item) => ({
+        ...item,
+        timestamp: String(item.timestamp),
+        username: item.users?.realName || item.users?.username || 'Unknown',
+      })) as any as AuditLog[],
+      total,
+    };
+  },
+
+  /**
+   * Delete an audit log
+   */
+  async deleteAuditLog(id: string): Promise<any> {
+    return prisma.audit_logs.delete({ where: { id } });
+  },
+
+  /**
+   * Batch delete audit logs
+   */
+  async batchDeleteAuditLogs(ids: string[]): Promise<Prisma.BatchPayload> {
+    return prisma.audit_logs.deleteMany({
       where: { id: { in: ids } },
     });
   },

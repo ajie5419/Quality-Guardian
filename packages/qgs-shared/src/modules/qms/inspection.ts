@@ -2,17 +2,18 @@ import { InspectionIssueStatusEnum } from './enums';
 
 export interface InspectionIssue {
   claim: string; // 索赔
+  date: string; // 发现日期 (from Prisma date field)
   defectSubtype?: string;
   defectType?: string;
   description: string;
   division?: string;
   id: string;
   inspector: string; // 检验员 (New standard)
+  isClaim: boolean; // 是否索赔
+  lossAmount: number; // 损失金额
   ncNumber: string; // 不合格编号
   partName: string; // 部件名称
   photos: string[]; // 问题照片
-  isClaim: boolean; // 是否索赔
-  lossAmount: number; // 损失金额
   projectName: string; // 项目名称
   quantity: number; // 数量
   reportDate: string;
@@ -25,7 +26,6 @@ export interface InspectionIssue {
   supplierName?: string; // 供应商名称
   title: string;
   updatedAt: string; // 最后编辑时间
-  date: string; // 发现日期 (from Prisma date field)
   workOrderNumber: string; // 工单号
 }
 

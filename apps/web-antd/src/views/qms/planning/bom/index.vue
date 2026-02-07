@@ -1,9 +1,8 @@
 <script lang="ts" setup>
 import type { QmsPlanningApi } from '#/api/qms/planning';
 
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { nextTick, onMounted, ref, watch } from 'vue';
 
-import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
@@ -21,6 +20,7 @@ import {
 } from '#/api/qms/planning';
 import { getDeptList } from '#/api/system/dept';
 import { useGridImport } from '#/hooks/useGridImport';
+import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { convertToTreeSelectData } from '#/types';
 
 // Shared
@@ -33,10 +33,8 @@ import BomEditModal from './components/BomEditModal.vue';
 import BomProjectModal from './components/BomProjectModal.vue';
 
 const { t } = useI18n();
-const { hasAccessByCodes } = useAccess();
-const canCreate = computed(() => hasAccessByCodes(['QMS:Planning:BOM:Create']));
-const canExport = computed(() => hasAccessByCodes(['QMS:Planning:BOM:Export']));
-const canImport = computed(() => hasAccessByCodes(['QMS:Planning:BOM:Import']));
+const { canCreate, canExport, canImport } =
+  useQmsPermissions('QMS:Planning:BOM');
 
 // ================= Data State =================
 const allProjects = ref<QmsPlanningApi.BomTreeNode[]>([]);

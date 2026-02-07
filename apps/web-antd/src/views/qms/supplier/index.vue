@@ -3,44 +3,27 @@ import type { VxeGridListeners, VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsSupplierApi } from '#/api/qms/supplier';
 import type { VxeCheckboxChangeParams } from '#/types';
 
-import { computed, reactive, ref } from 'vue';
+import { reactive, ref } from 'vue';
 
-import { useAccess } from '@vben/access';
-import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
-import {
-  Badge,
-  Button,
-  Card,
-  message,
-  Modal,
-  Space,
-  Tag,
-  Tooltip,
-} from 'ant-design-vue';
+import { Button, Card, Space, Tag, Tooltip } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import {
-  batchDeleteSuppliers,
-  deleteSupplier,
-  getSupplierList,
-} from '#/api/qms/supplier';
+import { getSupplierList } from '#/api/qms/supplier';
+import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 
 import { RATING_COLORS, SUPPLIER_STATUS_UI_MAP } from '../common-constants';
 import ScoringRulesModal from './components/ScoringRulesModal.vue';
 import SupplierDetailDrawer from './components/SupplierDetailDrawer.vue';
 import SupplierEditModal from './components/SupplierEditModal.vue';
 import SupplierStats from './components/SupplierStats.vue';
+import { useSupplierActions } from './composables/useSupplierActions';
 import { getColumns, getSearchFormSchema } from './data';
 
 const { t } = useI18n();
-const { hasAccessByCodes } = useAccess();
-
-const canExport = computed(() => hasAccessByCodes(['QMS:Supplier:Export']));
-const canImport = computed(() => hasAccessByCodes(['QMS:Supplier:Import']));
-const canEdit = computed(() => hasAccessByCodes(['QMS:Supplier:Edit']));
-const canDelete = computed(() => hasAccessByCodes(['QMS:Supplier:Delete']));
+const { canEdit, canDelete, canExport, canImport } =
+  useQmsPermissions('QMS:Supplier');
 
 const checkedRows = ref<QmsSupplierApi.SupplierItem[]>([]);
 const editModalRef = ref();
@@ -88,59 +71,7 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
   },
   importConfig: {
     remote: true,
-    importMethod: async ({ file }: { file: File }) => {
-      const { requestClient } = await import('#/api/request');
-      const XLSX = await import('xlsx');
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, {
-          type: 'array',
-          cellDates: true,
-        });
-        const sheetName = workbook.SheetNames[0];
-        if (!sheetName) return;
-        const worksheet = workbook.Sheets[sheetName]!;
-        const results = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-        const columns = gridApi.grid.getColumns();
-        const mappedItems = results.map((row: any) => {
-          const item: any = {};
-          columns.forEach((c: any) => {
-            if (!c.field || !c.title) return;
-            const excelKey = Object.keys(row).find(
-              (k) =>
-                String(k).replaceAll(/\s+/g, '') ===
-                String(c.title).replaceAll(/\s+/g, ''),
-            );
-            if (excelKey) {
-              let val = row[excelKey];
-              if (val instanceof Date) {
-                val = val.toISOString().split('T')[0];
-              }
-              item[c.field] = val;
-            }
-          });
-          return item;
-        });
-        const res = await requestClient.post(
-          '/qms/supplier/import',
-          {
-            items: mappedItems,
-            category: 'Supplier',
-          },
-          { timeout: 120_000 },
-        );
-        if (res.successCount > 0) {
-          message.success(
-            t('common.importSuccessCount', { count: res.successCount }),
-          );
-          gridApi.reload();
-        }
-      } catch (error) {
-        console.error('Import Error:', error);
-        message.error(t('common.importFailed'));
-      }
-    },
+    importMethod: (params: any) => handleCustomImport(params),
   },
   exportConfig: {
     remote: false,
@@ -235,58 +166,21 @@ const [Grid, gridApi] = useVbenVxeGrid({
 
 // ================= 操作逻辑 =================
 
-function handleOpenModal() {
-  editModalRef.value?.open({ isUpdate: false, category: 'Supplier' });
-}
-
-function handleEdit(row: QmsSupplierApi.SupplierItem) {
-  editModalRef.value?.open({
-    isUpdate: true,
-    record: row,
-    category: 'Supplier',
-  });
-}
-
-function handleDelete(row: QmsSupplierApi.SupplierItem) {
-  Modal.confirm({
-    title: t('common.confirmDelete'),
-    content: `${t('common.confirmDeleteContent')} [${row.name}] ?`,
-    onOk: async () => {
-      try {
-        await deleteSupplier(row.id);
-        message.success(t('common.deleteSuccess'));
-        gridApi.reload();
-      } catch (error) {
-        console.error('Delete failed:', error);
-      }
-    },
-  });
-}
-
-function handleBatchDelete() {
-  if (checkedRows.value.length === 0) return;
-  Modal.confirm({
-    title: t('common.confirmDelete'),
-    content: t('common.confirmBatchDelete', {
-      count: checkedRows.value.length,
-    }),
-    onOk: async () => {
-      try {
-        const ids = checkedRows.value.map((row) => row.id);
-        await batchDeleteSuppliers(ids);
-        message.success(t('common.deleteSuccess'));
-        checkedRows.value = [];
-        gridApi.reload();
-      } catch (error) {
-        console.error('Batch delete failed:', error);
-      }
-    },
-  });
-}
-
-function showDetail(row: QmsSupplierApi.SupplierItem) {
-  detailDrawerRef.value?.open(row, t('qms.supplier.title'));
-}
+const {
+  handleOpenModal,
+  handleEdit,
+  handleDelete,
+  handleBatchDelete,
+  showDetail,
+  handleCustomImport,
+  handleSuccess,
+} = useSupplierActions({
+  gridApi: gridApi as any,
+  editModalRef,
+  detailDrawerRef,
+  checkedRows,
+  category: 'Supplier',
+});
 
 // Helper to get status config safely
 function getStatusConfig(status?: string) {
@@ -306,9 +200,7 @@ function getStatusConfig(status?: string) {
   );
 }
 
-function handleSuccess() {
-  gridApi.reload();
-}
+// handleSuccess is now provided by useSupplierActions
 </script>
 
 <template>

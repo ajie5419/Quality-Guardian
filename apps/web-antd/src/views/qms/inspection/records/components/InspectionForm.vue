@@ -255,6 +255,31 @@ watch(
   { immediate: true },
 );
 
+// Watch for incomingType changes to switch Supplier/Outsourcing
+watch(
+  () => activeValues.value.incomingType,
+  (newVal, oldVal) => {
+    if (props.type === 'incoming') {
+      const isMachined = newVal === '机加成品件';
+      formApi.updateSchema([
+        {
+          fieldName: 'supplierName',
+          label: isMachined ? '外协单位' : '供应商',
+          componentProps: {
+            category: isMachined ? 'Outsourcing' : 'Supplier',
+            placeholder: isMachined ? '请选择外协单位' : '请选择供应商',
+          },
+        },
+      ]);
+
+      // Clear value if type changes and it's not the initial load (optimization)
+      if (newVal !== oldVal && oldVal !== undefined) {
+        formApi.setFieldValue('supplierName', undefined);
+      }
+    }
+  },
+);
+
 watch(
   () => props.record,
   async (val) => {

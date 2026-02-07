@@ -9,7 +9,6 @@ import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
 import { Button, DatePicker, Input, message, Tag } from 'ant-design-vue';
-import html2canvas from 'html2canvas';
 
 import { getDailySummary } from '#/api/qms/reports';
 import { getDeptList } from '#/api/system/dept';
@@ -87,6 +86,7 @@ async function handleExportImage() {
   if (!reportRef.value) return;
   try {
     loading.value = true;
+    const { default: html2canvas } = await import('html2canvas');
     const canvas = await html2canvas(reportRef.value, {
       useCORS: true,
       scale: 3,

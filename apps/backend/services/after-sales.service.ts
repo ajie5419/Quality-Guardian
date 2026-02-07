@@ -1,13 +1,20 @@
+import type {
+  AfterSalesItem,
+  AfterSalesParams,
+  AfterSalesStats,
+} from '@qgs/shared';
+
 import { Prisma } from '@prisma/client';
 import {
+  formatDate,
   QMS_DEFAULT_VALUES,
   QMS_STATUS_OPEN_SET,
-  type AfterSalesItem,
-  type AfterSalesParams,
-  type AfterSalesStats,
+  tryParsePhotos,
 } from '@qgs/shared';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+
+import { SystemLogService } from './system-log.service';
 
 // 创建模块级 logger
 const logger = createModuleLogger('AfterSalesService');
@@ -18,124 +25,96 @@ export const AfterSalesService = {
    */
   async getStats(year?: number): Promise<AfterSalesStats> {
     const currentYear = year || new Date().getFullYear();
-
-    // Local date range for the specified year
-    const startDate = new Date(currentYear, 0, 1, 0, 0, 0, 0);
+    const startDate = new Date(currentYear, 0, 1);
     const endDate = new Date(currentYear, 11, 31, 23, 59, 59, 999);
-
-    // Define months for trend analysis
     const months = Array.from({ length: 12 }, (_, i) => `${i + 1}月`);
+    const baseWhere = {
+      isDeleted: false,
+      occurDate: { gte: startDate, lte: endDate },
+    };
 
     try {
-      // 1. Fetch all relevant records for the year
-      const records = await prisma.after_sales.findMany({
-        where: {
-          isDeleted: false,
-          occurDate: {
-            gte: startDate,
-            lte: endDate,
-          },
-        },
-      });
+      const openStatus = [...QMS_STATUS_OPEN_SET];
 
-      // 2. Calculate KPI Data
-      const total = records.length;
-      const openStatus = QMS_STATUS_OPEN_SET;
-      const open = records.filter((r) => openStatus.has(r.claimStatus)).length;
+      // 1. KPI & Basic Aggregations
+      const [kpiAggregate, openCount, resolvedStats] = await Promise.all([
+        prisma.after_sales.aggregate({
+          where: baseWhere,
+          _count: { id: true },
+          _sum: { materialCost: true, laborTravelCost: true },
+        }),
+        prisma.after_sales.count({
+          where: { ...baseWhere, claimStatus: { in: openStatus as any } },
+        }),
+        // Average Resolution Time using Raw Query
+        prisma.$queryRaw<Array<{ avgDays: number }>>`
+          SELECT AVG(DATEDIFF(closeDate, occurDate)) as avgDays 
+          FROM after_sales 
+          WHERE isDeleted = 0 AND occurDate >= ${startDate} AND occurDate <= ${endDate} 
+          AND closeDate IS NOT NULL
+        `,
+      ]);
 
-      let totalCost = 0;
-      for (const r of records) {
-        const material = Number(r.materialCost) || 0;
-        const labor = Number(r.laborTravelCost) || 0;
-        totalCost += material + labor;
-      }
+      const total = kpiAggregate._count.id || 0;
+      const totalCost =
+        (Number(kpiAggregate._sum.materialCost) || 0) +
+        (Number(kpiAggregate._sum.laborTravelCost) || 0);
+      const avgTime = Number(resolvedStats?.[0]?.avgDays) || 0;
 
-      // Calculate Average Resolution Time (in days)
-      const resolvedRecords = records.filter((r) => r.closeDate && r.occurDate);
-      let totalDays = 0;
-      for (const r of resolvedRecords) {
-        const start = new Date(r.occurDate).getTime();
-        const end = new Date(r.closeDate).getTime();
-        totalDays += (end - start) / (1000 * 60 * 60 * 24);
-      }
-      const avgTime =
-        resolvedRecords.length > 0 ? totalDays / resolvedRecords.length : 0;
+      // 2. Distributions (Defect, Supplier, Dept)
+      const [defectStats, supplierStats, deptStats] = await Promise.all([
+        prisma.after_sales.groupBy({
+          by: ['defectType'],
+          where: baseWhere,
+          _count: { id: true },
+        }),
+        prisma.after_sales.groupBy({
+          by: ['supplierBrand'],
+          where: baseWhere,
+          _count: { id: true },
+          orderBy: { _count: { id: 'desc' } },
+          take: 5,
+        }),
+        prisma.after_sales.groupBy({
+          by: ['respDept'],
+          where: baseWhere,
+          _count: { id: true },
+          orderBy: { _count: { id: 'desc' } },
+        }),
+      ]);
 
-      // 3. Trend Analysis (Monthly)
-      const monthlyIssues: number[] = Array.from({ length: 12 }).fill(
-        0,
-      ) as number[];
-      const monthlyClosed: number[] = Array.from({ length: 12 }).fill(
-        0,
-      ) as number[];
-      const monthlyCosts: number[] = Array.from({ length: 12 }).fill(
-        0,
-      ) as number[];
+      // 3. Trend Analysis (Monthly) - Use Raw Query for efficiency
+      const trendResults = await prisma.$queryRaw<
+        Array<{ closed: bigint; costs: number; issues: bigint; month: number }>
+      >`
+        SELECT 
+          MONTH(occurDate) as month,
+          COUNT(*) as issues,
+          SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as costs,
+          SUM(CASE WHEN closeDate IS NOT NULL AND YEAR(closeDate) = ${currentYear} THEN 1 ELSE 0 END) as closed
+        FROM after_sales
+        WHERE isDeleted = 0 AND YEAR(occurDate) = ${currentYear}
+        GROUP BY month
+      `;
 
-      records.forEach((r) => {
-        const date = new Date(r.occurDate);
-        const month = date.getMonth();
-        if (month >= 0 && month < 12) {
-          monthlyIssues[month]++;
-          const material = Number(r.materialCost) || 0;
-          const labor = Number(r.laborTravelCost) || 0;
-          monthlyCosts[month] += material + labor;
-        }
+      // 4. Format Result
+      const monthlyIssues: number[] = Array.from({ length: 12 }, () => 0);
+      const monthlyClosed: number[] = Array.from({ length: 12 }, () => 0);
+      const monthlyCosts: number[] = Array.from({ length: 12 }, () => 0);
 
-        if (r.closeDate) {
-          const cDate = new Date(r.closeDate);
-          if (cDate.getFullYear() === currentYear) {
-            const cMonth = cDate.getMonth();
-            if (cMonth >= 0 && cMonth < 12) {
-              monthlyClosed[cMonth]++;
-            }
-          }
-        }
-      });
-
-      // 4. Defect Distribution
-      const defectMap = new Map<string, number>();
-      records.forEach((r) => {
-        const type = r.defectType || QMS_DEFAULT_VALUES.UNCLASSIFIED;
-        defectMap.set(type, (defectMap.get(type) || 0) + 1);
-      });
-      const defectDistribution = [...defectMap.entries()].map(
-        ([name, value]) => ({ name, value }),
-      );
-
-      // 5. Supplier Ranking (Top 5)
-      const supplierMap = new Map<string, number>();
-      records.forEach((r) => {
-        if (r.supplierBrand) {
-          supplierMap.set(
-            r.supplierBrand,
-            (supplierMap.get(r.supplierBrand) || 0) + 1,
-          );
+      trendResults.forEach((r) => {
+        const mIdx = Number(r.month) - 1;
+        if (mIdx >= 0 && mIdx < 12) {
+          monthlyIssues[mIdx] = Number(r.issues);
+          monthlyClosed[mIdx] = Number(r.closed);
+          monthlyCosts[mIdx] = Number(r.costs.toFixed(2));
         }
       });
-      const sortedSuppliers = [...supplierMap.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5);
-
-      const supplierRanking = {
-        categories: sortedSuppliers.map((s) => s[0]),
-        data: sortedSuppliers.map((s) => s[1]),
-      };
-
-      // 6. Department Responsibility Analysis
-      const deptMap = new Map<string, number>();
-      records.forEach((r) => {
-        const dept = r.respDept || QMS_DEFAULT_VALUES.UNASSIGNED;
-        deptMap.set(dept, (deptMap.get(dept) || 0) + 1);
-      });
-      const deptDistribution = [...deptMap.entries()]
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value);
 
       return {
         kpi: {
           total,
-          open,
+          open: openCount,
           cost: Number(totalCost.toFixed(2)),
           avgTime: Number(avgTime.toFixed(1)),
         },
@@ -143,16 +122,24 @@ export const AfterSalesService = {
           category: months,
           issues: monthlyIssues,
           closed: monthlyClosed,
-          costs: monthlyCosts.map((c) => Number(c.toFixed(2))),
+          costs: monthlyCosts,
         },
-        defectDistribution,
-        supplierRanking,
-        deptDistribution,
+        defectDistribution: defectStats.map((s) => ({
+          name: s.defectType || QMS_DEFAULT_VALUES.UNCLASSIFIED,
+          value: s._count.id,
+        })),
+        supplierRanking: {
+          categories: supplierStats.map((s) => s.supplierBrand || 'Unknown'),
+          data: supplierStats.map((s) => s._count.id),
+        },
+        deptDistribution: deptStats.map((s) => ({
+          name: s.respDept || QMS_DEFAULT_VALUES.UNASSIGNED,
+          value: s._count.id,
+        })),
       };
     } catch (error) {
       logger.error({ err: error }, 'getStats failed');
-      // Return empty structure on error
-      const emptyMonthly = (): number[] => Array.from<number>({ length: 12 }).fill(0);
+      const emptyMonthly = (): number[] => Array.from({ length: 12 }, () => 0);
       return {
         kpi: { total: 0, open: 0, cost: 0, avgTime: 0 },
         trend: {
@@ -208,26 +195,6 @@ export const AfterSalesService = {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Helper function to format date as YYYY-MM-DD
-    const formatDate = (date: Date | null | undefined): string => {
-      if (!date) return '';
-      try {
-        return date.toISOString().split('T')[0];
-      } catch {
-        return '';
-      }
-    };
-
-    const tryParsePhotos = (photosStr: string | null | undefined): string[] => {
-      if (!photosStr) return [];
-      try {
-        const parsed = JSON.parse(photosStr);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    };
-
     // Map to frontend expectation with formatted dates
     return list.map((item) => {
       const materialCost = Number(item.materialCost) || 0;
@@ -256,6 +223,28 @@ export const AfterSalesService = {
         supplierBrand: item.supplierBrand || '',
         runningHours: Number(item.runningHours) || 0,
       } as AfterSalesItem;
+    });
+  },
+
+  /**
+   * Soft delete a record with audit logging
+   */
+  async deleteRecord(id: string, userId: string): Promise<void> {
+    await prisma.after_sales.update({
+      where: { id },
+      data: {
+        isDeleted: true,
+        updatedAt: new Date(),
+      },
+    });
+
+    // Record audit log
+    await SystemLogService.recordAuditLog({
+      userId,
+      action: 'DELETE',
+      targetType: 'after_sales',
+      targetId: id,
+      details: 'Soft deleted after-sales record',
     });
   },
 };

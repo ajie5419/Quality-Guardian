@@ -8,42 +8,31 @@ import type { TreeSelectNode, VxeCheckboxChangeParams } from '#/types';
 
 import { computed, onMounted, ref, watchEffect } from 'vue';
 
-import { useAccess } from '@vben/access';
-import { Page } from '@vben/common-ui';
-import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
-import { Button, message, Modal, Select, Space, Tag } from 'ant-design-vue';
+import { Button, message, Select, Space } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { WorkOrderStatusEnum } from '#/api/qms/enums';
-import {
-  batchDeleteWorkOrders,
-  deleteWorkOrder,
-  getWorkOrderList,
-} from '#/api/qms/work-order';
+import { getWorkOrderList } from '#/api/qms/work-order';
 import { getDeptList } from '#/api/system/dept';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
+import { QmsStatusTag } from '#/components/Qms';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
-import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
+import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { convertToTreeSelectData, findNameById } from '#/types';
 
 import WorkOrderCharts from './components/WorkOrderCharts.vue';
 import WorkOrderEditModal from './components/WorkOrderEditModal.vue';
+import { useWorkOrderActions } from './composables/useWorkOrderActions';
 import { useWorkOrderImport } from './composables/useWorkOrderImport';
 import { getStatusInfo } from './composables/useWorkOrderStatus';
 import { getGridColumns } from './data';
 
-// 1. 基础状态
+// 1. 基础状态 (权限与通用功能)
 const { t } = useI18n();
-const { hasAccessByCodes } = useAccess();
-const { invalidateWorkOrders } = useInvalidateQmsQueries();
-
-const canCreate = computed(() => hasAccessByCodes(['QMS:WorkOrder:Create']));
-const canEdit = computed(() => hasAccessByCodes(['QMS:WorkOrder:Edit']));
-const canDelete = computed(() => hasAccessByCodes(['QMS:WorkOrder:Delete']));
-const canExport = computed(() => hasAccessByCodes(['QMS:WorkOrder:Export']));
-const canImport = computed(() => hasAccessByCodes(['QMS:WorkOrder:Import']));
+const { canCreate, canEdit, canDelete, canExport, canImport } =
+  useQmsPermissions('QMS:WorkOrder');
 
 // 2. 部门树数据
 const deptTreeData = ref<TreeSelectNode[]>([]);
@@ -296,69 +285,18 @@ watchEffect(() => {
 const editModalRef = ref<InstanceType<typeof WorkOrderEditModal> | null>(null);
 const showDashboard = ref(true);
 
-function handleAdd() {
-  if (editModalRef.value) {
-    editModalRef.value.open({ record: null, deptData: deptTreeData.value });
-  } else {
-    message.warning(t('qms.common.loading'));
-  }
-}
-
-function handleEdit(row: QmsWorkOrderApi.WorkOrderItem) {
-  if (editModalRef.value) {
-    editModalRef.value.open({ record: row, deptData: deptTreeData.value });
-  }
-}
-
-function handleSuccess() {
-  invalidateWorkOrders();
-  gridApi.value?.reload();
-}
-
-function handleDelete(row: QmsWorkOrderApi.WorkOrderItem) {
-  Modal.confirm({
-    title: t('qms.common.confirmDelete'),
-    content: `${t('qms.common.confirmDeleteContent')} ${row.workOrderNumber}?`,
-    onOk: async () => {
-      try {
-        // 类型安全：后端使用 workOrderNumber 作为主键
-        await deleteWorkOrder(row.workOrderNumber);
-        message.success(t('qms.common.deleteSuccess'));
-        handleSuccess();
-      } catch {
-        message.error(t('qms.common.deleteFailed'));
-      }
-    },
-  });
-}
-
-function handleBatchDelete() {
-  if (checkedRows.value.length === 0) {
-    return;
-  }
-  Modal.confirm({
-    title: t('qms.common.confirmBatchDelete'),
-    content: t('qms.common.confirmBatchDeleteContent', {
-      count: checkedRows.value.length,
-    }),
-    onOk: async () => {
-      try {
-        // 类型安全：后端使用 workOrderNumber 作为主键
-        const ids = checkedRows.value.map(
-          (r: QmsWorkOrderApi.WorkOrderItem) => r.workOrderNumber,
-        );
-        const res = await batchDeleteWorkOrders(ids);
-        message.success(
-          t('qms.common.deleteSuccessCount', { count: res.successCount }),
-        );
-        checkedRows.value = [];
-        handleSuccess();
-      } catch {
-        message.error(t('qms.common.deleteFailed'));
-      }
-    },
-  });
-}
+const {
+  handleAdd,
+  handleEdit,
+  handleDelete,
+  handleBatchDelete,
+  handleSuccess,
+} = useWorkOrderActions({
+  gridApi,
+  deptTreeData,
+  editModalRef,
+  checkedRows,
+});
 </script>
 
 <template>
@@ -436,13 +374,7 @@ function handleBatchDelete() {
             </template>
 
             <template #status="{ row }">
-              <Tag :color="getStatusInfo(row.status).color">
-                {{
-                  getStatusInfo(row.status).textKey
-                    ? t(getStatusInfo(row.status).textKey)
-                    : row.status
-                }}
-              </Tag>
+              <QmsStatusTag :status="row.status" type="work-order" />
             </template>
           </Grid>
         </div>
