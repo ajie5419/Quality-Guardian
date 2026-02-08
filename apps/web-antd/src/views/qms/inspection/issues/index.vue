@@ -11,6 +11,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useAccess } from '@vben/access';
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
+import { useUserStore } from '@vben/stores';
 
 import {
   Button,
@@ -34,9 +35,15 @@ import {
   getInspectionIssueStats,
   importInspectionIssues,
 } from '#/api/qms/inspection';
+import {
+  getMergedPreferenceApi,
+  saveSystemSettingApi,
+  saveUserPreferenceApi,
+} from '#/api/system/preference';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useGridImport } from '#/hooks/useGridImport';
 import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
+import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { findNameById } from '#/types';
 
@@ -56,6 +63,27 @@ import {
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
 
+const { canEdit, canDelete, canImport } = useQmsPermissions(
+  'QMS:Inspection:Issues',
+);
+
+const canSettle = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Issues:Settle']),
+);
+const canAddChart = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Issues:ChartAdd']),
+);
+
+const userStore = useUserStore();
+const isAdmin = computed(() => {
+  return (
+    userStore.userRoles?.some((role: string) => {
+      const lowerRole = role.toLowerCase();
+      return lowerRole.includes('admin') || lowerRole.includes('super');
+    }) || false
+  );
+});
+
 const checkedRows = ref<InspectionIssue[]>([]);
 
 function onCheckChange(params: VxeCheckboxChangeParams) {
@@ -65,22 +93,6 @@ function onCheckChange(params: VxeCheckboxChangeParams) {
 
 // ================= 权限与数据管理 =================
 const { invalidateInspectionIssues } = useInvalidateQmsQueries();
-
-const canEdit = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Issues:Edit']),
-);
-const canDelete = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Issues:Delete']),
-);
-const canSettle = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Issues:Settle']),
-);
-const canAddChart = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Issues:ChartAdd']),
-);
-const canImport = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Issues:Import']),
-);
 
 // 使用数据加载 composable
 const { deptTreeData, deptRawData, loadInitialData } = useIssueData();
@@ -258,12 +270,14 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
   },
 }));
 
+const gridEvents = {
+  checkboxChange: onCheckChange,
+  checkboxAll: onCheckChange,
+};
+
 const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions: gridOptions.value,
-  gridEvents: {
-    checkboxChange: onCheckChange,
-    checkboxAll: onCheckChange,
-  },
+  gridEvents: gridEvents,
   formOptions: {
     schema: searchFormSchema,
     submitOnChange: true,
@@ -271,7 +285,55 @@ const [Grid, gridApi] = useVbenVxeGrid({
 });
 
 // ================= 统计逻辑 =================
-const showCharts = ref(true);
+const showCharts = ref(false);
+const isFirstLoad = ref(true);
+
+// 加载偏好设置
+async function loadPreferences() {
+  try {
+    const pref = await getMergedPreferenceApi(
+      'inspection-issues-charts',
+      'qms:inspection_issues:default_charts',
+    );
+    if (pref) {
+      showCharts.value = !!pref.showCharts;
+    }
+  } catch (error) {
+    console.error('Failed to load preferences', error);
+  } finally {
+    isFirstLoad.value = false;
+  }
+}
+
+// 保存偏好设置
+async function savePreferences() {
+  if (isFirstLoad.value) return;
+  try {
+    await saveUserPreferenceApi('inspection-issues-charts', {
+      showCharts: showCharts.value,
+    });
+  } catch (error) {
+    console.error('Failed to save preferences', error);
+  }
+}
+
+// 监听状态变化并自动保存
+watch(showCharts, () => {
+  if (isFirstLoad.value) return;
+  savePreferences();
+});
+
+async function handleSaveSystemDefault() {
+  try {
+    await saveSystemSettingApi('qms:inspection_issues:default_charts', {
+      showCharts: showCharts.value,
+    });
+    message.success('已存为系统默认配置');
+  } catch (error) {
+    console.error('Failed to save system default', error);
+    message.error('保存失败');
+  }
+}
 
 // 使用统计 composable
 const statistics = ref<StatisticsData>({
@@ -315,6 +377,10 @@ watch(currentYear, () => {
 });
 
 onMounted(() => {
+  loadInitialData().then(() => {
+    gridApi.reload();
+  });
+  loadPreferences();
   fetchStatistics();
 });
 
@@ -433,7 +499,7 @@ function handleSettleToKnowledge(row: InspectionIssue) {
 </script>
 
 <template>
-  <Page>
+  <Page class="h-full">
     <div v-if="showCharts" class="mb-4">
       <IssueChartDashboard ref="chartDashboardRef" :year="currentYear" />
     </div>
@@ -484,7 +550,7 @@ function handleSettleToKnowledge(row: InspectionIssue) {
       </Row>
     </Card>
 
-    <Grid>
+    <Grid class="h-full" :grid-api="gridApi" :grid-events="gridEvents">
       <template #status="{ row }">
         <Tag :color="getStatusColor(row.status)">
           {{ getStatusLabel(row.status) }}
@@ -578,6 +644,17 @@ function handleSettleToKnowledge(row: InspectionIssue) {
               @change="() => gridApi.reload()"
             />
           </div>
+          <Button
+            v-if="isAdmin"
+            shape="round"
+            type="link"
+            @click="handleSaveSystemDefault"
+          >
+            <template #icon>
+              <IconifyIcon icon="lucide:save" />
+            </template>
+            存为系统默认
+          </Button>
         </div>
       </template>
     </Grid>

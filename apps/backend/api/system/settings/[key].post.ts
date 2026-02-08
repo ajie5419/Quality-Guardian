@@ -14,9 +14,14 @@ export default eventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  // TODO: Add admin role check here if needed
-  // For now, we trust the user if they can call this,
-  // but in production, we should check userinfo.roles.includes('Admin')
+  // Check if current user is an admin or super admin
+  const isAdmin = userinfo.roles?.some((role: string) => {
+    const lowerRole = role.toLowerCase();
+    return lowerRole.includes('admin') || lowerRole.includes('super');
+  });
+  if (!isAdmin) {
+    return useResponseError('拒绝访问：仅限管理员修改系统设置', 403);
+  }
 
   const key = getRouterParam(event, 'key');
   if (!key) {
@@ -29,6 +34,28 @@ export default eventHandler(async (event) => {
 
     const valStr = typeof value === 'string' ? value : JSON.stringify(value);
     await PreferenceService.setSystemSetting(key, valStr, description);
+
+    // If saving a chart default, clear all user preferences to force sync
+    switch (key) {
+      case 'qms:after_sales:default_charts': {
+        await PreferenceService.clearAllUserPreferences('after-sales-charts');
+
+        break;
+      }
+      case 'qms:inspection_issues:default_charts': {
+        await PreferenceService.clearAllUserPreferences(
+          'inspection-issues-charts',
+        );
+
+        break;
+      }
+      case 'qms:quality_loss:default_charts': {
+        await PreferenceService.clearAllUserPreferences('quality-loss-charts');
+
+        break;
+      }
+      // No default
+    }
 
     return useResponseSuccess({ message: 'System setting saved' });
   } catch (error) {

@@ -11,6 +11,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
+import { useUserStore } from '@vben/stores';
 
 import { Button, Image, message, Modal, Select, Tag } from 'ant-design-vue';
 
@@ -24,6 +25,7 @@ import {
 import { getDeptList } from '#/api/system/dept';
 import {
   getMergedPreferenceApi,
+  saveSystemSettingApi,
   saveUserPreferenceApi,
 } from '#/api/system/preference';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
@@ -65,6 +67,16 @@ const canAddChart = computed(() =>
   hasAccessByCodes(['QMS:AfterSales:ChartAdd']),
 );
 
+const userStore = useUserStore();
+const isAdmin = computed(() => {
+  return (
+    userStore.userRoles?.some((role: string) => {
+      const lowerRole = role.toLowerCase();
+      return lowerRole.includes('admin') || lowerRole.includes('super');
+    }) || false
+  );
+});
+
 // 加载偏好设置
 async function loadPreferences() {
   try {
@@ -100,10 +112,25 @@ async function savePreferences() {
 watch(
   [showCharts, customChartsData],
   () => {
+    // 只有当值真正改变且不是初次加载时才保存
+    if (isFirstLoad.value) return;
     savePreferences();
   },
   { deep: true },
 );
+
+async function handleSaveSystemDefault() {
+  try {
+    await saveSystemSettingApi('qms:after_sales:default_charts', {
+      showCharts: showCharts.value,
+      customCharts: customChartsData.value,
+    });
+    message.success('已存为系统默认配置');
+  } catch (error) {
+    console.error('Failed to save system default', error);
+    message.error('保存失败');
+  }
+}
 
 // 数据
 const deptTreeData = ref<TreeSelectNode[]>([]);
@@ -728,6 +755,17 @@ function handleModalSuccess() {
                     @change="() => gridApi.reload()"
                   />
                 </div>
+                <Button
+                  v-if="isAdmin"
+                  shape="round"
+                  type="link"
+                  @click="handleSaveSystemDefault"
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:save" />
+                  </template>
+                  存为系统默认
+                </Button>
               </div>
             </template>
           </Grid>

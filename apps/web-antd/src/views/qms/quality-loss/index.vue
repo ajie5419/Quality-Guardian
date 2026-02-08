@@ -10,9 +10,10 @@ import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
+import { useUserStore } from '@vben/stores';
 
 import { PERMISSION_CODES } from '@qgs/shared';
-import { Button, Card, Space, Tag } from 'ant-design-vue';
+import { Button, Card, message, Space, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
@@ -22,6 +23,7 @@ import {
 import { getDeptList } from '#/api/system/dept';
 import {
   getMergedPreferenceApi,
+  saveSystemSettingApi,
   saveUserPreferenceApi,
 } from '#/api/system/preference';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
@@ -52,6 +54,16 @@ const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const deptTreeData = ref<TreeSelectNode[]>([]);
 const showCharts = ref(true);
 const isFirstLoad = ref(true);
+
+const userStore = useUserStore();
+const isAdmin = computed(() => {
+  return (
+    userStore.userRoles?.some((role: string) => {
+      const lowerRole = role.toLowerCase();
+      return lowerRole.includes('admin') || lowerRole.includes('super');
+    }) || false
+  );
+});
 
 // 加载偏好设置
 async function loadPreferences() {
@@ -85,8 +97,21 @@ async function savePreferences() {
 
 // 监听状态变化并自动保存
 watch(showCharts, () => {
+  if (isFirstLoad.value) return;
   savePreferences();
 });
+
+async function handleSaveSystemDefault() {
+  try {
+    await saveSystemSettingApi('qms:quality_loss:default_charts', {
+      showCharts: showCharts.value,
+    });
+    message.success('已存为系统默认配置');
+  } catch (error) {
+    console.error('Failed to save system default', error);
+    message.error('保存失败');
+  }
+}
 
 // 统计逻辑
 const { stats } = useLossStatistics(allLossData);
@@ -386,6 +411,17 @@ function getStatusConfig(s: string) {
                   />
                 </template>
                 {{ showCharts ? t('common.hideChart') : t('common.showChart') }}
+              </Button>
+              <Button
+                v-if="isAdmin"
+                shape="round"
+                type="link"
+                @click="handleSaveSystemDefault"
+              >
+                <template #icon>
+                  <IconifyIcon icon="lucide:save" />
+                </template>
+                存为系统默认
               </Button>
             </Space>
           </template>

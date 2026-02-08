@@ -41,6 +41,33 @@ export const PreferenceService = {
   },
 
   /**
+   * 删除用户特定模块的偏好设置
+   */
+  async deleteUserPreference(userId: string, module: string) {
+    return (prisma as any).user_preferences
+      .delete({
+        where: {
+          userId_module: {
+            userId,
+            module,
+          },
+        },
+      })
+      .catch(() => null); // Ignore if not found
+  },
+
+  /**
+   * 删除所有用户特定模块的偏好设置 (用于管理员强制同步)
+   */
+  async clearAllUserPreferences(module: string) {
+    return (prisma as any).user_preferences.deleteMany({
+      where: {
+        module,
+      },
+    });
+  },
+
+  /**
    * 获取系统全局设置
    */
   async getSystemSetting(key: string) {

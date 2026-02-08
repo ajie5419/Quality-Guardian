@@ -44,3 +44,10 @@ export async function saveSystemSettingApi(
 ) {
   return requestClient.post(`/system/settings/${key}`, { value, description });
 }
+/**
+ * 重置用户特定的模块偏好设置 (回到系统默认)
+ * @param module 模块名称
+ */
+export async function deleteUserPreferenceApi(module: string) {
+  return requestClient.delete(`/user/preferences/${module}`);
+}
