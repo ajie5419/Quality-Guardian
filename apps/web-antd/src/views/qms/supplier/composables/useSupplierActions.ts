@@ -13,14 +13,16 @@ export function useSupplierActions(options: {
   checkedRows: Ref<QmsSupplierApi.SupplierItem[]>;
   detailDrawerRef: Ref<any>;
   editModalRef: Ref<any>;
-  gridApi: Ref<any>;
+  gridApi: any;
 }) {
   const { t } = useI18n();
   const { gridApi, editModalRef, detailDrawerRef, checkedRows, category } =
     options;
 
   function handleSuccess() {
-    gridApi.value?.reload();
+    // Determine if it's a ref or a direct object
+    const api = gridApi?.value || gridApi;
+    api?.reload();
   }
 
   function handleOpenModal() {

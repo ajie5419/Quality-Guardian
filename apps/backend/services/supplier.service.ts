@@ -380,8 +380,10 @@ export const SupplierService = {
         rate = Math.round((qualifiedQty / stat.quantity) * 100);
       }
 
-      let calculatedStatus = 'Qualified';
-      let calculatedRating = 'A';
+      // 1. Prioritize manual status if it's not the default 'Qualified'
+      const manualStatus = item.status;
+      let finalStatus = manualStatus || 'Qualified';
+      let finalRating = item.rating || 'A';
       let score = 100;
 
       const deductionAccidents =
@@ -393,35 +395,52 @@ export const SupplierService = {
 
       score = Math.max(0, 100 - deductionAccidents - deductionIncoming);
 
-      if (
-        stat.consecutiveBigFailures >= LIMIT_CONSECUTIVE_FAILURE ||
-        stat.maxSingleLoss > THRESHOLD_CRITICAL_AMOUNT
-      ) {
-        calculatedStatus = 'frozen';
-        calculatedRating = 'D';
-        score = 0;
-      } else {
-        let shouldDowngrade = false;
+      // 2. Automatic recommendation logic (only triggers if current status is 'Qualified' or equivalent)
+      if (finalStatus.toLowerCase() === 'qualified') {
         if (
-          stat.classA >= LIMIT_YEARLY_CLASS_A ||
-          stat.classB >= LIMIT_YEARLY_CLASS_B
+          stat.consecutiveBigFailures >= LIMIT_CONSECUTIVE_FAILURE ||
+          stat.maxSingleLoss > THRESHOLD_CRITICAL_AMOUNT
         ) {
-          shouldDowngrade = true;
-        }
-        if (stat.count >= 5 && rate < THRESHOLD_INCOMING_YIELD_WARNING) {
-          shouldDowngrade = true;
-        }
-
-        if (shouldDowngrade) {
-          calculatedStatus = 'observation';
-          calculatedRating = 'C';
-          score = Math.min(score, 70);
+          finalStatus = 'Frozen';
+          finalRating = 'D';
+          score = 0;
         } else {
-          if (stat.classA > 0 || stat.classB > 0 || score < 90) {
-            calculatedRating = 'B';
-            calculatedStatus = 'Qualified';
+          let shouldDowngrade = false;
+          if (
+            stat.classA >= LIMIT_YEARLY_CLASS_A ||
+            stat.classB >= LIMIT_YEARLY_CLASS_B
+          ) {
+            shouldDowngrade = true;
+          }
+          if (stat.count >= 5 && rate < THRESHOLD_INCOMING_YIELD_WARNING) {
+            shouldDowngrade = true;
+          }
+
+          if (shouldDowngrade) {
+            finalStatus = 'Observation';
+            finalRating = 'C';
+            score = Math.min(score, 70);
+          } else {
+            if (stat.classA > 0 || stat.classB > 0 || score < 90) {
+              finalRating = 'B';
+              finalStatus = 'Qualified';
+            } else {
+              finalStatus = 'Qualified';
+            }
           }
         }
+      } else {
+        // Normalize capitalized status if manually set in different cases
+        if (finalStatus.toLowerCase() === 'frozen') finalStatus = 'Frozen';
+        else if (finalStatus.toLowerCase() === 'observation')
+          finalStatus = 'Observation';
+        else if (finalStatus.toLowerCase() === 'trial') finalStatus = 'Trial';
+
+        // If status is manual (e.g. Trial, Blacklisted, Active), still calculate rating based on score
+        if (score >= 90) finalRating = 'A';
+        else if (score >= 80) finalRating = 'B';
+        else if (score >= 60) finalRating = 'C';
+        else finalRating = 'D';
       }
 
       return {
@@ -433,9 +452,9 @@ export const SupplierService = {
         totalEngineeringLoss: stat.engineeringLoss,
         engineeringIssueCount: stat.engineeringCount,
         afterSalesIssueCount: stat.afterSalesCount,
-        status: calculatedStatus,
-        rating: calculatedRating,
-        level: calculatedRating,
+        status: finalStatus,
+        rating: finalRating,
+        level: finalRating,
         qualityScore: score,
       };
     });
@@ -475,7 +494,7 @@ export const SupplierService = {
       qualified: processedFullList.filter((s) => s.status === 'Qualified')
         .length,
       warning: processedFullList.filter(
-        (s) => s.qualityScore < 80 || s.status === 'observation',
+        (s) => s.qualityScore < 80 || s.status === 'Observation',
       ).length,
       avgScore: (
         processedFullList.reduce((sum, i) => sum + i.qualityScore, 0) /

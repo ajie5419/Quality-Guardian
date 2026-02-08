@@ -5,10 +5,13 @@ import { requestClient } from '../request';
  * @param module 模块名称
  * @param systemKey 系统默认值的 key (可选)
  */
-export async function getMergedPreferenceApi(module: string, systemKey?: string) {
-    return requestClient.get<any>(`/user/preferences/${module}`, {
-        params: { systemKey },
-    });
+export async function getMergedPreferenceApi(
+  module: string,
+  systemKey?: string,
+) {
+  return requestClient.get<any>(`/user/preferences/${module}`, {
+    params: { systemKey },
+  });
 }
 
 /**
@@ -17,7 +20,7 @@ export async function getMergedPreferenceApi(module: string, systemKey?: string)
  * @param data 偏好数据
  */
 export async function saveUserPreferenceApi(module: string, data: any) {
-    return requestClient.post('/user/preferences/' + module, { data });
+  return requestClient.post(`/user/preferences/${module}`, { data });
 }
 
 /**
@@ -25,7 +28,7 @@ export async function saveUserPreferenceApi(module: string, data: any) {
  * @param key 设置的 key
  */
 export async function getSystemSettingApi(key: string) {
-    return requestClient.get<any>(`/system/settings/${key}`);
+  return requestClient.get<any>(`/system/settings/${key}`);
 }
 
 /**
@@ -34,6 +37,10 @@ export async function getSystemSettingApi(key: string) {
  * @param value 设置的值
  * @param description 设置的描述
  */
-export async function saveSystemSettingApi(key: string, value: any, description?: string) {
-    return requestClient.post(`/system/settings/${key}`, { value, description });
+export async function saveSystemSettingApi(
+  key: string,
+  value: any,
+  description?: string,
+) {
+  return requestClient.post(`/system/settings/${key}`, { value, description });
 }

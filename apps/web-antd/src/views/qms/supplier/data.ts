@@ -149,6 +149,7 @@ export const getFormSchema = (category: 'Outsourcing' | 'Supplier'): any[] => [
     component: 'Select',
     componentProps: {
       options: getStatusOptions(),
+      style: { width: '100%' },
     },
     defaultValue: 'Qualified',
     colProps: { span: 12 },

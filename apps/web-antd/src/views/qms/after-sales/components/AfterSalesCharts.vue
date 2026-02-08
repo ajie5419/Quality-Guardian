@@ -23,7 +23,9 @@ const props = defineProps<{
   year?: number;
 }>();
 
-const customCharts = defineModel<ChartConfig[]>('charts', { default: () => [] });
+const customCharts = defineModel<ChartConfig[]>('charts', {
+  default: () => [],
+});
 
 const { hasAccessByCodes } = useAccess();
 const { t } = useI18n();

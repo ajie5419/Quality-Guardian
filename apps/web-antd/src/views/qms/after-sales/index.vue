@@ -97,9 +97,13 @@ async function savePreferences() {
 }
 
 // 监听状态变化并自动保存
-watch([showCharts, customChartsData], () => {
-  savePreferences();
-}, { deep: true });
+watch(
+  [showCharts, customChartsData],
+  () => {
+    savePreferences();
+  },
+  { deep: true },
+);
 
 // 数据
 const deptTreeData = ref<TreeSelectNode[]>([]);

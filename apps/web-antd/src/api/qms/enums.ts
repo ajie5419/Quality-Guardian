@@ -9,6 +9,7 @@ export enum SupplierStatusEnum {
   FROZEN = 'Frozen',
   OBSERVATION = 'Observation',
   QUALIFIED = 'Qualified',
+  TRIAL = 'Trial',
 }
 
 /**

@@ -32,4 +32,9 @@ export const SUPPLIER_STATUS_UI_MAP: Record<
     textKey: 'qms.supplier.status.frozen',
     defaultText: '已冻结',
   },
+  [SupplierStatusEnum.TRIAL]: {
+    status: 'processing',
+    textKey: 'qms.supplier.status.trial',
+    defaultText: '试用',
+  },
 };

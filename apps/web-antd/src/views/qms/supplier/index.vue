@@ -7,7 +7,7 @@ import { reactive, ref } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
-import { Button, Card, Space, Tag, Tooltip } from 'ant-design-vue';
+import { Badge, Button, Card, Space, Tag, Tooltip } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getSupplierList } from '#/api/qms/supplier';

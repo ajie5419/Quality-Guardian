@@ -20,12 +20,12 @@ import {
   getQualityLossSummary,
 } from '#/api/qms/quality-loss';
 import { getDeptList } from '#/api/system/dept';
-import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
-import { convertToTreeSelectData, findNameById } from '#/types';
 import {
   getMergedPreferenceApi,
   saveUserPreferenceApi,
 } from '#/api/system/preference';
+import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
+import { convertToTreeSelectData, findNameById } from '#/types';
 
 import LossCharts from './components/LossCharts.vue';
 import LossClaimModal from './components/LossClaimModal.vue';
@@ -61,7 +61,8 @@ async function loadPreferences() {
       'qms:quality_loss:default_charts',
     );
     if (pref) {
-      showCharts.value = pref.showCharts !== undefined ? !!pref.showCharts : true;
+      showCharts.value =
+        pref.showCharts === undefined ? true : !!pref.showCharts;
     }
   } catch (error) {
     console.error('Failed to load preferences', error);
@@ -324,7 +325,11 @@ function getStatusConfig(s: string) {
       <LossKpiCards :stats="stats" />
 
       <!-- 2. 分析图表区 -->
-      <LossCharts v-if="showCharts" :data="allLossData" :departments="deptRawData" />
+      <LossCharts
+        v-if="showCharts"
+        :data="allLossData"
+        :departments="deptRawData"
+      />
 
       <!-- 3. 明细列表区 -->
       <Card :bordered="false" class="shadow-sm">
@@ -380,9 +385,7 @@ function getStatusConfig(s: string) {
                     "
                   />
                 </template>
-                {{
-                  showCharts ? t('common.hideChart') : t('common.showChart')
-                }}
+                {{ showCharts ? t('common.hideChart') : t('common.showChart') }}
               </Button>
             </Space>
           </template>
