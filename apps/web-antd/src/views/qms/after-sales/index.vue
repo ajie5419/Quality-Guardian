@@ -22,6 +22,10 @@ import {
   importAfterSalesExcel,
 } from '#/api/qms/after-sales';
 import { getDeptList } from '#/api/system/dept';
+import {
+  getMergedPreferenceApi,
+  saveUserPreferenceApi,
+} from '#/api/system/preference';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { QmsStatusTag } from '#/components/Qms';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
@@ -40,6 +44,8 @@ const { t } = useI18n();
 const showCharts = ref(false);
 const chartRefreshKey = ref(0);
 const chartsRef = ref<any>(null);
+const customChartsData = ref<any[]>([]);
+const isFirstLoad = ref(true);
 
 // 缓存失效控制
 const { invalidateAfterSales } = useInvalidateQmsQueries();
@@ -59,10 +65,41 @@ const canAddChart = computed(() =>
   hasAccessByCodes(['QMS:AfterSales:ChartAdd']),
 );
 
-// 状态选项
-// Status options moved to later in file
+// 加载偏好设置
+async function loadPreferences() {
+  try {
+    const pref = await getMergedPreferenceApi(
+      'after-sales-charts',
+      'qms:after_sales:default_charts',
+    );
+    if (pref) {
+      showCharts.value = !!pref.showCharts;
+      customChartsData.value = pref.customCharts || [];
+    }
+  } catch (error) {
+    console.error('Failed to load preferences', error);
+  } finally {
+    isFirstLoad.value = false;
+  }
+}
 
-// ...
+// 保存偏好设置
+async function savePreferences() {
+  if (isFirstLoad.value) return; // 初始加载时不反向保存
+  try {
+    await saveUserPreferenceApi('after-sales-charts', {
+      showCharts: showCharts.value,
+      customCharts: customChartsData.value,
+    });
+  } catch (error) {
+    console.error('Failed to save preferences', error);
+  }
+}
+
+// 监听状态变化并自动保存
+watch([showCharts, customChartsData], () => {
+  savePreferences();
+}, { deep: true });
 
 // 数据
 const deptTreeData = ref<TreeSelectNode[]>([]);
@@ -73,6 +110,7 @@ async function loadData() {
     const data = await getDeptList();
     deptRawData.value = data;
     deptTreeData.value = convertToTreeSelectData(data);
+    await loadPreferences(); // 加载配置
   } catch (error) {
     console.error('Failed to load data', error);
     message.error(t('common.dataLoadFailed'));
@@ -592,6 +630,7 @@ function handleModalSuccess() {
         <div v-if="showCharts" class="mb-4">
           <AfterSalesCharts
             ref="chartsRef"
+            v-model:charts="customChartsData"
             :year="currentYear"
             :refresh-key="chartRefreshKey"
           />

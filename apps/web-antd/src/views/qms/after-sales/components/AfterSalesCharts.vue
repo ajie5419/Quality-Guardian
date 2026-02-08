@@ -9,7 +9,6 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 import { useAccess } from '@vben/access';
 import { useI18n } from '@vben/locales';
 
-import { useStorage } from '@vueuse/core';
 import { Button, Card, message, Modal } from 'ant-design-vue';
 
 import { getAfterSalesList } from '#/api/qms/after-sales';
@@ -23,6 +22,8 @@ const props = defineProps<{
   refreshKey?: number;
   year?: number;
 }>();
+
+const customCharts = defineModel<ChartConfig[]>('charts', { default: () => [] });
 
 const { hasAccessByCodes } = useAccess();
 const { t } = useI18n();
@@ -41,12 +42,6 @@ const deptList = ref<DeptTreeNode[]>([]);
 // Custom Charts
 const isBuilderOpen = ref(false);
 const editingChart = ref<ChartConfig | undefined>(undefined);
-
-// 持久化存储自定义图表配置
-const customCharts = useStorage<ChartConfig[]>(
-  'qms-after-sales-custom-charts',
-  [],
-);
 
 async function fetchData() {
   loading.value = true;

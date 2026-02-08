@@ -4,7 +4,7 @@ import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
 import type { SystemDeptApi } from '#/api/system/dept';
 import type { TreeSelectNode } from '#/types';
 
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
@@ -22,6 +22,10 @@ import {
 import { getDeptList } from '#/api/system/dept';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData, findNameById } from '#/types';
+import {
+  getMergedPreferenceApi,
+  saveUserPreferenceApi,
+} from '#/api/system/preference';
 
 import LossCharts from './components/LossCharts.vue';
 import LossClaimModal from './components/LossClaimModal.vue';
@@ -46,6 +50,42 @@ const canDelete = computed(() => hasAccessByCodes([LOSS_ANALYSIS.DELETE]));
 const allLossData = ref<QmsQualityLossApi.QualityLossItem[]>([]);
 const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const deptTreeData = ref<TreeSelectNode[]>([]);
+const showCharts = ref(true);
+const isFirstLoad = ref(true);
+
+// 加载偏好设置
+async function loadPreferences() {
+  try {
+    const pref = await getMergedPreferenceApi(
+      'quality-loss-charts',
+      'qms:quality_loss:default_charts',
+    );
+    if (pref) {
+      showCharts.value = pref.showCharts !== undefined ? !!pref.showCharts : true;
+    }
+  } catch (error) {
+    console.error('Failed to load preferences', error);
+  } finally {
+    isFirstLoad.value = false;
+  }
+}
+
+// 保存偏好设置
+async function savePreferences() {
+  if (isFirstLoad.value) return;
+  try {
+    await saveUserPreferenceApi('quality-loss-charts', {
+      showCharts: showCharts.value,
+    });
+  } catch (error) {
+    console.error('Failed to save preferences', error);
+  }
+}
+
+// 监听状态变化并自动保存
+watch(showCharts, () => {
+  savePreferences();
+});
 
 // 统计逻辑
 const { stats } = useLossStatistics(allLossData);
@@ -265,6 +305,7 @@ async function loadInitialData() {
 // ================= 初始加载与联动 =================
 onMounted(async () => {
   await loadInitialData();
+  await loadPreferences();
   fetchSummaryData();
 });
 
@@ -283,7 +324,7 @@ function getStatusConfig(s: string) {
       <LossKpiCards :stats="stats" />
 
       <!-- 2. 分析图表区 -->
-      <LossCharts :data="allLossData" :departments="deptRawData" />
+      <LossCharts v-if="showCharts" :data="allLossData" :departments="deptRawData" />
 
       <!-- 3. 明细列表区 -->
       <Card :bordered="false" class="shadow-sm">
@@ -330,6 +371,18 @@ function getStatusConfig(s: string) {
                   <IconifyIcon icon="lucide:trash-2" />
                 </template>
                 {{ t('common.batchDelete') }}
+              </Button>
+              <Button shape="round" @click="showCharts = !showCharts">
+                <template #icon>
+                  <IconifyIcon
+                    :icon="
+                      showCharts ? 'lucide:bar-chart-3' : 'lucide:bar-chart-3'
+                    "
+                  />
+                </template>
+                {{
+                  showCharts ? t('common.hideChart') : t('common.showChart')
+                }}
               </Button>
             </Space>
           </template>

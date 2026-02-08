@@ -460,6 +460,19 @@ model system_settings {
   updatedAt   DateTime @updatedAt
 }
 
+model user_preferences {
+  id              String   @id @default(cuid())
+  userId          String
+  module          String
+  preference_data String   @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  users           users    @relation(fields: [userId], references: [id])
+
+  @@unique([userId, module])
+  @@index([userId])
+}
+
 model users {
   id                                                String                @id
   username                                          String                @unique
@@ -476,6 +489,7 @@ model users {
   updatedAt                                         DateTime              @updatedAt
   version                                           Int                   @default(1)
   audit_logs                                        audit_logs[]
+  user_preferences                                  user_preferences[]
   qms_task_dispatches_assignee                      qms_task_dispatches[] @relation("qms_task_dispatches_assigneeIdTousers")
   qms_task_dispatches_assignor                      qms_task_dispatches[] @relation("qms_task_dispatches_assignorIdTousers")
   quality_records_quality_records_inspectorTousers  quality_records[]     @relation("quality_records_inspectorTousers")
