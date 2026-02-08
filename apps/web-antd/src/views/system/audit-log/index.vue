@@ -57,6 +57,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
       field: 'targetType',
       title: '操作场景',
       width: 140,
+      slots: { default: 'targetType' },
     },
     {
       field: 'targetId',
@@ -144,9 +145,9 @@ const [Grid, gridApi] = useVbenVxeGrid({
         label: '操作类型',
         componentProps: {
           options: [
-            { label: 'DELETE', value: 'DELETE' },
-            { label: 'UPDATE', value: 'UPDATE' },
-            { label: 'CREATE', value: 'CREATE' },
+            { label: '删除', value: 'DELETE' },
+            { label: '修改', value: 'UPDATE' },
+            { label: '新增', value: 'CREATE' },
           ],
         },
       },
@@ -226,9 +227,17 @@ async function handleBatchDelete() {
       </template>
 
       <template #action="{ row }">
-        <Tag :color="row.action === 'DELETE' ? 'red' : 'blue'">
-          {{ row.action }}
-        </Tag>
+        <Tag v-if="row.action === 'CREATE'" color="green">新增</Tag>
+        <Tag v-else-if="row.action === 'UPDATE'" color="blue">修改</Tag>
+        <Tag v-else-if="row.action === 'DELETE'" color="red">删除</Tag>
+        <Tag v-else color="default">{{ row.action }}</Tag>
+      </template>
+
+      <template #targetType="{ row }">
+        <span v-if="row.targetType === 'inspection_issue'">检验问题</span>
+        <span v-else-if="row.targetType === 'after_sales'">售后记录</span>
+        <span v-else-if="row.targetType === 'quality_loss'">质量损失</span>
+        <span v-else>{{ row.targetType }}</span>
       </template>
     </Grid>
   </Page>

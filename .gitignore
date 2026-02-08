@@ -30,6 +30,7 @@ package-lock.json
 .env.*.local
 .eslintcache
 apps/backend-mock/.env
+apps/backend/uploads
 
 logs
 *.log

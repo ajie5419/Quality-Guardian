@@ -7,7 +7,7 @@ import type {
   VxeCheckboxChangeParams,
 } from '#/types';
 
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
@@ -649,8 +649,9 @@ function handleModalSuccess() {
                   v-if="canAddChart"
                   shape="round"
                   @click="
-                    () => {
+                    async () => {
                       showCharts = true;
+                      await nextTick();
                       chartsRef?.handleAddCustomChart();
                     }
                   "

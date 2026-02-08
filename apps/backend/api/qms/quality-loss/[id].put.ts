@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -88,6 +89,18 @@ export default defineEventHandler(async (event) => {
         data: updateData,
       });
     }
+
+    let targetType = 'quality_loss';
+    if (source === 'Internal') targetType = 'inspection_issue';
+    else if (source === 'External') targetType = 'after_sales';
+
+    await SystemLogService.recordAuditLog({
+      userId: String(userinfo.id),
+      action: 'UPDATE',
+      targetType,
+      targetId: String(id),
+      details: `修改质量损失相关记录: ${id}${source === 'Manual' ? '' : ` (${source} 来源)`}`,
+    });
 
     return useResponseSuccess({ message: '更新成功', success: true });
   } catch (error: unknown) {

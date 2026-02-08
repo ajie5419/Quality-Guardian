@@ -2,6 +2,7 @@ import { eventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
 
 interface Menu {
@@ -23,10 +24,10 @@ function buildMenuTree(menus: Menu[], parentId: string = '0'): Menu[] {
   const filtered = menus.filter((menu) => {
     const pid =
       !menu.parentId ||
-        menu.parentId === null ||
-        menu.parentId === undefined ||
-        menu.parentId === '0' ||
-        menu.parentId === 0
+      menu.parentId === null ||
+      menu.parentId === undefined ||
+      menu.parentId === '0' ||
+      menu.parentId === 0
         ? '0'
         : String(menu.parentId);
     return pid === parentId;
@@ -126,8 +127,6 @@ function filterMenus(
     .map((menu) => ({ ...menu }));
 }
 
-import { redis } from '~/utils/redis';
-
 // ... imports
 
 export default eventHandler(async (event) => {
@@ -144,7 +143,9 @@ export default eventHandler(async (event) => {
 
   const cached = await redis.get(cacheKey);
   if (cached) {
-    console.warn(`[Menu Cache] HIT - User: ${userinfo.username}, Key: ${cacheKey}`);
+    console.warn(
+      `[Menu Cache] HIT - User: ${userinfo.username}, Key: ${cacheKey}`,
+    );
     return cached;
   }
 

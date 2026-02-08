@@ -43,7 +43,10 @@ export const DashboardService = {
     recentWorkOrders: any[];
   }> {
     const cacheKey = 'qms:dashboard:stats';
-    const cached = await redis.get(cacheKey);
+    const cached = await redis.get<{
+      overview: DashboardOverview;
+      recentWorkOrders: any[];
+    }>(cacheKey);
     if (cached) {
       console.warn(`[Dashboard Cache] HIT - Key: ${cacheKey}`);
       return cached;
@@ -185,7 +188,7 @@ export const DashboardService = {
    */
   async getMonthlyTrend(): Promise<DashboardChartItem[]> {
     const cacheKey = 'qms:dashboard:trend';
-    const cached = await redis.get(cacheKey);
+    const cached = await redis.get<DashboardChartItem[]>(cacheKey);
     if (cached) {
       console.warn(`[Dashboard Cache] HIT - Key: ${cacheKey}`);
       return cached;
@@ -224,8 +227,18 @@ export const DashboardService = {
         ])) as [MonthInspecResult[], MonthDefectResult[]];
 
         const months = [
-          '1月', '2月', '3月', '4月', '5月', '6月',
-          '7月', '8月', '9月', '10月', '11月', '12月'
+          '1月',
+          '2月',
+          '3月',
+          '4月',
+          '5月',
+          '6月',
+          '7月',
+          '8月',
+          '9月',
+          '10月',
+          '11月',
+          '12月',
         ];
         const currentMonthIndex = new Date().getMonth();
 
@@ -242,7 +255,9 @@ export const DashboardService = {
           if (total > 0 || defect > 0) {
             const effectiveTotal = Math.max(total, defect);
             const netQualified = Math.max(0, qualified - defect);
-            passRate = Number(((netQualified / effectiveTotal) * 100).toFixed(1));
+            passRate = Number(
+              ((netQualified / effectiveTotal) * 100).toFixed(1),
+            );
           } else if (idx > currentMonthIndex) {
             passRate = null;
           } else {

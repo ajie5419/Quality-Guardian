@@ -1,6 +1,7 @@
 import { after_sales_claimStatus } from '@prisma/client';
 import { QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
+import { SystemLogService } from '~/services/system-log.service';
 import { mapAfterSalesStatus } from '~/utils/after-sales-status';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -69,6 +70,14 @@ export default defineEventHandler(async (event) => {
         isDeleted: false,
         updatedAt: new Date(),
       },
+    });
+
+    await SystemLogService.recordAuditLog({
+      userId: String(userinfo.id),
+      action: 'CREATE',
+      targetType: 'after_sales',
+      targetId: String(newItem.id),
+      details: `新增售后记录: ${newItem.projectName} (${newItem.id})`,
     });
 
     return useResponseSuccess(newItem);

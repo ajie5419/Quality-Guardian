@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -123,6 +124,14 @@ export default defineEventHandler(async (event) => {
     await prisma.quality_records.update({
       where: { id },
       data: updateData,
+    });
+
+    await SystemLogService.recordAuditLog({
+      userId: String(userinfo.id),
+      action: 'UPDATE',
+      targetType: 'inspection_issue',
+      targetId: String(id),
+      details: `修改检验问题: ${updateData.partName || '未修改名称'} (${updateData.nonConformanceNumber || existingNcNumber || '无编号'})`,
     });
 
     return useResponseSuccess(null);

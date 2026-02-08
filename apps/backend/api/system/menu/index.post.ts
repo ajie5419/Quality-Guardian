@@ -24,7 +24,6 @@ export default defineEventHandler(async (event) => {
       pid = String(body.pid);
     }
 
-
     const newMenu = await prisma.menus.create({
       data: {
         id: `menu-${Date.now()}`,

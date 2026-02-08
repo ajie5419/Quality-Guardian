@@ -208,6 +208,10 @@ watch(
   () => fetchData(),
   { immediate: true },
 );
+
+defineExpose({
+  handleAddCustomChart,
+});
 </script>
 
 <template>

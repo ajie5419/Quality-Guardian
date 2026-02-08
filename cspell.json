@@ -70,7 +70,9 @@
     "pmem",
     "sout",
     "Innodb",
-    "qqbrowser"
+    "qqbrowser",
+    "setex",
+    "Enumwork"
   ],
   "ignorePaths": [
     "**/node_modules/**",

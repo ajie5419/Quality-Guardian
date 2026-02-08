@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -76,6 +77,14 @@ export default defineEventHandler(async (event) => {
         isDeleted: false,
         updatedAt: new Date(),
       },
+    });
+
+    await SystemLogService.recordAuditLog({
+      userId: String(userinfo.id),
+      action: 'CREATE',
+      targetType: 'inspection_issue',
+      targetId: String(newRecord.id),
+      details: `新增检验问题: ${newRecord.partName} (${newRecord.nonConformanceNumber || '无编号'})`,
     });
 
     return useResponseSuccess({

@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -31,6 +32,14 @@ export default defineEventHandler(async (event) => {
         status: body.status || 'Pending',
         isDeleted: false,
       },
+    });
+
+    await SystemLogService.recordAuditLog({
+      userId: String(userinfo.id),
+      action: 'CREATE',
+      targetType: 'quality_loss',
+      targetId: String(newItem.id),
+      details: `新增质量损失记录: ${newItem.type} (${newItem.amount})`,
     });
 
     return useResponseSuccess({

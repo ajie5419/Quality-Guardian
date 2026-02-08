@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { SystemLogService } from '~/services/system-log.service';
 import { mapAfterSalesStatus } from '~/utils/after-sales-status';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -86,6 +87,14 @@ export default defineEventHandler(async (event) => {
     await prisma.after_sales.update({
       where: { id },
       data: updateData,
+    });
+
+    await SystemLogService.recordAuditLog({
+      userId: String(userinfo.id),
+      action: 'UPDATE',
+      targetType: 'after_sales',
+      targetId: String(id),
+      details: `修改售后记录: ${id}`,
     });
 
     return useResponseSuccess(null);
