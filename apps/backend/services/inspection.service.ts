@@ -359,13 +359,15 @@ export const InspectionService = {
   },
 
   async getIssues(params: {
+    defectType?: string | string[];
     page?: number;
     pageSize?: number;
     processName?: string;
     projectName?: string;
+    severity?: string | string[];
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
-    status?: string;
+    status?: string | string[];
     supplierName?: string;
     workOrderNumber?: string;
     year?: number;
@@ -389,16 +391,27 @@ export const InspectionService = {
       where.projectName = { contains: params.projectName };
     }
 
-    if (params.status) {
-      where.status = params.status as any;
-    }
-
-    if (params.supplierName) {
-      where.supplierName = { contains: params.supplierName };
-    }
-
     if (params.workOrderNumber) {
       where.workOrderNumber = { contains: params.workOrderNumber };
+    }
+
+    // New Filters
+    if (params.severity) {
+      where.severity = Array.isArray(params.severity)
+        ? { in: params.severity }
+        : params.severity;
+    }
+
+    if (params.defectType) {
+      where.defectType = Array.isArray(params.defectType)
+        ? { in: params.defectType }
+        : params.defectType;
+    }
+
+    if (params.status) {
+      where.status = Array.isArray(params.status)
+        ? { in: params.status as any }
+        : (params.status as any);
     }
 
     const {
@@ -411,10 +424,26 @@ export const InspectionService = {
     const take = pageSize && pageSize > 0 ? pageSize : undefined;
 
     const orderBy: Prisma.quality_recordsOrderByWithRelationInput = {};
-    if (sortBy === 'ncNumber') {
-      orderBy.nonConformanceNumber = sortOrder;
-    } else {
-      (orderBy as any)[sortBy] = sortOrder;
+    switch (sortBy) {
+      case 'ncNumber': {
+        orderBy.nonConformanceNumber = sortOrder;
+        break;
+      }
+      case 'reportDate': {
+        orderBy.date = sortOrder;
+        break;
+      }
+      case 'reportedBy': {
+        orderBy.inspector = sortOrder;
+        break;
+      }
+      case 'title': {
+        orderBy.partName = sortOrder;
+        break;
+      }
+      default: {
+        (orderBy as any)[sortBy] = sortOrder;
+      }
     }
 
     const [total, issues] = await Promise.all([

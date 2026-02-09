@@ -64,6 +64,9 @@ setupVbenVxeTable({
           showActiveMsg: true,
           showResponseMsg: false,
         },
+        filterConfig: {
+          remote: true,
+        },
         // 全局工具栏配置 - 所有表格默认启用这些功能
         toolbarConfig: {
           title: '', // 隐藏表格标题

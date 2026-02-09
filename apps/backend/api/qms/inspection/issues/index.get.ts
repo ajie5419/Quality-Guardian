@@ -13,7 +13,9 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const year = query.year ? Number.parseInt(String(query.year)) : undefined;
   const projectName = query.projectName ? String(query.projectName) : undefined;
-  const status = query.status ? String(query.status) : undefined;
+  const status = query.status;
+  const severity = query.severity;
+  const defectType = query.defectType;
   const processName = query.processName ? String(query.processName) : undefined;
   const supplierName = query.supplierName
     ? String(query.supplierName)
@@ -32,7 +34,9 @@ export default defineEventHandler(async (event) => {
     const result = await InspectionService.getIssues({
       year,
       projectName,
-      status,
+      status: status as string | string[],
+      severity: severity as string | string[],
+      defectType: defectType as string | string[],
       processName,
       supplierName,
       workOrderNumber,

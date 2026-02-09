@@ -148,19 +148,63 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
   columns: [
     { type: 'checkbox', width: 50 },
     ...(gridColumns || []).map((col) => {
+      // Add filters to specific columns
+      if (col.field === 'status') {
+        return {
+          ...col,
+          filters: [
+            { label: t('qms.inspection.issues.status.open'), value: 'OPEN' },
+            {
+              label: t('qms.inspection.issues.status.in_progress'),
+              value: 'IN_PROGRESS',
+            },
+            {
+              label: t('qms.inspection.issues.status.resolved'),
+              value: 'RESOLVED',
+            },
+            {
+              label: t('qms.inspection.issues.status.closed'),
+              value: 'CLOSED',
+            },
+          ],
+        };
+      }
+      if (col.field === 'severity') {
+        return {
+          ...col,
+          filters: [
+            { label: 'Critical', value: 'Critical' },
+            { label: 'Major', value: 'Major' },
+            { label: 'Minor', value: 'Minor' },
+          ],
+        };
+      }
+      if (col.field === 'defectType') {
+        return {
+          ...col,
+          filters: [
+            { label: '外观问题', value: '外观问题' },
+            { label: '尺寸问题', value: '尺寸问题' },
+            { label: '功能问题', value: '功能问题' },
+            { label: '材料问题', value: '材料问题' },
+            { label: '包装问题', value: '包装问题' },
+            { label: '其他', value: '其他' },
+          ],
+        };
+      }
+
       // 处理部门/事业部名称映射
       if (col.field === 'division' || col.field === 'responsibleDepartment') {
         return {
           ...col,
           formatter: ({ cellValue }: { cellValue: string | unknown }) => {
             if (!cellValue) return '';
-            // 确保从响应式的 deptRawData 中查找
             const name = findNameById(deptRawData.value, cellValue as string);
             return name || (cellValue as string);
           },
         };
       }
-      // 处理时间格式化和时区
+      // ... (rest of the column processing)
       if (col.field === 'updatedAt' || col.field === 'reportDate') {
         return {
           ...col,
@@ -168,7 +212,6 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
             if (!cellValue) return '';
             const format =
               col.field === 'reportDate' ? 'YYYY-MM-DD' : 'YYYY-MM-DD HH:mm:ss';
-            // 使用 dayjs 转换 UTC 到本地时区
             const date = dayjs(cellValue as Date | number | string);
             return date.isValid() ? date.format(format) : (cellValue as string);
           },
@@ -221,9 +264,13 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
     remote: true,
     trigger: 'cell',
   },
+  filterConfig: {
+    remote: true, // Enable remote filtering
+  },
   proxyConfig: {
     autoLoad: true,
     sort: true,
+    filter: true, // Enable filter proxy
     props: {
       result: 'items',
       total: 'total',
@@ -233,13 +280,25 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
         {
           page,
           sorts,
+          filters,
         }: {
+          filters: any[];
           page: { currentPage?: number; pageSize?: number };
           sorts: any[];
         },
         formValues: Record<string, unknown> = {},
       ) => {
         const sortParam = sorts?.[0];
+
+        // Parse filters
+        const filterParams: Record<string, any> = {};
+        filters?.forEach((item) => {
+          const values = item.values;
+          if (values && values.length > 0) {
+            filterParams[item.field] = values;
+          }
+        });
+
         const { items, total } = await getInspectionIssues({
           page: page?.currentPage || 1,
           pageSize: page?.pageSize || 20,
@@ -248,7 +307,15 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
           year: currentYear.value,
           workOrderNumber: formValues?.workOrderNumber as string,
           projectName: formValues?.projectName as string,
-          status: formValues?.status as string,
+          status: (filterParams.status?.[0] || formValues?.status) as string, // Priority to column filter or merge? Let's use column filter if present
+          // For now, mapping specific fields we enable filtering for
+          // If status is filtered by column, use that.
+          // Note: multiple select in column filter returns array. Backend might expect string or array.
+          // Let's assume backend currently handles single status via params.status.
+          // We might need to update backend to handle arrays or just take the first one for now if unsupported.
+          // Update: getIssues params definition in frontend api might need update to accept arrays.
+          // Let's pass the raw values to api and update api/service.
+          ...filterParams, // Spread other filters like severity, defectType
           processName: formValues?.processName as string,
         });
 
@@ -277,7 +344,7 @@ const gridEvents = {
 
 const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions: gridOptions.value,
-  gridEvents: gridEvents,
+  gridEvents,
   formOptions: {
     schema: searchFormSchema,
     submitOnChange: true,

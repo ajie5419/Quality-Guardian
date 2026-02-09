@@ -43,7 +43,6 @@
     "@wangeditor/editor-for-vue": "^1.0.2",
     "ant-design-vue": "catalog:",
     "dayjs": "catalog:",
-    "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
     "lodash-es": "^4.17.23",
     "mammoth": "^1.11.0",
@@ -53,7 +52,6 @@
     "vue-router": "catalog:",
     "vxe-pc-ui": "catalog:",
     "vxe-table": "catalog:",
-    "vxe-table-plugin-export-xlsx": "^4.0.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
