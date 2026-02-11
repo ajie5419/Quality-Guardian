@@ -21,6 +21,7 @@ model inspections {
   level2Component     String?
   team                String?
   documents           String?
+  hasDocuments        Boolean             @default(true)
   packingListArchived String?
   quantity            Int                 @default(1)
   inspector           String

@@ -2,6 +2,8 @@ import type { VbenFormSchema } from '#/adapter/form';
 
 import { $t } from '@vben/locales';
 
+import { Modal } from 'ant-design-vue';
+
 import { getProcessOptions } from '../config';
 
 export const getFormSchema = (type: string): VbenFormSchema[] => {
@@ -63,6 +65,27 @@ export const getFormSchema = (type: string): VbenFormSchema[] => {
         component: 'SupplierSelect',
         rules: 'required',
         modelPropName: 'value',
+      },
+      {
+        fieldName: 'hasDocuments',
+        label: '是否有资料',
+        component: 'Switch',
+        defaultValue: true,
+        modelPropName: 'checked',
+        componentProps: {
+          checkedChildren: '是',
+          unCheckedChildren: '否',
+          class: 'w-[60px]',
+          beforeChange: (checked: boolean) =>
+            new Promise<boolean>((resolve) => {
+              Modal.confirm({
+                title: '确认更改',
+                content: `确定要将是否有资料改为"${checked ? '是' : '否'}"吗？`,
+                onOk: () => resolve(true),
+                onCancel: () => resolve(false),
+              });
+            }),
+        },
       },
     );
   }

@@ -1,4 +1,4 @@
-import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { defineEventHandler, getQuery, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -15,12 +15,16 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const rawId = getRouterParam(event, 'id');
-  if (!rawId) {
+  // Use query param 'id' to handle special characters like '/'
+  const query = getQuery(event);
+  const id = String(query.id || '');
+
+  if (!id) {
     return useResponseError('缺少工单号');
   }
-  // Ensure ID is decoded (e.g. if passed as 23TL-CL%2F2501)
-  const id = decodeURIComponent(rawId);
+
+  // No need to decode if using query params, usually handled by h3/framework
+  // But just in case, ensure spacing is correct if needed, though raw query params are safer.
 
   try {
     const body = await readBody(event);

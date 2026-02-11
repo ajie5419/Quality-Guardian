@@ -107,6 +107,12 @@ export const getColumns = (
         title: t('qms.inspection.records.form.materialName'),
         minWidth: 150,
       },
+      {
+        field: 'hasDocuments',
+        title: '是否有资料',
+        width: 100,
+        slots: { default: 'hasDocuments' },
+      },
     ],
     [INSPECTION_TYPES.PROCESS.toLowerCase()]: [
       {
@@ -165,6 +171,12 @@ export const getColumns = (
       formatter: 'formatDate',
     },
     {
+      field: 'remarks',
+      title: t('qms.inspection.fields.remarks'),
+      minWidth: 150,
+      showOverflow: true,
+    },
+    {
       title: t('common.action'),
       width: 150,
       fixed: 'right',
@@ -186,6 +198,7 @@ export const getFormConfig = (type: string, t: (key: string) => string) => {
     showTeam: false,
     showDocuments: false,
     showPackingList: false,
+    showHasDocuments: false,
     labels: {
       materialName: t('qms.inspection.records.form.materialName'),
     },
@@ -198,6 +211,7 @@ export const getFormConfig = (type: string, t: (key: string) => string) => {
       config.showSupplier = true;
       config.showMaterial = true;
       config.showIncomingType = true;
+      config.showHasDocuments = true;
       break;
     }
     case INSPECTION_TYPES.PROCESS.toLowerCase(): {

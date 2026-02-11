@@ -63,4 +63,5 @@ EXPOSE 3000
 
 # 10. 🌟 关键修复：移除 db push！只启动服务
 # 数据库迁移应该在部署脚本中手动执行，而不是每次启动都执行
+USER node
 CMD ["node", ".output/server/index.mjs"]

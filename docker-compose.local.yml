@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    # 加载测试环境变量 (会覆盖主文件的配置)
+    env_file:
+      - .env.test.local
+    # 强制覆盖环境变量 (双重保险)
+    environment:
+      # 对于 Mac Docker 用户，localhost 需要改为 host.docker.internal 才能访问宿主机数据库
+      # 如果您的测试数据库在宿主机，请取消下面这行的注释并修改 .env.test.local
+      # - DATABASE_URL=${DATABASE_URL_LOCAL_DOCKER:-mysql://root:password@host.docker.internal:3306/quality_guard_test}
+      - NODE_ENV=production
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    # 加载测试环境变量
+    env_file:
+      - .env.test.local

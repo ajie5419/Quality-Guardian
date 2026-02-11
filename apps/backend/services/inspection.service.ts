@@ -60,6 +60,7 @@ interface InspectionRecordInput {
 
   team?: string;
   documents?: string;
+  hasDocuments?: boolean;
   packingListArchived?: string;
   quantity: number | string;
   inspector: string;
@@ -231,6 +232,8 @@ export const InspectionService = {
           level2Component: data.level2Component,
           team: data.team,
           documents: data.documents,
+          hasDocuments:
+            data.hasDocuments === undefined ? true : data.hasDocuments,
           packingListArchived: data.packingListArchived,
           quantity: Number(data.quantity) || 1,
           inspector: data.inspector,
@@ -292,6 +295,7 @@ export const InspectionService = {
           level2Component: data.level2Component,
           team: data.team,
           documents: data.documents,
+          hasDocuments: data.hasDocuments,
           packingListArchived: data.packingListArchived,
           quantity: Number(data.quantity),
           inspector: data.inspector,

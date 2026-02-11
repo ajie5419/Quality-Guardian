@@ -1,4 +1,4 @@
-import { defineEventHandler, getRouterParam } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -14,8 +14,10 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  // 解码 URL 编码的参数（处理工单号中的特殊字符如 '/'）
-  const id = decodeURIComponent(getRouterParam(event, 'id') || '');
+  // Use query param 'id' to handle special characters like '/'
+  const query = getQuery(event);
+  const id = String(query.id || '');
+
   if (!id) {
     return useResponseError('缺少工单号');
   }

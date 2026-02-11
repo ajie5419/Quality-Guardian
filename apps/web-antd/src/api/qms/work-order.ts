@@ -48,18 +48,15 @@ export async function updateWorkOrder(
   id: string,
   data: Partial<WorkOrderItem>,
 ) {
-  // Fix: Encode ID to handle special characters like '/' in work order numbers (e.g. "23TL-CL/2501")
-  const encodedId = encodeURIComponent(id);
-  return requestClient.put<WorkOrderItem>(
-    `${QMS_API.WORK_ORDER}/${encodedId}`,
-    data,
-  );
+  // Use query param 'id' to handle special characters like '/'
+  return requestClient.put<WorkOrderItem>(QMS_API.WORK_ORDER, data, {
+    params: { id },
+  });
 }
 
 export async function deleteWorkOrder(id: string) {
-  // Fix: Encode ID to handle special characters like '/' in work order numbers (e.g. "23TL-CL/2501")
-  const encodedId = encodeURIComponent(id);
-  return requestClient.delete(`${QMS_API.WORK_ORDER}/${encodedId}`);
+  // Use query param 'id' to handle special characters like '/'
+  return requestClient.delete(QMS_API.WORK_ORDER, { params: { id } });
 }
 
 /**

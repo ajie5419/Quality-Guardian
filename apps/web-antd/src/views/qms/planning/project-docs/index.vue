@@ -215,6 +215,10 @@ async function loadRecords() {
         // Exclude Shipment records as per user request
         if (type === 'SHIPMENT') return false;
 
+        // Filter by hasDocuments (only show if true, default to true if undefined for backward compatibility)
+        const hasDocs = (item as any).hasDocuments;
+        if (hasDocs === false) return false;
+
         return (
           (pName && itemProjectName && itemProjectName.includes(pName)) ||
           (wNum && itemWorkOrderNumber && itemWorkOrderNumber.includes(wNum))

@@ -115,10 +115,10 @@ docker-compose up -d redis
 # 等待 Redis 就绪
 sleep 3
 
-echo "🔄 同步数据库 Schema (db push)..."
-# 自动同步数据库结构
+echo "🔄 同步数据库 Schema (migrate deploy)..."
+# 生产环境使用 db push (因为项目中没有 migrations 文件夹)
 if ! docker-compose run --rm backend sh -c "cd /app && ./apps/backend/node_modules/.bin/prisma db push --schema=./prisma/schema.prisma --skip-generate"; then
-    echo "❌ 数据库同步失败，执行回滚..."
+    echo "❌ 数据库同步失败 (db push)，执行回滚..."
     docker-compose -f docker-compose.backup.yml up -d
     exit 1
 fi

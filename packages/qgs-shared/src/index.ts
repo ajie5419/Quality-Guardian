@@ -6,7 +6,10 @@ export * from './modules/qms/inspection';
 export * from './modules/qms/knowledge';
 export * from './modules/qms/planning';
 export * from './modules/qms/quality-loss';
+
 export * from './modules/qms/reports';
+export * from './modules/qms/reports-weekly';
+
 export * from './modules/qms/supplier';
 export * from './modules/qms/task';
 export * from './modules/qms/work-order';

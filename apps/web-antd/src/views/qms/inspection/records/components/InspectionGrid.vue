@@ -8,7 +8,7 @@ import { computed, ref, watch } from 'vue';
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
-import { Button, message, Modal, Space } from 'ant-design-vue';
+import { Button, message, Modal, Space, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
@@ -312,6 +312,12 @@ defineExpose({ reload });
 
     <template #result="{ row }">
       <QmsStatusTag :status="row.result" type="inspection" />
+    </template>
+
+    <template #hasDocuments="{ row }">
+      <Tag :color="row.hasDocuments ? 'blue' : 'default'">
+        {{ row.hasDocuments ? '是' : '否' }}
+      </Tag>
     </template>
   </Grid>
 </template>

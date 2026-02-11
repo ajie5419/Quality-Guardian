@@ -21,6 +21,7 @@ import {
   formatNumber,
   safeNumber,
 } from './base.service';
+import { DeptService } from './dept.service';
 import { SystemLogService } from './system-log.service';
 
 // 创建模块级 logger
@@ -371,7 +372,7 @@ export const QualityLossService = {
 
     try {
       // 1. 并行获取所有来源的原始数据
-      const [manualRecords, internalRecords, externalRecords] =
+      const [manualRecords, internalRecords, externalRecords, deptTreeRaw] =
         await Promise.all([
           prisma.quality_losses.findMany({
             where: buildManualLossesWhere(params),
@@ -382,7 +383,28 @@ export const QualityLossService = {
           prisma.after_sales.findMany({
             where: buildExternalSalesWhere(params),
           }),
+          DeptService.findAll(),
         ]);
+
+      const deptTree = deptTreeRaw as any[];
+      logger.info({ deptTree }, 'Debug: Dept Tree from Service'); // Added logging
+
+      // Flatten dept tree for easy lookup
+      const deptMap = new Map<string, string>();
+      const processDeptNode = (nodes: any[]) => {
+        nodes.forEach((node) => {
+          deptMap.set(node.id, node.name);
+          if (node.children && node.children.length > 0) {
+            processDeptNode(node.children);
+          }
+        });
+      };
+      processDeptNode(deptTree);
+
+      const getDeptName = (id: null | string | undefined) => {
+        if (!id) return null;
+        return deptMap.get(id) || id;
+      };
 
       const result: QualityLossItem[] = [];
 
@@ -404,14 +426,23 @@ export const QualityLossService = {
           };
           const amount = safeNumber(item.amount);
           if (amount <= 0) return;
-          result.push(formatManualLossItem({ ...item, ...itemRecord }));
+          if (amount <= 0) return;
+          const formatted = formatManualLossItem({ ...item, ...itemRecord });
+          formatted.responsibleDepartment = getDeptName(
+            formatted.responsibleDepartment,
+          );
+          result.push(formatted);
         });
       }
 
       // 3. 处理内部质量记录
       if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.INTERNAL) {
         internalRecords.forEach((item) => {
-          result.push(formatInternalRecordItem(item));
+          const formatted = formatInternalRecordItem(item);
+          formatted.responsibleDepartment = getDeptName(
+            formatted.responsibleDepartment,
+          );
+          result.push(formatted);
         });
       }
 
@@ -419,7 +450,12 @@ export const QualityLossService = {
       if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.EXTERNAL) {
         externalRecords.forEach((item) => {
           const formatted = formatExternalSalesItem(item);
-          if (formatted) result.push(formatted);
+          if (formatted) {
+            formatted.responsibleDepartment = getDeptName(
+              formatted.responsibleDepartment,
+            );
+            result.push(formatted);
+          }
         });
       }
 

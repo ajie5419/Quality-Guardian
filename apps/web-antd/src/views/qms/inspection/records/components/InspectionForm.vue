@@ -264,13 +264,16 @@ watch(
       formApi.updateSchema([
         {
           fieldName: 'supplierName',
-          label: isMachined ? '外协单位' : '供应商',
           componentProps: {
             category: isMachined ? 'Outsourcing' : 'Supplier',
             placeholder: isMachined ? '请选择外协单位' : '请选择供应商',
           },
         },
-      ]);
+        {
+          fieldName: 'hasDocuments',
+          show: true,
+        },
+      ] as any);
 
       // Clear value if type changes and it's not the initial load (optimization)
       if (newVal !== oldVal && oldVal !== undefined) {
