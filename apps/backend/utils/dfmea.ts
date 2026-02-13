@@ -1,5 +1,8 @@
 import { nanoid } from 'nanoid';
 
+const DEFAULT_DFMEA_PROJECT_STATUS = 'active';
+const DEFAULT_DFMEA_PROJECT_VERSION = 'V1.0';
+
 export function parseDfmeaScore(value: unknown, defaultValue = 5): number {
   if (value === undefined || value === null || value === '') {
     return defaultValue;
@@ -40,4 +43,41 @@ export function parseDfmeaOrder(value: unknown): number {
 
 export function createDfmeaProjectId(): string {
   return `DFMEA-${nanoid(6).toUpperCase()}`;
+}
+
+export function normalizeDfmeaText(value: unknown): string | undefined {
+  const normalized = String(value ?? '').trim();
+  return normalized || undefined;
+}
+
+export function normalizeDfmeaProjectStatus(value: unknown): string {
+  return normalizeDfmeaText(value) || DEFAULT_DFMEA_PROJECT_STATUS;
+}
+
+export function toDfmeaProjectVersionText(value: unknown): string {
+  return normalizeDfmeaText(value) || DEFAULT_DFMEA_PROJECT_VERSION;
+}
+
+export function buildDfmeaProjectUpdateData(body: Record<string, unknown>) {
+  const updateData: Record<string, unknown> = {
+    updatedAt: new Date(),
+  };
+
+  if (body.projectName !== undefined) {
+    updateData.projectName = normalizeDfmeaText(body.projectName) ?? '';
+  }
+  if (body.workOrderId !== undefined) {
+    updateData.workOrderId = normalizeDfmeaText(body.workOrderId) || null;
+  }
+  if (body.version !== undefined) {
+    updateData.version = toDfmeaProjectVersionText(body.version);
+  }
+  if (body.status !== undefined) {
+    updateData.status = normalizeDfmeaProjectStatus(body.status);
+  }
+  if (body.description !== undefined) {
+    updateData.description = normalizeDfmeaText(body.description) || '';
+  }
+
+  return updateData;
 }

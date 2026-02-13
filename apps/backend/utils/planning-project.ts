@@ -44,6 +44,10 @@ export function isPrismaNotFoundError(error: unknown): boolean {
   return (error as { code?: string }).code === 'P2025';
 }
 
+export function isPrismaForeignKeyError(error: unknown): boolean {
+  return (error as { code?: string }).code === 'P2003';
+}
+
 export function buildPlanningProjectUpdateData(
   body: { projectName?: unknown; status?: unknown },
   normalizeStatus: (status: unknown) => string,

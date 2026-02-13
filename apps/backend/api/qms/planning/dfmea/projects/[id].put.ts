@@ -5,6 +5,7 @@ import {
   setResponseStatus,
 } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { buildDfmeaProjectUpdateData } from '~/utils/dfmea';
 import { MOCK_DELAY } from '~/utils/index';
 import { isPrismaNotFoundError } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
@@ -20,18 +21,9 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    const updateData: Record<string, unknown> = {
-      updatedAt: new Date(),
-    };
-
-    if (body.projectName !== undefined)
-      updateData.projectName = body.projectName;
-    if (body.workOrderId !== undefined)
-      updateData.workOrderId = body.workOrderId;
-    if (body.version !== undefined) updateData.version = body.version;
-    if (body.status !== undefined) updateData.status = body.status;
-    if (body.description !== undefined)
-      updateData.description = body.description;
+    const updateData = buildDfmeaProjectUpdateData(
+      body as Record<string, unknown>,
+    );
 
     const updatedProject = await prisma.dfmea_projects.update({
       where: { id },
