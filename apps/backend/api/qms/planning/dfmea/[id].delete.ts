@@ -1,13 +1,17 @@
-import { defineEventHandler, getRouterParam } from 'h3';
+import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
   const id = getRouterParam(event, 'id');
 
-  if (!id) return { code: -1, message: 'ID required' };
+  if (!id) {
+    setResponseStatus(event, 400);
+    return useResponseError('ID required');
+  }
 
   try {
     // 软删除
@@ -16,13 +20,13 @@ export default defineEventHandler(async (event) => {
       data: { isDeleted: true },
     });
 
-    return {
-      code: 0,
-      data: null,
-      message: 'ok',
-    };
+    return useResponseSuccess(null);
   } catch (error) {
     logApiError('dfmea', error);
-    return { code: -1, message: '删除失败' };
+    setResponseStatus(
+      event,
+      (error as { code?: string }).code === 'P2025' ? 404 : 500,
+    );
+    return useResponseError('删除 DFMEA 条目失败');
   }
 });
