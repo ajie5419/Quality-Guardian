@@ -1,4 +1,5 @@
 import { nanoid } from 'nanoid';
+import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 
 import prisma from './prisma';
 
@@ -86,5 +87,81 @@ export function parseInspectionIssueListQuery(query: Record<string, unknown>) {
     supplierName: normalizeString(query.supplierName),
     workOrderNumber: normalizeString(query.workOrderNumber),
     year,
+  };
+}
+
+interface InspectionIssueImportItem {
+  description?: unknown;
+  division?: unknown;
+  ncNumber?: unknown;
+  nonConformanceNumber?: unknown;
+  partName?: unknown;
+  projectName?: unknown;
+  quantity?: unknown;
+  responsibleDepartment?: unknown;
+  status?: unknown;
+  workOrderNumber?: unknown;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  const normalized = normalizeString(value);
+  if (!normalized) {
+    return undefined;
+  }
+  return normalized;
+}
+
+function normalizeOptionalNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return undefined;
+  }
+  return parsed;
+}
+
+export function buildInspectionIssueUpsertPayload(
+  item: InspectionIssueImportItem,
+  serialNumber: number,
+) {
+  const ncNumber =
+    normalizeOptionalString(item.nonConformanceNumber) ??
+    normalizeOptionalString(item.ncNumber);
+  if (!ncNumber) {
+    return null;
+  }
+
+  const quantity = normalizeOptionalNumber(item.quantity);
+  const status = toQualityRecordStatus(normalizeOptionalString(item.status));
+
+  return {
+    create: {
+      id: createInspectionIssueId(),
+      serialNumber,
+      date: new Date(),
+      status,
+      partName: normalizeOptionalString(item.partName) ?? '未知零件',
+      description: normalizeOptionalString(item.description) ?? '',
+      quantity: quantity ?? 0,
+      projectName: normalizeOptionalString(item.projectName) ?? '',
+      division: normalizeOptionalString(item.division) ?? '',
+      responsibleDepartment:
+        normalizeOptionalString(item.responsibleDepartment) ?? '质量部',
+      nonConformanceNumber: ncNumber,
+      workOrderNumber: normalizeOptionalString(item.workOrderNumber) ?? null,
+    },
+    update: {
+      partName: normalizeOptionalString(item.partName),
+      description: normalizeOptionalString(item.description),
+      quantity,
+      projectName: normalizeOptionalString(item.projectName),
+      responsibleDepartment: normalizeOptionalString(
+        item.responsibleDepartment,
+      ),
+      status,
+    },
+    where: { nonConformanceNumber: ncNumber },
   };
 }

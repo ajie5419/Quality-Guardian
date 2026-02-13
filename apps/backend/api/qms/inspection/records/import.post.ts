@@ -1,26 +1,50 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
-import { useResponseSuccess } from '~/utils/response';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
+
+const DEFAULT_INSPECTION_CATEGORY = 'PROCESS';
+const INSPECTION_CATEGORIES = new Set(['INCOMING', 'PROCESS', 'SHIPMENT']);
+
+function normalizeInspectionCategory(value: unknown): string {
+  const normalized = String(value ?? '')
+    .trim()
+    .toUpperCase();
+  return INSPECTION_CATEGORIES.has(normalized)
+    ? normalized
+    : DEFAULT_INSPECTION_CATEGORY;
+}
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event);
-  const { items, category } = body;
+  try {
+    const body = await readBody(event);
+    const { items, category } = body;
 
-  let successCount = 0;
-  if (items && Array.isArray(items)) {
+    if (!Array.isArray(items) || items.length === 0) {
+      setResponseStatus(event, 400);
+      return useResponseError('未发现可导入的数据');
+    }
+
+    const normalizedCategory = normalizeInspectionCategory(category);
+    let successCount = 0;
     for (const item of items) {
       try {
         await InspectionService.create({
           ...item,
-          category: category || item.category || 'PROCESS',
+          category: normalizeInspectionCategory(
+            item.category ?? normalizedCategory,
+          ),
         });
         successCount++;
       } catch (error) {
-        logApiError('import', error);
+        logApiError('records-import-item', error);
       }
     }
-  }
 
-  return useResponseSuccess({ successCount });
+    return useResponseSuccess({ successCount, totalCount: items.length });
+  } catch (error: unknown) {
+    logApiError('records-import', error);
+    setResponseStatus(event, 500);
+    return useResponseError('数据解析失败');
+  }
 });

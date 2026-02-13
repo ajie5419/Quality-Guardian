@@ -1,12 +1,11 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {
-  createInspectionIssueId,
+  buildInspectionIssueUpsertPayload,
   getNextInspectionIssueSerialNumber,
 } from '~/utils/inspection-issue';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -30,47 +29,11 @@ export default defineEventHandler(async (event) => {
     let serialSeed = await getNextInspectionIssueSerialNumber();
     for (const item of items) {
       try {
-        const ncNumber = String(
-          item.nonConformanceNumber || item.ncNumber || '',
-        ).trim();
-        if (!ncNumber) continue;
-        const status = toQualityRecordStatus(item.status);
+        const payload = buildInspectionIssueUpsertPayload(item, serialSeed);
+        if (!payload) continue;
+        serialSeed++;
 
-        await prisma.quality_records.upsert({
-          where: { nonConformanceNumber: ncNumber },
-          update: {
-            partName: item.partName ? String(item.partName) : undefined,
-            description: item.description
-              ? String(item.description)
-              : undefined,
-            quantity: item.quantity ? Number(item.quantity) : undefined,
-            projectName: item.projectName
-              ? String(item.projectName)
-              : undefined,
-            responsibleDepartment: item.responsibleDepartment
-              ? String(item.responsibleDepartment)
-              : undefined,
-            status,
-          },
-          create: {
-            id: createInspectionIssueId(),
-            serialNumber: serialSeed++,
-            date: new Date(),
-            status,
-            partName: String(item.partName || '未知零件'),
-            description: String(item.description || ''),
-            quantity: Number(item.quantity) || 0,
-            projectName: String(item.projectName || ''),
-            division: String(item.division || ''),
-            responsibleDepartment: String(
-              item.responsibleDepartment || '质量部',
-            ),
-            nonConformanceNumber: ncNumber,
-            workOrderNumber: item.workOrderNumber
-              ? String(item.workOrderNumber)
-              : null,
-          },
-        });
+        await prisma.quality_records.upsert(payload);
         successCount++;
       } catch (error) {
         logApiError('import', error);
