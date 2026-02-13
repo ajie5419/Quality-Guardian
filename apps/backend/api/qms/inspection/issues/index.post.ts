@@ -8,6 +8,7 @@ import {
 } from '~/utils/inspection-issue';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -47,10 +48,9 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('issues', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2002' ? 409 : 500);
+    setResponseStatus(event, isPrismaUniqueConstraintError(error) ? 409 : 500);
     return useResponseError(
-      errorCode === 'P2002'
+      isPrismaUniqueConstraintError(error)
         ? 'NC number already exists'
         : 'Failed to create issue',
     );

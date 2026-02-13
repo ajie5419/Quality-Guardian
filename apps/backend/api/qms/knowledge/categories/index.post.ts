@@ -2,6 +2,7 @@ import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -27,10 +28,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(newCategory);
   } catch (error) {
     logApiError('categories', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2002' ? 409 : 500);
+    setResponseStatus(event, isPrismaUniqueConstraintError(error) ? 409 : 500);
     return useResponseError(
-      errorCode === 'P2002' ? '分类名称已存在' : '创建分类失败',
+      isPrismaUniqueConstraintError(error) ? '分类名称已存在' : '创建分类失败',
     );
   }
 });

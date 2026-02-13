@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -57,8 +58,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(newItem);
   } catch (error) {
     logApiError('knowledge', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2002' ? 409 : 500);
+    setResponseStatus(event, isPrismaUniqueConstraintError(error) ? 409 : 500);
     return useResponseError(
       `沉淀失败: ${error instanceof Error ? error.message : '未知错误'}`,
     );

@@ -2,6 +2,7 @@ import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -53,8 +54,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(newSupplier);
   } catch (error: unknown) {
     logApiError('supplier', error);
-    const errorCode = (error as { code?: string }).code;
-    if (errorCode === 'P2002') {
+    if (isPrismaUniqueConstraintError(error)) {
       setResponseStatus(event, 409);
       return useResponseError('供应商名称已存在');
     }
