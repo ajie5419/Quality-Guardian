@@ -1,21 +1,36 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { buildItpItemCreateData, getMaxItpItemOrder } from '~/utils/itp';
+import {
+  buildItpItemCreateData,
+  getMaxItpItemOrder,
+  normalizeItpText,
+} from '~/utils/itp';
 import prisma from '~/utils/prisma';
+import {
+  getMissingRequiredFields,
+  parseNonEmptyArray,
+} from '~/utils/request-validation';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
-  const { projectId, items } = body;
+  const projectId = normalizeItpText(body.projectId);
+  const items = parseNonEmptyArray<Record<string, unknown>>(body.items);
+  const normalizedProjectId = projectId || '';
+  const normalizedItems = items || [];
 
-  if (!projectId || !items || !Array.isArray(items)) {
+  const missingFields = getMissingRequiredFields({ items, projectId }, [
+    'projectId',
+    'items',
+  ]);
+  if (missingFields.length > 0) {
     setResponseStatus(event, 400);
     return useResponseError('参数错误：需要 projectId 和 items 数组');
   }
 
   try {
     const plan = await prisma.quality_plans.findUnique({
-      where: { id: projectId },
+      where: { id: normalizedProjectId },
       include: { items: true },
     });
 
@@ -25,14 +40,13 @@ export default defineEventHandler(async (event) => {
     }
 
     const maxOrder = getMaxItpItemOrder(plan.items || []);
-    const newItems = (items as Array<Record<string, unknown>>).map(
-      (item, index) =>
-        buildItpItemCreateData({
-          item,
-          order: maxOrder + index + 1,
-          projectId,
-          useImportDefaults: true,
-        }),
+    const newItems = normalizedItems.map((item, index) =>
+      buildItpItemCreateData({
+        item,
+        order: maxOrder + index + 1,
+        projectId: normalizedProjectId,
+        useImportDefaults: true,
+      }),
     );
 
     await prisma.itp_items.createMany({
@@ -40,7 +54,7 @@ export default defineEventHandler(async (event) => {
     });
 
     return useResponseSuccess({
-      count: items.length,
+      count: normalizedItems.length,
       message: '导入成功',
     });
   } catch (error: unknown) {

@@ -3,22 +3,32 @@ import { logApiError } from '~/utils/api-logger';
 import { buildProjectBomCreateData, normalizeBomText } from '~/utils/bom';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
+import {
+  getMissingRequiredFields,
+  parseNonEmptyArray,
+} from '~/utils/request-validation';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
   const body = await readBody(event);
-  const items = Array.isArray(body.items) ? body.items : [];
+  const items = parseNonEmptyArray<Record<string, unknown>>(body.items);
   const projectId = normalizeBomText(body.projectId);
+  const normalizedItems = items || [];
+  const normalizedProjectId = projectId || '';
 
-  if (!projectId || items.length === 0) {
+  const missingFields = getMissingRequiredFields({ items, projectId }, [
+    'projectId',
+    'items',
+  ]);
+  if (missingFields.length > 0) {
     setResponseStatus(event, 400);
     return useResponseError('参数错误：需要 projectId 和 items 数组');
   }
 
   try {
     const bomProject = await prisma.bom_projects.findUnique({
-      where: { id: projectId },
+      where: { id: normalizedProjectId },
       select: { workOrderNumber: true },
     });
 
@@ -28,7 +38,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const createResults = await Promise.allSettled(
-      items.map((item) =>
+      normalizedItems.map((item) =>
         prisma.project_boms.create({
           data: buildProjectBomCreateData(bomProject.workOrderNumber, item),
         }),
@@ -49,7 +59,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess({
       failedCount,
       successCount,
-      totalCount: items.length,
+      totalCount: normalizedItems.length,
     });
   } catch (error) {
     logApiError('bom-import', error);

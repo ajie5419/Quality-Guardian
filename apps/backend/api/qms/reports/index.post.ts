@@ -9,6 +9,7 @@ import {
   parseReportDate,
   parseReportNumber,
 } from '~/utils/report';
+import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -23,8 +24,9 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-
-    const reportDate = parseReportDate(body.date);
+    const missingFields = getMissingRequiredFields(body, ['date']);
+    const reportDate =
+      missingFields.length > 0 ? null : parseReportDate(body.date);
     if (!reportDate) {
       setResponseStatus(event, 400);
       return useResponseError('缺少或无效字段: date');

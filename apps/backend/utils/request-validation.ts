@@ -15,3 +15,10 @@ export function getMissingRequiredFields(
     return false;
   });
 }
+
+export function parseNonEmptyArray<T>(value: unknown): null | T[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    return null;
+  }
+  return value as T[];
+}
