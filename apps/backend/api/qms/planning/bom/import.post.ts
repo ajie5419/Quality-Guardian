@@ -1,7 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { buildProjectBomCreateData, normalizeBomText } from '~/utils/bom';
-import { MOCK_DELAY } from '~/utils/index';
+import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 import {
   getMissingRequiredFields,
@@ -15,7 +15,7 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
+  await awaitMockDelay();
   const body = await readBody(event);
   const items = parseNonEmptyArray<Record<string, unknown>>(body.items);
   const projectId = normalizeBomText(body.projectId);

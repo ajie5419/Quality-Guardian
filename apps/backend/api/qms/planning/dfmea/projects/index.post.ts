@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {
   createDfmeaProjectId,
@@ -6,18 +6,18 @@ import {
   normalizeDfmeaText,
   toDfmeaProjectVersionText,
 } from '~/utils/dfmea';
-import { MOCK_DELAY } from '~/utils/index';
+import { awaitMockDelay } from '~/utils/index';
 import { isPrismaForeignKeyError } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
-  useResponseError,
+  internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
+  await awaitMockDelay();
   try {
     const body = await readBody(event);
     const projectName = normalizeDfmeaText(body.projectName);
@@ -46,11 +46,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(newProject);
   } catch (error) {
     logApiError('dfmea-projects', error);
-    setResponseStatus(event, isPrismaForeignKeyError(error) ? 400 : 500);
-    return useResponseError(
-      isPrismaForeignKeyError(error)
-        ? '创建项目失败，请检查工单号是否存在'
-        : '创建项目失败',
-    );
+    if (isPrismaForeignKeyError(error)) {
+      return badRequestResponse(event, '创建项目失败，请检查工单号是否存在');
+    }
+    return internalServerErrorResponse(event, '创建项目失败');
   }
 });

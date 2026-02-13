@@ -1,13 +1,17 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { MOCK_DELAY } from '~/utils/index';
+import { awaitMockDelay } from '~/utils/index';
 import { isPrismaNotFoundError } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  internalServerErrorResponse,
+  notFoundResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
+  await awaitMockDelay();
   const id = getRequiredRouterParam(event, 'id', 'ID required');
   if (typeof id !== 'string') {
     return id;
@@ -22,11 +26,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('bom', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(
-      isPrismaNotFoundError(error)
-        ? 'BOM item not found'
-        : 'Failed to delete BOM item',
-    );
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, 'BOM item not found');
+    }
+    return internalServerErrorResponse(event, 'Failed to delete BOM item');
   }
 });

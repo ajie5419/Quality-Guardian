@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
@@ -9,9 +9,9 @@ import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  conflictResponse,
   internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -58,8 +58,7 @@ export default defineEventHandler(async (event) => {
       return badRequestResponse(event, '工单不存在');
     }
     if (upsertResult.code === 'CONFLICT') {
-      setResponseStatus(event, 409);
-      return useResponseError('该工单已在项目资料列表中');
+      return conflictResponse(event, '该工单已在项目资料列表中');
     }
 
     return useResponseSuccess(upsertResult.data);

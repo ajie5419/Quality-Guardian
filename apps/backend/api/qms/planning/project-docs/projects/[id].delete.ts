@@ -1,11 +1,12 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaNotFoundError } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import {
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -28,9 +29,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess({ message: 'Deleted' });
   } catch (error) {
     logApiError('project-docs-projects', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(
-      isPrismaNotFoundError(error) ? 'Project not found' : 'Delete failed',
-    );
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, 'Project not found');
+    }
+    return internalServerErrorResponse(event, 'Delete failed');
   }
 });

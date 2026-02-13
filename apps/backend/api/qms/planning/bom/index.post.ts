@@ -6,7 +6,7 @@ import {
   normalizeBomProjectStatus,
   normalizeBomText,
 } from '~/utils/bom';
-import { MOCK_DELAY } from '~/utils/index';
+import { awaitMockDelay } from '~/utils/index';
 import { upsertPlanningProjectByWorkOrder } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import {
@@ -16,7 +16,7 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
+  await awaitMockDelay();
   const body = await readBody(event);
   const workOrderNumber = normalizeBomText(body.workOrderNumber);
   if (!workOrderNumber) {

@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
@@ -7,8 +7,9 @@ import {
 } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import {
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -36,9 +37,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(updated);
   } catch (error) {
     logApiError('project-docs-projects', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(
-      isPrismaNotFoundError(error) ? 'Project not found' : '更新失败',
-    );
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, 'Project not found');
+    }
+    return internalServerErrorResponse(event, '更新失败');
   }
 });

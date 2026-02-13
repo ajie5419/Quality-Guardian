@@ -1,8 +1,12 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { isPrismaNotFoundError } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  internalServerErrorResponse,
+  notFoundResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
@@ -28,9 +32,11 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess({ message: 'Deleted' });
   } catch (error: unknown) {
     logApiError('dfmea-projects', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, 'DFMEA 项目不存在');
+    }
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    return useResponseError(`Delete failed: ${errorMessage}`);
+    return internalServerErrorResponse(event, `Delete failed: ${errorMessage}`);
   }
 });

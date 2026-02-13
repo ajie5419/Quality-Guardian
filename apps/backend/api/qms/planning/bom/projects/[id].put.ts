@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { normalizeBomProjectStatus } from '~/utils/bom';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -8,8 +8,9 @@ import {
 } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import {
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -32,11 +33,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(updated);
   } catch (error) {
     logApiError('bom-projects', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(
-      isPrismaNotFoundError(error)
-        ? 'BOM project not found'
-        : 'Failed to update BOM project',
-    );
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, 'BOM project not found');
+    }
+    return internalServerErrorResponse(event, 'Failed to update BOM project');
   }
 });

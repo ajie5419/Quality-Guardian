@@ -1,18 +1,18 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { MOCK_DELAY } from '~/utils/index';
+import { awaitMockDelay } from '~/utils/index';
 import { buildItpProjectCreateData, normalizeItpText } from '~/utils/itp';
 import { isPrismaForeignKeyError } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
-  useResponseError,
+  internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
+  await awaitMockDelay();
   const body = await readBody(event);
   const projectName = normalizeItpText(body.projectName);
   const missingFields = getMissingRequiredFields({ projectName }, [
@@ -34,9 +34,9 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error: unknown) {
     logApiError('itp-project-create', error);
-    setResponseStatus(event, isPrismaForeignKeyError(error) ? 400 : 500);
-    return useResponseError(
-      isPrismaForeignKeyError(error) ? '关联工单不存在' : '创建 ITP 项目失败',
-    );
+    if (isPrismaForeignKeyError(error)) {
+      return badRequestResponse(event, '关联工单不存在');
+    }
+    return internalServerErrorResponse(event, '创建 ITP 项目失败');
   }
 });

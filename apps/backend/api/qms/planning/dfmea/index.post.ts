@@ -7,7 +7,7 @@ import {
   parseDfmeaOrder,
   parseDfmeaScore,
 } from '~/utils/dfmea';
-import { MOCK_DELAY } from '~/utils/index';
+import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
@@ -17,7 +17,7 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
+  await awaitMockDelay();
 
   try {
     const body = (await readBody(event)) as Record<string, unknown>;
