@@ -7,6 +7,7 @@ import {
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   formatReportDate,
   normalizeReportAuthor,
@@ -71,10 +72,7 @@ export default defineEventHandler(async (event) => {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     logApiError('reports', error);
-    setResponseStatus(
-      event,
-      (error as { code?: string }).code === 'P2025' ? 404 : 500,
-    );
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError(`Update failed: ${errorMessage}`);
   }
 });

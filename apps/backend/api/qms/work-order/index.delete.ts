@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -36,8 +37,11 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('work-order', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
-    return useResponseError('删除工单失败：记录不存在');
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
+    return useResponseError(
+      isPrismaNotFoundError(error)
+        ? '删除工单失败：记录不存在'
+        : '删除工单失败',
+    );
   }
 });

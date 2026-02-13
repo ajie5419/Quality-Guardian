@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -74,9 +75,8 @@ export default defineEventHandler(async (event) => {
     logApiError('work-order', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    const errorCode = (error as { code?: string }).code;
     // Check for "Record to update not found"
-    if (errorCode === 'P2025') {
+    if (isPrismaNotFoundError(error)) {
       setResponseStatus(event, 404);
       return useResponseError(`工单不存在: ${id}`);
     }

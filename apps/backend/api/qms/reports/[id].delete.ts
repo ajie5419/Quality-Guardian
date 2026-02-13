@@ -2,6 +2,7 @@ import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -28,7 +29,7 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     logApiError('reports', error);
     const typedError = error as { code?: string; message?: string };
-    if (typedError.code === 'P2025') {
+    if (isPrismaNotFoundError(error)) {
       setResponseStatus(event, 404);
       return useResponseError('Report not found');
     }

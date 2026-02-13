@@ -6,6 +6,7 @@ import {
 } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -21,10 +22,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error: unknown) {
     logApiError('inspection-update', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError(
-      errorCode === 'P2025'
+      isPrismaNotFoundError(error)
         ? 'Inspection record not found'
         : 'Failed to update inspection record',
     );

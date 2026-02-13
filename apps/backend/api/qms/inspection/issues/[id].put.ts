@@ -12,6 +12,7 @@ import {
 } from '~/utils/inspection-issue';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   forbiddenResponse,
   unAuthorizedResponse,
@@ -82,8 +83,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('issues', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError('更新问题失败');
   }
 });
