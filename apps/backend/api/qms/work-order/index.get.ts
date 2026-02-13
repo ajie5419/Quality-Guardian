@@ -1,8 +1,12 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { WorkOrderService } from '~/services/work-order.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -44,6 +48,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('work-order', error);
-    return useResponseSuccess({ items: [], total: 0, summary: [] });
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to fetch work order list');
   }
 });

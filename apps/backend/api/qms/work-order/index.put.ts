@@ -1,4 +1,4 @@
-import { defineEventHandler, getQuery, readBody } from 'h3';
+import { defineEventHandler, getQuery, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -7,6 +7,11 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+import {
+  parseOptionalDate,
+  parseRequiredDate,
+  parseWorkOrderQuantity,
+} from '~/utils/work-order';
 import { mapWorkOrderStatus } from '~/utils/work-order-status';
 
 export default defineEventHandler(async (event) => {
@@ -20,6 +25,7 @@ export default defineEventHandler(async (event) => {
   const id = String(query.id || '');
 
   if (!id) {
+    setResponseStatus(event, 400);
     return useResponseError('缺少工单号');
   }
 
@@ -39,12 +45,15 @@ export default defineEventHandler(async (event) => {
     if (body.division !== undefined) updateData.division = body.division;
     if (body.projectName !== undefined)
       updateData.projectName = body.projectName;
-    if (body.quantity !== undefined && body.quantity !== null)
-      updateData.quantity = Number(body.quantity);
-    if (body.deliveryDate)
-      updateData.deliveryDate = new Date(body.deliveryDate);
-    if (body.effectiveTime)
-      updateData.effectiveTime = new Date(body.effectiveTime);
+    if (body.quantity !== undefined && body.quantity !== null) {
+      updateData.quantity = parseWorkOrderQuantity(body.quantity, 1);
+    }
+    if (body.deliveryDate !== undefined && body.deliveryDate !== null) {
+      updateData.deliveryDate = parseRequiredDate(body.deliveryDate);
+    }
+    if (body.effectiveTime !== undefined) {
+      updateData.effectiveTime = parseOptionalDate(body.effectiveTime);
+    }
 
     if (body.workOrderNumber && body.workOrderNumber !== id) {
       updateData.workOrderNumber = body.workOrderNumber;
@@ -68,8 +77,10 @@ export default defineEventHandler(async (event) => {
     const errorCode = (error as { code?: string }).code;
     // Check for "Record to update not found"
     if (errorCode === 'P2025') {
+      setResponseStatus(event, 404);
       return useResponseError(`工单不存在: ${id}`);
     }
+    setResponseStatus(event, 500);
     return useResponseError(`更新工单失败: ${errorMessage}`);
   }
 });

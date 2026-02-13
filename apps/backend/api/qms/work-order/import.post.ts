@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -7,6 +7,13 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+import {
+  parseOptionalDate,
+  parseRequiredDate,
+  parseRequiredWorkOrderNumber,
+  parseWorkOrderQuantity,
+} from '~/utils/work-order';
+import { mapWorkOrderStatus } from '~/utils/work-order-status';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -19,6 +26,7 @@ export default defineEventHandler(async (event) => {
     const { items } = body;
 
     if (!Array.isArray(items) || items.length === 0) {
+      setResponseStatus(event, 400);
       return useResponseError('未发现可导入的数据');
     }
 
@@ -28,40 +36,11 @@ export default defineEventHandler(async (event) => {
     // 批量处理记录
     for (const item of items) {
       try {
-        const woNumber = String(item.workOrderNumber || '').trim();
+        const woNumber = parseRequiredWorkOrderNumber(item.workOrderNumber);
         if (!woNumber) continue;
-
-        // 处理交货日期
-        let deliveryDate = new Date();
-        if (item.deliveryDate) {
-          const d = new Date(item.deliveryDate);
-          if (!Number.isNaN(d.getTime())) {
-            deliveryDate = d;
-          }
-        }
-
-        // 处理生效日期
-        let effectiveTime: Date | null = null;
-        if (item.effectiveTime) {
-          const d = new Date(item.effectiveTime);
-          if (!Number.isNaN(d.getTime())) {
-            effectiveTime = d;
-          }
-        }
-
-        // 处理状态
-        type WorkOrderStatus =
-          | 'CANCELLED'
-          | 'COMPLETED'
-          | 'IN_PROGRESS'
-          | 'OPEN';
-        let status: undefined | WorkOrderStatus;
-        if (item.status) {
-          const s = String(item.status).toUpperCase() as WorkOrderStatus;
-          if (['CANCELLED', 'COMPLETED', 'IN_PROGRESS', 'OPEN'].includes(s)) {
-            status = s;
-          }
-        }
+        const deliveryDate = parseRequiredDate(item.deliveryDate);
+        const effectiveTime = parseOptionalDate(item.effectiveTime);
+        const status = mapWorkOrderStatus(item.status);
 
         await prisma.work_orders.upsert({
           where: { workOrderNumber: woNumber },
@@ -73,7 +52,10 @@ export default defineEventHandler(async (event) => {
               ? String(item.projectName)
               : undefined,
             division: item.division ? String(item.division) : undefined,
-            quantity: item.quantity ? Number(item.quantity) : undefined,
+            quantity:
+              item.quantity !== undefined && item.quantity !== null
+                ? parseWorkOrderQuantity(item.quantity, 1)
+                : undefined,
             deliveryDate,
             effectiveTime,
             status,
@@ -84,10 +66,10 @@ export default defineEventHandler(async (event) => {
             customerName: String(item.customerName || '未知客户'),
             projectName: String(item.projectName || ''),
             division: String(item.division || ''),
-            quantity: Number(item.quantity) || 1,
+            quantity: parseWorkOrderQuantity(item.quantity, 1),
             deliveryDate,
             effectiveTime,
-            status: status || 'OPEN',
+            status,
           },
         });
         successCount++;
@@ -107,6 +89,7 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error: unknown) {
     logApiError('import', error);
+    setResponseStatus(event, 500);
     return useResponseError('数据处理异常');
   }
 });

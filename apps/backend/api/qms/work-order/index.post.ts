@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -7,6 +7,12 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+import {
+  parseOptionalDate,
+  parseRequiredDate,
+  parseRequiredWorkOrderNumber,
+  parseWorkOrderQuantity,
+} from '~/utils/work-order';
 import { mapWorkOrderStatus } from '~/utils/work-order-status';
 
 export default defineEventHandler(async (event) => {
@@ -18,9 +24,16 @@ export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
 
-    // Schema: workOrderNumber String @id
-    const rawWoNum = body.workOrderNumber;
-    const woNum = rawWoNum ? String(rawWoNum).trim() : `WO-${Date.now()}`;
+    const woNum = parseRequiredWorkOrderNumber(body.workOrderNumber);
+    if (!woNum) {
+      setResponseStatus(event, 400);
+      return useResponseError('缺少必填字段: workOrderNumber');
+    }
+
+    if (!body.customerName) {
+      setResponseStatus(event, 400);
+      return useResponseError('缺少必填字段: customerName');
+    }
 
     // Check for duplicate ID
     const existing = await prisma.work_orders.findUnique({
@@ -28,6 +41,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (existing) {
+      setResponseStatus(event, 409);
       return useResponseError(`工单号 ${woNum} 已存在，请使用其他编号`);
     }
 
@@ -40,9 +54,9 @@ export default defineEventHandler(async (event) => {
         customerName: body.customerName,
         projectName: body.projectName,
         division: body.division,
-        quantity: Number(body.quantity) || 1,
-        deliveryDate: new Date(body.deliveryDate || Date.now()),
-        effectiveTime: body.effectiveTime ? new Date(body.effectiveTime) : null,
+        quantity: parseWorkOrderQuantity(body.quantity, 1),
+        deliveryDate: parseRequiredDate(body.deliveryDate),
+        effectiveTime: parseOptionalDate(body.effectiveTime),
         status: statusValue,
         isDeleted: false,
         updatedAt: new Date(),
@@ -77,6 +91,7 @@ export default defineEventHandler(async (event) => {
       err.code === 'P2002' || errorMessage.includes('Unique constraint failed');
 
     if (isUniqueError) {
+      setResponseStatus(event, 409);
       return useResponseError('工单号已存在，请使用其他编号');
     }
 
@@ -86,6 +101,7 @@ export default defineEventHandler(async (event) => {
       err.code === 'P2012' ||
       errorMessage.includes('Argument')
     ) {
+      setResponseStatus(event, 400);
       // Try to extract the missing argument name if possible, or just give a generic validation error
       // Example msg: "Argument `customerName` is missing."
       const match = errorMessage.match(/Argument `(\w+)` is missing/);
@@ -95,6 +111,7 @@ export default defineEventHandler(async (event) => {
       return useResponseError('请求参数错误: 数据格式不正确或缺少必填字段');
     }
 
+    setResponseStatus(event, 500);
     return useResponseError(`创建工单失败: ${errorMessage}`);
   }
 });

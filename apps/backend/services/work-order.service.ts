@@ -66,81 +66,81 @@ export const WorkOrderService = {
       ids,
     } = params;
 
-    try {
-      // 1. 获取时间范围
-      const {
-        start: startOfYear,
-        end: endOfYear,
-        isCurrentYear,
-      } = getYearDateRange(year);
+    // 1. 获取时间范围
+    const {
+      start: startOfYear,
+      end: endOfYear,
+      isCurrentYear,
+    } = getYearDateRange(year);
 
-      // 2. 构建基础查询条件
-      const whereCondition: Prisma.work_ordersWhereInput = {
-        isDeleted: false,
-      };
+    // 2. 构建基础查询条件
+    const whereCondition: Prisma.work_ordersWhereInput = {
+      isDeleted: false,
+    };
 
-      // 2.1 精确 ID 查找 (最高优先级，用于回显)
-      if (ids && ids.length > 0) {
-        whereCondition.workOrderNumber = { in: ids };
-      } else {
-        // 常规过滤
-        if (projectName?.trim()) {
-          whereCondition.projectName = { contains: projectName.trim() };
-        }
-        if (workOrderNumber?.trim()) {
-          whereCondition.workOrderNumber = { contains: workOrderNumber.trim() };
-        }
-        if (status?.trim()) {
-          whereCondition.status = status.trim() as
-            | any
-            | Prisma.Enumwork_orders_statusFilter<'work_orders'>;
-        }
-
-        // 2.2 综合搜索
-        if (keyword?.trim()) {
-          whereCondition.OR = [
-            { workOrderNumber: { contains: keyword.trim() } },
-            { projectName: { contains: keyword.trim() } },
-          ];
-        }
-
-        // 3. 应用跨年逻辑 (仅在不忽略年份过滤时应用)
-        if (!ignoreYearFilter) {
-          if (isCurrentYear) {
-            whereCondition.AND = [
-              {
-                OR: [
-                  { deliveryDate: { gte: startOfYear, lte: endOfYear } },
-                  {
-                    deliveryDate: { lt: startOfYear },
-                    status: {
-                      in: [
-                        WO_CONSTANTS.STATUS.OPEN,
-                        WO_CONSTANTS.STATUS.IN_PROGRESS,
-                      ],
-                    },
-                  },
-                ],
-              },
-            ];
-          } else if (year && year < new Date().getFullYear()) {
-            whereCondition.AND = [
-              { deliveryDate: { gte: startOfYear, lte: endOfYear } },
-              {
-                status: {
-                  notIn: [
-                    WO_CONSTANTS.STATUS.OPEN,
-                    WO_CONSTANTS.STATUS.IN_PROGRESS,
-                  ],
-                },
-              },
-            ];
-          } else {
-            whereCondition.deliveryDate = { gte: startOfYear, lte: endOfYear };
-          }
-        }
+    // 2.1 精确 ID 查找 (最高优先级，用于回显)
+    if (ids && ids.length > 0) {
+      whereCondition.workOrderNumber = { in: ids };
+    } else {
+      // 常规过滤
+      if (projectName?.trim()) {
+        whereCondition.projectName = { contains: projectName.trim() };
+      }
+      if (workOrderNumber?.trim()) {
+        whereCondition.workOrderNumber = { contains: workOrderNumber.trim() };
+      }
+      if (status?.trim()) {
+        whereCondition.status = status.trim() as
+          | any
+          | Prisma.Enumwork_orders_statusFilter<'work_orders'>;
       }
 
+      // 2.2 综合搜索
+      if (keyword?.trim()) {
+        whereCondition.OR = [
+          { workOrderNumber: { contains: keyword.trim() } },
+          { projectName: { contains: keyword.trim() } },
+        ];
+      }
+
+      // 3. 应用跨年逻辑 (仅在不忽略年份过滤时应用)
+      if (!ignoreYearFilter) {
+        if (isCurrentYear) {
+          whereCondition.AND = [
+            {
+              OR: [
+                { deliveryDate: { gte: startOfYear, lte: endOfYear } },
+                {
+                  deliveryDate: { lt: startOfYear },
+                  status: {
+                    in: [
+                      WO_CONSTANTS.STATUS.OPEN,
+                      WO_CONSTANTS.STATUS.IN_PROGRESS,
+                    ],
+                  },
+                },
+              ],
+            },
+          ];
+        } else if (year && year < new Date().getFullYear()) {
+          whereCondition.AND = [
+            { deliveryDate: { gte: startOfYear, lte: endOfYear } },
+            {
+              status: {
+                notIn: [
+                  WO_CONSTANTS.STATUS.OPEN,
+                  WO_CONSTANTS.STATUS.IN_PROGRESS,
+                ],
+              },
+            },
+          ];
+        } else {
+          whereCondition.deliveryDate = { gte: startOfYear, lte: endOfYear };
+        }
+      }
+    }
+
+    try {
       // 4. 并行查询数据
       const [workOrders, total, summaryData] = await Promise.all([
         prisma.work_orders.findMany({
@@ -188,12 +188,8 @@ export const WorkOrderService = {
         summary,
       };
     } catch (error) {
-      logger.error({ err: error }, 'getList 执行失败');
-      return {
-        items: [],
-        total: 0,
-        summary: [],
-      };
+      logger.error({ err: error, params }, 'getList 执行失败');
+      throw error;
     }
   },
 };
