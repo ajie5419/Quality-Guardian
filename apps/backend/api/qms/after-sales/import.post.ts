@@ -1,5 +1,9 @@
-import { QMS_STATUS_COLOR_MAP } from '@qgs/shared';
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import {
+  createAfterSalesId,
+  getNextAfterSalesSerialNumber,
+} from '~/utils/after-sales-id';
+import { mapAfterSalesStatus } from '~/utils/after-sales-status';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -18,37 +22,26 @@ export default defineEventHandler(async (event) => {
     const { items } = body;
 
     if (!Array.isArray(items) || items.length === 0) {
+      setResponseStatus(event, 400);
       return useResponseError('未选择数据');
     }
 
     let successCount = 0;
+    let serialSeed = await getNextAfterSalesSerialNumber();
     for (const item of items) {
       try {
         const woNumber = String(item.workOrderNumber || '').trim();
         if (!woNumber) continue;
 
-        // Standardized ID Generation
-        const id = `AS-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-
-        // Validate Status using Shared Constants
-        type AfterSalesStatus =
-          | 'CANCELLED'
-          | 'COMPLETED'
-          | 'IN_PROGRESS'
-          | 'OPEN';
-        let status: AfterSalesStatus = 'OPEN';
-        if (
-          item.status &&
-          QMS_STATUS_COLOR_MAP[item.status as keyof typeof QMS_STATUS_COLOR_MAP]
-        ) {
-          // If the status key itself is passed (e.g. IN_PROGRESS)
-          status = item.status as AfterSalesStatus;
-        }
+        const status = item.status
+          ? mapAfterSalesStatus(String(item.status))
+          : mapAfterSalesStatus(undefined);
+        const serialNumber = serialSeed++;
 
         await prisma.after_sales.create({
           data: {
-            id,
-            serialNumber: Math.floor(Math.random() * 1_000_000),
+            id: createAfterSalesId(),
+            serialNumber,
             occurDate: new Date(item.issueDate || item.occurDate || Date.now()),
             claimStatus: status,
             projectName: String(item.projectName || ''),
@@ -67,6 +60,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ successCount, totalCount: items.length });
   } catch {
+    setResponseStatus(event, 500);
     return useResponseError('导入异常');
   }
 });

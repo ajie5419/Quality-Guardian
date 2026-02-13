@@ -1,4 +1,9 @@
-import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import {
+  defineEventHandler,
+  getRouterParam,
+  readBody,
+  setResponseStatus,
+} from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
 import { mapAfterSalesStatus } from '~/utils/after-sales-status';
 import { logApiError } from '~/utils/api-logger';
@@ -18,6 +23,7 @@ export default defineEventHandler(async (event) => {
 
   const id = getRouterParam(event, 'id');
   if (!id) {
+    setResponseStatus(event, 400);
     return useResponseError('缺少ID');
   }
 
@@ -72,12 +78,13 @@ export default defineEventHandler(async (event) => {
       }
     });
 
-    if (bodyRecord.quantity) updateData.quantity = Number(bodyRecord.quantity);
-    if (bodyRecord.materialCost)
+    if (bodyRecord.quantity !== undefined)
+      updateData.quantity = Number(bodyRecord.quantity);
+    if (bodyRecord.materialCost !== undefined)
       updateData.materialCost = Number(bodyRecord.materialCost);
-    if (bodyRecord.laborTravelCost)
+    if (bodyRecord.laborTravelCost !== undefined)
       updateData.laborTravelCost = Number(bodyRecord.laborTravelCost);
-    if (bodyRecord.runningHours)
+    if (bodyRecord.runningHours !== undefined)
       updateData.runningHours = Number(bodyRecord.runningHours);
     if (bodyRecord.factoryDate)
       updateData.factoryDate = new Date(bodyRecord.factoryDate as string);
@@ -100,6 +107,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('after-sales', error);
+    setResponseStatus(event, 500);
     return useResponseError('更新售后记录失败');
   }
 });

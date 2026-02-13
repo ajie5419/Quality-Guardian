@@ -1,7 +1,11 @@
 import { after_sales_claimStatus } from '@prisma/client';
 import { QMS_DEFAULT_VALUES } from '@qgs/shared';
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
+import {
+  createAfterSalesId,
+  getNextAfterSalesSerialNumber,
+} from '~/utils/after-sales-id';
 import { mapAfterSalesStatus } from '~/utils/after-sales-status';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -20,13 +24,18 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
+    if (!body?.workOrderNumber) {
+      setResponseStatus(event, 400);
+      return useResponseError('缺少必填字段: workOrderNumber');
+    }
 
     const claimStatus = mapAfterSalesStatus(body.status);
+    const serialNumber = await getNextAfterSalesSerialNumber();
 
     const newItem = await prisma.after_sales.create({
       data: {
-        id: `AS-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
-        serialNumber: Math.floor(Date.now() / 1000), // Use seconds to fit INT
+        id: createAfterSalesId(),
+        serialNumber,
         workOrderNumber:
           body.workOrderNumber || QMS_DEFAULT_VALUES.UNKNOWN_WORK_ORDER,
         projectName: body.projectName || '',
@@ -85,6 +94,7 @@ export default defineEventHandler(async (event) => {
     logApiError('after-sales-create', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
+    setResponseStatus(event, 500);
     return useResponseError(`创建售后记录失败: ${errorMessage}`);
   }
 });
