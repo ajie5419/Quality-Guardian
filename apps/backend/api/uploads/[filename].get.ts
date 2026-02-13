@@ -1,9 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { extname, join } from 'node:path';
+import { extname, relative, resolve } from 'node:path';
 
-import { createError, defineEventHandler } from 'h3';
+import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { UPLOAD_DIR } from '~/utils/paths';
+import { useResponseError } from '~/utils/response';
 
 // MIME types mapping
 const MIME_TYPES: Record<string, string> = {
@@ -17,32 +18,27 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 export default defineEventHandler((event) => {
-  const filename = event.context.params?.filename;
+  const filename = getRouterParam(event, 'filename');
 
   if (!filename) {
-    throw createError({
-      statusCode: 400,
-      message: 'Filename is required',
-    });
+    setResponseStatus(event, 400);
+    return useResponseError('Filename is required');
   }
 
-  const filePath = join(UPLOAD_DIR, filename);
+  const filePath = resolve(UPLOAD_DIR, filename);
+  const relativePath = relative(UPLOAD_DIR, filePath);
 
   // Security check
-  if (!filePath.startsWith(UPLOAD_DIR)) {
-    throw createError({
-      statusCode: 403,
-      message: 'Access denied',
-    });
+  if (relativePath.startsWith('..') || relativePath.includes('\0')) {
+    setResponseStatus(event, 403);
+    return useResponseError('Access denied');
   }
 
   if (!existsSync(filePath)) {
     // Log absolute path to help identify shared DB vs local storage discrepancies
     console.error(`[Serving] File not found at absolute path: ${filePath}`);
-    throw createError({
-      statusCode: 404,
-      message: 'File not found',
-    });
+    setResponseStatus(event, 404);
+    return useResponseError('File not found');
   }
 
   try {
@@ -58,9 +54,7 @@ export default defineEventHandler((event) => {
     return fileBuffer;
   } catch (error) {
     logApiError('uploads', error);
-    throw createError({
-      statusCode: 500,
-      message: 'Internal Server Error',
-    });
+    setResponseStatus(event, 500);
+    return useResponseError('Internal Server Error');
   }
 });
