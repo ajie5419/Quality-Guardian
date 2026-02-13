@@ -12,7 +12,7 @@
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=vbenjs_vue-vben-admin&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=vbenjs_vue-vben-admin) ![codeql](https://github.com/ajie5419/Quality-Guardian/actions/workflows/codeql.yml/badge.svg) ![build](https://github.com/ajie5419/Quality-Guardian/actions/workflows/build.yml/badge.svg) ![ci](https://github.com/ajie5419/Quality-Guardian/actions/workflows/ci.yml/badge.svg) ![deploy](https://github.com/ajie5419/Quality-Guardian/actions/workflows/deploy.yml/badge.svg)
 
-**中文** | [English](./README.md) | [日本語](./README.ja-JP.md)
+**中文** | [English](./README.md)
 
 ## 简介
 
@@ -63,7 +63,7 @@ git clone https://github.com/ajie5419/Quality-Guardian.git
 2. 安装依赖
 
 ```bash
-cd vue-vben-admin
+cd Quality-Guardian
 npm i -g corepack
 pnpm install
 ```
