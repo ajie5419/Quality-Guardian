@@ -1,8 +1,12 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
@@ -117,17 +121,8 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('workspace', error);
-    return useResponseSuccess({
-      projectItems: [],
-      todoItems: [],
-      trendItems: [],
-      stats: {
-        todayWorkOrders: 0,
-        todayInspections: 0,
-        todayIssues: 0,
-        openIssuesCount: 0,
-      },
-    });
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to fetch workspace data');
   }
 });
 

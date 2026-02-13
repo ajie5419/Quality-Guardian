@@ -1,8 +1,12 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { DashboardService } from '~/services/dashboard.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -29,15 +33,7 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('dashboard', error);
-    return useResponseSuccess({
-      overview: {
-        fieldIssues: { open: 0, total: 0 },
-        processIssues: { open: 0, total: 0 },
-        qualityLoss: { weekly: 0, total: 0 },
-        workOrders: { weekly: 0, total: 0 },
-      },
-      chartData: { monthlyQuality: [], issueDistribution: [] },
-      recentWorkOrders: [],
-    });
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to fetch dashboard data');
   }
 });
