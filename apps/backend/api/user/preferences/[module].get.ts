@@ -1,4 +1,4 @@
-import { eventHandler, getQuery, getRouterParam } from 'h3';
+import { eventHandler, getQuery, getRouterParam, setResponseStatus } from 'h3';
 import { PreferenceService } from '~/services/preference.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -16,6 +16,7 @@ export default eventHandler(async (event) => {
 
   const module = getRouterParam(event, 'module');
   if (!module) {
+    setResponseStatus(event, 400);
     return useResponseError('Missing module parameter');
   }
 
@@ -33,6 +34,7 @@ export default eventHandler(async (event) => {
     return useResponseSuccess(preference);
   } catch (error) {
     logApiError(`get_preference_${module}`, error);
+    setResponseStatus(event, 500);
     return useResponseError('Failed to fetch preference');
   }
 });

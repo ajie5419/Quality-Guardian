@@ -1,4 +1,5 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -15,12 +16,14 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event);
 
     if (!body || typeof body !== 'object') {
+      setResponseStatus(event, 400);
       return useResponseError('Invalid request body');
     }
 
     // Basic validation
     for (const [key, value] of Object.entries(body)) {
       if (typeof value !== 'number' || value < 0 || value > 100) {
+        setResponseStatus(event, 400);
         return useResponseError(
           `Invalid value for ${key}: ${value}. Must be between 0 and 100.`,
         );
@@ -41,6 +44,8 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ success: true, targets: body });
   } catch (error) {
+    logApiError('dashboard-targets', error);
+    setResponseStatus(event, 500);
     return useResponseError(
       `Failed to save quality targets: ${(error as Error).message}`,
     );

@@ -1,4 +1,4 @@
-import { eventHandler, getRouterParam, readBody } from 'h3';
+import { eventHandler, getRouterParam, readBody, setResponseStatus } from 'h3';
 import { PreferenceService } from '~/services/preference.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -16,6 +16,7 @@ export default eventHandler(async (event) => {
 
   const module = getRouterParam(event, 'module');
   if (!module) {
+    setResponseStatus(event, 400);
     return useResponseError('Missing module parameter');
   }
 
@@ -32,6 +33,7 @@ export default eventHandler(async (event) => {
     return useResponseSuccess({ message: 'Preference saved' });
   } catch (error) {
     logApiError(`save_preference_${module}`, error);
+    setResponseStatus(event, 500);
     return useResponseError('Failed to save preference');
   }
 });

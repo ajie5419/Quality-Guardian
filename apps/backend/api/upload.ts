@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { eventHandler, readMultipartFormData } from 'h3';
+import { eventHandler, readMultipartFormData, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { UPLOAD_DIR } from '~/utils/paths';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
@@ -18,11 +18,13 @@ export default eventHandler(async (event) => {
     const formData = await readMultipartFormData(event);
 
     if (!formData || formData.length === 0) {
+      setResponseStatus(event, 400);
       return useResponseError('No file uploaded');
     }
 
     const file = formData[0];
     if (!file || !file.data) {
+      setResponseStatus(event, 400);
       return useResponseError('Invalid file');
     }
 
@@ -49,6 +51,7 @@ export default eventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('upload', error);
+    setResponseStatus(event, 500);
     return useResponseError('Upload failed');
   }
 });
