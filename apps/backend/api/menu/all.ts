@@ -176,7 +176,7 @@ export default eventHandler(async (event) => {
           userPermissions = JSON.parse(dbUser.roles.permissions || '[]');
         } catch (error) {
           logApiError('all', error);
-          return useResponseSuccess([]);
+          userPermissions = [];
         }
       }
     } catch (error) {

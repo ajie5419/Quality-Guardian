@@ -1,9 +1,9 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
-import { useResponseSuccess } from '~/utils/response';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
   try {
     // 使用原生 SQL 获取所有工单交付日期的去重年份
     // 之前已经在 schema.prisma 中为 deliveryDate 建立了索引，查询效率极高
@@ -30,7 +30,7 @@ export default defineEventHandler(async () => {
     return useResponseSuccess(uniqueYears);
   } catch (error) {
     logApiError('years', error);
-    // 降级方案：返回当前年份
-    return useResponseSuccess([new Date().getFullYear()]);
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to fetch available years');
   }
 });
