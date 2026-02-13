@@ -1,8 +1,4 @@
 import type {
-  after_sales_claimStatus,
-  quality_records_status,
-} from '@prisma/client';
-import type {
   PageResult,
   QualityLossItem,
   QualityLossServiceTrendItem,
@@ -14,6 +10,7 @@ import { Prisma } from '@prisma/client';
 import { MONTHS } from '~/constants/locale';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+import { normalizeQualityLossStatus } from '~/utils/quality-loss-status';
 
 import {
   applyPagination,
@@ -68,11 +65,10 @@ const QL_CONSTANTS = {
  * 构建 quality_losses 表的 where 条件
  */
 function buildManualLossesWhere(
-  params: QualityLossQueryParams,
+  _params: QualityLossQueryParams,
 ): Prisma.quality_lossesWhereInput {
   return {
     isDeleted: false,
-    ...(params.status ? { status: params.status } : {}),
   };
 }
 
@@ -85,9 +81,6 @@ function buildInternalRecordsWhere(
   return {
     isDeleted: false,
     lossAmount: { gt: 0 },
-    ...(params.status
-      ? { status: params.status as quality_records_status }
-      : {}),
     ...(params.workOrderNumber
       ? { workOrderNumber: { contains: params.workOrderNumber } }
       : {}),
@@ -102,9 +95,6 @@ function buildExternalSalesWhere(
 ): Prisma.after_salesWhereInput {
   return {
     isDeleted: false,
-    ...(params.status
-      ? { claimStatus: params.status as after_sales_claimStatus }
-      : {}),
     ...(params.workOrderNumber
       ? { workOrderNumber: { contains: params.workOrderNumber } }
       : {}),
@@ -139,26 +129,20 @@ function formatManualLossItem(item: {
     partName: item.type,
     amount: safeNumber(item.amount),
     actualClaim: safeNumber(item.actualClaim),
-    status: item.status || QL_CONSTANTS.STATUS.PENDING,
+    status: normalizeQualityLossStatus(
+      item.status || QL_CONSTANTS.STATUS.PENDING,
+    ),
   };
 }
 
 // ============ 状态映射处理 ============
 
 function mapInternalStatus(status: string): string {
-  if (status === 'CLOSED') return QL_CONSTANTS.STATUS.CONFIRMED;
-  if (status === 'IN_PROGRESS' || status === 'CLAIMING') return 'Processing';
-  if (status === 'RESOLVED') return 'Resolved';
-  return QL_CONSTANTS.STATUS.PENDING;
+  return normalizeQualityLossStatus(status);
 }
 
 function mapExternalStatus(status: string): string {
-  if (status === 'CLOSED' || status === 'COMPLETED')
-    return QL_CONSTANTS.STATUS.CONFIRMED;
-  if (status === 'IN_PROGRESS' || ['NEGOTIATING', 'SUBMITTED'].includes(status))
-    return 'Processing';
-  if (status === 'RESOLVED') return 'Resolved';
-  return QL_CONSTANTS.STATUS.PENDING;
+  return normalizeQualityLossStatus(status);
 }
 
 /**
@@ -368,7 +352,7 @@ export const QualityLossService = {
   async getAllLosses(
     params: QualityLossQueryParams = {},
   ): Promise<PageResult<QualityLossItem>> {
-    const { lossSource, workOrderNumber } = params;
+    const { lossSource, status, workOrderNumber } = params;
 
     try {
       // 1. 并行获取所有来源的原始数据
@@ -464,7 +448,15 @@ export const QualityLossService = {
       }
 
       // 5. 排序并分页
-      const sorted = sortByDateDesc(result);
+      const statusFiltered = status
+        ? result.filter(
+            (item) =>
+              normalizeQualityLossStatus(item.status) ===
+              normalizeQualityLossStatus(status),
+          )
+        : result;
+
+      const sorted = sortByDateDesc(statusFiltered);
       return applyPagination(sorted, params);
     } catch (error) {
       logger.error({ err: error }, 'getAllLosses 执行失败');

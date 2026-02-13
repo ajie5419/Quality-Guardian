@@ -1,8 +1,18 @@
-import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import {
+  defineEventHandler,
+  getRouterParam,
+  readBody,
+  setResponseStatus,
+} from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import {
+  normalizeQualityLossStatus,
+  toAfterSalesClaimStatus,
+  toQualityRecordStatus,
+} from '~/utils/quality-loss-status';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -17,6 +27,7 @@ export default defineEventHandler(async (event) => {
 
   const id = getRouterParam(event, 'id');
   if (!id) {
+    setResponseStatus(event, 400);
     return useResponseError('请求缺少 ID 参数');
   }
 
@@ -35,10 +46,9 @@ export default defineEventHandler(async (event) => {
         ? undefined
         : Number.parseFloat(String(body.amount)) || 0;
 
-    let syncedStatus;
-    if (body.status) {
-      syncedStatus = body.status === 'Confirmed' ? 'CLOSED' : 'OPEN';
-    }
+    const normalizedStatus = body.status
+      ? normalizeQualityLossStatus(body.status)
+      : undefined;
 
     if (source === 'Internal') {
       // 内部质量损失：更新质量记录表 (quality_records)
@@ -46,8 +56,9 @@ export default defineEventHandler(async (event) => {
         where: { id: pk },
         data: {
           recoveredAmount: actualClaimValue,
-          // 同步状态：Confirmed -> CLOSED, others -> OPEN
-          status: syncedStatus,
+          ...(normalizedStatus
+            ? { status: toQualityRecordStatus(normalizedStatus) }
+            : {}),
           updatedAt: new Date(),
         },
       });
@@ -57,8 +68,9 @@ export default defineEventHandler(async (event) => {
         where: { id: pk },
         data: {
           actualClaim: actualClaimValue,
-          // 同步状态：Confirmed -> CLOSED, others -> OPEN
-          claimStatus: syncedStatus,
+          ...(normalizedStatus
+            ? { claimStatus: toAfterSalesClaimStatus(normalizedStatus) }
+            : {}),
           updatedAt: new Date(),
         },
       });
@@ -77,7 +89,7 @@ export default defineEventHandler(async (event) => {
         updateData.description = body.description;
       if (body.responsibleDepartment)
         updateData.respDept = body.responsibleDepartment;
-      if (body.status) updateData.status = body.status;
+      if (normalizedStatus) updateData.status = normalizedStatus;
 
       // 查找条件：手工录入的记录，ID 可能是 QL-编号 或 CUID
       const whereCondition = String(id).startsWith('QL-')
@@ -106,6 +118,7 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     logApiError('quality-loss', error);
     const err = error as { message?: string };
+    setResponseStatus(event, 500);
     return useResponseError(`数据更新失败：${err.message || '数据库操作异常'}`);
   }
 });

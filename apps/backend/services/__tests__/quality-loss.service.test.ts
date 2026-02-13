@@ -115,6 +115,63 @@ describe('qualityLossService', () => {
       expect(result.items).toHaveLength(0);
       expect(result.total).toBe(0);
     });
+
+    it('should filter by unified status across all sources', async () => {
+      (prisma.quality_losses.findMany as any).mockResolvedValue([
+        {
+          id: 'manual-1',
+          lossId: 'M001',
+          occurDate: new Date('2024-01-01'),
+          amount: '100.00',
+          actualClaim: '50.00',
+          respDept: 'Production',
+          type: 'Material',
+          status: 'Pending',
+          isDeleted: false,
+        },
+      ]);
+      (prisma.quality_records.findMany as any).mockResolvedValue([
+        {
+          id: 'internal-1',
+          serialNumber: 101,
+          date: new Date('2024-01-02'),
+          lossAmount: '200.00',
+          recoveredAmount: '150.00',
+          responsibleDepartment: 'QC',
+          partName: 'Engine',
+          projectName: 'Project A',
+          workOrderNumber: 'WO001',
+          status: 'CLOSED',
+          isDeleted: false,
+          createdAt: new Date(),
+        },
+      ]);
+      (prisma.after_sales.findMany as any).mockResolvedValue([
+        {
+          id: 'external-1',
+          serialNumber: 201,
+          occurDate: new Date('2024-01-03'),
+          materialCost: '300.00',
+          laborTravelCost: '50.00',
+          actualClaim: '200.00',
+          respDept: 'Service',
+          partName: 'Bolt',
+          projectName: 'Project B',
+          workOrderNumber: 'WO002',
+          claimStatus: 'COMPLETED',
+          isDeleted: false,
+          createdAt: new Date(),
+        },
+      ]);
+
+      const confirmedOnly = await QualityLossService.getAllLosses({
+        status: 'Confirmed',
+      });
+      expect(confirmedOnly.total).toBe(2);
+      expect(confirmedOnly.items.every((i) => i.status === 'Confirmed')).toBe(
+        true,
+      );
+    });
   });
 
   describe('getTrendData', () => {

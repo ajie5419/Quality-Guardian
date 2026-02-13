@@ -1,8 +1,10 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { nanoid } from 'nanoid';
 import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { normalizeQualityLossStatus } from '~/utils/quality-loss-status';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -17,8 +19,12 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
+    if (!body?.type) {
+      setResponseStatus(event, 400);
+      return useResponseError('缺少必填字段: type');
+    }
 
-    const lossId = `QL-${new Date().getFullYear()}${Math.floor(Math.random() * 10_000)}`;
+    const lossId = `QL-${new Date().getFullYear()}-${nanoid(6).toUpperCase()}`;
 
     const newItem = await prisma.quality_losses.create({
       data: {
@@ -29,7 +35,7 @@ export default defineEventHandler(async (event) => {
         actualClaim: Number(body.actualClaim) || 0,
         description: body.description,
         respDept: body.responsibleDepartment,
-        status: body.status || 'Pending',
+        status: normalizeQualityLossStatus(body.status || 'Pending'),
         isDeleted: false,
       },
     });
@@ -50,6 +56,7 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('quality-loss', error);
+    setResponseStatus(event, 500);
     return useResponseError('创建质量损失记录失败');
   }
 });
