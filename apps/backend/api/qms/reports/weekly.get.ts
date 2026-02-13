@@ -1,8 +1,12 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { ReportService } from '~/services/report.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
@@ -13,22 +17,25 @@ export default defineEventHandler(async (event) => {
   const endDate = query.endDate as string;
 
   if (!startDate || !endDate) {
-    return useResponseSuccess({
-      code: -1,
-      message: 'Missing startDate or endDate parameters',
-    });
+    setResponseStatus(event, 400);
+    return useResponseError('Missing startDate or endDate parameters');
   }
 
   try {
-    const reportData = await ReportService.getWeeklyReport(startDate, endDate);
+    const reportData = await ReportService.getWeeklyReport(startDate, endDate, {
+      name: userinfo.realName || userinfo.username,
+      dept: userinfo.deptName || '-',
+      role: userinfo.roles?.[0] || '-',
+      leader: '-',
+    });
     return useResponseSuccess(reportData);
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     logApiError('weekly-report', error);
-    return useResponseSuccess({
-      code: -1,
-      message: `Failed to generate weekly report: ${errorMessage}`,
-    });
+    setResponseStatus(event, 500);
+    return useResponseError(
+      `Failed to generate weekly report: ${errorMessage}`,
+    );
   }
 });

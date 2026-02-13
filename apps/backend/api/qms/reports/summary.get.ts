@@ -1,9 +1,13 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { getTargetPassRate } from '~/constants/quality-standards';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
@@ -121,10 +125,8 @@ export default defineEventHandler(async (event) => {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     logApiError('summary', error);
-    return useResponseSuccess({
-      code: -1,
-      message: `报告生成失败: ${errorMessage}`,
-    });
+    setResponseStatus(event, 500);
+    return useResponseError(`报告生成失败: ${errorMessage}`);
   }
 });
 
