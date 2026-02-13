@@ -8,6 +8,51 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+DRY_RUN=false
+ROLLBACK_TAG=""
+
+usage() {
+    cat <<USAGE
+用法:
+  ./publish.sh [--dry-run] [--rollback-tag <tag>]
+
+参数:
+  --dry-run            仅打印将执行的命令，不实际执行
+  --rollback-tag <tag> 回滚/部署到指定版本标签（如 v1.1.17 或 1.1.17）
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        --rollback-tag)
+            if [[ $# -lt 2 ]]; then
+                echo -e "${RED}❌ --rollback-tag 缺少参数${NC}"
+                usage
+                exit 1
+            fi
+            ROLLBACK_TAG="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}❌ 未知参数: $1${NC}"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+if [[ -n "$ROLLBACK_TAG" && "$ROLLBACK_TAG" != v* ]]; then
+    ROLLBACK_TAG="v$ROLLBACK_TAG"
+fi
+
 # --- 配置加载 ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$SCRIPT_DIR/.env.deploy" ]; then
@@ -22,79 +67,121 @@ fi
 : "${ECS_IP:?未设置 ECS_IP}"
 : "${ECS_SSH_KEY:?未设置 ECS_SSH_KEY}"
 
-# --- 1. 代码检查 ---
-echo -e "${BLUE}🧪 1. 代码质量检测...${NC}"
-FAIL=0
-pnpm run lint & LINT_PID=$!
-pnpm run check:type & TYPE_PID=$!
+run_cmd() {
+    if $DRY_RUN; then
+        echo "[DRY-RUN] $*"
+    else
+        eval "$*"
+    fi
+}
 
-wait $LINT_PID || { echo -e "${RED}❌ Lint 失败${NC}"; FAIL=1; }
-wait $TYPE_PID || { echo -e "${RED}❌ 类型检查失败${NC}"; FAIL=1; }
-
-if [ "$FAIL" -ne 0 ]; then
-    echo -e "${RED}❌ 检测未通过，终止部署${NC}"
-    exit 1
-fi
-
-# --- 2. 版本管理 ---
-CURRENT_VERSION=$(node -p "require('./package.json').version")
-echo -e "${BLUE}📌 当前项目版本: $CURRENT_VERSION${NC}"
-
-if [ -z "${AUTO_BUMP:-}" ]; then
-    read -p "是否需要升级版本号? (y: patch / m: minor / n: 保持) [y/m/n]: " IS_BUMP
+if [[ -n "$ROLLBACK_TAG" ]]; then
+    TAG="$ROLLBACK_TAG"
+    echo -e "${YELLOW}↩️ 回滚模式：将部署指定版本 $TAG${NC}"
 else
-    IS_BUMP="${AUTO_BUMP}"
+    # --- 1. 代码检查 ---
+    echo -e "${BLUE}🧪 1. 代码质量检测...${NC}"
+    if $DRY_RUN; then
+        echo "[DRY-RUN] pnpm run lint"
+        echo "[DRY-RUN] pnpm run check:type"
+    else
+        FAIL=0
+        pnpm run lint & LINT_PID=$!
+        pnpm run check:type & TYPE_PID=$!
+
+        wait $LINT_PID || { echo -e "${RED}❌ Lint 失败${NC}"; FAIL=1; }
+        wait $TYPE_PID || { echo -e "${RED}❌ 类型检查失败${NC}"; FAIL=1; }
+
+        if [ "$FAIL" -ne 0 ]; then
+            echo -e "${RED}❌ 检测未通过，终止部署${NC}"
+            exit 1
+        fi
+    fi
+
+    # --- 2. 版本管理 ---
+    CURRENT_VERSION=$(node -p "require('./package.json').version")
+    echo -e "${BLUE}📌 当前项目版本: $CURRENT_VERSION${NC}"
+
+    if $DRY_RUN; then
+        IS_BUMP="${AUTO_BUMP:-n}"
+        echo -e "${YELLOW}ℹ️ DRY-RUN 模式：跳过真实版本修改 (AUTO_BUMP=${IS_BUMP})${NC}"
+    elif [ -z "${AUTO_BUMP:-}" ]; then
+        read -p "是否需要升级版本号? (y: patch / m: minor / n: 保持) [y/m/n]: " IS_BUMP
+    else
+        IS_BUMP="${AUTO_BUMP}"
+    fi
+
+    case "$IS_BUMP" in
+        y|Y)
+            run_cmd "npm version patch --no-git-tag-version"
+            ;;
+        m|M)
+            run_cmd "npm version minor --no-git-tag-version"
+            ;;
+        n|N|"")
+            echo -e "${YELLOW}ℹ️ 保持当前版本号${NC}"
+            ;;
+        *)
+            echo -e "${RED}❌ 无效选项${NC}"
+            exit 1
+            ;;
+    esac
+
+    NEW_VERSION=$(node -p "require('./package.json').version")
+    echo -e "${GREEN}✅ 版本: $NEW_VERSION${NC}"
+
+    TAG="v$NEW_VERSION"
+
+    # --- 3. 登录 & 构建 ---
+    echo -e "${BLUE}🔐 3. 登录阿里云镜像仓库...${NC}"
+    run_cmd "echo \"$REGISTRY_PASSWORD\" | docker login --username=\"$REGISTRY_USERNAME\" --password-stdin \"$REGISTRY\""
+
+    echo -e "${BLUE}🏗️ 4. 构建镜像 (BuildKit)...${NC}"
+    export DOCKER_BUILDKIT=1
+    export BUILDKIT_PROGRESS=plain
+
+    if $DRY_RUN; then
+        echo "[DRY-RUN] docker build ... -t $REGISTRY/$REPO:backend-latest -t $REGISTRY/$REPO:backend-$TAG -f Dockerfile.backend ."
+        echo "[DRY-RUN] docker build ... -t $REGISTRY/$REPO:frontend-latest -t $REGISTRY/$REPO:frontend-$TAG -f Dockerfile.frontend ."
+    else
+        # 并行构建
+        docker build --platform linux/amd64 \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --cache-from "$REGISTRY/$REPO:backend-latest" \
+            -t "$REGISTRY/$REPO:backend-latest" \
+            -t "$REGISTRY/$REPO:backend-$TAG" \
+            -f Dockerfile.backend . &
+
+        BACKEND_PID=$!
+
+        docker build --platform linux/amd64 \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --cache-from "$REGISTRY/$REPO:frontend-latest" \
+            -t "$REGISTRY/$REPO:frontend-latest" \
+            -t "$REGISTRY/$REPO:frontend-$TAG" \
+            -f Dockerfile.frontend . &
+
+        FRONTEND_PID=$!
+
+        wait $BACKEND_PID || { echo -e "${RED}❌ 后端构建失败${NC}"; exit 1; }
+        wait $FRONTEND_PID || { echo -e "${RED}❌ 前端构建失败${NC}"; exit 1; }
+    fi
+
+    # --- 5. 推送镜像 ---
+    echo -e "${BLUE}📤 5. 推送镜像...${NC}"
+    if $DRY_RUN; then
+        echo "[DRY-RUN] docker push $REGISTRY/$REPO:backend-latest"
+        echo "[DRY-RUN] docker push $REGISTRY/$REPO:backend-$TAG"
+        echo "[DRY-RUN] docker push $REGISTRY/$REPO:frontend-latest"
+        echo "[DRY-RUN] docker push $REGISTRY/$REPO:frontend-$TAG"
+    else
+        docker push "$REGISTRY/$REPO:backend-latest" & B_PUSH=$!
+        docker push "$REGISTRY/$REPO:backend-$TAG" & B_TAG_PUSH=$!
+        docker push "$REGISTRY/$REPO:frontend-latest" & F_PUSH=$!
+        docker push "$REGISTRY/$REPO:frontend-$TAG" & F_TAG_PUSH=$!
+        wait $B_PUSH $B_TAG_PUSH $F_PUSH $F_TAG_PUSH
+    fi
 fi
-
-case "$IS_BUMP" in
-    y|Y) npm version patch --no-git-tag-version ;;
-    m|M) npm version minor --no-git-tag-version ;;
-    n|N|"") echo -e "${YELLOW}ℹ️ 保持当前版本号${NC}" ;;
-    *) echo -e "${RED}❌ 无效选项${NC}"; exit 1 ;;
-esac
-
-NEW_VERSION=$(node -p "require('./package.json').version")
-echo -e "${GREEN}✅ 版本: $NEW_VERSION${NC}"
-
-TAG="v$NEW_VERSION"
-
-# --- 3. 登录 & 构建 ---
-echo -e "${BLUE}🔐 3. 登录阿里云镜像仓库...${NC}"
-echo "$REGISTRY_PASSWORD" | docker login --username="$REGISTRY_USERNAME" --password-stdin "$REGISTRY"
-
-echo -e "${BLUE}🏗️ 4. 构建镜像 (BuildKit)...${NC}"
-export DOCKER_BUILDKIT=1
-export BUILDKIT_PROGRESS=plain
-
-# 并行构建
-docker build --platform linux/amd64 \
-    --build-arg BUILDKIT_INLINE_CACHE=1 \
-    --cache-from "$REGISTRY/$REPO:backend-latest" \
-    -t "$REGISTRY/$REPO:backend-latest" \
-    -t "$REGISTRY/$REPO:backend-$TAG" \
-    -f Dockerfile.backend . &
-
-BACKEND_PID=$!
-
-docker build --platform linux/amd64 \
-    --build-arg BUILDKIT_INLINE_CACHE=1 \
-    --cache-from "$REGISTRY/$REPO:frontend-latest" \
-    -t "$REGISTRY/$REPO:frontend-latest" \
-    -t "$REGISTRY/$REPO:frontend-$TAG" \
-    -f Dockerfile.frontend . &
-
-FRONTEND_PID=$!
-
-wait $BACKEND_PID || { echo -e "${RED}❌ 后端构建失败${NC}"; exit 1; }
-wait $FRONTEND_PID || { echo -e "${RED}❌ 前端构建失败${NC}"; exit 1; }
-
-# --- 5. 推送镜像 ---
-echo -e "${BLUE}📤 5. 推送镜像...${NC}"
-docker push "$REGISTRY/$REPO:backend-latest" & B_PUSH=$!
-docker push "$REGISTRY/$REPO:backend-$TAG" & B_TAG_PUSH=$!
-docker push "$REGISTRY/$REPO:frontend-latest" & F_PUSH=$!
-docker push "$REGISTRY/$REPO:frontend-$TAG" & F_TAG_PUSH=$!
-wait $B_PUSH $B_TAG_PUSH $F_PUSH $F_TAG_PUSH
 
 # --- 6. 远程部署（固定版本Tag + 自动回滚）---
 echo -e "${BLUE}🚀 6. 执行远程部署...${NC}"
@@ -165,24 +252,34 @@ EOF
 
 # 6.0 上传配置（修复 env 丢失）
 echo -e "${BLUE}📤 上传最新配置...${NC}"
-scp -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no "$SCRIPT_DIR/docker-compose.yml" "root@$ECS_IP:/opt/qms/docker-compose.next.yml"
+run_cmd "scp -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no \"$SCRIPT_DIR/docker-compose.yml\" \"root@$ECS_IP:/opt/qms/docker-compose.next.yml\""
 
 # 优先上传 .env.production，如果不存在则对应报警或回退
 if [ -f "$SCRIPT_DIR/.env.production" ]; then
-    scp -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no "$SCRIPT_DIR/.env.production" "root@$ECS_IP:/opt/qms/.env.production"
+    run_cmd "scp -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no \"$SCRIPT_DIR/.env.production\" \"root@$ECS_IP:/opt/qms/.env.production\""
 else
     echo -e "${YELLOW}⚠️ 本地未找到 .env.production，将使用 .env (可能导致 Redis 连接失败)${NC}"
-    scp -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no "$SCRIPT_DIR/.env" "root@$ECS_IP:/opt/qms/.env.production"
+    run_cmd "scp -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no \"$SCRIPT_DIR/.env\" \"root@$ECS_IP:/opt/qms/.env.production\""
 fi
 
-if ssh -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10 "root@$ECS_IP" "$DEPLOY_SCRIPT"; then
-    echo -e "${GREEN}✅ 远程部署成功${NC}"
+if $DRY_RUN; then
+    echo "[DRY-RUN] ssh -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no -o ConnectTimeout=10 \"root@$ECS_IP\" '<DEPLOY_SCRIPT>'"
+    echo -e "${YELLOW}ℹ️ DRY-RUN 模式：已跳过远程部署和健康检查${NC}"
 else
-    echo -e "${RED}❌ 部署失败${NC}"
-    exit 1
+    if ssh -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10 "root@$ECS_IP" "$DEPLOY_SCRIPT"; then
+        echo -e "${GREEN}✅ 远程部署成功${NC}"
+    else
+        echo -e "${RED}❌ 部署失败${NC}"
+        exit 1
+    fi
 fi
 
 # --- 7. 健康检查 ---
+if $DRY_RUN; then
+    echo -e "${GREEN}🎉 DRY-RUN 完成！目标版本: $TAG${NC}"
+    exit 0
+fi
+
 echo -e "${BLUE}🏥 7. 健康检查...${NC}"
 HEALTH_URL="http://$ECS_IP/api/status"
 MAX_RETRIES=6
