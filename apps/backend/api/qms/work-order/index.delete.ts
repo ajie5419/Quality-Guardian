@@ -1,8 +1,9 @@
-import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
+import { getRequiredQueryParam } from '~/utils/query-param';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -15,13 +16,9 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  // Use query param 'id' to handle special characters like '/'
-  const query = getQuery(event);
-  const id = String(query.id || '');
-
-  if (!id) {
-    setResponseStatus(event, 400);
-    return useResponseError('缺少工单号');
+  const id = getRequiredQueryParam(event, 'id', '缺少工单号');
+  if (typeof id !== 'string') {
+    return id;
   }
 
   try {

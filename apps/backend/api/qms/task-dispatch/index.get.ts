@@ -10,8 +10,8 @@ import {
 import {
   getTaskDispatchArchiveFilter,
   resolveTaskDispatchAssigneeFilter,
+  resolveTaskDispatchCurrentUserId,
   resolveTaskDispatchStatusFilter,
-  resolveTaskDispatchUserId,
 } from '~/utils/task-dispatch';
 
 export default defineEventHandler(async (event) => {
@@ -23,7 +23,10 @@ export default defineEventHandler(async (event) => {
   const { all, level, parentId, status } = getQuery(event);
 
   // 确保 ID 类型为 String 且兼容 id/userId 字段
-  const currentUserId = resolveTaskDispatchUserId(userinfo);
+  const currentUserId = await resolveTaskDispatchCurrentUserId(
+    userinfo,
+    prisma,
+  );
   if (!currentUserId) {
     setResponseStatus(event, 400);
     return useResponseError('无法识别当前用户');

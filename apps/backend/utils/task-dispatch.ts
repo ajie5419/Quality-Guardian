@@ -93,3 +93,61 @@ export function resolveTaskDispatchUserId(userinfo: {
   const userId = String(raw).trim();
   return userId || null;
 }
+
+interface TaskDispatchCurrentUserInfo {
+  id?: unknown;
+  userId?: unknown;
+  username?: unknown;
+}
+
+interface TaskDispatchUserLookupClient {
+  users: {
+    findFirst(args: {
+      select: { id: true };
+      where: { OR: Array<{ id: string } | { username: string }> };
+    }): Promise<null | { id: string }>;
+  };
+}
+
+export function getTaskDispatchMissingRequiredFields(
+  body: Record<string, unknown>,
+  fields: string[],
+): string[] {
+  return fields.filter((field) => {
+    const value = body[field];
+    if (value === undefined || value === null) {
+      return true;
+    }
+
+    if (typeof value === 'string') {
+      return value.trim().length === 0;
+    }
+
+    return false;
+  });
+}
+
+export async function resolveTaskDispatchCurrentUserId(
+  userinfo: TaskDispatchCurrentUserInfo,
+  userLookupClient: TaskDispatchUserLookupClient,
+): Promise<null | string> {
+  const tokenUserId = resolveTaskDispatchUserId(userinfo);
+  const username =
+    typeof userinfo.username === 'string' ? userinfo.username.trim() : '';
+
+  if (!tokenUserId && !username) {
+    return null;
+  }
+
+  const currentUser = await userLookupClient.users.findFirst({
+    where: {
+      OR: [
+        ...(tokenUserId ? [{ id: tokenUserId }] : []),
+        ...(username ? [{ username }] : []),
+      ],
+    },
+    select: { id: true },
+  });
+
+  return currentUser?.id ?? null;
+}

@@ -9,7 +9,7 @@ import {
 } from '~/utils/response';
 import {
   getTaskDispatchArchiveFilter,
-  resolveTaskDispatchUserId,
+  resolveTaskDispatchCurrentUserId,
   TASK_DISPATCH_STATUS,
 } from '~/utils/task-dispatch';
 
@@ -19,7 +19,10 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const currentUserId = resolveTaskDispatchUserId(userinfo);
+  const currentUserId = await resolveTaskDispatchCurrentUserId(
+    userinfo,
+    prisma,
+  );
   if (!currentUserId) {
     setResponseStatus(event, 400);
     return useResponseError('无法识别当前用户');

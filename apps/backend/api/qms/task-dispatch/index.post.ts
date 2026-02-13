@@ -9,7 +9,8 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 import {
-  resolveTaskDispatchUserId,
+  getTaskDispatchMissingRequiredFields,
+  resolveTaskDispatchCurrentUserId,
   TASK_DISPATCH_STATUS,
 } from '~/utils/task-dispatch';
 
@@ -32,28 +33,21 @@ export default defineEventHandler(async (event) => {
     type?: unknown;
   };
 
-  if (!body?.type || !body?.title || !body?.assigneeId) {
+  const missingFields = getTaskDispatchMissingRequiredFields(body, [
+    'type',
+    'title',
+    'assigneeId',
+  ]);
+  if (missingFields.length > 0) {
     setResponseStatus(event, 400);
-    return useResponseError('缺少必填字段: type/title/assigneeId');
+    return useResponseError(`缺少必填字段: ${missingFields.join('/')}`);
   }
 
-  const tokenUserId = resolveTaskDispatchUserId(userinfo);
-  if (!tokenUserId && !userinfo.username) {
-    setResponseStatus(event, 400);
-    return useResponseError('无法识别当前操作人身份');
-  }
-
-  const currentUser = await prisma.users.findFirst({
-    where: {
-      OR: [
-        ...(tokenUserId ? [{ id: tokenUserId }] : []),
-        ...(userinfo.username ? [{ username: userinfo.username }] : []),
-      ],
-    },
-    select: { id: true },
-  });
-
-  if (!currentUser) {
+  const currentUserId = await resolveTaskDispatchCurrentUserId(
+    userinfo,
+    prisma,
+  );
+  if (!currentUserId) {
     setResponseStatus(event, 400);
     return useResponseError('无法识别当前操作人身份');
   }
@@ -97,7 +91,7 @@ export default defineEventHandler(async (event) => {
         parentId: body.parentId ? String(body.parentId) : null,
         itpProjectId: body.itpProjectId ? String(body.itpProjectId) : null,
         dfmeaId: body.dfmeaId ? String(body.dfmeaId) : null,
-        assignorId: currentUser.id,
+        assignorId: currentUserId,
         assigneeId: assignee.id,
         content: body.content ? String(body.content) : null,
         priority: Number(body.priority) || 2,
