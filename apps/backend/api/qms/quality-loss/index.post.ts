@@ -5,6 +5,7 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { normalizeQualityLossStatus } from '~/utils/quality-loss-status';
+import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -19,9 +20,10 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    if (!body?.type) {
+    const missingFields = getMissingRequiredFields(body, ['type']);
+    if (missingFields.length > 0) {
       setResponseStatus(event, 400);
-      return useResponseError('缺少必填字段: type');
+      return useResponseError(`缺少必填字段: ${missingFields[0]}`);
     }
 
     const lossId = `QL-${new Date().getFullYear()}-${nanoid(6).toUpperCase()}`;

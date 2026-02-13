@@ -3,6 +3,7 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
+import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -25,9 +26,10 @@ export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
     const name = normalizeSupplierName(body.name);
-    if (!name) {
+    const missingFields = getMissingRequiredFields({ name }, ['name']);
+    if (missingFields.length > 0) {
       setResponseStatus(event, 400);
-      return useResponseError('缺少必填字段: name');
+      return useResponseError(`缺少必填字段: ${missingFields[0]}`);
     }
 
     const newSupplier = await prisma.suppliers.create({

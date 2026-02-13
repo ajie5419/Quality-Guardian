@@ -9,6 +9,7 @@ import { buildAfterSalesCreateData } from '~/utils/after-sales-payload';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -23,9 +24,10 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    if (!body?.workOrderNumber) {
+    const missingFields = getMissingRequiredFields(body, ['workOrderNumber']);
+    if (missingFields.length > 0) {
       setResponseStatus(event, 400);
-      return useResponseError('缺少必填字段: workOrderNumber');
+      return useResponseError(`缺少必填字段: ${missingFields[0]}`);
     }
 
     const serialNumber = await getNextAfterSalesSerialNumber();
