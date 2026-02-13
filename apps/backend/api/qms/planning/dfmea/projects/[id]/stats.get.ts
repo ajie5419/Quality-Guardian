@@ -1,13 +1,13 @@
-import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
+import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
-  const projectId = getRouterParam(event, 'id');
-  if (!projectId) {
-    setResponseStatus(event, 400);
-    return useResponseError('id required');
+  const projectId = getRequiredRouterParam(event, 'id', 'id required');
+  if (typeof projectId !== 'string') {
+    return projectId;
   }
 
   try {
