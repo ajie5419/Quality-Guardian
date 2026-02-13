@@ -1,4 +1,4 @@
-import { eventHandler, getRouterParam, readBody } from 'h3';
+import { eventHandler, getRouterParam, readBody, setResponseStatus } from 'h3';
 import { PreferenceService } from '~/services/preference.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -20,11 +20,13 @@ export default eventHandler(async (event) => {
     return lowerRole.includes('admin') || lowerRole.includes('super');
   });
   if (!isAdmin) {
-    return useResponseError('拒绝访问：仅限管理员修改系统设置', 403);
+    setResponseStatus(event, 403);
+    return useResponseError('拒绝访问：仅限管理员修改系统设置');
   }
 
   const key = getRouterParam(event, 'key');
   if (!key) {
+    setResponseStatus(event, 400);
     return useResponseError('Missing key parameter');
   }
 
@@ -60,6 +62,7 @@ export default eventHandler(async (event) => {
     return useResponseSuccess({ message: 'System setting saved' });
   } catch (error) {
     logApiError(`save_system_setting_${key}`, error);
+    setResponseStatus(event, 500);
     return useResponseError('Failed to save system setting');
   }
 });

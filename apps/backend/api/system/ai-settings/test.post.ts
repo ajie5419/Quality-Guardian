@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -7,6 +7,7 @@ export default defineEventHandler(async (event) => {
   const { apiKey, baseUrl, model } = body;
 
   if (!apiKey || !baseUrl) {
+    setResponseStatus(event, 400);
     return useResponseError('API Key 和 Base URL 不能为空');
   }
 
@@ -43,6 +44,7 @@ export default defineEventHandler(async (event) => {
       });
     } else {
       const errorMsg = await response.text();
+      setResponseStatus(event, response.status >= 400 ? response.status : 500);
       return useResponseError(
         `连接失败 (${response.status}): ${errorMsg.slice(0, 100)}`,
       );
@@ -51,10 +53,12 @@ export default defineEventHandler(async (event) => {
     logApiError('test', error);
     const err = error as { message?: string; name?: string };
     if (err.name === 'AbortError') {
+      setResponseStatus(event, 504);
       return useResponseError(
         '连接超时：无法访问该 API 地址，请检查 Base URL 是否正确。',
       );
     }
+    setResponseStatus(event, 500);
     return useResponseError(`连接测试异常: ${err.message}`);
   }
 });

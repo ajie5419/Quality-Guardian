@@ -1,5 +1,6 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { SystemService } from '~/services/system.service';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   unAuthorizedResponse,
@@ -28,6 +29,8 @@ export default defineEventHandler(async (event) => {
         .replaceAll('/', '-'),
     });
   } catch (error) {
+    logApiError('system-monitor', error);
+    setResponseStatus(event, 500);
     return useResponseError(
       `Failed to fetch system monitor data: ${(error as Error).message}`,
     );

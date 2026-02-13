@@ -1,4 +1,4 @@
-import { eventHandler, getRouterParam } from 'h3';
+import { eventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { PreferenceService } from '~/services/preference.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -16,6 +16,7 @@ export default eventHandler(async (event) => {
 
   const key = getRouterParam(event, 'key');
   if (!key) {
+    setResponseStatus(event, 400);
     return useResponseError('Missing key parameter');
   }
 
@@ -34,6 +35,7 @@ export default eventHandler(async (event) => {
     return useResponseSuccess(value);
   } catch (error) {
     logApiError(`get_system_setting_${key}`, error);
+    setResponseStatus(event, 500);
     return useResponseError('Failed to fetch system setting');
   }
 });
