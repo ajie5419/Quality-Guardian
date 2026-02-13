@@ -9,15 +9,18 @@ import {
 import { MOCK_DELAY } from '~/utils/index';
 import { upsertPlanningProjectByWorkOrder } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  badRequestResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
   const body = await readBody(event);
   const workOrderNumber = normalizeBomText(body.workOrderNumber);
   if (!workOrderNumber) {
-    setResponseStatus(event, 400);
-    return useResponseError('缺少必填字段: workOrderNumber');
+    return badRequestResponse(event, '缺少必填字段: workOrderNumber');
   }
 
   try {
@@ -45,8 +48,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (upsertResult.code === 'MISSING_WORK_ORDER') {
-      setResponseStatus(event, 400);
-      return useResponseError('工单不存在');
+      return badRequestResponse(event, '工单不存在');
     }
 
     const bomProject =

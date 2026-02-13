@@ -3,6 +3,7 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -20,8 +21,7 @@ export default defineEventHandler(async (event) => {
     const { items } = body;
 
     if (!items || !Array.isArray(items)) {
-      setResponseStatus(event, 400);
-      return useResponseError('无效的导入数据');
+      return badRequestResponse(event, '无效的导入数据');
     }
 
     const results = {

@@ -4,6 +4,7 @@ import { logApiError } from '~/utils/api-logger';
 import { normalizeIdList } from '~/utils/id-list';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -20,8 +21,7 @@ export default defineEventHandler(async (event) => {
     const ids = normalizeIdList(body.ids);
 
     if (ids.length === 0) {
-      setResponseStatus(event, 400);
-      return useResponseError('Missing or invalid IDs');
+      return badRequestResponse(event, 'Missing or invalid IDs');
     }
 
     const result = await QualityLossService.batchDelete(

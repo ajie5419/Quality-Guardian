@@ -5,6 +5,7 @@ import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -28,8 +29,7 @@ export default defineEventHandler(async (event) => {
     const name = normalizeSupplierName(body.name);
     const missingFields = getMissingRequiredFields({ name }, ['name']);
     if (missingFields.length > 0) {
-      setResponseStatus(event, 400);
-      return useResponseError(`缺少必填字段: ${missingFields[0]}`);
+      return badRequestResponse(event, `缺少必填字段: ${missingFields[0]}`);
     }
 
     const newSupplier = await prisma.suppliers.create({

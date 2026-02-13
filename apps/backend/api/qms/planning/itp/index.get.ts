@@ -3,7 +3,11 @@ import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import { normalizeItpText, parseItpQuantitativeItems } from '~/utils/itp';
 import prisma from '~/utils/prisma';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  badRequestResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
@@ -11,8 +15,7 @@ export default defineEventHandler(async (event) => {
   const projectId = normalizeItpText(query.projectId);
 
   if (!projectId) {
-    setResponseStatus(event, 400);
-    return useResponseError('projectId required');
+    return badRequestResponse(event, 'projectId required');
   }
 
   try {

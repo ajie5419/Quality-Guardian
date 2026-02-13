@@ -10,7 +10,11 @@ import { MOCK_DELAY } from '~/utils/index';
 import { isPrismaForeignKeyError } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  badRequestResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
@@ -21,8 +25,7 @@ export default defineEventHandler(async (event) => {
       'projectName',
     ]);
     if (missingFields.length > 0) {
-      setResponseStatus(event, 400);
-      return useResponseError('缺少必填字段: projectName');
+      return badRequestResponse(event, '缺少必填字段: projectName');
     }
 
     const newProject = await prisma.dfmea_projects.create({

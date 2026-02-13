@@ -9,7 +9,11 @@ import {
 } from '~/utils/itp';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  badRequestResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
@@ -19,8 +23,7 @@ export default defineEventHandler(async (event) => {
 
   const missingFields = getMissingRequiredFields({ projectId }, ['projectId']);
   if (missingFields.length > 0) {
-    setResponseStatus(event, 400);
-    return useResponseError(`${missingFields[0]} is required`);
+    return badRequestResponse(event, `${missingFields[0]} is required`);
   }
 
   try {

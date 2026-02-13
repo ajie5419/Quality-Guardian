@@ -4,6 +4,7 @@ import { normalizeIdList } from '~/utils/id-list';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -20,8 +21,7 @@ export default defineEventHandler(async (event) => {
     const ids = normalizeIdList(body.ids);
 
     if (ids.length === 0) {
-      setResponseStatus(event, 400);
-      return useResponseError('请提供有效的 ID 列表');
+      return badRequestResponse(event, '请提供有效的 ID 列表');
     }
 
     // work_orders 表的主键是 workOrderNumber

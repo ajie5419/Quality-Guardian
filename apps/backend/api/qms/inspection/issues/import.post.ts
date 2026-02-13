@@ -7,6 +7,7 @@ import {
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -21,8 +22,7 @@ export default defineEventHandler(async (event) => {
     const { items } = body;
 
     if (!Array.isArray(items) || items.length === 0) {
-      setResponseStatus(event, 400);
-      return useResponseError('未发现可导入的数据');
+      return badRequestResponse(event, '未发现可导入的数据');
     }
 
     let successCount = 0;

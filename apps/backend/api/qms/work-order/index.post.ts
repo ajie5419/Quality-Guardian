@@ -8,6 +8,7 @@ import {
 } from '~/utils/prisma-error';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -38,8 +39,7 @@ export default defineEventHandler(async (event) => {
       ['workOrderNumber', 'customerName'],
     );
     if (missingFields.length > 0) {
-      setResponseStatus(event, 400);
-      return useResponseError(`缺少必填字段: ${missingFields[0]}`);
+      return badRequestResponse(event, `缺少必填字段: ${missingFields[0]}`);
     }
 
     // Check for duplicate ID
@@ -105,14 +105,19 @@ export default defineEventHandler(async (event) => {
       isPrismaRequiredValueError(error) ||
       errorMessage.includes('Argument')
     ) {
-      setResponseStatus(event, 400);
       // Try to extract the missing argument name if possible, or just give a generic validation error
       // Example msg: "Argument `customerName` is missing."
       const match = errorMessage.match(/Argument `(\w+)` is missing/);
       if (match && match[1]) {
-        return useResponseError(`请求参数错误: 缺少必填字段 ${match[1]}`);
+        return badRequestResponse(
+          event,
+          `请求参数错误: 缺少必填字段 ${match[1]}`,
+        );
       }
-      return useResponseError('请求参数错误: 数据格式不正确或缺少必填字段');
+      return badRequestResponse(
+        event,
+        '请求参数错误: 数据格式不正确或缺少必填字段',
+      );
     }
 
     setResponseStatus(event, 500);

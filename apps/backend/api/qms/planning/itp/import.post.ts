@@ -10,7 +10,11 @@ import {
   getMissingRequiredFields,
   parseNonEmptyArray,
 } from '~/utils/request-validation';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  badRequestResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
@@ -24,8 +28,7 @@ export default defineEventHandler(async (event) => {
     'items',
   ]);
   if (missingFields.length > 0) {
-    setResponseStatus(event, 400);
-    return useResponseError('参数错误：需要 projectId 和 items 数组');
+    return badRequestResponse(event, '参数错误：需要 projectId 和 items 数组');
   }
 
   try {

@@ -1,7 +1,11 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  badRequestResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 const DEFAULT_INSPECTION_CATEGORY = 'PROCESS';
 const INSPECTION_CATEGORIES = new Set(['INCOMING', 'PROCESS', 'SHIPMENT']);
@@ -21,8 +25,7 @@ export default defineEventHandler(async (event) => {
     const { items, category } = body;
 
     if (!Array.isArray(items) || items.length === 0) {
-      setResponseStatus(event, 400);
-      return useResponseError('未发现可导入的数据');
+      return badRequestResponse(event, '未发现可导入的数据');
     }
 
     const normalizedCategory = normalizeInspectionCategory(category);

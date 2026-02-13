@@ -8,6 +8,7 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -22,8 +23,7 @@ export default defineEventHandler(async (event) => {
     const { items } = body;
 
     if (!Array.isArray(items) || items.length === 0) {
-      setResponseStatus(event, 400);
-      return useResponseError('未选择数据');
+      return badRequestResponse(event, '未选择数据');
     }
 
     let successCount = 0;

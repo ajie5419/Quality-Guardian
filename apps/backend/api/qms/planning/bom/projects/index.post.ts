@@ -6,6 +6,7 @@ import { upsertPlanningProjectByWorkOrder } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -23,8 +24,7 @@ export default defineEventHandler(async (event) => {
       'workOrderNumber',
     ]);
     if (missingFields.length > 0) {
-      setResponseStatus(event, 400);
-      return useResponseError('工单号不能为空');
+      return badRequestResponse(event, '工单号不能为空');
     }
 
     const upsertResult = await upsertPlanningProjectByWorkOrder({
@@ -50,8 +50,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (upsertResult.code === 'MISSING_WORK_ORDER') {
-      setResponseStatus(event, 400);
-      return useResponseError('工单不存在');
+      return badRequestResponse(event, '工单不存在');
     }
     if (upsertResult.code === 'CONFLICT') {
       setResponseStatus(event, 409);

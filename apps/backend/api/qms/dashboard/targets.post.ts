@@ -3,6 +3,7 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -16,15 +17,14 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event);
 
     if (!body || typeof body !== 'object') {
-      setResponseStatus(event, 400);
-      return useResponseError('Invalid request body');
+      return badRequestResponse(event, 'Invalid request body');
     }
 
     // Basic validation
     for (const [key, value] of Object.entries(body)) {
       if (typeof value !== 'number' || value < 0 || value > 100) {
-        setResponseStatus(event, 400);
-        return useResponseError(
+        return badRequestResponse(
+          event,
           `Invalid value for ${key}: ${value}. Must be between 0 and 100.`,
         );
       }

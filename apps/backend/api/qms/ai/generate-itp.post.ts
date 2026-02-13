@@ -6,7 +6,11 @@ import { nanoid } from 'nanoid';
 import { callAi, extractJson } from '~/utils/ai';
 import { logApiError } from '~/utils/api-logger';
 import { UPLOAD_DIR } from '~/utils/paths';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  badRequestResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
@@ -54,8 +58,7 @@ export default defineEventHandler(async (event) => {
 
   const userMessage = `输入内容：\n---\n${extractedText || userPrompt}\n---`;
   if (!extractedText && !userPrompt) {
-    setResponseStatus(event, 400);
-    return useResponseError('缺少可解析内容');
+    return badRequestResponse(event, '缺少可解析内容');
   }
 
   try {

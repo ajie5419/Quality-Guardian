@@ -7,6 +7,7 @@ import prisma from '~/utils/prisma';
 import { normalizeQualityLossStatus } from '~/utils/quality-loss-status';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -22,8 +23,7 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event);
     const missingFields = getMissingRequiredFields(body, ['type']);
     if (missingFields.length > 0) {
-      setResponseStatus(event, 400);
-      return useResponseError(`缺少必填字段: ${missingFields[0]}`);
+      return badRequestResponse(event, `缺少必填字段: ${missingFields[0]}`);
     }
 
     const lossId = `QL-${new Date().getFullYear()}-${nanoid(6).toUpperCase()}`;
