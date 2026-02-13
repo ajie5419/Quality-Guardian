@@ -6,6 +6,7 @@ import {
   upsertPlanningProjectByWorkOrder,
 } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
+import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -22,7 +23,10 @@ export default defineEventHandler(async (event) => {
       body.workOrderNumber,
     );
 
-    if (!workOrderNumber) {
+    const missingFields = getMissingRequiredFields({ workOrderNumber }, [
+      'workOrderNumber',
+    ]);
+    if (missingFields.length > 0) {
       setResponseStatus(event, 400);
       return useResponseError('工单号不能为空');
     }
