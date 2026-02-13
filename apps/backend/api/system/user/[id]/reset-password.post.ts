@@ -10,6 +10,7 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
+import { getDefaultResetPassword } from '~/utils/user-security';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -23,9 +24,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // Hash the default password
-    const defaultPassword = '123456';
-    const hashedPassword = await bcrypt.hash(defaultPassword, 12);
+    const hashedPassword = await bcrypt.hash(getDefaultResetPassword(), 12);
 
     await prisma.users.update({
       where: { id },

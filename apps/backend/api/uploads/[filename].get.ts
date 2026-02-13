@@ -1,10 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { extname, relative, resolve } from 'node:path';
 
-import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { UPLOAD_DIR } from '~/utils/paths';
 import { useResponseError } from '~/utils/response';
+import { getRequiredRouterParam } from '~/utils/route-param';
 
 // MIME types mapping
 const MIME_TYPES: Record<string, string> = {
@@ -18,11 +19,13 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 export default defineEventHandler((event) => {
-  const filename = getRouterParam(event, 'filename');
-
-  if (!filename) {
-    setResponseStatus(event, 400);
-    return useResponseError('Filename is required');
+  const filename = getRequiredRouterParam(
+    event,
+    'filename',
+    'Filename is required',
+  );
+  if (typeof filename !== 'string') {
+    return filename;
   }
 
   const filePath = resolve(UPLOAD_DIR, filename);
@@ -55,6 +58,6 @@ export default defineEventHandler((event) => {
   } catch (error) {
     logApiError('uploads', error);
     setResponseStatus(event, 500);
-    return useResponseError('Internal Server Error');
+    return useResponseError('读取文件失败');
   }
 });

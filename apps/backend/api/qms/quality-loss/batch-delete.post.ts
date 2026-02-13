@@ -32,6 +32,6 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     logApiError('quality-loss-batch-delete', error);
     setResponseStatus(event, 500);
-    return useResponseError('Internal Server Error');
+    return useResponseError('批量删除质量损失记录失败');
   }
 });

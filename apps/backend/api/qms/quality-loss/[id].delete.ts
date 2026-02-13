@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
     const errorCode = (error as { code?: string }).code;
     setResponseStatus(event, errorCode === 'NOT_FOUND' ? 404 : 500);
     return useResponseError(
-      errorCode === 'NOT_FOUND' ? '记录不存在' : 'Internal Server Error',
+      errorCode === 'NOT_FOUND' ? '记录不存在' : '删除质量损失记录失败',
     );
   }
 });
