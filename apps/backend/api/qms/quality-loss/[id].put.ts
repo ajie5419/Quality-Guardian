@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -12,8 +12,8 @@ import {
   toQualityRecordStatus,
 } from '~/utils/quality-loss-status';
 import {
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -114,7 +114,9 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     logApiError('quality-loss', error);
     const err = error as { message?: string };
-    setResponseStatus(event, 500);
-    return useResponseError(`数据更新失败：${err.message || '数据库操作异常'}`);
+    return internalServerErrorResponse(
+      event,
+      `数据更新失败：${err.message || '数据库操作异常'}`,
+    );
   }
 });

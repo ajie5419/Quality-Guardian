@@ -1,5 +1,5 @@
 import { QMS_DEFAULT_VALUES } from '@qgs/shared';
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
 import {
   createAfterSalesId,
@@ -12,8 +12,8 @@ import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -53,7 +53,6 @@ export default defineEventHandler(async (event) => {
     logApiError('after-sales-create', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    setResponseStatus(event, 500);
-    return useResponseError(`创建售后记录失败: ${errorMessage}`);
+    return internalServerErrorResponse(event, `创建售后记录失败: ${errorMessage}`);
   }
 });

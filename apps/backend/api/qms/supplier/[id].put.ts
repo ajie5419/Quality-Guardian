@@ -7,6 +7,8 @@ import {
   isPrismaUniqueConstraintError,
 } from '~/utils/prisma-error';
 import {
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -56,14 +58,12 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     logApiError('supplier', error);
     if (isPrismaNotFoundError(error)) {
-      setResponseStatus(event, 404);
-      return useResponseError('供应商不存在');
+      return notFoundResponse(event, '供应商不存在');
     }
     if (isPrismaUniqueConstraintError(error)) {
       setResponseStatus(event, 409);
       return useResponseError('供应商名称已存在');
     }
-    setResponseStatus(event, 500);
-    return useResponseError('更新供应商失败');
+    return internalServerErrorResponse(event, '更新供应商失败');
   }
 });

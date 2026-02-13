@@ -1,11 +1,12 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { parseNonEmptyArray } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import {
@@ -19,9 +20,10 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    const { items, category } = body;
+    const items = parseNonEmptyArray<Record<string, unknown>>(body.items);
+    const { category } = body;
 
-    if (!Array.isArray(items) || items.length === 0) {
+    if (!items) {
       return badRequestResponse(event, '未选择数据');
     }
 
@@ -44,7 +46,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess({ successCount, totalCount: items.length });
   } catch (error: unknown) {
     logApiError('import', error);
-    setResponseStatus(event, 500);
-    return useResponseError('导入异常');
+    return internalServerErrorResponse(event, '导入异常');
   }
 });

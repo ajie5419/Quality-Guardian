@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {
   buildInspectionIssueUpsertPayload,
@@ -6,10 +6,11 @@ import {
 } from '~/utils/inspection-issue';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { parseNonEmptyArray } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -19,9 +20,9 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    const { items } = body;
+    const items = parseNonEmptyArray<Record<string, unknown>>(body.items);
 
-    if (!Array.isArray(items) || items.length === 0) {
+    if (!items) {
       return badRequestResponse(event, '未发现可导入的数据');
     }
 
@@ -43,7 +44,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess({ successCount, totalCount: items.length });
   } catch (error: unknown) {
     logApiError('import', error);
-    setResponseStatus(event, 500);
-    return useResponseError('数据解析失败');
+    return internalServerErrorResponse(event, '数据解析失败');
   }
 });

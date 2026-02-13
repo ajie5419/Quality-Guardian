@@ -1,10 +1,10 @@
-import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
 import { WorkOrderService } from '~/services/work-order.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -48,7 +48,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('work-order', error);
-    setResponseStatus(event, 500);
-    return useResponseError('Failed to fetch work order list');
+    return internalServerErrorResponse(event, 'Failed to fetch work order list');
   }
 });

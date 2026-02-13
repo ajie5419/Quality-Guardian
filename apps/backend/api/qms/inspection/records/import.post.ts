@@ -1,30 +1,33 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
+import { parseNonEmptyArray } from '~/utils/request-validation';
 import {
   badRequestResponse,
-  useResponseError,
+  internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 const DEFAULT_INSPECTION_CATEGORY = 'PROCESS';
 const INSPECTION_CATEGORIES = new Set(['INCOMING', 'PROCESS', 'SHIPMENT']);
+type InspectionCategory = 'INCOMING' | 'PROCESS' | 'SHIPMENT';
 
-function normalizeInspectionCategory(value: unknown): string {
+function normalizeInspectionCategory(value: unknown): InspectionCategory {
   const normalized = String(value ?? '')
     .trim()
     .toUpperCase();
   return INSPECTION_CATEGORIES.has(normalized)
-    ? normalized
+    ? (normalized as InspectionCategory)
     : DEFAULT_INSPECTION_CATEGORY;
 }
 
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
-    const { items, category } = body;
+    const items = parseNonEmptyArray<Record<string, unknown>>(body.items);
+    const { category } = body;
 
-    if (!Array.isArray(items) || items.length === 0) {
+    if (!items) {
       return badRequestResponse(event, '未发现可导入的数据');
     }
 
@@ -32,12 +35,11 @@ export default defineEventHandler(async (event) => {
     let successCount = 0;
     for (const item of items) {
       try {
-        await InspectionService.create({
+        const payload = {
           ...item,
-          category: normalizeInspectionCategory(
-            item.category ?? normalizedCategory,
-          ),
-        });
+          category: normalizeInspectionCategory(item.category ?? normalizedCategory),
+        } as Parameters<typeof InspectionService.create>[0];
+        await InspectionService.create(payload);
         successCount++;
       } catch (error) {
         logApiError('records-import-item', error);
@@ -47,7 +49,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess({ successCount, totalCount: items.length });
   } catch (error: unknown) {
     logApiError('records-import', error);
-    setResponseStatus(event, 500);
-    return useResponseError('数据解析失败');
+    return internalServerErrorResponse(event, '数据解析失败');
   }
 });

@@ -1,12 +1,13 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import { getRequiredQueryParam } from '~/utils/query-param';
 import {
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import {
@@ -71,10 +72,8 @@ export default defineEventHandler(async (event) => {
       error instanceof Error ? error.message : 'Unknown error';
     // Check for "Record to update not found"
     if (isPrismaNotFoundError(error)) {
-      setResponseStatus(event, 404);
-      return useResponseError(`工单不存在: ${id}`);
+      return notFoundResponse(event, `工单不存在: ${id}`);
     }
-    setResponseStatus(event, 500);
-    return useResponseError(`更新工单失败: ${errorMessage}`);
+    return internalServerErrorResponse(event, `更新工单失败: ${errorMessage}`);
   }
 });

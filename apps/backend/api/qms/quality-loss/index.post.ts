@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { nanoid } from 'nanoid';
 import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
@@ -8,8 +8,8 @@ import { normalizeQualityLossStatus } from '~/utils/quality-loss-status';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -58,7 +58,6 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('quality-loss', error);
-    setResponseStatus(event, 500);
-    return useResponseError('创建质量损失记录失败');
+    return internalServerErrorResponse(event, '创建质量损失记录失败');
   }
 });

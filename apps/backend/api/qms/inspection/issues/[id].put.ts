@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import {
@@ -10,8 +10,9 @@ import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   forbiddenResponse,
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -36,8 +37,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!existingRecord) {
-      setResponseStatus(event, 404);
-      return useResponseError('记录不存在');
+      return notFoundResponse(event, '记录不存在');
     }
 
     existingNcNumber = existingRecord.nonConformanceNumber;
@@ -50,8 +50,7 @@ export default defineEventHandler(async (event) => {
     }
   } catch (error) {
     logApiError('issues', error);
-    setResponseStatus(event, 500);
-    return useResponseError('权限校验失败');
+    return internalServerErrorResponse(event, '权限校验失败');
   }
 
   try {
@@ -78,7 +77,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('issues', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError('更新问题失败');
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, '记录不存在');
+    }
+    return internalServerErrorResponse(event, '更新问题失败');
   }
 });

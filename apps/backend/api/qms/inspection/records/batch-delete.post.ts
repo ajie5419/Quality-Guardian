@@ -1,10 +1,10 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { normalizeIdList } from '~/utils/id-list';
 import {
   badRequestResponse,
-  useResponseError,
+  internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -20,7 +20,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess({ successCount: result.count });
   } catch (error: unknown) {
     logApiError('inspection-batch-delete', error);
-    setResponseStatus(event, 500);
-    return useResponseError('Failed to batch delete inspection records');
+    return internalServerErrorResponse(
+      event,
+      'Failed to batch delete inspection records',
+    );
   }
 });

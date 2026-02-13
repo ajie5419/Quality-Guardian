@@ -1,10 +1,10 @@
-import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
 import { AfterSalesService } from '~/services/after-sales.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -24,7 +24,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(stats);
   } catch (error) {
     logApiError('after-sales-stats', error);
-    setResponseStatus(event, 500);
-    return useResponseError('Failed to fetch after-sales stats');
+    return internalServerErrorResponse(event, 'Failed to fetch after-sales stats');
   }
 });

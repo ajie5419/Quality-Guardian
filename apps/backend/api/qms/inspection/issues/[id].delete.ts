@@ -1,4 +1,4 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { hasInspectionIssueAdminAccess } from '~/utils/inspection-issue';
@@ -6,8 +6,9 @@ import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
   forbiddenResponse,
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -31,8 +32,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!existingRecord) {
-      setResponseStatus(event, 404);
-      return useResponseError('记录不存在');
+      return notFoundResponse(event, '记录不存在');
     }
 
     const isAdmin = hasInspectionIssueAdminAccess(userinfo.roles);
@@ -43,8 +43,7 @@ export default defineEventHandler(async (event) => {
     }
   } catch (error: unknown) {
     logApiError('issues', error);
-    setResponseStatus(event, 500);
-    return useResponseError('权限校验失败');
+    return internalServerErrorResponse(event, '权限校验失败');
   }
 
   try {
@@ -52,7 +51,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('issues', error);
-    setResponseStatus(event, 500);
-    return useResponseError('删除问题失败');
+    return internalServerErrorResponse(event, '删除问题失败');
   }
 });

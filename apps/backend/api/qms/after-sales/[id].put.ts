@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
 import { buildAfterSalesUpdateData } from '~/utils/after-sales-payload';
 import { logApiError } from '~/utils/api-logger';
@@ -6,8 +6,9 @@ import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -35,8 +36,7 @@ export default defineEventHandler(async (event) => {
         select: { laborTravelCost: true, materialCost: true },
       });
       if (!current) {
-        setResponseStatus(event, 404);
-        return useResponseError('售后记录不存在');
+        return notFoundResponse(event, '售后记录不存在');
       }
 
       const materialCost = Number(
@@ -64,9 +64,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('after-sales', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(
-      isPrismaNotFoundError(error) ? '售后记录不存在' : '更新售后记录失败',
-    );
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, '售后记录不存在');
+    }
+    return internalServerErrorResponse(event, '更新售后记录失败');
   }
 });

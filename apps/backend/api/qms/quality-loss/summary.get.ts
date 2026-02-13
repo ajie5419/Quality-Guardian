@@ -1,10 +1,10 @@
-import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
 import { QualityLossService } from '~/services/quality-loss.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -26,7 +26,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('summary', error);
-    setResponseStatus(event, 500);
-    return useResponseError('Failed to fetch quality loss summary');
+    return internalServerErrorResponse(
+      event,
+      'Failed to fetch quality loss summary',
+    );
   }
 });

@@ -1,7 +1,10 @@
-import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
 import { SupplierService } from '~/services/supplier.service';
 import { logApiError } from '~/utils/api-logger';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  internalServerErrorResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 import { parseSupplierListQuery } from '~/utils/supplier';
 
 export default defineEventHandler(async (event) => {
@@ -12,7 +15,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error: unknown) {
     logApiError('supplier', error);
-    setResponseStatus(event, 500);
-    return useResponseError('Failed to fetch suppliers');
+    return internalServerErrorResponse(event, 'Failed to fetch suppliers');
   }
 });

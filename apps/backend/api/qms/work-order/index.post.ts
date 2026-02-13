@@ -9,6 +9,7 @@ import {
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -120,7 +121,6 @@ export default defineEventHandler(async (event) => {
       );
     }
 
-    setResponseStatus(event, 500);
-    return useResponseError(`创建工单失败: ${errorMessage}`);
+    return internalServerErrorResponse(event, `创建工单失败: ${errorMessage}`);
   }
 });

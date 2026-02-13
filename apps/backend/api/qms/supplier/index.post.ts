@@ -6,6 +6,7 @@ import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -60,7 +61,6 @@ export default defineEventHandler(async (event) => {
       setResponseStatus(event, 409);
       return useResponseError('供应商名称已存在');
     }
-    setResponseStatus(event, 500);
-    return useResponseError('创建供应商失败');
+    return internalServerErrorResponse(event, '创建供应商失败');
   }
 });

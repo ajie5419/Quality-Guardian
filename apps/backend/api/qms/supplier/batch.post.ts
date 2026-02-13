@@ -1,11 +1,12 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { parseNonEmptyArray } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { buildSupplierUpsertPayload } from '~/utils/supplier';
@@ -18,9 +19,9 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    const { items } = body;
+    const items = parseNonEmptyArray<Record<string, unknown>>(body.items);
 
-    if (!items || !Array.isArray(items)) {
+    if (!items) {
       return badRequestResponse(event, '无效的导入数据');
     }
 
@@ -57,7 +58,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(results);
   } catch (error) {
     logApiError('batch', error);
-    setResponseStatus(event, 500);
-    return useResponseError('批量导入失败');
+    return internalServerErrorResponse(event, '批量导入失败');
   }
 });
