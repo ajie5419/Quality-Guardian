@@ -9,6 +9,8 @@ const ITP_PLAN_STATUS_VALUES = new Set<quality_plans_planStatus>([
   'DRAFT',
   'IN_REVIEW',
 ]);
+const DEFAULT_ITP_CUSTOMER = 'Default Customer';
+const DEFAULT_ITP_PREPARED_BY = 'admin';
 const DEFAULT_ITP_PROJECT_VERSION = 'V1.0';
 
 export function normalizeItpText(value: unknown): string | undefined {
@@ -67,6 +69,23 @@ export function buildItpProjectUpdateData(body: Record<string, unknown>) {
   }
 
   return updateData;
+}
+
+export function buildItpProjectCreateData(
+  body: Record<string, unknown>,
+  options?: { preparedBy?: string },
+) {
+  return {
+    customer: normalizeItpText(body.customerName) || DEFAULT_ITP_CUSTOMER,
+    id: createItpProjectId(),
+    itpItems: '[]',
+    planStatus: normalizeItpPlanStatus(body.status),
+    preparedBy: options?.preparedBy || DEFAULT_ITP_PREPARED_BY,
+    projectName: normalizeItpText(body.projectName) || '',
+    updatedAt: new Date(),
+    version: 1,
+    workOrderNumber: normalizeItpText(body.workOrderId) || '',
+  };
 }
 
 export function parseItpQuantitativeItems(value: unknown): unknown[] {

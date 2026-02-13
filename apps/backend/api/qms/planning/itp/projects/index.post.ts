@@ -1,11 +1,8 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
-import {
-  createItpProjectId,
-  normalizeItpPlanStatus,
-  normalizeItpText,
-} from '~/utils/itp';
+import { buildItpProjectCreateData, normalizeItpText } from '~/utils/itp';
+import { isPrismaForeignKeyError } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -20,17 +17,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const newProject = await prisma.quality_plans.create({
-      data: {
-        id: createItpProjectId(),
-        projectName,
-        workOrderNumber: normalizeItpText(body.workOrderId) || '',
-        customer: normalizeItpText(body.customerName) || 'Default Customer',
-        version: 1,
-        planStatus: normalizeItpPlanStatus(body.status),
-        preparedBy: 'admin',
-        updatedAt: new Date(),
-        itpItems: '[]',
-      },
+      data: buildItpProjectCreateData(body as Record<string, unknown>),
     });
 
     return useResponseSuccess({
@@ -40,10 +27,9 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error: unknown) {
     logApiError('itp-project-create', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2003' ? 400 : 500);
+    setResponseStatus(event, isPrismaForeignKeyError(error) ? 400 : 500);
     return useResponseError(
-      errorCode === 'P2003' ? '关联工单不存在' : '创建 ITP 项目失败',
+      isPrismaForeignKeyError(error) ? '关联工单不存在' : '创建 ITP 项目失败',
     );
   }
 });
