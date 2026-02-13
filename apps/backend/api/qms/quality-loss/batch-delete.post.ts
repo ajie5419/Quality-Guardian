@@ -1,7 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { QualityLossService } from '~/services/quality-loss.service';
 import { logApiError } from '~/utils/api-logger';
-import { normalizeIdList } from '~/utils/id-list';
+import { parseNonEmptyIdList } from '~/utils/id-list';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,
@@ -18,9 +18,9 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = (await readBody(event)) as { ids?: unknown };
-    const ids = normalizeIdList(body.ids);
+    const ids = parseNonEmptyIdList(body.ids);
 
-    if (ids.length === 0) {
+    if (!ids) {
       return badRequestResponse(event, 'Missing or invalid IDs');
     }
 

@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery } from 'h3';
 import { QualityLossService } from '~/services/quality-loss.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { parseQualityLossListQuery } from '~/utils/quality-loss-query';
 import {
   internalServerErrorResponse,
   unAuthorizedResponse,
@@ -14,20 +15,17 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const query = getQuery(event);
-  const params = {
-    page: query.page ? Number(query.page) : undefined,
-    pageSize: query.pageSize ? Number(query.pageSize) : undefined,
-    lossSource: query.lossSource as string,
-    status: query.status as string,
-    workOrderNumber: query.workOrderNumber as string,
-  };
+  const query = getQuery(event) as Record<string, unknown>;
+  const params = parseQualityLossListQuery(query);
 
   try {
     const result = await QualityLossService.getAllLosses(params);
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('quality-loss', error);
-    return internalServerErrorResponse(event, 'Failed to fetch quality loss list');
+    return internalServerErrorResponse(
+      event,
+      'Failed to fetch quality loss list',
+    );
   }
 });

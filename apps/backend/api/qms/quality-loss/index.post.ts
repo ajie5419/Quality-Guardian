@@ -1,10 +1,13 @@
 import { defineEventHandler, readBody } from 'h3';
-import { nanoid } from 'nanoid';
 import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { normalizeQualityLossStatus } from '~/utils/quality-loss-status';
+import {
+  buildQualityLossCreateData,
+  buildQualityLossCreateResponse,
+  createQualityLossId,
+} from '~/utils/quality-loss-payload';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
@@ -26,20 +29,10 @@ export default defineEventHandler(async (event) => {
       return badRequestResponse(event, `缺少必填字段: ${missingFields[0]}`);
     }
 
-    const lossId = `QL-${new Date().getFullYear()}-${nanoid(6).toUpperCase()}`;
+    const lossId = createQualityLossId();
 
     const newItem = await prisma.quality_losses.create({
-      data: {
-        lossId,
-        occurDate: new Date(body.date || Date.now()),
-        type: body.type,
-        amount: Number(body.amount) || 0,
-        actualClaim: Number(body.actualClaim) || 0,
-        description: body.description,
-        respDept: body.responsibleDepartment,
-        status: normalizeQualityLossStatus(body.status || 'Pending'),
-        isDeleted: false,
-      },
+      data: buildQualityLossCreateData(body as Record<string, unknown>, lossId),
     });
 
     await SystemLogService.recordAuditLog({
@@ -50,12 +43,7 @@ export default defineEventHandler(async (event) => {
       details: `新增质量损失记录: ${newItem.type} (${newItem.amount})`,
     });
 
-    return useResponseSuccess({
-      ...newItem,
-      id: newItem.lossId,
-      date: newItem.occurDate.toISOString().split('T')[0],
-      responsibleDepartment: newItem.respDept,
-    });
+    return useResponseSuccess(buildQualityLossCreateResponse(newItem));
   } catch (error) {
     logApiError('quality-loss', error);
     return internalServerErrorResponse(event, '创建质量损失记录失败');

@@ -1,12 +1,13 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
-import { nanoid } from 'nanoid';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildKnowledgeCreateData } from '~/utils/knowledge';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
+  conflictResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -36,30 +37,24 @@ export default defineEventHandler(async (event) => {
 
     // 2. Create Knowledge Item
     const newItem = await prisma.knowledge_base.create({
-      data: {
-        docId: `KB-${nanoid(6).toUpperCase()}`,
-        title: body.title || '未命名案例',
-        categoryId: targetCategoryId,
-        author:
-          body.author || userinfo.realName || userinfo.username || 'System',
-        summary: body.summary || '',
-        content: body.content || '',
-        publishDate: new Date(),
-        tags: Array.isArray(body.tags) ? body.tags.join(',') : body.tags || '',
-        attachment:
-          typeof body.attachments === 'string'
-            ? body.attachments
-            : JSON.stringify(body.attachments || []),
-        status: body.status || 'Published',
-        version: body.version || 'V1.0',
-      },
+      data: buildKnowledgeCreateData(
+        body as Record<string, unknown>,
+        String(targetCategoryId),
+        {
+          realName: userinfo.realName,
+          username: userinfo.username,
+        },
+      ),
     });
 
     return useResponseSuccess(newItem);
   } catch (error) {
     logApiError('knowledge', error);
-    setResponseStatus(event, isPrismaUniqueConstraintError(error) ? 409 : 500);
-    return useResponseError(
+    if (isPrismaUniqueConstraintError(error)) {
+      return conflictResponse(event, '沉淀失败: 文档编号已存在');
+    }
+    return internalServerErrorResponse(
+      event,
       `沉淀失败: ${error instanceof Error ? error.message : '未知错误'}`,
     );
   }

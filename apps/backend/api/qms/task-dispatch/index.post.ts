@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -6,12 +6,16 @@ import { isPrismaForeignKeyError } from '~/utils/prisma-error';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import {
+  buildTaskDispatchCreateData,
+  resolveTaskDispatchAssigneeCandidates,
   resolveTaskDispatchCurrentUserId,
+  resolveTaskDispatchItpProjectIdForValidation,
+  resolveTaskDispatchParentIdForPromotion,
   TASK_DISPATCH_STATUS,
 } from '~/utils/task-dispatch';
 
@@ -55,11 +59,18 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const assigneeCandidates = resolveTaskDispatchAssigneeCandidates(
+      body.assigneeId,
+    );
+    if (!assigneeCandidates) {
+      return badRequestResponse(event, '受派人不存在');
+    }
+
     const assignee = await prisma.users.findFirst({
       where: {
         OR: [
-          { id: String(body.assigneeId) },
-          { username: String(body.assigneeId) },
+          { id: assigneeCandidates.id },
+          { username: assigneeCandidates.username },
         ],
       },
       select: { id: true },
@@ -69,42 +80,34 @@ export default defineEventHandler(async (event) => {
     }
 
     // 校验关联的 ITP 项目是否存在 (真实数据库外键约束预检)
-    if (body.type === 'ITP_INSPECTION' && body.itpProjectId) {
+    const itpProjectId = resolveTaskDispatchItpProjectIdForValidation(body);
+    if (itpProjectId) {
       const project = await prisma.quality_plans.findUnique({
-        where: { id: String(body.itpProjectId) },
+        where: { id: itpProjectId },
       });
       if (!project) {
         logApiError('task-dispatch', new Error('Project not found'), {
-          itpProjectId: body.itpProjectId,
+          itpProjectId,
         });
         return badRequestResponse(
           event,
-          `关联的 ITP 计划 (ID: ${body.itpProjectId}) 不存在，请刷新后重试`,
+          `关联的 ITP 计划 (ID: ${itpProjectId}) 不存在，请刷新后重试`,
         );
       }
     }
 
     const newTask = await prisma.qms_task_dispatches.create({
-      data: {
-        type: String(body.type),
-        title: String(body.title),
-        level: Number(body.level) || 1,
-        parentId: body.parentId ? String(body.parentId) : null,
-        itpProjectId: body.itpProjectId ? String(body.itpProjectId) : null,
-        dfmeaId: body.dfmeaId ? String(body.dfmeaId) : null,
-        assignorId: currentUserId,
+      data: buildTaskDispatchCreateData(body, {
         assigneeId: assignee.id,
-        content: body.content ? String(body.content) : null,
-        priority: Number(body.priority) || 2,
-        dueDate: body.deadline ? new Date(body.deadline) : null,
-        updatedAt: new Date(),
-      },
+        assignorId: currentUserId,
+      }),
     });
 
     // 如果是二级指派，更新父任务状态
-    if (body.level === 2 && body.parentId) {
+    const parentIdForPromotion = resolveTaskDispatchParentIdForPromotion(body);
+    if (parentIdForPromotion) {
       await prisma.qms_task_dispatches.update({
-        where: { id: String(body.parentId) },
+        where: { id: parentIdForPromotion },
         data: { status: TASK_DISPATCH_STATUS.DISPATCHED },
       });
     }
@@ -113,7 +116,15 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     logApiError('task-dispatch', error);
     const err = error as { code?: string; message?: string };
-    setResponseStatus(event, isPrismaForeignKeyError(error) ? 400 : 500);
-    return useResponseError(`派发失败: ${err.message || '数据库写入异常'}`);
+    if (isPrismaForeignKeyError(error)) {
+      return badRequestResponse(
+        event,
+        `派发失败: ${err.message || '外键约束异常'}`,
+      );
+    }
+    return internalServerErrorResponse(
+      event,
+      `派发失败: ${err.message || '数据库写入异常'}`,
+    );
   }
 });

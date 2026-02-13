@@ -61,6 +61,15 @@ export function forbiddenResponse(
   return useResponseError(message, message);
 }
 
+export function conflictResponse(
+  event: H3Event<EventHandlerRequest>,
+  message: string,
+  error: unknown = null,
+) {
+  setResponseStatus(event, 409);
+  return useResponseError(message, error);
+}
+
 export function notFoundResponse(
   event: H3Event<EventHandlerRequest>,
   message: string,

@@ -1,11 +1,12 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -31,9 +32,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('categories', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(
-      isPrismaNotFoundError(error) ? '分类不存在' : '删除分类失败',
-    );
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, '分类不存在');
+    }
+    return internalServerErrorResponse(event, '删除分类失败');
   }
 });
