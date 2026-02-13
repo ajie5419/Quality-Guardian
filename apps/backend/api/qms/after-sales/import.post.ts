@@ -59,7 +59,8 @@ export default defineEventHandler(async (event) => {
     }
 
     return useResponseSuccess({ successCount, totalCount: items.length });
-  } catch {
+  } catch (error: unknown) {
+    logApiError('after-sales-import', error);
     setResponseStatus(event, 500);
     return useResponseError('导入异常');
   }

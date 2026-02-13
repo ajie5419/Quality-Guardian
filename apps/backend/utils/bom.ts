@@ -1,5 +1,8 @@
 import { nanoid } from 'nanoid';
 
+const DEFAULT_BOM_PART_NAME = '未命名部件';
+const DEFAULT_BOM_UNIT = 'PCS';
+
 export function createBomItemId(): string {
   return `BOM-${nanoid(6).toUpperCase()}`;
 }
@@ -24,6 +27,38 @@ export function parseBomQuantity(value: unknown, defaultValue = 1): number {
 export function normalizeBomText(value: unknown): string | undefined {
   const normalized = String(value ?? '').trim();
   return normalized || undefined;
+}
+
+interface ProjectBomInput {
+  material?: unknown;
+  partName?: unknown;
+  partNumber?: unknown;
+  quantity?: unknown;
+  remarks?: unknown;
+  unit?: unknown;
+}
+
+export function buildProjectBomMutableData(item: ProjectBomInput) {
+  return {
+    material: normalizeBomText(item.material) || null,
+    part_name: normalizeBomText(item.partName) || DEFAULT_BOM_PART_NAME,
+    part_number: normalizeBomText(item.partNumber) || null,
+    quantity: parseBomQuantity(item.quantity, 1),
+    remarks: normalizeBomText(item.remarks) || null,
+    unit: normalizeBomText(item.unit) || DEFAULT_BOM_UNIT,
+    updated_at: new Date(),
+  };
+}
+
+export function buildProjectBomCreateData(
+  workOrderNumber: string,
+  item: ProjectBomInput,
+) {
+  return {
+    id: createBomItemId(),
+    work_order_number: workOrderNumber,
+    ...buildProjectBomMutableData(item),
+  };
 }
 
 export function mapProjectBomItem(item: {

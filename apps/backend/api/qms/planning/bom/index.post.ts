@@ -1,11 +1,10 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {
-  createBomItemId,
+  buildProjectBomCreateData,
   createBomProjectId,
   mapProjectBomItem,
   normalizeBomText,
-  parseBomQuantity,
 } from '~/utils/bom';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
@@ -51,17 +50,7 @@ export default defineEventHandler(async (event) => {
 
     // 创建 BOM 物料明细
     const newItem = await prisma.project_boms.create({
-      data: {
-        id: createBomItemId(),
-        work_order_number: workOrderNumber,
-        part_name: normalizeBomText(body.partName) || '未命名部件',
-        part_number: normalizeBomText(body.partNumber) || null,
-        material: normalizeBomText(body.material) || null,
-        quantity: parseBomQuantity(body.quantity, 1),
-        unit: normalizeBomText(body.unit) || 'PCS',
-        remarks: normalizeBomText(body.remarks) || null,
-        updated_at: new Date(),
-      },
+      data: buildProjectBomCreateData(workOrderNumber, body),
     });
 
     return useResponseSuccess({

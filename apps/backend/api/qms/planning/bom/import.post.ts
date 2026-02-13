@@ -1,10 +1,6 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import {
-  createBomItemId,
-  normalizeBomText,
-  parseBomQuantity,
-} from '~/utils/bom';
+import { buildProjectBomCreateData } from '~/utils/bom';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
@@ -35,17 +31,7 @@ export default defineEventHandler(async (event) => {
     for (const item of items) {
       try {
         await prisma.project_boms.create({
-          data: {
-            id: createBomItemId(),
-            work_order_number: workOrderNumber,
-            part_name: normalizeBomText(item.partName) || '未命名部件',
-            part_number: normalizeBomText(item.partNumber) || null,
-            material: normalizeBomText(item.material) || null,
-            quantity: parseBomQuantity(item.quantity, 1),
-            unit: normalizeBomText(item.unit) || 'PCS',
-            remarks: normalizeBomText(item.remarks) || null,
-            updated_at: new Date(),
-          },
+          data: buildProjectBomCreateData(workOrderNumber, item),
         });
         successCount++;
       } catch (error) {
@@ -53,7 +39,7 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    return useResponseSuccess({ successCount });
+    return useResponseSuccess({ successCount, totalCount: items.length });
   } catch (error) {
     logApiError('bom-import', error);
     setResponseStatus(event, 500);
