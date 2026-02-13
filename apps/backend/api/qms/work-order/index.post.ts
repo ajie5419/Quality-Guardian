@@ -6,6 +6,7 @@ import {
   isPrismaRequiredValueError,
   isPrismaUniqueConflictError,
 } from '~/utils/prisma-error';
+import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -29,14 +30,16 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event);
 
     const woNum = parseRequiredWorkOrderNumber(body.workOrderNumber);
-    if (!woNum) {
+    const missingFields = getMissingRequiredFields(
+      {
+        customerName: body.customerName,
+        workOrderNumber: woNum,
+      },
+      ['workOrderNumber', 'customerName'],
+    );
+    if (missingFields.length > 0) {
       setResponseStatus(event, 400);
-      return useResponseError('缺少必填字段: workOrderNumber');
-    }
-
-    if (!body.customerName) {
-      setResponseStatus(event, 400);
-      return useResponseError('缺少必填字段: customerName');
+      return useResponseError(`缺少必填字段: ${missingFields[0]}`);
     }
 
     // Check for duplicate ID

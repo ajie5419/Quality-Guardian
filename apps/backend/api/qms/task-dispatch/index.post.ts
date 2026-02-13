@@ -3,13 +3,13 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaForeignKeyError } from '~/utils/prisma-error';
+import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import {
-  getTaskDispatchMissingRequiredFields,
   resolveTaskDispatchCurrentUserId,
   TASK_DISPATCH_STATUS,
 } from '~/utils/task-dispatch';
@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
     type?: unknown;
   };
 
-  const missingFields = getTaskDispatchMissingRequiredFields(body, [
+  const missingFields = getMissingRequiredFields(body, [
     'type',
     'title',
     'assigneeId',
