@@ -1,14 +1,18 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
-import { createItpProjectId, normalizeItpPlanStatus } from '~/utils/itp';
+import {
+  createItpProjectId,
+  normalizeItpPlanStatus,
+  normalizeItpText,
+} from '~/utils/itp';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
   const body = await readBody(event);
-  const projectName = String(body.projectName ?? '').trim();
+  const projectName = normalizeItpText(body.projectName);
   if (!projectName) {
     setResponseStatus(event, 400);
     return useResponseError('缺少必填字段: projectName');
@@ -19,8 +23,8 @@ export default defineEventHandler(async (event) => {
       data: {
         id: createItpProjectId(),
         projectName,
-        workOrderNumber: body.workOrderId || '', // 这里传的是工单号
-        customer: body.customerName || 'Default Customer',
+        workOrderNumber: normalizeItpText(body.workOrderId) || '',
+        customer: normalizeItpText(body.customerName) || 'Default Customer',
         version: 1,
         planStatus: normalizeItpPlanStatus(body.status),
         preparedBy: 'admin',
@@ -36,12 +40,10 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error: unknown) {
     logApiError('itp-project-create', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    setResponseStatus(
-      event,
-      (error as { code?: string }).code === 'P2003' ? 400 : 500,
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2003' ? 400 : 500);
+    return useResponseError(
+      errorCode === 'P2003' ? '关联工单不存在' : '创建 ITP 项目失败',
     );
-    return useResponseError(`创建项目失败: ${errorMessage}`);
   }
 });

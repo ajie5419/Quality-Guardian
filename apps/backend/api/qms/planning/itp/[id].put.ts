@@ -49,10 +49,10 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('itp', error);
-    setResponseStatus(
-      event,
-      (error as { code?: string }).code === 'P2025' ? 404 : 500,
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    return useResponseError(
+      errorCode === 'P2025' ? 'ITP 条目不存在' : '更新 ITP 条目失败',
     );
-    return useResponseError('更新 ITP 条目失败');
   }
 });

@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id');
   if (!id) {
     setResponseStatus(event, 400);
-    return useResponseError('id required');
+    return useResponseError('ID required');
   }
 
   try {
@@ -21,10 +21,10 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('itp-projects', error);
-    setResponseStatus(
-      event,
-      (error as { code?: string }).code === 'P2025' ? 404 : 500,
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    return useResponseError(
+      errorCode === 'P2025' ? 'ITP 项目不存在' : '删除 ITP 项目失败',
     );
-    return useResponseError('Delete failed');
   }
 });

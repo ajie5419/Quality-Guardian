@@ -1,7 +1,11 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
-import { parseItpQuantitativeItems, toItpPlanStatusText } from '~/utils/itp';
+import {
+  parseItpQuantitativeItems,
+  toItpPlanStatusText,
+  toItpProjectVersionText,
+} from '~/utils/itp';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -97,7 +101,7 @@ export default defineEventHandler(async (event) => {
         name: project.projectName,
         projectName: project.projectName,
         workOrderId: project.workOrderNumber,
-        version: project.version?.toString() || 'V1.0',
+        version: toItpProjectVersionText(project.version),
         status: toItpPlanStatusText(project.planStatus),
         itemCount: processedItems.length,
         completedCount,

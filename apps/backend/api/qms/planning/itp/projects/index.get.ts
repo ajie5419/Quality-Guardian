@@ -1,7 +1,7 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
-import { toItpPlanStatusText } from '~/utils/itp';
+import { toItpPlanStatusText, toItpProjectVersionText } from '~/utils/itp';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
       id: p.id,
       projectName: p.projectName,
       workOrderId: p.workOrderNumber,
-      version: p.version?.toString() || 'V1.0',
+      version: toItpProjectVersionText(p.version),
       status: toItpPlanStatusText(p.planStatus),
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
