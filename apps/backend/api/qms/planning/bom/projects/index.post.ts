@@ -2,6 +2,7 @@ import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { normalizeBomProjectStatus, normalizeBomText } from '~/utils/bom';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { upsertPlanningProjectByWorkOrder } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import {
   unAuthorizedResponse,
@@ -22,44 +23,38 @@ export default defineEventHandler(async (event) => {
       return useResponseError('工单号不能为空');
     }
 
-    // 检查工单是否存在
-    const wo = await prisma.work_orders.findUnique({
-      where: { workOrderNumber },
+    const upsertResult = await upsertPlanningProjectByWorkOrder({
+      workOrderNumber,
+      findExistingByWorkOrderNumber: (value) =>
+        prisma.bom_projects.findUnique({
+          where: { workOrderNumber: value },
+          select: { id: true, isDeleted: true },
+        }),
+      restoreProjectById: (id) =>
+        prisma.bom_projects.update({
+          where: { id },
+          data: { isDeleted: false, updatedAt: new Date() },
+        }),
+      createProject: ({ projectName, workOrderNumber: value }) =>
+        prisma.bom_projects.create({
+          data: {
+            workOrderNumber: value,
+            projectName,
+            status: normalizeBomProjectStatus(body.status),
+          },
+        }),
     });
 
-    if (!wo) {
+    if (upsertResult.code === 'MISSING_WORK_ORDER') {
       setResponseStatus(event, 400);
       return useResponseError('工单不存在');
     }
-
-    // 检查是否已在 BOM 策划中
-    const existing = await prisma.bom_projects.findUnique({
-      where: { workOrderNumber },
-    });
-
-    if (existing) {
-      if (existing.isDeleted) {
-        // 恢复
-        const updated = await prisma.bom_projects.update({
-          where: { id: existing.id },
-          data: { isDeleted: false, updatedAt: new Date() },
-        });
-        return useResponseSuccess(updated);
-      }
+    if (upsertResult.code === 'CONFLICT') {
       setResponseStatus(event, 409);
       return useResponseError('该工单已在 BOM 策划列表中');
     }
 
-    // 创建 BOM 项目
-    const newProject = await prisma.bom_projects.create({
-      data: {
-        workOrderNumber,
-        projectName: wo.projectName || workOrderNumber,
-        status: normalizeBomProjectStatus(body.status),
-      },
-    });
-
-    return useResponseSuccess(newProject);
+    return useResponseSuccess(upsertResult.data);
   } catch (error) {
     logApiError('bom-projects', error);
     setResponseStatus(event, 500);
