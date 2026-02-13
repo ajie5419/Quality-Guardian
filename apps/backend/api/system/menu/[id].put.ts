@@ -7,6 +7,7 @@ import {
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import { redis } from '~/utils/redis';
 import {
   unAuthorizedResponse,
@@ -75,10 +76,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('menu-update', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError(
-      errorCode === 'P2025' ? '菜单不存在' : '更新菜单失败',
+      isPrismaNotFoundError(error) ? '菜单不存在' : '更新菜单失败',
     );
   }
 });

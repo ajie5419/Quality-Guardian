@@ -2,6 +2,7 @@ import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { DeptService } from '~/services/dept.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -25,10 +26,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('dept', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError(
-      errorCode === 'P2025' ? '部门不存在' : '删除部门失败',
+      isPrismaNotFoundError(error) ? '部门不存在' : '删除部门失败',
     );
   }
 });

@@ -1,6 +1,7 @@
 import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -15,10 +16,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('audit-log', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError(
-      errorCode === 'P2025'
+      isPrismaNotFoundError(error)
         ? 'Audit log not found'
         : 'Failed to delete audit log',
     );

@@ -2,6 +2,7 @@ import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import { redis } from '~/utils/redis';
 import {
   unAuthorizedResponse,
@@ -50,10 +51,11 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(newMenu);
   } catch (error) {
     logApiError('menu', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2002' ? 409 : 500);
+    setResponseStatus(event, isPrismaUniqueConstraintError(error) ? 409 : 500);
     return useResponseError(
-      errorCode === 'P2002' ? '菜单名称或路径已存在' : '创建菜单失败',
+      isPrismaUniqueConstraintError(error)
+        ? '菜单名称或路径已存在'
+        : '创建菜单失败',
     );
   }
 });

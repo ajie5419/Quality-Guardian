@@ -2,6 +2,7 @@ import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { UserService } from '~/services/user.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -20,8 +21,10 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('user', error);
-    const errorCode = (error as { code?: string }).code;
-    if (errorCode === 'P2002' || String(error).includes('Unique constraint')) {
+    if (
+      isPrismaUniqueConstraintError(error) ||
+      String(error).includes('Unique constraint')
+    ) {
       setResponseStatus(event, 409);
       return useResponseError('用户名已存在');
     }

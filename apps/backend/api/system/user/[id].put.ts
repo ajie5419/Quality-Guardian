@@ -8,6 +8,10 @@ import { UserService } from '~/services/user.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
+  isPrismaNotFoundError,
+  isPrismaUniqueConstraintError,
+} from '~/utils/prisma-error';
+import {
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -31,14 +35,13 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('user', error);
-    const errorCode = (error as { code?: string }).code;
-    if (errorCode === 'P2002') {
+    if (isPrismaUniqueConstraintError(error)) {
       setResponseStatus(event, 409);
       return useResponseError('用户名已存在');
     }
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError(
-      errorCode === 'P2025' ? '用户不存在' : '更新用户失败',
+      isPrismaNotFoundError(error) ? '用户不存在' : '更新用户失败',
     );
   }
 });
