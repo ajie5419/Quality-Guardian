@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { UserService } from '~/services/user.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -20,9 +20,12 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('user', error);
-    if (String(error).includes('Unique constraint')) {
+    const errorCode = (error as { code?: string }).code;
+    if (errorCode === 'P2002' || String(error).includes('Unique constraint')) {
+      setResponseStatus(event, 409);
       return useResponseError('用户名已存在');
     }
+    setResponseStatus(event, 500);
     return useResponseError('创建用户失败');
   }
 });

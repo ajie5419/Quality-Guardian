@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -45,9 +45,12 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     logApiError('role', error);
     // Check for unique constraint violation
-    if (String(error).includes('Unique constraint')) {
+    const errorCode = (error as { code?: string }).code;
+    if (errorCode === 'P2002' || String(error).includes('Unique constraint')) {
+      setResponseStatus(event, 409);
       return useResponseError('角色值已存在');
     }
+    setResponseStatus(event, 500);
     return useResponseError('创建角色失败');
   }
 });

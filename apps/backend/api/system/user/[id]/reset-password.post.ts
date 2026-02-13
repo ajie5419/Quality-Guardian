@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { defineEventHandler, getRouterParam } from 'h3';
+import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -17,6 +17,7 @@ export default defineEventHandler(async (event) => {
 
   const id = getRouterParam(event, 'id');
   if (!id) {
+    setResponseStatus(event, 400);
     return useResponseError('缺少用户ID');
   }
 
@@ -36,6 +37,10 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('user-reset-password', error);
-    return useResponseError('重置密码失败');
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    return useResponseError(
+      errorCode === 'P2025' ? '用户不存在' : '重置密码失败',
+    );
   }
 });

@@ -1,4 +1,9 @@
-import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import {
+  defineEventHandler,
+  getRouterParam,
+  readBody,
+  setResponseStatus,
+} from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -17,6 +22,7 @@ export default defineEventHandler(async (event) => {
 
   const id = getRouterParam(event, 'id');
   if (!id) {
+    setResponseStatus(event, 400);
     return useResponseError('缺少角色ID');
   }
 
@@ -52,6 +58,14 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('role', error);
-    return useResponseError('更新角色失败');
+    const errorCode = (error as { code?: string }).code;
+    if (errorCode === 'P2002') {
+      setResponseStatus(event, 409);
+      return useResponseError('角色值已存在');
+    }
+    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    return useResponseError(
+      errorCode === 'P2025' ? '角色不存在' : '更新角色失败',
+    );
   }
 });
