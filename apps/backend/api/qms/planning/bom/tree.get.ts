@@ -1,6 +1,6 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { mapProjectBomItem } from '~/utils/bom';
+import { groupBomItemsByWorkOrder, mapBomTreeProjectNode } from '~/utils/bom';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
@@ -30,42 +30,11 @@ export default defineEventHandler(async (event) => {
       orderBy: { created_at: 'asc' },
     });
 
-    // 将BOM项目按工单号分组
-    const bomItemsByProject: Record<string, typeof allBomItems> = {};
-    for (const item of allBomItems) {
-      const workOrderNumber = item.work_order_number;
-      if (!bomItemsByProject[workOrderNumber]) {
-        bomItemsByProject[workOrderNumber] = [];
-      }
-      bomItemsByProject[workOrderNumber].push(item);
-    }
+    const bomItemsByProject = groupBomItemsByWorkOrder(allBomItems);
 
     const treeNodes = projects.map((project) => {
       const items = bomItemsByProject[project.workOrderNumber] || [];
-      const itemCount = items.length;
-
-      return {
-        id: project.id,
-        type: 'project',
-        name: project.projectName,
-        projectName: project.projectName,
-        version: '1.0',
-        status: project.status,
-        workOrderNumber: project.workOrderNumber, // 关键：映射工单号字段供侧边栏显示
-        itemCount,
-        productName: project.work_order?.projectName || '',
-        productModel: project.work_order?.division || '',
-        customerName: project.work_order?.customerName || '',
-        quantity: project.work_order?.quantity,
-        deliveryDate: project.work_order?.deliveryDate,
-        children: items.map((item) => ({
-          ...mapProjectBomItem(item),
-          type: 'item',
-          parentId: project.id,
-          projectName: project.projectName,
-          workOrderNumber: project.workOrderNumber,
-        })),
-      };
+      return mapBomTreeProjectNode(project, items);
     });
 
     return useResponseSuccess(treeNodes);

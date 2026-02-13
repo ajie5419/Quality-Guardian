@@ -92,3 +92,68 @@ export function mapProjectBomItem(item: {
     unit: item.unit,
   };
 }
+
+export function groupBomItemsByWorkOrder<
+  T extends { work_order_number: string },
+>(items: T[]): Record<string, T[]> {
+  const grouped: Record<string, T[]> = {};
+  for (const item of items) {
+    const workOrderNumber = item.work_order_number;
+    if (!grouped[workOrderNumber]) {
+      grouped[workOrderNumber] = [];
+    }
+    grouped[workOrderNumber].push(item);
+  }
+  return grouped;
+}
+
+interface BomTreeProjectInput {
+  id: string;
+  projectName: string;
+  status: string;
+  workOrderNumber: string;
+  work_order?: null | {
+    customerName?: null | string;
+    deliveryDate?: Date | null;
+    division?: null | string;
+    projectName?: null | string;
+    quantity?: null | number;
+  };
+}
+
+export function mapBomTreeProjectNode(
+  project: BomTreeProjectInput,
+  projectItems: Array<{
+    id: string;
+    material: null | string;
+    part_name: string;
+    part_number: null | string;
+    quantity: number;
+    remarks: null | string;
+    unit: string;
+    work_order_number: string;
+  }>,
+) {
+  return {
+    children: projectItems.map((item) => ({
+      ...mapProjectBomItem(item),
+      parentId: project.id,
+      projectName: project.projectName,
+      type: 'item',
+      workOrderNumber: project.workOrderNumber,
+    })),
+    customerName: project.work_order?.customerName || '',
+    deliveryDate: project.work_order?.deliveryDate,
+    id: project.id,
+    itemCount: projectItems.length,
+    name: project.projectName,
+    productModel: project.work_order?.division || '',
+    productName: project.work_order?.projectName || '',
+    projectName: project.projectName,
+    quantity: project.work_order?.quantity,
+    status: normalizeBomProjectStatus(project.status),
+    type: 'project',
+    version: normalizeBomProjectVersion(undefined),
+    workOrderNumber: project.workOrderNumber,
+  };
+}
