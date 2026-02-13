@@ -372,8 +372,8 @@ export const QualityLossService = {
 
     try {
       // 1. 并行获取所有来源的原始数据
-      const [manualRecords, internalRecords, externalRecords, deptTreeRaw] =
-        await Promise.all([
+      const [manualRecords, internalRecords, externalRecords] = await Promise.all(
+        [
           prisma.quality_losses.findMany({
             where: buildManualLossesWhere(params),
           }),
@@ -383,11 +383,14 @@ export const QualityLossService = {
           prisma.after_sales.findMany({
             where: buildExternalSalesWhere(params),
           }),
-          DeptService.findAll(),
-        ]);
+        ],
+      );
 
-      const deptTree = deptTreeRaw as any[];
-      logger.info({ deptTree }, 'Debug: Dept Tree from Service'); // Added logging
+      // 部门树查询失败时不影响主流程，直接回退为原始部门ID
+      const deptTree = ((await DeptService.findAll().catch((error) => {
+        logger.warn({ err: error }, 'DeptService.findAll failed, fallback to raw dept id');
+        return [];
+      })) || []) as any[];
 
       // Flatten dept tree for easy lookup
       const deptMap = new Map<string, string>();
@@ -426,7 +429,6 @@ export const QualityLossService = {
           };
           const amount = safeNumber(item.amount);
           if (amount <= 0) return;
-          if (amount <= 0) return;
           const formatted = formatManualLossItem({ ...item, ...itemRecord });
           formatted.responsibleDepartment = getDeptName(
             formatted.responsibleDepartment,
@@ -464,7 +466,7 @@ export const QualityLossService = {
       return applyPagination(sorted, params);
     } catch (error) {
       logger.error({ err: error }, 'getAllLosses 执行失败');
-      return { items: [], total: 0 };
+      throw error;
     }
   },
 

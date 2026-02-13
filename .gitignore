@@ -25,12 +25,18 @@ package-lock.json
 
 # local env files
 .env
+.env.deploy
 .env.production
 .env.local
 .env.*.local
 .eslintcache
 apps/backend-mock/.env
 apps/backend/uploads
+apps/web-antd/uploads
+*.backup
+*.backup2
+*.broken
+apps/backend/vitest_output_full.txt
 
 logs
 *.log

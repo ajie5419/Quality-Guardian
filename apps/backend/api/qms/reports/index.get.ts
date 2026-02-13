@@ -1,9 +1,9 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
-import { useResponseSuccess } from '~/utils/response';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
   try {
     const reports = await prisma.reports.findMany({
       orderBy: { date: 'desc' },
@@ -17,6 +17,7 @@ export default defineEventHandler(async () => {
     return useResponseSuccess(items);
   } catch (error) {
     logApiError('reports', error);
-    return useResponseSuccess([]);
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to fetch reports');
   }
 });
