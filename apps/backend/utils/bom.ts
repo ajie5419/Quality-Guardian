@@ -1,6 +1,8 @@
 import { nanoid } from 'nanoid';
 
 const DEFAULT_BOM_PART_NAME = '未命名部件';
+const DEFAULT_BOM_PROJECT_STATUS = 'active';
+const DEFAULT_BOM_PROJECT_VERSION = 'V1.0';
 const DEFAULT_BOM_UNIT = 'PCS';
 
 export function createBomItemId(): string {
@@ -27,6 +29,14 @@ export function parseBomQuantity(value: unknown, defaultValue = 1): number {
 export function normalizeBomText(value: unknown): string | undefined {
   const normalized = String(value ?? '').trim();
   return normalized || undefined;
+}
+
+export function normalizeBomProjectStatus(value: unknown): string {
+  return normalizeBomText(value) || DEFAULT_BOM_PROJECT_STATUS;
+}
+
+export function normalizeBomProjectVersion(value: unknown): string {
+  return normalizeBomText(value) || DEFAULT_BOM_PROJECT_VERSION;
 }
 
 interface ProjectBomInput {

@@ -1,5 +1,9 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import {
+  normalizeBomProjectStatus,
+  normalizeBomProjectVersion,
+} from '~/utils/bom';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { getMetadata } from '~/utils/metadata';
 import prisma from '~/utils/prisma';
@@ -38,8 +42,8 @@ export default defineEventHandler(async (event) => {
         projectName: p.projectName,
         workOrderNumber: p.workOrderNumber,
         itemCount: p._count.project_boms,
-        version: meta.version || 'V1.0',
-        status: meta.status || 'active',
+        version: normalizeBomProjectVersion(meta.version),
+        status: normalizeBomProjectStatus(meta.status),
       };
     });
 

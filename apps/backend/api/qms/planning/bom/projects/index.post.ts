@@ -1,6 +1,6 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { normalizeBomText } from '~/utils/bom';
+import { normalizeBomProjectStatus, normalizeBomText } from '~/utils/bom';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -46,6 +46,7 @@ export default defineEventHandler(async (event) => {
         });
         return useResponseSuccess(updated);
       }
+      setResponseStatus(event, 409);
       return useResponseError('该工单已在 BOM 策划列表中');
     }
 
@@ -54,7 +55,7 @@ export default defineEventHandler(async (event) => {
       data: {
         workOrderNumber,
         projectName: wo.projectName || workOrderNumber,
-        status: 'active',
+        status: normalizeBomProjectStatus(body.status),
       },
     });
 

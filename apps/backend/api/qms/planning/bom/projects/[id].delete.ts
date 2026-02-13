@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
     });
 
     // 3. Cascade delete BOM items from database
-    await prisma.project_boms.deleteMany({
+    const deletedItems = await prisma.project_boms.deleteMany({
       where: { work_order_number: workOrderNumber },
     });
 
@@ -54,10 +54,17 @@ export default defineEventHandler(async (event) => {
       await setMetadata('BOM_PROJECT_METADATA', metadataMap);
     }
 
-    return useResponseSuccess({ message: 'Deleted' });
+    return useResponseSuccess({
+      deletedItems: deletedItems.count,
+      id,
+      message: 'Deleted',
+    });
   } catch (error) {
     logApiError('bom-projects', error);
-    setResponseStatus(event, 500);
+    setResponseStatus(
+      event,
+      (error as { code?: string }).code === 'P2025' ? 404 : 500,
+    );
     return useResponseError('Delete failed');
   }
 });
