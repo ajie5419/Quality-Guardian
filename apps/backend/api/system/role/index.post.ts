@@ -2,7 +2,7 @@ import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
+import { isPrismaUniqueConflictError } from '~/utils/prisma-error';
 import { redis } from '~/utils/redis';
 import {
   unAuthorizedResponse,
@@ -46,10 +46,7 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     logApiError('role', error);
     // Check for unique constraint violation
-    if (
-      isPrismaUniqueConstraintError(error) ||
-      String(error).includes('Unique constraint')
-    ) {
+    if (isPrismaUniqueConflictError(error)) {
       setResponseStatus(event, 409);
       return useResponseError('角色值已存在');
     }

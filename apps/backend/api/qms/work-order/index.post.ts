@@ -2,7 +2,7 @@ import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
+import { isPrismaUniqueConflictError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -88,9 +88,7 @@ export default defineEventHandler(async (event) => {
     const errorMessage = err.message || String(error);
 
     // Handle Prisma Unique Constraint Violation (P2002)
-    const isUniqueError =
-      isPrismaUniqueConstraintError(error) ||
-      errorMessage.includes('Unique constraint failed');
+    const isUniqueError = isPrismaUniqueConflictError(error);
 
     if (isUniqueError) {
       setResponseStatus(event, 409);
