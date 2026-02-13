@@ -5,7 +5,7 @@ import {
   setResponseStatus,
 } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
-import { mapAfterSalesStatus } from '~/utils/after-sales-status';
+import { buildAfterSalesUpdateData } from '~/utils/after-sales-payload';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -30,66 +30,27 @@ export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
     const bodyRecord = body as Record<string, unknown>;
+    const { costsChanged, data: updateData } =
+      buildAfterSalesUpdateData(bodyRecord);
 
-    const updateData: Record<string, unknown> = {
-      updatedAt: new Date(),
-    };
-
-    // Map fields
-    if (bodyRecord.issueDate)
-      updateData.occurDate = new Date(bodyRecord.issueDate as string);
-    if (bodyRecord.responsibleDept) {
-      updateData.respDept = bodyRecord.responsibleDept;
-      updateData.feedbackDept = bodyRecord.responsibleDept;
-    }
-    if (bodyRecord.resolutionPlan)
-      updateData.solution = bodyRecord.resolutionPlan;
-    if (bodyRecord.status) {
-      const status = bodyRecord.status as string;
-      updateData.claimStatus = mapAfterSalesStatus(status);
-    }
-
-    // Map other fields
-    const fields = [
-      'workOrderNumber',
-      'projectName',
-      'customerName',
-      'location',
-      'productType',
-      'productSubtype',
-      'warrantyStatus',
-      'issueDescription',
-      'handler',
-      'defectType',
-      'defectSubtype',
-      'severity',
-      'division',
-      'isClaim',
-      'supplierBrand',
-      'partName',
-      'photos',
-    ];
-    fields.forEach((f) => {
-      if (bodyRecord[f] !== undefined) {
-        updateData[f] =
-          f === 'photos' && Array.isArray(bodyRecord[f])
-            ? JSON.stringify(bodyRecord[f])
-            : bodyRecord[f];
+    if (costsChanged) {
+      const current = await prisma.after_sales.findUnique({
+        where: { id },
+        select: { laborTravelCost: true, materialCost: true },
+      });
+      if (!current) {
+        setResponseStatus(event, 404);
+        return useResponseError('售后记录不存在');
       }
-    });
 
-    if (bodyRecord.quantity !== undefined)
-      updateData.quantity = Number(bodyRecord.quantity);
-    if (bodyRecord.materialCost !== undefined)
-      updateData.materialCost = Number(bodyRecord.materialCost);
-    if (bodyRecord.laborTravelCost !== undefined)
-      updateData.laborTravelCost = Number(bodyRecord.laborTravelCost);
-    if (bodyRecord.runningHours !== undefined)
-      updateData.runningHours = Number(bodyRecord.runningHours);
-    if (bodyRecord.factoryDate)
-      updateData.factoryDate = new Date(bodyRecord.factoryDate as string);
-    if (bodyRecord.closeDate)
-      updateData.closeDate = new Date(bodyRecord.closeDate as string);
+      const materialCost = Number(
+        updateData.materialCost ?? current.materialCost ?? 0,
+      );
+      const laborTravelCost = Number(
+        updateData.laborTravelCost ?? current.laborTravelCost ?? 0,
+      );
+      updateData.qualityLoss = materialCost + laborTravelCost;
+    }
 
     await prisma.after_sales.update({
       where: { id },
@@ -105,9 +66,12 @@ export default defineEventHandler(async (event) => {
     });
 
     return useResponseSuccess(null);
-  } catch (error) {
+  } catch (error: unknown) {
     logApiError('after-sales', error);
-    setResponseStatus(event, 500);
-    return useResponseError('更新售后记录失败');
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    return useResponseError(
+      errorCode === 'P2025' ? '售后记录不存在' : '更新售后记录失败',
+    );
   }
 });

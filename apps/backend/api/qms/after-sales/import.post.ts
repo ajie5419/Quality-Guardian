@@ -3,7 +3,7 @@ import {
   createAfterSalesId,
   getNextAfterSalesSerialNumber,
 } from '~/utils/after-sales-id';
-import { mapAfterSalesStatus } from '~/utils/after-sales-status';
+import { buildAfterSalesCreateData } from '~/utils/after-sales-payload';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -32,25 +32,14 @@ export default defineEventHandler(async (event) => {
       try {
         const woNumber = String(item.workOrderNumber || '').trim();
         if (!woNumber) continue;
-
-        const status = item.status
-          ? mapAfterSalesStatus(String(item.status))
-          : mapAfterSalesStatus(undefined);
         const serialNumber = serialSeed++;
 
         await prisma.after_sales.create({
-          data: {
+          data: buildAfterSalesCreateData(item as Record<string, unknown>, {
+            defaultWorkOrderNumber: woNumber,
             id: createAfterSalesId(),
             serialNumber,
-            occurDate: new Date(item.issueDate || item.occurDate || Date.now()),
-            claimStatus: status,
-            projectName: String(item.projectName || ''),
-            customerName: String(item.customerName || ''),
-            workOrderNumber: woNumber,
-            issueDescription: String(item.issueDescription || ''),
-            quantity: Number(item.quantity) || 1,
-            isDeleted: false,
-          },
+          }),
         });
         successCount++;
       } catch (error) {
