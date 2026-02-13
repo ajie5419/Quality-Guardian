@@ -1,4 +1,9 @@
-import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import {
+  defineEventHandler,
+  getRouterParam,
+  readBody,
+  setResponseStatus,
+} from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
@@ -7,12 +12,13 @@ import { useResponseError, useResponseSuccess } from '~/utils/response';
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
   const id = getRouterParam(event, 'id');
-  const body = await readBody(event);
-
-  if (!id) return { code: -1, message: 'ID required' };
+  if (!id) {
+    setResponseStatus(event, 400);
+    return useResponseError('ID required');
+  }
 
   try {
-    // 关键修复：改为局部更新逻辑，防止 undefined 覆盖原有数据库字段
+    const body = await readBody(event);
     const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
     };
@@ -35,7 +41,11 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    logApiError('projects', error);
+    logApiError('dfmea-projects', error);
+    setResponseStatus(
+      event,
+      (error as { code?: string }).code === 'P2025' ? 404 : 500,
+    );
     return useResponseError(`更新失败: ${errorMessage}`);
   }
 });

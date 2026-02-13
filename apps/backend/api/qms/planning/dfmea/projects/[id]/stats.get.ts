@@ -1,23 +1,33 @@
-import { defineEventHandler, getRouterParam } from 'h3';
+import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
-import { useResponseSuccess } from '~/utils/response';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'id');
+  if (!projectId) {
+    setResponseStatus(event, 400);
+    return useResponseError('id required');
+  }
 
   try {
-    const projectItems = await prisma.dfmea.findMany({
-      where: {
-        projectId,
-        isDeleted: false,
-      },
-    });
+    const [project, projectItems] = await Promise.all([
+      prisma.dfmea_projects.findUnique({
+        where: { id: projectId },
+        select: { projectName: true },
+      }),
+      prisma.dfmea.findMany({
+        where: {
+          projectId,
+          isDeleted: false,
+        },
+      }),
+    ]);
 
-    if (projectItems.length === 0) {
+    if (!project || projectItems.length === 0) {
       return useResponseSuccess({
         projectId,
-        projectName: '',
+        projectName: project?.projectName || '',
         itemCount: 0,
         avgRpn: 0,
         maxRpn: 0,
@@ -40,7 +50,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({
       projectId,
-      projectName: projectItems[0].item,
+      projectName: project.projectName,
       itemCount,
       avgRpn,
       maxRpn,
@@ -49,16 +59,8 @@ export default defineEventHandler(async (event) => {
       lowRiskCount,
     });
   } catch (error) {
-    logApiError('stats', error);
-    return useResponseSuccess({
-      projectId,
-      projectName: '',
-      itemCount: 0,
-      avgRpn: 0,
-      maxRpn: 0,
-      highRiskCount: 0,
-      mediumRiskCount: 0,
-      lowRiskCount: 0,
-    });
+    logApiError('dfmea-project-stats', error);
+    setResponseStatus(event, 500);
+    return useResponseError('获取 DFMEA 项目统计失败');
   }
 });

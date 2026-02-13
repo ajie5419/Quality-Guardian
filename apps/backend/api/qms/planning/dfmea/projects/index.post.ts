@@ -1,20 +1,24 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
-import { nanoid } from 'nanoid';
 import { logApiError } from '~/utils/api-logger';
+import { createDfmeaProjectId } from '~/utils/dfmea';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
-  const body = await readBody(event);
-
   try {
-    // 关键修复：从内存列表存储改为 Prisma 数据库存储
-    // 同时确保 workOrderId 是工单编号字符串（满足外键约束）
+    const body = await readBody(event);
+    const projectName = String(body.projectName ?? '').trim();
+    if (!projectName) {
+      setResponseStatus(event, 400);
+      return useResponseError('缺少必填字段: projectName');
+    }
+
     const newProject = await prisma.dfmea_projects.create({
       data: {
-        id: `DFMEA-${nanoid(6).toUpperCase()}`,
-        projectName: body.projectName,
+        id: createDfmeaProjectId(),
+        projectName,
         workOrderId: body.workOrderId || null,
         version: body.version || 'V1.0',
         status: body.status || 'active',
@@ -26,14 +30,13 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    return {
-      code: 0,
-      data: newProject,
-      message: 'ok',
-    };
+    return useResponseSuccess(newProject);
   } catch (error) {
-    logApiError('projects', error);
-    setResponseStatus(event, 500);
-    return { code: -1, message: '创建项目失败，请检查工单号是否存在' };
+    logApiError('dfmea-projects', error);
+    setResponseStatus(
+      event,
+      (error as { code?: string }).code === 'P2003' ? 400 : 500,
+    );
+    return useResponseError('创建项目失败，请检查工单号是否存在');
   }
 });

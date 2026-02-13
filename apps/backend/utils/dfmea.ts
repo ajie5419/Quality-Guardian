@@ -1,3 +1,5 @@
+import { nanoid } from 'nanoid';
+
 export function parseDfmeaScore(value: unknown, defaultValue = 5): number {
   if (value === undefined || value === null || value === '') {
     return defaultValue;
@@ -34,4 +36,8 @@ export function parseDfmeaOrder(value: unknown): number {
   }
 
   return Math.max(0, Math.trunc(parsed));
+}
+
+export function createDfmeaProjectId(): string {
+  return `DFMEA-${nanoid(6).toUpperCase()}`;
 }
