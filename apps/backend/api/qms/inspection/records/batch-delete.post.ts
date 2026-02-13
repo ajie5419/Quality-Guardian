@@ -1,3 +1,4 @@
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
@@ -5,14 +6,16 @@ import { useResponseError, useResponseSuccess } from '~/utils/response';
 export default defineEventHandler(async (event) => {
   try {
     const { ids } = await readBody(event);
-    if (!ids || !Array.isArray(ids)) return useResponseError('IDs required');
+    if (!Array.isArray(ids) || ids.length === 0) {
+      setResponseStatus(event, 400);
+      return useResponseError('IDs required');
+    }
 
-    await InspectionService.batchDelete(ids);
-    return useResponseSuccess({ successCount: ids.length });
+    const result = await InspectionService.batchDelete(ids);
+    return useResponseSuccess({ successCount: result.count });
   } catch (error: unknown) {
     logApiError('inspection-batch-delete', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    return useResponseError(errorMessage);
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to batch delete inspection records');
   }
 });

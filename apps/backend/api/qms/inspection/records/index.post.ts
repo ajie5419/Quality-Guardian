@@ -1,3 +1,4 @@
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
@@ -9,8 +10,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error: unknown) {
     logApiError('inspection-create', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    return useResponseError(errorMessage);
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to create inspection record');
   }
 });
