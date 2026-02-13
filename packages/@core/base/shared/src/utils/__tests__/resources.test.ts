@@ -26,27 +26,29 @@ describe('loadScript', () => {
       return (scriptStore.get(match[1]) ?? null) as unknown as Element | null;
     });
 
-    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
-      if (tagName !== 'script') {
-        return originalCreateElement(tagName);
-      }
+    vi.spyOn(document, 'createElement').mockImplementation(
+      (tagName: string) => {
+        if (tagName !== 'script') {
+          return originalCreateElement(tagName);
+        }
 
-      const script: MockScriptElement = {
-        src: '',
-        _listeners: new Map(),
-        addEventListener(type, listener) {
-          const current = this._listeners.get(type) ?? [];
-          current.push(listener);
-          this._listeners.set(type, current);
-        },
-        dispatchEvent(event) {
-          const listeners = this._listeners.get(event.type) ?? [];
-          listeners.forEach((listener) => listener(event));
-          return true;
-        },
-      };
-      return script as unknown as HTMLElement;
-    });
+        const script: MockScriptElement = {
+          src: '',
+          _listeners: new Map(),
+          addEventListener(type, listener) {
+            const current = this._listeners.get(type) ?? [];
+            current.push(listener);
+            this._listeners.set(type, current);
+          },
+          dispatchEvent(event) {
+            const listeners = this._listeners.get(event.type) ?? [];
+            listeners.forEach((listener) => listener(event));
+            return true;
+          },
+        };
+        return script as unknown as HTMLElement;
+      },
+    );
 
     vi.spyOn(document.head, 'append').mockImplementation(
       (...nodes: (Node | string)[]) => {

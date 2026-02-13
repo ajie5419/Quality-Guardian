@@ -372,8 +372,8 @@ export const QualityLossService = {
 
     try {
       // 1. 并行获取所有来源的原始数据
-      const [manualRecords, internalRecords, externalRecords] = await Promise.all(
-        [
+      const [manualRecords, internalRecords, externalRecords] =
+        await Promise.all([
           prisma.quality_losses.findMany({
             where: buildManualLossesWhere(params),
           }),
@@ -383,12 +383,14 @@ export const QualityLossService = {
           prisma.after_sales.findMany({
             where: buildExternalSalesWhere(params),
           }),
-        ],
-      );
+        ]);
 
       // 部门树查询失败时不影响主流程，直接回退为原始部门ID
       const deptTree = ((await DeptService.findAll().catch((error) => {
-        logger.warn({ err: error }, 'DeptService.findAll failed, fallback to raw dept id');
+        logger.warn(
+          { err: error },
+          'DeptService.findAll failed, fallback to raw dept id',
+        );
         return [];
       })) || []) as any[];
 
