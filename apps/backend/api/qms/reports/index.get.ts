@@ -1,6 +1,7 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
+import { formatReportDate } from '~/utils/report';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -11,7 +12,7 @@ export default defineEventHandler(async (event) => {
 
     const items = reports.map((r) => ({
       ...r,
-      date: r.date.toISOString().split('T')[0],
+      date: formatReportDate(r.date),
     }));
 
     return useResponseSuccess(items);

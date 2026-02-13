@@ -1,6 +1,19 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { unAuthorizedResponse } from '~/utils/response';
+import prisma from '~/utils/prisma';
+import {
+  formatReportDate,
+  normalizeReportAuthor,
+  normalizeReportStatus,
+  parseReportDate,
+  parseReportNumber,
+} from '~/utils/report';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
@@ -8,6 +21,37 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const _body = await readBody(event);
-  return { success: true };
+  try {
+    const body = await readBody(event);
+
+    const reportDate = parseReportDate(body.date);
+    if (!reportDate) {
+      setResponseStatus(event, 400);
+      return useResponseError('缺少或无效字段: date');
+    }
+
+    const created = await prisma.reports.create({
+      data: {
+        author:
+          normalizeReportAuthor(body.author) ||
+          userinfo.realName ||
+          userinfo.username,
+        date: reportDate,
+        majorDefects: parseReportNumber(body.majorDefects, 0),
+        minorDefects: parseReportNumber(body.minorDefects, 0),
+        passRate: parseReportNumber(body.passRate, 0),
+        status: normalizeReportStatus(body.status),
+        totalInspections: parseReportNumber(body.totalInspections, 0),
+      },
+    });
+
+    return useResponseSuccess({
+      ...created,
+      date: formatReportDate(created.date),
+    });
+  } catch (error) {
+    logApiError('reports', error);
+    setResponseStatus(event, 500);
+    return useResponseError('创建报告失败');
+  }
 });
