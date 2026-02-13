@@ -5,6 +5,7 @@ import { nanoid } from 'nanoid';
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 200;
+const DEFAULT_SUPPLIER_CATEGORY = 'Supplier';
 
 function parsePositiveInt(value: unknown, defaultValue: number): number {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -54,6 +55,56 @@ export function normalizeSupplierScore(value: unknown, fallback = 0): number {
 
 export function normalizeSupplierStatus(value: unknown): string {
   return normalizeSupplierString(value) ?? 'Qualified';
+}
+
+interface SupplierImportItem {
+  brand?: unknown;
+  buyer?: unknown;
+  category?: unknown;
+  name?: unknown;
+  productName?: unknown;
+  status?: unknown;
+}
+
+interface BuildSupplierUpsertOptions {
+  category?: unknown;
+  defaultCategory?: string;
+}
+
+export function buildSupplierUpsertPayload(
+  item: SupplierImportItem,
+  options: BuildSupplierUpsertOptions = {},
+) {
+  const name = normalizeSupplierName(item.name);
+  if (!name) {
+    return null;
+  }
+
+  const category =
+    normalizeSupplierString(options.category) ??
+    normalizeSupplierString(item.category) ??
+    options.defaultCategory;
+
+  return {
+    create: {
+      id: createSupplierId(),
+      name,
+      brand: normalizeSupplierString(item.brand),
+      productName: normalizeSupplierString(item.productName),
+      buyer: normalizeSupplierString(item.buyer),
+      category: category ?? DEFAULT_SUPPLIER_CATEGORY,
+      status: normalizeSupplierStatus(item.status),
+    },
+    update: {
+      brand: normalizeSupplierString(item.brand),
+      productName: normalizeSupplierString(item.productName),
+      buyer: normalizeSupplierString(item.buyer),
+      category,
+      isDeleted: false,
+      updatedAt: new Date(),
+    },
+    where: { name },
+  };
 }
 
 export function parseSupplierListQuery(

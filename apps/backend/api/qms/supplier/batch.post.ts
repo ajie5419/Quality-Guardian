@@ -7,12 +7,7 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
-import {
-  createSupplierId,
-  normalizeSupplierName,
-  normalizeSupplierStatus,
-  normalizeSupplierString,
-} from '~/utils/supplier';
+import { buildSupplierUpsertPayload } from '~/utils/supplier';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -42,33 +37,14 @@ export default defineEventHandler(async (event) => {
 
       await Promise.all(
         chunk.map(async (item) => {
-          const name = normalizeSupplierName(item.name);
-          if (!name) {
-            results.errors++;
+          const payload = buildSupplierUpsertPayload(item);
+          if (!payload) {
+            results.skipped++;
             return;
           }
 
           try {
-            await prisma.suppliers.upsert({
-              where: { name },
-              update: {
-                brand: normalizeSupplierString(item.brand),
-                category: normalizeSupplierString(item.category),
-                productName: normalizeSupplierString(item.productName),
-                buyer: normalizeSupplierString(item.buyer),
-                isDeleted: false, // 确保重新导入时恢复已删除的记录
-                updatedAt: new Date(),
-              },
-              create: {
-                id: createSupplierId(),
-                name,
-                brand: normalizeSupplierString(item.brand),
-                category: normalizeSupplierString(item.category),
-                productName: normalizeSupplierString(item.productName),
-                buyer: normalizeSupplierString(item.buyer),
-                status: normalizeSupplierStatus(item.status),
-              },
-            });
+            await prisma.suppliers.upsert(payload);
             results.success++;
           } catch (error) {
             logApiError('batch', error);

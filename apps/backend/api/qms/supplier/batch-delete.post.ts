@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // 批量软删除
-    await prisma.suppliers.updateMany({
+    const result = await prisma.suppliers.updateMany({
       where: {
         id: { in: ids },
       },
@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    return useResponseSuccess({ count: ids.length });
+    return useResponseSuccess({ count: result.count });
   } catch (error) {
     logApiError('batch-delete', error);
     setResponseStatus(event, 500);

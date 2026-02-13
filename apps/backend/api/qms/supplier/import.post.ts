@@ -8,9 +8,7 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 import {
-  createSupplierId,
-  normalizeSupplierName,
-  normalizeSupplierStatus,
+  buildSupplierUpsertPayload,
   normalizeSupplierString,
 } from '~/utils/supplier';
 
@@ -27,36 +25,16 @@ export default defineEventHandler(async (event) => {
       return useResponseError('未选择数据');
     }
 
+    const normalizedCategory = normalizeSupplierString(category);
     let successCount = 0;
     for (const item of items) {
       try {
-        const name = normalizeSupplierName(item.name);
-        if (!name) continue;
-
-        await prisma.suppliers.upsert({
-          where: { name },
-          update: {
-            brand: normalizeSupplierString(item.brand),
-            productName: normalizeSupplierString(item.productName),
-            buyer: normalizeSupplierString(item.buyer),
-            category:
-              normalizeSupplierString(category) ||
-              normalizeSupplierString(item.category),
-            isDeleted: false,
-          },
-          create: {
-            id: createSupplierId(),
-            name,
-            brand: normalizeSupplierString(item.brand),
-            productName: normalizeSupplierString(item.productName),
-            buyer: normalizeSupplierString(item.buyer),
-            category:
-              normalizeSupplierString(category) ||
-              normalizeSupplierString(item.category) ||
-              'Supplier',
-            status: normalizeSupplierStatus(item.status),
-          },
+        const payload = buildSupplierUpsertPayload(item, {
+          category: normalizedCategory,
         });
+        if (!payload) continue;
+
+        await prisma.suppliers.upsert(payload);
         successCount++;
       } catch (error) {
         logApiError('import', error);
