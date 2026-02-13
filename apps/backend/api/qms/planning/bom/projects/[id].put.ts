@@ -5,7 +5,7 @@ import {
   setResponseStatus,
 } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { normalizeBomText } from '~/utils/bom';
+import { normalizeBomProjectStatus, normalizeBomText } from '~/utils/bom';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -29,7 +29,9 @@ export default defineEventHandler(async (event) => {
     const updated = await prisma.bom_projects.update({
       where: { id },
       data: {
-        status: normalizeBomText(body.status) || undefined,
+        status: body.status
+          ? normalizeBomProjectStatus(body.status)
+          : undefined,
         projectName: normalizeBomText(body.projectName) || undefined,
         updatedAt: new Date(),
       },
@@ -37,10 +39,12 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(updated);
   } catch (error) {
     logApiError('bom-projects', error);
-    setResponseStatus(
-      event,
-      (error as { code?: string }).code === 'P2025' ? 404 : 500,
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    return useResponseError(
+      errorCode === 'P2025'
+        ? 'BOM project not found'
+        : 'Failed to update BOM project',
     );
-    return useResponseError('更新失败');
   }
 });
