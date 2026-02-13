@@ -61,9 +61,27 @@ export function forbiddenResponse(
   return useResponseError(message, message);
 }
 
+export function notFoundResponse(
+  event: H3Event<EventHandlerRequest>,
+  message: string,
+  error: unknown = null,
+) {
+  setResponseStatus(event, 404);
+  return useResponseError(message, error);
+}
+
 export function unAuthorizedResponse(event: H3Event<EventHandlerRequest>) {
   setResponseStatus(event, 401);
   return useResponseError('Unauthorized Exception', 'Unauthorized Exception');
+}
+
+export function internalServerErrorResponse(
+  event: H3Event<EventHandlerRequest>,
+  message: string,
+  error: unknown = null,
+) {
+  setResponseStatus(event, 500);
+  return useResponseError(message, error);
 }
 
 export function sleep(ms: number) {

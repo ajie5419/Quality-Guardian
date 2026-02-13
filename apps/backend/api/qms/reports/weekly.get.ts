@@ -1,12 +1,12 @@
-import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
 import { ReportService } from '~/services/report.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { resolveReportDateRangeQuery } from '~/utils/report';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -40,8 +40,8 @@ export default defineEventHandler(async (event) => {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     logApiError('weekly-report', error);
-    setResponseStatus(event, 500);
-    return useResponseError(
+    return internalServerErrorResponse(
+      event,
       `Failed to generate weekly report: ${errorMessage}`,
     );
   }

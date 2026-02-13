@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -12,8 +12,8 @@ import {
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -53,7 +53,6 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('reports', error);
-    setResponseStatus(event, 500);
-    return useResponseError('创建报告失败');
+    return internalServerErrorResponse(event, '创建报告失败');
   }
 });

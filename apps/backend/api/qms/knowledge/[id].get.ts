@@ -1,10 +1,11 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -27,8 +28,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!item) {
-      setResponseStatus(event, 404);
-      return useResponseError('知识条目不存在');
+      return notFoundResponse(event, '知识条目不存在');
     }
 
     const result = {
@@ -45,7 +45,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('knowledge', error);
-    setResponseStatus(event, 500);
-    return useResponseError('读取详情失败');
+    return internalServerErrorResponse(event, '读取详情失败');
   }
 });

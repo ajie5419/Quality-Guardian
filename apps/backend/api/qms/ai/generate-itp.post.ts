@@ -8,6 +8,7 @@ import { logApiError } from '~/utils/api-logger';
 import { UPLOAD_DIR } from '~/utils/paths';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
@@ -163,9 +164,10 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     logApiError('generate-itp', error);
     const axiosError = error as { message?: string };
+    const errorMessage = `AI 解析失败: ${axiosError.message}`;
     if (!event.node.res.statusCode || event.node.res.statusCode < 400) {
-      setResponseStatus(event, 500);
+      return internalServerErrorResponse(event, errorMessage);
     }
-    return useResponseError(`AI 解析失败: ${axiosError.message}`);
+    return useResponseError(errorMessage);
   }
 });

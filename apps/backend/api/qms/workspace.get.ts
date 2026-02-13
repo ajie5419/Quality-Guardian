@@ -1,10 +1,10 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -121,8 +121,7 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('workspace', error);
-    setResponseStatus(event, 500);
-    return useResponseError('Failed to fetch workspace data');
+    return internalServerErrorResponse(event, 'Failed to fetch workspace data');
   }
 });
 

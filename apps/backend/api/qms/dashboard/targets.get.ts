@@ -1,10 +1,10 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -43,8 +43,8 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(targets);
   } catch (error) {
     logApiError('dashboard-targets', error);
-    setResponseStatus(event, 500);
-    return useResponseError(
+    return internalServerErrorResponse(
+      event,
       `Failed to fetch quality targets: ${(error as Error).message}`,
     );
   }

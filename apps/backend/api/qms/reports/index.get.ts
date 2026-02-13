@@ -1,11 +1,11 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { formatReportDate } from '~/utils/report';
 import {
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -28,7 +28,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(items);
   } catch (error) {
     logApiError('reports', error);
-    setResponseStatus(event, 500);
-    return useResponseError('Failed to fetch reports');
+    return internalServerErrorResponse(event, 'Failed to fetch reports');
   }
 });

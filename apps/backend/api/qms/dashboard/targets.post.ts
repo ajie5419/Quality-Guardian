@@ -1,11 +1,11 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -45,8 +45,8 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess({ success: true, targets: body });
   } catch (error) {
     logApiError('dashboard-targets', error);
-    setResponseStatus(event, 500);
-    return useResponseError(
+    return internalServerErrorResponse(
+      event,
       `Failed to save quality targets: ${(error as Error).message}`,
     );
   }

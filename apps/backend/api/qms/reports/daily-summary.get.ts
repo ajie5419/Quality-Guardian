@@ -1,4 +1,4 @@
-import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -9,8 +9,8 @@ import {
 } from '~/utils/report';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -231,7 +231,6 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error: unknown) {
     logApiError('daily-summary', error);
-    setResponseStatus(event, 500);
-    return useResponseError('Failed to fetch daily summary');
+    return internalServerErrorResponse(event, 'Failed to fetch daily summary');
   }
 });

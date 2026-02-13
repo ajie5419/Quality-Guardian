@@ -1,11 +1,11 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import {
@@ -68,7 +68,9 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('task-dispatch-stats', error);
-    setResponseStatus(event, 500);
-    return useResponseError('Failed to fetch task dispatch stats');
+    return internalServerErrorResponse(
+      event,
+      'Failed to fetch task dispatch stats',
+    );
   }
 });

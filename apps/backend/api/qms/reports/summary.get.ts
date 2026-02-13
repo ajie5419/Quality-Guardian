@@ -1,4 +1,4 @@
-import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
 import { getTargetPassRate } from '~/constants/quality-standards';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -6,8 +6,8 @@ import prisma from '~/utils/prisma';
 import { parseReportPeriodType, resolveReportQueryDate } from '~/utils/report';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -135,8 +135,7 @@ export default defineEventHandler(async (event) => {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     logApiError('summary', error);
-    setResponseStatus(event, 500);
-    return useResponseError(`报告生成失败: ${errorMessage}`);
+    return internalServerErrorResponse(event, `报告生成失败: ${errorMessage}`);
   }
 });
 

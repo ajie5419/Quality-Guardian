@@ -1,7 +1,10 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  internalServerErrorResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -30,7 +33,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(uniqueYears);
   } catch (error) {
     logApiError('years', error);
-    setResponseStatus(event, 500);
-    return useResponseError('Failed to fetch available years');
+    return internalServerErrorResponse(event, 'Failed to fetch available years');
   }
 });
