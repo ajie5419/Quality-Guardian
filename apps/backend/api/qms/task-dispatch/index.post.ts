@@ -1,8 +1,16 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
+import {
+  resolveTaskDispatchUserId,
+  TASK_DISPATCH_STATUS,
+} from '~/utils/task-dispatch';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -10,42 +18,60 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const body = await readBody(event);
+  const body = (await readBody(event)) as {
+    assigneeId?: unknown;
+    content?: unknown;
+    deadline?: string;
+    dfmeaId?: unknown;
+    itpProjectId?: unknown;
+    level?: unknown;
+    parentId?: unknown;
+    priority?: unknown;
+    title?: unknown;
+    type?: unknown;
+  };
 
-  // 获取并格式化当前用户 ID (assignorId)
-  let currentUserId: null | string = null;
+  if (!body?.type || !body?.title || !body?.assigneeId) {
+    setResponseStatus(event, 400);
+    return useResponseError('缺少必填字段: type/title/assigneeId');
+  }
+
+  const tokenUserId = resolveTaskDispatchUserId(userinfo);
+  if (!tokenUserId && !userinfo.username) {
+    setResponseStatus(event, 400);
+    return useResponseError('无法识别当前操作人身份');
+  }
+
+  const currentUser = await prisma.users.findFirst({
+    where: {
+      OR: [
+        ...(tokenUserId ? [{ id: tokenUserId }] : []),
+        ...(userinfo.username ? [{ username: userinfo.username }] : []),
+      ],
+    },
+    select: { id: true },
+  });
+
+  if (!currentUser) {
+    setResponseStatus(event, 400);
+    return useResponseError('无法识别当前操作人身份');
+  }
+
   try {
-    const user = await prisma.users.findUnique({
-      where: { username: userinfo.username },
+    const assignee = await prisma.users.findFirst({
+      where: {
+        OR: [
+          { id: String(body.assigneeId) },
+          { username: String(body.assigneeId) },
+        ],
+      },
+      select: { id: true },
     });
-    if (user) {
-      currentUserId = user.id;
-    } else {
-      console.warn(
-        '[Backend] User not found in DB by username:',
-        userinfo.username,
-      );
+    if (!assignee) {
+      setResponseStatus(event, 400);
+      return useResponseError('受派人不存在');
     }
-  } catch (error: unknown) {
-    const axiosError = error as { message?: string };
-    console.warn(
-      '[Backend] Failed to find user by username:',
-      axiosError.message,
-    );
-  }
 
-  if (!currentUserId) {
-    const rawId = userinfo.id ?? userinfo.userId;
-    if (rawId !== undefined && rawId !== null) {
-      currentUserId = String(rawId);
-    }
-  }
-
-  if (!currentUserId) {
-    return { code: -1, message: '无法确认识别当前操作人身份' };
-  }
-
-  try {
     // 校验关联的 ITP 项目是否存在 (真实数据库外键约束预检)
     if (body.type === 'ITP_INSPECTION' && body.itpProjectId) {
       const project = await prisma.quality_plans.findUnique({
@@ -55,28 +81,12 @@ export default defineEventHandler(async (event) => {
         logApiError('task-dispatch', new Error('Project not found'), {
           itpProjectId: body.itpProjectId,
         });
-        return {
-          code: -1,
-          message: `关联的 ITP 计划 (ID: ${body.itpProjectId}) 不存在，请刷新后重试`,
-        };
+        setResponseStatus(event, 400);
+        return useResponseError(
+          `关联的 ITP 计划 (ID: ${body.itpProjectId}) 不存在，请刷新后重试`,
+        );
       }
     }
-
-    // 终极补救：如果 assignorId 或 assigneeId 明显不是数据库格式（如单位数字），
-    // 且数据库里确实没这号人，尝试映射到现有的管理员 ID，避免外键冲突。
-    const validateUserId = async (id: string) => {
-      const exists = await prisma.users.findUnique({ where: { id } });
-      if (exists) return id;
-
-      // 尝试查找一个默认管理员作为兜底，防止派发完全阻塞
-      const admin = await prisma.users.findFirst({
-        where: { OR: [{ username: 'vben' }, { id: { startsWith: 'USR-' } }] },
-      });
-      return admin?.id || id;
-    };
-
-    const finalAssignorId = await validateUserId(currentUserId);
-    const finalAssigneeId = await validateUserId(String(body.assigneeId));
 
     const newTask = await prisma.qms_task_dispatches.create({
       data: {
@@ -86,8 +96,8 @@ export default defineEventHandler(async (event) => {
         parentId: body.parentId ? String(body.parentId) : null,
         itpProjectId: body.itpProjectId ? String(body.itpProjectId) : null,
         dfmeaId: body.dfmeaId ? String(body.dfmeaId) : null,
-        assignorId: finalAssignorId,
-        assigneeId: finalAssigneeId,
+        assignorId: currentUser.id,
+        assigneeId: assignee.id,
         content: body.content ? String(body.content) : null,
         priority: Number(body.priority) || 2,
         dueDate: body.deadline ? new Date(body.deadline) : null,
@@ -98,20 +108,16 @@ export default defineEventHandler(async (event) => {
     // 如果是二级指派，更新父任务状态
     if (body.level === 2 && body.parentId) {
       await prisma.qms_task_dispatches.update({
-        where: { id: body.parentId },
-        data: { status: 'DISPATCHED' },
+        where: { id: String(body.parentId) },
+        data: { status: TASK_DISPATCH_STATUS.DISPATCHED },
       });
     }
 
     return useResponseSuccess(newTask);
   } catch (error: unknown) {
     logApiError('task-dispatch', error);
-    const err = error as { message?: string; meta?: unknown };
-    // 返回具体错误信息
-    return {
-      code: -1,
-      details: err.meta, // Prisma 错误详情
-      message: `派发失败: ${err.message || '数据库写入异常'}`,
-    };
+    const err = error as { code?: string; message?: string };
+    setResponseStatus(event, err.code === 'P2003' ? 400 : 500);
+    return useResponseError(`派发失败: ${err.message || '数据库写入异常'}`);
   }
 });

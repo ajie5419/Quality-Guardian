@@ -1,26 +1,30 @@
-import { createError, defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { QualityLossService } from '~/services/quality-loss.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { useResponseSuccess } from '~/utils/response';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
-    throw createError({
-      statusCode: 401,
-      statusMessage: 'Unauthorized',
-    });
+    return unAuthorizedResponse(event);
   }
 
   try {
-    const body = await readBody(event);
-    const { ids } = body;
-    if (!ids || !Array.isArray(ids)) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Missing or invalid IDs',
-      });
+    const body = (await readBody(event)) as { ids?: unknown };
+    const ids = Array.isArray(body?.ids)
+      ? body.ids
+          .map((item) => String(item).trim())
+          .filter((item) => item.length > 0)
+      : [];
+
+    if (ids.length === 0) {
+      setResponseStatus(event, 400);
+      return useResponseError('Missing or invalid IDs');
     }
 
     const result = await QualityLossService.batchDelete(
@@ -28,12 +32,9 @@ export default defineEventHandler(async (event) => {
       String(userinfo.id),
     );
     return useResponseSuccess({ successCount: result.count });
-  } catch (error: any) {
-    if (error.statusCode) throw error;
+  } catch (error: unknown) {
     logApiError('quality-loss-batch-delete', error);
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Internal Server Error',
-    });
+    setResponseStatus(event, 500);
+    return useResponseError('Internal Server Error');
   }
 });

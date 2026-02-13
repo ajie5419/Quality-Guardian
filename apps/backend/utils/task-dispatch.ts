@@ -1,5 +1,16 @@
 import type { Prisma } from '@prisma/client';
 
+export const TASK_DISPATCH_STATUS = {
+  COMPLETED: 'COMPLETED',
+  DISPATCHED: 'DISPATCHED',
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+} as const;
+
+const TASK_DISPATCH_STATUS_SET = new Set<string>(
+  Object.values(TASK_DISPATCH_STATUS),
+);
+
 export function getTaskDispatchArchiveFilter(): Prisma.qms_task_dispatchesWhereInput {
   return {
     AND: [
@@ -55,4 +66,30 @@ export function resolveTaskDispatchStatusFilter(
   }
 
   return statusList.length > 1 ? { in: statusList } : statusList[0];
+}
+
+export function normalizeTaskDispatchStatus(status: unknown): null | string {
+  if (status === undefined || status === null) {
+    return null;
+  }
+
+  const normalized = String(status).trim().toUpperCase();
+  if (!normalized) {
+    return null;
+  }
+
+  return TASK_DISPATCH_STATUS_SET.has(normalized) ? normalized : null;
+}
+
+export function resolveTaskDispatchUserId(userinfo: {
+  id?: unknown;
+  userId?: unknown;
+}): null | string {
+  const raw = userinfo.id ?? userinfo.userId;
+  if (raw === undefined || raw === null) {
+    return null;
+  }
+
+  const userId = String(raw).trim();
+  return userId || null;
 }

@@ -7,7 +7,11 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
-import { getTaskDispatchArchiveFilter } from '~/utils/task-dispatch';
+import {
+  getTaskDispatchArchiveFilter,
+  resolveTaskDispatchUserId,
+  TASK_DISPATCH_STATUS,
+} from '~/utils/task-dispatch';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -15,7 +19,11 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const currentUserId = String(userinfo.id ?? userinfo.userId);
+  const currentUserId = resolveTaskDispatchUserId(userinfo);
+  if (!currentUserId) {
+    setResponseStatus(event, 400);
+    return useResponseError('无法识别当前用户');
+  }
 
   const archiveFilter = getTaskDispatchArchiveFilter();
 
@@ -25,7 +33,7 @@ export default defineEventHandler(async (event) => {
       where: {
         assigneeId: currentUserId,
         level: 1,
-        status: 'PENDING',
+        status: TASK_DISPATCH_STATUS.PENDING,
         ...archiveFilter,
       },
     });
@@ -35,7 +43,7 @@ export default defineEventHandler(async (event) => {
       where: {
         assigneeId: currentUserId,
         level: 2,
-        status: 'PENDING',
+        status: TASK_DISPATCH_STATUS.PENDING,
         ...archiveFilter,
       },
     });
@@ -44,7 +52,7 @@ export default defineEventHandler(async (event) => {
     const processing = await prisma.qms_task_dispatches.count({
       where: {
         assigneeId: currentUserId,
-        status: 'PROCESSING',
+        status: TASK_DISPATCH_STATUS.PROCESSING,
         ...archiveFilter,
       },
     });

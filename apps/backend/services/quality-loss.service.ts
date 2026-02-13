@@ -482,8 +482,26 @@ export const QualityLossService = {
    * Delete a single record with audit logging
    */
   async deleteRecord(id: string, userId: string): Promise<void> {
+    const target = await prisma.quality_losses.findFirst({
+      where: {
+        isDeleted: false,
+        OR: [{ id }, { lossId: id }],
+      },
+      select: { id: true },
+    });
+
+    if (!target) {
+      const notFoundError = new Error(
+        'Quality loss record not found',
+      ) as Error & {
+        code?: string;
+      };
+      notFoundError.code = 'NOT_FOUND';
+      throw notFoundError;
+    }
+
     await prisma.quality_losses.update({
-      where: { id },
+      where: { id: target.id },
       data: { isDeleted: true },
     });
 
@@ -491,7 +509,7 @@ export const QualityLossService = {
       userId,
       action: 'DELETE',
       targetType: 'quality_loss',
-      targetId: id,
+      targetId: target.id,
       details: 'Soft deleted quality loss record',
     });
   },
@@ -503,9 +521,23 @@ export const QualityLossService = {
     ids: string[],
     userId: string,
   ): Promise<Prisma.BatchPayload> {
-    if (ids.length === 0) return { count: 0 };
+    const normalizedIds = [
+      ...new Set(ids.map((item) => String(item).trim()).filter(Boolean)),
+    ];
+    if (normalizedIds.length === 0) return { count: 0 };
+
+    const targets = await prisma.quality_losses.findMany({
+      where: {
+        isDeleted: false,
+        OR: [{ id: { in: normalizedIds } }, { lossId: { in: normalizedIds } }],
+      },
+      select: { id: true },
+    });
+
+    if (targets.length === 0) return { count: 0 };
+
     const result = await prisma.quality_losses.updateMany({
-      where: { id: { in: ids } },
+      where: { id: { in: targets.map((target) => target.id) } },
       data: { isDeleted: true },
     });
 
@@ -513,7 +545,7 @@ export const QualityLossService = {
       userId,
       action: 'DELETE',
       targetType: 'quality_loss',
-      targetId: ids.join(','),
+      targetId: normalizedIds.join(','),
       details: `Batch soft deleted ${result.count} quality loss records`,
     });
 

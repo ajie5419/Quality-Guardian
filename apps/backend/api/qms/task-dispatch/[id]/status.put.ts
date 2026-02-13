@@ -1,27 +1,54 @@
-import { defineEventHandler, readBody } from 'h3';
+import {
+  defineEventHandler,
+  getRouterParam,
+  readBody,
+  setResponseStatus,
+} from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { useResponseSuccess } from '~/utils/response';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
+import { normalizeTaskDispatchStatus } from '~/utils/task-dispatch';
 
 export default defineEventHandler(async (event) => {
-  const id = event.context.params?.id;
-  const body = await readBody(event);
-  const { status } = body;
+  const userinfo = verifyAccessToken(event);
+  if (!userinfo) {
+    return unAuthorizedResponse(event);
+  }
 
-  if (!id) return { code: -1, message: 'ID required' };
+  const id = getRouterParam(event, 'id');
+  if (!id) {
+    setResponseStatus(event, 400);
+    return useResponseError('ID required');
+  }
+
+  const body = (await readBody(event)) as { status?: unknown };
+  const status = normalizeTaskDispatchStatus(body?.status);
+  if (!status) {
+    setResponseStatus(event, 400);
+    return useResponseError('Invalid status');
+  }
 
   try {
     const updatedTask = await prisma.qms_task_dispatches.update({
       where: { id: String(id) },
       data: {
-        status: String(status),
+        status,
         updatedAt: new Date(),
       },
     });
 
     return useResponseSuccess(updatedTask);
-  } catch (error) {
+  } catch (error: unknown) {
     logApiError('status', error);
-    return { code: -1, message: 'Update failed' };
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    return useResponseError(
+      errorCode === 'P2025' ? 'Task not found' : 'Update failed',
+    );
   }
 });

@@ -11,6 +11,7 @@ import {
   getTaskDispatchArchiveFilter,
   resolveTaskDispatchAssigneeFilter,
   resolveTaskDispatchStatusFilter,
+  resolveTaskDispatchUserId,
 } from '~/utils/task-dispatch';
 
 export default defineEventHandler(async (event) => {
@@ -22,7 +23,11 @@ export default defineEventHandler(async (event) => {
   const { all, level, parentId, status } = getQuery(event);
 
   // 确保 ID 类型为 String 且兼容 id/userId 字段
-  const currentUserId = String(userinfo.id ?? userinfo.userId);
+  const currentUserId = resolveTaskDispatchUserId(userinfo);
+  if (!currentUserId) {
+    setResponseStatus(event, 400);
+    return useResponseError('无法识别当前用户');
+  }
   const isAdmin =
     userinfo.roles?.includes('super') || userinfo.roles?.includes('admin');
   const statusFilter = resolveTaskDispatchStatusFilter(status);
