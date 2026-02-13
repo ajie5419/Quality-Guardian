@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { normalizeIdList } from '~/utils/id-list';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -15,10 +16,10 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
-    const { ids } = body;
+    const body = (await readBody(event)) as { ids?: unknown };
+    const ids = normalizeIdList(body.ids);
 
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    if (ids.length === 0) {
       setResponseStatus(event, 400);
       return useResponseError('请提供有效的 ID 列表');
     }

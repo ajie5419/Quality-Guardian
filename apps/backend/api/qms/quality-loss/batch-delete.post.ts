@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { QualityLossService } from '~/services/quality-loss.service';
 import { logApiError } from '~/utils/api-logger';
+import { normalizeIdList } from '~/utils/id-list';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   unAuthorizedResponse,
@@ -16,11 +17,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = (await readBody(event)) as { ids?: unknown };
-    const ids = Array.isArray(body?.ids)
-      ? body.ids
-          .map((item) => String(item).trim())
-          .filter((item) => item.length > 0)
-      : [];
+    const ids = normalizeIdList(body.ids);
 
     if (ids.length === 0) {
       setResponseStatus(event, 400);
