@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -7,6 +7,12 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+import {
+  createSupplierId,
+  normalizeSupplierName,
+  normalizeSupplierStatus,
+  normalizeSupplierString,
+} from '~/utils/supplier';
 
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
@@ -17,36 +23,38 @@ export default defineEventHandler(async (event) => {
     const { items, category } = body;
 
     if (!Array.isArray(items) || items.length === 0) {
+      setResponseStatus(event, 400);
       return useResponseError('未选择数据');
     }
 
     let successCount = 0;
     for (const item of items) {
       try {
-        const name = String(item.name || '').trim();
+        const name = normalizeSupplierName(item.name);
         if (!name) continue;
-
-        const id = `SUP-${Date.now()}-${Math.random().toString(36).slice(-4)}`;
 
         await prisma.suppliers.upsert({
           where: { name },
           update: {
-            brand: item.brand ? String(item.brand) : undefined,
-            productName: item.productName
-              ? String(item.productName)
-              : undefined,
-            buyer: item.buyer ? String(item.buyer) : undefined,
-            category: category || item.category,
+            brand: normalizeSupplierString(item.brand),
+            productName: normalizeSupplierString(item.productName),
+            buyer: normalizeSupplierString(item.buyer),
+            category:
+              normalizeSupplierString(category) ||
+              normalizeSupplierString(item.category),
             isDeleted: false,
           },
           create: {
-            id,
+            id: createSupplierId(),
             name,
-            brand: String(item.brand || ''),
-            productName: String(item.productName || ''),
-            buyer: String(item.buyer || ''),
-            category: category || item.category || 'Supplier',
-            status: 'Qualified',
+            brand: normalizeSupplierString(item.brand),
+            productName: normalizeSupplierString(item.productName),
+            buyer: normalizeSupplierString(item.buyer),
+            category:
+              normalizeSupplierString(category) ||
+              normalizeSupplierString(item.category) ||
+              'Supplier',
+            status: normalizeSupplierStatus(item.status),
           },
         });
         successCount++;
@@ -56,7 +64,9 @@ export default defineEventHandler(async (event) => {
     }
 
     return useResponseSuccess({ successCount, totalCount: items.length });
-  } catch {
+  } catch (error: unknown) {
+    logApiError('import', error);
+    setResponseStatus(event, 500);
     return useResponseError('导入异常');
   }
 });

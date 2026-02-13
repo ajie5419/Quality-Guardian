@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -7,6 +7,13 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+import {
+  createSupplierId,
+  normalizeSupplierName,
+  normalizeSupplierScore,
+  normalizeSupplierStatus,
+  normalizeSupplierString,
+} from '~/utils/supplier';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -16,31 +23,42 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
+    const name = normalizeSupplierName(body.name);
+    if (!name) {
+      setResponseStatus(event, 400);
+      return useResponseError('缺少必填字段: name');
+    }
 
     const newSupplier = await prisma.suppliers.create({
       data: {
-        id: `SUP-${Date.now()}`,
-        name: body.name,
-        category: body.category,
-        productName: body.productName,
-        brand: body.brand,
-        origin: body.origin,
-        project: body.project,
-        buyer: body.buyer,
-        score2025: Number(body.score2025) || 0,
-        status: body.status || 'Qualified',
+        id: createSupplierId(),
+        name,
+        category: normalizeSupplierString(body.category),
+        productName: normalizeSupplierString(body.productName),
+        brand: normalizeSupplierString(body.brand),
+        origin: normalizeSupplierString(body.origin),
+        project: normalizeSupplierString(body.project),
+        buyer: normalizeSupplierString(body.buyer),
+        score2025: normalizeSupplierScore(body.score2025, 0),
+        status: normalizeSupplierStatus(body.status),
         // Optional fields
-        contact: body.contact,
-        phone: body.phone,
-        email: body.email,
-        address: body.address,
+        contact: normalizeSupplierString(body.contact),
+        phone: normalizeSupplierString(body.phone),
+        email: normalizeSupplierString(body.email),
+        address: normalizeSupplierString(body.address),
         isDeleted: false,
       },
     });
 
     return useResponseSuccess(newSupplier);
-  } catch (error) {
+  } catch (error: unknown) {
     logApiError('supplier', error);
+    const errorCode = (error as { code?: string }).code;
+    if (errorCode === 'P2002') {
+      setResponseStatus(event, 409);
+      return useResponseError('供应商名称已存在');
+    }
+    setResponseStatus(event, 500);
     return useResponseError('创建供应商失败');
   }
 });

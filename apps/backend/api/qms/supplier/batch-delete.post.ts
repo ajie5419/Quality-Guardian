@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -19,6 +19,7 @@ export default defineEventHandler(async (event) => {
     const { ids } = body;
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      setResponseStatus(event, 400);
       return useResponseError('请提供有效的 ID 列表');
     }
 
@@ -36,6 +37,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess({ count: ids.length });
   } catch (error) {
     logApiError('batch-delete', error);
+    setResponseStatus(event, 500);
     return useResponseError('批量删除失败');
   }
 });

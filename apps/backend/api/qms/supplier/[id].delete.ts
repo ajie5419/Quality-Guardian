@@ -1,4 +1,4 @@
-import { defineEventHandler, getRouterParam } from 'h3';
+import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -16,6 +16,7 @@ export default defineEventHandler(async (event) => {
 
   const id = getRouterParam(event, 'id');
   if (!id) {
+    setResponseStatus(event, 400);
     return useResponseError('缺少供应商ID');
   }
 
@@ -29,8 +30,10 @@ export default defineEventHandler(async (event) => {
     });
 
     return useResponseSuccess(null);
-  } catch (error) {
+  } catch (error: unknown) {
     logApiError('supplier', error);
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
     return useResponseError('删除供应商失败');
   }
 });

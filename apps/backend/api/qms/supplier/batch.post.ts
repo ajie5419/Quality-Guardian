@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -7,6 +7,12 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+import {
+  createSupplierId,
+  normalizeSupplierName,
+  normalizeSupplierStatus,
+  normalizeSupplierString,
+} from '~/utils/supplier';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -19,6 +25,7 @@ export default defineEventHandler(async (event) => {
     const { items } = body;
 
     if (!items || !Array.isArray(items)) {
+      setResponseStatus(event, 400);
       return useResponseError('无效的导入数据');
     }
 
@@ -35,33 +42,31 @@ export default defineEventHandler(async (event) => {
 
       await Promise.all(
         chunk.map(async (item) => {
-          if (!item.name) {
+          const name = normalizeSupplierName(item.name);
+          if (!name) {
             results.errors++;
             return;
           }
 
           try {
-            // 生成唯一 ID (避免前端未传 ID 时的问题)
-            const id = `SUP-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-
             await prisma.suppliers.upsert({
-              where: { name: item.name },
+              where: { name },
               update: {
-                brand: item.brand || undefined,
-                category: item.category || undefined,
-                productName: item.productName || undefined,
-                buyer: item.buyer || undefined,
+                brand: normalizeSupplierString(item.brand),
+                category: normalizeSupplierString(item.category),
+                productName: normalizeSupplierString(item.productName),
+                buyer: normalizeSupplierString(item.buyer),
                 isDeleted: false, // 确保重新导入时恢复已删除的记录
                 updatedAt: new Date(),
               },
               create: {
-                id,
-                name: item.name,
-                brand: item.brand,
-                category: item.category,
-                productName: item.productName,
-                buyer: item.buyer,
-                status: 'Qualified',
+                id: createSupplierId(),
+                name,
+                brand: normalizeSupplierString(item.brand),
+                category: normalizeSupplierString(item.category),
+                productName: normalizeSupplierString(item.productName),
+                buyer: normalizeSupplierString(item.buyer),
+                status: normalizeSupplierStatus(item.status),
               },
             });
             results.success++;
@@ -76,6 +81,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(results);
   } catch (error) {
     logApiError('batch', error);
+    setResponseStatus(event, 500);
     return useResponseError('批量导入失败');
   }
 });
