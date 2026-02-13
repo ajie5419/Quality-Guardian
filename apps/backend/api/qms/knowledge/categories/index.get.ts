@@ -1,8 +1,12 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -51,6 +55,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(tree);
   } catch (error) {
     logApiError('categories', error);
-    return useResponseSuccess([]);
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to fetch knowledge categories');
   }
 });

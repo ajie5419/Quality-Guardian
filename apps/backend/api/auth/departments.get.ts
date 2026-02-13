@@ -1,7 +1,7 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
-import { useResponseSuccess } from '~/utils/response';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 interface DeptItem {
   id: string;
@@ -42,7 +42,7 @@ function buildDeptTree(items: DeptItem[]) {
 /**
  * Public endpoint to fetch departments for registration
  */
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
   try {
     const departments = await prisma.departments.findMany({
       where: {
@@ -61,6 +61,7 @@ export default defineEventHandler(async () => {
     return useResponseSuccess(tree);
   } catch (error) {
     logApiError('departments', error);
-    return useResponseSuccess([]);
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to fetch departments');
   }
 });

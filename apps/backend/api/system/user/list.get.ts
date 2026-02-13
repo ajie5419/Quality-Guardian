@@ -1,11 +1,11 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { UserService } from '~/services/user.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   unAuthorizedResponse,
   usePageResponseSuccess,
-  useResponseSuccess,
+  useResponseError,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -31,6 +31,7 @@ export default defineEventHandler(async (event) => {
     );
   } catch (error) {
     logApiError('user', error);
-    return useResponseSuccess([]);
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to fetch user list');
   }
 });

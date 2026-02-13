@@ -1,11 +1,11 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
   unAuthorizedResponse,
   usePageResponseSuccess,
-  useResponseSuccess,
+  useResponseError,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -61,6 +61,7 @@ export default defineEventHandler(async (event) => {
     );
   } catch (error) {
     logApiError('list', error);
-    return useResponseSuccess([]); // Fail safe
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to fetch role list');
   }
 });
