@@ -7,6 +7,7 @@ import {
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -48,10 +49,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('knowledge', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError(
-      errorCode === 'P2025' ? '知识条目不存在' : '更新失败',
+      isPrismaNotFoundError(error) ? '知识条目不存在' : '更新失败',
     );
   }
 });

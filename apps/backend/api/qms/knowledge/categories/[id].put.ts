@@ -8,6 +8,10 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
+  isPrismaNotFoundError,
+  isPrismaUniqueConstraintError,
+} from '~/utils/prisma-error';
+import {
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -39,14 +43,13 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('categories', error);
-    const errorCode = (error as { code?: string }).code;
-    if (errorCode === 'P2002') {
+    if (isPrismaUniqueConstraintError(error)) {
       setResponseStatus(event, 409);
       return useResponseError('分类名称已存在');
     }
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError(
-      errorCode === 'P2025' ? '分类不存在' : '更新分类失败',
+      isPrismaNotFoundError(error) ? '分类不存在' : '更新分类失败',
     );
   }
 });
