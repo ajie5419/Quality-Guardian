@@ -1,9 +1,4 @@
-import {
-  defineEventHandler,
-  getRouterParam,
-  readBody,
-  setResponseStatus,
-} from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -16,6 +11,7 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+import { getRequiredRouterParam } from '~/utils/route-param';
 import {
   normalizeSupplierScore,
   normalizeSupplierStatus,
@@ -28,10 +24,9 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const id = getRouterParam(event, 'id');
-  if (!id) {
-    setResponseStatus(event, 400);
-    return useResponseError('缺少供应商ID');
+  const id = getRequiredRouterParam(event, 'id', '缺少供应商ID');
+  if (typeof id !== 'string') {
+    return id;
   }
 
   try {

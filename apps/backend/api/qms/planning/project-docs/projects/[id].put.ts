@@ -1,9 +1,4 @@
-import {
-  defineEventHandler,
-  getRouterParam,
-  readBody,
-  setResponseStatus,
-} from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
@@ -16,15 +11,15 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
 
-  const id = getRouterParam(event, 'id');
-  if (!id) {
-    setResponseStatus(event, 400);
-    return useResponseError('ID is required');
+  const id = getRequiredRouterParam(event, 'id', 'ID is required');
+  if (typeof id !== 'string') {
+    return id;
   }
 
   try {

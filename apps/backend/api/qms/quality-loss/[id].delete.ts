@@ -1,4 +1,4 @@
-import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { QualityLossService } from '~/services/quality-loss.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -7,6 +7,7 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -14,10 +15,9 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const id = getRouterParam(event, 'id');
-  if (!id) {
-    setResponseStatus(event, 400);
-    return useResponseError('Missing ID');
+  const id = getRequiredRouterParam(event, 'id', 'Missing ID');
+  if (typeof id !== 'string') {
+    return id;
   }
 
   try {
