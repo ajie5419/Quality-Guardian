@@ -90,7 +90,6 @@ export default defineEventHandler(async (event) => {
     const err = error as { code?: string; message?: string; meta?: unknown };
     const errorMessage = err.message || String(error);
 
-    // Handle Prisma Unique Constraint Violation (P2002)
     const isUniqueError = isPrismaUniqueConflictError(error);
 
     if (isUniqueError) {
