@@ -1,6 +1,7 @@
 import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
+import { hasInspectionIssueAdminAccess } from '~/utils/inspection-issue';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -34,17 +35,13 @@ export default defineEventHandler(async (event) => {
       return useResponseError('记录不存在');
     }
 
-    const userRoles = userinfo.roles || [];
-    const isAdmin =
-      userRoles.includes('super') ||
-      userRoles.includes('admin') ||
-      userRoles.includes('Super Admin');
+    const isAdmin = hasInspectionIssueAdminAccess(userinfo.roles);
     const isOwner = existingRecord.inspector === userinfo.username;
 
     if (!isAdmin && !isOwner) {
       return forbiddenResponse(event, '无权删除：您只能删除自己创建的数据');
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logApiError('issues', error);
     setResponseStatus(event, 500);
     return useResponseError('权限校验失败');

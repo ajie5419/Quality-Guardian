@@ -122,6 +122,147 @@ function normalizeOptionalNumber(value: unknown): number | undefined {
   return parsed;
 }
 
+function normalizeOptionalDate(value: unknown): Date | undefined {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return undefined;
+  }
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+  return parsed;
+}
+
+export function hasInspectionIssueAdminAccess(roles: unknown): boolean {
+  if (!Array.isArray(roles)) {
+    return false;
+  }
+
+  const normalizedRoles = roles
+    .map((role) => normalizeOptionalString(role)?.toLowerCase())
+    .filter(Boolean) as string[];
+
+  return normalizedRoles.some(
+    (role) => role === 'admin' || role === 'super' || role === 'super admin',
+  );
+}
+
+export function buildInspectionIssueCreateData(
+  body: Record<string, unknown>,
+  options: {
+    id: string;
+    inspectorUsername?: string;
+    serialNumber: number;
+  },
+) {
+  const issueDate = normalizeOptionalDate(body.reportDate) ?? new Date();
+  const workOrderNumber = normalizeOptionalString(body.workOrderNumber);
+
+  return {
+    id: options.id,
+    serialNumber: options.serialNumber,
+    date: issueDate,
+    status: toQualityRecordStatus(normalizeOptionalString(body.status)),
+    nonConformanceNumber: normalizeOptionalString(body.ncNumber) ?? null,
+    work_orders: workOrderNumber
+      ? {
+          connect: {
+            workOrderNumber,
+          },
+        }
+      : undefined,
+    projectName: normalizeOptionalString(body.projectName),
+    processName: normalizeOptionalString(body.processName),
+    partName: normalizeOptionalString(body.partName) ?? 'Unknown',
+    division: normalizeOptionalString(body.division),
+    defectType: normalizeOptionalString(body.defectType),
+    defectSubtype: normalizeOptionalString(body.defectSubtype),
+    rootCause: normalizeOptionalString(body.rootCause),
+    solution: normalizeOptionalString(body.solution),
+    description: normalizeOptionalString(body.description),
+    quantity: normalizeOptionalNumber(body.quantity) ?? 1,
+    lossAmount: normalizeOptionalNumber(body.lossAmount) ?? 0,
+    responsibleDepartment:
+      normalizeOptionalString(body.responsibleDepartment) ?? 'Unknown',
+    supplierName: normalizeOptionalString(body.supplierName) ?? null,
+    users_quality_records_inspectorTousers: options.inspectorUsername
+      ? { connect: { username: options.inspectorUsername } }
+      : undefined,
+    isClaim: body.claim === 'Yes' || body.claim === true,
+    issuePhoto:
+      body.photos === undefined ? '[]' : JSON.stringify(body.photos ?? []),
+    isDeleted: false,
+    updatedAt: new Date(),
+  };
+}
+
+export function buildInspectionIssueUpdateData(
+  body: Record<string, unknown>,
+  existingNcNumber: null | string,
+) {
+  const updateData: Record<string, unknown> = {
+    updatedAt: new Date(),
+  };
+
+  if (body.ncNumber !== undefined && body.ncNumber !== existingNcNumber) {
+    updateData.nonConformanceNumber =
+      normalizeOptionalString(body.ncNumber) ?? null;
+  }
+
+  const stringFields = [
+    'workOrderNumber',
+    'projectName',
+    'processName',
+    'partName',
+    'inspector',
+    'description',
+    'responsibleDepartment',
+    'supplierName',
+    'rootCause',
+    'solution',
+    'defectType',
+    'defectSubtype',
+    'severity',
+  ];
+  for (const field of stringFields) {
+    if (body[field] !== undefined) {
+      updateData[field] = normalizeOptionalString(body[field]) ?? null;
+    }
+  }
+
+  const quantity = normalizeOptionalNumber(body.quantity);
+  if (quantity !== undefined) {
+    updateData.quantity = quantity;
+  }
+
+  const lossAmount = normalizeOptionalNumber(body.lossAmount);
+  if (lossAmount !== undefined) {
+    updateData.lossAmount = lossAmount;
+  }
+
+  const reportDate = normalizeOptionalDate(body.reportDate);
+  if (reportDate) {
+    updateData.date = reportDate;
+  }
+
+  if (body.photos !== undefined) {
+    updateData.issuePhoto = JSON.stringify(body.photos ?? []);
+  }
+
+  if (body.claim !== undefined) {
+    updateData.isClaim = body.claim === 'Yes' || body.claim === true;
+  }
+
+  if (body.status !== undefined) {
+    updateData.status = toQualityRecordStatus(
+      normalizeOptionalString(body.status),
+    );
+  }
+
+  return updateData;
+}
+
 export function buildInspectionIssueUpsertPayload(
   item: InspectionIssueImportItem,
   serialNumber: number,

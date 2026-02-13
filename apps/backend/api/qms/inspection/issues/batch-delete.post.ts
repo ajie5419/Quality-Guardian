@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
       return useResponseError('请提供有效的 ID 列表');
     }
 
-    await prisma.quality_records.updateMany({
+    const result = await prisma.quality_records.updateMany({
       where: {
         id: { in: ids },
       },
@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    return useResponseSuccess({ successCount: ids.length });
+    return useResponseSuccess({ successCount: result.count });
   } catch (error) {
     logApiError('batch-delete', error);
     setResponseStatus(event, 500);
