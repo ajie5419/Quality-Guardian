@@ -2,6 +2,7 @@ import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaForeignKeyError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -117,7 +118,7 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     logApiError('task-dispatch', error);
     const err = error as { code?: string; message?: string };
-    setResponseStatus(event, err.code === 'P2003' ? 400 : 500);
+    setResponseStatus(event, isPrismaForeignKeyError(error) ? 400 : 500);
     return useResponseError(`派发失败: ${err.message || '数据库写入异常'}`);
   }
 });

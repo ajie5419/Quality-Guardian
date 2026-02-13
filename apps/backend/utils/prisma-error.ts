@@ -29,3 +29,7 @@ export function isPrismaUniqueConflictError(error: unknown): boolean {
     message.includes('Unique constraint failed')
   );
 }
+
+export function isPrismaRequiredValueError(error: unknown): boolean {
+  return isPrismaErrorCode(error, 'P2011') || isPrismaErrorCode(error, 'P2012');
+}

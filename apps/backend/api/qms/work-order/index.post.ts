@@ -2,7 +2,10 @@ import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { isPrismaUniqueConflictError } from '~/utils/prisma-error';
+import {
+  isPrismaRequiredValueError,
+  isPrismaUniqueConflictError,
+} from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -97,8 +100,7 @@ export default defineEventHandler(async (event) => {
 
     // Handle Prisma Validation Errors (Missing Arguments etc.)
     if (
-      err.code === 'P2011' ||
-      err.code === 'P2012' ||
+      isPrismaRequiredValueError(error) ||
       errorMessage.includes('Argument')
     ) {
       setResponseStatus(event, 400);
