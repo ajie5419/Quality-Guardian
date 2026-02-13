@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -14,9 +14,10 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    const { workOrderNumber } = body;
+    const workOrderNumber = String(body.workOrderNumber ?? '').trim();
 
     if (!workOrderNumber) {
+      setResponseStatus(event, 400);
       return useResponseError('工单号不能为空');
     }
 
@@ -25,6 +26,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!wo) {
+      setResponseStatus(event, 400);
       return useResponseError('工单不存在');
     }
 
@@ -34,12 +36,13 @@ export default defineEventHandler(async (event) => {
 
     if (existing) {
       if (existing.isDeleted) {
-        await prisma.doc_projects.update({
+        const restored = await prisma.doc_projects.update({
           where: { id: existing.id },
           data: { isDeleted: false, updatedAt: new Date() },
         });
-        return useResponseSuccess(existing);
+        return useResponseSuccess(restored);
       }
+      setResponseStatus(event, 409);
       return useResponseError('该工单已在项目资料列表中');
     }
 
@@ -53,7 +56,8 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newProject);
   } catch (error) {
-    logApiError('projects', error);
+    logApiError('project-docs-projects', error);
+    setResponseStatus(event, 500);
     return useResponseError('添加项目资料失败');
   }
 });

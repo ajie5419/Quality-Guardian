@@ -1,4 +1,4 @@
-import { defineEventHandler, getRouterParam } from 'h3';
+import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -13,7 +13,10 @@ export default defineEventHandler(async (event) => {
   if (!userinfo) return unAuthorizedResponse(event);
 
   const id = getRouterParam(event, 'id');
-  if (!id) return useResponseError('ID is required');
+  if (!id) {
+    setResponseStatus(event, 400);
+    return useResponseError('ID is required');
+  }
 
   try {
     await prisma.doc_projects.update({
@@ -23,7 +26,11 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ message: 'Deleted' });
   } catch (error) {
-    logApiError('projects', error);
+    logApiError('project-docs-projects', error);
+    setResponseStatus(
+      event,
+      (error as { code?: string }).code === 'P2025' ? 404 : 500,
+    );
     return useResponseError('Delete failed');
   }
 });
