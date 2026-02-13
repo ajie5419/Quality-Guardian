@@ -7,6 +7,7 @@ import {
 import { logApiError } from '~/utils/api-logger';
 import { buildProjectBomMutableData, mapProjectBomItem } from '~/utils/bom';
 import { MOCK_DELAY } from '~/utils/index';
+import { isPrismaNotFoundError } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -28,10 +29,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(mapProjectBomItem(updated));
   } catch (error) {
     logApiError('bom', error);
-    setResponseStatus(
-      event,
-      (error as { code?: string }).code === 'P2025' ? 404 : 500,
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
+    return useResponseError(
+      isPrismaNotFoundError(error) ? 'BOM item not found' : '更新 BOM 条目失败',
     );
-    return useResponseError('更新 BOM 条目失败');
   }
 });
