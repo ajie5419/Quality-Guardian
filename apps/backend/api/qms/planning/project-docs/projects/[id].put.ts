@@ -6,6 +6,10 @@ import {
 } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  isPrismaNotFoundError,
+  normalizePlanningProjectName,
+} from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import {
   unAuthorizedResponse,
@@ -28,20 +32,18 @@ export default defineEventHandler(async (event) => {
     const updated = await prisma.doc_projects.update({
       where: { id },
       data: {
-        status: body.status ? String(body.status).trim() : undefined,
-        projectName: body.projectName
-          ? String(body.projectName).trim()
-          : undefined,
+        status:
+          body.status === undefined ? undefined : String(body.status).trim(),
+        projectName: normalizePlanningProjectName(body.projectName),
         updatedAt: new Date(),
       },
     });
     return useResponseSuccess(updated);
   } catch (error) {
     logApiError('project-docs-projects', error);
-    setResponseStatus(
-      event,
-      (error as { code?: string }).code === 'P2025' ? 404 : 500,
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
+    return useResponseError(
+      isPrismaNotFoundError(error) ? 'Project not found' : '更新失败',
     );
-    return useResponseError('更新失败');
   }
 });

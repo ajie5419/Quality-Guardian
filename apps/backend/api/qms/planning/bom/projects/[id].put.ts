@@ -5,8 +5,12 @@ import {
   setResponseStatus,
 } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { normalizeBomProjectStatus, normalizeBomText } from '~/utils/bom';
+import { normalizeBomProjectStatus } from '~/utils/bom';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  buildPlanningProjectUpdateData,
+  isPrismaNotFoundError,
+} from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import {
   unAuthorizedResponse,
@@ -28,21 +32,14 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event);
     const updated = await prisma.bom_projects.update({
       where: { id },
-      data: {
-        status: body.status
-          ? normalizeBomProjectStatus(body.status)
-          : undefined,
-        projectName: normalizeBomText(body.projectName) || undefined,
-        updatedAt: new Date(),
-      },
+      data: buildPlanningProjectUpdateData(body, normalizeBomProjectStatus),
     });
     return useResponseSuccess(updated);
   } catch (error) {
     logApiError('bom-projects', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError(
-      errorCode === 'P2025'
+      isPrismaNotFoundError(error)
         ? 'BOM project not found'
         : 'Failed to update BOM project',
     );
