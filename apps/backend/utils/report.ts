@@ -32,6 +32,44 @@ export function parseReportDate(value: unknown): Date | null {
   return parsed;
 }
 
+export function getReportDayRange(date: Date): { end: Date; start: Date } {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+
+  return { end, start };
+}
+
+export function resolveReportDateRangeQuery(
+  startValue: unknown,
+  endValue: unknown,
+):
+  | {
+      endDate: string;
+      reason: null;
+      startDate: string;
+    }
+  | {
+      endDate?: undefined;
+      reason: 'INVALID' | 'MISSING';
+      startDate?: undefined;
+    } {
+  const startDate = String(startValue ?? '').trim();
+  const endDate = String(endValue ?? '').trim();
+
+  if (!startDate || !endDate) {
+    return { reason: 'MISSING' };
+  }
+
+  if (!parseReportDate(startDate) || !parseReportDate(endDate)) {
+    return { reason: 'INVALID' };
+  }
+
+  return { endDate, reason: null, startDate };
+}
+
 export function parseReportNumber(value: unknown, defaultValue = 0): number {
   if (value === undefined || value === null || value === '') {
     return defaultValue;

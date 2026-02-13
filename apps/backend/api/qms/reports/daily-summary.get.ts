@@ -2,7 +2,11 @@ import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { formatReportDate, resolveReportQueryDate } from '~/utils/report';
+import {
+  formatReportDate,
+  getReportDayRange,
+  resolveReportQueryDate,
+} from '~/utils/report';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -29,10 +33,9 @@ export default defineEventHandler(async (event) => {
   try {
     // 1. Fetch Inspection Records (Created by user on date)
     // Range: queryDate 00:00:00 to 23:59:59
-    const startDate = new Date(queryDate);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(queryDate);
-    endDate.setHours(23, 59, 59, 999);
+    const { end: endDate, start: startDate } = getReportDayRange(
+      new Date(queryDate),
+    );
 
     const inspections = await prisma.inspections.findMany({
       where: {
