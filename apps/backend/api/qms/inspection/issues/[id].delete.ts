@@ -1,25 +1,25 @@
-import { createError, defineEventHandler, getRouterParam } from 'h3';
+import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { useResponseSuccess } from '~/utils/response';
+import {
+  forbiddenResponse,
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
-    throw createError({
-      statusCode: 401,
-      statusMessage: 'Unauthorized',
-    });
+    return unAuthorizedResponse(event);
   }
 
   const id = getRouterParam(event, 'id');
   if (!id) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Missing ID',
-    });
+    setResponseStatus(event, 400);
+    return useResponseError('缺少ID');
   }
 
   // Data Ownership Check
@@ -30,10 +30,8 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!existingRecord) {
-      throw createError({
-        statusCode: 404,
-        statusMessage: 'Record not found',
-      });
+      setResponseStatus(event, 404);
+      return useResponseError('记录不存在');
     }
 
     const userRoles = userinfo.roles || [];
@@ -44,18 +42,12 @@ export default defineEventHandler(async (event) => {
     const isOwner = existingRecord.inspector === userinfo.username;
 
     if (!isAdmin && !isOwner) {
-      throw createError({
-        statusCode: 403,
-        statusMessage: 'Forbidden: You can only delete your own data',
-      });
+      return forbiddenResponse(event, '无权删除：您只能删除自己创建的数据');
     }
   } catch (error: any) {
-    if (error.statusCode) throw error;
     logApiError('issues', error);
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Internal Server Error',
-    });
+    setResponseStatus(event, 500);
+    return useResponseError('权限校验失败');
   }
 
   try {
@@ -63,9 +55,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('issues', error);
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Internal Server Error',
-    });
+    setResponseStatus(event, 500);
+    return useResponseError('删除问题失败');
   }
 });

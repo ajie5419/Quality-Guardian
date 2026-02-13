@@ -1,8 +1,14 @@
-import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import {
+  defineEventHandler,
+  getRouterParam,
+  readBody,
+  setResponseStatus,
+} from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 import {
   forbiddenResponse,
   unAuthorizedResponse,
@@ -18,6 +24,7 @@ export default defineEventHandler(async (event) => {
 
   const id = getRouterParam(event, 'id');
   if (!id) {
+    setResponseStatus(event, 400);
     return useResponseError('缺少ID');
   }
 
@@ -30,6 +37,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!existingRecord) {
+      setResponseStatus(event, 404);
       return useResponseError('记录不存在');
     }
 
@@ -47,6 +55,7 @@ export default defineEventHandler(async (event) => {
     }
   } catch (error) {
     logApiError('issues', error);
+    setResponseStatus(event, 500);
     return useResponseError('权限校验失败');
   }
 
@@ -65,60 +74,48 @@ export default defineEventHandler(async (event) => {
     ) {
       updateData.nonConformanceNumber = bodyRecord.ncNumber || null;
     }
-    if (bodyRecord.workOrderNumber)
+    if (bodyRecord.workOrderNumber !== undefined)
       updateData.workOrderNumber = bodyRecord.workOrderNumber;
-    if (bodyRecord.projectName) updateData.projectName = bodyRecord.projectName;
-    if (bodyRecord.processName) updateData.processName = bodyRecord.processName; // Added processName
-    if (bodyRecord.partName) updateData.partName = bodyRecord.partName;
-    if (bodyRecord.inspector) updateData.inspector = bodyRecord.inspector;
-    if (bodyRecord.description) updateData.description = bodyRecord.description;
-    if (bodyRecord.quantity) updateData.quantity = Number(bodyRecord.quantity);
-    if (bodyRecord.lossAmount)
+    if (bodyRecord.projectName !== undefined)
+      updateData.projectName = bodyRecord.projectName;
+    if (bodyRecord.processName !== undefined)
+      updateData.processName = bodyRecord.processName;
+    if (bodyRecord.partName !== undefined)
+      updateData.partName = bodyRecord.partName;
+    if (bodyRecord.inspector !== undefined)
+      updateData.inspector = bodyRecord.inspector;
+    if (bodyRecord.description !== undefined)
+      updateData.description = bodyRecord.description;
+    if (bodyRecord.quantity !== undefined)
+      updateData.quantity = Number(bodyRecord.quantity);
+    if (bodyRecord.lossAmount !== undefined)
       updateData.lossAmount = Number(bodyRecord.lossAmount);
     if (bodyRecord.responsibleDepartment)
       updateData.responsibleDepartment = bodyRecord.responsibleDepartment;
     if (bodyRecord.supplierName !== undefined)
       updateData.supplierName = bodyRecord.supplierName;
-    if (bodyRecord.rootCause) updateData.rootCause = bodyRecord.rootCause;
-    if (bodyRecord.solution) updateData.solution = bodyRecord.solution;
-    if (bodyRecord.defectType) updateData.defectType = bodyRecord.defectType;
+    if (bodyRecord.rootCause !== undefined)
+      updateData.rootCause = bodyRecord.rootCause;
+    if (bodyRecord.solution !== undefined)
+      updateData.solution = bodyRecord.solution;
+    if (bodyRecord.defectType !== undefined)
+      updateData.defectType = bodyRecord.defectType;
     if (bodyRecord.defectSubtype)
       updateData.defectSubtype = bodyRecord.defectSubtype;
-    if (bodyRecord.severity) updateData.severity = bodyRecord.severity;
+    if (bodyRecord.severity !== undefined)
+      updateData.severity = bodyRecord.severity;
     if (bodyRecord.reportDate)
       updateData.date = new Date(bodyRecord.reportDate as string);
-    // Fix for Photos Update
-    if (bodyRecord.photos) {
+    if (bodyRecord.photos !== undefined) {
       updateData.issuePhoto = JSON.stringify(bodyRecord.photos);
     }
-    // Fix for Claim Update
     if (bodyRecord.claim !== undefined) {
       updateData.isClaim =
         bodyRecord.claim === 'Yes' || bodyRecord.claim === true;
     }
 
-    if (bodyRecord.status) {
-      const statusBody = String(bodyRecord.status).toUpperCase();
-      switch (statusBody) {
-        case 'CLOSED':
-        case '已关闭': {
-          updateData.status = 'CLOSED';
-          break;
-        }
-        case 'IN_PROGRESS':
-        case '进行中': {
-          updateData.status = 'IN_PROGRESS';
-          break;
-        }
-        case 'OPEN':
-        case '开启': {
-          updateData.status = 'OPEN';
-          break;
-        }
-        default: {
-          updateData.status = bodyRecord.status;
-        }
-      }
+    if (bodyRecord.status !== undefined) {
+      updateData.status = toQualityRecordStatus(bodyRecord.status as string);
     }
 
     await prisma.quality_records.update({
@@ -135,8 +132,10 @@ export default defineEventHandler(async (event) => {
     });
 
     return useResponseSuccess(null);
-  } catch (error) {
+  } catch (error: unknown) {
     logApiError('issues', error);
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
     return useResponseError('更新问题失败');
   }
 });

@@ -1,7 +1,12 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import {
+  createInspectionIssueId,
+  getNextInspectionIssueSerialNumber,
+} from '~/utils/inspection-issue';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -17,30 +22,19 @@ export default defineEventHandler(async (event) => {
     const { items } = body;
 
     if (!Array.isArray(items) || items.length === 0) {
+      setResponseStatus(event, 400);
       return useResponseError('未发现可导入的数据');
     }
 
     let successCount = 0;
+    let serialSeed = await getNextInspectionIssueSerialNumber();
     for (const item of items) {
       try {
         const ncNumber = String(
           item.nonConformanceNumber || item.ncNumber || '',
         ).trim();
         if (!ncNumber) continue;
-
-        const id = `QR-${Date.now()}-${Math.random().toString(36).slice(-4)}`;
-
-        // 状态映射
-        type QualityRecordStatus =
-          | 'CLOSED'
-          | 'IN_PROGRESS'
-          | 'OPEN'
-          | 'RESOLVED';
-        let status: QualityRecordStatus = 'OPEN';
-        const s = String(item.status || '').toUpperCase();
-        if (s.includes('CLOSE') || s.includes('解决')) status = 'RESOLVED';
-        if (s.includes('PROGRESS') || s.includes('处理'))
-          status = 'IN_PROGRESS';
+        const status = toQualityRecordStatus(item.status);
 
         await prisma.quality_records.upsert({
           where: { nonConformanceNumber: ncNumber },
@@ -59,8 +53,8 @@ export default defineEventHandler(async (event) => {
             status,
           },
           create: {
-            id,
-            serialNumber: Math.floor(Math.random() * 1_000_000),
+            id: createInspectionIssueId(),
+            serialNumber: serialSeed++,
             date: new Date(),
             status,
             partName: String(item.partName || '未知零件'),
@@ -84,7 +78,9 @@ export default defineEventHandler(async (event) => {
     }
 
     return useResponseSuccess({ successCount, totalCount: items.length });
-  } catch {
+  } catch (error: unknown) {
+    logApiError('import', error);
+    setResponseStatus(event, 500);
     return useResponseError('数据解析失败');
   }
 });

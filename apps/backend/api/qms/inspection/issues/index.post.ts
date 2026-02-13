@@ -1,8 +1,13 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
+import {
+  createInspectionIssueId,
+  getNextInspectionIssueSerialNumber,
+} from '~/utils/inspection-issue';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -10,33 +15,23 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  // 1. Read Body & Logging
-  const body = await readBody(event);
-
   const userinfo = await verifyAccessToken(event);
   if (!userinfo) {
     return unAuthorizedResponse(event);
   }
 
   try {
-    // Map Status - Unified to uppercase Enum keys
-    let status = 'OPEN';
-    const statusBody = String(body.status || '').toUpperCase();
-    if (statusBody === 'CLOSED' || statusBody === '已关闭') status = 'CLOSED';
-    else if (statusBody === 'IN_PROGRESS' || statusBody === '进行中')
-      status = 'IN_PROGRESS';
-    else status = 'OPEN';
-
-    // Ensure ID logic is clean
-    const currentYear = new Date().getFullYear();
-    const newId = `ISS-${currentYear}-${Date.now()}`;
+    const body = await readBody(event);
+    const status = toQualityRecordStatus(body.status);
+    const newId = createInspectionIssueId();
+    const serialNumber = await getNextInspectionIssueSerialNumber();
 
     const newRecord = await prisma.quality_records.create({
       data: {
         id: newId,
-        serialNumber: Math.floor(Date.now() / 1000),
+        serialNumber,
         date: new Date(body.reportDate || Date.now()),
-        status: status as 'CLOSED' | 'IN_PROGRESS' | 'OPEN',
+        status,
         nonConformanceNumber: body.ncNumber || null,
 
         work_orders: body.workOrderNumber
@@ -93,6 +88,10 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('issues', error);
-    return useResponseError(`创建问题失败: ${error.message}`);
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2002' ? 409 : 500);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return useResponseError(`创建问题失败: ${errorMessage}`);
   }
 });

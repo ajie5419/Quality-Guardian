@@ -571,16 +571,8 @@ export const InspectionService = {
         trendData,
       };
     } catch (error) {
-      logger.error({ err: error }, 'getIssueStats failed');
-      return {
-        totalCount: 0,
-        openCount: 0,
-        closedCount: 0,
-        totalLoss: 0,
-        closedRate: 0,
-        pieData: [],
-        trendData: [],
-      };
+      logger.error({ err: error, year }, 'getIssueStats failed');
+      throw error;
     }
   },
 
