@@ -22,7 +22,21 @@ fi
 : "${ECS_IP:?未设置 ECS_IP}"
 : "${ECS_SSH_KEY:?未设置 ECS_SSH_KEY}"
 
-# --- 1. 版本管理 ---
+# --- 1. 代码检查 ---
+echo -e "${BLUE}🧪 1. 代码质量检测...${NC}"
+FAIL=0
+pnpm run lint & LINT_PID=$!
+pnpm run check:type & TYPE_PID=$!
+
+wait $LINT_PID || { echo -e "${RED}❌ Lint 失败${NC}"; FAIL=1; }
+wait $TYPE_PID || { echo -e "${RED}❌ 类型检查失败${NC}"; FAIL=1; }
+
+if [ "$FAIL" -ne 0 ]; then
+    echo -e "${RED}❌ 检测未通过，终止部署${NC}"
+    exit 1
+fi
+
+# --- 2. 版本管理 ---
 CURRENT_VERSION=$(node -p "require('./package.json').version")
 echo -e "${BLUE}📌 当前项目版本: $CURRENT_VERSION${NC}"
 
@@ -43,20 +57,6 @@ NEW_VERSION=$(node -p "require('./package.json').version")
 echo -e "${GREEN}✅ 版本: $NEW_VERSION${NC}"
 
 TAG="v$NEW_VERSION"
-
-# --- 2. 代码检查 ---
-echo -e "${BLUE}🧪 2. 代码质量检测...${NC}"
-FAIL=0
-pnpm run lint & LINT_PID=$!
-pnpm run check:type & TYPE_PID=$!
-
-wait $LINT_PID || { echo -e "${RED}❌ Lint 失败${NC}"; FAIL=1; }
-wait $TYPE_PID || { echo -e "${RED}❌ 类型检查失败${NC}"; FAIL=1; }
-
-if [ "$FAIL" -ne 0 ]; then
-    echo -e "${RED}❌ 检测未通过，终止部署${NC}"
-    exit 1
-fi
 
 # --- 3. 登录 & 构建 ---
 echo -e "${BLUE}🔐 3. 登录阿里云镜像仓库...${NC}"
@@ -96,19 +96,41 @@ docker push "$REGISTRY/$REPO:frontend-latest" & F_PUSH=$!
 docker push "$REGISTRY/$REPO:frontend-$TAG" & F_TAG_PUSH=$!
 wait $B_PUSH $B_TAG_PUSH $F_PUSH $F_TAG_PUSH
 
-# --- 6. 远程部署（修复版）---
+# --- 6. 远程部署（固定版本Tag + 自动回滚）---
 echo -e "${BLUE}🚀 6. 执行远程部署...${NC}"
 
 DEPLOY_SCRIPT=$(cat << EOF
-set -e
+set -euo pipefail
 cd /opt/qms
 
+rollback() {
+    echo "❌ 部署过程失败，执行回滚..."
+    if [ -f docker-compose.backup.yml ]; then
+        cp docker-compose.backup.yml docker-compose.yml
+        docker-compose up -d
+    else
+        echo "⚠️ 未找到 docker-compose.backup.yml，无法自动回滚"
+    fi
+}
+trap rollback ERR
+
 echo "📝 备份当前运行版本（在拉取新镜像前）..."
-# 🌟 关键修复：先备份当前配置，再拉取镜像
 cp docker-compose.yml docker-compose.backup.yml
 
+if [ -f docker-compose.next.yml ]; then
+    cp docker-compose.next.yml docker-compose.yml
+fi
+
+echo "🏷️ 切换到目标镜像版本: $TAG"
+sed -E -i \
+  "s|(^[[:space:]]*image:[[:space:]]+).*:backend-[^[:space:]]+|\\1$REGISTRY/$REPO:backend-$TAG|" \
+  docker-compose.yml
+sed -E -i \
+  "s|(^[[:space:]]*image:[[:space:]]+).*:frontend-[^[:space:]]+|\\1$REGISTRY/$REPO:frontend-$TAG|" \
+  docker-compose.yml
+
 echo "⬇️ 拉取新镜像..."
-docker-compose pull
+docker-compose pull backend frontend
 
 echo "🚀 启动基础服务 (Redis)..."
 docker-compose up -d redis
@@ -116,22 +138,15 @@ docker-compose up -d redis
 sleep 3
 
 echo "🔄 同步数据库 Schema (migrate deploy)..."
-# 生产环境使用 db push (因为项目中没有 migrations 文件夹)
 if ! docker-compose run --rm backend sh -c "cd /app && ./apps/backend/node_modules/.bin/prisma db push --schema=./prisma/schema.prisma --skip-generate"; then
-    echo "❌ 数据库同步失败 (db push)，执行回滚..."
-    docker-compose -f docker-compose.backup.yml up -d
+    echo "❌ 数据库同步失败 (db push)"
     exit 1
 fi
 
 echo "🌱 执行数据库播种 (db seed)..."
-# 🌟 最终修复方案：
-# 1. 进入脚本所在目录 /app/prisma
-# 2. 建立指向后端完整 node_modules 的软链接
-# 3. 直接运行 seed.js。这样 Node 会在当前目录找依赖，且 pnpm 的相对路径软链接能保持生效。
 docker-compose run --rm backend sh -c "cd /app/prisma && ln -sfn ../apps/backend/node_modules node_modules && node seed.js"
 
 echo "🔄 更新后端服务..."
-# 🌟 关键修复：单台 ECS 不要用 scale=2，直接用 recreate
 docker-compose up -d --no-deps backend
 
 echo "⏳ 等待后端健康检查（10秒）..."
@@ -143,13 +158,14 @@ docker-compose up -d --no-deps frontend
 echo "🧹 清理旧镜像..."
 docker image prune -af --filter "until=168h"
 
+trap - ERR
 echo "✅ 部署完成"
 EOF
 )
 
 # 6.0 上传配置（修复 env 丢失）
 echo -e "${BLUE}📤 上传最新配置...${NC}"
-scp -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no "$SCRIPT_DIR/docker-compose.yml" "root@$ECS_IP:/opt/qms/docker-compose.yml"
+scp -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no "$SCRIPT_DIR/docker-compose.yml" "root@$ECS_IP:/opt/qms/docker-compose.next.yml"
 
 # 优先上传 .env.production，如果不存在则对应报警或回退
 if [ -f "$SCRIPT_DIR/.env.production" ]; then
