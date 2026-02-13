@@ -10,6 +10,9 @@ const ITP_PLAN_STATUS_VALUES = new Set<quality_plans_planStatus>([
   'IN_REVIEW',
 ]);
 const DEFAULT_ITP_CUSTOMER = 'Default Customer';
+const DEFAULT_ITP_ITEM_CONTROL_POINT = 'W';
+const DEFAULT_ITP_ITEM_FREQUENCY = '100%';
+const DEFAULT_ITP_ITEM_PROCESS_STEP = '组对';
 const DEFAULT_ITP_PREPARED_BY = 'admin';
 const DEFAULT_ITP_PROJECT_VERSION = 'V1.0';
 
@@ -105,4 +108,59 @@ export function parseItpQuantitativeItems(value: unknown): unknown[] {
 
 export function stringifyItpQuantitativeItems(value: unknown): string {
   return JSON.stringify(parseItpQuantitativeItems(value));
+}
+
+export function getMaxItpItemOrder(items: Array<{ order?: null | number }>) {
+  if (items.length === 0) {
+    return 0;
+  }
+
+  return Math.max(...items.map((item) => item.order || 0));
+}
+
+interface ItpItemInput {
+  acceptanceCriteria?: unknown;
+  activity?: unknown;
+  controlPoint?: unknown;
+  frequency?: unknown;
+  isQuantitative?: unknown;
+  processStep?: unknown;
+  quantitativeItems?: unknown;
+  referenceDoc?: unknown;
+  verifyingDocument?: unknown;
+}
+
+export function buildItpItemCreateData(params: {
+  item: ItpItemInput;
+  order: number;
+  projectId: string;
+  useImportDefaults?: boolean;
+}) {
+  const { item, order, projectId, useImportDefaults = false } = params;
+  return {
+    acceptanceCriteria:
+      normalizeItpText(item.acceptanceCriteria) ??
+      (useImportDefaults ? '' : undefined),
+    activity:
+      normalizeItpText(item.activity) ?? (useImportDefaults ? '' : undefined),
+    controlPoint:
+      normalizeItpText(item.controlPoint) ??
+      (useImportDefaults ? DEFAULT_ITP_ITEM_CONTROL_POINT : undefined),
+    frequency:
+      normalizeItpText(item.frequency) ??
+      (useImportDefaults ? DEFAULT_ITP_ITEM_FREQUENCY : undefined),
+    isQuantitative: Boolean(item.isQuantitative),
+    order,
+    processStep:
+      normalizeItpText(item.processStep) ??
+      (useImportDefaults ? DEFAULT_ITP_ITEM_PROCESS_STEP : undefined),
+    projectId,
+    quantitativeItems: stringifyItpQuantitativeItems(item.quantitativeItems),
+    referenceDoc:
+      normalizeItpText(item.referenceDoc) ??
+      (useImportDefaults ? '' : undefined),
+    verifyingDocument:
+      normalizeItpText(item.verifyingDocument) ??
+      (useImportDefaults ? '' : undefined),
+  };
 }

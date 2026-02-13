@@ -2,8 +2,9 @@ import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import {
+  buildItpItemCreateData,
+  getMaxItpItemOrder,
   parseItpQuantitativeItems,
-  stringifyItpQuantitativeItems,
 } from '~/utils/itp';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
@@ -29,26 +30,14 @@ export default defineEventHandler(async (event) => {
       return useResponseError('Quality plan not found');
     }
 
-    const itpItems = plan.items || [];
-    const maxOrder =
-      itpItems.length > 0 ? Math.max(...itpItems.map((i) => i.order || 0)) : 0;
+    const maxOrder = getMaxItpItemOrder(plan.items || []);
 
     const newItem = await prisma.itp_items.create({
-      data: {
+      data: buildItpItemCreateData({
+        item: itemData,
+        order: Number(itemData.order) || maxOrder + 1,
         projectId,
-        processStep: itemData.processStep,
-        activity: itemData.activity,
-        controlPoint: itemData.controlPoint,
-        acceptanceCriteria: itemData.acceptanceCriteria,
-        referenceDoc: itemData.referenceDoc,
-        frequency: itemData.frequency,
-        verifyingDocument: itemData.verifyingDocument,
-        isQuantitative: !!itemData.isQuantitative,
-        quantitativeItems: stringifyItpQuantitativeItems(
-          itemData.quantitativeItems,
-        ),
-        order: itemData.order || maxOrder + 1,
-      },
+      }),
     });
 
     return useResponseSuccess({
