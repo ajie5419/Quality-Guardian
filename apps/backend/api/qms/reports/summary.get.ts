@@ -15,7 +15,15 @@ export default defineEventHandler(async (event) => {
 
   const query = getQuery(event);
   const type = (query.type as string) || 'weekly'; // weekly | monthly
+  if (!['monthly', 'weekly'].includes(type)) {
+    setResponseStatus(event, 400);
+    return useResponseError('Invalid type parameter');
+  }
   const targetDate = query.date ? new Date(query.date as string) : new Date();
+  if (Number.isNaN(targetDate.getTime())) {
+    setResponseStatus(event, 400);
+    return useResponseError('Invalid date parameter');
+  }
 
   try {
     const historyCount = 6;
@@ -196,14 +204,13 @@ async function fetchPeriodMetrics(start: Date, end: Date) {
 }
 
 async function fetchProcessPassRates(start: Date, end: Date) {
-  try {
-    interface ProcessPassRateRow {
-      processName: null | string;
-      category: null | string;
-      total: bigint | number;
-      passed: bigint | number;
-    }
-    const rows = (await prisma.$queryRaw`
+  interface ProcessPassRateRow {
+    processName: null | string;
+    category: null | string;
+    total: bigint | number;
+    passed: bigint | number;
+  }
+  const rows = (await prisma.$queryRaw`
       SELECT 
         processName,
         category,
@@ -212,27 +219,23 @@ async function fetchProcessPassRates(start: Date, end: Date) {
       FROM inspections
       WHERE inspectionDate >= ${start} AND inspectionDate <= ${end} AND isDeleted = 0
       GROUP BY processName, category
-    `) as ProcessPassRateRow[];
+  `) as ProcessPassRateRow[];
 
-    return rows.map((row) => {
-      const total = Number(row.total);
-      const passed = Number(row.passed);
-      const passRate = total > 0 ? ((passed / total) * 100).toFixed(2) : '0.00';
-      const targetPassRate = getTargetPassRate(row.processName);
+  return rows.map((row) => {
+    const total = Number(row.total);
+    const passed = Number(row.passed);
+    const passRate = total > 0 ? ((passed / total) * 100).toFixed(2) : '0.00';
+    const targetPassRate = getTargetPassRate(row.processName);
 
-      return {
-        processName: row.processName || '未知工序',
-        category: row.category || '其他',
-        total,
-        passed,
-        passRate: Number(passRate),
-        targetPassRate, // 新增：目标合格率
-      };
-    });
-  } catch (error) {
-    logApiError('summary', error);
-    return [];
-  }
+    return {
+      processName: row.processName || '未知工序',
+      category: row.category || '其他',
+      total,
+      passed,
+      passRate: Number(passRate),
+      targetPassRate, // 新增：目标合格率
+    };
+  });
 }
 
 async function fetchDefectDistribution(start: Date, end: Date) {

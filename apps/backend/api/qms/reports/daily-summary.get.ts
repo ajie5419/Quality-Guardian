@@ -1,8 +1,13 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
+import { formatReportDate, parseReportDate } from '~/utils/report';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
@@ -11,7 +16,13 @@ export default defineEventHandler(async (event) => {
   }
 
   const { date, user } = getQuery(event) as { date: string; user?: string };
-  const queryDate = date || new Date().toISOString().split('T')[0];
+  const parsedDateInput = parseReportDate(date);
+  if (date && !parsedDateInput) {
+    setResponseStatus(event, 400);
+    return useResponseError('Invalid date parameter');
+  }
+  const parsedQueryDate = parsedDateInput || new Date();
+  const queryDate = formatReportDate(parsedQueryDate);
   const queryUser = user || userinfo.username;
   const realName = userinfo.realName;
 
@@ -217,12 +228,7 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error: unknown) {
     logApiError('daily-summary', error);
-    return useResponseSuccess({
-      date: queryDate,
-      inspections: [],
-      issues: [],
-      reporter: realName || queryUser,
-      summary: '',
-    });
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to fetch daily summary');
   }
 });
