@@ -1,6 +1,7 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
+import { parseOptionalIssueYear } from '~/utils/inspection-issue';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
@@ -14,8 +15,8 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const query = getQuery(event);
-  const year = query.year ? Number.parseInt(String(query.year)) : undefined;
+  const query = getQuery(event) as Record<string, unknown>;
+  const year = parseOptionalIssueYear(query.year);
 
   try {
     const result = await InspectionService.getIssueStats(year);

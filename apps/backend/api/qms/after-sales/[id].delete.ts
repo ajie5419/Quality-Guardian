@@ -1,11 +1,12 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { AfterSalesService } from '~/services/after-sales.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -26,11 +27,12 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('after-sales', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(
-      isPrismaNotFoundError(error)
-        ? 'After-sales record not found'
-        : 'Failed to delete after-sales record',
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, 'After-sales record not found');
+    }
+    return internalServerErrorResponse(
+      event,
+      'Failed to delete after-sales record',
     );
   }
 });

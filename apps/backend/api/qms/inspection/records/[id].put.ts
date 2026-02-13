@@ -1,8 +1,12 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  internalServerErrorResponse,
+  notFoundResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
@@ -17,11 +21,12 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error: unknown) {
     logApiError('inspection-update', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(
-      isPrismaNotFoundError(error)
-        ? 'Inspection record not found'
-        : 'Failed to update inspection record',
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, 'Inspection record not found');
+    }
+    return internalServerErrorResponse(
+      event,
+      'Failed to update inspection record',
     );
   }
 });

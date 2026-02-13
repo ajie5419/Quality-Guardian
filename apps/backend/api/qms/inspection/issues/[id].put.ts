@@ -3,7 +3,8 @@ import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import {
   buildInspectionIssueUpdateData,
-  hasInspectionIssueAdminAccess,
+  findInspectionIssueAccessRecord,
+  hasInspectionIssueWriteAccess,
 } from '~/utils/inspection-issue';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -31,10 +32,7 @@ export default defineEventHandler(async (event) => {
   // Data Ownership Check
   let existingNcNumber: null | string = null;
   try {
-    const existingRecord = await prisma.quality_records.findUnique({
-      where: { id },
-      select: { inspector: true, nonConformanceNumber: true },
-    });
+    const existingRecord = await findInspectionIssueAccessRecord(id);
 
     if (!existingRecord) {
       return notFoundResponse(event, '记录不存在');
@@ -42,10 +40,13 @@ export default defineEventHandler(async (event) => {
 
     existingNcNumber = existingRecord.nonConformanceNumber;
 
-    const isAdmin = hasInspectionIssueAdminAccess(userinfo.roles);
-    const isOwner = existingRecord.inspector === userinfo.username;
-
-    if (!isAdmin && !isOwner) {
+    if (
+      !hasInspectionIssueWriteAccess({
+        inspector: existingRecord.inspector,
+        roles: userinfo.roles,
+        username: userinfo.username,
+      })
+    ) {
       return forbiddenResponse(event, '无权修改：您只能修改自己创建的数据');
     }
   } catch (error) {

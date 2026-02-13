@@ -1,6 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { normalizeIdList } from '~/utils/id-list';
+import { parseNonEmptyIdList } from '~/utils/id-list';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -18,9 +18,9 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = (await readBody(event)) as { ids?: unknown };
-    const ids = normalizeIdList(body.ids);
+    const ids = parseNonEmptyIdList(body.ids);
 
-    if (ids.length === 0) {
+    if (!ids) {
       return badRequestResponse(event, '请提供有效的 ID 列表');
     }
 

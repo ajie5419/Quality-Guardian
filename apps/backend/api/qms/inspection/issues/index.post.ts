@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import {
@@ -10,8 +10,9 @@ import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
+  conflictResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -48,11 +49,9 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('issues', error);
-    setResponseStatus(event, isPrismaUniqueConstraintError(error) ? 409 : 500);
-    return useResponseError(
-      isPrismaUniqueConstraintError(error)
-        ? 'NC number already exists'
-        : 'Failed to create issue',
-    );
+    if (isPrismaUniqueConstraintError(error)) {
+      return conflictResponse(event, 'NC number already exists');
+    }
+    return internalServerErrorResponse(event, 'Failed to create issue');
   }
 });

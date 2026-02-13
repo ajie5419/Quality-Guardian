@@ -1,9 +1,11 @@
 import { defineEventHandler } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
-import { hasInspectionIssueAdminAccess } from '~/utils/inspection-issue';
+import {
+  findInspectionIssueAccessRecord,
+  hasInspectionIssueWriteAccess,
+} from '~/utils/inspection-issue';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import {
   forbiddenResponse,
   internalServerErrorResponse,
@@ -26,19 +28,19 @@ export default defineEventHandler(async (event) => {
 
   // Data Ownership Check
   try {
-    const existingRecord = await prisma.quality_records.findUnique({
-      where: { id },
-      select: { inspector: true },
-    });
+    const existingRecord = await findInspectionIssueAccessRecord(id);
 
     if (!existingRecord) {
       return notFoundResponse(event, '记录不存在');
     }
 
-    const isAdmin = hasInspectionIssueAdminAccess(userinfo.roles);
-    const isOwner = existingRecord.inspector === userinfo.username;
-
-    if (!isAdmin && !isOwner) {
+    if (
+      !hasInspectionIssueWriteAccess({
+        inspector: existingRecord.inspector,
+        roles: userinfo.roles,
+        username: userinfo.username,
+      })
+    ) {
       return forbiddenResponse(event, '无权删除：您只能删除自己创建的数据');
     }
   } catch (error: unknown) {

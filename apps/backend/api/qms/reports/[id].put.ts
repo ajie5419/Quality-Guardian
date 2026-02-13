@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -12,8 +12,9 @@ import {
 } from '~/utils/report';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -67,7 +68,9 @@ export default defineEventHandler(async (event) => {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     logApiError('reports', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(`Update failed: ${errorMessage}`);
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, 'Report not found');
+    }
+    return internalServerErrorResponse(event, `Update failed: ${errorMessage}`);
   }
 });

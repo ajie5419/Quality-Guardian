@@ -41,10 +41,7 @@ export default defineEventHandler(async (event) => {
         if (!woNumber) continue;
         const deliveryDate = parseRequiredDate(item.deliveryDate);
         const effectiveTime = parseOptionalDate(item.effectiveTime);
-        const status =
-          item.status === undefined || item.status === null
-            ? mapWorkOrderStatus(undefined)
-            : mapWorkOrderStatus(String(item.status));
+        const status = mapWorkOrderStatus(item.status);
 
         await prisma.work_orders.upsert({
           where: { workOrderNumber: woNumber },

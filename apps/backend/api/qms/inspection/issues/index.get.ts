@@ -24,6 +24,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('issues', error);
-    return internalServerErrorResponse(event, 'Failed to fetch inspection issues');
+    return internalServerErrorResponse(
+      event,
+      'Failed to fetch inspection issues',
+    );
   }
 });

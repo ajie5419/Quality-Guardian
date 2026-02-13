@@ -1,23 +1,16 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
-import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  conflictResponse,
   internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
-import {
-  createSupplierId,
-  normalizeSupplierName,
-  normalizeSupplierScore,
-  normalizeSupplierStatus,
-  normalizeSupplierString,
-} from '~/utils/supplier';
+import { buildSupplierCreateData } from '~/utils/supplier';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -27,39 +20,20 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    const name = normalizeSupplierName(body.name);
-    const missingFields = getMissingRequiredFields({ name }, ['name']);
-    if (missingFields.length > 0) {
-      return badRequestResponse(event, `缺少必填字段: ${missingFields[0]}`);
+    const createData = buildSupplierCreateData(body as Record<string, unknown>);
+    if (!createData) {
+      return badRequestResponse(event, '缺少必填字段: name');
     }
 
     const newSupplier = await prisma.suppliers.create({
-      data: {
-        id: createSupplierId(),
-        name,
-        category: normalizeSupplierString(body.category),
-        productName: normalizeSupplierString(body.productName),
-        brand: normalizeSupplierString(body.brand),
-        origin: normalizeSupplierString(body.origin),
-        project: normalizeSupplierString(body.project),
-        buyer: normalizeSupplierString(body.buyer),
-        score2025: normalizeSupplierScore(body.score2025, 0),
-        status: normalizeSupplierStatus(body.status),
-        // Optional fields
-        contact: normalizeSupplierString(body.contact),
-        phone: normalizeSupplierString(body.phone),
-        email: normalizeSupplierString(body.email),
-        address: normalizeSupplierString(body.address),
-        isDeleted: false,
-      },
+      data: createData,
     });
 
     return useResponseSuccess(newSupplier);
   } catch (error: unknown) {
     logApiError('supplier', error);
     if (isPrismaUniqueConstraintError(error)) {
-      setResponseStatus(event, 409);
-      return useResponseError('供应商名称已存在');
+      return conflictResponse(event, '供应商名称已存在');
     }
     return internalServerErrorResponse(event, '创建供应商失败');
   }

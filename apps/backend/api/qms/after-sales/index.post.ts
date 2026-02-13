@@ -53,6 +53,9 @@ export default defineEventHandler(async (event) => {
     logApiError('after-sales-create', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    return internalServerErrorResponse(event, `创建售后记录失败: ${errorMessage}`);
+    return internalServerErrorResponse(
+      event,
+      `创建售后记录失败: ${errorMessage}`,
+    );
   }
 });

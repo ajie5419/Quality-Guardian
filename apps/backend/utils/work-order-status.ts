@@ -56,9 +56,7 @@ const STATUS_MAPPING_TABLE: Record<string, WorkOrderStatus> = {
  * mapWorkOrderStatus('进行中')       // 'IN_PROGRESS'
  * mapWorkOrderStatus('UNKNOWN')      // 'OPEN' (默认值)
  */
-export function mapWorkOrderStatus(
-  frontendStatus?: null | string,
-): WorkOrderStatus {
+export function mapWorkOrderStatus(frontendStatus?: unknown): WorkOrderStatus {
   if (!frontendStatus) {
     return WORK_ORDER_STATUS.OPEN;
   }

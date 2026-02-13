@@ -14,6 +14,7 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
+import { parseRequiredWorkOrderNumber } from '~/utils/work-order';
 
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
@@ -31,7 +32,7 @@ export default defineEventHandler(async (event) => {
     let serialSeed = await getNextAfterSalesSerialNumber();
     for (const item of items) {
       try {
-        const woNumber = String(item.workOrderNumber || '').trim();
+        const woNumber = parseRequiredWorkOrderNumber(item.workOrderNumber);
         if (!woNumber) continue;
         const serialNumber = serialSeed++;
 

@@ -33,6 +33,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(uniqueYears);
   } catch (error) {
     logApiError('years', error);
-    return internalServerErrorResponse(event, 'Failed to fetch available years');
+    return internalServerErrorResponse(
+      event,
+      'Failed to fetch available years',
+    );
   }
 });

@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -9,9 +9,9 @@ import {
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  conflictResponse,
   internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import {
@@ -49,8 +49,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (existing) {
-      setResponseStatus(event, 409);
-      return useResponseError(`工单号 ${woNum} 已存在，请使用其他编号`);
+      return conflictResponse(event, `工单号 ${woNum} 已存在，请使用其他编号`);
     }
 
     // 使用统一的状态映射工具
@@ -97,8 +96,7 @@ export default defineEventHandler(async (event) => {
     const isUniqueError = isPrismaUniqueConflictError(error);
 
     if (isUniqueError) {
-      setResponseStatus(event, 409);
-      return useResponseError('工单号已存在，请使用其他编号');
+      return conflictResponse(event, '工单号已存在，请使用其他编号');
     }
 
     // Handle Prisma Validation Errors (Missing Arguments etc.)

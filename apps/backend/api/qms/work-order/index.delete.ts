@@ -1,12 +1,13 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import { getRequiredQueryParam } from '~/utils/query-param';
 import {
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -34,11 +35,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('work-order', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(
-      isPrismaNotFoundError(error)
-        ? '删除工单失败：记录不存在'
-        : '删除工单失败',
-    );
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, '删除工单失败：记录不存在');
+    }
+    return internalServerErrorResponse(event, '删除工单失败');
   }
 });

@@ -22,6 +22,14 @@ function parsePositiveInt(value: unknown, defaultValue: number): number {
   return parsed;
 }
 
+export function parseOptionalIssueYear(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
 function parseMultiString(value: unknown): string | string[] | undefined {
   if (value === undefined || value === null || value === '') {
     return undefined;
@@ -146,6 +154,23 @@ export function hasInspectionIssueAdminAccess(roles: unknown): boolean {
   return normalizedRoles.some(
     (role) => role === 'admin' || role === 'super' || role === 'super admin',
   );
+}
+
+export async function findInspectionIssueAccessRecord(id: string) {
+  return prisma.quality_records.findUnique({
+    where: { id },
+    select: { inspector: true, nonConformanceNumber: true },
+  });
+}
+
+export function hasInspectionIssueWriteAccess(params: {
+  inspector: null | string;
+  roles: unknown;
+  username: unknown;
+}): boolean {
+  const isAdmin = hasInspectionIssueAdminAccess(params.roles);
+  const isOwner = params.inspector === String(params.username ?? '');
+  return isAdmin || isOwner;
 }
 
 export function buildInspectionIssueCreateData(

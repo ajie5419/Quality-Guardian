@@ -58,11 +58,18 @@ export function normalizeSupplierStatus(value: unknown): string {
 }
 
 interface SupplierImportItem {
+  address?: unknown;
   brand?: unknown;
   buyer?: unknown;
   category?: unknown;
+  contact?: unknown;
+  email?: unknown;
   name?: unknown;
+  origin?: unknown;
+  phone?: unknown;
+  project?: unknown;
   productName?: unknown;
+  score2025?: unknown;
   status?: unknown;
 }
 
@@ -104,6 +111,45 @@ export function buildSupplierUpsertPayload(
       updatedAt: new Date(),
     },
     where: { name },
+  };
+}
+
+function buildSupplierMutableData(input: SupplierImportItem) {
+  return {
+    category: normalizeSupplierString(input.category),
+    productName: normalizeSupplierString(input.productName),
+    brand: normalizeSupplierString(input.brand),
+    origin: normalizeSupplierString(input.origin),
+    project: normalizeSupplierString(input.project),
+    buyer: normalizeSupplierString(input.buyer),
+    score2025: normalizeSupplierScore(input.score2025, 0),
+    status: normalizeSupplierStatus(input.status),
+    contact: normalizeSupplierString(input.contact),
+    phone: normalizeSupplierString(input.phone),
+    email: normalizeSupplierString(input.email),
+    address: normalizeSupplierString(input.address),
+  };
+}
+
+export function buildSupplierCreateData(input: SupplierImportItem) {
+  const name = normalizeSupplierName(input.name);
+  if (!name) {
+    return null;
+  }
+
+  return {
+    id: createSupplierId(),
+    name,
+    ...buildSupplierMutableData(input),
+    isDeleted: false,
+  };
+}
+
+export function buildSupplierUpdateData(input: SupplierImportItem) {
+  return {
+    name: normalizeSupplierString(input.name),
+    ...buildSupplierMutableData(input),
+    updatedAt: new Date(),
   };
 }
 

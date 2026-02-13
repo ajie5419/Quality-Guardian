@@ -7,6 +7,7 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
+import { parseWorkOrderListQuery } from '~/utils/work-order';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -14,40 +15,18 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  // 获取分页与过滤参数
-  const query = getQuery(event);
-  const page = Number.parseInt(String(query.page || 1));
-  const pageSize = Number.parseInt(String(query.pageSize || 20));
-  const year = query.year ? Number(query.year) : undefined;
-  const projectName = query.projectName ? String(query.projectName) : undefined;
-  const statusFilter = query.status ? String(query.status) : undefined;
-  const workOrderNumber = query.workOrderNumber
-    ? String(query.workOrderNumber)
-    : undefined;
-  const ignoreYearFilter = query.ignoreYearFilter === 'true';
-  const keyword = query.keyword ? String(query.keyword) : undefined;
-
-  // Parse ids from query (comma separated)
-  const ids = query.ids
-    ? String(query.ids).split(',').filter(Boolean)
-    : undefined;
+  const query = getQuery(event) as Record<string, unknown>;
+  const params = parseWorkOrderListQuery(query);
 
   try {
-    const result = await WorkOrderService.getList({
-      page,
-      pageSize,
-      year,
-      projectName,
-      status: statusFilter,
-      workOrderNumber,
-      ignoreYearFilter,
-      keyword,
-      ids,
-    });
+    const result = await WorkOrderService.getList(params);
 
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('work-order', error);
-    return internalServerErrorResponse(event, 'Failed to fetch work order list');
+    return internalServerErrorResponse(
+      event,
+      'Failed to fetch work order list',
+    );
   }
 });

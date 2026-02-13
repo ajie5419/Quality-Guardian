@@ -37,7 +37,9 @@ export default defineEventHandler(async (event) => {
       try {
         const payload = {
           ...item,
-          category: normalizeInspectionCategory(item.category ?? normalizedCategory),
+          category: normalizeInspectionCategory(
+            item.category ?? normalizedCategory,
+          ),
         } as Parameters<typeof InspectionService.create>[0];
         await InspectionService.create(payload);
         successCount++;

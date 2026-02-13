@@ -1,7 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
-import { normalizeIdList } from '~/utils/id-list';
+import { parseNonEmptyIdList } from '~/utils/id-list';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -11,8 +11,8 @@ import {
 export default defineEventHandler(async (event) => {
   try {
     const body = (await readBody(event)) as { ids?: unknown };
-    const ids = normalizeIdList(body.ids);
-    if (ids.length === 0) {
+    const ids = parseNonEmptyIdList(body.ids);
+    if (!ids) {
       return badRequestResponse(event, 'IDs required');
     }
 
