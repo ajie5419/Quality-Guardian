@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { QualityLossService } from '~/services/quality-loss.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { QUALITY_LOSS_SOURCE } from '~/utils/quality-loss-status';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -38,7 +39,7 @@ export default defineEventHandler(async (event) => {
         dept: string;
         desc: string;
         workOrderNumber: string;
-        source: string;
+        source: (typeof QUALITY_LOSS_SOURCE)[keyof typeof QUALITY_LOSS_SOURCE];
         _ts: number;
       }
       const details: LossDetail[] = [];
@@ -54,7 +55,7 @@ export default defineEventHandler(async (event) => {
           dept: item.respDept || '-',
           desc: item.description || '-',
           workOrderNumber: '-',
-          source: 'Manual',
+          source: QUALITY_LOSS_SOURCE.MANUAL,
           _ts: item.occurDate.getTime(),
         });
       });
@@ -69,7 +70,7 @@ export default defineEventHandler(async (event) => {
           dept: item.responsibleDepartment || '-',
           desc: item.description || '-',
           workOrderNumber: item.workOrderNumber || '-',
-          source: 'Internal',
+          source: QUALITY_LOSS_SOURCE.INTERNAL,
           _ts: item.date.getTime(),
         });
       });
@@ -85,7 +86,7 @@ export default defineEventHandler(async (event) => {
           dept: item.respDept || '-',
           desc: item.issueDescription || '-',
           workOrderNumber: item.workOrderNumber || '-',
-          source: 'External',
+          source: QUALITY_LOSS_SOURCE.EXTERNAL,
           _ts: item.occurDate.getTime(),
         });
       });

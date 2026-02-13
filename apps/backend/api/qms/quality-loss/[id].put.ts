@@ -4,8 +4,11 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
+  normalizeQualityLossSource,
   normalizeQualityLossStatus,
+  QUALITY_LOSS_SOURCE,
   toAfterSalesClaimStatus,
+  toQualityLossTargetType,
   toQualityRecordStatus,
 } from '~/utils/quality-loss-status';
 import {
@@ -28,7 +31,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    const source = body.lossSource || 'Manual';
+    const source = normalizeQualityLossSource(body.lossSource);
     const pk = body.pk || id;
 
     // 统一处理数值转化，防止 NaN 导致数据库报错
@@ -45,7 +48,7 @@ export default defineEventHandler(async (event) => {
       ? normalizeQualityLossStatus(body.status)
       : undefined;
 
-    if (source === 'Internal') {
+    if (source === QUALITY_LOSS_SOURCE.INTERNAL) {
       // 内部质量损失：更新质量记录表 (quality_records)
       await prisma.quality_records.update({
         where: { id: pk },
@@ -57,7 +60,7 @@ export default defineEventHandler(async (event) => {
           updatedAt: new Date(),
         },
       });
-    } else if (source === 'External') {
+    } else if (source === QUALITY_LOSS_SOURCE.EXTERNAL) {
       // 外部质量损失：更新售后表 (after_sales)
       await prisma.after_sales.update({
         where: { id: pk },
@@ -97,16 +100,14 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    let targetType = 'quality_loss';
-    if (source === 'Internal') targetType = 'inspection_issue';
-    else if (source === 'External') targetType = 'after_sales';
+    const targetType = toQualityLossTargetType(source);
 
     await SystemLogService.recordAuditLog({
       userId: String(userinfo.id),
       action: 'UPDATE',
       targetType,
       targetId: String(id),
-      details: `修改质量损失相关记录: ${id}${source === 'Manual' ? '' : ` (${source} 来源)`}`,
+      details: `修改质量损失相关记录: ${id}${source === QUALITY_LOSS_SOURCE.MANUAL ? '' : ` (${source} 来源)`}`,
     });
 
     return useResponseSuccess({ message: '更新成功', success: true });
