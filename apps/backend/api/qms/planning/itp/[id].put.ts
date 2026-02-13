@@ -10,6 +10,7 @@ import {
   parseItpQuantitativeItems,
   stringifyItpQuantitativeItems,
 } from '~/utils/itp';
+import { isPrismaNotFoundError } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -49,10 +50,9 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('itp', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError(
-      errorCode === 'P2025' ? 'ITP 条目不存在' : '更新 ITP 条目失败',
+      isPrismaNotFoundError(error) ? 'ITP 条目不存在' : '更新 ITP 条目失败',
     );
   }
 });

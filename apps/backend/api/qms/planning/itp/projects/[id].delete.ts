@@ -1,6 +1,7 @@
 import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
+import { isPrismaNotFoundError } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -21,10 +22,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('itp-projects', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError(
-      errorCode === 'P2025' ? 'ITP 项目不存在' : '删除 ITP 项目失败',
+      isPrismaNotFoundError(error) ? 'ITP 项目不存在' : '删除 ITP 项目失败',
     );
   }
 });

@@ -1,6 +1,7 @@
 import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
+import { isPrismaNotFoundError } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -23,10 +24,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('dfmea', error);
-    setResponseStatus(
-      event,
-      (error as { code?: string }).code === 'P2025' ? 404 : 500,
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
+    return useResponseError(
+      isPrismaNotFoundError(error) ? 'DFMEA 条目不存在' : '删除 DFMEA 条目失败',
     );
-    return useResponseError('删除 DFMEA 条目失败');
   }
 });
