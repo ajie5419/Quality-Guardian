@@ -1,7 +1,12 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
+import {
+  parseItpQuantitativeItems,
+  stringifyItpQuantitativeItems,
+} from '~/utils/itp';
 import prisma from '~/utils/prisma';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
@@ -9,7 +14,8 @@ export default defineEventHandler(async (event) => {
   const { projectId, ...itemData } = body;
 
   if (!projectId) {
-    return { code: -1, message: 'projectId is required' };
+    setResponseStatus(event, 400);
+    return useResponseError('projectId is required');
   }
 
   try {
@@ -19,7 +25,8 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!plan) {
-      return { code: -1, message: 'Quality plan not found' };
+      setResponseStatus(event, 404);
+      return useResponseError('Quality plan not found');
     }
 
     const itpItems = plan.items || [];
@@ -37,23 +44,20 @@ export default defineEventHandler(async (event) => {
         frequency: itemData.frequency,
         verifyingDocument: itemData.verifyingDocument,
         isQuantitative: !!itemData.isQuantitative,
-        quantitativeItems: itemData.quantitativeItems
-          ? JSON.stringify(itemData.quantitativeItems)
-          : '[]',
+        quantitativeItems: stringifyItpQuantitativeItems(
+          itemData.quantitativeItems,
+        ),
         order: itemData.order || maxOrder + 1,
       },
     });
 
-    return {
-      code: 0,
-      data: {
-        ...newItem,
-        quantitativeItems: JSON.parse(newItem.quantitativeItems || '[]'),
-      },
-      message: 'created',
-    };
+    return useResponseSuccess({
+      ...newItem,
+      quantitativeItems: parseItpQuantitativeItems(newItem.quantitativeItems),
+    });
   } catch (error) {
     logApiError('itp', error);
-    return { code: -1, message: '创建失败' };
+    setResponseStatus(event, 500);
+    return useResponseError('创建 ITP 条目失败');
   }
 });

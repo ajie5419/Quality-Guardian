@@ -1,9 +1,11 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
+import { parseItpQuantitativeItems, toItpPlanStatusText } from '~/utils/itp';
 import prisma from '~/utils/prisma';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
 
   try {
@@ -76,9 +78,7 @@ export default defineEventHandler(async () => {
           parentId: project.id,
           executionStatus,
           executionCount: matchedExecutionItems.length,
-          quantitativeItems: item.quantitativeItems
-            ? JSON.parse(item.quantitativeItems)
-            : [],
+          quantitativeItems: parseItpQuantitativeItems(item.quantitativeItems),
         };
       });
 
@@ -98,7 +98,7 @@ export default defineEventHandler(async () => {
         projectName: project.projectName,
         workOrderId: project.workOrderNumber,
         version: project.version?.toString() || 'V1.0',
-        status: project.planStatus?.toLowerCase() || 'draft',
+        status: toItpPlanStatusText(project.planStatus),
         itemCount: processedItems.length,
         completedCount,
         progress,
@@ -106,13 +106,10 @@ export default defineEventHandler(async () => {
       };
     });
 
-    return {
-      code: 0,
-      data: treeData,
-      message: 'ok',
-    };
+    return useResponseSuccess(treeData);
   } catch (error) {
-    logApiError('tree', error);
-    return { code: 0, data: [], message: 'error' };
+    logApiError('itp-tree', error);
+    setResponseStatus(event, 500);
+    return useResponseError('获取 ITP 树失败');
   }
 });

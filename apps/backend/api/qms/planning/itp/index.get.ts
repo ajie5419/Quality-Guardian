@@ -1,14 +1,19 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
+import { parseItpQuantitativeItems } from '~/utils/itp';
 import prisma from '~/utils/prisma';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
   const query = getQuery(event);
-  const projectId = query.projectId as string;
+  const projectId = query.projectId ? String(query.projectId) : undefined;
 
-  if (!projectId) return { code: 0, data: [], message: 'projectId required' };
+  if (!projectId) {
+    setResponseStatus(event, 400);
+    return useResponseError('projectId required');
+  }
 
   try {
     // Correctly fetch from the relation table instead of the legacy JSON column
@@ -22,13 +27,15 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    return {
-      code: 0,
-      data: items,
-      message: 'ok',
-    };
+    return useResponseSuccess(
+      items.map((item) => ({
+        ...item,
+        quantitativeItems: parseItpQuantitativeItems(item.quantitativeItems),
+      })),
+    );
   } catch (error) {
     logApiError('itp', error);
-    return { code: 0, data: [], message: 'error' };
+    setResponseStatus(event, 500);
+    return useResponseError('获取 ITP 条目失败');
   }
 });

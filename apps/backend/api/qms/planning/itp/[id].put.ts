@@ -1,16 +1,28 @@
-import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import {
+  defineEventHandler,
+  getRouterParam,
+  readBody,
+  setResponseStatus,
+} from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
+import {
+  parseItpQuantitativeItems,
+  stringifyItpQuantitativeItems,
+} from '~/utils/itp';
 import prisma from '~/utils/prisma';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
   const id = getRouterParam(event, 'id');
-  const body = await readBody(event);
-
-  if (!id) return { code: -1, message: 'ID required' };
+  if (!id) {
+    setResponseStatus(event, 400);
+    return useResponseError('ID required');
+  }
 
   try {
+    const body = await readBody(event);
     const updated = await prisma.itp_items.update({
       where: { id },
       data: {
@@ -23,25 +35,24 @@ export default defineEventHandler(async (event) => {
         verifyingDocument: body.verifyingDocument,
         isQuantitative:
           body.isQuantitative === undefined ? undefined : !!body.isQuantitative,
-        quantitativeItems: body.quantitativeItems
-          ? JSON.stringify(body.quantitativeItems)
-          : undefined,
+        quantitativeItems:
+          body.quantitativeItems === undefined
+            ? undefined
+            : stringifyItpQuantitativeItems(body.quantitativeItems),
         order: body.order === undefined ? undefined : Number(body.order),
       },
     });
 
-    return {
-      code: 0,
-      data: {
-        ...updated,
-        quantitativeItems: updated.quantitativeItems
-          ? JSON.parse(updated.quantitativeItems)
-          : [],
-      },
-      message: 'updated',
-    };
+    return useResponseSuccess({
+      ...updated,
+      quantitativeItems: parseItpQuantitativeItems(updated.quantitativeItems),
+    });
   } catch (error) {
     logApiError('itp', error);
-    return { code: -1, message: '更新失败' };
+    setResponseStatus(
+      event,
+      (error as { code?: string }).code === 'P2025' ? 404 : 500,
+    );
+    return useResponseError('更新 ITP 条目失败');
   }
 });
