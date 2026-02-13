@@ -1,5 +1,6 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
+import { logApiError } from '~/utils/api-logger';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -17,7 +18,9 @@ export default defineEventHandler(async (event) => {
     });
 
     return useResponseSuccess(result);
-  } catch (error: any) {
-    return useResponseError('InternalServerError', error.message);
+  } catch (error: unknown) {
+    logApiError('audit-log', error);
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to fetch audit logs');
   }
 });
