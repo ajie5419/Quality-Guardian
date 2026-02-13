@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -50,6 +50,10 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(newMenu);
   } catch (error) {
     logApiError('menu', error);
-    return useResponseError('创建菜单失败');
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2002' ? 409 : 500);
+    return useResponseError(
+      errorCode === 'P2002' ? '菜单名称或路径已存在' : '创建菜单失败',
+    );
   }
 });
