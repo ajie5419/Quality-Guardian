@@ -2,11 +2,12 @@ import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {
   buildProjectBomCreateData,
-  createBomProjectId,
   mapProjectBomItem,
+  normalizeBomProjectStatus,
   normalizeBomText,
 } from '~/utils/bom';
 import { MOCK_DELAY } from '~/utils/index';
+import { upsertPlanningProjectByWorkOrder } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -20,35 +21,46 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // 检查是否已存在 bom_projects 记录，如果不存在则创建
-    let bomProject = await prisma.bom_projects.findUnique({
-      where: { workOrderNumber },
+    const upsertResult = await upsertPlanningProjectByWorkOrder({
+      workOrderNumber,
+      findExistingByWorkOrderNumber: (value) =>
+        prisma.bom_projects.findUnique({
+          where: { workOrderNumber: value },
+          select: { id: true, isDeleted: true },
+        }),
+      restoreProjectById: (id) =>
+        prisma.bom_projects.update({
+          where: { id },
+          data: { isDeleted: false, updatedAt: new Date() },
+        }),
+      createProject: ({ projectName, workOrderNumber: value }) =>
+        prisma.bom_projects.create({
+          data: {
+            workOrderNumber: value,
+            projectName:
+              normalizeBomText(body.projectName) || projectName || value,
+            status: normalizeBomProjectStatus(body.status),
+          },
+        }),
     });
 
-    if (!bomProject) {
-      // 获取工单信息
-      const workOrder = await prisma.work_orders.findUnique({
-        where: { workOrderNumber },
-      });
-      if (!workOrder) {
-        setResponseStatus(event, 400);
-        return useResponseError('工单不存在');
-      }
-
-      bomProject = await prisma.bom_projects.create({
-        data: {
-          id: createBomProjectId(),
-          workOrderNumber,
-          projectName:
-            normalizeBomText(body.projectName) ||
-            workOrder.projectName ||
-            workOrderNumber,
-          status: 'active',
-        },
-      });
+    if (upsertResult.code === 'MISSING_WORK_ORDER') {
+      setResponseStatus(event, 400);
+      return useResponseError('工单不存在');
     }
 
-    // 创建 BOM 物料明细
+    const bomProject =
+      upsertResult.code === 'CONFLICT'
+        ? await prisma.bom_projects.findUnique({
+            where: { workOrderNumber },
+            select: { id: true },
+          })
+        : upsertResult.data;
+    if (!bomProject) {
+      setResponseStatus(event, 500);
+      return useResponseError('BOM 项目状态异常');
+    }
+
     const newItem = await prisma.project_boms.create({
       data: buildProjectBomCreateData(workOrderNumber, body),
     });
