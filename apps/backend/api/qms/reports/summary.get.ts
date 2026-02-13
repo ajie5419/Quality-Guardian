@@ -3,6 +3,7 @@ import { getTargetPassRate } from '~/constants/quality-standards';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { parseReportPeriodType, resolveReportQueryDate } from '~/utils/report';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -14,13 +15,15 @@ export default defineEventHandler(async (event) => {
   if (!userinfo) return unAuthorizedResponse(event);
 
   const query = getQuery(event);
-  const type = (query.type as string) || 'weekly'; // weekly | monthly
-  if (!['monthly', 'weekly'].includes(type)) {
+  const type = parseReportPeriodType(query.type);
+  if (!type) {
     setResponseStatus(event, 400);
     return useResponseError('Invalid type parameter');
   }
-  const targetDate = query.date ? new Date(query.date as string) : new Date();
-  if (Number.isNaN(targetDate.getTime())) {
+  const { date: targetDate, valid: isDateValid } = resolveReportQueryDate(
+    query.date,
+  );
+  if (!isDateValid) {
     setResponseStatus(event, 400);
     return useResponseError('Invalid date parameter');
   }

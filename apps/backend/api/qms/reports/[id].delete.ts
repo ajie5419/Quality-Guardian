@@ -25,13 +25,14 @@ export default defineEventHandler(async (event) => {
       where: { id },
     });
     return useResponseSuccess({ message: 'Deleted' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logApiError('reports', error);
-    if (error.code === 'P2025') {
+    const typedError = error as { code?: string; message?: string };
+    if (typedError.code === 'P2025') {
       setResponseStatus(event, 404);
       return useResponseError('Report not found');
     }
     setResponseStatus(event, 500);
-    return useResponseError(`Delete failed: ${error.message}`);
+    return useResponseError(`Delete failed: ${typedError.message}`);
   }
 });

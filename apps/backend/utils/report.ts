@@ -2,6 +2,23 @@ export function formatReportDate(date: Date): string {
   return date.toISOString().split('T')[0];
 }
 
+export type ReportPeriodType = 'monthly' | 'weekly';
+
+export function parseReportPeriodType(value: unknown): null | ReportPeriodType {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  if (!normalized) {
+    return 'weekly';
+  }
+
+  if (normalized === 'weekly' || normalized === 'monthly') {
+    return normalized;
+  }
+
+  return null;
+}
+
 export function parseReportDate(value: unknown): Date | null {
   if (!value) {
     return null;
@@ -36,4 +53,20 @@ export function normalizeReportStatus(value: unknown): string {
 export function normalizeReportAuthor(value: unknown): string | undefined {
   const normalized = String(value ?? '').trim();
   return normalized || undefined;
+}
+
+export function resolveReportQueryDate(value: unknown): {
+  date: Date;
+  valid: boolean;
+} {
+  if (value === undefined || value === null || value === '') {
+    return { date: new Date(), valid: true };
+  }
+
+  const parsed = parseReportDate(value);
+  if (!parsed) {
+    return { date: new Date(), valid: false };
+  }
+
+  return { date: parsed, valid: true };
 }

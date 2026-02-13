@@ -2,7 +2,7 @@ import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { formatReportDate, parseReportDate } from '~/utils/report';
+import { formatReportDate, resolveReportQueryDate } from '~/utils/report';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -16,12 +16,12 @@ export default defineEventHandler(async (event) => {
   }
 
   const { date, user } = getQuery(event) as { date: string; user?: string };
-  const parsedDateInput = parseReportDate(date);
-  if (date && !parsedDateInput) {
+  const { date: parsedQueryDate, valid: isDateValid } =
+    resolveReportQueryDate(date);
+  if (!isDateValid) {
     setResponseStatus(event, 400);
     return useResponseError('Invalid date parameter');
   }
-  const parsedQueryDate = parsedDateInput || new Date();
   const queryDate = formatReportDate(parsedQueryDate);
   const queryUser = user || userinfo.username;
   const realName = userinfo.realName;

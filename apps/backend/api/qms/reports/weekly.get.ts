@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { ReportService } from '~/services/report.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { parseReportDate } from '~/utils/report';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -19,6 +20,10 @@ export default defineEventHandler(async (event) => {
   if (!startDate || !endDate) {
     setResponseStatus(event, 400);
     return useResponseError('Missing startDate or endDate parameters');
+  }
+  if (!parseReportDate(startDate) || !parseReportDate(endDate)) {
+    setResponseStatus(event, 400);
+    return useResponseError('Invalid startDate or endDate parameters');
   }
 
   try {
