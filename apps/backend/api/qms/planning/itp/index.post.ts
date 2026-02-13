@@ -4,19 +4,23 @@ import { MOCK_DELAY } from '~/utils/index';
 import {
   buildItpItemCreateData,
   getMaxItpItemOrder,
+  normalizeItpText,
   parseItpQuantitativeItems,
 } from '~/utils/itp';
 import prisma from '~/utils/prisma';
+import { getMissingRequiredFields } from '~/utils/request-validation';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
   const body = await readBody(event);
-  const { projectId, ...itemData } = body;
+  const projectId = normalizeItpText(body.projectId);
+  const itemData = body as Record<string, unknown>;
 
-  if (!projectId) {
+  const missingFields = getMissingRequiredFields({ projectId }, ['projectId']);
+  if (missingFields.length > 0) {
     setResponseStatus(event, 400);
-    return useResponseError('projectId is required');
+    return useResponseError(`${missingFields[0]} is required`);
   }
 
   try {
@@ -36,7 +40,7 @@ export default defineEventHandler(async (event) => {
       data: buildItpItemCreateData({
         item: itemData,
         order: Number(itemData.order) || maxOrder + 1,
-        projectId,
+        projectId: String(projectId),
       }),
     });
 

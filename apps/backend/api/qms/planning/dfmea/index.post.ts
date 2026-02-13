@@ -3,11 +3,13 @@ import { logApiError } from '~/utils/api-logger';
 import {
   calculateDfmeaRpn,
   normalizeDfmeaEffect,
+  normalizeDfmeaText,
   parseDfmeaOrder,
   parseDfmeaScore,
 } from '~/utils/dfmea';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
+import { getMissingRequiredFields } from '~/utils/request-validation';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -15,10 +17,13 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = (await readBody(event)) as Record<string, unknown>;
-    const projectId = String(body.projectId ?? '').trim();
-    if (!projectId) {
+    const projectId = normalizeDfmeaText(body.projectId);
+    const missingFields = getMissingRequiredFields({ projectId }, [
+      'projectId',
+    ]);
+    if (missingFields.length > 0) {
       setResponseStatus(event, 400);
-      return useResponseError('缺少必填字段: projectId');
+      return useResponseError(`缺少必填字段: ${missingFields[0]}`);
     }
 
     const severity = parseDfmeaScore(body.severity, 5);
@@ -27,7 +32,7 @@ export default defineEventHandler(async (event) => {
 
     const newItem = await prisma.dfmea.create({
       data: {
-        projectId,
+        projectId: String(projectId),
         item: String(body.item ?? ''),
         failureMode: String(body.failureMode ?? ''),
         effect: normalizeDfmeaEffect(body),
