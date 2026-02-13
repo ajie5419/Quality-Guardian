@@ -4,13 +4,15 @@
 
 - **文档版本：** v1.1
 - **生成时间：** 2026-02-12 11:15
-- **最后更新：** 2026-02-13 18:20
+- **最后更新：** 2026-02-13 22:08
 
 ### 本次修订摘要（v1.1）
 
 - 对齐后端统一响应结构（`code/data/error/message`）
 - 补充 `400/404/500` 统一错误响应约定
 - 修正业务错误码说明，避免与当前实现不一致
+- 新增 `409 Conflict` 约定（唯一约束/业务冲突）
+- 增补接口实现约定：`payload mapper`、`query parser`、统一错误响应工具
 
 ---
 
@@ -85,9 +87,27 @@
 - 未授权：HTTP `401` + 失败响应包
 - 禁止访问：HTTP `403` + 失败响应包
 - 资源不存在：HTTP `404` + 失败响应包
+- 资源冲突：HTTP `409` + 失败响应包
 - 服务异常：HTTP `500` + 失败响应包
 
-> 说明：下文接口示例为业务字段示意，实际联调以统一响应包（`code/data/error/message`）为准。
+> 说明：下文中部分历史示例仍使用 `success/data/message` 风格。实际联调与验收应以统一响应包（`code/data/error/message`）为准。
+
+### 实现约定（2026-02-13 起）
+
+为降低重复逻辑与硬编码风险，QMS 接口按以下约定实现：
+
+- API 层只做参数接收、鉴权、编排，不直接堆叠大量 `String/Number/Date` 转换
+- 请求数据组装统一下沉到 `utils/*` 的 `build*CreateData/build*UpdateData`
+- 查询参数解析统一下沉到 `utils/*` 的 `parse*Query`
+- 冲突/不存在/参数错误统一使用响应工具函数（如 `conflictResponse/notFoundResponse/badRequestResponse/internalServerErrorResponse`）
+
+当前已落地模块（摘要）：
+
+- `planning`：错误分支标准化，项目与条目接口去重
+- `knowledge`：分类/知识条目 create/update 映射统一
+- `quality-loss`：列表查询与创建 payload 映射统一
+- `task-dispatch`：创建 payload、父任务晋级判断、ITP 关联校验收敛
+- `after-sales/supplier/work-order/inspection`：批量删除、查询解析、权限与错误分支去重
 
 ### 分页规范
 
@@ -792,6 +812,7 @@ GET /api/qms/reports/monthly?year=2024&month=1
 | `401`  | 未授权     | Token 无效或已过期     |
 | `403`  | 禁止访问   | 权限不足               |
 | `404`  | 未找到     | 资源不存在             |
+| `409`  | 资源冲突   | 唯一约束冲突/业务冲突  |
 | `500`  | 服务器错误 | 服务器内部错误         |
 
 ---
