@@ -1,36 +1,49 @@
-import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import {
+  defineEventHandler,
+  getRouterParam,
+  readBody,
+  setResponseStatus,
+} from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import {
+  mapProjectBomItem,
+  normalizeBomText,
+  parseBomQuantity,
+} from '~/utils/bom';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
   const id = getRouterParam(event, 'id');
-  const body = await readBody(event);
-
-  if (!id) return { code: -1, message: 'ID required' };
+  if (!id) {
+    setResponseStatus(event, 400);
+    return useResponseError('ID required');
+  }
 
   try {
+    const body = await readBody(event);
     const updated = await prisma.project_boms.update({
       where: { id },
       data: {
-        part_name: body.partName,
-        part_number: body.partNumber,
-        material: body.material,
-        quantity: Number(body.quantity),
-        unit: body.unit,
-        remarks: body.remarks,
+        part_name: normalizeBomText(body.partName) || '未命名部件',
+        part_number: normalizeBomText(body.partNumber) || null,
+        material: normalizeBomText(body.material) || null,
+        quantity: parseBomQuantity(body.quantity, 1),
+        unit: normalizeBomText(body.unit) || 'PCS',
+        remarks: normalizeBomText(body.remarks) || null,
         updated_at: new Date(),
       },
     });
 
-    return {
-      code: 0,
-      data: updated,
-      message: 'ok',
-    };
+    return useResponseSuccess(mapProjectBomItem(updated));
   } catch (error) {
     logApiError('bom', error);
-    return { code: -1, message: '更新失败' };
+    setResponseStatus(
+      event,
+      (error as { code?: string }).code === 'P2025' ? 404 : 500,
+    );
+    return useResponseError('更新 BOM 条目失败');
   }
 });

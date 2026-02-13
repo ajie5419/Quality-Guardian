@@ -1,31 +1,49 @@
-import { defineEventHandler, readBody } from 'h3';
-import { nanoid } from 'nanoid';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import {
+  createBomItemId,
+  createBomProjectId,
+  mapProjectBomItem,
+  normalizeBomText,
+  parseBomQuantity,
+} from '~/utils/bom';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
   const body = await readBody(event);
+  const workOrderNumber = normalizeBomText(body.workOrderNumber);
+  if (!workOrderNumber) {
+    setResponseStatus(event, 400);
+    return useResponseError('缺少必填字段: workOrderNumber');
+  }
 
   try {
     // 检查是否已存在 bom_projects 记录，如果不存在则创建
     let bomProject = await prisma.bom_projects.findUnique({
-      where: { workOrderNumber: body.workOrderNumber },
+      where: { workOrderNumber },
     });
 
     if (!bomProject) {
       // 获取工单信息
       const workOrder = await prisma.work_orders.findUnique({
-        where: { workOrderNumber: body.workOrderNumber },
+        where: { workOrderNumber },
       });
+      if (!workOrder) {
+        setResponseStatus(event, 400);
+        return useResponseError('工单不存在');
+      }
 
       bomProject = await prisma.bom_projects.create({
         data: {
-          id: `BOM-PROJ-${nanoid(6).toUpperCase()}`,
-          workOrderNumber: body.workOrderNumber,
+          id: createBomProjectId(),
+          workOrderNumber,
           projectName:
-            body.projectName || workOrder?.projectName || body.workOrderNumber,
+            normalizeBomText(body.projectName) ||
+            workOrder.projectName ||
+            workOrderNumber,
           status: 'active',
         },
       });
@@ -34,28 +52,25 @@ export default defineEventHandler(async (event) => {
     // 创建 BOM 物料明细
     const newItem = await prisma.project_boms.create({
       data: {
-        id: `BOM-${nanoid(6).toUpperCase()}`,
-        work_order_number: body.workOrderNumber,
-        part_name: body.partName,
-        part_number: body.partNumber,
-        material: body.material,
-        quantity: Number(body.quantity || 1),
-        unit: body.unit || 'PCS',
-        remarks: body.remarks,
+        id: createBomItemId(),
+        work_order_number: workOrderNumber,
+        part_name: normalizeBomText(body.partName) || '未命名部件',
+        part_number: normalizeBomText(body.partNumber) || null,
+        material: normalizeBomText(body.material) || null,
+        quantity: parseBomQuantity(body.quantity, 1),
+        unit: normalizeBomText(body.unit) || 'PCS',
+        remarks: normalizeBomText(body.remarks) || null,
         updated_at: new Date(),
       },
     });
 
-    return {
-      code: 0,
-      data: {
-        ...newItem,
-        projectId: bomProject.id,
-      },
-      message: 'ok',
-    };
+    return useResponseSuccess({
+      ...mapProjectBomItem(newItem),
+      projectId: bomProject.id,
+    });
   } catch (error) {
     logApiError('bom', error);
-    return { code: -1, message: '添加物料失败' };
+    setResponseStatus(event, 500);
+    return useResponseError('添加物料失败');
   }
 });

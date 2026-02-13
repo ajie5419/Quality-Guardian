@@ -1,7 +1,13 @@
-import { defineEventHandler, getRouterParam } from 'h3';
+import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import { getMetadata, setMetadata } from '~/utils/metadata';
 import prisma from '~/utils/prisma';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -9,7 +15,10 @@ export default defineEventHandler(async (event) => {
 
   const id = getRouterParam(event, 'id');
 
-  if (!id) return useResponseError('ID is required');
+  if (!id) {
+    setResponseStatus(event, 400);
+    return useResponseError('ID is required');
+  }
 
   try {
     // 1. Get project to find workOrderNumber
@@ -17,7 +26,10 @@ export default defineEventHandler(async (event) => {
       where: { id },
     });
 
-    if (!project) return useResponseError('Project not found');
+    if (!project) {
+      setResponseStatus(event, 404);
+      return useResponseError('Project not found');
+    }
 
     const workOrderNumber = project.workOrderNumber;
 
@@ -44,7 +56,8 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ message: 'Deleted' });
   } catch (error) {
-    logApiError('projects', error);
+    logApiError('bom-projects', error);
+    setResponseStatus(event, 500);
     return useResponseError('Delete failed');
   }
 });

@@ -1,4 +1,11 @@
-import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import {
+  defineEventHandler,
+  getRouterParam,
+  readBody,
+  setResponseStatus,
+} from 'h3';
+import { logApiError } from '~/utils/api-logger';
+import { normalizeBomText } from '~/utils/bom';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -12,19 +19,28 @@ export default defineEventHandler(async (event) => {
   if (!userinfo) return unAuthorizedResponse(event);
 
   const id = getRouterParam(event, 'id');
-  const body = await readBody(event);
+  if (!id) {
+    setResponseStatus(event, 400);
+    return useResponseError('ID required');
+  }
 
   try {
+    const body = await readBody(event);
     const updated = await prisma.bom_projects.update({
       where: { id },
       data: {
-        status: body.status,
-        projectName: body.projectName,
+        status: normalizeBomText(body.status) || undefined,
+        projectName: normalizeBomText(body.projectName) || undefined,
         updatedAt: new Date(),
       },
     });
     return useResponseSuccess(updated);
-  } catch {
+  } catch (error) {
+    logApiError('bom-projects', error);
+    setResponseStatus(
+      event,
+      (error as { code?: string }).code === 'P2025' ? 404 : 500,
+    );
     return useResponseError('更新失败');
   }
 });

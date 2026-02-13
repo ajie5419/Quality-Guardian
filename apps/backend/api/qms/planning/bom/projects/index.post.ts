@@ -1,5 +1,6 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { normalizeBomText } from '~/utils/bom';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -14,9 +15,10 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    const { workOrderNumber } = body;
+    const workOrderNumber = normalizeBomText(body.workOrderNumber);
 
     if (!workOrderNumber) {
+      setResponseStatus(event, 400);
       return useResponseError('工单号不能为空');
     }
 
@@ -26,6 +28,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!wo) {
+      setResponseStatus(event, 400);
       return useResponseError('工单不存在');
     }
 
@@ -57,7 +60,8 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newProject);
   } catch (error) {
-    logApiError('projects', error);
+    logApiError('bom-projects', error);
+    setResponseStatus(event, 500);
     return useResponseError('添加 BOM 项目失败');
   }
 });

@@ -1,12 +1,14 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { mapProjectBomItem } from '~/utils/bom';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
   const query = getQuery(event);
-  const projectId = query.projectId as string;
+  const projectId = query.projectId ? String(query.projectId) : undefined;
 
   try {
     if (projectId) {
@@ -25,30 +27,14 @@ export default defineEventHandler(async (event) => {
         orderBy: { created_at: 'desc' },
       });
 
-      return {
-        code: 0,
-        data: items.map((item) => ({
-          id: item.id,
-          partName: item.part_name,
-          partNumber: item.part_number,
-          quantity: item.quantity,
-          unit: item.unit,
-          material: item.material,
-          remarks: item.remarks,
-          parentId: item.work_order_number,
-        })),
-        message: 'ok',
-      };
+      return useResponseSuccess(items.map((item) => mapProjectBomItem(item)));
     }
 
     const allItems = await prisma.project_boms.findMany();
-    return {
-      code: 0,
-      data: allItems,
-      message: 'ok',
-    };
+    return useResponseSuccess(allItems.map((item) => mapProjectBomItem(item)));
   } catch (error) {
     logApiError('bom-list', error);
-    return { code: 0, data: [], message: 'error' };
+    setResponseStatus(event, 500);
+    return useResponseError('获取 BOM 条目失败');
   }
 });

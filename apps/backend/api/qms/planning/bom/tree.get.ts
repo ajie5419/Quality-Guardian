@@ -1,9 +1,11 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { mapProjectBomItem } from '~/utils/bom';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
 
   try {
@@ -57,28 +59,19 @@ export default defineEventHandler(async () => {
         quantity: project.work_order?.quantity,
         deliveryDate: project.work_order?.deliveryDate,
         children: items.map((item) => ({
-          id: item.id,
+          ...mapProjectBomItem(item),
           type: 'item',
           parentId: project.id,
-          partName: item.part_name,
-          partNumber: item.part_number,
-          quantity: item.quantity,
-          unit: item.unit,
-          material: item.material,
-          remarks: item.remarks,
           projectName: project.projectName,
           workOrderNumber: project.workOrderNumber,
         })),
       };
     });
 
-    return {
-      code: 0,
-      data: treeNodes,
-      message: 'ok',
-    };
+    return useResponseSuccess(treeNodes);
   } catch (error) {
     logApiError('bom-tree', error);
-    return { code: 0, data: [], message: 'error' };
+    setResponseStatus(event, 500);
+    return useResponseError('获取 BOM 树失败');
   }
 });
