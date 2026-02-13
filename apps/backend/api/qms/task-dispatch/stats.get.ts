@@ -1,8 +1,13 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
+import { getTaskDispatchArchiveFilter } from '~/utils/task-dispatch';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -12,23 +17,7 @@ export default defineEventHandler(async (event) => {
 
   const currentUserId = String(userinfo.id ?? userinfo.userId);
 
-  // 定义归档项目过滤条件
-  const archiveFilter: any = {
-    AND: [
-      {
-        OR: [
-          { itpProjectId: null },
-          { itp_project: { planStatus: { not: 'ARCHIVED' } } },
-        ],
-      },
-      {
-        OR: [
-          { dfmeaId: null },
-          { dfmea_project: { status: { not: 'archived' } } },
-        ],
-      },
-    ],
-  };
+  const archiveFilter = getTaskDispatchArchiveFilter();
 
   try {
     // Count Pending Level 1 Tasks (Assigned to user as head/leader)
@@ -67,12 +56,8 @@ export default defineEventHandler(async (event) => {
       overdue: 0,
     });
   } catch (error) {
-    logApiError('stats', error);
-    return useResponseSuccess({
-      pendingLevel1: 0,
-      pendingLevel2: 0,
-      processing: 0,
-      overdue: 0,
-    });
+    logApiError('task-dispatch-stats', error);
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to fetch task dispatch stats');
   }
 });

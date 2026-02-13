@@ -1,8 +1,17 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
+import {
+  getTaskDispatchArchiveFilter,
+  resolveTaskDispatchAssigneeFilter,
+  resolveTaskDispatchStatusFilter,
+} from '~/utils/task-dispatch';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -16,47 +25,22 @@ export default defineEventHandler(async (event) => {
   const currentUserId = String(userinfo.id ?? userinfo.userId);
   const isAdmin =
     userinfo.roles?.includes('super') || userinfo.roles?.includes('admin');
-
-  // 解析状态过滤条件，支持逗号分隔的多个状态
-  let statusFilter: string | undefined | { in: string[] };
-  if (status) {
-    const statusList = String(status).split(',');
-    statusFilter = statusList.length > 1 ? { in: statusList } : statusList[0];
-  }
+  const statusFilter = resolveTaskDispatchStatusFilter(status);
+  const assigneeFilter = resolveTaskDispatchAssigneeFilter({
+    all,
+    currentUserId,
+    isAdmin,
+    parentId,
+  });
+  const archiveFilter = getTaskDispatchArchiveFilter();
 
   try {
-    let assigneeFilter: Record<string, unknown> = {};
-    if (parentId) {
-      assigneeFilter = { parentId: String(parentId) };
-    } else if (isAdmin && all === 'true') {
-      assigneeFilter = {};
-    } else {
-      assigneeFilter = { assigneeId: currentUserId };
-    }
-
     const tasks = await prisma.qms_task_dispatches.findMany({
       where: {
-        // 如果提供了 parentId，通常是为了查询某个主任务下的所有子任务，此时不限制执行人
-        // 否则：如果是管理员且带了 all 参数，查询所有；否则只查指派给自己的
         ...assigneeFilter,
         ...(level ? { level: Number.parseInt(String(level)) } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
-
-        // 关键：联动过滤已归档项目 (利用 Prisma Relation)
-        AND: [
-          {
-            OR: [
-              { itpProjectId: null },
-              { itp_project: { planStatus: { not: 'ARCHIVED' } } },
-            ],
-          },
-          {
-            OR: [
-              { dfmeaId: null },
-              { dfmea_project: { status: { not: 'archived' } } },
-            ],
-          },
-        ],
+        ...archiveFilter,
       },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -78,6 +62,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('task-dispatch', error);
-    return useResponseSuccess([]);
+    setResponseStatus(event, 500);
+    return useResponseError('Failed to fetch task dispatch list');
   }
 });
