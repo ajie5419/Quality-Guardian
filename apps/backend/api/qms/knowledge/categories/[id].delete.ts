@@ -1,4 +1,4 @@
-import { defineEventHandler, getRouterParam } from 'h3';
+import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -15,7 +15,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const id = getRouterParam(event, 'id');
-  if (!id) return useResponseError('缺少分类ID');
+  if (!id) {
+    setResponseStatus(event, 400);
+    return useResponseError('缺少分类ID');
+  }
 
   try {
     // 软删除分类
@@ -27,6 +30,10 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('categories', error);
-    return useResponseError('删除分类失败');
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    return useResponseError(
+      errorCode === 'P2025' ? '分类不存在' : '删除分类失败',
+    );
   }
 });

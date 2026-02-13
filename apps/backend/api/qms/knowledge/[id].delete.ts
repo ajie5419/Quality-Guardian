@@ -1,4 +1,4 @@
-import { defineEventHandler, getRouterParam } from 'h3';
+import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -15,7 +15,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const id = getRouterParam(event, 'id');
-  if (!id) return useResponseError('缺少项目ID');
+  if (!id) {
+    setResponseStatus(event, 400);
+    return useResponseError('缺少项目ID');
+  }
 
   try {
     await prisma.knowledge_base.update({
@@ -26,6 +29,10 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('knowledge', error);
-    return useResponseError('删除失败');
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    return useResponseError(
+      errorCode === 'P2025' ? '知识条目不存在' : '删除失败',
+    );
   }
 });

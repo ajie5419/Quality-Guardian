@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { nanoid } from 'nanoid';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -57,6 +57,8 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(newItem);
   } catch (error) {
     logApiError('knowledge', error);
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2002' ? 409 : 500);
     return useResponseError(
       `沉淀失败: ${error instanceof Error ? error.message : '未知错误'}`,
     );

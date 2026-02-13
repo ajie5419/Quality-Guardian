@@ -1,4 +1,4 @@
-import { defineEventHandler, getRouterParam } from 'h3';
+import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -15,7 +15,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const id = getRouterParam(event, 'id');
-  if (!id) return useResponseError('缺少项目ID');
+  if (!id) {
+    setResponseStatus(event, 400);
+    return useResponseError('缺少项目ID');
+  }
 
   try {
     const item = await prisma.knowledge_base.findUnique({
@@ -23,7 +26,10 @@ export default defineEventHandler(async (event) => {
       include: { category: true },
     });
 
-    if (!item) return useResponseError('知识条目不存在');
+    if (!item) {
+      setResponseStatus(event, 404);
+      return useResponseError('知识条目不存在');
+    }
 
     const result = {
       ...item,
@@ -39,6 +45,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('knowledge', error);
+    setResponseStatus(event, 500);
     return useResponseError('读取详情失败');
   }
 });

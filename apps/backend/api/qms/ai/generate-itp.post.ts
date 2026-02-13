@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { nanoid } from 'nanoid';
 import { callAi, extractJson } from '~/utils/ai';
 import { logApiError } from '~/utils/api-logger';
@@ -53,6 +53,10 @@ export default defineEventHandler(async (event) => {
 只输出纯 JSON 块，禁止任何自然语言描述。`;
 
   const userMessage = `输入内容：\n---\n${extractedText || userPrompt}\n---`;
+  if (!extractedText && !userPrompt) {
+    setResponseStatus(event, 400);
+    return useResponseError('缺少可解析内容');
+  }
 
   try {
     const aiResponse = await callAi(
@@ -147,13 +151,18 @@ export default defineEventHandler(async (event) => {
         };
       });
 
-    if (normalizedItems.length === 0)
+    if (normalizedItems.length === 0) {
+      setResponseStatus(event, 422);
       throw new Error('解析内容为空，请检查输入描述是否包含质量要求');
+    }
 
     return useResponseSuccess(normalizedItems);
   } catch (error: unknown) {
     logApiError('generate-itp', error);
     const axiosError = error as { message?: string };
+    if (!event.node.res.statusCode || event.node.res.statusCode < 400) {
+      setResponseStatus(event, 500);
+    }
     return useResponseError(`AI 解析失败: ${axiosError.message}`);
   }
 });

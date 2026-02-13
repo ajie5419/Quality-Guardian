@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { callAi, extractJson } from '~/utils/ai';
 import { logApiError } from '~/utils/api-logger';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
@@ -48,6 +48,7 @@ export default defineEventHandler(async (event) => {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     logApiError('extract-tags', error);
+    setResponseStatus(event, 500);
     return useResponseError(`AI 提取标签失败: ${errorMessage}`);
   }
 });

@@ -1,4 +1,9 @@
-import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import {
+  defineEventHandler,
+  getRouterParam,
+  readBody,
+  setResponseStatus,
+} from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -15,7 +20,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const id = getRouterParam(event, 'id');
-  if (!id) return useResponseError('缺少项目ID');
+  if (!id) {
+    setResponseStatus(event, 400);
+    return useResponseError('缺少项目ID');
+  }
 
   try {
     const body = await readBody(event);
@@ -40,6 +48,10 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('knowledge', error);
-    return useResponseError('更新失败');
+    const errorCode = (error as { code?: string }).code;
+    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    return useResponseError(
+      errorCode === 'P2025' ? '知识条目不存在' : '更新失败',
+    );
   }
 });
