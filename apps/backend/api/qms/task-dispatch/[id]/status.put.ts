@@ -4,6 +4,7 @@ import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -25,8 +26,7 @@ export default defineEventHandler(async (event) => {
   const body = (await readBody(event)) as { status?: unknown };
   const status = normalizeTaskDispatchStatus(body?.status);
   if (!status) {
-    setResponseStatus(event, 400);
-    return useResponseError('Invalid status');
+    return badRequestResponse(event, 'Invalid status');
   }
 
   try {

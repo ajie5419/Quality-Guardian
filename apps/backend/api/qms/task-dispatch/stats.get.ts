@@ -3,6 +3,7 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -24,8 +25,7 @@ export default defineEventHandler(async (event) => {
     prisma,
   );
   if (!currentUserId) {
-    setResponseStatus(event, 400);
-    return useResponseError('无法识别当前用户');
+    return badRequestResponse(event, '无法识别当前用户');
   }
 
   const archiveFilter = getTaskDispatchArchiveFilter();

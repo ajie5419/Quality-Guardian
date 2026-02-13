@@ -8,6 +8,7 @@ import {
   resolveReportQueryDate,
 } from '~/utils/report';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -23,8 +24,7 @@ export default defineEventHandler(async (event) => {
   const { date: parsedQueryDate, valid: isDateValid } =
     resolveReportQueryDate(date);
   if (!isDateValid) {
-    setResponseStatus(event, 400);
-    return useResponseError('Invalid date parameter');
+    return badRequestResponse(event, 'Invalid date parameter');
   }
   const queryDate = formatReportDate(parsedQueryDate);
   const queryUser = user || userinfo.username;

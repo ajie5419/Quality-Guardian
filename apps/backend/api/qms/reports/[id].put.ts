@@ -11,6 +11,7 @@ import {
   parseReportNumber,
 } from '~/utils/report';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -45,8 +46,7 @@ export default defineEventHandler(async (event) => {
     if (body.date !== undefined) {
       const parsedDate = parseReportDate(body.date);
       if (!parsedDate) {
-        setResponseStatus(event, 400);
-        return useResponseError('invalid date');
+        return badRequestResponse(event, 'invalid date');
       }
       dataUpdate.date = parsedDate;
     }

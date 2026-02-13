@@ -5,6 +5,7 @@ import prisma from '~/utils/prisma';
 import { isPrismaForeignKeyError } from '~/utils/prisma-error';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -39,8 +40,10 @@ export default defineEventHandler(async (event) => {
     'assigneeId',
   ]);
   if (missingFields.length > 0) {
-    setResponseStatus(event, 400);
-    return useResponseError(`缺少必填字段: ${missingFields.join('/')}`);
+    return badRequestResponse(
+      event,
+      `缺少必填字段: ${missingFields.join('/')}`,
+    );
   }
 
   const currentUserId = await resolveTaskDispatchCurrentUserId(
@@ -48,8 +51,7 @@ export default defineEventHandler(async (event) => {
     prisma,
   );
   if (!currentUserId) {
-    setResponseStatus(event, 400);
-    return useResponseError('无法识别当前操作人身份');
+    return badRequestResponse(event, '无法识别当前操作人身份');
   }
 
   try {
@@ -63,8 +65,7 @@ export default defineEventHandler(async (event) => {
       select: { id: true },
     });
     if (!assignee) {
-      setResponseStatus(event, 400);
-      return useResponseError('受派人不存在');
+      return badRequestResponse(event, '受派人不存在');
     }
 
     // 校验关联的 ITP 项目是否存在 (真实数据库外键约束预检)
@@ -76,8 +77,8 @@ export default defineEventHandler(async (event) => {
         logApiError('task-dispatch', new Error('Project not found'), {
           itpProjectId: body.itpProjectId,
         });
-        setResponseStatus(event, 400);
-        return useResponseError(
+        return badRequestResponse(
+          event,
           `关联的 ITP 计划 (ID: ${body.itpProjectId}) 不存在，请刷新后重试`,
         );
       }

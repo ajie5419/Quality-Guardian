@@ -4,6 +4,7 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { resolveReportDateRangeQuery } from '~/utils/report';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -17,12 +18,10 @@ export default defineEventHandler(async (event) => {
   const dateRange = resolveReportDateRangeQuery(query.startDate, query.endDate);
 
   if (dateRange.reason === 'MISSING') {
-    setResponseStatus(event, 400);
-    return useResponseError('Missing startDate or endDate parameters');
+    return badRequestResponse(event, 'Missing startDate or endDate parameters');
   }
   if (dateRange.reason === 'INVALID') {
-    setResponseStatus(event, 400);
-    return useResponseError('Invalid startDate or endDate parameters');
+    return badRequestResponse(event, 'Invalid startDate or endDate parameters');
   }
 
   try {

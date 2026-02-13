@@ -11,6 +11,7 @@ import {
 } from '~/utils/report';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -28,8 +29,7 @@ export default defineEventHandler(async (event) => {
     const reportDate =
       missingFields.length > 0 ? null : parseReportDate(body.date);
     if (!reportDate) {
-      setResponseStatus(event, 400);
-      return useResponseError('缺少或无效字段: date');
+      return badRequestResponse(event, '缺少或无效字段: date');
     }
 
     const created = await prisma.reports.create({

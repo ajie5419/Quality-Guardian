@@ -5,6 +5,7 @@ import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { parseReportPeriodType, resolveReportQueryDate } from '~/utils/report';
 import {
+  badRequestResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -17,15 +18,13 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const type = parseReportPeriodType(query.type);
   if (!type) {
-    setResponseStatus(event, 400);
-    return useResponseError('Invalid type parameter');
+    return badRequestResponse(event, 'Invalid type parameter');
   }
   const { date: targetDate, valid: isDateValid } = resolveReportQueryDate(
     query.date,
   );
   if (!isDateValid) {
-    setResponseStatus(event, 400);
-    return useResponseError('Invalid date parameter');
+    return badRequestResponse(event, 'Invalid date parameter');
   }
 
   try {
