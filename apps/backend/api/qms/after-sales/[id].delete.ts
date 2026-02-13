@@ -2,6 +2,7 @@ import { defineEventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { AfterSalesService } from '~/services/after-sales.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -25,10 +26,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('after-sales', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError(
-      errorCode === 'P2025'
+      isPrismaNotFoundError(error)
         ? 'After-sales record not found'
         : 'Failed to delete after-sales record',
     );

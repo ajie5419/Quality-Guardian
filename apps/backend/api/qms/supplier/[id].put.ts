@@ -8,6 +8,10 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
+  isPrismaNotFoundError,
+  isPrismaUniqueConstraintError,
+} from '~/utils/prisma-error';
+import {
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -56,12 +60,11 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('supplier', error);
-    const errorCode = (error as { code?: string }).code;
-    if (errorCode === 'P2025') {
+    if (isPrismaNotFoundError(error)) {
       setResponseStatus(event, 404);
       return useResponseError('供应商不存在');
     }
-    if (errorCode === 'P2002') {
+    if (isPrismaUniqueConstraintError(error)) {
       setResponseStatus(event, 409);
       return useResponseError('供应商名称已存在');
     }

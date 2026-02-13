@@ -9,6 +9,7 @@ import { buildAfterSalesUpdateData } from '~/utils/after-sales-payload';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -68,10 +69,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('after-sales', error);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'P2025' ? 404 : 500);
+    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
     return useResponseError(
-      errorCode === 'P2025' ? '售后记录不存在' : '更新售后记录失败',
+      isPrismaNotFoundError(error) ? '售后记录不存在' : '更新售后记录失败',
     );
   }
 });
