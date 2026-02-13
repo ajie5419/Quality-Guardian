@@ -1,4 +1,4 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import {
@@ -7,7 +7,10 @@ import {
   toItpProjectVersionText,
 } from '~/utils/itp';
 import prisma from '~/utils/prisma';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  internalServerErrorResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
@@ -113,7 +116,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(treeData);
   } catch (error) {
     logApiError('itp-tree', error);
-    setResponseStatus(event, 500);
-    return useResponseError('获取 ITP 树失败');
+    return internalServerErrorResponse(event, '获取 ITP 树失败');
   }
 });

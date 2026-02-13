@@ -1,7 +1,10 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  internalServerErrorResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
@@ -60,7 +63,6 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('dfmea-project-stats', error);
-    setResponseStatus(event, 500);
-    return useResponseError('获取 DFMEA 项目统计失败');
+    return internalServerErrorResponse(event, '获取 DFMEA 项目统计失败');
   }
 });

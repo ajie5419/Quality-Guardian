@@ -9,6 +9,7 @@ import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -64,7 +65,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(upsertResult.data);
   } catch (error) {
     logApiError('project-docs-projects', error);
-    setResponseStatus(event, 500);
-    return useResponseError('添加项目资料失败');
+    return internalServerErrorResponse(event, '添加项目资料失败');
   }
 });

@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {
   buildProjectBomCreateData,
@@ -11,7 +11,7 @@ import { upsertPlanningProjectByWorkOrder } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
-  useResponseError,
+  internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -59,8 +59,7 @@ export default defineEventHandler(async (event) => {
           })
         : upsertResult.data;
     if (!bomProject) {
-      setResponseStatus(event, 500);
-      return useResponseError('BOM 项目状态异常');
+      return internalServerErrorResponse(event, 'BOM 项目状态异常');
     }
 
     const newItem = await prisma.project_boms.create({
@@ -73,7 +72,6 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('bom', error);
-    setResponseStatus(event, 500);
-    return useResponseError('添加物料失败');
+    return internalServerErrorResponse(event, '添加物料失败');
   }
 });

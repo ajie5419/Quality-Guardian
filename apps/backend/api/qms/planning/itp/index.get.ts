@@ -1,11 +1,11 @@
-import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import { normalizeItpText, parseItpQuantitativeItems } from '~/utils/itp';
 import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
-  useResponseError,
+  internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -38,7 +38,6 @@ export default defineEventHandler(async (event) => {
     );
   } catch (error) {
     logApiError('itp', error);
-    setResponseStatus(event, 500);
-    return useResponseError('获取 ITP 条目失败');
+    return internalServerErrorResponse(event, '获取 ITP 条目失败');
   }
 });

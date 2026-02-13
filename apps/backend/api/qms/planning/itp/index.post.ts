@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import {
@@ -11,7 +11,8 @@ import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
-  useResponseError,
+  internalServerErrorResponse,
+  notFoundResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -33,8 +34,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!plan) {
-      setResponseStatus(event, 404);
-      return useResponseError('Quality plan not found');
+      return notFoundResponse(event, 'Quality plan not found');
     }
 
     const maxOrder = getMaxItpItemOrder(plan.items || []);
@@ -53,7 +53,6 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('itp', error);
-    setResponseStatus(event, 500);
-    return useResponseError('创建 ITP 条目失败');
+    return internalServerErrorResponse(event, '创建 ITP 条目失败');
   }
 });

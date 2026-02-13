@@ -1,8 +1,11 @@
-import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  internalServerErrorResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
@@ -21,7 +24,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(items);
   } catch (error) {
     logApiError('dfmea', error);
-    setResponseStatus(event, 500);
-    return useResponseError('获取 DFMEA 条目失败');
+    return internalServerErrorResponse(event, '获取 DFMEA 条目失败');
   }
 });

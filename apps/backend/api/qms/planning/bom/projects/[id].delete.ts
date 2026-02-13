@@ -1,12 +1,13 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { getMetadata, setMetadata } from '~/utils/metadata';
 import { isPrismaNotFoundError } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import {
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -27,8 +28,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!project) {
-      setResponseStatus(event, 404);
-      return useResponseError('Project not found');
+      return notFoundResponse(event, 'Project not found');
     }
 
     const workOrderNumber = project.workOrderNumber;
@@ -61,11 +61,9 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('bom-projects', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(
-      isPrismaNotFoundError(error)
-        ? 'BOM project not found'
-        : 'Failed to delete BOM project',
-    );
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, 'BOM project not found');
+    }
+    return internalServerErrorResponse(event, 'Failed to delete BOM project');
   }
 });

@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {
   buildItpItemCreateData,
@@ -12,7 +12,8 @@ import {
 } from '~/utils/request-validation';
 import {
   badRequestResponse,
-  useResponseError,
+  internalServerErrorResponse,
+  notFoundResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -38,8 +39,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!plan) {
-      setResponseStatus(event, 404);
-      return useResponseError('未找到目标质量计划');
+      return notFoundResponse(event, '未找到目标质量计划');
     }
 
     const maxOrder = getMaxItpItemOrder(plan.items || []);
@@ -64,7 +64,6 @@ export default defineEventHandler(async (event) => {
     logApiError('import', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    setResponseStatus(event, 500);
-    return useResponseError(`导入失败: ${errorMessage}`);
+    return internalServerErrorResponse(event, `导入失败: ${errorMessage}`);
   }
 });

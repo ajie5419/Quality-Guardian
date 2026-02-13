@@ -1,8 +1,11 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { calculateDfmeaRpn, createDfmeaProjectId } from '~/utils/dfmea';
 import prisma from '~/utils/prisma';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  internalServerErrorResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 
 const SEED_PROJECTS = [
   {
@@ -126,9 +129,11 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error: unknown) {
     logApiError('dfmea-seed', error);
-    setResponseStatus(event, 500);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    return useResponseError(`初始化 DFMEA 种子数据失败: ${errorMessage}`);
+    return internalServerErrorResponse(
+      event,
+      `初始化 DFMEA 种子数据失败: ${errorMessage}`,
+    );
   }
 });

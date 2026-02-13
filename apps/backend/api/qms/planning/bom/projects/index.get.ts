@@ -1,4 +1,4 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {
   normalizeBomProjectStatus,
@@ -8,8 +8,8 @@ import { verifyAccessToken } from '~/utils/jwt-utils';
 import { getMetadata } from '~/utils/metadata';
 import prisma from '~/utils/prisma';
 import {
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -50,7 +50,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(data);
   } catch (error) {
     logApiError('bom-projects', error);
-    setResponseStatus(event, 500);
-    return useResponseError('获取 BOM 项目失败');
+    return internalServerErrorResponse(event, '获取 BOM 项目失败');
   }
 });

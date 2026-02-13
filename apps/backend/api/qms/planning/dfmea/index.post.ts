@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {
   calculateDfmeaRpn,
@@ -12,7 +12,7 @@ import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
-  useResponseError,
+  internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -52,7 +52,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(newItem);
   } catch (error) {
     logApiError('dfmea', error);
-    setResponseStatus(event, 500);
-    return useResponseError('添加 DFMEA 条目失败');
+    return internalServerErrorResponse(event, '添加 DFMEA 条目失败');
   }
 });

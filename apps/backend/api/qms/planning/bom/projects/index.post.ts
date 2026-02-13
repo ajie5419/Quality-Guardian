@@ -7,6 +7,7 @@ import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
@@ -60,7 +61,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(upsertResult.data);
   } catch (error) {
     logApiError('bom-projects', error);
-    setResponseStatus(event, 500);
-    return useResponseError('添加 BOM 项目失败');
+    return internalServerErrorResponse(event, '添加 BOM 项目失败');
   }
 });

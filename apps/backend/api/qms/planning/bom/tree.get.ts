@@ -1,9 +1,12 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { groupBomItemsByWorkOrder, mapBomTreeProjectNode } from '~/utils/bom';
 import { MOCK_DELAY } from '~/utils/index';
 import prisma from '~/utils/prisma';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  internalServerErrorResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
@@ -40,7 +43,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(treeNodes);
   } catch (error) {
     logApiError('bom-tree', error);
-    setResponseStatus(event, 500);
-    return useResponseError('获取 BOM 树失败');
+    return internalServerErrorResponse(event, '获取 BOM 树失败');
   }
 });

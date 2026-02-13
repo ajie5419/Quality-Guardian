@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { buildProjectBomCreateData, normalizeBomText } from '~/utils/bom';
 import { MOCK_DELAY } from '~/utils/index';
@@ -9,7 +9,8 @@ import {
 } from '~/utils/request-validation';
 import {
   badRequestResponse,
-  useResponseError,
+  internalServerErrorResponse,
+  notFoundResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -36,8 +37,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!bomProject) {
-      setResponseStatus(event, 404);
-      return useResponseError('项目不存在');
+      return notFoundResponse(event, '项目不存在');
     }
 
     const createResults = await Promise.allSettled(
@@ -66,7 +66,6 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('bom-import', error);
-    setResponseStatus(event, 500);
-    return useResponseError('导入 BOM 失败');
+    return internalServerErrorResponse(event, '导入 BOM 失败');
   }
 });
