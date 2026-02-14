@@ -5,6 +5,7 @@ import { useI18n } from '@vben/locales';
 import { message, Modal } from 'ant-design-vue';
 
 import { ProjectStatusEnum } from '#/api/qms/enums';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 /**
  * 通用项目操作 Hook
@@ -31,6 +32,7 @@ export function useProjectActions<
   } = {},
 ) {
   const { t } = useI18n();
+  const { handleApiError } = useErrorHandler();
 
   const {
     archiveProject,
@@ -57,6 +59,21 @@ export function useProjectActions<
     ].includes(s);
   };
 
+  const runConfirmedAction = async (
+    action: () => Promise<void>,
+    successMessage: string,
+    errorContext: string,
+  ) => {
+    try {
+      await action();
+      message.success(successMessage);
+      await loadData?.();
+    } catch (error) {
+      handleApiError(error, errorContext);
+      message.error(t('common.actionFailed'));
+    }
+  };
+
   /**
    * 归档/恢复项目
    */
@@ -74,16 +91,12 @@ export function useProjectActions<
         ? `${t('common.confirmRestoreContent')} "${project.name}" ?`
         : `${t('common.confirmArchiveContent')} "${project.name}" ?`,
       onOk: async () => {
-        try {
+        await runConfirmedAction(
+          async () => {
           await archiveProject(
             project.id,
             newStatus,
             passFullProjectOnArchive ? project : undefined,
-          );
-          message.success(
-            isArchived
-              ? t('common.restoreSuccess')
-              : t('common.archiveSuccess'),
           );
 
           // 如果归档的是当前选中的项目，清除选中
@@ -93,12 +106,10 @@ export function useProjectActions<
           ) {
             selectedProjectId.value = null;
           }
-
-          await loadData?.();
-        } catch (error) {
-          console.error('Archive Error:', error);
-          message.error(t('common.actionFailed'));
-        }
+          },
+          isArchived ? t('common.restoreSuccess') : t('common.archiveSuccess'),
+          'Archive Or Restore Project',
+        );
       },
     });
   };
@@ -115,9 +126,9 @@ export function useProjectActions<
         name: project.name || project.projectName,
       }),
       onOk: async () => {
-        try {
+        await runConfirmedAction(
+          async () => {
           await deleteProject(project.id);
-          message.success(t('common.deleteSuccess'));
 
           if (
             resetSelectionOnDelete &&
@@ -125,12 +136,10 @@ export function useProjectActions<
           ) {
             selectedProjectId.value = null;
           }
-
-          await loadData?.();
-        } catch (error) {
-          console.error('Delete Project Error:', error);
-          message.error(t('common.actionFailed'));
-        }
+          },
+          t('common.deleteSuccess'),
+          'Delete Planning Project',
+        );
       },
     });
   };
@@ -147,14 +156,13 @@ export function useProjectActions<
         name: item.name || item.partName || item.item,
       }),
       onOk: async () => {
-        try {
+        await runConfirmedAction(
+          async () => {
           await deleteItem(item.id, projectId);
-          message.success(t('common.deleteSuccess'));
-          await loadData?.();
-        } catch (error) {
-          console.error('Delete Item Error:', error);
-          message.error(t('common.actionFailed'));
-        }
+          },
+          t('common.deleteSuccess'),
+          'Delete Planning Item',
+        );
       },
     });
   };

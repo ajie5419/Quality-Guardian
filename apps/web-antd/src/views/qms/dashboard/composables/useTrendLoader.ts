@@ -7,8 +7,10 @@ import { useI18n } from '@vben/locales';
 import { useDebounceFn } from '@vueuse/core';
 import { message } from 'ant-design-vue';
 
+import { useErrorHandler } from '#/hooks/useErrorHandler';
+
 /** 趋势请求函数类型 */
-type TrendRequestFn<T = any> = (
+type TrendRequestFn<T = unknown> = (
   granularity: 'month' | 'week',
   period?: string,
 ) => Promise<T>;
@@ -19,17 +21,22 @@ type TrendRequestFn<T = any> = (
  * @param granularity 粒度响应式变量（week/month）
  * @returns 包含数据、加载状态、手动加载方法的对象
  */
-export function useTrendLoader<T = any>(
+export function useTrendLoader<T = unknown>(
   requestFn: TrendRequestFn<T>,
   granularity: Ref<'month' | 'week'>,
   initialData?: T,
 ) {
   const { t } = useI18n();
+  const { handleApiError } = useErrorHandler();
   const data = ref<T>(initialData as T) as Ref<T>;
   const isLoading = ref(false);
 
   // 简单的内存缓存
   const cache = ref<Record<string, T>>({});
+  const isCancelledRequest = (error: unknown) =>
+    error === 'cancel' ||
+    (error instanceof Error &&
+      error.message.toLowerCase().includes('cancel'));
 
   // 核心请求逻辑
   const loadTrendData = async (
@@ -52,9 +59,12 @@ export function useTrendLoader<T = any>(
         cache.value[key] = res;
       }
     } catch (error) {
-      if (error !== 'cancel') {
+      if (!isCancelledRequest(error)) {
         message.error(t('qms.dashboard.error.trendLoadFailed'));
-        console.error(`[${requestFn.name}] load failed:`, error);
+        handleApiError(
+          error,
+          `Dashboard Trend Load (${requestFn.name || 'anonymous'})`,
+        );
       }
     } finally {
       isLoading.value = false;

@@ -2,7 +2,11 @@ import type { Ref } from 'vue';
 
 import { ref } from 'vue';
 
+import { useI18n } from '@vben/locales';
+
 import { message } from 'ant-design-vue';
+
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 /**
  * 下钻逻辑Hook
@@ -10,10 +14,12 @@ import { message } from 'ant-design-vue';
  * @param requestFn 下钻数据请求函数
  * @returns 下钻状态及操作方法
  */
-export function useDrillDown<T = any>(
+export function useDrillDown<T = unknown>(
   type: 'passRate' | 'qualityLoss',
   requestFn: (period: string) => Promise<T[]>,
 ) {
+  const { t } = useI18n();
+  const { handleApiError } = useErrorHandler();
   // 下钻状态
   const visible = ref(false); // 弹窗可见性
   const period = ref(''); // 选中的时间段
@@ -31,8 +37,8 @@ export function useDrillDown<T = any>(
     try {
       data.value = await requestFn(periodStr);
     } catch (error) {
-      message.error(`Failed to load ${type} detail data`);
-      console.error(`[${type}] drill down load failed:`, error);
+      message.error(t('common.actionFailed'));
+      handleApiError(error, `Dashboard DrillDown Load (${type})`);
     } finally {
       isLoading.value = false;
     }
