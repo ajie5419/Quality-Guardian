@@ -147,6 +147,14 @@ function parseTaskDispatchInt(value: unknown, fallback: number): number {
   return parsed > 0 ? Math.trunc(parsed) : fallback;
 }
 
+export function resolveTaskDispatchLevel(value: unknown, fallback = 1): number {
+  return parseTaskDispatchInt(value, fallback);
+}
+
+export function isTaskDispatchLevelTwo(body: Record<string, unknown>): boolean {
+  return resolveTaskDispatchLevel(body.level, 1) === 2;
+}
+
 export function resolveTaskDispatchAssigneeCandidates(
   assigneeId: unknown,
 ): null | { id: string; username: string } {
@@ -172,7 +180,7 @@ export function resolveTaskDispatchItpProjectIdForValidation(
 export function resolveTaskDispatchParentIdForPromotion(
   body: Record<string, unknown>,
 ): null | string {
-  const level = parseTaskDispatchInt(body.level, 1);
+  const level = resolveTaskDispatchLevel(body.level, 1);
   if (level !== 2) {
     return null;
   }
@@ -199,7 +207,7 @@ export function buildTaskDispatchCreateData(
     itpProjectId: body.itpProjectId
       ? normalizeTaskDispatchText(body.itpProjectId)
       : null,
-    level: parseTaskDispatchInt(body.level, 1),
+    level: resolveTaskDispatchLevel(body.level, 1),
     parentId: body.parentId ? normalizeTaskDispatchText(body.parentId) : null,
     priority: parseTaskDispatchInt(body.priority, 2),
     title: normalizeTaskDispatchText(body.title),

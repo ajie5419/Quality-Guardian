@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildTaskDispatchCreateData,
+  isTaskDispatchLevelTwo,
   resolveTaskDispatchAssigneeCandidates,
   resolveTaskDispatchItpProjectIdForValidation,
+  resolveTaskDispatchLevel,
   resolveTaskDispatchParentIdForPromotion,
 } from './task-dispatch';
 
@@ -39,6 +41,18 @@ describe('task-dispatch payload utils', () => {
     expect(
       resolveTaskDispatchParentIdForPromotion({ level: 1, parentId: 'p1' }),
     ).toBeNull();
+  });
+
+  it('resolves task level with sane fallback', () => {
+    expect(resolveTaskDispatchLevel('2')).toBe(2);
+    expect(resolveTaskDispatchLevel('0')).toBe(1);
+    expect(resolveTaskDispatchLevel('bad')).toBe(1);
+  });
+
+  it('detects level two dispatch accurately', () => {
+    expect(isTaskDispatchLevelTwo({ level: 2 })).toBe(true);
+    expect(isTaskDispatchLevelTwo({ level: '2' })).toBe(true);
+    expect(isTaskDispatchLevelTwo({ level: 1 })).toBe(false);
   });
 
   it('builds normalized create payload with defaults', () => {

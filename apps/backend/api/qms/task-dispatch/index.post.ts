@@ -12,6 +12,7 @@ import {
 } from '~/utils/response';
 import {
   buildTaskDispatchCreateData,
+  isTaskDispatchLevelTwo,
   resolveTaskDispatchAssigneeCandidates,
   resolveTaskDispatchCurrentUserId,
   resolveTaskDispatchItpProjectIdForValidation,
@@ -96,21 +97,45 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    const newTask = await prisma.qms_task_dispatches.create({
-      data: buildTaskDispatchCreateData(body, {
-        assigneeId: assignee.id,
-        assignorId: currentUserId,
-      }),
-    });
-
-    // 如果是二级指派，更新父任务状态
+    const isLevelTwoTask = isTaskDispatchLevelTwo(body);
     const parentIdForPromotion = resolveTaskDispatchParentIdForPromotion(body);
-    if (parentIdForPromotion) {
-      await prisma.qms_task_dispatches.update({
-        where: { id: parentIdForPromotion },
-        data: { status: TASK_DISPATCH_STATUS.DISPATCHED },
-      });
+    if (isLevelTwoTask && !parentIdForPromotion) {
+      return badRequestResponse(event, '二级任务必须提供父任务ID');
     }
+    if (parentIdForPromotion) {
+      const parentTask = await prisma.qms_task_dispatches.findUnique({
+        where: { id: parentIdForPromotion },
+        select: { id: true, level: true },
+      });
+      if (!parentTask) {
+        return badRequestResponse(event, '父任务不存在');
+      }
+      if (parentTask.level !== 1) {
+        return badRequestResponse(event, '仅允许挂载到一级任务');
+      }
+    }
+
+    const newTask = await prisma.$transaction(async (tx) => {
+      const createdTask = await tx.qms_task_dispatches.create({
+        data: buildTaskDispatchCreateData(body, {
+          assigneeId: assignee.id,
+          assignorId: currentUserId,
+        }),
+      });
+
+      // 如果是二级指派，且父任务仍为待处理，则推进为已派发
+      if (parentIdForPromotion) {
+        await tx.qms_task_dispatches.updateMany({
+          where: {
+            id: parentIdForPromotion,
+            status: TASK_DISPATCH_STATUS.PENDING,
+          },
+          data: { status: TASK_DISPATCH_STATUS.DISPATCHED },
+        });
+      }
+
+      return createdTask;
+    });
 
     return useResponseSuccess(newTask);
   } catch (error: unknown) {
