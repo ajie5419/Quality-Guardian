@@ -160,7 +160,7 @@ Content-Type: application/json
 
 ```json
 {
-  "success": true,
+  "code": 0,
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImVzZXJO",
     "user": {
@@ -179,9 +179,10 @@ Content-Type: application/json
 
 ```json
 {
-  "success": false,
-  "message": "用户名或密码错误",
-  "code": "AUTH_FAILED"
+  "code": -1,
+  "data": null,
+  "error": "AUTH_FAILED",
+  "message": "用户名或密码错误"
 }
 ```
 
@@ -218,7 +219,7 @@ Authorization: Bearer <旧_token>
 
 ```json
 {
-  "success": true,
+  "code": 0,
   "data": {
     "token": "新_token"
   },
@@ -251,7 +252,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "success": true,
+  "code": 0,
   "data": {
     "id": "1",
     "username": "admin",
@@ -293,7 +294,7 @@ GET /api/qms/inspection/issues?page=1&pageSize=20&status=OPEN
 
 ```json
 {
-  "success": true,
+  "code": 0,
   "data": {
     "list": [
       {
@@ -366,7 +367,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "success": true,
+  "code": 0,
   "data": {
     "id": "2",
     "ncNumber": "NC-2024-002"
@@ -423,7 +424,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "success": true,
+  "code": 0,
   "data": {
     "id": "2",
     "updatedAt": "2024-01-15T14:00:00Z"
@@ -461,7 +462,9 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "success": true,
+  "code": 0,
+  "data": null,
+  "error": null,
   "message": "删除成功"
 }
 ```
@@ -510,7 +513,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "success": true,
+  "code": 0,
   "data": {
     "id": "WO-2024-001",
     "woNumber": "WO-2024-001"
@@ -562,7 +565,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "success": true,
+  "code": 0,
   "data": {
     "id": "WO-2024-001",
     "status": "IN_PROGRESS",
@@ -594,7 +597,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "success": true,
+  "code": 0,
   "data": {
     "list": [
       {
@@ -650,7 +653,7 @@ GET /api/qms/reports/weekly?startDate=2024-01-08&endDate=2024-01-14
 
 ```json
 {
-  "success": true,
+  "code": 0,
   "data": {
     "title": "Weekly Quality Report",
     "period": "2024-01-08 ~ 2024-01-14",
@@ -725,7 +728,7 @@ GET /api/qms/reports/monthly?year=2024&month=1
 
 ```json
 {
-  "success": true,
+  "code": 0,
   "data": {
     "title": "Monthly Quality Report",
     "period": "2024-01",
