@@ -34,6 +34,7 @@ import { useGridImport } from '#/hooks/useGridImport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { findNameById } from '#/types';
+import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
 import IssueChartDashboard from './components/IssueChartDashboard.vue';
 import IssueEditModal from './components/IssueEditModal.vue';
@@ -112,6 +113,73 @@ const yearOptions = computed(() => {
   }));
 });
 
+type InspectionGridRow = InspectionIssue & {
+  photoExportUrl: string;
+  photos: string[];
+};
+
+function extractPhotoUrl(photo: unknown): string | undefined {
+  if (typeof photo === 'string') {
+    return photo.trim() || undefined;
+  }
+  if (photo && typeof photo === 'object') {
+    const url = (photo as { url?: unknown }).url;
+    if (typeof url === 'string') {
+      return url.trim() || undefined;
+    }
+  }
+  return undefined;
+}
+
+function normalizeInspectionRows(data: InspectionIssue[]): InspectionGridRow[] {
+  return (data || []).map((item) => {
+    const photoList = Array.isArray(item.photos)
+      ? item.photos
+          .map((photo) => extractPhotoUrl(photo))
+          .filter((url): url is string => Boolean(url))
+      : [];
+    return {
+      ...item,
+      photos: photoList,
+      photoExportUrl: photoList[0] || '',
+    };
+  });
+}
+
+const exportInspectionIssuesAsXlsx =
+  createVxePhotoXlsxExportMethod<InspectionGridRow>({
+    sheetName: t('qms.inspection.issues.title'),
+    filename: () => `${t('qms.inspection.issues.title')}-${Date.now()}.xlsx`,
+    getPhotoUrl: (row) => row.photoExportUrl || '',
+    getRows: async ({ mode, $table, $grid }) => {
+      if (mode === 'selected') {
+        return normalizeInspectionRows($table.getCheckboxRecords() || []);
+      }
+      if (mode === 'all') {
+        const proxyInfo = $grid?.getProxyInfo?.();
+        const formValues = proxyInfo?.form || {};
+        const filterParams: Record<string, unknown[]> = {};
+        (proxyInfo?.filter || []).forEach((item: GridFilterItem) => {
+          const values = item.values;
+          if (values && values.length > 0) {
+            filterParams[item.field] = values;
+          }
+        });
+        const { items } = await getInspectionIssues({
+          year: currentYear.value,
+          workOrderNumber: formValues?.workOrderNumber as string,
+          projectName: formValues?.projectName as string,
+          status: (filterParams.status?.[0] || formValues?.status) as string,
+          processName: formValues?.processName as string,
+          ...(filterParams as Record<string, string | string[] | unknown>),
+        });
+        return normalizeInspectionRows(items || []);
+      }
+      const tableData = $table.getTableData?.();
+      return normalizeInspectionRows(tableData?.fullData || []);
+    },
+  });
+
 const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
   checkboxConfig: {
     reserve: true,
@@ -131,8 +199,9 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
     importMethod: ({ file }: { file: File }) => handleImport({ file }),
   },
   exportConfig: {
-    remote: false,
-    types: ['xlsx', 'csv'],
+    remote: true,
+    exportMethod: exportInspectionIssuesAsXlsx,
+    types: ['xlsx'],
     modes: ['current', 'selected', 'all'],
   },
   columns: [

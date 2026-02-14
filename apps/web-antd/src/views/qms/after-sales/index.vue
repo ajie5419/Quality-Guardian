@@ -28,6 +28,7 @@ import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { findNameById } from '#/types';
+import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
 import AfterSalesCharts from './components/AfterSalesCharts.vue';
 import AfterSalesModal from './components/AfterSalesModal.vue';
@@ -75,6 +76,8 @@ const isAdmin = computed(() => {
     }) || false
   );
 });
+
+const canToolbarExport = computed(() => canExport.value || isAdmin.value);
 
 async function loadData() {
   try {
@@ -125,6 +128,72 @@ const { handleImport } = useGridImport({
   },
 });
 
+type AfterSalesGridRow = QmsAfterSalesApi.AfterSalesItem & {
+  photoExportUrl: string;
+  photos: string[];
+};
+
+function extractPhotoUrl(photo: unknown): string | undefined {
+  if (typeof photo === 'string') {
+    return photo.trim() || undefined;
+  }
+  if (photo && typeof photo === 'object') {
+    const url = (photo as { url?: unknown }).url;
+    if (typeof url === 'string') {
+      return url.trim() || undefined;
+    }
+  }
+  return undefined;
+}
+
+function normalizeAfterSalesRows(
+  data: QmsAfterSalesApi.AfterSalesItem[],
+): AfterSalesGridRow[] {
+  return (data || []).map((item) => {
+    let photos = item.photos;
+    if (typeof photos === 'string') {
+      try {
+        photos = JSON.parse(photos);
+      } catch {
+        photos = [];
+      }
+    }
+    const photoList = Array.isArray(photos)
+      ? photos
+          .map((photo) => extractPhotoUrl(photo))
+          .filter((url): url is string => Boolean(url))
+      : [];
+    return {
+      ...item,
+      photos: photoList,
+      photoExportUrl: photoList[0] || '',
+    };
+  });
+}
+
+const exportAfterSalesAsXlsx = createVxePhotoXlsxExportMethod<AfterSalesGridRow>(
+  {
+    sheetName: t('qms.afterSales.title'),
+    filename: () => `${t('qms.afterSales.title')}-${Date.now()}.xlsx`,
+    getPhotoUrl: (row) => row.photoExportUrl || '',
+    getRows: async ({ mode, $table, $grid }) => {
+      if (mode === 'selected') {
+        return normalizeAfterSalesRows($table.getCheckboxRecords() || []);
+      }
+      if (mode === 'all') {
+        const proxyInfo = $grid?.getProxyInfo?.();
+        const data = await getAfterSalesList({
+          year: currentYear.value,
+          ...(proxyInfo?.form || {}),
+        } as QmsAfterSalesApi.AfterSalesParams);
+        return normalizeAfterSalesRows(data || []);
+      }
+      const tableData = $table.getTableData?.();
+      return normalizeAfterSalesRows(tableData?.fullData || []);
+    },
+  },
+);
+
 // 表格列配置
 const gridOptions = computed(() => ({
   checkboxConfig: {
@@ -132,7 +201,7 @@ const gridOptions = computed(() => ({
     highlight: true,
   },
   toolbarConfig: {
-    export: canExport.value,
+    export: canToolbarExport.value,
     import: canImport.value,
     refresh: true,
     search: true,
@@ -145,8 +214,9 @@ const gridOptions = computed(() => ({
     importMethod: ({ file }: { file: File }) => handleImport({ file }),
   },
   exportConfig: {
-    remote: false,
-    types: ['xlsx', 'csv'],
+    remote: true,
+    exportMethod: exportAfterSalesAsXlsx,
+    types: ['xlsx'],
     modes: ['current', 'selected', 'all'],
   },
   columns: [
@@ -352,22 +422,7 @@ const gridOptions = computed(() => ({
           year: currentYear.value,
           ...formValues,
         } as QmsAfterSalesApi.AfterSalesParams);
-
-        // 确保照片数据是数组格式
-        const items = (data || []).map((item) => {
-          let photos = item.photos;
-          if (typeof photos === 'string') {
-            try {
-              photos = JSON.parse(photos);
-            } catch {
-              photos = [];
-            }
-          }
-          return {
-            ...item,
-            photos: Array.isArray(photos) ? photos : [],
-          };
-        });
+        const items = normalizeAfterSalesRows(data || []);
 
         const { currentPage = 1, pageSize = 20 } = page || {};
         const start = (currentPage - 1) * pageSize;
@@ -378,14 +433,17 @@ const gridOptions = computed(() => ({
       },
       queryAll: async ({
         form,
+        formValues,
       }: {
         form?: Record<string, unknown>;
+        formValues?: Record<string, unknown>;
       }) => {
+        const filters = form || formValues || {};
         const data = await getAfterSalesList({
           year: currentYear.value,
-          ...(form || {}),
+          ...filters,
         } as QmsAfterSalesApi.AfterSalesParams);
-        return { items: data || [] };
+        return { items: normalizeAfterSalesRows(data || []) };
       },
     },
   },
@@ -591,6 +649,7 @@ function handleModalSuccess() {
   chartRefreshKey.value++;
   gridApi.reload();
 }
+
 </script>
 
 <template>
@@ -624,8 +683,8 @@ function handleModalSuccess() {
                 <Image
                   :width="40"
                   :height="40"
-                  :src="row.photos[0]"
-                  class="cursor-pointer rounded shadow-sm hover:scale-110"
+                  :src="Array.isArray(row.photos) ? row.photos[0] : row.photos"
+                  class="rounded shadow-sm"
                 />
               </div>
             </template>

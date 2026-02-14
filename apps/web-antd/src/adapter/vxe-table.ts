@@ -10,6 +10,9 @@ import {
   useVbenVxeGrid as _useVbenVxeGrid,
   setupVbenVxeTable,
 } from '@vben/plugins/vxe-table';
+import ExcelJS from 'exceljs';
+import VXETablePluginExportXLSX from 'vxe-table-plugin-export-xlsx';
+import { VXETable } from 'vxe-table';
 
 import { Button, Image, Tooltip } from 'ant-design-vue';
 
@@ -18,6 +21,9 @@ import { useVbenForm } from './form';
 // 引入 vxe-pc-ui 和 vxe-table 的样式，确保样式正确加载
 import 'vxe-pc-ui/lib/style.css';
 import 'vxe-table/lib/style.css';
+
+// Enable xlsx export support for vxe-table export panel.
+VXETable.use(VXETablePluginExportXLSX, { ExcelJS });
 
 // ---------------------------------------------------------
 // 临时移除: VXETable.mixin 导致生产环境报错，回退到原生导出
@@ -77,7 +83,7 @@ setupVbenVxeTable({
         },
         // 全局导出配置
         exportConfig: {
-          types: ['csv', 'html', 'txt'], // 暂时移除 xlsx
+          types: ['xlsx', 'csv', 'html', 'txt'],
         },
         importConfig: {},
         printConfig: {},
