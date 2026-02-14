@@ -15,7 +15,14 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { LossSource } from '../types';
 
-export function useQualityLossActions(gridApi: any, invalidateFn: () => void) {
+interface GridApiLike {
+  reload: () => void;
+}
+
+export function useQualityLossActions(
+  gridApi: GridApiLike,
+  invalidateFn: () => void,
+) {
   const { t } = useI18n();
   const { handleApiError } = useErrorHandler();
   const checkedRows = ref<QmsQualityLossApi.QualityLossItem[]>([]);

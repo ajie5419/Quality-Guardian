@@ -1,8 +1,7 @@
 <script lang="ts" setup>
 import type { VxeGridProps } from '#/adapter/vxe-table';
-import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
 import type { SystemDeptApi } from '#/api/system/dept';
-import type { TreeSelectNode } from '#/types';
+import type { TreeSelectNode, VxeCheckboxChangeParams } from '#/types';
 
 import { computed, onMounted, ref, watch } from 'vue';
 
@@ -26,6 +25,7 @@ import {
   saveSystemSettingApi,
   saveUserPreferenceApi,
 } from '#/api/system/preference';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData, findNameById } from '#/types';
 
@@ -39,7 +39,16 @@ import { useQualityLossActions } from './composables/useQualityLossActions';
 import { SOURCE_STYLE_MAP, STATUS_OPTIONS } from './constants';
 import { LossSource } from './types';
 
+type QualityLossItem =
+  import('#/api/qms/quality-loss').QmsQualityLossApi.QualityLossItem;
+type QualityLossQueryParams =
+  import('#/api/qms/quality-loss').QualityLossQueryParams;
+type QualityLossGridSetupOptions = Parameters<
+  typeof useVbenVxeGrid<QualityLossItem>
+>[0];
+
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const { hasAccessByCodes } = useAccess();
 const { invalidateQualityLoss } = useInvalidateQmsQueries();
 
@@ -49,7 +58,7 @@ const canEdit = computed(() => hasAccessByCodes([LOSS_ANALYSIS.EDIT]));
 const canDelete = computed(() => hasAccessByCodes([LOSS_ANALYSIS.DELETE]));
 
 // ================= 状态管理 =================
-const allLossData = ref<QmsQualityLossApi.QualityLossItem[]>([]);
+const allLossData = ref<QualityLossItem[]>([]);
 const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const deptTreeData = ref<TreeSelectNode[]>([]);
 const showCharts = ref(true);
@@ -77,7 +86,7 @@ async function loadPreferences() {
         pref.showCharts === undefined ? true : !!pref.showCharts;
     }
   } catch (error) {
-    console.error('Failed to load preferences', error);
+    handleApiError(error, 'Load Quality Loss Preferences');
   } finally {
     isFirstLoad.value = false;
   }
@@ -91,7 +100,7 @@ async function savePreferences() {
       showCharts: showCharts.value,
     });
   } catch (error) {
-    console.error('Failed to save preferences', error);
+    handleApiError(error, 'Save Quality Loss Preferences');
   }
 }
 
@@ -108,7 +117,7 @@ async function handleSaveSystemDefault() {
     });
     message.success('已存为系统默认配置');
   } catch (error) {
-    console.error('Failed to save system default', error);
+    handleApiError(error, 'Save Quality Loss System Default');
     message.error('保存失败');
   }
 }
@@ -117,7 +126,7 @@ async function handleSaveSystemDefault() {
 const { stats } = useLossStatistics(allLossData);
 
 // ================= 表格配置 =================
-const gridOptions = computed<VxeGridProps>(() => ({
+const gridOptions = computed<VxeGridProps<QualityLossItem>>(() => ({
   checkboxConfig: {
     reserve: true,
     highlight: true,
@@ -160,7 +169,11 @@ const gridOptions = computed<VxeGridProps>(() => ({
       title: t('qms.inspection.issues.partName'),
       minWidth: 150,
     },
-    { field: 'date', title: t('qms.inspection.issues.reportDate'), width: 120 },
+    {
+      field: 'date',
+      title: t('qms.inspection.issues.reportDate'),
+      width: 120,
+    },
     {
       field: 'amount',
       title: t('qms.inspection.issues.lossAmount'),
@@ -207,7 +220,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
             ...(canEdit.value ? ['edit'] : []),
             ...(canDelete.value ? ['delete'] : []),
           ],
-          onClick: ({ code, row }: { code: string; row: any }) => {
+          onClick: ({ code, row }: { code: string; row: QualityLossItem }) => {
             if (code === 'claim') handleClaim(row);
             if (code === 'edit') handleEdit(row);
             if (code === 'delete') handleDelete(row);
@@ -234,20 +247,22 @@ const gridOptions = computed<VxeGridProps>(() => ({
 /**
  * 获取统计和图表所需的汇总数据（解耦分页）
  */
-async function fetchSummaryData(filters: any = {}) {
+async function fetchSummaryData(filters: Partial<QualityLossQueryParams> = {}) {
   try {
     const data = await getQualityLossSummary(filters);
     allLossData.value = data;
   } catch (error) {
-    console.error('Failed to fetch summary data', error);
+    handleApiError(error, 'Fetch Quality Loss Summary');
   }
 }
 
-const [Grid, gridApi] = useVbenVxeGrid({
-  gridOptions: gridOptions as any,
+const [Grid, gridApi] = useVbenVxeGrid<QualityLossItem>({
+  gridOptions: gridOptions as unknown as VxeGridProps<QualityLossItem>,
   gridEvents: {
-    checkboxChange: (p: any) => actions.onCheckChange(p),
-    checkboxAll: (p: any) => actions.onCheckChange(p),
+    checkboxChange: (params: VxeCheckboxChangeParams<QualityLossItem>) =>
+      actions.onCheckChange(params),
+    checkboxAll: (params: VxeCheckboxChangeParams<QualityLossItem>) =>
+      actions.onCheckChange(params),
   },
   formOptions: {
     schema: [
@@ -292,7 +307,11 @@ const [Grid, gridApi] = useVbenVxeGrid({
     ],
     submitOnChange: true,
     submitButtonOptions: {
-      onClick: ({ formModel }: any) => {
+      onClick: ({
+        formModel,
+      }: {
+        formModel: Partial<QualityLossQueryParams>;
+      }) => {
         fetchSummaryData(formModel);
       },
     },
@@ -302,7 +321,7 @@ const [Grid, gridApi] = useVbenVxeGrid({
       },
     },
   },
-} as any);
+} as unknown as QualityLossGridSetupOptions);
 
 const actions = useQualityLossActions(gridApi, invalidateQualityLoss);
 const {
@@ -324,7 +343,7 @@ async function loadInitialData() {
     deptRawData.value = deptData;
     deptTreeData.value = convertToTreeSelectData(deptData);
   } catch (error) {
-    console.error('Failed to load departments', error);
+    handleApiError(error, 'Load Quality Loss Departments');
   }
 }
 

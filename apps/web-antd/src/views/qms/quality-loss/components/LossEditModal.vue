@@ -49,9 +49,20 @@ const { t } = useI18n();
 const { invalidateQualityLoss } = useInvalidateQmsQueries();
 const { handleApiError } = useErrorHandler();
 
-const formRef = ref();
+const formRef = ref<{ validate: () => Promise<void> }>();
 const formState = reactive<Partial<QmsQualityLossApi.QualityLossItem>>({});
 const confirmLoading = ref(false);
+
+const isValidationError = (
+  error: unknown,
+): error is { errorFields?: unknown[] } =>
+  typeof error === 'object' &&
+  error !== null &&
+  'errorFields' in error &&
+  Array.isArray((error as { errorFields?: unknown[] }).errorFields);
+
+const hasResponsePayload = (error: unknown) =>
+  typeof error === 'object' && error !== null && 'response' in error;
 
 const rules: Record<string, Rule[]> = {
   date: [{ required: true, message: '请选择日期', trigger: 'change' }],
@@ -59,7 +70,7 @@ const rules: Record<string, Rule[]> = {
   amount: [
     {
       required: true,
-      validator: (_: any, val: number | undefined) =>
+      validator: (_rule: unknown, val: number | undefined) =>
         val !== undefined && val >= 0
           ? Promise.resolve()
           : Promise.reject(new Error('金额不能为负数')),
@@ -77,9 +88,11 @@ watch(
   (val) => {
     if (val) {
       // 清除旧数据并合并新数据
-      Object.keys(formState).forEach((key) => {
-        (formState as any)[key] = undefined;
-      });
+      for (const key of Object.keys(formState) as Array<
+        keyof typeof formState
+      >) {
+        delete formState[key];
+      }
       Object.assign(formState, props.initialData);
     }
   },
@@ -90,7 +103,7 @@ watch(
  */
 async function handleOk() {
   try {
-    await formRef.value.validate();
+    await formRef.value?.validate();
     confirmLoading.value = true;
     await (props.isEditMode && formState.id
       ? updateQualityLoss(formState.id, formState)
@@ -99,15 +112,15 @@ async function handleOk() {
     emit('success');
     emit('update:open', false);
     invalidateQualityLoss();
-  } catch (error: any) {
-    if (error?.errorFields) {
+  } catch (error: unknown) {
+    if (isValidationError(error)) {
       console.warn('Validation failed:', error);
       return;
     }
     handleApiError(error, 'Save Quality Loss');
 
     // Fallback for non-HTTP or unexpected exceptions.
-    if (!(error as any)?.response) {
+    if (!hasResponsePayload(error)) {
       message.error(t('common.saveFailed'));
     }
   } finally {
@@ -118,6 +131,18 @@ async function handleOk() {
 const isManualSource = computed(
   () => formState.lossSource === LossSource.MANUAL || !formState.lossSource,
 );
+const dateValue = computed<string | undefined>({
+  get: () => formState.date ?? undefined,
+  set: (value) => {
+    formState.date = value ?? null;
+  },
+});
+const responsibleDepartmentValue = computed<string | undefined>({
+  get: () => formState.responsibleDepartment ?? undefined,
+  set: (value) => {
+    formState.responsibleDepartment = value ?? null;
+  },
+});
 </script>
 
 <template>
@@ -151,7 +176,7 @@ const isManualSource = computed(
         <Col :span="12">
           <FormItem label="日期" name="date" required>
             <Input
-              v-model:value="formState.date as any"
+              v-model:value="dateValue"
               type="date"
               class="w-full"
               :disabled="!isManualSource"
@@ -195,7 +220,7 @@ const isManualSource = computed(
 
       <FormItem label="责任部门" name="responsibleDepartment" required>
         <TreeSelect
-          v-model:value="formState.responsibleDepartment"
+          v-model:value="responsibleDepartmentValue"
           :tree-data="deptTreeData"
           placeholder="请选择责任部门"
           tree-default-expand-all

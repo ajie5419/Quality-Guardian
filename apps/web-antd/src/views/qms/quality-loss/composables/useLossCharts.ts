@@ -37,7 +37,7 @@ export function useLossCharts(
   /**
    * 生成责任部门分布饼图配置
    */
-  function getDeptDistributionOption(): any {
+  function getDeptDistributionOption(): Record<string, unknown> {
     // 🌟 关键修复：只过滤选中年份的数据
     const data = allLossData.value.filter((item) => {
       if (!item.date) return false;
@@ -72,13 +72,13 @@ export function useLossCharts(
           })),
         },
       ],
-    } as any;
+    };
   }
 
   /**
    * 生成月度趋势图配置
    */
-  function getTrendOption(): any {
+  function getTrendOption(): Record<string, unknown> {
     const monthNames = [
       '1月',
       '2月',

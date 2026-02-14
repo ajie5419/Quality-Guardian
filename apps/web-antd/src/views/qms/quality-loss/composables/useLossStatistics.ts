@@ -41,7 +41,7 @@ export function useLossStatistics(allLossData: Ref<QualityLossItem[]>) {
           item.status === QualityLossStatusEnum.RESOLVED,
       )
       .reduce(
-        (acc, item: any) =>
+        (acc, item) =>
           acc + (Number(item.amount) || 0) - (Number(item.actualClaim) || 0),
         0,
       );
