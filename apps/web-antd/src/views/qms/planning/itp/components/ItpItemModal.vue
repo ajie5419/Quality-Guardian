@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { QmsPlanningApi } from '#/api/qms/planning';
+import type { Rule } from 'ant-design-vue/es/form';
 
 import { computed, reactive, ref, watch } from 'vue';
 
@@ -17,6 +18,7 @@ import {
 } from 'ant-design-vue';
 
 import { createItp, updateItp } from '#/api/qms/planning';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { CONTROL_POINT_MAP } from '../../constants';
 
@@ -34,6 +36,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
 
@@ -75,7 +78,7 @@ const formState = reactive<Partial<QmsPlanningApi.ItpItem>>({
   ],
 });
 
-const rules: any = {
+const rules: Record<string, Rule[]> = {
   processStep: [
     { required: true, message: t('common.pleaseSelect'), trigger: 'change' },
   ],
@@ -136,9 +139,10 @@ async function handleOk() {
     message.success(t('common.saveSuccess'));
     emit('success');
     emit('update:open', false);
-  } catch (error: any) {
-    if (error?.errorFields) return;
-    console.error('ITP Item Save Error:', error);
+  } catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'errorFields' in error)
+      return;
+    handleApiError(error, 'Save ITP Item');
     message.error(t('common.actionFailed'));
   } finally {
     confirmLoading.value = false;

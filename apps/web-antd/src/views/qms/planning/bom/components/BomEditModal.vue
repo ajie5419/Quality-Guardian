@@ -18,6 +18,7 @@ import {
 } from 'ant-design-vue';
 
 import { createBom, updateBom } from '#/api/qms/planning';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 const props = defineProps<{
   currentId: null | string;
@@ -32,6 +33,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
 
@@ -107,8 +109,9 @@ async function handleOk() {
     emit('success');
     emit('update:open', false);
   } catch (error: unknown) {
-    if ((error as any)?.errorFields) return;
-    console.error('BOM Save Error:', error);
+    if (typeof error === 'object' && error !== null && 'errorFields' in error)
+      return;
+    handleApiError(error, 'Save BOM Item');
     const errorMessage =
       error instanceof Error ? error.message : t('common.actionFailed');
     message.error(errorMessage);

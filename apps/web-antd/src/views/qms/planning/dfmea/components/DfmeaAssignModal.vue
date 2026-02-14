@@ -85,7 +85,8 @@ async function handleOk() {
     emit('success');
     emit('update:open', false);
   } catch (error: unknown) {
-    if ((error as any)?.errorFields) return;
+    if (typeof error === 'object' && error !== null && 'errorFields' in error)
+      return;
     handleApiError(error, 'Assign DFMEA Task');
   } finally {
     confirmLoading.value = false;

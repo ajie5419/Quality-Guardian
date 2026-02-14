@@ -25,6 +25,7 @@ import {
 import { getWorkOrderList } from '#/api/qms/work-order';
 import { getUserList } from '#/api/system/user';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
@@ -37,11 +38,20 @@ import ItpItemModal from './components/ItpItemModal.vue';
 import ItpProjectModal from './components/ItpProjectModal.vue';
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const { hasAccessByCodes } = useAccess();
 const router = useRouter();
 
 const canCreate = computed(() => hasAccessByCodes(['QMS:Planning:ITP:Create']));
 const canExport = computed(() => hasAccessByCodes(['QMS:Planning:ITP:Export']));
+
+type ItpStatus = QmsPlanningApi.ItpProject['status'];
+type ItpNodeLike = Partial<QmsPlanningApi.ItpTreeNode> &
+  Record<string, unknown> & {
+    id: string;
+    name: string;
+    type: 'item' | 'project';
+  };
 
 // ================= Data State =================
 const allProjects = ref<QmsPlanningApi.ItpTreeNode[]>([]);
@@ -69,7 +79,7 @@ async function loadData(idToSelect?: string) {
     const enrichedData = (data || []).map((node) => {
       if (node.workOrderId && !node.workOrderNumber) {
         const wo = workOrderList.value.find(
-          (w: any) =>
+          (w) =>
             w.id === node.workOrderId || w.workOrderNumber === node.workOrderId,
         );
         if (wo) return { ...node, workOrderNumber: wo.workOrderNumber };
@@ -92,7 +102,7 @@ async function loadData(idToSelect?: string) {
       console.warn('Grid not ready for reload', error);
     }
   } catch (error) {
-    console.error('ITP Load Error:', error);
+    handleApiError(error, 'Load ITP Planning Data');
     message.error(t('common.loadFailed'));
   } finally {
     loading.value = false;
@@ -100,12 +110,18 @@ async function loadData(idToSelect?: string) {
 }
 
 const { handleArchiveProject, handleDeleteProject, handleDeleteItem } =
-  useProjectActions<any>({
+  useProjectActions<PlanningTreeNode>({
     archiveProject: async (id, status, project) => {
-      await updateItpProject(id, {
-        ...(project as any),
-        status: status as any,
-      });
+      const payload: Partial<QmsPlanningApi.ItpProject> = {
+        status: normalizeItpStatus(status),
+      };
+      if (project?.name) payload.projectName = project.name;
+      if (project?.version) payload.version = project.version;
+      const workOrderId = getNodeString(project, 'workOrderId');
+      if (workOrderId) payload.workOrderId = workOrderId;
+      const workOrderNumber = getNodeString(project, 'workOrderNumber');
+      if (workOrderNumber) payload.workOrderNumber = workOrderNumber;
+      await updateItpProject(id, payload);
     },
     deleteItem: async (id, projectId) => {
       await deleteItp(id, projectId!);
@@ -142,8 +158,73 @@ async function loadWorkOrders() {
 async function loadUsers() {
   try {
     const res = await getUserList();
-    userList.value = (res as any).items || [];
+    userList.value = res.items || [];
   } catch {}
+}
+
+function getControlPointColor(controlPoint?: string) {
+  return CONTROL_POINT_MAP[controlPoint as keyof typeof CONTROL_POINT_MAP]
+    ?.color;
+}
+
+function normalizeItpStatus(status: string): ItpStatus {
+  const value = status.toLowerCase();
+  if (value === 'archived') return 'archived';
+  if (value === 'draft') return 'draft';
+  return 'active';
+}
+
+function getNodeString(node: PlanningTreeNode | undefined, key: string) {
+  if (!node) return '';
+  const value = node[key];
+  return typeof value === 'string' ? value : '';
+}
+
+function isItpNodeLike(node: unknown): node is ItpNodeLike {
+  if (!node || typeof node !== 'object') return false;
+  const candidate = node as Record<string, unknown>;
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.name === 'string' &&
+    (candidate.type === 'item' || candidate.type === 'project')
+  );
+}
+
+function toPlanningNode(node: unknown): PlanningTreeNode {
+  if (!isItpNodeLike(node)) {
+    return { id: '', name: '', type: 'item' };
+  }
+  return {
+    id: node.id,
+    name: node.name,
+    parentId: typeof node.parentId === 'string' ? node.parentId : null,
+    status: typeof node.status === 'string' ? node.status : undefined,
+    type: node.type,
+    version: typeof node.version === 'string' ? node.version : undefined,
+    workOrderNumber:
+      typeof node.workOrderNumber === 'string' ? node.workOrderNumber : '',
+  };
+}
+
+function toItpTreeNode(node: unknown): QmsPlanningApi.ItpTreeNode {
+  if (isItpNodeLike(node)) return node;
+  return { id: '', name: '', type: 'item' };
+}
+
+function getCurrentProjectVersion(project: PlanningTreeNode | null) {
+  return project?.version || 'v1.0';
+}
+
+function handleEditProject(project: unknown) {
+  openProjectModal('edit', toItpTreeNode(project));
+}
+
+function handleEditItem(row: unknown) {
+  openItemModal('edit', toItpTreeNode(row));
+}
+
+function handleDeleteItpItem(row: unknown) {
+  handleDeleteItem(toPlanningNode(row));
 }
 
 // ================= Modals =================
@@ -311,7 +392,7 @@ onMounted(async () => {
               :can-dispatch="true"
               @archive="handleArchiveProject"
               @delete="handleDeleteProject"
-              @edit="openProjectModal('edit', project as any)"
+              @edit="handleEditProject"
               @dispatch="handleDispatch"
             />
           </template>
@@ -344,7 +425,7 @@ onMounted(async () => {
                   <span>
                     {{ t('qms.planning.bom.version') }}:
                     <b class="text-orange-600">{{
-                      (currentProject as any).version || 'v1.0'
+                      getCurrentProjectVersion(currentProject)
                     }}</b>
                   </span>
                 </div>
@@ -370,20 +451,18 @@ onMounted(async () => {
             <div class="p-4">
               <Grid>
                 <template #controlPoint="{ row }">
-                  <Tag
-                    :color="(CONTROL_POINT_MAP as any)[row.controlPoint]?.color"
-                  >
+                  <Tag :color="getControlPointColor(row.controlPoint)">
                     {{ row.controlPoint }}
                   </Tag>
                 </template>
                 <template #action="{ row }">
                   <ProjectActionButtons
-                    :project="row as any"
+                    :project="toPlanningNode(row)"
                     mode="table"
                     auth-prefix="QMS:Planning:ITP"
                     :can-archive="false"
-                    @delete="handleDeleteItem(row as any)"
-                    @edit="openItemModal('edit', row as any)"
+                    @delete="handleDeleteItpItem(row)"
+                    @edit="handleEditItem(row)"
                   />
                 </template>
               </Grid>

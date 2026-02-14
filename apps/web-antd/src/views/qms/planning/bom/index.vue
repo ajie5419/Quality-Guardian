@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { QmsPlanningApi } from '#/api/qms/planning';
+import type { PlanningTreeNode } from '../types';
 
 import { nextTick, onMounted, ref, watch } from 'vue';
 
@@ -18,10 +19,8 @@ import {
   importBomItems,
   updateBomProject,
 } from '#/api/qms/planning';
-import { getDeptList } from '#/api/system/dept';
 import { useGridImport } from '#/hooks/useGridImport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
-import { convertToTreeSelectData } from '#/types';
 
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
@@ -36,11 +35,19 @@ const { t } = useI18n();
 const { canCreate, canExport, canImport } =
   useQmsPermissions('QMS:Planning:BOM');
 
+type BomProjectViewModel = PlanningTreeNode & {
+  itemCount: number;
+  workOrderNumber: string;
+};
+
+type BomRow = Partial<QmsPlanningApi.BomItem> & {
+  id?: string;
+  parentId?: string;
+};
+
 // ================= Data State =================
-const allProjects = ref<QmsPlanningApi.BomTreeNode[]>([]);
+const allProjects = ref<BomProjectViewModel[]>([]);
 const loading = ref(false);
-const deptData = ref<any[]>([]);
-const deptTreeData = ref<any[]>([]);
 
 const {
   searchText,
@@ -49,7 +56,7 @@ const {
   filteredProjects,
   currentProject,
   handleTabChange,
-} = useProjectManager(allProjects as any);
+} = useProjectManager(allProjects);
 
 // ================= Composables =================
 
@@ -59,7 +66,16 @@ async function loadData() {
   loading.value = true;
   try {
     const data = await getBomTree();
-    allProjects.value = data;
+    allProjects.value = (data || []).map((node) => ({
+      id: node.id,
+      itemCount: node.itemCount || 0,
+      name: node.name || '',
+      parentId: node.parentId || null,
+      status: node.status,
+      type: node.type,
+      version: node.version,
+      workOrderNumber: node.workOrderNumber || '',
+    }));
     if (data.length > 0 && !selectedProjectId.value) {
       selectedProjectId.value = data[0]?.id ?? null;
     }
@@ -77,9 +93,11 @@ async function loadData() {
 }
 
 const { handleArchiveProject, handleDeleteProject, handleDeleteItem } =
-  useProjectActions<any>({
+  useProjectActions({
     archiveProject: async (id, status) => {
-      await updateBomProject(id, { status: status as any });
+      await updateBomProject(id, {
+        status: status as QmsPlanningApi.BomProject['status'],
+      });
     },
     deleteItem: async (id) => {
       await deleteBom(id);
@@ -92,38 +110,38 @@ const { handleArchiveProject, handleDeleteProject, handleDeleteItem } =
     selectedProjectId,
   });
 
-async function loadDepts() {
-  try {
-    const data = await getDeptList();
-    deptData.value = data;
-    deptTreeData.value = convertToTreeSelectData(data);
-  } catch {}
-}
-
 // ================= Modal =================
 const modalVisible = ref(false);
 const isEditMode = ref(false);
 const currentItemId = ref<null | string>(null);
-const initialFormData = ref<any>({});
+const initialFormData = ref<Record<string, unknown>>({});
 
 const projectModalVisible = ref(false);
 const projectEditMode = ref(false);
-const projectInitialData = ref({});
+const projectInitialData = ref<
+  Partial<QmsPlanningApi.BomProject> & { id?: string; name?: string }
+>({});
 
-function openProjectModal(_mode: 'edit', proj: any) {
+function openProjectModal(_mode: 'edit', proj: PlanningTreeNode) {
   projectEditMode.value = true;
-  projectInitialData.value = { ...proj };
+  projectInitialData.value = {
+    id: proj.id,
+    name: proj.name,
+    projectName: proj.name,
+    status: normalizeBomStatus(proj.status),
+    workOrderNumber: getProjectWorkOrder(proj),
+  };
   projectModalVisible.value = true;
 }
 
-function openModal(mode: 'create' | 'edit', row?: QmsPlanningApi.BomTreeNode) {
+function openModal(mode: 'create' | 'edit', row?: BomRow) {
   isEditMode.value = mode === 'edit';
   currentItemId.value = row?.id || null;
   initialFormData.value =
     mode === 'edit' && row
       ? {
           ...row,
-          partName: (row as any).partName,
+          partName: row.partName,
           workOrderNumber: row.parentId || currentProject.value?.id,
         }
       : {
@@ -138,7 +156,7 @@ function openModal(mode: 'create' | 'edit', row?: QmsPlanningApi.BomTreeNode) {
 const gridApiProxy = ref<ReturnType<typeof useVbenVxeGrid>[1]>();
 
 const { handleImport } = useGridImport({
-  gridApi: gridApiProxy as any,
+  gridApi: gridApiProxy,
   // 显式配置映射规则，确保 CSV/Excel 表头即便有细微差异（如空格、斜杠）也能识别
   fieldMap: {
     partName: [
@@ -167,9 +185,9 @@ const { handleImport } = useGridImport({
     unit: [t('qms.planning.bom.unit'), '单位', 'unit'],
     remarks: [t('qms.planning.bom.remarks'), '备注', 'remarks'],
   },
-  importApi: (items: any[]) => {
+  importApi: (items: Partial<QmsPlanningApi.BomItem>[]) => {
     return importBomItems({
-      items: items as any[],
+      items,
       projectId: currentProject.value?.id || '',
     });
   },
@@ -189,9 +207,37 @@ async function handleWorkOrderSelected(workOrderNumber: string) {
     await createBomProject({ workOrderNumber });
     message.success('已成功将工单添加到 BOM 策划列表');
     await loadData();
-  } catch (error: any) {
-    message.error(error.message || '添加失败');
+  } catch (error: unknown) {
+    message.error((error as { message?: string })?.message || '添加失败');
   }
+}
+
+function getProjectWorkOrder(project: PlanningTreeNode | null) {
+  return project?.workOrderNumber || '-';
+}
+
+function getProjectItemCount(project: PlanningTreeNode | null) {
+  const count = project?.itemCount;
+  return typeof count === 'number' ? count : 0;
+}
+
+function normalizeBomStatus(
+  status?: string,
+): QmsPlanningApi.BomProject['status'] {
+  const value = String(status || '').toLowerCase();
+  if (value === 'archived') return 'archived';
+  if (value === 'draft') return 'draft';
+  return 'active';
+}
+
+function toPlanningNode(row: BomRow): PlanningTreeNode {
+  return {
+    id: String(row.id || ''),
+    name: String(row.partName || ''),
+    parentId: row.parentId ? String(row.parentId) : null,
+    status: 'active',
+    workOrderNumber: currentProject.value?.workOrderNumber || '',
+  };
 }
 
 const [Grid, gridApi] = useVbenVxeGrid({
@@ -294,7 +340,6 @@ watch(
 
 onMounted(() => {
   loadData();
-  loadDepts();
 });
 </script>
 
@@ -318,17 +363,17 @@ onMounted(() => {
             auth-prefix="QMS:Planning:BOM"
             @archive="handleArchiveProject"
             @delete="handleDeleteProject"
-            @edit="openProjectModal('edit', project as any)"
+            @edit="openProjectModal('edit', project)"
           />
         </template>
         <template #projectInfo="{ project }">
           <div class="flex flex-col gap-0.5">
             <span
               >{{ t('qms.workOrder.workOrderNumber') }}:
-              {{ (project as any).workOrderNumber }}</span
+              {{ getProjectWorkOrder(project) }}</span
             >
             <span class="text-[10px] opacity-70"
-              >{{ (project as any).itemCount || 0 }}
+              >{{ getProjectItemCount(project) }}
               {{ t('qms.planning.bom.itemCountUnit') }}</span
             >
           </div>
@@ -351,13 +396,13 @@ onMounted(() => {
                 <span>
                   {{ t('qms.planning.bom.workOrderNo') }}:
                   <b class="text-gray-700">{{
-                    (currentProject as any).workOrderNumber
+                    getProjectWorkOrder(currentProject)
                   }}</b>
                 </span>
                 <span>
                   {{ t('qms.planning.bom.materialItems') }}:
                   <b class="text-blue-600">{{
-                    (currentProject as any).itemCount || 0
+                    getProjectItemCount(currentProject)
                   }}</b>
                 </span>
               </div>
@@ -377,12 +422,12 @@ onMounted(() => {
             <Grid>
               <template #action="{ row }">
                 <ProjectActionButtons
-                  :project="row as any"
+                  :project="toPlanningNode(row)"
                   mode="table"
                   auth-prefix="QMS:Planning:BOM"
                   :can-archive="false"
-                  @delete="handleDeleteItem(row as any)"
-                  @edit="openModal('edit', row as any)"
+                  @delete="handleDeleteItem(toPlanningNode(row))"
+                  @edit="openModal('edit', row)"
                 />
               </template>
             </Grid>
@@ -413,7 +458,7 @@ onMounted(() => {
     <BomProjectModal
       v-model:open="projectModalVisible"
       :initial-data="projectInitialData"
-      :project-id="(projectInitialData as any)?.id"
+      :project-id="projectInitialData?.id || null"
       @success="loadData"
     />
   </Page>

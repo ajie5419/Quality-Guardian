@@ -10,6 +10,7 @@ import { useI18n } from '@vben/locales';
 import { Form, Input, message, Modal, Select } from 'ant-design-vue';
 
 import { createDfmeaProject, updateDfmeaProject } from '#/api/qms/planning';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
 
@@ -26,6 +27,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
 
@@ -95,15 +97,16 @@ async function handleOk() {
         ...payload,
         workOrderNumber: formState.workOrderId,
       });
-      newId = (res as any)?.id;
+      newId = res?.id;
     }
 
     message.success(t('common.saveSuccess'));
     emit('success', newId);
     emit('update:open', false);
   } catch (error: unknown) {
-    if ((error as any)?.errorFields) return;
-    console.error('DFMEA Save Error:', error);
+    if (typeof error === 'object' && error !== null && 'errorFields' in error)
+      return;
+    handleApiError(error, 'Save DFMEA Project');
     const errorMessage =
       error instanceof Error ? error.message : t('common.actionFailed');
     message.error(errorMessage);

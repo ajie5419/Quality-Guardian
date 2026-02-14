@@ -42,6 +42,17 @@ const customPrompt = ref(t('qms.planning.itpGenerator.defaultPrompt'));
 const processingLogs = ref<string[]>([]);
 const extractedContent = ref('');
 
+const getErrorDetail = (error: unknown) => {
+  const maybeResponse = error as {
+    response?: { data?: { message?: string } };
+  };
+  return (
+    maybeResponse.response?.data?.message ||
+    (error as Error).message ||
+    t('common.unknownError')
+  );
+};
+
 const columns: ColumnType[] = [
   {
     title: t('qms.planning.itp.processStep'),
@@ -131,7 +142,7 @@ async function handleGenerate() {
     );
     const data = await generateItpFromFiles({
       fileContent: extractedContent.value,
-      fileList: fileList.value as any,
+      fileList: fileList.value,
       prompt: customPrompt.value,
     });
 
@@ -146,10 +157,7 @@ async function handleGenerate() {
     currentStep.value = 1;
     message.success(t('qms.planning.itpGenerator.parseCompleted'));
   } catch (error) {
-    const errorDetail =
-      (error as any).response?.data?.message ||
-      (error as Error).message ||
-      t('common.unknownError');
+    const errorDetail = getErrorDetail(error);
     processingLogs.value.push(
       `[${t('common.error')}] ${t('qms.planning.itpGenerator.parseFailed')}: ${errorDetail}`,
     );
@@ -310,7 +318,7 @@ loadProjects();
               class="w-80"
               :placeholder="t('qms.planning.itpGenerator.selectImportTarget')"
               :options="
-                itpProjects.map((p: any) => ({
+                itpProjects.map((p) => ({
                   label: p.projectName,
                   value: p.id,
                 }))

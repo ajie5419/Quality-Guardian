@@ -19,21 +19,33 @@ import {
   getProjectDocProjects,
   updateProjectDocProject,
 } from '#/api/qms/planning';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import PlanningSidebar from '../components/PlanningSidebar.vue';
 import ProjectActionButtons from '../components/ProjectActionButtons.vue';
 import WorkOrderSelectModal from '../components/WorkOrderSelectModal.vue';
 import { useProjectActions } from '../composables/useProjectActions';
+import type { PlanningTreeNode } from '../types';
 
 // Helper for strict type safe access
 function getField(record: unknown, field: string): string | undefined {
   if (typeof record === 'object' && record !== null && field in record) {
-    return (record as Record<string, unknown>)[field] as string;
+    const value = (record as Record<string, unknown>)[field];
+    return typeof value === 'string' ? value : undefined;
+  }
+  return undefined;
+}
+
+function getBooleanField(record: unknown, field: string): boolean | undefined {
+  if (typeof record === 'object' && record !== null && field in record) {
+    const value = (record as Record<string, unknown>)[field];
+    return typeof value === 'boolean' ? value : undefined;
   }
   return undefined;
 }
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const { hasAccessByCodes } = useAccess();
 
 const canExport = computed(() =>
@@ -51,9 +63,7 @@ const searchTerm = ref('');
 const activeTab = ref('active');
 
 const selectedProject = computed(
-  () =>
-    projectList.value.find((p: any) => p.id === selectedProjectId.value) ||
-    null,
+  () => projectList.value.find((p) => p.id === selectedProjectId.value) || null,
 );
 
 async function loadProjects() {
@@ -80,8 +90,8 @@ async function handleWorkOrderSelected(workOrderNumber: string) {
     await createProjectDocProject({ workOrderNumber });
     message.success('已成功将工单添加到项目资料列表');
     await loadProjects();
-  } catch (error: any) {
-    message.error(error.message || '添加失败');
+  } catch (error: unknown) {
+    message.error((error as { message?: string })?.message || '添加失败');
   }
 }
 
@@ -101,7 +111,7 @@ const filteredProjects = computed(() => {
 
   // 1. 状态过滤
   const isArchivedTab = activeTab.value === 'archived';
-  list = list.filter((p: any) => {
+  list = list.filter((p) => {
     const isArchived = isArchivedStatus(p.status as string);
     return isArchivedTab ? isArchived : !isArchived;
   });
@@ -110,7 +120,7 @@ const filteredProjects = computed(() => {
   if (searchTerm.value) {
     const lower = searchTerm.value.toLowerCase();
     list = list.filter(
-      (p: any) =>
+      (p) =>
         p.projectName?.toLowerCase().includes(lower) ||
         p.workOrderNumber?.toLowerCase().includes(lower),
     );
@@ -118,10 +128,36 @@ const filteredProjects = computed(() => {
   return list;
 });
 
+function normalizeProjectDocStatus(
+  status: string,
+): NonNullable<ProjectDocProject['status']> {
+  const value = status.toLowerCase();
+  if (value === 'archived') return 'archived';
+  if (value === 'draft') return 'draft';
+  return 'active';
+}
+
+function getProjectDisplayName(project: ProjectDocProject) {
+  return project.projectName || getField(project, 'name') || '';
+}
+
+const sidebarProjects = computed<PlanningTreeNode[]>(() =>
+  filteredProjects.value.map((project) => ({
+    id: project.id,
+    name: getProjectDisplayName(project),
+    status: isArchivedStatus(project.status as string) ? 'archived' : 'active',
+    type: 'project',
+    workOrderNumber: project.workOrderNumber,
+  })),
+);
+
 // ================= Composables =================
-const { handleArchiveProject, handleDeleteProject } = useProjectActions<any>({
+const { handleArchiveProject, handleDeleteProject } =
+  useProjectActions<PlanningTreeNode>({
   archiveProject: async (id, status) => {
-    await updateProjectDocProject(id, { status: status as any });
+    await updateProjectDocProject(id, {
+      status: normalizeProjectDocStatus(status),
+    });
   },
   deleteProject: async (id) => {
     await deleteProjectDocProject(id);
@@ -216,7 +252,7 @@ async function loadRecords() {
         if (type === 'SHIPMENT') return false;
 
         // Filter by hasDocuments (only show if true, default to true if undefined for backward compatibility)
-        const hasDocs = (item as any).hasDocuments;
+        const hasDocs = getBooleanField(item, 'hasDocuments');
         if (hasDocs === false) return false;
 
         return (
@@ -292,7 +328,7 @@ async function loadRecords() {
       console.warn('Grid not ready for reload', error);
     }
   } catch (error) {
-    console.error('Failed to load inspection records:', error);
+    handleApiError(error, 'Load Project Docs Inspection Records');
     inspectionRecords.value = [];
   } finally {
     isRecordsLoading.value = false;
@@ -315,15 +351,7 @@ onMounted(() => {
       <!-- Left: Project List -->
       <PlanningSidebar
         :title="t('qms.planning.bom.projectList')"
-        :projects="
-          filteredProjects.map((p: any) => ({
-            ...p,
-            name: p.projectName || (p as any).name,
-            status: isArchivedStatus(p.status as string)
-              ? 'archived'
-              : 'active',
-          }))
-        "
+        :projects="sidebarProjects"
         v-model:selected-id="selectedProjectId"
         v-model:active-tab="activeTab"
         v-model:search-text="searchTerm"

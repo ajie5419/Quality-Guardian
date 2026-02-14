@@ -24,6 +24,7 @@ import {
 import { getWorkOrderList } from '#/api/qms/work-order';
 import { getUserList } from '#/api/system/user';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
@@ -35,6 +36,7 @@ import DfmeaItemModal from './components/DfmeaItemModal.vue';
 import DfmeaProjectModal from './components/DfmeaProjectModal.vue';
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const { hasAccessByCodes } = useAccess();
 
 const canCreate = computed(() =>
@@ -43,6 +45,14 @@ const canCreate = computed(() =>
 const canExport = computed(() =>
   hasAccessByCodes(['QMS:Planning:DFMEA:Export']),
 );
+
+type DfmeaStatus = QmsPlanningApi.DfmeaProject['status'];
+type DfmeaNodeLike = Partial<QmsPlanningApi.DfmeaTreeNode> &
+  Record<string, unknown> & {
+    id: string;
+    name: string;
+    type: 'item' | 'project';
+  };
 
 // ================= Data State =================
 const allProjects = ref<QmsPlanningApi.DfmeaTreeNode[]>([]);
@@ -84,16 +94,16 @@ async function loadData(idToSelect?: string) {
       console.warn('Grid not ready for reload', error);
     }
   } catch (error) {
-    console.error('DFMEA Load Error:', error);
+    handleApiError(error, 'Load DFMEA Planning Data');
   } finally {
     loading.value = false;
   }
 }
 
 const { handleArchiveProject, handleDeleteProject, handleDeleteItem } =
-  useProjectActions<any>({
+  useProjectActions<PlanningTreeNode>({
     archiveProject: async (id, status) => {
-      await updateDfmeaProject(id, { status: status as any });
+      await updateDfmeaProject(id, { status: normalizeDfmeaStatus(status) });
     },
     deleteItem: async (id) => {
       await deleteDfmea(id);
@@ -124,8 +134,64 @@ async function loadWorkOrders() {
 async function loadUsers() {
   try {
     const res = await getUserList();
-    userList.value = (res as any).items || [];
+    userList.value = res.items || [];
   } catch {}
+}
+
+function normalizeDfmeaStatus(status: string): DfmeaStatus {
+  const value = status.toLowerCase();
+  if (value === 'archived') return 'archived';
+  if (value === 'draft') return 'draft';
+  return 'active';
+}
+
+function isDfmeaNodeLike(node: unknown): node is DfmeaNodeLike {
+  if (!node || typeof node !== 'object') return false;
+  const candidate = node as Record<string, unknown>;
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.name === 'string' &&
+    (candidate.type === 'item' || candidate.type === 'project')
+  );
+}
+
+function toPlanningNode(node: unknown): PlanningTreeNode {
+  if (!isDfmeaNodeLike(node)) {
+    return { id: '', name: '', type: 'item' };
+  }
+  return {
+    id: node.id,
+    name: node.name,
+    parentId: typeof node.parentId === 'string' ? node.parentId : null,
+    status: typeof node.status === 'string' ? node.status : undefined,
+    type: node.type,
+    version: typeof node.version === 'string' ? node.version : undefined,
+    workOrderNumber:
+      typeof node.workOrderNumber === 'string' ? node.workOrderNumber : '',
+  };
+}
+
+function toDfmeaTreeNode(node: unknown): QmsPlanningApi.DfmeaTreeNode {
+  if (isDfmeaNodeLike(node)) return node;
+  return { id: '', name: '', type: 'item' };
+}
+
+function getProjectWorkOrderId(project: QmsPlanningApi.DfmeaTreeNode) {
+  const value = (project as unknown as Record<string, unknown>)
+    .workOrderNumber;
+  return typeof value === 'string' ? value : '';
+}
+
+function handleEditProject(project: unknown) {
+  openProjectModal('edit', toDfmeaTreeNode(project));
+}
+
+function handleEditItem(row: unknown) {
+  openItemModal('edit', toDfmeaTreeNode(row));
+}
+
+function handleDeleteDfmeaItem(row: unknown) {
+  handleDeleteItem(toPlanningNode(row));
 }
 
 // ================= Modals =================
@@ -142,7 +208,7 @@ function openProjectModal(
     mode === 'edit' && proj
       ? {
           projectName: proj.name,
-          workOrderId: (proj as any).workOrderNumber,
+          workOrderId: getProjectWorkOrderId(proj),
           version: proj.version,
           status: proj.status,
         }
@@ -298,7 +364,7 @@ onMounted(async () => {
               :can-dispatch="true"
               @archive="handleArchiveProject"
               @delete="handleDeleteProject"
-              @edit="openProjectModal('edit', project as any)"
+              @edit="handleEditProject"
               @dispatch="handleDispatch"
             />
           </template>
@@ -355,12 +421,12 @@ onMounted(async () => {
                 </template>
                 <template #action="{ row }">
                   <ProjectActionButtons
-                    :project="row as any"
+                    :project="toPlanningNode(row)"
                     mode="table"
                     auth-prefix="QMS:Planning:DFMEA"
                     :can-archive="false"
-                    @delete="handleDeleteItem(row as any)"
-                    @edit="openItemModal('edit', row as any)"
+                    @delete="handleDeleteDfmeaItem(row)"
+                    @edit="handleEditItem(row)"
                   />
                 </template>
               </Grid>

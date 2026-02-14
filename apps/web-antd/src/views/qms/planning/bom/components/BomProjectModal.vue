@@ -1,4 +1,7 @@
 <script lang="ts" setup>
+import type { Rule } from 'ant-design-vue/es/form';
+import type { QmsPlanningApi } from '#/api/qms/planning';
+
 import { reactive, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
@@ -6,9 +9,10 @@ import { useI18n } from '@vben/locales';
 import { Form, Input, message, Modal, Select } from 'ant-design-vue';
 
 import { updateBomProject } from '#/api/qms/planning';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 const props = defineProps<{
-  initialData: any;
+  initialData: Partial<QmsPlanningApi.BomProject> & { name?: string };
   open: boolean;
   projectId: null | string;
 }>();
@@ -19,6 +23,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
 
@@ -28,11 +33,18 @@ const formState = reactive({
   workOrderNumber: '',
 });
 
-const rules: any = {
+const rules: Record<string, Rule[]> = {
   projectName: [
     { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
   ],
 };
+
+function normalizeBomStatus(status: string): QmsPlanningApi.BomProject['status'] {
+  const value = status.toLowerCase();
+  if (value === 'archived') return 'archived';
+  if (value === 'draft') return 'draft';
+  return 'active';
+}
 
 watch(
   () => props.open,
@@ -58,17 +70,20 @@ async function handleOk() {
     if (props.projectId) {
       await updateBomProject(props.projectId, {
         projectName: formState.projectName,
-        status: formState.status as any,
+        status: normalizeBomStatus(formState.status),
       });
       message.success(t('common.saveSuccess'));
     }
 
     emit('success');
     emit('update:open', false);
-  } catch (error: any) {
-    if (error?.errorFields) return;
-    console.error('BOM Project Save Error:', error);
-    message.error(error?.message || t('common.actionFailed'));
+  } catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'errorFields' in error)
+      return;
+    handleApiError(error, 'Save BOM Project');
+    message.error(
+      (error as { message?: string })?.message || t('common.actionFailed'),
+    );
   } finally {
     confirmLoading.value = false;
   }

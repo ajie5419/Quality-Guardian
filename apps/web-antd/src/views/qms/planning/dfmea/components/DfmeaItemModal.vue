@@ -46,12 +46,17 @@ const rules: Record<string, Rule[]> = {
   ],
 };
 
+function getFallbackItemName(initialData: Partial<DfmeaItem>) {
+  const value = (initialData as unknown as Record<string, unknown>).name;
+  return typeof value === 'string' ? value : '';
+}
+
 watch(
   () => props.open,
   (val) => {
     if (val) {
       Object.assign(formState, {
-        item: props.initialData.item || (props.initialData as any).name || '',
+        item: props.initialData.item || getFallbackItemName(props.initialData),
         failureMode: props.initialData.failureMode || '',
         effects: props.initialData.effects || '',
         severity: props.initialData.severity || 5,

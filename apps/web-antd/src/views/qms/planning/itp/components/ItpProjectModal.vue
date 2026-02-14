@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { ItpProjectForm } from '../../types';
+import type { Rule } from 'ant-design-vue/es/form';
 
 import { computed, reactive, ref, watch } from 'vue';
 
@@ -8,6 +9,7 @@ import { useI18n } from '@vben/locales';
 import { Form, Input, message, Modal, Select } from 'ant-design-vue';
 
 import { createItpProject, updateItpProject } from '#/api/qms/planning';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
 
@@ -24,6 +26,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
 
@@ -39,7 +42,7 @@ const statusOptions = computed(() => [
   { value: 'active', label: t('qms.planning.status.active') },
 ]);
 
-const rules: any = {
+const rules: Record<string, Rule[]> = {
   projectName: [
     { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
   ],
@@ -99,10 +102,13 @@ async function handleOk() {
     message.success(t('common.saveSuccess'));
     emit('success', newId);
     emit('update:open', false);
-  } catch (error: any) {
-    if (error?.errorFields) return;
-    console.error('ITP Project Save Error:', error);
-    message.error(error?.message || t('common.actionFailed'));
+  } catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'errorFields' in error)
+      return;
+    handleApiError(error, 'Save ITP Project');
+    message.error(
+      (error as { message?: string })?.message || t('common.actionFailed'),
+    );
   } finally {
     confirmLoading.value = false;
   }
