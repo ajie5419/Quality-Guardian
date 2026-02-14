@@ -153,6 +153,43 @@ defineExpose({
         </Col>
       </Row>
 
+      <Card size="small" title="评分构成" class="bg-gray-50">
+        <Row :gutter="12">
+          <Col :span="6">
+            <Statistic
+              title="来料质量"
+              :value="selectedSupplier.incomingScore ?? 0"
+              suffix="分"
+              :value-style="{ color: '#1677ff', fontSize: '16px' }"
+            />
+          </Col>
+          <Col :span="6">
+            <Statistic
+              title="工程质量"
+              :value="selectedSupplier.engineeringScore ?? 0"
+              suffix="分"
+              :value-style="{ color: '#fa8c16', fontSize: '16px' }"
+            />
+          </Col>
+          <Col :span="6">
+            <Statistic
+              title="售后质量"
+              :value="selectedSupplier.afterSalesScore ?? 0"
+              suffix="分"
+              :value-style="{ color: '#cf1322', fontSize: '16px' }"
+            />
+          </Col>
+          <Col :span="6">
+            <Statistic
+              title="稳定性"
+              :value="selectedSupplier.stabilityScore ?? 0"
+              suffix="分"
+              :value-style="{ color: '#3f8600', fontSize: '16px' }"
+            />
+          </Col>
+        </Row>
+      </Card>
+
       <Tabs default-active-key="1">
         <TabPane key="1" :tab="t('qms.common.tabs.basic')">
           <Descriptions bordered :column="2" size="small">

@@ -3,17 +3,86 @@ import prisma from '~/utils/prisma';
 // --- Scoring Constants (Configurable) ---
 const THRESHOLD_CLASS_A_AMOUNT = 5000; // Class A: Loss > 5000
 const THRESHOLD_CRITICAL_AMOUNT = 80_000; // Blacklist: Loss > 80000
-const THRESHOLD_INCOMING_YIELD_WARNING = 90; // Downgrade: Yield < 90% (if > 5 batches)
-
-const SCORE_DEDUCTION_CLASS_A = 15;
-const SCORE_DEDUCTION_CLASS_B = 5;
-const SCORE_DEDUCTION_CLASS_C = 1;
-
-const SCORE_DEDUCTION_INCOMING_FAIL = 3; // Per failed batch
+const THRESHOLD_SCORE_WARNING = 75;
+const THRESHOLD_INCOMING_YIELD_WARNING = 90;
+const THRESHOLD_SEVERE_ISSUE_RATE_WARNING = 0.7;
+const THRESHOLD_OPEN_ISSUE_RATE_WARNING = 0.7;
 
 const LIMIT_CONSECUTIVE_FAILURE = 3; // 3x Consecutive A/B -> Blacklist
-const LIMIT_YEARLY_CLASS_A = 2; // 2x Class A -> Downgrade
-const LIMIT_YEARLY_CLASS_B = 3; // 3x Class B -> Downgrade
+const LIMIT_MIN_ISSUE_COUNT_FOR_STRICT_ACTION = 3;
+
+const WEIGHT_INCOMING = 0.4;
+const WEIGHT_ENGINEERING = 0.25;
+const WEIGHT_AFTER_SALES = 0.25;
+const WEIGHT_STABILITY = 0.1;
+
+const SEVERITY_WEIGHT_A = 1;
+const SEVERITY_WEIGHT_B = 0.5;
+const SEVERITY_WEIGHT_C = 0.2;
+const SCORE_COMPONENT_LOSS_WEIGHT = 0.7;
+const SCORE_COMPONENT_SEVERITY_WEIGHT = 0.3;
+
+// Fixed baselines avoid "single issue => score 0" when dataset is small.
+const BASELINE_ENGINEERING_LOSS = 20_000;
+const BASELINE_AFTER_SALES_LOSS = 20_000;
+const BASELINE_ENGINEERING_SEVERITY = 3;
+const BASELINE_AFTER_SALES_SEVERITY = 3;
+
+interface SupplierStats {
+  afterSalesClassA: number;
+  afterSalesClassB: number;
+  afterSalesClassC: number;
+  afterSalesCount: number;
+  afterSalesLoss: number;
+  consecutiveBigFailures: number;
+  count: number;
+  engineeringClassA: number;
+  engineeringClassB: number;
+  engineeringClassC: number;
+  engineeringCount: number;
+  engineeringDefectQuantity: number;
+  engineeringLoss: number;
+  failures: number;
+  failuresQuantity: number;
+  maxSingleLoss: number;
+  openAfterSalesCount: number;
+  openEngineeringCount: number;
+  qualifiedCount: number;
+  quantity: number;
+}
+
+function createEmptyStats(): SupplierStats {
+  return {
+    count: 0,
+    quantity: 0,
+    qualifiedCount: 0,
+    failures: 0,
+    failuresQuantity: 0,
+    afterSalesLoss: 0,
+    engineeringLoss: 0,
+    afterSalesCount: 0,
+    engineeringCount: 0,
+    engineeringDefectQuantity: 0,
+    engineeringClassA: 0,
+    engineeringClassB: 0,
+    engineeringClassC: 0,
+    afterSalesClassA: 0,
+    afterSalesClassB: 0,
+    afterSalesClassC: 0,
+    openEngineeringCount: 0,
+    openAfterSalesCount: 0,
+    consecutiveBigFailures: 0,
+    maxSingleLoss: 0,
+  };
+}
+
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function clamp100(value: number) {
+  return Math.max(0, Math.min(100, value));
+}
 
 export interface SupplierQueryParams {
   page?: number;
@@ -87,26 +156,7 @@ export const SupplierService = {
     // 4. Statistics Aggregation
     // Get ALL supplier names to calculate global stats
     const supplierNames = listData.map((i) => i.name).filter(Boolean);
-    const statsMap = new Map<
-      string,
-      {
-        afterSalesCount: number;
-        afterSalesLoss: number;
-        classA: number;
-        classB: number;
-        classC: number;
-        consecutiveBigFailures: number;
-        count: number;
-        engineeringCount: number;
-        engineeringDefectQuantity: number;
-        engineeringLoss: number;
-        failures: number;
-        failuresQuantity: number;
-        maxSingleLoss: number;
-        qualifiedCount: number;
-        quantity: number;
-      }
-    >();
+    const statsMap = new Map<string, SupplierStats>();
 
     const now = new Date();
     const oneYearAgo = new Date();
@@ -117,6 +167,8 @@ export const SupplierService = {
         incomingStats,
         afterSalesStats,
         engineeringStats,
+        engineeringStatusStats,
+        afterSalesStatusStats,
         recentAfterSales,
         recentQualityRecords,
       ] = await Promise.all([
@@ -146,6 +198,22 @@ export const SupplierService = {
             isDeleted: false,
           },
           _sum: { lossAmount: true, quantity: true },
+          _count: { id: true },
+        }),
+        prisma.quality_records.groupBy({
+          by: ['supplierName', 'status'],
+          where: {
+            supplierName: { in: supplierNames },
+            isDeleted: false,
+          },
+          _count: { id: true },
+        }),
+        prisma.after_sales.groupBy({
+          by: ['supplierBrand', 'claimStatus'],
+          where: {
+            supplierBrand: { in: supplierNames },
+            isDeleted: false,
+          },
           _count: { id: true },
         }),
         prisma.after_sales.findMany({
@@ -193,23 +261,7 @@ export const SupplierService = {
 
       incomingStats.forEach((s) => {
         if (s.supplierName) {
-          const current = statsMap.get(s.supplierName) || {
-            count: 0,
-            quantity: 0,
-            qualifiedCount: 0,
-            failures: 0,
-            failuresQuantity: 0,
-            afterSalesLoss: 0,
-            engineeringLoss: 0,
-            afterSalesCount: 0,
-            engineeringCount: 0,
-            engineeringDefectQuantity: 0,
-            classA: 0,
-            classB: 0,
-            classC: 0,
-            consecutiveBigFailures: 0,
-            maxSingleLoss: 0,
-          };
+          const current = statsMap.get(s.supplierName) || createEmptyStats();
           current.count += s._count.id;
           current.quantity += s._sum.quantity || 0;
           if (s.result === 'PASS') {
@@ -224,23 +276,7 @@ export const SupplierService = {
 
       afterSalesStats.forEach((s) => {
         if (s.supplierBrand) {
-          const current = statsMap.get(s.supplierBrand) || {
-            count: 0,
-            quantity: 0,
-            qualifiedCount: 0,
-            failures: 0,
-            failuresQuantity: 0,
-            afterSalesLoss: 0,
-            engineeringLoss: 0,
-            afterSalesCount: 0,
-            engineeringCount: 0,
-            engineeringDefectQuantity: 0,
-            classA: 0,
-            classB: 0,
-            classC: 0,
-            consecutiveBigFailures: 0,
-            maxSingleLoss: 0,
-          };
+          const current = statsMap.get(s.supplierBrand) || createEmptyStats();
           current.afterSalesLoss +=
             Number(s._sum.materialCost || 0) +
             Number(s._sum.laborTravelCost || 0);
@@ -251,23 +287,7 @@ export const SupplierService = {
 
       engineeringStats.forEach((s) => {
         if (s.supplierName) {
-          const current = statsMap.get(s.supplierName) || {
-            count: 0,
-            quantity: 0,
-            qualifiedCount: 0,
-            failures: 0,
-            failuresQuantity: 0,
-            afterSalesLoss: 0,
-            engineeringLoss: 0,
-            afterSalesCount: 0,
-            engineeringCount: 0,
-            engineeringDefectQuantity: 0,
-            classA: 0,
-            classB: 0,
-            classC: 0,
-            consecutiveBigFailures: 0,
-            maxSingleLoss: 0,
-          };
+          const current = statsMap.get(s.supplierName) || createEmptyStats();
           current.engineeringLoss += Number(s._sum.lossAmount || 0);
           current.engineeringCount += s._count.id;
           current.engineeringDefectQuantity += s._sum.quantity || 0;
@@ -275,9 +295,32 @@ export const SupplierService = {
         }
       });
 
+      engineeringStatusStats.forEach((s) => {
+        if (!s.supplierName) return;
+        if (s.status === 'CLOSED') return;
+        const current = statsMap.get(s.supplierName) || createEmptyStats();
+        current.openEngineeringCount += s._count.id;
+        statsMap.set(s.supplierName, current);
+      });
+
+      afterSalesStatusStats.forEach((s) => {
+        if (!s.supplierBrand) return;
+        if (['CANCELLED', 'CLOSED', 'COMPLETED', 'RESOLVED'].includes(s.claimStatus)) {
+          return;
+        }
+        const current = statsMap.get(s.supplierBrand) || createEmptyStats();
+        current.openAfterSalesCount += s._count.id;
+        statsMap.set(s.supplierBrand, current);
+      });
+
       const supplierRecords: Record<
         string,
-        Array<{ date: Date; loss: number; type: 'A' | 'B' | 'C' | null }>
+        Array<{
+          date: Date;
+          loss: number;
+          origin: 'afterSales' | 'qualityRecords';
+          type: 'A' | 'B' | 'C' | null;
+        }>
       > = {};
 
       const combinedRecords = [
@@ -308,36 +351,31 @@ export const SupplierService = {
 
         const classification = classifyDefect(loss, r.severity || undefined);
         if (!supplierRecords[name]) supplierRecords[name] = [];
-        supplierRecords[name].push({ type: classification, loss, date });
+        supplierRecords[name].push({
+          type: classification,
+          loss,
+          date,
+          origin: r.origin,
+        });
       });
 
       Object.entries(supplierRecords).forEach(([name, records]) => {
-        const current = statsMap.get(name) || {
-          count: 0,
-          quantity: 0,
-          qualifiedCount: 0,
-          failures: 0,
-          failuresQuantity: 0,
-          afterSalesLoss: 0,
-          engineeringLoss: 0,
-          afterSalesCount: 0,
-          engineeringCount: 0,
-          engineeringDefectQuantity: 0,
-          classA: 0,
-          classB: 0,
-          classC: 0,
-          consecutiveBigFailures: 0,
-          maxSingleLoss: 0,
-        };
+        const current = statsMap.get(name) || createEmptyStats();
 
         records.sort((a, b) => b.date.getTime() - a.date.getTime());
 
         let consecutiveCount = 0;
         records.forEach((r) => {
           if (r.loss > current.maxSingleLoss) current.maxSingleLoss = r.loss;
-          if (r.type === 'A') current.classA++;
-          if (r.type === 'B') current.classB++;
-          if (r.type === 'C') current.classC++;
+          if (r.origin === 'qualityRecords') {
+            if (r.type === 'A') current.engineeringClassA++;
+            if (r.type === 'B') current.engineeringClassB++;
+            if (r.type === 'C') current.engineeringClassC++;
+          } else {
+            if (r.type === 'A') current.afterSalesClassA++;
+            if (r.type === 'B') current.afterSalesClassB++;
+            if (r.type === 'C') current.afterSalesClassC++;
+          }
 
           if (r.type === 'A' || r.type === 'B') {
             consecutiveCount++;
@@ -353,105 +391,163 @@ export const SupplierService = {
     }
 
     // 5. [Process FULL List for Global Stats]
-    const processedFullList = listData.map((item) => {
-      const stat = statsMap.get(item.name) || {
-        count: 0,
-        quantity: 0,
-        qualifiedCount: 0,
-        failures: 0,
-        failuresQuantity: 0,
-        afterSalesLoss: 0,
-        engineeringLoss: 0,
-        afterSalesCount: 0,
-        engineeringCount: 0,
-        engineeringDefectQuantity: 0,
-        classA: 0,
-        classB: 0,
-        classC: 0,
-        consecutiveBigFailures: 0,
-        maxSingleLoss: 0,
+    const preparedList = listData.map((item) => {
+      const stat = statsMap.get(item.name) || createEmptyStats();
+      const incomingPassRate =
+        stat.count > 0 ? stat.qualifiedCount / stat.count : 1;
+      const incomingFailBatchRate =
+        stat.count > 0 ? stat.failures / stat.count : 0;
+      const incomingQualifiedRate = Math.round(incomingPassRate * 100);
+      const incomingScore = clamp100(
+        100 * (0.7 * incomingPassRate + 0.3 * (1 - incomingFailBatchRate)),
+      );
+
+      const engineeringSeverityWeighted =
+        stat.engineeringClassA * SEVERITY_WEIGHT_A +
+        stat.engineeringClassB * SEVERITY_WEIGHT_B +
+        stat.engineeringClassC * SEVERITY_WEIGHT_C;
+      const afterSalesSeverityWeighted =
+        stat.afterSalesClassA * SEVERITY_WEIGHT_A +
+        stat.afterSalesClassB * SEVERITY_WEIGHT_B +
+        stat.afterSalesClassC * SEVERITY_WEIGHT_C;
+
+      const totalIssueCount = stat.engineeringCount + stat.afterSalesCount;
+      const severeIssueCount =
+        stat.engineeringClassA +
+        stat.engineeringClassB +
+        stat.afterSalesClassA +
+        stat.afterSalesClassB;
+      const severeIssueRate =
+        totalIssueCount > 0 ? severeIssueCount / totalIssueCount : 0;
+      const openIssueCount = stat.openEngineeringCount + stat.openAfterSalesCount;
+      const openIssueRate = totalIssueCount > 0 ? openIssueCount / totalIssueCount : 0;
+      const consecutiveRisk = clamp01(
+        stat.consecutiveBigFailures / LIMIT_CONSECUTIVE_FAILURE,
+      );
+      const stabilityScore = clamp100(
+        100 *
+          (1 -
+            0.4 * consecutiveRisk -
+            0.3 * clamp01(severeIssueRate) -
+            0.3 * clamp01(openIssueRate)),
+      );
+
+      return {
+        item,
+        stat,
+        incomingPassRate,
+        incomingScore,
+        incomingQualifiedRate,
+        engineeringSeverityWeighted,
+        afterSalesSeverityWeighted,
+        totalIssueCount,
+        severeIssueRate,
+        openIssueRate,
+        stabilityScore,
       };
+    });
 
-      let rate = 100;
-      if (stat.quantity > 0) {
-        const totalDefectQty =
-          stat.failuresQuantity + stat.engineeringDefectQuantity;
-        const qualifiedQty = Math.max(0, stat.quantity - totalDefectQty);
-        rate = Math.round((qualifiedQty / stat.quantity) * 100);
-      }
+    const processedFullList = preparedList.map((prepared) => {
+      const {
+        item,
+        stat,
+        incomingPassRate,
+        incomingScore,
+        incomingQualifiedRate,
+        engineeringSeverityWeighted,
+        afterSalesSeverityWeighted,
+        totalIssueCount,
+        severeIssueRate,
+        openIssueRate,
+        stabilityScore,
+      } = prepared;
 
-      // 1. Prioritize manual status if it's not the default 'Qualified'
+      const engineeringSeverityIndex = clamp01(
+        engineeringSeverityWeighted / BASELINE_ENGINEERING_SEVERITY,
+      );
+      const afterSalesSeverityIndex = clamp01(
+        afterSalesSeverityWeighted / BASELINE_AFTER_SALES_SEVERITY,
+      );
+      const engineeringLossIndex = clamp01(
+        stat.engineeringLoss / BASELINE_ENGINEERING_LOSS,
+      );
+      const afterSalesLossIndex = clamp01(
+        stat.afterSalesLoss / BASELINE_AFTER_SALES_LOSS,
+      );
+
+      const engineeringScore = clamp100(
+        100 *
+          (1 -
+            SCORE_COMPONENT_SEVERITY_WEIGHT * engineeringSeverityIndex -
+            SCORE_COMPONENT_LOSS_WEIGHT * engineeringLossIndex),
+      );
+      const afterSalesScore = clamp100(
+        100 *
+          (1 -
+            SCORE_COMPONENT_SEVERITY_WEIGHT * afterSalesSeverityIndex -
+            SCORE_COMPONENT_LOSS_WEIGHT * afterSalesLossIndex),
+      );
+
+      let score = Math.round(
+        incomingScore * WEIGHT_INCOMING +
+          engineeringScore * WEIGHT_ENGINEERING +
+          afterSalesScore * WEIGHT_AFTER_SALES +
+          stabilityScore * WEIGHT_STABILITY,
+      );
+
       const manualStatus = item.status;
       let finalStatus = manualStatus || 'Qualified';
-      let finalRating = item.rating || 'A';
-      let score = 100;
-
-      const deductionAccidents =
-        stat.classA * SCORE_DEDUCTION_CLASS_A +
-        stat.classB * SCORE_DEDUCTION_CLASS_B +
-        stat.classC * SCORE_DEDUCTION_CLASS_C;
-
-      const deductionIncoming = stat.failures * SCORE_DEDUCTION_INCOMING_FAIL;
-
-      score = Math.max(0, 100 - deductionAccidents - deductionIncoming);
-
-      // 2. Automatic recommendation logic (only triggers if current status is 'Qualified' or equivalent)
       if (finalStatus.toLowerCase() === 'qualified') {
-        if (
-          stat.consecutiveBigFailures >= LIMIT_CONSECUTIVE_FAILURE ||
-          stat.maxSingleLoss > THRESHOLD_CRITICAL_AMOUNT
-        ) {
-          finalStatus = 'Frozen';
-          finalRating = 'D';
-          score = 0;
-        } else {
-          let shouldDowngrade = false;
-          if (
-            stat.classA >= LIMIT_YEARLY_CLASS_A ||
-            stat.classB >= LIMIT_YEARLY_CLASS_B
-          ) {
-            shouldDowngrade = true;
-          }
-          if (stat.count >= 5 && rate < THRESHOLD_INCOMING_YIELD_WARNING) {
-            shouldDowngrade = true;
-          }
+        const hasEnoughIssuesForStrictAction =
+          totalIssueCount >= LIMIT_MIN_ISSUE_COUNT_FOR_STRICT_ACTION;
+        const shouldFreeze =
+          hasEnoughIssuesForStrictAction &&
+          (stat.consecutiveBigFailures >= LIMIT_CONSECUTIVE_FAILURE ||
+            stat.maxSingleLoss > THRESHOLD_CRITICAL_AMOUNT);
+        const shouldObserve =
+          score < THRESHOLD_SCORE_WARNING ||
+          (stat.count >= 5 && incomingPassRate * 100 < THRESHOLD_INCOMING_YIELD_WARNING) ||
+          (hasEnoughIssuesForStrictAction &&
+            (severeIssueRate >= THRESHOLD_SEVERE_ISSUE_RATE_WARNING ||
+              openIssueRate >= THRESHOLD_OPEN_ISSUE_RATE_WARNING));
 
-          if (shouldDowngrade) {
-            finalStatus = 'Observation';
-            finalRating = 'C';
-            score = Math.min(score, 70);
-          } else {
-            if (stat.classA > 0 || stat.classB > 0 || score < 90) {
-              finalRating = 'B';
-              finalStatus = 'Qualified';
-            } else {
-              finalStatus = 'Qualified';
-            }
-          }
+        if (shouldFreeze) {
+          finalStatus = 'Frozen';
+          score = 0;
+        } else if (shouldObserve) {
+          finalStatus = 'Observation';
+          score = Math.min(score, 75);
+        } else {
+          finalStatus = 'Qualified';
         }
       } else {
-        // Normalize capitalized status if manually set in different cases
         if (finalStatus.toLowerCase() === 'frozen') finalStatus = 'Frozen';
-        else if (finalStatus.toLowerCase() === 'observation')
+        else if (finalStatus.toLowerCase() === 'observation') {
           finalStatus = 'Observation';
-        else if (finalStatus.toLowerCase() === 'trial') finalStatus = 'Trial';
-
-        // If status is manual (e.g. Trial, Blacklisted, Active), still calculate rating based on score
-        if (score >= 90) finalRating = 'A';
-        else if (score >= 80) finalRating = 'B';
-        else if (score >= 60) finalRating = 'C';
-        else finalRating = 'D';
+        } else if (finalStatus.toLowerCase() === 'trial') {
+          finalStatus = 'Trial';
+        }
       }
+
+      let finalRating = 'A';
+      if (score >= 90) finalRating = 'A';
+      else if (score >= 80) finalRating = 'B';
+      else if (score >= 65) finalRating = 'C';
+      else finalRating = 'D';
 
       return {
         ...item,
         incomingBatchCount: stat.count,
         incomingTotalQuantity: stat.quantity,
-        incomingQualifiedRate: rate,
+        incomingQualifiedRate,
         totalAfterSalesLoss: stat.afterSalesLoss,
         totalEngineeringLoss: stat.engineeringLoss,
         engineeringIssueCount: stat.engineeringCount,
         afterSalesIssueCount: stat.afterSalesCount,
+        incomingScore: Math.round(incomingScore),
+        engineeringScore: Math.round(engineeringScore),
+        afterSalesScore: Math.round(afterSalesScore),
+        stabilityScore: Math.round(stabilityScore),
         status: finalStatus,
         rating: finalRating,
         level: finalRating,

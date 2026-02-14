@@ -319,17 +319,24 @@ function getRatingColor(level?: string, rating?: string) {
           </template>
 
           <template #score_tag="{ row }">
-            <div
-              :class="{
-                'text-green-600': (row.qualityScore ?? 0) >= 90,
-                'text-blue-600':
-                  (row.qualityScore ?? 0) >= 80 && (row.qualityScore ?? 0) < 90,
-                'text-red-600': (row.qualityScore ?? 0) < 80,
-              }"
-              class="flex items-center font-mono font-bold"
+            <Tooltip
+              :title="
+                `来料:${row.incomingScore ?? '-'} | 工程:${row.engineeringScore ?? '-'} | 售后:${row.afterSalesScore ?? '-'} | 稳定:${row.stabilityScore ?? '-'}`
+              "
             >
-              {{ row.qualityScore ?? '-' }}
-            </div>
+              <div
+                :class="{
+                  'text-green-600': (row.qualityScore ?? 0) >= 90,
+                  'text-blue-600':
+                    (row.qualityScore ?? 0) >= 80 &&
+                    (row.qualityScore ?? 0) < 90,
+                  'text-red-600': (row.qualityScore ?? 0) < 80,
+                }"
+                class="flex items-center font-mono font-bold"
+              >
+                {{ row.qualityScore ?? '-' }}
+              </div>
+            </Tooltip>
           </template>
 
           <template #eng_issue="{ row }">

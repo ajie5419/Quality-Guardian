@@ -399,6 +399,10 @@ export const InspectionService = {
       where.workOrderNumber = { contains: params.workOrderNumber };
     }
 
+    if (params.supplierName) {
+      where.supplierName = { contains: params.supplierName };
+    }
+
     // New Filters
     if (params.severity) {
       where.severity = Array.isArray(params.severity)

@@ -114,4 +114,32 @@ describe('inspectionService', () => {
       expect(stats.trendData).toContainEqual({ period: '2024-01', value: 300 });
     });
   });
+
+  describe('getIssues', () => {
+    it('should filter by supplierName when provided', async () => {
+      (prisma.quality_records.count as any).mockResolvedValue(0);
+      (prisma.quality_records.findMany as any).mockResolvedValue([]);
+
+      await InspectionService.getIssues({
+        supplierName: '江西子轩电气有限公司',
+      });
+
+      expect(prisma.quality_records.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            isDeleted: false,
+            supplierName: { contains: '江西子轩电气有限公司' },
+          }),
+        }),
+      );
+      expect(prisma.quality_records.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            isDeleted: false,
+            supplierName: { contains: '江西子轩电气有限公司' },
+          }),
+        }),
+      );
+    });
+  });
 });

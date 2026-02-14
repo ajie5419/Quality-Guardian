@@ -17,14 +17,17 @@ export type SupplierStatus = 'Disqualified' | 'Qualified' | 'Warning' | string;
  */
 export interface SupplierItem {
   afterSalesIssueCount?: number;
+  afterSalesScore?: number;
   brand: string;
   buyer: string;
   category: SupplierCategory;
   createdAt?: string;
+  engineeringScore?: number;
   engineeringIssueCount?: number;
   id: string;
   incomingBatchCount?: number;
   incomingQualifiedRate?: number;
+  incomingScore?: number;
   incomingTotalQuantity?: number;
   isWarning?: boolean;
   level?: string;
@@ -37,6 +40,7 @@ export interface SupplierItem {
   rating?: string;
   score2025: number;
   status?: SupplierStatus;
+  stabilityScore?: number;
   totalAfterSalesLoss?: number;
   totalEngineeringLoss?: number;
   updatedAt?: string;

@@ -65,7 +65,12 @@ export async function importSuppliers(data: {
 }
 
 export namespace QmsSupplierApi {
-  export type SupplierItem = import('@qgs/shared').SupplierItem;
+  export type SupplierItem = import('@qgs/shared').SupplierItem & {
+    afterSalesScore?: number;
+    engineeringScore?: number;
+    incomingScore?: number;
+    stabilityScore?: number;
+  };
   export type SupplierStats = import('@qgs/shared').SupplierStats;
   export type SupplierListParams = import('@qgs/shared').SupplierListParams;
 }
