@@ -51,6 +51,11 @@ import {
   getStatusLabel,
 } from './utils/statusHelper';
 
+interface GridFilterItem {
+  field: string;
+  values?: unknown[];
+}
+
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
 
@@ -123,7 +128,7 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
   },
   importConfig: {
     remote: true,
-    importMethod: ({ file }: any) => handleImport({ file }),
+    importMethod: ({ file }: { file: File }) => handleImport({ file }),
   },
   exportConfig: {
     remote: false,
@@ -267,16 +272,16 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
           sorts,
           filters,
         }: {
-          filters: any[];
+          filters: GridFilterItem[];
           page: { currentPage?: number; pageSize?: number };
-          sorts: any[];
+          sorts: Array<{ field?: string; order?: 'asc' | 'desc' }>;
         },
         formValues: Record<string, unknown> = {},
       ) => {
         const sortParam = sorts?.[0];
 
         // Parse filters
-        const filterParams: Record<string, any> = {};
+        const filterParams: Record<string, unknown[]> = {};
         filters?.forEach((item) => {
           const values = item.values;
           if (values && values.length > 0) {

@@ -13,6 +13,10 @@ import {
 } from '#/api/qms/supplier';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import {
+  mapRowsByColumnTitles,
+  readImportRowsFromFile,
+} from '#/utils/import-sheet';
+import {
   buildImportWarningMessage,
   resolveImportErrorCount,
 } from '#/utils/import-summary';
@@ -105,39 +109,10 @@ export function useSupplierActions(options: {
    * Standardized custom import logic for Excel files
    */
   async function handleCustomImport({ file }: { file: File }) {
-    const XLSX = await import('xlsx');
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, {
-        type: 'array',
-        cellDates: true,
-      });
-      const sheetName = workbook.SheetNames[0];
-      if (!sheetName) return;
-      const worksheet = workbook.Sheets[sheetName];
-      if (!worksheet) return;
-      const results = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-      const columns = gridApi.value.grid.getColumns();
-      const mappedItems = results.map((row: any) => {
-        const item: any = {};
-        columns.forEach((c: any) => {
-          if (!c.field || !c.title) return;
-          const excelKey = Object.keys(row).find(
-            (k) =>
-              String(k).replaceAll(/\s+/g, '') ===
-              String(c.title).replaceAll(/\s+/g, ''),
-          );
-          if (excelKey) {
-            let val = row[excelKey];
-            if (val instanceof Date) {
-              val = val.toISOString().split('T')[0];
-            }
-            item[c.field] = val;
-          }
-        });
-        return item;
-      });
+      const rows = await readImportRowsFromFile(file);
+      const columns = gridApi.value.grid.getColumns() || [];
+      const mappedItems = mapRowsByColumnTitles(rows, columns);
 
       const res = await importSuppliers({
         items: mappedItems,

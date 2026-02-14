@@ -76,7 +76,7 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
   },
   importConfig: {
     remote: true,
-    importMethod: (params: any) => handleCustomImport(params),
+    importMethod: ({ file }: { file: File }) => handleCustomImport({ file }),
   },
   exportConfig: {
     remote: false,
@@ -101,7 +101,13 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
               ...(canEdit.value ? ['edit'] : []),
               ...(canDelete.value ? ['delete'] : []),
             ],
-            onClick: ({ code, row }: { code: string; row: any }) => {
+            onClick: ({
+              code,
+              row,
+            }: {
+              code: string;
+              row: QmsSupplierApi.SupplierItem;
+            }) => {
               if (code === 'edit') handleEdit(row);
               if (code === 'delete') handleDelete(row);
             },
@@ -136,15 +142,18 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
           return { items: [], total: 0 };
         }
       },
-      queryAll: async ({ formValues }: any) => {
+      queryAll: async (params) => {
         try {
-          const params: QmsSupplierApi.SupplierListParams = {
+          const formValues = (
+            params as { formValues?: Record<string, unknown> }
+          ).formValues;
+          const queryParams: QmsSupplierApi.SupplierListParams = {
             category: 'Outsourcing',
             page: 1,
             pageSize: 100_000,
             ...formValues,
           };
-          const response = await getSupplierList(params);
+          const response = await getSupplierList(queryParams);
           return { items: response.items || [] };
         } catch (error) {
           console.error('Failed to load all outsourcing units:', error);
@@ -179,7 +188,7 @@ const {
   handleCustomImport,
   handleSuccess,
 } = useSupplierActions({
-  gridApi: gridApi as any,
+  gridApi,
   editModalRef,
   detailDrawerRef,
   checkedRows,
@@ -189,7 +198,11 @@ const {
 });
 
 // Helper to get status config safely
-function getStatusConfig(status?: string) {
+function getStatusConfig(status?: string): {
+  defaultText: string;
+  status: 'default' | 'error' | 'processing' | 'success' | 'warning';
+  textKey: string;
+} {
   if (!status) {
     return {
       status: 'default',
@@ -197,8 +210,16 @@ function getStatusConfig(status?: string) {
       defaultText: '-',
     };
   }
+  const statusMap = SUPPLIER_STATUS_UI_MAP as Record<
+    string,
+    {
+      defaultText: string;
+      status: 'default' | 'error' | 'processing' | 'success' | 'warning';
+      textKey: string;
+    }
+  >;
   return (
-    (SUPPLIER_STATUS_UI_MAP as any)[status] || {
+    statusMap[status] || {
       status: 'default',
       textKey: '',
       defaultText: '-',
@@ -281,9 +302,9 @@ function getStatusConfig(status?: string) {
               <Tag
                 :color="
                   row.level
-                    ? (RATING_COLORS as any)[row.level]
+                    ? (RATING_COLORS as Record<string, string>)[row.level]
                     : row.rating
-                      ? (RATING_COLORS as any)[row.rating]
+                      ? (RATING_COLORS as Record<string, string>)[row.rating]
                       : 'default'
                 "
               >

@@ -19,6 +19,7 @@ import {
 } from '#/api/qms/inspection';
 import { QmsStatusTag } from '#/components/Qms';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
+import { readImportRowsFromFile } from '#/utils/import-sheet';
 import {
   buildImportWarningMessage,
   resolveImportErrorCount,
@@ -87,20 +88,8 @@ const gridOptions = computed(() => ({
   importConfig: {
     remote: true,
     importMethod: async ({ file }: { file: File }) => {
-      const XLSX = await import('xlsx');
       try {
-        const arrayBuffer = await file.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, {
-          type: 'array',
-          cellDates: true,
-        });
-        const sheetName = workbook.SheetNames[0];
-        if (!sheetName) return;
-        const worksheet = workbook.Sheets[sheetName]!;
-        const results = XLSX.utils.sheet_to_json(worksheet) as Record<
-          string,
-          unknown
-        >[];
+        const results = await readImportRowsFromFile(file);
 
         if (!results || results.length === 0) return;
 
