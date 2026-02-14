@@ -1,6 +1,12 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {
+  buildImportRowError,
+  buildImportSummary,
+  inferImportErrorField,
+  toImportErrorMessage,
+} from '~/utils/import-report';
+import {
   buildInspectionIssueUpsertPayload,
   getNextInspectionIssueSerialNumber,
 } from '~/utils/inspection-issue';
@@ -27,21 +33,50 @@ export default defineEventHandler(async (event) => {
     }
 
     let successCount = 0;
+    const rowErrors = [];
     let serialSeed = await getNextInspectionIssueSerialNumber();
-    for (const item of items) {
+    for (const [index, item] of items.entries()) {
       try {
         const payload = buildInspectionIssueUpsertPayload(item, serialSeed);
-        if (!payload) continue;
+        if (!payload) {
+          rowErrors.push(
+            buildImportRowError({
+              field: 'workOrderNumber',
+              item,
+              keyField: 'ncNumber',
+              reason: '缺少有效的工单号',
+              row: index + 1,
+              suggestion: '请填写可关联的工单号',
+            }),
+          );
+          continue;
+        }
         serialSeed++;
 
         await prisma.quality_records.upsert(payload);
         successCount++;
       } catch (error) {
         logApiError('import', error);
+        const message = toImportErrorMessage(error);
+        rowErrors.push(
+          buildImportRowError({
+            field: inferImportErrorField(message),
+            item,
+            keyField: 'ncNumber',
+            reason: message,
+            row: index + 1,
+          }),
+        );
       }
     }
 
-    return useResponseSuccess({ successCount, totalCount: items.length });
+    return useResponseSuccess(
+      buildImportSummary({
+        rowErrors,
+        successCount,
+        totalCount: items.length,
+      }),
+    );
   } catch (error: unknown) {
     logApiError('import', error);
     return internalServerErrorResponse(event, '数据解析失败');

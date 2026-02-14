@@ -1,5 +1,11 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import {
+  buildImportRowError,
+  buildImportSummary,
+  inferImportErrorField,
+  toImportErrorMessage,
+} from '~/utils/import-report';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { parseNonEmptyArray } from '~/utils/request-validation';
@@ -32,13 +38,25 @@ export default defineEventHandler(async (event) => {
     }
 
     let successCount = 0;
-    const errors: string[] = [];
+    const rowErrors = [];
 
     // 批量处理记录
-    for (const item of items) {
+    for (const [index, item] of items.entries()) {
       try {
         const woNumber = parseRequiredWorkOrderNumber(item.workOrderNumber);
-        if (!woNumber) continue;
+        if (!woNumber) {
+          rowErrors.push(
+            buildImportRowError({
+              field: 'workOrderNumber',
+              item,
+              keyField: 'workOrderNumber',
+              reason: '工单号为空',
+              row: index + 1,
+              suggestion: '请填写有效工单号',
+            }),
+          );
+          continue;
+        }
         const deliveryDate = parseRequiredDate(item.deliveryDate);
         const effectiveTime = parseOptionalDate(item.effectiveTime);
         const status = mapWorkOrderStatus(item.status);
@@ -76,18 +94,26 @@ export default defineEventHandler(async (event) => {
         successCount++;
       } catch (error: unknown) {
         logApiError('import', error);
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
-        errors.push(`${String(item.workOrderNumber ?? '')}: ${errorMessage}`);
+        const message = toImportErrorMessage(error);
+        rowErrors.push(
+          buildImportRowError({
+            field: inferImportErrorField(message),
+            item,
+            keyField: 'workOrderNumber',
+            reason: message,
+            row: index + 1,
+          }),
+        );
       }
     }
 
-    return useResponseSuccess({
-      successCount,
-      totalCount: items.length,
-      errorCount: errors.length,
-      errors: errors.slice(0, 10), // 返回前10条错误
-    });
+    return useResponseSuccess(
+      buildImportSummary({
+        rowErrors,
+        successCount,
+        totalCount: items.length,
+      }),
+    );
   } catch (error: unknown) {
     logApiError('import', error);
     return internalServerErrorResponse(event, '数据处理异常');

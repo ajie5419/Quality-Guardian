@@ -1,6 +1,12 @@
 import { defineEventHandler, readBody } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
+import {
+  buildImportRowError,
+  buildImportSummary,
+  inferImportErrorField,
+  toImportErrorMessage,
+} from '~/utils/import-report';
 import { parseNonEmptyArray } from '~/utils/request-validation';
 import {
   badRequestResponse,
@@ -33,7 +39,8 @@ export default defineEventHandler(async (event) => {
 
     const normalizedCategory = normalizeInspectionCategory(category);
     let successCount = 0;
-    for (const item of items) {
+    const rowErrors = [];
+    for (const [index, item] of items.entries()) {
       try {
         const payload = {
           ...item,
@@ -45,10 +52,26 @@ export default defineEventHandler(async (event) => {
         successCount++;
       } catch (error) {
         logApiError('records-import-item', error);
+        const message = toImportErrorMessage(error);
+        rowErrors.push(
+          buildImportRowError({
+            field: inferImportErrorField(message),
+            item,
+            keyField: 'serialNumber',
+            reason: message,
+            row: index + 1,
+          }),
+        );
       }
     }
 
-    return useResponseSuccess({ successCount, totalCount: items.length });
+    return useResponseSuccess(
+      buildImportSummary({
+        rowErrors,
+        successCount,
+        totalCount: items.length,
+      }),
+    );
   } catch (error: unknown) {
     logApiError('records-import', error);
     return internalServerErrorResponse(event, '数据解析失败');

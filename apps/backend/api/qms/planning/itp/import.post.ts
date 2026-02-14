@@ -1,6 +1,12 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {
+  buildImportRowError,
+  buildImportSummary,
+  inferImportErrorField,
+  toImportErrorMessage,
+} from '~/utils/import-report';
+import {
   buildItpItemCreateData,
   getMaxItpItemOrder,
   normalizeItpText,
@@ -43,23 +49,48 @@ export default defineEventHandler(async (event) => {
     }
 
     const maxOrder = getMaxItpItemOrder(plan.items || []);
-    const newItems = normalizedItems.map((item, index) =>
-      buildItpItemCreateData({
-        item,
-        order: maxOrder + index + 1,
-        projectId: normalizedProjectId,
-        useImportDefaults: true,
+    const rowErrors = [];
+    const validItems = normalizedItems.map((item, index) => ({
+      item,
+      row: index + 1,
+    }));
+    const createResults = await Promise.allSettled(
+      validItems.map(({ item, row }, index) =>
+        prisma.itp_items
+          .create({
+            data: buildItpItemCreateData({
+              item,
+              order: maxOrder + index + 1,
+              projectId: normalizedProjectId,
+              useImportDefaults: true,
+            }),
+          })
+          .catch((error) => {
+            const message = toImportErrorMessage(error);
+            rowErrors.push(
+              buildImportRowError({
+                field: inferImportErrorField(message),
+                item,
+                keyField: 'processStep',
+                reason: message,
+                row,
+              }),
+            );
+            throw error;
+          }),
+      ),
+    );
+    const successCount = createResults.filter(
+      (result) => result.status === 'fulfilled',
+    ).length;
+
+    return useResponseSuccess(
+      buildImportSummary({
+        rowErrors,
+        successCount,
+        totalCount: normalizedItems.length,
       }),
     );
-
-    await prisma.itp_items.createMany({
-      data: newItems,
-    });
-
-    return useResponseSuccess({
-      count: normalizedItems.length,
-      message: '导入成功',
-    });
   } catch (error: unknown) {
     logApiError('import', error);
     const errorMessage =
