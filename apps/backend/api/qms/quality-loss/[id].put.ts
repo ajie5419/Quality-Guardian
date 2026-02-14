@@ -3,16 +3,22 @@ import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   normalizeQualityLossSource,
-  normalizeQualityLossStatus,
   QUALITY_LOSS_SOURCE,
   toAfterSalesClaimStatus,
   toQualityLossTargetType,
   toQualityRecordStatus,
 } from '~/utils/quality-loss-status';
 import {
+  parseQualityLossUpdateBody,
+  resolveQualityLossUpdateTarget,
+} from '~/utils/quality-loss-update';
+import {
+  badRequestResponse,
   internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
@@ -30,89 +36,94 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
-    const source = normalizeQualityLossSource(body.lossSource);
-    const pk = body.pk || id;
-
-    // 统一处理数值转化，防止 NaN 导致数据库报错
-    const actualClaimValue =
-      body.actualClaim === undefined
-        ? undefined
-        : Number.parseFloat(String(body.actualClaim)) || 0;
-    const amountValue =
-      body.amount === undefined
-        ? undefined
-        : Number.parseFloat(String(body.amount)) || 0;
-
-    const normalizedStatus = body.status
-      ? normalizeQualityLossStatus(body.status)
-      : undefined;
-
-    if (source === QUALITY_LOSS_SOURCE.INTERNAL) {
-      // 内部质量损失：更新质量记录表 (quality_records)
-      await prisma.quality_records.update({
-        where: { id: pk },
-        data: {
-          recoveredAmount: actualClaimValue,
-          ...(normalizedStatus
-            ? { status: toQualityRecordStatus(normalizedStatus) }
-            : {}),
-          updatedAt: new Date(),
-        },
-      });
-    } else if (source === QUALITY_LOSS_SOURCE.EXTERNAL) {
-      // 外部质量损失：更新售后表 (after_sales)
-      await prisma.after_sales.update({
-        where: { id: pk },
-        data: {
-          actualClaim: actualClaimValue,
-          ...(normalizedStatus
-            ? { claimStatus: toAfterSalesClaimStatus(normalizedStatus) }
-            : {}),
-          updatedAt: new Date(),
-        },
-      });
-    } else {
-      // 手工录入损失：更新损失表 (quality_losses)
-      const updateData: Record<string, unknown> = {
-        updatedAt: new Date(),
-      };
-
-      if (body.date) updateData.occurDate = new Date(body.date);
-      if (body.type) updateData.type = body.type;
-      if (amountValue !== undefined) updateData.amount = amountValue;
-      if (actualClaimValue !== undefined)
-        updateData.actualClaim = actualClaimValue;
-      if (body.description !== undefined)
-        updateData.description = body.description;
-      if (body.responsibleDepartment)
-        updateData.respDept = body.responsibleDepartment;
-      if (normalizedStatus) updateData.status = normalizedStatus;
-
-      // 查找条件：手工录入的记录，ID 可能是 QL-编号 或 CUID
-      const whereCondition = String(id).startsWith('QL-')
-        ? { lossId: id }
-        : { id: pk };
-
-      await prisma.quality_losses.update({
-        where: whereCondition,
-        data: updateData,
-      });
+    const body = (await readBody(event)) as Record<string, unknown>;
+    const source = normalizeQualityLossSource(
+      body.lossSource as string | undefined,
+    );
+    const parsedBody = parseQualityLossUpdateBody(body);
+    if ('message' in parsedBody) {
+      return badRequestResponse(event, parsedBody.message);
     }
 
-    const targetType = toQualityLossTargetType(source);
+    const target = await resolveQualityLossUpdateTarget({
+      client: prisma,
+      pathId: id,
+      pk: body.pk,
+      source,
+    });
+    if ('message' in target) {
+      return badRequestResponse(event, target.message);
+    }
 
-    await SystemLogService.recordAuditLog({
-      userId: String(userinfo.id),
-      action: 'UPDATE',
-      targetType,
-      targetId: String(id),
-      details: `修改质量损失相关记录: ${id}${source === QUALITY_LOSS_SOURCE.MANUAL ? '' : ` (${source} 来源)`}`,
+    await prisma.$transaction(async (tx) => {
+      if (target.source === QUALITY_LOSS_SOURCE.INTERNAL) {
+        await tx.quality_records.update({
+          where: target.where,
+          data: {
+            recoveredAmount: parsedBody.actualClaim,
+            ...(parsedBody.status
+              ? { status: toQualityRecordStatus(parsedBody.status) }
+              : {}),
+            updatedAt: new Date(),
+          },
+        });
+        return;
+      }
+
+      if (target.source === QUALITY_LOSS_SOURCE.EXTERNAL) {
+        await tx.after_sales.update({
+          where: target.where,
+          data: {
+            actualClaim: parsedBody.actualClaim,
+            ...(parsedBody.status
+              ? { claimStatus: toAfterSalesClaimStatus(parsedBody.status) }
+              : {}),
+            updatedAt: new Date(),
+          },
+        });
+        return;
+      }
+
+      await tx.quality_losses.update({
+        where: target.where,
+        data: {
+          ...(parsedBody.occurDate ? { occurDate: parsedBody.occurDate } : {}),
+          ...(parsedBody.type ? { type: parsedBody.type } : {}),
+          ...(parsedBody.amount === undefined
+            ? {}
+            : { amount: parsedBody.amount }),
+          ...(parsedBody.actualClaim === undefined
+            ? {}
+            : { actualClaim: parsedBody.actualClaim }),
+          ...(body.description === undefined
+            ? {}
+            : { description: body.description }),
+          ...(parsedBody.respDept ? { respDept: parsedBody.respDept } : {}),
+          ...(parsedBody.status ? { status: parsedBody.status } : {}),
+          updatedAt: new Date(),
+        },
+      });
     });
 
-    return useResponseSuccess({ message: '更新成功', success: true });
+    const targetType = toQualityLossTargetType(source);
+    try {
+      await SystemLogService.recordAuditLog({
+        userId: String(userinfo.id),
+        action: 'UPDATE',
+        targetType,
+        targetId: String(id),
+        details: `修改质量损失相关记录: ${id}${source === QUALITY_LOSS_SOURCE.MANUAL ? '' : ` (${source} 来源)`}`,
+      });
+    } catch (logError) {
+      logApiError('quality-loss-log', logError);
+    }
+
+    return useResponseSuccess({ message: '更新成功' });
   } catch (error: unknown) {
     logApiError('quality-loss', error);
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, '目标记录不存在');
+    }
     const err = error as { message?: string };
     return internalServerErrorResponse(
       event,
