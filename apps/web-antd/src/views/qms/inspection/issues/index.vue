@@ -131,12 +131,16 @@ function extractPhotoUrl(photo: unknown): string | undefined {
   return undefined;
 }
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
 function normalizeInspectionRows(data: InspectionIssue[]): InspectionGridRow[] {
   return (data || []).map((item) => {
     const photoList = Array.isArray(item.photos)
       ? item.photos
           .map((photo) => extractPhotoUrl(photo))
-          .filter((url): url is string => Boolean(url))
+          .filter((value): value is string => isNonEmptyString(value))
       : [];
     return {
       ...item,

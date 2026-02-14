@@ -1,3 +1,5 @@
+import type { ChartConfig } from './useChartAggregation';
+
 import { ref, watch } from 'vue';
 
 import { message } from 'ant-design-vue';
@@ -8,8 +10,6 @@ import {
   saveUserPreferenceApi,
 } from '#/api/system/preference';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
-
-import type { ChartConfig } from './useChartAggregation';
 
 export function useAfterSalesChartPreferences() {
   const { handleApiError } = useErrorHandler();

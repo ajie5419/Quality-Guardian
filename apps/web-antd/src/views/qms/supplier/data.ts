@@ -1,5 +1,5 @@
-import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { VbenFormSchema } from '#/adapter/form';
+import type { VxeGridProps } from '#/adapter/vxe-table';
 
 import { $t } from '@vben/locales';
 

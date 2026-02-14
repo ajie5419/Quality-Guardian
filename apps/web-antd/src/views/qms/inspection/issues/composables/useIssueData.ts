@@ -1,3 +1,7 @@
+import type { DeptNode } from '../types';
+
+import type { SystemDeptApi } from '#/api/system/dept';
+
 import { ref } from 'vue';
 
 import { useI18n } from '@vben/locales';
@@ -6,9 +10,6 @@ import { message } from 'ant-design-vue';
 
 import { getDeptList } from '#/api/system/dept';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
-import type { SystemDeptApi } from '#/api/system/dept';
-
-import type { DeptNode } from '../types';
 
 /**
  * 质量问题数据加载 Composable
@@ -22,7 +23,7 @@ export function useIssueData() {
   const isLoading = ref(false);
 
   const toDeptNode = (dept: SystemDeptApi.Dept): DeptNode => ({
-    children: (dept.children || []).map(toDeptNode),
+    children: (dept.children || []).map((child) => toDeptNode(child)),
     id: String(dept.id),
     label: dept.name,
     value: String(dept.id),
@@ -37,7 +38,7 @@ export function useIssueData() {
       const deptRes = await getDeptList();
 
       deptRawData.value = deptRes;
-      deptTreeData.value = deptRes.map(toDeptNode);
+      deptTreeData.value = deptRes.map((dept) => toDeptNode(dept));
     } catch (error) {
       handleApiError(error, 'Load Issue Base Data');
       const errorMessage =

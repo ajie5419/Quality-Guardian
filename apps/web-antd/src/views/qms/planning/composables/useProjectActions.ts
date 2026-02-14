@@ -93,19 +93,19 @@ export function useProjectActions<
       onOk: async () => {
         await runConfirmedAction(
           async () => {
-          await archiveProject(
-            project.id,
-            newStatus,
-            passFullProjectOnArchive ? project : undefined,
-          );
+            await archiveProject(
+              project.id,
+              newStatus,
+              passFullProjectOnArchive ? project : undefined,
+            );
 
-          // 如果归档的是当前选中的项目，清除选中
-          if (
-            resetSelectionOnDelete &&
-            selectedProjectId?.value === project.id
-          ) {
-            selectedProjectId.value = null;
-          }
+            // 如果归档的是当前选中的项目，清除选中
+            if (
+              resetSelectionOnDelete &&
+              selectedProjectId?.value === project.id
+            ) {
+              selectedProjectId.value = null;
+            }
           },
           isArchived ? t('common.restoreSuccess') : t('common.archiveSuccess'),
           'Archive Or Restore Project',
@@ -128,14 +128,14 @@ export function useProjectActions<
       onOk: async () => {
         await runConfirmedAction(
           async () => {
-          await deleteProject(project.id);
+            await deleteProject(project.id);
 
-          if (
-            resetSelectionOnDelete &&
-            selectedProjectId?.value === project.id
-          ) {
-            selectedProjectId.value = null;
-          }
+            if (
+              resetSelectionOnDelete &&
+              selectedProjectId?.value === project.id
+            ) {
+              selectedProjectId.value = null;
+            }
           },
           t('common.deleteSuccess'),
           'Delete Planning Project',
@@ -158,7 +158,7 @@ export function useProjectActions<
       onOk: async () => {
         await runConfirmedAction(
           async () => {
-          await deleteItem(item.id, projectId);
+            await deleteItem(item.id, projectId);
           },
           t('common.deleteSuccess'),
           'Delete Planning Item',

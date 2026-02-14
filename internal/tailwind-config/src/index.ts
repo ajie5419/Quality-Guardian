@@ -2,6 +2,13 @@ import type { Config } from 'tailwindcss';
 
 import path from 'node:path';
 
+import { icons as antDesignIcons } from '@iconify-json/ant-design';
+import { icons as boxicons } from '@iconify-json/bx';
+import { icons as carbonIcons } from '@iconify-json/carbon';
+import { icons as ionIcons } from '@iconify-json/ion';
+import { icons as lucideIcons } from '@iconify-json/lucide';
+import { icons as mdiIcons } from '@iconify-json/mdi';
+import { icons as remixIcons } from '@iconify-json/ri';
 import { addDynamicIconSelectors } from '@iconify/tailwind';
 import { getPackagesSync } from '@manypkg/get-packages';
 import typographyPlugin from '@tailwindcss/typography';
@@ -126,7 +133,17 @@ export default {
   plugins: [
     animate,
     typographyPlugin,
-    addDynamicIconSelectors(),
+    addDynamicIconSelectors({
+      iconSets: {
+        'ant-design': antDesignIcons,
+        bx: boxicons,
+        carbon: carbonIcons,
+        ion: ionIcons,
+        lucide: lucideIcons,
+        mdi: mdiIcons,
+        ri: remixIcons,
+      },
+    }),
     enterAnimationPlugin,
   ],
   prefix: '',

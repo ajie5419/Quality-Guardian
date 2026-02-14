@@ -28,15 +28,15 @@ const { canEdit, canDelete, canExport, canImport } =
   useQmsPermissions('QMS:Supplier');
 
 const checkedRows = ref<QmsSupplierApi.SupplierItem[]>([]);
-const editModalRef =
-  ref<{ open: (options: unknown) => Promise<void> | void }>();
-const detailDrawerRef =
-  ref<{
-    open: (
-      row: QmsSupplierApi.SupplierItem,
-      titlePrefix?: string,
-    ) => Promise<void> | void;
-  }>();
+const editModalRef = ref<{
+  open: (options: unknown) => Promise<void> | void;
+}>();
+const detailDrawerRef = ref<{
+  open: (
+    row: QmsSupplierApi.SupplierItem,
+    titlePrefix?: string,
+  ) => Promise<void> | void;
+}>();
 const rulesModalRef = ref<{ openModal: () => void }>();
 type BadgeStatus = 'default' | 'error' | 'processing' | 'success' | 'warning';
 
@@ -202,7 +202,11 @@ const {
 
 // Helper to get status config safely
 function getStatusConfig(status?: string) {
-  const defaultConfig: { defaultText: string; status: BadgeStatus; textKey: string } = {
+  const defaultConfig: {
+    defaultText: string;
+    status: BadgeStatus;
+    textKey: string;
+  } = {
     status: 'default',
     textKey: '',
     defaultText: '-',
@@ -310,9 +314,7 @@ function getRatingColor(level?: string, rating?: string) {
 
           <template #level_tag="{ row }">
             <div class="flex items-center">
-              <Tag
-                :color="getRatingColor(row.level, row.rating)"
-              >
+              <Tag :color="getRatingColor(row.level, row.rating)">
                 {{ row.level || row.rating || '-' }} {{ t('common.level') }}
               </Tag>
             </div>
@@ -320,9 +322,7 @@ function getRatingColor(level?: string, rating?: string) {
 
           <template #score_tag="{ row }">
             <Tooltip
-              :title="
-                `来料:${row.incomingScore ?? '-'} | 工程:${row.engineeringScore ?? '-'} | 售后:${row.afterSalesScore ?? '-'} | 稳定:${row.stabilityScore ?? '-'}`
-              "
+              :title="`来料:${row.incomingScore ?? '-'} | 工程:${row.engineeringScore ?? '-'} | 售后:${row.afterSalesScore ?? '-'} | 稳定:${row.stabilityScore ?? '-'}`"
             >
               <div
                 :class="{

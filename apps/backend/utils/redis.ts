@@ -9,8 +9,8 @@ const logger = createModuleLogger('Redis');
 class RedisManager {
   private static instance: RedisManager;
   private client: null | Redis = null;
-  private isEnabled = false;
   private connectionErrorLogged = false;
+  private isEnabled = false;
 
   private constructor() {
     const url = process.env.REDIS_URL;
@@ -52,10 +52,10 @@ class RedisManager {
         }
         this.isEnabled = false;
       });
-    } else if (!redisEnabled) {
-      logger.warn('Redis disabled by REDIS_ENABLED=false, caching disabled');
-    } else {
+    } else if (redisEnabled) {
       logger.warn('REDIS_URL not found, caching disabled');
+    } else {
+      logger.warn('Redis disabled by REDIS_ENABLED=false, caching disabled');
     }
   }
 

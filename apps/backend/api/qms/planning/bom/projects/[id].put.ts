@@ -2,11 +2,9 @@ import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { normalizeBomProjectStatus } from '~/utils/bom';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { isPrismaNotFoundError } from '~/utils/prisma-error';
-import {
-  buildPlanningProjectUpdateData,
-} from '~/utils/planning-project';
+import { buildPlanningProjectUpdateData } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
   notFoundResponse,

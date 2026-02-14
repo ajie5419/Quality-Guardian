@@ -1,18 +1,712 @@
 <script lang="ts" setup>
+import type {
+  VehicleCommissioningDailyReport,
+  VehicleCommissioningIssue,
+  VehicleCommissioningIssueStatus,
+} from '@qgs/shared';
+
+import type { WorkOrderItem } from '#/api/qms/work-order';
+
+import { computed, onMounted, reactive, ref } from 'vue';
+
 import { Page } from '@vben/common-ui';
-import { useI18n } from '@vben/locales';
 
-import { Empty } from 'ant-design-vue';
+import {
+  Button,
+  Card,
+  DatePicker,
+  Form,
+  Input,
+  message,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Tabs,
+  Tag,
+} from 'ant-design-vue';
+import dayjs from 'dayjs';
 
-const { t } = useI18n();
+import {
+  createVehicleCommissioningIssue,
+  createVehicleCommissioningReport,
+  getVehicleCommissioningIssueLogs,
+  getVehicleCommissioningIssues,
+  getVehicleCommissioningReportPreview,
+  getVehicleCommissioningReports,
+  updateVehicleCommissioningIssue,
+} from '#/api/qms/vehicle-commissioning';
+import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
+
+const loadingIssues = ref(false);
+const loadingReports = ref(false);
+const issues = ref<VehicleCommissioningIssue[]>([]);
+const reports = ref<VehicleCommissioningDailyReport[]>([]);
+const selectedIssueIds = ref<string[]>([]);
+const issueModalOpen = ref(false);
+const issueEditId = ref<string>('');
+const selectedWorkOrderValue = ref<string>();
+const selectedReportWorkOrderValue = ref<string>();
+const issueLogModalOpen = ref(false);
+const issueLogs = ref<
+  Array<{
+    action: string;
+    createdAt: string;
+    details: string;
+    id: string;
+    operator: string;
+  }>
+>([]);
+const reportPreviewModalOpen = ref(false);
+const reportPreviewText = ref('');
+const reportPreviewTitle = ref('');
+
+const reportForm = reactive({
+  date: dayjs().format('YYYY-MM-DD'),
+  mainWorksText: '',
+  notes: '',
+  projectName: '',
+  reportersText: '',
+});
+
+const issueForm = reactive<{
+  assignee: string;
+  date: string;
+  description: string;
+  partName: string;
+  projectName: string;
+  responsibleDepartment: string;
+  severity: string;
+  solution: string;
+  status: VehicleCommissioningIssueStatus;
+  workOrderNumber: string;
+}>({
+  assignee: '',
+  date: dayjs().format('YYYY-MM-DD'),
+  description: '',
+  partName: '',
+  projectName: '',
+  responsibleDepartment: '调试组',
+  severity: 'minor',
+  solution: '',
+  status: 'OPEN',
+  workOrderNumber: '',
+});
+
+const issueStatusOptions = [
+  { label: '待处理', value: 'OPEN' },
+  { label: '处理中', value: 'IN_PROGRESS' },
+  { label: '待验证', value: 'RESOLVED' },
+  { label: '已关闭', value: 'CLOSED' },
+];
+
+function onIssueSelectionChange(keys: (number | string)[]) {
+  selectedIssueIds.value = keys.map(String);
+}
+
+function normalizeProjectName(value?: string) {
+  return String(value || '')
+    .toLowerCase()
+    .replaceAll(/\s+/g, '')
+    .trim();
+}
+
+const severityOptions = [
+  { label: '轻微', value: 'minor' },
+  { label: '一般', value: 'major' },
+  { label: '严重', value: 'critical' },
+];
+
+const issuesByStatus = computed(() => {
+  const stats = {
+    CLOSED: 0,
+    IN_PROGRESS: 0,
+    OPEN: 0,
+    RESOLVED: 0,
+  };
+  issues.value.forEach((item: VehicleCommissioningIssue) => {
+    const key = item.status as keyof typeof stats;
+    if (stats[key] !== undefined) stats[key]++;
+  });
+  return stats;
+});
+
+async function loadIssues() {
+  loadingIssues.value = true;
+  try {
+    const data = await getVehicleCommissioningIssues({
+      page: 1,
+      pageSize: 200,
+    });
+    issues.value = data.items || [];
+  } catch (error) {
+    console.error(error);
+    message.error('加载调试问题失败');
+  } finally {
+    loadingIssues.value = false;
+  }
+}
+
+async function loadReports() {
+  loadingReports.value = true;
+  try {
+    const data = await getVehicleCommissioningReports({
+      page: 1,
+      pageSize: 50,
+    });
+    reports.value = data.items || [];
+  } catch (error) {
+    console.error(error);
+    message.error('加载日报失败');
+  } finally {
+    loadingReports.value = false;
+  }
+}
+
+function openCreateIssue() {
+  issueEditId.value = '';
+  Object.assign(issueForm, {
+    assignee: '',
+    date: dayjs().format('YYYY-MM-DD'),
+    description: '',
+    partName: '',
+    projectName: reportForm.projectName || '',
+    responsibleDepartment: '调试组',
+    severity: 'minor',
+    solution: '',
+    status: 'OPEN',
+    workOrderNumber: '',
+  });
+  issueModalOpen.value = true;
+  selectedWorkOrderValue.value = undefined;
+}
+
+function openEditIssue(row: VehicleCommissioningIssue) {
+  issueEditId.value = row.id;
+  Object.assign(issueForm, {
+    assignee: row.assignee || '',
+    date: row.date || dayjs().format('YYYY-MM-DD'),
+    description: row.description || '',
+    partName: row.partName || '',
+    projectName: row.projectName || '',
+    responsibleDepartment: row.responsibleDepartment || '调试组',
+    severity: row.severity || 'minor',
+    solution: row.solution || '',
+    status: row.status || 'OPEN',
+    workOrderNumber: row.workOrderNumber || '',
+  });
+  issueModalOpen.value = true;
+  selectedWorkOrderValue.value = row.workOrderNumber || undefined;
+}
+
+function onWorkOrderChange(_val: unknown, option?: { item?: WorkOrderItem }) {
+  const item = option?.item;
+  if (!item) return;
+  issueForm.workOrderNumber = item.workOrderNumber || '';
+  if (!issueForm.projectName && item.projectName) {
+    issueForm.projectName = item.projectName;
+  }
+}
+
+function onReportWorkOrderChange(
+  _val: unknown,
+  option?: { item?: WorkOrderItem },
+) {
+  const item = option?.item;
+  if (!item) return;
+  if (item.projectName) {
+    reportForm.projectName = item.projectName;
+  }
+}
+
+async function submitIssue() {
+  if (!issueForm.description.trim()) {
+    message.warning('请填写问题描述');
+    return;
+  }
+  if (!issueForm.projectName.trim()) {
+    message.warning('请填写项目名称');
+    return;
+  }
+  try {
+    if (issueEditId.value) {
+      await updateVehicleCommissioningIssue(issueEditId.value, {
+        ...issueForm,
+      });
+      message.success('问题更新成功');
+    } else {
+      await createVehicleCommissioningIssue({
+        ...issueForm,
+      });
+      message.success('问题创建成功');
+    }
+    issueModalOpen.value = false;
+    await loadIssues();
+  } catch (error) {
+    console.error(error);
+    message.error('保存问题失败');
+  }
+}
+
+async function quickCloseIssue(row: VehicleCommissioningIssue) {
+  try {
+    await updateVehicleCommissioningIssue(row.id, {
+      status: 'CLOSED',
+    });
+    message.success('问题已关闭');
+    await loadIssues();
+  } catch (error) {
+    console.error(error);
+    message.error('关闭问题失败');
+  }
+}
+
+async function createReport() {
+  const reporters = reportForm.reportersText
+    .split(/[\s,，]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const mainWorks = reportForm.mainWorksText
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (!reportForm.projectName.trim()) {
+    message.warning('请填写项目名称');
+    return;
+  }
+  if (!reportForm.date) {
+    message.warning('请选择日报日期');
+    return;
+  }
+  if (reporters.length === 0) {
+    message.warning('请填写汇报人');
+    return;
+  }
+  if (mainWorks.length === 0) {
+    message.warning('请填写主要工作');
+    return;
+  }
+
+  const autoIssueIds =
+    selectedIssueIds.value.length > 0
+      ? selectedIssueIds.value
+      : issues.value
+          .filter(
+            (item) =>
+              normalizeProjectName(item.projectName).includes(
+                normalizeProjectName(reportForm.projectName),
+              ) && item.status !== 'CLOSED',
+          )
+          .map((item) => item.id);
+
+  try {
+    await createVehicleCommissioningReport({
+      date: reportForm.date,
+      issueIds: autoIssueIds,
+      mainWorks,
+      notes: reportForm.notes,
+      projectName: reportForm.projectName.trim(),
+      reporters,
+    });
+    message.success('日报已生成并保存');
+    await loadReports();
+  } catch (error) {
+    console.error(error);
+    message.error('生成日报失败');
+  }
+}
+
+async function getRealtimeReport(row: VehicleCommissioningDailyReport) {
+  return getVehicleCommissioningReportPreview(row.id);
+}
+
+async function previewReportText(row: VehicleCommissioningDailyReport) {
+  try {
+    const realtime = await getRealtimeReport(row);
+    reportPreviewTitle.value = `${realtime.projectName} - ${realtime.date} 日报`;
+    reportPreviewText.value = realtime.reportText || '无内容';
+    reportPreviewModalOpen.value = true;
+  } catch (error) {
+    console.error(error);
+    message.error('加载日报预览失败');
+  }
+}
+
+async function exportReportAsWord(row: VehicleCommissioningDailyReport) {
+  try {
+    const realtime = await getRealtimeReport(row);
+    const blob = new Blob([realtime.reportText || ''], {
+      type: 'application/msword;charset=utf-8',
+    });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = `${realtime.projectName || '车辆调试'}-${realtime.date}.doc`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error(error);
+    message.error('导出Word失败');
+  }
+}
+
+async function exportReportAsPdf(row: VehicleCommissioningDailyReport) {
+  try {
+    const realtime = await getRealtimeReport(row);
+    reportPreviewTitle.value = `${realtime.projectName} - ${realtime.date} 日报`;
+    reportPreviewText.value = realtime.reportText || '无内容';
+    reportPreviewModalOpen.value = true;
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  } catch (error) {
+    console.error(error);
+    message.error('导出PDF失败');
+  }
+}
+
+async function viewIssueLogs(row: VehicleCommissioningIssue) {
+  try {
+    const logs = await getVehicleCommissioningIssueLogs(row.id);
+    issueLogs.value = logs || [];
+    issueLogModalOpen.value = true;
+  } catch (error) {
+    console.error(error);
+    message.error('加载问题日志失败');
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([loadIssues(), loadReports()]);
+});
 </script>
 
 <template>
   <Page content-class="p-4">
-    <div
-      class="flex min-h-[360px] items-center justify-center rounded-lg border border-dashed border-gray-200 bg-white"
-    >
-      <Empty :description="t('common.comingSoon')" />
+    <div class="space-y-4">
+      <Card title="车辆调试执行概览">
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div class="rounded border p-3">
+            <div class="text-xs text-gray-500">待处理</div>
+            <div class="text-xl font-semibold text-orange-500">
+              {{ issuesByStatus.OPEN }}
+            </div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-gray-500">处理中</div>
+            <div class="text-xl font-semibold text-blue-500">
+              {{ issuesByStatus.IN_PROGRESS }}
+            </div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-gray-500">待验证</div>
+            <div class="text-xl font-semibold text-purple-500">
+              {{ issuesByStatus.RESOLVED }}
+            </div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-gray-500">已关闭</div>
+            <div class="text-xl font-semibold text-green-500">
+              {{ issuesByStatus.CLOSED }}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Tabs>
+        <Tabs.TabPane key="issue" tab="问题台账">
+          <Card>
+            <div class="mb-3 flex items-center justify-between">
+              <Space>
+                <Button type="primary" @click="openCreateIssue">
+                  新建问题
+                </Button>
+                <Button @click="loadIssues">刷新</Button>
+              </Space>
+              <div class="text-xs text-gray-500">
+                选中问题将关联到日报：{{ selectedIssueIds.length }} 条
+              </div>
+            </div>
+            <Table
+              row-key="id"
+              :data-source="issues"
+              :loading="loadingIssues"
+              :row-selection="{
+                selectedRowKeys: selectedIssueIds,
+                onChange: onIssueSelectionChange,
+              }"
+              :pagination="{ pageSize: 10 }"
+            >
+              <Table.Column title="日期" data-index="date" width="110" />
+              <Table.Column
+                title="项目名称"
+                data-index="projectName"
+                width="150"
+              />
+              <Table.Column
+                title="工单号"
+                data-index="workOrderNumber"
+                width="130"
+              />
+              <Table.Column title="问题描述" data-index="description" />
+              <Table.Column
+                title="责任部门"
+                data-index="responsibleDepartment"
+                width="110"
+              />
+              <Table.Column title="状态" data-index="status" width="100">
+                <template #default="{ record }">
+                  <Tag
+                    :color="
+                      record.status === 'CLOSED'
+                        ? 'green'
+                        : record.status === 'IN_PROGRESS'
+                          ? 'blue'
+                          : record.status === 'RESOLVED'
+                            ? 'purple'
+                            : 'orange'
+                    "
+                  >
+                    {{
+                      record.status === 'CLOSED'
+                        ? '已关闭'
+                        : record.status === 'IN_PROGRESS'
+                          ? '处理中'
+                          : record.status === 'RESOLVED'
+                            ? '待验证'
+                            : '待处理'
+                    }}
+                  </Tag>
+                </template>
+              </Table.Column>
+              <Table.Column title="操作" width="170" fixed="right">
+                <template #default="{ record }">
+                  <Space>
+                    <Button
+                      size="small"
+                      type="link"
+                      @click="openEditIssue(record)"
+                    >
+                      编辑
+                    </Button>
+                    <Button
+                      size="small"
+                      type="link"
+                      @click="viewIssueLogs(record)"
+                    >
+                      日志
+                    </Button>
+                    <Button
+                      v-if="record.status !== 'CLOSED'"
+                      size="small"
+                      type="link"
+                      @click="quickCloseIssue(record)"
+                    >
+                      关闭
+                    </Button>
+                  </Space>
+                </template>
+              </Table.Column>
+            </Table>
+          </Card>
+        </Tabs.TabPane>
+
+        <Tabs.TabPane key="report" tab="日报生成与发布">
+          <Card title="生成试验日报">
+            <Form layout="vertical">
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <Form.Item label="关联工单">
+                  <WorkOrderSelect
+                    v-model:value="selectedReportWorkOrderValue"
+                    @change="onReportWorkOrderChange"
+                  />
+                </Form.Item>
+                <Form.Item label="项目名称" required>
+                  <Input
+                    v-model:value="reportForm.projectName"
+                    placeholder="例如：75T抱罐车"
+                  />
+                </Form.Item>
+                <Form.Item label="日期" required>
+                  <DatePicker
+                    v-model:value="reportForm.date"
+                    value-format="YYYY-MM-DD"
+                    class="w-full"
+                  />
+                </Form.Item>
+              </div>
+              <Form.Item label="汇报人（空格或逗号分隔）" required>
+                <Input
+                  v-model:value="reportForm.reportersText"
+                  placeholder="例如：邓志良 张达"
+                />
+              </Form.Item>
+              <Form.Item label="主要工作（每行一条）" required>
+                <Input.TextArea
+                  v-model:value="reportForm.mainWorksText"
+                  :rows="6"
+                  placeholder="1、大臂检验符合要求..."
+                />
+              </Form.Item>
+              <Form.Item label="备注">
+                <Input.TextArea
+                  v-model:value="reportForm.notes"
+                  :rows="3"
+                  placeholder="可填写客户要求、注意事项等"
+                />
+              </Form.Item>
+              <Space>
+                <Button type="primary" @click="createReport"
+                  >生成并发布日报</Button
+                >
+                <Button @click="loadReports">刷新日报列表</Button>
+              </Space>
+            </Form>
+          </Card>
+
+          <Card title="历史日报" class="mt-4">
+            <Table
+              row-key="id"
+              :data-source="reports"
+              :loading="loadingReports"
+              :pagination="{ pageSize: 8 }"
+            >
+              <Table.Column title="日期" data-index="date" width="110" />
+              <Table.Column
+                title="项目名称"
+                data-index="projectName"
+                width="160"
+              />
+              <Table.Column title="汇报人" width="180">
+                <template #default="{ record }">
+                  {{ (record.reporters || []).join(' ') || '-' }}
+                </template>
+              </Table.Column>
+              <Table.Column title="关联问题数" width="100">
+                <template #default="{ record }">
+                  {{ (record.issueIds || []).length }}
+                </template>
+              </Table.Column>
+              <Table.Column title="操作" width="120">
+                <template #default="{ record }">
+                  <Space>
+                    <Button
+                      size="small"
+                      type="link"
+                      @click="previewReportText(record)"
+                    >
+                      预览
+                    </Button>
+                    <Button
+                      size="small"
+                      type="link"
+                      @click="exportReportAsWord(record)"
+                    >
+                      Word
+                    </Button>
+                    <Button
+                      size="small"
+                      type="link"
+                      @click="exportReportAsPdf(record)"
+                    >
+                      PDF
+                    </Button>
+                  </Space>
+                </template>
+              </Table.Column>
+            </Table>
+          </Card>
+        </Tabs.TabPane>
+      </Tabs>
     </div>
+
+    <Modal
+      v-model:open="issueModalOpen"
+      :title="issueEditId ? '编辑调试问题' : '新建调试问题'"
+      ok-text="保存"
+      cancel-text="取消"
+      @ok="submitIssue"
+    >
+      <Form layout="vertical">
+        <Form.Item label="日期">
+          <DatePicker
+            v-model:value="issueForm.date"
+            value-format="YYYY-MM-DD"
+            class="w-full"
+          />
+        </Form.Item>
+        <Form.Item label="项目名称" required>
+          <Input v-model:value="issueForm.projectName" />
+        </Form.Item>
+        <Form.Item label="工单号">
+          <WorkOrderSelect
+            v-model:value="selectedWorkOrderValue"
+            @change="onWorkOrderChange"
+          />
+        </Form.Item>
+        <Form.Item label="部件名称">
+          <Input v-model:value="issueForm.partName" />
+        </Form.Item>
+        <Form.Item label="问题描述" required>
+          <Input.TextArea v-model:value="issueForm.description" :rows="4" />
+        </Form.Item>
+        <Form.Item label="责任部门">
+          <Input v-model:value="issueForm.responsibleDepartment" />
+        </Form.Item>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Form.Item label="严重程度">
+            <Select
+              v-model:value="issueForm.severity"
+              :options="severityOptions"
+            />
+          </Form.Item>
+          <Form.Item label="状态">
+            <Select
+              v-model:value="issueForm.status"
+              :options="issueStatusOptions"
+            />
+          </Form.Item>
+        </div>
+        <Form.Item label="处理建议">
+          <Input.TextArea v-model:value="issueForm.solution" :rows="3" />
+        </Form.Item>
+        <Form.Item label="责任人">
+          <Input v-model:value="issueForm.assignee" />
+        </Form.Item>
+      </Form>
+    </Modal>
+
+    <Modal
+      v-model:open="issueLogModalOpen"
+      title="问题处理记录"
+      :footer="null"
+      width="760"
+    >
+      <Table
+        row-key="id"
+        :data-source="issueLogs"
+        :pagination="false"
+        size="small"
+      >
+        <Table.Column title="时间" data-index="createdAt" width="180" />
+        <Table.Column title="操作人" data-index="operator" width="120" />
+        <Table.Column title="动作" data-index="action" width="100" />
+        <Table.Column title="内容" data-index="details" />
+      </Table>
+    </Modal>
+
+    <Modal
+      v-model:open="reportPreviewModalOpen"
+      :title="reportPreviewTitle"
+      :footer="null"
+      width="920"
+    >
+      <pre class="max-h-[560px] overflow-auto whitespace-pre-wrap"
+        >{{ reportPreviewText }}
+      </pre>
+    </Modal>
   </Page>
 </template>

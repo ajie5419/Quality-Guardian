@@ -77,7 +77,7 @@ async function scoreOf(name = 'S1') {
   return (result.items as any[]).find((item) => item.name === name);
 }
 
-describe('SupplierService standard scoring samples', () => {
+describe('supplierService standard scoring samples', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -98,8 +98,18 @@ describe('SupplierService standard scoring samples', () => {
   it('sample 02: poor incoming should become Observation with capped score', async () => {
     setupScenario({
       incomingStats: [
-        { supplierName: 'S1', result: 'PASS', _count: { id: 7 }, _sum: { quantity: 7 } },
-        { supplierName: 'S1', result: 'FAIL', _count: { id: 3 }, _sum: { quantity: 3 } },
+        {
+          supplierName: 'S1',
+          result: 'PASS',
+          _count: { id: 7 },
+          _sum: { quantity: 7 },
+        },
+        {
+          supplierName: 'S1',
+          result: 'FAIL',
+          _count: { id: 3 },
+          _sum: { quantity: 3 },
+        },
       ],
     });
     const row = await scoreOf();
@@ -113,10 +123,19 @@ describe('SupplierService standard scoring samples', () => {
   it('sample 03: one minor low-loss engineering issue should stay high score', async () => {
     setupScenario({
       engineeringStats: [
-        { supplierName: 'S1', _count: { id: 1 }, _sum: { lossAmount: 1000, quantity: 1 } },
+        {
+          supplierName: 'S1',
+          _count: { id: 1 },
+          _sum: { lossAmount: 1000, quantity: 1 },
+        },
       ],
       recentQualityRecords: [
-        { supplierName: 'S1', lossAmount: 1000, severity: 'minor', date: new Date('2026-02-01') },
+        {
+          supplierName: 'S1',
+          lossAmount: 1000,
+          severity: 'minor',
+          date: new Date('2026-02-01'),
+        },
       ],
     });
     const row = await scoreOf();
@@ -130,10 +149,19 @@ describe('SupplierService standard scoring samples', () => {
   it('sample 04: one engineering issue with high loss should reduce score明显', async () => {
     setupScenario({
       engineeringStats: [
-        { supplierName: 'S1', _count: { id: 1 }, _sum: { lossAmount: 20000, quantity: 1 } },
+        {
+          supplierName: 'S1',
+          _count: { id: 1 },
+          _sum: { lossAmount: 20_000, quantity: 1 },
+        },
       ],
       recentQualityRecords: [
-        { supplierName: 'S1', lossAmount: 20000, severity: 'minor', date: new Date('2026-02-01') },
+        {
+          supplierName: 'S1',
+          lossAmount: 20_000,
+          severity: 'minor',
+          date: new Date('2026-02-01'),
+        },
       ],
     });
     const row = await scoreOf();
@@ -149,13 +177,13 @@ describe('SupplierService standard scoring samples', () => {
         {
           supplierBrand: 'S1',
           _count: { id: 1 },
-          _sum: { laborTravelCost: 5000, materialCost: 15000 },
+          _sum: { laborTravelCost: 5000, materialCost: 15_000 },
         },
       ],
       recentAfterSales: [
         {
           supplierBrand: 'S1',
-          materialCost: 15000,
+          materialCost: 15_000,
           laborTravelCost: 5000,
           severity: 'minor',
           occurDate: new Date('2026-02-01'),
@@ -172,12 +200,31 @@ describe('SupplierService standard scoring samples', () => {
   it('sample 06: should freeze when max single loss exceeds threshold with enough samples', async () => {
     setupScenario({
       engineeringStats: [
-        { supplierName: 'S1', _count: { id: 3 }, _sum: { lossAmount: 91000, quantity: 3 } },
+        {
+          supplierName: 'S1',
+          _count: { id: 3 },
+          _sum: { lossAmount: 91_000, quantity: 3 },
+        },
       ],
       recentQualityRecords: [
-        { supplierName: 'S1', lossAmount: 90000, severity: 'minor', date: new Date('2026-02-03') },
-        { supplierName: 'S1', lossAmount: 500, severity: 'minor', date: new Date('2026-02-02') },
-        { supplierName: 'S1', lossAmount: 500, severity: 'minor', date: new Date('2026-02-01') },
+        {
+          supplierName: 'S1',
+          lossAmount: 90_000,
+          severity: 'minor',
+          date: new Date('2026-02-03'),
+        },
+        {
+          supplierName: 'S1',
+          lossAmount: 500,
+          severity: 'minor',
+          date: new Date('2026-02-02'),
+        },
+        {
+          supplierName: 'S1',
+          lossAmount: 500,
+          severity: 'minor',
+          date: new Date('2026-02-01'),
+        },
       ],
     });
     const row = await scoreOf();
@@ -191,12 +238,31 @@ describe('SupplierService standard scoring samples', () => {
   it('sample 07: should freeze on 3 consecutive A/B issues with enough samples', async () => {
     setupScenario({
       engineeringStats: [
-        { supplierName: 'S1', _count: { id: 3 }, _sum: { lossAmount: 3000, quantity: 3 } },
+        {
+          supplierName: 'S1',
+          _count: { id: 3 },
+          _sum: { lossAmount: 3000, quantity: 3 },
+        },
       ],
       recentQualityRecords: [
-        { supplierName: 'S1', lossAmount: 1000, severity: 'major', date: new Date('2026-02-03') },
-        { supplierName: 'S1', lossAmount: 1000, severity: 'major', date: new Date('2026-02-02') },
-        { supplierName: 'S1', lossAmount: 1000, severity: 'major', date: new Date('2026-02-01') },
+        {
+          supplierName: 'S1',
+          lossAmount: 1000,
+          severity: 'major',
+          date: new Date('2026-02-03'),
+        },
+        {
+          supplierName: 'S1',
+          lossAmount: 1000,
+          severity: 'major',
+          date: new Date('2026-02-02'),
+        },
+        {
+          supplierName: 'S1',
+          lossAmount: 1000,
+          severity: 'major',
+          date: new Date('2026-02-01'),
+        },
       ],
     });
     const row = await scoreOf();
@@ -208,22 +274,31 @@ describe('SupplierService standard scoring samples', () => {
   it('sample 08: low total score should become Observation', async () => {
     setupScenario({
       engineeringStats: [
-        { supplierName: 'S1', _count: { id: 1 }, _sum: { lossAmount: 20000, quantity: 1 } },
+        {
+          supplierName: 'S1',
+          _count: { id: 1 },
+          _sum: { lossAmount: 20_000, quantity: 1 },
+        },
       ],
       afterSalesStats: [
         {
           supplierBrand: 'S1',
           _count: { id: 1 },
-          _sum: { laborTravelCost: 5000, materialCost: 15000 },
+          _sum: { laborTravelCost: 5000, materialCost: 15_000 },
         },
       ],
       recentQualityRecords: [
-        { supplierName: 'S1', lossAmount: 20000, severity: 'minor', date: new Date('2026-02-02') },
+        {
+          supplierName: 'S1',
+          lossAmount: 20_000,
+          severity: 'minor',
+          date: new Date('2026-02-02'),
+        },
       ],
       recentAfterSales: [
         {
           supplierBrand: 'S1',
-          materialCost: 15000,
+          materialCost: 15_000,
           laborTravelCost: 5000,
           severity: 'minor',
           occurDate: new Date('2026-02-01'),
@@ -239,7 +314,11 @@ describe('SupplierService standard scoring samples', () => {
   it('sample 09: strict ratio rules should not trigger on small sample (<3)', async () => {
     setupScenario({
       engineeringStats: [
-        { supplierName: 'S1', _count: { id: 1 }, _sum: { lossAmount: 100, quantity: 1 } },
+        {
+          supplierName: 'S1',
+          _count: { id: 1 },
+          _sum: { lossAmount: 100, quantity: 1 },
+        },
       ],
       afterSalesStats: [
         {
@@ -255,7 +334,12 @@ describe('SupplierService standard scoring samples', () => {
         { supplierBrand: 'S1', claimStatus: 'OPEN', _count: { id: 1 } },
       ],
       recentQualityRecords: [
-        { supplierName: 'S1', lossAmount: 100, severity: 'major', date: new Date('2026-02-02') },
+        {
+          supplierName: 'S1',
+          lossAmount: 100,
+          severity: 'major',
+          date: new Date('2026-02-02'),
+        },
       ],
       recentAfterSales: [
         {
@@ -278,12 +362,30 @@ describe('SupplierService standard scoring samples', () => {
     setupScenario({
       suppliers: [supplier('S1'), supplier('S2'), supplier('S3')],
       engineeringStats: [
-        { supplierName: 'S2', _count: { id: 1 }, _sum: { lossAmount: 20000, quantity: 1 } },
-        { supplierName: 'S3', _count: { id: 1 }, _sum: { lossAmount: 5000, quantity: 1 } },
+        {
+          supplierName: 'S2',
+          _count: { id: 1 },
+          _sum: { lossAmount: 20_000, quantity: 1 },
+        },
+        {
+          supplierName: 'S3',
+          _count: { id: 1 },
+          _sum: { lossAmount: 5000, quantity: 1 },
+        },
       ],
       recentQualityRecords: [
-        { supplierName: 'S2', lossAmount: 20000, severity: 'minor', date: new Date('2026-02-02') },
-        { supplierName: 'S3', lossAmount: 5000, severity: 'minor', date: new Date('2026-02-01') },
+        {
+          supplierName: 'S2',
+          lossAmount: 20_000,
+          severity: 'minor',
+          date: new Date('2026-02-02'),
+        },
+        {
+          supplierName: 'S3',
+          lossAmount: 5000,
+          severity: 'minor',
+          date: new Date('2026-02-01'),
+        },
       ],
     });
 

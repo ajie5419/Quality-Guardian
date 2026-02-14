@@ -1,6 +1,7 @@
 <script lang="ts" setup>
-import type { QmsPlanningApi } from '#/api/qms/planning';
 import type { Rule } from 'ant-design-vue/es/form';
+
+import type { QmsPlanningApi } from '#/api/qms/planning';
 
 import { computed, reactive, ref, watch } from 'vue';
 

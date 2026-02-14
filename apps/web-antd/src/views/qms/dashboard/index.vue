@@ -29,8 +29,8 @@ import {
 
 import { getPassRateTrend, getQualityLossTrend } from '#/api/qms/dashboard';
 import { getDeptList } from '#/api/system/dept';
-import { useDashboardQuery } from '#/hooks/useQmsQueries';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { useDashboardQuery } from '#/hooks/useQmsQueries';
 import { findNameById } from '#/types';
 
 import PassRateTargetModal from './components/PassRateTargetModal.vue';

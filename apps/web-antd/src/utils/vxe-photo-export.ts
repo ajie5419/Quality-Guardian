@@ -1,4 +1,5 @@
 export type VxeExportMode = 'all' | 'current' | 'selected';
+// cspell:ignore spreadsheetml
 
 export interface CreateVxePhotoXlsxExportMethodOptions<
   Row extends Record<string, any>,
@@ -32,7 +33,10 @@ function getImageExtension(contentType?: string): 'gif' | 'jpeg' | 'png' {
 
 async function fetchImageBuffer(
   url: string,
-  cache: Map<string, { buffer: ArrayBuffer; extension: 'gif' | 'jpeg' | 'png' }>,
+  cache: Map<
+    string,
+    { buffer: ArrayBuffer; extension: 'gif' | 'jpeg' | 'png' }
+  >,
 ) {
   const fullUrl = resolveImageUrl(url);
   if (!fullUrl) return null;
@@ -52,6 +56,7 @@ async function fetchImageBuffer(
 }
 
 function downloadWorkbook(buffer: ArrayBuffer, filename: string) {
+  // cspell:disable-next-line
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
@@ -73,17 +78,18 @@ export function createVxePhotoXlsxExportMethod<Row extends Record<string, any>>(
     $table,
     $grid,
   }: {
-    options: Record<string, any>;
-    $table: any;
     $grid: any;
+    $table: any;
+    options: Record<string, any>;
   }) => {
     const mode = (options.mode || 'current') as VxeExportMode;
     const rows = await config.getRows({ mode, options, $table, $grid });
-    const workbook = new (await import('exceljs')).default.Workbook();
+    const exceljs = await import('exceljs');
+    const workbook = new exceljs.default.Workbook();
     const worksheet = workbook.addWorksheet(config.sheetName);
-    const visibleColumns = ($table.getTableColumn?.().visibleColumn || []).filter(
-      (column: any) => column.type === 'seq' || column.field,
-    );
+    const visibleColumns = (
+      $table.getTableColumn?.().visibleColumn || []
+    ).filter((column: any) => column.type === 'seq' || column.field);
     const photoField = config.photoField || 'photos';
 
     worksheet.columns = visibleColumns.map((column: any) => ({
@@ -95,11 +101,10 @@ export function createVxePhotoXlsxExportMethod<Row extends Record<string, any>>(
     (rows || []).forEach((row) => {
       const rowData: Record<string, any> = {};
       visibleColumns.forEach((column: any) => {
-        if (column.field === photoField) {
-          rowData[column.id] = '';
-        } else {
-          rowData[column.id] = $table.getCellLabel(row, column) ?? '';
-        }
+        rowData[column.id] =
+          column.field === photoField
+            ? ''
+            : ($table.getCellLabel(row, column) ?? '');
       });
       worksheet.addRow(rowData);
     });
@@ -108,14 +113,13 @@ export function createVxePhotoXlsxExportMethod<Row extends Record<string, any>>(
       (column: any) => column.field === photoField,
     );
 
-    if (photoColumnIndex >= 0) {
+    if (photoColumnIndex !== -1) {
       const imageCache = new Map<
         string,
         { buffer: ArrayBuffer; extension: 'gif' | 'jpeg' | 'png' }
       >();
 
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
+      for (const [i, row] of rows.entries()) {
         if (!row) continue;
         const photoUrl = config.getPhotoUrl(row);
         if (!photoUrl) continue;

@@ -328,8 +328,8 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
     checkIsPurchasingDept,
   };
 }
-  type PhotoCandidate = {
-    response?: { data?: { url?: string } };
-    status?: string;
-    url?: string;
-  };
+type PhotoCandidate = {
+  response?: { data?: { url?: string } };
+  status?: string;
+  url?: string;
+};

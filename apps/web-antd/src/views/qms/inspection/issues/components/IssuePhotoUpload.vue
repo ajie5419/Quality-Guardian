@@ -44,7 +44,7 @@ interface UploadResponse {
 function handleUploadChange(info: UploadChangeParam<UploadFile>) {
   if (info.file.status === 'done') {
     // Get URL from response
-    const response = info.file.response as UploadResponse | undefined;
+    const response = info.file.response as undefined | UploadResponse;
     if (response?.code === 0 && response.data?.url) {
       info.file.url = response.data.url;
     }

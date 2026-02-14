@@ -177,8 +177,7 @@ function toDfmeaTreeNode(node: unknown): QmsPlanningApi.DfmeaTreeNode {
 }
 
 function getProjectWorkOrderId(project: QmsPlanningApi.DfmeaTreeNode) {
-  const value = (project as unknown as Record<string, unknown>)
-    .workOrderNumber;
+  const value = (project as unknown as Record<string, unknown>).workOrderNumber;
   return typeof value === 'string' ? value : '';
 }
 

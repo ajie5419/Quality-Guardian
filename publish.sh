@@ -240,7 +240,7 @@ if ! docker-compose run --rm backend sh -c "cd /app && ./apps/backend/node_modul
 fi
 
 echo "🌱 执行数据库播种 (db seed)..."
-docker-compose run --rm backend sh -c "cd /app/prisma && ln -sfn ../apps/backend/node_modules node_modules && node seed.js"
+docker-compose run --rm --user root backend sh -c "cd /app/prisma && ln -sfn ../apps/backend/node_modules node_modules && node seed.js"
 
 echo "🔄 更新后端服务..."
 docker-compose up -d --no-deps backend

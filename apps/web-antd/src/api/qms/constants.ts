@@ -31,6 +31,8 @@ export const QMS_API = {
   // After Sales
   AFTER_SALES: '/qms/after-sales',
   AFTER_SALES_BATCH_DELETE: '/qms/after-sales/batch-delete',
+  VEHICLE_COMMISSIONING_ISSUES: '/qms/vehicle-commissioning/issues',
+  VEHICLE_COMMISSIONING_REPORTS: '/qms/vehicle-commissioning/reports',
 
   // Planning & Knowledge
   PLANNING_DFMEA: '/qms/planning/dfmea',

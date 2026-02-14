@@ -63,7 +63,7 @@ async function fetchBomItems() {
 
 function handleChange(
   val: SelectProps['value'],
-  option: Record<string, unknown> | Array<Record<string, unknown>>,
+  option: Array<Record<string, unknown>> | Record<string, unknown>,
 ) {
   emit('update:value', val);
   emit('change', val, option);

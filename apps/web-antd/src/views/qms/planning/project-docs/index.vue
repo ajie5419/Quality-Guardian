@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { InspectionDocItem } from '../types';
+import type { InspectionDocItem, PlanningTreeNode } from '../types';
 
 import type { ProjectDocProject } from '#/api/qms/planning';
 
@@ -25,7 +25,6 @@ import PlanningSidebar from '../components/PlanningSidebar.vue';
 import ProjectActionButtons from '../components/ProjectActionButtons.vue';
 import WorkOrderSelectModal from '../components/WorkOrderSelectModal.vue';
 import { useProjectActions } from '../composables/useProjectActions';
-import type { PlanningTreeNode } from '../types';
 
 // Helper for strict type safe access
 function getField(record: unknown, field: string): string | undefined {
@@ -154,18 +153,18 @@ const sidebarProjects = computed<PlanningTreeNode[]>(() =>
 // ================= Composables =================
 const { handleArchiveProject, handleDeleteProject } =
   useProjectActions<PlanningTreeNode>({
-  archiveProject: async (id, status) => {
-    await updateProjectDocProject(id, {
-      status: normalizeProjectDocStatus(status),
-    });
-  },
-  deleteProject: async (id) => {
-    await deleteProjectDocProject(id);
-  },
-  loadData: loadProjects,
-  resetSelectionOnDelete: true,
-  selectedProjectId,
-});
+    archiveProject: async (id, status) => {
+      await updateProjectDocProject(id, {
+        status: normalizeProjectDocStatus(status),
+      });
+    },
+    deleteProject: async (id) => {
+      await deleteProjectDocProject(id);
+    },
+    loadData: loadProjects,
+    resetSelectionOnDelete: true,
+    selectedProjectId,
+  });
 
 // ================= Right Column: Documents =================
 const inspectionRecords = ref<InspectionDocItem[]>([]);

@@ -1,6 +1,7 @@
 <script lang="ts" setup>
-import type { ItpProjectForm } from '../../types';
 import type { Rule } from 'ant-design-vue/es/form';
+
+import type { ItpProjectForm } from '../../types';
 
 import { computed, reactive, ref, watch } from 'vue';
 

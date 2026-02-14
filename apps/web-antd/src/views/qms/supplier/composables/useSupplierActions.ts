@@ -26,16 +26,17 @@ export function useSupplierActions(options: {
   checkedRows: Ref<QmsSupplierApi.SupplierItem[]>;
   createValues?: Record<string, unknown>;
   detailDrawerRef: Ref<
+    | undefined
     | {
         open: (
           row: QmsSupplierApi.SupplierItem,
           titlePrefix?: string,
         ) => Promise<void> | void;
       }
-    | undefined
   >;
   detailTitleKey?: string;
   editModalRef: Ref<
+    | undefined
     | {
         open: (options: {
           category: string;
@@ -44,7 +45,6 @@ export function useSupplierActions(options: {
           values?: Record<string, unknown>;
         }) => Promise<void> | void;
       }
-    | undefined
   >;
   gridApi: unknown;
 }) {
@@ -70,8 +70,7 @@ export function useSupplierActions(options: {
       'value' in gridApi &&
       typeof (gridApi as { value?: unknown }).value === 'object'
     ) {
-      return ((gridApi as { value?: unknown }).value ||
-        {}) as {
+      return ((gridApi as { value?: unknown }).value || {}) as {
         grid?: { getColumns: () => unknown[] };
         reload?: () => void;
       };

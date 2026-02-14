@@ -211,7 +211,7 @@ function toItpTreeNode(node: unknown): QmsPlanningApi.ItpTreeNode {
   return { id: '', name: '', type: 'item' };
 }
 
-function getCurrentProjectVersion(project: PlanningTreeNode | null) {
+function getCurrentProjectVersion(project: null | PlanningTreeNode) {
   return project?.version || 'v1.0';
 }
 

@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { Rule } from 'ant-design-vue/es/form';
+
 import type { QmsPlanningApi } from '#/api/qms/planning';
 
 import { reactive, ref, watch } from 'vue';
@@ -39,7 +40,9 @@ const rules: Record<string, Rule[]> = {
   ],
 };
 
-function normalizeBomStatus(status: string): QmsPlanningApi.BomProject['status'] {
+function normalizeBomStatus(
+  status: string,
+): QmsPlanningApi.BomProject['status'] {
   const value = status.toLowerCase();
   if (value === 'archived') return 'archived';
   if (value === 'draft') return 'draft';

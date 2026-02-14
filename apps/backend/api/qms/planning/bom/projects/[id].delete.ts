@@ -2,8 +2,8 @@ import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { getMetadata, setMetadata } from '~/utils/metadata';
-import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import prisma from '~/utils/prisma';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
   notFoundResponse,

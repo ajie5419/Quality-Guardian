@@ -10,11 +10,11 @@ import {
   useVbenVxeGrid as _useVbenVxeGrid,
   setupVbenVxeTable,
 } from '@vben/plugins/vxe-table';
-import ExcelJS from 'exceljs';
-import VXETablePluginExportXLSX from 'vxe-table-plugin-export-xlsx';
-import { VXETable } from 'vxe-table';
 
 import { Button, Image, Tooltip } from 'ant-design-vue';
+import ExcelJS from 'exceljs';
+import { VXETable } from 'vxe-table';
+import VXETablePluginExportXLSX from 'vxe-table-plugin-export-xlsx';
 
 import { useVbenForm } from './form';
 

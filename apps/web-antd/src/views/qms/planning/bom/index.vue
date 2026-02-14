@@ -1,6 +1,7 @@
 <script lang="ts" setup>
-import type { QmsPlanningApi } from '#/api/qms/planning';
 import type { PlanningTreeNode } from '../types';
+
+import type { QmsPlanningApi } from '#/api/qms/planning';
 
 import { nextTick, onMounted, ref, watch } from 'vue';
 
@@ -212,11 +213,11 @@ async function handleWorkOrderSelected(workOrderNumber: string) {
   }
 }
 
-function getProjectWorkOrder(project: PlanningTreeNode | null) {
+function getProjectWorkOrder(project: null | PlanningTreeNode) {
   return project?.workOrderNumber || '-';
 }
 
-function getProjectItemCount(project: PlanningTreeNode | null) {
+function getProjectItemCount(project: null | PlanningTreeNode) {
   const count = project?.itemCount;
   return typeof count === 'number' ? count : 0;
 }

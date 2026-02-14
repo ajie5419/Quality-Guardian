@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { DataNode } from 'ant-design-vue/es/tree';
+
 import type { QmsKnowledgeApi } from '#/api/qms/knowledge';
 
 import { computed, nextTick, onMounted, ref } from 'vue';
@@ -23,7 +25,6 @@ import {
   Tooltip,
   Tree,
 } from 'ant-design-vue';
-import type { DataNode } from 'ant-design-vue/es/tree';
 
 import {
   deleteCategory,

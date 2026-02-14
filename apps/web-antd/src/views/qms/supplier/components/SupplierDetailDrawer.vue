@@ -1,7 +1,7 @@
 <script lang="ts" setup>
-import type { QmsSupplierApi } from '#/api/qms/supplier';
 import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
 import type { QmsInspectionApi } from '#/api/qms/inspection';
+import type { QmsSupplierApi } from '#/api/qms/supplier';
 
 import { ref } from 'vue';
 

@@ -22,8 +22,8 @@ export interface SupplierItem {
   buyer: string;
   category: SupplierCategory;
   createdAt?: string;
-  engineeringScore?: number;
   engineeringIssueCount?: number;
+  engineeringScore?: number;
   id: string;
   incomingBatchCount?: number;
   incomingQualifiedRate?: number;
@@ -39,8 +39,8 @@ export interface SupplierItem {
   qualityScore?: number;
   rating?: string;
   score2025: number;
-  status?: SupplierStatus;
   stabilityScore?: number;
+  status?: SupplierStatus;
   totalAfterSalesLoss?: number;
   totalEngineeringLoss?: number;
   updatedAt?: string;

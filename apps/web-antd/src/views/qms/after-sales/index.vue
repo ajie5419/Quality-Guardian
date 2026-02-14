@@ -1,10 +1,11 @@
 <script lang="ts" setup>
+import type { Ref } from 'vue';
+
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
 import type { VxeCheckboxChangeParams } from '#/types';
 
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import type { Ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
@@ -40,7 +41,7 @@ const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 
 const chartRefreshKey = ref(0);
-const chartsRef = ref<{ handleAddCustomChart: () => void } | null>(null);
+const chartsRef = ref<null | { handleAddCustomChart: () => void }>(null);
 const {
   showCharts,
   customChartsData,
@@ -110,8 +111,9 @@ const yearOptions = computed(() => {
 const gridApiProxy =
   ref<ReturnType<typeof useVbenVxeGrid<QmsAfterSalesApi.AfterSalesItem>>[1]>();
 const { handleImport } = useGridImport({
-  gridApi:
-    gridApiProxy as unknown as Ref<ReturnType<typeof useVbenVxeGrid>[1] | undefined>,
+  gridApi: gridApiProxy as unknown as Ref<
+    ReturnType<typeof useVbenVxeGrid>[1] | undefined
+  >,
   importApi: importAfterSalesExcel,
   statusMap: {
     待处理: 'OPEN',
@@ -146,6 +148,10 @@ function extractPhotoUrl(photo: unknown): string | undefined {
   return undefined;
 }
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
 function normalizeAfterSalesRows(
   data: QmsAfterSalesApi.AfterSalesItem[],
 ): AfterSalesGridRow[] {
@@ -161,7 +167,7 @@ function normalizeAfterSalesRows(
     const photoList = Array.isArray(photos)
       ? photos
           .map((photo) => extractPhotoUrl(photo))
-          .filter((url): url is string => Boolean(url))
+          .filter((value): value is string => isNonEmptyString(value))
       : [];
     return {
       ...item,
@@ -171,8 +177,8 @@ function normalizeAfterSalesRows(
   });
 }
 
-const exportAfterSalesAsXlsx = createVxePhotoXlsxExportMethod<AfterSalesGridRow>(
-  {
+const exportAfterSalesAsXlsx =
+  createVxePhotoXlsxExportMethod<AfterSalesGridRow>({
     sheetName: t('qms.afterSales.title'),
     filename: () => `${t('qms.afterSales.title')}-${Date.now()}.xlsx`,
     getPhotoUrl: (row) => row.photoExportUrl || '',
@@ -184,15 +190,14 @@ const exportAfterSalesAsXlsx = createVxePhotoXlsxExportMethod<AfterSalesGridRow>
         const proxyInfo = $grid?.getProxyInfo?.();
         const data = await getAfterSalesList({
           year: currentYear.value,
-          ...(proxyInfo?.form || {}),
+          ...proxyInfo?.form,
         } as QmsAfterSalesApi.AfterSalesParams);
         return normalizeAfterSalesRows(data || []);
       }
       const tableData = $table.getTableData?.();
       return normalizeAfterSalesRows(tableData?.fullData || []);
     },
-  },
-);
+  });
 
 // 表格列配置
 const gridOptions = computed(() => ({
@@ -649,7 +654,6 @@ function handleModalSuccess() {
   chartRefreshKey.value++;
   gridApi.reload();
 }
-
 </script>
 
 <template>

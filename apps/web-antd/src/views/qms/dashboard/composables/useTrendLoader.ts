@@ -35,8 +35,7 @@ export function useTrendLoader<T = unknown>(
   const cache = ref<Record<string, T>>({});
   const isCancelledRequest = (error: unknown) =>
     error === 'cancel' ||
-    (error instanceof Error &&
-      error.message.toLowerCase().includes('cancel'));
+    (error instanceof Error && error.message.toLowerCase().includes('cancel'));
 
   // 核心请求逻辑
   const loadTrendData = async (

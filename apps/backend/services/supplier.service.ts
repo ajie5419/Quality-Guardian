@@ -305,7 +305,11 @@ export const SupplierService = {
 
       afterSalesStatusStats.forEach((s) => {
         if (!s.supplierBrand) return;
-        if (['CANCELLED', 'CLOSED', 'COMPLETED', 'RESOLVED'].includes(s.claimStatus)) {
+        if (
+          ['CANCELLED', 'CLOSED', 'COMPLETED', 'RESOLVED'].includes(
+            s.claimStatus,
+          )
+        ) {
           return;
         }
         const current = statsMap.get(s.supplierBrand) || createEmptyStats();
@@ -419,8 +423,10 @@ export const SupplierService = {
         stat.afterSalesClassB;
       const severeIssueRate =
         totalIssueCount > 0 ? severeIssueCount / totalIssueCount : 0;
-      const openIssueCount = stat.openEngineeringCount + stat.openAfterSalesCount;
-      const openIssueRate = totalIssueCount > 0 ? openIssueCount / totalIssueCount : 0;
+      const openIssueCount =
+        stat.openEngineeringCount + stat.openAfterSalesCount;
+      const openIssueRate =
+        totalIssueCount > 0 ? openIssueCount / totalIssueCount : 0;
       const consecutiveRisk = clamp01(
         stat.consecutiveBigFailures / LIMIT_CONSECUTIVE_FAILURE,
       );
@@ -506,7 +512,8 @@ export const SupplierService = {
             stat.maxSingleLoss > THRESHOLD_CRITICAL_AMOUNT);
         const shouldObserve =
           score < THRESHOLD_SCORE_WARNING ||
-          (stat.count >= 5 && incomingPassRate * 100 < THRESHOLD_INCOMING_YIELD_WARNING) ||
+          (stat.count >= 5 &&
+            incomingPassRate * 100 < THRESHOLD_INCOMING_YIELD_WARNING) ||
           (hasEnoughIssuesForStrictAction &&
             (severeIssueRate >= THRESHOLD_SEVERE_ISSUE_RATE_WARNING ||
               openIssueRate >= THRESHOLD_OPEN_ISSUE_RATE_WARNING));

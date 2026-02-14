@@ -1,8 +1,8 @@
+import type { QmsSupplierApi } from '#/api/qms/supplier';
+
 import { ref } from 'vue';
 
 import { describe, expect, it, vi } from 'vitest';
-
-import type { QmsSupplierApi } from '#/api/qms/supplier';
 
 import { useSupplierActions } from './useSupplierActions';
 

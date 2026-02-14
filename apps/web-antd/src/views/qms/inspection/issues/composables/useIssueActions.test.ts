@@ -1,8 +1,8 @@
+import type { InspectionIssue } from '../types';
+
 import { ref } from 'vue';
 
 import { describe, expect, it, vi } from 'vitest';
-
-import type { InspectionIssue } from '../types';
 
 import { useIssueActions } from './useIssueActions';
 
