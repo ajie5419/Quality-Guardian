@@ -9,7 +9,7 @@ import type { QmsImportSummary } from '#/api/qms/types';
 
 import { requestClient } from '#/api/request';
 
-import { QMS_API } from './constants';
+import { QMS_API, QMS_IMPORT_TIMEOUT } from './constants';
 
 // Re-export shared types
 export * from '@qgs/shared';
@@ -47,11 +47,11 @@ export async function batchDeleteSuppliers(ids: string[]) {
  * Batch import suppliers
  */
 export async function batchImportSuppliers(items: ImportSupplierItem[]) {
-  // Set 2 minute timeout to prevent interruption during large data imports
+  // Set timeout to prevent interruption during large data imports
   return requestClient.post(
     QMS_API.SUPPLIER_BATCH,
     { items },
-    { timeout: 120 * 1000 },
+    { timeout: QMS_IMPORT_TIMEOUT },
   );
 }
 
@@ -60,7 +60,7 @@ export async function importSuppliers(data: {
   items: Array<Record<string, unknown>>;
 }) {
   return requestClient.post<QmsImportSummary>('/qms/supplier/import', data, {
-    timeout: 120_000,
+    timeout: QMS_IMPORT_TIMEOUT,
   });
 }
 

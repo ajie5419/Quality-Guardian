@@ -6,6 +6,7 @@ import type {
 
 import type { QmsImportSummary } from '#/api/qms/types';
 
+import { QMS_IMPORT_TIMEOUT } from '#/api/qms/constants';
 import { requestClient } from '#/api/request';
 
 // Re-export types
@@ -66,7 +67,7 @@ export async function importAfterSalesExcel(
     '/qms/after-sales/import',
     { items },
     {
-      timeout: 120_000,
+      timeout: QMS_IMPORT_TIMEOUT,
       signal,
     },
   );

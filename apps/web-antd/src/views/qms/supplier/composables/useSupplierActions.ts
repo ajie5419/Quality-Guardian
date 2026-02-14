@@ -11,6 +11,7 @@ import {
   deleteSupplier,
   importSuppliers,
 } from '#/api/qms/supplier';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import {
   buildImportWarningMessage,
   resolveImportErrorCount,
@@ -19,13 +20,23 @@ import {
 export function useSupplierActions(options: {
   category: string;
   checkedRows: Ref<QmsSupplierApi.SupplierItem[]>;
+  createValues?: Record<string, unknown>;
   detailDrawerRef: Ref<any>;
+  detailTitleKey?: string;
   editModalRef: Ref<any>;
   gridApi: any;
 }) {
   const { t } = useI18n();
-  const { gridApi, editModalRef, detailDrawerRef, checkedRows, category } =
-    options;
+  const { handleApiError } = useErrorHandler();
+  const {
+    gridApi,
+    editModalRef,
+    detailDrawerRef,
+    checkedRows,
+    category,
+    detailTitleKey = 'qms.supplier.title',
+    createValues,
+  } = options;
 
   function handleSuccess() {
     // Determine if it's a ref or a direct object
@@ -34,7 +45,11 @@ export function useSupplierActions(options: {
   }
 
   function handleOpenModal() {
-    editModalRef.value?.open({ isUpdate: false, category });
+    editModalRef.value?.open({
+      isUpdate: false,
+      category,
+      values: createValues,
+    });
   }
 
   function handleEdit(row: QmsSupplierApi.SupplierItem) {
@@ -55,7 +70,7 @@ export function useSupplierActions(options: {
           message.success(t('common.deleteSuccess'));
           handleSuccess();
         } catch (error) {
-          console.error('Delete failed:', error);
+          handleApiError(error, 'Delete Supplier');
         }
       },
     });
@@ -76,14 +91,14 @@ export function useSupplierActions(options: {
           checkedRows.value = [];
           handleSuccess();
         } catch (error) {
-          console.error('Batch delete failed:', error);
+          handleApiError(error, 'Batch Delete Supplier');
         }
       },
     });
   }
 
   function showDetail(row: QmsSupplierApi.SupplierItem) {
-    detailDrawerRef.value?.open(row, t('qms.supplier.title'));
+    detailDrawerRef.value?.open(row, t(detailTitleKey));
   }
 
   /**
@@ -141,7 +156,7 @@ export function useSupplierActions(options: {
         message.warning(buildImportWarningMessage(res, errorCount));
       }
     } catch (error) {
-      console.error('Import Error:', error);
+      handleApiError(error, 'Import Supplier');
       message.error(t('common.importFailed'));
     }
   }

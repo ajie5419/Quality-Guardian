@@ -1,6 +1,8 @@
 /**
  * QMS API Path Constants
  */
+export const QMS_IMPORT_TIMEOUT = 120_000;
+
 export const QMS_API = {
   // Dashboard
   DASHBOARD: '/qms/dashboard',
