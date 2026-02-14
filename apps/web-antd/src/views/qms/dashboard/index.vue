@@ -30,6 +30,7 @@ import {
 import { getPassRateTrend, getQualityLossTrend } from '#/api/qms/dashboard';
 import { getDeptList } from '#/api/system/dept';
 import { useDashboardQuery } from '#/hooks/useQmsQueries';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { findNameById } from '#/types';
 
 import PassRateTargetModal from './components/PassRateTargetModal.vue';
@@ -40,6 +41,7 @@ import { useDrillDown } from './composables/useDrillDown';
 import { useTrendLoader } from './composables/useTrendLoader';
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const { data: dashboardData, isLoading: dashboardLoading } =
   useDashboardQuery();
 
@@ -76,7 +78,7 @@ const loadDeptList = async () => {
     deptRawData.value = await getDeptList();
   } catch (error) {
     message.error(t('qms.dashboard.error.deptLoadFailed'));
-    console.error('Failed to load dept list:', error);
+    handleApiError(error, 'Load Dashboard Dept List');
   } finally {
     deptLoading.value = false;
   }
@@ -108,7 +110,7 @@ const {
 // 缓存部门ID-名称映射（优化性能）
 const deptNameMap = computed(() => {
   const map = new Map<string, string>();
-  const traverse = (items: any[]) => {
+  const traverse = (items: SystemDeptApi.Dept[]) => {
     items?.forEach((item) => {
       map.set(item.id, item.name);
       if (item.children && item.children.length > 0) {
@@ -197,7 +199,7 @@ onMounted(async () => {
     }, CONSTANTS.CHART_RENDER_DELAY);
   } catch (error) {
     message.error(t('qms.dashboard.error.chartLoadFailed'));
-    console.error('Failed to load chart data:', error);
+    handleApiError(error, 'Load Dashboard Chart Data');
   }
 });
 

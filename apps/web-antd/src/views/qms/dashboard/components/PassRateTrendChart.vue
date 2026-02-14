@@ -36,6 +36,15 @@ const { renderEcharts, getChartInstance, resize } =
 // We only render the EchartsUI component when the tab is active
 const shouldRender = computed(() => props.active);
 
+function isPromiseLike(value: unknown): value is Promise<unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'then' in value &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
 function updatePassRateChart() {
   if (!props.trendData || props.trendData.length === 0) return;
   // Safety check: if ref is missing (e.g. unmounted), stop
@@ -88,8 +97,8 @@ function updatePassRateChart() {
   };
 
   const result = renderEcharts(chartOption);
-  if (result && typeof (result as any).then === 'function') {
-    (result as any).then(() => {
+  if (isPromiseLike(result)) {
+    result.then(() => {
       const instance = getChartInstance();
       if (instance) {
         instance.off('click');

@@ -16,13 +16,20 @@ import {
   getPassRateTargets,
   updatePassRateTargets,
 } from '#/api/qms/dashboard/targets';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 const emit = defineEmits(['success']);
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const visible = ref(false);
 const loading = ref(false);
 const saving = ref(false);
-const dataSource = ref<any[]>([]);
+type PassRateTargetRow = {
+  defectRate: number;
+  passRate: number;
+  process: string;
+};
+const dataSource = ref<PassRateTargetRow[]>([]);
 
 const columns = [
   {
@@ -58,7 +65,7 @@ const loadData = async () => {
       .sort((a, b) => a.process.localeCompare(b.process, 'zh-CN'));
   } catch (error) {
     message.error('加载指标数据失败');
-    console.error(error);
+    handleApiError(error, 'Load Pass Rate Targets');
   } finally {
     loading.value = false;
   }
@@ -69,14 +76,27 @@ const handleOpen = () => {
   loadData();
 };
 
-const handlePassRateChange = (val: number, record: any) => {
-  record.passRate = val;
-  record.defectRate = Number((100 - val).toFixed(2));
+function updateRecordRates(
+  record: Record<string, number | string>,
+  passRate: number,
+  defectRate: number,
+) {
+  record.passRate = passRate;
+  record.defectRate = defectRate;
+}
+
+const handlePassRateChange = (
+  val: number,
+  record: Record<string, number | string>,
+) => {
+  updateRecordRates(record, val, Number((100 - val).toFixed(2)));
 };
 
-const handleDefectRateChange = (val: number, record: any) => {
-  record.defectRate = val;
-  record.passRate = Number((100 - val).toFixed(2));
+const handleDefectRateChange = (
+  val: number,
+  record: Record<string, number | string>,
+) => {
+  updateRecordRates(record, Number((100 - val).toFixed(2)), val);
 };
 
 const handleSave = async () => {
@@ -92,7 +112,7 @@ const handleSave = async () => {
     emit('success');
   } catch (error) {
     message.error('保存指标失败');
-    console.error(error);
+    handleApiError(error, 'Save Pass Rate Targets');
   } finally {
     saving.value = false;
   }

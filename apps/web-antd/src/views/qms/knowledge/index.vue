@@ -23,6 +23,7 @@ import {
   Tooltip,
   Tree,
 } from 'ant-design-vue';
+import type { DataNode } from 'ant-design-vue/es/tree';
 
 import {
   deleteCategory,
@@ -61,6 +62,17 @@ const totalCount = ref(0);
 // Component Refs
 const knowledgeEditModalRef = ref();
 const categoryManageModalRef = ref();
+
+const categoryTreeData = computed<DataNode[]>(() => {
+  const mapTree = (nodes: QmsKnowledgeApi.Category[]): DataNode[] =>
+    nodes.map((node) => ({
+      key: node.id,
+      title: node.name,
+      value: node.id,
+      children: node.children ? mapTree(node.children) : undefined,
+    }));
+  return mapTree(categoryTree.value);
+});
 
 // 选中的分类名称（用于面包屑）
 const selectedCategoryName = computed(() => {
@@ -180,7 +192,7 @@ function handleDeleteCategory(category: QmsKnowledgeApi.Category) {
 }
 
 // ================= 弹窗管理 =================
-function openModal(item?: any) {
+function openModal(item?: Partial<QmsKnowledgeApi.KnowledgeItem>) {
   knowledgeEditModalRef.value?.open(item, selectedCategoryId.value[0]);
 }
 
@@ -353,7 +365,7 @@ onMounted(async () => {
           </div>
           <div class="flex-1 overflow-y-auto p-2">
             <Tree
-              :tree-data="categoryTree as any"
+              :tree-data="categoryTreeData"
               :field-names="{ title: 'name', key: 'id' }"
               @select="handleCategorySelect"
               :selected-keys="selectedCategoryId"

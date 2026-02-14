@@ -11,6 +11,7 @@ import { tryOnUnmounted } from '@vueuse/core';
 import { Spin } from 'ant-design-vue';
 
 import { getVehicleFailureRate } from '#/api/qms/dashboard';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 /**
  * 车型排行数据项
@@ -34,6 +35,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { handleApiError } = useErrorHandler();
 
 const rankingChartRef = ref<EchartsUIType>();
 const trendChartRef = ref<EchartsUIType>();
@@ -71,7 +73,7 @@ async function fetchData(model?: string) {
     // Update charts even if data is empty (to hide old data or show empty axes)
     updateCharts();
   } catch (error) {
-    console.error('Failed to vehicle failure data:', error);
+    handleApiError(error, 'Load Vehicle Failure Data');
   } finally {
     loading.value = false;
   }

@@ -25,10 +25,28 @@ export function useSupplierActions(options: {
   category: string;
   checkedRows: Ref<QmsSupplierApi.SupplierItem[]>;
   createValues?: Record<string, unknown>;
-  detailDrawerRef: Ref<any>;
+  detailDrawerRef: Ref<
+    | {
+        open: (
+          row: QmsSupplierApi.SupplierItem,
+          titlePrefix?: string,
+        ) => Promise<void> | void;
+      }
+    | undefined
+  >;
   detailTitleKey?: string;
-  editModalRef: Ref<any>;
-  gridApi: any;
+  editModalRef: Ref<
+    | {
+        open: (options: {
+          category: string;
+          isUpdate: boolean;
+          record?: QmsSupplierApi.SupplierItem;
+          values?: Record<string, unknown>;
+        }) => Promise<void> | void;
+      }
+    | undefined
+  >;
+  gridApi: unknown;
 }) {
   const { t } = useI18n();
   const { handleApiError } = useErrorHandler();
@@ -42,10 +60,34 @@ export function useSupplierActions(options: {
     createValues,
   } = options;
 
+  function resolveGridApi(): {
+    grid?: { getColumns: () => unknown[] };
+    reload?: () => void;
+  } {
+    if (
+      typeof gridApi === 'object' &&
+      gridApi !== null &&
+      'value' in gridApi &&
+      typeof (gridApi as { value?: unknown }).value === 'object'
+    ) {
+      return ((gridApi as { value?: unknown }).value ||
+        {}) as {
+        grid?: { getColumns: () => unknown[] };
+        reload?: () => void;
+      };
+    }
+    if (typeof gridApi === 'object' && gridApi !== null) {
+      return gridApi as {
+        grid?: { getColumns: () => unknown[] };
+        reload?: () => void;
+      };
+    }
+    return {};
+  }
+
   function handleSuccess() {
-    // Determine if it's a ref or a direct object
-    const api = gridApi?.value || gridApi;
-    api?.reload();
+    const api = resolveGridApi();
+    api.reload?.();
   }
 
   function handleOpenModal() {
@@ -111,7 +153,11 @@ export function useSupplierActions(options: {
   async function handleCustomImport({ file }: { file: File }) {
     try {
       const rows = await readImportRowsFromFile(file);
-      const columns = gridApi.value.grid.getColumns() || [];
+      const columns =
+        (resolveGridApi().grid?.getColumns?.() as Array<{
+          field?: null | string;
+          title?: unknown;
+        }>) || [];
       const mappedItems = mapRowsByColumnTitles(rows, columns);
 
       const res = await importSuppliers({

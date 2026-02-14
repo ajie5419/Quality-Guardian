@@ -160,7 +160,7 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
 
       // 将照片转换回 URL 数组
       const photos =
-        (rawData.photos as any[])
+        ((rawData.photos || []) as PhotoCandidate[])
           ?.map((f) => {
             if (f.url) return f.url;
             if (f.status === 'done' && f.response?.data?.url) {
@@ -328,3 +328,8 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
     checkIsPurchasingDept,
   };
 }
+  type PhotoCandidate = {
+    response?: { data?: { url?: string } };
+    status?: string;
+    url?: string;
+  };

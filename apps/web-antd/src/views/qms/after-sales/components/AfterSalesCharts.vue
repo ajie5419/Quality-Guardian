@@ -13,6 +13,7 @@ import { Button, Card, message, Modal } from 'ant-design-vue';
 
 import { getAfterSalesList } from '#/api/qms/after-sales';
 import { getDeptList } from '#/api/system/dept';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { CHART_DIMENSIONS, CHART_METRICS } from '../constants';
 import CustomChartBuilderModal from './CustomChartBuilderModal.vue';
@@ -29,6 +30,7 @@ const customCharts = defineModel<ChartConfig[]>('charts', {
 
 const { hasAccessByCodes } = useAccess();
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const canAdd = computed(() => hasAccessByCodes(['QMS:AfterSales:ChartAdd']));
 const canEdit = computed(() => hasAccessByCodes(['QMS:AfterSales:ChartEdit']));
 const canDelete = computed(() =>
@@ -59,7 +61,7 @@ async function fetchData() {
     fullDataList.value = listRes;
     deptList.value = deptRes;
   } catch (error) {
-    console.error('Failed to fetch after-sales data:', error);
+    handleApiError(error, 'Load After Sales Charts Data');
   } finally {
     loading.value = false;
   }

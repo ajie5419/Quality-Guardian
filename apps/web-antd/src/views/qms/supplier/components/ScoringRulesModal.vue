@@ -15,7 +15,7 @@ const columns = [
     dataIndex: 'dimension',
     key: 'dimension',
     width: 120,
-    customCell: (_: any, index: number | undefined) => {
+    customCell: (_: unknown, index: number | undefined) => {
       if (index === 0) return { rowSpan: 3 };
       if (index === 1 || index === 2) return { rowSpan: 0 };
       if (index === 3) return { rowSpan: 3 };

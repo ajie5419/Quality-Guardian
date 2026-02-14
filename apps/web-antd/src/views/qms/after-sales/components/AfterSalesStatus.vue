@@ -16,6 +16,19 @@ const formState = defineModel<AfterSalesFormState>('formState', {
 });
 
 const { t } = useI18n();
+
+const claimOptions = [
+  { label: t('common.yes'), value: 'true' },
+  { label: t('common.no'), value: 'false' },
+];
+
+function handleClaimChange(val: unknown) {
+  if (Array.isArray(val)) {
+    formState.value.isClaim = String(val[0]) === 'true';
+    return;
+  }
+  formState.value.isClaim = String(val) === 'true';
+}
 </script>
 
 <template>
@@ -42,14 +55,9 @@ const { t } = useI18n();
         </FormItem>
         <FormItem :label="t('qms.afterSales.form.isClaim')" class="mb-0">
           <Select
-            :value="(formState.isClaim ? 'true' : 'false') as any"
-            @change="(val: any) => (formState.isClaim = val === 'true')"
-            :options="
-              [
-                { label: t('common.yes'), value: 'true' },
-                { label: t('common.no'), value: 'false' },
-              ] as any
-            "
+            :value="formState.isClaim ? 'true' : 'false'"
+            @change="handleClaimChange"
+            :options="claimOptions"
           />
         </FormItem>
       </div>

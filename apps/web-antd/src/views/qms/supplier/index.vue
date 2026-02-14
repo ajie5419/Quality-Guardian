@@ -11,6 +11,7 @@ import { Badge, Button, Card, Space, Tag, Tooltip } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getSupplierList } from '#/api/qms/supplier';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 
 import { RATING_COLORS, SUPPLIER_STATUS_UI_MAP } from '../common-constants';
@@ -22,13 +23,22 @@ import { useSupplierActions } from './composables/useSupplierActions';
 import { getColumns, getSearchFormSchema } from './data';
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const { canEdit, canDelete, canExport, canImport } =
   useQmsPermissions('QMS:Supplier');
 
 const checkedRows = ref<QmsSupplierApi.SupplierItem[]>([]);
-const editModalRef = ref();
-const detailDrawerRef = ref();
-const rulesModalRef = ref();
+const editModalRef =
+  ref<{ open: (options: unknown) => Promise<void> | void }>();
+const detailDrawerRef =
+  ref<{
+    open: (
+      row: QmsSupplierApi.SupplierItem,
+      titlePrefix?: string,
+    ) => Promise<void> | void;
+  }>();
+const rulesModalRef = ref<{ openModal: () => void }>();
+type BadgeStatus = 'default' | 'error' | 'processing' | 'success' | 'warning';
 
 // 统计数据
 const stats = ref<QmsSupplierApi.SupplierStats>({
@@ -71,7 +81,7 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
   },
   importConfig: {
     remote: true,
-    importMethod: (params: any) => handleCustomImport(params),
+    importMethod: (params: { file: File }) => handleCustomImport(params),
   },
   exportConfig: {
     remote: false,
@@ -96,7 +106,13 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
               ...(canEdit.value ? ['edit'] : []),
               ...(canDelete.value ? ['delete'] : []),
             ],
-            onClick: ({ code, row }: { code: string; row: any }) => {
+            onClick: ({
+              code,
+              row,
+            }: {
+              code: string;
+              row: QmsSupplierApi.SupplierItem;
+            }) => {
               if (code === 'edit') handleEdit(row);
               if (code === 'delete') handleDelete(row);
             },
@@ -127,22 +143,24 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
           }
           return { items: response.items || [], total: response.total || 0 };
         } catch (error) {
-          console.error('Failed to load suppliers:', error);
+          handleApiError(error, 'Load Supplier List');
           return { items: [], total: 0 };
         }
       },
-      queryAll: async ({ formValues }: any) => {
+      queryAll: async (params) => {
         try {
-          const params: QmsSupplierApi.SupplierListParams = {
+          const formValues =
+            (params as { form?: Record<string, unknown> }).form || {};
+          const queryParams: QmsSupplierApi.SupplierListParams = {
             category: 'Supplier',
             page: 1,
             pageSize: 100_000,
             ...formValues,
           };
-          const response = await getSupplierList(params);
+          const response = await getSupplierList(queryParams);
           return { items: response.items || [] };
         } catch (error) {
-          console.error('Failed to load all suppliers:', error);
+          handleApiError(error, 'Load All Supplier Data');
           return { items: [] };
         }
       },
@@ -175,7 +193,7 @@ const {
   handleCustomImport,
   handleSuccess,
 } = useSupplierActions({
-  gridApi: gridApi as any,
+  gridApi,
   editModalRef,
   detailDrawerRef,
   checkedRows,
@@ -184,20 +202,33 @@ const {
 
 // Helper to get status config safely
 function getStatusConfig(status?: string) {
+  const defaultConfig: { defaultText: string; status: BadgeStatus; textKey: string } = {
+    status: 'default',
+    textKey: '',
+    defaultText: '-',
+  };
   if (!status) {
-    return {
-      status: 'default',
-      textKey: '',
-      defaultText: '-',
-    };
+    return defaultConfig;
   }
-  return (
-    (SUPPLIER_STATUS_UI_MAP as any)[status] || {
-      status: 'default',
-      textKey: '',
-      defaultText: '-',
-    }
-  );
+  const config = SUPPLIER_STATUS_UI_MAP[status];
+  if (!config) return defaultConfig;
+  const badgeStatusList: BadgeStatus[] = [
+    'default',
+    'error',
+    'processing',
+    'success',
+    'warning',
+  ];
+  const badgeStatus = badgeStatusList.includes(config.status as BadgeStatus)
+    ? (config.status as BadgeStatus)
+    : 'default';
+  return { ...config, status: badgeStatus };
+}
+
+function getRatingColor(level?: string, rating?: string) {
+  if (level && RATING_COLORS[level]) return RATING_COLORS[level];
+  if (rating && RATING_COLORS[rating]) return RATING_COLORS[rating];
+  return 'default';
 }
 
 // handleSuccess is now provided by useSupplierActions
@@ -280,13 +311,7 @@ function getStatusConfig(status?: string) {
           <template #level_tag="{ row }">
             <div class="flex items-center">
               <Tag
-                :color="
-                  row.level
-                    ? (RATING_COLORS as any)[row.level]
-                    : row.rating
-                      ? (RATING_COLORS as any)[row.rating]
-                      : 'default'
-                "
+                :color="getRatingColor(row.level, row.rating)"
               >
                 {{ row.level || row.rating || '-' }} {{ t('common.level') }}
               </Tag>

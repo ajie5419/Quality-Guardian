@@ -10,6 +10,7 @@ import { message } from 'ant-design-vue';
 
 import { useVbenForm } from '#/adapter/form';
 import { createSupplier, updateSupplier } from '#/api/qms/supplier';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { getFormSchema } from '../data';
 
@@ -22,6 +23,7 @@ interface OpenOptions {
 
 const emit = defineEmits(['success']);
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 
 const isUpdate = ref(false);
 const recordId = ref<null | string>(null);
@@ -52,7 +54,7 @@ async function handleSubmit() {
     modalApi.close();
     emit('success');
   } catch (error) {
-    console.error('Submit failed:', error);
+    handleApiError(error, 'Save Supplier');
   } finally {
     modalApi.setState({ confirmLoading: false });
   }

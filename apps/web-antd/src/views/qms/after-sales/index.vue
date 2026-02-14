@@ -4,6 +4,7 @@ import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
 import type { VxeCheckboxChangeParams } from '#/types';
 
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import type { Ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
@@ -38,7 +39,7 @@ const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 
 const chartRefreshKey = ref(0);
-const chartsRef = ref<any>(null);
+const chartsRef = ref<{ handleAddCustomChart: () => void } | null>(null);
 const {
   showCharts,
   customChartsData,
@@ -106,7 +107,8 @@ const yearOptions = computed(() => {
 const gridApiProxy =
   ref<ReturnType<typeof useVbenVxeGrid<QmsAfterSalesApi.AfterSalesItem>>[1]>();
 const { handleImport } = useGridImport({
-  gridApi: gridApiProxy as any,
+  gridApi:
+    gridApiProxy as unknown as Ref<ReturnType<typeof useVbenVxeGrid>[1] | undefined>,
   importApi: importAfterSalesExcel,
   statusMap: {
     待处理: 'OPEN',
@@ -140,7 +142,7 @@ const gridOptions = computed(() => ({
   },
   importConfig: {
     remote: true,
-    importMethod: ({ file }: any) => handleImport({ file }),
+    importMethod: ({ file }: { file: File }) => handleImport({ file }),
   },
   exportConfig: {
     remote: false,
@@ -346,10 +348,10 @@ const gridOptions = computed(() => ({
         { page }: { page?: { currentPage?: number; pageSize?: number } },
         formValues: Record<string, unknown> = {},
       ) => {
-        const data = (await getAfterSalesList({
+        const data = await getAfterSalesList({
           year: currentYear.value,
           ...formValues,
-        } as QmsAfterSalesApi.AfterSalesParams)) as any[];
+        } as QmsAfterSalesApi.AfterSalesParams);
 
         // 确保照片数据是数组格式
         const items = (data || []).map((item) => {
@@ -375,13 +377,13 @@ const gridOptions = computed(() => ({
         return { items: pageData, total: items.length };
       },
       queryAll: async ({
-        formValues = {},
+        form,
       }: {
-        formValues?: Record<string, unknown>;
+        form?: Record<string, unknown>;
       }) => {
         const data = await getAfterSalesList({
           year: currentYear.value,
-          ...formValues,
+          ...(form || {}),
         } as QmsAfterSalesApi.AfterSalesParams);
         return { items: data || [] };
       },

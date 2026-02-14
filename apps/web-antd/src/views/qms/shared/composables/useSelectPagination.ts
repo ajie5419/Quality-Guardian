@@ -3,10 +3,11 @@ import type { Ref } from 'vue';
 import { reactive, ref, watch } from 'vue';
 
 import { useDebounceFn } from '@vueuse/core';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 export interface UseSelectPaginationOptions<T> {
   fetchDataFn: (params: {
-    [key: string]: any;
+    [key: string]: boolean | number | string;
     page: number;
     pageSize: number;
   }) => Promise<{ items: T[]; total: number }>;
@@ -18,9 +19,10 @@ export interface UseSelectPaginationOptions<T> {
 export function useSelectPagination<T>(
   optionsConfig: UseSelectPaginationOptions<T>,
   propsValue: Ref<T[keyof T] | undefined>,
-  emit: (event: any, ...args: any[]) => void,
+  emit: (event: 'change' | 'update:value', ...args: unknown[]) => void,
 ) {
   const { fetchDataFn, getParams, valueKey, echoFetcher } = optionsConfig;
+  const { handleApiError } = useErrorHandler();
 
   const options = ref<T[]>([]) as Ref<T[]>;
   const loading = ref(false);
@@ -84,7 +86,7 @@ export function useSelectPagination<T>(
                 uniqueMap.set(currentVal, exactMatch);
               }
             } catch (error) {
-              console.error('Echo fetch failed:', error);
+              handleApiError(error, 'Select Echo Fetch');
             }
           }
         }
@@ -92,7 +94,7 @@ export function useSelectPagination<T>(
 
       options.value = [...uniqueMap.values()];
     } catch (error) {
-      console.error(error);
+      handleApiError(error, 'Select Pagination Query');
       if (loadMore) pagination.page -= 1;
     } finally {
       loading.value = false;
@@ -114,12 +116,16 @@ export function useSelectPagination<T>(
     }
   };
 
-  const handleChange = (val: unknown, option: any) => {
+  const handleChange = (val: unknown, option: unknown) => {
     const castedVal = val as T[keyof T] | undefined;
     emit('update:value', castedVal);
     emit('change', castedVal, option);
-    if (castedVal && (option?.item || option)) {
-      cachedSelectedItem.value = (option?.item || option) as T;
+    const selectedItem =
+      option && typeof option === 'object' && 'item' in option
+        ? (option as { item?: T }).item
+        : (option as T | undefined);
+    if (castedVal && selectedItem) {
+      cachedSelectedItem.value = selectedItem as T;
     } else if (!castedVal) {
       cachedSelectedItem.value = null;
     }

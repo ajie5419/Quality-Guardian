@@ -13,6 +13,7 @@ import { Badge, Button, Card, Space, Tag, Tooltip } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getSupplierList } from '#/api/qms/supplier';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { RATING_COLORS, SUPPLIER_STATUS_UI_MAP } from '../common-constants';
 import ScoringRulesModal from '../supplier/components/ScoringRulesModal.vue';
@@ -23,6 +24,7 @@ import { useSupplierActions } from '../supplier/composables/useSupplierActions';
 import { getColumns, getSearchFormSchema } from '../supplier/data';
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const { hasAccessByCodes } = useAccess();
 
 const canExport = computed(() => hasAccessByCodes(['QMS:Outsourcing:Export']));
@@ -138,7 +140,7 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
           }
           return { items: response.items || [], total: response.total || 0 };
         } catch (error) {
-          console.error('Failed to load outsourcing units:', error);
+          handleApiError(error, 'Load Outsourcing List');
           return { items: [], total: 0 };
         }
       },
@@ -156,7 +158,7 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
           const response = await getSupplierList(queryParams);
           return { items: response.items || [] };
         } catch (error) {
-          console.error('Failed to load all outsourcing units:', error);
+          handleApiError(error, 'Load All Outsourcing List');
           return { items: [] };
         }
       },

@@ -1,4 +1,5 @@
 import type { VxeGridProps } from '#/adapter/vxe-table';
+import type { VbenFormSchema } from '#/adapter/form';
 
 import { $t } from '@vben/locales';
 
@@ -45,7 +46,8 @@ export const columns: VxeGridProps['columns'] = [
     title: $t('qms.outsourcing.qualifiedRate'),
     width: 100,
     sortable: true,
-    formatter: ({ cellValue }: { cellValue: any }) => `${cellValue}%`,
+    formatter: ({ cellValue }: { cellValue: number | string }) =>
+      `${cellValue}%`,
   },
   {
     field: 'engineeringIssueCount',
@@ -81,7 +83,11 @@ export const columns: VxeGridProps['columns'] = [
   },
 ];
 
-export const formSchema: any[] = [
+type OutsourcingFormSchema = VbenFormSchema & {
+  colProps?: { span: number };
+};
+
+export const formSchema: OutsourcingFormSchema[] = [
   {
     fieldName: 'name',
     label: '名称',
@@ -131,7 +137,7 @@ export const formSchema: any[] = [
   },
 ];
 
-export const searchFormSchema: any[] = [
+export const searchFormSchema: OutsourcingFormSchema[] = [
   {
     fieldName: 'name',
     label: $t('qms.outsourcing.unitName'),

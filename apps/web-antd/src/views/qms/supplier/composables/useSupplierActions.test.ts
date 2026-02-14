@@ -2,6 +2,8 @@ import { ref } from 'vue';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import type { QmsSupplierApi } from '#/api/qms/supplier';
+
 import { useSupplierActions } from './useSupplierActions';
 
 const {
@@ -60,7 +62,7 @@ vi.mock('@vben/locales', () => ({
 
 describe('useSupplierActions', () => {
   function createComposable() {
-    const checkedRows = ref<any[]>([]);
+    const checkedRows = ref<QmsSupplierApi.SupplierItem[]>([]);
     const gridApi = {
       value: {
         grid: {
@@ -75,7 +77,7 @@ describe('useSupplierActions', () => {
       gridApi,
       ...useSupplierActions({
         category: 'Supplier',
-        checkedRows: checkedRows as any,
+        checkedRows,
         detailDrawerRef: ref({ open: vi.fn() }),
         editModalRef: ref({ open: vi.fn() }),
         gridApi,
@@ -105,7 +107,10 @@ describe('useSupplierActions', () => {
     mockBatchDeleteSuppliers.mockResolvedValueOnce({});
 
     const composable = createComposable();
-    composable.checkedRows.value = [{ id: '1' }, { id: '2' }];
+    composable.checkedRows.value = [
+      { id: '1' },
+      { id: '2' },
+    ] as unknown as QmsSupplierApi.SupplierItem[];
 
     composable.handleBatchDelete();
     await Promise.resolve();

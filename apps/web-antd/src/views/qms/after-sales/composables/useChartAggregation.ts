@@ -54,8 +54,8 @@ export function getAfterSalesChartOption(
   );
 }
 
-export function renderCustomChart(
-  renderFn: (option: any, clear?: boolean) => any,
+export function renderCustomChart<TOption>(
+  renderFn: (option: TOption, clear?: boolean) => unknown,
   data: AfterSalesItem[],
   config: ChartConfig,
   t: (key: string) => string,
@@ -64,6 +64,6 @@ export function renderCustomChart(
   if (!renderFn) return;
   const option = getAfterSalesChartOption(data, config, t, deptData);
   if (option) {
-    renderFn(option);
+    renderFn(option as TOption);
   }
 }

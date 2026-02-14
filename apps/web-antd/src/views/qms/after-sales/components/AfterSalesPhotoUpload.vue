@@ -35,7 +35,9 @@ const maxImages = computed(
 
 function handleUploadChange(info: UploadChangeParam<UploadFile>) {
   if (info.file.status === 'done') {
-    const response = info.file.response as any;
+    const response = info.file.response as
+      | { code?: number; data?: { url?: string } }
+      | undefined;
     if (response?.code === 0 && response.data?.url) {
       info.file.url = response.data.url;
     }

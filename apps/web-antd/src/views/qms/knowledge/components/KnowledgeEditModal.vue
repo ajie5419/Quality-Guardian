@@ -42,7 +42,7 @@ const formState = ref<Partial<QmsKnowledgeApi.KnowledgeItem>>({
 });
 
 function open(
-  item?: any | QmsKnowledgeApi.KnowledgeItem,
+  item?: Partial<QmsKnowledgeApi.KnowledgeItem>,
   defaultCategoryId?: string,
 ) {
   if (item && item.id) {

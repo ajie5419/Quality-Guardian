@@ -1,5 +1,7 @@
 <script lang="ts" setup>
 import type { QmsSupplierApi } from '#/api/qms/supplier';
+import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
+import type { QmsInspectionApi } from '#/api/qms/inspection';
 
 import { ref } from 'vue';
 
@@ -23,14 +25,16 @@ import {
   getInspectionIssues,
   getInspectionRecords,
 } from '#/api/qms/inspection';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 
 const selectedSupplier = ref<null | QmsSupplierApi.SupplierItem>(null);
 const isDetailLoading = ref(false);
-const supplierInspections = ref<any[]>([]);
-const supplierAfterSales = ref<any[]>([]);
-const supplierEngineeringIssues = ref<any[]>([]);
+const supplierInspections = ref<QmsInspectionApi.InspectionRecord[]>([]);
+const supplierAfterSales = ref<QmsAfterSalesApi.AfterSalesItem[]>([]);
+const supplierEngineeringIssues = ref<QmsInspectionApi.InspectionIssue[]>([]);
 
 const [Drawer, drawerApi] = useVbenDrawer({
   title: t('common.detail'),
@@ -56,7 +60,7 @@ async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
     supplierAfterSales.value = afterSales;
     supplierEngineeringIssues.value = engineering.items || [];
   } catch (error) {
-    console.error('Failed to load supplier detail:', error);
+    handleApiError(error, 'Load Supplier Detail');
   } finally {
     isDetailLoading.value = false;
   }

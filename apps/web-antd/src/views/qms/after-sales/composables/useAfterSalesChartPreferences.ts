@@ -9,10 +9,12 @@ import {
 } from '#/api/system/preference';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
+import type { ChartConfig } from './useChartAggregation';
+
 export function useAfterSalesChartPreferences() {
   const { handleApiError } = useErrorHandler();
   const showCharts = ref(false);
-  const customChartsData = ref<any[]>([]);
+  const customChartsData = ref<ChartConfig[]>([]);
   const isFirstLoad = ref(true);
 
   async function loadPreferences() {

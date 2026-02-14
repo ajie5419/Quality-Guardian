@@ -1,4 +1,5 @@
 import type { VxeGridProps } from '#/adapter/vxe-table';
+import type { VbenFormSchema } from '#/adapter/form';
 
 import { $t } from '@vben/locales';
 
@@ -104,7 +105,9 @@ export const getColumns = (
  * 获取表单配置
  * @param category 类型
  */
-export const getFormSchema = (category: 'Outsourcing' | 'Supplier'): any[] => [
+export const getFormSchema = (
+  category: 'Outsourcing' | 'Supplier',
+): SupplierFormSchema[] => [
   {
     fieldName: 'name',
     label:
@@ -171,7 +174,7 @@ export const getFormSchema = (category: 'Outsourcing' | 'Supplier'): any[] => [
  */
 export const getSearchFormSchema = (
   category: 'Outsourcing' | 'Supplier',
-): any[] => [
+): SupplierFormSchema[] => [
   {
     fieldName: 'name',
     label:
@@ -191,3 +194,6 @@ export const getSearchFormSchema = (
     colProps: { span: 6 },
   },
 ];
+type SupplierFormSchema = VbenFormSchema & {
+  colProps?: { span: number };
+};
