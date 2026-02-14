@@ -1,9 +1,8 @@
 <script lang="ts" setup>
-import type { InspectionIssue, PieDataItem, StatisticsData } from './types';
+import type { InspectionIssue } from './types';
 // Types
 
 import type { VxeGridProps } from '#/adapter/vxe-table';
-// Types
 import type { VxeCheckboxChangeParams } from '#/types';
 
 import { computed, onMounted, ref, watch } from 'vue';
@@ -18,8 +17,6 @@ import {
   Card,
   Col,
   Image,
-  message,
-  Modal,
   Row,
   Select,
   Statistic,
@@ -29,20 +26,11 @@ import dayjs from 'dayjs';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
-  batchDeleteInspectionIssues,
-  deleteInspectionIssue,
   getInspectionIssues,
-  getInspectionIssueStats,
   importInspectionIssues,
 } from '#/api/qms/inspection';
-import {
-  getMergedPreferenceApi,
-  saveSystemSettingApi,
-  saveUserPreferenceApi,
-} from '#/api/system/preference';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useGridImport } from '#/hooks/useGridImport';
-import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { findNameById } from '#/types';
@@ -51,7 +39,10 @@ import IssueChartDashboard from './components/IssueChartDashboard.vue';
 import IssueEditModal from './components/IssueEditModal.vue';
 import { useAiReport } from './composables/useAiReport';
 // Composables
+import { useIssueActions } from './composables/useIssueActions';
+import { useIssueChartPreferences } from './composables/useIssueChartPreferences';
 import { useIssueData } from './composables/useIssueData';
+import { useIssueRemoteStatistics } from './composables/useIssueRemoteStatistics';
 import { gridColumns, searchFormSchema } from './data';
 import {
   getSeverityColor,
@@ -96,12 +87,6 @@ const { invalidateInspectionIssues } = useInvalidateQmsQueries();
 
 // 使用数据加载 composable
 const { deptTreeData, deptRawData, loadInitialData } = useIssueData();
-
-// 加载初始数据
-loadInitialData().then(() => {
-  // 初始数据加载完成后，刷新表格以应用部门名称转换
-  gridApi.reload();
-});
 
 // ================= 表格配置 =================
 const { years: dynamicYears } = useAvailableYears();
@@ -352,94 +337,13 @@ const [Grid, gridApi] = useVbenVxeGrid({
 });
 
 // ================= 统计逻辑 =================
-const showCharts = ref(false);
-const isFirstLoad = ref(true);
-
-// 加载偏好设置
-async function loadPreferences() {
-  try {
-    const pref = await getMergedPreferenceApi(
-      'inspection-issues-charts',
-      'qms:inspection_issues:default_charts',
-    );
-    if (pref) {
-      showCharts.value = !!pref.showCharts;
-    }
-  } catch (error) {
-    console.error('Failed to load preferences', error);
-  } finally {
-    isFirstLoad.value = false;
-  }
-}
-
-// 保存偏好设置
-async function savePreferences() {
-  if (isFirstLoad.value) return;
-  try {
-    await saveUserPreferenceApi('inspection-issues-charts', {
-      showCharts: showCharts.value,
-    });
-  } catch (error) {
-    console.error('Failed to save preferences', error);
-  }
-}
-
-// 监听状态变化并自动保存
-watch(showCharts, () => {
-  if (isFirstLoad.value) return;
-  savePreferences();
-});
-
-async function handleSaveSystemDefault() {
-  try {
-    await saveSystemSettingApi('qms:inspection_issues:default_charts', {
-      showCharts: showCharts.value,
-    });
-    message.success('已存为系统默认配置');
-  } catch (error) {
-    console.error('Failed to save system default', error);
-    message.error('保存失败');
-  }
-}
-
-// 使用统计 composable
-const statistics = ref<StatisticsData>({
-  totalCount: 0,
-  openCount: 0,
-  closedCount: 0,
-  totalLoss: 0,
-  closedRate: 0,
-  pieData: [],
-  trendData: [],
-  pareto: [],
-});
-
-async function fetchStatistics() {
-  try {
-    const res = await getInspectionIssueStats({ year: currentYear.value });
-    // Calculate pareto on frontend based on pieData
-    let cumulativeCount = 0;
-    const totalCount = res.totalCount || 0;
-    const pareto = (res.pieData || []).map((item: PieDataItem) => {
-      cumulativeCount += item.value;
-      return {
-        label: item.name,
-        value: item.value,
-        percent:
-          totalCount > 0 ? Math.round((item.value / totalCount) * 100) : 0,
-        cumulativePercent:
-          totalCount > 0 ? Math.round((cumulativeCount / totalCount) * 100) : 0,
-      };
-    });
-
-    statistics.value = { ...res, pareto };
-  } catch (error) {
-    console.error('Failed to fetch statistics:', error);
-  }
-}
+const { showCharts, loadPreferences, handleSaveSystemDefault } =
+  useIssueChartPreferences();
+const { statistics, fetchStatistics } = useIssueRemoteStatistics();
+const refreshStatistics = () => fetchStatistics(currentYear.value);
 
 watch(currentYear, () => {
-  fetchStatistics();
+  refreshStatistics();
   gridApi.reload();
 });
 
@@ -448,7 +352,7 @@ onMounted(() => {
     gridApi.reload();
   });
   loadPreferences();
-  fetchStatistics();
+  refreshStatistics();
 });
 
 // 使用 AI 报告 composable
@@ -459,110 +363,22 @@ async function handleGenerateInsight() {
 }
 
 // ================= 操作逻辑 =================
-const modalVisible = ref(false);
-const isEditMode = ref(false);
-const currentRecord = ref<InspectionIssue | null>(null);
-
-function handleOpenModal() {
-  isEditMode.value = false;
-  currentRecord.value = null;
-  modalVisible.value = true;
-}
-
-function handleEdit(row: InspectionIssue) {
-  isEditMode.value = true;
-  currentRecord.value = { ...row };
-  modalVisible.value = true;
-}
-
-async function handleDelete(row: InspectionIssue) {
-  Modal.confirm({
-    title: t('qms.inspection.issues.deleteConfirm'),
-    content: t('qms.inspection.issues.deleteContent', {
-      ncNumber: row.ncNumber,
-    }),
-    onOk: async () => {
-      try {
-        await deleteInspectionIssue(row.id);
-        message.success(t('common.deleteSuccess'));
-        invalidateInspectionIssues();
-        gridApi.reload();
-        fetchStatistics();
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : t('common.deleteFailed');
-        message.error(errorMessage);
-      }
-    },
-  });
-}
-
-function handleBatchDelete() {
-  if (checkedRows.value.length === 0) {
-    message.warning(t('common.pleaseSelectData'));
-    return;
-  }
-  Modal.confirm({
-    title: t('common.confirmBatchDelete'),
-    content: t('common.confirmBatchDeleteContent', {
-      count: checkedRows.value.length,
-    }),
-    onOk: async () => {
-      try {
-        const ids = checkedRows.value.map((r: InspectionIssue) => r.id);
-        const res = await batchDeleteInspectionIssues(ids);
-        message.success(
-          t('common.deleteSuccessCount', { count: res.successCount }),
-        );
-        invalidateInspectionIssues();
-        gridApi.reload();
-        fetchStatistics();
-      } catch {
-        message.error(t('common.deleteFailed'));
-      }
-    },
-  });
-}
-
-const { settle: settleToKnowledge } = useKnowledgeSettlement();
-
-function handleSettleToKnowledge(row: InspectionIssue) {
-  settleToKnowledge({
-    title: `【${t('qms.dashboard.overview.processIssues')}】${
-      row.workOrderNumber || ''
-    } - ${row.partName}`,
-    summary: row.description,
-    categoryId: 'CAT-DEFAULT',
-    photos: row.photos,
-    attachmentNamePrefix: '现场图片',
-    tags: [row.defectType, row.division, row.partName, row.projectName],
-    sections: [
-      {
-        title: t('qms.inspection.issues.description'),
-        fields: [
-          {
-            label: t('qms.workOrder.workOrderNumber'),
-            value: row.workOrderNumber,
-          },
-          { label: t('qms.workOrder.projectName'), value: row.projectName },
-          { label: t('qms.inspection.issues.partName'), value: row.partName },
-        ],
-      },
-      {
-        title: t('qms.inspection.issues.description'),
-        content: row.description,
-      },
-      {
-        title: t('qms.inspection.issues.rootCause'),
-        content: row.rootCause || t('common.unknown'),
-      },
-      {
-        title: t('qms.inspection.issues.solution'),
-        content: row.solution || t('common.notSet'),
-      },
-    ],
-  });
-}
+const {
+  modalVisible,
+  isEditMode,
+  currentRecord,
+  handleOpenModal,
+  handleEdit,
+  handleDelete,
+  handleBatchDelete,
+  handleSettleToKnowledge,
+} = useIssueActions({
+  checkedRows,
+  t,
+  invalidateInspectionIssues,
+  gridApi,
+  onAfterDeleteSuccess: refreshStatistics,
+});
 </script>
 
 <template>
@@ -734,7 +550,7 @@ function handleSettleToKnowledge(row: InspectionIssue) {
       @success="
         () => {
           gridApi.reload();
-          fetchStatistics();
+          refreshStatistics();
         }
       "
     />
