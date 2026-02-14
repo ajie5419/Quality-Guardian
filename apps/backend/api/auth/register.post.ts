@@ -1,14 +1,21 @@
 import bcrypt from 'bcrypt';
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import prisma from '~/utils/prisma';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  badRequestResponse,
+  conflictResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const { deptId, password, username } = await readBody(event);
 
   if (!username || !password || !deptId) {
-    setResponseStatus(event, 400);
-    return useResponseError('BadRequest', '用户名、密码和部门均为必填项');
+    return badRequestResponse(
+      event,
+      '用户名、密码和部门均为必填项',
+      'BadRequest',
+    );
   }
 
   // 检查部门是否存在
@@ -17,8 +24,7 @@ export default defineEventHandler(async (event) => {
   });
 
   if (!dept) {
-    setResponseStatus(event, 400);
-    return useResponseError('BadRequest', '所选部门不存在');
+    return badRequestResponse(event, '所选部门不存在', 'BadRequest');
   }
 
   // 检查用户名是否已存在
@@ -27,8 +33,7 @@ export default defineEventHandler(async (event) => {
   });
 
   if (existingUser) {
-    setResponseStatus(event, 409);
-    return useResponseError('Conflict', '用户名已存在');
+    return conflictResponse(event, '用户名已存在', 'Conflict');
   }
 
   // 获取默认角色 (user)

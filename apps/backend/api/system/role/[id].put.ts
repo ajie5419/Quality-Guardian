@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -8,8 +8,10 @@ import {
 } from '~/utils/prisma-error';
 import { redis } from '~/utils/redis';
 import {
+  conflictResponse,
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -58,12 +60,11 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     logApiError('role', error);
     if (isPrismaUniqueConstraintError(error)) {
-      setResponseStatus(event, 409);
-      return useResponseError('角色值已存在');
+      return conflictResponse(event, '角色值已存在');
     }
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(
-      isPrismaNotFoundError(error) ? '角色不存在' : '更新角色失败',
-    );
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, '角色不存在');
+    }
+    return internalServerErrorResponse(event, '更新角色失败');
   }
 });

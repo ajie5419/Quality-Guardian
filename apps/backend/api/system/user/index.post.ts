@@ -1,11 +1,12 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { UserService } from '~/services/user.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaUniqueConflictError } from '~/utils/prisma-error';
 import {
+  conflictResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -22,10 +23,8 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     logApiError('user', error);
     if (isPrismaUniqueConflictError(error)) {
-      setResponseStatus(event, 409);
-      return useResponseError('用户名已存在');
+      return conflictResponse(event, '用户名已存在');
     }
-    setResponseStatus(event, 500);
-    return useResponseError('创建用户失败');
+    return internalServerErrorResponse(event, '创建用户失败');
   }
 });

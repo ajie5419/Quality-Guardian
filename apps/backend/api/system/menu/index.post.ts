@@ -1,12 +1,13 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import { redis } from '~/utils/redis';
 import {
+  conflictResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -51,11 +52,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(newMenu);
   } catch (error) {
     logApiError('menu', error);
-    setResponseStatus(event, isPrismaUniqueConstraintError(error) ? 409 : 500);
-    return useResponseError(
-      isPrismaUniqueConstraintError(error)
-        ? '菜单名称或路径已存在'
-        : '创建菜单失败',
-    );
+    if (isPrismaUniqueConstraintError(error)) {
+      return conflictResponse(event, '菜单名称或路径已存在');
+    }
+    return internalServerErrorResponse(event, '创建菜单失败');
   }
 });

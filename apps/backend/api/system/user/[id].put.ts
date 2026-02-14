@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { UserService } from '~/services/user.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -7,8 +7,10 @@ import {
   isPrismaUniqueConstraintError,
 } from '~/utils/prisma-error';
 import {
+  conflictResponse,
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -31,12 +33,11 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     logApiError('user', error);
     if (isPrismaUniqueConstraintError(error)) {
-      setResponseStatus(event, 409);
-      return useResponseError('用户名已存在');
+      return conflictResponse(event, '用户名已存在');
     }
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(
-      isPrismaNotFoundError(error) ? '用户不存在' : '更新用户失败',
-    );
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, '用户不存在');
+    }
+    return internalServerErrorResponse(event, '更新用户失败');
   }
 });

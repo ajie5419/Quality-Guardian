@@ -1,11 +1,12 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { DeptService } from '~/services/dept.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
+  internalServerErrorResponse,
+  notFoundResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -27,9 +28,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('dept', error);
-    setResponseStatus(event, isPrismaNotFoundError(error) ? 404 : 500);
-    return useResponseError(
-      isPrismaNotFoundError(error) ? '部门不存在' : '更新部门失败',
-    );
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, '部门不存在');
+    }
+    return internalServerErrorResponse(event, '更新部门失败');
   }
 });

@@ -1,11 +1,12 @@
-import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { defineEventHandler, readBody } from 'h3';
 import { DeptService } from '~/services/dept.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
+  conflictResponse,
+  internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -21,9 +22,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(newDept);
   } catch (error) {
     logApiError('dept', error);
-    setResponseStatus(event, isPrismaUniqueConstraintError(error) ? 409 : 500);
-    return useResponseError(
-      isPrismaUniqueConstraintError(error) ? '部门名称已存在' : '创建部门失败',
-    );
+    if (isPrismaUniqueConstraintError(error)) {
+      return conflictResponse(event, '部门名称已存在');
+    }
+    return internalServerErrorResponse(event, '创建部门失败');
   }
 });
