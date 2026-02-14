@@ -175,7 +175,9 @@ export const AfterSalesService = {
     }
 
     if (workOrderNumber && String(workOrderNumber).trim() !== '') {
-      where.workOrderNumber = String(workOrderNumber).trim();
+      where.workOrderNumber = {
+        contains: String(workOrderNumber).trim(),
+      };
     }
     if (projectName && String(projectName).trim() !== '') {
       where.projectName = { contains: String(projectName).trim() };

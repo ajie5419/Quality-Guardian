@@ -10,13 +10,23 @@ class RedisManager {
   private static instance: RedisManager;
   private client: null | Redis = null;
   private isEnabled = false;
+  private connectionErrorLogged = false;
 
   private constructor() {
     const url = process.env.REDIS_URL;
-    if (url) {
+    const redisEnabled = process.env.REDIS_ENABLED !== 'false';
+    const isDev = process.env.NODE_ENV === 'development';
+    const optionalMode = isDev || process.env.REDIS_OPTIONAL === 'true';
+
+    if (url && redisEnabled) {
       this.client = new Redis(url, {
         maxRetriesPerRequest: 3,
         retryStrategy(times) {
+          // In optional mode (usually local development), stop retrying quickly
+          // to avoid log flooding when Redis is not running.
+          if (optionalMode && times >= 2) {
+            return null;
+          }
           const delay = Math.min(times * 50, 2000);
           return delay;
         },
@@ -25,12 +35,25 @@ class RedisManager {
       this.client.on('connect', () => {
         logger.info('Redis connected');
         this.isEnabled = true;
+        this.connectionErrorLogged = false;
       });
 
       this.client.on('error', (err) => {
-        logger.error({ err }, 'Redis connection error');
+        if (optionalMode) {
+          if (!this.connectionErrorLogged) {
+            logger.warn(
+              { err },
+              'Redis unavailable, cache fallback enabled (dev optional mode)',
+            );
+            this.connectionErrorLogged = true;
+          }
+        } else {
+          logger.error({ err }, 'Redis connection error');
+        }
         this.isEnabled = false;
       });
+    } else if (!redisEnabled) {
+      logger.warn('Redis disabled by REDIS_ENABLED=false, caching disabled');
     } else {
       logger.warn('REDIS_URL not found, caching disabled');
     }
