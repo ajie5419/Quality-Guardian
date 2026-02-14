@@ -10,6 +10,7 @@ import {
   batchDeleteInspectionIssues,
   deleteInspectionIssue,
 } from '#/api/qms/inspection';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
 
 export function useIssueActions(options: {
@@ -29,6 +30,7 @@ export function useIssueActions(options: {
   const modalVisible = ref(false);
   const isEditMode = ref(false);
   const currentRecord = ref<InspectionIssue | null>(null);
+  const { handleApiError } = useErrorHandler();
 
   const { settle: settleToKnowledge } = useKnowledgeSettlement();
 
@@ -58,9 +60,7 @@ export function useIssueActions(options: {
           gridApi.reload();
           onAfterDeleteSuccess();
         } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : t('common.deleteFailed');
-          message.error(errorMessage);
+          handleApiError(error, 'Delete Inspection Issue');
         }
       },
     });
@@ -86,8 +86,8 @@ export function useIssueActions(options: {
           invalidateInspectionIssues();
           gridApi.reload();
           onAfterDeleteSuccess();
-        } catch {
-          message.error(t('common.deleteFailed'));
+        } catch (error) {
+          handleApiError(error, 'Batch Delete Inspection Issues');
         }
       },
     });

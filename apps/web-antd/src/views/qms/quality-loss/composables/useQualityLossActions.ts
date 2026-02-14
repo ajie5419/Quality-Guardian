@@ -1,3 +1,6 @@
+import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
+import type { VxeCheckboxChangeParams } from '#/types';
+
 import { ref } from 'vue';
 
 import { useI18n } from '@vben/locales';
@@ -8,18 +11,22 @@ import {
   batchDeleteQualityLoss,
   deleteQualityLoss,
 } from '#/api/qms/quality-loss';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { LossSource } from '../types';
 
 export function useQualityLossActions(gridApi: any, invalidateFn: () => void) {
   const { t } = useI18n();
-  const checkedRows = ref<any[]>([]);
+  const { handleApiError } = useErrorHandler();
+  const checkedRows = ref<QmsQualityLossApi.QualityLossItem[]>([]);
   const modalVisible = ref(false);
   const isEditMode = ref(false);
   const claimModalVisible = ref(false);
-  const currentRecord = ref<any>({});
+  const currentRecord = ref<Partial<QmsQualityLossApi.QualityLossItem>>({});
 
-  function onCheckChange(params: any) {
+  function onCheckChange(
+    params: VxeCheckboxChangeParams<QmsQualityLossApi.QualityLossItem>,
+  ) {
     const records = params.$grid.getCheckboxRecords() || [];
     checkedRows.value = records;
   }
@@ -39,18 +46,18 @@ export function useQualityLossActions(gridApi: any, invalidateFn: () => void) {
     modalVisible.value = true;
   }
 
-  function handleEdit(row: any) {
+  function handleEdit(row: QmsQualityLossApi.QualityLossItem) {
     isEditMode.value = true;
     currentRecord.value = { ...row };
     modalVisible.value = true;
   }
 
-  function handleClaim(row: any) {
+  function handleClaim(row: QmsQualityLossApi.QualityLossItem) {
     currentRecord.value = { ...row };
     claimModalVisible.value = true;
   }
 
-  async function handleDelete(row: any) {
+  async function handleDelete(row: QmsQualityLossApi.QualityLossItem) {
     Modal.confirm({
       title: t('common.confirmDelete'),
       content: t('common.confirmDeleteContent'),
@@ -60,8 +67,8 @@ export function useQualityLossActions(gridApi: any, invalidateFn: () => void) {
           message.success(t('common.deleteSuccess'));
           invalidateFn();
           gridApi.reload();
-        } catch {
-          message.error(t('common.deleteFailed'));
+        } catch (error) {
+          handleApiError(error, 'Delete Quality Loss');
         }
       },
     });
@@ -85,7 +92,7 @@ export function useQualityLossActions(gridApi: any, invalidateFn: () => void) {
       }),
       onOk: async () => {
         try {
-          const ids = checkedRows.value.map((r: any) => r.id);
+          const ids = checkedRows.value.map((r) => r.id);
           const res = await batchDeleteQualityLoss(ids);
           message.success(
             t('common.deleteSuccessCount', { count: res.successCount }),
@@ -93,8 +100,8 @@ export function useQualityLossActions(gridApi: any, invalidateFn: () => void) {
           checkedRows.value = [];
           invalidateFn();
           gridApi.reload();
-        } catch {
-          message.error(t('common.deleteFailed'));
+        } catch (error) {
+          handleApiError(error, 'Batch Delete Quality Loss');
         }
       },
     });

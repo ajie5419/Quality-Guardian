@@ -21,6 +21,7 @@ import {
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { QmsStatusTag } from '#/components/Qms';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useGridImport } from '#/hooks/useGridImport';
 import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
@@ -34,6 +35,7 @@ import { useAfterSalesDeptData } from './composables/useAfterSalesDeptData';
 import { useStatusOptions } from './constants';
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 
 const chartRefreshKey = ref(0);
 const chartsRef = ref<any>(null);
@@ -78,7 +80,7 @@ async function loadData() {
     await loadDeptData();
     await loadPreferences();
   } catch (error) {
-    console.error('Failed to load data', error);
+    handleApiError(error, 'Load After Sales Base Data');
     message.error(t('common.dataLoadFailed'));
   }
 }
@@ -491,8 +493,8 @@ function handleDelete(row: QmsAfterSalesApi.AfterSalesItem) {
         invalidateAfterSales();
         chartRefreshKey.value++;
         gridApi.reload();
-      } catch {
-        message.error(t('common.deleteFailed'));
+      } catch (error) {
+        handleApiError(error, 'Delete After Sales');
       }
     },
   });
@@ -518,8 +520,8 @@ function handleBatchDelete() {
         invalidateAfterSales();
         chartRefreshKey.value++;
         gridApi.reload();
-      } catch {
-        message.error(t('common.deleteFailed'));
+      } catch (error) {
+        handleApiError(error, 'Batch Delete After Sales');
       }
     },
   });
