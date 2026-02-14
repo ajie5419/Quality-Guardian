@@ -67,6 +67,15 @@ fi
 : "${ECS_IP:?未设置 ECS_IP}"
 : "${ECS_SSH_KEY:?未设置 ECS_SSH_KEY}"
 
+ECS_SSH_USER="${ECS_SSH_USER:-root}"
+# 支持 .env.deploy 中使用 ~ 前缀
+ECS_SSH_KEY="${ECS_SSH_KEY/#\~/$HOME}"
+
+if [ ! -f "$ECS_SSH_KEY" ]; then
+    echo -e "${RED}❌ SSH 密钥不存在: $ECS_SSH_KEY${NC}"
+    exit 1
+fi
+
 run_cmd() {
     if $DRY_RUN; then
         echo "[DRY-RUN] $*"
@@ -252,21 +261,21 @@ EOF
 
 # 6.0 上传配置（修复 env 丢失）
 echo -e "${BLUE}📤 上传最新配置...${NC}"
-run_cmd "scp -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no \"$SCRIPT_DIR/docker-compose.yml\" \"root@$ECS_IP:/opt/qms/docker-compose.next.yml\""
+run_cmd "scp -O -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no \"$SCRIPT_DIR/docker-compose.yml\" \"$ECS_SSH_USER@$ECS_IP:/opt/qms/docker-compose.next.yml\""
 
 # 优先上传 .env.production，如果不存在则对应报警或回退
 if [ -f "$SCRIPT_DIR/.env.production" ]; then
-    run_cmd "scp -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no \"$SCRIPT_DIR/.env.production\" \"root@$ECS_IP:/opt/qms/.env.production\""
+    run_cmd "scp -O -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no \"$SCRIPT_DIR/.env.production\" \"$ECS_SSH_USER@$ECS_IP:/opt/qms/.env.production\""
 else
     echo -e "${YELLOW}⚠️ 本地未找到 .env.production，将使用 .env (可能导致 Redis 连接失败)${NC}"
-    run_cmd "scp -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no \"$SCRIPT_DIR/.env\" \"root@$ECS_IP:/opt/qms/.env.production\""
+    run_cmd "scp -O -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no \"$SCRIPT_DIR/.env\" \"$ECS_SSH_USER@$ECS_IP:/opt/qms/.env.production\""
 fi
 
 if $DRY_RUN; then
-    echo "[DRY-RUN] ssh -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no -o ConnectTimeout=10 \"root@$ECS_IP\" '<DEPLOY_SCRIPT>'"
+    echo "[DRY-RUN] ssh -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no -o ConnectTimeout=10 \"$ECS_SSH_USER@$ECS_IP\" '<DEPLOY_SCRIPT>'"
     echo -e "${YELLOW}ℹ️ DRY-RUN 模式：已跳过远程部署和健康检查${NC}"
 else
-    if ssh -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10 "root@$ECS_IP" "$DEPLOY_SCRIPT"; then
+    if ssh -i "$ECS_SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$ECS_SSH_USER@$ECS_IP" "$DEPLOY_SCRIPT"; then
         echo -e "${GREEN}✅ 远程部署成功${NC}"
     else
         echo -e "${RED}❌ 部署失败${NC}"
@@ -297,7 +306,7 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
 done
 
 if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-    echo -e "${RED}❌ 健康检查失败，请检查: ssh root@$ECS_IP 'docker-compose logs backend'${NC}"
+    echo -e "${RED}❌ 健康检查失败，请检查: ssh $ECS_SSH_USER@$ECS_IP 'docker-compose logs backend'${NC}"
     exit 1
 fi
 
