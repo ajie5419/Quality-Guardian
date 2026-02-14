@@ -11,8 +11,16 @@ import { message } from 'ant-design-vue';
 import { analyzeQualityIssue, matchHistoryCases } from '#/api/ai';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
+interface AiFormState {
+  defectType?: string;
+  description?: string;
+  partName?: string;
+  rootCause?: string;
+  solution?: string;
+}
+
 interface UseAiAnalysisOptions {
-  formState: Ref<any>;
+  formState: Ref<AiFormState>;
 }
 
 /**

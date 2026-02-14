@@ -7,15 +7,27 @@ import { useI18n } from '@vben/locales';
 import { message, Modal } from 'ant-design-vue';
 
 import { batchDeleteWorkOrders, deleteWorkOrder } from '#/api/qms/work-order';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
+import type { TreeSelectNode } from '#/types';
+import type { OpenParams, WorkOrderRecord } from '../types/workOrder';
+
+interface EditModalLike {
+  open: (params?: OpenParams) => Promise<void> | void;
+}
+
+interface GridApiLike {
+  reload: () => void;
+}
 
 export function useWorkOrderActions(options: {
   checkedRows: Ref<QmsWorkOrderApi.WorkOrderItem[]>;
-  deptTreeData: Ref<any[]>;
-  editModalRef: Ref<any>;
-  gridApi: Ref<any>;
+  deptTreeData: Ref<TreeSelectNode[]>;
+  editModalRef: Ref<EditModalLike | null>;
+  gridApi: Ref<GridApiLike | undefined>;
 }) {
   const { t } = useI18n();
+  const { handleApiError } = useErrorHandler();
   const { invalidateWorkOrders } = useInvalidateQmsQueries();
   const { gridApi, deptTreeData, editModalRef, checkedRows } = options;
 
@@ -33,8 +45,21 @@ export function useWorkOrderActions(options: {
   }
 
   function handleEdit(row: QmsWorkOrderApi.WorkOrderItem) {
+    const normalizedRecord: WorkOrderRecord = {
+      workOrderNumber: row.workOrderNumber,
+      customerName: row.customerName || '',
+      projectName: row.projectName || null,
+      division: row.division || null,
+      quantity: row.quantity || 0,
+      deliveryDate: row.deliveryDate || '',
+      status: row.status,
+      effectiveTime: row.effectiveTime || null,
+    };
     if (editModalRef.value) {
-      editModalRef.value.open({ record: row, deptData: deptTreeData.value });
+      editModalRef.value.open({
+        record: normalizedRecord,
+        deptData: deptTreeData.value,
+      });
     }
   }
 
@@ -47,7 +72,8 @@ export function useWorkOrderActions(options: {
           await deleteWorkOrder(row.workOrderNumber);
           message.success(t('qms.common.deleteSuccess'));
           handleSuccess();
-        } catch {
+        } catch (error) {
+          handleApiError(error, 'Delete Work Order');
           message.error(t('qms.common.deleteFailed'));
         }
       },
@@ -71,7 +97,8 @@ export function useWorkOrderActions(options: {
           );
           checkedRows.value = [];
           handleSuccess();
-        } catch {
+        } catch (error) {
+          handleApiError(error, 'Batch Delete Work Orders');
           message.error(t('qms.common.deleteFailed'));
         }
       },

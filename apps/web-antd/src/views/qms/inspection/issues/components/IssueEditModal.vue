@@ -35,7 +35,17 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 // Local reactive state for form values to ensure reactivity in slots and composables
-const formValues = ref<Record<string, any>>({});
+type IssueFormValues = {
+  defectType?: string;
+  description?: string;
+  division?: string;
+  partName?: string;
+  projectName?: string;
+  responsibleDepartment?: string;
+  rootCause?: string;
+  solution?: string;
+};
+const formValues = ref<IssueFormValues>({});
 
 const [Form, formApi] = useVbenForm({
   commonConfig: {
@@ -48,7 +58,7 @@ const [Form, formApi] = useVbenForm({
   wrapperClass: 'grid grid-cols-2 gap-x-4 gap-y-0',
   handleSubmit: () => submit(),
   handleValuesChange: (vals) => {
-    formValues.value = vals;
+    formValues.value = vals as IssueFormValues;
   },
   schema: getIssueFormSchema(),
   showDefaultActions: false, // Handle submit via Modal OK button
@@ -82,13 +92,13 @@ const {
   matchHistory,
   applyCaseSolution,
   clearMatchedCases,
-} = useAiAnalysis({ formState: formValues as any });
+} = useAiAnalysis({ formState: formValues });
 
 // Department finding logic
 function findDeptTitle(tree: DeptNode[], value?: string): string | undefined {
   if (!value) return undefined;
   for (const node of tree) {
-    const nodeTitle = (node as any).title || (node as any).label;
+    const nodeTitle = node.label;
     if (node.value === value) return nodeTitle;
     if (node.children) {
       const found = findDeptTitle(node.children, value);
@@ -164,14 +174,23 @@ watch(openRef, (val) => {
 });
 
 // Event Handlers
-function handleWorkOrderChange(val: any, option: any) {
+function handleWorkOrderChange(
+  val: unknown,
+  option?: {
+    item?: {
+      division?: string;
+      projectName?: string;
+      workOrderNumber?: string;
+    };
+  },
+) {
   const wo = option?.item;
   if (wo) {
     formApi.setValues({
       projectName: wo.projectName || '',
       division: wo.division || '',
     });
-    emit('searchWorkOrder', wo.workOrderNumber);
+    emit('searchWorkOrder', wo.workOrderNumber || '');
   } else {
     emit('searchWorkOrder', String(val));
   }

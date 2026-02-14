@@ -51,10 +51,15 @@ const router = useRouter();
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 
+type UserInfoWithOptionalUserId = {
+  id?: number | string;
+  userId?: number | string;
+};
+
 // 获取当前用户 ID 的统一计算属性
 const currentUserId = computed(() => {
-  const info = userStore.userInfo;
-  const id = info?.id ?? (info as Record<string, any>)?.userId;
+  const info = userStore.userInfo as null | UserInfoWithOptionalUserId;
+  const id = info?.id ?? info?.userId;
   return id === undefined ? '' : String(id);
 });
 
@@ -160,7 +165,7 @@ function navTo(nav: WorkbenchProjectItem | WorkbenchQuickNavItem) {
   }
   if (nav.url?.startsWith('/')) {
     router.push(nav.url).catch((error) => {
-      console.error('Navigation failed:', error);
+      handleApiError(error, 'Workspace Navigation');
     });
   }
 }
@@ -170,8 +175,13 @@ const isTaskDetailVisible = ref(false);
 const taskDetailContent = ref<string[]>([]);
 
 function handleViewDetails(task: QmsTaskDispatchApi.TaskDispatch) {
+  const content = task.content as Record<string, unknown> | undefined;
+  const contentItems = content?.items;
+  const requirements = content?.requirements;
   taskDetailContent.value =
-    (task.content as any)?.items || task.content?.requirements || [];
+    (Array.isArray(contentItems) ? (contentItems as string[]) : undefined) ||
+    (Array.isArray(requirements) ? (requirements as string[]) : undefined) ||
+    [];
   isTaskDetailVisible.value = true;
 }
 

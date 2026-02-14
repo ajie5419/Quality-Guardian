@@ -79,7 +79,7 @@ export function useWorkspaceTaskDispatch(
       taskStats.value = stats;
       myTasks.value = list;
     } catch (error) {
-      console.error('Failed to load task data', error);
+      handleApiError(error, 'Load Workspace Task Data');
     }
   }
 
@@ -133,7 +133,7 @@ export function useWorkspaceTaskDispatch(
               }))
               .filter((item) => !dispatchedItemLabels.has(item.label));
     } catch (error) {
-      console.error('Load and filter business items failed', error);
+      handleApiError(error, 'Load Workspace Business Items');
     } finally {
       isItemsLoading.value = false;
     }

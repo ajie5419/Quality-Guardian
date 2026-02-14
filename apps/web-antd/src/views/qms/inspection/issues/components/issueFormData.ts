@@ -16,7 +16,7 @@ export function getIssueFormSchema(): VbenFormSchema[] {
   const { severityOptions } = useSeverityOptions();
   const { claimOptions } = useClaimOptions();
 
-  const schema: any[] = [
+  const schema: VbenFormSchema[] = [
     // Hidden ID field for edit mode - completely invisible
     {
       fieldName: 'id',
@@ -130,7 +130,8 @@ export function getIssueFormSchema(): VbenFormSchema[] {
       rules: 'required',
       dependencies: {
         triggerFields: ['responsibleDepartment'],
-        show: (values: any) => !!values.responsibleDepartment,
+        show: (values: Record<string, unknown>) =>
+          !!values.responsibleDepartment,
       },
     },
     {
@@ -167,7 +168,7 @@ export function getIssueFormSchema(): VbenFormSchema[] {
       rules: 'selectRequired',
       dependencies: {
         triggerFields: ['defectType'],
-        componentProps: (values: any) => {
+        componentProps: (values: Record<string, unknown>) => {
           const type = values.defectType;
           return {
             options: type ? defectSubtypes.value[type as string] || [] : [],
@@ -232,5 +233,5 @@ export function getIssueFormSchema(): VbenFormSchema[] {
     },
   ];
 
-  return schema as VbenFormSchema[];
+  return schema;
 }

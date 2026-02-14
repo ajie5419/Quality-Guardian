@@ -2,6 +2,8 @@ import { ref } from 'vue';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import type { InspectionIssue } from '../types';
+
 import { useIssueActions } from './useIssueActions';
 
 const {
@@ -42,8 +44,28 @@ vi.mock('ant-design-vue', () => ({
 }));
 
 describe('useIssueActions', () => {
+  function createIssue(id: string): InspectionIssue {
+    return {
+      id,
+      ncNumber: `NC-${id}`,
+      reportDate: '2026-01-01',
+      workOrderNumber: 'WO-1',
+      projectName: 'Project',
+      partName: 'Part',
+      description: 'desc',
+      quantity: 1,
+      lossAmount: 0,
+      responsibleDepartment: 'D1',
+      status: 'Open',
+      claim: 'No',
+      photos: [],
+      severity: 'Major',
+      inspector: 'Inspector',
+    };
+  }
+
   function createComposable() {
-    const checkedRows = ref<any[]>([]);
+    const checkedRows = ref<InspectionIssue[]>([]);
     const gridApi = { reload: vi.fn() };
     const onAfterDeleteSuccess = vi.fn();
     const invalidateInspectionIssues = vi.fn();
@@ -54,7 +76,7 @@ describe('useIssueActions', () => {
       onAfterDeleteSuccess,
       invalidateInspectionIssues,
       ...useIssueActions({
-        checkedRows: checkedRows as any,
+        checkedRows,
         gridApi,
         invalidateInspectionIssues,
         onAfterDeleteSuccess,
@@ -72,7 +94,7 @@ describe('useIssueActions', () => {
   it('batch deletes selected rows and triggers refresh callbacks', async () => {
     mockBatchDeleteInspectionIssues.mockResolvedValueOnce({ successCount: 2 });
     const composable = createComposable();
-    composable.checkedRows.value = [{ id: 'a' }, { id: 'b' }];
+    composable.checkedRows.value = [createIssue('a'), createIssue('b')];
 
     composable.handleBatchDelete();
     await Promise.resolve();

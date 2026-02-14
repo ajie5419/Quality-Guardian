@@ -10,12 +10,14 @@ import { message } from 'ant-design-vue';
 
 import { useVbenForm } from '#/adapter/form';
 import { createWorkOrder, updateWorkOrder } from '#/api/qms/work-order';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { getFormSchema } from '../data';
 
 // ========== 2. 基础配置 ==========
 const emit = defineEmits(['success']);
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const isUpdate = ref(false);
 const recordId = ref<null | string>(null);
 
@@ -122,7 +124,7 @@ async function open({ record, deptData = [] }: OpenParams = {}) {
     // 5. 验证表单状态
     await nextTick();
   } catch (error) {
-    console.error('弹窗打开失败:', error);
+    handleApiError(error, 'Open Work Order Edit Modal');
     message.error(t('qms.workOrder.initFailed'));
     modalApi.close();
   }

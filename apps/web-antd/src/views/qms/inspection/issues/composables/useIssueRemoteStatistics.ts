@@ -3,8 +3,10 @@ import type { StatisticsData } from '../types';
 import { ref } from 'vue';
 
 import { getInspectionIssueStats } from '#/api/qms/inspection';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 export function useIssueRemoteStatistics() {
+  const { handleApiError } = useErrorHandler();
   const statistics = ref<StatisticsData>({
     totalCount: 0,
     openCount: 0,
@@ -37,7 +39,7 @@ export function useIssueRemoteStatistics() {
 
       statistics.value = { ...res, pareto };
     } catch (error) {
-      console.error('Failed to fetch statistics:', error);
+      handleApiError(error, 'Fetch Issue Statistics');
     }
   }
 

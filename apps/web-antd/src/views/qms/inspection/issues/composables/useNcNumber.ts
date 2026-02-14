@@ -4,9 +4,10 @@ import type { Ref } from 'vue';
 import { ref, watch } from 'vue';
 
 import { generateInspectionNcNumber } from '#/api/qms/inspection';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 interface UseNcNumberOptions {
-  formApi: { setFieldValue: (field: string, value: any) => void };
+  formApi: { setFieldValue: (field: string, value: unknown) => void };
   isEditMode: Ref<boolean>;
 }
 
@@ -15,6 +16,7 @@ interface UseNcNumberOptions {
  */
 export function useNcNumber(options: UseNcNumberOptions) {
   const { formApi, isEditMode } = options;
+  const { handleApiError } = useErrorHandler();
 
   const isAutoNc = ref(false);
 
@@ -26,8 +28,7 @@ export function useNcNumber(options: UseNcNumberOptions) {
       const { ncNumber } = await generateInspectionNcNumber();
       return ncNumber;
     } catch (error) {
-      console.error('Failed to generate NC sequence', error);
-      // Fallback or rethrow
+      handleApiError(error, 'Generate NC Number');
       throw error;
     }
   }

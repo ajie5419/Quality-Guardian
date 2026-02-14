@@ -18,7 +18,7 @@ export function useIssueActions(options: {
   gridApi: { reload: () => void };
   invalidateInspectionIssues: () => void;
   onAfterDeleteSuccess: () => void;
-  t: (...args: any[]) => string;
+  t: (key: string, params?: Record<string, unknown>) => string;
 }) {
   const {
     checkedRows,

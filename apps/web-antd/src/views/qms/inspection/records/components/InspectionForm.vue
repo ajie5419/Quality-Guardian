@@ -12,6 +12,7 @@ import dayjs from 'dayjs';
 
 import { useVbenForm } from '#/adapter/form';
 import { getItpList, getItpProjectList } from '#/api/qms/planning';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
@@ -46,6 +47,7 @@ const props = defineProps<{
 }>();
 
 const userStore = useUserStore();
+const { handleApiError } = useErrorHandler();
 
 // Reactive items list that remains separate from Vben Form for easy filtering/management
 const inspectionItems = ref<LocalInspectionTaskResult[]>([]);
@@ -83,7 +85,7 @@ const parsedItpItems = computed<ExtendedItpItem[]>(() => {
         qItems = item.quantitativeItems as QuantitativeItem[];
       }
     } catch (error) {
-      console.error('Failed to parse quantitative items', error);
+      handleApiError(error, 'Parse ITP Quantitative Items');
     }
     return { ...item, _parsedQItems: qItems };
   });
@@ -182,7 +184,7 @@ async function loadItp(itpProjectId?: string) {
     rawItpItems.value = items || [];
     await filterItpItems();
   } catch (error) {
-    console.error(error);
+    handleApiError(error, 'Load ITP Items');
   }
 }
 
@@ -230,7 +232,7 @@ async function handleWorkOrderChange(
       formApi.validateField('workOrderNumber');
     }, 200);
   } catch (error) {
-    console.error(error);
+    handleApiError(error, 'Handle Work Order Change');
   }
 }
 
@@ -273,7 +275,7 @@ watch(
           fieldName: 'hasDocuments',
           show: true,
         },
-      ] as any);
+      ] as unknown as Parameters<typeof formApi.updateSchema>[0]);
 
       // Clear value if type changes and it's not the initial load (optimization)
       if (newVal !== oldVal && oldVal !== undefined) {

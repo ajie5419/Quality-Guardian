@@ -8,6 +8,7 @@ import { computed, ref, watch } from 'vue';
 import { Select } from 'ant-design-vue';
 
 import { getBomList } from '#/api/qms/planning';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 defineOptions({
   name: 'BomItemSelect',
@@ -29,6 +30,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits(['update:value', 'change']);
+const { handleApiError } = useErrorHandler();
 
 const options = ref<BomItem[]>([]);
 const loading = ref(false);
@@ -52,14 +54,17 @@ async function fetchBomItems() {
     const items = await getBomList({ projectId: props.workOrderNumber });
     options.value = items || [];
   } catch (error) {
-    console.error('Fetch BOM items error:', error);
+    handleApiError(error, 'Fetch BOM Items');
     options.value = [];
   } finally {
     loading.value = false;
   }
 }
 
-function handleChange(val: SelectProps['value'], option: any) {
+function handleChange(
+  val: SelectProps['value'],
+  option: Record<string, unknown> | Array<Record<string, unknown>>,
+) {
   emit('update:value', val);
   emit('change', val, option);
 }

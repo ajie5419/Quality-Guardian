@@ -7,6 +7,7 @@ import { Select } from 'ant-design-vue';
 
 import { getSupplierList } from '#/api/qms/supplier';
 import { getDeptList } from '#/api/system/dept';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 defineOptions({ name: 'TeamSelect' });
 
@@ -22,6 +23,7 @@ defineProps({
 });
 
 const emit = defineEmits(['update:value', 'change']);
+const { handleApiError } = useErrorHandler();
 
 const loading = ref(false);
 const options = ref<
@@ -95,13 +97,13 @@ async function loadData() {
       { label: '外协加工单位', options: externalOptions },
     ];
   } catch (error) {
-    console.error('Load team data failed:', error);
+    handleApiError(error, 'Load Team Select Data');
   } finally {
     loading.value = false;
   }
 }
 
-function handleChange(val: any) {
+function handleChange(val: unknown) {
   emit('update:value', val);
   emit('change', val);
 }

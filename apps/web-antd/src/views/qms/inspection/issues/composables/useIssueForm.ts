@@ -19,6 +19,15 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { DEFAULT_VALUES } from '../constants';
 
 type FormApi = ReturnType<typeof useVbenForm>[1];
+type UploadPhotoItem = {
+  response?: { data?: { url?: string } };
+  status?: string;
+  url?: string;
+};
+type IssueSubmitValues = Omit<Partial<InspectionIssue>, 'photos'> & {
+  id?: string;
+  photos?: UploadPhotoItem[];
+};
 
 /**
  * 创建初始数据
@@ -81,8 +90,8 @@ export function useIssueForm(options: UseIssueFormOptions) {
       photoArray = [photos as unknown as string];
     }
 
-    const values = {
-      ...(rest as any),
+    const values: Record<string, unknown> = {
+      ...rest,
       photos: photoArray.map((url, index) => ({
         uid: String(index),
         name: `Photo ${index + 1}`,
@@ -101,11 +110,11 @@ export function useIssueForm(options: UseIssueFormOptions) {
       const { valid } = await formApi.validate();
       if (!valid) return;
 
-      const rawData = await formApi.getValues();
+      const rawData = (await formApi.getValues()) as IssueSubmitValues;
 
       // Transform photos to string[] (urls)
       const photos =
-        (rawData.photos as any[])
+        rawData.photos
           ?.map((f) => {
             if (f.url) return f.url;
             if (f.status === 'done' && f.response?.data?.url) {
@@ -121,8 +130,8 @@ export function useIssueForm(options: UseIssueFormOptions) {
         severity: rawData.severity || DEFAULT_VALUES.DEFAULT_SEVERITY,
       };
 
-      if (isEditMode.value && (data as any).id) {
-        await updateInspectionIssue((data as any).id, data as InspectionIssue);
+      if (isEditMode.value && data.id) {
+        await updateInspectionIssue(data.id, data as InspectionIssue);
         message.success(t('common.saveSuccess'));
       } else {
         await createInspectionIssue(data as InspectionIssue);

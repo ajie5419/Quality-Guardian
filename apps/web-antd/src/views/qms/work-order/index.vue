@@ -19,6 +19,7 @@ import { getDeptList } from '#/api/system/dept';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { QmsStatusTag } from '#/components/Qms';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { convertToTreeSelectData, findNameById } from '#/types';
 
@@ -31,6 +32,7 @@ import { getGridColumns } from './data';
 
 // 1. 基础状态 (权限与通用功能)
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const { canCreate, canEdit, canDelete, canExport, canImport } =
   useQmsPermissions('QMS:WorkOrder');
 
@@ -46,7 +48,7 @@ const loadDeptTree = async () => {
     deptRawData.value = data;
     deptTreeData.value = convertToTreeSelectData(data);
   } catch (error) {
-    console.error('Dept load error', error);
+    handleApiError(error, 'Load Work Order Departments');
   } finally {
     isDeptLoading.value = false;
   }
@@ -220,7 +222,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
             total,
           };
         } catch (error: unknown) {
-          console.error('Get work order list error:', error);
+          handleApiError(error, 'Load Work Order List');
           message.error(
             t('qms.common.dataLoadFailed') +
               ((error as { message?: string }).message
@@ -241,7 +243,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
           });
           return { items: response.items };
         } catch (error) {
-          console.error('Query all work orders error:', error);
+          handleApiError(error, 'Query All Work Orders');
           message.error(t('qms.common.dataLoadFailed'));
           return { items: [] };
         }
@@ -254,9 +256,11 @@ const gridOptions = computed<VxeGridProps>(() => ({
 
 const checkedRows = ref<QmsWorkOrderApi.WorkOrderItem[]>([]);
 
-function onCheckChange(params: VxeCheckboxChangeParams) {
+function onCheckChange(
+  params: VxeCheckboxChangeParams<QmsWorkOrderApi.WorkOrderItem>,
+) {
   const records = params.$grid.getCheckboxRecords() || [];
-  checkedRows.value = records as unknown as QmsWorkOrderApi.WorkOrderItem[];
+  checkedRows.value = records;
 }
 
 const gridEvents = {

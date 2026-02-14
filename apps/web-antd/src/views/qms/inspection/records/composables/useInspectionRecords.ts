@@ -8,8 +8,19 @@ import {
   createInspectionRecord,
   updateInspectionRecord,
 } from '#/api/qms/inspection';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
+
+interface FormRefLike {
+  getValues: () => Promise<Record<string, unknown>>;
+  validate: () => Promise<void>;
+}
+
+interface GridRefLike {
+  reload: () => void;
+}
 
 export function useInspectionRecords() {
+  const { handleApiError } = useErrorHandler();
   const activeKey = ref('incoming');
   const currentYear = ref(new Date().getFullYear());
   const yearOptions = [2024, 2025, 2026].map((y) => ({
@@ -17,8 +28,8 @@ export function useInspectionRecords() {
     value: y,
   }));
 
-  const gridRef = ref();
-  const formRef = ref();
+  const gridRef = ref<GridRefLike>();
+  const formRef = ref<FormRefLike>();
   const modalVisible = ref(false);
   const currentRecord = ref<QmsInspectionApi.InspectionRecord | undefined>(
     undefined,
@@ -48,7 +59,7 @@ export function useInspectionRecords() {
       currentRecord.value = undefined;
       gridRef.value?.reload();
     } catch (error: unknown) {
-      console.error('Submit failed:', error);
+      handleApiError(error, 'Submit Inspection Record');
       let errorMsg = '提交失败，请重试';
       if (error instanceof Error) {
         errorMsg = error.message;

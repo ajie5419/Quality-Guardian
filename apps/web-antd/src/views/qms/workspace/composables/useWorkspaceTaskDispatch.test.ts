@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { QmsTaskDispatchApi } from '#/api/qms/task-dispatch';
+
 import { useWorkspaceTaskDispatch } from './useWorkspaceTaskDispatch';
 
 const {
@@ -48,6 +50,24 @@ vi.mock('ant-design-vue', () => ({
 }));
 
 describe('useWorkspaceTaskDispatch', () => {
+  function createTask(
+    partial: Partial<QmsTaskDispatchApi.TaskDispatch>,
+  ): QmsTaskDispatchApi.TaskDispatch {
+    return {
+      assigneeId: 'u-1',
+      assignorId: 'u-admin',
+      createdAt: '',
+      id: 'task-default',
+      level: 1,
+      priority: 1,
+      status: 'PENDING',
+      title: 'task',
+      type: 'ITP_INSPECTION',
+      updatedAt: '',
+      ...partial,
+    };
+  }
+
   function createComposable() {
     return useWorkspaceTaskDispatch({
       t: (key: string) => key,
@@ -78,11 +98,11 @@ describe('useWorkspaceTaskDispatch', () => {
 
   it('warns and blocks submit when required dispatch fields are missing', async () => {
     const composable = createComposable();
-    composable.currentTask.value = {
+    composable.currentTask.value = createTask({
       id: 'task-2',
       title: 'dispatch-me',
       type: 'ITP_INSPECTION',
-    } as any;
+    });
 
     await composable.submitSecondaryDispatch();
 
@@ -104,11 +124,11 @@ describe('useWorkspaceTaskDispatch', () => {
     mockGetTaskList.mockResolvedValue([]);
 
     const composable = createComposable();
-    composable.currentTask.value = {
+    composable.currentTask.value = createTask({
       id: 'task-3',
       title: 'parent-task',
       type: 'ITP_INSPECTION',
-    } as any;
+    });
     composable.dispatchForm.value = {
       assigneeId: 'u-1',
       selectedItems: ['A', 'B'],

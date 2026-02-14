@@ -1,5 +1,6 @@
 // import type { EChartsOption } from 'echarts';
 import type { QmsInspectionApi } from '#/api/qms/inspection';
+import type { SystemDeptApi } from '#/api/system/dept';
 import type {
   ChartConfig,
   ChartOptionItem,
@@ -30,8 +31,8 @@ export const ISSUE_CHART_METRICS: ChartOptionItem[] = [
 export function getIssueChartOption(
   data: QmsInspectionApi.InspectionIssue[],
   config: ChartConfig,
-  deptData?: any[],
-): any {
+  deptData?: SystemDeptApi.Dept[],
+): ReturnType<typeof aggregateChartData> {
   return aggregateChartData(
     data,
     config,
@@ -53,14 +54,14 @@ export function getIssueChartOption(
         return (item.reportDate || '').slice(0, 7);
       }
 
-      const val = (item as any)[dimension];
+      const val = (item as unknown as Record<string, unknown>)[dimension];
       if (!val) return '未分类';
 
       if (
         (dimension === 'division' || dimension === 'responsibleDepartment') &&
         deptData
       ) {
-        return findNameById(deptData, val) || String(val);
+        return findNameById(deptData, String(val)) || String(val);
       }
 
       return String(val);

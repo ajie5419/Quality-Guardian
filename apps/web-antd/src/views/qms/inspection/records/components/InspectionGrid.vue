@@ -24,6 +24,7 @@ import {
   buildImportWarningMessage,
   resolveImportErrorCount,
 } from '#/utils/import-summary';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { getColumns } from '../config';
 
@@ -39,6 +40,7 @@ const props = defineProps<{
 
 const emit = defineEmits(['create', 'edit']);
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const { canCreate, canEdit, canDelete, canExport, canImport } =
   useQmsPermissions('QMS:Inspection:Records');
 
@@ -123,7 +125,7 @@ const gridOptions = computed(() => ({
           message.warning(buildImportWarningMessage(res, errorCount));
         }
       } catch (error) {
-        console.error('Import Error:', error);
+        handleApiError(error, 'Import Inspection Records');
         message.error(t('common.importFailed'));
       }
     },

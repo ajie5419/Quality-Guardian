@@ -34,10 +34,17 @@ const maxImages = computed(
     photos.value.length < (props?.maxCount ?? UI_CONSTANTS.MAX_UPLOAD_IMAGES),
 );
 
+interface UploadResponse {
+  code?: number;
+  data?: {
+    url?: string;
+  };
+}
+
 function handleUploadChange(info: UploadChangeParam<UploadFile>) {
   if (info.file.status === 'done') {
     // Get URL from response
-    const response = info.file.response as any;
+    const response = info.file.response as UploadResponse | undefined;
     if (response?.code === 0 && response.data?.url) {
       info.file.url = response.data.url;
     }

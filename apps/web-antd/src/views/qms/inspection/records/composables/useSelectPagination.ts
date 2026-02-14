@@ -4,6 +4,8 @@ import { reactive, ref, watch } from 'vue';
 
 import { useDebounceFn } from '@vueuse/core';
 
+import { useErrorHandler } from '#/hooks/useErrorHandler';
+
 export interface UseSelectPaginationOptions<T> {
   fetchDataFn: (
     params: Record<string, unknown>,
@@ -16,9 +18,10 @@ export interface UseSelectPaginationOptions<T> {
 export function useSelectPagination<T>(
   optionsConfig: UseSelectPaginationOptions<T>,
   propsValue: Ref<T[keyof T] | undefined>,
-  emit: (event: string, ...args: any[]) => void,
+  emit: (event: string, ...args: unknown[]) => void,
 ) {
   const { fetchDataFn, getParams, valueKey, echoFetcher } = optionsConfig;
+  const { handleApiError } = useErrorHandler();
 
   const options = ref<T[]>([]) as Ref<T[]>;
   const loading = ref(false);
@@ -82,7 +85,7 @@ export function useSelectPagination<T>(
                 uniqueMap.set(currentVal, exactMatch);
               }
             } catch (error) {
-              console.error('Echo fetch failed:', error);
+              handleApiError(error, 'Select Echo Fetch');
             }
           }
         }
@@ -90,7 +93,7 @@ export function useSelectPagination<T>(
 
       options.value = [...uniqueMap.values()];
     } catch (error) {
-      console.error(error);
+      handleApiError(error, 'Select Pagination Fetch');
       if (loadMore) pagination.page -= 1;
     } finally {
       loading.value = false;

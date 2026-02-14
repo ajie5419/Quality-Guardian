@@ -1,6 +1,5 @@
 <script lang="ts" setup>
-import type { InspectionIssue } from '../types';
-
+import type { QmsInspectionApi } from '#/api/qms/inspection';
 import type { ChartConfig } from '#/components/Qms/ChartBuilder/types';
 
 import { computed, onUnmounted, ref, watch } from 'vue';
@@ -17,6 +16,7 @@ import {
   CustomChartBuilderModal,
   CustomChartItem,
 } from '#/components/Qms/ChartBuilder';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import {
   getIssueChartOption,
@@ -31,6 +31,7 @@ const props = defineProps<{
 
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
+const { handleApiError } = useErrorHandler();
 
 const canEdit = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Issues:ChartEdit']),
@@ -40,8 +41,8 @@ const canDelete = computed(() =>
 );
 
 const loading = ref(false);
-const fullDataList = ref<InspectionIssue[]>([]);
-const deptList = ref<any[]>([]);
+const fullDataList = ref<QmsInspectionApi.InspectionIssue[]>([]);
+const deptList = ref<import('#/api/system/dept').SystemDeptApi.Dept[]>([]);
 
 // Custom Charts
 const isBuilderOpen = ref(false);
@@ -63,14 +64,17 @@ async function fetchData() {
     fullDataList.value = res.items || [];
     deptList.value = deptRes;
   } catch (error) {
-    console.error('Failed to fetch inspection issues:', error);
+    handleApiError(error, 'Fetch Issue Chart Dashboard Data');
   } finally {
     loading.value = false;
   }
 }
 
 // 包装 getOption 函数，注入 deptList
-function getOptionWithDept(data: any[], config: ChartConfig) {
+function getOptionWithDept(
+  data: QmsInspectionApi.InspectionIssue[],
+  config: ChartConfig,
+) {
   return getIssueChartOption(data, config, deptList.value);
 }
 
