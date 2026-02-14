@@ -67,3 +67,4 @@ progress.md
 task_plan.md
 **/*_output.txt
 typecheck_errors.txt
+dump.rdb
