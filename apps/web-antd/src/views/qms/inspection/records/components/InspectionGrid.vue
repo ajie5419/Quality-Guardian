@@ -19,6 +19,10 @@ import {
 } from '#/api/qms/inspection';
 import { QmsStatusTag } from '#/components/Qms';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
+import {
+  buildImportWarningMessage,
+  resolveImportErrorCount,
+} from '#/utils/import-summary';
 
 import { getColumns } from '../config';
 
@@ -117,13 +121,17 @@ const gridOptions = computed(() => ({
           category: props.type,
         });
 
+        const { errorCount } = resolveImportErrorCount(res, mappedItems.length);
+
         if (res.successCount > 0) {
           message.success(
             t('common.importSuccessCount', { count: res.successCount }),
           );
           reload();
-        } else {
-          message.error(t('common.importFailed'));
+        }
+
+        if (errorCount > 0) {
+          message.warning(buildImportWarningMessage(res, errorCount));
         }
       } catch (error) {
         console.error('Import Error:', error);

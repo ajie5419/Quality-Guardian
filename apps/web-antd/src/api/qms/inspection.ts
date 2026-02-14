@@ -1,5 +1,7 @@
 import type { InspectionIssue, InspectionRecord } from '@qgs/shared';
 
+import type { QmsImportSummary } from '#/api/qms/types';
+
 import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
@@ -83,7 +85,7 @@ export async function batchDeleteInspectionIssues(ids: string[]) {
 export async function importInspectionIssues(
   items: Partial<InspectionIssue>[],
 ) {
-  return requestClient.post<{ successCount: number }>(
+  return requestClient.post<QmsImportSummary>(
     `${QMS_API.INSPECTION_ISSUES}/import`,
     { items },
   );
@@ -135,7 +137,7 @@ export async function importInspectionRecords(data: {
   category: string;
   items: Partial<InspectionRecord>[];
 }) {
-  return requestClient.post<{ successCount: number }>(
+  return requestClient.post<QmsImportSummary>(
     `${QMS_API.INSPECTION_RECORDS}/import`,
     data,
   );

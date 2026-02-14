@@ -1,20 +1,13 @@
 import type { WorkOrderItem } from '@qgs/shared';
 
+import type { QmsImportSummary } from '#/api/qms/types';
+
 import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
 
 // Re-export shared types
 export * from '@qgs/shared';
-
-/**
- * 导入响应类型
- */
-export interface ImportResponse {
-  successCount: number;
-  failedCount: number;
-  errors: Array<{ message: string; row: number }>;
-}
 
 /**
  * Get Work Order list (Paginated with Summary)
@@ -73,7 +66,7 @@ export async function batchDeleteWorkOrders(ids: string[]) {
  * Import work orders from Excel
  */
 export async function importWorkOrders(items: Array<Record<string, unknown>>) {
-  return requestClient.post<ImportResponse>(QMS_API.WORK_ORDER_IMPORT, {
+  return requestClient.post<QmsImportSummary>(QMS_API.WORK_ORDER_IMPORT, {
     items,
   });
 }

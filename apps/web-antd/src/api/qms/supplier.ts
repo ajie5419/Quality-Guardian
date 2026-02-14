@@ -5,6 +5,8 @@ import type {
   SupplierListResponse,
 } from '@qgs/shared';
 
+import type { QmsImportSummary } from '#/api/qms/types';
+
 import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
@@ -51,6 +53,15 @@ export async function batchImportSuppliers(items: ImportSupplierItem[]) {
     { items },
     { timeout: 120 * 1000 },
   );
+}
+
+export async function importSuppliers(data: {
+  category: string;
+  items: Array<Record<string, unknown>>;
+}) {
+  return requestClient.post<QmsImportSummary>('/qms/supplier/import', data, {
+    timeout: 120_000,
+  });
 }
 
 export namespace QmsSupplierApi {

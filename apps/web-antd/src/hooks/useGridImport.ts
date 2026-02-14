@@ -2,6 +2,8 @@ import type { VxeTableDefines } from 'vxe-table';
 
 import type { Ref } from 'vue';
 
+import type { QmsImportSummary } from '#/api/qms/types';
+
 import { ref } from 'vue';
 
 import { useI18n } from '@vben/locales';
@@ -9,12 +11,16 @@ import { useI18n } from '@vben/locales';
 import { message } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
+import {
+  buildImportWarningMessage,
+  resolveImportErrorCount,
+} from '#/utils/import-summary';
 
 interface ImportOptions<T = Record<string, any>> {
   /** Grid API instance ref */
   gridApi: Ref<ReturnType<typeof useVbenVxeGrid>[1] | undefined>;
   /** Import API function */
-  importApi: (items: T[]) => Promise<{ successCount: number }>;
+  importApi: (items: T[]) => Promise<QmsImportSummary>;
   /** Optional status mapping */
   statusMap?: Record<string, string>;
   /** Optional field mapping for aliases (field -> possible headers) */
@@ -144,11 +150,19 @@ export function useGridImport<T = Record<string, any>>(
       });
 
       const res = await options.importApi(mappedItems);
+      const { errorCount } = resolveImportErrorCount(res, mappedItems.length);
 
       if (res.successCount > 0) {
         message.success(
           t('common.importSuccessCount', { count: res.successCount }),
         );
+      }
+
+      if (errorCount > 0) {
+        message.warning(buildImportWarningMessage(res, errorCount));
+      }
+
+      if (res.successCount > 0) {
         options.gridApi.value?.reload();
         options.onSuccess?.();
       }

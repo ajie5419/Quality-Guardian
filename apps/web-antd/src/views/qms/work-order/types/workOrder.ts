@@ -23,12 +23,16 @@ export interface WorkOrderImportRow {
 
 /** 导入响应类型 */
 export interface ImportResponse {
-  successCount: number;
-  failCount: number;
-  failItems?: Array<{
+  errorCount?: number;
+  errors?: Array<{
+    field?: string;
+    key?: string;
     reason: string;
-    workOrderNumber: string;
+    row: number;
+    suggestion?: string;
   }>;
+  successCount: number;
+  totalCount?: number;
 }
 
 /** 状态 UI 配置类型 */

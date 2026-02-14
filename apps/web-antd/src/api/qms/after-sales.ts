@@ -4,6 +4,8 @@ import type {
   AfterSalesStats,
 } from '@qgs/shared';
 
+import type { QmsImportSummary } from '#/api/qms/types';
+
 import { requestClient } from '#/api/request';
 
 // Re-export types
@@ -60,7 +62,7 @@ export async function importAfterSalesExcel(
   items: Array<Record<string, unknown>>,
   signal?: AbortSignal,
 ) {
-  return requestClient.post<{ successCount: number }>(
+  return requestClient.post<QmsImportSummary>(
     '/qms/after-sales/import',
     { items },
     {

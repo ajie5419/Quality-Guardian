@@ -6,7 +6,15 @@ import { useI18n } from '@vben/locales';
 
 import { message, Modal } from 'ant-design-vue';
 
-import { batchDeleteSuppliers, deleteSupplier } from '#/api/qms/supplier';
+import {
+  batchDeleteSuppliers,
+  deleteSupplier,
+  importSuppliers,
+} from '#/api/qms/supplier';
+import {
+  buildImportWarningMessage,
+  resolveImportErrorCount,
+} from '#/utils/import-summary';
 
 export function useSupplierActions(options: {
   category: string;
@@ -82,7 +90,6 @@ export function useSupplierActions(options: {
    * Standardized custom import logic for Excel files
    */
   async function handleCustomImport({ file }: { file: File }) {
-    const { requestClient } = await import('#/api/request');
     const XLSX = await import('xlsx');
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -117,20 +124,21 @@ export function useSupplierActions(options: {
         return item;
       });
 
-      const res = await requestClient.post(
-        `/qms/supplier/import`,
-        {
-          items: mappedItems,
-          category,
-        },
-        { timeout: 120_000 },
-      );
+      const res = await importSuppliers({
+        items: mappedItems,
+        category,
+      });
+      const { errorCount } = resolveImportErrorCount(res, mappedItems.length);
 
       if (res.successCount > 0) {
         message.success(
           t('common.importSuccessCount', { count: res.successCount }),
         );
         handleSuccess();
+      }
+
+      if (errorCount > 0) {
+        message.warning(buildImportWarningMessage(res, errorCount));
       }
     } catch (error) {
       console.error('Import Error:', error);

@@ -25,7 +25,12 @@ import {
   batchDeleteSuppliers,
   deleteSupplier,
   getSupplierList,
+  importSuppliers,
 } from '#/api/qms/supplier';
+import {
+  buildImportWarningMessage,
+  resolveImportErrorCount,
+} from '#/utils/import-summary';
 
 import { RATING_COLORS, SUPPLIER_STATUS_UI_MAP } from '../common-constants';
 import ScoringRulesModal from '../supplier/components/ScoringRulesModal.vue';
@@ -89,7 +94,6 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
   importConfig: {
     remote: true,
     importMethod: async ({ file }: { file: File }) => {
-      const { requestClient } = await import('#/api/request');
       const XLSX = await import('xlsx');
       try {
         const arrayBuffer = await file.arrayBuffer();
@@ -122,19 +126,21 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
           });
           return item;
         });
-        const res = await requestClient.post(
-          '/qms/supplier/import',
-          {
-            items: mappedItems,
-            category: 'Outsourcing',
-          },
-          { timeout: 120_000 },
-        );
+        const res = await importSuppliers({
+          items: mappedItems,
+          category: 'Outsourcing',
+        });
+        const { errorCount } = resolveImportErrorCount(res, mappedItems.length);
+
         if (res.successCount > 0) {
           message.success(
             t('common.importSuccessCount', { count: res.successCount }),
           );
           gridApi.reload();
+        }
+
+        if (errorCount > 0) {
+          message.warning(buildImportWarningMessage(res, errorCount));
         }
       } catch (error) {
         console.error('Import Error:', error);

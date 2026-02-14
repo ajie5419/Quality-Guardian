@@ -11,6 +11,8 @@ import type {
   ItpTreeNode,
 } from '@qgs/shared';
 
+import type { QmsImportSummary } from '#/api/qms/types';
+
 import { requestClient } from '#/api/request';
 
 // Project Document type (local definition since not in shared)
@@ -166,7 +168,7 @@ export async function importBomItems(data: {
   items: Partial<BomItem>[];
   projectId: string;
 }) {
-  return requestClient.post('/qms/planning/bom/import', data);
+  return requestClient.post<QmsImportSummary>('/qms/planning/bom/import', data);
 }
 
 /**
