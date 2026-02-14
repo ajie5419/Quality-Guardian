@@ -2,7 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { awaitMockDelay } from '~/utils/index';
 import { buildItpProjectCreateData, normalizeItpText } from '~/utils/itp';
-import { isPrismaForeignKeyError } from '~/utils/planning-project';
+import { isPrismaForeignKeyError } from '~/utils/prisma-error';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {

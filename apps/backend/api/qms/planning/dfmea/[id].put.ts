@@ -7,7 +7,7 @@ import {
   parseDfmeaScore,
 } from '~/utils/dfmea';
 import { awaitMockDelay } from '~/utils/index';
-import { isPrismaNotFoundError } from '~/utils/planning-project';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,

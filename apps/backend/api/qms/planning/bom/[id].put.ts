@@ -2,7 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { buildProjectBomMutableData, mapProjectBomItem } from '~/utils/bom';
 import { awaitMockDelay } from '~/utils/index';
-import { isPrismaNotFoundError } from '~/utils/planning-project';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,

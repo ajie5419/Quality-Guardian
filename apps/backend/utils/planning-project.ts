@@ -1,8 +1,4 @@
 import prisma from '~/utils/prisma';
-import {
-  isPrismaForeignKeyError as isPrismaForeignKeyErrorBase,
-  isPrismaNotFoundError as isPrismaNotFoundErrorBase,
-} from '~/utils/prisma-error';
 
 interface PlanningProjectRecord {
   id: string;
@@ -42,14 +38,6 @@ export function normalizePlanningProjectName(
 ): string | undefined {
   const normalized = String(value ?? '').trim();
   return normalized || undefined;
-}
-
-export function isPrismaNotFoundError(error: unknown): boolean {
-  return isPrismaNotFoundErrorBase(error);
-}
-
-export function isPrismaForeignKeyError(error: unknown): boolean {
-  return isPrismaForeignKeyErrorBase(error);
 }
 
 export function buildPlanningProjectUpdateData(
