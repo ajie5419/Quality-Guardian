@@ -13,6 +13,7 @@ export default defineConfig({
     environment: 'happy-dom',
     exclude: [...configDefaults.exclude, '**/e2e/**'],
     alias: {
+      '#': path.resolve(__dirname, './apps/web-antd/src'),
       '~': path.resolve(__dirname, './apps/backend'),
     },
   },
