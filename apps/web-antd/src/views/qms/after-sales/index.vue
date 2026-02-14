@@ -1,11 +1,7 @@
 <script lang="ts" setup>
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
-import type {
-  DeptTreeNode,
-  TreeSelectNode,
-  VxeCheckboxChangeParams,
-} from '#/types';
+import type { VxeCheckboxChangeParams } from '#/types';
 
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
@@ -22,12 +18,6 @@ import {
   getAfterSalesList,
   importAfterSalesExcel,
 } from '#/api/qms/after-sales';
-import { getDeptList } from '#/api/system/dept';
-import {
-  getMergedPreferenceApi,
-  saveSystemSettingApi,
-  saveUserPreferenceApi,
-} from '#/api/system/preference';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { QmsStatusTag } from '#/components/Qms';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
@@ -35,19 +25,25 @@ import { useGridImport } from '#/hooks/useGridImport';
 import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
-import { convertToTreeSelectData, findNameById } from '#/types';
+import { findNameById } from '#/types';
 
 import AfterSalesCharts from './components/AfterSalesCharts.vue';
 import AfterSalesModal from './components/AfterSalesModal.vue';
+import { useAfterSalesChartPreferences } from './composables/useAfterSalesChartPreferences';
+import { useAfterSalesDeptData } from './composables/useAfterSalesDeptData';
 import { useStatusOptions } from './constants';
 
 const { t } = useI18n();
 
-const showCharts = ref(false);
 const chartRefreshKey = ref(0);
 const chartsRef = ref<any>(null);
-const customChartsData = ref<any[]>([]);
-const isFirstLoad = ref(true);
+const {
+  showCharts,
+  customChartsData,
+  loadPreferences,
+  handleSaveSystemDefault,
+} = useAfterSalesChartPreferences();
+const { deptTreeData, deptRawData, loadDeptData } = useAfterSalesDeptData();
 
 // 缓存失效控制
 const { invalidateAfterSales } = useInvalidateQmsQueries();
@@ -77,71 +73,10 @@ const isAdmin = computed(() => {
   );
 });
 
-// 加载偏好设置
-async function loadPreferences() {
-  try {
-    const pref = await getMergedPreferenceApi(
-      'after-sales-charts',
-      'qms:after_sales:default_charts',
-    );
-    if (pref) {
-      showCharts.value = !!pref.showCharts;
-      customChartsData.value = pref.customCharts || [];
-    }
-  } catch (error) {
-    console.error('Failed to load preferences', error);
-  } finally {
-    isFirstLoad.value = false;
-  }
-}
-
-// 保存偏好设置
-async function savePreferences() {
-  if (isFirstLoad.value) return; // 初始加载时不反向保存
-  try {
-    await saveUserPreferenceApi('after-sales-charts', {
-      showCharts: showCharts.value,
-      customCharts: customChartsData.value,
-    });
-  } catch (error) {
-    console.error('Failed to save preferences', error);
-  }
-}
-
-// 监听状态变化并自动保存
-watch(
-  [showCharts, customChartsData],
-  () => {
-    // 只有当值真正改变且不是初次加载时才保存
-    if (isFirstLoad.value) return;
-    savePreferences();
-  },
-  { deep: true },
-);
-
-async function handleSaveSystemDefault() {
-  try {
-    await saveSystemSettingApi('qms:after_sales:default_charts', {
-      showCharts: showCharts.value,
-      customCharts: customChartsData.value,
-    });
-    message.success('已存为系统默认配置');
-  } catch (error) {
-    console.error('Failed to save system default', error);
-    message.error('保存失败');
-  }
-}
-
-// 数据
-const deptTreeData = ref<TreeSelectNode[]>([]);
-const deptRawData = ref<DeptTreeNode[]>([]); // 保存原始部门数据用于 ID 转名称
-
 async function loadData() {
   try {
-    const data = await getDeptList();
-    deptRawData.value = data;
-    deptTreeData.value = convertToTreeSelectData(data);
-    await loadPreferences(); // 加载配置
+    await loadDeptData();
+    await loadPreferences();
   } catch (error) {
     console.error('Failed to load data', error);
     message.error(t('common.dataLoadFailed'));

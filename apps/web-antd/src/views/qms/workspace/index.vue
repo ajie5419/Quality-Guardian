@@ -8,9 +8,7 @@ import type {
   WorkbenchTrendItem,
 } from '@vben/common-ui';
 
-import type { QmsPlanningApi } from '#/api/qms/planning';
 import type { QmsTaskDispatchApi } from '#/api/qms/task-dispatch';
-import type { SystemUserApi } from '#/api/system/user';
 
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -34,7 +32,6 @@ import {
   Col,
   Empty,
   List,
-  message,
   Modal,
   Progress,
   Row,
@@ -44,16 +41,10 @@ import {
   Tag,
 } from 'ant-design-vue';
 
-import { getDfmeaItemsByProject, getItpList } from '#/api/qms/planning';
-import {
-  createTask,
-  getTaskList,
-  getTaskStats,
-  updateTaskStatus,
-} from '#/api/qms/task-dispatch';
-import { getUserList } from '#/api/system/user';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useWorkspaceQuery } from '#/hooks/useQmsQueries';
+
+import { useWorkspaceTaskDispatch } from './composables/useWorkspaceTaskDispatch';
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -67,159 +58,27 @@ const currentUserId = computed(() => {
   return id === undefined ? '' : String(id);
 });
 
-// 任务统计数据
-const taskStats = ref({
-  pendingLevel1: 0,
-  pendingLevel2: 0,
-  processing: 0,
-  overdue: 0,
-});
-
-const myTasks = ref<QmsTaskDispatchApi.TaskDispatch[]>([]);
-
 // 解决模板中无法访问 Empty.PRESENTED_IMAGE_SIMPLE 的问题
 const EMPTY_IMAGE = Empty.PRESENTED_IMAGE_SIMPLE;
-
-async function loadTaskData() {
-  try {
-    const isAdmin =
-      userStore.userInfo?.roles?.includes('super') ||
-      userStore.userInfo?.roles?.includes('admin');
-    const [stats, list] = await Promise.all([
-      getTaskStats(),
-      // 关键：查询包含 PENDING 和 DISPATCHED 状态的任务，支持连续指派
-      getTaskList({
-        status: 'PENDING,DISPATCHED',
-        all: isAdmin ? 'true' : 'false',
-      }),
-    ]);
-    taskStats.value = stats;
-    myTasks.value = list;
-  } catch (error) {
-    console.error('Failed to load task data', error);
-  }
-}
-
-// 二级分派 Modal 逻辑
-const isDispatchModalVisible = ref(false);
-const currentTask = ref<null | QmsTaskDispatchApi.TaskDispatch>(null);
-const userList = ref<SystemUserApi.User[]>([]);
-const businessItems = ref<{ id: string; label: string }[]>([]);
-const isItemsLoading = ref(false);
-
-async function loadUsers() {
-  try {
-    const res = await getUserList();
-    userList.value = res.items || (res as unknown as SystemUserApi.User[]);
-  } catch {}
-}
-
-async function loadBusinessItems(task: QmsTaskDispatchApi.TaskDispatch) {
-  isItemsLoading.value = true;
-  businessItems.value = [];
-  try {
-    // 1. 获取业务全量条目
-    let allBusinessData: (QmsPlanningApi.DfmeaItem | QmsPlanningApi.ItpItem)[] =
-      [];
-    if (task.type === 'ITP_INSPECTION' && task.itpProjectId) {
-      allBusinessData = await getItpList({ projectId: task.itpProjectId });
-    } else if (task.type === 'DFMEA_ACTION' && task.dfmeaId) {
-      allBusinessData = (await getDfmeaItemsByProject(
-        task.dfmeaId,
-      )) as QmsPlanningApi.DfmeaItem[];
-    }
-
-    // 2. 获取已经派发出去的二级任务
-    const dispatchedSubTasks = await getTaskList({
-      parentId: task.id,
-      level: 2,
-    });
-
-    // 提取已经派发的条目 ID 或 Label (由于 content 存储的是 label，我们这里用 label 进行过滤)
-    const dispatchedItemLabels = new Set<string>();
-    dispatchedSubTasks.forEach((st) => {
-      if (st.content?.items && Array.isArray(st.content.items)) {
-        st.content.items.forEach((label: string) =>
-          dispatchedItemLabels.add(label),
-        );
-      }
-    });
-
-    // 3. 过滤掉已派发的条目
-    businessItems.value =
-      task.type === 'ITP_INSPECTION'
-        ? (allBusinessData as QmsPlanningApi.ItpItem[])
-            .map((item) => ({
-              id: item.id,
-              label: `${item.processStep} - ${item.activity}`,
-            }))
-            .filter((item) => !dispatchedItemLabels.has(item.label))
-        : (allBusinessData as QmsPlanningApi.DfmeaItem[])
-            .map((item) => ({
-              id: item.id,
-              label: `${item.item}: ${item.failureMode}`,
-            }))
-            .filter((item) => !dispatchedItemLabels.has(item.label));
-  } catch (error) {
-    console.error('Load and filter business items failed', error);
-  } finally {
-    isItemsLoading.value = false;
-  }
-}
-
-const dispatchForm = ref({
-  assigneeId: '',
-  selectedItems: [] as string[],
+const {
+  taskStats,
+  myTasks,
+  isDispatchModalVisible,
+  currentTask,
+  userList,
+  businessItems,
+  isItemsLoading,
+  dispatchForm,
+  loadTaskData,
+  handleOpenDispatch,
+  submitSecondaryDispatch,
+  getStatusLabel,
+  getStatusColor,
+} = useWorkspaceTaskDispatch({
+  t,
+  handleApiError,
+  userRoles: userStore.userInfo?.roles || [],
 });
-
-function handleOpenDispatch(task: QmsTaskDispatchApi.TaskDispatch) {
-  currentTask.value = task;
-  dispatchForm.value = { assigneeId: '', selectedItems: [] };
-  isDispatchModalVisible.value = true;
-  loadUsers();
-  loadBusinessItems(task);
-}
-
-async function submitSecondaryDispatch() {
-  const task = currentTask.value;
-  if (!task) return;
-
-  if (
-    !dispatchForm.value.assigneeId ||
-    dispatchForm.value.selectedItems.length === 0
-  ) {
-    message.warning(t('common.pleaseCompleteInfo'));
-    return;
-  }
-
-  try {
-    await createTask({
-      type: task.type,
-      title: `[${t('common.dispatch')}] ${task.title}`,
-      level: 2,
-      parentId: task.id,
-      itpProjectId: task.itpProjectId,
-      dfmeaId: task.dfmeaId,
-      assigneeId: dispatchForm.value.assigneeId,
-      content: { items: dispatchForm.value.selectedItems },
-    });
-
-    // 检查是否所有条目均已分派完成
-    const isAllDispatched =
-      businessItems.value.length === dispatchForm.value.selectedItems.length;
-    if (isAllDispatched) {
-      await updateTaskStatus(task.id, 'COMPLETED');
-      message.success(t('qms.workspace.allDispatched'));
-    } else {
-      message.success(t('qms.workspace.secondaryDispatchSuccess'));
-    }
-
-    isDispatchModalVisible.value = false;
-    loadTaskData();
-  } catch (error) {
-    handleApiError(error, 'Secondary Dispatch');
-  }
-}
 
 onMounted(() => {
   loadTaskData();
@@ -304,25 +163,6 @@ function navTo(nav: WorkbenchProjectItem | WorkbenchQuickNavItem) {
       console.error('Navigation failed:', error);
     });
   }
-}
-
-// 任务状态映射
-const statusMap = computed<Record<string, { color: string; label: string }>>(
-  () => ({
-    PENDING: { label: t('qms.task.status.pending'), color: 'default' },
-    DISPATCHED: { label: t('qms.task.status.dispatched'), color: 'blue' },
-    PROCESSING: { label: t('qms.task.status.processing'), color: 'orange' },
-    COMPLETED: { label: t('qms.task.status.completed'), color: 'green' },
-    OVERDUE: { label: t('qms.task.status.overdue'), color: 'red' },
-  }),
-);
-
-function getStatusLabel(status: string) {
-  return statusMap.value[status]?.label || status;
-}
-
-function getStatusColor(status: string) {
-  return statusMap.value[status]?.color || 'default';
 }
 
 // 任务详情弹窗状态
