@@ -3,7 +3,7 @@ import { useI18n } from '@vben/locales';
 
 defineProps<{
   columns: Column[];
-  dataSource: any[];
+  dataSource: TableRecord[];
   emptyText?: string;
   title: string;
 }>();
@@ -15,8 +15,10 @@ interface Column {
   key: string;
   width?: string;
   align?: 'center' | 'left' | 'right';
-  class?: ((record: any) => string) | string;
+  class?: ((record: TableRecord) => string) | string;
 }
+
+type TableRecord = Record<string, unknown>;
 </script>
 
 <template>

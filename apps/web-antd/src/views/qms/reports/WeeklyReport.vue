@@ -98,11 +98,16 @@ watch(
 
 // Expose report data for parent to update header
 // Helper for template access
-function getRecordValue(record: any, key: string): string {
-  return (record[key] || '') as string;
+function getRecordValue(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  return typeof value === 'string' ? value : '';
 }
 
-function setRecordValue(record: any, key: string, value: string) {
+function setRecordValue(
+  record: Record<string, unknown>,
+  key: string,
+  value: string,
+) {
   record[key] = value;
 }
 
@@ -182,7 +187,8 @@ defineExpose({
             <Input.TextArea
               :value="getRecordValue(record, column.key as string)"
               @update:value="
-                (val: any) => setRecordValue(record, column.key as string, val)
+                (val: string) =>
+                  setRecordValue(record, column.key as string, val)
               "
               :auto-size="{ minRows: 2, maxRows: 6 }"
               :bordered="false"

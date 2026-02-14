@@ -12,10 +12,12 @@ import { Button, DatePicker, Input, message, Tag } from 'ant-design-vue';
 
 import { getDailySummary } from '#/api/qms/reports';
 import { getDeptList } from '#/api/system/dept';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import ReportTable from './components/ReportTable.vue';
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const userStore = useUserStore();
 
 // Constants for status
@@ -57,12 +59,13 @@ const reportData = ref<DailySummaryData>({
   issues: [],
   summary: '',
 });
+type TableRecord = Record<string, unknown>;
 
 async function loadDeptData() {
   try {
     deptRawData.value = await getDeptList();
   } catch (error) {
-    console.error('Failed to load department data', error);
+    handleApiError(error, 'Load Report Department Data');
   }
 }
 
@@ -99,7 +102,7 @@ async function handleExportImage() {
     link.click();
     message.success(t('qms.reports.exportSuccess') || '图片导出成功');
   } catch (error) {
-    console.error(error);
+    handleApiError(error, 'Export Report Image');
     message.error(t('qms.reports.exportFailed') || '图片导出失败');
   } finally {
     loading.value = false;
@@ -134,8 +137,8 @@ const inspectionColumns = [
     key: 'result',
     width: '96px',
     align: 'center' as const,
-    class: (record: any) =>
-      record.result === t('qms.inspection.records.result.pass')
+    class: (record: TableRecord) =>
+      String(record.result) === t('qms.inspection.records.result.pass')
         ? 'text-green-500 font-bold'
         : 'text-red-500 font-bold',
   },
@@ -241,17 +244,21 @@ onMounted(() => {
       >
         <template #status="{ record }">
           <Tag
-            :color="STATUS_CLOSED.includes(record.status) ? 'success' : 'error'"
+            :color="
+              STATUS_CLOSED.includes(String(record.status))
+                ? 'success'
+                : 'error'
+            "
           >
             {{
-              STATUS_CLOSED.includes(record.status)
+              STATUS_CLOSED.includes(String(record.status))
                 ? t('qms.inspection.issues.status.closed')
                 : t('qms.inspection.issues.status.open')
             }}
           </Tag>
         </template>
         <template #dept="{ record }">
-          {{ deptMap[record.dept] || record.dept }}
+          {{ deptMap[String(record.dept)] || String(record.dept || '') }}
         </template>
       </ReportTable>
 

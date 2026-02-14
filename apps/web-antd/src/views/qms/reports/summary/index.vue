@@ -26,10 +26,12 @@ import {
 import dayjs from 'dayjs';
 
 import { getSummaryReport } from '#/api/qms/reports';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import WeeklyReport from '../WeeklyReport.vue';
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const loading = ref(false);
 
 const canExport = computed(() => {
@@ -61,7 +63,7 @@ async function loadReport() {
     });
     reportData.value = data;
   } catch (error) {
-    console.error('Failed to load report', error);
+    handleApiError(error, 'Load Summary Report');
   } finally {
     loading.value = false;
   }
@@ -72,9 +74,10 @@ async function handlePrint() {
     // Basic export for now, or just print window
     // Weekly Report component doesn't expose export yet, but window.print works if CSS is right
     // or we can use html2canvas if we grab the element
-    const html2canvasModule = await import('html2canvas');
-    const html2canvas = (html2canvasModule as any).default || html2canvasModule;
-    const element = document.querySelector('#weekly-report-container');
+    const { default: html2canvas } = await import('html2canvas');
+    const element = document.querySelector<HTMLElement>(
+      '#weekly-report-container',
+    );
     if (element) {
       try {
         const canvas = await html2canvas(element, { useCORS: true, scale: 2 });
