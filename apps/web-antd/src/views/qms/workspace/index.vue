@@ -52,11 +52,13 @@ import {
   updateTaskStatus,
 } from '#/api/qms/task-dispatch';
 import { getUserList } from '#/api/system/user';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useWorkspaceQuery } from '#/hooks/useQmsQueries';
 
 const userStore = useUserStore();
 const router = useRouter();
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 
 // 获取当前用户 ID 的统一计算属性
 const currentUserId = computed(() => {
@@ -179,6 +181,9 @@ function handleOpenDispatch(task: QmsTaskDispatchApi.TaskDispatch) {
 }
 
 async function submitSecondaryDispatch() {
+  const task = currentTask.value;
+  if (!task) return;
+
   if (
     !dispatchForm.value.assigneeId ||
     dispatchForm.value.selectedItems.length === 0
@@ -189,12 +194,12 @@ async function submitSecondaryDispatch() {
 
   try {
     await createTask({
-      type: currentTask.value!.type,
-      title: `[${t('common.dispatch')}] ${currentTask.value!.title}`,
+      type: task.type,
+      title: `[${t('common.dispatch')}] ${task.title}`,
       level: 2,
-      parentId: currentTask.value!.id,
-      itpProjectId: currentTask.value!.itpProjectId,
-      dfmeaId: currentTask.value!.dfmeaId,
+      parentId: task.id,
+      itpProjectId: task.itpProjectId,
+      dfmeaId: task.dfmeaId,
       assigneeId: dispatchForm.value.assigneeId,
       content: { items: dispatchForm.value.selectedItems },
     });
@@ -203,7 +208,7 @@ async function submitSecondaryDispatch() {
     const isAllDispatched =
       businessItems.value.length === dispatchForm.value.selectedItems.length;
     if (isAllDispatched) {
-      await updateTaskStatus(currentTask.value!.id, 'COMPLETED');
+      await updateTaskStatus(task.id, 'COMPLETED');
       message.success(t('qms.workspace.allDispatched'));
     } else {
       message.success(t('qms.workspace.secondaryDispatchSuccess'));
@@ -211,8 +216,8 @@ async function submitSecondaryDispatch() {
 
     isDispatchModalVisible.value = false;
     loadTaskData();
-  } catch {
-    message.error(t('common.actionFailed'));
+  } catch (error) {
+    handleApiError(error, 'Secondary Dispatch');
   }
 }
 

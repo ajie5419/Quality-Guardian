@@ -8,6 +8,7 @@ import { useI18n } from '@vben/locales';
 import { Form, Input, message, Modal, Select } from 'ant-design-vue';
 
 import { createTask } from '#/api/qms/task-dispatch';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 const props = defineProps<{
   open: boolean;
@@ -22,6 +23,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
 
@@ -82,8 +84,7 @@ async function handleOk() {
     emit('update:open', false);
   } catch (error: any) {
     if (error?.errorFields) return;
-    console.error('Assign Task Error:', error);
-    message.error(t('common.actionFailed'));
+    handleApiError(error, 'Assign ITP Task');
   } finally {
     confirmLoading.value = false;
   }

@@ -10,6 +10,7 @@ import { useI18n } from '@vben/locales';
 import { Form, Input, message, Modal, Select } from 'ant-design-vue';
 
 import { createTask } from '#/api/qms/task-dispatch';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 const props = defineProps<{
   open: boolean;
@@ -24,6 +25,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
 
@@ -84,8 +86,7 @@ async function handleOk() {
     emit('update:open', false);
   } catch (error: unknown) {
     if ((error as any)?.errorFields) return;
-    console.error('Assign DFMEA Error:', error);
-    message.error(t('common.actionFailed'));
+    handleApiError(error, 'Assign DFMEA Task');
   } finally {
     confirmLoading.value = false;
   }

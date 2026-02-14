@@ -23,6 +23,7 @@ import {
 } from 'ant-design-vue';
 
 import { createQualityLoss, updateQualityLoss } from '#/api/qms/quality-loss';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 
 import {
@@ -46,6 +47,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const { invalidateQualityLoss } = useInvalidateQmsQueries();
+const { handleApiError } = useErrorHandler();
 
 const formRef = ref();
 const formState = reactive<Partial<QmsQualityLossApi.QualityLossItem>>({});
@@ -102,7 +104,12 @@ async function handleOk() {
       console.warn('Validation failed:', error);
       return;
     }
-    message.error(error.message || t('common.saveFailed'));
+    handleApiError(error, 'Save Quality Loss');
+
+    // Fallback for non-HTTP or unexpected exceptions.
+    if (!(error as any)?.response) {
+      message.error(t('common.saveFailed'));
+    }
   } finally {
     confirmLoading.value = false;
   }
