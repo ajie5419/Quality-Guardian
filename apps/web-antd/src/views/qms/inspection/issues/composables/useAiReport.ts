@@ -7,12 +7,14 @@ import { useI18n } from '@vben/locales';
 import { message, Modal } from 'ant-design-vue';
 
 import { generateQualityInsight } from '#/api/ai';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 /**
  * AI 洞察报告 Composable
  */
 export function useAiReport() {
   const { t } = useI18n();
+  const { handleApiError } = useErrorHandler();
   const isGeneratingInsight = ref(false);
 
   /**
@@ -48,6 +50,7 @@ export function useAiReport() {
         content: response.report,
       });
     } catch (error) {
+      handleApiError(error, 'Generate AI Insight Report');
       const errorMessage =
         error instanceof Error ? error.message : t('common.actionFailed');
       message.error(errorMessage);

@@ -14,6 +14,7 @@ import {
   createInspectionIssue,
   updateInspectionIssue,
 } from '#/api/qms/inspection';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { DEFAULT_VALUES } from '../constants';
 
@@ -54,6 +55,7 @@ export function useIssueForm(options: UseIssueFormOptions) {
   const { formApi, initialData, isEditMode, open, onSuccess, onClose } =
     options;
   const { t } = useI18n();
+  const { handleApiError } = useErrorHandler();
   const userStore = useUserStore();
 
   /**
@@ -130,7 +132,7 @@ export function useIssueForm(options: UseIssueFormOptions) {
       onClose();
       onSuccess();
     } catch (error) {
-      console.error('Submit error:', error);
+      handleApiError(error, 'Save Inspection Issue');
       const errorMessage =
         error instanceof Error ? error.message : t('common.saveFailed');
       message.error(errorMessage);

@@ -34,4 +34,11 @@ describe('import sheet utils', () => {
     const mapped = mapRowsByColumnTitles(rows, columns);
     expect(mapped[0]?.date).toBe('2026-02-14');
   });
+
+  it('returns empty mapped object when no title matches are found', () => {
+    const rows = [{ foo: 'bar' }];
+    const columns = [{ field: 'workOrderNumber', title: '工单号' }];
+
+    expect(mapRowsByColumnTitles(rows, columns)).toEqual([{}]);
+  });
 });

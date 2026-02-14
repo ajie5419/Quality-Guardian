@@ -5,6 +5,7 @@ import { useI18n } from '@vben/locales';
 import { message } from 'ant-design-vue';
 
 import { getDeptList } from '#/api/system/dept';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { convertToTreeSelectData } from '#/types';
 
 /**
@@ -12,6 +13,7 @@ import { convertToTreeSelectData } from '#/types';
  */
 export function useIssueData() {
   const { t } = useI18n();
+  const { handleApiError } = useErrorHandler();
 
   const deptTreeData = ref<any[]>([]);
   const deptRawData = ref<any[]>([]);
@@ -28,7 +30,7 @@ export function useIssueData() {
       deptRawData.value = deptRes as any[];
       deptTreeData.value = convertToTreeSelectData(deptRes) as any[];
     } catch (error) {
-      console.error('Failed to load initial data', error);
+      handleApiError(error, 'Load Issue Base Data');
       const errorMessage =
         error instanceof Error ? error.message : t('common.loadDataFailed');
       message.error(errorMessage);

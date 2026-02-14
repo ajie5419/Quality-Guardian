@@ -7,8 +7,10 @@ import {
   saveSystemSettingApi,
   saveUserPreferenceApi,
 } from '#/api/system/preference';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 export function useIssueChartPreferences() {
+  const { handleApiError } = useErrorHandler();
   const showCharts = ref(false);
   const isFirstLoad = ref(true);
 
@@ -22,7 +24,7 @@ export function useIssueChartPreferences() {
         showCharts.value = !!pref.showCharts;
       }
     } catch (error) {
-      console.error('Failed to load preferences', error);
+      handleApiError(error, 'Load Issue Chart Preferences');
     } finally {
       isFirstLoad.value = false;
     }
@@ -35,7 +37,7 @@ export function useIssueChartPreferences() {
         showCharts: showCharts.value,
       });
     } catch (error) {
-      console.error('Failed to save preferences', error);
+      handleApiError(error, 'Save Issue Chart Preferences');
     }
   }
 
@@ -46,7 +48,7 @@ export function useIssueChartPreferences() {
       });
       message.success('已存为系统默认配置');
     } catch (error) {
-      console.error('Failed to save system default', error);
+      handleApiError(error, 'Save Issue Chart System Default');
       message.error('保存失败');
     }
   }

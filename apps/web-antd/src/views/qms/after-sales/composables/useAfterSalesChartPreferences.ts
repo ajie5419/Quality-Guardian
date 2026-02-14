@@ -7,8 +7,10 @@ import {
   saveSystemSettingApi,
   saveUserPreferenceApi,
 } from '#/api/system/preference';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 export function useAfterSalesChartPreferences() {
+  const { handleApiError } = useErrorHandler();
   const showCharts = ref(false);
   const customChartsData = ref<any[]>([]);
   const isFirstLoad = ref(true);
@@ -24,7 +26,7 @@ export function useAfterSalesChartPreferences() {
         customChartsData.value = pref.customCharts || [];
       }
     } catch (error) {
-      console.error('Failed to load preferences', error);
+      handleApiError(error, 'Load After Sales Chart Preferences');
     } finally {
       isFirstLoad.value = false;
     }
@@ -38,7 +40,7 @@ export function useAfterSalesChartPreferences() {
         customCharts: customChartsData.value,
       });
     } catch (error) {
-      console.error('Failed to save preferences', error);
+      handleApiError(error, 'Save After Sales Chart Preferences');
     }
   }
 
@@ -50,7 +52,7 @@ export function useAfterSalesChartPreferences() {
       });
       message.success('已存为系统默认配置');
     } catch (error) {
-      console.error('Failed to save system default', error);
+      handleApiError(error, 'Save After Sales Chart System Default');
       message.error('保存失败');
     }
   }

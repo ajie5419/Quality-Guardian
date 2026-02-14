@@ -9,6 +9,7 @@ import { useI18n } from '@vben/locales';
 import { message } from 'ant-design-vue';
 
 import { analyzeQualityIssue, matchHistoryCases } from '#/api/ai';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 interface UseAiAnalysisOptions {
   formState: Ref<any>;
@@ -20,6 +21,7 @@ interface UseAiAnalysisOptions {
 export function useAiAnalysis(options: UseAiAnalysisOptions) {
   const { formState } = options;
   const { t } = useI18n();
+  const { handleApiError } = useErrorHandler();
 
   const isAiAnalyzing = ref(false);
   const isMatchingCases = ref(false);
@@ -57,7 +59,7 @@ export function useAiAnalysis(options: UseAiAnalysisOptions) {
         message.success(t('qms.inspection.issues.aiAnalysisComplete'));
       }
     } catch (error: unknown) {
-      console.error('AI Analyze Error:', error);
+      handleApiError(error, 'AI Analyze Issue');
       const errorMessage =
         error instanceof Error ? error.message : t('common.actionFailed');
       message.error(errorMessage);
@@ -89,7 +91,7 @@ export function useAiAnalysis(options: UseAiAnalysisOptions) {
         message.success(t('qms.inspection.issues.matchCasesSuccess'));
       }
     } catch (error) {
-      console.error('AI Match Error:', error);
+      handleApiError(error, 'AI Match History Cases');
       const errorMessage =
         error instanceof Error ? error.message : t('common.actionFailed');
       message.error(errorMessage);
