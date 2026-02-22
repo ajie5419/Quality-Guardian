@@ -5,6 +5,7 @@ import type {
   VehicleCommissioningIssueParams,
 } from '@qgs/shared';
 
+import { normalizeListResponse } from '#/api/qms/adapters';
 import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
@@ -12,10 +13,11 @@ import { QMS_API } from './constants';
 export async function getVehicleCommissioningIssues(
   params?: VehicleCommissioningIssueParams,
 ) {
-  return requestClient.get<{
+  const raw = await requestClient.get<{
     items: VehicleCommissioningIssue[];
     total: number;
   }>(QMS_API.VEHICLE_COMMISSIONING_ISSUES, { params });
+  return normalizeListResponse<VehicleCommissioningIssue>(raw);
 }
 
 export async function createVehicleCommissioningIssue(
@@ -54,10 +56,11 @@ export async function getVehicleCommissioningReports(params?: {
   pageSize?: number;
   projectName?: string;
 }) {
-  return requestClient.get<{
+  const raw = await requestClient.get<{
     items: VehicleCommissioningDailyReport[];
     total: number;
   }>(QMS_API.VEHICLE_COMMISSIONING_REPORTS, { params });
+  return normalizeListResponse<VehicleCommissioningDailyReport>(raw);
 }
 
 export async function createVehicleCommissioningReport(

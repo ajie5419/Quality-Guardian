@@ -2,6 +2,7 @@ import type { InspectionIssue, InspectionRecord } from '@qgs/shared';
 
 import type { QmsImportSummary } from '#/api/qms/types';
 
+import { normalizeListResponse } from '#/api/qms/adapters';
 import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
@@ -32,10 +33,11 @@ export async function getInspectionIssues(params?: {
   workOrderNumber?: string;
   year?: number;
 }) {
-  return requestClient.get<{ items: InspectionIssue[]; total: number }>(
-    QMS_API.INSPECTION_ISSUES,
-    { params },
-  );
+  const raw = await requestClient.get<{
+    items: InspectionIssue[];
+    total: number;
+  }>(QMS_API.INSPECTION_ISSUES, { params });
+  return normalizeListResponse<InspectionIssue>(raw);
 }
 
 export async function getInspectionIssueStats(params?: { year?: number }) {
@@ -102,10 +104,11 @@ export async function getInspectionRecords(params?: {
   workOrderNumber?: string;
   year?: number;
 }) {
-  return requestClient.get<{ items: InspectionRecord[]; total: number }>(
-    QMS_API.INSPECTION_RECORDS,
-    { params },
-  );
+  const raw = await requestClient.get<{
+    items: InspectionRecord[];
+    total: number;
+  }>(QMS_API.INSPECTION_RECORDS, { params });
+  return normalizeListResponse<InspectionRecord>(raw);
 }
 
 export async function createInspectionRecord(data: Partial<InspectionRecord>) {

@@ -6,6 +6,7 @@ import type {
 
 import type { QmsImportSummary } from '#/api/qms/types';
 
+import { normalizeListResponse } from '#/api/qms/adapters';
 import { QMS_IMPORT_TIMEOUT } from '#/api/qms/constants';
 import { requestClient } from '#/api/request';
 
@@ -17,6 +18,16 @@ export * from '@qgs/shared';
  */
 export async function getAfterSalesList(params?: AfterSalesParams) {
   return requestClient.get<AfterSalesItem[]>('/qms/after-sales', { params });
+}
+
+/**
+ * Get After-sales list (normalized pagination shape for page layer)
+ */
+export async function getAfterSalesListPage(
+  params?: AfterSalesParams,
+): Promise<{ items: AfterSalesItem[]; total: number }> {
+  const raw = await getAfterSalesList(params);
+  return normalizeListResponse<AfterSalesItem>(raw);
 }
 
 /**
