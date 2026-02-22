@@ -248,6 +248,104 @@ docker-compose up -d --no-deps backend
 echo "⏳ 等待后端健康检查（10秒）..."
 sleep 10
 
+echo "🔎 检查并补齐关键菜单/权限数据（车辆调试）..."
+if ! docker-compose run --rm backend sh -lc 'node -e "
+let PrismaClient;
+try {
+  ({ PrismaClient } = require(\"/app/apps/backend/node_modules/@prisma/client\"));
+} catch {
+  ({ PrismaClient } = require(\"@prisma/client\"));
+}
+const prisma = new PrismaClient();
+(async () => {
+  const qmsRoot = await prisma.menus.findFirst({
+    where: {
+      path: \"/qms\",
+      status: 1,
+      isDeleted: false
+    },
+    select: { id: true, name: true }
+  });
+
+  if (!qmsRoot) {
+    console.error(\"❌ 缺少根菜单: /qms\");
+    process.exit(2);
+  }
+
+  let menu = await prisma.menus.findFirst({
+    where: {
+      OR: [
+        { path: \"/qms/vehicle-commissioning\" },
+        { name: \"QMSVehicleCommissioning\" }
+      ]
+    },
+    select: { id: true, authCode: true, name: true, parentId: true, status: true, isDeleted: true }
+  });
+
+  if (!menu) {
+    const created = await prisma.menus.create({
+      data: {
+        id: \"menu-\" + Date.now() + \"-vc\",
+        path: \"/qms/vehicle-commissioning\",
+        name: \"QMSVehicleCommissioning\",
+        component: \"/qms/vehicle-commissioning/index.vue\",
+        type: \"menu\",
+        authCode: \"QMS:VehicleCommissioning:List\",
+        parentId: qmsRoot.id,
+        order: 95,
+        status: 1,
+        isDeleted: false,
+        meta: JSON.stringify({
+          title: \"车辆调试\",
+          icon: \"carbon:vehicle-connected\",
+          orderNo: 95
+        })
+      }
+    });
+    menu = {
+      id: created.id,
+      authCode: created.authCode,
+      name: created.name,
+      parentId: created.parentId,
+      status: created.status,
+      isDeleted: created.isDeleted
+    };
+    console.log(\"🛠️ 已自动创建车辆调试菜单:\", created.id);
+  } else {
+    const patch = {};
+    if (menu.isDeleted) patch.isDeleted = false;
+    if (menu.status !== 1) patch.status = 1;
+    if (menu.parentId !== qmsRoot.id) patch.parentId = qmsRoot.id;
+    if (menu.authCode !== \"QMS:VehicleCommissioning:List\") patch.authCode = \"QMS:VehicleCommissioning:List\";
+
+    if (Object.keys(patch).length > 0) {
+      await prisma.menus.update({
+        where: { id: menu.id },
+        data: patch
+      });
+      console.log(\"🛠️ 已自动修正车辆调试菜单字段:\", menu.id);
+    }
+  }
+
+  if (!menu || !menu.id) {
+    console.error(\"❌ 车辆调试菜单补齐失败\");
+    process.exit(3);
+  }
+
+  if (menu.authCode !== \"QMS:VehicleCommissioning:List\") {
+    console.error(\"❌ 关键菜单 authCode 不正确:\", menu.authCode);
+    process.exit(4);
+  }
+
+  console.log(\"✅ 关键菜单检查通过:\", menu.id, menu.name, menu.authCode);
+})();"'; then
+    echo "❌ 菜单/权限健康检查与自动补齐失败"
+    exit 1
+fi
+
+echo "🧹 清理菜单缓存..."
+docker-compose exec -T redis redis-cli EVAL "for _,k in ipairs(redis.call('keys','qms:menu:*')) do redis.call('del',k) end return 1" 0 >/dev/null 2>&1 || true
+
 echo "🔄 更新前端..."
 docker-compose up -d --no-deps frontend
 
