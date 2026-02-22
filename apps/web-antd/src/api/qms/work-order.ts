@@ -53,6 +53,23 @@ export async function getWorkOrderListPage(params?: {
   };
 }
 
+export async function getWorkOrderExportList(params?: {
+  ids?: string;
+  ignoreYearFilter?: boolean;
+  keyword?: string;
+  projectName?: string;
+  status?: string;
+  workOrderNumber?: string;
+  year?: number;
+}) {
+  const raw = await requestClient.get<{
+    items: WorkOrderItem[];
+    summary?: Array<{ division: string; quantity: number; status: string }>;
+    total: number;
+  }>(`${QMS_API.WORK_ORDER}/export`, { params });
+  return normalizeListResponse<WorkOrderItem>(raw);
+}
+
 /**
  * Create Work Order
  */

@@ -14,7 +14,10 @@ import { Button, message, Select, Space } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { WorkOrderStatusEnum } from '#/api/qms/enums';
-import { getWorkOrderListPage } from '#/api/qms/work-order';
+import {
+  getWorkOrderExportList,
+  getWorkOrderListPage,
+} from '#/api/qms/work-order';
 import { getDeptList } from '#/api/system/dept';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { QmsStatusTag } from '#/components/Qms';
@@ -131,9 +134,7 @@ const exportWorkOrderAsXlsx =
       if (mode === 'all') {
         const proxyInfo = $grid?.getProxyInfo?.();
         const formValues = (proxyInfo?.form || {}) as WorkOrderFormValues;
-        const response = await getWorkOrderListPage({
-          page: 1,
-          pageSize: 100_000,
+        const response = await getWorkOrderExportList({
           year: currentYear.value,
           ...formValues,
         });

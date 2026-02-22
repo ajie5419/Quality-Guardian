@@ -111,6 +111,20 @@ export async function getInspectionRecords(params?: {
   return normalizeListResponse<InspectionRecord>(raw);
 }
 
+export async function getInspectionRecordsExport(params?: {
+  keyword?: string;
+  projectName?: string;
+  type?: string;
+  workOrderNumber?: string;
+  year?: number;
+}) {
+  const raw = await requestClient.get<{
+    items: InspectionRecord[];
+    total: number;
+  }>(`${QMS_API.INSPECTION_RECORDS}/export`, { params });
+  return normalizeListResponse<InspectionRecord>(raw);
+}
+
 export async function createInspectionRecord(data: Partial<InspectionRecord>) {
   return requestClient.post<InspectionRecord>(QMS_API.INSPECTION_RECORDS, data);
 }

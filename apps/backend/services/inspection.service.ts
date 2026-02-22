@@ -75,6 +75,7 @@ export const InspectionService = {
    * Find all inspections with pagination, filtering and sorting
    */
   async findAll(params: {
+    forExport?: boolean;
     keyword?: string;
     page?: number;
     pageSize?: number;
@@ -87,6 +88,7 @@ export const InspectionService = {
       page = 1,
       pageSize = 100,
       type = 'INCOMING',
+      forExport = false,
       year,
       keyword,
       projectName,
@@ -123,17 +125,31 @@ export const InspectionService = {
     }
 
     // Execute Query
-    const { skip, take } = BaseService.parsePagination({ page, pageSize });
-    const [items, total] = await Promise.all([
-      prisma.inspections.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { createdAt: 'desc' },
-        include: { items: true },
-      }),
-      prisma.inspections.count({ where }),
-    ]);
+    const [items, total] = forExport
+      ? await Promise.all([
+          prisma.inspections.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            include: { items: true },
+          }),
+          prisma.inspections.count({ where }),
+        ])
+      : await (() => {
+          const { skip, take } = BaseService.parsePagination({
+            page,
+            pageSize,
+          });
+          return Promise.all([
+            prisma.inspections.findMany({
+              where,
+              skip,
+              take,
+              orderBy: { createdAt: 'desc' },
+              include: { items: true },
+            }),
+            prisma.inspections.count({ where }),
+          ]);
+        })();
 
     return { items, total };
   },

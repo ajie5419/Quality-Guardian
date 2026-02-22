@@ -12,7 +12,7 @@ import { useI18n } from '@vben/locales';
 import { Empty, message, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { getInspectionRecords } from '#/api/qms/inspection';
+import { getInspectionRecordsExport } from '#/api/qms/inspection';
 import {
   createProjectDocProject,
   deleteProjectDocProject,
@@ -234,10 +234,9 @@ async function loadRecords() {
   }
   isRecordsLoading.value = true;
   try {
-    const res = await getInspectionRecords({
+    const res = await getInspectionRecordsExport({
       workOrderNumber: selectedProject.value?.workOrderNumber,
       type: 'ALL',
-      pageSize: 500, // Get all records for this project
     });
     const items = res.items || [];
 

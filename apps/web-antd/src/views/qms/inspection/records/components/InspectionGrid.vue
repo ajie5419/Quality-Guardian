@@ -15,6 +15,7 @@ import {
   batchDeleteInspectionRecords,
   deleteInspectionRecord,
   getInspectionRecords,
+  getInspectionRecordsExport,
   importInspectionRecords,
 } from '#/api/qms/inspection';
 import { QmsStatusTag } from '#/components/Qms';
@@ -25,6 +26,7 @@ import {
   buildImportWarningMessage,
   resolveImportErrorCount,
 } from '#/utils/import-summary';
+import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
 import { getColumns } from '../config';
 
@@ -43,6 +45,31 @@ const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const { canCreate, canEdit, canDelete, canExport, canImport } =
   useQmsPermissions('QMS:Inspection:Records');
+
+const exportInspectionRecordsAsXlsx =
+  createVxePhotoXlsxExportMethod<QmsInspectionApi.InspectionRecord>({
+    sheetName: '检验记录列表',
+    filename: () => `检验记录列表-${Date.now()}.xlsx`,
+    photoField: '__none__',
+    getPhotoUrl: () => '',
+    getRows: async ({ mode, $table, $grid }) => {
+      if (mode === 'selected') {
+        return $table.getCheckboxRecords() || [];
+      }
+      if (mode === 'all') {
+        const proxyInfo = $grid?.getProxyInfo?.();
+        const formValues = (proxyInfo?.form || {}) as Record<string, unknown>;
+        const response = await getInspectionRecordsExport({
+          type: props.type,
+          year: props.year,
+          keyword: formValues?.keyword as string | undefined,
+        });
+        return response.items || [];
+      }
+      const tableData = $table.getTableData?.();
+      return tableData?.fullData || [];
+    },
+  });
 
 const processedColumns = (type: string) => {
   return getColumns(type, t).map((col) => {
@@ -131,8 +158,9 @@ const gridOptions = computed(() => ({
     },
   },
   exportConfig: {
-    remote: false,
-    types: ['xlsx', 'csv'],
+    remote: true,
+    exportMethod: exportInspectionRecordsAsXlsx,
+    types: ['xlsx'],
     modes: ['current', 'selected', 'all'],
     filename: '检验记录列表',
   },
