@@ -1,3 +1,5 @@
+import { message } from 'ant-design-vue';
+
 export type VxeExportMode = 'all' | 'current' | 'selected';
 // cspell:ignore spreadsheetml
 
@@ -82,77 +84,97 @@ export function createVxePhotoXlsxExportMethod<Row extends Record<string, any>>(
     $table: any;
     options: Record<string, any>;
   }) => {
-    const mode = (options.mode || 'current') as VxeExportMode;
-    const rows = await config.getRows({ mode, options, $table, $grid });
-    const exceljs = await import('exceljs');
-    const workbook = new exceljs.default.Workbook();
-    const worksheet = workbook.addWorksheet(config.sheetName);
-    const visibleColumns = (
-      $table.getTableColumn?.().visibleColumn || []
-    ).filter((column: any) => column.type === 'seq' || column.field);
-    const photoField = config.photoField || 'photos';
-
-    worksheet.columns = visibleColumns.map((column: any) => ({
-      header: column.getTitle?.() || '',
-      key: column.id,
-      width: Math.max(10, Math.ceil((column.renderWidth || 100) / 8)),
-    }));
-
-    (rows || []).forEach((row) => {
-      const rowData: Record<string, any> = {};
-      visibleColumns.forEach((column: any) => {
-        rowData[column.id] =
-          column.field === photoField
-            ? ''
-            : ($table.getCellLabel(row, column) ?? '');
-      });
-      worksheet.addRow(rowData);
+    const hideLoading = message.loading({
+      content: '正在导出，请稍候...',
+      duration: 0,
     });
+    try {
+      const mode = (options.mode || 'current') as VxeExportMode;
+      const rows = await config.getRows({ mode, options, $table, $grid });
+      const exceljs = await import('exceljs');
+      const workbook = new exceljs.default.Workbook();
+      const worksheet = workbook.addWorksheet(config.sheetName);
+      const visibleColumns = (
+        $table.getTableColumn?.().visibleColumn || []
+      ).filter((column: any) => column.type === 'seq' || column.field);
+      const photoField = config.photoField || 'photos';
 
-    const photoColumnIndex = visibleColumns.findIndex(
-      (column: any) => column.field === photoField,
-    );
+      worksheet.columns = visibleColumns.map((column: any) => ({
+        header: column.getTitle?.() || '',
+        key: column.id,
+        width: Math.max(10, Math.ceil((column.renderWidth || 100) / 8)),
+      }));
 
-    if (photoColumnIndex !== -1) {
-      const imageCache = new Map<
-        string,
-        { buffer: ArrayBuffer; extension: 'gif' | 'jpeg' | 'png' }
-      >();
+      (rows || []).forEach((row) => {
+        const rowData: Record<string, any> = {};
+        visibleColumns.forEach((column: any) => {
+          rowData[column.id] =
+            column.field === photoField
+              ? ''
+              : ($table.getCellLabel(row, column) ?? '');
+        });
+        worksheet.addRow(rowData);
+      });
 
-      for (const [i, row] of rows.entries()) {
-        if (!row) continue;
-        const photoUrl = config.getPhotoUrl(row);
-        if (!photoUrl) continue;
-        try {
-          const imageData = await fetchImageBuffer(photoUrl, imageCache);
-          if (!imageData) continue;
-          const imageId = workbook.addImage({
-            buffer: imageData.buffer,
-            extension: imageData.extension,
-          });
-          const excelRow = i + 2;
-          worksheet.getCell(excelRow, photoColumnIndex + 1).value = '';
-          worksheet.getRow(excelRow).height = 34;
-          worksheet.addImage(imageId, {
-            tl: { col: photoColumnIndex + 0.15, row: excelRow - 1 + 0.1 },
-            ext: { width: 38, height: 38 },
-          });
-        } catch {
-          worksheet.getCell(i + 2, photoColumnIndex + 1).value = '';
+      const photoColumnIndex = visibleColumns.findIndex(
+        (column: any) => column.field === photoField,
+      );
+
+      if (photoColumnIndex !== -1) {
+        const imageCache = new Map<
+          string,
+          { buffer: ArrayBuffer; extension: 'gif' | 'jpeg' | 'png' }
+        >();
+
+        for (const [i, row] of rows.entries()) {
+          if (!row) continue;
+          const photoUrl = config.getPhotoUrl(row);
+          if (!photoUrl) continue;
+          try {
+            const imageData = await fetchImageBuffer(photoUrl, imageCache);
+            if (!imageData) continue;
+            const imageId = workbook.addImage({
+              buffer: imageData.buffer,
+              extension: imageData.extension,
+            });
+            const excelRow = i + 2;
+            worksheet.getCell(excelRow, photoColumnIndex + 1).value = '';
+            worksheet.getRow(excelRow).height = 34;
+            worksheet.addImage(imageId, {
+              tl: { col: photoColumnIndex + 0.15, row: excelRow - 1 + 0.1 },
+              ext: { width: 38, height: 38 },
+            });
+          } catch {
+            worksheet.getCell(i + 2, photoColumnIndex + 1).value = '';
+          }
         }
+
+        const photoColumn = worksheet.getColumn(photoColumnIndex + 1);
+        photoColumn.width = Math.max(10, photoColumn.width || 10);
       }
 
-      const photoColumn = worksheet.getColumn(photoColumnIndex + 1);
-      photoColumn.width = Math.max(10, photoColumn.width || 10);
-    }
-
-    worksheet.eachRow((row) => {
-      row.eachCell((cell) => {
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
       });
-    });
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    downloadWorkbook(buffer as ArrayBuffer, config.filename(mode));
+      const buffer = await workbook.xlsx.writeBuffer();
+      downloadWorkbook(buffer as ArrayBuffer, config.filename(mode));
+      message.success('导出成功');
+    } catch (error: unknown) {
+      const fallback = '导出失败，请稍后重试';
+      const errorMessage =
+        error &&
+        typeof error === 'object' &&
+        'message' in error &&
+        typeof (error as { message?: unknown }).message === 'string'
+          ? (error as { message: string }).message
+          : fallback;
+      message.error(errorMessage || fallback);
+      throw error;
+    } finally {
+      hideLoading();
+    }
   };
 }
