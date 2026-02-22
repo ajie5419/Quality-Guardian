@@ -20,6 +20,8 @@ import { useAuthStore } from '#/store';
 import { refreshTokenApi } from './core';
 
 const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
+const NETWORK_ERROR_NOTIFY_COOLDOWN_MS = 15_000;
+let lastNetworkErrorNotifyAt = 0;
 
 function createRequestClient(baseURL: string, options?: RequestClientOptions) {
   const client = new RequestClient({
@@ -135,7 +137,13 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
 
       // 情况 C: 网络异常/超时 (没有 status)
       if (!status) {
+        const now = Date.now();
+        if (now - lastNetworkErrorNotifyAt < NETWORK_ERROR_NOTIFY_COOLDOWN_MS) {
+          return;
+        }
+        lastNetworkErrorNotifyAt = now;
         notification.warning({
+          key: 'global-network-error',
           description: '网络连接异常或请求超时，请检查您的网络设置',
           message: '网络错误',
         });

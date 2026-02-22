@@ -36,9 +36,29 @@ export function setupClientLogger() {
   });
 
   window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason as {
+      code?: string;
+      config?: { url?: string };
+      message?: string;
+      stack?: string;
+    };
+    const message = reason?.message || String(reason);
+    const isNetworkError =
+      reason?.code === 'ECONNABORTED' ||
+      reason?.code === 'ERR_NETWORK' ||
+      /network error|timeout/i.test(message);
+    const isClientLogRequest =
+      reason?.config?.url?.includes('/system/log/client') ?? false;
+
+    // 网络异常在离线/后端停机时会大量出现，避免控制台和上报风暴。
+    if (isNetworkError || isClientLogRequest) {
+      event.preventDefault();
+      return;
+    }
+
     sendClientLog({
-      message: event.reason?.message || String(event.reason),
-      stack: event.reason?.stack,
+      message,
+      stack: reason?.stack,
       type: 'unhandledrejection',
       url: window.location.href,
       userAgent: navigator.userAgent,

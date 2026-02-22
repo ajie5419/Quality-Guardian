@@ -28,14 +28,53 @@ const data = ref<null | SystemMonitorData>(null);
 const loading = ref(true);
 const selectedKey = ref(['overview']);
 const { handleApiError } = useErrorHandler();
-let timer: any = null;
+const MAX_CONSECUTIVE_FAILURES = 3;
+const POLL_INTERVAL_MS = 5000;
+const consecutiveFailures = ref(0);
+const pollingPaused = ref(false);
+let timer: null | ReturnType<typeof setInterval> = null;
+
+function isNetworkOrTimeoutError(error: unknown) {
+  const err = error as { code?: string; response?: { status?: number } };
+  return !err?.response?.status || err?.code === 'ECONNABORTED';
+}
+
+function stopPolling() {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+}
+
+function startPolling() {
+  if (timer || pollingPaused.value) return;
+  timer = setInterval(fetchData, POLL_INTERVAL_MS);
+}
 
 const fetchData = async () => {
   try {
     const res = await getSystemMonitorData();
     data.value = res;
+    consecutiveFailures.value = 0;
+    if (pollingPaused.value) {
+      pollingPaused.value = false;
+      startPolling();
+    }
   } catch (error) {
-    handleApiError(error, 'Load System Monitor');
+    consecutiveFailures.value += 1;
+    const networkError = isNetworkOrTimeoutError(error);
+    const shouldPausePolling =
+      networkError && consecutiveFailures.value >= MAX_CONSECUTIVE_FAILURES;
+
+    if (shouldPausePolling) {
+      pollingPaused.value = true;
+      stopPolling();
+    }
+
+    // 首次失败和触发暂停时提示，避免后台中断时通知刷屏
+    if (consecutiveFailures.value === 1 || shouldPausePolling) {
+      handleApiError(error, 'Load System Monitor');
+    }
   } finally {
     loading.value = false;
   }
@@ -82,11 +121,11 @@ const formatDate = (dateStr: string) => {
 
 onMounted(() => {
   fetchData();
-  timer = setInterval(fetchData, 5000);
+  startPolling();
 });
 
 onUnmounted(() => {
-  if (timer) clearInterval(timer);
+  stopPolling();
 });
 </script>
 
