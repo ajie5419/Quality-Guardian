@@ -71,11 +71,24 @@ const categoryTreeData = computed<DataNode[]>(() => {
     nodes.map((node) => ({
       key: node.id,
       title: node.name,
-      value: node.id,
       children: node.children ? mapTree(node.children) : undefined,
     }));
   return mapTree(categoryTree.value);
 });
+
+function findCategoryById(
+  list: QmsKnowledgeApi.Category[],
+  id: string,
+): null | QmsKnowledgeApi.Category {
+  for (const item of list) {
+    if (item.id === id) return item;
+    if (item.children) {
+      const found = findCategoryById(item.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
 
 // 选中的分类名称（用于面包屑）
 const selectedCategoryName = computed(() => {
@@ -196,6 +209,18 @@ function handleDeleteCategory(category: QmsKnowledgeApi.Category) {
       }
     },
   });
+}
+
+function handleEditCategoryNode(nodeKey: string) {
+  const category = findCategoryById(categoryTree.value, nodeKey);
+  if (!category) return;
+  openCategoryModal(undefined, category);
+}
+
+function handleDeleteCategoryNode(nodeKey: string) {
+  const category = findCategoryById(categoryTree.value, nodeKey);
+  if (!category) return;
+  handleDeleteCategory(category);
 }
 
 // ================= 弹窗管理 =================
@@ -374,7 +399,6 @@ onMounted(async () => {
           <div class="flex-1 overflow-y-auto p-2">
             <Tree
               :tree-data="categoryTreeData"
-              :field-names="{ title: 'name', key: 'id' }"
               @select="handleCategorySelect"
               :selected-keys="selectedCategoryId"
               block-node
@@ -386,8 +410,8 @@ onMounted(async () => {
                 >
                   <span
                     class="flex-1 truncate text-gray-700"
-                    :title="node.name"
-                    >{{ node.name }}</span
+                    :title="String(node.title || '')"
+                    >{{ node.title }}</span
                   >
 
                   <!-- 操作区：默认半透明，悬浮高亮 -->
@@ -398,14 +422,16 @@ onMounted(async () => {
                     <Tooltip v-if="canCreate" title="增加子类">
                       <span
                         class="cursor-pointer rounded px-1 text-sm font-bold text-blue-500 hover:bg-blue-100"
-                        @click.stop="openCategoryModal(node.id)"
+                        @click.stop="openCategoryModal(String(node.key || ''))"
                         >+</span
                       >
                     </Tooltip>
                     <Tooltip v-if="canEdit" title="重命名">
                       <span
                         class="cursor-pointer rounded border border-orange-200 px-1 text-[10px] text-orange-500 hover:bg-orange-100"
-                        @click.stop="openCategoryModal(undefined, node)"
+                        @click.stop="
+                          handleEditCategoryNode(String(node.key || ''))
+                        "
                       >
                         编辑
                       </span>
@@ -413,7 +439,9 @@ onMounted(async () => {
                     <Tooltip v-if="canDelete" title="删除分类">
                       <span
                         class="cursor-pointer rounded border border-red-200 px-1 text-[10px] text-red-500 hover:bg-red-100"
-                        @click.stop="handleDeleteCategory(node)"
+                        @click.stop="
+                          handleDeleteCategoryNode(String(node.key || ''))
+                        "
                       >
                         删除
                       </span>
