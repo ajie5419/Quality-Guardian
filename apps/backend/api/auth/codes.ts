@@ -1,6 +1,7 @@
 import { eventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { ensureVehicleCommissioningMenu } from '~/utils/menu-bootstrap';
 import prisma from '~/utils/prisma';
 import {
   unAuthorizedResponse,
@@ -20,6 +21,8 @@ export default eventHandler(async (event) => {
   }
 
   try {
+    await ensureVehicleCommissioningMenu();
+
     const user = await prisma.users.findFirst({
       where: {
         OR: [{ id: String(userId) }, { username: userinfo.username }],
@@ -46,22 +49,24 @@ export default eventHandler(async (event) => {
       codes = [];
     }
 
-    // 🔴 关键修复：让超级管理员也遵循勾选逻辑
-    // 如果 codes 数组不为空，说明管理员已经在 UI 上进行了显式分配，我们直接返回勾选的列表
-    if (codes.length > 0) {
-      return useResponseSuccess(codes);
-    }
-
-    // 只有在权限列表完全为空，且是超级管理员时，才执行全量下发（兜底逻辑）
+    // 超级管理员：返回“已勾选 + 全量系统权限码”并集
+    // 避免新增菜单后，历史勾选列表导致新功能不可见。
     if (role.name === 'super' || role.name === 'Super Admin') {
       const allMenus = await prisma.menus.findMany({
-        where: { authCode: { not: null }, status: 1 },
+        where: {
+          authCode: { not: null },
+          isDeleted: false,
+          status: 1,
+        },
         select: { authCode: true },
       });
-      const allSystemCodes = [
-        ...new Set(allMenus.map((m) => m.authCode as string)),
+      const mergedCodes = [
+        ...new Set([
+          ...allMenus.map((menu) => menu.authCode as string),
+          ...codes,
+        ]),
       ];
-      return useResponseSuccess(allSystemCodes);
+      return useResponseSuccess(mergedCodes);
     }
 
     return useResponseSuccess(codes);

@@ -1,6 +1,7 @@
 import { eventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { ensureVehicleCommissioningMenu } from '~/utils/menu-bootstrap';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -150,9 +151,11 @@ export default eventHandler(async (event) => {
   }
 
   const result = await (async () => {
+    await ensureVehicleCommissioningMenu();
+
     // 1. 获取所有状态正常的菜单
     const allDbMenus = (await prisma.menus.findMany({
-      where: { status: 1 },
+      where: { isDeleted: false, status: 1 },
       orderBy: { order: 'asc' },
     })) as unknown as Menu[];
 
