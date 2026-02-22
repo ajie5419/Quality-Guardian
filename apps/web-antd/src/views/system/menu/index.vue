@@ -20,12 +20,18 @@ import {
 } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { requestClient } from '#/api/request';
-import { getMenuList } from '#/api/system/menu';
+import {
+  createMenu,
+  deleteMenu,
+  getMenuList,
+  updateMenu,
+} from '#/api/system/menu';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { convertToTreeSelectDataWithTitle } from '#/types';
 
 const { t } = useI18n();
 const { hasAccessByCodes, hasAccessByRoles } = useAccess();
+const { handleApiError } = useErrorHandler();
 
 const isModalVisible = ref(false);
 const isEditMode = ref(false);
@@ -71,7 +77,7 @@ async function loadMenuTree(excludeId?: string) {
       ),
     ];
   } catch (error) {
-    console.error('Failed to load menu tree', error);
+    handleApiError(error, 'Load Menu Tree');
   }
 }
 
@@ -200,11 +206,12 @@ function handleDelete(row: SystemMenuApi.Menu) {
     content: `${t('common.confirmDeleteContent')} "${row.meta?.title || row.name}" ?`,
     onOk: async () => {
       try {
-        await requestClient.delete(`/system/menu/${row.id}`);
+        await deleteMenu(row.id);
         message.success(t('common.deleteSuccess'));
         gridApi.reload();
         loadMenuTree();
-      } catch {
+      } catch (error) {
+        handleApiError(error, 'Delete Menu');
         message.error(t('common.deleteFailed'));
       }
     },
@@ -229,16 +236,17 @@ async function handleSubmit() {
       },
     };
     if (isEditMode.value && currentId.value) {
-      await requestClient.put(`/system/menu/${currentId.value}`, payload);
+      await updateMenu(currentId.value, payload);
       message.success(t('common.saveSuccess'));
     } else {
-      await requestClient.post('/system/menu', payload);
+      await createMenu(payload);
       message.success(t('common.createSuccess'));
     }
     isModalVisible.value = false;
     gridApi.reload();
     loadMenuTree();
-  } catch {
+  } catch (error) {
+    handleApiError(error, isEditMode.value ? 'Update Menu' : 'Create Menu');
     message.error(isEditMode.value ? '保存失败' : '创建失败');
   }
 }

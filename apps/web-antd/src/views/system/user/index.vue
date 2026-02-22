@@ -32,10 +32,12 @@ import {
   resetPassword,
   updateUser,
 } from '#/api/system/user';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { convertToTreeSelectData, findNameById } from '#/types';
 
 const { t } = useI18n();
 const { hasAccessByCodes, hasAccessByRoles } = useAccess();
+const { handleApiError } = useErrorHandler();
 
 // Permission check helpers
 const canCreate = computed(
@@ -80,7 +82,7 @@ async function loadDeptTree() {
       data as unknown as DeptTreeNode[],
     );
   } catch (error) {
-    console.error('Failed to load dept tree', error);
+    handleApiError(error, 'Load Dept Tree');
   }
 }
 
@@ -93,7 +95,7 @@ async function loadRoles() {
       value: item.value,
     }));
   } catch (error) {
-    console.error('Failed to load roles', error);
+    handleApiError(error, 'Load Roles');
   }
 }
 

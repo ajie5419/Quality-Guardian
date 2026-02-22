@@ -14,6 +14,22 @@ export const getRoleList = (params?: { page?: number; pageSize?: number }) => {
   });
 };
 
+export const getRolePermissionTree = () => {
+  return requestClient.get('/system/role/permission-tree');
+};
+
+export const createRole = (data: Record<string, unknown>) => {
+  return requestClient.post('/system/role', data);
+};
+
+export const updateRole = (id: string, data: Record<string, unknown>) => {
+  return requestClient.put(`/system/role/${id}`, data);
+};
+
+export const deleteRole = (id: string) => {
+  return requestClient.delete(`/system/role/${id}`);
+};
+
 export namespace SystemRoleApi {
   export type Role = import('@qgs/shared').Role;
 }

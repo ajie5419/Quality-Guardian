@@ -7,13 +7,16 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+import { requireSystemAdmin } from '~/utils/system-auth';
 
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
 
-  // Consider adding admin role check here if needed
-  // if (userinfo.role !== 'admin') return unAuthorizedResponse(event);
+  const adminCheck = requireSystemAdmin(event, userinfo);
+  if (adminCheck) {
+    return adminCheck;
+  }
 
   try {
     const [server, database] = await Promise.all([

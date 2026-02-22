@@ -10,11 +10,16 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
+import { requireSystemAdmin } from '~/utils/system-auth';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
     return unAuthorizedResponse(event);
+  }
+  const adminCheck = requireSystemAdmin(event, userinfo);
+  if (adminCheck) {
+    return adminCheck;
   }
 
   try {

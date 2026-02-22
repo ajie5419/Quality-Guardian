@@ -20,12 +20,14 @@ import {
 } from 'ant-design-vue';
 
 import { getSystemMonitorData } from '#/api/system/monitor';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 const { Sider, Content } = Layout;
 
 const data = ref<null | SystemMonitorData>(null);
 const loading = ref(true);
 const selectedKey = ref(['overview']);
+const { handleApiError } = useErrorHandler();
 let timer: any = null;
 
 const fetchData = async () => {
@@ -33,7 +35,7 @@ const fetchData = async () => {
     const res = await getSystemMonitorData();
     data.value = res;
   } catch (error) {
-    console.error('Failed to fetch monitor data:', error);
+    handleApiError(error, 'Load System Monitor');
   } finally {
     loading.value = false;
   }

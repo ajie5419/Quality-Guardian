@@ -1,8 +1,19 @@
 import { defineEventHandler, readBody } from 'h3';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { useResponseSuccess } from '~/utils/response';
+import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
+import { requireSystemAdmin } from '~/utils/system-auth';
 
 export default defineEventHandler(async (event) => {
+  const userinfo = verifyAccessToken(event);
+  if (!userinfo) {
+    return unAuthorizedResponse(event);
+  }
+  const adminCheck = requireSystemAdmin(event, userinfo);
+  if (adminCheck) {
+    return adminCheck;
+  }
+
   const body = await readBody(event);
 
   await prisma.system_settings.upsert({

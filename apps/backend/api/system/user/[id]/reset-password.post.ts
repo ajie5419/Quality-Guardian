@@ -11,12 +11,17 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
+import { requireSystemAdmin } from '~/utils/system-auth';
 import { getDefaultResetPassword } from '~/utils/user-security';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
     return unAuthorizedResponse(event);
+  }
+  const adminCheck = requireSystemAdmin(event, userinfo);
+  if (adminCheck) {
+    return adminCheck;
   }
 
   const id = getRequiredRouterParam(event, 'id', '缺少用户ID');

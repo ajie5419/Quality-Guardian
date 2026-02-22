@@ -1,9 +1,24 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  unAuthorizedResponse,
+  useResponseError,
+  useResponseSuccess,
+} from '~/utils/response';
+import { requireSystemAdmin } from '~/utils/system-auth';
 
 export default defineEventHandler(async (event) => {
+  const userinfo = verifyAccessToken(event);
+  if (!userinfo) {
+    return unAuthorizedResponse(event);
+  }
+  const adminCheck = requireSystemAdmin(event, userinfo);
+  if (adminCheck) {
+    return adminCheck;
+  }
+
   const body = await readBody(event);
   const { ids } = body;
 

@@ -7,6 +7,7 @@ import {
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+import { requireSystemAdmin } from '~/utils/system-auth';
 
 export default eventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -14,14 +15,9 @@ export default eventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  // Check if current user is an admin or super admin
-  const isAdmin = userinfo.roles?.some((role: string) => {
-    const lowerRole = role.toLowerCase();
-    return lowerRole.includes('admin') || lowerRole.includes('super');
-  });
-  if (!isAdmin) {
-    setResponseStatus(event, 403);
-    return useResponseError('拒绝访问：仅限管理员修改系统设置');
+  const adminCheck = requireSystemAdmin(event, userinfo);
+  if (adminCheck) {
+    return adminCheck;
   }
 
   const key = getRouterParam(event, 'key');

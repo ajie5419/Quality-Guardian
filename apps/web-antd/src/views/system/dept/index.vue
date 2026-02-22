@@ -21,13 +21,19 @@ import {
 } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { requestClient } from '#/api/request';
-import { getDeptList } from '#/api/system/dept';
+import {
+  createDept,
+  deleteDept,
+  getDeptList,
+  updateDept,
+} from '#/api/system/dept';
 import { SysStatusEnum } from '#/api/system/enums';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { convertToTreeSelectData } from '#/types/tree';
 
 const { t } = useI18n();
 const { hasAccessByCodes, hasAccessByRoles } = useAccess();
+const { handleApiError } = useErrorHandler();
 
 const isModalVisible = ref(false);
 const isEditMode = ref(false);
@@ -67,7 +73,7 @@ async function loadDeptTree(excludeId?: string) {
       ...convertToTreeSelectData(data as DeptTreeNode[], excludeId),
     ];
   } catch (error) {
-    console.error('Failed to load dept tree', error);
+    handleApiError(error, 'Load Dept Tree');
   }
 }
 
@@ -188,11 +194,12 @@ function handleDelete(row: DeptTreeNode) {
     content: `确定要删除部门 "${row.name}" 吗？删除后其子部门也将被删除。`,
     onOk: async () => {
       try {
-        await requestClient.delete(`/system/dept/${row.id}`);
+        await deleteDept(row.id);
         message.success('删除成功');
         gridApi.reload();
         loadDeptTree();
-      } catch {
+      } catch (error) {
+        handleApiError(error, 'Delete Dept');
         message.error('删除失败');
       }
     },
@@ -210,16 +217,17 @@ async function handleSubmit() {
       createTime: new Date().toLocaleString(),
     };
     if (isEditMode.value && currentId.value) {
-      await requestClient.put(`/system/dept/${currentId.value}`, payload);
+      await updateDept(currentId.value, payload);
       message.success('保存成功');
     } else {
-      await requestClient.post('/system/dept', payload);
+      await createDept(payload);
       message.success('创建成功');
     }
     isModalVisible.value = false;
     gridApi.reload();
     loadDeptTree();
-  } catch {
+  } catch (error) {
+    handleApiError(error, isEditMode.value ? 'Update Dept' : 'Create Dept');
     message.error(isEditMode.value ? '保存失败' : '创建失败');
   }
 }

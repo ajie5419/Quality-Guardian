@@ -22,12 +22,19 @@ import {
 } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { requestClient } from '#/api/request';
 import { SysStatusEnum } from '#/api/system/enums';
-import { getRoleList } from '#/api/system/role';
+import {
+  createRole,
+  deleteRole,
+  getRoleList,
+  getRolePermissionTree,
+  updateRole,
+} from '#/api/system/role';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 const { t } = useI18n();
 const { hasAccessByCodes, hasAccessByRoles } = useAccess();
+const { handleApiError } = useErrorHandler();
 
 // Permission check helpers
 const canCreate = computed(
@@ -64,10 +71,10 @@ const allPermissions = ref<any[]>([]);
 
 async function fetchPermissionTree() {
   try {
-    const res = await requestClient.get('/system/role/permission-tree');
+    const res = await getRolePermissionTree();
     allPermissions.value = res;
   } catch (error) {
-    console.error('Failed to fetch permission tree', error);
+    handleApiError(error, 'Load Role Permission Tree');
   }
 }
 
@@ -194,13 +201,14 @@ function handlePermissions(row: SystemRoleApi.Role) {
 async function handleSavePermissions() {
   if (!currentId.value) return;
   try {
-    await requestClient.put(`/system/role/${currentId.value}`, {
+    await updateRole(currentId.value, {
       permissions: checkedKeys.value,
     });
     message.success('权限设置保存成功');
     isPermDrawerVisible.value = false;
     gridApi.reload();
-  } catch {
+  } catch (error) {
+    handleApiError(error, 'Save Role Permissions');
     message.error('保存权限失败');
   }
 }
@@ -211,10 +219,11 @@ function handleDelete(row: SystemRoleApi.Role) {
     content: `确定要删除角色 "${row.name}" 吗？`,
     onOk: async () => {
       try {
-        await requestClient.delete(`/system/role/${row.id}`);
+        await deleteRole(row.id);
         message.success('删除成功');
         gridApi.reload();
-      } catch {
+      } catch (error) {
+        handleApiError(error, 'Delete Role');
         message.error('删除失败');
       }
     },
@@ -232,15 +241,16 @@ async function handleSubmit() {
       createTime: new Date().toLocaleString(),
     };
     if (isEditMode.value && currentId.value) {
-      await requestClient.put(`/system/role/${currentId.value}`, payload);
+      await updateRole(currentId.value, payload);
       message.success('保存成功');
     } else {
-      await requestClient.post('/system/role', payload);
+      await createRole(payload);
       message.success('创建成功');
     }
     isModalVisible.value = false;
     gridApi.reload();
-  } catch {
+  } catch (error) {
+    handleApiError(error, isEditMode.value ? 'Update Role' : 'Create Role');
     message.error(isEditMode.value ? '保存失败' : '创建失败');
   }
 }
