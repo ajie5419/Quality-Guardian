@@ -34,6 +34,16 @@ export async function getSupplierListPage(params?: SupplierListParams) {
   };
 }
 
+export async function getSupplierExportList(params?: SupplierListParams) {
+  const raw = await requestClient.get<SupplierListResponse>(
+    '/qms/supplier/export',
+    {
+      params,
+    },
+  );
+  return normalizeListResponse<SupplierItem>(raw);
+}
+
 /**
  * Create Supplier
  */

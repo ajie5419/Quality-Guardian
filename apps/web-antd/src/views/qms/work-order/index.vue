@@ -22,6 +22,7 @@ import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { convertToTreeSelectData, findNameById } from '#/types';
+import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
 import WorkOrderCharts from './components/WorkOrderCharts.vue';
 import WorkOrderEditModal from './components/WorkOrderEditModal.vue';
@@ -117,6 +118,32 @@ const formSchema = [
   },
 ];
 
+const exportWorkOrderAsXlsx =
+  createVxePhotoXlsxExportMethod<QmsWorkOrderApi.WorkOrderItem>({
+    sheetName: t('qms.workOrder.title'),
+    filename: () => `${t('qms.workOrder.title')}-${Date.now()}.xlsx`,
+    photoField: '__none__',
+    getPhotoUrl: () => '',
+    getRows: async ({ mode, $table, $grid }) => {
+      if (mode === 'selected') {
+        return $table.getCheckboxRecords() || [];
+      }
+      if (mode === 'all') {
+        const proxyInfo = $grid?.getProxyInfo?.();
+        const formValues = (proxyInfo?.form || {}) as WorkOrderFormValues;
+        const response = await getWorkOrderListPage({
+          page: 1,
+          pageSize: 100_000,
+          year: currentYear.value,
+          ...formValues,
+        });
+        return response.items || [];
+      }
+      const tableData = $table.getTableData?.();
+      return tableData?.fullData || [];
+    },
+  });
+
 // 6. Grid 表格配置
 const gridOptions = computed<VxeGridProps>(() => ({
   columns: [
@@ -188,8 +215,9 @@ const gridOptions = computed<VxeGridProps>(() => ({
     importMethod: handleImport,
   },
   exportConfig: {
-    remote: false,
-    types: ['xlsx', 'csv'],
+    remote: true,
+    exportMethod: exportWorkOrderAsXlsx,
+    types: ['xlsx'],
     modes: ['current', 'selected', 'all'],
   },
   proxyConfig: {
@@ -235,9 +263,17 @@ const gridOptions = computed<VxeGridProps>(() => ({
         }
       },
       queryAll: async (params) => {
-        const formValues = params.form as WorkOrderFormValues;
+        const rawParams = params as {
+          form?: Record<string, unknown>;
+          formValues?: Record<string, unknown>;
+        };
+        const formValues =
+          (rawParams.form as unknown as WorkOrderFormValues) ||
+          (rawParams.formValues as unknown as WorkOrderFormValues);
         try {
           const response = await getWorkOrderListPage({
+            page: 1,
+            pageSize: 100_000,
             year: currentYear.value,
             ...formValues,
           });

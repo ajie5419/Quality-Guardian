@@ -12,8 +12,9 @@ import { useI18n } from '@vben/locales';
 import { Badge, Button, Card, Space, Tag, Tooltip } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { getSupplierListPage } from '#/api/qms/supplier';
+import { getSupplierExportList, getSupplierListPage } from '#/api/qms/supplier';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
 import { RATING_COLORS, SUPPLIER_STATUS_UI_MAP } from '../common-constants';
 import ScoringRulesModal from '../supplier/components/ScoringRulesModal.vue';
@@ -36,6 +37,30 @@ const checkedRows = ref<QmsSupplierApi.SupplierItem[]>([]);
 const editModalRef = ref();
 const detailDrawerRef = ref();
 const rulesModalRef = ref();
+
+const exportOutsourcingAsXlsx =
+  createVxePhotoXlsxExportMethod<QmsSupplierApi.SupplierItem>({
+    sheetName: t('qms.outsourcing.title'),
+    filename: () => `${t('qms.outsourcing.title')}-${Date.now()}.xlsx`,
+    photoField: '__none__',
+    getPhotoUrl: () => '',
+    getRows: async ({ mode, $table, $grid }) => {
+      if (mode === 'selected') {
+        return $table.getCheckboxRecords() || [];
+      }
+      if (mode === 'all') {
+        const proxyInfo = $grid?.getProxyInfo?.();
+        const formValues = (proxyInfo?.form || {}) as Record<string, unknown>;
+        const response = await getSupplierExportList({
+          category: 'Outsourcing',
+          ...formValues,
+        });
+        return response.items || [];
+      }
+      const tableData = $table.getTableData?.();
+      return tableData?.fullData || [];
+    },
+  });
 
 // 统计数据
 const stats = ref<QmsSupplierApi.SupplierStats>({
@@ -81,8 +106,9 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
     importMethod: ({ file }: { file: File }) => handleCustomImport({ file }),
   },
   exportConfig: {
-    remote: false,
-    types: ['xlsx', 'csv'],
+    remote: true,
+    exportMethod: exportOutsourcingAsXlsx,
+    types: ['xlsx'],
     modes: ['current', 'selected', 'all'],
   },
   keepSource: true,

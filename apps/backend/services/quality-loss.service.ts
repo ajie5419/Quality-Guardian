@@ -233,6 +233,113 @@ function sortByDateDesc(items: QualityLossItem[]): QualityLossItem[] {
   );
 }
 
+async function getAllLossesUnpaginated(
+  params: Omit<QualityLossQueryParams, 'page' | 'pageSize'> = {},
+): Promise<QualityLossItem[]> {
+  const { lossSource, status, workOrderNumber } = params;
+
+  // 1. 并行获取所有来源的原始数据
+  const [manualRecords, internalRecords, externalRecords] = await Promise.all([
+    prisma.quality_losses.findMany({
+      where: buildManualLossesWhere(params),
+    }),
+    prisma.quality_records.findMany({
+      where: buildInternalRecordsWhere(params),
+    }),
+    prisma.after_sales.findMany({
+      where: buildExternalSalesWhere(params),
+    }),
+  ]);
+
+  // 部门树查询失败时不影响主流程，直接回退为原始部门ID
+  const deptTree = ((await DeptService.findAll().catch((error) => {
+    logger.warn(
+      { err: error },
+      'DeptService.findAll failed, fallback to raw dept id',
+    );
+    return [];
+  })) || []) as any[];
+
+  // Flatten dept tree for easy lookup
+  const deptMap = new Map<string, string>();
+  const processDeptNode = (nodes: any[]) => {
+    nodes.forEach((node) => {
+      deptMap.set(node.id, node.name);
+      if (node.children && node.children.length > 0) {
+        processDeptNode(node.children);
+      }
+    });
+  };
+  processDeptNode(deptTree);
+
+  const getDeptName = (id: null | string | undefined) => {
+    if (!id) return null;
+    return deptMap.get(id) || id;
+  };
+
+  const result: QualityLossItem[] = [];
+
+  // 2. 处理手工录入记录
+  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.MANUAL) {
+    const filteredManual = workOrderNumber
+      ? manualRecords.filter((r) => {
+          const record = r as typeof r & {
+            workOrderNumber?: null | string;
+          };
+          return record.workOrderNumber?.includes(workOrderNumber);
+        })
+      : manualRecords;
+
+    filteredManual.forEach((item) => {
+      const itemRecord = item as typeof item & {
+        projectName?: null | string;
+        workOrderNumber?: null | string;
+      };
+      const amount = safeNumber(item.amount);
+      if (amount <= 0) return;
+      const formatted = formatManualLossItem({ ...item, ...itemRecord });
+      formatted.responsibleDepartment = getDeptName(
+        formatted.responsibleDepartment,
+      );
+      result.push(formatted);
+    });
+  }
+
+  // 3. 处理内部质量记录
+  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.INTERNAL) {
+    internalRecords.forEach((item) => {
+      const formatted = formatInternalRecordItem(item);
+      formatted.responsibleDepartment = getDeptName(
+        formatted.responsibleDepartment,
+      );
+      result.push(formatted);
+    });
+  }
+
+  // 4. 处理售后记录
+  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.EXTERNAL) {
+    externalRecords.forEach((item) => {
+      const formatted = formatExternalSalesItem(item);
+      if (formatted) {
+        formatted.responsibleDepartment = getDeptName(
+          formatted.responsibleDepartment,
+        );
+        result.push(formatted);
+      }
+    });
+  }
+
+  const statusFiltered = status
+    ? result.filter(
+        (item) =>
+          normalizeQualityLossStatus(item.status) ===
+          normalizeQualityLossStatus(status),
+      )
+    : result;
+
+  return sortByDateDesc(statusFiltered);
+}
+
 // ============ 辅助函数：趋势数据处理 ============
 
 /**
@@ -352,111 +459,8 @@ export const QualityLossService = {
   async getAllLosses(
     params: QualityLossQueryParams = {},
   ): Promise<PageResult<QualityLossItem>> {
-    const { lossSource, status, workOrderNumber } = params;
-
     try {
-      // 1. 并行获取所有来源的原始数据
-      const [manualRecords, internalRecords, externalRecords] =
-        await Promise.all([
-          prisma.quality_losses.findMany({
-            where: buildManualLossesWhere(params),
-          }),
-          prisma.quality_records.findMany({
-            where: buildInternalRecordsWhere(params),
-          }),
-          prisma.after_sales.findMany({
-            where: buildExternalSalesWhere(params),
-          }),
-        ]);
-
-      // 部门树查询失败时不影响主流程，直接回退为原始部门ID
-      const deptTree = ((await DeptService.findAll().catch((error) => {
-        logger.warn(
-          { err: error },
-          'DeptService.findAll failed, fallback to raw dept id',
-        );
-        return [];
-      })) || []) as any[];
-
-      // Flatten dept tree for easy lookup
-      const deptMap = new Map<string, string>();
-      const processDeptNode = (nodes: any[]) => {
-        nodes.forEach((node) => {
-          deptMap.set(node.id, node.name);
-          if (node.children && node.children.length > 0) {
-            processDeptNode(node.children);
-          }
-        });
-      };
-      processDeptNode(deptTree);
-
-      const getDeptName = (id: null | string | undefined) => {
-        if (!id) return null;
-        return deptMap.get(id) || id;
-      };
-
-      const result: QualityLossItem[] = [];
-
-      // 2. 处理手工录入记录
-      if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.MANUAL) {
-        const filteredManual = workOrderNumber
-          ? manualRecords.filter((r) => {
-              const record = r as typeof r & {
-                workOrderNumber?: null | string;
-              };
-              return record.workOrderNumber?.includes(workOrderNumber);
-            })
-          : manualRecords;
-
-        filteredManual.forEach((item) => {
-          const itemRecord = item as typeof item & {
-            projectName?: null | string;
-            workOrderNumber?: null | string;
-          };
-          const amount = safeNumber(item.amount);
-          if (amount <= 0) return;
-          const formatted = formatManualLossItem({ ...item, ...itemRecord });
-          formatted.responsibleDepartment = getDeptName(
-            formatted.responsibleDepartment,
-          );
-          result.push(formatted);
-        });
-      }
-
-      // 3. 处理内部质量记录
-      if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.INTERNAL) {
-        internalRecords.forEach((item) => {
-          const formatted = formatInternalRecordItem(item);
-          formatted.responsibleDepartment = getDeptName(
-            formatted.responsibleDepartment,
-          );
-          result.push(formatted);
-        });
-      }
-
-      // 4. 处理售后记录
-      if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.EXTERNAL) {
-        externalRecords.forEach((item) => {
-          const formatted = formatExternalSalesItem(item);
-          if (formatted) {
-            formatted.responsibleDepartment = getDeptName(
-              formatted.responsibleDepartment,
-            );
-            result.push(formatted);
-          }
-        });
-      }
-
-      // 5. 排序并分页
-      const statusFiltered = status
-        ? result.filter(
-            (item) =>
-              normalizeQualityLossStatus(item.status) ===
-              normalizeQualityLossStatus(status),
-          )
-        : result;
-
-      const sorted = sortByDateDesc(statusFiltered);
+      const sorted = await getAllLossesUnpaginated(params);
       return applyPagination(sorted, params);
     } catch (error) {
       logger.error({ err: error }, 'getAllLosses 执行失败');
@@ -470,12 +474,7 @@ export const QualityLossService = {
   async getLossSummary(
     filters: Omit<QualityLossQueryParams, 'page' | 'pageSize'>,
   ): Promise<QualityLossItem[]> {
-    const { items } = await this.getAllLosses({
-      ...filters,
-      page: 1,
-      pageSize: 100_000,
-    });
-    return items;
+    return getAllLossesUnpaginated(filters);
   },
 
   /**

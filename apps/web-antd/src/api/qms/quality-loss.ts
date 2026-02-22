@@ -36,6 +36,14 @@ export async function getQualityLossSummary(params?: QualityLossQueryParams) {
   });
 }
 
+export async function getQualityLossExportList(
+  params?: Omit<QualityLossQueryParams, 'page' | 'pageSize'>,
+) {
+  return requestClient.get<QualityLossPageResult>('/qms/quality-loss/export', {
+    params,
+  });
+}
+
 /**
  * Create Quality Loss record
  */

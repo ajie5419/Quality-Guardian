@@ -16,6 +16,7 @@ import { Button, Card, message, Space, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
+  getQualityLossExportList,
   getQualityLossList,
   getQualityLossSummary,
 } from '#/api/qms/quality-loss';
@@ -28,6 +29,7 @@ import {
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData, findNameById } from '#/types';
+import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
 import LossCharts from './components/LossCharts.vue';
 import LossClaimModal from './components/LossClaimModal.vue';
@@ -56,6 +58,29 @@ const { LOSS_ANALYSIS } = PERMISSION_CODES.QMS;
 const canExport = computed(() => hasAccessByCodes([LOSS_ANALYSIS.EXPORT]));
 const canEdit = computed(() => hasAccessByCodes([LOSS_ANALYSIS.EDIT]));
 const canDelete = computed(() => hasAccessByCodes([LOSS_ANALYSIS.DELETE]));
+
+const exportQualityLossAsXlsx = createVxePhotoXlsxExportMethod<QualityLossItem>(
+  {
+    sheetName: t('qms.qualityLoss.title'),
+    filename: () => `${t('qms.qualityLoss.title')}-${Date.now()}.xlsx`,
+    photoField: '__none__',
+    getPhotoUrl: () => '',
+    getRows: async ({ mode, $table, $grid }) => {
+      if (mode === 'selected') {
+        return $table.getCheckboxRecords() || [];
+      }
+      if (mode === 'all') {
+        const proxyInfo = $grid?.getProxyInfo?.();
+        const formValues = (proxyInfo?.form ||
+          {}) as Partial<QualityLossQueryParams>;
+        const response = await getQualityLossExportList(formValues);
+        return response.items || [];
+      }
+      const tableData = $table.getTableData?.();
+      return tableData?.fullData || [];
+    },
+  },
+);
 
 // ================= 状态管理 =================
 const allLossData = ref<QualityLossItem[]>([]);
@@ -141,8 +166,9 @@ const gridOptions = computed<VxeGridProps<QualityLossItem>>(() => ({
     custom: true,
   },
   exportConfig: {
-    remote: false,
-    types: ['xlsx', 'csv'],
+    remote: true,
+    exportMethod: exportQualityLossAsXlsx,
+    types: ['xlsx'],
     modes: ['current', 'selected', 'all'],
   },
   columns: [
