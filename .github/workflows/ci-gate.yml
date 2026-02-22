@@ -54,6 +54,26 @@ jobs:
       - name: Run typecheck
         run: pnpm run check:type
 
+  qms-arch:
+    name: QMS Architecture Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run QMS architecture check
+        run: pnpm run check:qms-arch
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
