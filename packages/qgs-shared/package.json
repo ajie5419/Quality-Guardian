@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch"
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "stub": "sh -c 'pnpm run build'"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
