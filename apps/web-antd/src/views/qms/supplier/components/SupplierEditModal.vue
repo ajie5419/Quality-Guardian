@@ -9,7 +9,10 @@ import { useI18n } from '@vben/locales';
 import { message } from 'ant-design-vue';
 
 import { useVbenForm } from '#/adapter/form';
-import { createSupplier, updateSupplier } from '#/api/qms/supplier';
+import {
+  createSupplierMutation,
+  updateSupplierMutation,
+} from '#/api/qms/supplier';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { getFormSchema } from '../data';
@@ -46,11 +49,15 @@ async function handleSubmit() {
     const values = await formApi.getValues();
     modalApi.setState({ confirmLoading: true });
 
-    await (isUpdate.value && recordId.value
-      ? updateSupplier(recordId.value, values)
-      : createSupplier({ ...values, category: currentCategory.value }));
+    const result =
+      isUpdate.value && recordId.value
+        ? await updateSupplierMutation(recordId.value, values)
+        : await createSupplierMutation({
+            ...values,
+            category: currentCategory.value,
+          });
 
-    message.success(t('common.saveSuccess'));
+    message.success(result.message || t('common.saveSuccess'));
     modalApi.close();
     emit('success');
   } catch (error) {

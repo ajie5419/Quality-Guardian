@@ -15,8 +15,12 @@ import {
   TreeSelect,
 } from 'ant-design-vue';
 
-import { createKnowledge, updateKnowledge } from '#/api/qms/knowledge';
+import {
+  createKnowledgeMutation,
+  updateKnowledgeMutation,
+} from '#/api/qms/knowledge';
 import WangEditor from '#/components/WangEditor/index.vue';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 defineProps<{
   categoryTree: QmsKnowledgeApi.Category[];
@@ -25,6 +29,7 @@ defineProps<{
 const emit = defineEmits(['success']);
 
 const userStore = useUserStore();
+const { handleApiError } = useErrorHandler();
 
 const visible = ref(false);
 const editMode = ref(false);
@@ -77,15 +82,16 @@ async function handleSave() {
     };
 
     if (editMode.value && formState.value.id) {
-      await updateKnowledge(formState.value.id, payload);
-      message.success('更新成功');
+      const result = await updateKnowledgeMutation(formState.value.id, payload);
+      message.success(result.message || '更新成功');
     } else {
-      await createKnowledge(payload);
-      message.success('创建成功');
+      const result = await createKnowledgeMutation(payload);
+      message.success(result.message || '创建成功');
     }
     visible.value = false;
     emit('success', formState.value.id);
-  } catch {
+  } catch (error) {
+    handleApiError(error, 'Save Knowledge');
     message.error('保存失败');
   }
 }

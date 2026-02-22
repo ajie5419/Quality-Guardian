@@ -4,6 +4,10 @@ import type {
   KnowledgeQueryParams,
 } from '@qgs/shared';
 
+import {
+  normalizeListResponse,
+  normalizeMutationResponse,
+} from '#/api/qms/adapters';
 import { requestClient } from '#/api/request';
 
 // Re-export shared types
@@ -58,6 +62,11 @@ export async function getKnowledgeList(params?: KnowledgeQueryParams) {
   );
 }
 
+export async function getKnowledgeListPage(params?: KnowledgeQueryParams) {
+  const raw = await getKnowledgeList(params);
+  return normalizeListResponse<KnowledgeItem>(raw);
+}
+
 /**
  * 获取知识详情
  */
@@ -80,6 +89,19 @@ export async function updateKnowledge(
   data: Partial<KnowledgeItem>,
 ) {
   return requestClient.put<KnowledgeItem>(`/qms/knowledge/${id}`, data);
+}
+
+export async function createKnowledgeMutation(data: Partial<KnowledgeItem>) {
+  const raw = await createKnowledge(data);
+  return normalizeMutationResponse<KnowledgeItem>(raw);
+}
+
+export async function updateKnowledgeMutation(
+  id: string,
+  data: Partial<KnowledgeItem>,
+) {
+  const raw = await updateKnowledge(id, data);
+  return normalizeMutationResponse<KnowledgeItem>(raw);
 }
 
 /**

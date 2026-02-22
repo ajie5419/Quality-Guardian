@@ -7,6 +7,10 @@ import type {
 
 import type { QmsImportSummary } from '#/api/qms/types';
 
+import {
+  normalizeListResponse,
+  normalizeMutationResponse,
+} from '#/api/qms/adapters';
 import { requestClient } from '#/api/request';
 
 import { QMS_API, QMS_IMPORT_TIMEOUT } from './constants';
@@ -19,6 +23,15 @@ export * from '@qgs/shared';
  */
 export async function getSupplierList(params?: SupplierListParams) {
   return requestClient.get<SupplierListResponse>(QMS_API.SUPPLIER, { params });
+}
+
+export async function getSupplierListPage(params?: SupplierListParams) {
+  const raw = await getSupplierList(params);
+  const normalized = normalizeListResponse<SupplierItem>(raw);
+  return {
+    ...normalized,
+    stats: raw.stats,
+  };
 }
 
 /**
@@ -34,6 +47,19 @@ export async function updateSupplier(id: string, data: Partial<SupplierItem>) {
 
 export async function deleteSupplier(id: string) {
   return requestClient.delete(`${QMS_API.SUPPLIER}/${id}`);
+}
+
+export async function createSupplierMutation(data: Partial<SupplierItem>) {
+  const raw = await createSupplier(data);
+  return normalizeMutationResponse<SupplierItem>(raw);
+}
+
+export async function updateSupplierMutation(
+  id: string,
+  data: Partial<SupplierItem>,
+) {
+  const raw = await updateSupplier(id, data);
+  return normalizeMutationResponse<SupplierItem>(raw);
 }
 
 /**

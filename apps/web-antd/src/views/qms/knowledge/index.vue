@@ -31,14 +31,16 @@ import {
   deleteKnowledge,
   getCategoryTree,
   getKnowledgeDetail,
-  getKnowledgeList,
+  getKnowledgeListPage,
 } from '#/api/qms/knowledge';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import CategoryManageModal from './components/CategoryManageModal.vue';
 import KnowledgeEditModal from './components/KnowledgeEditModal.vue';
 
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
+const { handleApiError } = useErrorHandler();
 
 const canCreate = computed(() => hasAccessByCodes(['QMS:Knowledge:Create']));
 const canEdit = computed(() => hasAccessByCodes(['QMS:Knowledge:Edit']));
@@ -100,7 +102,8 @@ async function loadCategories() {
   try {
     const data = await getCategoryTree();
     categoryTree.value = data;
-  } catch {
+  } catch (error) {
+    handleApiError(error, 'Load Knowledge Categories');
     message.error('加载分类失败');
   }
 }
@@ -114,10 +117,11 @@ async function loadKnowledgeList() {
       page: currentPage.value,
       pageSize: pageSize.value,
     };
-    const { items, total } = await getKnowledgeList(params);
+    const { items, total } = await getKnowledgeListPage(params);
     knowledgeList.value = items;
     totalCount.value = total;
-  } catch {
+  } catch (error) {
+    handleApiError(error, 'Load Knowledge List');
     message.error('加载知识列表失败');
   } finally {
     loading.value = false;
@@ -135,7 +139,8 @@ async function loadArticleDetail(id: string) {
   try {
     const data = await getKnowledgeDetail(id);
     articleDetail.value = data;
-  } catch {
+  } catch (error) {
+    handleApiError(error, 'Load Knowledge Detail');
     message.error('加载详情失败');
   } finally {
     detailLoading.value = false;
@@ -185,7 +190,8 @@ function handleDeleteCategory(category: QmsKnowledgeApi.Category) {
           selectedCategoryId.value = [];
         }
         loadCategories();
-      } catch {
+      } catch (error) {
+        handleApiError(error, 'Delete Knowledge Category');
         message.error('删除失败');
       }
     },
@@ -208,7 +214,8 @@ function handleDelete(id: string) {
         selectedArticleId.value = null;
         articleDetail.value = null;
         loadKnowledgeList();
-      } catch {
+      } catch (error) {
+        handleApiError(error, 'Delete Knowledge');
         message.error('删除失败');
       }
     },

@@ -78,7 +78,8 @@ async function loadData() {
     });
     reportData.value = data;
     summary.value = data.summary || '';
-  } catch {
+  } catch (error) {
+    handleApiError(error, 'Load Daily Summary');
     message.error(t('qms.common.dataLoadFailed'));
   } finally {
     loading.value = false;

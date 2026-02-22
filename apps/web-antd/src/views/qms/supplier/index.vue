@@ -10,7 +10,7 @@ import { useI18n } from '@vben/locales';
 import { Badge, Button, Card, Space, Tag, Tooltip } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { getSupplierList } from '#/api/qms/supplier';
+import { getSupplierListPage } from '#/api/qms/supplier';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 
@@ -137,7 +137,7 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
             ...formValues,
           };
 
-          const response = await getSupplierList(params);
+          const response = await getSupplierListPage(params);
           if (response.stats) {
             stats.value = response.stats;
           }
@@ -157,7 +157,7 @@ const gridOptions = reactive<VxeGridProps<QmsSupplierApi.SupplierItem>>({
             pageSize: 100_000,
             ...formValues,
           };
-          const response = await getSupplierList(queryParams);
+          const response = await getSupplierListPage(queryParams);
           return { items: response.items || [] };
         } catch (error) {
           handleApiError(error, 'Load All Supplier Data');

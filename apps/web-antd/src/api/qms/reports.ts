@@ -4,6 +4,10 @@ import type {
   ReportItem,
 } from '@qgs/shared';
 
+import {
+  normalizeListResponse,
+  normalizeMutationResponse,
+} from '#/api/qms/adapters';
 import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
@@ -33,6 +37,11 @@ export async function getReportsList() {
   return requestClient.get<ReportItem[]>(QMS_API.REPORTS);
 }
 
+export async function getReportsListPage() {
+  const raw = await getReportsList();
+  return normalizeListResponse<ReportItem>(raw);
+}
+
 /**
  * Create Report
  */
@@ -46,4 +55,17 @@ export async function updateReport(id: string, data: Partial<ReportItem>) {
 
 export async function deleteReport(id: string) {
   return requestClient.delete(`/qms/reports/${id}`);
+}
+
+export async function createReportMutation(data: Partial<ReportItem>) {
+  const raw = await createReport(data);
+  return normalizeMutationResponse<ReportItem>(raw);
+}
+
+export async function updateReportMutation(
+  id: string,
+  data: Partial<ReportItem>,
+) {
+  const raw = await updateReport(id, data);
+  return normalizeMutationResponse<ReportItem>(raw);
 }
