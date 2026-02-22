@@ -21,7 +21,7 @@ import {
   getDfmeaTree,
   updateDfmeaProject,
 } from '#/api/qms/planning';
-import { getWorkOrderList } from '#/api/qms/work-order';
+import { getWorkOrderListPage } from '#/api/qms/work-order';
 import { getUserList } from '#/api/system/user';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
@@ -126,16 +126,20 @@ async function handleSuccess(id?: string) {
 
 async function loadWorkOrders() {
   try {
-    const res = await getWorkOrderList();
+    const res = await getWorkOrderListPage();
     workOrderList.value = res.items || [];
-  } catch {}
+  } catch (error) {
+    handleApiError(error, 'Load Work Orders For DFMEA');
+  }
 }
 
 async function loadUsers() {
   try {
     const res = await getUserList();
     userList.value = res.items || [];
-  } catch {}
+  } catch (error) {
+    handleApiError(error, 'Load Users For DFMEA');
+  }
 }
 
 function normalizeDfmeaStatus(status: string): DfmeaStatus {

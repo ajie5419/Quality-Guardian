@@ -27,9 +27,11 @@ import {
   generateItpFromFiles,
   importGeneratedItp,
 } from '#/api/qms/ai-planning';
-import { getItpProjectList } from '#/api/qms/planning';
+import { getItpProjectListPage } from '#/api/qms/planning';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 
 const currentStep = ref(0);
 const fileList = ref<UploadFile[]>([]);
@@ -177,15 +179,19 @@ async function handleImport() {
     await importGeneratedItp(selectedProjectId.value, generatedItems.value);
     message.success(t('qms.planning.itpGenerator.importSuccess'));
     currentStep.value = 2;
-  } catch {
+  } catch (error) {
+    handleApiError(error, 'Import Generated ITP');
     message.error(t('common.importFailed'));
   }
 }
 
 async function loadProjects() {
   try {
-    itpProjects.value = await getItpProjectList();
-  } catch {}
+    const res = await getItpProjectListPage();
+    itpProjects.value = res.items || [];
+  } catch (error) {
+    handleApiError(error, 'Load ITP Projects');
+  }
 }
 
 loadProjects();

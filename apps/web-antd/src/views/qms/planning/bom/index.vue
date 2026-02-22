@@ -15,11 +15,12 @@ import {
   createBomProject,
   deleteBom,
   deleteBomProject,
-  getBomList,
+  getBomListPage,
   getBomTree,
   importBomItems,
   updateBomProject,
 } from '#/api/qms/planning';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useGridImport } from '#/hooks/useGridImport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 
@@ -33,6 +34,7 @@ import BomEditModal from './components/BomEditModal.vue';
 import BomProjectModal from './components/BomProjectModal.vue';
 
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
 const { canCreate, canExport, canImport } =
   useQmsPermissions('QMS:Planning:BOM');
 
@@ -86,8 +88,8 @@ async function loadData() {
     } catch (error) {
       console.warn('Grid not ready for reload', error);
     }
-  } catch {
-    // message.error(t('common.loadFailed'));
+  } catch (error) {
+    handleApiError(error, 'Load BOM Planning Data');
   } finally {
     loading.value = false;
   }
@@ -209,6 +211,7 @@ async function handleWorkOrderSelected(workOrderNumber: string) {
     message.success('已成功将工单添加到 BOM 策划列表');
     await loadData();
   } catch (error: unknown) {
+    handleApiError(error, 'Create BOM Project');
     message.error((error as { message?: string })?.message || '添加失败');
   }
 }
@@ -290,10 +293,10 @@ const [Grid, gridApi] = useVbenVxeGrid({
       ajax: {
         query: async () => {
           if (!currentProject.value?.id) return { items: [] };
-          const data = await getBomList({
+          const { items } = await getBomListPage({
             projectId: currentProject.value.id,
           });
-          return { items: data };
+          return { items };
         },
       },
     },

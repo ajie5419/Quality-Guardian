@@ -22,7 +22,7 @@ import {
   getItpTree,
   updateItpProject,
 } from '#/api/qms/planning';
-import { getWorkOrderList } from '#/api/qms/work-order';
+import { getWorkOrderListPage } from '#/api/qms/work-order';
 import { getUserList } from '#/api/system/user';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
@@ -36,6 +36,12 @@ import { CONTROL_POINT_MAP } from '../constants';
 import ItpAssignModal from './components/ItpAssignModal.vue';
 import ItpItemModal from './components/ItpItemModal.vue';
 import ItpProjectModal from './components/ItpProjectModal.vue';
+import {
+  getCurrentProjectVersion,
+  getNodeString,
+  toItpTreeNode,
+  toPlanningNode,
+} from './composables/useItpNodeMapper';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
@@ -46,12 +52,6 @@ const canCreate = computed(() => hasAccessByCodes(['QMS:Planning:ITP:Create']));
 const canExport = computed(() => hasAccessByCodes(['QMS:Planning:ITP:Export']));
 
 type ItpStatus = QmsPlanningApi.ItpProject['status'];
-type ItpNodeLike = Partial<QmsPlanningApi.ItpTreeNode> &
-  Record<string, unknown> & {
-    id: string;
-    name: string;
-    type: 'item' | 'project';
-  };
 
 // ================= Data State =================
 const allProjects = ref<QmsPlanningApi.ItpTreeNode[]>([]);
@@ -150,16 +150,20 @@ async function handleSuccess(id?: string) {
 
 async function loadWorkOrders() {
   try {
-    const res = await getWorkOrderList();
+    const res = await getWorkOrderListPage();
     workOrderList.value = res.items || [];
-  } catch {}
+  } catch (error) {
+    handleApiError(error, 'Load Work Orders For ITP');
+  }
 }
 
 async function loadUsers() {
   try {
     const res = await getUserList();
     userList.value = res.items || [];
-  } catch {}
+  } catch (error) {
+    handleApiError(error, 'Load Users For ITP');
+  }
 }
 
 function getControlPointColor(controlPoint?: string) {
@@ -172,47 +176,6 @@ function normalizeItpStatus(status: string): ItpStatus {
   if (value === 'archived') return 'archived';
   if (value === 'draft') return 'draft';
   return 'active';
-}
-
-function getNodeString(node: PlanningTreeNode | undefined, key: string) {
-  if (!node) return '';
-  const value = node[key];
-  return typeof value === 'string' ? value : '';
-}
-
-function isItpNodeLike(node: unknown): node is ItpNodeLike {
-  if (!node || typeof node !== 'object') return false;
-  const candidate = node as Record<string, unknown>;
-  return (
-    typeof candidate.id === 'string' &&
-    typeof candidate.name === 'string' &&
-    (candidate.type === 'item' || candidate.type === 'project')
-  );
-}
-
-function toPlanningNode(node: unknown): PlanningTreeNode {
-  if (!isItpNodeLike(node)) {
-    return { id: '', name: '', type: 'item' };
-  }
-  return {
-    id: node.id,
-    name: node.name,
-    parentId: typeof node.parentId === 'string' ? node.parentId : null,
-    status: typeof node.status === 'string' ? node.status : undefined,
-    type: node.type,
-    version: typeof node.version === 'string' ? node.version : undefined,
-    workOrderNumber:
-      typeof node.workOrderNumber === 'string' ? node.workOrderNumber : '',
-  };
-}
-
-function toItpTreeNode(node: unknown): QmsPlanningApi.ItpTreeNode {
-  if (isItpNodeLike(node)) return node;
-  return { id: '', name: '', type: 'item' };
-}
-
-function getCurrentProjectVersion(project: null | PlanningTreeNode) {
-  return project?.version || 'v1.0';
 }
 
 function handleEditProject(project: unknown) {

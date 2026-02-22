@@ -13,6 +13,7 @@ import type {
 
 import type { QmsImportSummary } from '#/api/qms/types';
 
+import { normalizeListResponse } from '#/api/qms/adapters';
 import { requestClient } from '#/api/request';
 
 // Project Document type (local definition since not in shared)
@@ -34,6 +35,11 @@ export * from '@qgs/shared';
  */
 export async function getDfmeaProjectList() {
   return requestClient.get<DfmeaProject[]>('/qms/planning/dfmea/projects');
+}
+
+export async function getDfmeaProjectListPage() {
+  const raw = await getDfmeaProjectList();
+  return normalizeListResponse<DfmeaProject>(raw);
 }
 
 export async function createDfmeaProject(data: Partial<DfmeaProject>) {
@@ -73,6 +79,11 @@ export async function getDfmeaItemsByProject(projectId: string) {
   });
 }
 
+export async function getDfmeaItemsByProjectPage(projectId: string) {
+  const raw = await getDfmeaItemsByProject(projectId);
+  return normalizeListResponse<DfmeaItem>(raw);
+}
+
 export async function createDfmea(data: Partial<DfmeaItem>) {
   return requestClient.post<DfmeaItem>('/qms/planning/dfmea', data);
 }
@@ -90,6 +101,11 @@ export async function deleteDfmea(id: string) {
  */
 export async function getBomProjectList() {
   return requestClient.get<BomProject[]>('/qms/planning/bom/projects');
+}
+
+export async function getBomProjectListPage() {
+  const raw = await getBomProjectList();
+  return normalizeListResponse<BomProject>(raw);
 }
 
 export async function createBomProject(data: Partial<BomProject>) {
@@ -114,6 +130,11 @@ export async function getProjectDocProjects() {
   return requestClient.get<ProjectDocProject[]>(
     '/qms/planning/project-docs/projects',
   );
+}
+
+export async function getProjectDocProjectsPage() {
+  const raw = await getProjectDocProjects();
+  return normalizeListResponse<ProjectDocProject>(raw);
 }
 
 export async function createProjectDocProject(data: {
@@ -152,6 +173,11 @@ export async function getBomList(params?: { projectId?: string }) {
   });
 }
 
+export async function getBomListPage(params?: { projectId?: string }) {
+  const raw = await getBomList(params);
+  return normalizeListResponse<BomItem>(raw);
+}
+
 export async function createBom(data: Partial<BomItem>) {
   return requestClient.post<BomItem>('/qms/planning/bom', data);
 }
@@ -176,6 +202,11 @@ export async function importBomItems(data: {
  */
 export async function getItpProjectList() {
   return requestClient.get<ItpProject[]>('/qms/planning/itp/projects');
+}
+
+export async function getItpProjectListPage() {
+  const raw = await getItpProjectList();
+  return normalizeListResponse<ItpProject>(raw);
 }
 
 export async function createItpProject(data: Partial<ItpProject>) {
@@ -204,6 +235,11 @@ export async function getItpList(params?: { projectId?: string }) {
   return requestClient.get<ItpItem[]>('/qms/planning/itp', {
     params,
   });
+}
+
+export async function getItpListPage(params?: { projectId?: string }) {
+  const raw = await getItpList(params);
+  return normalizeListResponse<ItpItem>(raw);
 }
 
 export async function createItp(data: Partial<ItpItem>) {

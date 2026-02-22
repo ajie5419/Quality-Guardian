@@ -16,7 +16,7 @@ import { getInspectionRecords } from '#/api/qms/inspection';
 import {
   createProjectDocProject,
   deleteProjectDocProject,
-  getProjectDocProjects,
+  getProjectDocProjectsPage,
   updateProjectDocProject,
 } from '#/api/qms/planning';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
@@ -68,11 +68,13 @@ const selectedProject = computed(
 async function loadProjects() {
   isProjectsLoading.value = true;
   try {
-    const res = await getProjectDocProjects();
-    projectList.value = res || [];
+    const res = await getProjectDocProjectsPage();
+    projectList.value = res.items || [];
     if (projectList.value.length > 0 && !selectedProjectId.value) {
       selectedProjectId.value = projectList.value[0]?.id || null;
     }
+  } catch (error) {
+    handleApiError(error, 'Load Project Docs Projects');
   } finally {
     isProjectsLoading.value = false;
   }
@@ -90,6 +92,7 @@ async function handleWorkOrderSelected(workOrderNumber: string) {
     message.success('已成功将工单添加到项目资料列表');
     await loadProjects();
   } catch (error: unknown) {
+    handleApiError(error, 'Create Project Docs Project');
     message.error((error as { message?: string })?.message || '添加失败');
   }
 }

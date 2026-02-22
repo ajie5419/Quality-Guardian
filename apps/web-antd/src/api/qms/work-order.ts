@@ -2,6 +2,10 @@ import type { WorkOrderItem } from '@qgs/shared';
 
 import type { QmsImportSummary } from '#/api/qms/types';
 
+import {
+  normalizeListResponse,
+  normalizeMutationResponse,
+} from '#/api/qms/adapters';
 import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
@@ -30,6 +34,25 @@ export async function getWorkOrderList(params?: {
   }>(QMS_API.WORK_ORDER, { params });
 }
 
+export async function getWorkOrderListPage(params?: {
+  ids?: string;
+  ignoreYearFilter?: boolean;
+  keyword?: string;
+  page?: number;
+  pageSize?: number;
+  projectName?: string;
+  status?: string;
+  workOrderNumber?: string;
+  year?: number;
+}) {
+  const raw = await getWorkOrderList(params);
+  const normalized = normalizeListResponse<WorkOrderItem>(raw);
+  return {
+    ...normalized,
+    summary: Array.isArray(raw.summary) ? raw.summary : [],
+  };
+}
+
 /**
  * Create Work Order
  */
@@ -50,6 +73,19 @@ export async function updateWorkOrder(
 export async function deleteWorkOrder(id: string) {
   // Use query param 'id' to handle special characters like '/'
   return requestClient.delete(QMS_API.WORK_ORDER, { params: { id } });
+}
+
+export async function createWorkOrderMutation(data: Partial<WorkOrderItem>) {
+  const raw = await createWorkOrder(data);
+  return normalizeMutationResponse<WorkOrderItem>(raw);
+}
+
+export async function updateWorkOrderMutation(
+  id: string,
+  data: Partial<WorkOrderItem>,
+) {
+  const raw = await updateWorkOrder(id, data);
+  return normalizeMutationResponse<WorkOrderItem>(raw);
 }
 
 /**

@@ -14,7 +14,7 @@ import { Button, message, Select, Space } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { WorkOrderStatusEnum } from '#/api/qms/enums';
-import { getWorkOrderList } from '#/api/qms/work-order';
+import { getWorkOrderListPage } from '#/api/qms/work-order';
 import { getDeptList } from '#/api/system/dept';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { QmsStatusTag } from '#/components/Qms';
@@ -205,14 +205,14 @@ const gridOptions = computed<VxeGridProps>(() => ({
           isStatsLoading.value = true;
 
           // 向后端发送分页与过滤参数
-          const response = await getWorkOrderList({
+          const response = await getWorkOrderListPage({
             year: currentYear.value,
             page: currentPage,
             pageSize,
             ...formValues,
           });
 
-          const { items, total, summary } = response;
+          const { items, summary, total } = response;
 
           // 关键修复：将全量概要数据交给 dashboard 计算
           allWorkOrders.value = summary || [];
@@ -237,7 +237,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
       queryAll: async (params) => {
         const formValues = params.form as WorkOrderFormValues;
         try {
-          const response = await getWorkOrderList({
+          const response = await getWorkOrderListPage({
             year: currentYear.value,
             ...formValues,
           });

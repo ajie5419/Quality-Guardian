@@ -9,7 +9,10 @@ import { useI18n } from '@vben/locales';
 import { message } from 'ant-design-vue';
 
 import { useVbenForm } from '#/adapter/form';
-import { createWorkOrder, updateWorkOrder } from '#/api/qms/work-order';
+import {
+  createWorkOrderMutation,
+  updateWorkOrderMutation,
+} from '#/api/qms/work-order';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { getFormSchema } from '../data';
@@ -59,21 +62,17 @@ async function handleSubmit() {
     // ✅ 修复：移除前端生成的 createTime，由后端统一生成
     const submitApi =
       isUpdate.value && recordId.value
-        ? () => updateWorkOrder(recordId.value!, cleanedValues)
-        : () => createWorkOrder(cleanedValues);
+        ? () => updateWorkOrderMutation(recordId.value!, cleanedValues)
+        : () => createWorkOrderMutation(cleanedValues);
 
-    await submitApi();
+    const result = await submitApi();
 
-    message.success(t('qms.common.saveSuccess'));
+    message.success(result.message || t('qms.common.saveSuccess'));
     modalApi.close();
     emit('success');
   } catch (error: unknown) {
-    const errorMsg =
-      (error as { response?: { data?: { message?: string } } })?.response?.data
-        ?.message ||
-      (error as { message?: string })?.message ||
-      t('qms.common.actionFailed');
-    message.error(errorMsg);
+    handleApiError(error, 'Save Work Order');
+    message.error(t('qms.common.actionFailed'));
   } finally {
     modalApi.setState({ confirmLoading: false });
   }
