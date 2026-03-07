@@ -1,9 +1,16 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { getTargetPassRate } from '~/constants/quality-standards';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  createPassRateTargetResolver,
+  getPassRateDrillDownByRange,
+} from '~/utils/pass-rate';
 import prisma from '~/utils/prisma';
-import { parseReportPeriodType, resolveReportQueryDate } from '~/utils/report';
+import {
+  formatReportDate,
+  parseReportPeriodType,
+  resolveReportQueryDate,
+} from '~/utils/report';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -61,7 +68,7 @@ export default defineEventHandler(async (event) => {
 
     const reportData = {
       title: `${type === 'weekly' ? '周' : '月'}度质量分析报告`,
-      period: `${formatDate(currentPeriod.start)} ~ ${formatDate(currentPeriod.end)}`,
+      period: `${formatReportDate(currentPeriod.start)} ~ ${formatReportDate(currentPeriod.end)}`,
       metrics: [
         {
           label: '综合合格率',
@@ -125,7 +132,7 @@ export default defineEventHandler(async (event) => {
         project: e.projectName,
         loss: Number(e.lossAmount),
         status: e.status,
-        date: formatDate(e.date),
+        date: formatReportDate(e.date),
         desc: e.description,
       })),
     };
@@ -205,38 +212,21 @@ async function fetchPeriodMetrics(start: Date, end: Date) {
 }
 
 async function fetchProcessPassRates(start: Date, end: Date) {
-  interface ProcessPassRateRow {
-    processName: null | string;
-    category: null | string;
-    total: bigint | number;
-    passed: bigint | number;
-  }
-  const rows = (await prisma.$queryRaw`
-      SELECT 
-        processName,
-        category,
-        COUNT(*) as total,
-        SUM(CASE WHEN result = 'PASS' THEN 1 ELSE 0 END) as passed
-      FROM inspections
-      WHERE inspectionDate >= ${start} AND inspectionDate <= ${end} AND isDeleted = 0
-      GROUP BY processName, category
-  `) as ProcessPassRateRow[];
+  const getTargetPassRate = await createPassRateTargetResolver();
+  const drillDown = await getPassRateDrillDownByRange(
+    start,
+    end,
+    getTargetPassRate,
+  );
 
-  return rows.map((row) => {
-    const total = Number(row.total);
-    const passed = Number(row.passed);
-    const passRate = total > 0 ? ((passed / total) * 100).toFixed(2) : '0.00';
-    const targetPassRate = getTargetPassRate(row.processName);
-
-    return {
-      processName: row.processName || '未知工序',
-      category: row.category || '其他',
-      total,
-      passed,
-      passRate: Number(passRate),
-      targetPassRate, // 新增：目标合格率
-    };
-  });
+  return drillDown.map((row) => ({
+    processName: row.process,
+    category: row.category,
+    total: row.totalCount,
+    passed: row.passCount,
+    passRate: row.passRate,
+    targetPassRate: row.targetPassRate,
+  }));
 }
 
 async function fetchDefectDistribution(start: Date, end: Date) {
@@ -314,10 +304,6 @@ function calculateTrend(curr: number, prev: number, lowerIsBetter = false) {
   const diff = (((curr - prev) / prev) * 100).toFixed(1);
   const val = Number(diff);
   return lowerIsBetter ? -val : val;
-}
-
-function formatDate(date: Date) {
-  return date.toISOString().split('T')[0];
 }
 
 function formatDateShort(date: Date, type: string) {

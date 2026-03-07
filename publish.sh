@@ -10,15 +10,17 @@ NC='\033[0m'
 
 DRY_RUN=false
 ROLLBACK_TAG=""
+REHEARSE_ROLLBACK_TAG=""
 
 usage() {
     cat <<USAGE
 用法:
-  ./publish.sh [--dry-run] [--rollback-tag <tag>]
+  ./publish.sh [--dry-run] [--rollback-tag <tag>] [--rehearse-rollback <tag>]
 
 参数:
   --dry-run            仅打印将执行的命令，不实际执行
   --rollback-tag <tag> 回滚/部署到指定版本标签（如 v1.1.17 或 1.1.17）
+  --rehearse-rollback  发布后执行回滚演练，参数为要回滚到的旧版本标签
 USAGE
 }
 
@@ -37,6 +39,15 @@ while [[ $# -gt 0 ]]; do
             ROLLBACK_TAG="$2"
             shift 2
             ;;
+        --rehearse-rollback)
+            if [[ $# -lt 2 ]]; then
+                echo -e "${RED}❌ --rehearse-rollback 缺少参数${NC}"
+                usage
+                exit 1
+            fi
+            REHEARSE_ROLLBACK_TAG="$2"
+            shift 2
+            ;;
         -h|--help)
             usage
             exit 0
@@ -51,6 +62,9 @@ done
 
 if [[ -n "$ROLLBACK_TAG" && "$ROLLBACK_TAG" != v* ]]; then
     ROLLBACK_TAG="v$ROLLBACK_TAG"
+fi
+if [[ -n "$REHEARSE_ROLLBACK_TAG" && "$REHEARSE_ROLLBACK_TAG" != v* ]]; then
+    REHEARSE_ROLLBACK_TAG="v$REHEARSE_ROLLBACK_TAG"
 fi
 
 # --- 配置加载 ---
@@ -242,11 +256,29 @@ fi
 echo "🌱 执行数据库播种 (db seed)..."
 docker-compose run --rm --user root backend sh -c "cd /app/prisma && ln -sfn ../apps/backend/node_modules node_modules && node seed.js"
 
+echo "🔎 预检查 RBAC 脚本运行环境..."
+if ! docker-compose run --rm --user root backend sh -c "cd /app && node -e \"const { createRequire } = require('node:module'); const { pathToFileURL } = require('node:url'); const req = createRequire(pathToFileURL('/app/prisma/rbac-backfill.js')); const candidates = ['@prisma/client','../node_modules/@prisma/client','../apps/backend/node_modules/@prisma/client']; let resolved = ''; for (const candidate of candidates) { try { resolved = req.resolve(candidate); break; } catch {} } if (!resolved) { console.error('RBAC precheck failed: cannot resolve @prisma/client'); process.exit(1); } console.log('RBAC precheck ok:', resolved);\""; then
+    echo "❌ RBAC 脚本运行环境预检查失败"
+    exit 1
+fi
+
+echo "🔁 执行 RBAC 回填 (legacy -> v2)..."
+docker-compose run --rm --user root backend sh -c "cd /app && node prisma/rbac-backfill.js"
+
+echo "🧪 执行 RBAC 一致性检查..."
+if ! docker-compose run --rm --user root backend sh -c "cd /app && node prisma/rbac-consistency-check.js"; then
+    echo "❌ RBAC 一致性检查失败"
+    exit 1
+fi
+
 echo "🔄 更新后端服务..."
 docker-compose up -d --no-deps backend
 
 echo "⏳ 等待后端健康检查（10秒）..."
 sleep 10
+
+echo "🔐 修复上传目录权限 (/app/uploads)..."
+docker-compose exec -u root backend sh -lc "mkdir -p /app/uploads && chown -R node:node /app/uploads && chmod -R u+rwX,g+rwX /app/uploads"
 
 echo "🔎 检查并补齐关键菜单/权限数据（车辆调试）..."
 if ! docker-compose run --rm backend sh -lc 'node -e "
@@ -337,6 +369,60 @@ const prisma = new PrismaClient();
     process.exit(4);
   }
 
+  const superRole = await prisma.roles.findFirst({
+    where: { OR: [{ name: \"super\" }, { name: \"Super Admin\" }], isDeleted: false },
+    select: { id: true, permissions: true }
+  });
+  if (!superRole) {
+    console.error(\"❌ 缺少 super 角色，无法完成权限健康检查\");
+    process.exit(5);
+  }
+
+  let permCodes = [];
+  try {
+    permCodes = JSON.parse(superRole.permissions || \"[]\");
+  } catch {
+    permCodes = [];
+  }
+
+  if (!Array.isArray(permCodes)) {
+    permCodes = [];
+  }
+  if (!permCodes.includes(\"QMS:VehicleCommissioning:List\")) {
+    permCodes.push(\"QMS:VehicleCommissioning:List\");
+    await prisma.roles.update({
+      where: { id: superRole.id },
+      data: { permissions: JSON.stringify(permCodes) }
+    });
+    console.log(\"🛠️ 已自动补齐 super 角色权限码: QMS:VehicleCommissioning:List\");
+  }
+
+  const v2Permission = await prisma.rbac_permissions.upsert({
+    where: { code: \"QMS:VehicleCommissioning:List\" },
+    update: {},
+    create: {
+      id: \"rbac-perm-vc-list\",
+      code: \"QMS:VehicleCommissioning:List\",
+      name: \"QMS:VehicleCommissioning:List\",
+      module: \"QMS\"
+    },
+    select: { id: true }
+  });
+  await prisma.rbac_role_permissions.upsert({
+    where: {
+      roleId_permissionId: {
+        roleId: superRole.id,
+        permissionId: v2Permission.id
+      }
+    },
+    update: { updatedAt: new Date() },
+    create: {
+      id: \"rbac-rp-vc-list-\" + Date.now(),
+      roleId: superRole.id,
+      permissionId: v2Permission.id
+    }
+  });
+
   console.log(\"✅ 关键菜单检查通过:\", menu.id, menu.name, menu.authCode);
 })();"'; then
     echo "❌ 菜单/权限健康检查与自动补齐失败"
@@ -406,6 +492,21 @@ done
 if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
     echo -e "${RED}❌ 健康检查失败，请检查: ssh $ECS_SSH_USER@$ECS_IP 'docker-compose logs backend'${NC}"
     exit 1
+fi
+
+if [[ -n "$REHEARSE_ROLLBACK_TAG" ]]; then
+    echo -e "${BLUE}🧪 8. 回滚演练 (${TAG} -> ${REHEARSE_ROLLBACK_TAG} -> ${TAG})...${NC}"
+    if $DRY_RUN; then
+        echo "[DRY-RUN] bash \"$SCRIPT_DIR/scripts/deploy/rehearse-rollback.sh\" \"$ECS_SSH_USER\" \"$ECS_IP\" \"$ECS_SSH_KEY\" \"$REGISTRY/$REPO\" \"$TAG\" \"$REHEARSE_ROLLBACK_TAG\""
+    else
+        bash "$SCRIPT_DIR/scripts/deploy/rehearse-rollback.sh" \
+            "$ECS_SSH_USER" \
+            "$ECS_IP" \
+            "$ECS_SSH_KEY" \
+            "$REGISTRY/$REPO" \
+            "$TAG" \
+            "$REHEARSE_ROLLBACK_TAG"
+    fi
 fi
 
 echo -e "${GREEN}🎉 部署完成！版本: $TAG${NC}"
