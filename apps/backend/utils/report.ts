@@ -1,5 +1,8 @@
 export function formatReportDate(date: Date): string {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export type ReportPeriodType = 'monthly' | 'weekly';
@@ -24,7 +27,19 @@ export function parseReportDate(value: unknown): Date | null {
     return null;
   }
 
-  const parsed = new Date(String(value));
+  const raw = String(value).trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const parsed = new Date(year, month - 1, day, 12, 0, 0, 0);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) {
     return null;
   }

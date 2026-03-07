@@ -36,6 +36,7 @@ export interface DailySummaryData {
 
 export interface QualityReportSummary {
   defects: Array<{ name: string; value: number }>;
+  historyLabels?: string[];
   majorEvents: Array<{
     date: string;
     desc: string;
@@ -54,6 +55,14 @@ export interface QualityReportSummary {
     value: number;
   }>;
   period: string;
+  processPassRates?: Array<{
+    category: string;
+    passed: number;
+    passRate: number;
+    processName: string;
+    targetPassRate: number;
+    total: number;
+  }>;
   suppliers: {
     best: Array<{ issues: number; name: string }>;
     worst: Array<{ issues: number; name: string }>;
