@@ -22,12 +22,15 @@ import {
 } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
+import { getDeptList } from '#/api/system/dept';
 import { SysStatusEnum } from '#/api/system/enums';
 import {
   createRole,
   deleteRole,
+  getRoleDataScope,
   getRoleList,
   getRolePermissionTree,
+  saveRoleDataScope,
   updateRole,
 } from '#/api/system/role';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
@@ -80,10 +83,74 @@ async function fetchPermissionTree() {
 
 onMounted(() => {
   fetchPermissionTree();
+  fetchDepartments();
 });
 
 const checkedKeys = ref<string[]>([]);
 const expandedKeys = ref<string[]>(['System', 'QMS']);
+type DataScopeModule =
+  | 'after-sales'
+  | 'inspection'
+  | 'quality-loss'
+  | 'supplier'
+  | 'work-order';
+
+const selectedDataScopeModule = ref<DataScopeModule>('supplier');
+const deptOptions = ref<Array<{ label: string; value: string }>>([]);
+const roleDataScopes = reactive<
+  Record<
+    DataScopeModule,
+    { deptIds: string[]; scopeType: 'ALL' | 'DEPT' | 'SELF' }
+  >
+>({
+  'after-sales': { scopeType: 'DEPT', deptIds: [] },
+  inspection: { scopeType: 'DEPT', deptIds: [] },
+  'quality-loss': { scopeType: 'DEPT', deptIds: [] },
+  supplier: { scopeType: 'DEPT', deptIds: [] },
+  'work-order': { scopeType: 'DEPT', deptIds: [] },
+});
+
+function flattenDeptTree(
+  nodes: any[],
+  depth = 0,
+): Array<{ label: string; value: string }> {
+  const result: Array<{ label: string; value: string }> = [];
+  for (const node of nodes || []) {
+    if (!node?.id) continue;
+    const prefix = depth > 0 ? `${'  '.repeat(depth)}└ ` : '';
+    result.push({
+      label: `${prefix}${node.name || node.id}`,
+      value: node.id,
+    });
+    if (Array.isArray(node.children) && node.children.length > 0) {
+      result.push(...flattenDeptTree(node.children, depth + 1));
+    }
+  }
+  return result;
+}
+
+async function fetchDepartments() {
+  try {
+    const list = await getDeptList();
+    deptOptions.value = flattenDeptTree(Array.isArray(list) ? list : []);
+  } catch (error) {
+    handleApiError(error, 'Load Departments');
+  }
+}
+
+async function fetchRoleDataScope(roleId: string, module: DataScopeModule) {
+  try {
+    const result = await getRoleDataScope(roleId, module);
+    roleDataScopes[module].scopeType = result?.scopeType || 'DEPT';
+    roleDataScopes[module].deptIds = Array.isArray(result?.deptIds)
+      ? result.deptIds
+      : [];
+  } catch (error) {
+    roleDataScopes[module].scopeType = 'DEPT';
+    roleDataScopes[module].deptIds = [];
+    handleApiError(error, `Load ${module} Data Scope`);
+  }
+}
 
 const gridOptions = computed<VxeGridProps>(() => ({
   columns: [
@@ -195,6 +262,18 @@ function handlePermissions(row: SystemRoleApi.Role) {
   currentRoleName.value = row.name;
   // Load current permissions for this role
   checkedKeys.value = row.permissions || [];
+  selectedDataScopeModule.value = 'supplier';
+  void Promise.all(
+    (
+      [
+        'supplier',
+        'inspection',
+        'after-sales',
+        'work-order',
+        'quality-loss',
+      ] as DataScopeModule[]
+    ).map((module) => fetchRoleDataScope(row.id, module)),
+  );
   isPermDrawerVisible.value = true;
 }
 
@@ -204,6 +283,15 @@ async function handleSavePermissions() {
     await updateRole(currentId.value, {
       permissions: checkedKeys.value,
     });
+    await Promise.all(
+      (Object.keys(roleDataScopes) as DataScopeModule[]).map((module) =>
+        saveRoleDataScope(currentId.value!, {
+          module,
+          scopeType: roleDataScopes[module].scopeType,
+          deptIds: roleDataScopes[module].deptIds,
+        }),
+      ),
+    );
     message.success('权限设置保存成功');
     isPermDrawerVisible.value = false;
     gridApi.reload();
@@ -333,6 +421,41 @@ async function handleSubmit() {
         :selectable="false"
         :default-expand-all="true"
       />
+      <div class="mt-6 border-t pt-4">
+        <div class="mb-3 text-gray-500">数据权限（标准 RBAC 数据范围）</div>
+        <Form layout="vertical">
+          <FormItem label="作用模块">
+            <Select v-model:value="selectedDataScopeModule">
+              <SelectOption value="supplier">供应商管理</SelectOption>
+              <SelectOption value="inspection">检验管理</SelectOption>
+              <SelectOption value="after-sales">售后质量</SelectOption>
+              <SelectOption value="work-order">工单管理</SelectOption>
+              <SelectOption value="quality-loss">质量损失</SelectOption>
+            </Select>
+          </FormItem>
+          <FormItem label="数据范围">
+            <Select
+              v-model:value="roleDataScopes[selectedDataScopeModule].scopeType"
+            >
+              <SelectOption value="ALL">全部数据 (ALL)</SelectOption>
+              <SelectOption value="DEPT">部门数据 (DEPT)</SelectOption>
+              <SelectOption value="SELF">仅本人数据 (SELF)</SelectOption>
+            </Select>
+          </FormItem>
+          <FormItem
+            v-if="roleDataScopes[selectedDataScopeModule].scopeType === 'DEPT'"
+            label="授权部门"
+          >
+            <Select
+              v-model:value="roleDataScopes[selectedDataScopeModule].deptIds"
+              mode="multiple"
+              allow-clear
+              :options="deptOptions"
+              placeholder="请选择可访问的部门"
+            />
+          </FormItem>
+        </Form>
+      </div>
       <template #footer>
         <Button @click="isPermDrawerVisible = false" class="mr-2">取消</Button>
         <Button type="primary" @click="handleSavePermissions">保存权限</Button>

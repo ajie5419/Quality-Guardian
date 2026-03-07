@@ -13,6 +13,7 @@ import {
 } from '~/utils/work-order-status';
 
 import { formatDateString } from './base.service';
+import { DataScopeService } from './data-scope.service';
 
 // 创建模块级 logger
 const logger = createModuleLogger('WorkOrderService');
@@ -47,6 +48,7 @@ interface WorkOrderListParams {
   ignoreYearFilter?: boolean;
   keyword?: string;
   ids?: string[];
+  userContext?: { userId: string; username?: string };
 }
 
 export const WorkOrderService = {
@@ -74,7 +76,7 @@ export const WorkOrderService = {
     } = getYearDateRange(year);
 
     // 2. 构建基础查询条件
-    const whereCondition: Prisma.work_ordersWhereInput = {
+    let whereCondition: Prisma.work_ordersWhereInput = {
       isDeleted: false,
     };
 
@@ -138,6 +140,16 @@ export const WorkOrderService = {
           whereCondition.deliveryDate = { gte: startOfYear, lte: endOfYear };
         }
       }
+    }
+
+    if (params.userContext?.userId) {
+      whereCondition = await DataScopeService.buildWorkOrderWhere(
+        whereCondition,
+        {
+          userId: params.userContext.userId,
+          username: params.userContext.username,
+        },
+      );
     }
 
     try {

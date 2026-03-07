@@ -252,6 +252,63 @@ model permissions {
   updatedAt   DateTime @updatedAt
 }
 
+model rbac_permissions {
+  id          String                 @id
+  code        String                 @unique
+  name        String
+  description String?
+  module      String
+  isDeleted   Boolean                @default(false)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  roleLinks   rbac_role_permissions[]
+}
+
+model rbac_role_permissions {
+  id           String           @id
+  roleId       String
+  permissionId String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  permission   rbac_permissions @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         roles            @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([permissionId])
+  @@index([roleId])
+}
+
+model rbac_user_roles {
+  id        String   @id
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  role      roles    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+  @@index([userId])
+}
+
+model data_permission_policies {
+  id          String   @id
+  roleId      String
+  module      String
+  scopeType   String   @default("SELF")
+  deptIds     String?  @db.LongText
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  description String?
+  role        roles    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, module])
+  @@index([module])
+  @@index([roleId])
+}
+
 model project_boms {
   id                String      @id
   work_order_number String
@@ -401,7 +458,10 @@ model roles {
   isDeleted   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  users       users[]
+  data_permission_policies data_permission_policies[]
+  rbac_role_permissions    rbac_role_permissions[]
+  rbac_user_roles          rbac_user_roles[]
+  users                    users[]
 }
 
 model sequences {
@@ -495,6 +555,7 @@ model users {
   qms_task_dispatches_assignor                      qms_task_dispatches[] @relation("qms_task_dispatches_assignorIdTousers")
   quality_records_quality_records_inspectorTousers  quality_records[]     @relation("quality_records_inspectorTousers")
   quality_records_quality_records_lastEditorTousers quality_records[]     @relation("quality_records_lastEditorTousers")
+  rbac_user_roles                                   rbac_user_roles[]
   roles                                             roles                 @relation(fields: [roleId], references: [id])
 
   @@index([roleId], map: "users_roleId_fkey")

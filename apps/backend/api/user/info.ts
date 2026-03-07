@@ -1,11 +1,12 @@
 import { eventHandler } from 'h3';
+import { RbacService } from '~/services/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
 
 export default eventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
+  const userinfo = await verifyAccessToken(event);
   if (!userinfo) {
     return unAuthorizedResponse(event);
   }
@@ -19,30 +20,11 @@ export default eventHandler(async (event) => {
     });
 
     if (dbUser) {
-      // Fetch the role name from the roles table
       let roles: string[] = userinfo.roles || [];
       let permissions: string[] = [];
-
-      if (dbUser.roleId) {
-        const role = await prisma.roles.findFirst({
-          where: { id: dbUser.roleId },
-        });
-        if (role) {
-          // Use the role's name as the role identifier
-          roles = [role.name];
-          try {
-            // Parse permissions from JSON string
-            const perms = role.permissions
-              ? JSON.parse(role.permissions as string)
-              : [];
-            if (Array.isArray(perms)) {
-              permissions = perms;
-            }
-          } catch (error) {
-            logApiError('info', error);
-          }
-        }
-      }
+      const roleRows = await RbacService.getUserRoles(dbUser.id);
+      roles = roleRows.map((role) => role.name);
+      permissions = await RbacService.getUserPermissionCodes(dbUser.id);
 
       // Fetch department name
       let deptName = '';

@@ -10,7 +10,7 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
+  const userinfo = await verifyAccessToken(event);
   if (!userinfo) {
     return unAuthorizedResponse(event);
   }
@@ -19,7 +19,13 @@ export default defineEventHandler(async (event) => {
   const params = parseAfterSalesListQuery(query);
 
   try {
-    const list = await AfterSalesService.getList(params);
+    const list = await AfterSalesService.getList({
+      ...params,
+      userContext: {
+        userId: String(userinfo.id || userinfo.userId || ''),
+        username: userinfo.username,
+      },
+    });
     return useResponseSuccess(list);
   } catch (error) {
     logApiError('after-sales', error);

@@ -10,7 +10,7 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
+  const userinfo = await verifyAccessToken(event);
   if (!userinfo) {
     return unAuthorizedResponse(event);
   }
@@ -19,7 +19,13 @@ export default defineEventHandler(async (event) => {
   const params = parseQualityLossListQuery(query);
 
   try {
-    const result = await QualityLossService.getAllLosses(params);
+    const result = await QualityLossService.getAllLosses({
+      ...params,
+      userContext: {
+        userId: String(userinfo.id || userinfo.userId || ''),
+        username: userinfo.username,
+      },
+    });
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('quality-loss', error);

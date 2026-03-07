@@ -10,7 +10,7 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
+  const userinfo = await verifyAccessToken(event);
   if (!userinfo) {
     return unAuthorizedResponse(event);
   }
@@ -19,7 +19,13 @@ export default defineEventHandler(async (event) => {
   const params = parseInspectionIssueListQuery(query);
 
   try {
-    const result = await InspectionService.getIssues(params);
+    const result = await InspectionService.getIssues({
+      ...params,
+      userContext: {
+        userId: String(userinfo.id || userinfo.userId || ''),
+        username: userinfo.username,
+      },
+    });
 
     return useResponseSuccess(result);
   } catch (error) {

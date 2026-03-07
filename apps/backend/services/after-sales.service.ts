@@ -14,6 +14,7 @@ import {
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
+import { DataScopeService } from './data-scope.service';
 import { SystemLogService } from './system-log.service';
 
 // 创建模块级 logger
@@ -158,11 +159,15 @@ export const AfterSalesService = {
   /**
    * Get List of After-Sales Records with filtering
    */
-  async getList(params: AfterSalesParams): Promise<AfterSalesItem[]> {
+  async getList(
+    params: AfterSalesParams & {
+      userContext?: { userId: string; username?: string };
+    },
+  ): Promise<AfterSalesItem[]> {
     const { year, workOrderNumber, projectName, status, supplierBrand } =
       params;
 
-    const where: Prisma.after_salesWhereInput = {
+    let where: Prisma.after_salesWhereInput = {
       isDeleted: false,
     };
 
@@ -190,6 +195,13 @@ export const AfterSalesService = {
         { supplierBrand: { contains: String(supplierBrand).trim() } },
         { projectName: { contains: String(supplierBrand).trim() } },
       ];
+    }
+
+    if (params.userContext?.userId) {
+      where = await DataScopeService.buildAfterSalesWhere(where, {
+        userId: params.userContext.userId,
+        username: params.userContext.username,
+      });
     }
 
     const list = await prisma.after_sales.findMany({

@@ -18,6 +18,7 @@ import {
   formatNumber,
   safeNumber,
 } from './base.service';
+import { DataScopeService } from './data-scope.service';
 import { DeptService } from './dept.service';
 import { SystemLogService } from './system-log.service';
 
@@ -40,6 +41,7 @@ interface TrendItem {
 interface QualityLossQueryParams extends PaginationParams {
   lossSource?: string;
   status?: string;
+  userContext?: { userId: string; username?: string };
   workOrderNumber?: string;
 }
 
@@ -236,7 +238,7 @@ function sortByDateDesc(items: QualityLossItem[]): QualityLossItem[] {
 async function getAllLossesUnpaginated(
   params: Omit<QualityLossQueryParams, 'page' | 'pageSize'> = {},
 ): Promise<QualityLossItem[]> {
-  const { lossSource, status, workOrderNumber } = params;
+  const { lossSource, status, userContext, workOrderNumber } = params;
 
   // 1. 并行获取所有来源的原始数据
   const [manualRecords, internalRecords, externalRecords] = await Promise.all([
@@ -337,7 +339,42 @@ async function getAllLossesUnpaginated(
       )
     : result;
 
-  return sortByDateDesc(statusFiltered);
+  if (!userContext?.userId) {
+    return sortByDateDesc(statusFiltered);
+  }
+
+  const scope = await DataScopeService.getScopeForModule(
+    userContext.userId,
+    'quality-loss',
+  );
+  if (scope.scopeType === 'ALL') {
+    return sortByDateDesc(statusFiltered);
+  }
+
+  if (scope.scopeType === 'DEPT') {
+    const deptCandidates = await DataScopeService.getDeptCandidates(
+      scope.deptIds,
+    );
+    return sortByDateDesc(
+      statusFiltered.filter((item) =>
+        deptCandidates.includes(String(item.responsibleDepartment || '')),
+      ),
+    );
+  }
+
+  // 质量损失聚合记录缺少稳定“责任人账号”字段，SELF 先按用户部门口径兜底。
+  const deptFallback = await DataScopeService.getScopeForModule(
+    userContext.userId,
+    'supplier',
+  );
+  const deptCandidates = await DataScopeService.getDeptCandidates(
+    deptFallback.deptIds,
+  );
+  return sortByDateDesc(
+    statusFiltered.filter((item) =>
+      deptCandidates.includes(String(item.responsibleDepartment || '')),
+    ),
+  );
 }
 
 // ============ 辅助函数：趋势数据处理 ============

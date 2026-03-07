@@ -1,4 +1,5 @@
 import { eventHandler } from 'h3';
+import { RbacService } from '~/services/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { ensureVehicleCommissioningMenu } from '~/utils/menu-bootstrap';
@@ -131,7 +132,7 @@ function filterMenus(
 // ... imports
 
 export default eventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
+  const userinfo = await verifyAccessToken(event);
   if (!userinfo) {
     return unAuthorizedResponse(event);
   }
@@ -159,29 +160,15 @@ export default eventHandler(async (event) => {
       orderBy: { order: 'asc' },
     })) as unknown as Menu[];
 
-    // 2. 获取用户真实权限
+    // 2. 获取用户真实权限（支持 RBAC_READ_V2 切读）
     let userPermissions: string[] = [];
-    let roleName = '';
-
+    let roleNames: string[] = [];
     try {
-      const dbUser = await prisma.users.findFirst({
-        where: {
-          OR: [{ id: String(userId) }, { username: userinfo.username }],
-        },
-        include: {
-          roles: true,
-        },
-      });
-
-      if (dbUser && dbUser.roles) {
-        roleName = dbUser.roles.name;
-        try {
-          userPermissions = JSON.parse(dbUser.roles.permissions || '[]');
-        } catch (error) {
-          logApiError('all', error);
-          userPermissions = [];
-        }
-      }
+      userPermissions = await RbacService.getUserPermissionCodes(
+        String(userId),
+      );
+      const roles = await RbacService.getUserRoles(String(userId));
+      roleNames = roles.map((role) => role.name || '');
     } catch (error) {
       logApiError('all', error);
     }
@@ -191,7 +178,7 @@ export default eventHandler(async (event) => {
 
     // 4. 执行过滤
     const isSuper =
-      roleName.toLowerCase().includes('super') ||
+      roleNames.some((role) => role.toLowerCase().includes('super')) ||
       userPermissions.includes('*') ||
       userPermissions.includes('["*"]') ||
       userId === '1' ||
@@ -205,7 +192,7 @@ export default eventHandler(async (event) => {
     const filteredMenus = filterMenus(fullMenuTree, userCodesSet, isSuper);
 
     console.warn(
-      `[Menu Cache] MISS - User: ${userinfo.username}, ID: ${userinfo.id}, Role: ${roleName}, IsSuper: ${isSuper}`,
+      `[Menu Cache] MISS - User: ${userinfo.username}, ID: ${userinfo.id}, Roles: ${roleNames.join(',')}, IsSuper: ${isSuper}`,
     );
 
     return useResponseSuccess(filteredMenus);

@@ -1,5 +1,7 @@
 import prisma from '~/utils/prisma';
 
+import { RbacService } from './rbac.service';
+
 export interface UserQueryParams {
   page?: number;
   pageSize?: number;
@@ -116,6 +118,8 @@ export const UserService = {
       },
     });
 
+    await RbacService.saveUserRoles(newUser.id, [newUser.roleId]);
+
     return {
       ...newUser,
       deptId: newUser.department,
@@ -161,6 +165,10 @@ export const UserService = {
       where: { id },
       data: updateData,
     });
+
+    if (updateData.roleId) {
+      await RbacService.saveUserRoles(id, [String(updateData.roleId)]);
+    }
   },
 
   /**

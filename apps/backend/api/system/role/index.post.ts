@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { RbacService } from '~/services/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -13,7 +14,7 @@ import {
 import { requireSystemAdmin } from '~/utils/system-auth';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
+  const userinfo = await verifyAccessToken(event);
   if (!userinfo) {
     return unAuthorizedResponse(event);
   }
@@ -25,11 +26,7 @@ export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
 
-    // Ensure permissions is stringified
-    let permissionsStr = '[]';
-    if (body.permissions) {
-      permissionsStr = JSON.stringify(body.permissions);
-    }
+    const permissions = Array.isArray(body.permissions) ? body.permissions : [];
 
     await redis.delByPattern('qms:menu:*');
     const newRole = await prisma.roles.create({
@@ -38,16 +35,18 @@ export default defineEventHandler(async (event) => {
         name: body.value || body.name, // Use 'value' as the unique name identifier
         description: body.remark || body.description || body.name, // Use 'name' as description/display name
         status: body.status ?? 1,
-        permissions: permissionsStr,
+        permissions: JSON.stringify(permissions),
         isSystem: false,
         isDeleted: false,
       },
     });
 
+    await RbacService.saveRolePermissions(newRole.id, permissions);
+
     // Return with parsed permissions to be consistent
     return useResponseSuccess({
       ...newRole,
-      permissions: body.permissions || [],
+      permissions,
     });
   } catch (error) {
     logApiError('role', error);

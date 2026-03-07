@@ -30,6 +30,29 @@ export const deleteRole = (id: string) => {
   return requestClient.delete(`/system/role/${id}`);
 };
 
+export interface RoleDataScopePayload {
+  deptIds?: string[];
+  module: string;
+  scopeType: 'ALL' | 'DEPT' | 'SELF';
+}
+
+export interface RoleDataScopeResponse extends RoleDataScopePayload {
+  roleId: string;
+}
+
+export const getRoleDataScope = (id: string, module: string) => {
+  return requestClient.get<RoleDataScopeResponse>(
+    `/system/role/${id}/data-scope`,
+    {
+      params: { module },
+    },
+  );
+};
+
+export const saveRoleDataScope = (id: string, data: RoleDataScopePayload) => {
+  return requestClient.post(`/system/role/${id}/data-scope`, data);
+};
+
 export namespace SystemRoleApi {
   export type Role = import('@qgs/shared').Role;
 }

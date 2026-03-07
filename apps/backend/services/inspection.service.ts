@@ -7,6 +7,7 @@ import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
 import { BaseService } from './base.service';
+import { DataScopeService } from './data-scope.service';
 import { SystemLogService } from './system-log.service';
 
 const logger = createModuleLogger('InspectionService');
@@ -389,10 +390,11 @@ export const InspectionService = {
     sortOrder?: 'asc' | 'desc';
     status?: string | string[];
     supplierName?: string;
+    userContext?: { userId: string; username?: string };
     workOrderNumber?: string;
     year?: number;
   }): Promise<{ items: InspectionIssue[]; total: number }> {
-    const where: Prisma.quality_recordsWhereInput = { isDeleted: false };
+    let where: Prisma.quality_recordsWhereInput = { isDeleted: false };
 
     if (params.processName) {
       where.processName = params.processName;
@@ -436,6 +438,13 @@ export const InspectionService = {
       where.status = Array.isArray(params.status)
         ? { in: params.status as any }
         : (params.status as any);
+    }
+
+    if (params.userContext?.userId) {
+      where = await DataScopeService.buildInspectionWhere(where, {
+        userId: params.userContext.userId,
+        username: params.userContext.username,
+      });
     }
 
     const {

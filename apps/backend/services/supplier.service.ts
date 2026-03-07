@@ -1,5 +1,7 @@
 import prisma from '~/utils/prisma';
 
+import { DataScopeService } from './data-scope.service';
+
 // --- Scoring Constants (Configurable) ---
 const THRESHOLD_CLASS_A_AMOUNT = 5000; // Class A: Loss > 5000
 const THRESHOLD_CRITICAL_AMOUNT = 80_000; // Blacklist: Loss > 80000
@@ -93,6 +95,7 @@ export interface SupplierQueryParams {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   name?: string;
+  userContext?: { userId: string; username?: string };
 }
 
 export const SupplierService = {
@@ -132,13 +135,20 @@ export const SupplierService = {
       ];
     }
 
+    const scopedWhere = params.userContext?.userId
+      ? await DataScopeService.buildSupplierWhere(where, {
+          userId: params.userContext.userId,
+          username: params.userContext.username,
+        })
+      : where;
+
     // 2. 执行核心查询
     const [rawItems, totalCount] = await Promise.all([
       prisma.suppliers.findMany({
-        where,
+        where: scopedWhere,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.suppliers.count({ where }),
+      prisma.suppliers.count({ where: scopedWhere }),
     ]);
 
     // 3. 安全的数据映射
