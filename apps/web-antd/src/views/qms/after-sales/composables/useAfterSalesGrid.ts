@@ -8,6 +8,11 @@ import { computed } from 'vue';
 
 import { findNameById } from '#/types';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
+import {
+  extractPhotoThumbUrl,
+  extractPhotoUrl,
+  isNonEmptyString,
+} from '#/views/qms/shared/utils/photo-url';
 
 import { useStatusOptions } from '../constants';
 
@@ -20,6 +25,7 @@ type ExtendedGridFormSchema = GridFormSchema & { colProps?: { span?: number } };
 type AfterSalesGridRow = QmsAfterSalesApi.AfterSalesItem & {
   photoExportUrl: string;
   photos: string[];
+  photoThumbUrl: string;
 };
 
 interface UseAfterSalesGridParams {
@@ -40,23 +46,6 @@ interface UseAfterSalesGridParams {
   t: (key: string, params?: Record<string, any>) => string;
 }
 
-function extractPhotoUrl(photo: unknown): string | undefined {
-  if (typeof photo === 'string') {
-    return photo.trim() || undefined;
-  }
-  if (photo && typeof photo === 'object') {
-    const url = (photo as { url?: unknown }).url;
-    if (typeof url === 'string') {
-      return url.trim() || undefined;
-    }
-  }
-  return undefined;
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0;
-}
-
 function normalizeAfterSalesRows(
   data: QmsAfterSalesApi.AfterSalesItem[],
 ): AfterSalesGridRow[] {
@@ -74,10 +63,17 @@ function normalizeAfterSalesRows(
           .map((photo) => extractPhotoUrl(photo))
           .filter((value): value is string => isNonEmptyString(value))
       : [];
+    const thumbList = Array.isArray(photos)
+      ? photos
+          .map((photo) => extractPhotoThumbUrl(photo))
+          .filter((value): value is string => isNonEmptyString(value))
+      : [];
+
     return {
       ...item,
       photos: photoList,
       photoExportUrl: photoList[0] || '',
+      photoThumbUrl: thumbList[0] || photoList[0] || '',
     };
   });
 }

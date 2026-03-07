@@ -12,6 +12,11 @@ import dayjs from 'dayjs';
 import { getInspectionIssues } from '#/api/qms/inspection';
 import { findNameById } from '#/types';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
+import {
+  extractPhotoThumbUrl,
+  extractPhotoUrl,
+  isNonEmptyString,
+} from '#/views/qms/shared/utils/photo-url';
 
 import { gridColumns } from '../data';
 
@@ -23,6 +28,7 @@ interface GridFilterItem {
 type InspectionGridRow = InspectionIssue & {
   photoExportUrl: string;
   photos: string[];
+  photoThumbUrl: string;
 };
 
 interface UseIssueGridOptionsParams {
@@ -39,23 +45,6 @@ interface UseIssueGridOptionsParams {
   t: (key: string, params?: Record<string, any>) => string;
 }
 
-function extractPhotoUrl(photo: unknown): string | undefined {
-  if (typeof photo === 'string') {
-    return photo.trim() || undefined;
-  }
-  if (photo && typeof photo === 'object') {
-    const url = (photo as { url?: unknown }).url;
-    if (typeof url === 'string') {
-      return url.trim() || undefined;
-    }
-  }
-  return undefined;
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0;
-}
-
 function normalizeInspectionRows(data: InspectionIssue[]): InspectionGridRow[] {
   return (data || []).map((item) => {
     const photoList = Array.isArray(item.photos)
@@ -63,10 +52,17 @@ function normalizeInspectionRows(data: InspectionIssue[]): InspectionGridRow[] {
           .map((photo) => extractPhotoUrl(photo))
           .filter((value): value is string => isNonEmptyString(value))
       : [];
+    const thumbList = Array.isArray(item.photos)
+      ? item.photos
+          .map((photo) => extractPhotoThumbUrl(photo))
+          .filter((value): value is string => isNonEmptyString(value))
+      : [];
+
     return {
       ...item,
       photos: photoList,
       photoExportUrl: photoList[0] || '',
+      photoThumbUrl: thumbList[0] || photoList[0] || '',
     };
   });
 }

@@ -17,6 +17,7 @@ export interface AfterSalesItem {
   occurDate: string; // 发生日期
   partName?: string; // 部件名称
   photos?: string[]; // 现场照片
+  photoThumbUrl?: string; // 缩略图地址（列表展示）
   productSubtype?: string; // 产品二级分类
   productType?: string; // 产品类型
   projectName: string; // 项目名称

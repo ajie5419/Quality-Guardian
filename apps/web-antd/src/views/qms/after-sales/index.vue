@@ -325,7 +325,13 @@ function handleModalSuccess() {
                 <Image
                   :width="40"
                   :height="40"
-                  :src="Array.isArray(row.photos) ? row.photos[0] : row.photos"
+                  :src="
+                    row.photoThumbUrl ||
+                    (Array.isArray(row.photos) ? row.photos[0] : row.photos)
+                  "
+                  :fallback="
+                    Array.isArray(row.photos) ? row.photos[0] : row.photos
+                  "
                   class="rounded shadow-sm"
                 />
               </div>

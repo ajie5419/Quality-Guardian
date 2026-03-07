@@ -14,6 +14,7 @@ export interface InspectionIssue {
   ncNumber: string; // 不合格编号
   partName: string; // 部件名称
   photos: string[]; // 问题照片
+  photoThumbUrl?: string; // 缩略图地址（列表展示）
   projectName: string; // 项目名称
   quantity: number; // 数量
   reportDate: string;

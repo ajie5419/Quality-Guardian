@@ -1,7 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { extname, relative, resolve } from 'node:path';
 
 import { defineEventHandler, setResponseStatus } from 'h3';
+import sharp from 'sharp';
 import { logApiError } from '~/utils/api-logger';
 import { UPLOAD_DIR } from '~/utils/paths';
 import { useResponseError } from '~/utils/response';
@@ -18,7 +20,55 @@ const MIME_TYPES: Record<string, string> = {
   '.pdf': 'application/pdf',
 };
 
-export default defineEventHandler((event) => {
+const THUMB_SUFFIX = '_thumb.webp';
+const THUMB_SOURCE_EXTENSIONS = [
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.gif',
+  '.bmp',
+  '.svg',
+];
+
+async function ensureThumbnailIfNeeded(filename: string, filePath: string) {
+  if (existsSync(filePath) || !filename.endsWith(THUMB_SUFFIX)) {
+    return;
+  }
+
+  const baseName = filename.slice(0, -THUMB_SUFFIX.length);
+  let sourcePath: string | undefined;
+  for (const ext of THUMB_SOURCE_EXTENSIONS) {
+    const candidate = resolve(UPLOAD_DIR, `${baseName}${ext}`);
+    if (existsSync(candidate)) {
+      sourcePath = candidate;
+      break;
+    }
+  }
+
+  if (!sourcePath) {
+    return;
+  }
+
+  try {
+    const thumbBuffer = await sharp(sourcePath)
+      .rotate()
+      .resize(320, 320, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 72 })
+      .toBuffer();
+    await writeFile(filePath, thumbBuffer);
+  } catch (error) {
+    logApiError('uploads-thumbnail-lazy-generate', error, {
+      filename,
+      sourcePath,
+    });
+  }
+}
+
+export default defineEventHandler(async (event) => {
   const filename = getRequiredRouterParam(
     event,
     'filename',
@@ -37,6 +87,8 @@ export default defineEventHandler((event) => {
     return useResponseError('Access denied');
   }
 
+  await ensureThumbnailIfNeeded(filename, filePath);
+
   if (!existsSync(filePath)) {
     // Log absolute path to help identify shared DB vs local storage discrepancies
     console.error(`[Serving] File not found at absolute path: ${filePath}`);
@@ -51,7 +103,11 @@ export default defineEventHandler((event) => {
 
     event.node.res.setHeader('Content-Type', contentType);
     event.node.res.setHeader('Content-Length', fileBuffer.length);
-    event.node.res.setHeader('Cache-Control', 'public, max-age=31536000');
+    // Filenames are unique (timestamp + random), safe for long immutable cache.
+    event.node.res.setHeader(
+      'Cache-Control',
+      'public, max-age=31536000, immutable',
+    );
     event.node.res.setHeader('Access-Control-Allow-Origin', '*');
 
     return fileBuffer;

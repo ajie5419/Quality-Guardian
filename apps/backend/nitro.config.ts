@@ -38,6 +38,18 @@ export default defineNitroConfig({
           process.env.NODE_ENV === 'production'
             ? process.env.PRODUCTION_URL || 'https://qms.tolian-tech.com'
             : '*',
+        // Uploaded files use hashed/timestamped filenames and can be strongly cached.
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
+    },
+    '/api/uploads/**': {
+      cors: true,
+      headers: {
+        'Access-Control-Allow-Origin':
+          process.env.NODE_ENV === 'production'
+            ? process.env.PRODUCTION_URL || 'https://qms.tolian-tech.com'
+            : '*',
+        'Cache-Control': 'public, max-age=31536000, immutable',
       },
     },
   },
