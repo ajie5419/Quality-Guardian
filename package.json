@@ -1,6 +1,6 @@
 {
   "name": "quality-guardian-system",
-  "version": "1.2.0",
+  "version": "1.2.3",
   "private": true,
   "keywords": [
     "quality",
@@ -30,6 +30,7 @@
     "check:qms-arch": "bash ./scripts/check-qms-architecture.sh",
     "check:dep": "vsh check-dep",
     "check:type": "turbo run typecheck",
+    "local:rbac": "bash ./scripts/local/rbac-local-one-click.sh",
     "clean": "node ./scripts/clean.mjs",
     "commit": "czg",
     "dev": "turbo-run dev",
