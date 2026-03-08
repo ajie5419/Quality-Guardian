@@ -1,14 +1,18 @@
 <script lang="ts" setup>
+import type { Dayjs } from 'dayjs';
+
 import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import type { EChartsClickParams, EChartsColorParams } from '#/types/common';
 
 import { nextTick, ref, watch } from 'vue';
 
+import { useI18n } from '@vben/locales';
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
 
 import { tryOnUnmounted } from '@vueuse/core';
-import { Spin } from 'ant-design-vue';
+import { DatePicker, Spin } from 'ant-design-vue';
+import dayjs from 'dayjs';
 
 import { getVehicleFailureRate } from '#/api/qms/dashboard';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
@@ -17,17 +21,20 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
  * 车型排行数据项
  */
 interface RankingItem {
+  failedVehicles: number;
   model: string;
   rate: number;
+  totalVehicles: number;
 }
 
 /**
  * 趋势数据项
  */
 interface TrendItem {
+  failedVehicles: number;
   period: string;
-  shipped: number;
   rate: number;
+  totalVehicles: number;
 }
 
 interface Props {
@@ -35,6 +42,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 
 const rankingChartRef = ref<EchartsUIType>();
@@ -52,20 +60,53 @@ const loading = ref(false);
 const rankingData = ref<RankingItem[]>([]);
 const trendData = ref<TrendItem[]>([]);
 const selectedModel = ref<null | string>(null);
+const selectedMonth = ref<Dayjs>(dayjs());
+
+function normalizeRankingItem(item: unknown): RankingItem {
+  const normalized = item as Record<string, number | string>;
+  return {
+    failedVehicles: Number(
+      normalized.failedVehicles || normalized.faultWorkOrders || 0,
+    ),
+    model: String(normalized.model || ''),
+    rate: Number(normalized.rate || 0),
+    totalVehicles: Number(
+      normalized.totalVehicles || normalized.shippedWorkOrders || 0,
+    ),
+  };
+}
+
+function normalizeTrendItem(item: unknown): TrendItem {
+  const normalized = item as Record<string, number | string>;
+  return {
+    failedVehicles: Number(
+      normalized.failedVehicles || normalized.faultWorkOrders || 0,
+    ),
+    period: String(normalized.period || ''),
+    rate: Number(normalized.rate || 0),
+    totalVehicles: Number(
+      normalized.totalVehicles || normalized.shippedWorkOrders || 0,
+    ),
+  };
+}
 
 async function fetchData(model?: string) {
   loading.value = true;
   try {
     const res = await getVehicleFailureRate({
-      range: '12m',
+      month: selectedMonth.value.format('YYYY-MM'),
       model: model || undefined,
     });
     // Ensure we handle empty response gracefully
     if (res) {
       if (!model) {
-        rankingData.value = res.ranking || [];
+        rankingData.value = (res.ranking || []).map((item) =>
+          normalizeRankingItem(item as unknown),
+        );
       }
-      trendData.value = res.trend || [];
+      trendData.value = (res.trend || []).map((item) =>
+        normalizeTrendItem(item as unknown),
+      );
     } else {
       if (!model) rankingData.value = [];
       trendData.value = [];
@@ -87,18 +128,33 @@ function updateCharts() {
   if (!selectedModel.value && rankingData.value) {
     const rankingOption = {
       title: {
-        text: '车型故障率排行 (Top 10)',
+        text: t('qms.dashboard.vehicleFailureRateRanking'),
         left: 'center',
         textStyle: { fontSize: 14 },
       },
       tooltip: {
         trigger: 'axis' as const,
         axisPointer: { type: 'shadow' as const },
+        formatter: (params: unknown) => {
+          const [first] = params as Array<{ data: number; name: string }>;
+          const item = rankingData.value.find(
+            (entry) => entry.model === first?.name,
+          );
+          if (!item) {
+            return '';
+          }
+          return [
+            `${item.model}`,
+            `${t('qms.dashboard.vehicleFailureRate')}: ${item.rate}%`,
+            `${t('qms.dashboard.failedVehicles')}: ${item.failedVehicles}`,
+            `${t('qms.dashboard.totalVehicles')}: ${item.totalVehicles}`,
+          ].join('<br/>');
+        },
       },
       grid: { left: '3%', right: '10%', bottom: '3%', containLabel: true },
       xAxis: {
         type: 'value' as const,
-        name: '故障率%',
+        name: `${t('qms.dashboard.vehicleFailureRate')}%`,
         axisLabel: { formatter: '{value}%' },
       },
       yAxis: {
@@ -107,7 +163,7 @@ function updateCharts() {
       },
       series: [
         {
-          name: '故障率',
+          name: t('qms.dashboard.vehicleFailureRate'),
           type: 'bar' as const,
           data: rankingData.value.map((i) => i.rate).reverse(),
           itemStyle: {
@@ -137,27 +193,51 @@ function updateCharts() {
   const trendOption = {
     title: {
       text: selectedModel.value
-        ? `${selectedModel.value} 故障率趋势`
-        : '总体故障率趋势',
+        ? `${selectedModel.value} ${t('qms.dashboard.vehicleFailureRateTrend')}`
+        : t('qms.dashboard.overallVehicleFailureRateTrend'),
       left: 'center',
-      subtext: '近12个月',
+      subtext: t('qms.dashboard.yearToMonthByVehicle'),
       textStyle: { fontSize: 14 },
     },
     tooltip: {
       trigger: 'axis' as const,
       axisPointer: { type: 'cross' as const },
+      formatter: (params: unknown) => {
+        const seriesParams = params as Array<{ name: string }>;
+        const period = seriesParams[0]?.name;
+        const item = trendData.value.find((entry) => entry.period === period);
+        if (!item) {
+          return '';
+        }
+        return [
+          `${item.period}`,
+          `${t('qms.dashboard.vehicleFailureRate')}: ${item.rate}%`,
+          `${t('qms.dashboard.failedVehicles')}: ${item.failedVehicles}`,
+          `${t('qms.dashboard.totalVehicles')}: ${item.totalVehicles}`,
+        ].join('<br/>');
+      },
     },
-    legend: { data: ['出货量', '故障率'], bottom: 0 },
+    legend: {
+      data: [
+        t('qms.dashboard.totalVehicles'),
+        t('qms.dashboard.vehicleFailureRate'),
+      ],
+      bottom: 0,
+    },
     grid: { left: '3%', right: '4%', bottom: '10%', containLabel: true },
     xAxis: {
       type: 'category' as const,
       data: trendData.value.map((i) => i.period),
     },
     yAxis: [
-      { type: 'value' as const, name: '出货量', position: 'left' as const },
       {
         type: 'value' as const,
-        name: '故障率',
+        name: t('qms.dashboard.totalVehicles'),
+        position: 'left' as const,
+      },
+      {
+        type: 'value' as const,
+        name: t('qms.dashboard.vehicleFailureRate'),
         position: 'right' as const,
         axisLabel: { formatter: '{value}%' },
         splitLine: { show: false },
@@ -165,14 +245,14 @@ function updateCharts() {
     ],
     series: [
       {
-        name: '出货量',
+        name: t('qms.dashboard.totalVehicles'),
         type: 'bar' as const,
-        data: trendData.value.map((i) => i.shipped),
+        data: trendData.value.map((i) => i.totalVehicles),
         itemStyle: { color: '#d9d9d9', borderRadius: [4, 4, 0, 0] },
         barMaxWidth: 30,
       },
       {
-        name: '故障率',
+        name: t('qms.dashboard.vehicleFailureRate'),
         type: 'line' as const,
         yAxisIndex: 1,
         data: trendData.value.map((i) => i.rate),
@@ -182,7 +262,7 @@ function updateCharts() {
           data: [
             {
               yAxis: 2,
-              name: '预警线',
+              name: t('qms.dashboard.warningLine'),
               lineStyle: { color: 'red', type: 'dashed' as const },
             },
           ],
@@ -220,6 +300,14 @@ watch(
   { immediate: true },
 );
 
+watch(selectedMonth, () => {
+  if (!props.active) {
+    return;
+  }
+  selectedModel.value = null;
+  fetchData();
+});
+
 tryOnUnmounted(() => {
   if (getRankingInstance()) {
     getRankingInstance()?.dispose();
@@ -240,6 +328,15 @@ tryOnUnmounted(() => {
 
     <!-- Ranking List (Left) -->
     <div class="relative h-full w-full border-r border-gray-100 pr-2 md:w-1/3">
+      <div class="mb-2 flex items-center justify-end">
+        <DatePicker
+          v-model:value="selectedMonth"
+          picker="month"
+          :allow-clear="false"
+          size="small"
+          style="width: 140px"
+        />
+      </div>
       <EchartsUI ref="rankingChartRef" width="100%" height="100%" />
 
       <div

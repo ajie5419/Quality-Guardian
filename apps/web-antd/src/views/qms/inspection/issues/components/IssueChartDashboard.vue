@@ -26,6 +26,8 @@ import {
 import { UI_CONSTANTS } from '../constants';
 
 const props = defineProps<{
+  dateMode?: 'month' | 'week' | 'year';
+  dateValue?: string;
   year?: number;
 }>();
 
@@ -55,6 +57,8 @@ async function fetchData() {
   loading.value = true;
   try {
     const res = await getInspectionIssues({
+      dateMode: props.dateMode,
+      dateValue: props.dateValue,
       year: props.year,
       pageSize: 10_000,
     });
@@ -213,7 +217,7 @@ function handleRemoveCustomChart(id: string) {
 }
 
 watch(
-  () => props.year,
+  () => [props.year, props.dateMode, props.dateValue],
   () => fetchData(),
   { immediate: true },
 );

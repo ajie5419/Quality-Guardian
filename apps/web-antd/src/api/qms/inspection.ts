@@ -22,6 +22,8 @@ export interface InspectionIssueStats {
 export * from '@qgs/shared';
 
 export async function getInspectionIssues(params?: {
+  dateMode?: 'month' | 'week' | 'year';
+  dateValue?: string;
   page?: number;
   pageSize?: number;
   processName?: string;
@@ -40,7 +42,11 @@ export async function getInspectionIssues(params?: {
   return normalizeListResponse<InspectionIssue>(raw);
 }
 
-export async function getInspectionIssueStats(params?: { year?: number }) {
+export async function getInspectionIssueStats(params?: {
+  dateMode?: 'month' | 'week' | 'year';
+  dateValue?: string;
+  year?: number;
+}) {
   return requestClient.get<InspectionIssueStats>(
     QMS_API.INSPECTION_ISSUES_STATS,
     { params },

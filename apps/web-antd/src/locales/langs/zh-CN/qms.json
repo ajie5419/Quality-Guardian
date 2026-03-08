@@ -131,6 +131,13 @@
     "passRateTrend": "合格率趋势",
     "qualityLossStats": "质量损失统计",
     "vehicleFailureRate": "车辆故障率",
+    "vehicleFailureRateRanking": "车型故障率排行（年度累计）",
+    "failedVehicles": "故障车辆数",
+    "totalVehicles": "出货车辆数",
+    "vehicleFailureRateTrend": "车辆故障率趋势",
+    "overallVehicleFailureRateTrend": "总体车辆故障率趋势",
+    "yearToMonthByVehicle": "当年1月至所选月，按唯一工单号累计统计",
+    "warningLine": "预警线",
     "weeklyPassRateTrend": "周度合格率趋势",
     "monthlyPassRateTrend": "月度合格率趋势",
     "recentOrders": "最近工单",
@@ -324,6 +331,12 @@
       "closedRate": "关闭率",
       "aiInsightReport": "AI 质量月报洞察",
       "trendAnalysis": "质量问题趋势分析",
+      "dateMode": {
+        "label": "统计维度",
+        "year": "按年",
+        "month": "按月",
+        "week": "按周"
+      },
       "createIssue": "新建问题",
       "editIssue": "编辑问题",
       "settleToKnowledge": "案例",
@@ -511,6 +524,12 @@
   },
   "afterSales": {
     "title": "售后问题",
+    "dateMode": {
+      "label": "统计维度",
+      "year": "按年",
+      "month": "按月",
+      "week": "按周"
+    },
     "status": {
       "open": "开启",
       "resolved": "已解决",

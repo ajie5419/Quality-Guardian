@@ -3,162 +3,267 @@ import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseSuccess } from '~/utils/response';
 
+interface FaultRateWindow {
+  end: Date;
+  label: string;
+  start: Date;
+}
+
+interface FaultSummary {
+  failedVehicles: number;
+  rate: number;
+  totalVehicles: number;
+}
+
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
-  const modelFilter = (query.model as string) || null;
+  const modelFilter = normalizeModelFilter(query.model);
+  const endMonth = parseEndMonth(query.month);
 
   try {
-    const months = getYTDMonths();
+    const windows = getYearToDateWindows(endMonth);
 
-    // 1. Get Trend Data (YTD Cumulative)
-    // Each point represents the cumulative failure rate from Jan 1st to that month.
     const trend = await Promise.all(
-      months.map(async (month) => {
-        // YTD Window: [Jan 1st, Month End]
-        const windowStart = new Date(new Date().getFullYear(), 0, 1);
-        windowStart.setHours(0, 0, 0, 0);
-
-        // A. Shipped Count (Denominator) - R12M
-        const shippedResult = await prisma.work_orders.aggregate({
-          _sum: { quantity: true },
-          where: {
-            deliveryDate: { gte: windowStart, lte: month.end }, // Rolling window
-            isDeleted: false,
-            status: 'COMPLETED',
-            ...(modelFilter ? { projectName: modelFilter } : {}),
-          },
-        });
-        const shipped = Number(shippedResult._sum.quantity || 0);
-
-        // B. Failure Count (Numerator) - R12M
-        const failureCount = await prisma.after_sales.count({
-          where: {
-            occurDate: { gte: windowStart, lte: month.end }, // Rolling window
-            ...(modelFilter ? { projectName: modelFilter } : {}),
-            isDeleted: false,
-          },
-        });
-
-        const rate =
-          shipped > 0 ? ((failureCount / shipped) * 100).toFixed(2) : 0;
+      windows.map(async (window) => {
+        const summary = await buildFaultSummary(window, modelFilter);
 
         return {
-          period: month.label,
-          rate: Number(rate),
-          shipped, // Note: This is now R12M cumulative shipment, might be misleading if interpreted as monthly.
-          // Usually trend bars show monthly volume, line shows R12M rate.
-          // BUT user wants data accurate for low volume. Showing monthly volume is fine, rate should be R12M.
-          // Let's return Monthly Shipment for the bar, but R12M Rate for the line.
-          r12mShipped: shipped, // Internal use or debugging
-          r12mFailures: failureCount,
+          failedVehicles: summary.failedVehicles,
+          period: window.label,
+          rate: summary.rate,
+          totalVehicles: summary.totalVehicles,
         };
       }),
     );
 
-    // Correcting the "Shipped" returned to frontend:
-    // If we return the R12M sum as "shipped", the bar chart will be huge (annual volume).
-    // Usually, dashboard users want to see "Monthly Volume vs Annualized Rate".
-    // Let's re-query strict monthly volume for the "shipped" field.
+    const rankingWindow = {
+      end: windows.at(-1)?.end ?? new Date(),
+      label: 'ranking',
+      start: windows[0]?.start ?? new Date(),
+    };
 
-    const monthlyVolumes = await Promise.all(
-      months.map(async (m) => {
-        const res = await prisma.work_orders.aggregate({
-          _sum: { quantity: true },
-          where: {
-            deliveryDate: { gte: m.start, lte: m.end },
-            isDeleted: false,
-            status: 'COMPLETED',
-            ...(modelFilter ? { projectName: modelFilter } : {}),
-          },
-        });
-        return Number(res._sum.quantity || 0);
-      }),
-    );
-
-    const finalTrend = trend.map((t, i) => ({
-      ...t,
-      shipped: monthlyVolumes[i], // Return MONTHLY volume for the bar chart
-    }));
-
-    // 2. Ranking Data (Overall R12M of the LAST month in the series, effectively current status)
-    // Or aggregate of the whole displayed period?
-    // Ranking typically shows "Who is worst right now?". So R12M of the latest month is best.
-    // But the previous implementation aggregated the whole visible period (Jan-Dec).
-    // Let's stick to "Last 12 Months from Today" for ranking, which matches the R12M concept.
-
-    // 2. Ranking (YTD Total)
-    // Filter from Jan 1st of Current Year
-    const rankingStart = new Date(new Date().getFullYear(), 0, 1);
-    rankingStart.setHours(0, 0, 0, 0);
-    const rankingEnd = new Date();
-
-    const shipmentsByModel = await prisma.work_orders.groupBy({
-      _sum: { quantity: true },
-      by: ['projectName'],
-      where: {
-        deliveryDate: { gte: rankingStart, lte: rankingEnd },
-        isDeleted: false,
-        status: 'COMPLETED',
-      },
-    });
-
-    const failuresByModel = await prisma.after_sales.groupBy({
-      by: ['projectName'],
-      _count: { _all: true },
-      where: {
-        occurDate: { gte: rankingStart, lte: rankingEnd },
-        isDeleted: false,
-      },
-    });
-
-    const failureCounts: Record<string, number> = {};
-    failuresByModel.forEach((f) => {
-      const model = f.projectName || 'Unknown';
-      failureCounts[model] = f._count._all;
-    });
-
-    const ranking = shipmentsByModel
-      .map((item) => {
-        const model = item.projectName || 'Unknown';
-        const shipped = Number(item._sum.quantity || 0);
-        const failures = failureCounts[model] || 0;
-        const rate = shipped > 0 ? ((failures / shipped) * 100).toFixed(2) : 0;
-
-        return {
-          model,
-          shipped,
-          failures,
-          rate: Number(rate),
-        };
-      })
-      .filter((item) => item.model !== 'Unknown' && item.shipped > 0)
-      .sort((a, b) => b.rate - a.rate)
-      .slice(0, 10);
+    const ranking = await buildRanking(rankingWindow);
 
     return useResponseSuccess({
-      trend: finalTrend,
       ranking,
+      trend,
     });
   } catch (error) {
     logApiError('vehicle-failure-rate', error);
-    return { trend: [], ranking: [] };
+    return useResponseSuccess({
+      ranking: [],
+      trend: [],
+    });
   }
 });
 
-function getYTDMonths() {
-  const months = [];
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
+async function buildFaultSummary(
+  window: FaultRateWindow,
+  modelFilter: null | string,
+): Promise<FaultSummary> {
+  const shippedVehicles = await prisma.work_orders.findMany({
+    select: {
+      workOrderNumber: true,
+    },
+    where: {
+      deliveryDate: { gte: window.start, lte: window.end },
+      isDeleted: false,
+      projectName: buildVehicleProjectNameFilter(modelFilter),
+      status: 'COMPLETED',
+    },
+  });
 
-  for (let i = 0; i <= currentMonth; i++) {
-    const start = new Date(currentYear, i, 1);
-    const end = new Date(currentYear, i + 1, 0, 23, 59, 59);
-    months.push({
-      label: `${currentYear}-${String(i + 1).padStart(2, '0')}`,
-      start,
+  const shippedVehicleIds = [
+    ...new Set(shippedVehicles.map((item) => item.workOrderNumber)),
+  ];
+  if (shippedVehicleIds.length === 0) {
+    return {
+      failedVehicles: 0,
+      rate: 0,
+      totalVehicles: 0,
+    };
+  }
+
+  const failedVehicles = await prisma.after_sales.groupBy({
+    by: ['workOrderNumber'],
+    where: {
+      isDeleted: false,
+      occurDate: { lte: window.end },
+      projectName: buildVehicleProjectNameFilter(modelFilter),
+      workOrderNumber: {
+        in: shippedVehicleIds,
+      },
+    },
+  });
+
+  const totalVehicles = shippedVehicleIds.length;
+  const failedVehicleCount = failedVehicles.length;
+  const rate =
+    totalVehicles > 0
+      ? Number(((failedVehicleCount / totalVehicles) * 100).toFixed(2))
+      : 0;
+
+  return {
+    failedVehicles: failedVehicleCount,
+    rate,
+    totalVehicles,
+  };
+}
+
+async function buildRanking(window: FaultRateWindow) {
+  const shippedVehicles = await prisma.work_orders.findMany({
+    select: {
+      projectName: true,
+      workOrderNumber: true,
+    },
+    where: {
+      deliveryDate: { gte: window.start, lte: window.end },
+      isDeleted: false,
+      projectName: buildVehicleProjectNameFilter(),
+      status: 'COMPLETED',
+    },
+  });
+
+  const modelToVehicles = new Map<string, Set<string>>();
+  for (const item of shippedVehicles) {
+    const model = normalizeModelName(item.projectName);
+    if (!model) {
+      continue;
+    }
+
+    if (!modelToVehicles.has(model)) {
+      modelToVehicles.set(model, new Set());
+    }
+    modelToVehicles.get(model)?.add(item.workOrderNumber);
+  }
+
+  const allVehicleIds = [
+    ...new Set(shippedVehicles.map((item) => item.workOrderNumber)),
+  ];
+  const faultGroups =
+    allVehicleIds.length > 0
+      ? await prisma.after_sales.groupBy({
+          by: ['projectName', 'workOrderNumber'],
+          where: {
+            isDeleted: false,
+            occurDate: { lte: window.end },
+            projectName: buildVehicleProjectNameFilter(),
+            workOrderNumber: {
+              in: allVehicleIds,
+            },
+          },
+        })
+      : [];
+
+  const failedVehiclesByModel = new Map<string, Set<string>>();
+  for (const group of faultGroups) {
+    const model = normalizeModelName(group.projectName);
+    if (!model) {
+      continue;
+    }
+    if (!failedVehiclesByModel.has(model)) {
+      failedVehiclesByModel.set(model, new Set());
+    }
+    failedVehiclesByModel.get(model)?.add(group.workOrderNumber);
+  }
+
+  return [...modelToVehicles.entries()]
+    .map(([model, vehicles]) => {
+      const totalVehicles = vehicles.size;
+      const failedVehicles = failedVehiclesByModel.get(model)?.size || 0;
+      const rate =
+        totalVehicles > 0
+          ? Number(((failedVehicles / totalVehicles) * 100).toFixed(2))
+          : 0;
+
+      return {
+        failedVehicles,
+        model,
+        rate,
+        totalVehicles,
+      };
+    })
+    .filter((item) => {
+      return Boolean(item.model) && item.totalVehicles > 0;
+    })
+    .sort((a, b) => b.rate - a.rate)
+    .slice(0, 10);
+}
+
+function getYearToDateWindows(endMonth: Date): FaultRateWindow[] {
+  const windows: FaultRateWindow[] = [];
+  const endMonthIndex = endMonth.getMonth();
+
+  for (let monthIndex = 0; monthIndex <= endMonthIndex; monthIndex += 1) {
+    const start = new Date(endMonth.getFullYear(), 0, 1);
+    const end = new Date(
+      endMonth.getFullYear(),
+      monthIndex + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
+
+    windows.push({
       end,
+      label: `${endMonth.getFullYear()}-${String(monthIndex + 1).padStart(2, '0')}`,
+      start,
     });
   }
-  return months;
+
+  return windows;
+}
+
+function normalizeModelFilter(value: unknown): null | string {
+  const normalized = normalizeModelName(value);
+  return normalized || null;
+}
+
+function normalizeModelName(value: unknown): null | string {
+  const normalized = String(value ?? '').trim();
+  return normalized || null;
+}
+
+function buildVehicleProjectNameFilter(modelFilter?: null | string) {
+  if (modelFilter) {
+    if (!modelFilter.includes('车')) {
+      return {
+        equals: '__QMS_VEHICLE_PROJECT_FILTER_NONE__',
+      };
+    }
+
+    return {
+      equals: modelFilter,
+    };
+  }
+
+  return {
+    contains: '车',
+  };
+}
+
+function parseEndMonth(month: unknown): Date {
+  if (typeof month !== 'string' || !month.trim()) {
+    return new Date();
+  }
+
+  const match = /^(\d{4})-(\d{2})$/.exec(month.trim());
+  if (!match) {
+    return new Date();
+  }
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(monthIndex) ||
+    monthIndex < 0 ||
+    monthIndex > 11
+  ) {
+    return new Date();
+  }
+
+  return new Date(year, monthIndex, 1);
 }

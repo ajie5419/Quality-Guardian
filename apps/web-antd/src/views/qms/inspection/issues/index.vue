@@ -14,12 +14,14 @@ import {
   Button,
   Card,
   Col,
+  DatePicker,
   Image,
   Row,
   Select,
   Statistic,
   Tag,
 } from 'ant-design-vue';
+import dayjs from 'dayjs';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { importInspectionIssues } from '#/api/qms/inspection';
@@ -80,7 +82,25 @@ const { deptTreeData, deptRawData, loadInitialData } = useIssueData();
 
 const { years: dynamicYears } = useAvailableYears();
 const currentYear = ref<number>(new Date().getFullYear());
+const currentDateMode = ref<'month' | 'week' | 'year'>('year');
+const currentDate = ref(dayjs());
 const chartDashboardRef = ref();
+
+const currentFilterYear = computed(() => {
+  return currentDateMode.value === 'year'
+    ? currentYear.value
+    : currentDate.value.year();
+});
+
+const currentDateValue = computed(() => {
+  if (currentDateMode.value === 'month') {
+    return currentDate.value.format('YYYY-MM');
+  }
+  if (currentDateMode.value === 'week') {
+    return currentDate.value.format('YYYY-MM-DD');
+  }
+  return String(currentYear.value);
+});
 
 const gridApiProxyRef = ref<null | { reload: () => void }>(null);
 
@@ -115,12 +135,22 @@ const yearOptions = computed(() => {
   }));
 });
 
+const dateModeOptions = computed(() => {
+  return [
+    { label: t('qms.inspection.issues.dateMode.year'), value: 'year' },
+    { label: t('qms.inspection.issues.dateMode.month'), value: 'month' },
+    { label: t('qms.inspection.issues.dateMode.week'), value: 'week' },
+  ];
+});
+
 const { gridOptions } = useIssueGridOptions({
+  currentDateMode,
+  currentDateValue,
   canDelete,
   canEdit,
   canImport,
   canSettle,
-  currentYear,
+  currentYear: currentFilterYear,
   deptRawData,
   handleDelete,
   handleEdit,
@@ -149,12 +179,25 @@ const { showCharts, loadPreferences, handleSaveSystemDefault } =
   useIssueChartPreferences();
 const { statistics, fetchStatistics } = useIssueRemoteStatistics();
 function refreshStatistics() {
-  return fetchStatistics(currentYear.value);
+  return fetchStatistics({
+    dateMode: currentDateMode.value,
+    dateValue: currentDateValue.value,
+    year: currentFilterYear.value,
+  });
 }
 
-watch(currentYear, () => {
+watch([currentYear, currentDateMode, currentDate], () => {
   refreshStatistics();
   gridApi.reload();
+});
+
+watch(currentDateMode, (mode) => {
+  if (mode === 'year') {
+    currentYear.value = currentDate.value.year();
+    return;
+  }
+
+  currentDate.value = currentDate.value.year(currentYear.value);
 });
 
 onMounted(() => {
@@ -168,14 +211,19 @@ onMounted(() => {
 const { isGeneratingInsight, generateReport } = useAiReport();
 
 async function handleGenerateInsight() {
-  await generateReport(statistics.value, currentYear.value);
+  await generateReport(statistics.value, currentFilterYear.value);
 }
 </script>
 
 <template>
   <Page class="h-full">
     <div v-if="showCharts" class="mb-4">
-      <IssueChartDashboard ref="chartDashboardRef" :year="currentYear" />
+      <IssueChartDashboard
+        ref="chartDashboardRef"
+        :date-mode="currentDateMode"
+        :date-value="currentDateValue"
+        :year="currentFilterYear"
+      />
     </div>
 
     <!-- 核心统计概览 -->
@@ -312,14 +360,26 @@ async function handleGenerateInsight() {
             {{ showCharts ? t('common.hideChart') : t('common.showChart') }}
           </Button>
           <div class="flex items-center gap-2">
-            <span class="text-gray-500"
-              >{{ t('qms.inspection.records.statsYear') }}:</span
-            >
+            <span class="text-gray-500">
+              {{ t('qms.inspection.issues.dateMode.label') }}:
+            </span>
             <Select
+              v-model:value="currentDateMode"
+              :options="dateModeOptions"
+              class="w-[100px]"
+            />
+            <Select
+              v-if="currentDateMode === 'year'"
               v-model:value="currentYear"
               :options="yearOptions"
               class="w-[120px]"
-              @change="() => gridApi.reload()"
+            />
+            <DatePicker
+              v-else
+              v-model:value="currentDate"
+              :allow-clear="false"
+              :picker="currentDateMode"
+              class="w-[160px]"
             />
           </div>
           <Button

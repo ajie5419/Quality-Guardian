@@ -105,17 +105,20 @@ export interface QualityLossTrendResponse {
  * Vehicle Ranking Item
  */
 export interface VehicleRankingItem {
+  failedVehicles: number;
   model: string;
   rate: number;
+  totalVehicles: number;
 }
 
 /**
  * Vehicle Trend Item
  */
 export interface VehicleTrendItem {
+  failedVehicles: number;
   period: string;
   rate: number;
-  shipped: number;
+  totalVehicles: number;
 }
 
 /**

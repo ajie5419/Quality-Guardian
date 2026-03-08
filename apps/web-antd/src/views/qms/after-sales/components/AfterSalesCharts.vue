@@ -20,6 +20,8 @@ import CustomChartBuilderModal from './CustomChartBuilderModal.vue';
 import CustomChartItem from './CustomChartItem.vue';
 
 const props = defineProps<{
+  dateMode?: 'month' | 'week' | 'year';
+  dateValue?: string;
   refreshKey?: number;
   year?: number;
 }>();
@@ -53,6 +55,8 @@ async function fetchData() {
     // 获取全量数据用于自定义分析，pageSize 设大一点
     const [listRes, deptRes] = await Promise.all([
       getAfterSalesList({
+        dateMode: props.dateMode,
+        dateValue: props.dateValue,
         year: props.year,
         pageSize: 10_000,
       } as QmsAfterSalesApi.AfterSalesParams),
@@ -203,7 +207,7 @@ function handleRemoveCustomChart(id: string) {
 
 // Watch for year or refreshKey changes
 watch(
-  () => [props.year, props.refreshKey],
+  () => [props.year, props.dateMode, props.dateValue, props.refreshKey],
   () => fetchData(),
   { immediate: true },
 );

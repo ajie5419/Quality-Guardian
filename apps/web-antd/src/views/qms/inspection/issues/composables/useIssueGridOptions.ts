@@ -32,11 +32,13 @@ type InspectionGridRow = InspectionIssue & {
 };
 
 interface UseIssueGridOptionsParams {
+  currentDateMode: Ref<'month' | 'week' | 'year'>;
+  currentDateValue: ComputedRef<string> | Ref<string>;
   canDelete: Ref<boolean>;
   canEdit: Ref<boolean>;
   canImport: Ref<boolean>;
   canSettle: ComputedRef<boolean>;
-  currentYear: Ref<number>;
+  currentYear: ComputedRef<number> | Ref<number>;
   deptRawData: Ref<BaseTreeNode[]>;
   handleDelete: (row: InspectionIssue) => void;
   handleEdit: (row: InspectionIssue) => void;
@@ -68,6 +70,8 @@ function normalizeInspectionRows(data: InspectionIssue[]): InspectionGridRow[] {
 }
 
 export function useIssueGridOptions({
+  currentDateMode,
+  currentDateValue,
   canDelete,
   canEdit,
   canImport,
@@ -100,6 +104,8 @@ export function useIssueGridOptions({
             }
           });
           const { items } = await getInspectionIssues({
+            dateMode: currentDateMode.value,
+            dateValue: currentDateValue.value,
             year: currentYear.value,
             workOrderNumber: formValues?.workOrderNumber as string,
             projectName: formValues?.projectName as string,
@@ -294,6 +300,8 @@ export function useIssueGridOptions({
           });
 
           const { items, total } = await getInspectionIssues({
+            dateMode: currentDateMode.value,
+            dateValue: currentDateValue.value,
             page: page?.currentPage || 1,
             pageSize: page?.pageSize || 20,
             sortBy: sortParam?.field,
@@ -311,6 +319,8 @@ export function useIssueGridOptions({
         queryAll: async ({ form }: { form: Record<string, unknown> }) => {
           const formValues = form || {};
           const { items } = await getInspectionIssues({
+            dateMode: currentDateMode.value,
+            dateValue: currentDateValue.value,
             year: currentYear.value,
             workOrderNumber: formValues?.workOrderNumber as string,
             projectName: formValues?.projectName as string,

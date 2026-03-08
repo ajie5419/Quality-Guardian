@@ -11,7 +11,16 @@ import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
-import { Button, Image, message, Modal, Select, Tag } from 'ant-design-vue';
+import {
+  Button,
+  DatePicker,
+  Image,
+  message,
+  Modal,
+  Select,
+  Tag,
+} from 'ant-design-vue';
+import dayjs from 'dayjs';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
@@ -90,12 +99,42 @@ onMounted(() => loadData());
 
 const { years: dynamicYears } = useAvailableYears();
 const currentYear = ref<number>(new Date().getFullYear());
+const currentDateMode = ref<'month' | 'week' | 'year'>('year');
+const currentDate = ref(dayjs());
 const yearOptions = computed(() => {
   return dynamicYears.value.map((y) => ({
     label: `${y}${t('common.unit.year')}`,
     value: y,
   }));
 });
+const currentFilterYear = computed(() =>
+  currentDateMode.value === 'year'
+    ? currentYear.value
+    : currentDate.value.year(),
+);
+const currentDateValue = computed(() => {
+  if (currentDateMode.value === 'month') {
+    return currentDate.value.format('YYYY-MM');
+  }
+  if (currentDateMode.value === 'week') {
+    return currentDate.value.format('YYYY-MM-DD');
+  }
+  return String(currentYear.value);
+});
+const dateModeOptions = computed(() => [
+  {
+    label: t('qms.afterSales.dateMode.year'),
+    value: 'year',
+  },
+  {
+    label: t('qms.afterSales.dateMode.month'),
+    value: 'month',
+  },
+  {
+    label: t('qms.afterSales.dateMode.week'),
+    value: 'week',
+  },
+]);
 
 const gridApiProxy =
   ref<ReturnType<typeof useVbenVxeGrid<QmsAfterSalesApi.AfterSalesItem>>[1]>();
@@ -259,7 +298,9 @@ const { gridOptions, formSchema } = useAfterSalesGrid({
   canImport,
   canSettle,
   canToolbarExport,
-  currentYear,
+  currentDateMode,
+  currentDateValue,
+  currentYear: currentFilterYear,
   deptRawData,
   getAfterSalesListPage,
   handleDelete,
@@ -287,6 +328,19 @@ watch(deptRawData, () => {
   gridApi.reload();
 });
 
+watch([currentYear, currentDateMode, currentDate], () => {
+  gridApi.reload();
+  chartRefreshKey.value++;
+});
+
+watch(currentDateMode, (mode) => {
+  if (mode === 'year') {
+    currentYear.value = currentDate.value.year();
+    return;
+  }
+  currentDate.value = currentDate.value.year(currentYear.value);
+});
+
 function handleModalSuccess() {
   invalidateAfterSales();
   chartRefreshKey.value++;
@@ -302,7 +356,9 @@ function handleModalSuccess() {
           <AfterSalesCharts
             ref="chartsRef"
             v-model:charts="customChartsData"
-            :year="currentYear"
+            :date-mode="currentDateMode"
+            :date-value="currentDateValue"
+            :year="currentFilterYear"
             :refresh-key="chartRefreshKey"
           />
         </div>
@@ -390,15 +446,35 @@ function handleModalSuccess() {
                   }}
                 </Button>
                 <div class="flex items-center gap-2">
+                  <span class="text-xs text-gray-500">
+                    {{ t('qms.afterSales.dateMode.label') }}:
+                  </span>
+                  <Select
+                    v-model:value="currentDateMode"
+                    :options="dateModeOptions"
+                    size="small"
+                    class="w-[100px]"
+                  />
+                </div>
+                <div class="flex items-center gap-2">
                   <span class="text-xs text-gray-500"
                     >{{ t('qms.inspection.records.statsYear') }}:</span
                   >
                   <Select
+                    v-if="currentDateMode === 'year'"
                     v-model:value="currentYear"
                     :options="yearOptions"
                     size="small"
                     class="w-[100px]"
                     @change="() => gridApi.reload()"
+                  />
+                  <DatePicker
+                    v-else
+                    v-model:value="currentDate"
+                    :picker="currentDateMode"
+                    :allow-clear="false"
+                    size="small"
+                    class="w-[140px]"
                   />
                 </div>
                 <Button

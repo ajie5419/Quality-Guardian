@@ -61,11 +61,13 @@ export async function getQualityLossTrend(
 /**
  * Get vehicle failure rate data
  * @param params
+ * @param params.month
  * @param params.model
  * @param params.range
  */
 export async function getVehicleFailureRate(params?: {
   model?: string;
+  month?: string;
   range?: string;
 }) {
   return requestClient.get<VehicleFailureResponse>(

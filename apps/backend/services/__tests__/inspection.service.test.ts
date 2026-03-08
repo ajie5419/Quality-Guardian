@@ -102,7 +102,7 @@ describe('inspectionService', () => {
       ]);
       (prisma.$queryRaw as any).mockResolvedValue([{ month: 1, amount: 300 }]);
 
-      const stats = await InspectionService.getIssueStats(2024);
+      const stats = await InspectionService.getIssueStats({ year: 2024 });
 
       expect(stats.totalCount).toBe(2);
       expect(stats.openCount).toBe(1);

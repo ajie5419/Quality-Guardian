@@ -145,3 +145,120 @@
 - [ ] 收集当前未提交改动
 - [ ] 按模块归类为可审查清单
 - [ ] 输出建议的整理/提交顺序
+
+## 质量概览故障率口径严谨化（2026-03-08）
+
+- [x] 确认 `after_sales` / `work_orders` 可用于唯一主体统计的字段
+- [x] 将“车辆故障率”改为按唯一工单统计的严谨口径
+- [x] 同步调整前端标题、图例、提示文案
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type`
+- [x] 输出新旧口径差异说明
+
+### 故障率口径严谨化 Review
+
+- 现有模型中没有 VIN/车架号，`after_sales` 与 `work_orders` 间唯一稳定公共键只有 `workOrderNumber`。
+- 因此将原“车辆故障率”调整为“车型故障工单率”，避免用售后记录条数冒充单车故障率。
+- 后端接口 `apps/backend/api/qms/vehicle-failure-rate.get.ts` 已改为按近 12 个月、按月窗口、按唯一 `workOrderNumber` 统计：
+  - 分子：当月发生售后的唯一工单数
+  - 分母：当月已完成出货的唯一工单数
+- 前端图表 `apps/web-antd/src/views/qms/dashboard/components/VehicleFailureChart.vue` 已同步改为“故障工单率 / 出货工单数 / 故障工单数”口径，并在副标题中明确“按唯一工单统计”。
+- 国际化文案 `apps/web-antd/src/locales/langs/zh-CN/qms.json` 已同步调整，去掉“车辆故障率”的误导表达。
+- 验证通过：`pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`。
+
+## 质量概览月份筛选口径修正（2026-03-08）
+
+- [x] 将月份筛选窗口从“滚动12个月”改为“当年1月至所选月”
+- [x] 同步修正图表标题/副标题文案
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type`
+
+### 月份筛选口径修正 Review
+
+- `apps/backend/api/qms/vehicle-failure-rate.get.ts` 已由“滚动12个月”窗口改为“当年1月至所选月”的自然年窗口。
+- 选择 `YYYY-MM` 后，趋势图会展示该年 1 月到该月的逐月数据；不会再混入上一年月份。
+- 排行榜也统一按同一自然年窗口重算，保证左侧排行与右侧趋势口径一致。
+- `apps/web-antd/src/views/qms/dashboard/components/VehicleFailureChart.vue` 已移除旧的 `range=12m` 语义依赖。
+- 文案已修正为“年度累计”“当年1月至所选月，按唯一工单统计”。
+- 验证通过：`pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`。
+
+## 质量概览车型范围收口（2026-03-08）
+
+- [x] 将故障工单率接口限制为只统计项目名包含“车”的项目
+- [x] 修复车型筛选覆盖默认过滤的问题
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type`
+- [x] 运行 `pnpm check:qms-arch`
+
+### 车型范围收口 Review
+
+- `apps/backend/api/qms/vehicle-failure-rate.get.ts` 已统一限制为仅统计 `projectName` 包含“车”的项目。
+- 当存在车型筛选时，若筛选值本身不包含“车”，接口将返回空结果，不再错误统计其他非车辆项目。
+- 当筛选值包含“车”时，接口按该项目名精确匹配，避免 `contains` 带来的误命中。
+
+## 质量概览车辆故障率标准化（2026-03-08）
+
+- [x] 按“工单号即车辆唯一 ID”重定义分子分母
+- [x] 将趋势与排行统一为年度累计车辆故障率口径
+- [x] 同步修正前端图表文案、图例、提示字段
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type`
+- [x] 运行 `pnpm check:qms-arch`
+
+### 车辆故障率标准化 Review
+
+- 用户确认 `workOrderNumber` 即车辆唯一 ID，因此首页指标已从“故障工单率”升级为标准“车辆故障率”。
+- `apps/backend/api/qms/vehicle-failure-rate.get.ts` 现改为：
+  - 分母：当年 1 月至所选月累计出货的唯一工单号数
+  - 分子：这些已出货车辆中，截至所选月累计发生售后的唯一工单号数
+- 趋势图每个月均按“当年 1 月起累计”重算，不再使用单月故障数除以单月出货数。
+- 排行榜与趋势图口径已统一，且仍只统计项目名包含“车”的项目。
+- 前端文案已同步改为“车辆故障率 / 故障车辆数 / 出货车辆数”，副标题明确为“按唯一工单号累计统计”。
+
+## 质量概览车辆故障率趋势标签修复（2026-03-08）
+
+- [x] 修复年度累计窗口下月份标签重复显示为 1 月的问题
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type`
+- [x] 运行 `pnpm check:qms-arch`
+
+### 趋势标签修复 Review
+
+- 根因：`apps/backend/api/qms/vehicle-failure-rate.get.ts` 将累计窗口的 `start` 固定为当年 1 月后，趋势标签仍从 `start` 取月份，导致所有点显示为 `YYYY-01`。
+- 修复：趋势标签改为使用循环中的 `monthIndex + 1` 生成，累计窗口仍保持“当年 1 月起”。
+- 结果：趋势图现在会正确显示 `2026-01 / 2026-02 / 2026-03 ...`，而不是全部显示 `2026-01`。
+
+## 不合格项周/月筛选联动（2026-03-08）
+
+- [x] 为不合格项列表增加按年/按月/按周时间筛选
+- [x] 让统计卡与图表面板同步复用同一时间范围
+- [x] 后端列表与统计接口统一支持 `dateMode/dateValue`
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type`
+- [x] 运行 `pnpm check:qms-arch`
+
+### 不合格项周/月筛选联动 Review
+
+- `apps/web-antd/src/views/qms/inspection/issues/index.vue` 已新增按年/按月/按周筛选控件；年模式保留原年份选择，月/周模式改为日期选择器。
+- 列表数据、统计卡片和图表面板统一透传 `dateMode/dateValue/year`，避免页面和图表各算各的。
+- `apps/backend/utils/inspection-issue.ts` 已新增统一时间解析与范围构建逻辑；周模式按周一到周日、月模式按自然月、年模式按自然年处理。
+- `apps/backend/services/inspection.service.ts` 已复用同一时间范围构建列表与统计查询；趋势图在月/周模式下切换为按日统计，年模式保持按月统计。
+- 验证通过：`pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`。
+
+## 售后质量周/月筛选联动（2026-03-08）
+
+- [x] 检查售后页面、图表与后端筛选口径
+- [x] 为售后列表与图表增加按年/按月/按周时间筛选
+- [x] 后端列表与统计接口统一支持 `dateMode/dateValue`
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type`
+- [x] 运行 `pnpm check:qms-arch`
+
+### 售后质量周/月筛选联动 Review
+
+- `apps/web-antd/src/views/qms/after-sales/index.vue` 已增加按年/按月/按周时间维度切换；年模式保留年份下拉，月/周模式改为日期选择器。
+- `apps/web-antd/src/views/qms/after-sales/composables/useAfterSalesGrid.ts` 已让列表查询、全量导出与 `queryAll` 统一透传 `dateMode/dateValue/year`。
+- `apps/web-antd/src/views/qms/after-sales/components/AfterSalesCharts.vue` 已随同一时间范围重拉全量数据，自定义图表与列表口径保持一致。
+- `apps/backend/utils/after-sales-query.ts` 已新增统一时间解析与范围构建逻辑；周模式按周一到周日，月模式按自然月，年模式按自然年。
+- `apps/backend/services/after-sales.service.ts` 与 `apps/backend/api/qms/after-sales/stats.get.ts` 已统一支持 `dateMode/dateValue`，并顺手修复了 `stats` 接口缺少 `await verifyAccessToken` 的鉴权问题。
+- 验证通过：`pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`。

@@ -33,7 +33,11 @@ export async function getAfterSalesListPage(
 /**
  * Get After-sales statistics
  */
-export async function getAfterSalesStats(params?: { year?: number }) {
+export async function getAfterSalesStats(params?: {
+  dateMode?: 'month' | 'week' | 'year';
+  dateValue?: string;
+  year?: number;
+}) {
   return requestClient.get<AfterSalesStats>('/qms/after-sales/stats', {
     params,
   });

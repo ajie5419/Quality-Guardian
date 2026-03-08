@@ -1,8 +1,10 @@
 import type { inspection_result } from '@prisma/client';
 import type { InspectionIssue, InspectionIssueStatusEnum } from '@qgs/shared';
+import type { InspectionIssueDateMode } from '~/utils/inspection-issue';
 
 import { Prisma } from '@prisma/client';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
+import { buildInspectionIssueDateRange } from '~/utils/inspection-issue';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
@@ -380,6 +382,8 @@ export const InspectionService = {
   },
 
   async getIssues(params: {
+    dateMode?: InspectionIssueDateMode;
+    dateValue?: string;
     defectType?: string | string[];
     page?: number;
     pageSize?: number;
@@ -400,14 +404,15 @@ export const InspectionService = {
       where.processName = params.processName;
     }
 
-    if (params.year) {
-      const start = new Date(`${params.year}-01-01`);
-      const end = new Date(`${params.year + 1}-01-01`);
-      where.date = {
-        gte: start,
-        lt: end,
-      };
-    }
+    const { start, end } = buildInspectionIssueDateRange({
+      dateMode: params.dateMode,
+      dateValue: params.dateValue,
+      year: params.year,
+    });
+    where.date = {
+      gte: start,
+      lt: end,
+    };
 
     if (params.projectName) {
       where.projectName = { contains: params.projectName };
@@ -521,10 +526,17 @@ export const InspectionService = {
     return { items, total };
   },
 
-  async getIssueStats(year?: number): Promise<IssueStats> {
-    const currentYear = year || new Date().getFullYear();
-    const start = new Date(`${currentYear}-01-01`);
-    const end = new Date(`${currentYear + 1}-01-01`);
+  async getIssueStats(params: {
+    dateMode?: InspectionIssueDateMode;
+    dateValue?: string;
+    year?: number;
+  }): Promise<IssueStats> {
+    const currentYear = params.year || new Date().getFullYear();
+    const { start, end } = buildInspectionIssueDateRange({
+      dateMode: params.dateMode,
+      dateValue: params.dateValue,
+      year: params.year,
+    });
     const where: Prisma.quality_recordsWhereInput = {
       isDeleted: false,
       date: { gte: start, lt: end },
@@ -562,33 +574,12 @@ export const InspectionService = {
       }));
 
       // 3. Monthly Trend (Using Raw Query for efficiency)
-      const trendResults = await prisma.$queryRaw<
-        Array<{ amount: number; month: number }>
-      >`
-        SELECT 
-          MONTH(date) as month,
-          SUM(IFNULL(lossAmount, 0)) as amount
-        FROM quality_records
-        WHERE isDeleted = 0 AND date >= ${start} AND date < ${end}
-        GROUP BY month
-      `;
-
-      const trendMap = new Map<string, number>();
-      for (let i = 1; i <= 12; i++) {
-        const monthKey = `${currentYear}-${String(i).padStart(2, '0')}`;
-        trendMap.set(monthKey, 0);
-      }
-
-      trendResults.forEach((r) => {
-        const monthKey = `${currentYear}-${String(r.month).padStart(2, '0')}`;
-        if (trendMap.has(monthKey)) {
-          trendMap.set(monthKey, Number(Number(r.amount).toFixed(2)));
-        }
+      const trendData = await this.buildIssueTrendData({
+        currentYear,
+        dateMode: params.dateMode,
+        end,
+        start,
       });
-
-      const trendData: TrendDataItem[] = [...trendMap.entries()].map(
-        ([period, value]) => ({ period, value }),
-      );
 
       return {
         totalCount,
@@ -600,9 +591,79 @@ export const InspectionService = {
         trendData,
       };
     } catch (error) {
-      logger.error({ err: error, year }, 'getIssueStats failed');
+      logger.error({ err: error, params }, 'getIssueStats failed');
       throw error;
     }
+  },
+
+  async buildIssueTrendData(params: {
+    currentYear: number;
+    dateMode?: InspectionIssueDateMode;
+    end: Date;
+    start: Date;
+  }): Promise<TrendDataItem[]> {
+    if (params.dateMode === 'month' || params.dateMode === 'week') {
+      const dayMap = new Map<string, number>();
+      const cursor = new Date(params.start);
+
+      while (cursor < params.end) {
+        const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+        dayMap.set(key, 0);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      const trendResults = await prisma.$queryRaw<
+        Array<{ amount: number; day: string }>
+      >`
+        SELECT 
+          DATE(date) as day,
+          SUM(IFNULL(lossAmount, 0)) as amount
+        FROM quality_records
+        WHERE isDeleted = 0 AND date >= ${params.start} AND date < ${params.end}
+        GROUP BY DATE(date)
+      `;
+
+      trendResults.forEach((item) => {
+        const key = String(item.day);
+        if (dayMap.has(key)) {
+          dayMap.set(key, Number(Number(item.amount).toFixed(2)));
+        }
+      });
+
+      return [...dayMap.entries()].map(([period, value]) => ({
+        period,
+        value,
+      }));
+    }
+
+    const trendResults = await prisma.$queryRaw<
+      Array<{ amount: number; month: number }>
+    >`
+      SELECT 
+        MONTH(date) as month,
+        SUM(IFNULL(lossAmount, 0)) as amount
+      FROM quality_records
+      WHERE isDeleted = 0 AND date >= ${params.start} AND date < ${params.end}
+      GROUP BY month
+    `;
+
+    const trendMap = new Map<string, number>();
+    for (let i = 1; i <= 12; i++) {
+      const monthKey = `${params.currentYear}-${String(i).padStart(2, '0')}`;
+      trendMap.set(monthKey, 0);
+    }
+
+    trendResults.forEach((r) => {
+      const monthKey = `${params.currentYear}-${String(r.month).padStart(2, '0')}`;
+      if (trendMap.has(monthKey)) {
+        trendMap.set(monthKey, Number(Number(r.amount).toFixed(2)));
+      }
+    });
+
+    return [...trendMap.entries()].map(([period, value]) => ({
+      period,
+      value,
+    }));
   },
 
   async generateNextNcNumber(): Promise<string> {

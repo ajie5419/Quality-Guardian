@@ -18,9 +18,13 @@ export function useIssueRemoteStatistics() {
     pareto: [],
   });
 
-  async function fetchStatistics(year: number) {
+  async function fetchStatistics(params: {
+    dateMode: 'month' | 'week' | 'year';
+    dateValue: string;
+    year: number;
+  }) {
     try {
-      const res = await getInspectionIssueStats({ year });
+      const res = await getInspectionIssueStats(params);
       let cumulativeCount = 0;
       const totalCount = res.totalCount || 0;
       const pareto = (res.pieData || []).map((item) => {

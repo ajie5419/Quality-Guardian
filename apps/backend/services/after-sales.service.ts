@@ -3,6 +3,7 @@ import type {
   AfterSalesParams,
   AfterSalesStats,
 } from '@qgs/shared';
+import type { AfterSalesDateMode } from '~/utils/after-sales-query';
 
 import { Prisma } from '@prisma/client';
 import {
@@ -11,6 +12,7 @@ import {
   QMS_STATUS_OPEN_SET,
   tryParsePhotos,
 } from '@qgs/shared';
+import { buildAfterSalesDateRange } from '~/utils/after-sales-query';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
@@ -24,11 +26,36 @@ export const AfterSalesService = {
   /**
    * Calculate After-Sales KPI and Statistics
    */
-  async getStats(year?: number): Promise<AfterSalesStats> {
-    const currentYear = year || new Date().getFullYear();
-    const startDate = new Date(currentYear, 0, 1);
-    const endDate = new Date(currentYear, 11, 31, 23, 59, 59, 999);
-    const months = Array.from({ length: 12 }, (_, i) => `${i + 1}月`);
+  async getStats(params?: {
+    dateMode?: AfterSalesDateMode;
+    dateValue?: string;
+    year?: number;
+  }): Promise<AfterSalesStats> {
+    const { start: startDate, end } = buildAfterSalesDateRange({
+      dateMode: params?.dateMode,
+      dateValue: params?.dateValue,
+      year: params?.year,
+    });
+    const endDate = new Date(end.getTime() - 1);
+    const isYearMode = (params?.dateMode || 'year') === 'year';
+    const months = isYearMode
+      ? Array.from(
+          { length: endDate.getMonth() - startDate.getMonth() + 1 },
+          (_, i) => `${startDate.getMonth() + i + 1}月`,
+        )
+      : Array.from(
+          {
+            length: Math.max(
+              1,
+              Math.round((end.getTime() - startDate.getTime()) / 86_400_000),
+            ),
+          },
+          (_, i) => {
+            const date = new Date(startDate);
+            date.setDate(startDate.getDate() + i);
+            return `${date.getMonth() + 1}-${date.getDate()}`;
+          },
+        );
     const baseWhere = {
       isDeleted: false,
       occurDate: { gte: startDate, lte: endDate },
@@ -85,32 +112,95 @@ export const AfterSalesService = {
       ]);
 
       // 3. Trend Analysis (Monthly) - Use Raw Query for efficiency
-      const trendResults = await prisma.$queryRaw<
-        Array<{ closed: bigint; costs: number; issues: bigint; month: number }>
-      >`
-        SELECT 
-          MONTH(occurDate) as month,
-          COUNT(*) as issues,
-          SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as costs,
-          SUM(CASE WHEN closeDate IS NOT NULL AND YEAR(closeDate) = ${currentYear} THEN 1 ELSE 0 END) as closed
-        FROM after_sales
-        WHERE isDeleted = 0 AND YEAR(occurDate) = ${currentYear}
-        GROUP BY month
-      `;
+      const trendResults = isYearMode
+        ? await prisma.$queryRaw<
+            Array<{
+              closed: bigint;
+              costs: number;
+              issues: bigint;
+              period: number;
+            }>
+          >`
+            SELECT 
+              MONTH(occurDate) as period,
+              COUNT(*) as issues,
+              SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as costs,
+              SUM(
+                CASE
+                  WHEN closeDate IS NOT NULL AND closeDate >= ${startDate} AND closeDate <= ${endDate}
+                  THEN 1 ELSE 0
+                END
+              ) as closed
+            FROM after_sales
+            WHERE isDeleted = 0 AND occurDate >= ${startDate} AND occurDate <= ${endDate}
+            GROUP BY period
+          `
+        : await prisma.$queryRaw<
+            Array<{
+              closed: bigint;
+              costs: number;
+              issues: bigint;
+              period: Date;
+            }>
+          >`
+            SELECT 
+              DATE(occurDate) as period,
+              COUNT(*) as issues,
+              SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as costs,
+              SUM(
+                CASE
+                  WHEN closeDate IS NOT NULL AND DATE(closeDate) = DATE(occurDate)
+                  THEN 1 ELSE 0
+                END
+              ) as closed
+            FROM after_sales
+            WHERE isDeleted = 0 AND occurDate >= ${startDate} AND occurDate <= ${endDate}
+            GROUP BY period
+          `;
 
       // 4. Format Result
-      const monthlyIssues: number[] = Array.from({ length: 12 }, () => 0);
-      const monthlyClosed: number[] = Array.from({ length: 12 }, () => 0);
-      const monthlyCosts: number[] = Array.from({ length: 12 }, () => 0);
+      const monthlyIssues: number[] = Array.from(
+        { length: months.length },
+        () => 0,
+      );
+      const monthlyClosed: number[] = Array.from(
+        { length: months.length },
+        () => 0,
+      );
+      const monthlyCosts: number[] = Array.from(
+        { length: months.length },
+        () => 0,
+      );
 
-      trendResults.forEach((r) => {
-        const mIdx = Number(r.month) - 1;
-        if (mIdx >= 0 && mIdx < 12) {
-          monthlyIssues[mIdx] = Number(r.issues);
-          monthlyClosed[mIdx] = Number(r.closed);
-          monthlyCosts[mIdx] = Number(r.costs.toFixed(2));
-        }
-      });
+      if (isYearMode) {
+        trendResults.forEach((r) => {
+          const mIdx = Number(r.period) - startDate.getMonth() - 1;
+          if (mIdx >= 0 && mIdx < months.length) {
+            monthlyIssues[mIdx] = Number(r.issues);
+            monthlyClosed[mIdx] = Number(r.closed);
+            monthlyCosts[mIdx] = Number(r.costs.toFixed(2));
+          }
+        });
+      } else {
+        const periodMap = new Map<
+          string,
+          { closed: bigint; costs: number; issues: bigint; period: Date }
+        >(
+          trendResults.map(
+            (item) => [formatDate(item.period).slice(0, 10), item] as const,
+          ),
+        );
+        months.forEach((_, index) => {
+          const date = new Date(startDate);
+          date.setDate(startDate.getDate() + index);
+          const key = formatDate(date).slice(0, 10);
+          const item = periodMap.get(key);
+          if (!item) return;
+          monthlyIssues[index] = Number(item.issues);
+          monthlyClosed[index] = Number(item.closed);
+          monthlyCosts[index] = Number(item.costs.toFixed(2));
+        });
+      }
 
       return {
         kpi: {
@@ -139,8 +229,9 @@ export const AfterSalesService = {
         })),
       };
     } catch (error) {
-      logger.error({ err: error }, 'getStats failed');
-      const emptyMonthly = (): number[] => Array.from({ length: 12 }, () => 0);
+      logger.error({ err: error, params }, 'getStats failed');
+      const emptyMonthly = (): number[] =>
+        Array.from({ length: months.length }, () => 0);
       return {
         kpi: { total: 0, open: 0, cost: 0, avgTime: 0 },
         trend: {
@@ -161,21 +252,36 @@ export const AfterSalesService = {
    */
   async getList(
     params: AfterSalesParams & {
+      dateMode?: AfterSalesDateMode;
+      dateValue?: string;
       userContext?: { userId: string; username?: string };
     },
   ): Promise<AfterSalesItem[]> {
-    const { year, workOrderNumber, projectName, status, supplierBrand } =
-      params;
+    const {
+      dateMode,
+      dateValue,
+      projectName,
+      status,
+      supplierBrand,
+      workOrderNumber,
+      year,
+    } = params;
 
     let where: Prisma.after_salesWhereInput = {
       isDeleted: false,
     };
 
     // Date Logic
-    if (year) {
+    const hasCustomRange = dateMode === 'month' || dateMode === 'week';
+    if (year || hasCustomRange) {
+      const { start, end } = buildAfterSalesDateRange({
+        dateMode,
+        dateValue,
+        year,
+      });
       where.occurDate = {
-        gte: new Date(`${year}-01-01T00:00:00.000Z`),
-        lte: new Date(`${year}-12-31T23:59:59.999Z`),
+        gte: start,
+        lt: end,
       };
     }
 

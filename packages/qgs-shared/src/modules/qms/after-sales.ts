@@ -35,6 +35,8 @@ export interface AfterSalesItem {
 }
 
 export interface AfterSalesParams {
+  dateMode?: 'month' | 'week' | 'year';
+  dateValue?: string;
   projectName?: string;
   status?: string;
   supplierBrand?: string;

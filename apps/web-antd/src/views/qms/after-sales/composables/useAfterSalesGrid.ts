@@ -34,7 +34,9 @@ interface UseAfterSalesGridParams {
   canImport: Ref<boolean>;
   canSettle: ComputedRef<boolean>;
   canToolbarExport: ComputedRef<boolean>;
-  currentYear: Ref<number>;
+  currentDateMode: Ref<'month' | 'week' | 'year'>;
+  currentDateValue: ComputedRef<string> | Ref<string>;
+  currentYear: ComputedRef<number> | Ref<number>;
   deptRawData: Ref<BaseTreeNode[]>;
   getAfterSalesListPage: (
     params?: QmsAfterSalesApi.AfterSalesParams,
@@ -84,6 +86,8 @@ export function useAfterSalesGrid({
   canImport,
   canSettle,
   canToolbarExport,
+  currentDateMode,
+  currentDateValue,
   currentYear,
   deptRawData,
   getAfterSalesListPage,
@@ -113,6 +117,8 @@ export function useAfterSalesGrid({
         if (mode === 'all') {
           const proxyInfo = $grid?.getProxyInfo?.();
           const data = await getAfterSalesListPage({
+            dateMode: currentDateMode.value,
+            dateValue: currentDateValue.value,
             year: currentYear.value,
             ...proxyInfo?.form,
           } as QmsAfterSalesApi.AfterSalesParams);
@@ -347,6 +353,8 @@ export function useAfterSalesGrid({
           formValues: Record<string, unknown> = {},
         ) => {
           const data = await getAfterSalesListPage({
+            dateMode: currentDateMode.value,
+            dateValue: currentDateValue.value,
             year: currentYear.value,
             ...formValues,
           } as QmsAfterSalesApi.AfterSalesParams);
@@ -368,6 +376,8 @@ export function useAfterSalesGrid({
         }) => {
           const filters = form || formValues || {};
           const data = await getAfterSalesListPage({
+            dateMode: currentDateMode.value,
+            dateValue: currentDateValue.value,
             year: currentYear.value,
             ...filters,
           } as QmsAfterSalesApi.AfterSalesParams);

@@ -52,7 +52,7 @@ describe('afterSalesService', () => {
         return Promise.resolve([]);
       });
 
-      const stats = await AfterSalesService.getStats(2024);
+      const stats = await AfterSalesService.getStats({ year: 2024 });
 
       expect(stats.kpi.total).toBe(10);
       expect(stats.kpi.open).toBe(5);
