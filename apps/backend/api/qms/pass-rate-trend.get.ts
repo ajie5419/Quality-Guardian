@@ -3,9 +3,9 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   createPassRateTargetResolver,
+  getNetPassRateSummaryByRange,
   getPassRateDrillDownByRange,
 } from '~/utils/pass-rate';
-import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,
   unAuthorizedResponse,
@@ -93,66 +93,22 @@ async function getTrendData(granularity: string) {
     }
   }
 
-  // Optimization: Fetch ALL inspections and NCRs for the year in parallel
-  const [allInspections, allNCRs] = await Promise.all([
-    prisma.inspections.findMany({
-      where: {
-        isDeleted: false,
-        inspectionDate: { gte: yearStart, lte: now },
-      },
-      select: { inspectionDate: true, result: true, quantity: true },
+  const trend = await Promise.all(
+    periods.map(async (p) => {
+      const summary = await getNetPassRateSummaryByRange(p.start, p.end);
+
+      const emptyPeriodPassRate: null | number = p.start > now ? null : 100;
+      const passRate: null | number =
+        summary.totalCount === 0 ? emptyPeriodPassRate : summary.passRate;
+
+      return {
+        period: p.label,
+        passRate,
+        totalCount: summary.totalCount,
+        passCount: summary.passCount,
+      };
     }),
-    prisma.quality_records.findMany({
-      where: {
-        isDeleted: false,
-        date: { gte: yearStart, lte: now },
-      },
-      select: { date: true, quantity: true },
-    }),
-  ]);
-
-  const trend = periods.map((p) => {
-    const periodInspections = allInspections.filter((ins) => {
-      const d = new Date(ins.inspectionDate);
-      return d >= p.start && d <= p.end;
-    });
-
-    const periodNCRs = allNCRs.filter((ncr) => {
-      const d = new Date(ncr.date);
-      return d >= p.start && d <= p.end;
-    });
-
-    const totalQty = periodInspections.reduce(
-      (sum, i) => sum + (i.quantity || 1),
-      0,
-    );
-    const passedQty = periodInspections
-      .filter((ins) => ins.result === 'PASS')
-      .reduce((sum, i) => sum + (i.quantity || 1), 0);
-
-    const ncrQty = periodNCRs.reduce((sum, i) => sum + (i.quantity || 0), 0);
-
-    const effectiveTotal = Math.max(totalQty, ncrQty);
-    const netPassed = Math.max(0, passedQty - ncrQty);
-
-    let passRate: null | number = 100;
-    if (effectiveTotal > 0) {
-      passRate = Number(((netPassed / effectiveTotal) * 100).toFixed(1));
-    } else if (p.start > now) {
-      // Future month with no data
-      passRate = null;
-    } else {
-      // Past/Current month with no data
-      passRate = 100;
-    }
-
-    return {
-      period: p.label,
-      passRate,
-      totalCount: effectiveTotal,
-      passCount: netPassed,
-    };
-  });
+  );
 
   return { trend };
 }

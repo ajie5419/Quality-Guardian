@@ -3,6 +3,7 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   createPassRateTargetResolver,
+  getNetPassRateSummaryByRange,
   getPassRateDrillDownByRange,
 } from '~/utils/pass-rate';
 import prisma from '~/utils/prisma';
@@ -75,7 +76,7 @@ export default defineEventHandler(async (event) => {
           value: currData.passRate,
           unit: '%',
           trend: calculateTrend(currData.passRate, prevData.passRate),
-          desc: '检验合格总数 /检验总数',
+          desc: '检验合格数量扣减不合格项后的净合格率',
           history: historyMetrics.map((h) => h.passRate),
         },
         {
@@ -148,24 +149,14 @@ export default defineEventHandler(async (event) => {
 
 async function fetchPeriodMetrics(start: Date, end: Date) {
   const [
-    passedInspections,
-    totalInspections,
+    passRateSummary,
     newIssues,
     closedIssues,
     internalLossAgg,
     externalLossAgg,
     manualLossAgg,
   ] = await Promise.all([
-    prisma.inspections.count({
-      where: {
-        inspectionDate: { gte: start, lte: end },
-        result: 'PASS',
-        isDeleted: false,
-      },
-    }),
-    prisma.inspections.count({
-      where: { inspectionDate: { gte: start, lte: end }, isDeleted: false },
-    }),
+    getNetPassRateSummaryByRange(start, end),
     prisma.quality_records.count({
       where: { createdAt: { gte: start, lte: end }, isDeleted: false },
     }),
@@ -190,10 +181,6 @@ async function fetchPeriodMetrics(start: Date, end: Date) {
     }),
   ]);
 
-  const passRate =
-    totalInspections > 0
-      ? ((passedInspections / totalInspections) * 100).toFixed(1)
-      : 0;
   const closingRate =
     newIssues > 0 ? ((closedIssues / newIssues) * 100).toFixed(1) : 100;
   const internalLoss =
@@ -204,7 +191,7 @@ async function fetchPeriodMetrics(start: Date, end: Date) {
     Number(externalLossAgg._sum.laborTravelCost || 0);
 
   return {
-    passRate: Number(passRate),
+    passRate: passRateSummary.passRate,
     closingRate: Number(closingRate),
     internalLoss,
     externalLoss,

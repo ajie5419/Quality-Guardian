@@ -18,6 +18,12 @@ export const searchFormSchema: VbenFormSchema[] = [
     colProps: { span: 6 },
   },
   {
+    fieldName: 'responsibleDepartment',
+    label: $t('qms.inspection.issues.responsibleDepartment'),
+    component: 'Input',
+    colProps: { span: 6 },
+  },
+  {
     fieldName: 'status',
     label: $t('common.status'),
     component: 'Select',

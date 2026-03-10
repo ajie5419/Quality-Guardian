@@ -109,6 +109,7 @@ export function useIssueGridOptions({
             year: currentYear.value,
             workOrderNumber: formValues?.workOrderNumber as string,
             projectName: formValues?.projectName as string,
+            responsibleDepartment: formValues?.responsibleDepartment as string,
             status: (filterParams.status?.[0] || formValues?.status) as string,
             processName: formValues?.processName as string,
             ...(filterParams as Record<string, string | string[] | unknown>),
@@ -188,6 +189,15 @@ export function useIssueGridOptions({
               { label: '包装问题', value: '包装问题' },
               { label: '其他', value: '其他' },
             ],
+          };
+        }
+        if (col.field === 'responsibleDepartment') {
+          return {
+            ...col,
+            filters: deptRawData.value.map((dept) => ({
+              label: String((dept as { name?: string }).name || ''),
+              value: String((dept as { id?: string }).id || ''),
+            })),
           };
         }
 
@@ -309,6 +319,7 @@ export function useIssueGridOptions({
             year: currentYear.value,
             workOrderNumber: formValues?.workOrderNumber as string,
             projectName: formValues?.projectName as string,
+            responsibleDepartment: formValues?.responsibleDepartment as string,
             status: (filterParams.status?.[0] || formValues?.status) as string,
             ...filterParams,
             processName: formValues?.processName as string,
@@ -324,6 +335,7 @@ export function useIssueGridOptions({
             year: currentYear.value,
             workOrderNumber: formValues?.workOrderNumber as string,
             projectName: formValues?.projectName as string,
+            responsibleDepartment: formValues?.responsibleDepartment as string,
             status: formValues?.status as string,
             processName: formValues?.processName as string,
           });

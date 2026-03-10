@@ -28,6 +28,7 @@ export async function getInspectionIssues(params?: {
   pageSize?: number;
   processName?: string;
   projectName?: string;
+  responsibleDepartment?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   status?: string;

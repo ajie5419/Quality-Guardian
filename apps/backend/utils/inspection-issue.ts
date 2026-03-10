@@ -179,6 +179,7 @@ export function parseInspectionIssueListQuery(query: Record<string, unknown>) {
     pageSize,
     processName: normalizeString(query.processName),
     projectName: normalizeString(query.projectName),
+    responsibleDepartment: parseMultiString(query.responsibleDepartment),
     severity: parseMultiString(query.severity),
     sortBy: normalizeString(query.sortBy),
     sortOrder,

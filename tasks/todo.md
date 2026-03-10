@@ -218,6 +218,26 @@
 ## 质量概览车辆故障率趋势标签修复（2026-03-08）
 
 - [x] 修复年度累计窗口下月份标签重复显示为 1 月的问题
+
+## 不合格项责任部门筛选修复（2026-03-08）
+
+- [x] 定位责任部门筛选/搜索失效根因
+- [x] 前端搜索表单增加责任部门查询字段
+- [x] 表格责任部门列增加筛选项
+- [x] 后端列表解析与服务层增加责任部门过滤
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type`
+- [x] 运行 `pnpm check:qms-arch`
+
+### 不合格项责任部门筛选修复 Review
+
+- 根因不是单点失效，而是整条责任部门筛选链路缺失：搜索表单无字段、前端查询未透传、后端 query parser 未解析、service where 未收口。
+- 已在 `apps/web-antd/src/views/qms/inspection/issues/data.ts` 增加责任部门搜索字段，支持表单按责任部门关键字搜索。
+- 已在 `apps/web-antd/src/views/qms/inspection/issues/composables/useIssueGridOptions.ts` 为责任部门列补充筛选项，并在 query/queryAll/export 全链路透传 `responsibleDepartment`。
+- 已在 `apps/backend/utils/inspection-issue.ts` 与 `apps/backend/services/inspection.service.ts` 增加责任部门解析和过滤逻辑：
+  - 支持按部门 ID 精确过滤
+  - 支持按部门名称关键字匹配后映射到部门 ID 再过滤
+- 验证通过：`pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`。
 - [x] 运行 `pnpm lint`
 - [x] 运行 `pnpm check:type`
 - [x] 运行 `pnpm check:qms-arch`
@@ -262,3 +282,98 @@
 - `apps/backend/utils/after-sales-query.ts` 已新增统一时间解析与范围构建逻辑；周模式按周一到周日，月模式按自然月，年模式按自然年。
 - `apps/backend/services/after-sales.service.ts` 与 `apps/backend/api/qms/after-sales/stats.get.ts` 已统一支持 `dateMode/dateValue`，并顺手修复了 `stats` 接口缺少 `await verifyAccessToken` 的鉴权问题。
 - 验证通过：`pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`。
+
+## 质量概览合格率趋势标准化（2026-03-09）
+
+- [x] 确认首页趋势与下钻当前口径及影响范围
+- [x] 将首页趋势改为标准合格率算法（合格数/检验总数）
+- [x] 同步修正下钻明细口径与说明
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type`
+- [x] 运行 `pnpm check:qms-arch`
+
+### 质量概览合格率趋势标准化 Review
+
+- 首页质量概览的合格率趋势实际走 `apps/backend/api/qms/pass-rate-trend.get.ts`，不是 `apps/backend/services/dashboard.service.ts` 里的旧月度质量算法。
+- 已将首页趋势口径改为标准合格率：
+  - 分母：周期内检验总数量
+  - 分子：周期内 `result = PASS` 的检验数量
+  - 公式：`passRate = passCount / totalCount * 100`
+- 已同步修正首页下钻数据口径，来料检验 / 过程检验 / 成品检验均按同一标准算法统计，不再扣减 `quality_records` 的 NCR 数量。
+- 影响范围仅限首页质量概览合格率趋势与其下钻；月报、工序合格率等其他使用 `utils/pass-rate.ts` 的模块未改口径。
+- 验证通过：`pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`。
+
+## 首页合格率全为100%原因排查（2026-03-10）
+
+- [x] 核对首页合格率趋势当前算法与查询口径
+- [x] 核对 inspections.result 的实际写入与不合格项记录关系
+- [x] 解释为什么当前数据会全部显示 100%
+- [ ] 给出修正方案并完成必要实现
+- [x] 运行 pnpm lint && pnpm check:type && pnpm check:qms-arch
+
+### Review
+
+- 首页当前仅按 `inspections.result = PASS / total` 计算，不再扣减 `quality_records`。
+- 不合格项主要记录在 `quality_records`，不会自动回写 `inspections.result`，因此在现有数据下首页容易显示为 100%。
+
+## 首页与月报合格率口径统一（2026-03-10）
+
+- [x] 检查首页合格率趋势与月报工序合格率当前实现差异
+- [x] 恢复首页为贴合业务现状的净合格率
+- [x] 若月报不是净合格率，同步统一到同一口径
+- [x] 运行 pnpm lint && pnpm check:type && pnpm check:qms-arch
+
+### Review
+
+- 首页趋势已恢复为检验数量扣减 NCR 数量后的净合格率。
+- 月报总览“综合合格率”已与月报工序合格率统一为同一净合格率 helper。
+
+## 成品检验展示范围排查（2026-03-10）
+
+- [ ] 检查成品检验在首页下钻与月报工序合格率中的使用位置
+- [ ] 检查其他页面/报表是否复用同一工序归类逻辑
+- [ ] 给出去掉成品检验展示的影响范围与改法
+
+## 合格率统计隐藏成品检验（2026-03-10）
+
+- [x] 修改合格率统计 helper，首页/月报工序统计排除 SHIPMENT
+- [x] 确认仅影响首页下钻与月报工序统计，不影响检验记录分类
+- [x] 运行 pnpm lint && pnpm check:type && pnpm check:qms-arch
+
+### Review
+
+- 已在合格率统计 helper 中排除 SHIPMENT，首页下钻与月报工序统计不再显示成品检验。
+- 检验记录模块中的 SHIPMENT 分类与录入逻辑未变。
+
+## 外购件 NCR 别名扣减（2026-03-10）
+
+- [x] 在合格率统计 helper 中将 NCR 的“成品检验”视作“外购件”别名
+- [x] 确认仅影响首页/月报工序与来料统计，不改检验记录业务分类
+- [x] 运行 pnpm lint && pnpm check:type && pnpm check:qms-arch
+
+### Review
+
+- 统计口径中，外购件的 NCR 扣减现在同时识别 “外购件” 与 “成品检验” 两个别名。
+- 只影响首页/月报的合格率统计展示，不改变检验记录的 SHIPMENT 业务分类。
+
+## 合格率统计隐藏设计工序（2026-03-10）
+
+- [x] 在合格率统计 helper 中排除设计工序
+- [x] 确认仅影响首页/月报合格率展示，不影响业务数据
+- [x] 运行 pnpm lint && pnpm check:type && pnpm check:qms-arch
+
+### Review
+
+- 合格率统计 helper 已排除设计工序，首页下钻与月报工序统计不再显示设计。
+- 仅影响统计展示，不修改检验数据与业务分类。
+
+## 检验记录与不合格品项口径规范方案（2026-03-10）
+
+- [x] 梳理检验记录与不合格品项当前数据模型与断点
+- [x] 设计统一关联主线与字段规范
+- [x] 给出分阶段落地方案、风险与验收口径
+
+### Review
+
+- 当前 `inspections` 与 `quality_records` 没有强制主关联，NCR 创建时也不会自动回写检验结果，导致合格率与不合格项统计天然存在口径偏差。
+- 规范方案应围绕“检验记录为主线、NCR 为派生闭环对象、统计只认统一主键和统一状态”落地。

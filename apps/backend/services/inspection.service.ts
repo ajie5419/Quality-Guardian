@@ -10,6 +10,7 @@ import prisma from '~/utils/prisma';
 
 import { BaseService } from './base.service';
 import { DataScopeService } from './data-scope.service';
+import { DeptService } from './dept.service';
 import { SystemLogService } from './system-log.service';
 
 const logger = createModuleLogger('InspectionService');
@@ -389,6 +390,7 @@ export const InspectionService = {
     pageSize?: number;
     processName?: string;
     projectName?: string;
+    responsibleDepartment?: string | string[];
     severity?: string | string[];
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
@@ -443,6 +445,58 @@ export const InspectionService = {
       where.status = Array.isArray(params.status)
         ? { in: params.status as any }
         : (params.status as any);
+    }
+
+    if (params.responsibleDepartment) {
+      const deptTree = await DeptService.findAll().catch(() => []);
+      const searchTerms = (
+        Array.isArray(params.responsibleDepartment)
+          ? params.responsibleDepartment
+          : [params.responsibleDepartment]
+      )
+        .map((item) => String(item || '').trim())
+        .filter(Boolean);
+
+      const matchedDeptIds = new Set<string>();
+      const collectMatchedDeptIds = (nodes: any[]) => {
+        for (const node of nodes || []) {
+          const nodeId = String(node.id || '');
+          const nodeName = String(node.name || '');
+          if (
+            searchTerms.some(
+              (term) => nodeId === term || nodeName.includes(term),
+            )
+          ) {
+            matchedDeptIds.add(nodeId);
+          }
+          if (Array.isArray(node.children) && node.children.length > 0) {
+            collectMatchedDeptIds(node.children);
+          }
+        }
+      };
+
+      collectMatchedDeptIds(deptTree as any[]);
+
+      const idCandidates = [...new Set([...matchedDeptIds, ...searchTerms])];
+      let existingAndConditions: Prisma.quality_recordsWhereInput[] = [];
+      if (Array.isArray(where.AND)) {
+        existingAndConditions = where.AND;
+      } else if (where.AND) {
+        existingAndConditions = [where.AND];
+      }
+      const responsibleDepartmentConditions =
+        idCandidates.length > 0
+          ? [{ responsibleDepartment: { in: idCandidates } }]
+          : searchTerms.map((term) => ({
+              responsibleDepartment: { contains: term },
+            }));
+
+      where.AND = [
+        ...existingAndConditions,
+        {
+          OR: responsibleDepartmentConditions,
+        },
+      ];
     }
 
     if (params.userContext?.userId) {
