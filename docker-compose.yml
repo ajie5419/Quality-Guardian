@@ -1,6 +1,6 @@
 services:
   backend:
-    image: crpi-jy3d0qwkxxv0twpn.cn-beijing.personal.cr.aliyuncs.com/ajie5419/qms:backend-latest
+    image: 
     container_name: qms-backend
     env_file:
       - .env.production
@@ -35,7 +35,7 @@ services:
         max-file: '3'
 
   frontend:
-    image: crpi-jy3d0qwkxxv0twpn.cn-beijing.personal.cr.aliyuncs.com/ajie5419/qms:frontend-latest
+    image: 
     container_name: qms-frontend
     ports:
       - '80:80'
