@@ -9,14 +9,14 @@
     "qms",
     "quality guardian"
   ],
-  "homepage": "https://www.tolian-tech.com",
-  "bugs": "https://github.com/ajie5419/Quality-Guardian/issues",
+  "homepage": "",
+  "bugs": "",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ajie5419/Quality-Guardian.git"
+    "url": ""
   },
   "license": "MIT",
-  "author": "Zhao XiaoJie",
+  "author": "",
   "type": "module",
   "scripts": {
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 turbo build",
