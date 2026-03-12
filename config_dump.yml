@@ -10,14 +10,14 @@ services:
         reservations:
           memory: '536870912'
     environment:
-      DATABASE_URL: mysql://quality_guard:178025249aA..@113.31.111.152:3306/quality_guard?connection_limit=10&pool_timeout=60
-      JWT_ACCESS_SECRET: 0c696a863a71f071114812430a05727e4fe2ed40f4667a2042c6256db3ee579a
-      JWT_REFRESH_SECRET: 4f19cc4d22c74d4470ae10ca984ff79d526e60b2b3e12b966d1876c160533e9b94d0aee58c6f167375b2274acc33bf68af547111019278afda379fa98bae866f
+      DATABASE_URL: 
+      JWT_ACCESS_SECRET: 
+      JWT_REFRESH_SECRET: 
       NODE_ENV: production
       PORT: '3000'
       PRODUCTION_URL: http://localhost:3000
       REDIS_URL: redis://redis:6379
-    image: crpi-jy3d0qwkxxv0twpn.cn-beijing.personal.cr.aliyuncs.com/ajie5419/qms:backend-latest
+    image: 
     logging:
       driver: json-file
       options:
@@ -43,7 +43,7 @@ services:
       backend:
         condition: service_started
         required: true
-    image: crpi-jy3d0qwkxxv0twpn.cn-beijing.personal.cr.aliyuncs.com/ajie5419/qms:frontend-latest
+    image: 
     logging:
       driver: json-file
       options:
