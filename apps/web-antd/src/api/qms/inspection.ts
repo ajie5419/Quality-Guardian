@@ -12,11 +12,36 @@ export interface InspectionIssueStats {
   closedCount: number;
   closedRate: number;
   openCount: number;
+  pareto: Array<{
+    cumulativePercent: number;
+    label: string;
+    percent: number;
+    value: number;
+  }>;
   pieData: Array<{ name: string; value: number }>;
   totalCount: number;
   totalLoss: number;
   trendData: Array<{ period: string; value: number }>;
 }
+
+export type InspectionIssueChartDimension =
+  | 'claim'
+  | 'defectSubtype'
+  | 'defectType'
+  | 'division'
+  | 'projectName'
+  | 'reportMonth'
+  | 'responsibleDepartment'
+  | 'severity'
+  | 'status'
+  | 'supplierName';
+
+export type InspectionIssueChartMetric = 'count' | 'lossAmount' | 'quantity';
+
+export type InspectionIssueChartAggregateItem = {
+  name: string;
+  value: number;
+};
 
 // Re-export types for backward compatibility (optional, can be removed if views are updated)
 export * from '@qgs/shared';
@@ -28,10 +53,11 @@ export async function getInspectionIssues(params?: {
   pageSize?: number;
   processName?: string;
   projectName?: string;
-  responsibleDepartment?: string;
+  responsibleDepartment?: string | string[];
+  responsibleWelder?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
-  status?: string;
+  status?: string | string[];
   supplierName?: string;
   workOrderNumber?: string;
   year?: number;
@@ -50,6 +76,20 @@ export async function getInspectionIssueStats(params?: {
 }) {
   return requestClient.get<InspectionIssueStats>(
     QMS_API.INSPECTION_ISSUES_STATS,
+    { params },
+  );
+}
+
+export async function getInspectionIssueChartAggregate(params: {
+  dateMode?: 'month' | 'week' | 'year';
+  dateValue?: string;
+  dimension: InspectionIssueChartDimension;
+  metric: InspectionIssueChartMetric;
+  top?: number;
+  year?: number;
+}) {
+  return requestClient.get<{ items: InspectionIssueChartAggregateItem[] }>(
+    QMS_API.INSPECTION_ISSUES_CHART_AGGREGATE,
     { params },
   );
 }
@@ -157,6 +197,57 @@ export async function batchDeleteInspectionRecords(ids: string[]) {
   );
 }
 
+export interface InspectionRecordPrintItem {
+  acceptanceCriteria?: null | string;
+  checkItem: string;
+  id: string;
+  measuredValue?: null | string;
+  remarks?: null | string;
+  result: 'FAIL' | 'NA' | 'PASS';
+  standardValue?: null | string;
+  uom?: null | string;
+}
+
+export interface InspectionRecordPrintDetail {
+  category: string;
+  drawingNo?: null | string;
+  formNo?: null | string;
+  id: string;
+  incomingType?: null | string;
+  inspectionDate: string;
+  inspector: string;
+  items: InspectionRecordPrintItem[];
+  level1Component?: null | string;
+  level2Component?: null | string;
+  materialName?: null | string;
+  processName?: null | string;
+  projectName?: null | string;
+  qualifiedQuantity?: null | number;
+  quantity: number;
+  remarks?: null | string;
+  reportDate?: null | string;
+  result: 'FAIL' | 'PASS';
+  serialNumber?: null | string;
+  supplierName?: null | string;
+  templateId?: null | string;
+  templateName?: null | string;
+  unqualifiedQuantity?: null | number;
+  workOrderNumber: string;
+  printHeaders?: {
+    checkItem?: string;
+    measuredValue?: string;
+    remarks?: string;
+    result?: string;
+    standard?: string;
+  };
+}
+
+export async function getInspectionRecordDetail(id: string) {
+  return requestClient.get<InspectionRecordPrintDetail>(
+    `${QMS_API.INSPECTION_RECORDS}/${id}`,
+  );
+}
+
 export async function importInspectionRecords(data: {
   category: string;
   items: Partial<InspectionRecord>[];
@@ -167,11 +258,26 @@ export async function importInspectionRecords(data: {
   );
 }
 
+export async function updateInspectionArchiveTaskStatus(
+  id: string,
+  data: {
+    status: 'ARCHIVED' | 'IN_PROGRESS' | 'PENDING' | 'REJECTED';
+    workContent?: string;
+  },
+) {
+  return requestClient.put(
+    `${QMS_API.INSPECTION_ARCHIVE_TASKS}/${id}/status`,
+    data,
+  );
+}
+
 export namespace QmsInspectionApi {
   export type InspectionTaskResult = import('@qgs/shared').InspectionTaskResult;
   export type InspectionIssue = import('@qgs/shared').InspectionIssue;
   export type InspectionRecord = import('@qgs/shared').InspectionRecord;
   export type DetailedInspectionRecord = InspectionRecord & {
     items: InspectionTaskResult[];
+    templateId?: string;
+    templateName?: string;
   };
 }

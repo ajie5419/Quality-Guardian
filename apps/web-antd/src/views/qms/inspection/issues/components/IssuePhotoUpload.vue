@@ -37,6 +37,7 @@ const maxImages = computed(
 interface UploadResponse {
   code?: number;
   data?: {
+    thumbUrl?: string;
     url?: string;
   };
 }
@@ -47,6 +48,9 @@ function handleUploadChange(info: UploadChangeParam<UploadFile>) {
     const response = info.file.response as undefined | UploadResponse;
     if (response?.code === 0 && response.data?.url) {
       info.file.url = response.data.url;
+      if (response.data.thumbUrl) {
+        info.file.thumbUrl = response.data.thumbUrl;
+      }
     }
     message.success(`${info.file.name} ${t('common.saveSuccess')}`);
   } else if (info.file.status === 'error') {

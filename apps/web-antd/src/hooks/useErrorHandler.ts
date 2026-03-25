@@ -9,9 +9,15 @@ export function useErrorHandler() {
     // 1. 忽略来自 Form 验证的错误 (通常由组件自身处理)
     if ((error as any)?.errorFields) return;
 
+    let errorMessage: string | undefined;
+    if (typeof error !== 'object' || error === null) {
+      errorMessage = error instanceof Error ? error.message : String(error);
+    }
+
     // 2. 静默上报远程日志
     logRemoteError(`${context} failed`, {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMessage,
+      originalError: error,
       response: (error as any)?.response?.data,
       stack: error instanceof Error ? error.stack : undefined,
     });

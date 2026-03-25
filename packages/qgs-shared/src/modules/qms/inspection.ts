@@ -8,6 +8,7 @@ export interface InspectionIssue {
   description: string;
   division?: string;
   id: string;
+  inspectionId?: string;
   inspector: string; // 检验员 (New standard)
   isClaim: boolean; // 是否索赔
   lossAmount: number; // 损失金额
@@ -20,6 +21,7 @@ export interface InspectionIssue {
   reportDate: string;
   reportedBy: string; // 检验员 (Legacy?)
   responsibleDepartment: string; // 责任部门
+  responsibleWelder?: string; // 责任焊工
   rootCause: string; // 原因分析
   severity: 'Critical' | 'Major' | 'Minor';
   solution: string; // 解决方案
@@ -31,42 +33,84 @@ export interface InspectionIssue {
 }
 
 export interface IncomingInspection {
+  archiveDueAt?: string;
+  archiveIsOverdue?: boolean;
+  archiveTaskId?: null | string;
+  archiveTaskStatus?:
+    | 'ARCHIVED'
+    | 'IN_PROGRESS'
+    | 'PENDING'
+    | 'REJECTED'
+    | null;
   hasDocuments: string;
   id: string;
   inspector: string;
+  issueStatus?: string;
   materialName: string;
+  qualifiedQuantity?: number;
   quantity: number;
   remarks?: string;
   reportDate: string;
   reporter: string;
   supplierName: string;
+  templateId?: string;
+  templateName?: string;
+  unqualifiedQuantity?: number;
 }
 
 export interface ProcessInspection {
   archived: string;
+  archiveDueAt?: string;
+  archiveIsOverdue?: boolean;
+  archiveTaskId?: null | string;
+  archiveTaskStatus?:
+    | 'ARCHIVED'
+    | 'IN_PROGRESS'
+    | 'PENDING'
+    | 'REJECTED'
+    | null;
   componentName: string;
   id: string;
   inspector: string;
+  issueStatus?: string;
   level1Component: string;
   level2Component?: string;
   process: string;
+  qualifiedQuantity?: number;
   quantity: number;
   remarks?: string;
   reporter: string;
   team: string;
+  templateId?: string;
+  templateName?: string;
+  unqualifiedQuantity?: number;
   workOrderNumber: string;
 }
 
 export interface ShipmentInspection {
+  archiveDueAt?: string;
+  archiveIsOverdue?: boolean;
+  archiveTaskId?: null | string;
+  archiveTaskStatus?:
+    | 'ARCHIVED'
+    | 'IN_PROGRESS'
+    | 'PENDING'
+    | 'REJECTED'
+    | null;
   documents: string;
   id: string;
   inspector: string;
+  issueStatus?: string;
   packingListArchived: string;
   projectName: string;
+  qualifiedQuantity?: number;
   quantity: number;
   remarks?: string;
   reportDate: string;
   reporter: string;
+  templateId?: string;
+  templateName?: string;
+  unqualifiedQuantity?: number;
   workOrderNumber: string;
 }
 
@@ -96,6 +140,8 @@ export interface DetailedInspectionRecord {
   reportDate: string;
   results: InspectionTaskResult[];
   status: 'COMPLETED' | 'DRAFT';
+  templateId?: string;
+  templateName?: string;
   type: 'FINAL' | 'INCOMING' | 'OUTGOING' | 'PROCESS';
   updatedAt: string;
   workOrderNumber: string;

@@ -20,6 +20,7 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:rbac-backfill": "node prisma/rbac-backfill.js",
+    "db:inspection-quantity-backfill": "node prisma/inspection-quantity-backfill.js",
     "db:rbac:check": "node prisma/rbac-consistency-check.js",
     "db:studio": "prisma studio"
   },

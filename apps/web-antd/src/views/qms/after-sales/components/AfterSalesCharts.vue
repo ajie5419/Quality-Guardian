@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import type { ChartConfig } from '../composables/useChartAggregation';
 
-import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
 import type { DeptTreeNode } from '#/types';
 
 import { computed, onUnmounted, ref, watch } from 'vue';
@@ -11,7 +10,6 @@ import { useI18n } from '@vben/locales';
 
 import { Button, Card, message, Modal } from 'ant-design-vue';
 
-import { getAfterSalesList } from '#/api/qms/after-sales';
 import { getDeptList } from '#/api/system/dept';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
@@ -33,16 +31,12 @@ const customCharts = defineModel<ChartConfig[]>('charts', {
 const { hasAccessByCodes } = useAccess();
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
-const canAdd = computed(() => hasAccessByCodes(['QMS:AfterSales:ChartAdd']));
 const canEdit = computed(() => hasAccessByCodes(['QMS:AfterSales:ChartEdit']));
 const canDelete = computed(() =>
   hasAccessByCodes(['QMS:AfterSales:ChartDelete']),
 );
 
 const loading = ref(false);
-
-// 全量列表数据，用于自定义图表计算
-const fullDataList = ref<QmsAfterSalesApi.AfterSalesItem[]>([]);
 const deptList = ref<DeptTreeNode[]>([]);
 
 // Custom Charts
@@ -52,18 +46,7 @@ const editingChart = ref<ChartConfig | undefined>(undefined);
 async function fetchData() {
   loading.value = true;
   try {
-    // 获取全量数据用于自定义分析，pageSize 设大一点
-    const [listRes, deptRes] = await Promise.all([
-      getAfterSalesList({
-        dateMode: props.dateMode,
-        dateValue: props.dateValue,
-        year: props.year,
-        pageSize: 10_000,
-      } as QmsAfterSalesApi.AfterSalesParams),
-      getDeptList(),
-    ]);
-    fullDataList.value = listRes;
-    deptList.value = deptRes;
+    deptList.value = await getDeptList();
   } catch (error) {
     handleApiError(error, 'Load After Sales Charts Data');
   } finally {
@@ -219,22 +202,9 @@ defineExpose({
 
 <template>
   <div class="mb-4 flex flex-col gap-4">
-    <!-- 4. Custom Charts Section -->
-    <div class="flex items-center justify-end border-b pb-2">
-      <Button
-        v-if="canAdd"
-        type="dashed"
-        size="small"
-        @click="handleAddCustomChart"
-      >
-        <span class="i-lucide-plus mr-1"></span
-        >{{ t('qms.afterSales.chart.add') }}
-      </Button>
-    </div>
-
     <!-- 可拖拽区域 -->
     <div
-      class="custom-chart-grid mt-4 grid gap-4"
+      class="custom-chart-grid grid gap-4"
       style="grid-template-columns: repeat(12, minmax(0, 1fr))"
       @dragover.prevent
       @drop="handleDrop"
@@ -282,7 +252,9 @@ defineExpose({
           <div class="relative h-60 w-full cursor-move">
             <CustomChartItem
               :config="chart"
-              :data="fullDataList"
+              :date-mode="props.dateMode"
+              :date-value="props.dateValue"
+              :year="props.year"
               :loading="loading"
               :dept-data="deptList"
             />
@@ -310,8 +282,10 @@ defineExpose({
 
     <CustomChartBuilderModal
       v-model:open="isBuilderOpen"
-      :source-data="fullDataList"
       :initial-config="editingChart"
+      :date-mode="props.dateMode"
+      :date-value="props.dateValue"
+      :year="props.year"
       :dept-data="deptList"
       :dimension-options="CHART_DIMENSIONS"
       :metric-options="CHART_METRICS"

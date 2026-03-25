@@ -89,6 +89,50 @@ describe('inspectionService', () => {
     });
   });
 
+  describe('normalizeQuantitySummary', () => {
+    it('should prefer explicit qualified and unqualified quantities when valid', () => {
+      const result = InspectionService.normalizeQuantitySummary({
+        quantity: 10,
+        qualifiedQuantity: 7,
+        unqualifiedQuantity: 3,
+        result: 'FAIL',
+      });
+
+      expect(result).toEqual({
+        quantity: 10,
+        qualifiedQuantity: 7,
+        unqualifiedQuantity: 3,
+      });
+    });
+
+    it('should derive qualified quantity from unqualified quantity when only it is provided', () => {
+      const result = InspectionService.normalizeQuantitySummary({
+        quantity: 8,
+        unqualifiedQuantity: 2,
+        result: 'FAIL',
+      });
+
+      expect(result).toEqual({
+        quantity: 8,
+        qualifiedQuantity: 6,
+        unqualifiedQuantity: 2,
+      });
+    });
+
+    it('should fall back to fail-all when record result is fail and no split quantity is provided', () => {
+      const result = InspectionService.normalizeQuantitySummary({
+        quantity: 5,
+        result: 'FAIL',
+      });
+
+      expect(result).toEqual({
+        quantity: 5,
+        qualifiedQuantity: 0,
+        unqualifiedQuantity: 5,
+      });
+    });
+  });
+
   describe('getIssueStats', () => {
     it('should correctly aggregate counts and loss amounts', async () => {
       (prisma.quality_records.aggregate as any).mockResolvedValue({

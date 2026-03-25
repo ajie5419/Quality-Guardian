@@ -53,6 +53,29 @@ export async function getWorkOrderListPage(params?: {
   };
 }
 
+export type WorkOrderDashboardStats = {
+  completed: number;
+  inProgress: number;
+  pieData: Array<{ name: string; value: number }>;
+  progressPercent: number;
+  rankings: Array<{ division: string; totalQuantity: number }>;
+  total: number;
+};
+
+export async function getWorkOrderDashboardStats(params?: {
+  ids?: string;
+  ignoreYearFilter?: boolean;
+  keyword?: string;
+  projectName?: string;
+  status?: string;
+  workOrderNumber?: string;
+  year?: number;
+}) {
+  return requestClient.get<WorkOrderDashboardStats>(QMS_API.WORK_ORDER_STATS, {
+    params,
+  });
+}
+
 export async function getWorkOrderExportList(params?: {
   ids?: string;
   ignoreYearFilter?: boolean;

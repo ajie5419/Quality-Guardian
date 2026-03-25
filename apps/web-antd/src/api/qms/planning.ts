@@ -16,10 +16,72 @@ import type { QmsImportSummary } from '#/api/qms/types';
 import { normalizeListResponse } from '#/api/qms/adapters';
 import { requestClient } from '#/api/request';
 
+export interface ProjectDocumentLedgerItem {
+  createdAt: string;
+  id: string;
+  projectName: string;
+  sourceInspectionId?: string;
+  sourceIssueId?: string;
+  sourceIssueNumber?: string;
+  sourceLabel?: string;
+  sourceType: 'INSPECTION' | 'ISSUE' | 'MANUAL';
+  status: string;
+  updatedAt: string;
+  workContent: string;
+  workOrderNumber: string;
+}
+
+export interface InspectionFormTemplateItem {
+  attachments?: string;
+  createdAt: string;
+  createdBy?: string;
+  customerName?: string;
+  formFields?:
+    | Array<{
+        acceptanceCriteria?: string;
+        checkItem?: string;
+        lowerTolerance?: number;
+        standardValue?: number;
+        unit?: string;
+        upperTolerance?: number;
+      }>
+    | string;
+  formName: string;
+  id: string;
+  partName?: string;
+  processName: string;
+  projectName?: string;
+  status: string;
+  updatedAt: string;
+  updatedBy?: string;
+  workOrderNumber: string;
+}
+
+export interface InspectionFormMatchResult {
+  hasTemplate: boolean;
+  processName: string;
+  template: null | {
+    attachments?: string;
+    formFields?: Array<{
+      acceptanceCriteria?: string;
+      checkItem?: string;
+      lowerTolerance?: number;
+      standardValue?: number;
+      unit?: string;
+      upperTolerance?: number;
+    }>;
+    formName: string;
+    id: string;
+    partName?: string;
+    workOrderNumber: string;
+  };
+}
+
 // Project Document type (local definition since not in shared)
 export interface ProjectDocProject {
   createdAt: string;
   description?: string;
+  documents?: ProjectDocumentLedgerItem[];
   id: string;
   projectName?: string;
   status?: 'active' | 'archived' | 'draft';
@@ -135,6 +197,66 @@ export async function getProjectDocProjects() {
 export async function getProjectDocProjectsPage() {
   const raw = await getProjectDocProjects();
   return normalizeListResponse<ProjectDocProject>(raw);
+}
+
+export async function getInspectionFormTemplateList(params?: {
+  partName?: string;
+  processName?: string;
+  workOrderNumber?: string;
+}) {
+  return requestClient.get<InspectionFormTemplateItem[]>(
+    '/qms/planning/inspection-forms',
+    { params },
+  );
+}
+
+export async function getInspectionFormTemplateListPage(params?: {
+  partName?: string;
+  processName?: string;
+  workOrderNumber?: string;
+}) {
+  const raw = await getInspectionFormTemplateList(params);
+  return normalizeListResponse<InspectionFormTemplateItem>(raw);
+}
+
+export async function createInspectionFormTemplate(
+  data: Partial<InspectionFormTemplateItem> & {
+    formFields?: Array<Record<string, unknown>>;
+  },
+) {
+  return requestClient.post<InspectionFormTemplateItem>(
+    '/qms/planning/inspection-forms',
+    data,
+  );
+}
+
+export async function updateInspectionFormTemplate(
+  id: string,
+  data: Partial<InspectionFormTemplateItem> & {
+    formFields?: Array<Record<string, unknown>>;
+  },
+) {
+  return requestClient.put<InspectionFormTemplateItem>(
+    `/qms/planning/inspection-forms/${id}`,
+    data,
+  );
+}
+
+export async function deleteInspectionFormTemplate(id: string) {
+  return requestClient.delete(`/qms/planning/inspection-forms/${id}`);
+}
+
+export async function matchInspectionFormTemplate(params: {
+  category: string;
+  incomingType?: string;
+  partName?: string;
+  processName?: string;
+  workOrderNumber: string;
+}) {
+  return requestClient.get<InspectionFormMatchResult>(
+    '/qms/planning/inspection-forms/match',
+    { params },
+  );
 }
 
 export async function createProjectDocProject(data: {

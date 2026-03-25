@@ -25,23 +25,7 @@ export function useIssueRemoteStatistics() {
   }) {
     try {
       const res = await getInspectionIssueStats(params);
-      let cumulativeCount = 0;
-      const totalCount = res.totalCount || 0;
-      const pareto = (res.pieData || []).map((item) => {
-        cumulativeCount += item.value;
-        return {
-          label: item.name,
-          value: item.value,
-          percent:
-            totalCount > 0 ? Math.round((item.value / totalCount) * 100) : 0,
-          cumulativePercent:
-            totalCount > 0
-              ? Math.round((cumulativeCount / totalCount) * 100)
-              : 0,
-        };
-      });
-
-      statistics.value = { ...res, pareto };
+      statistics.value = res;
     } catch (error) {
       handleApiError(error, 'Fetch Issue Statistics');
     }

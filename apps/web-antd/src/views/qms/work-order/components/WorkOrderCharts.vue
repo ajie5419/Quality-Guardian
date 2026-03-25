@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import type { EchartsUIType } from '@vben/plugins/echarts';
 
+import type { WorkOrderDashboardStats } from '#/api/qms/work-order';
 import type { SystemDeptApi } from '#/api/system/dept';
 
 import { computed, nextTick, ref, shallowRef, watch } from 'vue';
@@ -18,67 +19,51 @@ import {
   Statistic,
 } from 'ant-design-vue';
 
-import { WorkOrderStatusEnum } from '#/api/qms/enums';
 import { findNameById } from '#/types';
 
-import { normalizeStatus } from '../composables/useWorkOrderStatus';
 import { CHART_COLORS, getStableColor } from '../constants';
 
 const props = defineProps<{
   deptData: SystemDeptApi.Dept[];
   loading?: boolean;
-  summaryData: Array<{ division: string; quantity: number; status: string }>;
+  statsData: null | WorkOrderDashboardStats;
 }>();
 
 const { t } = useI18n();
 
 const dashboardStats = computed(() => {
-  const data = props.summaryData || [];
-
-  const stats = {
-    total: 0,
-    inProgress: 0,
-    completed: 0,
-    divisionProjectMap: {} as Record<string, number>,
-    divisionQuantityMap: {} as Record<string, number>,
-  };
-
-  for (const item of data) {
-    stats.total++;
-    const status = normalizeStatus(item.status);
-
-    if (status === WorkOrderStatusEnum.IN_PROGRESS) stats.inProgress++;
-    if (status === WorkOrderStatusEnum.COMPLETED) stats.completed++;
-
-    const rawDiv = String(item.division || t('qms.common.other')).trim();
-    // 使用传入的 deptData 进行查找
-    const divName = findNameById(props.deptData, rawDiv) || rawDiv;
-
-    stats.divisionProjectMap[divName] =
-      (stats.divisionProjectMap[divName] || 0) + 1;
-    stats.divisionQuantityMap[divName] =
-      (stats.divisionQuantityMap[divName] || 0) + (Number(item.quantity) || 0);
+  const source = props.statsData;
+  if (!source) {
+    return {
+      completed: 0,
+      inProgress: 0,
+      pieData: [] as Array<{ color: string; name: string; value: number }>,
+      progressPercent: 0,
+      rankings: [] as Array<{ division: string; totalQuantity: number }>,
+      total: 0,
+    };
   }
 
-  const progressPercent =
-    stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
-
-  const pieData = Object.entries(stats.divisionProjectMap)
-    .map(([name, value]) => ({
+  const pieData = (source.pieData || []).map((item) => {
+    const rawName = String(item.name || t('qms.common.other')).trim();
+    const name = findNameById(props.deptData, rawName) || rawName;
+    return {
       name,
-      value,
-      // 使用基于名称的稳定颜色映射
+      value: Number(item.value || 0),
       color: getStableColor(name),
-    }))
-    .sort((a, b) => b.value - a.value);
+    };
+  });
 
-  const rankings = Object.entries(stats.divisionQuantityMap)
-    .map(([division, totalQuantity]) => ({ division, totalQuantity }))
-    .sort((a, b) => b.totalQuantity - a.totalQuantity);
+  const rankings = (source.rankings || []).map((item) => {
+    const rawDivision = String(item.division || t('qms.common.other')).trim();
+    return {
+      division: findNameById(props.deptData, rawDivision) || rawDivision,
+      totalQuantity: Number(item.totalQuantity || 0),
+    };
+  });
 
   return {
-    ...stats,
-    progressPercent,
+    ...source,
     pieData,
     rankings,
   };

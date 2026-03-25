@@ -6,16 +6,39 @@ import { requestClient } from '#/api/request';
 export * from '@qgs/shared';
 
 export interface QualityLossQueryParams {
+  granularity?: 'month' | 'week' | 'year';
   lossSource?: string;
   page?: number;
   pageSize?: number;
   status?: string;
   workOrderNumber?: string;
+  year?: number;
 }
 
 export interface QualityLossPageResult {
   items: QualityLossItem[];
   total: number;
+}
+
+export interface QualityLossDashboardSummary {
+  kpi: {
+    displayRate: string;
+    pendingAmount: number;
+    recoveryRate: number;
+    totalAmount: number;
+    totalClaim: number;
+  };
+  years: number[];
+}
+
+export interface QualityLossCharts {
+  deptDistribution: Array<{ name: string; value: number }>;
+  trend: Array<{
+    claimAmount: number;
+    period: number;
+    periodLabel: string;
+    totalAmount: number;
+  }>;
 }
 
 /**
@@ -27,12 +50,22 @@ export async function getQualityLossList(params?: QualityLossQueryParams) {
   });
 }
 
-/**
- * Get Quality Loss summary (all records for KPIs and charts)
- */
-export async function getQualityLossSummary(params?: QualityLossQueryParams) {
-  return requestClient.get<QualityLossItem[]>('/qms/quality-loss/summary', {
+export async function getQualityLossDashboardSummary(
+  params?: Omit<QualityLossQueryParams, 'page' | 'pageSize' | 'year'>,
+) {
+  return requestClient.get<QualityLossDashboardSummary>(
+    '/qms/quality-loss/dashboard',
+    { params },
+  );
+}
+
+export async function getQualityLossCharts(
+  params?: QualityLossQueryParams,
+  signal?: AbortSignal,
+) {
+  return requestClient.get<QualityLossCharts>('/qms/quality-loss/charts', {
     params,
+    signal,
   });
 }
 

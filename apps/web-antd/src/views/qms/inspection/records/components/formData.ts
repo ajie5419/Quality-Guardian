@@ -186,15 +186,6 @@ export const getFormSchema = (type: string): VbenFormSchema[] => {
       rules: 'required',
     },
     {
-      fieldName: 'itemsSlot',
-      label: '', // Anchor for ITP table
-      component: 'Divider',
-      componentProps: {
-        style: { display: 'none' },
-      },
-      formItemClass: 'col-span-full',
-    },
-    {
       fieldName: 'remarks',
       label: $t('qms.inspection.fields.remarks'),
       component: 'Textarea',

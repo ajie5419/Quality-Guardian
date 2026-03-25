@@ -218,6 +218,12 @@ export const DataScopeService = {
     }
 
     const deptCandidates = await this.getDeptCandidates(deptIds);
+    // 工单缺少稳定的“责任人”字段，SELF/DEPT 当前都按部门口径兜底；
+    // 若用户未绑定部门，不能构造 in [] 导致全量下拉为空。
+    if (deptCandidates.length === 0) {
+      return baseWhere;
+    }
+
     // 工单当前无稳定“责任人”字段，SELF 暂按部门口径兜底
     return {
       AND: [baseWhere, { division: { in: deptCandidates } }],

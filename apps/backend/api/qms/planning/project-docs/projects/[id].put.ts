@@ -5,6 +5,10 @@ import { normalizePlanningProjectName } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
+  normalizeProjectDocuments,
+  stringifyProjectDocuments,
+} from '~/utils/project-documents';
+import {
   internalServerErrorResponse,
   notFoundResponse,
   unAuthorizedResponse,
@@ -23,12 +27,17 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
+    const documents =
+      body.documents === undefined
+        ? undefined
+        : stringifyProjectDocuments(normalizeProjectDocuments(body.documents));
     const updated = await prisma.doc_projects.update({
       where: { id },
       data: {
         status:
           body.status === undefined ? undefined : String(body.status).trim(),
         projectName: normalizePlanningProjectName(body.projectName),
+        documents,
         updatedAt: new Date(),
       },
     });

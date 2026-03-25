@@ -54,6 +54,7 @@ export enum DefectType {
  */
 export interface InspectionIssue {
   id: string;
+  inspectionId?: string;
   ncNumber: string;
   reportDate: string;
   workOrderNumber: string;
@@ -68,6 +69,7 @@ export interface InspectionIssue {
   solution?: string;
   lossAmount: number;
   responsibleDepartment: string;
+  responsibleWelder?: string;
   supplierName?: string;
   status: 'Closed' | 'Open' | 'Resolved' | IssueStatus;
   claim: ClaimStatus | string;

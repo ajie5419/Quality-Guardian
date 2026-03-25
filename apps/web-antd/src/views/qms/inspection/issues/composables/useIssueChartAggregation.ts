@@ -1,12 +1,15 @@
-// import type { EChartsOption } from 'echarts';
-import type { QmsInspectionApi } from '#/api/qms/inspection';
-import type { SystemDeptApi } from '#/api/system/dept';
+import type {
+  InspectionIssueChartDimension,
+  InspectionIssueChartMetric,
+} from '#/api/qms/inspection';
 import type {
   ChartConfig,
   ChartOptionItem,
 } from '#/components/Qms/ChartBuilder/types';
+import type { DeptTreeNode } from '#/types';
 
-import { aggregateChartData } from '#/components/Qms/ChartBuilder/composables/useChartCore';
+import { getInspectionIssueChartAggregate } from '#/api/qms/inspection';
+import { buildChartOptionFromAggregated } from '#/components/Qms/ChartBuilder/composables/useChartCore';
 import { findNameById } from '#/types';
 
 export const ISSUE_CHART_DIMENSIONS: ChartOptionItem[] = [
@@ -28,43 +31,53 @@ export const ISSUE_CHART_METRICS: ChartOptionItem[] = [
   { label: '涉及数量', value: 'quantity' },
 ];
 
-export function getIssueChartOption(
-  data: QmsInspectionApi.InspectionIssue[],
+type ChartFilterParams = {
+  dateMode?: 'month' | 'week' | 'year';
+  dateValue?: string;
+  year?: number;
+};
+
+function normalizeChartRows(
+  rows: Array<{ name: string; value: number }>,
   config: ChartConfig,
-  deptData?: SystemDeptApi.Dept[],
-): ReturnType<typeof aggregateChartData> {
-  return aggregateChartData(
-    data,
-    config,
-    ISSUE_CHART_DIMENSIONS,
-    ISSUE_CHART_METRICS,
-    (item, metric) => {
-      if (metric === 'lossAmount') {
-        return Number(item.lossAmount) || 0;
-      }
-      if (metric === 'quantity') {
-        return Number(item.quantity) || 0;
-      }
-      return 0;
-    },
-    // 添加维度提取器，处理日期格式
-    (item, dimension) => {
-      if (dimension === 'reportMonth') {
-        // reportDate 格式通常是 YYYY-MM-DD
-        return (item.reportDate || '').slice(0, 7);
-      }
+  deptData?: DeptTreeNode[],
+) {
+  if (
+    config.dimension !== 'division' &&
+    config.dimension !== 'responsibleDepartment'
+  ) {
+    return rows;
+  }
+  return rows.map((row) => ({
+    ...row,
+    name: findNameById(deptData || [], row.name) || row.name,
+  }));
+}
 
-      const val = (item as unknown as Record<string, unknown>)[dimension];
-      if (!val) return '未分类';
+export async function getIssueChartOption(
+  config: ChartConfig,
+  filters: ChartFilterParams,
+  deptData?: DeptTreeNode[],
+) {
+  const response = await getInspectionIssueChartAggregate({
+    ...filters,
+    dimension: config.dimension as InspectionIssueChartDimension,
+    metric: config.metric as InspectionIssueChartMetric,
+    top: 15,
+  });
+  const rows = normalizeChartRows(response.items || [], config, deptData);
+  return buildChartOptionFromAggregated(rows, config, ISSUE_CHART_METRICS);
+}
 
-      if (
-        (dimension === 'division' || dimension === 'responsibleDepartment') &&
-        deptData
-      ) {
-        return findNameById(deptData, String(val)) || String(val);
-      }
-
-      return String(val);
-    },
-  );
+export async function renderCustomChart<TOption>(
+  renderFn: (option: TOption, clear?: boolean) => unknown,
+  config: ChartConfig,
+  filters: ChartFilterParams,
+  deptData?: DeptTreeNode[],
+) {
+  if (!renderFn) return;
+  const option = await getIssueChartOption(config, filters, deptData);
+  if (option) {
+    renderFn(option as TOption);
+  }
 }

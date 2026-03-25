@@ -3,7 +3,6 @@ import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import type { ChartConfig } from '../composables/useChartAggregation';
 
-import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
 import type { DeptTreeNode } from '#/types';
 
 import { reactive, ref, watch } from 'vue';
@@ -27,10 +26,12 @@ import { renderCustomChart } from '../composables/useChartAggregation';
 import { CHART_DIMENSIONS, CHART_METRICS } from '../constants';
 
 const props = defineProps<{
+  dateMode?: 'month' | 'week' | 'year';
+  dateValue?: string;
   deptData?: DeptTreeNode[];
   initialConfig?: ChartConfig;
   open: boolean;
-  sourceData: QmsAfterSalesApi.AfterSalesItem[];
+  year?: number;
 }>();
 
 const emit = defineEmits<{
@@ -94,6 +95,9 @@ watch(
     () => formState.metric,
     () => formState.chartType,
     () => props.open,
+    () => props.dateMode,
+    () => props.dateValue,
+    () => props.year,
   ],
   () => {
     if (props.open) {
@@ -101,9 +105,13 @@ watch(
       setTimeout(() => {
         renderCustomChart(
           renderEcharts,
-          props.sourceData,
           { id: 'preview', ...formState },
           t,
+          {
+            dateMode: props.dateMode,
+            dateValue: props.dateValue,
+            year: props.year,
+          },
           props.deptData,
         );
       }, 100);

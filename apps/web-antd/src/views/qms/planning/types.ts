@@ -70,6 +70,21 @@ export interface InspectionDocItem {
   reportDate: string;
 }
 
+export interface ProjectDocumentLedgerItem {
+  createdAt: string;
+  id: string;
+  projectName: string;
+  sourceInspectionId?: string;
+  sourceIssueId?: string;
+  sourceIssueNumber?: string;
+  sourceLabel?: string;
+  sourceType: 'INSPECTION' | 'ISSUE' | 'MANUAL';
+  status: string;
+  updatedAt: string;
+  workContent: string;
+  workOrderNumber: string;
+}
+
 /**
  * 侧边栏项点击回调
  */

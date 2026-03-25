@@ -16,6 +16,22 @@ interface NetPassRateSummary {
   totalCount: number;
 }
 
+type InspectionPassRateRow = {
+  category: string;
+  incomingType: null | string;
+  processName: null | string;
+  qualifiedQuantity: null | number;
+  quantity: number;
+  result: string;
+  unqualifiedQuantity: null | number;
+};
+
+type InspectionQuantitySummary = {
+  qualifiedQuantity: number;
+  quantity: number;
+  unqualifiedQuantity: number;
+};
+
 const DEFAULT_PASS_RATE_TARGETS: Record<string, number> = {
   原材料: 99.8,
   辅材: 99.9,
@@ -35,6 +51,10 @@ const DEFAULT_PASS_RATE_TARGETS: Record<string, number> = {
 
 const GLOBAL_DEFAULT_TARGET = 99.85;
 
+function roundPercent(value: number) {
+  return Number(value.toFixed(2));
+}
+
 const PROCESS_MAPPING: Record<string, string> = {
   设计: '设计',
   组对: '组焊',
@@ -51,9 +71,78 @@ const PROCESS_MAPPING: Record<string, string> = {
   整体拼装: '',
 };
 
-const INCOMING_NCR_ALIASES: Record<string, string[]> = {
-  外购件: ['外购件', '成品检验'],
-};
+function normalizeInspectionQuantitySummary(
+  item: InspectionPassRateRow,
+): InspectionQuantitySummary {
+  const totalQuantity = Math.max(1, Number(item.quantity) || 1);
+  const rawQualified = Number(item.qualifiedQuantity);
+  const rawUnqualified = Number(item.unqualifiedQuantity);
+  const hasQualified = Number.isFinite(rawQualified);
+  const hasUnqualified = Number.isFinite(rawUnqualified);
+
+  if (
+    hasQualified &&
+    hasUnqualified &&
+    rawQualified + rawUnqualified === totalQuantity
+  ) {
+    return {
+      quantity: totalQuantity,
+      qualifiedQuantity: rawQualified,
+      unqualifiedQuantity: rawUnqualified,
+    };
+  }
+
+  if (hasUnqualified) {
+    const unqualifiedQuantity = Math.max(
+      0,
+      Math.min(totalQuantity, rawUnqualified),
+    );
+    return {
+      quantity: totalQuantity,
+      qualifiedQuantity: totalQuantity - unqualifiedQuantity,
+      unqualifiedQuantity,
+    };
+  }
+
+  if (hasQualified) {
+    const qualifiedQuantity = Math.max(
+      0,
+      Math.min(totalQuantity, rawQualified),
+    );
+    return {
+      quantity: totalQuantity,
+      qualifiedQuantity,
+      unqualifiedQuantity: totalQuantity - qualifiedQuantity,
+    };
+  }
+
+  return item.result === 'FAIL'
+    ? {
+        quantity: totalQuantity,
+        qualifiedQuantity: 0,
+        unqualifiedQuantity: totalQuantity,
+      }
+    : {
+        quantity: totalQuantity,
+        qualifiedQuantity: totalQuantity,
+        unqualifiedQuantity: 0,
+      };
+}
+
+async function getInspectionPassRateRows(start: Date, end: Date) {
+  return prisma.inspections.findMany({
+    where: { isDeleted: false, inspectionDate: { gte: start, lte: end } },
+    select: {
+      category: true,
+      incomingType: true,
+      processName: true,
+      quantity: true,
+      qualifiedQuantity: true,
+      unqualifiedQuantity: true,
+      result: true,
+    },
+  });
+}
 
 export async function createPassRateTargetResolver() {
   const setting = await prisma.system_settings.findUnique({
@@ -80,38 +169,21 @@ export async function getNetPassRateSummaryByRange(
   start: Date,
   end: Date,
 ): Promise<NetPassRateSummary> {
-  const [inspections, ncrRecords] = await Promise.all([
-    prisma.inspections.findMany({
-      where: { isDeleted: false, inspectionDate: { gte: start, lte: end } },
-      select: { quantity: true, result: true },
-    }),
-    prisma.quality_records.findMany({
-      where: { isDeleted: false, date: { gte: start, lte: end } },
-      select: { quantity: true },
-    }),
-  ]);
+  const inspections = await getInspectionPassRateRows(start, end);
 
-  const totalQty = inspections.reduce(
-    (sum, item) => sum + (item.quantity || 1),
-    0,
-  );
-  const passedQty = inspections
-    .filter((item) => item.result === 'PASS')
-    .reduce((sum, item) => sum + (item.quantity || 1), 0);
-  const ncrQty = ncrRecords.reduce(
-    (sum, item) => sum + (item.quantity || 0),
-    0,
-  );
-
-  const effectiveTotal = Math.max(totalQty, ncrQty);
-  const netPassed = Math.max(0, passedQty - ncrQty);
+  const summary = { totalCount: 0, passCount: 0 };
+  for (const item of inspections) {
+    const quantities = normalizeInspectionQuantitySummary(item);
+    summary.totalCount += quantities.quantity;
+    summary.passCount += quantities.qualifiedQuantity;
+  }
 
   return {
-    totalCount: effectiveTotal,
-    passCount: netPassed,
+    totalCount: summary.totalCount,
+    passCount: summary.passCount,
     passRate:
-      effectiveTotal > 0
-        ? Number(((netPassed / effectiveTotal) * 100).toFixed(1))
+      summary.totalCount > 0
+        ? roundPercent((summary.passCount / summary.totalCount) * 100)
         : 0,
   };
 }
@@ -122,93 +194,76 @@ export async function getPassRateDrillDownByRange(
   getTargetPassRate: (name?: string) => number,
 ): Promise<DrillDownItem[]> {
   const drillDown: DrillDownItem[] = [];
-  const inspections = await prisma.inspections.findMany({
-    where: { isDeleted: false, inspectionDate: { gte: start, lte: end } },
-  });
-
-  const ncrRecords = await prisma.quality_records.findMany({
-    where: { isDeleted: false, date: { gte: start, lte: end } },
-    select: { processName: true, quantity: true },
-  });
-
-  const ncrDefectsMap: Record<string, number> = {};
-  ncrRecords.forEach((rec) => {
-    const rawProc = rec.processName || '其他';
-    const proc = PROCESS_MAPPING[rawProc] || rawProc;
-    ncrDefectsMap[proc] = (ncrDefectsMap[proc] || 0) + (rec.quantity || 0);
-  });
+  const inspections = await getInspectionPassRateRows(start, end);
 
   const incomingTypes = [
     ...new Set(
       inspections
-        .filter((i) => i.category === 'INCOMING')
-        .map((i) => (i.incomingType || '未分类') as string),
+        .filter((item) => item.category === 'INCOMING')
+        .map((item) => (item.incomingType || '未分类') as string),
     ),
   ];
 
-  const resolveIncomingNcrQty = (incomingType: string) => {
-    const aliases = INCOMING_NCR_ALIASES[incomingType] || [incomingType];
-    return aliases.reduce((sum, alias) => sum + (ncrDefectsMap[alias] || 0), 0);
-  };
-
   for (const type of incomingTypes) {
     const items = inspections.filter(
-      (i) => i.category === 'INCOMING' && (i.incomingType || '未分类') === type,
+      (item) =>
+        item.category === 'INCOMING' &&
+        (item.incomingType || '未分类') === type,
     );
-    const total = items.reduce((sum, i) => sum + (i.quantity || 1), 0);
-    let passed = items
-      .filter((i) => i.result === 'PASS')
-      .reduce((sum, i) => sum + (i.quantity || 1), 0);
 
-    const ncrQty = resolveIncomingNcrQty(String(type));
-    passed = Math.max(0, passed - ncrQty);
+    const summary = { totalCount: 0, passCount: 0 };
+    for (const item of items) {
+      const quantities = normalizeInspectionQuantitySummary(item);
+      summary.totalCount += quantities.quantity;
+      summary.passCount += quantities.qualifiedQuantity;
+    }
 
     drillDown.push({
       process: String(type),
       category: '来料检验',
-      passRate: total > 0 ? Number(((passed / total) * 100).toFixed(1)) : 0,
+      passRate:
+        summary.totalCount > 0
+          ? roundPercent((summary.passCount / summary.totalCount) * 100)
+          : 0,
       targetPassRate: getTargetPassRate(String(type)),
-      totalCount: total,
-      passCount: passed,
+      totalCount: summary.totalCount,
+      passCount: summary.passCount,
     });
   }
 
-  const processItems = inspections.filter((i) => i.category === 'PROCESS');
-  const processStats: Record<string, { passed: number; total: number }> = {};
+  const processStats: Record<
+    string,
+    { passCount: number; totalCount: number }
+  > = {};
 
-  for (const item of processItems) {
+  for (const item of inspections.filter(
+    (record) => record.category === 'PROCESS',
+  )) {
     const rawProcess = item.processName || '';
     const mappedName = PROCESS_MAPPING[rawProcess];
 
     if (!mappedName || mappedName === '设计') continue;
 
     if (!processStats[mappedName]) {
-      processStats[mappedName] = { total: 0, passed: 0 };
+      processStats[mappedName] = { totalCount: 0, passCount: 0 };
     }
 
-    const qty = item.quantity || 1;
-    processStats[mappedName].total += qty;
-    if (item.result === 'PASS') {
-      processStats[mappedName].passed += qty;
-    }
+    const quantities = normalizeInspectionQuantitySummary(item);
+    processStats[mappedName].totalCount += quantities.quantity;
+    processStats[mappedName].passCount += quantities.qualifiedQuantity;
   }
 
   for (const [name, stats] of Object.entries(processStats)) {
-    const { total, passed: rawPassed } = stats;
-    const ncrQty = ncrDefectsMap[name] || 0;
-    const passed = Math.max(0, rawPassed - ncrQty);
-    const effectiveTotal = Math.max(total, ncrQty);
-
     drillDown.push({
       process: name,
       category: '过程检验',
       passRate:
-        effectiveTotal > 0
-          ? Number(((passed / effectiveTotal) * 100).toFixed(1))
+        stats.totalCount > 0
+          ? roundPercent((stats.passCount / stats.totalCount) * 100)
           : 0,
       targetPassRate: getTargetPassRate(name),
-      totalCount: effectiveTotal,
-      passCount: passed,
+      totalCount: stats.totalCount,
+      passCount: stats.passCount,
     });
   }
 

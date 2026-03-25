@@ -1,12 +1,23 @@
 <script lang="ts" setup>
-import type { QmsInspectionApi } from '#/api/qms/inspection';
-
 import { useI18n } from '@vben/locales';
 
 import { Input, InputNumber, Select, Table, Tag } from 'ant-design-vue';
 
+interface InspectionItemRow {
+  acceptanceCriteria?: string;
+  checkItem?: string;
+  id: string;
+  lowerTolerance?: number;
+  measuredValue?: number | string;
+  remarks?: string;
+  result: 'FAIL' | 'NA' | 'PASS';
+  standardValue?: number;
+  uom?: string;
+  upperTolerance?: number;
+}
+
 defineProps<{
-  dataSource: QmsInspectionApi.InspectionTaskResult[];
+  dataSource: InspectionItemRow[];
 }>();
 
 const emit = defineEmits(['update:dataSource', 'change']);
@@ -16,21 +27,27 @@ const { t } = useI18n();
 const columns = [
   { title: '检查项目', dataIndex: 'checkItem', width: 150 },
   { title: '标准值', dataIndex: 'standard', width: 200 }, // Custom render
-  { title: '单位', dataIndex: 'uom', width: 80 },
   { title: '实测值', dataIndex: 'measuredValue', width: 150 },
   { title: '结果', dataIndex: 'result', width: 100 },
   { title: '备注', dataIndex: 'remarks' },
 ];
 
+function appendUnit(text: string, uom?: string) {
+  const base = String(text || '').trim();
+  const unit = String(uom || '').trim();
+  if (!unit) return base;
+  return base ? `${base}（${unit}）` : unit;
+}
+
 function handleResultChange(
-  record: QmsInspectionApi.InspectionTaskResult,
+  record: InspectionItemRow,
   val: 'FAIL' | 'NA' | 'PASS',
 ) {
   record.result = val;
   emit('change');
 }
 
-function handleValueChange(record: QmsInspectionApi.InspectionTaskResult) {
+function handleValueChange(record: InspectionItemRow) {
   // Simple client-side auto-calc
   if (
     record.standardValue !== undefined &&
@@ -73,35 +90,48 @@ function handleValueChange(record: QmsInspectionApi.InspectionTaskResult) {
     bordered
   >
     <template #bodyCell="{ column, record }">
+      <template v-if="column.dataIndex === 'checkItem'">
+        <span>{{
+          appendUnit(String(record.checkItem || ''), record.uom)
+        }}</span>
+      </template>
+
       <template v-if="column.dataIndex === 'standard'">
+        <div v-if="String(record.acceptanceCriteria || '').trim()">
+          {{
+            String(record.acceptanceCriteria || '')
+              .toLowerCase()
+              .includes(String(record.uom || '').toLowerCase())
+              ? record.acceptanceCriteria
+              : appendUnit(String(record.acceptanceCriteria || ''), record.uom)
+          }}
+        </div>
         <div
-          v-if="
+          v-else-if="
             record.standardValue !== undefined && record.standardValue !== null
           "
         >
-          {{ record.standardValue }}
+          {{ appendUnit(String(record.standardValue), record.uom) }}
           <span class="text-xs text-gray-400">
             (+{{ record.upperTolerance || 0 }}/-{{
               record.lowerTolerance || 0
             }})
           </span>
         </div>
-        <div v-else class="text-xs text-gray-500">
-          {{ record.acceptanceCriteria }}
-        </div>
+        <div v-else class="text-xs text-gray-500">-</div>
       </template>
 
       <template v-if="column.dataIndex === 'measuredValue'">
         <InputNumber
           v-if="
-            record.standardValue !== undefined && record.standardValue !== null
+            !String(record.acceptanceCriteria || '').trim() &&
+            record.standardValue !== undefined &&
+            record.standardValue !== null
           "
           v-model:value="record.measuredValue"
           size="small"
           class="w-full"
-          @change="
-            handleValueChange(record as QmsInspectionApi.InspectionTaskResult)
-          "
+          @change="handleValueChange(record as InspectionItemRow)"
         />
         <Input v-else v-model:value="record.measuredValue" size="small" />
       </template>
@@ -114,7 +144,7 @@ function handleValueChange(record: QmsInspectionApi.InspectionTaskResult) {
           @change="
             (val) =>
               handleResultChange(
-                record as QmsInspectionApi.InspectionTaskResult,
+                record as InspectionItemRow,
                 val as 'FAIL' | 'PASS' | 'NA',
               )
           "

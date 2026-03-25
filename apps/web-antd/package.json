@@ -24,6 +24,8 @@
   "dependencies": {
     "@qgs/shared": "workspace:*",
     "@tanstack/vue-query": "catalog:",
+    "@univerjs/preset-sheets-core": "0.16.1",
+    "@univerjs/presets": "0.16.1",
     "@vben/access": "workspace:*",
     "@vben/common-ui": "workspace:*",
     "@vben/constants": "workspace:*",

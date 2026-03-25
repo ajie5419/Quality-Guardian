@@ -3,6 +3,7 @@ import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
+  badRequestResponse,
   internalServerErrorResponse,
   notFoundResponse,
   useResponseSuccess,
@@ -21,6 +22,15 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error: unknown) {
     logApiError('inspection-update', error);
+    if (
+      error instanceof Error &&
+      String(error.message || '').startsWith('VALIDATION:')
+    ) {
+      return badRequestResponse(
+        event,
+        String(error.message || '').replace('VALIDATION:', ''),
+      );
+    }
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'Inspection record not found');
     }

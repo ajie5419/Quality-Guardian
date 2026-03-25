@@ -18,7 +18,6 @@ import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
   getQualityLossExportList,
   getQualityLossList,
-  getQualityLossSummary,
 } from '#/api/qms/quality-loss';
 import { getDeptList } from '#/api/system/dept';
 import {
@@ -36,7 +35,7 @@ import LossClaimModal from './components/LossClaimModal.vue';
 import LossEditModal from './components/LossEditModal.vue';
 // 子组件与逻辑抽离
 import LossKpiCards from './components/LossKpiCards.vue';
-import { useLossStatistics } from './composables/useLossStatistics';
+import { useLossOverview } from './composables/useLossOverview';
 import { useQualityLossActions } from './composables/useQualityLossActions';
 import { SOURCE_STYLE_MAP, STATUS_OPTIONS } from './constants';
 import { LossSource } from './types';
@@ -83,7 +82,6 @@ const exportQualityLossAsXlsx = createVxePhotoXlsxExportMethod<QualityLossItem>(
 );
 
 // ================= 状态管理 =================
-const allLossData = ref<QualityLossItem[]>([]);
 const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const deptTreeData = ref<TreeSelectNode[]>([]);
 const showCharts = ref(true);
@@ -147,8 +145,17 @@ async function handleSaveSystemDefault() {
   }
 }
 
-// 统计逻辑
-const { stats } = useLossStatistics(allLossData);
+const {
+  chartData,
+  invalidateOverviewCache,
+  refreshOverview,
+  selectedGranularity,
+  selectedYear,
+  stats,
+  yearOptions,
+  handleGranularityChange,
+  handleYearChange,
+} = useLossOverview(handleApiError);
 
 // ================= 表格配置 =================
 const gridOptions = computed<VxeGridProps<QualityLossItem>>(() => ({
@@ -263,24 +270,15 @@ const gridOptions = computed<VxeGridProps<QualityLossItem>>(() => ({
           pageSize: page?.pageSize,
           ...form,
         };
-        const result = await getQualityLossList(params);
+        const [result] = await Promise.all([
+          getQualityLossList(params),
+          refreshOverview(form),
+        ]);
         return result;
       },
     },
   },
 }));
-
-/**
- * 获取统计和图表所需的汇总数据（解耦分页）
- */
-async function fetchSummaryData(filters: Partial<QualityLossQueryParams> = {}) {
-  try {
-    const data = await getQualityLossSummary(filters);
-    allLossData.value = data;
-  } catch (error) {
-    handleApiError(error, 'Fetch Quality Loss Summary');
-  }
-}
 
 const [Grid, gridApi] = useVbenVxeGrid<QualityLossItem>({
   gridOptions: gridOptions as unknown as VxeGridProps<QualityLossItem>,
@@ -332,24 +330,15 @@ const [Grid, gridApi] = useVbenVxeGrid<QualityLossItem>({
       },
     ],
     submitOnChange: true,
-    submitButtonOptions: {
-      onClick: ({
-        formModel,
-      }: {
-        formModel: Partial<QualityLossQueryParams>;
-      }) => {
-        fetchSummaryData(formModel);
-      },
-    },
-    resetButtonOptions: {
-      onClick: () => {
-        fetchSummaryData();
-      },
-    },
   },
 } as unknown as QualityLossGridSetupOptions);
 
-const actions = useQualityLossActions(gridApi, invalidateQualityLoss);
+const onLossDataChanged = () => {
+  invalidateOverviewCache();
+  invalidateQualityLoss();
+};
+
+const actions = useQualityLossActions(gridApi, onLossDataChanged);
 const {
   checkedRows,
   modalVisible,
@@ -377,7 +366,6 @@ async function loadInitialData() {
 onMounted(async () => {
   await loadInitialData();
   await loadPreferences();
-  fetchSummaryData();
 });
 
 // 辅助函数
@@ -397,8 +385,12 @@ function getStatusConfig(s: string) {
       <!-- 2. 分析图表区 -->
       <LossCharts
         v-if="showCharts"
-        :data="allLossData"
-        :departments="deptRawData"
+        :chart-data="chartData"
+        :selected-granularity="selectedGranularity"
+        :selected-year="selectedYear"
+        :year-options="yearOptions"
+        @update:selected-granularity="handleGranularityChange"
+        @update:selected-year="handleYearChange"
       />
 
       <!-- 3. 明细列表区 -->
@@ -480,7 +472,12 @@ function getStatusConfig(s: string) {
       :is-edit-mode="isEditMode"
       :initial-data="currentRecord"
       :dept-tree-data="deptTreeData"
-      @success="gridApi.reload()"
+      @success="
+        () => {
+          onLossDataChanged();
+          gridApi.reload();
+        }
+      "
     />
 
     <!-- 索赔库单打印组件 -->

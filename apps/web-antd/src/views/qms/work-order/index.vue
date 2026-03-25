@@ -15,6 +15,7 @@ import { Button, message, Select, Space } from 'ant-design-vue';
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { WorkOrderStatusEnum } from '#/api/qms/enums';
 import {
+  getWorkOrderDashboardStats,
   getWorkOrderExportList,
   getWorkOrderListPage,
 } from '#/api/qms/work-order';
@@ -60,9 +61,9 @@ const loadDeptTree = async () => {
 onMounted(loadDeptTree);
 
 // 3. 工单数据与统计逻辑 (动态年份)
-const allWorkOrders = ref<
-  Array<{ division: string; quantity: number; status: string }>
->([]); // 存储全量统计概要
+const workOrderStats = ref<
+  import('#/api/qms/work-order').WorkOrderDashboardStats | null
+>(null);
 const isStatsLoading = ref(false);
 const { years: dynamicYears } = useAvailableYears();
 const currentYear = ref<number>(new Date().getFullYear());
@@ -233,18 +234,21 @@ const gridOptions = computed<VxeGridProps>(() => ({
           const { currentPage = 1, pageSize = 20 } = pageParams || {};
           isStatsLoading.value = true;
 
-          // 向后端发送分页与过滤参数
-          const response = await getWorkOrderListPage({
-            year: currentYear.value,
-            page: currentPage,
-            pageSize,
-            ...formValues,
-          });
+          const [response, stats] = await Promise.all([
+            getWorkOrderListPage({
+              year: currentYear.value,
+              page: currentPage,
+              pageSize,
+              ...formValues,
+            }),
+            getWorkOrderDashboardStats({
+              year: currentYear.value,
+              ...formValues,
+            }),
+          ]);
+          workOrderStats.value = stats;
 
-          const { items, summary, total } = response;
-
-          // 关键修复：将全量概要数据交给 dashboard 计算
-          allWorkOrders.value = summary || [];
+          const { items, total } = response;
 
           return {
             items,
@@ -347,7 +351,7 @@ const {
         <!-- 数字化仪表盘 -->
         <WorkOrderCharts
           v-if="showDashboard"
-          :summary-data="allWorkOrders"
+          :stats-data="workOrderStats"
           :dept-data="deptRawData"
           :loading="isStatsLoading || isDeptLoading"
         />

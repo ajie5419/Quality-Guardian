@@ -365,6 +365,7 @@
       "lossAmount": "损失金额",
       "reportedBy": "检验员",
       "claim": "索赔",
+      "responsibleWelder": "责任焊工",
       "photos": "照片",
       "updatedAt": "最后更新",
       "severity": "严重程度",
@@ -675,6 +676,30 @@
         "incoming": "进货检验履历"
       }
     }
+  },
+  "welder": {
+    "title": "焊工管理",
+    "welderCode": "焊工编号",
+    "name": "焊工姓名",
+    "team": "所属班组",
+    "examDate": "入厂考试时间",
+    "examPassed": "进厂考试通过",
+    "employmentStatus": "人员状态",
+    "onDuty": "在岗",
+    "resigned": "离职",
+    "certificationNo": "焊工证号",
+    "score": "积分",
+    "scoreLevel": {
+      "label": "积分等级",
+      "safe": "安全",
+      "warning": "预警",
+      "danger": "高风险"
+    },
+    "total": "焊工总数",
+    "examPassedCount": "考试通过人数",
+    "certifiedCount": "持证人数",
+    "averageScore": "平均积分",
+    "warningCount": "低积分人数"
   },
   "reports": {
     "title": "质量报表",

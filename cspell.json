@@ -72,7 +72,13 @@
     "Innodb",
     "qqbrowser",
     "setex",
-    "Enumwork"
+    "Enumwork",
+    "Argb",
+    "argb",
+    "drawingno",
+    "formno",
+    "formnorev",
+    "onduty"
   ],
   "ignorePaths": [
     "**/node_modules/**",

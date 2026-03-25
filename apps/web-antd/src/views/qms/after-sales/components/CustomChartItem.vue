@@ -3,7 +3,6 @@ import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import type { ChartConfig } from '../composables/useChartAggregation';
 
-import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
 import type { DeptTreeNode } from '#/types';
 
 import { onMounted, ref, watch } from 'vue';
@@ -17,9 +16,11 @@ import { renderCustomChart } from '../composables/useChartAggregation';
 
 const props = defineProps<{
   config: ChartConfig;
-  data: QmsAfterSalesApi.AfterSalesItem[];
+  dateMode?: 'month' | 'week' | 'year';
+  dateValue?: string;
   deptData?: DeptTreeNode[];
   loading?: boolean;
+  year?: number;
 }>();
 
 const chartRef = ref<EchartsUIType>();
@@ -27,26 +28,35 @@ const { renderEcharts } = useEcharts(chartRef);
 const { t } = useI18n();
 
 // 渲染图表
-function render() {
-  if (!props.data || props.data.length === 0) return;
-
-  // 使用标准的 renderEcharts 函数，它会自动处理 setOption 和 resize
-  renderCustomChart(renderEcharts, props.data, props.config, t, props.deptData);
+async function render() {
+  await renderCustomChart(
+    renderEcharts,
+    props.config,
+    t,
+    {
+      dateMode: props.dateMode,
+      dateValue: props.dateValue,
+      year: props.year,
+    },
+    props.deptData,
+  );
 }
 
 // 监听数据或配置变化
 watch(
   [
-    () => props.data,
     () => props.config,
     () => props.loading,
     () => props.deptData,
+    () => props.dateMode,
+    () => props.dateValue,
+    () => props.year,
   ],
-  ([data, _, loading]) => {
-    if (!loading && data && data.length > 0) {
+  ([_, loading]) => {
+    if (!loading) {
       // 稍微延迟以确保容器已渲染
       setTimeout(() => {
-        render();
+        void render();
       }, 50);
     }
   },

@@ -1,5 +1,55 @@
 import { sendClientLog } from '#/api/system/log';
 
+function serializeUnknownError(error: unknown) {
+  if (!error) {
+    return { error: 'Unknown error' };
+  }
+
+  if (error instanceof Error) {
+    const typedError = error as Error & {
+      code?: string;
+      config?: { method?: string; timeout?: number; url?: string };
+      response?: { data?: unknown; status?: number; statusText?: string };
+    };
+
+    return {
+      error: typedError.message,
+      errorCode: typedError.code,
+      requestMethod: typedError.config?.method,
+      requestTimeout: typedError.config?.timeout,
+      requestUrl: typedError.config?.url,
+      response: typedError.response?.data,
+      responseStatus: typedError.response?.status,
+      responseStatusText: typedError.response?.statusText,
+      stack: typedError.stack,
+    };
+  }
+
+  if (typeof error === 'object') {
+    const typedError = error as {
+      code?: string;
+      config?: { method?: string; timeout?: number; url?: string };
+      message?: string;
+      response?: { data?: unknown; status?: number; statusText?: string };
+      stack?: string;
+    };
+
+    return {
+      error: typedError.message || JSON.stringify(error),
+      errorCode: typedError.code,
+      requestMethod: typedError.config?.method,
+      requestTimeout: typedError.config?.timeout,
+      requestUrl: typedError.config?.url,
+      response: typedError.response?.data,
+      responseStatus: typedError.response?.status,
+      responseStatusText: typedError.response?.statusText,
+      stack: typedError.stack,
+    };
+  }
+
+  return { error: String(error) };
+}
+
 /**
  * 设置全局错误处理器，捕获未处理的运行时错误和 Promise 拒绝
  */
@@ -57,8 +107,8 @@ export function setupClientLogger() {
     }
 
     sendClientLog({
+      ...serializeUnknownError(reason),
       message,
-      stack: reason?.stack,
       type: 'unhandledrejection',
       url: window.location.href,
       userAgent: navigator.userAgent,
@@ -70,10 +120,12 @@ export function setupClientLogger() {
  * 手动记录远程错误
  */
 export const logRemoteError = (message: string, context?: any) => {
+  const { originalError, ...restContext } = context || {};
   sendClientLog({
     type: 'manual',
     message,
-    ...context,
+    ...serializeUnknownError(originalError),
+    ...restContext,
     url: window.location.href,
     userAgent: navigator.userAgent,
   });

@@ -10,7 +10,28 @@ export interface ReportItem {
 }
 
 export interface DailySummaryData {
+  archiveStats?: {
+    archivedCount: number;
+    missingTemplateCount?: number;
+    overdueCount: number;
+    requiredCount: number;
+    timelinessRate: number;
+  };
   date: string;
+  documentItems: Array<{
+    projectName: string;
+    seq: number;
+    status: string;
+    workContent: string;
+    workOrder: string;
+  }>;
+  engineeringTodos?: Array<{
+    processName: string;
+    projectName: string;
+    seq: number;
+    status: string;
+    workOrder: string;
+  }>;
   inspections: Array<{
     partName: string;
     process: string;
@@ -25,6 +46,7 @@ export interface DailySummaryData {
     description: string;
     isToday: boolean;
     partName: string;
+    projectName: string;
     seq: number;
     solution: string;
     status: string;

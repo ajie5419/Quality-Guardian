@@ -24,7 +24,11 @@ model inspections {
   hasDocuments        Boolean             @default(true)
   packingListArchived String?
   quantity            Int                 @default(1)
+  qualifiedQuantity   Int?
+  unqualifiedQuantity Int?
   inspector           String
+  templateId          String?
+  templateName        String?
   inspectionDate      DateTime
   reportDate          DateTime?
   result              inspection_result   @default(PASS)
@@ -33,6 +37,8 @@ model inspections {
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   items               inspection_items[]
+  archiveTask         inspection_archive_tasks?
+  qualityRecords      quality_records[]
   work_order          work_orders         @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([workOrderNumber])
@@ -253,14 +259,14 @@ model permissions {
 }
 
 model rbac_permissions {
-  id          String                 @id
-  code        String                 @unique
+  id          String                  @id
+  code        String                  @unique
   name        String
   description String?
   module      String
-  isDeleted   Boolean                @default(false)
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
+  isDeleted   Boolean                 @default(false)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
   roleLinks   rbac_role_permissions[]
 }
 
@@ -341,6 +347,7 @@ model doc_projects {
   id              String      @id @default(cuid())
   workOrderNumber String      @unique
   projectName     String
+  documents       String?     @db.LongText
   status          String      @default("active")
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -418,6 +425,7 @@ model quality_records {
   updatedAt                               DateTime                    @updatedAt
   version                                 Int                         @default(1)
   isDeleted                               Boolean                     @default(false)
+  inspectionId                            String?
   workOrderNumber                         String?
   claimNotes                              String?                     @db.Text
   claimStatus                             quality_records_claimStatus @default(OPEN)
@@ -428,14 +436,17 @@ model quality_records {
   processName                             String?
   defectType                              String?
   defectSubtype                           String?
+  responsibleWelder                       String?
   rootCause                               String?                     @db.Text
   severity                                String?
   users_quality_records_inspectorTousers  users?                      @relation("quality_records_inspectorTousers", fields: [inspector], references: [username])
   users_quality_records_lastEditorTousers users?                      @relation("quality_records_lastEditorTousers", fields: [lastEditor], references: [username])
+  inspection                              inspections?                @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
   work_orders                             work_orders?                @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([createdAt])
   @@index([date])
+  @@index([inspectionId])
   @@index([inspector], map: "quality_records_inspector_fkey")
   @@index([lastEditor], map: "quality_records_lastEditor_fkey")
   @@index([partName])
@@ -448,16 +459,43 @@ model quality_records {
   @@index([processName])
 }
 
+model welders {
+  id              String   @id
+  welderCode      String?  @unique
+  name            String
+  team            String
+  examDate        DateTime?
+  examPassed      Boolean  @default(false)
+  employmentStatus welder_employment_status @default(ON_DUTY)
+  certificationNo String?
+  score           Int      @default(12)
+  isDeleted       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([name])
+  @@index([welderCode])
+  @@index([team])
+  @@index([examDate])
+  @@index([employmentStatus])
+  @@index([score])
+}
+
+enum welder_employment_status {
+  ON_DUTY
+  RESIGNED
+}
+
 model roles {
-  id          String   @id
-  name        String   @unique
-  description String?
-  permissions String   @db.LongText
-  status      Int      @default(1)
-  isSystem    Boolean  @default(false)
-  isDeleted   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                       String                     @id
+  name                     String                     @unique
+  description              String?
+  permissions              String                     @db.LongText
+  status                   Int                        @default(1)
+  isSystem                 Boolean                    @default(false)
+  isDeleted                Boolean                    @default(false)
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
   data_permission_policies data_permission_policies[]
   rbac_role_permissions    rbac_role_permissions[]
   rbac_user_roles          rbac_user_roles[]
@@ -582,6 +620,7 @@ model work_orders {
   project_boms    project_boms[]
   quality_plans   quality_plans[]
   quality_records quality_records[]
+  inspection_form_templates inspection_form_templates[]
 
   @@index([customerName])
   @@index([deliveryDate])
@@ -674,6 +713,54 @@ model daily_reports {
   @@unique([date, reporter], name: "date_reporter")
 }
 
+model inspection_archive_tasks {
+  id              String              @id @default(cuid())
+  inspectionId    String              @unique
+  workOrderNumber String
+  projectName     String?
+  inspector       String
+  workContent     String?             @db.Text
+  attachments     String?             @db.LongText
+  status          archive_task_status @default(PENDING)
+  dueAt           DateTime
+  archivedAt      DateTime?
+  isOverdue       Boolean             @default(false)
+  inspectionDate  DateTime
+  isDeleted       Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  inspection      inspections         @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@index([workOrderNumber])
+  @@index([inspectionDate])
+  @@index([inspector, inspectionDate])
+  @@index([status, isOverdue])
+}
+
+model inspection_form_templates {
+  id              String   @id @default(cuid())
+  workOrderNumber String
+  projectName     String?
+  processName     String
+  partName        String?
+  formName        String
+  formFields      String?  @db.LongText
+  attachments     String?  @db.LongText
+  status          String   @default("active")
+  createdBy       String?
+  updatedBy       String?
+  isDeleted       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  work_order      work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+
+  @@index([workOrderNumber])
+  @@index([processName])
+  @@index([partName])
+  @@index([status])
+  @@index([workOrderNumber, processName, partName])
+}
+
 enum inspection_category {
   INCOMING
   PROCESS
@@ -755,4 +842,11 @@ enum quality_records_claimStatus {
   COMPLETED
   CLOSED
   CANCELLED
+}
+
+enum archive_task_status {
+  PENDING
+  IN_PROGRESS
+  ARCHIVED
+  REJECTED
 }

@@ -1,9 +1,11 @@
 <script lang="ts" setup>
 import type { InspectionDocItem, PlanningTreeNode } from '../types';
 
+import type { InspectionRecordPrintDetail } from '#/api/qms/inspection';
 import type { ProjectDocProject } from '#/api/qms/planning';
 
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
@@ -12,7 +14,10 @@ import { useI18n } from '@vben/locales';
 import { Empty, message, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { getInspectionRecordsExport } from '#/api/qms/inspection';
+import {
+  getInspectionRecordDetail,
+  getInspectionRecordsExport,
+} from '#/api/qms/inspection';
 import {
   createProjectDocProject,
   deleteProjectDocProject,
@@ -25,8 +30,8 @@ import PlanningSidebar from '../components/PlanningSidebar.vue';
 import ProjectActionButtons from '../components/ProjectActionButtons.vue';
 import WorkOrderSelectModal from '../components/WorkOrderSelectModal.vue';
 import { useProjectActions } from '../composables/useProjectActions';
+import InspectionDocPrintModal from './components/InspectionDocPrintModal.vue';
 
-// Helper for strict type safe access
 function getField(record: unknown, field: string): string | undefined {
   if (typeof record === 'object' && record !== null && field in record) {
     const value = (record as Record<string, unknown>)[field];
@@ -46,6 +51,7 @@ function getBooleanField(record: unknown, field: string): boolean | undefined {
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const { hasAccessByCodes } = useAccess();
+const router = useRouter();
 
 const canExport = computed(() =>
   hasAccessByCodes([
@@ -54,7 +60,6 @@ const canExport = computed(() =>
   ]),
 );
 
-// ================= Left Column: Project List =================
 const projectList = ref<ProjectDocProject[]>([]);
 const isProjectsLoading = ref(false);
 const selectedProjectId = ref<null | string>(null);
@@ -97,28 +102,20 @@ async function handleWorkOrderSelected(workOrderNumber: string) {
   }
 }
 
-/**
- * 判断是否为归档状态
- */
 function isArchivedStatus(status?: string) {
   const s = String(status || '').toLowerCase();
   return ['archived', 'closed', 'completed', '已完成', '已归档'].includes(s);
 }
 
-/**
- * 核心过滤逻辑：必须与 useProjectManager 保持逻辑一致
- */
 const filteredProjects = computed(() => {
   let list = projectList.value;
 
-  // 1. 状态过滤
   const isArchivedTab = activeTab.value === 'archived';
   list = list.filter((p) => {
     const isArchived = isArchivedStatus(p.status as string);
     return isArchivedTab ? isArchived : !isArchived;
   });
 
-  // 2. 搜索过滤
   if (searchTerm.value) {
     const lower = searchTerm.value.toLowerCase();
     list = list.filter(
@@ -153,7 +150,6 @@ const sidebarProjects = computed<PlanningTreeNode[]>(() =>
   })),
 );
 
-// ================= Composables =================
 const { handleArchiveProject, handleDeleteProject } =
   useProjectActions<PlanningTreeNode>({
     archiveProject: async (id, status) => {
@@ -169,9 +165,11 @@ const { handleArchiveProject, handleDeleteProject } =
     selectedProjectId,
   });
 
-// ================= Right Column: Documents =================
 const inspectionRecords = ref<InspectionDocItem[]>([]);
 const isRecordsLoading = ref(false);
+const detailVisible = ref(false);
+const detailLoading = ref(false);
+const currentDetail = ref<InspectionRecordPrintDetail | null>(null);
 
 const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions: {
@@ -198,6 +196,12 @@ const [Grid, gridApi] = useVbenVxeGrid({
         field: 'reportDate',
         title: t('qms.inspection.issues.reportDate'),
         width: 120,
+      },
+      {
+        field: 'actions',
+        title: t('common.actions'),
+        width: 120,
+        slots: { default: 'actions' },
       },
     ],
     proxyConfig: {
@@ -249,10 +253,8 @@ async function loadRecords() {
         const itemWorkOrderNumber = getField(item, 'workOrderNumber');
         const type = getField(item, 'type') || getField(item, 'category');
 
-        // Exclude Shipment records as per user request
         if (type === 'SHIPMENT') return false;
 
-        // Filter by hasDocuments (only show if true, default to true if undefined for backward compatibility)
         const hasDocs = getBooleanField(item, 'hasDocuments');
         if (hasDocs === false) return false;
 
@@ -289,7 +291,6 @@ async function loadRecords() {
           }
         }
 
-        // Logic: INCOMING -> materialName, PROCESS -> level2Component
         let displayName = '-';
         if (recordType === 'INCOMING') {
           displayName = getField(item, 'materialName') || '-';
@@ -336,6 +337,35 @@ async function loadRecords() {
   }
 }
 
+function handleOpenInspectionRecord(row: InspectionDocItem) {
+  const workOrderNumber = selectedProject.value?.workOrderNumber || '';
+  const keyword = [workOrderNumber, row.category, row.name]
+    .filter(Boolean)
+    .join(' ');
+  void router.push({
+    path: '/qms/inspection/records',
+    query: {
+      keyword,
+      sourceInspectionId: row.id,
+      workOrderNumber,
+    },
+  });
+}
+
+async function handleViewDoc(row: InspectionDocItem) {
+  if (!row.id) return;
+  detailLoading.value = true;
+  try {
+    currentDetail.value = await getInspectionRecordDetail(row.id);
+    detailVisible.value = true;
+  } catch (error) {
+    handleApiError(error, 'Load Inspection Record Detail');
+    message.error('加载检验资料失败');
+  } finally {
+    detailLoading.value = false;
+  }
+}
+
 watch(selectedProjectId, () => {
   loadRecords();
 });
@@ -349,7 +379,6 @@ onMounted(() => {
 <template>
   <Page content-class="h-full p-4">
     <div class="flex h-[calc(100vh-130px)] min-h-0 gap-4 overflow-hidden">
-      <!-- Left: Project List -->
       <PlanningSidebar
         :title="t('qms.planning.bom.projectList')"
         :projects="sidebarProjects"
@@ -402,25 +431,46 @@ onMounted(() => {
           </div>
 
           <div class="flex-1 overflow-hidden p-4">
-            <Grid>
-              <template #status="{ row }">
-                <Tag
-                  color="green"
-                  v-if="
-                    [
-                      'Completed',
-                      'COMPLETED',
-                      '已归档',
-                      'Pass',
-                      'PASS',
-                    ].includes(row.status as string)
-                  "
-                >
-                  {{ t('common.completed') }}
-                </Tag>
-                <Tag color="orange" v-else>{{ t('task.status.pending') }}</Tag>
-              </template>
-            </Grid>
+            <div class="flex h-full flex-col gap-4 overflow-hidden">
+              <div
+                class="min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-200"
+              >
+                <div class="border-b border-gray-100 bg-gray-50 px-4 py-3">
+                  <h3 class="text-sm font-semibold text-gray-700">
+                    检验资料记录
+                  </h3>
+                </div>
+                <div class="h-[calc(100%-49px)] p-4">
+                  <Grid>
+                    <template #status="{ row }">
+                      <Tag
+                        color="green"
+                        v-if="
+                          [
+                            'Completed',
+                            'COMPLETED',
+                            '已归档',
+                            'Pass',
+                            'PASS',
+                          ].includes(row.status as string)
+                        "
+                      >
+                        {{ t('common.completed') }}
+                      </Tag>
+                      <Tag color="orange" v-else>{{
+                        t('task.status.pending')
+                      }}</Tag>
+                    </template>
+                    <template #actions="{ row }">
+                      <div class="flex items-center gap-2">
+                        <a @click="handleViewDoc(row)">查看资料</a>
+                        <a @click="handleOpenInspectionRecord(row)">查看记录</a>
+                      </div>
+                    </template>
+                  </Grid>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div
@@ -434,6 +484,11 @@ onMounted(() => {
     <WorkOrderSelectModal
       v-model:open="workOrderSelectVisible"
       @success="handleWorkOrderSelected"
+    />
+    <InspectionDocPrintModal
+      v-model:open="detailVisible"
+      :detail="currentDetail"
+      :loading="detailLoading"
     />
   </Page>
 </template>

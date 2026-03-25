@@ -36,6 +36,10 @@ const { renderEcharts, getChartInstance, resize } =
 // We only render the EchartsUI component when the tab is active
 const shouldRender = computed(() => props.active);
 
+function formatPercent(value: null | number | undefined) {
+  return Number(value ?? 0).toFixed(2);
+}
+
 function isPromiseLike(value: unknown): value is Promise<unknown> {
   return (
     typeof value === 'object' &&
@@ -60,6 +64,11 @@ function updatePassRateChart() {
     },
     tooltip: {
       trigger: 'axis' as const,
+      formatter: (params: any) => {
+        const item = Array.isArray(params) ? params[0] : params;
+        if (!item) return '';
+        return `${item.name}<br/>${formatPercent(item.data)}%`;
+      },
     },
     grid: {
       left: '3%',
@@ -88,7 +97,7 @@ function updatePassRateChart() {
         label: {
           show: true,
           position: 'top' as const,
-          formatter: '{c}%',
+          formatter: (params: any) => `${formatPercent(params?.value)}%`,
           color: '#666',
         },
         barWidth: '50%',

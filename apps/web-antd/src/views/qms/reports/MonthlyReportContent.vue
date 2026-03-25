@@ -18,6 +18,10 @@ const props = defineProps<{
   t: (key: string, params?: Record<string, any>) => string;
 }>();
 
+function formatPercent(value: null | number | undefined) {
+  return Number(value ?? 0).toFixed(2);
+}
+
 function getCategoryLabel(category: string) {
   const normalized = (category || '').trim().toUpperCase();
   switch (normalized) {
@@ -71,10 +75,10 @@ const insightRows = computed(() => {
         : props.t('qms.reports.summary.analysis.trendDown');
     items.push(
       props.t('qms.reports.summary.analysis.passRate', {
-        trend: Math.abs(passRate.trend),
+        trend: formatPercent(Math.abs(passRate.trend)),
         trendWord,
         unit: passRate.unit,
-        value: passRate.value,
+        value: formatPercent(passRate.value),
       }),
     );
   }
@@ -94,7 +98,10 @@ const insightRows = computed(() => {
     items.push(
       props.t('qms.reports.summary.analysis.closingRate', {
         unit: closingRate.unit,
-        value: closingRate.value,
+        value:
+          closingRate.unit === '%'
+            ? formatPercent(closingRate.value)
+            : closingRate.value,
       }),
     );
   }
@@ -148,7 +155,9 @@ const insightRows = computed(() => {
             <div class="mb-1 text-xs text-gray-500">{{ item.label }}</div>
             <div class="flex items-baseline gap-1">
               <span class="text-2xl font-black text-gray-800">{{
-                item.value.toLocaleString()
+                item.unit === '%'
+                  ? formatPercent(item.value)
+                  : item.value.toLocaleString()
               }}</span>
               <span class="text-xs text-gray-400">{{ item.unit }}</span>
             </div>
@@ -169,7 +178,9 @@ const insightRows = computed(() => {
                   class="i-lucide-arrow-up-right"
                 ></span>
                 <span v-else class="i-lucide-arrow-down-right"></span>
-                <b class="ml-0.5 text-xs">{{ Math.abs(item.trend) }}%</b>
+                <b class="ml-0.5 text-xs"
+                  >{{ formatPercent(Math.abs(item.trend)) }}%</b
+                >
               </span>
               <!-- eslint-disable-next-line vue/no-v-html -->
               <div
@@ -259,7 +270,7 @@ const insightRows = computed(() => {
                 >{{ item.passed }}/{{ item.total }}，{{
                   t('qms.reports.summary.targetPassRate')
                 }}
-                {{ item.targetPassRate }}%</span
+                {{ formatPercent(item.targetPassRate) }}%</span
               >
             </div>
             <Progress

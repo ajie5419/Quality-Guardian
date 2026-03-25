@@ -238,6 +238,28 @@
   - 支持按部门 ID 精确过滤
   - 支持按部门名称关键字匹配后映射到部门 ID 再过滤
 - 验证通过：`pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`。
+
+## 合格率历史数量回填修复（2026-03-11）
+
+- [x] 确认质量概览下钻 100% 异常的直接根因
+- [x] 增加检验记录数量回填脚本，修正历史 `qualifiedQuantity/unqualifiedQuantity`
+- [x] 执行本地回填并校验关键分组统计结果
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type`
+
+### 合格率历史数量回填修复 Review
+
+- 根因不是新公式本身，而是 30 条历史 `inspections` 记录的 `qualifiedQuantity/unqualifiedQuantity` 仍为 `null`，导致单一口径统计只能按 `result` 兜底，出现分组 100% 的假象。
+- 已新增回填脚本：`apps/backend/prisma/inspection-quantity-backfill.js`，规则如下：
+  - 有关联不合格项：`unqualifiedQuantity = sum(quality_records.quantity)`，`qualifiedQuantity = quantity - unqualifiedQuantity`，并同步将 `result` 收敛为 `FAIL`
+  - 无关联不合格项：按既有 `result` 回填（`PASS => 全合格`，`FAIL => 全不合格`）
+- 已执行本地回填，当前本地库 `remainingNullQuantityRows = 0`。
+- 已验证关键异常样例：
+  - `quantity=10` 行已修正为 `qualifiedQuantity=7 / unqualifiedQuantity=3`
+  - `quantity=55` 行已修正为 `qualifiedQuantity=52 / unqualifiedQuantity=3`
+- 当前同月分组统计已恢复为真实值，例如：
+  - `原材料`：`53 / 56`
+  - `机加成品件`：`7 / 10`
 - [x] 运行 `pnpm lint`
 - [x] 运行 `pnpm check:type`
 - [x] 运行 `pnpm check:qms-arch`
@@ -377,3 +399,162 @@
 
 - 当前 `inspections` 与 `quality_records` 没有强制主关联，NCR 创建时也不会自动回写检验结果，导致合格率与不合格项统计天然存在口径偏差。
 - 规范方案应围绕“检验记录为主线、NCR 为派生闭环对象、统计只认统一主键和统一状态”落地。
+
+## 不合格项责任部门展示与列筛选修复（2026-03-10）
+
+- [x] 定位责任部门列显示部门ID与筛选项为空的根因
+- [x] 修复责任部门列展示为部门名称
+- [x] 修复责任部门列筛选项生成与筛选提交
+- [ ] 运行 pnpm lint && pnpm check:type && pnpm check:qms-arch
+
+## 不合格项责任部门原生筛选恢复（2026-03-10）
+
+- [ ] 回退责任部门列的非原生单选筛选改法
+- [ ] 保留 VXE 原生多选筛选，仅修复选项注入与面板可用性
+- [ ] 运行 pnpm lint && pnpm check:type && pnpm check:qms-arch
+
+## 对照 Vben Admin 原生表格筛选实现（2026-03-11）
+
+- [ ] 查找仓库内已验证可用的 Vben/VXE 列筛选实现
+- [ ] 对比不合格项页面当前实现差异
+- [ ] 按同一实现方式修复责任部门列筛选
+- [ ] 运行 pnpm lint && pnpm check:type && pnpm check:qms-arch
+
+## 不合格项责任部门筛选对齐 Vben 原生实现（2026-03-11）
+
+- [x] 查找仓库内 Vben Admin 原生列筛选实现方式
+- [x] 对比当前不合格项责任部门列的差异点
+- [x] 按同一模式修正前端列筛选与参数透传
+- [x] 联调后端过滤，验证列筛选真实收口
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type`
+- [x] 运行 `pnpm check:qms-arch`
+
+### 原生筛选对齐 Review
+
+- 对照 `apps/web-antd/src/adapter/vxe-table.ts` 与 `packages/effects/plugins/src/vxe-table/use-vxe-grid.vue` 后确认：仓库默认就是 VXE 原生远程筛选，关键在于 `proxyConfig.filter = true` 和 `filterConfig.remote = true`，不需要自定义筛选组件。
+- 当前责任部门列筛选失效的核心原因不在 VXE 原生实现，而在请求链路：原生多选筛选透传数组时会落成 `responsibleDepartment[]` 这类查询参数；后端 `parseInspectionIssueListQuery` 之前只读取 `responsibleDepartment`，导致筛选值在 parser 层被丢弃。
+- 已在 `apps/backend/utils/inspection-issue.ts` 增加 `getQueryValue(query, key)`，统一兼容 `key` 与 `key[]` 两种参数名，并同步用于 `status`、`severity`、`defectType` 等多选字段，避免同类远程列筛选继续失效。
+- 同步将 `apps/web-antd/src/api/qms/inspection.ts` 的 `responsibleDepartment` / `status` 参数类型放宽为 `string | string[]`，与原生列筛选透传形态一致。
+
+## 检验记录与不合格品项一体化规范（2026-03-11）
+
+- [x] 复核 schema、创建链路与页面入口，确认当前是弱关联而非完全无关联
+- [x] 输出一阶段最小改造方案：强关联字段、创建入口、统计切换边界
+- [x] 明确旧数据兼容与回填策略
+- [x] 实现 `quality_records.inspectionId` 强关联字段与 Prisma 关系
+- [x] 实现“从检验记录生成不合格项”页面入口与预填逻辑
+- [x] 实现不合格项创建时按 `inspectionId` 自动回填主业务字段
+- [x] 运行 `pnpm --filter @qgs/backend exec prisma generate`
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type`
+- [x] 运行 `pnpm check:qms-arch`
+
+### 一体化规范 Review
+
+- 当前一阶段改造已将“弱关联”提升为“可选强关联”：`quality_records` 新增 `inspectionId`，并与 `inspections.id` 建立 Prisma 关系；旧数据保持兼容，不强制回填。
+- 检验记录页已新增“生成不合格项”入口，前端会预填 `inspectionId`、工单号、项目名、部件名、工序/来料类别、数量、日期、供应商等字段，避免用户在不合格项页重新手工拼装一遍业务上下文。
+- 后端创建不合格项时，若带 `inspectionId`，将以关联检验记录为准自动回填 `workOrderNumber`、`projectName`、`supplierName`、`division`、`processName`、`partName`、`quantity`、`category` 等字段，降低检验记录与 NCR 数据漂移风险。
+- 这次没有直接切换首页/月报合格率主统计逻辑；现阶段只为“新产生的不合格项”建立强关联基础。后续二阶段应让统计优先认 `inspectionId`，旧数据再走字段兜底，并补历史回填脚本。
+
+## 客户端错误日志可观测性修复（2026-03-11）
+
+- [ ] 定位 `Fetch Issue Chart Dashboard Data failed` 日志丢失真实错误的原因
+- [ ] 修复前端错误对象序列化，保留 axios/status/url/response 关键信息
+- [ ] 运行 `pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`
+
+## 工单号下拉全模块为空修复（2026-03-11）
+
+- [x] 复核工单下拉公共链路（WorkOrderSelect -> work-order API -> WorkOrderService）
+- [x] 修复 ignoreYearFilter 对布尔入参不兼容导致的年份过滤误伤
+- [x] 修复工单数据权限在空部门场景下误构造 in [] 条件
+- [ ] 运行 `pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`
+
+## 检验记录表单内强关联不合格项（2026-03-11）
+
+- [x] 梳理检验记录新建/编辑表单与不合格项创建链路
+- [x] 在检验记录表单内新增“同步创建不合格项”并提供关键字段录入
+- [x] 提交时先保存检验记录，再自动创建并绑定 `inspectionId` 的不合格项
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type`
+- [x] 运行 `pnpm check:qms-arch`
+
+### 强关联 Review
+
+- 之前“列表页按钮生成不合格项”属于弱入口，用户仍需要跨弹窗二次维护信息；这次改为检验记录表单内一并提交，强关联在同一业务动作完成。
+- 当前实现为：勾选“同步创建不合格项”后，保存检验记录成功即调用不合格项创建接口，带上 `inspectionId`，实现检验记录与不合格项一对一业务绑定。
+- 关联不合格项的缺陷分类、严重程度、索赔选项复用了现有不合格项模块配置，避免再造一套字段口径。
+- 兼容策略：未勾选时保留原检验记录流程；勾选但不合格项创建失败时，不回滚检验记录，前端给出明确告警。
+
+## 检验记录判定驱动不合格项联动（2026-03-11）
+
+- [x] 改为“最终汇总判定=不合格”时自动显示不合格项联动区域
+- [x] 工序/责任部门/部件名称优先沿用检验记录，避免重复录入
+- [x] 增加合格数量/不合格数量区分，提交时按不合格数量写入不合格项
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type --filter @qgs/web-antd`
+- [x] 运行 `pnpm check:qms-arch`
+
+## 检验记录生成不合格项业务口径对齐（2026-03-11）
+
+- [x] 进货检验责任部门按工序映射自动带出（原材料/外购件=采购部，辅材/机加成品件=生产 OBU）
+- [x] 供应商名称沿用检验记录已选供应商
+- [x] 工序/责任部门/部件名称默认沿用检验记录，避免重复录入
+- [x] 不合格项联动表单补齐字段（状态、原因分析、解决方案、检验员、报告日期）
+- [x] 数量拆分为合格数量/不合格数量，并按不合格数量写入不合格项
+- [x] 运行 `pnpm lint`
+- [x] 运行 `pnpm check:type --filter @qgs/web-antd`
+- [x] 运行 `pnpm check:qms-arch`
+
+## 检验记录不合格默认仍显示合格修复（2026-03-11）
+
+- [x] 定位结果字段前后端不一致根因（前端手工判定未被后端强约束）
+- [x] 后端增加 `resolveOverallResult`：明细失败或手工判定失败均落库为 `FAIL`
+- [x] 前端在检验明细结果变更时自动同步“最终汇总判定”
+- [x] 运行 `pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`
+
+## 检验记录列表三列展示（2026-03-11）
+
+- [x] 后端返回检验记录关联问题聚合字段：issueStatus、unqualifiedQuantity
+- [x] 前端列表新增三列：检验结论、问题状态、不合格数量
+- [x] 运行 `pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`
+
+- [x] 收敛质量概览合格率统计到检验记录单一数据源
+  - [x] inspections 表新增 qualifiedQuantity / unqualifiedQuantity
+  - [x] 检验记录前后端提交链路写入数量字段并做一致性校验
+  - [x] 合格率趋势/下钻/月报统一改为只基于 inspections 统计
+  - [x] 增加或更新相关测试，验证单一数据源口径
+  - [x] 运行 pnpm lint、pnpm check:type、pnpm check:qms-arch、相关单测
+
+### 合格率单一数据源 Review
+
+- 质量概览和月报现在统一复用 `apps/backend/utils/pass-rate.ts`，统计只读取 `inspections`，不再使用 `quality_records` 反扣，问题台账与检验统计职责分离。
+- 检验记录提交时会把 `qualifiedQuantity` / `unqualifiedQuantity` 一并写入 `inspections`；若旧数据或兼容场景未提供拆分数量，后端会基于 `result + quantity` 做保守兜底，避免上线后立即出现空值断档。
+- 首页旧接口 `DashboardService.getMonthlyTrend()` 也已改为复用统一统计函数，避免首页与周月报继续维护两套公式。
+- 本地已完成 `prisma db push`，并验证 `pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`、后端相关单测通过。
+
+## 合格率显示精度修复（2026-03-12）
+
+- [x] 统一质量概览/报表合格率保留两位小数
+- [x] 运行 pnpm lint
+- [x] 运行 pnpm check:type
+
+### 合格率显示精度修复 Review
+
+- 后端 `apps/backend/utils/pass-rate.ts` 已统一将合格率统计值四舍五入到小数点后 2 位。
+- 前端质量概览趋势图、下钻表格、月报概览与过程质量区块已统一使用两位小数格式展示，`100` 现在会显示为 `100.00%`。
+- 验证通过：`pnpm lint`、`pnpm check:type`。
+
+## 日报查看增加资料整理情况（2026-03-12）
+
+- [x] 定位日报查看模块接口与模板
+- [x] 新增资料整理情况字段（工单号/项目名称/工作内容/状态）
+- [x] 运行 pnpm lint
+- [x] 运行 pnpm check:type
+
+### 日报资料整理情况 Review
+
+- 本次改动已限定在 `报表分析 -> 日报查看`，数据来源为 `/qms/reports/daily-summary`；此前误加到车辆调试日报的改动已撤回。
+- 标题已改为“当日资料整理情况”，并从自动生成改为页面内手动录入表格，支持新增、删除。
+- 后端新增 `/qms/reports/daily-summary` 保存接口，手动录入内容与日报总结统一存入 `daily_reports.summary`，刷新后可回显。
+- 验证通过：`pnpm lint`、`pnpm check:type`、`pnpm check:qms-arch`。

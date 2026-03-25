@@ -26,6 +26,13 @@ export function getIssueFormSchema(): VbenFormSchema[] {
       formItemClass: 'hidden', // Tailwind class to hide completely
     },
     {
+      fieldName: 'inspectionId',
+      label: '',
+      component: 'Input',
+      hideLabel: true,
+      formItemClass: 'hidden',
+    },
+    {
       fieldName: 'ncNumber',
       label: t('qms.inspection.issues.ncNumber'),
       component: 'Input',
@@ -76,6 +83,10 @@ export function getIssueFormSchema(): VbenFormSchema[] {
       rules: 'selectRequired',
       componentProps: {
         options: [
+          { label: '外购件', value: '外购件' },
+          { label: '原材料', value: '原材料' },
+          { label: '辅材', value: '辅材' },
+          { label: '机加成品件', value: '机加成品件' },
           { label: '设计', value: '设计' },
           { label: '下料', value: '下料' },
           { label: '组对', value: '组对' },
@@ -121,6 +132,19 @@ export function getIssueFormSchema(): VbenFormSchema[] {
       componentProps: {
         dropdownStyle: { maxHeight: '400px', overflow: 'auto' },
         treeDefaultExpandAll: true,
+      },
+    },
+    {
+      fieldName: 'responsibleWelder',
+      label: t('qms.inspection.issues.responsibleWelder'),
+      component: 'Input',
+      componentProps: {
+        placeholder: '请输入责任焊工',
+      },
+      dependencies: {
+        triggerFields: ['processName'],
+        show: (values: Record<string, unknown>) =>
+          String(values.processName || '').includes('焊'),
       },
     },
     {

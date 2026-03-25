@@ -51,6 +51,15 @@ interface WorkOrderListParams {
   userContext?: { userId: string; username?: string };
 }
 
+type WorkOrderDashboardStats = {
+  completed: number;
+  inProgress: number;
+  pieData: Array<{ name: string; value: number }>;
+  progressPercent: number;
+  rankings: Array<{ division: string; totalQuantity: number }>;
+  total: number;
+};
+
 export const WorkOrderService = {
   /**
    * 获取工单列表（分页）
@@ -203,5 +212,57 @@ export const WorkOrderService = {
       logger.error({ err: error, params }, 'getList 执行失败');
       throw error;
     }
+  },
+
+  async getDashboardStats(
+    params: Omit<WorkOrderListParams, 'page' | 'pageSize'>,
+  ): Promise<WorkOrderDashboardStats> {
+    const listResult = await this.getList({
+      ...params,
+      page: 1,
+      pageSize: 1,
+    });
+    const summary = listResult.summary || [];
+
+    const divisionProjectMap = new Map<string, number>();
+    const divisionQuantityMap = new Map<string, number>();
+    let total = 0;
+    let completed = 0;
+    let inProgress = 0;
+
+    for (const item of summary) {
+      total += 1;
+      const normalizedStatus = String(item.status || '').toUpperCase();
+      if (normalizedStatus === 'COMPLETED') completed += 1;
+      if (normalizedStatus === 'IN_PROGRESS') inProgress += 1;
+
+      const division = String(item.division || '其他').trim() || '其他';
+      const quantity = Number(item.quantity) || 0;
+      divisionProjectMap.set(
+        division,
+        (divisionProjectMap.get(division) || 0) + 1,
+      );
+      divisionQuantityMap.set(
+        division,
+        (divisionQuantityMap.get(division) || 0) + quantity,
+      );
+    }
+
+    const pieData = [...divisionProjectMap.entries()]
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const rankings = [...divisionQuantityMap.entries()]
+      .map(([division, totalQuantity]) => ({ division, totalQuantity }))
+      .sort((a, b) => b.totalQuantity - a.totalQuantity);
+
+    return {
+      total,
+      inProgress,
+      completed,
+      progressPercent: total > 0 ? Math.round((completed / total) * 100) : 0,
+      pieData,
+      rankings,
+    };
   },
 };

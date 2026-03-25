@@ -2,75 +2,21 @@ import type { ECOption as EChartsOption } from '@vben/plugins/echarts';
 
 import type { ChartConfig, ChartOptionItem } from '../types';
 
-// Simple GroupBy implementation
-function groupBy<T>(
-  array: T[],
-  keyFn: (item: T) => string,
-): Record<string, T[]> {
-  const result: Record<string, T[]> = {};
-  for (const item of array) {
-    const key = keyFn(item);
-    if (!result[key]) {
-      result[key] = [];
-    }
-    result[key].push(item);
-  }
-  return result;
-}
-
-// Simple SumBy implementation
-function sumBy<T>(array: T[], fn: (item: T) => number): number {
-  let sum = 0;
-  for (const item of array) {
-    sum += fn(item);
-  }
-  return sum;
-}
-
-/**
- * Generic data aggregation logic
- */
-export function aggregateChartData<T>(
-  data: T[],
+export function buildChartOptionFromAggregated(
+  data: Array<{ name: string; value: number }>,
   config: ChartConfig,
-  _dimensionOptions: ChartOptionItem[],
   metricOptions: ChartOptionItem[],
-  valueCalculator: (item: T, metric: string) => number,
-  dimensionExtractor?: (item: T, dimension: string) => string,
 ): EChartsOption | null {
-  if (!data || data.length === 0) {
+  if (!Array.isArray(data) || data.length === 0) {
     return null;
   }
-
-  // 1. Group By Dimension
-  const grouped = groupBy(data, (item: any) => {
-    if (dimensionExtractor) {
-      return dimensionExtractor(item, config.dimension);
-    }
-    return String(item[config.dimension] || 'Unknown');
-  });
-
-  // 2. Aggregate Metric
-  const result = Object.entries(grouped).map(([key, items]) => {
-    // Round to 2 decimal places
-    const value =
-      Math.round(
-        (config.metric === 'count'
-          ? items.length
-          : sumBy(items, (i) => valueCalculator(i, config.metric))) * 100,
-      ) / 100;
-
-    return { name: key, value };
-  });
-
-  // 3. Sort (descending by value)
-  result.sort((a, b) => b.value - a.value);
-
-  // Take top 15
-  const topResults = result.slice(0, 15);
-
-  // 4. Generate Chart Option
-  return generateChartOption(topResults, config, metricOptions);
+  const normalized = data
+    .map((item) => ({
+      name: String(item.name || 'Unknown'),
+      value: Number(item.value || 0),
+    }))
+    .sort((a, b) => b.value - a.value);
+  return generateChartOption(normalized, config, metricOptions);
 }
 
 // Modern color palette

@@ -43,6 +43,44 @@ export async function getAfterSalesStats(params?: {
   });
 }
 
+export type AfterSalesChartDimension =
+  | 'defectSubtype'
+  | 'defectType'
+  | 'productSubtype'
+  | 'productType'
+  | 'reportMonth'
+  | 'responsibleDept'
+  | 'severity'
+  | 'status'
+  | 'supplierBrand';
+
+export type AfterSalesChartMetric =
+  | 'count'
+  | 'laborTravelCost'
+  | 'materialCost'
+  | 'quantity'
+  | 'runningHours'
+  | 'totalLoss';
+
+export type AfterSalesChartAggregateItem = {
+  name: string;
+  value: number;
+};
+
+export async function getAfterSalesChartAggregate(params: {
+  dateMode?: 'month' | 'week' | 'year';
+  dateValue?: string;
+  dimension: AfterSalesChartDimension;
+  metric: AfterSalesChartMetric;
+  top?: number;
+  year?: number;
+}) {
+  return requestClient.get<{ items: AfterSalesChartAggregateItem[] }>(
+    '/qms/after-sales/chart-aggregate',
+    { params },
+  );
+}
+
 /**
  * Create After-sales record
  */

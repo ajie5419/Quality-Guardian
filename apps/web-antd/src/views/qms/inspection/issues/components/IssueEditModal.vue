@@ -1,13 +1,14 @@
 <script lang="ts" setup>
 import type { DeptNode, InspectionIssue } from '../types';
 
-import { computed, ref, toRef, watch } from 'vue';
+import { computed, onMounted, ref, toRef, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
-import { Button, Modal, Switch, Tooltip } from 'ant-design-vue';
+import { Button, Modal, Select, Switch, Tooltip } from 'ant-design-vue';
 
 import { useVbenForm } from '#/adapter/form';
+import { getWelderListPage } from '#/api/qms/welder';
 
 import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
@@ -42,10 +43,13 @@ type IssueFormValues = {
   partName?: string;
   projectName?: string;
   responsibleDepartment?: string;
+  responsibleWelder?: string;
   rootCause?: string;
   solution?: string;
 };
 const formValues = ref<IssueFormValues>({});
+const welderOptions = ref<Array<{ label: string; value: string }>>([]);
+const welderLoading = ref(false);
 
 const [Form, formApi] = useVbenForm({
   commonConfig: {
@@ -173,6 +177,30 @@ watch(openRef, (val) => {
   }
 });
 
+onMounted(async () => {
+  try {
+    welderLoading.value = true;
+    const result = await getWelderListPage({
+      employmentStatus: 'ON_DUTY',
+      page: 1,
+      pageSize: 500,
+    });
+    welderOptions.value = (result.items || [])
+      .map((item) => {
+        const name = String(item.name || '').trim();
+        if (!name) return null;
+        const code = String(item.welderCode || '').trim();
+        return {
+          label: code ? `${name}（${code}）` : name,
+          value: name,
+        };
+      })
+      .filter(Boolean) as Array<{ label: string; value: string }>;
+  } finally {
+    welderLoading.value = false;
+  }
+});
+
 // Event Handlers
 function handleWorkOrderChange(
   val: unknown,
@@ -254,6 +282,17 @@ function handleCancel() {
             v-bind="slotProps"
             :key="targetUnitCategory"
             :category="targetUnitCategory"
+          />
+        </template>
+
+        <template #responsibleWelder="slotProps">
+          <Select
+            v-bind="slotProps"
+            :loading="welderLoading"
+            :options="welderOptions"
+            allow-clear
+            show-search
+            placeholder="请选择责任焊工"
           />
         </template>
 

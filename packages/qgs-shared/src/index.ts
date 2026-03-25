@@ -13,6 +13,7 @@ export * from './modules/qms/reports-weekly';
 export * from './modules/qms/supplier';
 export * from './modules/qms/task';
 export * from './modules/qms/vehicle-commissioning';
+export * from './modules/qms/welder';
 export * from './modules/qms/work-order';
 
 export * from './modules/system/constants';

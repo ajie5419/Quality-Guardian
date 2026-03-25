@@ -6,5 +6,4 @@ export * from './useIssueChartPreferences';
 export * from './useIssueData';
 export * from './useIssueForm';
 export * from './useIssueRemoteStatistics';
-export * from './useIssueStatistics';
 export * from './useNcNumber';

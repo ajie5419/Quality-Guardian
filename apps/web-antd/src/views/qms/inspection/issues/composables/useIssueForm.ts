@@ -15,6 +15,7 @@ import {
   updateInspectionIssue,
 } from '#/api/qms/inspection';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { buildThumbUrlFromOriginal } from '#/views/qms/shared/utils/photo-url';
 
 import { DEFAULT_VALUES } from '../constants';
 
@@ -93,9 +94,10 @@ export function useIssueForm(options: UseIssueFormOptions) {
     const values: Record<string, unknown> = {
       ...rest,
       photos: photoArray.map((url, index) => ({
-        uid: String(index),
+        uid: `photo-${encodeURIComponent(url)}-${index}`,
         name: `Photo ${index + 1}`,
         status: 'done' as const,
+        thumbUrl: buildThumbUrlFromOriginal(url),
         url,
       })),
     };

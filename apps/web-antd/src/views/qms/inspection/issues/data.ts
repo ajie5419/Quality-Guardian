@@ -24,6 +24,12 @@ export const searchFormSchema: VbenFormSchema[] = [
     colProps: { span: 6 },
   },
   {
+    fieldName: 'responsibleWelder',
+    label: $t('qms.inspection.issues.responsibleWelder'),
+    component: 'Input',
+    colProps: { span: 6 },
+  },
+  {
     fieldName: 'status',
     label: $t('common.status'),
     component: 'Select',
@@ -164,6 +170,11 @@ export const gridColumns: VxeGridProps['columns'] = [
   {
     field: 'responsibleDepartment',
     title: $t('qms.inspection.issues.responsibleDepartment'),
+    width: 120,
+  },
+  {
+    field: 'responsibleWelder',
+    title: $t('qms.inspection.issues.responsibleWelder'),
     width: 120,
   },
   {

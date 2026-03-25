@@ -17,6 +17,7 @@ import {
   getInspectionRecords,
   getInspectionRecordsExport,
   importInspectionRecords,
+  updateInspectionArchiveTaskStatus,
 } from '#/api/qms/inspection';
 import { QmsStatusTag } from '#/components/Qms';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
@@ -36,15 +37,20 @@ type GridFormSchema = NonNullable<
 >[number];
 
 const props = defineProps<{
+  keyword?: string;
+  sourceInspectionId?: string;
   type: string;
   year: number;
 }>();
 
-const emit = defineEmits(['create', 'edit']);
+const emit = defineEmits(['create', 'edit', 'createIssue', 'view']);
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const { canCreate, canEdit, canDelete, canExport, canImport } =
   useQmsPermissions('QMS:Inspection:Records');
+const { canCreate: canCreateIssue } = useQmsPermissions(
+  'QMS:Inspection:Issues',
+);
 
 const exportInspectionRecordsAsXlsx =
   createVxePhotoXlsxExportMethod<QmsInspectionApi.InspectionRecord>({
@@ -62,12 +68,12 @@ const exportInspectionRecordsAsXlsx =
         const response = await getInspectionRecordsExport({
           type: props.type,
           year: props.year,
-          keyword: formValues?.keyword as string | undefined,
+          keyword: (formValues?.keyword as string | undefined) || props.keyword,
         });
-        return response.items || [];
+        return filterBySourceInspectionId(response.items || []);
       }
       const tableData = $table.getTableData?.();
-      return tableData?.fullData || [];
+      return filterBySourceInspectionId(tableData?.fullData || []);
     },
   });
 
@@ -81,7 +87,25 @@ const processedColumns = (type: string) => {
           name: 'CellOperation',
           props: {
             options: [
+              ...(canCreateIssue.value
+                ? [
+                    {
+                      code: 'create-issue',
+                      icon: 'carbon:warning-alt',
+                      title: '生成不合格项',
+                    },
+                  ]
+                : []),
               ...(canEdit.value ? ['edit'] : []),
+              ...(canEdit.value
+                ? [
+                    {
+                      code: 'mark-archived',
+                      icon: 'carbon:task-complete',
+                      title: '标记归档',
+                    },
+                  ]
+                : []),
               ...(canDelete.value ? ['delete'] : []),
             ],
             onClick: ({
@@ -91,11 +115,14 @@ const processedColumns = (type: string) => {
               code: string;
               row: QmsInspectionApi.InspectionRecord;
             }) => {
+              if (code === 'create-issue') emit('createIssue', row);
               if (code === 'edit') handleEdit(row);
+              if (code === 'mark-archived') handleMarkArchived(row);
               if (code === 'delete') handleDelete(row);
             },
           },
         },
+        field: '__action',
       };
     }
     return col;
@@ -181,7 +208,7 @@ const gridOptions = computed(() => ({
           year: props.year,
           page: page.currentPage,
           pageSize: page.pageSize,
-          keyword: formValues?.keyword as string | undefined,
+          keyword: (formValues?.keyword as string | undefined) || props.keyword,
         });
       },
       queryAll: async ({
@@ -194,15 +221,41 @@ const gridOptions = computed(() => ({
           year: props.year,
           page: 1,
           pageSize: 100_000,
-          keyword: formValues?.keyword as string | undefined,
+          keyword: (formValues?.keyword as string | undefined) || props.keyword,
         });
-        return { items: res.items };
+        return { items: filterBySourceInspectionId(res.items || []) };
       },
     },
   },
 }));
 
 const checkedRows = ref<QmsInspectionApi.InspectionRecord[]>([]);
+
+function normalizeIssueStatus(status: unknown) {
+  const normalized = String(status || '')
+    .trim()
+    .toUpperCase();
+  return normalized || 'NO_ISSUE';
+}
+
+function normalizeArchiveStatus(status: unknown) {
+  const normalized = String(status || '')
+    .trim()
+    .toUpperCase();
+  if (!normalized) return 'NONE';
+  if (normalized === 'ARCHIVED') return 'ARCHIVED';
+  if (normalized === 'IN_PROGRESS') return 'IN_PROGRESS';
+  if (normalized === 'REJECTED') return 'REJECTED';
+  return 'PENDING';
+}
+
+function filterBySourceInspectionId(
+  items: QmsInspectionApi.InspectionRecord[] = [],
+) {
+  return props.sourceInspectionId
+    ? items.filter((item) => item.id === props.sourceInspectionId)
+    : items;
+}
 
 function onCheckChange(params: VxeCheckboxChangeParams) {
   const records =
@@ -211,9 +264,30 @@ function onCheckChange(params: VxeCheckboxChangeParams) {
   checkedRows.value = records;
 }
 
+function onCellClick(params: any) {
+  const row = params?.row as QmsInspectionApi.InspectionRecord | undefined;
+  const column = params?.column as
+    | undefined
+    | { field?: string; type?: string };
+
+  if (!row || !column) return;
+
+  if (column.field === '__action') return;
+  if (
+    column.type === 'checkbox' ||
+    column.type === 'radio' ||
+    column.type === 'seq'
+  ) {
+    return;
+  }
+
+  emit('view', row);
+}
+
 const gridEvents = {
   checkboxChange: onCheckChange,
   checkboxAll: onCheckChange,
+  cellClick: onCellClick,
 };
 
 const [Grid, gridApi] = useVbenVxeGrid({
@@ -228,6 +302,7 @@ const [Grid, gridApi] = useVbenVxeGrid({
         componentProps: {
           placeholder: t('common.pleaseInput'),
         },
+        defaultValue: props.keyword,
         colProps: {
           span: 8,
         },
@@ -254,6 +329,36 @@ function handleDelete(row: QmsInspectionApi.InspectionRecord) {
         reload();
       } catch {
         message.error(t('common.deleteFailed'));
+      }
+    },
+  });
+}
+
+async function handleMarkArchived(row: QmsInspectionApi.InspectionRecord) {
+  const archiveTaskId = String((row as any).archiveTaskId || '').trim();
+  if (!archiveTaskId) {
+    message.warning('当前记录无需归档（未生成归档任务）');
+    return;
+  }
+
+  if (normalizeArchiveStatus((row as any).archiveTaskStatus) === 'ARCHIVED') {
+    message.info('该记录已归档');
+    return;
+  }
+
+  Modal.confirm({
+    title: '确认标记归档',
+    content: '系统将校验工作内容和附件，校验通过后标记为已归档。',
+    onOk: async () => {
+      try {
+        await updateInspectionArchiveTaskStatus(archiveTaskId, {
+          status: 'ARCHIVED',
+        });
+        message.success('已标记归档');
+        reload();
+      } catch (error) {
+        handleApiError(error, 'Update Inspection Archive Status');
+        message.error('归档失败，请先补全工作内容和附件');
       }
     },
   });
@@ -304,6 +409,11 @@ watch(
   () => reload(),
 );
 
+watch(
+  () => [props.keyword, props.sourceInspectionId],
+  () => reload(),
+);
+
 defineExpose({ reload });
 </script>
 
@@ -341,9 +451,48 @@ defineExpose({ reload });
       <QmsStatusTag :status="row.result" type="inspection" />
     </template>
 
+    <template #issueStatus="{ row }">
+      <Tag v-if="normalizeIssueStatus(row.issueStatus) === 'NO_ISSUE'">
+        无问题
+      </Tag>
+      <QmsStatusTag
+        v-else
+        :status="normalizeIssueStatus(row.issueStatus)"
+        type="after-sales"
+      />
+    </template>
+
     <template #hasDocuments="{ row }">
       <Tag :color="row.hasDocuments ? 'blue' : 'default'">
         {{ row.hasDocuments ? '是' : '否' }}
+      </Tag>
+    </template>
+
+    <template #archiveTaskStatus="{ row }">
+      <Tag
+        :color="
+          normalizeArchiveStatus(row.archiveTaskStatus) === 'NONE'
+            ? 'default'
+            : normalizeArchiveStatus(row.archiveTaskStatus) === 'ARCHIVED'
+              ? 'success'
+              : normalizeArchiveStatus(row.archiveTaskStatus) === 'IN_PROGRESS'
+                ? 'processing'
+                : normalizeArchiveStatus(row.archiveTaskStatus) === 'REJECTED'
+                  ? 'error'
+                  : 'warning'
+        "
+      >
+        {{
+          normalizeArchiveStatus(row.archiveTaskStatus) === 'NONE'
+            ? '无需归档'
+            : normalizeArchiveStatus(row.archiveTaskStatus) === 'ARCHIVED'
+              ? '已归档'
+              : normalizeArchiveStatus(row.archiveTaskStatus) === 'IN_PROGRESS'
+                ? '整理中'
+                : normalizeArchiveStatus(row.archiveTaskStatus) === 'REJECTED'
+                  ? '已退回'
+                  : '待整理'
+        }}
       </Tag>
     </template>
   </Grid>

@@ -1,7 +1,7 @@
 import type {
-  DailySummaryData,
   QualityReportSummary,
   ReportItem,
+  DailySummaryData as SharedDailySummaryData,
 } from '@qgs/shared';
 
 import {
@@ -14,6 +14,23 @@ import { QMS_API } from './constants';
 
 // Re-export shared types
 export * from '@qgs/shared';
+
+export type DailySummaryData = SharedDailySummaryData & {
+  archiveStats?: {
+    archivedCount: number;
+    missingTemplateCount?: number;
+    overdueCount: number;
+    requiredCount: number;
+    timelinessRate: number;
+  };
+  engineeringTodos?: Array<{
+    processName: string;
+    projectName: string;
+    seq: number;
+    status: string;
+    workOrder: string;
+  }>;
+};
 
 export function getSummaryReport(params: {
   date?: string;
@@ -28,6 +45,20 @@ export function getDailySummary(params: { date: string; user?: string }) {
   return requestClient.get<DailySummaryData>(QMS_API.REPORTS_DAILY, {
     params,
   });
+}
+
+export function saveDailySummary(data: {
+  date: string;
+  documentItems: DailySummaryData['documentItems'];
+  summary: string;
+  user?: string;
+}) {
+  return requestClient.put<{
+    date: string;
+    documentItems: DailySummaryData['documentItems'];
+    reporter: string;
+    summary: string;
+  }>(QMS_API.REPORTS_DAILY, data);
 }
 
 /**

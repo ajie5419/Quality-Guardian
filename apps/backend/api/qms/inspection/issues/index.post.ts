@@ -4,12 +4,14 @@ import { logApiError } from '~/utils/api-logger';
 import {
   buildInspectionIssueCreateData,
   createInspectionIssueId,
+  findInspectionForIssue,
   getNextInspectionIssueSerialNumber,
 } from '~/utils/inspection-issue';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
+  badRequestResponse,
   conflictResponse,
   internalServerErrorResponse,
   unAuthorizedResponse,
@@ -24,12 +26,29 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
+    const bodyRecord = body as Record<string, unknown>;
+    const sourceType = String(bodyRecord.sourceType || '')
+      .trim()
+      .toUpperCase();
+    if (
+      (sourceType === 'INSPECTION' || sourceType === 'INSPECTION_RECORD') &&
+      !String(bodyRecord.inspectionId || '').trim()
+    ) {
+      return badRequestResponse(
+        event,
+        '检验记录来源创建不合格项时必须携带 inspectionId',
+      );
+    }
+    const linkedInspection = await findInspectionForIssue(
+      bodyRecord.inspectionId as string | undefined,
+    );
     const newId = createInspectionIssueId();
     const serialNumber = await getNextInspectionIssueSerialNumber();
 
     const newRecord = await prisma.quality_records.create({
-      data: buildInspectionIssueCreateData(body as Record<string, unknown>, {
+      data: buildInspectionIssueCreateData(bodyRecord, {
         id: newId,
+        inspection: linkedInspection,
         inspectorUsername: userinfo.username,
         serialNumber,
       }),

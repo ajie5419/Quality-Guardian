@@ -39,10 +39,14 @@ interface UseIssueGridOptionsParams {
   canImport: Ref<boolean>;
   canSettle: ComputedRef<boolean>;
   currentYear: ComputedRef<number> | Ref<number>;
+  defaultProjectName?: ComputedRef<string> | Ref<string>;
+  defaultSourceIssueId?: ComputedRef<string> | Ref<string>;
+  defaultWorkOrderNumber?: ComputedRef<string> | Ref<string>;
   deptRawData: Ref<BaseTreeNode[]>;
   handleDelete: (row: InspectionIssue) => void;
   handleEdit: (row: InspectionIssue) => void;
   handleImport: (params: { file: File }) => Promise<void>;
+  handleLinkToProjectDocs: (row: InspectionIssue) => Promise<void> | void;
   handleSettleToKnowledge: (row: InspectionIssue) => void;
   t: (key: string, params?: Record<string, any>) => string;
 }
@@ -69,6 +73,29 @@ function normalizeInspectionRows(data: InspectionIssue[]): InspectionGridRow[] {
   });
 }
 
+function flattenDeptFilters(
+  nodes: BaseTreeNode[],
+): Array<{ label: string; value: string }> {
+  const result: Array<{ label: string; value: string }> = [];
+
+  const walk = (items: BaseTreeNode[]) => {
+    for (const item of items || []) {
+      if (item.id !== undefined && item.id !== null && item.name) {
+        result.push({
+          label: String(item.name),
+          value: String(item.id),
+        });
+      }
+      if (Array.isArray(item.children) && item.children.length > 0) {
+        walk(item.children);
+      }
+    }
+  };
+
+  walk(nodes);
+  return result;
+}
+
 export function useIssueGridOptions({
   currentDateMode,
   currentDateValue,
@@ -77,13 +104,25 @@ export function useIssueGridOptions({
   canImport,
   canSettle,
   currentYear,
+  defaultProjectName,
+  defaultSourceIssueId,
+  defaultWorkOrderNumber,
   deptRawData,
   handleDelete,
   handleEdit,
   handleImport,
+  handleLinkToProjectDocs,
   handleSettleToKnowledge,
   t,
 }: UseIssueGridOptionsParams) {
+  const deptFilters = computed(() => flattenDeptFilters(deptRawData.value));
+
+  function filterBySourceIssueId(items: InspectionIssue[] = []) {
+    return defaultSourceIssueId?.value
+      ? items.filter((item) => item.id === defaultSourceIssueId.value)
+      : items;
+  }
+
   const exportInspectionIssuesAsXlsx =
     createVxePhotoXlsxExportMethod<InspectionGridRow>({
       sheetName: t('qms.inspection.issues.title'),
@@ -107,17 +146,23 @@ export function useIssueGridOptions({
             dateMode: currentDateMode.value,
             dateValue: currentDateValue.value,
             year: currentYear.value,
-            workOrderNumber: formValues?.workOrderNumber as string,
-            projectName: formValues?.projectName as string,
+            workOrderNumber:
+              (formValues?.workOrderNumber as string) ||
+              defaultWorkOrderNumber?.value,
+            projectName:
+              (formValues?.projectName as string) || defaultProjectName?.value,
             responsibleDepartment: formValues?.responsibleDepartment as string,
+            responsibleWelder: formValues?.responsibleWelder as string,
             status: (filterParams.status?.[0] || formValues?.status) as string,
             processName: formValues?.processName as string,
             ...(filterParams as Record<string, string | string[] | unknown>),
           });
-          return normalizeInspectionRows(items || []);
+          return normalizeInspectionRows(filterBySourceIssueId(items || []));
         }
         const tableData = $table.getTableData?.();
-        return normalizeInspectionRows(tableData?.fullData || []);
+        return normalizeInspectionRows(
+          filterBySourceIssueId(tableData?.fullData || []),
+        );
       },
     });
 
@@ -191,19 +236,21 @@ export function useIssueGridOptions({
             ],
           };
         }
-        if (col.field === 'responsibleDepartment') {
+        if (col.field === 'division') {
           return {
             ...col,
-            filters: deptRawData.value.map((dept) => ({
-              label: String((dept as { name?: string }).name || ''),
-              value: String((dept as { id?: string }).id || ''),
-            })),
+            formatter: ({ cellValue }: { cellValue: string | unknown }) => {
+              if (!cellValue) return '';
+              const name = findNameById(deptRawData.value, cellValue as string);
+              return name || (cellValue as string);
+            },
           };
         }
 
-        if (col.field === 'division' || col.field === 'responsibleDepartment') {
+        if (col.field === 'responsibleDepartment') {
           return {
             ...col,
+            filters: deptFilters.value,
             formatter: ({ cellValue }: { cellValue: string | unknown }) => {
               if (!cellValue) return '';
               const name = findNameById(deptRawData.value, cellValue as string);
@@ -240,6 +287,11 @@ export function useIssueGridOptions({
                   ...(canSettle.value
                     ? [
                         {
+                          code: 'linkProjectDocs',
+                          icon: 'carbon:document-add',
+                          title: '加入项目资料',
+                        },
+                        {
                           code: 'settle',
                           icon: 'lucide:book-check',
                           title: t('qms.inspection.issues.settleToKnowledge'),
@@ -257,6 +309,7 @@ export function useIssueGridOptions({
                 }) => {
                   if (code === 'edit') handleEdit(row);
                   if (code === 'delete') handleDelete(row);
+                  if (code === 'linkProjectDocs') handleLinkToProjectDocs(row);
                   if (code === 'settle') handleSettleToKnowledge(row);
                 },
               },
@@ -317,15 +370,22 @@ export function useIssueGridOptions({
             sortBy: sortParam?.field,
             sortOrder: sortParam?.order,
             year: currentYear.value,
-            workOrderNumber: formValues?.workOrderNumber as string,
-            projectName: formValues?.projectName as string,
+            workOrderNumber:
+              (formValues?.workOrderNumber as string) ||
+              defaultWorkOrderNumber?.value,
+            projectName:
+              (formValues?.projectName as string) || defaultProjectName?.value,
             responsibleDepartment: formValues?.responsibleDepartment as string,
             status: (filterParams.status?.[0] || formValues?.status) as string,
             ...filterParams,
             processName: formValues?.processName as string,
           });
 
-          return { items, total };
+          const filteredItems = filterBySourceIssueId(items || []);
+          return {
+            items: filteredItems,
+            total: defaultSourceIssueId?.value ? filteredItems.length : total,
+          };
         },
         queryAll: async ({ form }: { form: Record<string, unknown> }) => {
           const formValues = form || {};
@@ -333,13 +393,16 @@ export function useIssueGridOptions({
             dateMode: currentDateMode.value,
             dateValue: currentDateValue.value,
             year: currentYear.value,
-            workOrderNumber: formValues?.workOrderNumber as string,
-            projectName: formValues?.projectName as string,
+            workOrderNumber:
+              (formValues?.workOrderNumber as string) ||
+              defaultWorkOrderNumber?.value,
+            projectName:
+              (formValues?.projectName as string) || defaultProjectName?.value,
             responsibleDepartment: formValues?.responsibleDepartment as string,
             status: formValues?.status as string,
             processName: formValues?.processName as string,
           });
-          return { items };
+          return { items: filterBySourceIssueId(items || []) };
         },
       },
     },

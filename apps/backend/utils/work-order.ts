@@ -60,6 +60,11 @@ export function parseWorkOrderListQuery(query: Record<string, unknown>) {
     .map((id) => id.trim())
     .filter(Boolean);
 
+  const ignoreYearFilterRaw = query.ignoreYearFilter;
+  const ignoreYearFilter =
+    ignoreYearFilterRaw === true ||
+    String(ignoreYearFilterRaw).toLowerCase() === 'true';
+
   return {
     page: parsePositiveInt(query.page, 1),
     pageSize: parsePositiveInt(query.pageSize, 20),
@@ -67,7 +72,7 @@ export function parseWorkOrderListQuery(query: Record<string, unknown>) {
     projectName: normalizeQueryText(query.projectName),
     status: normalizeQueryText(query.status),
     workOrderNumber: normalizeQueryText(query.workOrderNumber),
-    ignoreYearFilter: query.ignoreYearFilter === 'true',
+    ignoreYearFilter,
     keyword: normalizeQueryText(query.keyword),
     ids: ids && ids.length > 0 ? [...new Set(ids)] : undefined,
   };

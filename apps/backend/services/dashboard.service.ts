@@ -2,6 +2,7 @@ import type { DashboardChartItem, DashboardOverview } from '@qgs/shared';
 
 import { safeNumber } from '@qgs/shared';
 import { createModuleLogger } from '~/utils/logger';
+import { getNetPassRateSummaryByRange } from '~/utils/pass-rate';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
@@ -197,35 +198,6 @@ export const DashboardService = {
     const result = await (async () => {
       const currentYear = new Date().getFullYear();
       try {
-        interface MonthInspecResult {
-          month: bigint | number;
-          totalQty: bigint | number;
-          qualifiedQty: bigint | number;
-        }
-        interface MonthDefectResult {
-          month: bigint | number;
-          defectQty: bigint | number;
-        }
-        const [inspections, defects] = (await Promise.all([
-          prisma.$queryRaw`
-            SELECT 
-              MONTH(inspectionDate) as month, 
-              SUM(quantity) as totalQty,
-              SUM(CASE WHEN result = 'PASS' THEN quantity ELSE 0 END) as qualifiedQty
-            FROM inspections 
-            WHERE YEAR(inspectionDate) = ${currentYear} AND isDeleted = ${false}
-            GROUP BY MONTH(inspectionDate)
-          `,
-          prisma.$queryRaw`
-            SELECT 
-              MONTH(date) as month, 
-              SUM(quantity) as defectQty
-            FROM quality_records
-            WHERE YEAR(date) = ${currentYear} AND isDeleted = ${false}
-            GROUP BY MONTH(date)
-          `,
-        ])) as [MonthInspecResult[], MonthDefectResult[]];
-
         const months = [
           '1月',
           '2月',
@@ -241,35 +213,26 @@ export const DashboardService = {
           '12月',
         ];
         const currentMonthIndex = new Date().getMonth();
+        return Promise.all(
+          months.map(async (m, idx) => {
+            const start = new Date(currentYear, idx, 1);
+            const end = new Date(currentYear, idx + 1, 0, 23, 59, 59, 999);
+            const summary = await getNetPassRateSummaryByRange(start, end);
 
-        return months.map((m, idx) => {
-          const mIdx = idx + 1;
-          const insp = inspections.find((r) => Number(r.month) === mIdx);
-          const def = defects.find((r) => Number(r.month) === mIdx);
+            let passRate: null | number = 100;
+            if (summary.totalCount > 0) {
+              passRate = summary.passRate;
+            } else if (idx > currentMonthIndex) {
+              passRate = null;
+            }
 
-          const total = safeNumber(insp?.totalQty);
-          const qualified = safeNumber(insp?.qualifiedQty);
-          const defect = safeNumber(def?.defectQty);
-
-          let passRate: null | number = 100;
-          if (total > 0 || defect > 0) {
-            const effectiveTotal = Math.max(total, defect);
-            const netQualified = Math.max(0, qualified - defect);
-            passRate = Number(
-              ((netQualified / effectiveTotal) * 100).toFixed(1),
-            );
-          } else if (idx > currentMonthIndex) {
-            passRate = null;
-          } else {
-            passRate = 100;
-          }
-
-          return {
-            month: m,
-            value: passRate === null ? 0 : passRate,
-            rate: passRate ?? 0,
-          };
-        });
+            return {
+              month: m,
+              value: passRate === null ? 0 : passRate,
+              rate: passRate ?? 0,
+            };
+          }),
+        );
       } catch (error) {
         logger.error({ err: error }, 'getMonthlyTrend 执行失败');
         return [];

@@ -1,5 +1,4 @@
 <script lang="ts" setup>
-import type { QmsInspectionApi } from '#/api/qms/inspection';
 import type { ChartConfig } from '#/components/Qms/ChartBuilder/types';
 
 import { computed, onUnmounted, ref, watch } from 'vue';
@@ -10,20 +9,12 @@ import { useI18n } from '@vben/locales';
 import { useStorage } from '@vueuse/core';
 import { Button, Card, message, Modal } from 'ant-design-vue';
 
-import { getInspectionIssues } from '#/api/qms/inspection';
 import { getDeptList } from '#/api/system/dept';
-import {
-  CustomChartBuilderModal,
-  CustomChartItem,
-} from '#/components/Qms/ChartBuilder';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
-import {
-  getIssueChartOption,
-  ISSUE_CHART_DIMENSIONS,
-  ISSUE_CHART_METRICS,
-} from '../composables/useIssueChartAggregation';
 import { UI_CONSTANTS } from '../constants';
+import IssueCustomChartBuilderModal from './IssueCustomChartBuilderModal.vue';
+import IssueCustomChartItem from './IssueCustomChartItem.vue';
 
 const props = defineProps<{
   dateMode?: 'month' | 'week' | 'year';
@@ -43,7 +34,6 @@ const canDelete = computed(() =>
 );
 
 const loading = ref(false);
-const fullDataList = ref<QmsInspectionApi.InspectionIssue[]>([]);
 const deptList = ref<import('#/api/system/dept').SystemDeptApi.Dept[]>([]);
 
 // Custom Charts
@@ -56,30 +46,13 @@ const customCharts = useStorage<ChartConfig[]>('qms-issues-custom-charts', []);
 async function fetchData() {
   loading.value = true;
   try {
-    const res = await getInspectionIssues({
-      dateMode: props.dateMode,
-      dateValue: props.dateValue,
-      year: props.year,
-      pageSize: 10_000,
-    });
     const deptRes = await getDeptList();
-
-    // The API returns { items: [], total: number }
-    fullDataList.value = res.items || [];
     deptList.value = deptRes;
   } catch (error) {
     handleApiError(error, 'Fetch Issue Chart Dashboard Data');
   } finally {
     loading.value = false;
   }
-}
-
-// 包装 getOption 函数，注入 deptList
-function getOptionWithDept(
-  data: QmsInspectionApi.InspectionIssue[],
-  config: ChartConfig,
-) {
-  return getIssueChartOption(data, config, deptList.value);
 }
 
 // Drag & Drop Logic
@@ -279,11 +252,13 @@ defineExpose({
           </template>
 
           <div class="relative h-60 w-full cursor-move">
-            <CustomChartItem
+            <IssueCustomChartItem
               :config="chart"
-              :data="fullDataList"
+              :date-mode="dateMode"
+              :date-value="dateValue"
+              :dept-data="deptList"
               :loading="loading"
-              :get-option="getOptionWithDept"
+              :year="year"
             />
           </div>
 
@@ -307,13 +282,13 @@ defineExpose({
       {{ t('common.noData') }}
     </div>
 
-    <CustomChartBuilderModal
+    <IssueCustomChartBuilderModal
       v-model:open="isBuilderOpen"
-      :source-data="fullDataList"
+      :date-mode="dateMode"
+      :date-value="dateValue"
+      :dept-data="deptList"
       :initial-config="editingChart"
-      :dimension-options="ISSUE_CHART_DIMENSIONS"
-      :metric-options="ISSUE_CHART_METRICS"
-      :get-option="getOptionWithDept"
+      :year="year"
       @save="handleSaveCustomChart"
     />
   </div>

@@ -160,9 +160,26 @@ export const getColumns = (
     { field: 'inspector', title: '检验员', width: 100 },
     {
       field: 'result',
-      title: '结果',
+      title: '检验结论',
       width: 100,
       slots: { default: 'result' },
+    },
+    {
+      field: 'issueStatus',
+      title: '问题状态',
+      width: 120,
+      slots: { default: 'issueStatus' },
+    },
+    {
+      field: 'unqualifiedQuantity',
+      title: '不合格数量',
+      width: 110,
+    },
+    {
+      field: 'archiveTaskStatus',
+      title: '资料归档状态',
+      width: 130,
+      slots: { default: 'archiveTaskStatus' },
     },
     {
       field: 'inspectionDate',

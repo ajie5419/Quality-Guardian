@@ -55,6 +55,10 @@ const CONSTANTS = {
   },
 };
 
+function formatPercent(value: null | number | undefined) {
+  return Number(value ?? 0).toFixed(2);
+}
+
 // 合格率/质量损失粒度控制
 const granularity = ref<'month' | 'week'>('week');
 const qualityLossGranularity = ref<'month' | 'week'>('week');
@@ -447,7 +451,7 @@ const activeTab = ref('trends');
       >
         <template #bodyCell="{ column, text }">
           <template v-if="column.key === 'targetPassRate'">
-            {{ text != null ? `${text}%` : '-' }}
+            {{ text != null ? `${formatPercent(text)}%` : '-' }}
           </template>
           <template v-if="column.key === 'passRate'">
             <Tag
@@ -459,7 +463,7 @@ const activeTab = ref('trends');
                     : 'red'
               "
             >
-              {{ text }}%
+              {{ formatPercent(text) }}%
             </Tag>
           </template>
           <template v-if="column.key === 'dept'">

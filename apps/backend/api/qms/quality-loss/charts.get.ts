@@ -16,16 +16,22 @@ export default defineEventHandler(async (event) => {
   }
 
   const query = getQuery(event) as Record<string, unknown>;
-  const params = parseQualityLossCommonQuery(query);
+  const filters = parseQualityLossCommonQuery(query);
 
   try {
-    const result = await QualityLossService.getLossSummary(params);
+    const result = await QualityLossService.getYearlyCharts({
+      ...filters,
+      userContext: {
+        userId: String(userinfo.id || userinfo.userId || ''),
+        username: userinfo.username,
+      },
+    });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('summary', error);
+    logApiError('quality-loss-charts', error);
     return internalServerErrorResponse(
       event,
-      'Failed to fetch quality loss summary',
+      'Failed to fetch quality loss charts',
     );
   }
 });
