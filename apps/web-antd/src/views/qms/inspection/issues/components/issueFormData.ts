@@ -137,14 +137,17 @@ export function getIssueFormSchema(): VbenFormSchema[] {
     {
       fieldName: 'responsibleWelder',
       label: t('qms.inspection.issues.responsibleWelder'),
-      component: 'Input',
+      component: 'Select',
+      rules: 'selectRequired',
       componentProps: {
-        placeholder: '请输入责任焊工',
+        allowClear: true,
+        showSearch: true,
+        placeholder: '请选择责任焊工',
       },
       dependencies: {
         triggerFields: ['processName'],
         show: (values: Record<string, unknown>) =>
-          String(values.processName || '').includes('焊'),
+          String(values.processName || '').trim() === '焊接',
       },
     },
     {

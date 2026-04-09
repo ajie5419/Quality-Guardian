@@ -570,66 +570,6 @@ async function main() {
       meta: { title: '导出' },
     },
 
-    // --- ITP 检验计划 ---
-    {
-      id: 33,
-      parentId: 30,
-      path: '/qms/planning/itp',
-      name: 'QMSPlanningITP',
-      component: 'qms/planning/itp/index',
-      type: 'menu',
-      authCode: 'QMS:Planning:ITP:List',
-      meta: { title: 'ITP 检验计划', icon: 'carbon:list-checked' },
-    },
-    {
-      id: 3300,
-      parentId: 33,
-      name: 'QMSPlanningITPView',
-      type: 'button',
-      authCode: 'QMS:Planning:ITP:View',
-      meta: { title: '查看' },
-    },
-    {
-      id: 3301,
-      parentId: 33,
-      name: 'QMSPlanningITPCreate',
-      type: 'button',
-      authCode: 'QMS:Planning:ITP:Create',
-      meta: { title: '新增' },
-    },
-    {
-      id: 3302,
-      parentId: 33,
-      name: 'QMSPlanningITPEdit',
-      type: 'button',
-      authCode: 'QMS:Planning:ITP:Edit',
-      meta: { title: '编辑' },
-    },
-    {
-      id: 3303,
-      parentId: 33,
-      name: 'QMSPlanningITPDelete',
-      type: 'button',
-      authCode: 'QMS:Planning:ITP:Delete',
-      meta: { title: '删除' },
-    },
-    {
-      id: 3304,
-      parentId: 33,
-      name: 'QMSPlanningITPExport',
-      type: 'button',
-      authCode: 'QMS:Planning:ITP:Export',
-      meta: { title: '导出' },
-    },
-    {
-      id: 3305,
-      parentId: 33,
-      name: 'QMSPlanningITPDispatch',
-      type: 'button',
-      authCode: 'QMS:Planning:ITP:Dispatch',
-      meta: { title: '下发' },
-    },
-
     // --- 项目资料 ---
     {
       id: 34,

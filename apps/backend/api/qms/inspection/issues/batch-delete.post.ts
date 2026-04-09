@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { WelderScoreService } from '~/services/welder-score.service';
 import { logApiError } from '~/utils/api-logger';
 import { parseNonEmptyIdList } from '~/utils/id-list';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -33,6 +34,9 @@ export default defineEventHandler(async (event) => {
         updatedAt: new Date(),
       },
     });
+    if (result.count > 0) {
+      await WelderScoreService.syncFromInspectionIssues();
+    }
 
     return useResponseSuccess({ successCount: result.count });
   } catch (error) {

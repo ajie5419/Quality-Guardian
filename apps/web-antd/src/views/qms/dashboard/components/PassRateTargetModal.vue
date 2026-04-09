@@ -30,6 +30,18 @@ type PassRateTargetRow = {
   process: string;
 };
 const dataSource = ref<PassRateTargetRow[]>([]);
+const PROCESS_ORDER = [
+  '外协下料',
+  '外协结构',
+  '外协机加',
+  '外协涂装',
+  '下料',
+  '结构BU1',
+  '结构BU2',
+  '组装',
+  '机加',
+  '模具',
+] as const;
 
 const columns = [
   {
@@ -56,13 +68,14 @@ const loadData = async () => {
   loading.value = true;
   try {
     const targets = await getPassRateTargets();
-    dataSource.value = Object.entries(targets)
-      .map(([process, passRate]) => ({
+    dataSource.value = PROCESS_ORDER.map((process) => {
+      const passRate = Number(targets[process] ?? 0);
+      return {
         process,
         passRate,
         defectRate: Number((100 - passRate).toFixed(2)),
-      }))
-      .sort((a, b) => a.process.localeCompare(b.process, 'zh-CN'));
+      };
+    });
   } catch (error) {
     message.error('加载指标数据失败');
     handleApiError(error, 'Load Pass Rate Targets');

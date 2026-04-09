@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import type { InspectionIssue } from './types';
 
-import type { ProjectDocumentLedgerItem } from '#/api/qms/planning';
 import type { VxeCheckboxChangeParams } from '#/types';
 
 import { computed, onMounted, ref, watch } from 'vue';
@@ -20,7 +19,6 @@ import {
   Descriptions,
   Drawer,
   Image,
-  message,
   Row,
   Select,
   Statistic,
@@ -30,13 +28,7 @@ import dayjs from 'dayjs';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { importInspectionIssues } from '#/api/qms/inspection';
-import {
-  createProjectDocProject,
-  getProjectDocProjectsPage,
-  updateProjectDocProject,
-} from '#/api/qms/planning';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
-import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useGridImport } from '#/hooks/useGridImport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
@@ -60,7 +52,6 @@ import {
 
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
-const { handleApiError } = useErrorHandler();
 const route = useRoute();
 
 const { canEdit, canDelete, canImport } = useQmsPermissions(
@@ -234,7 +225,6 @@ const { gridOptions } = useIssueGridOptions({
   handleDelete,
   handleEdit,
   handleImport,
-  handleLinkToProjectDocs,
   handleSettleToKnowledge,
   t,
 });
@@ -265,69 +255,6 @@ function refreshStatistics() {
     dateValue: currentDateValue.value,
     year: currentFilterYear.value,
   });
-}
-
-function createIssueLedgerItem(
-  issue: InspectionIssue,
-): ProjectDocumentLedgerItem {
-  const now = new Date().toISOString();
-  return {
-    id:
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    createdAt: now,
-    updatedAt: now,
-    workOrderNumber: issue.workOrderNumber || '',
-    projectName: issue.projectName || '',
-    workContent:
-      issue.description || `${issue.partName || '问题项'}整改资料整理`,
-    status: getStatusLabel(issue.status || 'OPEN'),
-    sourceIssueId: issue.id,
-    sourceIssueNumber: issue.ncNumber || '',
-    sourceLabel: issue.partName || issue.defectType || '不合格项',
-    sourceType: 'ISSUE',
-  };
-}
-
-async function handleLinkToProjectDocs(row: InspectionIssue) {
-  if (!row.workOrderNumber) {
-    message.error('当前不合格项缺少工单号，无法加入项目资料');
-    return;
-  }
-
-  try {
-    const { items } = await getProjectDocProjectsPage();
-    let project = (items || []).find(
-      (item) => item.workOrderNumber === row.workOrderNumber,
-    );
-
-    if (!project) {
-      await createProjectDocProject({ workOrderNumber: row.workOrderNumber });
-      const refreshed = await getProjectDocProjectsPage();
-      project = (refreshed.items || []).find(
-        (item) => item.workOrderNumber === row.workOrderNumber,
-      );
-    }
-
-    if (!project) {
-      message.error('创建项目资料容器失败');
-      return;
-    }
-
-    const documents = project.documents || [];
-    if (documents.some((item) => item.sourceIssueId === row.id)) {
-      message.warning('该不合格项已加入项目资料');
-      return;
-    }
-
-    await updateProjectDocProject(project.id, {
-      documents: [createIssueLedgerItem(row), ...documents],
-    });
-    message.success('已加入项目资料');
-  } catch (error) {
-    handleApiError(error, 'Link Inspection Issue To Project Docs');
-  }
 }
 
 watch([currentYear, currentDateMode, currentDate], () => {

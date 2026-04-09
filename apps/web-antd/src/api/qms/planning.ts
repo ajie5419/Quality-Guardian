@@ -36,6 +36,7 @@ export interface InspectionFormTemplateItem {
   createdAt: string;
   createdBy?: string;
   customerName?: string;
+  drawingNo?: string;
   formFields?:
     | Array<{
         acceptanceCriteria?: string;
@@ -47,11 +48,13 @@ export interface InspectionFormTemplateItem {
       }>
     | string;
   formName: string;
+  formNo?: string;
   id: string;
   partName?: string;
   processName: string;
   projectName?: string;
   status: string;
+  templateQuantity?: null | number;
   updatedAt: string;
   updatedBy?: string;
   workOrderNumber: string;
@@ -62,6 +65,7 @@ export interface InspectionFormMatchResult {
   processName: string;
   template: null | {
     attachments?: string;
+    drawingNo?: string;
     formFields?: Array<{
       acceptanceCriteria?: string;
       checkItem?: string;
@@ -71,8 +75,10 @@ export interface InspectionFormMatchResult {
       upperTolerance?: number;
     }>;
     formName: string;
+    formNo?: string;
     id: string;
     partName?: string;
+    templateQuantity?: null | number;
     workOrderNumber: string;
   };
 }

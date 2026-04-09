@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import type { InspectionIssue } from '../issues/types';
-
 import type { QmsInspectionApi } from '#/api/qms/inspection';
 
 import { onMounted, ref, watch } from 'vue';
@@ -19,8 +17,6 @@ import {
 
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 
-import IssueEditModal from '../issues/components/IssueEditModal.vue';
-import { useIssueData } from '../issues/composables/useIssueData';
 import InspectionForm from './components/InspectionForm.vue';
 import InspectionGrid from './components/InspectionGrid.vue';
 import { useInspectionRecords } from './composables/useInspectionRecords';
@@ -40,70 +36,10 @@ const {
 } = useInspectionRecords();
 const route = useRoute();
 
-const issueModalVisible = ref(false);
-const issueInitialData = ref<Partial<InspectionIssue>>();
 const detailVisible = ref(false);
 const detailRecord = ref<QmsInspectionApi.InspectionRecord>();
-const { deptTreeData, loadInitialData } = useIssueData();
 const routeKeyword = ref('');
 const routeSourceInspectionId = ref('');
-
-function getStringField<
-  T extends QmsInspectionApi.InspectionRecord,
-  K extends string,
->(record: T, key: K) {
-  const value = (record as unknown as Record<string, unknown>)[key];
-  return typeof value === 'string' ? value : '';
-}
-
-function getNumberField<
-  T extends QmsInspectionApi.InspectionRecord,
-  K extends string,
->(record: T, key: K, fallback = 0) {
-  const value = (record as unknown as Record<string, unknown>)[key];
-  return typeof value === 'number' ? value : fallback;
-}
-
-function deriveIssuePartName(record: QmsInspectionApi.InspectionRecord) {
-  const materialName = getStringField(record, 'materialName');
-  if (materialName) return materialName;
-
-  const level2Component = getStringField(record, 'level2Component');
-  if (level2Component) return level2Component;
-
-  const level1Component = getStringField(record, 'level1Component');
-  if (level1Component) return level1Component;
-
-  return '';
-}
-
-function deriveIssueProcessName(record: QmsInspectionApi.InspectionRecord) {
-  const incomingType = getStringField(record, 'incomingType');
-  if (incomingType) return incomingType;
-
-  const processName = getStringField(record, 'processName');
-  if (processName) return processName;
-
-  return '成品检验';
-}
-
-function openIssueModalFromInspection(
-  record: QmsInspectionApi.InspectionRecord,
-) {
-  issueInitialData.value = {
-    inspectionId: record.id,
-    partName: deriveIssuePartName(record),
-    processName: deriveIssueProcessName(record),
-    projectName: getStringField(record, 'projectName'),
-    quantity: getNumberField(record, 'quantity', 1),
-    reportDate: getStringField(record, 'inspectionDate')
-      ? String(getStringField(record, 'inspectionDate')).slice(0, 10)
-      : new Date().toISOString().slice(0, 10),
-    supplierName: getStringField(record, 'supplierName') || undefined,
-    workOrderNumber: getStringField(record, 'workOrderNumber'),
-  };
-  issueModalVisible.value = true;
-}
 
 function openDetail(record: QmsInspectionApi.InspectionRecord) {
   detailRecord.value = record;
@@ -217,7 +153,6 @@ function syncRouteFilters() {
 
 onMounted(() => {
   syncRouteFilters();
-  loadInitialData();
 });
 
 watch(
@@ -249,7 +184,6 @@ watch(
             :year="currentYear"
             @create="openModal()"
             @edit="openModal"
-            @create-issue="openIssueModalFromInspection"
             @view="openDetail"
           />
         </div>
@@ -268,15 +202,6 @@ watch(
           :record="currentRecord"
         />
       </Modal>
-
-      <IssueEditModal
-        v-model:open="issueModalVisible"
-        :dept-tree-data="deptTreeData"
-        :initial-data="issueInitialData"
-        :is-edit-mode="false"
-        @search-work-order="() => {}"
-        @success="issueModalVisible = false"
-      />
 
       <Drawer
         v-model:open="detailVisible"

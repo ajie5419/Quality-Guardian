@@ -395,6 +395,7 @@ export function buildInspectionIssueCreateData(
     division,
     defectType: normalizeOptionalString(body.defectType),
     defectSubtype: normalizeOptionalString(body.defectSubtype),
+    severity: normalizeOptionalString(body.severity) ?? 'Minor',
     rootCause: normalizeOptionalString(body.rootCause),
     solution: normalizeOptionalString(body.solution),
     description: normalizeOptionalString(body.description),

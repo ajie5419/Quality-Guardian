@@ -29,6 +29,7 @@ import { BaseService } from './base.service';
 import { DataScopeService } from './data-scope.service';
 import { DeptService } from './dept.service';
 import { SystemLogService } from './system-log.service';
+import { WelderScoreService } from './welder-score.service';
 
 const logger = createModuleLogger('InspectionService');
 const inspectionTemplateAutoBindEnabled =
@@ -678,13 +679,25 @@ export const InspectionService = {
         where: { id: inspection.templateId },
         select: {
           attachments: true,
+          drawingNo: true,
           formFields: true,
+          formNo: true,
         },
       });
       templateFields = parseTemplateFields(template?.formFields);
-      templateMeta = await resolveTemplateMetaFromAttachment(
-        template?.attachments,
-      );
+      templateMeta = {
+        drawingNo: String(template?.drawingNo || '').trim() || null,
+        formNo: String(template?.formNo || '').trim() || null,
+      };
+      if (!templateMeta.formNo || !templateMeta.drawingNo) {
+        const attachmentMeta = await resolveTemplateMetaFromAttachment(
+          template?.attachments,
+        );
+        templateMeta = {
+          drawingNo: templateMeta.drawingNo || attachmentMeta.drawingNo,
+          formNo: templateMeta.formNo || attachmentMeta.formNo,
+        };
+      }
     }
 
     const printHeaders = resolveInspectionPrintHeaders(
@@ -1962,6 +1975,7 @@ export const InspectionService = {
         updatedAt: new Date(),
       },
     });
+    await WelderScoreService.syncFromInspectionIssues();
 
     // Record audit log
     await SystemLogService.recordAuditLog({

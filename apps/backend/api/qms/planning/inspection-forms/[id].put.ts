@@ -56,6 +56,16 @@ export default defineEventHandler(async (event) => {
       body.status === undefined
         ? undefined
         : String(body.status || '').trim() || 'active';
+    const formNo =
+      body.formNo === undefined ? undefined : String(body.formNo || '').trim();
+    const drawingNo =
+      body.drawingNo === undefined
+        ? undefined
+        : String(body.drawingNo || '').trim();
+    const templateQuantity =
+      body.templateQuantity === undefined
+        ? undefined
+        : Number(body.templateQuantity);
     const finalStatus = status ?? String(current.status || '').trim();
 
     if (finalStatus === 'active') {
@@ -86,6 +96,15 @@ export default defineEventHandler(async (event) => {
       }
     }
 
+    let normalizedTemplateQuantity: null | number | undefined;
+    if (templateQuantity === undefined) {
+      normalizedTemplateQuantity = undefined;
+    } else if (Number.isFinite(templateQuantity) && templateQuantity > 0) {
+      normalizedTemplateQuantity = Math.trunc(templateQuantity);
+    } else {
+      normalizedTemplateQuantity = null;
+    }
+
     const updated = await prisma.inspection_form_templates.update({
       where: { id },
       data: {
@@ -101,12 +120,15 @@ export default defineEventHandler(async (event) => {
           body.formName === undefined
             ? undefined
             : String(body.formName || '').trim(),
+        formNo: formNo === undefined ? undefined : formNo || null,
         partName: partName === undefined ? undefined : partName || null,
         processName: processName === undefined ? undefined : processName,
         projectName:
           body.projectName === undefined
             ? undefined
             : String(body.projectName || '').trim() || null,
+        templateQuantity: normalizedTemplateQuantity,
+        drawingNo: drawingNo === undefined ? undefined : drawingNo || null,
         status: status === undefined ? undefined : status,
         updatedAt: new Date(),
         updatedBy: userinfo.username,

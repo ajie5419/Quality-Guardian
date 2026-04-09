@@ -17,7 +17,6 @@ import {
   getInspectionRecords,
   getInspectionRecordsExport,
   importInspectionRecords,
-  updateInspectionArchiveTaskStatus,
 } from '#/api/qms/inspection';
 import { QmsStatusTag } from '#/components/Qms';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
@@ -43,14 +42,11 @@ const props = defineProps<{
   year: number;
 }>();
 
-const emit = defineEmits(['create', 'edit', 'createIssue', 'view']);
+const emit = defineEmits(['create', 'edit', 'view']);
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const { canCreate, canEdit, canDelete, canExport, canImport } =
   useQmsPermissions('QMS:Inspection:Records');
-const { canCreate: canCreateIssue } = useQmsPermissions(
-  'QMS:Inspection:Issues',
-);
 
 const exportInspectionRecordsAsXlsx =
   createVxePhotoXlsxExportMethod<QmsInspectionApi.InspectionRecord>({
@@ -87,25 +83,7 @@ const processedColumns = (type: string) => {
           name: 'CellOperation',
           props: {
             options: [
-              ...(canCreateIssue.value
-                ? [
-                    {
-                      code: 'create-issue',
-                      icon: 'carbon:warning-alt',
-                      title: '生成不合格项',
-                    },
-                  ]
-                : []),
               ...(canEdit.value ? ['edit'] : []),
-              ...(canEdit.value
-                ? [
-                    {
-                      code: 'mark-archived',
-                      icon: 'carbon:task-complete',
-                      title: '标记归档',
-                    },
-                  ]
-                : []),
               ...(canDelete.value ? ['delete'] : []),
             ],
             onClick: ({
@@ -115,9 +93,7 @@ const processedColumns = (type: string) => {
               code: string;
               row: QmsInspectionApi.InspectionRecord;
             }) => {
-              if (code === 'create-issue') emit('createIssue', row);
               if (code === 'edit') handleEdit(row);
-              if (code === 'mark-archived') handleMarkArchived(row);
               if (code === 'delete') handleDelete(row);
             },
           },
@@ -238,17 +214,6 @@ function normalizeIssueStatus(status: unknown) {
   return normalized || 'NO_ISSUE';
 }
 
-function normalizeArchiveStatus(status: unknown) {
-  const normalized = String(status || '')
-    .trim()
-    .toUpperCase();
-  if (!normalized) return 'NONE';
-  if (normalized === 'ARCHIVED') return 'ARCHIVED';
-  if (normalized === 'IN_PROGRESS') return 'IN_PROGRESS';
-  if (normalized === 'REJECTED') return 'REJECTED';
-  return 'PENDING';
-}
-
 function filterBySourceInspectionId(
   items: QmsInspectionApi.InspectionRecord[] = [],
 ) {
@@ -329,36 +294,6 @@ function handleDelete(row: QmsInspectionApi.InspectionRecord) {
         reload();
       } catch {
         message.error(t('common.deleteFailed'));
-      }
-    },
-  });
-}
-
-async function handleMarkArchived(row: QmsInspectionApi.InspectionRecord) {
-  const archiveTaskId = String((row as any).archiveTaskId || '').trim();
-  if (!archiveTaskId) {
-    message.warning('当前记录无需归档（未生成归档任务）');
-    return;
-  }
-
-  if (normalizeArchiveStatus((row as any).archiveTaskStatus) === 'ARCHIVED') {
-    message.info('该记录已归档');
-    return;
-  }
-
-  Modal.confirm({
-    title: '确认标记归档',
-    content: '系统将校验工作内容和附件，校验通过后标记为已归档。',
-    onOk: async () => {
-      try {
-        await updateInspectionArchiveTaskStatus(archiveTaskId, {
-          status: 'ARCHIVED',
-        });
-        message.success('已标记归档');
-        reload();
-      } catch (error) {
-        handleApiError(error, 'Update Inspection Archive Status');
-        message.error('归档失败，请先补全工作内容和附件');
       }
     },
   });
@@ -465,34 +400,6 @@ defineExpose({ reload });
     <template #hasDocuments="{ row }">
       <Tag :color="row.hasDocuments ? 'blue' : 'default'">
         {{ row.hasDocuments ? '是' : '否' }}
-      </Tag>
-    </template>
-
-    <template #archiveTaskStatus="{ row }">
-      <Tag
-        :color="
-          normalizeArchiveStatus(row.archiveTaskStatus) === 'NONE'
-            ? 'default'
-            : normalizeArchiveStatus(row.archiveTaskStatus) === 'ARCHIVED'
-              ? 'success'
-              : normalizeArchiveStatus(row.archiveTaskStatus) === 'IN_PROGRESS'
-                ? 'processing'
-                : normalizeArchiveStatus(row.archiveTaskStatus) === 'REJECTED'
-                  ? 'error'
-                  : 'warning'
-        "
-      >
-        {{
-          normalizeArchiveStatus(row.archiveTaskStatus) === 'NONE'
-            ? '无需归档'
-            : normalizeArchiveStatus(row.archiveTaskStatus) === 'ARCHIVED'
-              ? '已归档'
-              : normalizeArchiveStatus(row.archiveTaskStatus) === 'IN_PROGRESS'
-                ? '整理中'
-                : normalizeArchiveStatus(row.archiveTaskStatus) === 'REJECTED'
-                  ? '已退回'
-                  : '待整理'
-        }}
       </Tag>
     </template>
   </Grid>

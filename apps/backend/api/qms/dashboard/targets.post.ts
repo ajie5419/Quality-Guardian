@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { isProcessPassRateTargetKey } from '~/utils/pass-rate-process';
 import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
@@ -22,6 +23,9 @@ export default defineEventHandler(async (event) => {
 
     // Basic validation
     for (const [key, value] of Object.entries(body)) {
+      if (!isProcessPassRateTargetKey(key)) {
+        return badRequestResponse(event, `Unsupported process key: ${key}`);
+      }
       if (typeof value !== 'number' || value < 0 || value > 100) {
         return badRequestResponse(
           event,

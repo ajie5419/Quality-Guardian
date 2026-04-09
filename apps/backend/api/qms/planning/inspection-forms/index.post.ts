@@ -22,6 +22,9 @@ export default defineEventHandler(async (event) => {
     const processName = String(body.processName || '').trim();
     const partName = String(body.partName || '').trim();
     const formName = String(body.formName || '').trim();
+    const formNo = String(body.formNo || '').trim();
+    const drawingNo = String(body.drawingNo || '').trim();
+    const templateQuantity = Number(body.templateQuantity);
 
     const missingFields = getMissingRequiredFields(
       { formName, processName, workOrderNumber },
@@ -65,9 +68,15 @@ export default defineEventHandler(async (event) => {
             ? null
             : JSON.stringify(body.formFields || []),
         formName,
+        formNo: formNo || null,
         partName: partName || null,
         processName,
         projectName: String(body.projectName || '').trim() || null,
+        templateQuantity:
+          Number.isFinite(templateQuantity) && templateQuantity > 0
+            ? Math.trunc(templateQuantity)
+            : null,
+        drawingNo: drawingNo || null,
         status,
         updatedBy: userinfo.username,
         workOrderNumber,

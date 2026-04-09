@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
+import { WelderScoreService } from '~/services/welder-score.service';
 import { logApiError } from '~/utils/api-logger';
 import {
   buildInspectionIssueUpdateData,
@@ -74,6 +75,7 @@ export default defineEventHandler(async (event) => {
       targetId: String(id),
       details: `修改检验问题: ${updateData.partName || '未修改名称'} (${updateData.nonConformanceNumber || existingNcNumber || '无编号'})`,
     });
+    await WelderScoreService.syncFromInspectionIssues();
 
     return useResponseSuccess(null);
   } catch (error: unknown) {

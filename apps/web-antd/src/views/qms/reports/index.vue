@@ -99,26 +99,6 @@ function normalizeDocumentItems() {
   );
 }
 
-const archiveStatsCards = computed(() => {
-  const stats = reportData.value.archiveStats || {
-    archivedCount: 0,
-    missingTemplateCount: 0,
-    overdueCount: 0,
-    requiredCount: 0,
-    timelinessRate: 0,
-  };
-  return [
-    { label: '应归档数', value: stats.requiredCount },
-    { label: '已归档数', value: stats.archivedCount },
-    { label: '逾期未归档数', value: stats.overdueCount },
-    { label: '检验表未编制数', value: stats.missingTemplateCount || 0 },
-    {
-      label: '归档及时率',
-      value: `${Number(stats.timelinessRate || 0).toFixed(2)}%`,
-    },
-  ];
-});
-
 async function loadDeptData() {
   try {
     deptRawData.value = await getDeptList();
@@ -260,52 +240,6 @@ const issueColumns = [
   },
 ];
 
-const documentColumns = [
-  {
-    title: t('qms.afterSales.columns.seq'),
-    key: 'seq',
-    width: '64px',
-    align: 'center' as const,
-    class: 'font-bold',
-  },
-  {
-    title: t('qms.workOrder.workOrderNumber'),
-    key: 'workOrder',
-    class: 'whitespace-nowrap',
-  },
-  { title: t('qms.workOrder.projectName'), key: 'projectName' },
-  { title: '工作内容', key: 'workContent' },
-  {
-    title: t('qms.inspection.issues.statusLabel'),
-    key: 'status',
-    align: 'center' as const,
-    width: '128px',
-  },
-];
-
-const engineeringTodoColumns = [
-  {
-    title: t('qms.afterSales.columns.seq'),
-    key: 'seq',
-    width: '64px',
-    align: 'center' as const,
-    class: 'font-bold',
-  },
-  {
-    title: t('qms.workOrder.workOrderNumber'),
-    key: 'workOrder',
-    class: 'whitespace-nowrap',
-  },
-  { title: t('qms.workOrder.projectName'), key: 'projectName' },
-  { title: t('qms.inspection.records.form.process'), key: 'processName' },
-  {
-    title: t('qms.inspection.issues.statusLabel'),
-    key: 'status',
-    align: 'center' as const,
-    width: '128px',
-  },
-];
-
 watch(currentDate, () => {
   loadData();
 });
@@ -376,70 +310,6 @@ onMounted(() => {
           {{ deptMap[String(record.dept)] || String(record.dept || '') }}
         </template>
       </ReportTable>
-
-      <div>
-        <div
-          class="mb-0 inline-flex items-center gap-3 bg-gray-800 px-4 py-2 text-xl font-bold text-white"
-        >
-          <span>当日检验资料情况</span>
-        </div>
-        <div class="my-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div
-            v-for="item in archiveStatsCards"
-            :key="item.label"
-            class="rounded border border-gray-200 bg-gray-50 px-3 py-2"
-          >
-            <div class="text-sm text-gray-500">{{ item.label }}</div>
-            <div class="mt-1 text-xl font-semibold text-gray-800">
-              {{ item.value }}
-            </div>
-          </div>
-        </div>
-        <table class="w-full border-collapse border border-gray-300">
-          <thead>
-            <tr class="bg-gray-100 text-lg">
-              <th
-                v-for="col in documentColumns"
-                :key="col.key"
-                :style="{ width: col.width }"
-                class="whitespace-nowrap border p-2 text-center"
-              >
-                {{ col.title }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="reportData.documentItems.length === 0">
-              <td colspan="5" class="border p-4 text-center text-gray-500">
-                今日无检验资料内容
-              </td>
-            </tr>
-            <tr
-              v-for="(item, index) in reportData.documentItems"
-              :key="`${item.seq}-${index}`"
-              class="text-lg"
-            >
-              <td class="border p-2 text-center">{{ index + 1 }}</td>
-              <td class="border p-2">{{ item.workOrder }}</td>
-              <td class="border p-2">{{ item.projectName }}</td>
-              <td class="whitespace-pre-wrap border p-2">
-                {{ item.workContent }}
-              </td>
-              <td class="border p-2 text-center">{{ item.status }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="mt-2 text-sm text-gray-500">
-          数据来源：检验记录自动同步至项目资料台账，按更新时间汇总当日检验资料。
-        </div>
-      </div>
-
-      <ReportTable
-        title="工程师组待办（检验表未编制）"
-        :columns="engineeringTodoColumns"
-        :data-source="reportData.engineeringTodos || []"
-        empty-text="今日无检验表未编制待办"
-      />
 
       <!-- Section 3: Summary -->
       <div class="relative border border-gray-300 p-4">

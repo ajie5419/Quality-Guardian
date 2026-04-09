@@ -46,7 +46,6 @@ interface UseIssueGridOptionsParams {
   handleDelete: (row: InspectionIssue) => void;
   handleEdit: (row: InspectionIssue) => void;
   handleImport: (params: { file: File }) => Promise<void>;
-  handleLinkToProjectDocs: (row: InspectionIssue) => Promise<void> | void;
   handleSettleToKnowledge: (row: InspectionIssue) => void;
   t: (key: string, params?: Record<string, any>) => string;
 }
@@ -111,7 +110,6 @@ export function useIssueGridOptions({
   handleDelete,
   handleEdit,
   handleImport,
-  handleLinkToProjectDocs,
   handleSettleToKnowledge,
   t,
 }: UseIssueGridOptionsParams) {
@@ -287,11 +285,6 @@ export function useIssueGridOptions({
                   ...(canSettle.value
                     ? [
                         {
-                          code: 'linkProjectDocs',
-                          icon: 'carbon:document-add',
-                          title: '加入项目资料',
-                        },
-                        {
                           code: 'settle',
                           icon: 'lucide:book-check',
                           title: t('qms.inspection.issues.settleToKnowledge'),
@@ -309,7 +302,6 @@ export function useIssueGridOptions({
                 }) => {
                   if (code === 'edit') handleEdit(row);
                   if (code === 'delete') handleDelete(row);
-                  if (code === 'linkProjectDocs') handleLinkToProjectDocs(row);
                   if (code === 'settle') handleSettleToKnowledge(row);
                 },
               },

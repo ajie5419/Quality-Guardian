@@ -48,8 +48,44 @@ type IssueFormValues = {
   solution?: string;
 };
 const formValues = ref<IssueFormValues>({});
-const welderOptions = ref<Array<{ label: string; value: string }>>([]);
+type WelderOption = { label: string; searchText: string; value: string };
+const welderOptions = ref<WelderOption[]>([]);
 const welderLoading = ref(false);
+
+function isHeaderLikeWelderRecord(params: { code?: string; name?: string }) {
+  const name = String(params.name || '')
+    .trim()
+    .toLowerCase();
+  const code = String(params.code || '')
+    .trim()
+    .toLowerCase();
+  const combined = `${name} ${code}`;
+  return (
+    combined.includes('焊工编号') ||
+    combined.includes('焊工姓名') ||
+    combined.includes('姓名') ||
+    combined.includes('最新') ||
+    combined.includes('(姓名)') ||
+    combined.includes('（姓名）') ||
+    combined.includes('weldercode') ||
+    combined.includes('weldername')
+  );
+}
+
+function isTestWelderRecord(params: { code?: string; name?: string }) {
+  const name = String(params.name || '')
+    .trim()
+    .toLowerCase();
+  const code = String(params.code || '')
+    .trim()
+    .toLowerCase();
+  return (
+    name.includes('测试') ||
+    name.includes('test') ||
+    code.includes('test') ||
+    code.startsWith('t-test')
+  );
+}
 
 const [Form, formApi] = useVbenForm({
   commonConfig: {
@@ -190,12 +226,19 @@ onMounted(async () => {
         const name = String(item.name || '').trim();
         if (!name) return null;
         const code = String(item.welderCode || '').trim();
+        if (
+          isHeaderLikeWelderRecord({ code, name }) ||
+          isTestWelderRecord({ code, name })
+        ) {
+          return null;
+        }
         return {
           label: code ? `${name}（${code}）` : name,
-          value: name,
+          searchText: `${name} ${code}`.trim().toLowerCase(),
+          value: code || name,
         };
       })
-      .filter(Boolean) as Array<{ label: string; value: string }>;
+      .filter(Boolean) as WelderOption[];
   } finally {
     welderLoading.value = false;
   }
@@ -292,6 +335,30 @@ function handleCancel() {
             :options="welderOptions"
             allow-clear
             show-search
+            :filter-option="
+              (input, option) =>
+                String(option?.searchText || '')
+                  .toLowerCase()
+                  .includes(
+                    String(input || '')
+                      .trim()
+                      .toLowerCase(),
+                  ) ||
+                String(option?.label || '')
+                  .toLowerCase()
+                  .includes(
+                    String(input || '')
+                      .trim()
+                      .toLowerCase(),
+                  ) ||
+                String(option?.value || '')
+                  .toLowerCase()
+                  .includes(
+                    String(input || '')
+                      .trim()
+                      .toLowerCase(),
+                  )
+            "
             placeholder="请选择责任焊工"
           />
         </template>

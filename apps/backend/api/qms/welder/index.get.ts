@@ -1,4 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { WelderScoreService } from '~/services/welder-score.service';
 import { WelderService } from '~/services/welder.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -16,6 +17,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    await WelderScoreService.syncFromInspectionIssues();
     const query = getQuery(event) as Record<string, unknown>;
     const result = await WelderService.findAll(parseWelderListQuery(query));
     return useResponseSuccess(result);

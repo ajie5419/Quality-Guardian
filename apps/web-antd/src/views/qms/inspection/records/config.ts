@@ -176,12 +176,6 @@ export const getColumns = (
       width: 110,
     },
     {
-      field: 'archiveTaskStatus',
-      title: '资料归档状态',
-      width: 130,
-      slots: { default: 'archiveTaskStatus' },
-    },
-    {
       field: 'inspectionDate',
       title: '检验日期',
       width: 120,

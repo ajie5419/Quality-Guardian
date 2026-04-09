@@ -1,4 +1,9 @@
 import { getTargetPassRate as getTargetPassRateByStd } from '~/constants/quality-standards';
+import {
+  buildCanonicalProcessPassRateTargets,
+  mapInspectionToPassRateBucket,
+  parsePassRateTargets,
+} from '~/utils/pass-rate-process';
 import prisma from '~/utils/prisma';
 
 interface DrillDownItem {
@@ -23,6 +28,7 @@ type InspectionPassRateRow = {
   qualifiedQuantity: null | number;
   quantity: number;
   result: string;
+  team: null | string;
   unqualifiedQuantity: null | number;
 };
 
@@ -32,44 +38,11 @@ type InspectionQuantitySummary = {
   unqualifiedQuantity: number;
 };
 
-const DEFAULT_PASS_RATE_TARGETS: Record<string, number> = {
-  原材料: 99.8,
-  辅材: 99.9,
-  外购件: 99.8,
-  机加件: 99.9,
-  下料: 99.9,
-  组对: 99.85,
-  焊接: 99.85,
-  机加: 99.9,
-  涂装: 99.85,
-  组装: 99.85,
-  装配: 99.85,
-  外协: 99.85,
-  成品检验: 99.85,
-  设计: 99.85,
-};
-
 const GLOBAL_DEFAULT_TARGET = 99.85;
 
 function roundPercent(value: number) {
   return Number(value.toFixed(2));
 }
-
-const PROCESS_MAPPING: Record<string, string> = {
-  设计: '设计',
-  组对: '组焊',
-  焊接: '组焊',
-  焊后尺寸: '组焊',
-  组装: '组装',
-  装配: '组装',
-  组拼: '组装',
-  打砂: '涂装',
-  喷漆: '涂装',
-  下料: '下料',
-  机加: '机加',
-  外观: '',
-  整体拼装: '',
-};
 
 function normalizeInspectionQuantitySummary(
   item: InspectionPassRateRow,
@@ -140,6 +113,7 @@ async function getInspectionPassRateRows(start: Date, end: Date) {
       qualifiedQuantity: true,
       unqualifiedQuantity: true,
       result: true,
+      team: true,
     },
   });
 }
@@ -149,13 +123,18 @@ export async function createPassRateTargetResolver() {
     where: { key: 'QMS_PASS_RATE_TARGETS' },
   });
 
-  let targets = { ...DEFAULT_PASS_RATE_TARGETS };
+  let targets: Record<string, number> = buildCanonicalProcessPassRateTargets(
+    {},
+  );
   if (setting?.value) {
     try {
-      const saved = JSON.parse(setting.value);
-      targets = { ...targets, ...saved };
+      const saved = parsePassRateTargets(JSON.parse(setting.value));
+      const canonicalTargets = buildCanonicalProcessPassRateTargets(saved);
+      // Keep non-process custom keys from saved settings (e.g. incoming types),
+      // while forcing canonical process keys to current definitions.
+      targets = { ...saved, ...canonicalTargets };
     } catch {
-      // 忽略脏配置，回退默认目标值
+      // Ignore dirty config and fallback to defaults
     }
   }
 
@@ -196,41 +175,6 @@ export async function getPassRateDrillDownByRange(
   const drillDown: DrillDownItem[] = [];
   const inspections = await getInspectionPassRateRows(start, end);
 
-  const incomingTypes = [
-    ...new Set(
-      inspections
-        .filter((item) => item.category === 'INCOMING')
-        .map((item) => (item.incomingType || '未分类') as string),
-    ),
-  ];
-
-  for (const type of incomingTypes) {
-    const items = inspections.filter(
-      (item) =>
-        item.category === 'INCOMING' &&
-        (item.incomingType || '未分类') === type,
-    );
-
-    const summary = { totalCount: 0, passCount: 0 };
-    for (const item of items) {
-      const quantities = normalizeInspectionQuantitySummary(item);
-      summary.totalCount += quantities.quantity;
-      summary.passCount += quantities.qualifiedQuantity;
-    }
-
-    drillDown.push({
-      process: String(type),
-      category: '来料检验',
-      passRate:
-        summary.totalCount > 0
-          ? roundPercent((summary.passCount / summary.totalCount) * 100)
-          : 0,
-      targetPassRate: getTargetPassRate(String(type)),
-      totalCount: summary.totalCount,
-      passCount: summary.passCount,
-    });
-  }
-
   const processStats: Record<
     string,
     { passCount: number; totalCount: number }
@@ -239,10 +183,11 @@ export async function getPassRateDrillDownByRange(
   for (const item of inspections.filter(
     (record) => record.category === 'PROCESS',
   )) {
-    const rawProcess = item.processName || '';
-    const mappedName = PROCESS_MAPPING[rawProcess];
-
-    if (!mappedName || mappedName === '设计') continue;
+    const mappedName = mapInspectionToPassRateBucket({
+      processName: item.processName,
+      team: item.team,
+    });
+    if (!mappedName) continue;
 
     if (!processStats[mappedName]) {
       processStats[mappedName] = { totalCount: 0, passCount: 0 };

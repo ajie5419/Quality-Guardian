@@ -34,21 +34,23 @@ const reportHeader = computed(() => {
     rawFormName.includes('尺寸');
   const isWeld =
     normalizedName === 'hanfeng' ||
+    normalizedName === 'hanjie' ||
     normalizedName.includes('weld') ||
-    rawFormName.includes('焊缝');
+    rawFormName.includes('焊缝') ||
+    rawFormName.includes('焊接');
 
   let formTitle = rawFormName || '检验表';
   if (isDimension) {
     formTitle = '尺寸检验表';
   } else if (isWeld) {
-    formTitle = '钢结构焊缝检验表';
+    formTitle = '焊接检验表';
   }
 
   let englishTitle = 'Inspection Records';
   if (isDimension) {
     englishTitle = 'Dimension Inspection Records';
   } else if (isWeld) {
-    englishTitle = 'Steel Weld Inspection Records';
+    englishTitle = 'Weld Inspection Records';
   } else if (rawFormName) {
     englishTitle = `${rawFormName} Inspection Records`;
   }
@@ -88,6 +90,48 @@ type PrintRow = {
   standardValue: string;
 };
 
+type MergedPrintRow = PrintRow & {
+  checkItemRowSpan: number;
+  showCheckItem: boolean;
+};
+
+function normalizeCheckItemKey(value: unknown) {
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (!raw) return '';
+
+  // Group key should be the semantic title of check item, not bracket payload/unit.
+  const head = raw.split(/[（(]/)[0] || raw;
+  return head
+    .replaceAll(/\s+/g, '')
+    .replaceAll(/[^\p{L}\p{N}]+/gu, '')
+    .trim();
+}
+
+function buildMergedRows(rows: PrintRow[]): MergedPrintRow[] {
+  return rows.map((row, index) => {
+    const currentKey = normalizeCheckItemKey(row.checkItem);
+    if (!currentKey) {
+      return { ...row, checkItemRowSpan: 1, showCheckItem: true };
+    }
+
+    const previous = rows[index - 1];
+    if (previous && normalizeCheckItemKey(previous.checkItem) === currentKey) {
+      return { ...row, checkItemRowSpan: 0, showCheckItem: false };
+    }
+
+    let span = 1;
+    for (let i = index + 1; i < rows.length; i++) {
+      if (normalizeCheckItemKey(rows[i]?.checkItem) !== currentKey) {
+        break;
+      }
+      span++;
+    }
+    return { ...row, checkItemRowSpan: span, showCheckItem: true };
+  });
+}
+
 function appendUnit(text: string, uom?: string) {
   const base = String(text || '').trim();
   const unit = String(uom || '').trim();
@@ -123,7 +167,7 @@ function resolveStandardValue(item: {
 }
 
 const tableRows = computed<PrintRow[]>(() => {
-  return (props.detail?.items || []).map((item, index) => {
+  const rows = (props.detail?.items || []).map((item, index) => {
     return {
       ...item,
       checkItem: appendUnit(
@@ -136,23 +180,10 @@ const tableRows = computed<PrintRow[]>(() => {
       standardValue: resolveStandardValue(item),
     };
   });
-});
-
-const printableRows = computed(() => {
-  const minRows = 13;
-  const rows = [...tableRows.value];
-  while (rows.length < minRows) {
-    rows.push({
-      checkItem: '',
-      id: `empty-${rows.length + 1}`,
-      index: rows.length + 1,
-      measuredValue: '',
-      remarks: '',
-      standardValue: '',
-    });
-  }
   return rows;
 });
+
+const previewRows = computed(() => buildMergedRows(tableRows.value));
 
 function handleClose() {
   emit('update:open', false);
@@ -166,10 +197,10 @@ function handlePrint() {
     <table class="header-table">
       <colgroup>
         <col style="width:10%;" />
-        <col style="width:22%;" />
-        <col style="width:22%;" />
-        <col style="width:23%;" />
-        <col style="width:23%;" />
+        <col style="width:20%;" />
+        <col style="width:24%;" />
+        <col style="width:21%;" />
+        <col style="width:25%;" />
       </colgroup>
       <tr>
         <td class="logo-cell" colspan="2">
@@ -182,7 +213,7 @@ function handlePrint() {
       </tr>
       <tr>
         <td class="label-cell" colspan="2">表单号及版本：<br/>Form No. & Rev.</td>
-        <td class="value-cell">${reportHeader.value.formNo}</td>
+        <td class="value-cell value-cell-code">${reportHeader.value.formNo}</td>
         <td class="label-cell">产品名称<br/>Project</td>
         <td class="value-cell">${reportHeader.value.projectName}</td>
       </tr>
@@ -190,7 +221,7 @@ function handlePrint() {
         <td class="label-cell" colspan="2">部件名称<br/>Part Name</td>
         <td class="value-cell">${reportHeader.value.partName}</td>
         <td class="label-cell">工单号<br/>Project NO.</td>
-        <td class="value-cell">${reportHeader.value.workOrderNumber}</td>
+        <td class="value-cell value-cell-code">${reportHeader.value.workOrderNumber}</td>
       </tr>
       <tr>
         <td class="label-cell" colspan="2">图号：<br/>Drawing NO.</td>
@@ -201,30 +232,31 @@ function handlePrint() {
     </table>
   `;
 
-  const finalRows = [...tableRows.value];
-  while (finalRows.length < 13) {
-    finalRows.push({
-      checkItem: '',
-      id: `print-empty-${finalRows.length + 1}`,
-      index: finalRows.length + 1,
-      measuredValue: '',
-      remarks: '',
-      standardValue: '',
-    } as any);
+  const rowsPerPage = 14;
+  const sourceRows = [...tableRows.value];
+  const chunks: PrintRow[][] = [];
+  for (let i = 0; i < sourceRows.length; i += rowsPerPage) {
+    chunks.push(sourceRows.slice(i, i + rowsPerPage));
   }
-  const bodyRows = finalRows
-    .map(
-      (item) => `
-      <tr>
-        <td class="center">${item.index}</td>
-        <td class="center">${item.checkItem || ''}</td>
-        <td class="center">${item.standardValue || ''}</td>
-        <td class="center">${item.measuredValue || ''}</td>
-        <td class="center">${item.remarks || ''}</td>
-      </tr>
-    `,
-    )
-    .join('');
+  if (chunks.length === 0) {
+    chunks.push([]);
+  }
+
+  const paddedChunks = chunks.map((chunk, pageIndex) => {
+    const padded = [...chunk];
+    const startIndex = pageIndex * rowsPerPage;
+    while (padded.length < rowsPerPage) {
+      padded.push({
+        checkItem: '',
+        id: `print-empty-${pageIndex + 1}-${padded.length + 1}`,
+        index: startIndex + padded.length + 1,
+        measuredValue: '',
+        remarks: '',
+        standardValue: '',
+      });
+    }
+    return buildMergedRows(padded);
+  });
 
   const html = `
     <html>
@@ -232,66 +264,119 @@ function handlePrint() {
         <meta charset="UTF-8" />
         <title>${printTitle.value}</title>
         <style>
-          body { font-family: "PingFang SC","Microsoft YaHei",sans-serif; padding: 16px; color: #1f2937; }
+          @page { size: A4 portrait; margin: 10mm; }
+          body {
+            font-family: "PingFang SC","Microsoft YaHei",sans-serif;
+            margin: 0;
+            color: #1f2937;
+            background: #fff;
+          }
+          .print-page {
+            page-break-after: always;
+            break-after: page;
+          }
+          .print-page:last-child {
+            page-break-after: auto;
+            break-after: auto;
+          }
           .header-table { border-collapse: collapse; width: 100%; margin-bottom: 12px; table-layout: fixed; }
           .header-table td { border: 1px solid #222; padding: 6px 8px; text-align: center; vertical-align: middle; }
-          .logo-cell img { max-width: 120px; max-height: 90px; object-fit: contain; }
+          .logo-cell img { max-width: 108px; max-height: 72px; object-fit: contain; }
           .title-cell { font-weight: 700; }
-          .zh-title { font-size: 34px; line-height: 1.15; }
-          .en-title { font-size: 18px; line-height: 1.2; margin-top: 4px; }
-          .label-cell { font-weight: 700; font-size: 14px; line-height: 1.5; }
-          .value-cell { font-size: 16px; font-weight: 600; line-height: 1.25; white-space: nowrap; word-break: keep-all; }
+          .zh-title { font-size: 20px; line-height: 1.2; }
+          .en-title { font-size: 13px; line-height: 1.2; margin-top: 2px; }
+          .label-cell { font-weight: 700; font-size: 13px; line-height: 1.35; }
+          .value-cell {
+            font-size: 15px;
+            font-weight: 600;
+            line-height: 1.25;
+            white-space: nowrap;
+            word-break: keep-all;
+            overflow-wrap: normal;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .value-cell-code { font-size: 13px; letter-spacing: 0; }
           .detail-table { border-collapse: collapse; width: 100%; table-layout: fixed; border: 1px solid #222; }
           .detail-table th, .detail-table td { border: 1px solid #222; padding: 8px 6px; font-size: 14px; vertical-align: middle; }
           .detail-table th { font-weight: 700; }
           .detail-table .center { text-align: center; }
-          .detail-table .head-zh { display: block; font-size: 16px; line-height: 1.2; }
+          .detail-table .head-zh { display: block; font-size: 14px; line-height: 1.2; }
           .detail-table .head-en { display: block; font-size: 12px; line-height: 1.2; margin-top: 2px; }
-          .detail-table .item-row td { height: 36px; }
+          .detail-table tbody tr td { height: 34px; }
+          .nowrap { white-space: nowrap; word-break: keep-all; overflow-wrap: normal; }
         </style>
       </head>
       <body>
-        ${header}
-        <table class="detail-table">
-          <colgroup>
-            <col style="width: 9%;" />
-            <col style="width: 29%;" />
-            <col style="width: 25%;" />
-            <col style="width: 25%;" />
-            <col style="width: 12%;" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th class="center"><span class="head-zh">序号</span><span class="head-en">No.</span></th>
-              <th class="center"><span class="head-zh">${printHeaders.value.checkItem || '检查项目'}</span><span class="head-en">Item</span></th>
-              <th class="center"><span class="head-zh">${printHeaders.value.standard || '标准要求（mm）'}</span><span class="head-en">Requirement</span></th>
-              <th class="center"><span class="head-zh">${printHeaders.value.measuredValue || '实测值（mm）'}</span><span class="head-en">Value</span></th>
-              <th class="center"><span class="head-zh">${printHeaders.value.remarks || '备注'}</span><span class="head-en">Remarks</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${bodyRows}
-            <tr>
-              <td colspan="2" class="center" style="font-weight:700;">
-                检验结论：<br/>Inspection Conclusion：
-              </td>
-              <td colspan="3" style="padding-left: 14px;">
-                □ 接受 Accepted&nbsp;&nbsp;□ 拒绝 Rejected
-              </td>
-            </tr>
-            <tr>
-              <td colspan="2" style="padding: 14px 16px; height: 56px;">
-                施工班组 Foreman：
-              </td>
-              <td colspan="2" style="padding: 14px 16px; height: 56px;">
-                质检员 Inspector：
-              </td>
-              <td style="padding: 14px 16px; height: 56px;">
-                日期 Date：${props.detail.inspectionDate || ''}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        ${paddedChunks
+          .map((chunk) => {
+            const bodyRows = chunk
+              .map(
+                (item) => `
+              <tr>
+                <td class="center">${item.index}</td>
+                ${
+                  item.showCheckItem
+                    ? `<td class="center" rowspan="${item.checkItemRowSpan}">${item.checkItem || ''}</td>`
+                    : ''
+                }
+                <td class="center">${item.standardValue || ''}</td>
+                <td class="center">${item.measuredValue || ''}</td>
+                <td class="center">${item.remarks || ''}</td>
+              </tr>
+            `,
+              )
+              .join('');
+
+            return `
+              <section class="print-page">
+                ${header}
+                <table class="detail-table">
+                  <colgroup>
+                    <col style="width: 9%;" />
+                    <col style="width: 29%;" />
+                    <col style="width: 25%;" />
+                    <col style="width: 25%;" />
+                    <col style="width: 12%;" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th class="center"><span class="head-zh">序号</span><span class="head-en">No.</span></th>
+                      <th class="center"><span class="head-zh">${printHeaders.value.checkItem || '检查项目'}</span><span class="head-en">Item</span></th>
+                      <th class="center"><span class="head-zh">${printHeaders.value.standard || '标准要求（mm）'}</span><span class="head-en">Requirement</span></th>
+                      <th class="center"><span class="head-zh">${printHeaders.value.measuredValue || '实测值（mm）'}</span><span class="head-en">Value</span></th>
+                      <th class="center"><span class="head-zh">${printHeaders.value.remarks || '备注'}</span><span class="head-en">Remarks</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${bodyRows}
+                    <tr>
+                      <td colspan="2" class="center" style="font-weight:700;">
+                        检验结论：<br/>Inspection Conclusion：
+                      </td>
+                      <td colspan="3" style="padding-left: 14px;">
+                        □ 接受 Accepted&nbsp;&nbsp;□ 拒绝 Rejected
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colspan="2" style="padding: 10px 16px; height: 56px;">
+                        <div>施工班组 Foreman：</div>
+                        <div style="height: 22px;"></div>
+                      </td>
+                      <td style="padding: 10px 16px; height: 56px;">
+                        <div>质检员 Inspector：</div>
+                        <div style="height: 22px;"></div>
+                      </td>
+                      <td colspan="2" class="nowrap" style="padding: 14px 16px; height: 56px;">
+                        日期 Date：${props.detail?.inspectionDate || '-'}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </section>
+            `;
+          })
+          .join('')}
       </body>
     </html>
   `;
@@ -320,10 +405,10 @@ function handlePrint() {
         <table class="w-full table-fixed border-collapse text-center">
           <colgroup>
             <col style="width: 10%" />
-            <col style="width: 22%" />
-            <col style="width: 22%" />
-            <col style="width: 23%" />
-            <col style="width: 23%" />
+            <col style="width: 20%" />
+            <col style="width: 24%" />
+            <col style="width: 21%" />
+            <col style="width: 25%" />
           </colgroup>
           <tbody>
             <tr>
@@ -331,72 +416,84 @@ function handlePrint() {
                 <img
                   src="/logo-tolian.png"
                   alt="TOLIAN"
-                  class="mx-auto max-h-[90px] max-w-[120px] object-contain"
+                  class="mx-auto max-h-[72px] max-w-[108px] object-contain"
                 />
               </td>
               <td class="border border-[#222] px-2 py-2" colspan="3">
-                <div class="text-[34px] font-bold leading-[1.15]">
+                <div class="text-[20px] font-bold leading-[1.2]">
                   {{ reportHeader.formTitle }}
                 </div>
-                <div class="mt-1 text-base font-semibold leading-tight">
+                <div class="mt-0.5 text-[13px] font-semibold leading-tight">
                   {{ reportHeader.englishTitle }}
                 </div>
               </td>
             </tr>
             <tr>
               <td
-                class="border border-[#222] px-2 py-2 font-semibold leading-6"
+                class="border border-[#222] px-2 py-2 text-[13px] font-semibold leading-5"
                 colspan="2"
               >
                 表单号及版本<br />Form No. &amp; Rev.
               </td>
-              <td class="border border-[#222] px-2 py-2 text-lg font-semibold">
+              <td
+                class="whitespace-nowrap break-keep border border-[#222] px-2 py-2 text-[13px] font-semibold"
+              >
                 {{ reportHeader.formNo }}
               </td>
               <td
-                class="border border-[#222] px-2 py-2 font-semibold leading-6"
+                class="border border-[#222] px-2 py-2 text-[13px] font-semibold leading-5"
               >
                 产品名称<br />Project
               </td>
-              <td class="border border-[#222] px-2 py-2 text-lg font-semibold">
+              <td
+                class="border border-[#222] px-2 py-2 text-[15px] font-semibold"
+              >
                 {{ reportHeader.projectName }}
               </td>
             </tr>
             <tr>
               <td
-                class="border border-[#222] px-2 py-2 font-semibold leading-6"
+                class="border border-[#222] px-2 py-2 text-[13px] font-semibold leading-5"
                 colspan="2"
               >
                 部件名称<br />Part Name
               </td>
-              <td class="border border-[#222] px-2 py-2 text-lg font-semibold">
+              <td
+                class="border border-[#222] px-2 py-2 text-[15px] font-semibold"
+              >
                 {{ reportHeader.partName }}
               </td>
               <td
-                class="border border-[#222] px-2 py-2 font-semibold leading-6"
+                class="border border-[#222] px-2 py-2 text-[13px] font-semibold leading-5"
               >
                 工单号<br />Project NO.
               </td>
-              <td class="border border-[#222] px-2 py-2 text-lg font-semibold">
+              <td
+                class="whitespace-nowrap break-keep border border-[#222] px-2 py-2 text-[13px] font-semibold"
+              >
                 {{ reportHeader.workOrderNumber }}
               </td>
             </tr>
             <tr>
               <td
-                class="border border-[#222] px-2 py-2 font-semibold leading-6"
+                class="border border-[#222] px-2 py-2 text-[13px] font-semibold leading-5"
                 colspan="2"
               >
                 图号<br />Drawing NO.
               </td>
-              <td class="border border-[#222] px-2 py-2 text-lg font-semibold">
+              <td
+                class="whitespace-nowrap break-keep border border-[#222] px-2 py-2 text-[15px] font-semibold"
+              >
                 {{ reportHeader.drawingNo }}
               </td>
               <td
-                class="border border-[#222] px-2 py-2 font-semibold leading-6"
+                class="border border-[#222] px-2 py-2 text-[13px] font-semibold leading-5"
               >
                 数量<br />Qty.
               </td>
-              <td class="border border-[#222] px-2 py-2 text-lg font-semibold">
+              <td
+                class="border border-[#222] px-2 py-2 text-[15px] font-semibold"
+              >
                 {{ reportHeader.quantity }}
               </td>
             </tr>
@@ -451,14 +548,18 @@ function handlePrint() {
           </thead>
           <tbody>
             <tr
-              v-for="row in printableRows"
+              v-for="row in previewRows"
               :key="row.id || row.index"
-              class="h-[52px]"
+              class="h-[42px]"
             >
               <td class="border border-[#222] px-2 text-center">
                 {{ row.index }}
               </td>
-              <td class="border border-[#222] px-2 text-center">
+              <td
+                v-if="row.showCheckItem"
+                class="border border-[#222] px-2 text-center align-middle"
+                :rowspan="row.checkItemRowSpan"
+              >
                 {{ row.checkItem || '' }}
               </td>
               <td class="border border-[#222] px-2 text-center">
@@ -484,19 +585,21 @@ function handlePrint() {
             </tr>
             <tr>
               <td
-                class="h-[56px] border border-[#222] px-4 py-3 text-base"
+                class="h-[52px] border border-[#222] px-4 py-2 text-base"
                 colspan="2"
               >
-                施工班组 Foreman：
+                <div>施工班组 Foreman：</div>
+                <div class="h-6"></div>
+              </td>
+              <td class="h-[52px] border border-[#222] px-4 py-2 text-base">
+                <div>质检员 Inspector：</div>
+                <div class="h-6"></div>
               </td>
               <td
-                class="h-[56px] border border-[#222] px-4 py-3 text-base"
+                class="h-[52px] whitespace-nowrap break-keep border border-[#222] px-4 py-3 text-base"
                 colspan="2"
               >
-                质检员 Inspector：
-              </td>
-              <td class="h-[56px] border border-[#222] px-4 py-3 text-base">
-                日期 Date：{{ detail.inspectionDate || '' }}
+                日期 Date：{{ detail.inspectionDate || '-' }}
               </td>
             </tr>
           </tbody>

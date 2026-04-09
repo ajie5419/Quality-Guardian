@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
+import { WelderScoreService } from '~/services/welder-score.service';
 import { logApiError } from '~/utils/api-logger';
 import {
   buildInspectionIssueCreateData,
@@ -61,6 +62,7 @@ export default defineEventHandler(async (event) => {
       targetId: String(newRecord.id),
       details: `新增检验问题: ${newRecord.partName} (${newRecord.nonConformanceNumber || '无编号'})`,
     });
+    await WelderScoreService.syncFromInspectionIssues();
 
     return useResponseSuccess({
       ...newRecord,

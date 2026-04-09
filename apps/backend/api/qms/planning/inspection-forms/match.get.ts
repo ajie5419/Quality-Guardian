@@ -89,10 +89,13 @@ export default defineEventHandler(async (event) => {
       processName,
       template: {
         attachments: template.attachments || '',
+        drawingNo: String(template.drawingNo || ''),
         formFields: parseInspectionFormFields(template.formFields),
         formName: template.formName,
+        formNo: String(template.formNo || ''),
         id: template.id,
         partName: String(template.partName || ''),
+        templateQuantity: template.templateQuantity ?? null,
         workOrderNumber: template.workOrderNumber,
       },
     });

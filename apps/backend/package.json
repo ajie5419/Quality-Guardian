@@ -20,6 +20,8 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:rbac-backfill": "node prisma/rbac-backfill.js",
+    "db:cleanup-legacy-itp-menu": "node prisma/cleanup-legacy-itp-menu.js",
+    "db:migrate-itp-to-forms": "node prisma/migrate-itp-to-inspection-forms.js",
     "db:inspection-quantity-backfill": "node prisma/inspection-quantity-backfill.js",
     "db:rbac:check": "node prisma/rbac-consistency-check.js",
     "db:studio": "prisma studio"

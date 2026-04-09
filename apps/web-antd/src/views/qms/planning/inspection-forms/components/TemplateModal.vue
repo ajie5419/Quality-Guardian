@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
 
+import type { SheetMerge, TemplateField } from './template-modal.utils';
+
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 
 import { useAccessStore } from '@vben/stores';
@@ -19,16 +21,17 @@ import {
 import { parseExcelWorkbookFromArrayBuffer } from '#/utils/excel-sheet';
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
 
+import {
+  autoBuildFormFieldsFromRows,
+  buildStandardizedSheetRows,
+  createDefaultSheetRows,
+  expandRowsByMerges,
+  inferFileNameFromAttachmentUrl,
+  isExcelLikeFile,
+  normalizeFields,
+  normalizeSheetRows,
+} from './template-modal.utils';
 import UniverEditor from './UniverEditor.vue';
-
-type TemplateField = {
-  acceptanceCriteria?: string;
-  checkItem?: string;
-  lowerTolerance?: number;
-  standardValue?: number;
-  unit?: string;
-  upperTolerance?: number;
-};
 
 type TemplatePayload = {
   attachments: string;
@@ -65,12 +68,6 @@ type UniverEditorRef = {
     rows: string[][];
     styles?: Array<Array<null | Record<string, unknown>>>;
   }) => Promise<void>;
-};
-type SheetMerge = {
-  endColumn: number;
-  endRow: number;
-  startColumn: number;
-  startRow: number;
 };
 
 const props = defineProps<{
@@ -152,6 +149,7 @@ const selectedSheetName = ref('');
 const spreadsheetDirty = ref(false);
 const uploadingEditedFile = ref(false);
 const initialFormSignature = ref('');
+const showAdvancedOptions = ref(false);
 const showRawSpreadsheetEditor = ref(false);
 
 const fieldTableColumns = [
@@ -172,56 +170,6 @@ const fieldTableData = computed(() =>
 const modalConfirmLoading = computed(
   () => props.saving || uploadingEditedFile.value,
 );
-
-function createDefaultSheetRows() {
-  return [
-    ['检验项', '判定标准', '标准值', '上偏差', '下偏差', '单位'],
-    ['', '', '', '', '', ''],
-  ];
-}
-
-function normalizeFields(fields: TemplateField[]) {
-  return fields
-    .map((field) => ({
-      acceptanceCriteria: String(field.acceptanceCriteria || '').trim(),
-      checkItem: String(field.checkItem || '').trim(),
-      lowerTolerance:
-        field.lowerTolerance === undefined
-          ? undefined
-          : Number(field.lowerTolerance),
-      standardValue:
-        field.standardValue === undefined
-          ? undefined
-          : Number(field.standardValue),
-      unit: String(field.unit || '').trim(),
-      upperTolerance:
-        field.upperTolerance === undefined
-          ? undefined
-          : Number(field.upperTolerance),
-    }))
-    .filter((field) => field.checkItem);
-}
-
-function cleanBilingualCellText(value: unknown) {
-  const raw = String(value || '')
-    .replaceAll('\u00A0', ' ')
-    .replaceAll('\u3000', ' ')
-    .replaceAll(/\s+/g, ' ')
-    .trim();
-
-  if (!raw) return '';
-
-  // 中英文/数字相邻时补空格，提升可读性
-  return raw
-    .replaceAll(/([\u4E00-\u9FFF])([A-Z0-9])/gi, '$1 $2')
-    .replaceAll(/([A-Z0-9])([\u4E00-\u9FFF])/gi, '$1 $2')
-    .replaceAll(/\s+/g, ' ')
-    .trim();
-}
-
-function normalizeSheetRows(rawRows: (number | string)[][]) {
-  return rawRows.map((row) => row.map((cell) => cleanBilingualCellText(cell)));
-}
 
 function applySheetDataToEditor(
   rows: string[][],
@@ -279,28 +227,6 @@ function syncCurrentSheetSnapshot() {
     rows: sheetData.rows,
     styles: sheetData.styles as Array<Array<null | Record<string, unknown>>>,
   };
-}
-
-function isExcelLikeFile(fileName: string) {
-  const lower = fileName.toLowerCase();
-  return (
-    lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv')
-  );
-}
-
-function inferFileNameFromAttachmentUrl(url: string) {
-  const clean =
-    String(url || '')
-      .split('?')[0]
-      ?.split('#')[0] || '';
-  const segment = clean.split('/').pop() || '';
-  if (!segment) return '';
-
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return segment;
-  }
 }
 
 async function loadSpreadsheetFromFile(file: File) {
@@ -361,6 +287,7 @@ async function loadSpreadsheetFromFile(file: File) {
     } else {
       message.success('Excel 已加载，可直接在线编辑单元格');
     }
+    showRawSpreadsheetEditor.value = true;
 
     const mergedRows: string[][] = [];
     for (const sheet of Object.values(nextMap)) {
@@ -455,353 +382,6 @@ async function uploadFileToServer(file: File) {
   }
 
   return data.data.url;
-}
-
-function parseNumber(value: string): number | undefined {
-  const raw = String(value || '').trim();
-  if (!raw) return undefined;
-  const num = Number(raw);
-  return Number.isNaN(num) ? undefined : num;
-}
-
-function normalizeHeaderKey(value: string) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replaceAll(/[\s_/()（）【】:：-]/g, '');
-}
-
-function expandRowsByMerges(rows: string[][], merges: SheetMerge[]) {
-  if (rows.length === 0 || merges.length === 0) return rows;
-
-  const maxRow = Math.max(
-    rows.length - 1,
-    ...merges.map((merge) => merge.endRow),
-  );
-  const maxCol = Math.max(
-    0,
-    ...rows.map((row) => row.length - 1),
-    ...merges.map((merge) => merge.endColumn),
-  );
-
-  const matrix = Array.from({ length: maxRow + 1 }).map((_, rowIndex) =>
-    Array.from({ length: maxCol + 1 }).map((_, colIndex) =>
-      String(rows[rowIndex]?.[colIndex] || ''),
-    ),
-  );
-
-  for (const merge of merges) {
-    const anchor = matrix[merge.startRow]?.[merge.startColumn] || '';
-    for (let row = merge.startRow; row <= merge.endRow; row++) {
-      const rowCells = matrix[row];
-      if (!rowCells) continue;
-      for (let col = merge.startColumn; col <= merge.endColumn; col++) {
-        if (!rowCells[col]) {
-          rowCells[col] = anchor;
-        }
-      }
-    }
-  }
-
-  return matrix;
-}
-
-function autoBuildFormFieldsFromRows(rows: string[][]) {
-  if (rows.length === 0) return [];
-
-  const dimensionFields = parseDimensionInspectionFields(rows);
-  if (dimensionFields.length > 0) return dimensionFields;
-
-  const weldFields = parseWeldInspectionFields(rows);
-  if (weldFields.length > 0) return weldFields;
-
-  const fallbackFields = parseSimpleFixedColumns(rows);
-  if (fallbackFields.length > 0) return fallbackFields;
-
-  return parseBilingualInspectionFields(rows);
-}
-
-function parseSimpleFixedColumns(rows: string[][]) {
-  const headerRow = new Set(
-    (rows[0] || []).map((cell) => normalizeHeaderKey(cell)),
-  );
-  const hasHeader =
-    headerRow.has(normalizeHeaderKey('检验项')) ||
-    headerRow.has(normalizeHeaderKey('判定标准')) ||
-    headerRow.has(normalizeHeaderKey('标准值')) ||
-    headerRow.has(normalizeHeaderKey('上偏差')) ||
-    headerRow.has(normalizeHeaderKey('下偏差')) ||
-    headerRow.has(normalizeHeaderKey('单位'));
-  const startRow = hasHeader ? 1 : 0;
-
-  const fields: TemplateField[] = [];
-  for (const row of rows.slice(startRow)) {
-    const checkItem = String(row[0] || '').trim();
-    if (!checkItem) continue;
-
-    fields.push({
-      acceptanceCriteria: String(row[1] || '').trim(),
-      checkItem,
-      lowerTolerance: parseNumber(row[4] || ''),
-      standardValue: parseNumber(row[2] || ''),
-      unit: String(row[5] || '').trim(),
-      upperTolerance: parseNumber(row[3] || ''),
-    });
-  }
-
-  return normalizeFields(fields);
-}
-
-function parseRequirementText(requirementText: string) {
-  const text = String(requirementText || '').replaceAll(/\s+/g, '');
-  let standardValue: number | undefined;
-  let upperTolerance: number | undefined;
-  let lowerTolerance: number | undefined;
-
-  const plusMinusMatch = text.match(/^(-?\d+(?:\.\d+)?)±(\d+(?:\.\d+)?)$/);
-  if (plusMinusMatch) {
-    standardValue = parseNumber(plusMinusMatch[1] || '');
-    upperTolerance = parseNumber(plusMinusMatch[2] || '');
-    lowerTolerance = parseNumber(plusMinusMatch[2] || '');
-    return { lowerTolerance, standardValue, upperTolerance };
-  }
-
-  const lteMatch = text.match(/^≤(-?\d+(?:\.\d+)?)$/);
-  if (lteMatch) {
-    standardValue = parseNumber(lteMatch[1] || '');
-    return { lowerTolerance, standardValue, upperTolerance };
-  }
-
-  const gteMatch = text.match(/^≥(-?\d+(?:\.\d+)?)$/);
-  if (gteMatch) {
-    standardValue = parseNumber(gteMatch[1] || '');
-    return { lowerTolerance, standardValue, upperTolerance };
-  }
-
-  return { lowerTolerance, standardValue, upperTolerance };
-}
-
-function isConclusionRow(row: string[]) {
-  const merged = row
-    .map((cell) => String(cell || ''))
-    .join(' ')
-    .replaceAll(/\s+/g, '')
-    .toLowerCase();
-  return merged.includes('检验结论') || merged.includes('inspectionconclusion');
-}
-
-function parseDimensionInspectionFields(rows: string[][]) {
-  const norm = (value: unknown) =>
-    String(value || '')
-      .replaceAll(/\s+/g, '')
-      .toLowerCase();
-  const includeAny = (text: string, keys: string[]) =>
-    keys.some((key) => text.includes(norm(key)));
-
-  const headerRowIndex = rows.findIndex((row) => {
-    const merged = row.map((cell) => norm(cell)).join('|');
-    const hasNo = includeAny(merged, ['序号', 'no']);
-    const hasItem = includeAny(merged, ['检验项目', 'item']);
-    const hasRequirement = includeAny(merged, ['标准要求', 'requirement']);
-    const hasActual = includeAny(merged, ['实测值', 'value']);
-    return hasNo && hasItem && hasRequirement && hasActual;
-  });
-
-  if (headerRowIndex === -1) return [];
-
-  const headerRow = rows[headerRowIndex] || [];
-  const findCol = (aliases: string[]) =>
-    headerRow.findIndex((cell) => includeAny(norm(cell), aliases));
-
-  const noCol = findCol(['序号', 'no']);
-  const itemCol = findCol(['检验项目', 'item']);
-  const requirementCol = findCol(['标准要求', 'requirement']);
-  const actualCol = findCol(['实测值', 'value']);
-
-  if (noCol < 0 || itemCol < 0 || requirementCol < 0 || actualCol < 0) {
-    return [];
-  }
-
-  const parsed: TemplateField[] = [];
-  for (const row of rows.slice(headerRowIndex + 1)) {
-    if (isConclusionRow(row)) break;
-
-    const noText = String(row[noCol] || '').trim();
-    if (!/^\d+$/.test(noText)) continue;
-
-    const itemText = String(row[itemCol] || '').trim();
-    const requirementText = String(row[requirementCol] || '').trim();
-    const actualText = String(row[actualCol] || '').trim();
-    if (!itemText && !requirementText && !actualText) continue;
-
-    const { lowerTolerance, standardValue, upperTolerance } =
-      parseRequirementText(requirementText);
-    parsed.push({
-      acceptanceCriteria: requirementText || actualText,
-      checkItem: itemText || `尺寸检验-${noText}`,
-      lowerTolerance,
-      standardValue,
-      unit:
-        requirementText.includes('mm') || actualText.includes('mm') ? 'mm' : '',
-      upperTolerance,
-    });
-  }
-
-  return normalizeFields(parsed);
-}
-
-function parseWeldInspectionFields(rows: string[][]) {
-  const norm = (value: unknown) =>
-    String(value || '')
-      .replaceAll(/\s+/g, '')
-      .toLowerCase();
-  const includeAny = (text: string, keys: string[]) =>
-    keys.some((key) => text.includes(norm(key)));
-
-  const headerRowIndex = rows.findIndex((row) => {
-    const merged = row.map((cell) => norm(cell)).join('|');
-    const hasItem = includeAny(merged, ['项目', 'item']);
-    const hasRequirement = includeAny(merged, ['标准要求', 'requirement']);
-    const hasActual = includeAny(merged, ['实测值', 'value']);
-    const hasResult = includeAny(merged, ['判定', 'result']);
-    return hasItem && hasRequirement && hasActual && hasResult;
-  });
-
-  if (headerRowIndex === -1) return [];
-
-  const headerRow = rows[headerRowIndex] || [];
-  const findCol = (aliases: string[]) =>
-    headerRow.findIndex((cell) => includeAny(norm(cell), aliases));
-
-  const itemCol = findCol(['项目', 'item']);
-  const requirementCol = findCol(['标准要求', 'requirement']);
-  const actualCol = findCol(['实测值', 'value']);
-  const resultCol = findCol(['判定', 'result']);
-
-  if (itemCol < 0 || requirementCol < 0 || actualCol < 0 || resultCol < 0) {
-    return [];
-  }
-
-  const parsed: TemplateField[] = [];
-  let currentGroup = '';
-
-  for (const row of rows.slice(headerRowIndex + 1)) {
-    if (isConclusionRow(row)) break;
-
-    const itemText = String(row[itemCol] || '').trim();
-    const requirementText = String(row[requirementCol] || '').trim();
-    const actualText = String(row[actualCol] || '').trim();
-    const resultText = String(row[resultCol] || '').trim();
-    if (!itemText && !requirementText && !actualText && !resultText) continue;
-
-    if (itemText && !requirementText && !actualText && !resultText) {
-      currentGroup = itemText;
-      continue;
-    }
-
-    const { lowerTolerance, standardValue, upperTolerance } =
-      parseRequirementText(requirementText);
-    parsed.push({
-      acceptanceCriteria: requirementText || resultText || actualText,
-      checkItem: currentGroup ? `${currentGroup} - ${itemText}` : itemText,
-      lowerTolerance,
-      standardValue,
-      unit:
-        requirementText.includes('mm') || actualText.includes('mm') ? 'mm' : '',
-      upperTolerance,
-    });
-  }
-
-  return normalizeFields(parsed);
-}
-
-function parseBilingualInspectionFields(rows: string[][]) {
-  const norm = (value: unknown) =>
-    String(value || '')
-      .replaceAll(/\s+/g, '')
-      .toLowerCase();
-
-  const includeAny = (text: string, keys: string[]) =>
-    keys.some((key) => text.includes(norm(key)));
-
-  const headerRowIndex = rows.findIndex((row) => {
-    const merged = row.map((cell) => norm(cell)).join('|');
-    const hasItem = includeAny(merged, ['检验项目', 'item']);
-    const hasRequirement = includeAny(merged, ['标准要求', 'requirement']);
-    const hasActual = includeAny(merged, ['实测值', 'actual', 'actualvalue']);
-    return hasItem && hasRequirement && hasActual;
-  });
-
-  if (headerRowIndex === -1) return [];
-
-  const headerRow = rows[headerRowIndex] || [];
-  const findCol = (aliases: string[]) =>
-    headerRow.findIndex((cell) => includeAny(norm(cell), aliases));
-
-  // 该类模板常见布局：A序号 B/C检验项目 D标准要求 E/F实测值 G备注
-  const itemCol =
-    findCol(['检验项目', 'item']) >= 0 ? findCol(['检验项目', 'item']) : 1;
-  const requirementCol =
-    findCol(['标准要求', 'requirement']) >= 0
-      ? findCol(['标准要求', 'requirement'])
-      : 3;
-  const actualCol =
-    findCol(['实测值', 'actual', 'actualvalue']) >= 0
-      ? findCol(['实测值', 'actual', 'actualvalue'])
-      : 4;
-  const remarkCol = findCol(['备注', 'remark']);
-
-  const parsed: TemplateField[] = [];
-
-  for (const row of rows.slice(headerRowIndex + 1)) {
-    const rawItemText = String(row[itemCol] || row[itemCol + 1] || '').trim();
-    const requirementText = String(row[requirementCol] || '').trim();
-    const actualText = String(
-      row[actualCol] || row[actualCol + 1] || '',
-    ).trim();
-    const remarkText =
-      remarkCol >= 0 ? String(row[remarkCol] || '').trim() : '';
-
-    // 空行跳过
-    if (!rawItemText && !requirementText && !actualText && !remarkText)
-      continue;
-
-    let itemText = rawItemText;
-    // 中英尺寸检验表里常见“检验项目列=序号”，这里自动生成可用检验项名
-    if (!itemText && /^\d+(?:\.\d+)?$/.test(String(row[0] || '').trim())) {
-      itemText = `尺寸检验-${String(row[0] || '').trim()}`;
-    } else if (/^\d+(?:\.\d+)?$/.test(itemText)) {
-      itemText = `尺寸检验-${itemText}`;
-    }
-    if (!itemText) continue;
-
-    const requirementMatch = requirementText.match(
-      /^(-?\d+(?:\.\d+)?)\s*[±+-]\s*(\d+(?:\.\d+)?)$/,
-    );
-
-    let standardValue: number | undefined;
-    let upperTolerance: number | undefined;
-    let lowerTolerance: number | undefined;
-    if (requirementMatch) {
-      standardValue = parseNumber(requirementMatch[1] || '');
-      upperTolerance = parseNumber(requirementMatch[2] || '');
-      lowerTolerance = parseNumber(requirementMatch[2] || '');
-    }
-
-    parsed.push({
-      checkItem: itemText,
-      acceptanceCriteria: requirementText || actualText || remarkText,
-      standardValue,
-      upperTolerance,
-      lowerTolerance,
-      unit:
-        includeAny(requirementText, ['mm']) || includeAny(actualText, ['mm'])
-          ? 'mm'
-          : '',
-    });
-  }
-
-  return normalizeFields(parsed);
 }
 
 function getEditorSheetData() {
@@ -936,37 +516,6 @@ async function saveEditedSpreadsheetAndOverwriteAttachment() {
   } finally {
     uploadingEditedFile.value = false;
   }
-}
-
-function buildStandardizedSheetRows(fields: TemplateField[]) {
-  const rows: string[][] = [
-    ['序号', '检验项目', '标准要求', '实测值', '判定', '备注'],
-  ];
-
-  const normalized = fields
-    .map((field) => {
-      const checkItem = String(field.checkItem || '').trim();
-      const criteria = String(field.acceptanceCriteria || '').trim();
-      const requirement = criteria;
-      return {
-        checkItem,
-        requirement,
-      };
-    })
-    .filter((item) => item.checkItem && item.requirement);
-
-  normalized.forEach((field, index) => {
-    rows.push([
-      String(index + 1),
-      field.checkItem,
-      field.requirement,
-      '',
-      '',
-      '',
-    ]);
-  });
-
-  return rows;
 }
 
 async function saveStandardizedSpreadsheetAndOverwriteAttachment() {
@@ -1211,6 +760,22 @@ function handleSheetChange(value: unknown) {
   applySheetByName(sheetName);
 }
 
+async function reloadVisibleEditorBySnapshot() {
+  await nextTick();
+  const currentSheet = selectedSheetName.value
+    ? sheetDataByName.value[selectedSheetName.value]
+    : undefined;
+  await editorRef.value?.loadSheetData({
+    columnWidths: currentSheet?.columnWidths || spreadsheetColumnWidths.value,
+    merges: currentSheet?.merges || spreadsheetMerges.value,
+    rowHeights: currentSheet?.rowHeights || spreadsheetRowHeights.value,
+    rows: currentSheet?.rows || spreadsheetRows.value,
+    styles: (currentSheet?.styles || spreadsheetStyles.value) as Array<
+      Array<null | Record<string, unknown>>
+    >,
+  });
+}
+
 function handleWorkOrderChange(
   val: string | undefined,
   option: { item?: { projectName?: string } },
@@ -1294,6 +859,11 @@ watch(
   },
   { immediate: true },
 );
+
+watch(showRawSpreadsheetEditor, (visible) => {
+  if (!visible) return;
+  void reloadVisibleEditorBySnapshot();
+});
 </script>
 
 <template>
@@ -1356,13 +926,6 @@ watch(
           ]"
         />
       </div>
-      <div>
-        <div class="mb-1 text-gray-700">附件链接</div>
-        <Input
-          v-model:value="formState.attachments"
-          placeholder="上传并保存后自动覆盖为新附件地址"
-        />
-      </div>
     </div>
 
     <div class="mt-3 flex flex-wrap items-center gap-2">
@@ -1376,17 +939,13 @@ watch(
       >
         <Button>上传 Excel</Button>
       </Upload>
-      <Button
-        :loading="uploadingEditedFile"
-        type="primary"
-        @click="handleSaveEditedAttachment"
-      >
-        转标准表并覆盖附件
-      </Button>
+      <Button @click="addFormFieldRow">新增检验项</Button>
       <Button @click="showRawSpreadsheetEditor = !showRawSpreadsheetEditor">
         {{ showRawSpreadsheetEditor ? '隐藏原始表格' : '查看原始表格' }}
       </Button>
-      <Button @click="addFormFieldRow">新增检验项</Button>
+      <Button @click="showAdvancedOptions = !showAdvancedOptions">
+        {{ showAdvancedOptions ? '收起高级选项' : '高级选项' }}
+      </Button>
       <span class="text-xs text-gray-500">
         当前文件：{{ spreadsheetFileName }}
         <template v-if="spreadsheetDirty">（有未保存修改）</template>
@@ -1399,6 +958,28 @@ watch(
         placeholder="选择 Excel 分页"
         @change="handleSheetChange"
       />
+    </div>
+
+    <div
+      v-if="showAdvancedOptions"
+      class="mt-3 rounded border border-gray-200 bg-gray-50 p-3"
+    >
+      <div class="mb-2 text-xs text-gray-500">
+        附件链接由系统自动维护，通常无需手动处理。
+      </div>
+      <Input
+        v-model:value="formState.attachments"
+        class="mb-2"
+        placeholder="上传并保存后自动覆盖为新附件地址"
+      />
+      <div class="flex flex-wrap gap-2">
+        <Button
+          :loading="uploadingEditedFile"
+          @click="handleSaveEditedAttachment"
+        >
+          转标准表并覆盖附件
+        </Button>
+      </div>
     </div>
 
     <div class="mt-3 rounded border border-gray-200 p-2">

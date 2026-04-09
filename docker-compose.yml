@@ -1,6 +1,6 @@
 services:
   backend:
-    image: 
+    image:
     container_name: qms-backend
     env_file:
       - .env.production
@@ -35,7 +35,7 @@ services:
         max-file: '3'
 
   frontend:
-    image: 
+    image:
     container_name: qms-frontend
     ports:
       - '80:80'
