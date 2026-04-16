@@ -62,18 +62,27 @@ export async function getQualityLossTrend(
  * Get vehicle failure rate data
  * @param params
  * @param params.month
- * @param params.model
- * @param params.range
  */
-export async function getVehicleFailureRate(params?: {
-  model?: string;
-  month?: string;
-  range?: string;
-}) {
+export async function getVehicleFailureRate(params?: { month?: string }) {
   return requestClient.get<VehicleFailureResponse>(
     QMS_API.VEHICLE_FAILURE_RATE,
     { params },
   );
+}
+
+/**
+ * Save manual last-year vehicle feedback data
+ */
+export async function setVehicleFailureManualData(data: {
+  count: number;
+  month: string;
+}) {
+  return requestClient.post<{
+    count: number;
+    month: string;
+    success: boolean;
+    updatedBy?: string;
+  }>(QMS_API.VEHICLE_FAILURE_RATE_MANUAL, data);
 }
 
 export namespace QmsDashboardApi {

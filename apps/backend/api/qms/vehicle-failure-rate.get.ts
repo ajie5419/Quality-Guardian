@@ -3,46 +3,50 @@ import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseSuccess } from '~/utils/response';
 
-interface FaultRateWindow {
-  end: Date;
-  label: string;
-  start: Date;
-}
+const VEHICLE_PRODUCT_TYPE = '车辆产品';
+const MANUAL_SETTING_KEY = 'QMS_VEHICLE_FAILURE_LAST_YEAR_MANUAL';
 
-interface FaultSummary {
-  failedVehicles: number;
-  rate: number;
-  totalVehicles: number;
+interface MonthWindow {
+  currentEnd: Date;
+  currentLabel: string;
+  currentStart: Date;
+  lastYearEnd: Date;
+  lastYearLabel: string;
+  lastYearStart: Date;
 }
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
-  const modelFilter = normalizeModelFilter(query.model);
   const endMonth = parseEndMonth(query.month);
 
   try {
-    const windows = getYearToDateWindows(endMonth);
+    const windows = getMonthWindows(endMonth);
+    const manualData = await getManualData();
 
     const trend = await Promise.all(
       windows.map(async (window) => {
-        const summary = await buildFaultSummary(window, modelFilter);
+        const [currentYear, lastYear] = await Promise.all([
+          countVehicleFeedback(window.currentStart, window.currentEnd),
+          countVehicleFeedback(window.lastYearStart, window.lastYearEnd),
+        ]);
+        const manualValue = manualData[window.lastYearLabel];
 
         return {
-          failedVehicles: summary.failedVehicles,
-          period: window.label,
-          rate: summary.rate,
-          totalVehicles: summary.totalVehicles,
+          currentYear,
+          lastYear,
+          lastYearManual:
+            typeof manualValue === 'number' && Number.isFinite(manualValue)
+              ? manualValue
+              : null,
+          period: window.currentLabel,
         };
       }),
     );
 
-    const rankingWindow = {
-      end: windows.at(-1)?.end ?? new Date(),
-      label: 'ranking',
-      start: windows[0]?.start ?? new Date(),
-    };
-
-    const ranking = await buildRanking(rankingWindow);
+    const rankingWindow = windows.at(-1);
+    const ranking = rankingWindow
+      ? await buildRanking(windows[0].currentStart, rankingWindow.currentEnd)
+      : [];
 
     return useResponseSuccess({
       ranking,
@@ -57,191 +61,93 @@ export default defineEventHandler(async (event) => {
   }
 });
 
-async function buildFaultSummary(
-  window: FaultRateWindow,
-  modelFilter: null | string,
-): Promise<FaultSummary> {
-  const shippedVehicles = await prisma.work_orders.findMany({
-    select: {
-      workOrderNumber: true,
-    },
-    where: {
-      deliveryDate: { gte: window.start, lte: window.end },
-      isDeleted: false,
-      projectName: buildVehicleProjectNameFilter(modelFilter),
-      status: 'COMPLETED',
-    },
-  });
-
-  const shippedVehicleIds = [
-    ...new Set(shippedVehicles.map((item) => item.workOrderNumber)),
-  ];
-  if (shippedVehicleIds.length === 0) {
-    return {
-      failedVehicles: 0,
-      rate: 0,
-      totalVehicles: 0,
-    };
-  }
-
-  const failedVehicles = await prisma.after_sales.groupBy({
-    by: ['workOrderNumber'],
+async function countVehicleFeedback(start: Date, end: Date): Promise<number> {
+  return prisma.after_sales.count({
     where: {
       isDeleted: false,
-      occurDate: { lte: window.end },
-      projectName: buildVehicleProjectNameFilter(modelFilter),
-      workOrderNumber: {
-        in: shippedVehicleIds,
-      },
+      occurDate: { gte: start, lte: end },
+      productType: VEHICLE_PRODUCT_TYPE,
     },
   });
-
-  const totalVehicles = shippedVehicleIds.length;
-  const failedVehicleCount = failedVehicles.length;
-  const rate =
-    totalVehicles > 0
-      ? Number(((failedVehicleCount / totalVehicles) * 100).toFixed(2))
-      : 0;
-
-  return {
-    failedVehicles: failedVehicleCount,
-    rate,
-    totalVehicles,
-  };
 }
 
-async function buildRanking(window: FaultRateWindow) {
-  const shippedVehicles = await prisma.work_orders.findMany({
+async function buildRanking(start: Date, end: Date) {
+  const records = await prisma.after_sales.findMany({
     select: {
-      projectName: true,
-      workOrderNumber: true,
+      defectType: true,
     },
     where: {
-      deliveryDate: { gte: window.start, lte: window.end },
       isDeleted: false,
-      projectName: buildVehicleProjectNameFilter(),
-      status: 'COMPLETED',
+      occurDate: { gte: start, lte: end },
+      productType: VEHICLE_PRODUCT_TYPE,
     },
   });
 
-  const modelToVehicles = new Map<string, Set<string>>();
-  for (const item of shippedVehicles) {
-    const model = normalizeModelName(item.projectName);
-    if (!model) {
-      continue;
-    }
+  const total = records.length;
+  const counts = new Map<string, number>();
 
-    if (!modelToVehicles.has(model)) {
-      modelToVehicles.set(model, new Set());
-    }
-    modelToVehicles.get(model)?.add(item.workOrderNumber);
+  for (const record of records) {
+    const defectType = record.defectType?.trim() || '未分类';
+    counts.set(defectType, (counts.get(defectType) || 0) + 1);
   }
 
-  const allVehicleIds = [
-    ...new Set(shippedVehicles.map((item) => item.workOrderNumber)),
-  ];
-  const faultGroups =
-    allVehicleIds.length > 0
-      ? await prisma.after_sales.groupBy({
-          by: ['projectName', 'workOrderNumber'],
-          where: {
-            isDeleted: false,
-            occurDate: { lte: window.end },
-            projectName: buildVehicleProjectNameFilter(),
-            workOrderNumber: {
-              in: allVehicleIds,
-            },
-          },
-        })
-      : [];
-
-  const failedVehiclesByModel = new Map<string, Set<string>>();
-  for (const group of faultGroups) {
-    const model = normalizeModelName(group.projectName);
-    if (!model) {
-      continue;
-    }
-    if (!failedVehiclesByModel.has(model)) {
-      failedVehiclesByModel.set(model, new Set());
-    }
-    failedVehiclesByModel.get(model)?.add(group.workOrderNumber);
-  }
-
-  return [...modelToVehicles.entries()]
-    .map(([model, vehicles]) => {
-      const totalVehicles = vehicles.size;
-      const failedVehicles = failedVehiclesByModel.get(model)?.size || 0;
-      const rate =
-        totalVehicles > 0
-          ? Number(((failedVehicles / totalVehicles) * 100).toFixed(2))
-          : 0;
-
-      return {
-        failedVehicles,
-        model,
-        rate,
-        totalVehicles,
-      };
-    })
-    .filter((item) => {
-      return Boolean(item.model) && item.totalVehicles > 0;
-    })
-    .sort((a, b) => b.rate - a.rate)
+  return [...counts.entries()]
+    .map(([defectType, count]) => ({
+      count,
+      defectType,
+      percentage: total > 0 ? Number(((count / total) * 100).toFixed(1)) : 0,
+    }))
+    .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 }
 
-function getYearToDateWindows(endMonth: Date): FaultRateWindow[] {
-  const windows: FaultRateWindow[] = [];
+async function getManualData(): Promise<Record<string, number>> {
+  const setting = await prisma.system_settings.findUnique({
+    where: { key: MANUAL_SETTING_KEY },
+  });
+
+  if (!setting?.value) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(setting.value) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .map(([month, count]) => [month, Number(count)] as const)
+        .filter(([, count]) => Number.isFinite(count)),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function getMonthWindows(endMonth: Date): MonthWindow[] {
+  const windows: MonthWindow[] = [];
+  const year = endMonth.getFullYear();
   const endMonthIndex = endMonth.getMonth();
 
   for (let monthIndex = 0; monthIndex <= endMonthIndex; monthIndex += 1) {
-    const start = new Date(endMonth.getFullYear(), 0, 1);
-    const end = new Date(
-      endMonth.getFullYear(),
-      monthIndex + 1,
-      0,
-      23,
-      59,
-      59,
-      999,
-    );
+    const currentStart = new Date(year, monthIndex, 1);
+    const currentEnd = new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
+    const lastYearStart = new Date(year - 1, monthIndex, 1);
+    const lastYearEnd = new Date(year - 1, monthIndex + 1, 0, 23, 59, 59, 999);
 
     windows.push({
-      end,
-      label: `${endMonth.getFullYear()}-${String(monthIndex + 1).padStart(2, '0')}`,
-      start,
+      currentEnd,
+      currentLabel: formatMonth(year, monthIndex),
+      currentStart,
+      lastYearEnd,
+      lastYearLabel: formatMonth(year - 1, monthIndex),
+      lastYearStart,
     });
   }
 
   return windows;
 }
 
-function normalizeModelFilter(value: unknown): null | string {
-  const normalized = normalizeModelName(value);
-  return normalized || null;
-}
-
-function normalizeModelName(value: unknown): null | string {
-  const normalized = String(value ?? '').trim();
-  return normalized || null;
-}
-
-function buildVehicleProjectNameFilter(modelFilter?: null | string) {
-  if (modelFilter) {
-    if (!modelFilter.includes('车')) {
-      return {
-        equals: '__QMS_VEHICLE_PROJECT_FILTER_NONE__',
-      };
-    }
-
-    return {
-      equals: modelFilter,
-    };
-  }
-
-  return {
-    contains: '车',
-  };
+function formatMonth(year: number, monthIndex: number) {
+  return `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
 }
 
 function parseEndMonth(month: unknown): Date {

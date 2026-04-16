@@ -58,14 +58,34 @@ function generateChartOption(
     rotate: data.length > 5 ? 30 : 0,
     color: '#6b7280',
     formatter: (value: string) => {
-      // 超过 6 个字符截断，防止 X 轴标签过长导致显示不全
-      return value.length > 6 ? `${value.slice(0, 6)}...` : value;
+      // 超过 10 个字符截断，防止 X 轴标签过长导致显示不全
+      return value.length > 10 ? `${value.slice(0, 10)}...` : value;
     },
+  };
+
+  const formatCategoryTooltip = (params: any) => {
+    const items = Array.isArray(params) ? params : [params];
+    const first = items[0] || {};
+    const category =
+      first.axisValueLabel || first.axisValue || first.name || '';
+    const lines = category ? [String(category)] : [];
+
+    for (const item of items) {
+      const marker = item.marker || '';
+      const name = item.seriesName || metricLabel;
+      const value = Array.isArray(item.value)
+        ? item.value[item.value.length - 1]
+        : item.value;
+      lines.push(`${marker}${name}: ${value}`);
+    }
+
+    return lines.join('<br/>');
   };
 
   const commonTooltip = {
     trigger: 'axis',
     axisPointer: { type: 'line' },
+    formatter: formatCategoryTooltip,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderColor: '#e5e7eb',
     borderWidth: 1,

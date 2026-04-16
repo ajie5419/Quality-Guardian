@@ -105,20 +105,19 @@ export interface QualityLossTrendResponse {
  * Vehicle Ranking Item
  */
 export interface VehicleRankingItem {
-  failedVehicles: number;
-  model: string;
-  rate: number;
-  totalVehicles: number;
+  count: number;
+  defectType: string;
+  percentage: number;
 }
 
 /**
  * Vehicle Trend Item
  */
 export interface VehicleTrendItem {
-  failedVehicles: number;
+  currentYear: number;
+  lastYear: number;
+  lastYearManual: null | number;
   period: string;
-  rate: number;
-  totalVehicles: number;
 }
 
 /**
@@ -126,10 +125,9 @@ export interface VehicleTrendItem {
  */
 export interface VehicleFailureItem {
   category?: string; // Failure Category
-  failedVehicles: number; // Failed Vehicles
-  failureRate: number; // Failure Rate
-  model: string; // Model
-  totalVehicles: number; // Total Vehicles
+  count: number; // Feedback Count
+  defectType: string; // Defect Type
+  percentage: number; // Percentage
 }
 
 /**
@@ -137,7 +135,7 @@ export interface VehicleFailureItem {
  */
 export interface VehicleFailureResponse {
   data?: VehicleFailureItem[];
-  range: string;
+  range?: string;
   ranking?: VehicleRankingItem[];
   trend?: VehicleTrendItem[];
 }
