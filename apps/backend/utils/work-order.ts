@@ -41,6 +41,12 @@ export function parseOptionalDate(value: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+export function addYearsToDate(date: Date, years = 1): Date {
+  const result = new Date(date);
+  result.setFullYear(result.getFullYear() + years);
+  return result;
+}
+
 function normalizeQueryText(value: unknown): string | undefined {
   const normalized = String(value ?? '').trim();
   return normalized || undefined;
@@ -68,7 +74,11 @@ export function parseWorkOrderListQuery(query: Record<string, unknown>) {
   return {
     page: parsePositiveInt(query.page, 1),
     pageSize: parsePositiveInt(query.pageSize, 20),
+    granularity: normalizeQueryText(query.granularity),
+    startDate: normalizeQueryText(query.startDate),
+    endDate: normalizeQueryText(query.endDate),
     year: query.year ? Number(query.year) : undefined,
+    productName: normalizeQueryText(query.productName),
     projectName: normalizeQueryText(query.projectName),
     status: normalizeQueryText(query.status),
     workOrderNumber: normalizeQueryText(query.workOrderNumber),

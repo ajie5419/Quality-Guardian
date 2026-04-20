@@ -27,6 +27,55 @@ describe('workOrderService', () => {
   });
 
   describe('getList', () => {
+    it('should set warrantyStatus based on deliveryDate + 1 year', async () => {
+      const now = new Date('2026-04-16T00:00:00.000Z');
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(now);
+
+        const mockWorkOrders = [
+          {
+            workOrderNumber: 'WO-IN',
+            projectName: 'Project In Warranty',
+            status: 'OPEN',
+            deliveryDate: new Date('2025-09-01T00:00:00.000Z'),
+            createdAt: new Date('2025-01-01T00:00:00.000Z'),
+            quantity: 10,
+            customerName: 'Customer A',
+            division: 'Division A',
+            effectiveTime: null,
+          },
+          {
+            workOrderNumber: 'WO-OUT',
+            projectName: 'Project Out Warranty',
+            status: 'OPEN',
+            deliveryDate: new Date('2024-01-01T00:00:00.000Z'),
+            createdAt: new Date('2024-01-01T00:00:00.000Z'),
+            quantity: 10,
+            customerName: 'Customer B',
+            division: 'Division B',
+            effectiveTime: null,
+          },
+        ];
+
+        (prisma.work_orders.findMany as any).mockResolvedValueOnce(
+          mockWorkOrders,
+        );
+        (prisma.work_orders.count as any).mockResolvedValueOnce(2);
+        (prisma.work_orders.findMany as any).mockResolvedValueOnce([]);
+
+        const result = await WorkOrderService.getList({
+          page: 1,
+          pageSize: 10,
+        });
+
+        expect(result.items[0].warrantyStatus).toBe('是');
+        expect(result.items[1].warrantyStatus).toBe('否');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('should correctly format work order items', async () => {
       const mockWorkOrders = [
         {
@@ -77,6 +126,7 @@ describe('workOrderService', () => {
 
       const result = await WorkOrderService.getList({ page: 1, pageSize: 10 });
       expect(result.items[0].deliveryDate).toBeNull();
+      expect(result.items[0].warrantyStatus).toBe('否');
     });
   });
 });

@@ -69,6 +69,26 @@ export default defineEventHandler(async (event) => {
       }),
     ]);
 
+    const workOrderNumbers = workOrders
+      .map((item) => String(item.workOrderNumber || '').trim())
+      .filter(Boolean);
+    const requirementRows =
+      workOrderNumbers.length > 0
+        ? await prisma.work_order_requirements.findMany({
+            where: {
+              isDeleted: false,
+              status: 'active',
+              workOrderNumber: { in: workOrderNumbers },
+            },
+            select: {
+              confirmStatus: true,
+              createdAt: true,
+              workOrderNumber: true,
+            },
+          })
+        : [];
+
+    const requirementSummaryMap = buildRequirementSummaryMap(requirementRows);
     const projectItems = workOrders.map((wo) => {
       let color = '#999';
       if (wo.status === 'IN_PROGRESS') {
@@ -76,6 +96,11 @@ export default defineEventHandler(async (event) => {
       } else if (wo.status === 'COMPLETED') {
         color = '#52c41a';
       }
+      const summary = requirementSummaryMap.get(wo.workOrderNumber) || {
+        confirmedRequirements: 0,
+        overdueUnconfirmedRequirements: 0,
+        plannedRequirements: 0,
+      };
 
       return {
         id: wo.workOrderNumber,
@@ -85,6 +110,9 @@ export default defineEventHandler(async (event) => {
         date: wo.createdAt
           ? new Date(wo.createdAt).toLocaleDateString('zh-CN')
           : '',
+        plannedRequirements: summary.plannedRequirements,
+        confirmedRequirements: summary.confirmedRequirements,
+        overdueUnconfirmedRequirements: summary.overdueUnconfirmedRequirements,
         color,
         icon: 'lucide:clipboard-list',
         url: '/qms/work-order',
@@ -137,4 +165,46 @@ function formatRelativeTime(date: Date | string): string {
   if (hours < 24) return `${hours}小时前`;
   if (days < 7) return `${days}天前`;
   return d.toLocaleDateString('zh-CN');
+}
+
+function buildRequirementSummaryMap(
+  rows: Array<{
+    confirmStatus: string;
+    createdAt: Date;
+    workOrderNumber: string;
+  }>,
+) {
+  const result = new Map<
+    string,
+    {
+      confirmedRequirements: number;
+      overdueUnconfirmedRequirements: number;
+      plannedRequirements: number;
+    }
+  >();
+  const now = Date.now();
+  const tenDaysMs = 10 * 24 * 60 * 60 * 1000;
+
+  for (const row of rows) {
+    const workOrderNumber = String(row.workOrderNumber || '').trim();
+    if (!workOrderNumber) continue;
+    const current = result.get(workOrderNumber) || {
+      confirmedRequirements: 0,
+      overdueUnconfirmedRequirements: 0,
+      plannedRequirements: 0,
+    };
+    current.plannedRequirements += 1;
+
+    const confirmStatus = String(row.confirmStatus || '')
+      .trim()
+      .toUpperCase();
+    if (confirmStatus === 'CONFIRMED') {
+      current.confirmedRequirements += 1;
+    } else if (now - new Date(row.createdAt).getTime() > tenDaysMs) {
+      current.overdueUnconfirmedRequirements += 1;
+    }
+    result.set(workOrderNumber, current);
+  }
+
+  return result;
 }

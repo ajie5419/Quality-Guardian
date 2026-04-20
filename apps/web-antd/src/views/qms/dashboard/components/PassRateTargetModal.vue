@@ -31,16 +31,15 @@ type PassRateTargetRow = {
 };
 const dataSource = ref<PassRateTargetRow[]>([]);
 const PROCESS_ORDER = [
-  '外协下料',
   '外协结构',
   '外协机加',
   '外协涂装',
-  '下料',
+  '下料BU',
   '结构BU1',
   '结构BU2',
-  '组装',
-  '机加',
-  '模具',
+  '组装BU',
+  '机加BU',
+  '模具 BU',
 ] as const;
 
 const columns = [

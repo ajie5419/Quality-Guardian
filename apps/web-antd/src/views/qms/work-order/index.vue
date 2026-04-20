@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import type { WorkOrderFormValues } from './data';
-
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 import type { SystemDeptApi } from '#/api/system/dept';
@@ -10,7 +8,15 @@ import { computed, onMounted, ref, watchEffect } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
-import { Button, message, Select, Space } from 'ant-design-vue';
+import {
+  Button,
+  DatePicker,
+  message,
+  Segmented,
+  Select,
+  Space,
+} from 'ant-design-vue';
+import dayjs from 'dayjs';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { WorkOrderStatusEnum } from '#/api/qms/enums';
@@ -67,6 +73,8 @@ const workOrderStats = ref<
 const isStatsLoading = ref(false);
 const { years: dynamicYears } = useAvailableYears();
 const currentYear = ref<number>(new Date().getFullYear());
+const currentDateMode = ref<'month' | 'week' | 'year'>('year');
+const currentDate = ref(dayjs());
 
 const yearOptions = computed(() => {
   return dynamicYears.value.map((y) => ({
@@ -74,6 +82,64 @@ const yearOptions = computed(() => {
     value: y,
   }));
 });
+
+const dateModeOptions = computed(() => [
+  {
+    label: t('common.unit.year'),
+    value: 'year',
+  },
+  {
+    label: t('common.unit.month'),
+    value: 'month',
+  },
+  {
+    label: t('common.unit.week'),
+    value: 'week',
+  },
+]);
+
+const dateRange = computed(() => {
+  if (currentDateMode.value === 'year') {
+    return {
+      startDate: `${currentYear.value}-01-01`,
+      endDate: `${currentYear.value}-12-31`,
+    };
+  }
+  if (currentDateMode.value === 'month') {
+    return {
+      startDate: currentDate.value.startOf('month').format('YYYY-MM-DD'),
+      endDate: currentDate.value.endOf('month').format('YYYY-MM-DD'),
+    };
+  }
+  return {
+    startDate: currentDate.value.startOf('week').format('YYYY-MM-DD'),
+    endDate: currentDate.value.endOf('week').format('YYYY-MM-DD'),
+  };
+});
+
+interface WorkOrderSearchFormValues {
+  productName?: string;
+  status?: string;
+  workOrderNumber?: string;
+}
+
+function buildQueryParams(formValues: WorkOrderSearchFormValues = {}) {
+  const { productName, ...rest } = formValues;
+  return {
+    ...rest,
+    granularity: currentDateMode.value,
+    productName: productName?.trim() || undefined,
+    startDate: dateRange.value.startDate,
+    endDate: dateRange.value.endDate,
+    year: currentYear.value,
+  };
+}
+
+function reloadGrid() {
+  if (gridApi.value) {
+    gridApi.value.reload();
+  }
+}
 
 // 5. 导入功能（使用 gridApi 引用）
 const { handleImport, gridApi } = useWorkOrderImport(() => {
@@ -100,8 +166,8 @@ const formSchema = [
     colProps: { span: 6 },
   },
   {
-    fieldName: 'projectName',
-    label: t('qms.workOrder.projectName'),
+    fieldName: 'productName',
+    label: t('qms.workOrder.productName'),
     component: 'Input',
     componentProps: {
       placeholder: t('common.pleaseInput'),
@@ -134,11 +200,10 @@ const exportWorkOrderAsXlsx =
       }
       if (mode === 'all') {
         const proxyInfo = $grid?.getProxyInfo?.();
-        const formValues = (proxyInfo?.form || {}) as WorkOrderFormValues;
-        const response = await getWorkOrderExportList({
-          year: currentYear.value,
-          ...formValues,
-        });
+        const formValues = (proxyInfo?.form || {}) as WorkOrderSearchFormValues;
+        const response = await getWorkOrderExportList(
+          buildQueryParams(formValues),
+        );
         return response.items || [];
       }
       const tableData = $table.getTableData?.();
@@ -228,23 +293,20 @@ const gridOptions = computed<VxeGridProps>(() => ({
         {
           page: pageParams,
         }: { page?: { currentPage?: number; pageSize?: number } },
-        formValues: WorkOrderFormValues,
+        formValues: WorkOrderSearchFormValues,
       ) => {
         try {
           const { currentPage = 1, pageSize = 20 } = pageParams || {};
           isStatsLoading.value = true;
+          const queryParams = buildQueryParams(formValues);
 
           const [response, stats] = await Promise.all([
             getWorkOrderListPage({
-              year: currentYear.value,
               page: currentPage,
               pageSize,
-              ...formValues,
+              ...queryParams,
             }),
-            getWorkOrderDashboardStats({
-              year: currentYear.value,
-              ...formValues,
-            }),
+            getWorkOrderDashboardStats(queryParams),
           ]);
           workOrderStats.value = stats;
 
@@ -273,14 +335,13 @@ const gridOptions = computed<VxeGridProps>(() => ({
           formValues?: Record<string, unknown>;
         };
         const formValues =
-          (rawParams.form as unknown as WorkOrderFormValues) ||
-          (rawParams.formValues as unknown as WorkOrderFormValues);
+          (rawParams.form as unknown as WorkOrderSearchFormValues) ||
+          (rawParams.formValues as unknown as WorkOrderSearchFormValues);
         try {
           const response = await getWorkOrderListPage({
             page: 1,
             pageSize: 100_000,
-            year: currentYear.value,
-            ...formValues,
+            ...buildQueryParams(formValues),
           });
           return { items: response.items };
         } catch (error) {
@@ -403,15 +464,30 @@ const {
                 </Button>
                 <div class="ml-2 flex items-center gap-2">
                   <span class="text-xs text-gray-500"
-                    >{{ t('qms.inspection.records.statsYear') }}:</span
+                    >{{ t('qms.workOrder.dateMode') }}:</span
                   >
                   <div class="flex items-center gap-2">
+                    <Segmented
+                      v-model:value="currentDateMode"
+                      :options="dateModeOptions"
+                      size="small"
+                      @change="reloadGrid"
+                    />
                     <Select
+                      v-if="currentDateMode === 'year'"
                       v-model:value="currentYear"
                       :options="yearOptions"
                       size="small"
                       class="w-[100px]"
-                      @change="() => gridApi && gridApi.reload()"
+                      @change="reloadGrid"
+                    />
+                    <DatePicker
+                      v-else
+                      v-model:value="currentDate"
+                      :picker="currentDateMode"
+                      size="small"
+                      style="width: 140px"
+                      @change="reloadGrid"
                     />
                   </div>
                 </div>

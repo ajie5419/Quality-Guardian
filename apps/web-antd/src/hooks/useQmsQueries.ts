@@ -15,6 +15,7 @@ import { getBomList } from '#/api/qms/planning';
 import { getQualityLossList } from '#/api/qms/quality-loss';
 import { getSupplierList } from '#/api/qms/supplier';
 import { getWorkOrderList } from '#/api/qms/work-order';
+import { getWorkspaceData } from '#/api/qms/workspace';
 import { requestClient } from '#/api/request';
 
 // 缓存时间配置
@@ -95,7 +96,7 @@ export function useBomQuery() {
 export function useWorkspaceQuery() {
   return useQuery({
     queryKey: ['workspace'],
-    queryFn: () => requestClient.get('/qms/workspace'),
+    queryFn: () => getWorkspaceData(),
     staleTime: 2 * 60 * 1000, // 2分钟缓存（工作台数据更新更频繁）
     gcTime: 5 * 60 * 1000,
   });

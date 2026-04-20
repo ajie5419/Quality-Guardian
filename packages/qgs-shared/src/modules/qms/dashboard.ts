@@ -120,6 +120,26 @@ export interface VehicleTrendItem {
   period: string;
 }
 
+export interface VehicleYearSeriesItem {
+  manualOverrides: boolean[];
+  values: number[];
+  year: number;
+}
+
+export interface VehicleYearWarrantySeriesItem {
+  manualOverrides: boolean[];
+  values: number[];
+  year: number;
+}
+
+export interface VehicleYearIntensityItem {
+  intensityPct: number;
+  issueCount: number;
+  perVehicle: number;
+  warrantyVehicleCount: number;
+  year: number;
+}
+
 /**
  * Vehicle Failure Item
  */
@@ -138,4 +158,7 @@ export interface VehicleFailureResponse {
   range?: string;
   ranking?: VehicleRankingItem[];
   trend?: VehicleTrendItem[];
+  yearIntensity?: VehicleYearIntensityItem[];
+  yearSeries?: VehicleYearSeriesItem[];
+  yearWarrantySeries?: VehicleYearWarrantySeriesItem[];
 }

@@ -47,59 +47,18 @@ function roundPercent(value: number) {
 function normalizeInspectionQuantitySummary(
   item: InspectionPassRateRow,
 ): InspectionQuantitySummary {
-  const totalQuantity = Math.max(1, Number(item.quantity) || 1);
-  const rawQualified = Number(item.qualifiedQuantity);
+  const totalQuantity = Math.max(0, Number(item.quantity) || 0);
   const rawUnqualified = Number(item.unqualifiedQuantity);
-  const hasQualified = Number.isFinite(rawQualified);
   const hasUnqualified = Number.isFinite(rawUnqualified);
+  const unqualifiedQuantity = hasUnqualified
+    ? Math.max(0, Math.min(totalQuantity, rawUnqualified))
+    : 0;
 
-  if (
-    hasQualified &&
-    hasUnqualified &&
-    rawQualified + rawUnqualified === totalQuantity
-  ) {
-    return {
-      quantity: totalQuantity,
-      qualifiedQuantity: rawQualified,
-      unqualifiedQuantity: rawUnqualified,
-    };
-  }
-
-  if (hasUnqualified) {
-    const unqualifiedQuantity = Math.max(
-      0,
-      Math.min(totalQuantity, rawUnqualified),
-    );
-    return {
-      quantity: totalQuantity,
-      qualifiedQuantity: totalQuantity - unqualifiedQuantity,
-      unqualifiedQuantity,
-    };
-  }
-
-  if (hasQualified) {
-    const qualifiedQuantity = Math.max(
-      0,
-      Math.min(totalQuantity, rawQualified),
-    );
-    return {
-      quantity: totalQuantity,
-      qualifiedQuantity,
-      unqualifiedQuantity: totalQuantity - qualifiedQuantity,
-    };
-  }
-
-  return item.result === 'FAIL'
-    ? {
-        quantity: totalQuantity,
-        qualifiedQuantity: 0,
-        unqualifiedQuantity: totalQuantity,
-      }
-    : {
-        quantity: totalQuantity,
-        qualifiedQuantity: totalQuantity,
-        unqualifiedQuantity: 0,
-      };
+  return {
+    quantity: totalQuantity,
+    qualifiedQuantity: totalQuantity - unqualifiedQuantity,
+    unqualifiedQuantity,
+  };
 }
 
 async function getInspectionPassRateRows(start: Date, end: Date) {
@@ -148,22 +107,31 @@ export async function getNetPassRateSummaryByRange(
   start: Date,
   end: Date,
 ): Promise<NetPassRateSummary> {
-  const inspections = await getInspectionPassRateRows(start, end);
+  const [summary] = await prisma.$queryRaw<
+    Array<{ passCount: bigint | null; totalCount: bigint | null }>
+  >`
+    SELECT
+      SUM(quantity) as totalCount,
+      SUM(
+        CASE
+          WHEN unqualifiedQuantity IS NULL OR unqualifiedQuantity <= 0 THEN quantity
+          WHEN unqualifiedQuantity >= quantity THEN 0
+          ELSE quantity - unqualifiedQuantity
+        END
+      ) as passCount
+    FROM inspections
+    WHERE isDeleted = 0
+      AND inspectionDate >= ${start}
+      AND inspectionDate <= ${end}
+  `;
 
-  const summary = { totalCount: 0, passCount: 0 };
-  for (const item of inspections) {
-    const quantities = normalizeInspectionQuantitySummary(item);
-    summary.totalCount += quantities.quantity;
-    summary.passCount += quantities.qualifiedQuantity;
-  }
+  const totalCount = Number(summary?.totalCount || 0);
+  const passCount = Number(summary?.passCount || 0);
 
   return {
-    totalCount: summary.totalCount,
-    passCount: summary.passCount,
-    passRate:
-      summary.totalCount > 0
-        ? roundPercent((summary.passCount / summary.totalCount) * 100)
-        : 0,
+    totalCount,
+    passCount,
+    passRate: totalCount > 0 ? roundPercent((passCount / totalCount) * 100) : 0,
   };
 }
 

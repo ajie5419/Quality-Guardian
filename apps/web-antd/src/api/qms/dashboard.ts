@@ -74,14 +74,16 @@ export async function getVehicleFailureRate(params?: { month?: string }) {
  * Save manual last-year vehicle feedback data
  */
 export async function setVehicleFailureManualData(data: {
-  count: number;
-  month: string;
+  count?: number;
+  month?: string;
+  warrantyVehicleCount?: number;
 }) {
   return requestClient.post<{
-    count: number;
-    month: string;
+    count?: number;
+    month?: string;
     success: boolean;
     updatedBy?: string;
+    warrantyVehicleCount?: number;
   }>(QMS_API.VEHICLE_FAILURE_RATE_MANUAL, data);
 }
 

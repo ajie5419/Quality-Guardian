@@ -7,28 +7,9 @@ const THRESHOLD_CLASS_A_AMOUNT = 5000; // Class A: Loss > 5000
 const THRESHOLD_CRITICAL_AMOUNT = 80_000; // Blacklist: Loss > 80000
 const THRESHOLD_SCORE_WARNING = 75;
 const THRESHOLD_INCOMING_YIELD_WARNING = 90;
-const THRESHOLD_SEVERE_ISSUE_RATE_WARNING = 0.7;
-const THRESHOLD_OPEN_ISSUE_RATE_WARNING = 0.7;
 
 const LIMIT_CONSECUTIVE_FAILURE = 3; // 3x Consecutive A/B -> Blacklist
 const LIMIT_MIN_ISSUE_COUNT_FOR_STRICT_ACTION = 3;
-
-const WEIGHT_INCOMING = 0.4;
-const WEIGHT_ENGINEERING = 0.25;
-const WEIGHT_AFTER_SALES = 0.25;
-const WEIGHT_STABILITY = 0.1;
-
-const SEVERITY_WEIGHT_A = 1;
-const SEVERITY_WEIGHT_B = 0.5;
-const SEVERITY_WEIGHT_C = 0.2;
-const SCORE_COMPONENT_LOSS_WEIGHT = 0.7;
-const SCORE_COMPONENT_SEVERITY_WEIGHT = 0.3;
-
-// Fixed baselines avoid "single issue => score 0" when dataset is small.
-const BASELINE_ENGINEERING_LOSS = 20_000;
-const BASELINE_AFTER_SALES_LOSS = 20_000;
-const BASELINE_ENGINEERING_SEVERITY = 3;
-const BASELINE_AFTER_SALES_SEVERITY = 3;
 
 interface SupplierStats {
   afterSalesClassA: number;
@@ -76,10 +57,6 @@ function createEmptyStats(): SupplierStats {
     consecutiveBigFailures: 0,
     maxSingleLoss: 0,
   };
-}
-
-function clamp01(value: number) {
-  return Math.max(0, Math.min(1, value));
 }
 
 function clamp100(value: number) {
@@ -188,6 +165,7 @@ export const SupplierService = {
             supplierName: { in: supplierNames },
             category: 'INCOMING',
             isDeleted: false,
+            inspectionDate: { gte: oneYearAgo },
           },
           _count: { id: true },
           _sum: { quantity: true },
@@ -197,6 +175,7 @@ export const SupplierService = {
           where: {
             supplierBrand: { in: supplierNames },
             isDeleted: false,
+            occurDate: { gte: oneYearAgo },
           },
           _sum: { materialCost: true, laborTravelCost: true },
           _count: { id: true },
@@ -206,6 +185,7 @@ export const SupplierService = {
           where: {
             supplierName: { in: supplierNames },
             isDeleted: false,
+            date: { gte: oneYearAgo },
           },
           _sum: { lossAmount: true, quantity: true },
           _count: { id: true },
@@ -215,6 +195,7 @@ export const SupplierService = {
           where: {
             supplierName: { in: supplierNames },
             isDeleted: false,
+            date: { gte: oneYearAgo },
           },
           _count: { id: true },
         }),
@@ -223,6 +204,7 @@ export const SupplierService = {
           where: {
             supplierBrand: { in: supplierNames },
             isDeleted: false,
+            occurDate: { gte: oneYearAgo },
           },
           _count: { id: true },
         }),
@@ -263,7 +245,7 @@ export const SupplierService = {
       ): 'A' | 'B' | 'C' | null => {
         const sev = (severity || '').toLowerCase();
         if (loss > THRESHOLD_CLASS_A_AMOUNT) return 'A';
-        if (['critical', 'p0', 'p1'].includes(sev)) return 'A';
+        if (['critical', 'fatal', 'p0', 'p1', '致命'].includes(sev)) return 'A';
         if (['high', 'major', 'p2'].includes(sev)) return 'B';
         if (['low', 'minor', 'p3'].includes(sev)) return 'C';
         return null;
@@ -405,111 +387,32 @@ export const SupplierService = {
     }
 
     // 5. [Process FULL List for Global Stats]
-    const preparedList = listData.map((item) => {
+    const processedFullList = listData.map((item) => {
       const stat = statsMap.get(item.name) || createEmptyStats();
       const incomingPassRate =
         stat.count > 0 ? stat.qualifiedCount / stat.count : 1;
-      const incomingFailBatchRate =
-        stat.count > 0 ? stat.failures / stat.count : 0;
       const incomingQualifiedRate = Math.round(incomingPassRate * 100);
-      const incomingScore = clamp100(
-        100 * (0.7 * incomingPassRate + 0.3 * (1 - incomingFailBatchRate)),
-      );
-
-      const engineeringSeverityWeighted =
-        stat.engineeringClassA * SEVERITY_WEIGHT_A +
-        stat.engineeringClassB * SEVERITY_WEIGHT_B +
-        stat.engineeringClassC * SEVERITY_WEIGHT_C;
-      const afterSalesSeverityWeighted =
-        stat.afterSalesClassA * SEVERITY_WEIGHT_A +
-        stat.afterSalesClassB * SEVERITY_WEIGHT_B +
-        stat.afterSalesClassC * SEVERITY_WEIGHT_C;
-
       const totalIssueCount = stat.engineeringCount + stat.afterSalesCount;
-      const severeIssueCount =
-        stat.engineeringClassA +
-        stat.engineeringClassB +
-        stat.afterSalesClassA +
-        stat.afterSalesClassB;
-      const severeIssueRate =
-        totalIssueCount > 0 ? severeIssueCount / totalIssueCount : 0;
-      const openIssueCount =
-        stat.openEngineeringCount + stat.openAfterSalesCount;
-      const openIssueRate =
-        totalIssueCount > 0 ? openIssueCount / totalIssueCount : 0;
-      const consecutiveRisk = clamp01(
-        stat.consecutiveBigFailures / LIMIT_CONSECUTIVE_FAILURE,
-      );
-      const stabilityScore = clamp100(
-        100 *
-          (1 -
-            0.4 * consecutiveRisk -
-            0.3 * clamp01(severeIssueRate) -
-            0.3 * clamp01(openIssueRate)),
-      );
 
-      return {
-        item,
-        stat,
-        incomingPassRate,
-        incomingScore,
-        incomingQualifiedRate,
-        engineeringSeverityWeighted,
-        afterSalesSeverityWeighted,
-        totalIssueCount,
-        severeIssueRate,
-        openIssueRate,
-        stabilityScore,
-      };
-    });
+      const engineeringDeduction =
+        stat.engineeringClassA * 15 +
+        stat.engineeringClassB * 5 +
+        stat.engineeringClassC * 1;
+      const afterSalesDeduction =
+        stat.afterSalesClassA * 15 +
+        stat.afterSalesClassB * 5 +
+        stat.afterSalesClassC * 1;
+      const incomingDeduction = stat.failures * 3;
+      const totalDeduction =
+        engineeringDeduction + afterSalesDeduction + incomingDeduction;
 
-    const processedFullList = preparedList.map((prepared) => {
-      const {
-        item,
-        stat,
-        incomingPassRate,
-        incomingScore,
-        incomingQualifiedRate,
-        engineeringSeverityWeighted,
-        afterSalesSeverityWeighted,
-        totalIssueCount,
-        severeIssueRate,
-        openIssueRate,
-        stabilityScore,
-      } = prepared;
+      const incomingScore = clamp100(100 - incomingDeduction);
+      const engineeringScore = clamp100(100 - engineeringDeduction);
+      const afterSalesScore = clamp100(100 - afterSalesDeduction);
+      const stabilityScore = 100;
 
-      const engineeringSeverityIndex = clamp01(
-        engineeringSeverityWeighted / BASELINE_ENGINEERING_SEVERITY,
-      );
-      const afterSalesSeverityIndex = clamp01(
-        afterSalesSeverityWeighted / BASELINE_AFTER_SALES_SEVERITY,
-      );
-      const engineeringLossIndex = clamp01(
-        stat.engineeringLoss / BASELINE_ENGINEERING_LOSS,
-      );
-      const afterSalesLossIndex = clamp01(
-        stat.afterSalesLoss / BASELINE_AFTER_SALES_LOSS,
-      );
-
-      const engineeringScore = clamp100(
-        100 *
-          (1 -
-            SCORE_COMPONENT_SEVERITY_WEIGHT * engineeringSeverityIndex -
-            SCORE_COMPONENT_LOSS_WEIGHT * engineeringLossIndex),
-      );
-      const afterSalesScore = clamp100(
-        100 *
-          (1 -
-            SCORE_COMPONENT_SEVERITY_WEIGHT * afterSalesSeverityIndex -
-            SCORE_COMPONENT_LOSS_WEIGHT * afterSalesLossIndex),
-      );
-
-      let score = Math.round(
-        incomingScore * WEIGHT_INCOMING +
-          engineeringScore * WEIGHT_ENGINEERING +
-          afterSalesScore * WEIGHT_AFTER_SALES +
-          stabilityScore * WEIGHT_STABILITY,
-      );
+      let score = Math.round(clamp100(100 - totalDeduction));
+      const warningReasons: string[] = [];
 
       const manualStatus = item.status;
       let finalStatus = manualStatus || 'Qualified';
@@ -520,20 +423,24 @@ export const SupplierService = {
           hasEnoughIssuesForStrictAction &&
           (stat.consecutiveBigFailures >= LIMIT_CONSECUTIVE_FAILURE ||
             stat.maxSingleLoss > THRESHOLD_CRITICAL_AMOUNT);
-        const shouldObserve =
-          score < THRESHOLD_SCORE_WARNING ||
-          (stat.count >= 5 &&
-            incomingPassRate * 100 < THRESHOLD_INCOMING_YIELD_WARNING) ||
-          (hasEnoughIssuesForStrictAction &&
-            (severeIssueRate >= THRESHOLD_SEVERE_ISSUE_RATE_WARNING ||
-              openIssueRate >= THRESHOLD_OPEN_ISSUE_RATE_WARNING));
+        const shouldDowngradeToC =
+          stat.engineeringClassA + stat.afterSalesClassA >= 2 ||
+          stat.engineeringClassB + stat.afterSalesClassB >= 3 ||
+          (stat.count > 5 &&
+            incomingQualifiedRate < THRESHOLD_INCOMING_YIELD_WARNING);
 
         if (shouldFreeze) {
           finalStatus = 'Frozen';
           score = 0;
-        } else if (shouldObserve) {
+          warningReasons.push('连续重大问题/单次超大损失');
+        } else if (shouldDowngradeToC) {
+          finalStatus = 'Observation';
+          score = Math.min(score, 70);
+          warningReasons.push('累计问题触发C级降级');
+        } else if (score < THRESHOLD_SCORE_WARNING) {
           finalStatus = 'Observation';
           score = Math.min(score, 75);
+          warningReasons.push('综合分过低');
         } else {
           finalStatus = 'Qualified';
         }
@@ -568,6 +475,8 @@ export const SupplierService = {
         status: finalStatus,
         rating: finalRating,
         level: finalRating,
+        isWarning: finalStatus === 'Observation' || finalStatus === 'Frozen',
+        warningReasons,
         qualityScore: score,
       };
     });

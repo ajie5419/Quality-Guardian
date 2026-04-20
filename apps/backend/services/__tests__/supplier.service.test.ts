@@ -114,9 +114,9 @@ describe('supplierService standard scoring samples', () => {
     });
     const row = await scoreOf();
 
-    expect(row.incomingScore).toBe(70);
+    expect(row.incomingScore).toBe(91);
     expect(row.status).toBe('Observation');
-    expect(row.qualityScore).toBe(75);
+    expect(row.qualityScore).toBe(70);
     expect(row.level).toBe('C');
   });
 
@@ -166,7 +166,7 @@ describe('supplierService standard scoring samples', () => {
     });
     const row = await scoreOf();
 
-    expect(row.engineeringScore).toBeLessThanOrEqual(35);
+    expect(row.engineeringScore).toBe(85);
     expect(row.qualityScore).toBeLessThanOrEqual(85);
     expect(['B', 'C']).toContain(row.level);
   });
@@ -193,7 +193,7 @@ describe('supplierService standard scoring samples', () => {
     const row = await scoreOf();
 
     expect(row.afterSalesIssueCount).toBe(1);
-    expect(row.afterSalesScore).toBeLessThanOrEqual(35);
+    expect(row.afterSalesScore).toBe(85);
     expect(row.qualityScore).toBeLessThanOrEqual(85);
   });
 
@@ -396,5 +396,50 @@ describe('supplierService standard scoring samples', () => {
     });
     const names = result.items.map((item: any) => item.name);
     expect(names).toEqual(['S1', 'S3', 'S2']);
+  });
+
+  it('sample 11: outsourcing category should use the same deduction/freeze rules', async () => {
+    setupScenario({
+      suppliers: [
+        {
+          ...supplier('OS1'),
+          category: 'Outsourcing',
+        },
+      ],
+      engineeringStats: [
+        {
+          supplierName: 'OS1',
+          _count: { id: 3 },
+          _sum: { lossAmount: 91_000, quantity: 3 },
+        },
+      ],
+      recentQualityRecords: [
+        {
+          supplierName: 'OS1',
+          lossAmount: 90_000,
+          severity: 'minor',
+          date: new Date('2026-02-03'),
+        },
+        {
+          supplierName: 'OS1',
+          lossAmount: 500,
+          severity: 'minor',
+          date: new Date('2026-02-02'),
+        },
+        {
+          supplierName: 'OS1',
+          lossAmount: 500,
+          severity: 'minor',
+          date: new Date('2026-02-01'),
+        },
+      ],
+    });
+
+    const result = await SupplierService.findAll({ category: 'Outsourcing' });
+    const row = (result.items as any[]).find((item) => item.name === 'OS1');
+
+    expect(row.status).toBe('Frozen');
+    expect(row.qualityScore).toBe(0);
+    expect(row.level).toBe('D');
   });
 });

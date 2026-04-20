@@ -1,14 +1,13 @@
 export const PROCESS_PASS_RATE_TARGET_ORDER = [
-  '外协下料',
   '外协结构',
   '外协机加',
   '外协涂装',
-  '下料',
+  '下料BU',
   '结构BU1',
   '结构BU2',
-  '组装',
-  '机加',
-  '模具',
+  '组装BU',
+  '机加BU',
+  '模具 BU',
 ] as const;
 
 export type ProcessPassRateTargetKey =
@@ -18,16 +17,15 @@ export const DEFAULT_PROCESS_PASS_RATE_TARGETS: Record<
   ProcessPassRateTargetKey,
   number
 > = {
-  外协下料: 99.9,
   外协结构: 99.85,
   外协机加: 99.9,
   外协涂装: 99.85,
-  下料: 99.9,
+  下料BU: 99.9,
   结构BU1: 99.85,
   结构BU2: 99.85,
-  组装: 99.85,
-  机加: 99.9,
-  模具: 99.85,
+  组装BU: 99.85,
+  机加BU: 99.9,
+  '模具 BU': 99.85,
 };
 
 const LEGACY_TARGET_MIGRATION_RULES: Array<{
@@ -36,11 +34,11 @@ const LEGACY_TARGET_MIGRATION_RULES: Array<{
 }> = [
   {
     from: ['外协'],
-    to: ['外协下料', '外协结构', '外协机加', '外协涂装'],
+    to: ['外协结构', '外协机加', '外协涂装'],
   },
   {
-    from: ['组对', '焊接', '组焊', '焊后尺寸'],
-    to: ['结构BU1', '结构BU2'],
+    from: ['下料'],
+    to: ['下料BU'],
   },
   {
     from: ['结构BU1组焊'],
@@ -51,8 +49,16 @@ const LEGACY_TARGET_MIGRATION_RULES: Array<{
     to: ['结构BU2'],
   },
   {
-    from: ['装配'],
-    to: ['组装'],
+    from: ['装配', '组装'],
+    to: ['组装BU'],
+  },
+  {
+    from: ['机加'],
+    to: ['机加BU'],
+  },
+  {
+    from: ['模具'],
+    to: ['模具 BU'],
   },
 ];
 
@@ -124,10 +130,15 @@ function includesAny(text: string, keywords: string[]) {
   return keywords.some((keyword) => text.includes(keyword));
 }
 
-const WELDING_KEYWORDS = ['组对', '焊接', '组焊', '焊后尺寸', '组拼'];
 const COATING_KEYWORDS = ['涂装', '喷漆', '打砂'];
-const MACHINING_KEYWORDS = ['机加'];
-const CUTTING_KEYWORDS = ['下料'];
+const OUTSOURCING_STRUCTURE_PROCESSES = [
+  '组对',
+  '焊接',
+  '焊后尺寸',
+  '整体拼装',
+  '组拼',
+  '外观',
+];
 
 /**
  * Normalize PROCESS inspection raw process names into dashboard buckets.
@@ -138,46 +149,9 @@ export function mapProcessToPassRateBucket(
   const rawText = String(processName || '').trim();
   if (!rawText) return undefined;
   const normalized = normalizeProcessText(rawText);
-
-  if (normalized.includes('外协')) {
-    if (includesAny(normalized, CUTTING_KEYWORDS)) return '外协下料';
-    if (includesAny(normalized, MACHINING_KEYWORDS)) return '外协机加';
-    if (includesAny(normalized, COATING_KEYWORDS)) return '外协涂装';
-    if (
-      normalized.includes('外协结构') ||
-      includesAny(normalized, WELDING_KEYWORDS) ||
-      normalized.includes('结构')
-    ) {
-      return '外协结构';
-    }
-    return undefined;
-  }
-
-  if (normalized.includes('模具')) return '模具';
-  if (normalized === '下料') return '下料';
-  if (normalized === '机加') return '机加';
-  if (
-    normalized === '组装' ||
-    normalized === '装配' ||
-    normalized === '整体拼装'
-  ) {
-    return '组装';
-  }
-
-  if (
-    (normalized.includes('bu1') || normalized.includes('结构bu1')) &&
-    (normalized === '结构bu1' || includesAny(normalized, WELDING_KEYWORDS))
-  ) {
-    return '结构BU1';
-  }
-
-  if (
-    (normalized.includes('bu2') || normalized.includes('结构bu2')) &&
-    (normalized === '结构bu2' || includesAny(normalized, WELDING_KEYWORDS))
-  ) {
-    return '结构BU2';
-  }
-
+  if (includesAny(normalized, COATING_KEYWORDS)) return '外协涂装';
+  if (includesAny(normalized, OUTSOURCING_STRUCTURE_PROCESSES))
+    return '外协结构';
   return undefined;
 }
 
@@ -188,11 +162,10 @@ function mapTeamToPassRateBucket(
   if (!rawText) return undefined;
   const normalized = normalizeProcessText(rawText);
 
-  if (normalized.includes('外协下料')) return '外协下料';
-  if (normalized.includes('外协机加')) return '外协机加';
-  if (normalized.includes('外协涂装')) return '外协涂装';
   if (normalized.includes('外协结构') || normalized === '外协')
     return '外协结构';
+  if (normalized.includes('外协机加')) return '外协机加';
+  if (normalized.includes('外协涂装')) return '外协涂装';
 
   if (
     normalized.includes('结构bu1组焊') ||
@@ -212,10 +185,15 @@ function mapTeamToPassRateBucket(
     return '结构BU2';
   }
 
-  if (normalized === '下料') return '下料';
-  if (normalized === '组装' || normalized === '装配') return '组装';
-  if (normalized === '机加') return '机加';
-  if (normalized.includes('模具')) return '模具';
+  if (normalized === '下料' || normalized.includes('下料bu')) return '下料BU';
+  if (
+    normalized === '组装' ||
+    normalized === '装配' ||
+    normalized.includes('组装bu')
+  )
+    return '组装BU';
+  if (normalized === '机加' || normalized.includes('机加bu')) return '机加BU';
+  if (normalized.includes('模具')) return '模具 BU';
 
   return undefined;
 }
@@ -228,8 +206,20 @@ export function mapInspectionToPassRateBucket(input: {
   processName: null | string;
   team: null | string;
 }): ProcessPassRateTargetKey | undefined {
-  return (
-    mapTeamToPassRateBucket(input.team) ??
-    mapProcessToPassRateBucket(input.processName)
-  );
+  const teamBucket = mapTeamToPassRateBucket(input.team);
+  const processBucket = mapProcessToPassRateBucket(input.processName);
+
+  if (processBucket === '外协涂装') {
+    return processBucket;
+  }
+
+  if (
+    processBucket === '外协结构' &&
+    teamBucket !== '结构BU1' &&
+    teamBucket !== '结构BU2'
+  ) {
+    return processBucket;
+  }
+
+  return teamBucket;
 }

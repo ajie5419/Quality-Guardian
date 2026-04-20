@@ -8,6 +8,7 @@ export interface WorkOrderItem {
   projectName?: null | string;
   quantity: null | number;
   status: string;
+  warrantyStatus?: null | string;
   workOrderNumber: string;
 }
 

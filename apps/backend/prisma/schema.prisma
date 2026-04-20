@@ -8,8 +8,8 @@ datasource db {
 }
 
 model inspections {
-  id                  String              @id @default(cuid())
-  serialNumber        String?             @unique
+  id                  String                    @id @default(cuid())
+  serialNumber        String?                   @unique
   category            inspection_category
   workOrderNumber     String
   projectName         String?
@@ -21,9 +21,9 @@ model inspections {
   level2Component     String?
   team                String?
   documents           String?
-  hasDocuments        Boolean             @default(true)
+  hasDocuments        Boolean                   @default(true)
   packingListArchived String?
-  quantity            Int                 @default(1)
+  quantity            Int                       @default(1)
   qualifiedQuantity   Int?
   unqualifiedQuantity Int?
   inspector           String
@@ -31,15 +31,15 @@ model inspections {
   templateName        String?
   inspectionDate      DateTime
   reportDate          DateTime?
-  result              inspection_result   @default(PASS)
-  remarks             String?             @db.Text
-  isDeleted           Boolean             @default(false)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  result              inspection_result         @default(PASS)
+  remarks             String?                   @db.Text
+  isDeleted           Boolean                   @default(false)
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
   items               inspection_items[]
   archiveTask         inspection_archive_tasks?
   qualityRecords      quality_records[]
-  work_order          work_orders         @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+  work_order          work_orders               @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([workOrderNumber])
   @@index([category])
@@ -460,18 +460,18 @@ model quality_records {
 }
 
 model welders {
-  id              String   @id
-  welderCode      String?  @unique
-  name            String
-  team            String
-  examDate        DateTime?
-  examPassed      Boolean  @default(false)
+  id               String                   @id
+  welderCode       String?                  @unique
+  name             String
+  team             String
+  examDate         DateTime?
+  examPassed       Boolean                  @default(false)
   employmentStatus welder_employment_status @default(ON_DUTY)
-  certificationNo String?
-  score           Int      @default(12)
-  isDeleted       Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  certificationNo  String?
+  score            Int                      @default(12)
+  isDeleted        Boolean                  @default(false)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
 
   @@index([name])
   @@index([welderCode])
@@ -600,31 +600,58 @@ model users {
 }
 
 model work_orders {
-  workOrderNumber String             @id
-  customerName    String
-  projectName     String?
-  division        String?
-  quantity        Int
-  deliveryDate    DateTime
-  status          work_orders_status @default(OPEN)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  version         Int                @default(1)
-  isDeleted       Boolean            @default(false)
-  effectiveTime   DateTime?
-  after_sales     after_sales[]
-  bom_projects    bom_projects?
-  dfmea_projects  dfmea_projects[]
-  doc_projects    doc_projects?
-  inspections     inspections[]
-  project_boms    project_boms[]
-  quality_plans   quality_plans[]
-  quality_records quality_records[]
+  workOrderNumber           String                      @id
+  customerName              String
+  projectName               String?
+  division                  String?
+  quantity                  Int
+  deliveryDate              DateTime
+  status                    work_orders_status          @default(OPEN)
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @updatedAt
+  version                   Int                         @default(1)
+  isDeleted                 Boolean                     @default(false)
+  effectiveTime             DateTime?
+  after_sales               after_sales[]
+  bom_projects              bom_projects?
+  dfmea_projects            dfmea_projects[]
+  doc_projects              doc_projects?
+  inspections               inspections[]
+  project_boms              project_boms[]
+  quality_plans             quality_plans[]
+  quality_records           quality_records[]
   inspection_form_templates inspection_form_templates[]
+  work_order_requirements   work_order_requirements[]
 
   @@index([customerName])
   @@index([deliveryDate])
   @@index([status])
+}
+
+model work_order_requirements {
+  id               String      @id @default(cuid())
+  workOrderNumber  String
+  requirementName  String
+  partName         String?
+  processName      String?
+  responsiblePerson String?
+  responsibleTeam  String?
+  requirementItems String?     @db.LongText
+  attachment       String?     @db.LongText
+  status           String      @default("active")
+  confirmStatus    String      @default("PENDING")
+  confirmer        String?
+  confirmedAt      DateTime?
+  createdBy        String?
+  updatedBy        String?
+  isDeleted        Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  work_order       work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+
+  @@index([workOrderNumber])
+  @@index([status])
+  @@index([workOrderNumber, processName, partName])
 }
 
 model qms_task_dispatches {
@@ -738,24 +765,24 @@ model inspection_archive_tasks {
 }
 
 model inspection_form_templates {
-  id              String   @id @default(cuid())
-  workOrderNumber String
-  projectName     String?
+  id               String      @id @default(cuid())
+  workOrderNumber  String
+  projectName      String?
   templateQuantity Int?
-  processName     String
-  partName        String?
-  formName        String
-  formNo          String?
-  drawingNo       String?
-  formFields      String?  @db.LongText
-  attachments     String?  @db.LongText
-  status          String   @default("active")
-  createdBy       String?
-  updatedBy       String?
-  isDeleted       Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  work_order      work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+  processName      String
+  partName         String?
+  formName         String
+  formNo           String?
+  drawingNo        String?
+  formFields       String?     @db.LongText
+  attachments      String?     @db.LongText
+  status           String      @default("active")
+  createdBy        String?
+  updatedBy        String?
+  isDeleted        Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  work_order       work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([workOrderNumber])
   @@index([processName])

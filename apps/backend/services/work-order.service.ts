@@ -7,6 +7,7 @@ import type {
 import { Prisma } from '@prisma/client';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+import { addYearsToDate } from '~/utils/work-order';
 import {
   mapToDisplayStatus,
   WORK_ORDER_STATUS,
@@ -22,7 +23,19 @@ const logger = createModuleLogger('WorkOrderService');
 const WO_CONSTANTS = {
   DEFAULT_PAGE: 1,
   DEFAULT_PAGE_SIZE: 20,
+  DEFAULT_WARRANTY_YEARS: 1,
   STATUS: WORK_ORDER_STATUS,
+};
+
+const getWarrantyStatus = (deliveryDate: Date | null) => {
+  if (!deliveryDate) {
+    return '否';
+  }
+  const expiryDate = addYearsToDate(
+    deliveryDate,
+    WO_CONSTANTS.DEFAULT_WARRANTY_YEARS,
+  );
+  return new Date() <= expiryDate ? '是' : '否';
 };
 
 /**
@@ -41,6 +54,10 @@ const getYearDateRange = (year?: number) => {
 interface WorkOrderListParams {
   page?: number;
   pageSize?: number;
+  granularity?: string;
+  startDate?: string;
+  endDate?: string;
+  productName?: string;
   year?: number;
   projectName?: string;
   status?: string;
@@ -56,9 +73,120 @@ type WorkOrderDashboardStats = {
   inProgress: number;
   pieData: Array<{ name: string; value: number }>;
   progressPercent: number;
-  rankings: Array<{ division: string; totalQuantity: number }>;
+  rankings: Array<{
+    division: string;
+    productName: string;
+    warrantyCount: number;
+  }>;
   total: number;
 };
+
+const isValidDate = (value?: string) => {
+  if (!value) return false;
+  return !Number.isNaN(new Date(value).getTime());
+};
+
+async function buildWorkOrderWhereCondition(
+  params: WorkOrderListParams,
+): Promise<Prisma.work_ordersWhereInput> {
+  const {
+    year,
+    projectName,
+    productName,
+    status,
+    workOrderNumber,
+    ignoreYearFilter = false,
+    keyword,
+    ids,
+    startDate,
+    endDate,
+    userContext,
+  } = params;
+
+  const {
+    start: startOfYear,
+    end: endOfYear,
+    isCurrentYear,
+  } = getYearDateRange(year);
+
+  let whereCondition: Prisma.work_ordersWhereInput = {
+    isDeleted: false,
+  };
+
+  if (ids && ids.length > 0) {
+    whereCondition.workOrderNumber = { in: ids };
+  } else {
+    const productKeyword = (productName || projectName || '').trim();
+    if (productKeyword) {
+      whereCondition.projectName = { contains: productKeyword };
+    }
+    if (workOrderNumber?.trim()) {
+      whereCondition.workOrderNumber = { contains: workOrderNumber.trim() };
+    }
+    if (status?.trim()) {
+      whereCondition.status = status.trim() as
+        | any
+        | Prisma.Enumwork_orders_statusFilter<'work_orders'>;
+    }
+    if (keyword?.trim()) {
+      whereCondition.OR = [
+        { workOrderNumber: { contains: keyword.trim() } },
+        { projectName: { contains: keyword.trim() } },
+      ];
+    }
+
+    if (!ignoreYearFilter) {
+      if (isValidDate(startDate) && isValidDate(endDate)) {
+        whereCondition.deliveryDate = {
+          gte: new Date(`${startDate}T00:00:00.000Z`),
+          lte: new Date(`${endDate}T23:59:59.999Z`),
+        };
+      } else if (isCurrentYear) {
+        whereCondition.AND = [
+          {
+            OR: [
+              { deliveryDate: { gte: startOfYear, lte: endOfYear } },
+              {
+                deliveryDate: { lt: startOfYear },
+                status: {
+                  in: [
+                    WO_CONSTANTS.STATUS.OPEN,
+                    WO_CONSTANTS.STATUS.IN_PROGRESS,
+                  ],
+                },
+              },
+            ],
+          },
+        ];
+      } else if (year && year < new Date().getFullYear()) {
+        whereCondition.AND = [
+          { deliveryDate: { gte: startOfYear, lte: endOfYear } },
+          {
+            status: {
+              notIn: [
+                WO_CONSTANTS.STATUS.OPEN,
+                WO_CONSTANTS.STATUS.IN_PROGRESS,
+              ],
+            },
+          },
+        ];
+      } else {
+        whereCondition.deliveryDate = { gte: startOfYear, lte: endOfYear };
+      }
+    }
+  }
+
+  if (userContext?.userId) {
+    whereCondition = await DataScopeService.buildWorkOrderWhere(
+      whereCondition,
+      {
+        userId: userContext.userId,
+        username: userContext.username,
+      },
+    );
+  }
+  return whereCondition;
+}
 
 export const WorkOrderService = {
   /**
@@ -68,98 +196,8 @@ export const WorkOrderService = {
     const {
       page = WO_CONSTANTS.DEFAULT_PAGE,
       pageSize = WO_CONSTANTS.DEFAULT_PAGE_SIZE,
-      year,
-      projectName,
-      status,
-      workOrderNumber,
-      ignoreYearFilter = false,
-      keyword,
-      ids,
     } = params;
-
-    // 1. 获取时间范围
-    const {
-      start: startOfYear,
-      end: endOfYear,
-      isCurrentYear,
-    } = getYearDateRange(year);
-
-    // 2. 构建基础查询条件
-    let whereCondition: Prisma.work_ordersWhereInput = {
-      isDeleted: false,
-    };
-
-    // 2.1 精确 ID 查找 (最高优先级，用于回显)
-    if (ids && ids.length > 0) {
-      whereCondition.workOrderNumber = { in: ids };
-    } else {
-      // 常规过滤
-      if (projectName?.trim()) {
-        whereCondition.projectName = { contains: projectName.trim() };
-      }
-      if (workOrderNumber?.trim()) {
-        whereCondition.workOrderNumber = { contains: workOrderNumber.trim() };
-      }
-      if (status?.trim()) {
-        whereCondition.status = status.trim() as
-          | any
-          | Prisma.Enumwork_orders_statusFilter<'work_orders'>;
-      }
-
-      // 2.2 综合搜索
-      if (keyword?.trim()) {
-        whereCondition.OR = [
-          { workOrderNumber: { contains: keyword.trim() } },
-          { projectName: { contains: keyword.trim() } },
-        ];
-      }
-
-      // 3. 应用跨年逻辑 (仅在不忽略年份过滤时应用)
-      if (!ignoreYearFilter) {
-        if (isCurrentYear) {
-          whereCondition.AND = [
-            {
-              OR: [
-                { deliveryDate: { gte: startOfYear, lte: endOfYear } },
-                {
-                  deliveryDate: { lt: startOfYear },
-                  status: {
-                    in: [
-                      WO_CONSTANTS.STATUS.OPEN,
-                      WO_CONSTANTS.STATUS.IN_PROGRESS,
-                    ],
-                  },
-                },
-              ],
-            },
-          ];
-        } else if (year && year < new Date().getFullYear()) {
-          whereCondition.AND = [
-            { deliveryDate: { gte: startOfYear, lte: endOfYear } },
-            {
-              status: {
-                notIn: [
-                  WO_CONSTANTS.STATUS.OPEN,
-                  WO_CONSTANTS.STATUS.IN_PROGRESS,
-                ],
-              },
-            },
-          ];
-        } else {
-          whereCondition.deliveryDate = { gte: startOfYear, lte: endOfYear };
-        }
-      }
-    }
-
-    if (params.userContext?.userId) {
-      whereCondition = await DataScopeService.buildWorkOrderWhere(
-        whereCondition,
-        {
-          userId: params.userContext.userId,
-          username: params.userContext.username,
-        },
-      );
-    }
+    const whereCondition = await buildWorkOrderWhereCondition(params);
 
     try {
       // 4. 并行查询数据
@@ -190,6 +228,7 @@ export const WorkOrderService = {
           effectiveTime: formatDateString(wo.effectiveTime),
           createTime: wo.createdAt ? wo.createdAt.toISOString() : null,
           status: mapToDisplayStatus(wo.status),
+          warrantyStatus: getWarrantyStatus(wo.deliveryDate),
           projectName: wo.projectName || null,
           customerName: wo.customerName || null,
           division: wo.division || null,
@@ -217,15 +256,19 @@ export const WorkOrderService = {
   async getDashboardStats(
     params: Omit<WorkOrderListParams, 'page' | 'pageSize'>,
   ): Promise<WorkOrderDashboardStats> {
-    const listResult = await this.getList({
-      ...params,
-      page: 1,
-      pageSize: 1,
+    const whereCondition = await buildWorkOrderWhereCondition(params);
+    const summary = await prisma.work_orders.findMany({
+      where: whereCondition,
+      select: {
+        status: true,
+        division: true,
+        quantity: true,
+        projectName: true,
+        deliveryDate: true,
+      },
     });
-    const summary = listResult.summary || [];
-
     const divisionProjectMap = new Map<string, number>();
-    const divisionQuantityMap = new Map<string, number>();
+    const divisionProductWarrantyMap = new Map<string, number>();
     let total = 0;
     let completed = 0;
     let inProgress = 0;
@@ -237,24 +280,36 @@ export const WorkOrderService = {
       if (normalizedStatus === 'IN_PROGRESS') inProgress += 1;
 
       const division = String(item.division || '其他').trim() || '其他';
+      const productName =
+        String(item.projectName || '未命名产品').trim() || '未命名产品';
       const quantity = Number(item.quantity) || 0;
       divisionProjectMap.set(
         division,
         (divisionProjectMap.get(division) || 0) + 1,
       );
-      divisionQuantityMap.set(
-        division,
-        (divisionQuantityMap.get(division) || 0) + quantity,
-      );
+      if (getWarrantyStatus(item.deliveryDate) === '是') {
+        const rankingKey = `${division}__${productName}`;
+        divisionProductWarrantyMap.set(
+          rankingKey,
+          (divisionProductWarrantyMap.get(rankingKey) || 0) + quantity,
+        );
+      }
     }
 
     const pieData = [...divisionProjectMap.entries()]
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
 
-    const rankings = [...divisionQuantityMap.entries()]
-      .map(([division, totalQuantity]) => ({ division, totalQuantity }))
-      .sort((a, b) => b.totalQuantity - a.totalQuantity);
+    const rankings = [...divisionProductWarrantyMap.entries()]
+      .map(([rankingKey, warrantyCount]) => {
+        const [division, productName] = rankingKey.split('__');
+        return {
+          division: division || '其他',
+          productName: productName || '未命名产品',
+          warrantyCount,
+        };
+      })
+      .sort((a, b) => b.warrantyCount - a.warrantyCount);
 
     return {
       total,

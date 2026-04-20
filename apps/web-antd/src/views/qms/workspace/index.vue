@@ -1,22 +1,19 @@
 <script lang="ts" setup>
-import type { CheckboxChangeEvent } from 'ant-design-vue/es/checkbox/interface';
-
 import type {
   WorkbenchProjectItem,
-  WorkbenchQuickNavItem,
   WorkbenchTodoItem,
   WorkbenchTrendItem,
 } from '@vben/common-ui';
 
-import type { QmsTaskDispatchApi } from '#/api/qms/task-dispatch';
+import type { WorkspaceWorkOrderAggregateResponse } from '#/api/qms/workspace';
+import type { SystemDeptApi } from '#/api/system/dept';
 
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import {
   WorkbenchHeader,
   WorkbenchProject,
-  WorkbenchQuickNav,
   WorkbenchTodo,
   WorkbenchTrends,
 } from '@vben/common-ui';
@@ -27,67 +24,35 @@ import { openWindow } from '@vben/utils';
 
 import {
   Button,
-  Card,
-  Checkbox,
-  Col,
-  Empty,
-  List,
+  Descriptions,
+  Drawer,
+  Form,
+  Input,
+  message,
   Modal,
-  Progress,
-  Row,
   Select,
-  SelectOption,
-  Statistic,
+  Spin,
+  Table,
   Tag,
 } from 'ant-design-vue';
 
+import {
+  confirmWorkOrderRequirement,
+  uploadWorkOrderRequirements,
+} from '#/api/qms/work-order';
+import { getWorkspaceWorkOrderAggregate } from '#/api/qms/workspace';
+import { getDeptList } from '#/api/system/dept';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useWorkspaceQuery } from '#/hooks/useQmsQueries';
-
-import { useWorkspaceTaskDispatch } from './composables/useWorkspaceTaskDispatch';
+import { findNameById } from '#/types';
+import TeamSelect from '#/views/qms/inspection/records/components/form/TeamSelect.vue';
+import { getProcessOptions } from '#/views/qms/inspection/records/config';
 
 const userStore = useUserStore();
 const router = useRouter();
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
-
-type UserInfoWithOptionalUserId = {
-  id?: number | string;
-  userId?: number | string;
-};
-
-// 获取当前用户 ID 的统一计算属性
-const currentUserId = computed(() => {
-  const info = userStore.userInfo as null | UserInfoWithOptionalUserId;
-  const id = info?.id ?? info?.userId;
-  return id === undefined ? '' : String(id);
-});
-
-// 解决模板中无法访问 Empty.PRESENTED_IMAGE_SIMPLE 的问题
-const EMPTY_IMAGE = Empty.PRESENTED_IMAGE_SIMPLE;
-const {
-  taskStats,
-  myTasks,
-  isDispatchModalVisible,
-  currentTask,
-  userList,
-  businessItems,
-  isItemsLoading,
-  dispatchForm,
-  loadTaskData,
-  handleOpenDispatch,
-  submitSecondaryDispatch,
-  getStatusLabel,
-  getStatusColor,
-} = useWorkspaceTaskDispatch({
-  t,
-  handleApiError,
-  userRoles: userStore.userInfo?.roles || [],
-});
-
-onMounted(() => {
-  loadTaskData();
-});
+const processOptions = computed(() => getProcessOptions(t));
 
 // 使用 vue-query 缓存查询
 const { data: workspaceData } = useWorkspaceQuery();
@@ -111,54 +76,207 @@ const stats = computed(
       openIssuesCount: 0,
     },
 );
+const aggregateVisible = ref(false);
+const aggregateLoading = ref(false);
+const creatingRequirement = ref(false);
+const requirementModalVisible = ref(false);
+const selectedWorkOrderNumber = ref('');
+const aggregateData = ref<null | WorkspaceWorkOrderAggregateResponse>(null);
+const deptRawData = ref<SystemDeptApi.Dept[]>([]);
+const requirementForm = ref({
+  attachment: '',
+  partName: '',
+  processName: '',
+  requirementItemsText: '',
+  requirementName: '',
+  responsiblePerson: '',
+  responsibleTeam: '',
+});
 
-// QMS 快捷导航
-const quickNavItems: WorkbenchQuickNavItem[] = [
-  {
-    color: '#1890ff',
-    icon: 'lucide:layout-dashboard',
-    title: t('qms.dashboard.title'),
-    url: '/qms/dashboard',
-  },
-  {
-    color: '#52c41a',
-    icon: 'lucide:clipboard-list',
-    title: t('qms.workOrder.title'),
-    url: '/qms/work-order',
-  },
-  {
-    color: '#faad14',
-    icon: 'lucide:alert-triangle',
-    title: t('qms.inspection.issues.title'),
-    url: '/qms/inspection/issues',
-  },
-  {
-    color: '#eb2f96',
-    icon: 'lucide:file-check',
-    title: t('qms.inspection.records.title'),
-    url: '/qms/inspection/records',
-  },
-  {
-    color: '#722ed1',
-    icon: 'lucide:phone-call',
-    title: t('qms.afterSales.title'),
-    url: '/qms/after-sales',
-  },
-  {
-    color: '#fa8c16',
-    icon: 'lucide:book-open',
-    title: t('qms.knowledge.title'),
-    url: '/qms/knowledge',
-  },
-  {
-    color: '#13c2c2',
-    icon: 'lucide:file-bar-chart',
-    title: t('qms.reports.daily.title'),
-    url: '/qms/reports',
-  },
-];
+function parseWorkOrderNumber(nav: WorkbenchProjectItem) {
+  if (String(nav.url || '').startsWith('/qms/work-order')) {
+    return String(nav.title || '').trim();
+  }
+  return '';
+}
 
-function navTo(nav: WorkbenchProjectItem | WorkbenchQuickNavItem) {
+async function openWorkOrderAggregate(workOrderNumber: string) {
+  if (deptRawData.value.length === 0) {
+    try {
+      deptRawData.value = await getDeptList();
+    } catch (error) {
+      handleApiError(error, 'Load Workspace Departments');
+    }
+  }
+  aggregateLoading.value = true;
+  aggregateVisible.value = true;
+  selectedWorkOrderNumber.value = workOrderNumber;
+  try {
+    const data = await getWorkspaceWorkOrderAggregate({ workOrderNumber });
+    aggregateData.value = data;
+  } catch (error) {
+    aggregateVisible.value = false;
+    aggregateData.value = null;
+    handleApiError(error, 'Load Workspace Work Order Aggregate');
+  } finally {
+    aggregateLoading.value = false;
+  }
+}
+
+function getDivisionLabel(value?: string) {
+  const idOrName = String(value || '').trim();
+  if (!idOrName) return '-';
+  return findNameById(deptRawData.value, idOrName) || idOrName;
+}
+
+function getWorkOrderStatusLabel(value?: string) {
+  const status = String(value || '')
+    .trim()
+    .toUpperCase();
+  if (status === 'COMPLETED') return '已完成';
+  if (status === 'IN_PROGRESS') return '进行中';
+  if (status === 'CANCELLED') return '已取消';
+  if (status === 'OPEN') return '未开始';
+  return value || '-';
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', { hour12: false });
+}
+
+function formatDate(value?: string) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('zh-CN');
+}
+
+function openRequirementModal() {
+  requirementForm.value = {
+    attachment: '',
+    partName: '',
+    processName: '',
+    requirementItemsText: '',
+    requirementName: '',
+    responsiblePerson: '',
+    responsibleTeam: '',
+  };
+  requirementModalVisible.value = true;
+}
+
+async function submitRequirement() {
+  const workOrderNumber = selectedWorkOrderNumber.value;
+  if (!workOrderNumber) {
+    message.warning('请先选择工单');
+    return;
+  }
+  const requirementName = requirementForm.value.requirementName.trim();
+  if (!requirementName) {
+    message.warning('要求名称不能为空');
+    return;
+  }
+  const items = requirementForm.value.requirementItemsText
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  creatingRequirement.value = true;
+  try {
+    await uploadWorkOrderRequirements({
+      requirements: [
+        {
+          attachment: requirementForm.value.attachment.trim() || undefined,
+          items,
+          partName: requirementForm.value.partName.trim() || undefined,
+          processName: requirementForm.value.processName.trim() || undefined,
+          requirementName,
+          responsiblePerson:
+            requirementForm.value.responsiblePerson.trim() || undefined,
+          responsibleTeam:
+            requirementForm.value.responsibleTeam.trim() || undefined,
+          workOrderNumber,
+        },
+      ],
+    });
+    message.success('要求已新增');
+    requirementModalVisible.value = false;
+    await openWorkOrderAggregate(workOrderNumber);
+  } catch (error) {
+    handleApiError(error, 'Create Work Order Requirement');
+  } finally {
+    creatingRequirement.value = false;
+  }
+}
+
+async function confirmRequirement(id: string) {
+  if (!id) return;
+  try {
+    await confirmWorkOrderRequirement(id, true);
+    message.success('已确认完成');
+    if (selectedWorkOrderNumber.value) {
+      await openWorkOrderAggregate(selectedWorkOrderNumber.value);
+    }
+  } catch (error) {
+    handleApiError(error, 'Confirm Work Order Requirement');
+  }
+}
+
+async function unconfirmRequirement(id: string) {
+  if (!id) return;
+  try {
+    await confirmWorkOrderRequirement(id, false);
+    message.success('已撤销确认');
+    if (selectedWorkOrderNumber.value) {
+      await openWorkOrderAggregate(selectedWorkOrderNumber.value);
+    }
+  } catch (error) {
+    handleApiError(error, 'Unconfirm Work Order Requirement');
+  }
+}
+
+function getExecutionStatusColor(
+  value?:
+    | 'CONFIRMED'
+    | 'EXECUTED_PENDING_CONFIRM'
+    | 'MANUAL_CONFIRMED'
+    | 'NOT_EXECUTED',
+) {
+  if (value === 'CONFIRMED') return 'green';
+  if (value === 'MANUAL_CONFIRMED') return 'cyan';
+  if (value === 'EXECUTED_PENDING_CONFIRM') return 'gold';
+  return 'red';
+}
+
+function getExecutionStatusText(
+  value?:
+    | 'CONFIRMED'
+    | 'EXECUTED_PENDING_CONFIRM'
+    | 'MANUAL_CONFIRMED'
+    | 'NOT_EXECUTED',
+) {
+  if (value === 'CONFIRMED') return '已确认';
+  if (value === 'MANUAL_CONFIRMED') return '手动确认';
+  if (value === 'EXECUTED_PENDING_CONFIRM') return '待确认';
+  return '未执行';
+}
+
+function navToWorkOrderPage() {
+  if (!selectedWorkOrderNumber.value) return;
+  router.push({
+    path: '/qms/work-order',
+    query: { workOrderNumber: selectedWorkOrderNumber.value },
+  });
+}
+
+async function navTo(nav: WorkbenchProjectItem) {
+  const workOrderNumber = parseWorkOrderNumber(nav);
+  if (workOrderNumber) {
+    await openWorkOrderAggregate(workOrderNumber);
+    return;
+  }
   if (nav.url?.startsWith('http')) {
     openWindow(nav.url);
     return;
@@ -167,36 +285,6 @@ function navTo(nav: WorkbenchProjectItem | WorkbenchQuickNavItem) {
     router.push(nav.url).catch((error) => {
       handleApiError(error, 'Workspace Navigation');
     });
-  }
-}
-
-// 任务详情弹窗状态
-const isTaskDetailVisible = ref(false);
-const taskDetailContent = ref<string[]>([]);
-
-function handleViewDetails(task: QmsTaskDispatchApi.TaskDispatch) {
-  const content = task.content as Record<string, unknown> | undefined;
-  const contentItems = content?.items;
-  const requirements = content?.requirements;
-  taskDetailContent.value =
-    (Array.isArray(contentItems) ? (contentItems as string[]) : undefined) ||
-    (Array.isArray(requirements) ? (requirements as string[]) : undefined) ||
-    [];
-  isTaskDetailVisible.value = true;
-}
-
-function handleGoToFill(task: QmsTaskDispatchApi.TaskDispatch) {
-  if (task.type === 'ITP_INSPECTION') {
-    router.push({
-      path: '/qms/inspection/records',
-      query: {
-        taskId: task.id,
-        itpProjectId: task.itpProjectId,
-      },
-    });
-  } else if (task.type === 'DFMEA_ACTION') {
-    // 跳转到 DFMEA 规划页面进行改进措施反馈
-    router.push('/qms/planning/dfmea');
   }
 }
 
@@ -243,153 +331,8 @@ function getGreeting(): string {
       </template>
     </WorkbenchHeader>
 
-    <!-- 任务统计看板 -->
-    <Row :gutter="16" class="mt-5">
-      <Col :span="6">
-        <Card size="small" class="shadow-sm">
-          <Statistic
-            :title="t('qms.workspace.taskStats.pendingLevel1')"
-            :value="taskStats.pendingLevel1"
-            :value-style="{ color: '#cf1322' }"
-          />
-        </Card>
-      </Col>
-      <Col :span="6">
-        <Card size="small" class="shadow-sm">
-          <Statistic
-            :title="t('qms.workspace.taskStats.pendingLevel2')"
-            :value="taskStats.pendingLevel2"
-            :value-style="{ color: '#faad14' }"
-          />
-        </Card>
-      </Col>
-      <Col :span="6">
-        <Card size="small" class="shadow-sm">
-          <Statistic
-            :title="t('qms.workspace.taskStats.processingTasks')"
-            :value="taskStats.processing"
-            :value-style="{ color: '#3f8600' }"
-          />
-        </Card>
-      </Col>
-      <Col :span="6">
-        <Card size="small" class="bg-blue-50/30 shadow-sm">
-          <div class="flex h-[56px] items-center justify-between px-2">
-            <div class="text-gray-500">
-              {{ t('qms.workspace.taskStats.closureRate') }}
-            </div>
-            <Progress
-              type="circle"
-              :percent="85"
-              :size="40"
-              stroke-color="#1890ff"
-            />
-          </div>
-        </Card>
-      </Col>
-    </Row>
-
     <div class="mt-5 flex flex-col lg:flex-row">
       <div class="mr-4 w-full lg:w-3/5">
-        <!-- 待我派发的任务列表 -->
-        <Card
-          :title="t('qms.workspace.taskWorkbench')"
-          size="small"
-          class="mb-5 shadow-sm"
-        >
-          <template #extra>
-            <Button type="link" size="small" @click="loadTaskData">{{
-              t('common.refresh')
-            }}</Button>
-          </template>
-          <List :data-source="myTasks" size="small">
-            <template #renderItem="{ item }">
-              <List.Item>
-                <div class="flex w-full items-center justify-between">
-                  <div class="flex items-center gap-3">
-                    <Tag
-                      :color="
-                        item.type === 'ITP_INSPECTION' ? 'blue' : 'purple'
-                      "
-                    >
-                      {{ item.type === 'ITP_INSPECTION' ? 'ITP' : 'DFMEA' }}
-                    </Tag>
-                    <span class="font-medium">{{ item.title }}</span>
-                  </div>
-                  <div class="flex items-center gap-4">
-                    <!-- 状态展示 -->
-                    <Tag :color="getStatusColor(item.status)">
-                      {{ getStatusLabel(item.status) }}
-                    </Tag>
-
-                    <span class="text-xs">
-                      <Tag
-                        v-if="String(item.assigneeId) === currentUserId"
-                        color="blue"
-                        >{{ t('qms.workspace.myTask') }}</Tag
-                      >
-                      <span v-else class="text-gray-400"
-                        >{{ t('common.responsible') }}:
-                        {{ item.assigneeName || t('common.notSet') }}</span
-                      >
-                    </span>
-
-                    <!-- 动作按钮：仅当当前用户是执行人时显示 -->
-                    <template v-if="String(item.assigneeId) === currentUserId">
-                      <Button
-                        v-if="item.level === 1"
-                        type="primary"
-                        size="small"
-                        ghost
-                        @click="handleOpenDispatch(item)"
-                      >
-                        {{ t('qms.workspace.deconstruct') }}
-                      </Button>
-                      <Button
-                        v-else-if="item.level === 2"
-                        type="primary"
-                        size="small"
-                        ghost
-                        @click="handleGoToFill(item)"
-                      >
-                        {{ t('qms.workspace.goToFill') }}
-                      </Button>
-                      <Button
-                        type="link"
-                        size="small"
-                        @click="handleViewDetails(item)"
-                      >
-                        {{ t('common.detail') }}
-                      </Button>
-                    </template>
-                    <!-- 非执行人也能看详情 -->
-                    <template v-else>
-                      <Button
-                        type="link"
-                        size="small"
-                        @click="handleViewDetails(item)"
-                      >
-                        {{ t('common.detail') }}
-                      </Button>
-                    </template>
-                  </div>
-                </div>
-              </List.Item>
-            </template>
-            <template #footer v-if="myTasks.length === 0">
-              <div class="py-10 text-center">
-                <Empty
-                  :description="t('qms.workspace.unassigned')"
-                  :image="EMPTY_IMAGE"
-                />
-                <div class="mt-2 text-[10px] text-gray-300">
-                  用户 ID: {{ userStore.userInfo?.id || t('common.unknown') }}
-                </div>
-              </div>
-            </template>
-          </List>
-        </Card>
-
         <WorkbenchProject
           :items="projectItems"
           :title="t('qms.workspace.workOrderList')"
@@ -402,120 +345,345 @@ function getGreeting(): string {
         />
       </div>
       <div class="w-full lg:w-2/5">
-        <WorkbenchQuickNav
-          :items="quickNavItems"
-          class="mt-5 lg:mt-0"
-          :title="t('common.quickNav')"
-          @click="navTo"
-        />
         <WorkbenchTodo
           :items="todoItems"
-          class="mt-5"
+          class="mt-5 lg:mt-0"
           title="待处理的工程问题"
         />
       </div>
     </div>
 
-    <!-- 二级分派弹窗 -->
-    <Modal
-      v-model:open="isDispatchModalVisible"
-      :title="`任务二级分办: ${currentTask?.title}`"
-      width="700px"
-      @ok="submitSecondaryDispatch"
+    <Drawer
+      v-model:open="aggregateVisible"
+      :title="`工单聚合看板 - ${selectedWorkOrderNumber || '-'}`"
+      width="980"
     >
-      <div class="space-y-4 py-4">
-        <div
-          class="flex items-start gap-2 rounded bg-blue-50 p-3 text-xs text-blue-700"
-        >
-          <span class="i-lucide-info mt-0.5 text-sm"></span>
-          <div>
-            二级分办说明：您可以将本任务拆解为具体的检验项或措施，并指派给团队成员。
+      <template #extra>
+        <div class="flex items-center gap-2">
+          <Button type="primary" size="small" @click="openRequirementModal">
+            新增要求
+          </Button>
+          <Button type="link" @click="navToWorkOrderPage">前往工单管理</Button>
+        </div>
+      </template>
+      <Spin :spinning="aggregateLoading">
+        <div v-if="aggregateData" class="space-y-4">
+          <Descriptions :column="3" bordered size="small">
+            <Descriptions.Item label="工单号">
+              {{ aggregateData.workOrder.workOrderNumber || '-' }}
+            </Descriptions.Item>
+            <Descriptions.Item label="项目名称">
+              {{ aggregateData.workOrder.projectName || '-' }}
+            </Descriptions.Item>
+            <Descriptions.Item label="客户名称">
+              {{ aggregateData.workOrder.customerName || '-' }}
+            </Descriptions.Item>
+            <Descriptions.Item label="事业部">
+              {{ getDivisionLabel(aggregateData.workOrder.division) }}
+            </Descriptions.Item>
+            <Descriptions.Item label="工单数量">
+              {{ aggregateData.workOrder.quantity || 0 }}
+            </Descriptions.Item>
+            <Descriptions.Item label="状态">
+              {{ getWorkOrderStatusLabel(aggregateData.workOrder.status) }}
+            </Descriptions.Item>
+          </Descriptions>
+
+          <div class="py-2 text-center text-2xl font-bold text-black">
+            工作事项安排与跟踪表
           </div>
-        </div>
 
-        <div>
-          <label class="mb-1 block text-sm font-medium">选择执行人</label>
-          <Select
-            v-model:value="dispatchForm.assigneeId"
-            class="w-full"
-            placeholder="请选择组员"
-          >
-            <SelectOption
-              v-for="user in userList"
-              :key="user.id"
-              :value="user.id"
-            >
-              {{ user.realName || user.username }}
-            </SelectOption>
-          </Select>
-        </div>
-
-        <div>
-          <label class="mb-1 block text-sm font-medium"
-            >勾选指派内容 ({{
-              currentTask?.type === 'ITP_INSPECTION'
-                ? 'ITP 控制点'
-                : 'DFMEA 建议措施'
-            }})</label
-          >
-          <div class="max-h-[300px] overflow-y-auto rounded border p-2">
-            <div v-if="isItemsLoading" class="p-8 text-center text-gray-400">
-              数据加载中...
-            </div>
-            <div v-else-if="businessItems.length > 0" class="space-y-1">
-              <div
-                v-for="item in businessItems"
-                :key="item.id"
-                class="flex items-center gap-2 rounded p-2 hover:bg-gray-50"
-              >
-                <Checkbox
-                  :checked="dispatchForm.selectedItems.includes(item.label)"
-                  @change="
-                    (e: CheckboxChangeEvent) =>
-                      e.target.checked
-                        ? dispatchForm.selectedItems.push(item.label)
-                        : (dispatchForm.selectedItems =
-                            dispatchForm.selectedItems.filter(
-                              (i) => i !== item.label,
-                            ))
-                  "
+          <div class="space-y-3 rounded border border-gray-200 p-3">
+            <div class="text-base font-semibold text-black">制作进度</div>
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div>
+                <div class="mb-2 text-sm font-medium text-gray-700">
+                  过程进度
+                </div>
+                <Table
+                  size="small"
+                  :pagination="false"
+                  :data-source="aggregateData.productionProgress?.process || []"
+                  :columns="[
+                    {
+                      title: '部件名称',
+                      dataIndex: 'partName',
+                      key: 'partName',
+                      ellipsis: true,
+                    },
+                    {
+                      title: '工序',
+                      dataIndex: 'processName',
+                      key: 'processName',
+                      width: 100,
+                    },
+                    {
+                      title: '数量',
+                      dataIndex: 'quantity',
+                      key: 'quantity',
+                      width: 80,
+                    },
+                    {
+                      title: '日期',
+                      dataIndex: 'date',
+                      key: 'date',
+                      width: 120,
+                    },
+                  ]"
+                  :row-key="(record) => record.id"
                 >
-                  {{ item.label }}
-                </Checkbox>
+                  <template #bodyCell="{ column, record }">
+                    <template v-if="column.key === 'date'">
+                      {{ formatDate(record.date) }}
+                    </template>
+                  </template>
+                </Table>
+              </div>
+
+              <div>
+                <div class="mb-2 text-sm font-medium text-gray-700">
+                  外购件进度
+                </div>
+                <Table
+                  size="small"
+                  :pagination="false"
+                  :data-source="
+                    aggregateData.productionProgress?.outsourced || []
+                  "
+                  :columns="[
+                    {
+                      title: '外购件名称',
+                      dataIndex: 'materialName',
+                      key: 'materialName',
+                      ellipsis: true,
+                    },
+                    {
+                      title: '日期',
+                      dataIndex: 'date',
+                      key: 'date',
+                      width: 120,
+                    },
+                  ]"
+                  :row-key="(record) => record.id"
+                >
+                  <template #bodyCell="{ column, record }">
+                    <template v-if="column.key === 'date'">
+                      {{ formatDate(record.date) }}
+                    </template>
+                  </template>
+                </Table>
               </div>
             </div>
-            <div v-else class="p-8 text-center text-gray-400">
-              未查找到相关条目
-            </div>
           </div>
-        </div>
-      </div>
-    </Modal>
 
-    <!-- 任务内容详情弹窗 -->
-    <Modal
-      v-model:open="isTaskDetailVisible"
-      :title="t('qms.task.detail.content')"
-      :footer="null"
-    >
-      <div class="py-4">
-        <List size="small" bordered :data-source="taskDetailContent">
-          <template #renderItem="{ item }">
-            <List.Item>{{ item }}</List.Item>
-          </template>
-          <template #header>
-            <div class="font-medium text-gray-500">
-              {{ t('qms.task.detail.items') }}
-            </div>
-          </template>
-        </List>
-        <div
-          v-if="taskDetailContent.length === 0"
-          class="py-4 text-center text-gray-400"
-        >
-          {{ t('common.noData') }}
+          <Table
+            class="workspace-requirement-table"
+            size="middle"
+            :pagination="false"
+            :scroll="{ x: 1380 }"
+            :data-source="aggregateData.requirements"
+            :columns="[
+              { title: '序号', key: 'seq', width: 70 },
+              {
+                title: 'OBU单元',
+                dataIndex: 'division',
+                key: 'division',
+                width: 120,
+                ellipsis: true,
+              },
+              {
+                title: '工单号',
+                dataIndex: 'workOrderNumber',
+                key: 'workOrderNumber',
+                width: 130,
+                ellipsis: true,
+              },
+              {
+                title: '项目名称',
+                dataIndex: 'projectName',
+                key: 'projectName',
+                width: 140,
+                ellipsis: true,
+              },
+              {
+                title: '内容描述',
+                dataIndex: 'requirementName',
+                key: 'requirementName',
+                width: 170,
+                ellipsis: true,
+              },
+              {
+                title: '文件',
+                dataIndex: 'attachment',
+                key: 'attachment',
+                width: 90,
+              },
+              {
+                title: '下发日期',
+                dataIndex: 'createdAt',
+                key: 'createdAt',
+                width: 120,
+              },
+              {
+                title: '责任班组',
+                dataIndex: 'responsibleTeam',
+                key: 'responsibleTeam',
+                width: 120,
+                ellipsis: true,
+              },
+              { title: '完成情况', key: 'executionStatus', width: 110 },
+              {
+                title: '执行人',
+                dataIndex: 'executor',
+                key: 'executor',
+                width: 100,
+                ellipsis: true,
+              },
+              {
+                title: '完成时间',
+                dataIndex: 'confirmedAt',
+                key: 'confirmedAt',
+                width: 180,
+              },
+              { title: '操作', key: 'action', width: 110 },
+            ]"
+            :row-key="
+              (record) =>
+                `${record.partName}-${record.processName}-${record.id}`
+            "
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'seq'">
+                {{
+                  aggregateData.requirements.findIndex(
+                    (item) => item.id === record.id,
+                  ) + 1
+                }}
+              </template>
+              <template v-else-if="column.key === 'division'">
+                {{ getDivisionLabel(aggregateData.workOrder.division) }}
+              </template>
+              <template v-else-if="column.key === 'projectName'">
+                {{ aggregateData.workOrder.projectName || '-' }}
+              </template>
+              <template v-else-if="column.key === 'createdAt'">
+                {{
+                  record.createdAt
+                    ? new Date(record.createdAt).toLocaleDateString('zh-CN')
+                    : '-'
+                }}
+              </template>
+              <template v-else-if="column.key === 'attachment'">
+                <a
+                  v-if="record.attachment"
+                  :href="record.attachment"
+                  target="_blank"
+                  class="text-blue-600 underline"
+                >
+                  文件
+                </a>
+                <span v-else class="text-gray-400">未上传</span>
+              </template>
+              <template v-else-if="column.key === 'responsibleTeam'">
+                {{
+                  record.responsibleTeam ||
+                  getDivisionLabel(aggregateData.workOrder.division)
+                }}
+              </template>
+              <template v-else-if="column.key === 'executionStatus'">
+                <Tag :color="getExecutionStatusColor(record.executionStatus)">
+                  {{ getExecutionStatusText(record.executionStatus) }}
+                </Tag>
+              </template>
+              <template v-else-if="column.key === 'confirmedAt'">
+                {{ formatDateTime(record.confirmedAt) }}
+              </template>
+              <template v-else-if="column.key === 'action'">
+                <div class="flex items-center gap-2">
+                  <Button
+                    v-if="
+                      record.executionStatus !== 'CONFIRMED' &&
+                      record.executionStatus !== 'MANUAL_CONFIRMED'
+                    "
+                    type="link"
+                    size="small"
+                    @click="confirmRequirement(record.id)"
+                  >
+                    确认完成
+                  </Button>
+                  <Button
+                    v-else
+                    type="link"
+                    size="small"
+                    @click="unconfirmRequirement(record.id)"
+                  >
+                    撤销确认
+                  </Button>
+                </div>
+              </template>
+            </template>
+          </Table>
         </div>
-      </div>
+      </Spin>
+    </Drawer>
+
+    <Modal
+      v-model:open="requirementModalVisible"
+      title="新增工单要求"
+      :confirm-loading="creatingRequirement"
+      @ok="submitRequirement"
+    >
+      <Form layout="vertical">
+        <Form.Item label="要求名称" required>
+          <Input
+            v-model:value="requirementForm.requirementName"
+            placeholder="例如：焊缝外观复检要求"
+          />
+        </Form.Item>
+        <Form.Item label="部件名称">
+          <Input
+            v-model:value="requirementForm.partName"
+            placeholder="例如：底盘总成"
+          />
+        </Form.Item>
+        <Form.Item label="工序">
+          <Select
+            v-model:value="requirementForm.processName"
+            :options="processOptions"
+            placeholder="请选择工序"
+            show-search
+            allow-clear
+          />
+        </Form.Item>
+        <Form.Item label="文件链接">
+          <Input
+            v-model:value="requirementForm.attachment"
+            placeholder="例如：https://.../需求变更.pdf"
+          />
+        </Form.Item>
+        <Form.Item label="责任班组">
+          <TeamSelect v-model:value="requirementForm.responsibleTeam" />
+        </Form.Item>
+        <Form.Item label="责任人">
+          <Input
+            v-model:value="requirementForm.responsiblePerson"
+            placeholder="例如：张三"
+          />
+        </Form.Item>
+        <Form.Item label="要求项点（每行一条）">
+          <Input.TextArea
+            v-model:value="requirementForm.requirementItemsText"
+            :rows="6"
+            placeholder="输入项点，每行一条，例如：&#10;焊缝高度一致&#10;无夹渣气孔"
+          />
+        </Form.Item>
+      </Form>
     </Modal>
   </div>
 </template>
+
+<style scoped>
+:deep(.workspace-requirement-table .ant-table-cell) {
+  white-space: nowrap;
+}
+</style>

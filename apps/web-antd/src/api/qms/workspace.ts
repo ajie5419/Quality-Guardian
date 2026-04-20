@@ -1,0 +1,109 @@
+import { requestClient } from '#/api/request';
+
+import { QMS_API } from './constants';
+
+export interface WorkspaceWorkOrderAggregateResponse {
+  byPart: Array<{
+    completionRate: number;
+    inspectedPoints: number;
+    missingPoints: number;
+    partName: string;
+    plannedPoints: number;
+  }>;
+  byProcess: Array<{
+    completionRate: number;
+    inspectedPoints: number;
+    missingPoints: number;
+    plannedPoints: number;
+    processName: string;
+  }>;
+  inspectionWorksToday: Array<{
+    inspector: string;
+    partName: string;
+    processName: string;
+    quantity: number;
+    result: string;
+    workOrderNumber: string;
+  }>;
+  productionProgress: {
+    outsourced: Array<{
+      date: string;
+      id: string;
+      materialName: string;
+    }>;
+    process: Array<{
+      date: string;
+      id: string;
+      partName: string;
+      processName: string;
+      quantity: number;
+    }>;
+  };
+  missingDetails: Array<{
+    inspectedPoints: number;
+    missingPoints: number;
+    partName: string;
+    plannedPoints: number;
+    processName: string;
+    status: 'NOT_STARTED' | 'PARTIAL';
+  }>;
+  requirements: Array<{
+    attachment: string;
+    confirmedAt?: null | string;
+    confirmer: string;
+    confirmStatus: string;
+    createdAt: string;
+    executed: boolean;
+    executedPoints: number;
+    executionStatus:
+      | 'CONFIRMED'
+      | 'EXECUTED_PENDING_CONFIRM'
+      | 'MANUAL_CONFIRMED'
+      | 'NOT_EXECUTED';
+    executor: string;
+    id: string;
+    partName: string;
+    plannedPoints: number;
+    processName: string;
+    requirementName: string;
+    responsiblePerson: string;
+    responsibleTeam: string;
+    status: 'EXECUTED' | 'NOT_EXECUTED';
+    workOrderNumber: string;
+  }>;
+  summary: {
+    checkedParts: number;
+    completionRate: number;
+    confirmedRequirements: number;
+    executedRequirements: number;
+    inspectedPoints: number;
+    missingPoints: number;
+    overdueUnconfirmedRequirements: number;
+    pendingConfirmRequirements: number;
+    pendingRequirements: number;
+    plannedPoints: number;
+    plannedRequirements: number;
+    totalParts: number;
+  };
+  workOrder: {
+    customerName: string;
+    division: string;
+    projectName: string;
+    quantity: number;
+    status: string;
+    workOrderNumber: string;
+  };
+}
+
+export async function getWorkspaceData() {
+  return requestClient.get(QMS_API.WORKSPACE);
+}
+
+export async function getWorkspaceWorkOrderAggregate(params: {
+  workOrderNumber: string;
+}) {
+  return requestClient.get<WorkspaceWorkOrderAggregateResponse>(
+    QMS_API.WORKSPACE_WORK_ORDER_AGGREGATE,
+    { params },
+  );
+}

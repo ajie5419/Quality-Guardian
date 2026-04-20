@@ -95,9 +95,18 @@ async function getTrendData(granularity: string) {
 
   const trend = await Promise.all(
     periods.map(async (p) => {
+      if (p.start > now) {
+        return {
+          period: p.label,
+          passRate: null,
+          totalCount: 0,
+          passCount: 0,
+        };
+      }
+
       const summary = await getNetPassRateSummaryByRange(p.start, p.end);
 
-      const emptyPeriodPassRate: null | number = p.start > now ? null : 100;
+      const emptyPeriodPassRate: null | number = 100;
       const passRate: null | number =
         summary.totalCount === 0 ? emptyPeriodPassRate : summary.passRate;
 

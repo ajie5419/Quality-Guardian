@@ -216,6 +216,14 @@ export const getGridColumns = (
         cellValue || '-',
     },
     {
+      field: 'warrantyStatus',
+      title: $t('qms.workOrder.warrantyStatus'),
+      width: 100,
+      sortable: true,
+      formatter: ({ cellValue }: { cellValue: null | string | undefined }) =>
+        cellValue || '-',
+    },
+    {
       field: 'status',
       title: $t('qms.workOrder.statusLabel'),
       width: 120,

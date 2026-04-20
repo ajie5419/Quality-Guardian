@@ -39,7 +39,11 @@ const dashboardStats = computed(() => {
       inProgress: 0,
       pieData: [] as Array<{ color: string; name: string; value: number }>,
       progressPercent: 0,
-      rankings: [] as Array<{ division: string; totalQuantity: number }>,
+      rankings: [] as Array<{
+        division: string;
+        productName: string;
+        warrantyCount: number;
+      }>,
       total: 0,
     };
   }
@@ -56,9 +60,12 @@ const dashboardStats = computed(() => {
 
   const rankings = (source.rankings || []).map((item) => {
     const rawDivision = String(item.division || t('qms.common.other')).trim();
+    const productName =
+      String(item.productName || '未知产品').trim() || '未知产品';
     return {
       division: findNameById(props.deptData, rawDivision) || rawDivision,
-      totalQuantity: Number(item.totalQuantity || 0),
+      productName,
+      warrantyCount: Number(item.warrantyCount || 0),
     };
   });
 
@@ -187,7 +194,7 @@ watch(
 
     <Col :span="10">
       <Card
-        :title="t('qms.workOrder.outputRanking')"
+        :title="t('qms.workOrder.warrantyRanking')"
         size="small"
         class="h-full shadow-sm"
       >
@@ -196,7 +203,7 @@ watch(
             <div class="space-y-1.5 py-1">
               <div
                 v-for="(rank, idx) in dashboardStats.rankings"
-                :key="rank.division"
+                :key="`${rank.division}-${rank.productName}`"
                 class="group flex items-center justify-between rounded-lg border-b border-gray-50 p-2.5 transition-all hover:bg-blue-50/30"
               >
                 <div class="flex items-center gap-4">
@@ -211,16 +218,21 @@ watch(
                   >
                     {{ idx + 1 }}
                   </div>
-                  <span class="text-sm font-bold text-gray-700">{{
-                    rank.division
-                  }}</span>
+                  <div class="flex flex-col">
+                    <span class="text-sm font-bold text-gray-700">{{
+                      rank.division
+                    }}</span>
+                    <span class="text-xs text-gray-500">
+                      {{ rank.productName }}
+                    </span>
+                  </div>
                 </div>
                 <div class="flex items-center gap-2">
                   <span class="text-[11px] text-gray-400">{{
-                    t('qms.workOrder.totalOutput')
+                    t('qms.workOrder.warrantyCount')
                   }}</span>
                   <span class="font-mono text-base font-bold text-blue-600">{{
-                    rank.totalQuantity
+                    rank.warrantyCount
                   }}</span>
                   <span class="text-[11px] text-gray-400">{{
                     t('common.unit.piece')

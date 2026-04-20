@@ -32,10 +32,10 @@ const columns = [
     key: 'condition',
   },
   {
-    title: '扣分 (基础100)',
+    title: '扣分规则 (基础100)',
     dataIndex: 'deduction',
     key: 'deduction',
-    width: 120,
+    width: 160,
   },
   {
     title: '评级影响',
@@ -52,79 +52,104 @@ const columns = [
 ];
 
 const data = [
-  // A类
+  // A类事故
   {
     key: 'A1',
     dimension: 'A类质量事故',
-    condition: '连续 3 次 或 单次损失 > 8万',
-    deduction: '0分',
-    rating: 'D (淘汰)',
-    status: 'Frozen',
+    condition: '单次发生（损失 > 5000 或严重度为 critical/fatal/p0/p1/致命）',
+    deduction: '-15分/次',
+    rating: '-',
+    status: '-',
   },
   {
     key: 'A2',
     dimension: 'A类质量事故',
-    condition: '累计 2 次',
-    deduction: '封顶 70分',
-    rating: 'C (降级)',
+    condition: '累计 ≥ 2 次（最近12个月）',
+    deduction: '总分封顶 70 分',
+    rating: '建议C',
     status: 'Action',
   },
   {
     key: 'A3',
     dimension: 'A类质量事故',
-    condition: '单次发生 (损失>5000 或 致命缺陷)',
-    deduction: '-15分/次',
-    rating: 'B',
-    status: '-',
+    condition: '与B类合并后出现连续 3 次（且问题总数≥3）',
+    deduction: '总分归零',
+    rating: 'D (淘汰)',
+    status: 'Frozen',
   },
-  // B类
+  // B类事故
   {
     key: 'B1',
     dimension: 'B类质量事故',
-    condition: '连续 3 次',
-    deduction: '0分',
-    rating: 'D (淘汰)',
-    status: 'Frozen',
+    condition: '单次发生（严重度为 high/major/p2）',
+    deduction: '-5分/次',
+    rating: '-',
+    status: '-',
   },
   {
     key: 'B2',
     dimension: 'B类质量事故',
-    condition: '累计 3 次',
-    deduction: '封顶 70分',
-    rating: 'C (降级)',
+    condition: '累计 ≥ 3 次（最近12个月）',
+    deduction: '总分封顶 70 分',
+    rating: '建议C',
     status: 'Action',
   },
   {
     key: 'B3',
     dimension: 'B类质量事故',
-    condition: '单次发生 (严重程度: Major)',
-    deduction: '-5分/次',
-    rating: 'B',
-    status: '-',
+    condition: '与A类合并后出现连续 3 次（且问题总数≥3）',
+    deduction: '总分归零',
+    rating: 'D (淘汰)',
+    status: 'Frozen',
   },
-  // C类
+  // C类事故
   {
     key: 'C1',
     dimension: 'C类质量事故',
-    condition: '单次发生 (严重程度: Minor)',
+    condition: '单次发生（严重度为 low/minor/p3）',
     deduction: '-1分/次',
     rating: '-',
     status: '-',
   },
-  // 进货
+  // 进货检验
   {
     key: 'IN1',
     dimension: '进货检验',
-    condition: '批次合格率 < 90% (且批数>5)',
-    deduction: '按批扣分',
-    rating: 'C (降级)',
-    status: 'Action',
+    condition: '单批次不合格（FAIL）',
+    deduction: '-3分/批',
+    rating: '-',
+    status: '-',
   },
   {
     key: 'IN2',
     dimension: '进货检验',
-    condition: '单批次不合格 (FAIL)',
-    deduction: '-3分/批',
+    condition: '最近12个月批次 > 5 且进货合格率 < 90%',
+    deduction: '总分封顶 70 分',
+    rating: '建议C',
+    status: 'Action',
+  },
+  // 综合规则
+  {
+    key: 'G1',
+    dimension: '综合规则',
+    condition: '单次损失 > 8万（且问题总数≥3）',
+    deduction: '总分归零',
+    rating: 'D (淘汰)',
+    status: 'Frozen',
+  },
+  {
+    key: 'G2',
+    dimension: '综合规则',
+    condition: '综合分 < 75',
+    deduction: '总分封顶 75 分',
+    rating: '按分数映射',
+    status: 'Action',
+  },
+  {
+    key: 'G3',
+    dimension: '综合规则',
+    condition: '最终评级映射',
+    deduction: 'A≥90, B≥80, C≥65, D<65',
     rating: '-',
     status: '-',
   },
@@ -146,11 +171,11 @@ defineExpose({ openModal });
   >
     <div class="mb-4 text-gray-500">
       <p>
-        系统根据 **最近12个月** 的质量记录自动计算评分与等级。
+        系统根据 **最近12个月**
+        的质量记录自动计算评分与等级（基础分100，按事件扣分）。
         <br />
         <span class="text-xs text-gray-400"
-          >*
-          外协单位与供应商适用同一套评价标准。进货检验权重较低，主要关注售后/工程质量事故。</span
+          >* 外协单位与供应商适用同一套规则；冻结/观察规则优先于普通扣分。</span
         >
       </p>
     </div>

@@ -10,10 +10,13 @@ interface AnalysisOverviewItem {
 
 interface WorkbenchProjectItem {
   color?: string;
+  confirmedRequirements?: number;
   content: string;
   date: string;
   group: string;
   icon: Component | string;
+  overdueUnconfirmedRequirements?: number;
+  plannedRequirements?: number;
   title: string;
   url?: string;
 }

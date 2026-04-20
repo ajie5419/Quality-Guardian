@@ -17,12 +17,16 @@ export * from '@qgs/shared';
  * Get Work Order list (Paginated with Summary)
  */
 export async function getWorkOrderList(params?: {
+  endDate?: string;
+  granularity?: 'month' | 'week' | 'year';
   ids?: string; // Comma separated IDs
   ignoreYearFilter?: boolean;
   keyword?: string;
   page?: number;
   pageSize?: number;
+  productName?: string;
   projectName?: string;
+  startDate?: string;
   status?: string;
   workOrderNumber?: string;
   year?: number;
@@ -35,12 +39,16 @@ export async function getWorkOrderList(params?: {
 }
 
 export async function getWorkOrderListPage(params?: {
+  endDate?: string;
+  granularity?: 'month' | 'week' | 'year';
   ids?: string;
   ignoreYearFilter?: boolean;
   keyword?: string;
   page?: number;
   pageSize?: number;
+  productName?: string;
   projectName?: string;
+  startDate?: string;
   status?: string;
   workOrderNumber?: string;
   year?: number;
@@ -58,15 +66,23 @@ export type WorkOrderDashboardStats = {
   inProgress: number;
   pieData: Array<{ name: string; value: number }>;
   progressPercent: number;
-  rankings: Array<{ division: string; totalQuantity: number }>;
+  rankings: Array<{
+    division: string;
+    productName: string;
+    warrantyCount: number;
+  }>;
   total: number;
 };
 
 export async function getWorkOrderDashboardStats(params?: {
+  endDate?: string;
+  granularity?: 'month' | 'week' | 'year';
   ids?: string;
   ignoreYearFilter?: boolean;
   keyword?: string;
+  productName?: string;
   projectName?: string;
+  startDate?: string;
   status?: string;
   workOrderNumber?: string;
   year?: number;
@@ -77,10 +93,14 @@ export async function getWorkOrderDashboardStats(params?: {
 }
 
 export async function getWorkOrderExportList(params?: {
+  endDate?: string;
+  granularity?: 'month' | 'week' | 'year';
   ids?: string;
   ignoreYearFilter?: boolean;
   keyword?: string;
+  productName?: string;
   projectName?: string;
+  startDate?: string;
   status?: string;
   workOrderNumber?: string;
   year?: number;
@@ -145,6 +165,59 @@ export async function importWorkOrders(items: Array<Record<string, unknown>>) {
   return requestClient.post<QmsImportSummary>(QMS_API.WORK_ORDER_IMPORT, {
     items,
   });
+}
+
+export async function getWorkOrderRequirements(params: {
+  workOrderNumber: string;
+}) {
+  return requestClient.get<
+    Array<{
+      attachment: string;
+      confirmedAt?: null | string;
+      confirmer: string;
+      confirmStatus: 'CONFIRMED' | 'PENDING';
+      createdAt: string;
+      id: string;
+      items: unknown[];
+      partName: string;
+      processName: string;
+      requirementName: string;
+      responsiblePerson: string;
+      responsibleTeam: string;
+      workOrderNumber: string;
+    }>
+  >(QMS_API.WORK_ORDER_REQUIREMENTS, { params });
+}
+
+export async function uploadWorkOrderRequirements(data: {
+  requirements: Array<{
+    attachment?: string;
+    items?: unknown[];
+    partName?: string;
+    processName?: string;
+    requirementName: string;
+    responsiblePerson?: string;
+    responsibleTeam?: string;
+    workOrderNumber: string;
+  }>;
+}) {
+  return requestClient.post<{
+    items: Array<{
+      id: string;
+      requirementName: string;
+      workOrderNumber: string;
+    }>;
+    success: boolean;
+  }>(QMS_API.WORK_ORDER_REQUIREMENTS, data);
+}
+
+export async function confirmWorkOrderRequirement(id: string, confirm = true) {
+  return requestClient.put<{
+    confirmedAt?: null | string;
+    confirmer?: null | string;
+    confirmStatus: 'CONFIRMED' | 'PENDING';
+    id: string;
+  }>(`${QMS_API.WORK_ORDER_REQUIREMENTS}/${id}`, { confirm });
 }
 
 export namespace QmsWorkOrderApi {

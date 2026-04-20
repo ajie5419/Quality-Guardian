@@ -48,6 +48,11 @@
   },
   "workOrder": {
     "statusLabel": "Status",
+    "dateMode": "Dimension",
+    "productName": "Product",
+    "warrantyRanking": "In-Warranty Qty by Division Product",
+    "warrantyCount": "In-Warranty Qty",
+    "warrantyStatus": "Warranty Status",
     "status": {
       "open": "Open",
       "pending": "Pending",
