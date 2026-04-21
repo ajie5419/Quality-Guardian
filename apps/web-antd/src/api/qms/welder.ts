@@ -15,6 +15,7 @@ export interface WelderItem {
   team: string;
   updatedAt?: string;
   welderCode?: null | string;
+  welding_method?: null | string;
 }
 
 export interface WelderStats {

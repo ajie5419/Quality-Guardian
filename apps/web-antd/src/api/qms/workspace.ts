@@ -2,6 +2,13 @@ import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
 
+export interface WorkOrderRequirementAttachment {
+  name?: string;
+  thumbUrl?: string;
+  type?: string;
+  url: string;
+}
+
 export interface WorkspaceWorkOrderAggregateResponse {
   byPart: Array<{
     completionRate: number;
@@ -32,11 +39,20 @@ export interface WorkspaceWorkOrderAggregateResponse {
       materialName: string;
     }>;
     process: Array<{
+      coveredQuantity: number;
       date: string;
       id: string;
+      latestDate: string;
       partName: string;
-      processName: string;
-      quantity: number;
+      processes: Array<{
+        completedQuantity: number;
+        latestDate: string;
+        processName: string;
+        status: 'COMPLETE' | 'PARTIAL';
+        totalQuantity: number;
+      }>;
+      teams: string[];
+      totalQuantity: number;
     }>;
   };
   missingDetails: Array<{
@@ -48,7 +64,7 @@ export interface WorkspaceWorkOrderAggregateResponse {
     status: 'NOT_STARTED' | 'PARTIAL';
   }>;
   requirements: Array<{
-    attachment: string;
+    attachments: WorkOrderRequirementAttachment[];
     confirmedAt?: null | string;
     confirmer: string;
     confirmStatus: string;

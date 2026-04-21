@@ -8,9 +8,10 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
+import { stringifyRequirementAttachments } from '~/utils/work-order-requirement-attachments';
 
 type RequirementPayload = {
-  attachment?: string;
+  attachments?: unknown[];
   items?: unknown[];
   partName?: string;
   processName?: string;
@@ -37,7 +38,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const normalized = requirements.map((item) => ({
-      attachment: String(item.attachment || '').trim() || null,
+      attachments: stringifyRequirementAttachments(item.attachments),
       items: Array.isArray(item.items) ? item.items : [],
       partName: String(item.partName || '').trim() || null,
       processName: String(item.processName || '').trim() || null,
@@ -57,7 +58,7 @@ export default defineEventHandler(async (event) => {
       normalized.map((item) =>
         prisma.work_order_requirements.create({
           data: {
-            attachment: item.attachment,
+            attachment: item.attachments,
             createdBy: userinfo.username,
             partName: item.partName,
             processName: item.processName,

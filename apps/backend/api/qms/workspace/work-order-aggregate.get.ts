@@ -8,12 +8,27 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
+import { parseRequirementAttachments } from '~/utils/work-order-requirement-attachments';
 
 type GroupStats = {
   inspectedPoints: number;
   partName: string;
   plannedPoints: number;
   processName: string;
+};
+
+type ProcessProgressGroup = {
+  latestDate: Date;
+  partName: string;
+  processStats: Map<
+    string,
+    {
+      completedQuantity: number;
+      latestDate: Date;
+    }
+  >;
+  teams: Set<string>;
+  totalQuantity: number;
 };
 
 export default defineEventHandler(async (event) => {
@@ -93,7 +108,7 @@ export default defineEventHandler(async (event) => {
       current.plannedPoints += plannedPoints;
       byGroup.set(key, current);
       return {
-        attachment: item.attachment || '',
+        attachments: parseRequirementAttachments(item.attachment),
         confirmer: item.confirmer || '',
         confirmedAt: item.confirmedAt,
         confirmStatus: String(item.confirmStatus || 'PENDING'),
@@ -127,12 +142,7 @@ export default defineEventHandler(async (event) => {
       result: string;
       workOrderNumber: string;
     }> = [];
-    const processProgressRows: Array<{
-      inspectionDate: Date;
-      partName: string;
-      processName: string;
-      quantity: number;
-    }> = [];
+    const processProgressMap = new Map<string, ProcessProgressGroup>();
     const outsourcedProgressRows: Array<{
       inspectionDate: Date;
       materialName: string;
@@ -176,12 +186,45 @@ export default defineEventHandler(async (event) => {
       }
 
       if (inspection.category === 'PROCESS') {
-        processProgressRows.push({
-          inspectionDate: inspection.inspectionDate,
+        const inspectionQuantity = Math.max(
+          1,
+          Number(inspection.quantity) || 1,
+        );
+        const current = processProgressMap.get(partName) || {
+          latestDate: inspection.inspectionDate,
           partName,
-          processName,
-          quantity: Number(inspection.quantity || 0),
-        });
+          processStats: new Map(),
+          totalQuantity: 0,
+          teams: new Set<string>(),
+        };
+        /**
+         * Workspace progress follows the current shop-floor data entry rule:
+         * repeated records for the same part/process represent additional
+         * inspected pieces. We therefore accumulate quantity per process and use
+         * the largest process total as the part baseline, which exposes gaps such
+         * as "grouping 3/4, welding 4/4".
+         */
+        if (inspection.inspectionDate > current.latestDate) {
+          current.latestDate = inspection.inspectionDate;
+        }
+        const processStat = current.processStats.get(processName) || {
+          completedQuantity: 0,
+          latestDate: inspection.inspectionDate,
+        };
+        processStat.completedQuantity += inspectionQuantity;
+        if (inspection.inspectionDate > processStat.latestDate) {
+          processStat.latestDate = inspection.inspectionDate;
+        }
+        current.processStats.set(processName, processStat);
+        current.totalQuantity = Math.max(
+          current.totalQuantity,
+          processStat.completedQuantity,
+        );
+        const team = String(inspection.team || '').trim();
+        if (team) {
+          current.teams.add(team);
+        }
+        processProgressMap.set(partName, current);
       }
 
       const incomingType = String(inspection.incomingType || '').trim();
@@ -320,13 +363,44 @@ export default defineEventHandler(async (event) => {
           id: `${workOrderNumber}-outsourced-${index}`,
           materialName: item.materialName,
         })),
-        process: processProgressRows.map((item, index) => ({
-          date: item.inspectionDate,
-          id: `${workOrderNumber}-process-${index}`,
-          partName: item.partName,
-          processName: item.processName,
-          quantity: item.quantity,
-        })),
+        process: [...processProgressMap.values()]
+          .map((item, index) => {
+            let coveredQuantity = 0;
+            for (const processStat of item.processStats.values()) {
+              coveredQuantity = Math.max(
+                coveredQuantity,
+                processStat.completedQuantity,
+              );
+            }
+
+            return {
+              coveredQuantity,
+              date: item.latestDate,
+              id: `${workOrderNumber}-process-${index}`,
+              latestDate: item.latestDate,
+              partName: item.partName,
+              processes: [...item.processStats.entries()]
+                .map(([processName, processStat]) => ({
+                  completedQuantity: Math.min(
+                    processStat.completedQuantity,
+                    item.totalQuantity,
+                  ),
+                  latestDate: processStat.latestDate,
+                  processName,
+                  status:
+                    processStat.completedQuantity >= item.totalQuantity
+                      ? ('COMPLETE' as const)
+                      : ('PARTIAL' as const),
+                  totalQuantity: item.totalQuantity,
+                }))
+                .sort(
+                  (a, b) => b.latestDate.getTime() - a.latestDate.getTime(),
+                ),
+              teams: [...item.teams],
+              totalQuantity: item.totalQuantity,
+            };
+          })
+          .sort((a, b) => b.latestDate.getTime() - a.latestDate.getTime()),
       },
       missingDetails: missingDetails.sort(
         (a, b) => b.missingPoints - a.missingPoints,

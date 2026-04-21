@@ -8,6 +8,7 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
+import { parseRequirementAttachments } from '~/utils/work-order-requirement-attachments';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -46,7 +47,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(
       list.map((item) => ({
-        attachment: item.attachment || '',
+        attachments: parseRequirementAttachments(item.attachment),
         confirmer: item.confirmer || '',
         confirmedAt: item.confirmedAt,
         confirmStatus: item.confirmStatus || 'PENDING',

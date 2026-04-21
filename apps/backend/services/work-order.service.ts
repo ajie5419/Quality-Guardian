@@ -86,7 +86,7 @@ const isValidDate = (value?: string) => {
   return !Number.isNaN(new Date(value).getTime());
 };
 
-async function buildWorkOrderWhereCondition(
+export async function buildWorkOrderWhereCondition(
   params: WorkOrderListParams,
 ): Promise<Prisma.work_ordersWhereInput> {
   const {
@@ -219,14 +219,45 @@ export const WorkOrderService = {
         }),
       ]);
 
+      const workOrderNumbers = workOrders
+        .map((item) => String(item.workOrderNumber || '').trim())
+        .filter(Boolean);
+      const requirementRows =
+        workOrderNumbers.length > 0
+          ? await prisma.work_order_requirements.findMany({
+              where: {
+                isDeleted: false,
+                status: 'active',
+                workOrderNumber: { in: workOrderNumbers },
+              },
+              select: {
+                confirmStatus: true,
+                createdAt: true,
+                workOrderNumber: true,
+              },
+            })
+          : [];
+      const requirementSummaryMap = buildRequirementSummaryMap(requirementRows);
+
       // 5. 数据映射与返回
       const items: WorkOrderItem[] = workOrders.map((wo) => {
+        const requirementSummary = requirementSummaryMap.get(
+          wo.workOrderNumber,
+        ) || {
+          confirmedRequirements: 0,
+          overdueUnconfirmedRequirements: 0,
+          plannedRequirements: 0,
+        };
         return {
           ...wo,
+          confirmedRequirements: requirementSummary.confirmedRequirements,
           id: wo.workOrderNumber,
           deliveryDate: formatDateString(wo.deliveryDate),
           effectiveTime: formatDateString(wo.effectiveTime),
           createTime: wo.createdAt ? wo.createdAt.toISOString() : null,
+          overdueUnconfirmedRequirements:
+            requirementSummary.overdueUnconfirmedRequirements,
+          plannedRequirements: requirementSummary.plannedRequirements,
           status: mapToDisplayStatus(wo.status),
           warrantyStatus: getWarrantyStatus(wo.deliveryDate),
           projectName: wo.projectName || null,
@@ -320,4 +351,166 @@ export const WorkOrderService = {
       rankings,
     };
   },
+
+  async getRequirementOverview(
+    params: Omit<WorkOrderListParams, 'page' | 'pageSize'>,
+  ) {
+    const workOrderWhere = await buildWorkOrderWhereCondition(params);
+    const requirementWhere: Prisma.work_order_requirementsWhereInput = {
+      isDeleted: false,
+      status: 'active',
+      work_order: workOrderWhere,
+    };
+    const overdueDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+
+    const [
+      plannedRequirements,
+      confirmedRequirements,
+      overdueUnconfirmedRequirements,
+    ] = await Promise.all([
+      prisma.work_order_requirements.count({
+        where: requirementWhere,
+      }),
+      prisma.work_order_requirements.count({
+        where: {
+          ...requirementWhere,
+          confirmStatus: 'CONFIRMED',
+        },
+      }),
+      prisma.work_order_requirements.count({
+        where: {
+          ...requirementWhere,
+          NOT: { confirmStatus: 'CONFIRMED' },
+          createdAt: { lt: overdueDate },
+        },
+      }),
+    ]);
+
+    return {
+      confirmedRequirements,
+      overdueUnconfirmedRequirements,
+      pendingRequirements: Math.max(
+        plannedRequirements - confirmedRequirements,
+        0,
+      ),
+      plannedRequirements,
+    };
+  },
+
+  async getRequirementBoard(
+    params: Omit<WorkOrderListParams, 'ids'> & {
+      filter?: 'all' | 'confirmed' | 'overdue' | 'pending';
+    },
+  ) {
+    const {
+      page = WO_CONSTANTS.DEFAULT_PAGE,
+      pageSize = WO_CONSTANTS.DEFAULT_PAGE_SIZE,
+      filter = 'all',
+    } = params;
+    const workOrderWhere = await buildWorkOrderWhereCondition(params);
+    const overdueDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+    const where: Prisma.work_order_requirementsWhereInput = {
+      isDeleted: false,
+      status: 'active',
+      work_order: workOrderWhere,
+    };
+
+    switch (filter) {
+      case 'confirmed': {
+        where.confirmStatus = 'CONFIRMED';
+        break;
+      }
+      case 'overdue': {
+        where.NOT = { confirmStatus: 'CONFIRMED' };
+        where.createdAt = { lt: overdueDate };
+        break;
+      }
+      case 'pending': {
+        where.NOT = { confirmStatus: 'CONFIRMED' };
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+
+    const [items, total] = await Promise.all([
+      prisma.work_order_requirements.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: [{ createdAt: 'desc' }],
+        select: {
+          attachment: true,
+          confirmer: true,
+          confirmedAt: true,
+          confirmStatus: true,
+          createdAt: true,
+          id: true,
+          partName: true,
+          processName: true,
+          requirementName: true,
+          responsiblePerson: true,
+          responsibleTeam: true,
+          workOrderNumber: true,
+          work_order: {
+            select: {
+              customerName: true,
+              division: true,
+              projectName: true,
+              status: true,
+            },
+          },
+        },
+      }),
+      prisma.work_order_requirements.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+    };
+  },
 };
+
+function buildRequirementSummaryMap(
+  rows: Array<{
+    confirmStatus: string;
+    createdAt: Date;
+    workOrderNumber: string;
+  }>,
+) {
+  const result = new Map<
+    string,
+    {
+      confirmedRequirements: number;
+      overdueUnconfirmedRequirements: number;
+      plannedRequirements: number;
+    }
+  >();
+  const now = Date.now();
+  const tenDaysMs = 10 * 24 * 60 * 60 * 1000;
+
+  for (const row of rows) {
+    const workOrderNumber = String(row.workOrderNumber || '').trim();
+    if (!workOrderNumber) continue;
+    const current = result.get(workOrderNumber) || {
+      confirmedRequirements: 0,
+      overdueUnconfirmedRequirements: 0,
+      plannedRequirements: 0,
+    };
+    current.plannedRequirements += 1;
+
+    const confirmStatus = String(row.confirmStatus || '')
+      .trim()
+      .toUpperCase();
+    if (confirmStatus === 'CONFIRMED') {
+      current.confirmedRequirements += 1;
+    } else if (now - new Date(row.createdAt).getTime() > tenDaysMs) {
+      current.overdueUnconfirmedRequirements += 1;
+    }
+    result.set(workOrderNumber, current);
+  }
+
+  return result;
+}

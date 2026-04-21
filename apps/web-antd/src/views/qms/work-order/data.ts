@@ -172,6 +172,7 @@ export const getGridColumns = (
       title: $t('qms.workOrder.workOrderNumber'),
       minWidth: 120,
       sortable: true,
+      slots: { default: 'workOrderNumber' },
     },
     {
       field: 'division',
@@ -229,6 +230,33 @@ export const getGridColumns = (
       width: 120,
       sortable: true,
       slots: { default: 'status' },
+    },
+    {
+      field: 'plannedRequirements',
+      title: '任务数',
+      width: 90,
+      align: 'center',
+      sortable: true,
+      formatter: ({ cellValue }: { cellValue: null | number | undefined }) =>
+        Number(cellValue || 0),
+    },
+    {
+      field: 'confirmedRequirements',
+      title: '已完成',
+      width: 90,
+      align: 'center',
+      sortable: true,
+      formatter: ({ cellValue }: { cellValue: null | number | undefined }) =>
+        Number(cellValue || 0),
+    },
+    {
+      field: 'overdueUnconfirmedRequirements',
+      title: '超10天',
+      width: 90,
+      align: 'center',
+      sortable: true,
+      formatter: ({ cellValue }: { cellValue: null | number | undefined }) =>
+        Number(cellValue || 0),
     },
   ];
 

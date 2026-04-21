@@ -1,22 +1,17 @@
 <script lang="ts" setup>
+import type { WorkOrderSearchFormValues } from './composables/useWorkOrderQueryFilters';
+
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 import type { SystemDeptApi } from '#/api/system/dept';
 import type { TreeSelectNode, VxeCheckboxChangeParams } from '#/types';
 
-import { computed, onMounted, ref, watchEffect } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 import { useI18n } from '@vben/locales';
 
-import {
-  Button,
-  DatePicker,
-  message,
-  Segmented,
-  Select,
-  Space,
-} from 'ant-design-vue';
-import dayjs from 'dayjs';
+import { Button, message } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { WorkOrderStatusEnum } from '#/api/qms/enums';
@@ -28,26 +23,31 @@ import {
 import { getDeptList } from '#/api/system/dept';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { QmsStatusTag } from '#/components/Qms';
-import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { convertToTreeSelectData, findNameById } from '#/types';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
+import WorkOrderAggregateDrawer from '../workspace/components/WorkOrderAggregateDrawer.vue';
 import WorkOrderCharts from './components/WorkOrderCharts.vue';
 import WorkOrderEditModal from './components/WorkOrderEditModal.vue';
+import WorkOrderRequirementBoardDrawer from './components/WorkOrderRequirementBoardDrawer.vue';
+import WorkOrderRequirementSummaryCards from './components/WorkOrderRequirementSummaryCards.vue';
+import WorkOrderToolbarActions from './components/WorkOrderToolbarActions.vue';
 import { useWorkOrderActions } from './composables/useWorkOrderActions';
+import { useWorkOrderAggregateDrawer } from './composables/useWorkOrderAggregateDrawer';
 import { useWorkOrderImport } from './composables/useWorkOrderImport';
+import { useWorkOrderQueryFilters } from './composables/useWorkOrderQueryFilters';
+import { useWorkOrderRequirementBoard } from './composables/useWorkOrderRequirementBoard';
 import { getStatusInfo } from './composables/useWorkOrderStatus';
 import { getGridColumns } from './data';
 
-// 1. 基础状态 (权限与通用功能)
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
+const route = useRoute();
+const router = useRouter();
 const { canCreate, canEdit, canDelete, canExport, canImport } =
   useQmsPermissions('QMS:WorkOrder');
-
-// 2. 部门树数据
 const deptTreeData = ref<TreeSelectNode[]>([]);
 const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const isDeptLoading = ref(false);
@@ -65,75 +65,45 @@ const loadDeptTree = async () => {
   }
 };
 onMounted(loadDeptTree);
-
-// 3. 工单数据与统计逻辑 (动态年份)
 const workOrderStats = ref<
   import('#/api/qms/work-order').WorkOrderDashboardStats | null
 >(null);
+const {
+  aggregateData,
+  aggregateLoading,
+  aggregateVisible,
+  closeWorkOrderAggregate,
+  divisionLabel,
+  openWorkOrderAggregate,
+  refreshAggregate,
+  selectedWorkOrderNumber,
+} = useWorkOrderAggregateDrawer(handleApiError);
 const isStatsLoading = ref(false);
-const { years: dynamicYears } = useAvailableYears();
-const currentYear = ref<number>(new Date().getFullYear());
-const currentDateMode = ref<'month' | 'week' | 'year'>('year');
-const currentDate = ref(dayjs());
-
-const yearOptions = computed(() => {
-  return dynamicYears.value.map((y) => ({
-    label: `${y}${t('qms.common.unit.year')}`,
-    value: y,
-  }));
-});
-
-const dateModeOptions = computed(() => [
-  {
-    label: t('common.unit.year'),
-    value: 'year',
-  },
-  {
-    label: t('common.unit.month'),
-    value: 'month',
-  },
-  {
-    label: t('common.unit.week'),
-    value: 'week',
-  },
-]);
-
-const dateRange = computed(() => {
-  if (currentDateMode.value === 'year') {
-    return {
-      startDate: `${currentYear.value}-01-01`,
-      endDate: `${currentYear.value}-12-31`,
-    };
-  }
-  if (currentDateMode.value === 'month') {
-    return {
-      startDate: currentDate.value.startOf('month').format('YYYY-MM-DD'),
-      endDate: currentDate.value.endOf('month').format('YYYY-MM-DD'),
-    };
-  }
-  return {
-    startDate: currentDate.value.startOf('week').format('YYYY-MM-DD'),
-    endDate: currentDate.value.endOf('week').format('YYYY-MM-DD'),
-  };
-});
-
-interface WorkOrderSearchFormValues {
-  productName?: string;
-  status?: string;
-  workOrderNumber?: string;
-}
-
-function buildQueryParams(formValues: WorkOrderSearchFormValues = {}) {
-  const { productName, ...rest } = formValues;
-  return {
-    ...rest,
-    granularity: currentDateMode.value,
-    productName: productName?.trim() || undefined,
-    startDate: dateRange.value.startDate,
-    endDate: dateRange.value.endDate,
-    year: currentYear.value,
-  };
-}
+const {
+  buildQueryParams,
+  currentDate,
+  currentDateMode,
+  currentYear,
+  dateModeOptions,
+  yearOptions,
+} = useWorkOrderQueryFilters();
+const latestRequirementQueryParams =
+  ref<ReturnType<typeof buildQueryParams>>(buildQueryParams());
+const {
+  boardFilter,
+  boardItems,
+  boardLoading,
+  boardPagination,
+  boardVisible,
+  closeBoard,
+  loadBoard,
+  loadOverview,
+  openBoard,
+  overview,
+} = useWorkOrderRequirementBoard(
+  () => latestRequirementQueryParams.value,
+  handleApiError,
+);
 
 function reloadGrid() {
   if (gridApi.value) {
@@ -141,12 +111,10 @@ function reloadGrid() {
   }
 }
 
-// 5. 导入功能（使用 gridApi 引用）
 const { handleImport, gridApi } = useWorkOrderImport(() => {
   api.reload();
 });
 
-// 5.1 搜索表单配置
 const statusOptions = computed(() =>
   Object.values(WorkOrderStatusEnum).map((value) => {
     const info = getStatusInfo(value);
@@ -187,7 +155,6 @@ const formSchema = [
     colProps: { span: 6 },
   },
 ];
-
 const exportWorkOrderAsXlsx =
   createVxePhotoXlsxExportMethod<QmsWorkOrderApi.WorkOrderItem>({
     sheetName: t('qms.workOrder.title'),
@@ -210,17 +177,14 @@ const exportWorkOrderAsXlsx =
       return tableData?.fullData || [];
     },
   });
-
-// 6. Grid 表格配置
 const gridOptions = computed<VxeGridProps>(() => ({
   columns: [
     { type: 'checkbox', width: 50 },
     ...(getGridColumns() || []).map((col) => {
-      // 关键修复：通过 formatter 实现事业部名称的响应式转换
       if (col.field === 'division') {
         return {
           ...col,
-          slots: {}, // 禁用 slot，改用更稳定的 formatter
+          slots: {},
           formatter: ({
             cellValue,
           }: {
@@ -300,6 +264,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
           isStatsLoading.value = true;
           const queryParams = buildQueryParams(formValues);
 
+          latestRequirementQueryParams.value = queryParams;
           const [response, stats] = await Promise.all([
             getWorkOrderListPage({
               page: currentPage,
@@ -307,6 +272,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
               ...queryParams,
             }),
             getWorkOrderDashboardStats(queryParams),
+            loadOverview(queryParams),
           ]);
           workOrderStats.value = stats;
 
@@ -354,8 +320,6 @@ const gridOptions = computed<VxeGridProps>(() => ({
   },
 }));
 
-// ...
-
 const checkedRows = ref<QmsWorkOrderApi.WorkOrderItem[]>([]);
 
 function onCheckChange(
@@ -370,7 +334,6 @@ const gridEvents = {
   checkboxAll: onCheckChange,
 };
 
-// 使用 useVbenVxeGrid 并更新 gridApi 引用
 const [Grid, api] = useVbenVxeGrid({
   gridOptions: gridOptions.value,
   gridEvents,
@@ -381,13 +344,25 @@ const [Grid, api] = useVbenVxeGrid({
     submitOnEnter: true,
   },
 });
+gridApi.value = api;
 
-// 更新之前声明的 gridApi 引用
-watchEffect(() => {
-  gridApi.value = api;
-});
+watch(
+  () => route.query.workOrderNumber,
+  (value) => {
+    const workOrderNumber = String(value || '').trim();
+    if (!workOrderNumber) {
+      if (!aggregateVisible.value) return;
+      aggregateVisible.value = false;
+      aggregateData.value = null;
+      selectedWorkOrderNumber.value = '';
+      return;
+    }
+    if (selectedWorkOrderNumber.value === workOrderNumber) return;
+    openWorkOrderAggregate(workOrderNumber);
+  },
+  { immediate: true },
+);
 
-// 6. 业务操作
 const editModalRef = ref<InstanceType<typeof WorkOrderEditModal> | null>(null);
 const showDashboard = ref(true);
 
@@ -409,103 +384,94 @@ const {
   <Page>
     <ErrorBoundary>
       <div class="flex flex-col gap-4 p-4">
-        <!-- 数字化仪表盘 -->
         <WorkOrderCharts
           v-if="showDashboard"
           :stats-data="workOrderStats"
           :dept-data="deptRawData"
           :loading="isStatsLoading || isDeptLoading"
         />
+        <WorkOrderRequirementSummaryCards
+          :overview="overview"
+          :loading="boardLoading"
+          @open="openBoard"
+        />
 
-        <!-- 表格区域 -->
         <div class="rounded-lg bg-white shadow-sm">
           <Grid>
-            <!-- 核心修复：Toolbar 内部也保留按钮作为备份 -->
             <template #toolbar-actions>
-              <Space>
-                <Button
-                  v-if="canCreate"
-                  shape="round"
-                  type="primary"
-                  @click="handleAdd"
-                >
-                  <template #icon>
-                    <IconifyIcon icon="lucide:plus" />
-                  </template>
-                  {{ t('qms.workOrder.createWorkOrder') }}
-                </Button>
-                <Button
-                  v-if="checkedRows.length > 0 && canDelete"
-                  danger
-                  shape="round"
-                  type="primary"
-                  @click="handleBatchDelete"
-                >
-                  <template #icon>
-                    <IconifyIcon icon="lucide:trash-2" />
-                  </template>
-                  {{ t('common.batchDelete') }}
-                </Button>
-                <Button @click="showDashboard = !showDashboard">
-                  <template #icon>
-                    <IconifyIcon
-                      :icon="
-                        showDashboard
-                          ? 'lucide:layout-panel-top'
-                          : 'lucide:layout-panel-off'
-                      "
-                    />
-                  </template>
-                  {{
-                    showDashboard
-                      ? t('qms.workOrder.hideChart')
-                      : t('qms.workOrder.showChart')
-                  }}
-                </Button>
-                <div class="ml-2 flex items-center gap-2">
-                  <span class="text-xs text-gray-500"
-                    >{{ t('qms.workOrder.dateMode') }}:</span
-                  >
-                  <div class="flex items-center gap-2">
-                    <Segmented
-                      v-model:value="currentDateMode"
-                      :options="dateModeOptions"
-                      size="small"
-                      @change="reloadGrid"
-                    />
-                    <Select
-                      v-if="currentDateMode === 'year'"
-                      v-model:value="currentYear"
-                      :options="yearOptions"
-                      size="small"
-                      class="w-[100px]"
-                      @change="reloadGrid"
-                    />
-                    <DatePicker
-                      v-else
-                      v-model:value="currentDate"
-                      :picker="currentDateMode"
-                      size="small"
-                      style="width: 140px"
-                      @change="reloadGrid"
-                    />
-                  </div>
-                </div>
-              </Space>
+              <WorkOrderToolbarActions
+                :can-create="canCreate"
+                :can-delete="canDelete"
+                :checked-rows-length="checkedRows.length"
+                :current-date="currentDate"
+                :current-date-mode="currentDateMode"
+                :current-year="currentYear"
+                :date-mode-options="dateModeOptions"
+                :show-dashboard="showDashboard"
+                :year-options="yearOptions"
+                @add="handleAdd"
+                @batch-delete="handleBatchDelete"
+                @reload="reloadGrid"
+                @toggle-dashboard="showDashboard = !showDashboard"
+                @update:current-date="currentDate = $event"
+                @update:current-date-mode="currentDateMode = $event"
+                @update:current-year="currentYear = $event"
+              />
             </template>
 
             <template #status="{ row }">
               <QmsStatusTag :status="row.status" type="work-order" />
+            </template>
+
+            <template #workOrderNumber="{ row }">
+              <Button
+                type="link"
+                class="!px-0"
+                @click="openWorkOrderAggregate(row.workOrderNumber)"
+              >
+                {{ row.workOrderNumber }}
+              </Button>
             </template>
           </Grid>
         </div>
       </div>
 
       <WorkOrderEditModal ref="editModalRef" @success="handleSuccess" />
+      <WorkOrderRequirementBoardDrawer
+        :open="boardVisible"
+        :loading="boardLoading"
+        :filter="boardFilter"
+        :items="boardItems"
+        :pagination="boardPagination"
+        @close="closeBoard"
+        @page-change="
+          (page, pageSize) => loadBoard(boardFilter, page, pageSize)
+        "
+        @open-work-order="
+          async (workOrderNumber) => {
+            closeBoard();
+            await openWorkOrderAggregate(workOrderNumber);
+          }
+        "
+      />
+      <WorkOrderAggregateDrawer
+        :open="aggregateVisible"
+        :loading="aggregateLoading"
+        :work-order-number="selectedWorkOrderNumber"
+        :aggregate-data="aggregateData"
+        :division-label="divisionLabel"
+        @close="closeWorkOrderAggregate"
+        @go-work-order="
+          router.push({
+            path: '/qms/work-order',
+            query: { workOrderNumber: selectedWorkOrderNumber },
+          })
+        "
+        @refresh="refreshAggregate"
+      />
     </ErrorBoundary>
   </Page>
 </template>
-
 <style scoped>
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;

@@ -29,6 +29,8 @@ export const QMS_API = {
   INSPECTION_ARCHIVE_TASKS: '/qms/inspection/archive-tasks',
   QUALITY_LOSS: '/qms/quality-loss',
   WORK_ORDER: '/qms/work-order',
+  WORK_ORDER_REQUIREMENT_BOARD: '/qms/work-order/requirement-board',
+  WORK_ORDER_REQUIREMENT_OVERVIEW: '/qms/work-order/requirement-overview',
   WORK_ORDER_REQUIREMENTS: '/qms/work-order/requirements',
   WORKSPACE: '/qms/workspace',
   WORKSPACE_WORK_ORDER_AGGREGATE: '/qms/workspace/work-order-aggregate',

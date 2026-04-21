@@ -1,5 +1,7 @@
 import type { WorkOrderItem } from '@qgs/shared';
 
+import type { WorkOrderRequirementAttachment } from './workspace';
+
 import type { QmsImportSummary } from '#/api/qms/types';
 
 import {
@@ -172,7 +174,7 @@ export async function getWorkOrderRequirements(params: {
 }) {
   return requestClient.get<
     Array<{
-      attachment: string;
+      attachments: WorkOrderRequirementAttachment[];
       confirmedAt?: null | string;
       confirmer: string;
       confirmStatus: 'CONFIRMED' | 'PENDING';
@@ -191,7 +193,7 @@ export async function getWorkOrderRequirements(params: {
 
 export async function uploadWorkOrderRequirements(data: {
   requirements: Array<{
-    attachment?: string;
+    attachments?: WorkOrderRequirementAttachment[];
     items?: unknown[];
     partName?: string;
     processName?: string;
@@ -218,6 +220,75 @@ export async function confirmWorkOrderRequirement(id: string, confirm = true) {
     confirmStatus: 'CONFIRMED' | 'PENDING';
     id: string;
   }>(`${QMS_API.WORK_ORDER_REQUIREMENTS}/${id}`, { confirm });
+}
+
+export type WorkOrderRequirementBoardFilter =
+  | 'all'
+  | 'confirmed'
+  | 'overdue'
+  | 'pending';
+
+export type WorkOrderRequirementOverview = {
+  confirmedRequirements: number;
+  overdueUnconfirmedRequirements: number;
+  pendingRequirements: number;
+  plannedRequirements: number;
+};
+
+export async function getWorkOrderRequirementOverview(params?: {
+  endDate?: string;
+  granularity?: 'month' | 'week' | 'year';
+  ignoreYearFilter?: boolean;
+  keyword?: string;
+  productName?: string;
+  projectName?: string;
+  startDate?: string;
+  status?: string;
+  workOrderNumber?: string;
+  year?: number;
+}) {
+  return requestClient.get<WorkOrderRequirementOverview>(
+    QMS_API.WORK_ORDER_REQUIREMENT_OVERVIEW,
+    { params },
+  );
+}
+
+export async function getWorkOrderRequirementBoard(params?: {
+  endDate?: string;
+  filter?: WorkOrderRequirementBoardFilter;
+  granularity?: 'month' | 'week' | 'year';
+  ignoreYearFilter?: boolean;
+  keyword?: string;
+  page?: number;
+  pageSize?: number;
+  productName?: string;
+  projectName?: string;
+  startDate?: string;
+  status?: string;
+  workOrderNumber?: string;
+  year?: number;
+}) {
+  return requestClient.get<{
+    items: Array<{
+      attachments: WorkOrderRequirementAttachment[];
+      confirmedAt?: null | string;
+      confirmer: string;
+      confirmStatus: 'CONFIRMED' | 'PENDING';
+      createdAt: string;
+      customerName: string;
+      division: string;
+      id: string;
+      partName: string;
+      processName: string;
+      projectName: string;
+      requirementName: string;
+      responsiblePerson: string;
+      responsibleTeam: string;
+      workOrderNumber: string;
+      workOrderStatus: string;
+    }>;
+    total: number;
+  }>(QMS_API.WORK_ORDER_REQUIREMENT_BOARD, { params });
 }
 
 export namespace QmsWorkOrderApi {

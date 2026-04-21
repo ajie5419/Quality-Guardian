@@ -28,7 +28,10 @@ defineEmits(['click']);
 <template>
   <Card>
     <CardHeader class="py-4">
-      <CardTitle class="text-lg">{{ title }}</CardTitle>
+      <div class="flex items-center justify-between gap-3">
+        <CardTitle class="text-lg">{{ title }}</CardTitle>
+        <slot name="extra"></slot>
+      </div>
     </CardHeader>
     <CardContent class="flex flex-wrap p-0">
       <template v-for="(item, index) in items" :key="item.title">
