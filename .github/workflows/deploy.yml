@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       IMAGE_REPO: ${{ secrets.ACR_REGISTRY }}/ajie5419/qms
-      ECS_USER: root
+      ECS_USER: ${{ secrets.ECS_USER || 'root' }}
       COMPOSE_FILE: /opt/qms/docker-compose.yml
       HEALTH_URL: http://127.0.0.1:3000/api/status
     steps:
