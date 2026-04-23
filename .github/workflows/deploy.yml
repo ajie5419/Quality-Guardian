@@ -2,8 +2,16 @@ name: deploy
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'release-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Optional image tag override (e.g. 1.2.4)'
+        required: false
+        type: string
 
 concurrency:
   group: deploy-production
@@ -25,11 +33,17 @@ jobs:
         id: version
         run: |
           REF_NAME="${GITHUB_REF_NAME}"
-          VERSION="${REF_NAME#release-v}"
-          if [ -z "$VERSION" ] || [ "$VERSION" = "$REF_NAME" ]; then
-            echo "Invalid tag format: $REF_NAME"
-            exit 1
+          EVENT="${GITHUB_EVENT_NAME}"
+          INPUT_VERSION="${{ github.event.inputs.version || '' }}"
+
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
+          elif [[ "$REF_NAME" == release-v* ]]; then
+            VERSION="${REF_NAME#release-v}"
+          else
+            VERSION="$(date +%Y%m%d%H%M)-${GITHUB_SHA::7}"
           fi
+
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Login ACR
@@ -74,6 +88,12 @@ jobs:
             fi
 
             cp "$COMPOSE_FILE" "$COMPOSE_FILE.bak"
+            rollback() {
+              cp "$COMPOSE_FILE.bak" "$COMPOSE_FILE" || true
+              docker compose -f "$COMPOSE_FILE" up -d redis backend frontend || true
+            }
+            trap 'echo "deploy failed, rolling back compose and containers"; rollback' ERR
+
             awk -v backend="$IMAGE_REPO:backend-$TAG" -v frontend="$IMAGE_REPO:frontend-$TAG" '
               BEGIN { in_backend=0; in_frontend=0 }
               /^  backend:/ { in_backend=1; in_frontend=0; print; next }
@@ -94,7 +114,9 @@ jobs:
             mv "$COMPOSE_FILE.tmp" "$COMPOSE_FILE"
 
             docker compose -f "$COMPOSE_FILE" pull backend frontend
-            docker compose -f "$COMPOSE_FILE" up -d backend frontend redis
+            docker compose -f "$COMPOSE_FILE" up -d redis
+            docker compose -f "$COMPOSE_FILE" run --rm backend npx prisma migrate deploy
+            docker compose -f "$COMPOSE_FILE" up -d backend frontend
 
             ok=0
             for _ in {1..30}; do
@@ -106,10 +128,9 @@ jobs:
             done
 
             if [ "$ok" -ne 1 ]; then
-              cp "$COMPOSE_FILE.bak" "$COMPOSE_FILE"
-              docker compose -f "$COMPOSE_FILE" up -d backend frontend redis
-              echo "healthcheck failed, rolled back"
+              echo "healthcheck failed"
               exit 1
             fi
 
+            trap - ERR
             rm -f "$COMPOSE_FILE.bak"
