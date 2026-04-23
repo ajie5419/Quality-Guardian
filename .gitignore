@@ -26,9 +26,12 @@ package-lock.json
 # local env files
 .env
 .env.deploy
+.env.oss-deploy
 .env.production
 .env.local
 .env.*.local
+.agent
+.gitconfig
 .eslintcache
 apps/backend-mock/.env
 apps/backend/uploads
@@ -37,6 +40,8 @@ apps/web-antd/uploads
 *.backup2
 *.broken
 apps/backend/vitest_output_full.txt
+config_dump.yml
+config_verify.yml
 
 logs
 *.log

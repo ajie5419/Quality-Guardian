@@ -1,0 +1,115 @@
+name: deploy
+
+on:
+  push:
+    tags:
+      - 'release-v*'
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_REPO: ${{ secrets.ACR_REGISTRY }}/ajie5419/qms
+      ECS_USER: root
+      COMPOSE_FILE: /opt/qms/infra/docker/docker-compose.yml
+      HEALTH_URL: http://127.0.0.1:3000/api/status
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare version
+        id: version
+        run: |
+          REF_NAME="${GITHUB_REF_NAME}"
+          VERSION="${REF_NAME#release-v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$REF_NAME" ]; then
+            echo "Invalid tag format: $REF_NAME"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Login ACR
+        run: |
+          echo "${{ secrets.ACR_PASSWORD }}" | docker login "${{ secrets.ACR_REGISTRY }}" \
+            --username "${{ secrets.ACR_USERNAME }}" --password-stdin
+
+      - name: Build backend image
+        run: |
+          docker build --platform linux/amd64 \
+            -f infra/docker/Dockerfile.backend \
+            -t "$IMAGE_REPO:backend-${{ steps.version.outputs.version }}" .
+
+      - name: Build frontend image
+        run: |
+          docker build --platform linux/amd64 \
+            -f infra/docker/Dockerfile.frontend \
+            -t "$IMAGE_REPO:frontend-${{ steps.version.outputs.version }}" .
+
+      - name: Push images
+        run: |
+          docker push "$IMAGE_REPO:backend-${{ steps.version.outputs.version }}"
+          docker push "$IMAGE_REPO:frontend-${{ steps.version.outputs.version }}"
+
+      - name: Deploy to ECS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ env.ECS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            TAG='${{ steps.version.outputs.version }}'
+            IMAGE_REPO='${{ env.IMAGE_REPO }}'
+            COMPOSE_FILE='${{ env.COMPOSE_FILE }}'
+            HEALTH_URL='${{ env.HEALTH_URL }}'
+
+            if [ ! -f "$COMPOSE_FILE" ]; then
+              echo "compose file not found: $COMPOSE_FILE"
+              exit 1
+            fi
+
+            cp "$COMPOSE_FILE" "$COMPOSE_FILE.bak"
+            awk -v backend="$IMAGE_REPO:backend-$TAG" -v frontend="$IMAGE_REPO:frontend-$TAG" '
+              BEGIN { in_backend=0; in_frontend=0 }
+              /^  backend:/ { in_backend=1; in_frontend=0; print; next }
+              /^  frontend:/ { in_frontend=1; in_backend=0; print; next }
+              /^  [^ ]/ { in_backend=0; in_frontend=0; print; next }
+              {
+                if (in_backend && $1 == "image:") {
+                  print "    image: " backend;
+                  next;
+                }
+                if (in_frontend && $1 == "image:") {
+                  print "    image: " frontend;
+                  next;
+                }
+                print;
+              }
+            ' "$COMPOSE_FILE" > "$COMPOSE_FILE.tmp"
+            mv "$COMPOSE_FILE.tmp" "$COMPOSE_FILE"
+
+            docker compose -f "$COMPOSE_FILE" pull backend frontend
+            docker compose -f "$COMPOSE_FILE" up -d backend frontend redis
+
+            ok=0
+            for _ in {1..30}; do
+              if curl -sf "$HEALTH_URL" >/dev/null 2>&1; then
+                ok=1
+                break
+              fi
+              sleep 2
+            done
+
+            if [ "$ok" -ne 1 ]; then
+              cp "$COMPOSE_FILE.bak" "$COMPOSE_FILE"
+              docker compose -f "$COMPOSE_FILE" up -d backend frontend redis
+              echo "healthcheck failed, rolled back"
+              exit 1
+            fi
+
+            rm -f "$COMPOSE_FILE.bak"
