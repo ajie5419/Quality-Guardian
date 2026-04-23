@@ -110,46 +110,7 @@ jobs:
               fi
             }
 
-            PRISMA_BIN="/app/apps/backend/node_modules/.bin/prisma"
-            PRISMA_MIGRATIONS_DIR="/app/apps/backend/prisma/migrations"
-
-            run_prisma_schema_sync() {
-              local has_migrations
-              has_migrations="$(docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "[ -d '$PRISMA_MIGRATIONS_DIR' ] && [ \"\$(ls -A '$PRISMA_MIGRATIONS_DIR' 2>/dev/null)\" ] && echo yes || echo no")"
-
-              case "$has_migrations" in
-                yes)
-                  set +e
-                  local migrate_output
-                  migrate_output="$(run_with_timeout 240 docker compose -f "$COMPOSE_FILE" run --rm backend "$PRISMA_BIN" migrate deploy 2>&1)"
-                  local migrate_status=$?
-                  set -e
-                  echo "$migrate_output"
-
-                  case "$migrate_status" in
-                    0)
-                      return 0
-                      ;;
-                    *)
-                      case "$migrate_output" in
-                        *P3005*)
-                          echo "Detected P3005 (non-empty existing DB without baseline). Fallback to prisma db push."
-                          ;;
-                        *)
-                          echo "prisma migrate deploy failed"
-                          return "$migrate_status"
-                          ;;
-                      esac
-                      ;;
-                  esac
-                  ;;
-                *)
-                  echo "No prisma migrations found in image. Use prisma db push."
-                  ;;
-              esac
-
-              run_with_timeout 240 docker compose -f "$COMPOSE_FILE" run --rm backend "$PRISMA_BIN" db push --skip-generate
-            }
+            PRISMA_CMD="/app/apps/backend/node_modules/.bin/prisma"
 
             sed -i.qms "/^  backend:/,/^  [^ ]/ s#^    image:.*#    image: ${IMAGE_REPO}:backend-${TAG}#" "$COMPOSE_FILE"
             sed -i.qms "/^  frontend:/,/^  [^ ]/ s#^    image:.*#    image: ${IMAGE_REPO}:frontend-${TAG}#" "$COMPOSE_FILE"
@@ -157,7 +118,7 @@ jobs:
 
             run_with_timeout 300 docker compose -f "$COMPOSE_FILE" pull backend frontend
             run_with_timeout 120 docker compose -f "$COMPOSE_FILE" up -d redis
-            run_prisma_schema_sync
+            run_with_timeout 300 docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "$PRISMA_CMD migrate deploy || $PRISMA_CMD db push --skip-generate"
             run_with_timeout 180 docker compose -f "$COMPOSE_FILE" up -d backend frontend
 
             ok=0
