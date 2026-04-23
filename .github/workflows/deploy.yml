@@ -12,6 +12,11 @@ on:
         description: 'Optional image tag override (e.g. 1.2.4)'
         required: false
         type: string
+      deploy_only:
+        description: 'Skip image build/push and only run Deploy to ECS'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: deploy-production
@@ -35,6 +40,12 @@ jobs:
           REF_NAME="${GITHUB_REF_NAME}"
           EVENT="${GITHUB_EVENT_NAME}"
           INPUT_VERSION="${{ github.event.inputs.version || '' }}"
+          DEPLOY_ONLY="${{ github.event.inputs.deploy_only || 'false' }}"
+
+          if [ "$DEPLOY_ONLY" = "true" ] && [ -z "$INPUT_VERSION" ]; then
+            echo "When deploy_only=true, 'version' is required."
+            exit 1
+          fi
 
           if [ -n "$INPUT_VERSION" ]; then
             VERSION="$INPUT_VERSION"
@@ -47,23 +58,27 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Login ACR
+        if: ${{ github.event.inputs.deploy_only != 'true' }}
         run: |
           echo "${{ secrets.ACR_PASSWORD }}" | docker login "${{ secrets.ACR_REGISTRY }}" \
             --username "${{ secrets.ACR_USERNAME }}" --password-stdin
 
       - name: Build backend image
+        if: ${{ github.event.inputs.deploy_only != 'true' }}
         run: |
           docker build --platform linux/amd64 \
             -f Dockerfile.backend \
             -t "$IMAGE_REPO:backend-${{ steps.version.outputs.version }}" .
 
       - name: Build frontend image
+        if: ${{ github.event.inputs.deploy_only != 'true' }}
         run: |
           docker build --platform linux/amd64 \
             -f Dockerfile.frontend \
             -t "$IMAGE_REPO:frontend-${{ steps.version.outputs.version }}" .
 
       - name: Push images
+        if: ${{ github.event.inputs.deploy_only != 'true' }}
         run: |
           docker push "$IMAGE_REPO:backend-${{ steps.version.outputs.version }}"
           docker push "$IMAGE_REPO:frontend-${{ steps.version.outputs.version }}"
