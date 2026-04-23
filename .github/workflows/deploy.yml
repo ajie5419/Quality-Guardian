@@ -117,27 +117,36 @@ jobs:
               local has_migrations
               has_migrations="$(docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "[ -d '$PRISMA_MIGRATIONS_DIR' ] && [ \"\$(ls -A '$PRISMA_MIGRATIONS_DIR' 2>/dev/null)\" ] && echo yes || echo no")"
 
-              if [ "$has_migrations" = "yes" ]; then
-                set +e
-                local migrate_output
-                migrate_output="$(run_with_timeout 240 docker compose -f "$COMPOSE_FILE" run --rm backend "$PRISMA_BIN" migrate deploy 2>&1)"
-                local migrate_status=$?
-                set -e
-                echo "$migrate_output"
+              case "$has_migrations" in
+                yes)
+                  set +e
+                  local migrate_output
+                  migrate_output="$(run_with_timeout 240 docker compose -f "$COMPOSE_FILE" run --rm backend "$PRISMA_BIN" migrate deploy 2>&1)"
+                  local migrate_status=$?
+                  set -e
+                  echo "$migrate_output"
 
-                if [ "$migrate_status" -eq 0 ]; then
-                  return 0
-                fi
-
-                if echo "$migrate_output" | grep -q "P3005"; then
-                  echo "Detected P3005 (non-empty existing DB without baseline). Fallback to prisma db push."
-                else
-                  echo "prisma migrate deploy failed"
-                  return "$migrate_status"
-                fi
-              else
-                echo "No prisma migrations found in image. Use prisma db push."
-              fi
+                  case "$migrate_status" in
+                    0)
+                      return 0
+                      ;;
+                    *)
+                      case "$migrate_output" in
+                        *P3005*)
+                          echo "Detected P3005 (non-empty existing DB without baseline). Fallback to prisma db push."
+                          ;;
+                        *)
+                          echo "prisma migrate deploy failed"
+                          return "$migrate_status"
+                          ;;
+                      esac
+                      ;;
+                  esac
+                  ;;
+                *)
+                  echo "No prisma migrations found in image. Use prisma db push."
+                  ;;
+              esac
 
               run_with_timeout 240 docker compose -f "$COMPOSE_FILE" run --rm backend "$PRISMA_BIN" db push --skip-generate
             }
