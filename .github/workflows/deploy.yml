@@ -23,7 +23,7 @@ jobs:
     env:
       IMAGE_REPO: ${{ secrets.ACR_REGISTRY }}/ajie5419/qms
       ECS_USER: root
-      COMPOSE_FILE: /opt/qms/infra/docker/docker-compose.yml
+      COMPOSE_FILE: /opt/qms/docker-compose.yml
       HEALTH_URL: http://127.0.0.1:3000/api/status
     steps:
       - name: Checkout
@@ -54,13 +54,13 @@ jobs:
       - name: Build backend image
         run: |
           docker build --platform linux/amd64 \
-            -f infra/docker/Dockerfile.backend \
+            -f Dockerfile.backend \
             -t "$IMAGE_REPO:backend-${{ steps.version.outputs.version }}" .
 
       - name: Build frontend image
         run: |
           docker build --platform linux/amd64 \
-            -f infra/docker/Dockerfile.frontend \
+            -f Dockerfile.frontend \
             -t "$IMAGE_REPO:frontend-${{ steps.version.outputs.version }}" .
 
       - name: Push images
@@ -83,8 +83,13 @@ jobs:
             HEALTH_URL='${{ env.HEALTH_URL }}'
 
             if [ ! -f "$COMPOSE_FILE" ]; then
-              echo "compose file not found: $COMPOSE_FILE"
-              exit 1
+              ALT_COMPOSE_FILE="/opt/qms/infra/docker/docker-compose.yml"
+              if [ -f "$ALT_COMPOSE_FILE" ]; then
+                COMPOSE_FILE="$ALT_COMPOSE_FILE"
+              else
+                echo "compose file not found: $COMPOSE_FILE or $ALT_COMPOSE_FILE"
+                exit 1
+              fi
             fi
 
             cp "$COMPOSE_FILE" "$COMPOSE_FILE.bak"
