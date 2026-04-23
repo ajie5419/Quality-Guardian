@@ -99,28 +99,7 @@ jobs:
             }
             trap 'echo "deploy failed, rolling back compose and containers"; rollback' ERR
 
-            cat > /tmp/update-compose-images.awk <<'AWK'
-            BEGIN { in_backend=0; in_frontend=0 }
-            /^  backend:/ { in_backend=1; in_frontend=0; print; next }
-            /^  frontend:/ { in_frontend=1; in_backend=0; print; next }
-            /^  [^ ]/ { in_backend=0; in_frontend=0; print; next }
-            {
-              if (in_backend && $1 == "image:") {
-                print "    image: " backend;
-                next;
-              }
-              if (in_frontend && $1 == "image:") {
-                print "    image: " frontend;
-                next;
-              }
-              print;
-            }
-            AWK
-
-            awk -v backend="$IMAGE_REPO:backend-$TAG" -v frontend="$IMAGE_REPO:frontend-$TAG" \
-              -f /tmp/update-compose-images.awk "$COMPOSE_FILE" > "$COMPOSE_FILE.tmp"
-            mv "$COMPOSE_FILE.tmp" "$COMPOSE_FILE"
-            rm -f /tmp/update-compose-images.awk
+            node -e "const fs=require('fs');const p=process.argv[1],b=process.argv[2],f=process.argv[3];const lines=fs.readFileSync(p,'utf8').split(/\\r?\\n/);let sec=null;for(let i=0;i<lines.length;i++){const line=lines[i];if(/^  backend:$/.test(line))sec='b';else if(/^  frontend:$/.test(line))sec='f';else if(/^  [^ ]/.test(line))sec=null;if(sec==='b'&&/^    image:/.test(line))lines[i]='    image: '+b;if(sec==='f'&&/^    image:/.test(line))lines[i]='    image: '+f;}if(lines.length&&lines[lines.length-1]==='')lines.pop();fs.writeFileSync(p,lines.join('\n')+'\n');" "$COMPOSE_FILE" "$IMAGE_REPO:backend-$TAG" "$IMAGE_REPO:frontend-$TAG"
 
             docker compose -f "$COMPOSE_FILE" pull backend frontend
             docker compose -f "$COMPOSE_FILE" up -d redis
