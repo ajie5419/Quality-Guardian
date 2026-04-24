@@ -31,6 +31,15 @@ const props = defineProps<{
 
 const { t } = useI18n();
 
+function normalizeDivisionKey(value: string) {
+  return value.replaceAll(/\s+/g, '').toUpperCase();
+}
+
+function formatDivisionName(value: string) {
+  const compact = value.replaceAll(/\s+/g, '');
+  return compact.replace(/(SOBU|OBU|BU)$/i, ' $1').trim();
+}
+
 const dashboardStats = computed(() => {
   const source = props.statsData;
   if (!source) {
@@ -48,26 +57,52 @@ const dashboardStats = computed(() => {
     };
   }
 
-  const pieData = (source.pieData || []).map((item) => {
+  const pieMap = new Map<string, { name: string; value: number }>();
+  for (const item of source.pieData || []) {
     const rawName = String(item.name || t('qms.common.other')).trim();
-    const name = findNameById(props.deptData, rawName) || rawName;
-    return {
-      name,
-      value: Number(item.value || 0),
-      color: getStableColor(name),
-    };
-  });
+    const displayName = formatDivisionName(
+      findNameById(props.deptData, rawName) || rawName,
+    );
+    const key = normalizeDivisionKey(displayName);
+    const existing = pieMap.get(key);
+    pieMap.set(key, {
+      name: existing?.name || displayName,
+      value: (existing?.value || 0) + Number(item.value || 0),
+    });
+  }
 
-  const rankings = (source.rankings || []).map((item) => {
+  const pieData = [...pieMap.values()]
+    .map(({ name, value }) => ({
+      name,
+      value,
+      color: getStableColor(name),
+    }))
+    .sort((a, b) => b.value - a.value);
+
+  const rankingMap = new Map<
+    string,
+    { division: string; productName: string; warrantyCount: number }
+  >();
+  for (const item of source.rankings || []) {
     const rawDivision = String(item.division || t('qms.common.other')).trim();
     const productName =
       String(item.productName || '未知产品').trim() || '未知产品';
-    return {
-      division: findNameById(props.deptData, rawDivision) || rawDivision,
+    const division = formatDivisionName(
+      findNameById(props.deptData, rawDivision) || rawDivision,
+    );
+    const key = `${normalizeDivisionKey(division)}__${productName}`;
+    const existing = rankingMap.get(key);
+    rankingMap.set(key, {
+      division: existing?.division || division,
       productName,
-      warrantyCount: Number(item.warrantyCount || 0),
-    };
-  });
+      warrantyCount:
+        (existing?.warrantyCount || 0) + Number(item.warrantyCount || 0),
+    });
+  }
+
+  const rankings = [...rankingMap.values()].sort(
+    (a, b) => b.warrantyCount - a.warrantyCount,
+  );
 
   return {
     ...source,
@@ -148,7 +183,7 @@ watch(
         class="h-full shadow-sm"
       >
         <Spin :spinning="loading">
-          <div class="flex h-[300px] w-full items-center">
+          <div class="flex h-[300px] w-full items-center overflow-hidden">
             <!-- 左侧：纯图表区域 (60%) -->
             <div class="h-full w-3/5">
               <EchartsUI
@@ -168,13 +203,15 @@ watch(
             </div>
 
             <!-- 右侧：自定义图例区域 (40%) -->
-            <div class="flex h-full w-2/5 flex-col justify-center gap-2 pr-2">
+            <div
+              class="custom-scrollbar flex h-full w-2/5 flex-col gap-2 overflow-y-auto pr-2"
+            >
               <div
                 v-for="item in dashboardStats.pieData"
                 :key="item.name"
-                class="flex cursor-default items-center justify-between text-xs transition-colors hover:bg-gray-50"
+                class="flex shrink-0 cursor-default items-center justify-between rounded px-1 py-0.5 text-xs transition-colors hover:bg-gray-50"
               >
-                <div class="flex items-center gap-2 overflow-hidden">
+                <div class="flex min-w-0 items-center gap-2 overflow-hidden">
                   <span
                     class="h-2.5 w-2.5 shrink-0 rounded-full"
                     :style="{ backgroundColor: item.color }"
@@ -184,7 +221,9 @@ watch(
                   </span>
                 </div>
                 <!-- 显示百分比或数值，这里显示数值 -->
-                <span class="font-medium text-gray-800">{{ item.value }}</span>
+                <span class="ml-2 shrink-0 font-medium text-gray-800">{{
+                  item.value
+                }}</span>
               </div>
             </div>
           </div>
@@ -256,7 +295,7 @@ watch(
         class="h-full shadow-sm"
       >
         <Spin :spinning="loading">
-          <div class="flex h-[300px] flex-col justify-between py-2">
+          <div class="flex h-[300px] flex-col justify-center gap-10 py-2">
             <Row :gutter="8">
               <Col :span="8">
                 <Statistic
@@ -294,21 +333,6 @@ watch(
                 :stroke-width="12"
                 status="active"
               />
-            </div>
-            <div class="mt-4 flex items-center gap-3 rounded-lg bg-blue-50 p-3">
-              <div
-                class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600"
-              >
-                <span class="i-lucide-activity text-xl"></span>
-              </div>
-              <div>
-                <div class="text-[10px] uppercase text-gray-400">
-                  {{ t('qms.workspace.taskStats.closureRate') }}
-                </div>
-                <div class="text-xs font-bold text-blue-800">
-                  {{ t('qms.workOrder.excellent') }}
-                </div>
-              </div>
             </div>
           </div>
         </Spin>

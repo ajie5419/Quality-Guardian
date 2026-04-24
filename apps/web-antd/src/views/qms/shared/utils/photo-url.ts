@@ -19,11 +19,8 @@ export function buildThumbUrlFromOriginal(url: string): string {
     dotIndex > 0
       ? `${pathPart.slice(0, dotIndex)}${suffix}`
       : `${pathPart}${suffix}`;
-  const apiThumbPath = thumbPath
-    .replace(/^\/uploads\//, '/api/uploads/')
-    .replace(/^(https?:\/\/[^/]+)\/uploads\//, '$1/api/uploads/');
 
-  return query ? `${apiThumbPath}?${query}` : apiThumbPath;
+  return query ? `${thumbPath}?${query}` : thumbPath;
 }
 
 export function extractPhotoUrl(photo: unknown): string | undefined {

@@ -279,7 +279,13 @@ function parseReportSummary(summary?: null | string) {
   if (!summary) return null;
   try {
     const parsed = JSON.parse(summary) as VehicleCommissioningDailyReport;
-    if (parsed && typeof parsed === 'object') {
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof parsed.projectName === 'string' &&
+      Array.isArray(parsed.reporters) &&
+      Array.isArray(parsed.mainWorks)
+    ) {
       return parsed;
     }
   } catch {
@@ -434,21 +440,20 @@ export const VehicleCommissioningService = {
         }
       : {};
 
-    const [items, total] = await Promise.all([
-      prisma.daily_reports.findMany({
-        where,
-        orderBy: { date: 'desc' },
-        skip,
-        take: pageSize,
-      }),
-      prisma.daily_reports.count({ where }),
-    ]);
+    const allItems = await prisma.daily_reports.findMany({
+      where,
+      orderBy: { date: 'desc' },
+    });
 
+    const vehicleReportRows = allItems.filter((row) =>
+      parseReportSummary(row.summary),
+    );
+    const pageRows = vehicleReportRows.slice(skip, skip + pageSize);
     const mapped = await Promise.all(
-      items.map((row) => buildRealtimeReportData(row)),
+      pageRows.map((row) => buildRealtimeReportData(row)),
     );
 
-    return { items: mapped, total };
+    return { items: mapped, total: vehicleReportRows.length };
   },
 
   async getDailyReportPreview(id: string) {
