@@ -22,8 +22,8 @@ import {
   createPublicMetrologyBorrowMutation,
   matchMetrologyBorrowInstruments,
   matchPublicMetrologyBorrowInstruments,
-  returnPublicMetrologyBorrowMutation,
   returnMetrologyBorrowMutation,
+  returnPublicMetrologyBorrowMutation,
 } from '#/api/qms/metrology';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
@@ -239,11 +239,9 @@ async function handleBorrowSubmit() {
       remark: borrowForm.remark || null,
       ...(props.publicToken ? { token: props.publicToken } : {}),
     };
-    if (props.publicMode) {
-      await createPublicMetrologyBorrowMutation(payload);
-    } else {
-      await createMetrologyBorrowMutation(payload);
-    }
+    await (props.publicMode
+      ? createPublicMetrologyBorrowMutation(payload)
+      : createMetrologyBorrowMutation(payload));
     message.success(t('qms.metrology.borrow.borrowSuccess'));
     resetState('');
     emit('success');
@@ -269,17 +267,15 @@ async function handleReturnSubmit() {
       returnedAt: returnForm.returnedAt,
       ...(props.publicToken ? { token: props.publicToken } : {}),
     };
-    if (props.publicMode) {
-      await returnPublicMetrologyBorrowMutation(
-        selectedInstrument.value.currentBorrowRecordId,
-        payload,
-      );
-    } else {
-      await returnMetrologyBorrowMutation(
-        selectedInstrument.value.currentBorrowRecordId,
-        payload,
-      );
-    }
+    await (props.publicMode
+      ? returnPublicMetrologyBorrowMutation(
+          selectedInstrument.value.currentBorrowRecordId,
+          payload,
+        )
+      : returnMetrologyBorrowMutation(
+          selectedInstrument.value.currentBorrowRecordId,
+          payload,
+        ));
     message.success(t('qms.metrology.borrow.returnSuccess'));
     resetState('');
     emit('success');

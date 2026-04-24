@@ -3,7 +3,6 @@ import type { EventHandlerRequest, H3Event } from 'h3';
 import process from 'node:process';
 
 import { getHeader } from 'h3';
-
 import { forbiddenResponse } from '~/utils/response';
 
 export const PUBLIC_METROLOGY_BORROW_OPERATOR = 'PUBLIC_QR';
