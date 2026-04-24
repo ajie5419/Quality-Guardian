@@ -45,6 +45,8 @@ export const QMS_API = {
   METROLOGY_BORROW: '/qms/metrology/borrow',
   METROLOGY_BORROW_MATCH: '/qms/metrology/borrow/match',
   METROLOGY_BORROW_OVERVIEW: '/qms/metrology/borrow/overview',
+  PUBLIC_METROLOGY_BORROW: '/qms/public/metrology/borrow',
+  PUBLIC_METROLOGY_BORROW_MATCH: '/qms/public/metrology/borrow/match',
   WORK_ORDER: '/qms/work-order',
   WORK_ORDER_REQUIREMENT_BOARD: '/qms/work-order/requirement-board',
   WORK_ORDER_REQUIREMENT_OVERVIEW: '/qms/work-order/requirement-overview',

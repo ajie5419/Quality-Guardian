@@ -614,7 +614,10 @@ export async function ensureMetrologyMenu() {
     if (!borrowExisting.authCode) {
       nextData.authCode = METROLOGY_BORROW_AUTH_CODE;
     }
-    if (!borrowExisting.meta || !String(borrowExisting.meta).includes('"icon"')) {
+    if (
+      !borrowExisting.meta ||
+      !String(borrowExisting.meta).includes('"icon"')
+    ) {
       nextData.meta = buildMetrologyBorrowMeta();
     }
     if (borrowExisting.name !== METROLOGY_BORROW_NAME) {

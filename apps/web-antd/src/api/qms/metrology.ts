@@ -186,6 +186,18 @@ export async function matchMetrologyBorrowInstruments(keyword: string) {
   );
 }
 
+export async function matchPublicMetrologyBorrowInstruments(
+  keyword: string,
+  token?: string,
+) {
+  return requestClient.get<MetrologyBorrowInstrumentMatchItem[]>(
+    QMS_API.PUBLIC_METROLOGY_BORROW_MATCH,
+    {
+      params: { keyword, token },
+    },
+  );
+}
+
 export async function getMetrologyBorrowOverview(
   params?: MetrologyBorrowListParams,
 ) {
@@ -203,11 +215,27 @@ export async function createMetrologyBorrowMutation(
   return requestClient.post(QMS_API.METROLOGY_BORROW, data);
 }
 
+export async function createPublicMetrologyBorrowMutation(
+  data: MetrologyBorrowMutationPayload & { token?: string },
+) {
+  return requestClient.post(QMS_API.PUBLIC_METROLOGY_BORROW, data);
+}
+
 export async function returnMetrologyBorrowMutation(
   id: string,
   data: MetrologyBorrowReturnPayload,
 ) {
   return requestClient.post(`${QMS_API.METROLOGY_BORROW}/${id}/return`, data);
+}
+
+export async function returnPublicMetrologyBorrowMutation(
+  id: string,
+  data: MetrologyBorrowReturnPayload & { token?: string },
+) {
+  return requestClient.post(
+    `${QMS_API.PUBLIC_METROLOGY_BORROW}/${id}/return`,
+    data,
+  );
 }
 
 export namespace QmsMetrologyApi {
