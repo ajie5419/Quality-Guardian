@@ -42,12 +42,6 @@ Quality Guardian 是 Quality Guardian 的升级版本。作为一个免费开源
   <img alt="VbenAdmin Logo" width="100%" src="https://anncwb.github.io/anncwb/images/preview3.png">
 </div>
 
-### 使用 Gitpod
-
-在 Gitpod（适用于 GitHub 的免费在线开发环境）中打开项目，并立即开始编码。
-
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/ajie5419/Quality-Guardian)
-
 ## 文档
 
 [文档地址](https://doc.vben.pro/)

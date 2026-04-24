@@ -15,7 +15,10 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
-import { RATING_COLORS, SUPPLIER_STATUS_UI_MAP } from '../common-constants';
+import {
+  RATING_COLORS,
+  SUPPLIER_STATUS_UI_MAP,
+} from '../shared/constants/supplier-ui';
 import ScoringRulesModal from './components/ScoringRulesModal.vue';
 import SupplierDetailDrawer from './components/SupplierDetailDrawer.vue';
 import SupplierEditModal from './components/SupplierEditModal.vue';

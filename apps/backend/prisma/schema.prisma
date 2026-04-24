@@ -552,6 +552,80 @@ model suppliers {
   @@index([status])
 }
 
+model measuring_instruments {
+  id               String   @id @default(cuid())
+  orderNo          Int?
+  instrumentName   String
+  instrumentCode   String   @unique
+  model            String?
+  usingUnit        String?
+  validUntil       DateTime?
+  inspectionStatus String
+  borrowStatus     String   @default("AVAILABLE")
+  sourceFileName   String?
+  createdBy        String?
+  updatedBy        String?
+  isDeleted        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  calibrationPlans metrology_calibration_plans[]
+  borrowRecords    metrology_borrow_records[]
+
+  @@index([instrumentName])
+  @@index([usingUnit])
+  @@index([inspectionStatus])
+  @@index([borrowStatus])
+  @@index([validUntil])
+}
+
+model metrology_borrow_records {
+  id                 String                @id @default(cuid())
+  instrumentId       String
+  borrowerDepartment String
+  borrowerName       String
+  borrowedAt         DateTime
+  expectedReturnAt   DateTime?
+  returnedAt         DateTime?
+  status             String
+  remark             String?               @db.Text
+  createdBy          String?
+  updatedBy          String?
+  isDeleted          Boolean               @default(false)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  instrument         measuring_instruments @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@index([instrumentId])
+  @@index([status])
+  @@index([borrowedAt])
+  @@index([expectedReturnAt])
+}
+
+model metrology_calibration_plans {
+  id             String                @id @default(cuid())
+  instrumentId   String
+  planYear       Int
+  planMonth      Int
+  planDay        Int
+  plannedDate    DateTime
+  actualDate     DateTime?
+  status         String
+  remark         String?               @db.Text
+  sourceFileName String?
+  createdBy      String?
+  updatedBy      String?
+  isDeleted      Boolean               @default(false)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  instrument     measuring_instruments @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([instrumentId, planYear, planMonth])
+  @@index([instrumentId])
+  @@index([planYear, planMonth])
+  @@index([plannedDate])
+  @@index([status])
+}
+
 model system_settings {
   key         String   @id
   value       String?  @db.Text

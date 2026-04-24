@@ -16,7 +16,10 @@ import { getSupplierExportList, getSupplierListPage } from '#/api/qms/supplier';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
-import { RATING_COLORS, SUPPLIER_STATUS_UI_MAP } from '../common-constants';
+import {
+  RATING_COLORS,
+  SUPPLIER_STATUS_UI_MAP,
+} from '../shared/constants/supplier-ui';
 import ScoringRulesModal from '../supplier/components/ScoringRulesModal.vue';
 import SupplierDetailDrawer from '../supplier/components/SupplierDetailDrawer.vue';
 import SupplierEditModal from '../supplier/components/SupplierEditModal.vue';

@@ -4,7 +4,22 @@ function normalizeSheetKey(value: unknown) {
     .toLowerCase();
 }
 
-export async function readImportRowsFromFile(file: File) {
+interface ReadImportRowsOptions {
+  defval?: unknown;
+  raw?: boolean;
+  range?: number;
+}
+
+interface ReadSheetMatrixOptions {
+  blankRows?: boolean;
+  defval?: unknown;
+  raw?: boolean;
+}
+
+export async function readImportRowsFromFile(
+  file: File,
+  options?: ReadImportRowsOptions,
+) {
   const XLSX = await import('xlsx');
   const arrayBuffer = await file.arrayBuffer();
   const workbook = XLSX.read(arrayBuffer, {
@@ -16,7 +31,34 @@ export async function readImportRowsFromFile(file: File) {
   const worksheet = workbook.Sheets[sheetName];
   if (!worksheet) return [];
 
-  return XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
+  return XLSX.utils.sheet_to_json(worksheet, {
+    defval: options?.defval ?? '',
+    raw: options?.raw ?? true,
+    range: options?.range ?? 0,
+  }) as Record<string, unknown>[];
+}
+
+export async function readSheetMatrixFromFile(
+  file: File,
+  options?: ReadSheetMatrixOptions,
+) {
+  const XLSX = await import('xlsx');
+  const arrayBuffer = await file.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, {
+    type: 'array',
+    cellDates: true,
+  });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) return [];
+  const worksheet = workbook.Sheets[sheetName];
+  if (!worksheet) return [];
+
+  return XLSX.utils.sheet_to_json(worksheet, {
+    blankrows: options?.blankRows ?? false,
+    defval: options?.defval ?? '',
+    header: 1,
+    raw: options?.raw ?? true,
+  }) as unknown[][];
 }
 
 export function mapRowsByColumnTitles(

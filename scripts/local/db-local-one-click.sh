@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-DB_COMPOSE_FILE="$ROOT_DIR/docker-compose.db.yml"
+DB_COMPOSE_FILE="$ROOT_DIR/infra/docker/docker-compose.db.yml"
 BACKEND_DIR="$ROOT_DIR/apps/backend"
 
 echo "Starting local MySQL..."

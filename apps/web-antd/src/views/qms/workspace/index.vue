@@ -5,10 +5,9 @@ import type {
   WorkbenchTrendItem,
 } from '@vben/common-ui';
 
-import type { WorkspaceWorkOrderAggregateResponse } from '#/api/qms/workspace';
-import type { SystemDeptApi } from '#/api/system/dept';
+import type { WorkspaceDataResponse } from '#/api/qms/workspace';
 
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
 import {
@@ -24,13 +23,13 @@ import { openWindow } from '@vben/utils';
 
 import { Spin } from 'ant-design-vue';
 
-import { getWorkspaceWorkOrderAggregate } from '#/api/qms/workspace';
-import { getDeptList } from '#/api/system/dept';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useWorkspaceQuery } from '#/hooks/useQmsQueries';
-import { findNameById } from '#/types';
 
+import { useWorkOrderAggregateDrawer } from '../work-order/composables/useWorkOrderAggregateDrawer';
 import WorkOrderAggregateDrawer from './components/WorkOrderAggregateDrawer.vue';
+
+type WorkspaceProjectItem = WorkspaceDataResponse['projectItems'][number];
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -39,7 +38,7 @@ const { handleApiError } = useErrorHandler();
 
 const { data: workspaceData } = useWorkspaceQuery();
 
-const projectItems = computed<WorkbenchProjectItem[]>(
+const projectItems = computed<WorkspaceProjectItem[]>(
   () => workspaceData.value?.projectItems || [],
 );
 const todoItems = computed<WorkbenchTodoItem[]>(
@@ -58,11 +57,30 @@ const stats = computed(
     },
 );
 
-const aggregateVisible = ref(false);
-const aggregateLoading = ref(false);
-const selectedWorkOrderNumber = ref('');
-const aggregateData = ref<null | WorkspaceWorkOrderAggregateResponse>(null);
-const deptRawData = ref<SystemDeptApi.Dept[]>([]);
+function getRequirementSummary(item: WorkbenchProjectItem) {
+  const projectItem = item as WorkspaceProjectItem;
+  return {
+    confirmedRequirements: projectItem.confirmedRequirements ?? 0,
+    overdueUnconfirmedRequirements:
+      projectItem.overdueUnconfirmedRequirements ?? 0,
+    plannedRequirements: projectItem.plannedRequirements ?? 0,
+  };
+}
+
+const {
+  aggregateData,
+  aggregateLoading,
+  aggregateVisible,
+  closeWorkOrderAggregate,
+  divisionLabel,
+  openWorkOrderAggregate,
+  refreshAggregate,
+  selectedWorkOrderNumber,
+} = useWorkOrderAggregateDrawer(handleApiError, {
+  aggregateContext: 'Load Workspace Work Order Aggregate',
+  loadDeptContext: 'Load Workspace Departments',
+  syncRoute: false,
+});
 
 function parseWorkOrderNumber(nav: WorkbenchProjectItem) {
   if (String(nav.url || '').startsWith('/qms/work-order')) {
@@ -71,50 +89,12 @@ function parseWorkOrderNumber(nav: WorkbenchProjectItem) {
   return '';
 }
 
-async function ensureDepartmentsLoaded() {
-  if (deptRawData.value.length > 0) return;
-  try {
-    deptRawData.value = await getDeptList();
-  } catch (error) {
-    handleApiError(error, 'Load Workspace Departments');
-  }
-}
-
-async function openWorkOrderAggregate(workOrderNumber: string) {
-  await ensureDepartmentsLoaded();
-  aggregateLoading.value = true;
-  aggregateVisible.value = true;
-  selectedWorkOrderNumber.value = workOrderNumber;
-  try {
-    aggregateData.value = await getWorkspaceWorkOrderAggregate({
-      workOrderNumber,
-    });
-  } catch (error) {
-    aggregateVisible.value = false;
-    aggregateData.value = null;
-    handleApiError(error, 'Load Workspace Work Order Aggregate');
-  } finally {
-    aggregateLoading.value = false;
-  }
-}
-
-function getDivisionLabel(value?: string) {
-  const idOrName = String(value || '').trim();
-  if (!idOrName) return '-';
-  return findNameById(deptRawData.value, idOrName) || idOrName;
-}
-
 function navToWorkOrderPage() {
   if (!selectedWorkOrderNumber.value) return;
   router.push({
     path: '/qms/work-order',
     query: { workOrderNumber: selectedWorkOrderNumber.value },
   });
-}
-
-async function refreshAggregate() {
-  if (!selectedWorkOrderNumber.value) return;
-  await openWorkOrderAggregate(selectedWorkOrderNumber.value);
 }
 
 async function navTo(nav: WorkbenchProjectItem) {
@@ -184,6 +164,32 @@ function getGreeting(): string {
           :title="t('qms.workspace.workOrderList')"
           @click="navTo"
         >
+          <template #item-extra="{ item }">
+            <div
+              class="mt-3 grid grid-cols-3 gap-2 rounded-md border border-gray-200 p-2"
+            >
+              <div class="text-center">
+                <div class="text-[20px] font-bold leading-6 text-blue-600">
+                  {{ getRequirementSummary(item).plannedRequirements }}
+                </div>
+                <div class="text-[12px] text-blue-600">任务</div>
+              </div>
+              <div class="text-center">
+                <div class="text-[20px] font-bold leading-6 text-green-600">
+                  {{ getRequirementSummary(item).confirmedRequirements }}
+                </div>
+                <div class="text-[12px] text-green-600">已完成</div>
+              </div>
+              <div class="text-center">
+                <div class="text-[20px] font-bold leading-6 text-red-600">
+                  {{
+                    getRequirementSummary(item).overdueUnconfirmedRequirements
+                  }}
+                </div>
+                <div class="text-[12px] text-red-600">超10天</div>
+              </div>
+            </div>
+          </template>
           <template #extra>
             <a
               class="text-sm text-blue-600"
@@ -214,8 +220,8 @@ function getGreeting(): string {
         :loading="aggregateLoading"
         :work-order-number="selectedWorkOrderNumber"
         :aggregate-data="aggregateData"
-        :division-label="getDivisionLabel(aggregateData?.workOrder.division)"
-        @close="aggregateVisible = false"
+        :division-label="divisionLabel"
+        @close="closeWorkOrderAggregate"
         @go-work-order="navToWorkOrderPage"
         @refresh="refreshAggregate"
       />

@@ -10,9 +10,15 @@ import { findNameById } from '#/types';
 
 export function useWorkOrderAggregateDrawer(
   handleApiError: (error: unknown, context: string) => void,
+  options?: {
+    aggregateContext?: string;
+    loadDeptContext?: string;
+    syncRoute?: boolean;
+  },
 ) {
   const router = useRouter();
   const route = useRoute();
+  const syncRoute = options?.syncRoute ?? true;
   const aggregateVisible = ref(false);
   const aggregateLoading = ref(false);
   const selectedWorkOrderNumber = ref('');
@@ -31,7 +37,10 @@ export function useWorkOrderAggregateDrawer(
     try {
       deptRawData.value = await getDeptList();
     } catch (error) {
-      handleApiError(error, 'Load Work Order Departments');
+      handleApiError(
+        error,
+        options?.loadDeptContext || 'Load Work Order Departments',
+      );
     }
   }
 
@@ -46,7 +55,10 @@ export function useWorkOrderAggregateDrawer(
       aggregateData.value = await getWorkspaceWorkOrderAggregate({
         workOrderNumber: normalized,
       });
-      if (String(route.query.workOrderNumber || '').trim() !== normalized) {
+      if (
+        syncRoute &&
+        String(route.query.workOrderNumber || '').trim() !== normalized
+      ) {
         await router.replace({
           query: {
             ...route.query,
@@ -57,16 +69,19 @@ export function useWorkOrderAggregateDrawer(
     } catch (error) {
       aggregateVisible.value = false;
       aggregateData.value = null;
-      handleApiError(error, 'Load Work Order Aggregate');
+      handleApiError(
+        error,
+        options?.aggregateContext || 'Load Work Order Aggregate',
+      );
     } finally {
       aggregateLoading.value = false;
     }
   }
 
   async function closeWorkOrderAggregate() {
-    const nextQuery = { ...route.query };
-    Reflect.deleteProperty(nextQuery, 'workOrderNumber');
-    if (Reflect.has(route.query, 'workOrderNumber')) {
+    if (syncRoute && Reflect.has(route.query, 'workOrderNumber')) {
+      const nextQuery = { ...route.query };
+      Reflect.deleteProperty(nextQuery, 'workOrderNumber');
       await router.replace({ query: nextQuery });
     }
     aggregateVisible.value = false;

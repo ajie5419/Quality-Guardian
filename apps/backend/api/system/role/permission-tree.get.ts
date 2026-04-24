@@ -1,7 +1,10 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { ensureVehicleCommissioningMenu } from '~/utils/menu-bootstrap';
+import {
+  ensureMetrologyMenu,
+  ensureVehicleCommissioningMenu,
+} from '~/utils/menu-bootstrap';
 import prisma from '~/utils/prisma';
 import {
   unAuthorizedResponse,
@@ -19,6 +22,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     await ensureVehicleCommissioningMenu();
+    await ensureMetrologyMenu();
 
     // 1. 获取所有启用的菜单
     const allMenus = await prisma.menus.findMany({

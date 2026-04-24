@@ -2,7 +2,10 @@ import { eventHandler, setResponseStatus } from 'h3';
 import { RbacService } from '~/services/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { ensureVehicleCommissioningMenu } from '~/utils/menu-bootstrap';
+import {
+  ensureMetrologyMenu,
+  ensureVehicleCommissioningMenu,
+} from '~/utils/menu-bootstrap';
 import {
   unAuthorizedResponse,
   useResponseError,
@@ -22,6 +25,7 @@ export default eventHandler(async (event) => {
 
   try {
     await ensureVehicleCommissioningMenu();
+    await ensureMetrologyMenu();
     const codes = await RbacService.getUserPermissionCodes(String(userId));
     return useResponseSuccess(codes);
   } catch (error) {

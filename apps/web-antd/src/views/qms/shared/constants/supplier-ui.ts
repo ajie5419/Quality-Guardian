@@ -1,0 +1,40 @@
+import { SupplierStatusEnum } from '#/api/qms/enums';
+
+/**
+ * Shared rating colors for supplier-related pages.
+ */
+export const RATING_COLORS: Record<string, string> = {
+  A: 'green',
+  B: 'blue',
+  C: 'orange',
+  D: 'red',
+};
+
+/**
+ * Shared supplier status UI configuration for supplier-like pages.
+ */
+export const SUPPLIER_STATUS_UI_MAP: Record<
+  string,
+  { defaultText: string; status: string; textKey: string }
+> = {
+  [SupplierStatusEnum.QUALIFIED]: {
+    status: 'success',
+    textKey: 'qms.supplier.status.qualified',
+    defaultText: '已准入',
+  },
+  [SupplierStatusEnum.OBSERVATION]: {
+    status: 'warning',
+    textKey: 'qms.supplier.status.observation',
+    defaultText: '质量观察',
+  },
+  [SupplierStatusEnum.FROZEN]: {
+    status: 'error',
+    textKey: 'qms.supplier.status.frozen',
+    defaultText: '已冻结',
+  },
+  [SupplierStatusEnum.TRIAL]: {
+    status: 'processing',
+    textKey: 'qms.supplier.status.trial',
+    defaultText: '试用',
+  },
+};

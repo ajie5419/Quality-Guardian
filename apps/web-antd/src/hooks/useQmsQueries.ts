@@ -2,11 +2,10 @@
  * QMS 数据查询缓存 Hooks
  * 使用 @tanstack/vue-query 实现数据缓存，避免重复请求
  */
-import type { DashboardData } from '@qgs/shared';
-
 import { useQuery, useQueryClient } from '@tanstack/vue-query';
 
 import { getAfterSalesList } from '#/api/qms/after-sales';
+import { getQmsDashboardData } from '#/api/qms/dashboard';
 import {
   getInspectionIssues,
   getInspectionRecords,
@@ -16,7 +15,6 @@ import { getQualityLossList } from '#/api/qms/quality-loss';
 import { getSupplierList } from '#/api/qms/supplier';
 import { getWorkOrderList } from '#/api/qms/work-order';
 import { getWorkspaceData } from '#/api/qms/workspace';
-import { requestClient } from '#/api/request';
 
 // 缓存时间配置
 const STALE_TIME = 5 * 60 * 1000; // 5分钟内不重新请求
@@ -106,7 +104,7 @@ export function useWorkspaceQuery() {
 export function useDashboardQuery() {
   return useQuery({
     gcTime: 10 * 60 * 1000,
-    queryFn: () => requestClient.get<DashboardData>('/qms/dashboard'),
+    queryFn: () => getQmsDashboardData(),
     queryKey: ['dashboard'],
     staleTime: 5 * 60 * 1000, // 5分钟缓存
   });

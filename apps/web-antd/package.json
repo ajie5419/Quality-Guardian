@@ -51,6 +51,7 @@
     "mammoth": "^1.11.0",
     "pdfjs-dist": "^5.4.530",
     "pinia": "catalog:",
+    "qrcode": "catalog:",
     "vue": "catalog:",
     "vue-router": "catalog:",
     "vxe-pc-ui": "catalog:",
@@ -59,6 +60,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@types/lodash-es": "^4.17.12"
+    "@types/lodash-es": "^4.17.12",
+    "@types/qrcode": "^1.5.5"
   }
 }

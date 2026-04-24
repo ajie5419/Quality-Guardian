@@ -67,14 +67,14 @@ jobs:
         if: ${{ github.event.inputs.deploy_only != 'true' }}
         run: |
           docker build --platform linux/amd64 \
-            -f Dockerfile.backend \
+            -f infra/docker/Dockerfile.backend \
             -t "$IMAGE_REPO:backend-${{ steps.version.outputs.version }}" .
 
       - name: Build frontend image
         if: ${{ github.event.inputs.deploy_only != 'true' }}
         run: |
           docker build --platform linux/amd64 \
-            -f Dockerfile.frontend \
+            -f infra/docker/Dockerfile.frontend \
             -t "$IMAGE_REPO:frontend-${{ steps.version.outputs.version }}" .
 
       - name: Push images

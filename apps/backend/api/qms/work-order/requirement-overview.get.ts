@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { WorkOrderService } from '~/services/work-order.service';
+import { WorkOrderRequirementService } from '~/services/work-order-requirement.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
   const params = parseWorkOrderListQuery(query);
 
   try {
-    const result = await WorkOrderService.getRequirementOverview({
+    const result = await WorkOrderRequirementService.getRequirementOverview({
       ...params,
       userContext: {
         userId: String(userinfo.id || userinfo.userId || ''),

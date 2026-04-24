@@ -28,6 +28,23 @@ export const QMS_API = {
   INSPECTION_RECORDS_BATCH_DELETE: '/qms/inspection/records/batch-delete',
   INSPECTION_ARCHIVE_TASKS: '/qms/inspection/archive-tasks',
   QUALITY_LOSS: '/qms/quality-loss',
+  METROLOGY: '/qms/metrology',
+  METROLOGY_BATCH_DELETE: '/qms/metrology/batch-delete',
+  METROLOGY_EXPORT: '/qms/metrology/export',
+  METROLOGY_IMPORT: '/qms/metrology/import',
+  METROLOGY_OVERVIEW: '/qms/metrology/overview',
+  METROLOGY_TEMPLATE: '/qms/metrology/template',
+  METROLOGY_CALIBRATION_PLAN: '/qms/metrology/calibration-plan',
+  METROLOGY_CALIBRATION_PLAN_ANNUAL_GRID:
+    '/qms/metrology/calibration-plan/annual-grid',
+  METROLOGY_CALIBRATION_PLAN_IMPORT: '/qms/metrology/calibration-plan/import',
+  METROLOGY_CALIBRATION_PLAN_OVERVIEW:
+    '/qms/metrology/calibration-plan/overview',
+  METROLOGY_CALIBRATION_PLAN_TEMPLATE:
+    '/qms/metrology/calibration-plan/template',
+  METROLOGY_BORROW: '/qms/metrology/borrow',
+  METROLOGY_BORROW_MATCH: '/qms/metrology/borrow/match',
+  METROLOGY_BORROW_OVERVIEW: '/qms/metrology/borrow/overview',
   WORK_ORDER: '/qms/work-order',
   WORK_ORDER_REQUIREMENT_BOARD: '/qms/work-order/requirement-board',
   WORK_ORDER_REQUIREMENT_OVERVIEW: '/qms/work-order/requirement-overview',

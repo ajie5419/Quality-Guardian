@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { WorkOrderService } from '~/services/work-order.service';
+import { WorkOrderRequirementService } from '~/services/work-order-requirement.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
   const filter = normalizeFilter(query.filter);
 
   try {
-    const result = await WorkOrderService.getRequirementBoard({
+    const result = await WorkOrderRequirementService.getRequirementBoard({
       ...params,
       filter,
       userContext: {

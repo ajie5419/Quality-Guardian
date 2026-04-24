@@ -2,6 +2,47 @@ import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
 
+export interface WorkspaceProjectItem {
+  color: string;
+  confirmedRequirements: number;
+  content: string;
+  date: string;
+  group: string;
+  icon: string;
+  id: string;
+  overdueUnconfirmedRequirements: number;
+  plannedRequirements: number;
+  title: string;
+  url: string;
+}
+
+export interface WorkspaceTodoItem {
+  completed: boolean;
+  content: string;
+  date: string;
+  id: string;
+  title: string;
+}
+
+export interface WorkspaceTrendItem {
+  avatar: string;
+  content: string;
+  date: string;
+  title: string;
+}
+
+export interface WorkspaceDataResponse {
+  projectItems: WorkspaceProjectItem[];
+  stats: {
+    openIssuesCount: number;
+    todayInspections: number;
+    todayIssues: number;
+    todayWorkOrders: number;
+  };
+  todoItems: WorkspaceTodoItem[];
+  trendItems: WorkspaceTrendItem[];
+}
+
 export interface WorkOrderRequirementAttachment {
   name?: string;
   thumbUrl?: string;
@@ -112,7 +153,7 @@ export interface WorkspaceWorkOrderAggregateResponse {
 }
 
 export async function getWorkspaceData() {
-  return requestClient.get(QMS_API.WORKSPACE);
+  return requestClient.get<WorkspaceDataResponse>(QMS_API.WORKSPACE);
 }
 
 export async function getWorkspaceWorkOrderAggregate(params: {

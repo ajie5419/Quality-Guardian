@@ -2,7 +2,10 @@ import { eventHandler } from 'h3';
 import { RbacService } from '~/services/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { ensureVehicleCommissioningMenu } from '~/utils/menu-bootstrap';
+import {
+  ensureMetrologyMenu,
+  ensureVehicleCommissioningMenu,
+} from '~/utils/menu-bootstrap';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
@@ -17,6 +20,20 @@ interface Menu {
   meta?: Record<string, unknown> | string;
   children?: Menu[];
   [key: string]: unknown;
+}
+
+function parseMenuMeta(meta: Menu['meta']) {
+  if (!meta) {
+    return {};
+  }
+  if (typeof meta === 'string') {
+    try {
+      return JSON.parse(meta) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  return meta;
 }
 
 /**
@@ -45,8 +62,7 @@ function buildMenuTree(menus: Menu[], parentId: string = '0'): Menu[] {
     .sort((a, b) => (a.order || 0) - (b.order || 0))
     .map((menu) => {
       const children = buildMenuTree(menus, String(menu.id));
-      const meta =
-        typeof menu.meta === 'string' ? JSON.parse(menu.meta) : menu.meta;
+      const meta = parseMenuMeta(menu.meta);
 
       return {
         ...menu,
@@ -77,6 +93,12 @@ function collectMenuAuthCodes(menu: Menu): string[] {
  * 规则：用户拥有菜单本身的权限码 OR 菜单下任意子按钮的权限码
  */
 function hasMenuAccess(menu: Menu, userCodesSet: Set<string>): boolean {
+  const meta = parseMenuMeta(menu.meta);
+
+  if (meta.publicAccess === true) {
+    return true;
+  }
+
   // 如果菜单本身没有权限码要求，直接通过
   if (!menu.authCode && menu.type !== 'menu') {
     return true;
@@ -153,6 +175,7 @@ export default eventHandler(async (event) => {
 
   const result = await (async () => {
     await ensureVehicleCommissioningMenu();
+    await ensureMetrologyMenu();
 
     // 1. 获取所有状态正常的菜单
     const allDbMenus = (await prisma.menus.findMany({

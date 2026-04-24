@@ -180,6 +180,138 @@
       "frozen": "Frozen"
     }
   },
+  "metrology": {
+    "title": "Measuring Instrument Ledger",
+    "managementTitle": "Measuring Instrument Management",
+    "calibrationPlan": {
+      "title": "Measuring Instrument Calibration Plan",
+      "createTitle": "Create Calibration Plan",
+      "editTitle": "Edit Calibration Plan",
+      "empty": "No calibration plan data",
+      "importEmpty": "No calibration plan data was detected in the file",
+      "importFailed": "Calibration plan import failed",
+      "importSuccess": "Import completed: {count} succeeded out of {total}",
+      "keywordPlaceholder": "Enter instrument name, code, or model",
+      "planDay": "Plan Day",
+      "planMonth": "Plan Month",
+      "planYear": "Plan Year",
+      "plannedDate": "Planned Date",
+      "actualDate": "Actual Date",
+      "remark": "Remark",
+      "views": {
+        "grid": "Annual Grid",
+        "list": "Plan List"
+      },
+      "overview": {
+        "totalCount": "Annual Plan Count",
+        "currentMonthCount": "Current Month Plans",
+        "completedCount": "Completed",
+        "overdueCount": "Overdue",
+        "upcomingCount": "Due in 7 Days",
+        "monthlyDistribution": "Monthly Plan Distribution",
+        "upcomingTable": "Upcoming Tasks"
+      },
+      "status": {
+        "label": "Plan Status",
+        "completed": "Completed",
+        "overdue": "Overdue",
+        "planned": "Planned"
+      }
+    },
+    "createTitle": "Create Instrument",
+    "editTitle": "Edit Instrument",
+    "orderNo": "No.",
+    "instrumentName": "Instrument Name",
+    "instrumentCode": "Code",
+    "model": "Model",
+    "usingUnit": "Using Unit",
+    "validUntil": "Valid Until",
+    "inspectionStatus": "Inspection Status",
+    "borrowStatus": "Borrow Status",
+    "remainingDays": "Remaining Days",
+    "borrow": {
+      "title": "Instrument Borrow Management",
+      "entryTitle": "Borrow / Return Entry",
+      "entryAccessTitle": "Unified Borrow Entry",
+      "entryAccessHint": "Print this QR code or copy the link so shop-floor staff can open the borrow entry directly.",
+      "copyEntryLink": "Copy Entry Link",
+      "openEntry": "Open Entry Page",
+      "entryLinkCopied": "Entry link copied",
+      "entryLinkCopyFailed": "Failed to copy entry link",
+      "entryHint": "The unified QR code only opens the borrow entry. Enter the instrument code, name, or model and let the system match the ledger record.",
+      "entryPlaceholder": "Enter instrument code, name, or model",
+      "selectInstrumentFirst": "Select an instrument record first.",
+      "createPermissionDenied": "The current account does not have borrow permission.",
+      "alreadyBorrowed": "This instrument is already borrowed. Use the return flow instead.",
+      "disabledBlocked": "Disabled instruments cannot be borrowed.",
+      "expiredBlocked": "Expired instruments cannot be borrowed.",
+      "borrowedAtRequired": "Borrowed date is required.",
+      "borrowerDepartmentRequired": "Borrowing department is required.",
+      "borrowerNameRequired": "Borrower name is required.",
+      "keyword": "Instrument Search",
+      "borrowerDepartment": "Borrowing Department",
+      "borrowerName": "Borrower",
+      "borrowedAt": "Borrowed Date",
+      "expectedReturnAt": "Expected Return Date",
+      "returnedAt": "Returned Date",
+      "currentBorrower": "Current Borrower",
+      "borrowSuccess": "Borrow recorded successfully",
+      "returnSuccess": "Return recorded successfully",
+      "borrowBlocked": "This instrument is not borrowable in its current calibration state.",
+      "overdueReminder": "{count} borrow records are overdue. Follow up on returns promptly.",
+      "pendingHint": "This instrument is close to expiry. Confirm business approval before borrowing.",
+      "returnHint": "The instrument is currently borrowed. Confirm the return date to close the borrow record.",
+      "viewOverdue": "View Overdue",
+      "actions": {
+        "borrow": "Confirm Borrow",
+        "manual": "Manual Borrow",
+        "return": "Confirm Return",
+        "scan": "Scan Borrow / Return"
+      },
+      "status": {
+        "label": "Borrow Record Status",
+        "borrowed": "Borrowed",
+        "overdue": "Overdue",
+        "returned": "Returned"
+      },
+      "overview": {
+        "borrowedCount": "Borrowed",
+        "monthlyBorrowed": "Monthly Borrowed",
+        "monthlyDistribution": "Annual Borrow/Return Distribution",
+        "monthlyReturned": "Monthly Returned",
+        "overdueCount": "Overdue",
+        "todayBorrowedCount": "Borrowed Today",
+        "todayReturnedCount": "Returned Today",
+        "totalCount": "Total Records",
+        "upcomingReturnCount": "Due In 7 Days",
+        "upcomingTable": "Pending Returns"
+      }
+    },
+    "overview": {
+      "totalCount": "Total Instruments",
+      "validCount": "Within Calibration Date",
+      "expiredCount": "Expired Instruments",
+      "expiringSoonCount": "Expiring Soon",
+      "disabledCount": "Disabled Instruments",
+      "expiringSoonHint": "Expire within 30 days"
+    },
+    "validFrom": "Valid From",
+    "validTo": "Valid To",
+    "downloadTemplate": "Download Template",
+    "importExcel": "Import Excel",
+    "importEmpty": "No measuring instrument data was detected in the file",
+    "importFailed": "Import failed",
+    "importSuccess": "Import completed: {count} succeeded out of {total}",
+    "expireToday": "Expires today",
+    "expiredDays": "Expired by {days} days",
+    "remainingDaysValue": "{days} days left",
+    "status": {
+      "valid": "Valid",
+      "expired": "Expired",
+      "pending": "Pending",
+      "disabled": "Disabled"
+    }
+  },
   "planning": {
     "title": "Quality Planning",
     "status": {

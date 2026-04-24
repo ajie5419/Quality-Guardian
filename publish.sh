@@ -164,8 +164,8 @@ else
     export BUILDKIT_PROGRESS=plain
 
     if $DRY_RUN; then
-        echo "[DRY-RUN] docker build ... -t $REGISTRY/$REPO:backend-latest -t $REGISTRY/$REPO:backend-$TAG -f Dockerfile.backend ."
-        echo "[DRY-RUN] docker build ... -t $REGISTRY/$REPO:frontend-latest -t $REGISTRY/$REPO:frontend-$TAG -f Dockerfile.frontend ."
+        echo "[DRY-RUN] docker build ... -t $REGISTRY/$REPO:backend-latest -t $REGISTRY/$REPO:backend-$TAG -f infra/docker/Dockerfile.backend ."
+        echo "[DRY-RUN] docker build ... -t $REGISTRY/$REPO:frontend-latest -t $REGISTRY/$REPO:frontend-$TAG -f infra/docker/Dockerfile.frontend ."
     else
         # 并行构建
         docker build --platform linux/amd64 \
@@ -173,7 +173,7 @@ else
             --cache-from "$REGISTRY/$REPO:backend-latest" \
             -t "$REGISTRY/$REPO:backend-latest" \
             -t "$REGISTRY/$REPO:backend-$TAG" \
-            -f Dockerfile.backend . &
+            -f infra/docker/Dockerfile.backend . &
 
         BACKEND_PID=$!
 
@@ -182,7 +182,7 @@ else
             --cache-from "$REGISTRY/$REPO:frontend-latest" \
             -t "$REGISTRY/$REPO:frontend-latest" \
             -t "$REGISTRY/$REPO:frontend-$TAG" \
-            -f Dockerfile.frontend . &
+            -f infra/docker/Dockerfile.frontend . &
 
         FRONTEND_PID=$!
 
@@ -445,7 +445,7 @@ EOF
 
 # 6.0 上传配置（修复 env 丢失）
 echo -e "${BLUE}📤 上传最新配置...${NC}"
-run_cmd "scp -O -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no \"$SCRIPT_DIR/docker-compose.yml\" \"$ECS_SSH_USER@$ECS_IP:/opt/qms/docker-compose.next.yml\""
+run_cmd "scp -O -i \"$ECS_SSH_KEY\" -o StrictHostKeyChecking=no \"$SCRIPT_DIR/infra/docker/docker-compose.yml\" \"$ECS_SSH_USER@$ECS_IP:/opt/qms/docker-compose.next.yml\""
 
 # 优先上传 .env.production，如果不存在则对应报警或回退
 if [ -f "$SCRIPT_DIR/.env.production" ]; then
