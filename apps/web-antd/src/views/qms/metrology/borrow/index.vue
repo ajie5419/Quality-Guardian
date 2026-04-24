@@ -8,12 +8,21 @@ import { useRouter } from 'vue-router';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
-import { Alert, Button, Card, Modal, Space, Tag } from 'ant-design-vue';
+import {
+  Alert,
+  Button,
+  Card,
+  message,
+  Modal,
+  Space,
+  Tag,
+} from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
   getMetrologyBorrowListPage,
   getMetrologyBorrowOverview,
+  returnMetrologyBorrowMutation,
 } from '#/api/qms/metrology';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
@@ -153,7 +162,19 @@ function handleReturn(row: QmsMetrologyApi.MetrologyBorrowRecordItem) {
   if (row.status === 'RETURNED') {
     return;
   }
-  openBorrowEntry(row.instrumentCode);
+  const returnedAt = new Date().toISOString().slice(0, 10);
+  void returnMetrologyBorrowMutation(row.id, {
+    remark: row.remark || null,
+    returnedAt,
+  })
+    .then(async () => {
+      message.success(t('qms.metrology.borrow.returnSuccess'));
+      await loadOverview();
+      gridApi.query();
+    })
+    .catch((error) => {
+      handleApiError(error, 'Return Metrology Borrow');
+    });
 }
 
 function handleOverviewOpen(payload: {
@@ -186,7 +207,10 @@ function handleOpenOverdue() {
 
 function confirmReturn(row: QmsMetrologyApi.MetrologyBorrowRecordItem) {
   Modal.confirm({
-    title: t('qms.metrology.borrow.actions.return'),
+    title:
+      row.status === 'RETURN_PENDING'
+        ? t('qms.metrology.borrow.actions.confirmReceived')
+        : t('qms.metrology.borrow.actions.return'),
     content: `${row.instrumentName} / ${row.instrumentCode}`,
     onOk() {
       handleReturn(row);

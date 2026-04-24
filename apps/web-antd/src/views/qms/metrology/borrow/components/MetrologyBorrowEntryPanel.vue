@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { QmsMetrologyApi } from '#/api/qms/metrology';
 
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
@@ -50,6 +50,7 @@ const matchedItems = ref<QmsMetrologyApi.MetrologyBorrowInstrumentMatchItem[]>(
 );
 const selectedInstrument =
   ref<null | QmsMetrologyApi.MetrologyBorrowInstrumentMatchItem>(null);
+const selectedSectionRef = ref<HTMLElement>();
 
 const borrowForm = reactive({
   borrowedAt: '',
@@ -229,11 +230,25 @@ async function handleSearch() {
   }
 }
 
-function handleSelectInstrument(
+async function handleSelectInstrument(
   item: QmsMetrologyApi.MetrologyBorrowInstrumentMatchItem,
 ) {
   selectedInstrument.value = item;
   returnForm.returnedAt = todayText();
+  await nextTick();
+  selectedSectionRef.value?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  });
+}
+
+function getMatchRowProps(
+  record: QmsMetrologyApi.MetrologyBorrowInstrumentMatchItem,
+) {
+  return {
+    class: 'cursor-pointer',
+    onClick: () => handleSelectInstrument(record),
+  };
 }
 
 async function handleBorrowSubmit() {
@@ -371,6 +386,10 @@ async function handleReturnSubmit() {
         (record: QmsMetrologyApi.MetrologyBorrowInstrumentMatchItem) =>
           record.id
       "
+      :custom-row="
+        (record: QmsMetrologyApi.MetrologyBorrowInstrumentMatchItem) =>
+          getMatchRowProps(record)
+      "
       :scroll="{ y: 220 }"
       size="small"
     >
@@ -389,7 +408,7 @@ async function handleReturnSubmit() {
           <Button
             size="small"
             type="link"
-            @click="
+            @click.stop="
               handleSelectInstrument(
                 record as QmsMetrologyApi.MetrologyBorrowInstrumentMatchItem,
               )
@@ -403,6 +422,7 @@ async function handleReturnSubmit() {
 
     <div
       v-if="selectedInstrument"
+      ref="selectedSectionRef"
       class="rounded-2xl border border-gray-200 bg-gray-50 p-4"
     >
       <Descriptions
