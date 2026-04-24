@@ -10,12 +10,17 @@ import QRCode from 'qrcode';
 const { t } = useI18n();
 const router = useRouter();
 const qrcode = ref('');
+const entryPath = '/qms/metrology/borrow/entry';
 
 const entryUrl = computed(() => {
   if (typeof window === 'undefined') {
-    return '/qms/metrology/borrow/entry';
+    return entryPath;
   }
-  return `${window.location.origin}/qms/metrology/borrow/entry`;
+  const routePath =
+    import.meta.env.VITE_ROUTER_HISTORY === 'hash'
+      ? `/#${entryPath}`
+      : entryPath;
+  return `${window.location.origin}${routePath}`;
 });
 
 watch(
@@ -62,7 +67,7 @@ async function handleCopyLink() {
 }
 
 function handleOpenEntry() {
-  void router.push('/qms/metrology/borrow/entry');
+  void router.push(entryPath);
 }
 </script>
 

@@ -4,6 +4,27 @@ import { unmountGlobalLoading } from '@vben/utils';
 import { overridesPreferences } from './preferences';
 import { setupClientLogger } from './utils/client-logger';
 
+const PUBLIC_METROLOGY_BORROW_ENTRY_PATH = '/qms/metrology/borrow/entry';
+
+function redirectLegacyPublicEntryPath() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (import.meta.env.VITE_ROUTER_HISTORY !== 'hash') {
+    return;
+  }
+
+  if (window.location.pathname !== PUBLIC_METROLOGY_BORROW_ENTRY_PATH) {
+    return;
+  }
+
+  const target = `${window.location.origin}/#${PUBLIC_METROLOGY_BORROW_ENTRY_PATH}${window.location.search}`;
+  window.location.replace(target);
+}
+
+redirectLegacyPublicEntryPath();
+
 // 启动客户端错误记录
 setupClientLogger();
 /**
