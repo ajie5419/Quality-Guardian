@@ -35,7 +35,7 @@ describe('afterSalesService', () => {
         }
         if (queryStr.includes('MONTH(occurDate)')) {
           return Promise.resolve([
-            { month: 1, issues: 10n, costs: 1500, closed: 5n },
+            { period: 1, issues: 10n, costs: 1500, closed: 5n },
           ]);
         }
         return Promise.resolve([]);

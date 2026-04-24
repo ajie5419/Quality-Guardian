@@ -10,6 +10,9 @@ vi.mock('../../utils/prisma', () => ({
       findMany: vi.fn(),
       count: vi.fn(),
     },
+    work_order_requirements: {
+      findMany: vi.fn(),
+    },
   },
 }));
 
@@ -24,6 +27,7 @@ vi.mock('~/utils/logger', () => ({
 describe('workOrderService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma.work_order_requirements.findMany as any).mockResolvedValue([]);
   });
 
   describe('getList', () => {

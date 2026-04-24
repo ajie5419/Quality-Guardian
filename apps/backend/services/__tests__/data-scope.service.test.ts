@@ -12,6 +12,9 @@ vi.mock('../../utils/prisma', () => ({
     data_permission_policies: {
       findMany: vi.fn(),
     },
+    departments: {
+      findMany: vi.fn(),
+    },
     rbac_user_roles: {
       findMany: vi.fn(),
     },
@@ -24,6 +27,7 @@ vi.mock('../../utils/prisma', () => ({
 describe('dataScopeService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma.departments.findMany as any).mockResolvedValue([]);
     (prisma.users.findFirst as any).mockResolvedValue({ roleId: 'role-1' });
     (prisma.rbac_user_roles.findMany as any).mockResolvedValue([
       { roleId: 'role-1' },

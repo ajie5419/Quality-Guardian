@@ -5,6 +5,7 @@ import { getNetPassRateSummaryByRange } from './pass-rate';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    $queryRaw: vi.fn(),
     inspections: {
       findMany: vi.fn(),
     },
@@ -17,27 +18,8 @@ describe('pass-rate quantity rule', () => {
   });
 
   it('calculates pass rate only by quantity and unqualifiedQuantity', async () => {
-    (prisma.inspections.findMany as any).mockResolvedValue([
-      {
-        category: 'PROCESS',
-        incomingType: null,
-        processName: '机加',
-        quantity: 100,
-        qualifiedQuantity: 10,
-        unqualifiedQuantity: 8,
-        result: 'FAIL',
-        team: '机加BU',
-      },
-      {
-        category: 'PROCESS',
-        incomingType: null,
-        processName: '组装',
-        quantity: 80,
-        qualifiedQuantity: 80,
-        unqualifiedQuantity: null,
-        result: 'FAIL',
-        team: '组装BU',
-      },
+    (prisma.$queryRaw as any).mockResolvedValue([
+      { passCount: 172n, totalCount: 180n },
     ]);
 
     const summary = await getNetPassRateSummaryByRange(

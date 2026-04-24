@@ -6,6 +6,7 @@ import { DashboardService } from '../dashboard.service';
 // Mock prisma and logger
 vi.mock('../../utils/prisma', () => ({
   default: {
+    $queryRaw: vi.fn(),
     inspections: {
       findMany: vi.fn(),
     },
@@ -117,17 +118,9 @@ describe('dashboardService', () => {
 
   describe('getMonthlyTrend', () => {
     it('should calculate pass rate correctly from inspection quantities only', async () => {
-      (prisma.inspections.findMany as any).mockResolvedValueOnce([
-        {
-          quantity: 100,
-          qualifiedQuantity: 92,
-          unqualifiedQuantity: 8,
-          result: 'FAIL',
-        },
-      ]);
-      for (let i = 0; i < 11; i += 1) {
-        (prisma.inspections.findMany as any).mockResolvedValueOnce([]);
-      }
+      (prisma.$queryRaw as any)
+        .mockResolvedValueOnce([{ passCount: 92n, totalCount: 100n }])
+        .mockResolvedValue([{ passCount: 0n, totalCount: 0n }]);
 
       const trend = await DashboardService.getMonthlyTrend();
       const jan = trend[0];
@@ -137,9 +130,9 @@ describe('dashboardService', () => {
     });
 
     it('should handle zero total quantity', async () => {
-      (prisma.inspections.findMany as any).mockResolvedValue(
-        Array.from({ length: 12 }, () => []),
-      );
+      (prisma.$queryRaw as any).mockResolvedValue([
+        { passCount: 0n, totalCount: 0n },
+      ]);
 
       const trend = await DashboardService.getMonthlyTrend();
       expect(trend[0].rate).toBe(100); // Default for no activity
