@@ -125,6 +125,9 @@ watch(
 );
 
 const currentMode = computed(() => {
+  if (selectedInstrument.value?.borrowStatus === 'RETURN_PENDING') {
+    return 'pending';
+  }
   if (selectedInstrument.value?.borrowStatus === 'BORROWED') {
     return 'return';
   }
@@ -137,6 +140,9 @@ const borrowDisabledReason = computed(() => {
   }
   if (selectedInstrument.value.borrowStatus === 'BORROWED') {
     return t('qms.metrology.borrow.alreadyBorrowed');
+  }
+  if (selectedInstrument.value.borrowStatus === 'RETURN_PENDING') {
+    return t('qms.metrology.borrow.returnPendingBlocked');
   }
 
   const inspectionStatus = selectedInstrument.value.inspectionStatus;
@@ -164,7 +170,8 @@ const canBorrowSelected = computed(() => !borrowDisabledReason.value);
 const canReturnSelected = computed(() =>
   Boolean(
     selectedInstrument.value?.borrowStatus === 'BORROWED' &&
-      selectedInstrument.value.currentBorrowRecordId,
+      selectedInstrument.value.currentBorrowRecordId &&
+      (props.publicMode || returnForm.returnedAt),
   ),
 );
 
@@ -188,7 +195,13 @@ function getInspectionStatusColor(
 }
 
 function getBorrowStatusColor(status: QmsMetrologyApi.MetrologyBorrowStatus) {
-  return status === 'BORROWED' ? 'blue' : 'default';
+  if (status === 'BORROWED') {
+    return 'blue';
+  }
+  if (status === 'RETURN_PENDING') {
+    return 'orange';
+  }
+  return 'default';
 }
 
 /**
@@ -262,21 +275,25 @@ async function handleReturnSubmit() {
 
   loading.value = true;
   try {
-    const payload = {
-      remark: returnForm.remark || null,
-      returnedAt: returnForm.returnedAt,
-      ...(props.publicToken ? { token: props.publicToken } : {}),
-    };
-    await (props.publicMode
-      ? returnPublicMetrologyBorrowMutation(
-          selectedInstrument.value.currentBorrowRecordId,
-          payload,
-        )
-      : returnMetrologyBorrowMutation(
-          selectedInstrument.value.currentBorrowRecordId,
-          payload,
-        ));
-    message.success(t('qms.metrology.borrow.returnSuccess'));
+    if (props.publicMode) {
+      await returnPublicMetrologyBorrowMutation(
+        selectedInstrument.value.currentBorrowRecordId,
+        {
+          remark: returnForm.remark || null,
+          ...(props.publicToken ? { token: props.publicToken } : {}),
+        },
+      );
+      message.success(t('qms.metrology.borrow.returnRequestSuccess'));
+    } else {
+      await returnMetrologyBorrowMutation(
+        selectedInstrument.value.currentBorrowRecordId,
+        {
+          remark: returnForm.remark || null,
+          returnedAt: returnForm.returnedAt,
+        },
+      );
+      message.success(t('qms.metrology.borrow.returnSuccess'));
+    }
     resetState('');
     emit('success');
   } catch (error) {
@@ -408,9 +425,20 @@ async function handleReturnSubmit() {
 
     <Alert
       v-if="selectedInstrument?.borrowStatus === 'BORROWED'"
-      :message="t('qms.metrology.borrow.returnHint')"
+      :message="
+        props.publicMode
+          ? t('qms.metrology.borrow.returnRequestHint')
+          : t('qms.metrology.borrow.returnHint')
+      "
       show-icon
       type="info"
+    />
+
+    <Alert
+      v-if="selectedInstrument?.borrowStatus === 'RETURN_PENDING'"
+      :message="t('qms.metrology.borrow.returnPendingHint')"
+      show-icon
+      type="warning"
     />
 
     <Form
@@ -463,7 +491,11 @@ async function handleReturnSubmit() {
       :wrapper-col="{ span: 19 }"
       layout="horizontal"
     >
-      <Form.Item :label="t('qms.metrology.borrow.returnedAt')" required>
+      <Form.Item
+        v-if="!props.publicMode"
+        :label="t('qms.metrology.borrow.returnedAt')"
+        required
+      >
         <DatePicker
           v-model:value="returnForm.returnedAt"
           class="w-full"
@@ -480,7 +512,11 @@ async function handleReturnSubmit() {
           type="primary"
           @click="handleReturnSubmit"
         >
-          {{ t('qms.metrology.borrow.actions.return') }}
+          {{
+            props.publicMode
+              ? t('qms.metrology.borrow.actions.requestReturn')
+              : t('qms.metrology.borrow.actions.return')
+          }}
         </Button>
       </Form.Item>
     </Form>

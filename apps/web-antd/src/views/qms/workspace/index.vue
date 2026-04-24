@@ -157,8 +157,8 @@ function getGreeting(): string {
       </template>
     </WorkbenchHeader>
 
-    <div class="mt-5 flex flex-col lg:flex-row">
-      <div class="mr-4 w-full lg:w-3/5">
+    <div class="mt-5">
+      <div class="w-full">
         <WorkbenchProject
           :items="projectItems"
           :title="t('qms.workspace.workOrderList')"
@@ -199,17 +199,13 @@ function getGreeting(): string {
             </a>
           </template>
         </WorkbenchProject>
+      </div>
+
+      <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <WorkbenchTodo :items="todoItems" title="待处理的工程问题" />
         <WorkbenchTrends
           :items="trendItems"
-          class="mt-5"
           :title="t('qms.workspace.latestIssueTrends')"
-        />
-      </div>
-      <div class="w-full lg:w-2/5">
-        <WorkbenchTodo
-          :items="todoItems"
-          class="mt-5 lg:mt-0"
-          title="待处理的工程问题"
         />
       </div>
     </div>

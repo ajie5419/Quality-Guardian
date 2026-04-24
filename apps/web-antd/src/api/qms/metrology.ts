@@ -6,6 +6,7 @@ import type {
   MetrologyBorrowOverview,
   MetrologyBorrowRecordItem,
   MetrologyBorrowReturnPayload,
+  MetrologyBorrowReturnRequestPayload,
   MetrologyCalibrationAnnualGridParams,
   MetrologyCalibrationAnnualRow,
   MetrologyCalibrationPlanItem,
@@ -230,7 +231,7 @@ export async function returnMetrologyBorrowMutation(
 
 export async function returnPublicMetrologyBorrowMutation(
   id: string,
-  data: MetrologyBorrowReturnPayload & { token?: string },
+  data: MetrologyBorrowReturnRequestPayload & { token?: string },
 ) {
   return requestClient.post(
     `${QMS_API.PUBLIC_METROLOGY_BORROW}/${id}/return`,
@@ -253,6 +254,8 @@ export namespace QmsMetrologyApi {
     import('@qgs/shared').MetrologyBorrowRecordStatus;
   export type MetrologyBorrowReturnPayload =
     import('@qgs/shared').MetrologyBorrowReturnPayload;
+  export type MetrologyBorrowReturnRequestPayload =
+    import('@qgs/shared').MetrologyBorrowReturnRequestPayload;
   export type MetrologyBorrowStatus =
     import('@qgs/shared').MetrologyBorrowStatus;
   export type MetrologyItem = import('@qgs/shared').MetrologyItem;

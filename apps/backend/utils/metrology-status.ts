@@ -8,6 +8,7 @@ const INSPECTION_STATUS_LABELS = {
 const BORROW_STATUS_LABELS = {
   AVAILABLE: '未借出',
   BORROWED: '已借出',
+  RETURN_PENDING: '待确认归还',
 } as const;
 
 export type MetrologyInspectionStatus = keyof typeof INSPECTION_STATUS_LABELS;
@@ -76,11 +77,15 @@ export function getMetrologyInspectionStatusLabel(
 export function normalizeMetrologyBorrowStatus(
   rawStatus: null | string | undefined,
 ): MetrologyBorrowStatus {
-  return String(rawStatus || '')
+  const status = String(rawStatus || '')
     .trim()
-    .toUpperCase() === 'BORROWED'
-    ? 'BORROWED'
-    : 'AVAILABLE';
+    .toUpperCase();
+
+  if (status === 'BORROWED' || status === 'RETURN_PENDING') {
+    return status;
+  }
+
+  return 'AVAILABLE';
 }
 
 export function getMetrologyBorrowStatusLabel(status: MetrologyBorrowStatus) {

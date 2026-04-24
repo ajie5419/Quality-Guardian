@@ -4,7 +4,7 @@ export type MetrologyInspectionStatus =
   | 'PENDING'
   | 'VALID';
 
-export type MetrologyBorrowStatus = 'AVAILABLE' | 'BORROWED';
+export type MetrologyBorrowStatus = 'AVAILABLE' | 'BORROWED' | 'RETURN_PENDING';
 
 export interface MetrologyItem {
   borrowStatus: MetrologyBorrowStatus;
@@ -62,7 +62,11 @@ export interface MetrologyOverview {
   validCount: number;
 }
 
-export type MetrologyBorrowRecordStatus = 'BORROWED' | 'OVERDUE' | 'RETURNED';
+export type MetrologyBorrowRecordStatus =
+  | 'BORROWED'
+  | 'OVERDUE'
+  | 'RETURN_PENDING'
+  | 'RETURNED';
 
 export interface MetrologyBorrowInstrumentMatchItem {
   borrowStatus: MetrologyBorrowStatus;
@@ -152,6 +156,10 @@ export interface MetrologyBorrowMutationPayload {
 export interface MetrologyBorrowReturnPayload {
   remark?: null | string;
   returnedAt: string;
+}
+
+export interface MetrologyBorrowReturnRequestPayload {
+  remark?: null | string;
 }
 
 export type MetrologyCalibrationPlanStatus =

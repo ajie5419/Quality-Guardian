@@ -6,6 +6,10 @@ import { $t } from '@vben/locales';
 export const getBorrowStatusOptions = () => [
   { label: $t('qms.metrology.borrow.status.borrowed'), value: 'BORROWED' },
   { label: $t('qms.metrology.borrow.status.overdue'), value: 'OVERDUE' },
+  {
+    label: $t('qms.metrology.borrow.status.returnPending'),
+    value: 'RETURN_PENDING',
+  },
   { label: $t('qms.metrology.borrow.status.returned'), value: 'RETURNED' },
 ];
 

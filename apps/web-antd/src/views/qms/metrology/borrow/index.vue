@@ -130,6 +130,9 @@ function getStatusColor(status: QmsMetrologyApi.MetrologyBorrowRecordStatus) {
     case 'OVERDUE': {
       return 'red';
     }
+    case 'RETURN_PENDING': {
+      return 'orange';
+    }
     case 'RETURNED': {
       return 'green';
     }
@@ -266,7 +269,11 @@ function confirmReturn(row: QmsMetrologyApi.MetrologyBorrowRecordItem) {
               type="link"
               @click="confirmReturn(row)"
             >
-              {{ t('qms.metrology.borrow.actions.return') }}
+              {{
+                row.status === 'RETURN_PENDING'
+                  ? t('qms.metrology.borrow.actions.confirmReceived')
+                  : t('qms.metrology.borrow.actions.return')
+              }}
             </Button>
           </template>
         </Grid>

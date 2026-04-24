@@ -55,6 +55,9 @@ function getStatusColor(status: QmsMetrologyApi.MetrologyBorrowRecordStatus) {
     case 'OVERDUE': {
       return 'red';
     }
+    case 'RETURN_PENDING': {
+      return 'orange';
+    }
     case 'RETURNED': {
       return 'green';
     }

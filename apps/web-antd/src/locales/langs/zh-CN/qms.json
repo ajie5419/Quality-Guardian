@@ -773,6 +773,7 @@
       "selectInstrumentFirst": "请先选择一条量具台账记录。",
       "createPermissionDenied": "当前账号没有借用权限。",
       "alreadyBorrowed": "该量具当前已借出，请改用归还流程。",
+      "returnPendingBlocked": "该量具正在等待保管员确认归还，暂不能再次借用。",
       "disabledBlocked": "停用量具不能借用。",
       "expiredBlocked": "超期量具不能借用。",
       "borrowedAtRequired": "请填写借用日期。",
@@ -787,14 +788,19 @@
       "currentBorrower": "当前借用人",
       "borrowSuccess": "借用登记成功",
       "returnSuccess": "归还登记成功",
+      "returnRequestSuccess": "归还申请已提交，请等待保管员确认收到实物",
       "borrowBlocked": "该量具当前不在可借用状态，不能发起借用。",
       "overdueReminder": "当前有 {count} 条超期未还记录，请尽快跟进归还。",
       "pendingHint": "该量具处于待检状态，请确认业务允许后再借用。",
       "returnHint": "已匹配到借出中的量具，确认归还日期后即可归还。",
+      "returnRequestHint": "已匹配到借出中的量具，提交归还申请后，需保管员确认收到实物才算归还完成。",
+      "returnPendingHint": "该量具已提交归还申请，等待保管员确认收到实物。",
       "viewOverdue": "查看超期记录",
       "actions": {
         "borrow": "确认借用",
+        "confirmReceived": "确认收到",
         "manual": "手工借用",
+        "requestReturn": "申请归还",
         "return": "确认归还",
         "scan": "扫码借还"
       },
@@ -802,6 +808,7 @@
         "label": "借用记录状态",
         "borrowed": "已借出",
         "overdue": "超期未还",
+        "returnPending": "待确认归还",
         "returned": "已归还"
       },
       "overview": {

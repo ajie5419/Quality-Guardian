@@ -3,6 +3,7 @@ import {
   formatMetrologyDate,
   getMetrologyBorrowStatusLabel,
   getMetrologyInspectionStatusLabel,
+  normalizeMetrologyBorrowStatus,
   startOfToday,
 } from '~/utils/metrology-status';
 import prisma from '~/utils/prisma';
@@ -10,10 +11,17 @@ import prisma from '~/utils/prisma';
 const BORROW_RECORD_STATUS_LABELS = {
   BORROWED: '已借出',
   OVERDUE: '超期未还',
+  RETURN_PENDING: '待确认归还',
   RETURNED: '已归还',
 } as const;
 
 type BorrowRecordStatus = keyof typeof BORROW_RECORD_STATUS_LABELS;
+
+const ACTIVE_BORROW_RECORD_STATUSES = [
+  'BORROWED',
+  'OVERDUE',
+  'RETURN_PENDING',
+] as const;
 
 interface MetrologyBorrowListParams {
   borrowerDepartment?: string;
@@ -38,6 +46,10 @@ interface MetrologyBorrowMutationPayload {
 interface MetrologyBorrowReturnPayload {
   remark?: unknown;
   returnedAt?: unknown;
+}
+
+interface MetrologyBorrowReturnRequestPayload {
+  remark?: unknown;
 }
 
 interface BorrowOverviewParams {
@@ -204,6 +216,16 @@ function normalizeReturnPayload(body: MetrologyBorrowReturnPayload) {
   };
 }
 
+function normalizeReturnRequestPayload(
+  body: MetrologyBorrowReturnRequestPayload,
+) {
+  const remark = String(body.remark || '').trim() || null;
+
+  return {
+    remark,
+  };
+}
+
 async function refreshOverdueStatuses() {
   await prisma.metrology_borrow_records.updateMany({
     where: {
@@ -245,10 +267,9 @@ function buildBorrowRecordItem(item: {
     item.instrument.inspectionStatus,
     item.instrument.validUntil,
   );
-  const borrowStatus =
-    String(item.instrument.borrowStatus || '').toUpperCase() === 'BORROWED'
-      ? 'BORROWED'
-      : 'AVAILABLE';
+  const borrowStatus = normalizeMetrologyBorrowStatus(
+    item.instrument.borrowStatus,
+  );
   const recordStatus = String(
     item.status || '',
   ).toUpperCase() as BorrowRecordStatus;
@@ -300,10 +321,7 @@ function buildInstrumentMatchItem(item: {
     item.inspectionStatus,
     item.validUntil,
   );
-  const borrowStatus =
-    String(item.borrowStatus || '').toUpperCase() === 'BORROWED'
-      ? 'BORROWED'
-      : 'AVAILABLE';
+  const borrowStatus = normalizeMetrologyBorrowStatus(item.borrowStatus);
   const currentBorrow = item.borrowRecords[0];
 
   return {
@@ -500,7 +518,7 @@ export const MetrologyBorrowService = {
           where: {
             isDeleted: false,
             status: {
-              in: ['BORROWED', 'OVERDUE'],
+              in: [...ACTIVE_BORROW_RECORD_STATUSES],
             },
           },
           orderBy: [{ borrowedAt: 'desc' }],
@@ -584,8 +602,14 @@ export const MetrologyBorrowService = {
     if (inspectionStatus === 'EXPIRED') {
       throw new Error('超期量具不能借用');
     }
-    if (String(instrument.borrowStatus || '').toUpperCase() === 'BORROWED') {
+    const borrowStatus = normalizeMetrologyBorrowStatus(
+      instrument.borrowStatus,
+    );
+    if (borrowStatus === 'BORROWED') {
       throw new Error('该量具当前已借出');
+    }
+    if (borrowStatus === 'RETURN_PENDING') {
+      throw new Error('该量具正在等待归还确认');
     }
 
     const status =
@@ -624,7 +648,57 @@ export const MetrologyBorrowService = {
     });
   },
 
-  async returnBorrow(
+  async requestReturn(
+    id: string,
+    payload: MetrologyBorrowReturnRequestPayload,
+    operator?: string,
+  ) {
+    const normalized = normalizeReturnRequestPayload(payload);
+
+    const record = await prisma.metrology_borrow_records.findFirst({
+      where: {
+        id,
+        isDeleted: false,
+      },
+      select: {
+        id: true,
+        instrumentId: true,
+        returnedAt: true,
+        status: true,
+      },
+    });
+
+    if (!record) {
+      throw new Error('未找到对应借用记录');
+    }
+    if (record.returnedAt || record.status === 'RETURNED') {
+      throw new Error('该借用记录已归还');
+    }
+    if (record.status === 'RETURN_PENDING') {
+      throw new Error('该借用记录已提交归还申请，等待保管员确认');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.metrology_borrow_records.update({
+        where: { id: record.id },
+        data: {
+          remark: normalized.remark,
+          status: 'RETURN_PENDING',
+          updatedBy: operator || null,
+        },
+      });
+
+      await tx.measuring_instruments.update({
+        where: { id: record.instrumentId },
+        data: {
+          borrowStatus: 'RETURN_PENDING',
+          updatedBy: operator || null,
+        },
+      });
+    });
+  },
+
+  async confirmReturn(
     id: string,
     payload: MetrologyBorrowReturnPayload,
     operator?: string,
@@ -683,16 +757,19 @@ export const MetrologyBorrowService = {
           isDeleted: false,
           returnedAt: null,
           status: {
-            in: ['BORROWED', 'OVERDUE'],
+            in: [...ACTIVE_BORROW_RECORD_STATUSES],
           },
+          id: { not: record.id },
         },
-        select: { id: true },
+        select: { id: true, status: true },
       });
 
       await tx.measuring_instruments.update({
         where: { id: record.instrumentId },
         data: {
-          borrowStatus: activeRecord ? 'BORROWED' : 'AVAILABLE',
+          borrowStatus: activeRecord
+            ? normalizeMetrologyBorrowStatus(activeRecord.status)
+            : 'AVAILABLE',
           updatedBy: operator || null,
         },
       });

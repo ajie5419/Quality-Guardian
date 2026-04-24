@@ -243,6 +243,7 @@
       "selectInstrumentFirst": "Select an instrument record first.",
       "createPermissionDenied": "The current account does not have borrow permission.",
       "alreadyBorrowed": "This instrument is already borrowed. Use the return flow instead.",
+      "returnPendingBlocked": "This instrument is waiting for return confirmation and cannot be borrowed again.",
       "disabledBlocked": "Disabled instruments cannot be borrowed.",
       "expiredBlocked": "Expired instruments cannot be borrowed.",
       "borrowedAtRequired": "Borrowed date is required.",
@@ -257,14 +258,19 @@
       "currentBorrower": "Current Borrower",
       "borrowSuccess": "Borrow recorded successfully",
       "returnSuccess": "Return recorded successfully",
+      "returnRequestSuccess": "Return request submitted. Wait for the custodian to confirm receipt.",
       "borrowBlocked": "This instrument is not borrowable in its current calibration state.",
       "overdueReminder": "{count} borrow records are overdue. Follow up on returns promptly.",
       "pendingHint": "This instrument is close to expiry. Confirm business approval before borrowing.",
       "returnHint": "The instrument is currently borrowed. Confirm the return date to close the borrow record.",
+      "returnRequestHint": "The instrument is currently borrowed. Submit a return request; the custodian must confirm physical receipt before it is closed.",
+      "returnPendingHint": "A return request has been submitted and is waiting for custodian confirmation.",
       "viewOverdue": "View Overdue",
       "actions": {
         "borrow": "Confirm Borrow",
+        "confirmReceived": "Confirm Received",
         "manual": "Manual Borrow",
+        "requestReturn": "Request Return",
         "return": "Confirm Return",
         "scan": "Scan Borrow / Return"
       },
@@ -272,6 +278,7 @@
         "label": "Borrow Record Status",
         "borrowed": "Borrowed",
         "overdue": "Overdue",
+        "returnPending": "Return Pending",
         "returned": "Returned"
       },
       "overview": {

@@ -212,7 +212,13 @@ function getStatusColor(status: QmsMetrologyApi.MetrologyInspectionStatus) {
 }
 
 function getBorrowStatusColor(status: QmsMetrologyApi.MetrologyBorrowStatus) {
-  return status === 'BORROWED' ? 'blue' : 'default';
+  if (status === 'BORROWED') {
+    return 'blue';
+  }
+  if (status === 'RETURN_PENDING') {
+    return 'orange';
+  }
+  return 'default';
 }
 
 function getRemainingDaysText(value: null | number | undefined) {

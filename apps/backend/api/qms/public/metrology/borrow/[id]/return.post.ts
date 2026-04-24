@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    await MetrologyBorrowService.returnBorrow(
+    await MetrologyBorrowService.requestReturn(
       id,
       body,
       PUBLIC_METROLOGY_BORROW_OPERATOR,

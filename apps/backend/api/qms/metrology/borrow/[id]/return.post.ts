@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    await MetrologyBorrowService.returnBorrow(
+    await MetrologyBorrowService.confirmReturn(
       id,
       body as Record<string, unknown>,
       userinfo.username,

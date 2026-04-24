@@ -32,7 +32,6 @@ export default defineEventHandler(async (event) => {
       // 1. 获取所有工单（实际工单数据）
       prisma.work_orders.findMany({
         where: { isDeleted: false },
-        take: 6,
         orderBy: { createdAt: 'desc' },
       }),
       // 2. 获取未关闭的工程问题
@@ -90,35 +89,68 @@ export default defineEventHandler(async (event) => {
         : [];
 
     const requirementSummaryMap = buildRequirementSummaryMap(requirementRows);
-    const projectItems = workOrders.map((wo) => {
-      let color = '#999';
-      if (wo.status === 'IN_PROGRESS') {
-        color = '#1890ff';
-      } else if (wo.status === 'COMPLETED') {
-        color = '#52c41a';
-      }
-      const summary = requirementSummaryMap.get(wo.workOrderNumber) || {
-        confirmedRequirements: 0,
-        overdueUnconfirmedRequirements: 0,
-        plannedRequirements: 0,
-      };
+    const projectItems = workOrders
+      .map((wo) => {
+        let color = '#999';
+        if (wo.status === 'IN_PROGRESS') {
+          color = '#1890ff';
+        } else if (wo.status === 'COMPLETED') {
+          color = '#52c41a';
+        }
+        const summary = requirementSummaryMap.get(wo.workOrderNumber) || {
+          confirmedRequirements: 0,
+          overdueUnconfirmedRequirements: 0,
+          plannedRequirements: 0,
+        };
+        const pendingRequirements =
+          summary.plannedRequirements - summary.confirmedRequirements;
 
-      return {
-        id: wo.workOrderNumber,
-        title: wo.workOrderNumber,
-        content: wo.projectName || wo.customerName,
-        group: wo.division || '未分配',
-        date: wo.createdAt
-          ? new Date(wo.createdAt).toLocaleDateString('zh-CN')
-          : '',
-        plannedRequirements: summary.plannedRequirements,
-        confirmedRequirements: summary.confirmedRequirements,
-        overdueUnconfirmedRequirements: summary.overdueUnconfirmedRequirements,
-        color,
-        icon: 'lucide:clipboard-list',
-        url: '/qms/work-order',
-      };
-    });
+        return {
+          id: wo.workOrderNumber,
+          title: wo.workOrderNumber,
+          content: wo.projectName || wo.customerName,
+          group: wo.division || '未分配',
+          date: wo.createdAt
+            ? new Date(wo.createdAt).toLocaleDateString('zh-CN')
+            : '',
+          plannedRequirements: summary.plannedRequirements,
+          confirmedRequirements: summary.confirmedRequirements,
+          overdueUnconfirmedRequirements:
+            summary.overdueUnconfirmedRequirements,
+          pendingRequirements,
+          deliveryDate: wo.deliveryDate,
+          color,
+          icon: 'lucide:clipboard-list',
+          url: '/qms/work-order',
+        };
+      })
+      .sort((a, b) => {
+        const byPlanned = b.plannedRequirements - a.plannedRequirements;
+        if (byPlanned !== 0) return byPlanned;
+
+        const byOverdue =
+          b.overdueUnconfirmedRequirements - a.overdueUnconfirmedRequirements;
+        if (byOverdue !== 0) return byOverdue;
+
+        const byPending = b.pendingRequirements - a.pendingRequirements;
+        if (byPending !== 0) return byPending;
+
+        const aDelivery = a.deliveryDate
+          ? new Date(a.deliveryDate).getTime()
+          : Number.MAX_SAFE_INTEGER;
+        const bDelivery = b.deliveryDate
+          ? new Date(b.deliveryDate).getTime()
+          : Number.MAX_SAFE_INTEGER;
+        return aDelivery - bDelivery;
+      })
+      .slice(0, 6)
+      .map(
+        ({
+          deliveryDate: _deliveryDate,
+          pendingRequirements: _pendingRequirements,
+          ...item
+        }) => item,
+      );
 
     const todoItems = openIssues.map((issue) => ({
       id: issue.id,
