@@ -511,6 +511,15 @@ export const MetrologyBorrowService = {
           { instrumentCode: { contains: trimmedKeyword } },
           { instrumentName: { contains: trimmedKeyword } },
           { model: { contains: trimmedKeyword } },
+          {
+            borrowRecords: {
+              some: {
+                borrowerName: { contains: trimmedKeyword },
+                isDeleted: false,
+                status: { in: [...ACTIVE_BORROW_RECORD_STATUSES] },
+              },
+            },
+          },
         ],
       },
       select: {

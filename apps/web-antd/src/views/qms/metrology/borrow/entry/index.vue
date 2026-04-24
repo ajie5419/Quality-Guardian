@@ -22,15 +22,17 @@ function handleSuccess() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-100 px-3 py-4 sm:px-6 sm:py-8">
-    <div class="mx-auto flex max-w-4xl flex-col gap-4">
-      <header class="rounded-lg bg-white px-5 py-4 shadow-sm">
-        <h1 class="text-xl font-semibold text-gray-900">
+  <div class="min-h-screen bg-gray-100 px-2 py-3 sm:px-6 sm:py-8">
+    <div class="mx-auto flex w-full max-w-4xl flex-col gap-3 sm:gap-4">
+      <header class="rounded-xl bg-white px-4 py-3 shadow-sm sm:px-5 sm:py-4">
+        <h1 class="text-lg font-semibold text-gray-900 sm:text-xl">
           {{ t('qms.metrology.borrow.entryTitle') }}
         </h1>
       </header>
 
-      <main class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <main
+        class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4"
+      >
         <MetrologyBorrowEntryPanel
           :initial-keyword="initialKeyword"
           :public-mode="true"

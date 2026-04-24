@@ -312,18 +312,57 @@ async function handleReturnSubmit() {
       type="info"
     />
 
-    <div class="flex gap-2">
+    <div class="flex flex-col gap-2 sm:flex-row">
       <Input
         v-model:value="searchKeyword"
         :placeholder="t('qms.metrology.borrow.entryPlaceholder')"
         @press-enter="handleSearch"
       />
-      <Button :loading="searchLoading" type="primary" @click="handleSearch">
+      <Button
+        :loading="searchLoading"
+        class="w-full sm:w-auto"
+        type="primary"
+        @click="handleSearch"
+      >
         {{ t('common.search') }}
       </Button>
     </div>
 
+    <div class="flex flex-col gap-2 md:hidden">
+      <button
+        v-for="item in matchedItems"
+        :key="item.id"
+        class="rounded-xl border border-gray-200 bg-white p-3 text-left shadow-sm"
+        type="button"
+        @click="handleSelectInstrument(item)"
+      >
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <div class="truncate text-base font-semibold text-gray-900">
+              {{ item.instrumentName }}
+            </div>
+            <div class="mt-1 text-sm text-gray-500">
+              {{ item.instrumentCode }} / {{ item.model || '-' }}
+            </div>
+          </div>
+          <Tag :color="getBorrowStatusColor(item.borrowStatus)">
+            {{ item.borrowStatusLabel }}
+          </Tag>
+        </div>
+        <div class="mt-2 flex flex-wrap gap-2 text-sm text-gray-600">
+          <Tag :color="getInspectionStatusColor(item.inspectionStatus)">
+            {{ item.inspectionStatusLabel }}
+          </Tag>
+          <span v-if="item.currentBorrowerName">
+            {{ item.currentBorrowerDepartment || '-' }} /
+            {{ item.currentBorrowerName }}
+          </span>
+        </div>
+      </button>
+    </div>
+
     <Table
+      class="hidden md:block"
       :columns="matchColumns"
       :data-source="matchedItems"
       :loading="searchLoading"
@@ -366,7 +405,11 @@ async function handleReturnSubmit() {
       v-if="selectedInstrument"
       class="rounded-2xl border border-gray-200 bg-gray-50 p-4"
     >
-      <Descriptions :column="2" bordered size="small">
+      <Descriptions
+        :column="{ lg: 2, md: 2, sm: 1, xs: 1 }"
+        bordered
+        size="small"
+      >
         <Descriptions.Item :label="t('qms.metrology.instrumentName')">
           {{ selectedInstrument.instrumentName }}
         </Descriptions.Item>
@@ -443,9 +486,7 @@ async function handleReturnSubmit() {
 
     <Form
       v-if="selectedInstrument && currentMode === 'borrow'"
-      :label-col="{ span: 5 }"
-      :wrapper-col="{ span: 19 }"
-      layout="horizontal"
+      layout="vertical"
     >
       <Form.Item :label="t('qms.metrology.borrow.borrowedAt')" required>
         <DatePicker
@@ -470,10 +511,11 @@ async function handleReturnSubmit() {
       <Form.Item :label="t('common.remark')">
         <Input.TextArea v-model:value="borrowForm.remark" :rows="3" />
       </Form.Item>
-      <Form.Item :wrapper-col="{ offset: 5, span: 19 }">
+      <Form.Item>
         <Button
           :disabled="!canBorrowSelected"
           :loading="loading"
+          class="w-full sm:w-auto"
           type="primary"
           @click="handleBorrowSubmit"
         >
@@ -487,9 +529,7 @@ async function handleReturnSubmit() {
 
     <Form
       v-else-if="selectedInstrument && currentMode === 'return'"
-      :label-col="{ span: 5 }"
-      :wrapper-col="{ span: 19 }"
-      layout="horizontal"
+      layout="vertical"
     >
       <Form.Item
         v-if="!props.publicMode"
@@ -505,10 +545,11 @@ async function handleReturnSubmit() {
       <Form.Item :label="t('common.remark')">
         <Input.TextArea v-model:value="returnForm.remark" :rows="3" />
       </Form.Item>
-      <Form.Item :wrapper-col="{ offset: 5, span: 19 }">
+      <Form.Item>
         <Button
           :disabled="!canReturnSelected"
           :loading="loading"
+          class="w-full sm:w-auto"
           type="primary"
           @click="handleReturnSubmit"
         >
