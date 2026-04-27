@@ -13,6 +13,9 @@ ENV TURBO_DAEMON=false \
     GENERATE_SOURCEMAP=false \
     NODE_ENV=production
 
+ARG VITE_APP_VERSION
+ENV VITE_APP_VERSION=$VITE_APP_VERSION
+
 WORKDIR /app
 
 # 🌟 关键优化：分层复制依赖文件

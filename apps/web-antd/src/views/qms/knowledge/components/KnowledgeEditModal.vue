@@ -1,11 +1,14 @@
 <script lang="ts" setup>
+import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
+
 import type { QmsKnowledgeApi } from '#/api/qms/knowledge';
 
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
-import { useUserStore } from '@vben/stores';
+import { useAccessStore, useUserStore } from '@vben/stores';
 
 import {
+  Button,
   Input,
   message,
   Modal,
@@ -13,6 +16,7 @@ import {
   RadioGroup,
   Select,
   TreeSelect,
+  Upload,
 } from 'ant-design-vue';
 
 import {
@@ -29,11 +33,13 @@ defineProps<{
 const emit = defineEmits(['success']);
 
 const userStore = useUserStore();
+const accessStore = useAccessStore();
 const { handleApiError } = useErrorHandler();
 
 const visible = ref(false);
 const editMode = ref(false);
 const editorTab = ref<'edit' | 'preview'>('edit');
+const attachmentFileList = ref<UploadFile[]>([]);
 
 const formState = ref<Partial<QmsKnowledgeApi.KnowledgeItem>>({
   attachments: [],
@@ -46,6 +52,82 @@ const formState = ref<Partial<QmsKnowledgeApi.KnowledgeItem>>({
   version: 'V1.0',
 });
 
+const uploadHeaders = computed(() => ({
+  Authorization: `Bearer ${accessStore.accessToken}`,
+}));
+
+function getFileExtension(fileName: string) {
+  const suffix = fileName.split('.').pop();
+  return suffix ? suffix.toLowerCase() : '';
+}
+
+function toUploadFiles(
+  attachments: QmsKnowledgeApi.KnowledgeItem['attachments'] = [],
+): UploadFile[] {
+  return attachments.map((file, index) => ({
+    name: file.name,
+    size: file.size,
+    status: 'done',
+    type: file.type,
+    uid: `${file.url}-${index}`,
+    url: file.url,
+  }));
+}
+
+function syncAttachmentsFromFiles(files: UploadFile[]) {
+  formState.value.attachments = files
+    .map((file) => {
+      const response = file.response as
+        | undefined
+        | {
+            data?: {
+              originalName?: string;
+              size?: number;
+              url?: string;
+            };
+          };
+      const url = String(file.url || response?.data?.url || '').trim();
+      if (!url) return null;
+
+      const name = String(
+        file.name || response?.data?.originalName || '附件',
+      ).trim();
+      return {
+        name,
+        size: Number(file.size ?? response?.data?.size ?? 0),
+        type: getFileExtension(name),
+        url,
+      };
+    })
+    .filter(Boolean) as QmsKnowledgeApi.KnowledgeItem['attachments'];
+}
+
+function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
+  if (info.file.status === 'done') {
+    const response = info.file.response as
+      | undefined
+      | {
+          code?: number;
+          data?: {
+            originalName?: string;
+            size?: number;
+            url?: string;
+          };
+        };
+    if (response?.code === 0 && response.data?.url) {
+      info.file.url = response.data.url;
+      message.success(`${info.file.name} 上传成功`);
+    } else {
+      message.warning('附件上传完成，但未返回有效地址');
+    }
+  } else if (info.file.status === 'error') {
+    message.error(`${info.file.name} 上传失败`);
+  }
+
+  attachmentFileList.value = [...info.fileList];
+  syncAttachmentsFromFiles(attachmentFileList.value);
+}
+
 function open(
   item?: Partial<QmsKnowledgeApi.KnowledgeItem>,
   defaultCategoryId?: string,
@@ -53,14 +135,13 @@ function open(
   if (item && item.id) {
     editMode.value = true;
     formState.value = { ...item };
-    formState.value = { ...item };
+    attachmentFileList.value = toUploadFiles(item.attachments || []);
   } else {
     editMode.value = false;
-    // 如果是预填模式（没有 id 但有 attachments）
-    // 如果是预填模式（没有 id 但有 attachments）
+    const attachments = (item && item.attachments) || [];
 
     formState.value = {
-      attachments: (item && item.attachments) || [],
+      attachments,
       author: userStore.userInfo?.realName || 'Admin',
       categoryId: (item && item.categoryId) || defaultCategoryId || '',
       content: (item && item.content) || '',
@@ -70,6 +151,7 @@ function open(
       title: (item && item.title) || '',
       version: (item && item.version) || 'V1.0',
     };
+    attachmentFileList.value = toUploadFiles(attachments);
   }
   editorTab.value = 'edit';
   visible.value = true;
@@ -149,6 +231,21 @@ defineExpose({ open });
           mode="tags"
           placeholder="请输入标签并回车确认"
         />
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium">附件</label>
+        <Upload
+          v-model:file-list="attachmentFileList"
+          :headers="uploadHeaders"
+          action="/api/upload"
+          name="file"
+          @change="handleAttachmentUploadChange"
+        >
+          <Button>上传附件</Button>
+        </Upload>
+        <div class="mt-1 text-xs text-gray-400">
+          支持 PDF、Word、Excel、图片等文件，保存后会在知识详情中展示。
+        </div>
       </div>
       <div>
         <div class="mb-2 flex items-center justify-between">

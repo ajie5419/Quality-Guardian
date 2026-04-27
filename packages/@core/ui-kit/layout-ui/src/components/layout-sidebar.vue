@@ -10,6 +10,25 @@ import { useScrollLock } from '@vueuse/core';
 import { version } from '../../../../../../package.json';
 import { SidebarCollapseButton, SidebarFixedButton } from './widgets';
 
+const props = withDefaults(defineProps<Props>(), {
+  collapseHeight: 42,
+  collapseWidth: 48,
+  domVisible: true,
+  fixedExtra: false,
+  isSidebarMixed: false,
+  marginTop: 0,
+  mixedWidth: 70,
+  paddingTop: 0,
+  show: true,
+  showCollapseButton: true,
+  showFixedButton: true,
+  zIndex: 0,
+});
+
+const emit = defineEmits<{ leave: [] }>();
+
+const displayVersion = import.meta.env.VITE_APP_VERSION || version;
+
 interface Props {
   /**
    * 折叠区域高度
@@ -90,22 +109,6 @@ interface Props {
   zIndex?: number;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  collapseHeight: 42,
-  collapseWidth: 48,
-  domVisible: true,
-  fixedExtra: false,
-  isSidebarMixed: false,
-  marginTop: 0,
-  mixedWidth: 70,
-  paddingTop: 0,
-  show: true,
-  showCollapseButton: true,
-  showFixedButton: true,
-  zIndex: 0,
-});
-
-const emit = defineEmits<{ leave: [] }>();
 const collapse = defineModel<boolean>('collapse');
 const extraCollapse = defineModel<boolean>('extraCollapse');
 const expandOnHovering = defineModel<boolean>('expandOnHovering');
@@ -288,7 +291,7 @@ function handleMouseleave() {
       v-if="!collapse"
       class="text-muted-foreground flex-center mb-1 p-2 text-[10px] opacity-40 transition-all"
     >
-      v{{ version }}
+      v{{ displayVersion }}
     </div>
 
     <div :style="collapseStyle"></div>

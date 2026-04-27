@@ -252,34 +252,51 @@ const previewVisible = ref(false);
 const previewTitle = ref('');
 const previewUrl = ref('');
 const previewType = ref('');
+const previewMode = ref<'download' | 'embed' | 'empty' | 'image'>('empty');
+
+function resolvePreviewUrl(url: string) {
+  const trimmedUrl = String(url || '').trim();
+  if (!trimmedUrl || trimmedUrl === '#') return '';
+  if (/^https?:\/\//i.test(trimmedUrl)) return trimmedUrl;
+  if (trimmedUrl.startsWith('/')) {
+    return `${window.location.origin}${trimmedUrl}`;
+  }
+  return new URL(trimmedUrl, window.location.href).href;
+}
 
 function handlePreview(file: QmsKnowledgeApi.Attachment) {
   previewTitle.value = file.name;
   previewType.value = file.type.toLowerCase();
+  previewMode.value = 'empty';
 
-  // 处理 Mock 数据或无效 URL
-  const isMockUrl = file.url === '#' || !file.url.startsWith('http');
+  const resolvedUrl = resolvePreviewUrl(file.url);
 
-  if (isMockUrl) {
-    message.warning(
-      '当前为演示数据，无法通过远程服务预览。请在上传真实文件后重试。',
-    );
+  if (!resolvedUrl) {
+    message.warning('附件地址无效，无法预览。');
     previewUrl.value = '';
     previewVisible.value = true;
     return;
   }
 
   if (['gif', 'jpeg', 'jpg', 'png', 'webp'].includes(previewType.value)) {
-    previewUrl.value = file.url;
+    previewMode.value = 'image';
+    previewUrl.value = resolvedUrl;
   } else if (previewType.value === 'pdf') {
-    previewUrl.value = file.url;
+    previewMode.value = 'embed';
+    previewUrl.value = resolvedUrl;
   } else if (
     ['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'].includes(previewType.value)
   ) {
-    // 仅公网地址支持此预览
-    previewUrl.value = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(file.url)}`;
+    if (/^https?:\/\//i.test(file.url)) {
+      previewMode.value = 'embed';
+      previewUrl.value = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(resolvedUrl)}`;
+    } else {
+      previewMode.value = 'download';
+      previewUrl.value = resolvedUrl;
+    }
   } else {
-    previewUrl.value = file.url;
+    previewMode.value = 'download';
+    previewUrl.value = resolvedUrl;
   }
 
   previewVisible.value = true;
@@ -680,20 +697,14 @@ onMounted(async () => {
 
         <!-- 图片预览 -->
         <Image
-          v-else-if="
-            ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(previewType)
-          "
+          v-else-if="previewMode === 'image'"
           :src="previewUrl"
           style="max-height: 75vh; object-fit: contain"
         />
 
         <!-- 文档预览 -->
         <iframe
-          v-else-if="
-            ['pdf', 'docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt'].includes(
-              previewType,
-            )
-          "
+          v-else-if="previewMode === 'embed'"
           :src="previewUrl"
           width="100%"
           height="100%"
@@ -706,7 +717,9 @@ onMounted(async () => {
           class="flex h-full flex-col items-center justify-center gap-4"
         >
           <div class="text-6xl opacity-20">🚫</div>
-          <p class="text-gray-500">该文件类型不支持在线预览，请下载后查看</p>
+          <p class="text-gray-500">
+            该文件类型暂不支持本地在线预览，请下载后查看
+          </p>
           <Button type="primary" :href="previewUrl" target="_blank">
             下载文件
           </Button>

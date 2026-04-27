@@ -75,6 +75,7 @@ jobs:
         run: |
           docker build --platform linux/amd64 \
             -f infra/docker/Dockerfile.frontend \
+            --build-arg VITE_APP_VERSION="${{ steps.version.outputs.version }}" \
             -t "$IMAGE_REPO:frontend-${{ steps.version.outputs.version }}" .
 
       - name: Push images
