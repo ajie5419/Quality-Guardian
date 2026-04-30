@@ -427,7 +427,11 @@ const {
               <Button
                 type="link"
                 class="!px-0"
-                @click="openWorkOrderAggregate(row.workOrderNumber)"
+                @click="
+                  openWorkOrderAggregate(row.workOrderNumber, {
+                    syncRoute: false,
+                  })
+                "
               >
                 {{ row.workOrderNumber }}
               </Button>
@@ -450,7 +454,9 @@ const {
         @open-work-order="
           async (workOrderNumber) => {
             closeBoard();
-            await openWorkOrderAggregate(workOrderNumber);
+            await openWorkOrderAggregate(workOrderNumber, {
+              syncRoute: false,
+            });
           }
         "
       />

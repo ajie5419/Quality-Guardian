@@ -133,4 +133,41 @@ describe('workOrderService', () => {
       expect(result.items[0].warrantyStatus).toBe('否');
     });
   });
+
+  describe('getDashboardStats', () => {
+    it('should merge warranty ranking by division', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-04-29T00:00:00.000Z'));
+        (prisma.work_orders.findMany as any).mockResolvedValueOnce([
+          {
+            deliveryDate: new Date('2025-09-01T00:00:00.000Z'),
+            division: '车辆 SOBU',
+            projectName: '70t 管片车',
+            quantity: 1,
+            status: 'COMPLETED',
+          },
+          {
+            deliveryDate: new Date('2025-10-01T00:00:00.000Z'),
+            division: '车辆 SOBU',
+            projectName: '786',
+            quantity: 1,
+            status: 'OPEN',
+          },
+        ]);
+
+        const result = await WorkOrderService.getDashboardStats({});
+
+        expect(result.rankings).toHaveLength(1);
+        expect(result.rankings[0]).toEqual({
+          division: '车辆 SOBU',
+          productName: '70t 管片车、786',
+          productNames: ['70t 管片车', '786'],
+          warrantyCount: 2,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });

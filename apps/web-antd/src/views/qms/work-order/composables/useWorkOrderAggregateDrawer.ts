@@ -44,9 +44,13 @@ export function useWorkOrderAggregateDrawer(
     }
   }
 
-  async function openWorkOrderAggregate(workOrderNumber: string) {
+  async function openWorkOrderAggregate(
+    workOrderNumber: string,
+    openOptions?: { syncRoute?: boolean },
+  ) {
     const normalized = String(workOrderNumber || '').trim();
     if (!normalized) return;
+    const shouldSyncRoute = openOptions?.syncRoute ?? syncRoute;
     await ensureDepartmentsLoaded();
     aggregateLoading.value = true;
     aggregateVisible.value = true;
@@ -56,7 +60,7 @@ export function useWorkOrderAggregateDrawer(
         workOrderNumber: normalized,
       });
       if (
-        syncRoute &&
+        shouldSyncRoute &&
         String(route.query.workOrderNumber || '').trim() !== normalized
       ) {
         await router.replace({

@@ -77,6 +77,7 @@ type WorkOrderDashboardStats = {
   rankings: Array<{
     division: string;
     productName: string;
+    productNames: string[];
     warrantyCount: number;
   }>;
   total: number;
@@ -300,7 +301,10 @@ export const WorkOrderService = {
       },
     });
     const divisionProjectMap = new Map<string, number>();
-    const divisionProductWarrantyMap = new Map<string, number>();
+    const divisionWarrantyMap = new Map<
+      string,
+      { productNames: Set<string>; warrantyCount: number }
+    >();
     let total = 0;
     let completed = 0;
     let inProgress = 0;
@@ -320,11 +324,13 @@ export const WorkOrderService = {
         (divisionProjectMap.get(division) || 0) + 1,
       );
       if (getWarrantyStatus(item.deliveryDate) === '是') {
-        const rankingKey = `${division}__${productName}`;
-        divisionProductWarrantyMap.set(
-          rankingKey,
-          (divisionProductWarrantyMap.get(rankingKey) || 0) + quantity,
-        );
+        const current = divisionWarrantyMap.get(division) || {
+          productNames: new Set<string>(),
+          warrantyCount: 0,
+        };
+        current.productNames.add(productName);
+        current.warrantyCount += quantity;
+        divisionWarrantyMap.set(division, current);
       }
     }
 
@@ -332,13 +338,14 @@ export const WorkOrderService = {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
 
-    const rankings = [...divisionProductWarrantyMap.entries()]
-      .map(([rankingKey, warrantyCount]) => {
-        const [division, productName] = rankingKey.split('__');
+    const rankings = [...divisionWarrantyMap.entries()]
+      .map(([division, value]) => {
+        const productNames = [...value.productNames].sort();
         return {
           division: division || '其他',
-          productName: productName || '未命名产品',
-          warrantyCount,
+          productName: productNames.join('、') || '未命名产品',
+          productNames,
+          warrantyCount: value.warrantyCount,
         };
       })
       .sort((a, b) => b.warrantyCount - a.warrantyCount);

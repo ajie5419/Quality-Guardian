@@ -51,6 +51,7 @@ const dashboardStats = computed(() => {
       rankings: [] as Array<{
         division: string;
         productName: string;
+        productNames?: string[];
         warrantyCount: number;
       }>,
       total: 0,
@@ -81,28 +82,47 @@ const dashboardStats = computed(() => {
 
   const rankingMap = new Map<
     string,
-    { division: string; productName: string; warrantyCount: number }
+    {
+      division: string;
+      productNames: Set<string>;
+      warrantyCount: number;
+    }
   >();
   for (const item of source.rankings || []) {
     const rawDivision = String(item.division || t('qms.common.other')).trim();
-    const productName =
-      String(item.productName || '未知产品').trim() || '未知产品';
+    const productNames =
+      Array.isArray(item.productNames) && item.productNames.length > 0
+        ? item.productNames
+        : [item.productName || '未知产品'];
     const division = formatDivisionName(
       findNameById(props.deptData, rawDivision) || rawDivision,
     );
-    const key = `${normalizeDivisionKey(division)}__${productName}`;
+    const key = normalizeDivisionKey(division);
     const existing = rankingMap.get(key);
+    const names = existing?.productNames || new Set<string>();
+    productNames.forEach((name) => {
+      const normalizedName = String(name || '').trim();
+      if (normalizedName) names.add(normalizedName);
+    });
     rankingMap.set(key, {
       division: existing?.division || division,
-      productName,
+      productNames: names,
       warrantyCount:
         (existing?.warrantyCount || 0) + Number(item.warrantyCount || 0),
     });
   }
 
-  const rankings = [...rankingMap.values()].sort(
-    (a, b) => b.warrantyCount - a.warrantyCount,
-  );
+  const rankings = [...rankingMap.values()]
+    .map((item) => {
+      const productNames = [...item.productNames].sort();
+      return {
+        division: item.division,
+        productName: productNames.join('、') || '未知产品',
+        productNames,
+        warrantyCount: item.warrantyCount,
+      };
+    })
+    .sort((a, b) => b.warrantyCount - a.warrantyCount);
 
   return {
     ...source,
@@ -242,7 +262,7 @@ watch(
             <div class="space-y-1.5 py-1">
               <div
                 v-for="(rank, idx) in dashboardStats.rankings"
-                :key="`${rank.division}-${rank.productName}`"
+                :key="rank.division"
                 class="group flex items-center justify-between rounded-lg border-b border-gray-50 p-2.5 transition-all hover:bg-blue-50/30"
               >
                 <div class="flex items-center gap-4">

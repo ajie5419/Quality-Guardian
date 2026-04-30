@@ -71,6 +71,7 @@ export type WorkOrderDashboardStats = {
   rankings: Array<{
     division: string;
     productName: string;
+    productNames?: string[];
     warrantyCount: number;
   }>;
   total: number;
