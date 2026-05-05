@@ -7,7 +7,6 @@ import { VbenScrollbar } from '@vben-core/shadcn-ui';
 
 import { useScrollLock } from '@vueuse/core';
 
-import { version } from '../../../../../../package.json';
 import { SidebarCollapseButton, SidebarFixedButton } from './widgets';
 
 const props = withDefaults(defineProps<Props>(), {
@@ -27,7 +26,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{ leave: [] }>();
 
-const displayVersion = import.meta.env.VITE_APP_VERSION || version;
+const displayVersion = import.meta.env.VITE_APP_VERSION;
 
 interface Props {
   /**
