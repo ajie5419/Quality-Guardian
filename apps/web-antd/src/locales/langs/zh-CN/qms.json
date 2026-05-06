@@ -85,6 +85,12 @@
     },
     "unitName": "单位名称",
     "serviceRange": "服务范围",
+    "managementType": "管理类型",
+    "mode": {
+      "inHouseTeam": "驻厂队伍",
+      "externalProcessor": "外部加工",
+      "externalService": "外部服务"
+    },
     "mainProcessing": "主要加工内容",
     "qualityLevel": "质量等级",
     "realTimeScore": "实时评分",

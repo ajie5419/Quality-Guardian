@@ -6,6 +6,11 @@
  * Supplier Category
  */
 export type SupplierCategory = 'Outsourcing' | 'Supplier' | string;
+export type OutsourcingMode =
+  | 'EXTERNAL_PROCESSOR'
+  | 'EXTERNAL_SERVICE'
+  | 'IN_HOUSE_TEAM'
+  | string;
 
 /**
  * Supplier Status
@@ -33,12 +38,14 @@ export interface SupplierItem {
   level?: string;
   name: string;
   origin: string;
+  outsourcingMode?: OutsourcingMode;
   productName: string;
   project: string;
   // Quality Indicators
   qualityScore?: number;
   rating?: string;
   score2025: number;
+  scoringModel?: 'IN_HOUSE_OUTSOURCING' | 'SUPPLIER' | string;
   stabilityScore?: number;
   status?: SupplierStatus;
   totalAfterSalesLoss?: number;
@@ -63,6 +70,7 @@ export interface SupplierStats {
 export interface SupplierListParams {
   category?: SupplierCategory;
   keyword?: string;
+  outsourcingMode?: OutsourcingMode;
   page?: number;
   pageSize?: number;
   sortBy?: string;
@@ -88,6 +96,7 @@ export interface ImportSupplierItem {
   category?: SupplierCategory;
   name: string;
   origin?: string;
+  outsourcingMode?: OutsourcingMode;
   productName?: string;
   project?: string;
   status?: SupplierStatus;

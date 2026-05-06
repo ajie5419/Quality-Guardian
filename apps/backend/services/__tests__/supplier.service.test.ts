@@ -398,7 +398,121 @@ describe('supplierService standard scoring samples', () => {
     expect(names).toEqual(['S1', 'S3', 'S2']);
   });
 
-  it('sample 11: outsourcing category should use the same deduction/freeze rules', async () => {
+  it('sample 11: external outsourcing should use supplier risk rules', async () => {
+    setupScenario({
+      suppliers: [
+        {
+          ...supplier('OS1'),
+          category: 'Outsourcing',
+          outsourcingMode: 'EXTERNAL_PROCESSOR',
+        },
+      ],
+      engineeringStats: [
+        {
+          supplierName: 'OS1',
+          _count: { id: 3 },
+          _sum: { lossAmount: 91_000, quantity: 3 },
+        },
+      ],
+      recentQualityRecords: [
+        {
+          supplierName: 'OS1',
+          lossAmount: 90_000,
+          severity: 'minor',
+          date: new Date('2026-02-03'),
+        },
+        {
+          supplierName: 'OS1',
+          lossAmount: 500,
+          severity: 'minor',
+          date: new Date('2026-02-02'),
+        },
+        {
+          supplierName: 'OS1',
+          lossAmount: 500,
+          severity: 'minor',
+          date: new Date('2026-02-01'),
+        },
+      ],
+    });
+
+    const result = await SupplierService.findAll({ category: 'Outsourcing' });
+    const row = (result.items as any[]).find((item) => item.name === 'OS1');
+
+    expect(row.status).toBe('Frozen');
+    expect(row.qualityScore).toBe(0);
+    expect(row.level).toBe('D');
+  });
+
+  it('sample 12: in-house outsourcing should treat closed minor issues as improvement items', async () => {
+    setupScenario({
+      suppliers: [
+        {
+          ...supplier('OS1'),
+          category: 'Outsourcing',
+          outsourcingMode: 'IN_HOUSE_TEAM',
+        },
+      ],
+      engineeringStats: [
+        {
+          supplierName: 'OS1',
+          _count: { id: 10 },
+          _sum: { lossAmount: 1000, quantity: 10 },
+        },
+      ],
+      recentQualityRecords: Array.from({ length: 10 }, (_, index) => ({
+        supplierName: 'OS1',
+        lossAmount: 100,
+        severity: 'minor',
+        date: new Date(`2026-02-${String(index + 1).padStart(2, '0')}`),
+      })),
+    });
+
+    const result = await SupplierService.findAll({ category: 'Outsourcing' });
+    const row = (result.items as any[]).find((item) => item.name === 'OS1');
+
+    expect(row.status).toBe('Qualified');
+    expect(row.qualityScore).toBe(95);
+    expect(row.level).toBe('A');
+    expect(row.scoringModel).toBe('IN_HOUSE_OUTSOURCING');
+  });
+
+  it('sample 13: in-house outsourcing should focus on open issue closure', async () => {
+    setupScenario({
+      suppliers: [
+        {
+          ...supplier('OS1'),
+          category: 'Outsourcing',
+          outsourcingMode: 'IN_HOUSE_TEAM',
+        },
+      ],
+      engineeringStats: [
+        {
+          supplierName: 'OS1',
+          _count: { id: 3 },
+          _sum: { lossAmount: 300, quantity: 3 },
+        },
+      ],
+      engineeringStatusStats: [
+        { supplierName: 'OS1', status: 'OPEN', _count: { id: 3 } },
+      ],
+      recentQualityRecords: Array.from({ length: 3 }, (_, index) => ({
+        supplierName: 'OS1',
+        lossAmount: 100,
+        severity: 'minor',
+        date: new Date(`2026-02-0${index + 1}`),
+      })),
+    });
+
+    const result = await SupplierService.findAll({ category: 'Outsourcing' });
+    const row = (result.items as any[]).find((item) => item.name === 'OS1');
+
+    expect(row.status).toBe('Observation');
+    expect(row.qualityScore).toBe(85);
+    expect(row.level).toBe('B');
+  });
+
+  it('sample 14: outsourcing without management type should default to external processor rules', async () => {
     setupScenario({
       suppliers: [
         {
@@ -438,8 +552,9 @@ describe('supplierService standard scoring samples', () => {
     const result = await SupplierService.findAll({ category: 'Outsourcing' });
     const row = (result.items as any[]).find((item) => item.name === 'OS1');
 
+    expect(row.outsourcingMode).toBe('EXTERNAL_PROCESSOR');
+    expect(row.scoringModel).toBe('SUPPLIER');
     expect(row.status).toBe('Frozen');
     expect(row.qualityScore).toBe(0);
-    expect(row.level).toBe('D');
   });
 });

@@ -180,6 +180,25 @@
       "frozen": "Frozen"
     }
   },
+  "outsourcing": {
+    "title": "Outsourcing Management",
+    "entityName": "Outsourcing Unit",
+    "unitName": "Unit Name",
+    "serviceRange": "Service Scope",
+    "managementType": "Management Type",
+    "mode": {
+      "inHouseTeam": "In-house Team",
+      "externalProcessor": "External Processor",
+      "externalService": "External Service"
+    },
+    "mainProcessing": "Main Processing",
+    "qualityLevel": "Quality Level",
+    "realTimeScore": "Real-time Score",
+    "qualifiedRate": "Qualified Rate",
+    "engIssue": "Engineering Issues",
+    "afterSalesIssue": "After-sales Issues",
+    "addUnit": "Add Outsourcing Unit"
+  },
   "metrology": {
     "title": "Measuring Instrument Ledger",
     "managementTitle": "Measuring Instrument Management",

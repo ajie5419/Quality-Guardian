@@ -530,6 +530,7 @@ model standard_documents {
 model suppliers {
   id           String   @id @default(cuid())
   category     String?
+  outsourcingMode String?
   name         String   @unique
   productName  String?
   brand        String?

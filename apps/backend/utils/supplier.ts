@@ -6,6 +6,27 @@ const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 200;
 const DEFAULT_SUPPLIER_CATEGORY = 'Supplier';
+export const DEFAULT_OUTSOURCING_MODE = 'EXTERNAL_PROCESSOR';
+export const IN_HOUSE_OUTSOURCING_MODE = 'IN_HOUSE_TEAM';
+export const OUTSOURCING_CATEGORY = 'Outsourcing';
+
+export const OUTSOURCING_MODES = new Set([
+  'EXTERNAL_PROCESSOR',
+  'EXTERNAL_SERVICE',
+  IN_HOUSE_OUTSOURCING_MODE,
+]);
+
+const OUTSOURCING_MODE_ALIASES: Record<string, string> = {
+  'external processor': 'EXTERNAL_PROCESSOR',
+  'external service': 'EXTERNAL_SERVICE',
+  'in-house team': 'IN_HOUSE_TEAM',
+  externalprocessor: 'EXTERNAL_PROCESSOR',
+  externalservice: 'EXTERNAL_SERVICE',
+  inhouseteam: 'IN_HOUSE_TEAM',
+  外部加工: 'EXTERNAL_PROCESSOR',
+  外部服务: 'EXTERNAL_SERVICE',
+  驻厂队伍: 'IN_HOUSE_TEAM',
+};
 
 function parsePositiveInt(value: unknown, defaultValue: number): number {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -57,6 +78,34 @@ export function normalizeSupplierStatus(value: unknown): string {
   return normalizeSupplierString(value) ?? 'Qualified';
 }
 
+export function isOutsourcingCategory(value: unknown): boolean {
+  return (
+    normalizeSupplierString(value)?.toLowerCase() ===
+    OUTSOURCING_CATEGORY.toLowerCase()
+  );
+}
+
+export function normalizeOutsourcingMode(
+  value: unknown,
+  category?: unknown,
+): string | undefined {
+  const raw = normalizeSupplierString(value);
+  const normalized = raw?.toUpperCase();
+  if (normalized && OUTSOURCING_MODES.has(normalized)) {
+    return normalized;
+  }
+  if (raw) {
+    const alias =
+      OUTSOURCING_MODE_ALIASES[raw.toLowerCase()] ||
+      OUTSOURCING_MODE_ALIASES[raw];
+    if (alias) {
+      return alias;
+    }
+  }
+
+  return isOutsourcingCategory(category) ? DEFAULT_OUTSOURCING_MODE : undefined;
+}
+
 interface SupplierImportItem {
   address?: unknown;
   brand?: unknown;
@@ -66,6 +115,7 @@ interface SupplierImportItem {
   email?: unknown;
   name?: unknown;
   origin?: unknown;
+  outsourcingMode?: unknown;
   phone?: unknown;
   project?: unknown;
   productName?: unknown;
@@ -91,6 +141,10 @@ export function buildSupplierUpsertPayload(
     normalizeSupplierString(options.category) ??
     normalizeSupplierString(item.category) ??
     options.defaultCategory;
+  const outsourcingMode = normalizeOutsourcingMode(
+    item.outsourcingMode,
+    category,
+  );
 
   return {
     create: {
@@ -100,6 +154,7 @@ export function buildSupplierUpsertPayload(
       productName: normalizeSupplierString(item.productName),
       buyer: normalizeSupplierString(item.buyer),
       category: category ?? DEFAULT_SUPPLIER_CATEGORY,
+      outsourcingMode,
       status: normalizeSupplierStatus(item.status),
     },
     update: {
@@ -107,6 +162,7 @@ export function buildSupplierUpsertPayload(
       productName: normalizeSupplierString(item.productName),
       buyer: normalizeSupplierString(item.buyer),
       category,
+      outsourcingMode,
       isDeleted: false,
       updatedAt: new Date(),
     },
@@ -115,8 +171,11 @@ export function buildSupplierUpsertPayload(
 }
 
 function buildSupplierMutableData(input: SupplierImportItem) {
+  const category = normalizeSupplierString(input.category);
+
   return {
-    category: normalizeSupplierString(input.category),
+    category,
+    outsourcingMode: normalizeOutsourcingMode(input.outsourcingMode, category),
     productName: normalizeSupplierString(input.productName),
     brand: normalizeSupplierString(input.brand),
     origin: normalizeSupplierString(input.origin),
@@ -173,6 +232,10 @@ export function parseSupplierListQuery(
     keyword:
       normalizeSupplierString(query.keyword) ||
       normalizeSupplierString(query.name),
+    outsourcingMode:
+      query.outsourcingMode === undefined
+        ? undefined
+        : normalizeOutsourcingMode(query.outsourcingMode, query.category),
     page,
     pageSize,
     sortBy: normalizeSupplierString(query.sortBy),

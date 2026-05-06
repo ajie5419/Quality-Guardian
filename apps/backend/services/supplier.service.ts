@@ -1,4 +1,10 @@
 import prisma from '~/utils/prisma';
+import {
+  DEFAULT_OUTSOURCING_MODE,
+  IN_HOUSE_OUTSOURCING_MODE,
+  isOutsourcingCategory,
+  normalizeOutsourcingMode,
+} from '~/utils/supplier';
 
 import { DataScopeService } from './data-scope.service';
 
@@ -10,6 +16,7 @@ const THRESHOLD_INCOMING_YIELD_WARNING = 90;
 
 const LIMIT_CONSECUTIVE_FAILURE = 3; // 3x Consecutive A/B -> Blacklist
 const LIMIT_MIN_ISSUE_COUNT_FOR_STRICT_ACTION = 3;
+const OPEN_IN_HOUSE_ISSUE_WARNING_LIMIT = 3;
 
 interface SupplierStats {
   afterSalesClassA: number;
@@ -63,6 +70,95 @@ function clamp100(value: number) {
   return Math.max(0, Math.min(100, value));
 }
 
+function buildSupplierScore(input: {
+  incomingQualifiedRate: number;
+  stat: SupplierStats;
+  totalIssueCount: number;
+}) {
+  const { incomingQualifiedRate, stat, totalIssueCount } = input;
+  const engineeringDeduction =
+    stat.engineeringClassA * 15 +
+    stat.engineeringClassB * 5 +
+    stat.engineeringClassC * 1;
+  const afterSalesDeduction =
+    stat.afterSalesClassA * 15 +
+    stat.afterSalesClassB * 5 +
+    stat.afterSalesClassC * 1;
+  const incomingDeduction = stat.failures * 3;
+  const totalDeduction =
+    engineeringDeduction + afterSalesDeduction + incomingDeduction;
+
+  return {
+    afterSalesScore: clamp100(100 - afterSalesDeduction),
+    engineeringScore: clamp100(100 - engineeringDeduction),
+    incomingScore: clamp100(100 - incomingDeduction),
+    score: Math.round(clamp100(100 - totalDeduction)),
+    shouldDowngradeToC:
+      stat.engineeringClassA + stat.afterSalesClassA >= 2 ||
+      stat.engineeringClassB + stat.afterSalesClassB >= 3 ||
+      (stat.count > 5 &&
+        incomingQualifiedRate < THRESHOLD_INCOMING_YIELD_WARNING),
+    shouldFreeze:
+      totalIssueCount >= LIMIT_MIN_ISSUE_COUNT_FOR_STRICT_ACTION &&
+      (stat.consecutiveBigFailures >= LIMIT_CONSECUTIVE_FAILURE ||
+        stat.maxSingleLoss > THRESHOLD_CRITICAL_AMOUNT),
+    stabilityScore: 100,
+  };
+}
+
+function buildInHouseOutsourcingScore(input: {
+  stat: SupplierStats;
+  totalIssueCount: number;
+}) {
+  const { stat, totalIssueCount } = input;
+  const openIssueCount = stat.openEngineeringCount + stat.openAfterSalesCount;
+
+  const engineeringDeduction =
+    stat.engineeringClassA * 12 +
+    stat.engineeringClassB * 4 +
+    stat.engineeringClassC * 0.5 +
+    Math.max(
+      0,
+      stat.engineeringCount -
+        stat.engineeringClassA -
+        stat.engineeringClassB -
+        stat.engineeringClassC,
+    ) *
+      0.5;
+  const afterSalesDeduction =
+    stat.afterSalesClassA * 12 +
+    stat.afterSalesClassB * 4 +
+    stat.afterSalesClassC * 0.5 +
+    Math.max(
+      0,
+      stat.afterSalesCount -
+        stat.afterSalesClassA -
+        stat.afterSalesClassB -
+        stat.afterSalesClassC,
+    ) *
+      0.5;
+  const openIssueDeduction = openIssueCount * 2;
+  const totalDeduction =
+    engineeringDeduction + afterSalesDeduction + openIssueDeduction;
+
+  return {
+    afterSalesScore: clamp100(100 - afterSalesDeduction),
+    engineeringScore: clamp100(100 - engineeringDeduction),
+    incomingScore: 100,
+    openIssueCount,
+    score: Math.round(clamp100(100 - totalDeduction)),
+    shouldDowngradeToC:
+      stat.engineeringClassA + stat.afterSalesClassA >= 2 ||
+      stat.engineeringClassB + stat.afterSalesClassB >= 3 ||
+      openIssueCount >= OPEN_IN_HOUSE_ISSUE_WARNING_LIMIT,
+    shouldFreeze:
+      totalIssueCount >= LIMIT_MIN_ISSUE_COUNT_FOR_STRICT_ACTION &&
+      (stat.consecutiveBigFailures >= LIMIT_CONSECUTIVE_FAILURE ||
+        stat.maxSingleLoss > THRESHOLD_CRITICAL_AMOUNT),
+    stabilityScore: clamp100(100 - openIssueCount * 10),
+  };
+}
+
 export interface SupplierQueryParams {
   page?: number;
   pageSize?: number;
@@ -72,6 +168,7 @@ export interface SupplierQueryParams {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   name?: string;
+  outsourcingMode?: string;
   userContext?: { userId: string; username?: string };
 }
 
@@ -88,6 +185,7 @@ export const SupplierService = {
       keyword,
       sortBy,
       sortOrder,
+      outsourcingMode,
     } = params;
 
     // 1. 构造极其稳健的过滤条件
@@ -110,6 +208,25 @@ export const SupplierService = {
         { email: { contains: keyword } },
         { phone: { contains: keyword } },
       ];
+    }
+    const normalizedOutsourcingMode = normalizeOutsourcingMode(
+      outsourcingMode,
+      category,
+    );
+    if (normalizedOutsourcingMode && outsourcingMode) {
+      if (normalizedOutsourcingMode === DEFAULT_OUTSOURCING_MODE) {
+        where.AND = [
+          ...((where.AND as unknown[]) || []),
+          {
+            OR: [
+              { outsourcingMode: normalizedOutsourcingMode },
+              { outsourcingMode: null },
+            ],
+          },
+        ];
+      } else {
+        where.outsourcingMode = normalizedOutsourcingMode;
+      }
     }
 
     const scopedWhere = params.userContext?.userId
@@ -393,50 +510,40 @@ export const SupplierService = {
         stat.count > 0 ? stat.qualifiedCount / stat.count : 1;
       const incomingQualifiedRate = Math.round(incomingPassRate * 100);
       const totalIssueCount = stat.engineeringCount + stat.afterSalesCount;
+      const outsourcingMode = normalizeOutsourcingMode(
+        item.outsourcingMode,
+        item.category,
+      );
+      const usesInHouseOutsourcingScore =
+        isOutsourcingCategory(item.category) &&
+        outsourcingMode === IN_HOUSE_OUTSOURCING_MODE;
+      const scoring = usesInHouseOutsourcingScore
+        ? buildInHouseOutsourcingScore({ stat, totalIssueCount })
+        : buildSupplierScore({ incomingQualifiedRate, stat, totalIssueCount });
 
-      const engineeringDeduction =
-        stat.engineeringClassA * 15 +
-        stat.engineeringClassB * 5 +
-        stat.engineeringClassC * 1;
-      const afterSalesDeduction =
-        stat.afterSalesClassA * 15 +
-        stat.afterSalesClassB * 5 +
-        stat.afterSalesClassC * 1;
-      const incomingDeduction = stat.failures * 3;
-      const totalDeduction =
-        engineeringDeduction + afterSalesDeduction + incomingDeduction;
+      const incomingScore = scoring.incomingScore;
+      const engineeringScore = scoring.engineeringScore;
+      const afterSalesScore = scoring.afterSalesScore;
+      const stabilityScore = scoring.stabilityScore;
 
-      const incomingScore = clamp100(100 - incomingDeduction);
-      const engineeringScore = clamp100(100 - engineeringDeduction);
-      const afterSalesScore = clamp100(100 - afterSalesDeduction);
-      const stabilityScore = 100;
-
-      let score = Math.round(clamp100(100 - totalDeduction));
+      let score = scoring.score;
       const warningReasons: string[] = [];
 
       const manualStatus = item.status;
       let finalStatus = manualStatus || 'Qualified';
       if (finalStatus.toLowerCase() === 'qualified') {
-        const hasEnoughIssuesForStrictAction =
-          totalIssueCount >= LIMIT_MIN_ISSUE_COUNT_FOR_STRICT_ACTION;
-        const shouldFreeze =
-          hasEnoughIssuesForStrictAction &&
-          (stat.consecutiveBigFailures >= LIMIT_CONSECUTIVE_FAILURE ||
-            stat.maxSingleLoss > THRESHOLD_CRITICAL_AMOUNT);
-        const shouldDowngradeToC =
-          stat.engineeringClassA + stat.afterSalesClassA >= 2 ||
-          stat.engineeringClassB + stat.afterSalesClassB >= 3 ||
-          (stat.count > 5 &&
-            incomingQualifiedRate < THRESHOLD_INCOMING_YIELD_WARNING);
-
-        if (shouldFreeze) {
+        if (scoring.shouldFreeze) {
           finalStatus = 'Frozen';
           score = 0;
           warningReasons.push('连续重大问题/单次超大损失');
-        } else if (shouldDowngradeToC) {
+        } else if (scoring.shouldDowngradeToC) {
           finalStatus = 'Observation';
-          score = Math.min(score, 70);
-          warningReasons.push('累计问题触发C级降级');
+          score = Math.min(score, usesInHouseOutsourcingScore ? 85 : 70);
+          warningReasons.push(
+            usesInHouseOutsourcingScore
+              ? '未关闭/严重问题触发观察'
+              : '累计问题触发C级降级',
+          );
         } else if (score < THRESHOLD_SCORE_WARNING) {
           finalStatus = 'Observation';
           score = Math.min(score, 75);
@@ -475,6 +582,10 @@ export const SupplierService = {
         status: finalStatus,
         rating: finalRating,
         level: finalRating,
+        outsourcingMode,
+        scoringModel: usesInHouseOutsourcingScore
+          ? 'IN_HOUSE_OUTSOURCING'
+          : 'SUPPLIER',
         isWarning: finalStatus === 'Observation' || finalStatus === 'Frozen',
         warningReasons,
         qualityScore: score,

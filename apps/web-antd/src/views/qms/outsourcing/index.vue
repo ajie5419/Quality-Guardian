@@ -25,7 +25,11 @@ import SupplierDetailDrawer from '../supplier/components/SupplierDetailDrawer.vu
 import SupplierEditModal from '../supplier/components/SupplierEditModal.vue';
 import SupplierStats from '../supplier/components/SupplierStats.vue';
 import { useSupplierActions } from '../supplier/composables/useSupplierActions';
-import { getColumns, getSearchFormSchema } from '../supplier/data';
+import {
+  getColumns,
+  getOutsourcingModeLabel,
+  getSearchFormSchema,
+} from '../supplier/data';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
@@ -224,7 +228,10 @@ const {
   detailDrawerRef,
   checkedRows,
   category: 'Outsourcing',
-  createValues: { category: 'Outsourcing' },
+  createValues: {
+    category: 'Outsourcing',
+    outsourcingMode: 'EXTERNAL_PROCESSOR',
+  },
   detailTitleKey: 'qms.outsourcing.title',
 });
 
@@ -326,6 +333,20 @@ function getStatusConfig(status?: string): {
                 "
               />
             </div>
+          </template>
+
+          <template #outsourcing_mode="{ row }">
+            <Tag
+              :color="
+                row.outsourcingMode === 'EXTERNAL_PROCESSOR'
+                  ? 'blue'
+                  : row.outsourcingMode === 'EXTERNAL_SERVICE'
+                    ? 'cyan'
+                    : 'green'
+              "
+            >
+              {{ getOutsourcingModeLabel(row.outsourcingMode) }}
+            </Tag>
           </template>
 
           <template #level_tag="{ row }">

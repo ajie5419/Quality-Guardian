@@ -27,6 +27,8 @@ import {
 } from '#/api/qms/inspection';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
+import { getOutsourcingModeLabel } from '../data';
+
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 
@@ -198,6 +200,14 @@ defineExpose({
             </Descriptions.Item>
             <Descriptions.Item :label="t('qms.supplier.brand')">
               {{ selectedSupplier.brand }}
+            </Descriptions.Item>
+            <Descriptions.Item
+              v-if="selectedSupplier.category === 'Outsourcing'"
+              :label="t('qms.outsourcing.managementType')"
+            >
+              <Tag color="green">
+                {{ getOutsourcingModeLabel(selectedSupplier.outsourcingMode) }}
+              </Tag>
             </Descriptions.Item>
             <Descriptions.Item :label="t('qms.supplier.mainProduct')">
               {{ selectedSupplier.productName }}
