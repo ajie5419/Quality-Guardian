@@ -15,8 +15,44 @@ export function buildChartOptionFromAggregated(
       name: String(item.name || 'Unknown'),
       value: Number(item.value || 0),
     }))
-    .sort((a, b) => b.value - a.value);
+    .sort((a, b) => compareChartRows(a, b, config));
   return generateChartOption(normalized, config, metricOptions);
+}
+
+const TIME_DIMENSIONS = new Set(['reportMonth']);
+
+function compareChartRows(
+  a: { name: string; value: number },
+  b: { name: string; value: number },
+  config: ChartConfig,
+) {
+  if (TIME_DIMENSIONS.has(config.dimension)) {
+    return compareTimeLabels(a.name, b.name);
+  }
+  return b.value - a.value;
+}
+
+function compareTimeLabels(a: string, b: string) {
+  const aTime = parseTimeLabel(a);
+  const bTime = parseTimeLabel(b);
+  if (aTime !== bTime) return aTime - bTime;
+  return a.localeCompare(b);
+}
+
+function parseTimeLabel(value: string) {
+  const normalized = value.trim();
+  const yearMonth = /^(\d{4})-(\d{1,2})$/.exec(normalized);
+  if (yearMonth) {
+    return Number(yearMonth[1]) * 100 + Number(yearMonth[2]);
+  }
+
+  const monthOnly = /^(\d{1,2})\s*月$/.exec(normalized);
+  if (monthOnly) {
+    return Number(monthOnly[1]);
+  }
+
+  const dateValue = Date.parse(normalized);
+  return Number.isNaN(dateValue) ? Number.MAX_SAFE_INTEGER : dateValue;
 }
 
 // Modern color palette
