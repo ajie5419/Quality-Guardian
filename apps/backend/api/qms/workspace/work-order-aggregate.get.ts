@@ -17,6 +17,12 @@ type GroupStats = {
   processName: string;
 };
 
+type AggregateAttachment = {
+  name?: string;
+  type?: string;
+  url: string;
+};
+
 type ProcessProgressGroup = {
   latestDate: Date;
   partName: string;
@@ -108,7 +114,9 @@ export default defineEventHandler(async (event) => {
       current.plannedPoints += plannedPoints;
       byGroup.set(key, current);
       return {
-        attachments: parseRequirementAttachments(item.attachment),
+        attachments: compactAggregateAttachments(
+          parseRequirementAttachments(item.attachment),
+        ),
         confirmer: item.confirmer || '',
         confirmedAt: item.confirmedAt,
         confirmStatus: String(item.confirmStatus || 'PENDING'),
@@ -464,6 +472,12 @@ function parseRequirementItems(raw: unknown): unknown[] {
 function resolveRequirementPoints(requirementItems: unknown) {
   const parsed = parseRequirementItems(requirementItems);
   return parsed.length > 0 ? parsed.length : 1;
+}
+
+function compactAggregateAttachments(
+  attachments: Array<AggregateAttachment & { thumbUrl?: string }>,
+): AggregateAttachment[] {
+  return attachments.map(({ name, type, url }) => ({ name, type, url }));
 }
 
 function normalizeLabel(value: unknown) {
