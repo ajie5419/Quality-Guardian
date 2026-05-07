@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
@@ -27,6 +28,14 @@ export default defineEventHandler(async (event) => {
 
     const newSupplier = await prisma.suppliers.create({
       data: createData,
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'CREATE',
+      targetType: 'supplier',
+      targetId: String(newSupplier.id),
+      details: `新增供应商/外协单位: ${newSupplier.name}`,
     });
 
     return useResponseSuccess(newSupplier);

@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { MetrologyService } from '~/services/metrology.service';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -34,12 +35,20 @@ export default defineEventHandler(async (event) => {
       body as Record<string, unknown>,
     );
 
-    await prisma.measuring_instruments.update({
+    const updated = await prisma.measuring_instruments.update({
       where: { id },
       data: {
         ...data,
         updatedBy: userinfo.username,
       },
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'UPDATE',
+      targetType: 'metrology',
+      targetId: String(id),
+      details: `修改计量器具: ${updated.instrumentName} (${updated.instrumentCode})`,
     });
 
     return useResponseSuccess(null);

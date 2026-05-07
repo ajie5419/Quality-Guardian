@@ -1,7 +1,9 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { awaitMockDelay } from '~/utils/index';
 import { buildItpProjectUpdateData } from '~/utils/itp';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
@@ -13,6 +15,7 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
   await awaitMockDelay();
+  const userinfo = verifyAccessToken(event);
   const id = getRequiredRouterParam(event, 'id', 'ID required');
   if (typeof id !== 'string') {
     return id;
@@ -27,6 +30,14 @@ export default defineEventHandler(async (event) => {
     const updated = await prisma.quality_plans.update({
       where: { id },
       data: updateData,
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo?.id,
+      action: 'UPDATE',
+      targetType: 'planning_itp_project',
+      targetId: String(id),
+      details: `修改 ITP 项目: ${updated.projectName}`,
     });
 
     return useResponseSuccess(updated);

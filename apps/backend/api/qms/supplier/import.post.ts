@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { parseNonEmptyArray } from '~/utils/request-validation';
@@ -42,6 +43,14 @@ export default defineEventHandler(async (event) => {
         logApiError('import', error);
       }
     }
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'CREATE',
+      targetType: 'supplier',
+      targetId: 'batch-import',
+      details: `导入供应商/外协单位: ${successCount}/${items.length} 条`,
+    });
 
     return useResponseSuccess({ successCount, totalCount: items.length });
   } catch (error: unknown) {

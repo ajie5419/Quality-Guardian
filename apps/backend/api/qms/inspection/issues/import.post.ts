@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { WelderScoreService } from '~/services/welder-score.service';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import {
   buildImportRowError,
   buildImportSummary,
@@ -73,6 +74,13 @@ export default defineEventHandler(async (event) => {
     if (successCount > 0) {
       await WelderScoreService.syncFromInspectionIssues();
     }
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'CREATE',
+      targetType: 'inspection_issue',
+      targetId: 'batch-import',
+      details: `导入不合格品项: ${successCount}/${items.length} 条`,
+    });
 
     return useResponseSuccess(
       buildImportSummary({

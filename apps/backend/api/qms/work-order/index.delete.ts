@@ -1,5 +1,6 @@
 import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
@@ -24,12 +25,20 @@ export default defineEventHandler(async (event) => {
 
   try {
     // work_orders 表的主键是 workOrderNumber，不是 id
-    await prisma.work_orders.update({
+    const deleted = await prisma.work_orders.update({
       where: { workOrderNumber: id },
       data: {
         isDeleted: true,
         updatedAt: new Date(),
       },
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'DELETE',
+      targetType: 'work_order',
+      targetId: String(id),
+      details: `删除工单: ${deleted.workOrderNumber} (${deleted.customerName})`,
     });
 
     return useResponseSuccess(null);

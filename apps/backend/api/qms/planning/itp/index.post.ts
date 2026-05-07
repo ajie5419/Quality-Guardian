@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { awaitMockDelay } from '~/utils/index';
 import {
   buildItpItemCreateData,
@@ -7,6 +8,7 @@ import {
   normalizeItpText,
   parseItpQuantitativeItems,
 } from '~/utils/itp';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
@@ -18,6 +20,7 @@ import {
 
 export default defineEventHandler(async (event) => {
   await awaitMockDelay();
+  const userinfo = verifyAccessToken(event);
   const body = await readBody(event);
   const projectId = normalizeItpText(body.projectId);
   const itemData = body as Record<string, unknown>;
@@ -45,6 +48,14 @@ export default defineEventHandler(async (event) => {
         order: Number(itemData.order) || maxOrder + 1,
         projectId: String(projectId),
       }),
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo?.id,
+      action: 'CREATE',
+      targetType: 'planning_itp_item',
+      targetId: String(newItem.id),
+      details: `新增 ITP 条目: ${newItem.processStep || newItem.activity || newItem.id}`,
     });
 
     return useResponseSuccess({

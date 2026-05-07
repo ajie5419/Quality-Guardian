@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { parseNonEmptyArray } from '~/utils/request-validation';
@@ -54,6 +55,14 @@ export default defineEventHandler(async (event) => {
         }),
       );
     }
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'CREATE',
+      targetType: 'supplier',
+      targetId: 'batch-upsert',
+      details: `批量导入供应商/外协单位: 成功 ${results.success} 条，跳过 ${results.skipped} 条，失败 ${results.errors} 条`,
+    });
 
     return useResponseSuccess(results);
   } catch (error) {

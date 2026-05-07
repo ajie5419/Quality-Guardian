@@ -1,6 +1,7 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { MetrologyCalibrationPlanService } from '~/services/metrology-calibration-plan.service';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
@@ -38,12 +39,20 @@ export default defineEventHandler(async (event) => {
       body as Record<string, unknown>,
     );
 
-    await prisma.metrology_calibration_plans.update({
+    const updated = await prisma.metrology_calibration_plans.update({
       where: { id },
       data: {
         ...data,
         updatedBy: userinfo.username,
       },
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'UPDATE',
+      targetType: 'metrology_calibration_plan',
+      targetId: String(id),
+      details: `修改计量校准计划: ${updated.instrumentId} (${updated.planYear}-${updated.planMonth})`,
     });
 
     return useResponseSuccess(null);

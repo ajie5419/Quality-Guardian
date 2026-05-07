@@ -1,7 +1,9 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { awaitMockDelay } from '~/utils/index';
 import { buildItpProjectCreateData, normalizeItpText } from '~/utils/itp';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaForeignKeyError } from '~/utils/prisma-error';
 import { getMissingRequiredFields } from '~/utils/request-validation';
@@ -13,6 +15,7 @@ import {
 
 export default defineEventHandler(async (event) => {
   await awaitMockDelay();
+  const userinfo = verifyAccessToken(event);
   const body = await readBody(event);
   const projectName = normalizeItpText(body.projectName);
   const missingFields = getMissingRequiredFields({ projectName }, [
@@ -25,6 +28,14 @@ export default defineEventHandler(async (event) => {
   try {
     const newProject = await prisma.quality_plans.create({
       data: buildItpProjectCreateData(body as Record<string, unknown>),
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo?.id,
+      action: 'CREATE',
+      targetType: 'planning_itp_project',
+      targetId: String(newProject.id),
+      details: `新增 ITP 项目: ${newProject.projectName}`,
     });
 
     return useResponseSuccess({

@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
@@ -60,9 +61,17 @@ export default defineEventHandler(async (event) => {
       updateData.status = mapWorkOrderStatus(body.status);
     }
 
-    await prisma.work_orders.update({
+    const updated = await prisma.work_orders.update({
       where: { workOrderNumber: id },
       data: updateData,
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'UPDATE',
+      targetType: 'work_order',
+      targetId: String(id),
+      details: `修改工单: ${updated.workOrderNumber} (${updated.customerName})`,
     });
 
     return useResponseSuccess(null);

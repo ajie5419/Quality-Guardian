@@ -1,5 +1,6 @@
 import { defineEventHandler, getRouterParam } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -31,12 +32,20 @@ export default defineEventHandler(async (event) => {
       return notFoundResponse(event, '校准计划不存在');
     }
 
-    await prisma.metrology_calibration_plans.update({
+    const deleted = await prisma.metrology_calibration_plans.update({
       where: { id },
       data: {
         isDeleted: true,
         updatedBy: userinfo.username,
       },
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'DELETE',
+      targetType: 'metrology_calibration_plan',
+      targetId: String(id),
+      details: `删除计量校准计划: ${deleted.instrumentId} (${deleted.planYear}-${deleted.planMonth})`,
     });
 
     return useResponseSuccess(null);

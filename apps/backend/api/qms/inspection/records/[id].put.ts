@@ -1,6 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   badRequestResponse,
@@ -17,8 +19,16 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const userinfo = verifyAccessToken(event);
     const body = await readBody(event);
     const result = await InspectionService.update(id, body);
+    await recordBusinessAuditLog(event, {
+      userId: userinfo?.id,
+      action: 'UPDATE',
+      targetType: 'inspection_record',
+      targetId: String(id),
+      details: `修改检验记录: ${result.projectName || result.workOrderNumber || id}`,
+    });
     return useResponseSuccess(result);
   } catch (error: unknown) {
     logApiError('inspection-update', error);

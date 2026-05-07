@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { MetrologyCalibrationPlanService } from '~/services/metrology-calibration-plan.service';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,
@@ -32,6 +33,13 @@ export default defineEventHandler(async (event) => {
       userinfo.username,
       body.fileName,
     );
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'CREATE',
+      targetType: 'metrology_calibration_plan',
+      targetId: `batch-import-${year}`,
+      details: `导入计量校准计划: ${result.successCount}/${result.totalCount} 条`,
+    });
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('metrology-calibration-plan-import', error);

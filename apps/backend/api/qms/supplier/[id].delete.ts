@@ -1,5 +1,6 @@
 import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
@@ -23,12 +24,20 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    await prisma.suppliers.update({
+    const deleted = await prisma.suppliers.update({
       where: { id },
       data: {
         isDeleted: true,
         updatedAt: new Date(),
       },
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'DELETE',
+      targetType: 'supplier',
+      targetId: String(id),
+      details: `删除供应商/外协单位: ${deleted.name}`,
     });
 
     return useResponseSuccess(null);

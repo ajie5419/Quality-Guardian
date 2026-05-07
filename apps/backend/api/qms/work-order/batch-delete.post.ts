@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { parseNonEmptyIdList } from '~/utils/id-list';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -34,6 +35,14 @@ export default defineEventHandler(async (event) => {
         isDeleted: true,
         updatedAt: new Date(),
       },
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'DELETE',
+      targetType: 'work_order',
+      targetId: ids.join(','),
+      details: `批量删除工单: ${result.count} 条`,
     });
 
     return useResponseSuccess({ successCount: result.count });

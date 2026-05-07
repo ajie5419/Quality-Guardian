@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -30,9 +31,17 @@ export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
 
-    await prisma.suppliers.update({
+    const updated = await prisma.suppliers.update({
       where: { id },
       data: buildSupplierUpdateData(body as Record<string, unknown>),
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'UPDATE',
+      targetType: 'supplier',
+      targetId: String(id),
+      details: `修改供应商/外协单位: ${updated.name}`,
     });
 
     return useResponseSuccess(null);

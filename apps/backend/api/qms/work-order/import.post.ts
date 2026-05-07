@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import {
   buildImportRowError,
   buildImportSummary,
@@ -106,6 +107,14 @@ export default defineEventHandler(async (event) => {
         );
       }
     }
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'CREATE',
+      targetType: 'work_order',
+      targetId: 'batch-import',
+      details: `导入工单: ${successCount}/${items.length} 条`,
+    });
 
     return useResponseSuccess(
       buildImportSummary({

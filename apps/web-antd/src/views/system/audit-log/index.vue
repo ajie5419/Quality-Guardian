@@ -25,6 +25,24 @@ function onCheckChange(params: VxeCheckboxChangeParams) {
   checkedRows.value = records;
 }
 
+const targetTypeLabels: Record<string, string> = {
+  after_sales: '售后记录',
+  inspection_issue: '检验问题',
+  inspection_record: '检验记录',
+  metrology: '计量器具',
+  metrology_calibration_plan: '计量校准计划',
+  planning_itp_item: 'ITP 条目',
+  planning_itp_project: 'ITP 项目',
+  quality_loss: '质量损失',
+  supplier: '供应商/外协',
+  work_order: '工单',
+};
+
+function getTargetTypeLabel(targetType?: string) {
+  if (!targetType) return '-';
+  return targetTypeLabels[targetType] || targetType;
+}
+
 const gridEvents = {
   checkboxChange: onCheckChange,
   checkboxAll: onCheckChange,
@@ -234,10 +252,7 @@ async function handleBatchDelete() {
       </template>
 
       <template #targetType="{ row }">
-        <span v-if="row.targetType === 'inspection_issue'">检验问题</span>
-        <span v-else-if="row.targetType === 'after_sales'">售后记录</span>
-        <span v-else-if="row.targetType === 'quality_loss'">质量损失</span>
-        <span v-else>{{ row.targetType }}</span>
+        <span>{{ getTargetTypeLabel(row.targetType) }}</span>
       </template>
     </Grid>
   </Page>

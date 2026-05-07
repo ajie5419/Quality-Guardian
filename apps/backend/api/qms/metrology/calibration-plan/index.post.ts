@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { MetrologyCalibrationPlanService } from '~/services/metrology-calibration-plan.service';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
@@ -30,6 +31,14 @@ export default defineEventHandler(async (event) => {
         createdBy: userinfo.username,
         updatedBy: userinfo.username,
       },
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'CREATE',
+      targetType: 'metrology_calibration_plan',
+      targetId: String(created.id),
+      details: `新增计量校准计划: ${created.instrumentId} (${created.planYear}-${created.planMonth})`,
     });
 
     return useResponseSuccess(created);

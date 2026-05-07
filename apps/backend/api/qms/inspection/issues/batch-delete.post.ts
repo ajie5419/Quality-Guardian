@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { WelderScoreService } from '~/services/welder-score.service';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { parseNonEmptyIdList } from '~/utils/id-list';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -37,6 +38,13 @@ export default defineEventHandler(async (event) => {
     if (result.count > 0) {
       await WelderScoreService.syncFromInspectionIssues();
     }
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'DELETE',
+      targetType: 'inspection_issue',
+      targetId: ids.join(','),
+      details: `批量删除不合格品项: ${result.count} 条`,
+    });
 
     return useResponseSuccess({ successCount: result.count });
   } catch (error) {
