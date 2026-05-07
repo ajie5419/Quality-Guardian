@@ -122,6 +122,15 @@ checksum_verify() {
   exit 1
 }
 
+echo "[remote] docker disk usage before cleanup"
+docker system df || true
+docker container prune -f || true
+docker image prune -af || true
+docker builder prune -af || true
+find "$RELEASE_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} + || true
+echo "[remote] docker disk usage after cleanup"
+docker system df || true
+
 echo "[remote] download artifacts from $release_oss_dir"
 "$OSSUTIL_BIN" cp -f "${release_oss_dir}/backend-${VERSION}.tar.gz" "$backend_archive"
 "$OSSUTIL_BIN" cp -f "${release_oss_dir}/frontend-${VERSION}.tar.gz" "$frontend_archive"
