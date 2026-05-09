@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
+  type PassRateSource,
   createPassRateTargetResolver,
   getNetPassRateSummaryByRange,
   getPassRateDrillDownByRange,
@@ -19,15 +20,16 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const granularity = (query.granularity as unknown as string) || 'week';
   const period = query.period as unknown as string;
+  const source = parsePassRateSource(query.source);
 
   try {
     const getTargetPassRate = await createPassRateTargetResolver();
 
     if (period)
       return useResponseSuccess(
-        await getDrillDownData(period, granularity, getTargetPassRate),
+        await getDrillDownData(period, granularity, getTargetPassRate, source),
       );
-    return useResponseSuccess(await getTrendData(granularity));
+    return useResponseSuccess(await getTrendData(granularity, source));
   } catch (error) {
     logApiError('pass-rate-trend', error);
     return internalServerErrorResponse(
@@ -37,7 +39,11 @@ export default defineEventHandler(async (event) => {
   }
 });
 
-async function getTrendData(granularity: string) {
+function parsePassRateSource(queryValue: unknown): PassRateSource {
+  return String(queryValue || '').trim() === 'issue' ? 'issue' : 'inspection';
+}
+
+async function getTrendData(granularity: string, source: PassRateSource) {
   const now = new Date();
   interface Period {
     end: Date;
@@ -104,7 +110,11 @@ async function getTrendData(granularity: string) {
         };
       }
 
-      const summary = await getNetPassRateSummaryByRange(p.start, p.end);
+      const summary = await getNetPassRateSummaryByRange(
+        p.start,
+        p.end,
+        source,
+      );
 
       const emptyPeriodPassRate: null | number = 100;
       const passRate: null | number =
@@ -126,6 +136,7 @@ async function getDrillDownData(
   period: string,
   granularity: string,
   getTargetPassRate: (name?: string) => number,
+  source: PassRateSource,
 ) {
   const range = getPeriodRangeFromTrend(period, granularity);
   if (!range) return { drillDown: [], period };
@@ -133,6 +144,7 @@ async function getDrillDownData(
     range.start,
     range.end,
     getTargetPassRate,
+    source,
   );
   return { drillDown, period };
 }

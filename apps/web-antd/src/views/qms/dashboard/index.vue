@@ -62,6 +62,7 @@ function formatPercent(value: null | number | undefined) {
 // 合格率/质量损失粒度控制
 const granularity = ref<'month' | 'week'>('week');
 const qualityLossGranularity = ref<'month' | 'week'>('week');
+const passRateSource = ref<'inspection' | 'issue'>('inspection');
 
 // ===================== 数据获取 =====================
 const targetModalRef = ref();
@@ -94,9 +95,13 @@ const {
   isLoading: passRateLoading,
   load: loadPassRateTrend,
 } = useTrendLoader<QmsDashboardApi.PassRateTrendItem[]>(
-  (g, p) => getPassRateTrend(g, p).then((res) => res.trend || res.data || []),
+  (g, p) =>
+    getPassRateTrend(g, p, passRateSource.value).then(
+      (res) => res.trend || res.data || [],
+    ),
   granularity,
   [],
+  () => passRateSource.value,
 );
 
 /** 3. 质量损失趋势数据（基于useRequest的自定义Hook） */
@@ -133,7 +138,7 @@ const currentDrillDownType = ref<'passRate' | 'qualityLoss'>('passRate');
 const passRateDrillDown = useDrillDown<QmsDashboardApi.PassRateDrillDownItem>(
   'passRate',
   (period) =>
-    getPassRateTrend(granularity.value, period).then(
+    getPassRateTrend(granularity.value, period, passRateSource.value).then(
       (res) => res.drillDown || [],
     ),
 );
@@ -210,6 +215,10 @@ onMounted(async () => {
 // 监听粒度变化，重置下钻状态
 watch(granularity, () => {
   passRateDrillDown.close();
+});
+watch(passRateSource, () => {
+  passRateDrillDown.close();
+  loadPassRateTrend({ force: true });
 });
 watch(qualityLossGranularity, () => {
   qualityLossDrillDown.close();
@@ -362,13 +371,22 @@ const activeTab = ref('trends');
             <div class="pt-2">
               <!-- 粒度切换 -->
               <div class="mb-4">
-                <Segmented
-                  v-model:value="granularity"
-                  :options="[
-                    { label: t('common.unit.week'), value: 'week' },
-                    { label: t('common.unit.month'), value: 'month' },
-                  ]"
-                />
+                <div class="flex flex-wrap gap-3">
+                  <Segmented
+                    v-model:value="granularity"
+                    :options="[
+                      { label: t('common.unit.week'), value: 'week' },
+                      { label: t('common.unit.month'), value: 'month' },
+                    ]"
+                  />
+                  <Segmented
+                    v-model:value="passRateSource"
+                    :options="[
+                      { label: '按检验记录', value: 'inspection' },
+                      { label: '按不合格项', value: 'issue' },
+                    ]"
+                  />
+                </div>
               </div>
               <div v-show="activeTab === 'trends'">
                 <Spin v-if="passRateLoading" tip="Loading pass rate data..." />

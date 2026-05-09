@@ -21,6 +21,8 @@ interface NetPassRateSummary {
   totalCount: number;
 }
 
+export type PassRateSource = 'inspection' | 'issue';
+
 type InspectionPassRateRow = {
   category: string;
   incomingType: null | string;
@@ -36,6 +38,18 @@ type InspectionQuantitySummary = {
   qualifiedQuantity: number;
   quantity: number;
   unqualifiedQuantity: number;
+};
+
+type IssuePassRateRow = {
+  category: null | string;
+  incomingType: null | string;
+  inspectionCategory: null | string;
+  inspectionIncomingType: null | string;
+  inspectionProcessName: null | string;
+  inspectionTeam: null | string;
+  processName: null | string;
+  quantity: number;
+  responsibleDepartment: string;
 };
 
 const GLOBAL_DEFAULT_TARGET = 99.85;
@@ -106,7 +120,12 @@ export async function createPassRateTargetResolver() {
 export async function getNetPassRateSummaryByRange(
   start: Date,
   end: Date,
+  source: PassRateSource = 'inspection',
 ): Promise<NetPassRateSummary> {
+  if (source === 'issue') {
+    return getIssuePassRateSummaryByRange(start, end);
+  }
+
   const [summary] = await prisma.$queryRaw<
     Array<{ passCount: bigint | null; totalCount: bigint | null }>
   >`
@@ -135,17 +154,81 @@ export async function getNetPassRateSummaryByRange(
   };
 }
 
+async function getIssuePassRateSummaryByRange(
+  start: Date,
+  end: Date,
+): Promise<NetPassRateSummary> {
+  const [inspectionSummary, issueSummary] = await Promise.all([
+    prisma.inspections.aggregate({
+      where: { isDeleted: false, inspectionDate: { gte: start, lte: end } },
+      _sum: { quantity: true },
+    }),
+    prisma.quality_records.aggregate({
+      where: { isDeleted: false, date: { gte: start, lte: end } },
+      _sum: { quantity: true },
+    }),
+  ]);
+
+  const totalCount = Number(inspectionSummary._sum.quantity || 0);
+  const unqualifiedCount = Math.max(
+    0,
+    Math.min(totalCount, Number(issueSummary._sum.quantity || 0)),
+  );
+  const passCount = Math.max(0, totalCount - unqualifiedCount);
+
+  return {
+    totalCount,
+    passCount,
+    passRate: totalCount > 0 ? roundPercent((passCount / totalCount) * 100) : 0,
+  };
+}
+
+async function getIssuePassRateRows(start: Date, end: Date) {
+  const issues = await prisma.quality_records.findMany({
+    where: { isDeleted: false, date: { gte: start, lte: end } },
+    select: {
+      category: true,
+      processName: true,
+      quantity: true,
+      responsibleDepartment: true,
+      inspection: {
+        select: {
+          category: true,
+          incomingType: true,
+          processName: true,
+          team: true,
+        },
+      },
+    },
+  });
+
+  return issues.map<IssuePassRateRow>((item) => ({
+    category: item.category,
+    incomingType: null,
+    inspectionCategory: item.inspection?.category || null,
+    inspectionIncomingType: item.inspection?.incomingType || null,
+    inspectionProcessName: item.inspection?.processName || null,
+    inspectionTeam: item.inspection?.team || null,
+    processName: item.processName,
+    quantity: item.quantity,
+    responsibleDepartment: item.responsibleDepartment,
+  }));
+}
+
 export async function getPassRateDrillDownByRange(
   start: Date,
   end: Date,
   getTargetPassRate: (name?: string) => number,
+  source: PassRateSource = 'inspection',
 ): Promise<DrillDownItem[]> {
   const drillDown: DrillDownItem[] = [];
   const inspections = await getInspectionPassRateRows(start, end);
+  const issueRows =
+    source === 'issue' ? await getIssuePassRateRows(start, end) : [];
 
   const processStats: Record<
     string,
-    { passCount: number; totalCount: number }
+    { passCount: number; totalCount: number; unqualifiedCount: number }
   > = {};
 
   for (const item of inspections.filter(
@@ -158,25 +241,118 @@ export async function getPassRateDrillDownByRange(
     if (!mappedName) continue;
 
     if (!processStats[mappedName]) {
-      processStats[mappedName] = { totalCount: 0, passCount: 0 };
+      processStats[mappedName] = {
+        totalCount: 0,
+        passCount: 0,
+        unqualifiedCount: 0,
+      };
     }
 
     const quantities = normalizeInspectionQuantitySummary(item);
     processStats[mappedName].totalCount += quantities.quantity;
-    processStats[mappedName].passCount += quantities.qualifiedQuantity;
+    if (source === 'inspection') {
+      processStats[mappedName].passCount += quantities.qualifiedQuantity;
+    }
+  }
+
+  for (const item of issueRows.filter((record) => {
+    const category = String(record.inspectionCategory || record.category || '')
+      .trim()
+      .toUpperCase();
+    return category === 'PROCESS';
+  })) {
+    const mappedName = mapInspectionToPassRateBucket({
+      processName: item.inspectionProcessName || item.processName,
+      team: item.inspectionTeam || item.responsibleDepartment,
+    });
+    if (!mappedName || !processStats[mappedName]) continue;
+    processStats[mappedName].unqualifiedCount += Math.max(
+      0,
+      Number(item.quantity) || 0,
+    );
   }
 
   for (const [name, stats] of Object.entries(processStats)) {
+    const passCount =
+      source === 'issue'
+        ? Math.max(0, stats.totalCount - stats.unqualifiedCount)
+        : stats.passCount;
     drillDown.push({
       process: name,
       category: '过程检验',
       passRate:
         stats.totalCount > 0
-          ? roundPercent((stats.passCount / stats.totalCount) * 100)
+          ? roundPercent((passCount / stats.totalCount) * 100)
           : 0,
       targetPassRate: getTargetPassRate(name),
       totalCount: stats.totalCount,
-      passCount: stats.passCount,
+      passCount,
+    });
+  }
+
+  // --- 进货检验（INCOMING）按 incomingType 分桶统计 ---
+  const incomingStats: Record<
+    string,
+    { passCount: number; totalCount: number; unqualifiedCount: number }
+  > = {};
+
+  for (const item of inspections.filter(
+    (record) => record.category === 'INCOMING',
+  )) {
+    const bucketName = String(
+      item.incomingType || item.processName || '',
+    ).trim();
+    if (!bucketName) continue;
+
+    if (!incomingStats[bucketName]) {
+      incomingStats[bucketName] = {
+        totalCount: 0,
+        passCount: 0,
+        unqualifiedCount: 0,
+      };
+    }
+
+    const quantities = normalizeInspectionQuantitySummary(item);
+    incomingStats[bucketName].totalCount += quantities.quantity;
+    if (source === 'inspection') {
+      incomingStats[bucketName].passCount += quantities.qualifiedQuantity;
+    }
+  }
+
+  for (const item of issueRows.filter((record) => {
+    const category = String(record.inspectionCategory || record.category || '')
+      .trim()
+      .toUpperCase();
+    return category === 'INCOMING';
+  })) {
+    const bucketName = String(
+      item.inspectionIncomingType ||
+        item.incomingType ||
+        item.processName ||
+        '',
+    ).trim();
+    if (!bucketName || !incomingStats[bucketName]) continue;
+    incomingStats[bucketName].unqualifiedCount += Math.max(
+      0,
+      Number(item.quantity) || 0,
+    );
+  }
+
+  for (const [name, stats] of Object.entries(incomingStats)) {
+    const passCount =
+      source === 'issue'
+        ? Math.max(0, stats.totalCount - stats.unqualifiedCount)
+        : stats.passCount;
+    drillDown.push({
+      process: name,
+      category: '进货检验',
+      passRate:
+        stats.totalCount > 0
+          ? roundPercent((passCount / stats.totalCount) * 100)
+          : 0,
+      targetPassRate: getTargetPassRate(name),
+      totalCount: stats.totalCount,
+      passCount,
     });
   }
 

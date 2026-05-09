@@ -27,8 +27,9 @@ export async function getQmsDashboardData() {
 export async function getPassRateTrend(
   granularity: 'month' | 'week' = 'week',
   period?: string,
+  source: 'inspection' | 'issue' = 'inspection',
 ) {
-  const params: Record<string, string> = { granularity };
+  const params: Record<string, string> = { granularity, source };
   if (period) {
     params.period = period;
   }

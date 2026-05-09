@@ -25,6 +25,7 @@ export function useTrendLoader<T = unknown>(
   requestFn: TrendRequestFn<T>,
   granularity: Ref<'month' | 'week'>,
   initialData?: T,
+  getCacheKeySuffix?: () => string,
 ) {
   const { t } = useI18n();
   const { handleApiError } = useErrorHandler();
@@ -41,7 +42,8 @@ export function useTrendLoader<T = unknown>(
   const loadTrendData = async (
     params: { force?: boolean; period?: string } = {},
   ) => {
-    const key = granularity.value;
+    const suffix = getCacheKeySuffix?.();
+    const key = suffix ? `${granularity.value}:${suffix}` : granularity.value;
 
     // 如果不是强制刷新，且有缓存，直接使用
     if (!params.force && !params.period && cache.value[key]) {

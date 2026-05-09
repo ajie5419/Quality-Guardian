@@ -62,6 +62,7 @@ export interface PassRateTrendResponse {
   drillDown?: PassRateDrillDownItem[];
   drillDownAvailable?: boolean;
   granularity: 'month' | 'week';
+  source?: 'inspection' | 'issue';
   trend?: PassRateTrendItem[];
 }
 
