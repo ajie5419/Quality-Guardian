@@ -12,6 +12,16 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+async function recordLoginLog(
+  params: Parameters<typeof SystemLogService.recordLogin>[0],
+) {
+  try {
+    await SystemLogService.recordLogin(params);
+  } catch (error) {
+    console.warn('Failed to record login log:', error);
+  }
+}
+
 export default defineEventHandler(async (event) => {
   const { password, username } = await readBody(event);
   let ip =
@@ -35,8 +45,7 @@ export default defineEventHandler(async (event) => {
       password,
     );
 
-    // Record success log
-    await SystemLogService.recordLogin({
+    void recordLoginLog({
       username,
       ip: String(ip),
       userAgent,
@@ -50,8 +59,7 @@ export default defineEventHandler(async (event) => {
       accessToken,
     });
   } catch (error: any) {
-    // Record failure log
-    await SystemLogService.recordLogin({
+    void recordLoginLog({
       username,
       ip: String(ip),
       userAgent,

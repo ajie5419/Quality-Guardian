@@ -1,8 +1,9 @@
+import type { PassRateSource } from '~/utils/pass-rate';
+
 import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
-  type PassRateSource,
   createPassRateTargetResolver,
   getNetPassRateSummaryByRange,
   getPassRateDrillDownByRange,
