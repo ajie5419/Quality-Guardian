@@ -4,6 +4,7 @@ import {
   mapInspectionToPassRateBucket,
   parsePassRateTargets,
 } from '~/utils/pass-rate-process';
+import type { ProcessPassRateTargetKey } from '~/utils/pass-rate-process';
 import prisma from '~/utils/prisma';
 
 interface DrillDownItem {
@@ -215,6 +216,69 @@ async function getIssuePassRateRows(start: Date, end: Date) {
   }));
 }
 
+const INCOMING_ISSUE_BUCKET_ALIASES: Record<string, string> = {
+  原材料: '原材料',
+  外购件: '外购件',
+  辅材: '辅材',
+  机加成品件: '机加成品件',
+  成品检验: '外购件',
+};
+
+function normalizeIssueBucketText(value: null | string) {
+  return String(value || '')
+    .trim()
+    .replaceAll(/\s+/g, '')
+    .replaceAll(/[：:]/g, '');
+}
+
+function getIssueQuantity(item: IssuePassRateRow) {
+  return Math.max(0, Number(item.quantity) || 0);
+}
+
+function getLinkedIssueCategory(item: IssuePassRateRow) {
+  const category = String(item.inspectionCategory || '')
+    .trim()
+    .toUpperCase();
+  if (category === 'PROCESS' || category === 'INCOMING') return category;
+  return undefined;
+}
+
+function resolveIssueProcessBucket(
+  item: IssuePassRateRow,
+): ProcessPassRateTargetKey | undefined {
+  return mapInspectionToPassRateBucket({
+    processName: item.inspectionProcessName || item.processName,
+    team: item.inspectionTeam || item.responsibleDepartment,
+  });
+}
+
+function resolveIssueIncomingBucket(item: IssuePassRateRow) {
+  const candidates = [
+    item.inspectionIncomingType,
+    item.incomingType,
+    item.processName,
+    item.category,
+    item.inspectionProcessName,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeIssueBucketText(candidate);
+    if (normalized && INCOMING_ISSUE_BUCKET_ALIASES[normalized]) {
+      return INCOMING_ISSUE_BUCKET_ALIASES[normalized];
+    }
+  }
+
+  return undefined;
+}
+
+function resolveIssuePassRateCategory(item: IssuePassRateRow) {
+  const linkedCategory = getLinkedIssueCategory(item);
+  if (linkedCategory) return linkedCategory;
+  if (resolveIssueIncomingBucket(item)) return 'INCOMING';
+  if (resolveIssueProcessBucket(item)) return 'PROCESS';
+  return undefined;
+}
+
 export async function getPassRateDrillDownByRange(
   start: Date,
   end: Date,
@@ -255,21 +319,11 @@ export async function getPassRateDrillDownByRange(
     }
   }
 
-  for (const item of issueRows.filter((record) => {
-    const category = String(record.inspectionCategory || record.category || '')
-      .trim()
-      .toUpperCase();
-    return category === 'PROCESS';
-  })) {
-    const mappedName = mapInspectionToPassRateBucket({
-      processName: item.inspectionProcessName || item.processName,
-      team: item.inspectionTeam || item.responsibleDepartment,
-    });
+  for (const item of issueRows) {
+    if (resolveIssuePassRateCategory(item) !== 'PROCESS') continue;
+    const mappedName = resolveIssueProcessBucket(item);
     if (!mappedName || !processStats[mappedName]) continue;
-    processStats[mappedName].unqualifiedCount += Math.max(
-      0,
-      Number(item.quantity) || 0,
-    );
+    processStats[mappedName].unqualifiedCount += getIssueQuantity(item);
   }
 
   for (const [name, stats] of Object.entries(processStats)) {
@@ -319,23 +373,17 @@ export async function getPassRateDrillDownByRange(
     }
   }
 
-  for (const item of issueRows.filter((record) => {
-    const category = String(record.inspectionCategory || record.category || '')
-      .trim()
-      .toUpperCase();
-    return category === 'INCOMING';
-  })) {
+  for (const item of issueRows) {
+    if (resolveIssuePassRateCategory(item) !== 'INCOMING') continue;
     const bucketName = String(
-      item.inspectionIncomingType ||
+      resolveIssueIncomingBucket(item) ||
+        item.inspectionIncomingType ||
         item.incomingType ||
         item.processName ||
         '',
     ).trim();
     if (!bucketName || !incomingStats[bucketName]) continue;
-    incomingStats[bucketName].unqualifiedCount += Math.max(
-      0,
-      Number(item.quantity) || 0,
-    );
+    incomingStats[bucketName].unqualifiedCount += getIssueQuantity(item);
   }
 
   for (const [name, stats] of Object.entries(incomingStats)) {
