@@ -316,20 +316,21 @@ model data_permission_policies {
 }
 
 model project_boms {
-  id                String      @id
-  work_order_number String
-  part_name         String
-  part_number       String?
-  material          String?
-  quantity          Int         @default(1)
-  unit              String      @default("pcs")
-  remarks           String?     @db.Text
-  created_by        String?
-  created_at        DateTime    @default(now())
-  updated_at        DateTime    @updatedAt
-  work_orders       work_orders @relation(fields: [work_order_number], references: [workOrderNumber], onUpdate: Cascade)
+  id                 String      @id
+  work_order_number  String
+  part_name          String
+  part_number        String?
+  required_processes String?     @db.LongText
+  quantity           Int         @default(1)
+  unit               String      @default("pcs")
+  remarks            String?     @db.Text
+  created_by         String?
+  created_at         DateTime    @default(now())
+  updated_at         DateTime    @updatedAt
+  work_orders        work_orders @relation(fields: [work_order_number], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([work_order_number])
+  @@index([part_number])
 }
 
 model bom_projects {

@@ -40,20 +40,61 @@ export function normalizeBomProjectVersion(value: unknown): string {
 }
 
 interface ProjectBomInput {
-  material?: unknown;
   partName?: unknown;
   partNumber?: unknown;
   quantity?: unknown;
+  requiredProcesses?: unknown;
   remarks?: unknown;
   unit?: unknown;
 }
 
+export interface BomInspectionProgress {
+  completed: boolean;
+  completedQuantity: number;
+  processName: string;
+  requiredQuantity: number;
+  remainingQuantity: number;
+}
+
+function normalizeBomProcessList(value: unknown): string[] {
+  let values: unknown[] = [];
+  if (Array.isArray(value)) {
+    values = value;
+  } else if (typeof value === 'string') {
+    values = value.startsWith('[')
+      ? tryParseJsonArray(value)
+      : value.split(/[、,，;；\n]/);
+  }
+
+  return [
+    ...new Set(values.map((item) => normalizeBomText(item)).filter(Boolean)),
+  ];
+}
+
+function tryParseJsonArray(value: string): unknown[] {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function serializeBomRequiredProcesses(value: unknown): null | string {
+  const processes = normalizeBomProcessList(value);
+  return processes.length > 0 ? JSON.stringify(processes) : null;
+}
+
+export function parseBomRequiredProcesses(value: unknown): string[] {
+  return normalizeBomProcessList(value);
+}
+
 export function buildProjectBomMutableData(item: ProjectBomInput) {
   return {
-    material: normalizeBomText(item.material) || null,
     part_name: normalizeBomText(item.partName) || DEFAULT_BOM_PART_NAME,
     part_number: normalizeBomText(item.partNumber) || null,
     quantity: parseBomQuantity(item.quantity, 1),
+    required_processes: serializeBomRequiredProcesses(item.requiredProcesses),
     remarks: normalizeBomText(item.remarks) || null,
     unit: normalizeBomText(item.unit) || DEFAULT_BOM_UNIT,
     updated_at: new Date(),
@@ -73,21 +114,23 @@ export function buildProjectBomCreateData(
 
 export function mapProjectBomItem(item: {
   id: string;
-  material: null | string;
+  inspectionProgress?: BomInspectionProgress[];
   part_name: string;
   part_number: null | string;
   quantity: number;
   remarks: null | string;
+  required_processes?: null | string;
   unit: string;
   work_order_number: string;
 }) {
   return {
     id: item.id,
-    material: item.material,
+    inspectionProgress: item.inspectionProgress || [],
     parentId: item.work_order_number,
     partName: item.part_name,
     partNumber: item.part_number,
     quantity: item.quantity,
+    requiredProcesses: parseBomRequiredProcesses(item.required_processes),
     remarks: item.remarks,
     unit: item.unit,
   };
@@ -125,11 +168,12 @@ export function mapBomTreeProjectNode(
   project: BomTreeProjectInput,
   projectItems: Array<{
     id: string;
-    material: null | string;
+    inspectionProgress?: BomInspectionProgress[];
     part_name: string;
     part_number: null | string;
     quantity: number;
     remarks: null | string;
+    required_processes?: null | string;
     unit: string;
     work_order_number: string;
   }>,

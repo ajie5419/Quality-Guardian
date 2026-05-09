@@ -3,7 +3,7 @@ import type { Rule } from 'ant-design-vue/es/form';
 
 import type { QmsPlanningApi } from '#/api/qms/planning';
 
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
@@ -15,10 +15,12 @@ import {
   message,
   Modal,
   Row,
+  Select,
 } from 'ant-design-vue';
 
 import { createBom, updateBom } from '#/api/qms/planning';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { getProcessOptions } from '#/views/qms/inspection/records/config';
 
 const props = defineProps<{
   currentId: null | string;
@@ -36,14 +38,15 @@ const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
+const processOptions = computed(() => getProcessOptions(t));
 
 const formState = reactive<
   Partial<QmsPlanningApi.BomItem> & { workOrderNumber?: string }
 >({
-  material: '',
   partName: '',
   partNumber: '',
   quantity: 1,
+  requiredProcesses: [],
   remarks: '',
   unit: 'PCS',
   workOrderNumber: '',
@@ -79,10 +82,10 @@ watch(
   (val) => {
     if (val) {
       Object.assign(formState, {
-        material: props.initialData.material || '',
         partName: props.initialData.partName || '',
         partNumber: props.initialData.partNumber || '',
         quantity: props.initialData.quantity || 1,
+        requiredProcesses: props.initialData.requiredProcesses || [],
         remarks: props.initialData.remarks || '',
         unit: props.initialData.unit || 'PCS',
         workOrderNumber: props.initialData.workOrderNumber || '',
@@ -167,10 +170,7 @@ async function handleOk() {
 
       <Row :gutter="16">
         <Col :span="12">
-          <Form.Item
-            :label="t('qms.planning.bom.partNumber')"
-            name="partNumber"
-          >
+          <Form.Item label="图号" name="partNumber">
             <Input
               v-model:value="formState.partNumber"
               :placeholder="t('qms.planning.bom.placeholder.partNumber')"
@@ -178,10 +178,13 @@ async function handleOk() {
           </Form.Item>
         </Col>
         <Col :span="12">
-          <Form.Item :label="t('qms.planning.bom.material')" name="material">
-            <Input
-              v-model:value="formState.material"
-              :placeholder="t('qms.planning.bom.placeholder.material')"
+          <Form.Item label="所需检验工序" name="requiredProcesses">
+            <Select
+              v-model:value="formState.requiredProcesses"
+              mode="multiple"
+              allow-clear
+              :options="processOptions"
+              placeholder="请选择所需检验工序"
             />
           </Form.Item>
         </Col>

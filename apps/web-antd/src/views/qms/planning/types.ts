@@ -20,10 +20,10 @@ export interface PlanningTreeNode {
  * BOM 表单状态
  */
 export interface BomFormState {
-  material: string;
   partName: string;
   partNumber: string;
   quantity: number;
+  requiredProcesses: string[];
   remarks: string;
   unit: string;
   workOrderNumber: string;

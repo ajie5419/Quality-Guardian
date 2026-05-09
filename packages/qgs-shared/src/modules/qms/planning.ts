@@ -78,21 +78,30 @@ export interface BomProject {
 
 export interface BomItem {
   id: string;
-  material: string;
+  inspectionProgress?: BomInspectionProgress[];
   partName: string;
   partNumber: string;
   projectId: string;
   quantity: number;
   remarks?: string;
+  requiredProcesses: string[];
   unit: string;
   version: string;
+}
+
+export interface BomInspectionProgress {
+  completed: boolean;
+  completedQuantity: number;
+  processName: string;
+  remainingQuantity: number;
+  requiredQuantity: number;
 }
 
 export interface BomTreeNode {
   children?: BomTreeNode[];
   id: string;
+  inspectionProgress?: BomInspectionProgress[];
   itemCount?: number;
-  material?: string;
   name: string;
   parentId?: string;
   // Item specific
@@ -100,6 +109,7 @@ export interface BomTreeNode {
   projectName?: string;
   quantity?: number;
   remarks?: string;
+  requiredProcesses?: string[];
   status?: string;
   type: 'item' | 'project';
   unit?: string;

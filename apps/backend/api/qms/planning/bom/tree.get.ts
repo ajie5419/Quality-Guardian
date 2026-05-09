@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
 
     // 获取所有BOM项目
     const allBomItems = await prisma.project_boms.findMany({
-      orderBy: { created_at: 'asc' },
+      orderBy: [{ part_number: 'asc' }, { created_at: 'asc' }],
     });
 
     const bomItemsByProject = groupBomItemsByWorkOrder(allBomItems);
