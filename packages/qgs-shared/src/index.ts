@@ -3,6 +3,7 @@ export * from './modules/qms/constants';
 export * from './modules/qms/dashboard';
 export * from './modules/qms/enums';
 export * from './modules/qms/inspection';
+export * from './modules/qms/inspection-request';
 export * from './modules/qms/knowledge';
 export * from './modules/qms/metrology';
 export * from './modules/qms/planning';

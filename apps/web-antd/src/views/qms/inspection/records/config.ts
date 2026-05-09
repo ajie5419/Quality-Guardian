@@ -42,6 +42,10 @@ export const getProcessOptions = (t: (key: string) => string) => [
     value: '焊接',
   },
   {
+    label: t('qms.inspection.records.options.process.flawDetection'),
+    value: '探伤',
+  },
+  {
     label: t('qms.inspection.records.options.process.weldSize'),
     value: '焊后尺寸',
   },

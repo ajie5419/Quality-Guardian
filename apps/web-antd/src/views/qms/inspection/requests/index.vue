@@ -1,24 +1,25 @@
 <script lang="ts" setup>
+import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
+
 import type { UploadFileWithResponse } from '../issues/types';
+
 import type {
-  InspectionRequestAttachment,
   InspectionRequest,
+  InspectionRequestAttachment,
   InspectionRequestCheckResult,
   InspectionRequestStatus,
 } from '#/api/qms/inspection-request';
 import type { BomItem } from '#/api/qms/planning';
 import type { SystemUserApi } from '#/api/system/user';
-import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
 
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import QRCode from 'qrcode';
-import dayjs from 'dayjs';
 
 import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 import { $t } from '@vben/locales';
 import { useAccessStore } from '@vben/stores';
+
 import {
   Button,
   Card,
@@ -27,15 +28,17 @@ import {
   Form,
   Input,
   InputNumber,
+  message,
   Modal,
+  Segmented,
   Select,
   Space,
-  Segmented,
   Table,
   Tag,
   Upload,
-  message,
 } from 'ant-design-vue';
+import dayjs from 'dayjs';
+import QRCode from 'qrcode';
 
 import {
   closeInspectionRequest,
@@ -47,6 +50,7 @@ import { getBomList } from '#/api/qms/planning';
 import { getWorkOrderRequirements } from '#/api/qms/work-order';
 import { getUserList } from '#/api/system/user';
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
+
 import IssuePhotoUpload from '../issues/components/IssuePhotoUpload.vue';
 import {
   DEFAULT_VALUES,
@@ -54,7 +58,6 @@ import {
   useDefectOptions,
   useSeverityOptions,
 } from '../issues/constants';
-
 import TeamSelect from '../records/components/form/TeamSelect.vue';
 import { getProcessOptions } from '../records/config';
 
@@ -151,9 +154,87 @@ const linkedDefectSubtypeOptions = computed(() => {
   return defectSubtypes.value[defectType] || [];
 });
 
-const shouldCreateLinkedIssue = computed(
-  () => closeForm.result === 'FAIL',
-);
+const shouldCreateLinkedIssue = computed(() => closeForm.result === 'FAIL');
+
+function normalizeCloseText(value: unknown) {
+  return String(value ?? '').trim();
+}
+
+function normalizeCloseQuantity(value: unknown, fallback = 1) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(1, Math.trunc(parsed));
+}
+
+function syncLinkedIssueQuantities(unqualifiedValue?: unknown) {
+  const totalQuantity = normalizeCloseQuantity(closeForm.quantity);
+  const rawUnqualified =
+    unqualifiedValue === undefined
+      ? linkedIssueDraft.value.unqualifiedQuantity
+      : unqualifiedValue;
+  const unqualifiedQuantity = Math.max(
+    0,
+    Math.min(totalQuantity, Number(rawUnqualified) || 0),
+  );
+
+  linkedIssueDraft.value.unqualifiedQuantity = unqualifiedQuantity;
+  linkedIssueDraft.value.qualifiedQuantity =
+    totalQuantity - unqualifiedQuantity;
+}
+
+function hasBlockingCloseAttachmentState() {
+  return closeAttachmentFileList.value.some((file) =>
+    ['error', 'uploading'].includes(String(file.status || '')),
+  );
+}
+
+function validateCloseForm() {
+  if (!normalizeCloseText(closeForm.inspector)) {
+    message.warning('检验员不能为空');
+    return false;
+  }
+
+  if (closeForm.attachments.length === 0) {
+    message.warning('关闭附件不能为空');
+    return false;
+  }
+
+  if (hasBlockingCloseAttachmentState()) {
+    message.warning('关闭附件仍在上传或上传失败，请处理后再完成检验');
+    return false;
+  }
+
+  if (!shouldCreateLinkedIssue.value) return true;
+
+  syncLinkedIssueQuantities();
+
+  const requiredFields = [
+    [linkedIssueDraft.value.partName, '部件名称'],
+    [linkedIssueDraft.value.processName, '工序'],
+    [linkedIssueDraft.value.responsibleDepartment, '责任部门'],
+    [linkedIssueDraft.value.defectType, '缺陷分类'],
+    [linkedIssueDraft.value.defectSubtype, '二级分类'],
+    [linkedIssueDraft.value.severity, '严重程度'],
+    [linkedIssueDraft.value.status, '状态'],
+    [linkedIssueDraft.value.description, '不合格描述'],
+    [linkedIssueDraft.value.rootCause, '原因分析'],
+    [linkedIssueDraft.value.solution, '解决方案'],
+  ] as const;
+  const missingField = requiredFields.find(
+    ([value]) => !normalizeCloseText(value),
+  );
+  if (missingField) {
+    message.warning(`不合格项${missingField[1]}不能为空`);
+    return false;
+  }
+
+  if (linkedIssueDraft.value.unqualifiedQuantity <= 0) {
+    message.warning('不合格数量必须大于 0');
+    return false;
+  }
+
+  return true;
+}
 
 const statusOptions = [
   { label: '已报检', value: 'SUBMITTED' },
@@ -221,7 +302,9 @@ function statusLabel(status: InspectionRequestStatus) {
 }
 
 function checkResultLabel(result: InspectionRequestCheckResult) {
-  return checkResultOptions.find((item) => item.value === result)?.label || result;
+  return (
+    checkResultOptions.find((item) => item.value === result)?.label || result
+  );
 }
 
 function formatDateTime(value?: null | string) {
@@ -247,7 +330,10 @@ function durationText(start?: null | string, end?: null | string) {
 }
 
 function waitDuration(record: InspectionRequest) {
-  return durationText(record.submittedAt, record.dispatchedAt || record.closedAt);
+  return durationText(
+    record.submittedAt,
+    record.dispatchedAt || record.closedAt,
+  );
 }
 
 function executeDuration(record: InspectionRequest) {
@@ -278,14 +364,26 @@ async function makeQr(url: string) {
 }
 
 function applyViewStatus(value: string) {
-  if (value === 'submitted') {
-    query.status = 'SUBMITTED';
-  } else if (value === 'dispatched' || value === 'inspecting') {
-    query.status = 'DISPATCHED';
-  } else if (value === 'closed') {
-    query.status = 'CLOSED';
-  } else {
-    query.status = undefined;
+  switch (value) {
+    case 'closed': {
+      query.status = 'CLOSED';
+
+      break;
+    }
+    case 'dispatched':
+    case 'inspecting': {
+      query.status = 'DISPATCHED';
+
+      break;
+    }
+    case 'submitted': {
+      query.status = 'SUBMITTED';
+
+      break;
+    }
+    default: {
+      query.status = undefined;
+    }
   }
 }
 
@@ -293,7 +391,7 @@ function shouldUseMineFilter() {
   return activeView.value === 'inspecting';
 }
 
-async function handleViewChange(value: string | number) {
+async function handleViewChange(value: number | string) {
   activeView.value = String(value);
   applyViewStatus(activeView.value);
   page.value = 1;
@@ -372,7 +470,9 @@ function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
   syncAttachmentsFromFiles(attachmentFileList.value);
 }
 
-function handleCloseAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
+function handleCloseAttachmentUploadChange(
+  info: UploadChangeParam<UploadFile>,
+) {
   if (info.file.status === 'done') {
     const response = info.file.response as
       | undefined
@@ -471,7 +571,9 @@ async function loadWorkOrderRequirementOptions(workOrderNumber: string) {
 
   workOrderRequirementsLoading.value = true;
   try {
-    const list = await getWorkOrderRequirements({ workOrderNumber: normalized });
+    const list = await getWorkOrderRequirements({
+      workOrderNumber: normalized,
+    });
     if (requestForm.workOrderNumber !== normalized) return;
 
     const processNames = new Set<string>();
@@ -597,7 +699,7 @@ function openClose(record: InspectionRequest) {
   closeForm.inspector = record.inspectorName || record.reporter;
   closeForm.quantity = record.quantity || 1;
   closeForm.result = 'PASS';
-  
+
   linkedIssueDraft.value = {
     claim: DEFAULT_VALUES.DEFAULT_CLAIM,
     defectSubtype: DEFAULT_VALUES.DEFAULT_DEFECT_SUBTYPE,
@@ -631,13 +733,18 @@ async function openCloseQr(record: InspectionRequest) {
 
 async function submitClose() {
   if (!currentRequest.value) return;
+  if (!validateCloseForm()) return;
 
   submitting.value = true;
   try {
+    syncLinkedIssueQuantities();
     const payloadLinkedIssue = shouldCreateLinkedIssue.value
       ? {
           ...linkedIssueDraft.value,
-          photos: linkedIssueDraft.value.photos.map((p) => p.url).filter(Boolean) as string[],
+          photos: linkedIssueDraft.value.photos
+            .map((p) => p.url)
+            .filter(Boolean) as string[],
+          quantity: linkedIssueDraft.value.unqualifiedQuantity,
         }
       : undefined;
 
@@ -647,8 +754,14 @@ async function submitClose() {
       inspectionId: closeForm.inspectionId || undefined,
       inspector: closeForm.inspector,
       linkedIssue: payloadLinkedIssue,
+      qualifiedQuantity: shouldCreateLinkedIssue.value
+        ? linkedIssueDraft.value.qualifiedQuantity
+        : closeForm.quantity,
       quantity: closeForm.quantity,
       result: closeForm.result,
+      unqualifiedQuantity: shouldCreateLinkedIssue.value
+        ? linkedIssueDraft.value.unqualifiedQuantity
+        : 0,
     });
     message.success('报检任务检验完成');
     closeOpen.value = false;
@@ -659,7 +772,7 @@ async function submitClose() {
 }
 
 function applyRoutePrefill() {
-    requestForm.workOrderNumber = String(route.query.workOrderNumber || '');
+  requestForm.workOrderNumber = String(route.query.workOrderNumber || '');
   requestForm.partName = String(route.query.partName || '');
   requestForm.processName = String(route.query.processName || '');
   requestForm.reporter = String(route.query.reporter || '');
@@ -694,6 +807,15 @@ watch(
 );
 
 watch(
+  () => closeForm.quantity,
+  () => {
+    if (shouldCreateLinkedIssue.value) {
+      syncLinkedIssueQuantities();
+    }
+  },
+);
+
+watch(
   () => requestForm.workOrderNumber,
   (workOrderNumber) => {
     void Promise.all([
@@ -708,7 +830,9 @@ watch(
   <Page content-class="p-4">
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
       <Card title="扫码报检入口">
-        <div class="mb-4 flex flex-col items-center rounded border bg-gray-50 p-3">
+        <div
+          class="mb-4 flex flex-col items-center rounded border bg-gray-50 p-3"
+        >
           <img
             v-if="requestEntryQr"
             :src="requestEntryQr"
@@ -805,7 +929,9 @@ watch(
 
       <Card>
         <div class="mb-4 space-y-4">
-          <div class="grid grid-cols-1 gap-3 lg:grid-cols-[160px_180px_minmax(0,1fr)]">
+          <div
+            class="grid grid-cols-1 gap-3 lg:grid-cols-[160px_180px_minmax(0,1fr)]"
+          >
             <div class="rounded border border-amber-100 bg-amber-50 px-4 py-3">
               <div class="text-xs text-amber-700">调度待办</div>
               <div class="mt-1 text-2xl font-semibold text-amber-900">
@@ -830,9 +956,13 @@ watch(
             </div>
           </div>
 
-          <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div
+            class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between"
+          >
             <div class="flex flex-wrap items-center gap-3">
-              <span class="text-base font-semibold text-gray-900">报检任务</span>
+              <span class="text-base font-semibold text-gray-900"
+                >报检任务</span
+              >
               <Segmented
                 v-model:value="activeView"
                 :options="viewOptions"
@@ -902,10 +1032,12 @@ watch(
             <template #default="{ record }">
               <div class="space-y-1 text-xs">
                 <div>
-                  <span class="text-gray-500">报检人：</span>{{ record.reporter }}
+                  <span class="text-gray-500">报检人：</span
+                  >{{ record.reporter }}
                 </div>
                 <div>
-                  <span class="text-gray-500">班组：</span>{{ record.team || '-' }}
+                  <span class="text-gray-500">班组：</span
+                  >{{ record.team || '-' }}
                 </div>
                 <div>
                   自检 {{ checkResultLabel(record.selfCheckResult) }} / 互检
@@ -1033,12 +1165,7 @@ watch(
       :width="620"
       placement="right"
     >
-      <Descriptions
-        v-if="currentRequest"
-        bordered
-        :column="1"
-        size="small"
-      >
+      <Descriptions v-if="currentRequest" bordered :column="1" size="small">
         <Descriptions.Item label="报检单号">
           {{ currentRequest.requestNo }}
         </Descriptions.Item>
@@ -1186,7 +1313,7 @@ watch(
         <Form.Item label="关闭备注">
           <Input.TextArea v-model:value="closeForm.closeRemark" />
         </Form.Item>
-        
+
         <!-- 不合格项填写区域 -->
         <div
           v-if="shouldCreateLinkedIssue"
@@ -1279,20 +1406,7 @@ watch(
                 :min="0"
                 :max="Math.max(1, Number(closeForm.quantity) || 1)"
                 class="w-full"
-                @change="
-                  (value) => {
-                    const totalQuantity = Math.max(
-                      1,
-                      Number(closeForm.quantity) || 1,
-                    );
-                    const normalized = Math.max(
-                      0,
-                      Math.min(totalQuantity, Number(value) || 0),
-                    );
-                    linkedIssueDraft.unqualifiedQuantity = normalized;
-                    linkedIssueDraft.qualifiedQuantity = totalQuantity - normalized;
-                  }
-                "
+                @change="syncLinkedIssueQuantities"
               />
             </div>
             <div>
@@ -1364,7 +1478,6 @@ watch(
             </div>
           </div>
         </div>
-
       </Form>
     </Modal>
   </Page>

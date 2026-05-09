@@ -22,6 +22,8 @@
     "db:rbac-backfill": "node prisma/rbac-backfill.js",
     "db:cleanup-legacy-itp-menu": "node prisma/cleanup-legacy-itp-menu.js",
     "db:migrate-itp-to-forms": "node prisma/migrate-itp-to-inspection-forms.js",
+    "db:migrate-inspection-requests": "node prisma/migrate-inspection-requests.mjs",
+    "db:migrate-bom-inspection-processes": "node prisma/migrate-bom-inspection-processes.mjs",
     "db:inspection-quantity-backfill": "node prisma/inspection-quantity-backfill.js",
     "db:rbac:check": "node prisma/rbac-consistency-check.js",
     "db:studio": "prisma studio"

@@ -520,6 +520,7 @@
           "cutting": "下料",
           "assembly": "组对",
           "welding": "焊接",
+          "flawDetection": "探伤",
           "weldSize": "焊后尺寸",
           "appearance": "外观",
           "overallAssembly": "整体拼装",

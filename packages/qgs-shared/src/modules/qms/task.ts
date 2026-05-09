@@ -1,4 +1,4 @@
-export type TaskType = 'DFMEA_ACTION' | 'ITP_INSPECTION';
+export type TaskType = 'DFMEA_ACTION' | 'INSPECTION_REQUEST' | 'ITP_INSPECTION';
 export type TaskStatus =
   | 'COMPLETED'
   | 'DISPATCHED'

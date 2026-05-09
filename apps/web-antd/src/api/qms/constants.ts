@@ -26,6 +26,13 @@ export const QMS_API = {
   INSPECTION_ISSUES_NC_NUMBER: '/qms/inspection/issues/nc-number',
   INSPECTION_RECORDS: '/qms/inspection/records',
   INSPECTION_RECORDS_BATCH_DELETE: '/qms/inspection/records/batch-delete',
+  INSPECTION_REQUESTS: '/qms/inspection/requests',
+  PUBLIC_INSPECTION_REQUESTS: '/qms/public/inspection/requests',
+  PUBLIC_INSPECTION_REQUEST_PROCESSES:
+    '/qms/public/inspection/requests/processes',
+  PUBLIC_INSPECTION_REQUEST_TEAMS: '/qms/public/inspection/requests/teams',
+  PUBLIC_INSPECTION_REQUEST_WORK_ORDERS:
+    '/qms/public/inspection/requests/work-orders',
   INSPECTION_ARCHIVE_TASKS: '/qms/inspection/archive-tasks',
   QUALITY_LOSS: '/qms/quality-loss',
   METROLOGY: '/qms/metrology',

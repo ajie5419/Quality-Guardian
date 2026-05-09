@@ -4,7 +4,10 @@ import { unmountGlobalLoading } from '@vben/utils';
 import { overridesPreferences } from './preferences';
 import { setupClientLogger } from './utils/client-logger';
 
-const PUBLIC_METROLOGY_BORROW_ENTRY_PATH = '/qms/metrology/borrow/entry';
+const PUBLIC_ENTRY_PATHS = new Set([
+  '/qms/inspection/requests/entry',
+  '/qms/metrology/borrow/entry',
+]);
 
 function redirectLegacyPublicEntryPath() {
   if (typeof window === 'undefined') {
@@ -15,11 +18,11 @@ function redirectLegacyPublicEntryPath() {
     return;
   }
 
-  if (window.location.pathname !== PUBLIC_METROLOGY_BORROW_ENTRY_PATH) {
+  if (!PUBLIC_ENTRY_PATHS.has(window.location.pathname)) {
     return;
   }
 
-  const target = `${window.location.origin}/#${PUBLIC_METROLOGY_BORROW_ENTRY_PATH}${window.location.search}`;
+  const target = `${window.location.origin}/#${window.location.pathname}${window.location.search}`;
   window.location.replace(target);
 }
 

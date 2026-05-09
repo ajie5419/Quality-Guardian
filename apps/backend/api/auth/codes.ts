@@ -3,6 +3,7 @@ import { RbacService } from '~/services/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
+  ensureInspectionRequestMenu,
   ensureMetrologyMenu,
   ensureVehicleCommissioningMenu,
 } from '~/utils/menu-bootstrap';
@@ -25,6 +26,7 @@ export default eventHandler(async (event) => {
 
   try {
     await ensureVehicleCommissioningMenu();
+    await ensureInspectionRequestMenu();
     await ensureMetrologyMenu();
     const codes = await RbacService.getUserPermissionCodes(String(userId));
     return useResponseSuccess(codes);

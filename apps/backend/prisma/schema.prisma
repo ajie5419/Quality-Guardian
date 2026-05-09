@@ -38,6 +38,7 @@ model inspections {
   updatedAt           DateTime                  @updatedAt
   items               inspection_items[]
   archiveTask         inspection_archive_tasks?
+  inspectionRequest   qms_inspection_requests?
   qualityRecords      quality_records[]
   work_order          work_orders               @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
@@ -649,28 +650,30 @@ model user_preferences {
 }
 
 model users {
-  id                                                String                @id
-  username                                          String                @unique
+  id                                                String                    @id
+  username                                          String                    @unique
   password                                          String
   email                                             String?
   realName                                          String?
   phone                                             String?
   roleId                                            String
   department                                        String
-  status                                            users_status          @default(ACTIVE)
+  status                                            users_status              @default(ACTIVE)
   avatar                                            String?
-  isDeleted                                         Boolean               @default(false)
-  createdAt                                         DateTime              @default(now())
-  updatedAt                                         DateTime              @updatedAt
-  version                                           Int                   @default(1)
+  isDeleted                                         Boolean                   @default(false)
+  createdAt                                         DateTime                  @default(now())
+  updatedAt                                         DateTime                  @updatedAt
+  version                                           Int                       @default(1)
   audit_logs                                        audit_logs[]
+  qms_inspection_requests_dispatcher                qms_inspection_requests[] @relation("qms_inspection_requests_dispatcherIdTousers")
+  qms_inspection_requests_inspector                 qms_inspection_requests[] @relation("qms_inspection_requests_inspectorIdTousers")
   user_preferences                                  user_preferences[]
-  qms_task_dispatches_assignee                      qms_task_dispatches[] @relation("qms_task_dispatches_assigneeIdTousers")
-  qms_task_dispatches_assignor                      qms_task_dispatches[] @relation("qms_task_dispatches_assignorIdTousers")
-  quality_records_quality_records_inspectorTousers  quality_records[]     @relation("quality_records_inspectorTousers")
-  quality_records_quality_records_lastEditorTousers quality_records[]     @relation("quality_records_lastEditorTousers")
+  qms_task_dispatches_assignee                      qms_task_dispatches[]     @relation("qms_task_dispatches_assigneeIdTousers")
+  qms_task_dispatches_assignor                      qms_task_dispatches[]     @relation("qms_task_dispatches_assignorIdTousers")
+  quality_records_quality_records_inspectorTousers  quality_records[]         @relation("quality_records_inspectorTousers")
+  quality_records_quality_records_lastEditorTousers quality_records[]         @relation("quality_records_lastEditorTousers")
   rbac_user_roles                                   rbac_user_roles[]
-  roles                                             roles                 @relation(fields: [roleId], references: [id])
+  roles                                             roles                     @relation(fields: [roleId], references: [id])
 
   @@index([roleId], map: "users_roleId_fkey")
 }
@@ -697,6 +700,7 @@ model work_orders {
   quality_plans             quality_plans[]
   quality_records           quality_records[]
   inspection_form_templates inspection_form_templates[]
+  qms_inspection_requests   qms_inspection_requests[]
   work_order_requirements   work_order_requirements[]
 
   @@index([customerName])
@@ -731,30 +735,73 @@ model work_order_requirements {
 }
 
 model qms_task_dispatches {
-  id                                          String          @id @default(cuid())
+  id                                          String                    @id @default(cuid())
   type                                        String
   title                                       String
-  level                                       Int             @default(1)
+  level                                       Int                       @default(1)
   itpProjectId                                String?
   dfmeaId                                     String?
   assignorId                                  String
   assigneeId                                  String
-  status                                      String          @default("PENDING")
-  priority                                    Int             @default(3)
-  createdAt                                   DateTime        @default(now())
-  updatedAt                                   DateTime        @updatedAt
+  status                                      String                    @default("PENDING")
+  priority                                    Int                       @default(3)
+  createdAt                                   DateTime                  @default(now())
+  updatedAt                                   DateTime                  @updatedAt
   dueDate                                     DateTime?
-  content                                     String?         @db.Text
+  content                                     String?                   @db.Text
   parentId                                    String?
-  users_qms_task_dispatches_assigneeIdTousers users           @relation("qms_task_dispatches_assigneeIdTousers", fields: [assigneeId], references: [id])
-  users_qms_task_dispatches_assignorIdTousers users           @relation("qms_task_dispatches_assignorIdTousers", fields: [assignorId], references: [id])
-  dfmea_project                               dfmea_projects? @relation(fields: [dfmeaId], references: [id])
-  itp_project                                 quality_plans?  @relation(fields: [itpProjectId], references: [id])
+  users_qms_task_dispatches_assigneeIdTousers users                     @relation("qms_task_dispatches_assigneeIdTousers", fields: [assigneeId], references: [id])
+  users_qms_task_dispatches_assignorIdTousers users                     @relation("qms_task_dispatches_assignorIdTousers", fields: [assignorId], references: [id])
+  dfmea_project                               dfmea_projects?           @relation(fields: [dfmeaId], references: [id])
+  itp_project                                 quality_plans?            @relation(fields: [itpProjectId], references: [id])
+  inspection_requests                         qms_inspection_requests[]
 
   @@index([assigneeId])
   @@index([assignorId], map: "qms_task_dispatches_assignorId_fkey")
   @@index([dfmeaId], map: "qms_task_dispatches_dfmeaId_fkey")
   @@index([itpProjectId], map: "qms_task_dispatches_itpProjectId_fkey")
+}
+
+model qms_inspection_requests {
+  id                String                    @id @default(cuid())
+  requestNo         String                    @unique
+  workOrderNumber   String
+  partName          String
+  processName       String
+  team              String?
+  quantity          Int                       @default(1)
+  reporter          String
+  selfCheckResult   String                    @default("PASS")
+  mutualCheckResult String                    @default("PASS")
+  requestInfo       String?                   @db.Text
+  attachments       String?                   @db.LongText
+  status            inspection_request_status @default(SUBMITTED)
+  priority          Int                       @default(3)
+  dispatcherId      String?
+  inspectorId       String?
+  dispatchTaskId    String?
+  inspectionId      String?                   @unique
+  dispatchRemark    String?                   @db.Text
+  closeRemark       String?                   @db.Text
+  closeAttachments  String?                   @db.LongText
+  submittedAt       DateTime                  @default(now())
+  dispatchedAt      DateTime?
+  closedAt          DateTime?
+  isDeleted         Boolean                   @default(false)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  work_order        work_orders               @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+  dispatcher        users?                    @relation("qms_inspection_requests_dispatcherIdTousers", fields: [dispatcherId], references: [id])
+  inspector         users?                    @relation("qms_inspection_requests_inspectorIdTousers", fields: [inspectorId], references: [id])
+  dispatch_task     qms_task_dispatches?      @relation(fields: [dispatchTaskId], references: [id], onDelete: SetNull)
+  inspection        inspections?              @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+
+  @@index([workOrderNumber])
+  @@index([status])
+  @@index([inspectorId])
+  @@index([dispatcherId])
+  @@index([submittedAt])
+  @@index([workOrderNumber, processName, partName])
 }
 
 model quality_losses {
@@ -955,4 +1002,12 @@ enum archive_task_status {
   IN_PROGRESS
   ARCHIVED
   REJECTED
+}
+
+enum inspection_request_status {
+  SUBMITTED
+  DISPATCHED
+  INSPECTING
+  CLOSED
+  CANCELLED
 }

@@ -40,6 +40,7 @@ const detailVisible = ref(false);
 const detailRecord = ref<QmsInspectionApi.InspectionRecord>();
 const routeKeyword = ref('');
 const routeSourceInspectionId = ref('');
+const routeInspectionTypeSet = new Set(['incoming', 'process', 'shipment']);
 
 function openDetail(record: QmsInspectionApi.InspectionRecord) {
   detailRecord.value = record;
@@ -149,6 +150,13 @@ function syncRouteFilters() {
     typeof route.query.sourceInspectionId === 'string'
       ? route.query.sourceInspectionId
       : '';
+  const routeType =
+    typeof route.query.type === 'string'
+      ? route.query.type.trim().toLowerCase()
+      : '';
+  if (routeInspectionTypeSet.has(routeType)) {
+    activeKey.value = routeType;
+  }
 }
 
 onMounted(() => {

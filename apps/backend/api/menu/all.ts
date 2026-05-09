@@ -3,6 +3,7 @@ import { RbacService } from '~/services/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
+  ensureInspectionRequestMenu,
   ensureMetrologyMenu,
   ensureVehicleCommissioningMenu,
 } from '~/utils/menu-bootstrap';
@@ -175,6 +176,7 @@ export default eventHandler(async (event) => {
 
   const result = await (async () => {
     await ensureVehicleCommissioningMenu();
+    await ensureInspectionRequestMenu();
     await ensureMetrologyMenu();
 
     // 1. 获取所有状态正常的菜单

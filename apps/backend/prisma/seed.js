@@ -736,6 +736,42 @@ async function main() {
       meta: { title: '导入' },
     },
 
+    // --- 报检任务 ---
+    {
+      id: 43,
+      parentId: 40,
+      path: '/qms/inspection/requests',
+      name: 'QMSInspectionRequests',
+      component: 'qms/inspection/requests/index',
+      type: 'menu',
+      authCode: 'QMS:Inspection:Requests:List',
+      meta: { title: '报检任务', icon: 'carbon:qr-code' },
+    },
+    {
+      id: 4300,
+      parentId: 43,
+      name: 'QMSInspectionRequestsCreate',
+      type: 'button',
+      authCode: 'QMS:Inspection:Requests:Create',
+      meta: { title: '新增' },
+    },
+    {
+      id: 4301,
+      parentId: 43,
+      name: 'QMSInspectionRequestsDispatch',
+      type: 'button',
+      authCode: 'QMS:Inspection:Requests:Dispatch',
+      meta: { title: '派单' },
+    },
+    {
+      id: 4302,
+      parentId: 43,
+      name: 'QMSInspectionRequestsClose',
+      type: 'button',
+      authCode: 'QMS:Inspection:Requests:Close',
+      meta: { title: '关闭' },
+    },
+
     // --- 不合格品项 ---
     {
       id: 42,

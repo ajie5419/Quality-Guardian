@@ -4,6 +4,9 @@ import { redis } from '~/utils/redis';
 const VEHICLE_COMMISSIONING_PATH = '/qms/vehicle-commissioning';
 const VEHICLE_COMMISSIONING_NAME = 'QMSVehicleCommissioning';
 const VEHICLE_COMMISSIONING_AUTH_CODE = 'QMS:VehicleCommissioning:List';
+const INSPECTION_REQUEST_PATH = '/qms/inspection/requests';
+const INSPECTION_REQUEST_NAME = 'QMSInspectionRequests';
+const INSPECTION_REQUEST_AUTH_CODE = 'QMS:Inspection:Requests:List';
 
 const METROLOGY_CATALOG_PATH = '/qms/metrology';
 const METROLOGY_CATALOG_NAME = 'QMSMetrologyManagement';
@@ -21,6 +24,27 @@ const METROLOGY_BORROW_NAME = 'QMSMetrologyBorrow';
 const METROLOGY_BORROW_AUTH_CODE = 'QMS:Metrology:Borrow:List';
 const METROLOGY_BORROW_ENTRY_PATH = '/qms/metrology/borrow/entry';
 const METROLOGY_BORROW_ENTRY_NAME = 'QMSMetrologyBorrowEntry';
+
+const INSPECTION_REQUEST_BUTTONS = [
+  {
+    authCode: 'QMS:Inspection:Requests:Create',
+    name: 'QMSInspectionRequestsCreate',
+    order: 1,
+    title: '新增',
+  },
+  {
+    authCode: 'QMS:Inspection:Requests:Dispatch',
+    name: 'QMSInspectionRequestsDispatch',
+    order: 2,
+    title: '派单',
+  },
+  {
+    authCode: 'QMS:Inspection:Requests:Close',
+    name: 'QMSInspectionRequestsClose',
+    order: 3,
+    title: '关闭',
+  },
+] as const;
 
 const METROLOGY_LEDGER_BUTTONS = [
   {
@@ -102,6 +126,13 @@ function buildVehicleCommissioningMeta() {
     icon: 'carbon:vehicle-connected',
     orderNo: 95,
     title: '车辆调试',
+  });
+}
+
+function buildInspectionRequestMeta() {
+  return JSON.stringify({
+    icon: 'carbon:qr-code',
+    title: '报检任务',
   });
 }
 
@@ -309,6 +340,101 @@ export async function ensureVehicleCommissioningMenu() {
       where: { id: existing.id },
       data: nextData,
     });
+    await redis.delByPattern('qms:menu:*');
+  }
+}
+
+export async function ensureInspectionRequestMenu() {
+  const inspectionRoot = await prisma.menus.findFirst({
+    where: {
+      isDeleted: false,
+      path: '/qms/inspection',
+      status: 1,
+    },
+    select: { id: true },
+  });
+  if (!inspectionRoot?.id) {
+    return;
+  }
+
+  let changed = false;
+  const parentId = String(inspectionRoot.id);
+  const existing = await prisma.menus.findFirst({
+    where: {
+      OR: [
+        { name: INSPECTION_REQUEST_NAME },
+        { path: INSPECTION_REQUEST_PATH },
+      ],
+    },
+    select: {
+      authCode: true,
+      component: true,
+      id: true,
+      isDeleted: true,
+      meta: true,
+      name: true,
+      parentId: true,
+      path: true,
+      status: true,
+      type: true,
+    },
+  });
+
+  let requestMenuId = existing?.id ? String(existing.id) : '';
+
+  if (existing) {
+    const nextData: Record<string, unknown> = {};
+    if (existing.isDeleted) nextData.isDeleted = false;
+    if (existing.status !== 1) nextData.status = 1;
+    if (existing.parentId !== parentId) nextData.parentId = parentId;
+    if (existing.type !== 'menu') nextData.type = 'menu';
+    if (existing.path !== INSPECTION_REQUEST_PATH) {
+      nextData.path = INSPECTION_REQUEST_PATH;
+    }
+    if (existing.component !== 'qms/inspection/requests/index') {
+      nextData.component = 'qms/inspection/requests/index';
+    }
+    if (!existing.authCode) nextData.authCode = INSPECTION_REQUEST_AUTH_CODE;
+    if (!existing.meta || !String(existing.meta).includes('"icon"')) {
+      nextData.meta = buildInspectionRequestMeta();
+    }
+    if (existing.name !== INSPECTION_REQUEST_NAME) {
+      nextData.name = INSPECTION_REQUEST_NAME;
+    }
+
+    if (Object.keys(nextData).length > 0) {
+      await prisma.menus.update({
+        data: nextData,
+        where: { id: existing.id },
+      });
+      changed = true;
+    }
+  } else {
+    const created = await prisma.menus.create({
+      data: {
+        id: `menu-${Date.now()}-inspection-request`,
+        authCode: INSPECTION_REQUEST_AUTH_CODE,
+        component: 'qms/inspection/requests/index',
+        isDeleted: false,
+        meta: buildInspectionRequestMeta(),
+        name: INSPECTION_REQUEST_NAME,
+        order: 3,
+        parentId,
+        path: INSPECTION_REQUEST_PATH,
+        status: 1,
+        type: 'menu',
+      },
+    });
+    requestMenuId = String(created.id);
+    changed = true;
+  }
+
+  const buttonsChanged = await ensureButtons(
+    INSPECTION_REQUEST_BUTTONS,
+    requestMenuId,
+  );
+
+  if (changed || buttonsChanged) {
     await redis.delByPattern('qms:menu:*');
   }
 }

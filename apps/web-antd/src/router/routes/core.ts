@@ -9,6 +9,8 @@ const BasicLayout = () => import('#/layouts/basic.vue');
 const AuthPageLayout = () => import('#/layouts/auth.vue');
 const MetrologyBorrowEntryPage = () =>
   import('#/views/qms/metrology/borrow/entry/index.vue');
+const InspectionRequestEntryPage = () =>
+  import('#/views/qms/inspection/requests/entry/index.vue');
 /** 全局404页面 */
 const fallbackNotFoundRoute: RouteRecordRaw = {
   component: () => import('#/views/_core/fallback/not-found.vue'),
@@ -104,6 +106,18 @@ const coreRoutes: RouteRecordRaw[] = [
       hideInTab: true,
       ignoreAccess: true,
       title: 'Metrology Borrow Entry',
+    },
+  },
+  {
+    name: 'PublicInspectionRequestEntry',
+    path: '/qms/inspection/requests/entry',
+    component: InspectionRequestEntryPage,
+    meta: {
+      hideInBreadcrumb: true,
+      hideInMenu: true,
+      hideInTab: true,
+      ignoreAccess: true,
+      title: '扫码报检',
     },
   },
 ];

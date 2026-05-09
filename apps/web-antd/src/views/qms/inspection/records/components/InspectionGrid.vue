@@ -179,13 +179,23 @@ const gridOptions = computed(() => ({
         { page }: { page: { currentPage: number; pageSize: number } },
         formValues: Record<string, unknown>,
       ) => {
-        return await getInspectionRecords({
+        const response = await getInspectionRecords({
           type: props.type,
           year: props.year,
-          page: page.currentPage,
-          pageSize: page.pageSize,
+          page: props.sourceInspectionId ? 1 : page.currentPage,
+          pageSize: props.sourceInspectionId ? 100_000 : page.pageSize,
           keyword: (formValues?.keyword as string | undefined) || props.keyword,
         });
+        if (!props.sourceInspectionId) {
+          return response;
+        }
+
+        const items = filterBySourceInspectionId(response.items || []);
+        return {
+          ...response,
+          items,
+          total: items.length,
+        };
       },
       queryAll: async ({
         formValues,
