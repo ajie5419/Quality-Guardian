@@ -1,6 +1,7 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { WorkOrderService } from '~/services/work-order.service';
 import { logApiDebug, logApiError, logApiWarn } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,
@@ -49,6 +50,14 @@ export default defineEventHandler(async (event) => {
       latencyMs: Date.now() - startedAt,
       module: 'work-order',
       userId: userinfo.userId,
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'EXPORT',
+      targetType: 'work_order',
+      targetId: 'export',
+      details: `导出工单: ${result.total || 0} 条`,
     });
 
     return useResponseSuccess({

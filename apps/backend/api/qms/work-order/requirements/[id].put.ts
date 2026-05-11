@@ -1,5 +1,6 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -47,7 +48,17 @@ export default defineEventHandler(async (event) => {
         confirmer: true,
         confirmStatus: true,
         id: true,
+        requirementName: true,
+        workOrderNumber: true,
       },
+    });
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'UPDATE',
+      targetType: 'work_order_requirement',
+      targetId: String(updated.id),
+      details: `更新工单要求: ${updated.workOrderNumber} - ${updated.requirementName}`,
     });
 
     return useResponseSuccess(updated);

@@ -1,10 +1,11 @@
+import type { ProcessPassRateTargetKey } from '~/utils/pass-rate-process';
+
 import { getTargetPassRate as getTargetPassRateByStd } from '~/constants/quality-standards';
 import {
   buildCanonicalProcessPassRateTargets,
   mapInspectionToPassRateBucket,
   parsePassRateTargets,
 } from '~/utils/pass-rate-process';
-import type { ProcessPassRateTargetKey } from '~/utils/pass-rate-process';
 import prisma from '~/utils/prisma';
 
 interface DrillDownItem {

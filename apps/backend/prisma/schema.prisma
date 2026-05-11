@@ -531,47 +531,47 @@ model standard_documents {
 }
 
 model suppliers {
-  id           String   @id @default(cuid())
-  category     String?
+  id              String   @id @default(cuid())
+  category        String?
   outsourcingMode String?
-  name         String   @unique
-  productName  String?
-  brand        String?
-  origin       String?
-  project      String?
-  buyer        String?
-  score2025    Float?
-  contact      String?
-  phone        String?
-  email        String?
-  address      String?
-  isDeleted    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  version      Int      @default(1)
-  qualityScore Float    @default(100)
-  rating       String   @default("A")
-  status       String   @default("Qualified")
+  name            String   @unique
+  productName     String?
+  brand           String?
+  origin          String?
+  project         String?
+  buyer           String?
+  score2025       Float?
+  contact         String?
+  phone           String?
+  email           String?
+  address         String?
+  isDeleted       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  version         Int      @default(1)
+  qualityScore    Float    @default(100)
+  rating          String   @default("A")
+  status          String   @default("Qualified")
 
   @@index([status])
 }
 
 model measuring_instruments {
-  id               String   @id @default(cuid())
+  id               String                        @id @default(cuid())
   orderNo          Int?
   instrumentName   String
-  instrumentCode   String   @unique
+  instrumentCode   String                        @unique
   model            String?
   usingUnit        String?
   validUntil       DateTime?
   inspectionStatus String
-  borrowStatus     String   @default("AVAILABLE")
+  borrowStatus     String                        @default("AVAILABLE")
   sourceFileName   String?
   createdBy        String?
   updatedBy        String?
-  isDeleted        Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  isDeleted        Boolean                       @default(false)
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
   calibrationPlans metrology_calibration_plans[]
   borrowRecords    metrology_borrow_records[]
 
@@ -710,25 +710,25 @@ model work_orders {
 }
 
 model work_order_requirements {
-  id               String      @id @default(cuid())
-  workOrderNumber  String
-  requirementName  String
-  partName         String?
-  processName      String?
+  id                String      @id @default(cuid())
+  workOrderNumber   String
+  requirementName   String
+  partName          String?
+  processName       String?
   responsiblePerson String?
-  responsibleTeam  String?
-  requirementItems String?     @db.LongText
-  attachment       String?     @db.LongText
-  status           String      @default("active")
-  confirmStatus    String      @default("PENDING")
-  confirmer        String?
-  confirmedAt      DateTime?
-  createdBy        String?
-  updatedBy        String?
-  isDeleted        Boolean     @default(false)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  work_order       work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+  responsibleTeam   String?
+  requirementItems  String?     @db.LongText
+  attachment        String?     @db.LongText
+  status            String      @default("active")
+  confirmStatus     String      @default("PENDING")
+  confirmer         String?
+  confirmedAt       DateTime?
+  createdBy         String?
+  updatedBy         String?
+  isDeleted         Boolean     @default(false)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  work_order        work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([workOrderNumber])
   @@index([status])

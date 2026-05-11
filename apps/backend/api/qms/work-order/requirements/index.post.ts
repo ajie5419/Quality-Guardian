@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -78,6 +79,14 @@ export default defineEventHandler(async (event) => {
         }),
       ),
     );
+
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'CREATE',
+      targetType: 'work_order_requirement',
+      targetId: created.map((item) => item.id).join(','),
+      details: `新增工单要求: ${created.length} 条`,
+    });
 
     return useResponseSuccess({
       items: created,
