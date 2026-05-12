@@ -11,6 +11,7 @@ import { useI18n } from '@vben/locales';
 import { message } from 'ant-design-vue';
 
 import { createAfterSales, updateAfterSales } from '#/api/qms/after-sales';
+import { getUploadResponse } from '#/views/qms/shared/utils/upload-file';
 
 import {
   createInitialFormState,
@@ -163,8 +164,9 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
         ((rawData.photos || []) as PhotoCandidate[])
           ?.map((f) => {
             if (f.url) return f.url;
-            if (f.status === 'done' && f.response?.data?.url) {
-              return f.response.data.url;
+            const response = getUploadResponse(f);
+            if (f.status === 'done' && response?.data?.url) {
+              return response.data.url;
             }
             return null;
           })

@@ -3,6 +3,7 @@ import { RbacService } from '~/services/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
+  ensureFileCenterMenu,
   ensureInspectionRequestMenu,
   ensureMetrologyMenu,
   ensureVehicleCommissioningMenu,
@@ -25,6 +26,7 @@ export default eventHandler(async (event) => {
   }
 
   try {
+    await ensureFileCenterMenu();
     await ensureVehicleCommissioningMenu();
     await ensureInspectionRequestMenu();
     await ensureMetrologyMenu();

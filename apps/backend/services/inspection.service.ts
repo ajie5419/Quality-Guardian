@@ -534,9 +534,21 @@ async function syncInspectionArchiveTask(
 ) {
   try {
     if (!shouldRequireArchiveTask(source)) {
+      const tasks = await tx.inspection_archive_tasks.findMany({
+        select: { id: true },
+        where: { inspectionId: source.id },
+      });
       await tx.inspection_archive_tasks.deleteMany({
         where: { inspectionId: source.id },
       });
+      await Promise.all(
+        tasks.map((task) =>
+          FileStorageService.softDeleteReferences({
+            bizId: task.id,
+            bizType: 'inspection_archive_task',
+          }),
+        ),
+      );
       return;
     }
 
@@ -561,7 +573,7 @@ async function syncInspectionArchiveTask(
       status === 'ARCHIVED' ? existing?.archivedAt || new Date() : null;
     const now = new Date();
 
-    await tx.inspection_archive_tasks.upsert({
+    const task = await tx.inspection_archive_tasks.upsert({
       where: { inspectionId: source.id },
       update: {
         archivedAt,
@@ -588,6 +600,12 @@ async function syncInspectionArchiveTask(
         inspectionId: source.id,
         archivedAt,
       },
+    });
+    await FileStorageService.registerReferencesFromAttachments({
+      attachments: source.documents,
+      bizId: String(task.id),
+      bizType: 'inspection_archive_task',
+      fieldName: 'attachments',
     });
   } catch (error) {
     if (isPrismaSchemaMismatchError(error)) {
@@ -626,6 +644,12 @@ async function syncInspectionProjectDocuments(
           updatedAt: new Date(),
         },
       });
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: stringifyProjectDocuments(nextDocuments),
+        bizId: String(currentProject.id),
+        bizType: 'doc_project',
+        fieldName: 'documents',
+      });
       return;
     }
 
@@ -633,13 +657,19 @@ async function syncInspectionProjectDocuments(
       return;
     }
 
-    await tx.doc_projects.create({
+    const created = await tx.doc_projects.create({
       data: {
         documents: stringifyProjectDocuments(nextDocuments),
         projectName: source.projectName || source.workOrderNumber,
         status: 'active',
         workOrderNumber: source.workOrderNumber,
       },
+    });
+    await FileStorageService.registerReferencesFromAttachments({
+      attachments: stringifyProjectDocuments(nextDocuments),
+      bizId: String(created.id),
+      bizType: 'doc_project',
+      fieldName: 'documents',
     });
   } catch (error) {
     if (isPrismaMissingColumnError(error)) {
@@ -1120,6 +1150,12 @@ export const InspectionService = {
           });
           await syncInspectionProjectDocuments(tx, inspection);
           await syncInspectionArchiveTask(tx, inspection);
+          await FileStorageService.registerReferencesFromAttachments({
+            attachments: inspection.documents,
+            bizId: String(inspection.id),
+            bizType: 'inspection_record',
+            fieldName: 'documents',
+          });
           return inspection;
         });
       } catch (error) {
@@ -1261,6 +1297,12 @@ export const InspectionService = {
 
       await syncInspectionProjectDocuments(tx, inspection);
       await syncInspectionArchiveTask(tx, inspection);
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: inspection.documents,
+        bizId: String(inspection.id),
+        bizType: 'inspection_record',
+        fieldName: 'documents',
+      });
 
       return inspection;
     });
@@ -1292,6 +1334,10 @@ export const InspectionService = {
       });
 
       if (inspection) {
+        const archiveTasks = await tx.inspection_archive_tasks.findMany({
+          select: { id: true },
+          where: { inspectionId: inspection.id },
+        });
         await syncInspectionProjectDocuments(tx, {
           ...inspection,
           hasDocuments: false,
@@ -1299,7 +1345,20 @@ export const InspectionService = {
         await tx.inspection_archive_tasks.deleteMany({
           where: { inspectionId: inspection.id },
         });
+        await Promise.all(
+          archiveTasks.map((task) =>
+            FileStorageService.softDeleteReferences({
+              bizId: task.id,
+              bizType: 'inspection_archive_task',
+            }),
+          ),
+        );
       }
+
+      await FileStorageService.softDeleteReferences({
+        bizId: id,
+        bizType: 'inspection_record',
+      });
 
       return deleted;
     });
@@ -1331,6 +1390,10 @@ export const InspectionService = {
       });
 
       for (const inspection of inspections) {
+        const archiveTasks = await tx.inspection_archive_tasks.findMany({
+          select: { id: true },
+          where: { inspectionId: inspection.id },
+        });
         await syncInspectionProjectDocuments(tx, {
           ...inspection,
           hasDocuments: false,
@@ -1338,7 +1401,24 @@ export const InspectionService = {
         await tx.inspection_archive_tasks.deleteMany({
           where: { inspectionId: inspection.id },
         });
+        await Promise.all(
+          archiveTasks.map((task) =>
+            FileStorageService.softDeleteReferences({
+              bizId: task.id,
+              bizType: 'inspection_archive_task',
+            }),
+          ),
+        );
       }
+
+      await Promise.all(
+        ids.map((id) =>
+          FileStorageService.softDeleteReferences({
+            bizId: id,
+            bizType: 'inspection_record',
+          }),
+        ),
+      );
 
       return result;
     });

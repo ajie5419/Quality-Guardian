@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -24,6 +25,10 @@ export default defineEventHandler(async (event) => {
     await prisma.doc_projects.update({
       where: { id },
       data: { isDeleted: true, updatedAt: new Date() },
+    });
+    await FileStorageService.softDeleteReferences({
+      bizId: String(id),
+      bizType: 'doc_project',
     });
 
     return useResponseSuccess({ message: 'Deleted' });

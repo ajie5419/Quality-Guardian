@@ -16,12 +16,13 @@ import {
 } from '#/api/qms/inspection';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { buildThumbUrlFromOriginal } from '#/views/qms/shared/utils/photo-url';
+import { getUploadResponse } from '#/views/qms/shared/utils/upload-file';
 
 import { DEFAULT_VALUES } from '../constants';
 
 type FormApi = ReturnType<typeof useVbenForm>[1];
 type UploadPhotoItem = {
-  response?: { data?: { url?: string } };
+  response?: ReturnType<typeof getUploadResponse>;
   status?: string;
   url?: string;
 };
@@ -119,8 +120,9 @@ export function useIssueForm(options: UseIssueFormOptions) {
         rawData.photos
           ?.map((f) => {
             if (f.url) return f.url;
-            if (f.status === 'done' && f.response?.data?.url) {
-              return f.response.data.url;
+            const response = getUploadResponse(f);
+            if (f.status === 'done' && response?.data?.url) {
+              return response.data.url;
             }
             return null;
           })

@@ -2,6 +2,7 @@ import { defineEventHandler, setResponseStatus } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
+  ensureFileCenterMenu,
   ensureMetrologyMenu,
   ensureVehicleCommissioningMenu,
 } from '~/utils/menu-bootstrap';
@@ -21,6 +22,7 @@ export default defineEventHandler(async (event) => {
   if (!userinfo) return unAuthorizedResponse(event);
 
   try {
+    await ensureFileCenterMenu();
     await ensureVehicleCommissioningMenu();
     await ensureMetrologyMenu();
 

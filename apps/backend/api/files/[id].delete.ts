@@ -1,6 +1,7 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
 import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   unAuthorizedResponse,
@@ -17,7 +18,14 @@ export default defineEventHandler(async (event) => {
   if (typeof id !== 'string') return id;
 
   try {
-    await FileStorageService.deleteFile(id, userinfo.id);
+    const result = await FileStorageService.deleteFile(id, userinfo.id);
+    await recordBusinessAuditLog(event, {
+      action: 'DELETE',
+      details: `删除文件: ${result.file.originalName}`,
+      targetId: String(id),
+      targetType: 'file_asset',
+      userId: userinfo.id,
+    });
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('file-delete', error, { id, userId: userinfo.id });

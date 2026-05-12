@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { normalizePlanningProjectName } from '~/utils/planning-project';
@@ -41,6 +42,14 @@ export default defineEventHandler(async (event) => {
         updatedAt: new Date(),
       },
     });
+    if (body.documents !== undefined) {
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: body.documents,
+        bizId: String(id),
+        bizType: 'doc_project',
+        fieldName: 'documents',
+      });
+    }
     return useResponseSuccess(updated);
   } catch (error) {
     logApiError('project-docs-projects', error);

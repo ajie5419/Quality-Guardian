@@ -1,6 +1,7 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
 import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { unAuthorizedResponse, useResponseError } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -29,6 +30,13 @@ export default defineEventHandler(async (event) => {
       'Content-Disposition',
       `attachment; filename*=UTF-8''${encodeDownloadName(result.filename)}`,
     );
+    await recordBusinessAuditLog(event, {
+      action: 'READ',
+      details: `下载文件: ${result.file.originalName}`,
+      targetId: String(id),
+      targetType: 'file_asset',
+      userId: userinfo.id,
+    });
     return result.buffer;
   } catch (error) {
     logApiError('file-download', error, { id, userId: userinfo.id });

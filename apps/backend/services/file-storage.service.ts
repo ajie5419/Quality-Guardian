@@ -129,6 +129,45 @@ function toPublicFileUrl(id: string, mode: 'download' | 'preview' | 'thumb') {
   return `/api/files/${id}/${mode}`;
 }
 
+function parseAttachmentItems(value: unknown): unknown[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'object') return [value];
+  try {
+    const parsed = JSON.parse(String(value));
+    if (Array.isArray(parsed)) return parsed;
+    return parsed ? [parsed] : [];
+  } catch {
+    return [value];
+  }
+}
+
+function extractStoredName(value: unknown) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const withoutQuery = raw.split('?')[0] || '';
+  const filename = withoutQuery.split('/').findLast(Boolean) || '';
+  return filename.startsWith('oss_') ? filename.slice(4) : filename;
+}
+
+function resolveAttachmentLookup(item: unknown) {
+  if (typeof item === 'string') {
+    return { storedName: extractStoredName(item) };
+  }
+  if (!item || typeof item !== 'object') {
+    return { storedName: '' };
+  }
+  const record = item as Record<string, unknown>;
+  const fileId = String(record.fileId || '').trim();
+  if (fileId) return { fileId };
+
+  return {
+    storedName: extractStoredName(
+      record.url || record.path || record.filename || record.thumbUrl,
+    ),
+  };
+}
+
 async function buildThumbnail(data: Buffer, mimeType: string) {
   if (!isImageMimeType(mimeType)) return null;
   try {
@@ -303,6 +342,77 @@ export const FileStorageService = {
     return IMAGE_EXTENSIONS.has(extname(filename).toLowerCase());
   },
 
+  async getFileDetail(id: string) {
+    return prisma.file_assets.findUnique({
+      include: {
+        references: {
+          orderBy: [
+            { bizType: 'asc' },
+            { fieldName: 'asc' },
+            { sortOrder: 'asc' },
+          ],
+        },
+      },
+      where: { id },
+    });
+  },
+
+  async listFiles(params: {
+    bizId?: string;
+    bizType?: string;
+    fieldName?: string;
+    keyword?: string;
+    mimeType?: string;
+    page?: number;
+    pageSize?: number;
+    status?: string;
+    storageProvider?: string;
+    uploadedBy?: string;
+  }) {
+    const page = Math.max(1, Number(params.page || 1));
+    const pageSize = Math.max(1, Math.min(200, Number(params.pageSize || 20)));
+    const where: any = {};
+    const keyword = String(params.keyword || '').trim();
+    if (keyword) {
+      where.OR = [
+        { originalName: { contains: keyword } },
+        { storedName: { contains: keyword } },
+        { objectKey: { contains: keyword } },
+        { sha256: { contains: keyword } },
+      ];
+    }
+    if (params.status) where.status = String(params.status).toUpperCase();
+    if (params.storageProvider) {
+      where.storageProvider = String(params.storageProvider).toUpperCase();
+    }
+    if (params.uploadedBy) where.uploadedBy = String(params.uploadedBy);
+    if (params.mimeType) where.mimeType = { contains: String(params.mimeType) };
+    if (params.bizType || params.bizId || params.fieldName) {
+      where.references = {
+        some: {
+          ...(params.bizType ? { bizType: params.bizType } : {}),
+          ...(params.bizId ? { bizId: params.bizId } : {}),
+          ...(params.fieldName ? { fieldName: params.fieldName } : {}),
+        },
+      };
+    }
+
+    const [items, total] = await Promise.all([
+      prisma.file_assets.findMany({
+        include: {
+          _count: { select: { references: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        where,
+      }),
+      prisma.file_assets.count({ where }),
+    ]);
+
+    return { items, total };
+  },
+
   async registerReference(params: {
     bizId: string;
     bizType: string;
@@ -327,25 +437,33 @@ export const FileStorageService = {
     bizType: string;
     fieldName?: string;
   }) {
-    const attachments = Array.isArray(params.attachments)
-      ? params.attachments
-      : (() => {
-          try {
-            const parsed = JSON.parse(String(params.attachments || '[]'));
-            return Array.isArray(parsed) ? parsed : [];
-          } catch {
-            return [];
-          }
-        })();
-    const fileIds = attachments
-      .map((item) =>
-        item && typeof item === 'object'
-          ? String((item as Record<string, unknown>).fileId || '').trim()
-          : '',
-      )
-      .filter(Boolean);
-
-    if (fileIds.length === 0) return { count: 0 };
+    const attachments = parseAttachmentItems(params.attachments);
+    const fileIds = [];
+    for (const item of attachments) {
+      const lookup = resolveAttachmentLookup(item);
+      if ('fileId' in lookup && lookup.fileId) {
+        const file = await prisma.file_assets.findFirst({
+          select: { id: true },
+          where: { id: lookup.fileId, status: 'ACTIVE' },
+        });
+        if (file) fileIds.push(file.id);
+        continue;
+      }
+      if (!lookup.storedName) continue;
+      const file = await prisma.file_assets.findFirst({
+        select: { id: true },
+        where: {
+          OR: [
+            { storedName: lookup.storedName },
+            { objectKey: { endsWith: lookup.storedName } },
+            { thumbObjectKey: { endsWith: lookup.storedName } },
+          ],
+          status: 'ACTIVE',
+        },
+      });
+      if (file) fileIds.push(file.id);
+    }
+    const uniqueFileIds = [...new Set(fileIds)];
 
     await prisma.file_references.deleteMany({
       where: {
@@ -355,8 +473,10 @@ export const FileStorageService = {
       },
     });
 
+    if (uniqueFileIds.length === 0) return { count: 0 };
+
     const result = await prisma.file_references.createMany({
-      data: fileIds.map((fileId, index) => ({
+      data: uniqueFileIds.map((fileId, index) => ({
         bizId: params.bizId,
         bizType: params.bizType,
         fieldName: params.fieldName || 'attachments',
@@ -397,6 +517,62 @@ export const FileStorageService = {
         },
       });
     }
+  },
+
+  async listOrphanFiles(params: { page?: number; pageSize?: number }) {
+    const page = Math.max(1, Number(params.page || 1));
+    const pageSize = Math.max(1, Math.min(200, Number(params.pageSize || 20)));
+    const where = {
+      references: { none: {} },
+      status: 'ACTIVE' as const,
+    };
+    const [items, total] = await Promise.all([
+      prisma.file_assets.findMany({
+        include: { _count: { select: { references: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        where,
+      }),
+      prisma.file_assets.count({ where }),
+    ]);
+    return { items, total };
+  },
+
+  async scanMissingFiles(params: { limit?: number; markMissing?: boolean }) {
+    const limit = Math.max(1, Math.min(500, Number(params.limit || 100)));
+    const files = await prisma.file_assets.findMany({
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+      where: { status: 'ACTIVE' },
+    });
+    const missingIds = [];
+
+    for (const file of files) {
+      try {
+        if (file.storageProvider === 'OSS') {
+          const client = createOssClient();
+          await client.head(file.objectKey);
+        } else if (!existsSync(join(UPLOAD_DIR, file.objectKey))) {
+          missingIds.push(file.id);
+        }
+      } catch {
+        missingIds.push(file.id);
+      }
+    }
+
+    if (params.markMissing && missingIds.length > 0) {
+      await prisma.file_assets.updateMany({
+        data: { status: 'MISSING' },
+        where: { id: { in: missingIds } },
+      });
+    }
+
+    return {
+      checked: files.length,
+      marked: params.markMissing ? missingIds.length : 0,
+      missingIds,
+    };
   },
 
   async uploadFile(params: UploadFileParams) {

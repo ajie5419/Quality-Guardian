@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { awaitMockDelay } from '~/utils/index';
@@ -24,6 +25,10 @@ export default defineEventHandler(async (event) => {
     const deleted = await prisma.quality_plans.update({
       where: { id },
       data: { isDeleted: true },
+    });
+    await FileStorageService.softDeleteReferences({
+      bizId: String(id),
+      bizType: 'quality_plan',
     });
 
     await recordBusinessAuditLog(event, {

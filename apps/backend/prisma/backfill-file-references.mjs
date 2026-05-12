@@ -1,25 +1,30 @@
+/* eslint-disable no-console */
 import { createRequire } from 'node:module';
-import path from 'node:path';
+import process from 'node:process';
 
 const require = createRequire(import.meta.url);
 
 function loadPrismaClient() {
-  for (const candidate of [
+  const candidates = [
     '@prisma/client',
-    path.resolve(process.cwd(), 'node_modules/@prisma/client'),
-    path.resolve(process.cwd(), '../../node_modules/@prisma/client'),
-  ]) {
+    '../node_modules/@prisma/client',
+    '../apps/backend/node_modules/@prisma/client',
+  ];
+
+  for (const candidate of candidates) {
     try {
-      const mod = require(candidate);
-      return new mod.PrismaClient();
+      return require(candidate);
     } catch {
-      // Try the next runtime location. Production images and local monorepo installs differ.
+      // Support local source, container and built deployment layouts.
     }
   }
-  throw new Error('Unable to load @prisma/client');
+  throw new Error(
+    'Unable to resolve @prisma/client for file reference backfill',
+  );
 }
 
-const prisma = loadPrismaClient();
+const { PrismaClient } = loadPrismaClient();
+const prisma = new PrismaClient();
 const dryRun = process.argv.includes('--dry-run');
 
 const sources = [
@@ -38,6 +43,38 @@ const sources = [
     select: { attachments: true, id: true },
     valueKey: 'attachments',
     where: { isDeleted: false, attachments: { not: null } },
+  },
+  {
+    bizType: 'doc_project',
+    fieldName: 'documents',
+    model: 'doc_projects',
+    select: { documents: true, id: true },
+    valueKey: 'documents',
+    where: { isDeleted: false, documents: { not: null } },
+  },
+  {
+    bizType: 'quality_plan',
+    fieldName: 'documents',
+    model: 'quality_plans',
+    select: { documents: true, id: true },
+    valueKey: 'documents',
+    where: { isDeleted: false, documents: { not: null } },
+  },
+  {
+    bizType: 'inspection_record',
+    fieldName: 'documents',
+    model: 'inspections',
+    select: { documents: true, id: true },
+    valueKey: 'documents',
+    where: { isDeleted: false, documents: { not: null } },
+  },
+  {
+    bizType: 'inspection_archive_task',
+    fieldName: 'attachments',
+    model: 'inspection_archive_tasks',
+    select: { attachments: true, id: true },
+    valueKey: 'attachments',
+    where: { attachments: { not: null }, isDeleted: false },
   },
   {
     bizType: 'inspection_request',
@@ -87,7 +124,8 @@ function parseAttachments(value) {
   if (typeof value === 'object') return [value];
   try {
     const parsed = JSON.parse(String(value));
-    return Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+    if (Array.isArray(parsed)) return parsed;
+    return parsed ? [parsed] : [];
   } catch {
     return [];
   }
@@ -98,7 +136,7 @@ function extractStoredName(value) {
   if (!raw) return '';
   const withoutQuery = raw.split('?')[0] || '';
   const normalized = withoutQuery.replace(/^\/api\/uploads\//, '/uploads/');
-  const filename = normalized.split('/').filter(Boolean).pop() || '';
+  const filename = normalized.split('/').findLast(Boolean) || '';
   return filename.startsWith('oss_') ? filename.slice(4) : filename;
 }
 
@@ -148,7 +186,7 @@ async function backfillSource(source) {
       const fileId = await findFileId(item);
       if (fileId) fileIds.push(fileId);
     }
-    const uniqueFileIds = Array.from(new Set(fileIds));
+    const uniqueFileIds = [...new Set(fileIds)];
     if (uniqueFileIds.length === 0) continue;
 
     matched += uniqueFileIds.length;

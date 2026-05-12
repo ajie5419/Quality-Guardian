@@ -1,6 +1,7 @@
 import { eventHandler, readMultipartFormData, setResponseStatus } from 'h3';
 import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
+import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -25,6 +26,14 @@ export default eventHandler(async (event) => {
       filename: file.filename,
       mimeType: file.type,
       uploadedBy: userinfo?.id,
+    });
+
+    await recordBusinessAuditLog(event, {
+      action: 'CREATE',
+      details: `上传文件: ${uploaded.originalName}`,
+      targetId: String(uploaded.id),
+      targetType: 'file_asset',
+      userId: userinfo?.id,
     });
 
     return useResponseSuccess({

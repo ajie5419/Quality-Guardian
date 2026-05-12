@@ -1,5 +1,7 @@
 import type { UploadFileWithResponse } from '../../issues/types';
 
+import { getUploadResponse } from '#/views/qms/shared/utils/upload-file';
+
 function pickFirstNonEmpty(
   values: Record<string, unknown>,
   keys: string[],
@@ -47,7 +49,7 @@ export function normalizeIssuePhotoUrls(
 
   const urls: string[] = [];
   for (const file of files) {
-    const responseUrl = String(file?.response?.data?.url ?? '').trim();
+    const responseUrl = String(getUploadResponse(file)?.data?.url ?? '').trim();
     const directUrl = String(file?.url ?? '').trim();
     const thumbUrl = String(file?.thumbUrl ?? '').trim();
     const candidate = responseUrl || directUrl || thumbUrl;

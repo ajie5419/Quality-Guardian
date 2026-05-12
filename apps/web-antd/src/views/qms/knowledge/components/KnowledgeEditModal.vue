@@ -25,6 +25,10 @@ import {
 } from '#/api/qms/knowledge';
 import WangEditor from '#/components/WangEditor/index.vue';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import {
+  applyUploadResponse,
+  normalizeUploadFile,
+} from '#/views/qms/shared/utils/upload-file';
 
 defineProps<{
   categoryTree: QmsKnowledgeApi.Category[];
@@ -56,11 +60,6 @@ const uploadHeaders = computed(() => ({
   Authorization: `Bearer ${accessStore.accessToken}`,
 }));
 
-function getFileExtension(fileName: string) {
-  const suffix = fileName.split('.').pop();
-  return suffix ? suffix.toLowerCase() : '';
-}
-
 function toUploadFiles(
   attachments: QmsKnowledgeApi.KnowledgeItem['attachments'] = [],
 ): UploadFile[] {
@@ -76,46 +75,13 @@ function toUploadFiles(
 
 function syncAttachmentsFromFiles(files: UploadFile[]) {
   formState.value.attachments = files
-    .map((file) => {
-      const response = file.response as
-        | undefined
-        | {
-            data?: {
-              originalName?: string;
-              size?: number;
-              url?: string;
-            };
-          };
-      const url = String(file.url || response?.data?.url || '').trim();
-      if (!url) return null;
-
-      const name = String(
-        file.name || response?.data?.originalName || '附件',
-      ).trim();
-      return {
-        name,
-        size: Number(file.size ?? response?.data?.size ?? 0),
-        type: getFileExtension(name),
-        url,
-      };
-    })
+    .map((file) => normalizeUploadFile(file, '附件') || null)
     .filter(Boolean) as QmsKnowledgeApi.KnowledgeItem['attachments'];
 }
 
 function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
   if (info.file.status === 'done') {
-    const response = info.file.response as
-      | undefined
-      | {
-          code?: number;
-          data?: {
-            originalName?: string;
-            size?: number;
-            url?: string;
-          };
-        };
-    if (response?.code === 0 && response.data?.url) {
-      info.file.url = response.data.url;
+    if (applyUploadResponse(info.file)) {
       message.success(`${info.file.name} 上传成功`);
     } else {
       message.warning('附件上传完成，但未返回有效地址');

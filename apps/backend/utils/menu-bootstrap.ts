@@ -4,6 +4,9 @@ import { redis } from '~/utils/redis';
 const VEHICLE_COMMISSIONING_PATH = '/qms/vehicle-commissioning';
 const VEHICLE_COMMISSIONING_NAME = 'QMSVehicleCommissioning';
 const VEHICLE_COMMISSIONING_AUTH_CODE = 'QMS:VehicleCommissioning:List';
+const FILE_CENTER_PATH = '/qms/file-center';
+const FILE_CENTER_NAME = 'QMSFileCenter';
+const FILE_CENTER_AUTH_CODE = 'QMS:FileCenter:List';
 const INSPECTION_REQUEST_PATH = '/qms/inspection/requests';
 const INSPECTION_REQUEST_NAME = 'QMSInspectionRequests';
 const INSPECTION_REQUEST_AUTH_CODE = 'QMS:Inspection:Requests:List';
@@ -43,6 +46,21 @@ const INSPECTION_REQUEST_BUTTONS = [
     name: 'QMSInspectionRequestsClose',
     order: 3,
     title: '关闭',
+  },
+] as const;
+
+const FILE_CENTER_BUTTONS = [
+  {
+    authCode: 'QMS:FileCenter:Delete',
+    name: 'QMSFileCenterDelete',
+    order: 1,
+    title: '删除',
+  },
+  {
+    authCode: 'QMS:FileCenter:Scan',
+    name: 'QMSFileCenterScan',
+    order: 2,
+    title: '扫描',
   },
 ] as const;
 
@@ -126,6 +144,14 @@ function buildVehicleCommissioningMeta() {
     icon: 'carbon:vehicle-connected',
     orderNo: 95,
     title: '车辆调试',
+  });
+}
+
+function buildFileCenterMeta() {
+  return JSON.stringify({
+    icon: 'carbon:document-attachment',
+    orderNo: 94,
+    title: '文件中心',
   });
 }
 
@@ -264,6 +290,83 @@ async function getQmsRootId() {
   });
 
   return qmsRoot?.id ? String(qmsRoot.id) : null;
+}
+
+export async function ensureFileCenterMenu() {
+  const qmsRootId = await getQmsRootId();
+  if (!qmsRootId) {
+    return;
+  }
+
+  let changed = false;
+  const existing = await prisma.menus.findFirst({
+    where: {
+      OR: [{ name: FILE_CENTER_NAME }, { path: FILE_CENTER_PATH }],
+    },
+    select: {
+      authCode: true,
+      component: true,
+      id: true,
+      isDeleted: true,
+      meta: true,
+      name: true,
+      parentId: true,
+      path: true,
+      status: true,
+      type: true,
+    },
+  });
+
+  let menuId = existing?.id ? String(existing.id) : '';
+
+  if (existing) {
+    const nextData: Record<string, unknown> = {};
+    if (existing.isDeleted) nextData.isDeleted = false;
+    if (existing.status !== 1) nextData.status = 1;
+    if (existing.parentId !== qmsRootId) nextData.parentId = qmsRootId;
+    if (existing.type !== 'menu') nextData.type = 'menu';
+    if (existing.path !== FILE_CENTER_PATH) nextData.path = FILE_CENTER_PATH;
+    if (existing.component !== 'qms/file-center/index') {
+      nextData.component = 'qms/file-center/index';
+    }
+    if (!existing.authCode) nextData.authCode = FILE_CENTER_AUTH_CODE;
+    if (!existing.meta || !String(existing.meta).includes('"icon"')) {
+      nextData.meta = buildFileCenterMeta();
+    }
+    if (existing.name !== FILE_CENTER_NAME) nextData.name = FILE_CENTER_NAME;
+
+    if (Object.keys(nextData).length > 0) {
+      await prisma.menus.update({
+        data: nextData,
+        where: { id: existing.id },
+      });
+      changed = true;
+    }
+  } else {
+    const created = await prisma.menus.create({
+      data: {
+        id: `menu-${Date.now()}-file-center`,
+        authCode: FILE_CENTER_AUTH_CODE,
+        component: 'qms/file-center/index',
+        isDeleted: false,
+        meta: buildFileCenterMeta(),
+        name: FILE_CENTER_NAME,
+        order: 94,
+        parentId: qmsRootId,
+        path: FILE_CENTER_PATH,
+        status: 1,
+        type: 'menu',
+      },
+    });
+    menuId = String(created.id);
+    changed = true;
+  }
+
+  const buttonsChanged = await ensureButtons(FILE_CENTER_BUTTONS, menuId);
+
+  if (changed || buttonsChanged) {
+    await redis.delByPattern('qms:menu:*');
+  }
 }
 
 /**

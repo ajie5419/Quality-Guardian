@@ -53,6 +53,13 @@ export function toItpProjectVersionText(value: unknown): string {
   return String(value);
 }
 
+function stringifyItpDocuments(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  return JSON.stringify(value || []);
+}
+
 export function buildItpProjectUpdateData(body: Record<string, unknown>) {
   const updateData: Record<string, unknown> = {
     updatedAt: new Date(),
@@ -70,6 +77,9 @@ export function buildItpProjectUpdateData(body: Record<string, unknown>) {
   if (body.customerName !== undefined) {
     updateData.customer = normalizeItpText(body.customerName) ?? '';
   }
+  if (body.documents !== undefined) {
+    updateData.documents = stringifyItpDocuments(body.documents);
+  }
 
   return updateData;
 }
@@ -80,6 +90,10 @@ export function buildItpProjectCreateData(
 ) {
   return {
     customer: normalizeItpText(body.customerName) || DEFAULT_ITP_CUSTOMER,
+    documents:
+      body.documents === undefined
+        ? undefined
+        : stringifyItpDocuments(body.documents),
     id: createItpProjectId(),
     itpItems: '[]',
     planStatus: normalizeItpPlanStatus(body.status),

@@ -115,6 +115,11 @@ export interface SupplierItem {
 export interface UploadFileWithResponse extends Omit<UploadFile, 'response'> {
   response?: {
     data: {
+      fileId?: string;
+      originalName?: string;
+      size?: number;
+      thumbUrl?: string;
+      type?: string;
       url: string;
     };
   };

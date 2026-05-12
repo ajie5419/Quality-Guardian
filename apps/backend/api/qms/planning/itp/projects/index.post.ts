@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { awaitMockDelay } from '~/utils/index';
@@ -28,6 +29,13 @@ export default defineEventHandler(async (event) => {
   try {
     const newProject = await prisma.quality_plans.create({
       data: buildItpProjectCreateData(body as Record<string, unknown>),
+    });
+
+    await FileStorageService.registerReferencesFromAttachments({
+      attachments: (body as Record<string, unknown>).documents,
+      bizId: String(newProject.id),
+      bizType: 'quality_plan',
+      fieldName: 'documents',
     });
 
     await recordBusinessAuditLog(event, {

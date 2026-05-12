@@ -1,14 +1,11 @@
 <script lang="ts" setup>
-import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
-
 import type { UploadFileWithResponse } from '../types';
 
 import { computed } from 'vue';
 
 import { useI18n } from '@vben/locales';
-import { useAccessStore } from '@vben/stores';
 
-import { message, Upload } from 'ant-design-vue';
+import QmsFileUpload from '#/views/qms/shared/components/QmsFileUpload.vue';
 
 import { UI_CONSTANTS } from '../constants';
 
@@ -21,42 +18,11 @@ const photos = defineModel<UploadFileWithResponse[]>('value', {
 });
 
 const { t } = useI18n();
-const accessStore = useAccessStore();
-
-const uploadHeaders = computed(() => {
-  return {
-    Authorization: `Bearer ${accessStore.accessToken}`,
-  };
-});
 
 const maxImages = computed(
   () =>
     photos.value.length < (props?.maxCount ?? UI_CONSTANTS.MAX_UPLOAD_IMAGES),
 );
-
-interface UploadResponse {
-  code?: number;
-  data?: {
-    thumbUrl?: string;
-    url?: string;
-  };
-}
-
-function handleUploadChange(info: UploadChangeParam<UploadFile>) {
-  if (info.file.status === 'done') {
-    // Get URL from response
-    const response = info.file.response as undefined | UploadResponse;
-    if (response?.code === 0 && response.data?.url) {
-      info.file.url = response.data.url;
-      if (response.data.thumbUrl) {
-        info.file.thumbUrl = response.data.thumbUrl;
-      }
-    }
-    message.success(`${info.file.name} ${t('common.saveSuccess')}`);
-  } else if (info.file.status === 'error') {
-    message.error(`${info.file.name} ${t('common.loadFailed')}`);
-  }
-}
 </script>
 
 <template>
@@ -64,13 +30,10 @@ function handleUploadChange(info: UploadChangeParam<UploadFile>) {
     <label class="mb-1 block text-sm font-medium text-gray-700">
       {{ t('qms.inspection.issues.photos') }}
     </label>
-    <Upload
+    <QmsFileUpload
       v-model:file-list="photos"
-      action="/api/upload"
-      :headers="uploadHeaders"
       list-type="picture-card"
-      name="file"
-      @change="handleUploadChange"
+      :max-count="props?.maxCount ?? UI_CONSTANTS.MAX_UPLOAD_IMAGES"
     >
       <div v-if="maxImages">
         <span class="i-lucide-plus text-xl"></span>
@@ -78,6 +41,6 @@ function handleUploadChange(info: UploadChangeParam<UploadFile>) {
           {{ t('qms.inspection.issues.upload-image') }}
         </div>
       </div>
-    </Upload>
+    </QmsFileUpload>
   </div>
 </template>

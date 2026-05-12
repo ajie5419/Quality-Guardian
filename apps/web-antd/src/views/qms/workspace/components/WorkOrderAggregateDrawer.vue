@@ -34,6 +34,10 @@ import {
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import TeamSelect from '#/views/qms/inspection/records/components/form/TeamSelect.vue';
 import { getProcessOptions } from '#/views/qms/inspection/records/config';
+import {
+  applyUploadResponse,
+  normalizeUploadFile,
+} from '#/views/qms/shared/utils/upload-file';
 
 type RequirementFilter = 'all' | 'done' | 'overdue' | 'pending';
 
@@ -278,39 +282,13 @@ function normalizeAttachmentPayload(
   files: UploadFile[],
 ): WorkOrderRequirementAttachment[] {
   return files
-    .map((file) => {
-      const response = file.response as
-        | undefined
-        | {
-            data?: { thumbUrl?: string; url?: string };
-          };
-      const url = String(file.url || response?.data?.url || '').trim();
-      if (!url) return null;
-      return {
-        name: String(file.name || '').trim() || undefined,
-        thumbUrl:
-          String(file.thumbUrl || response?.data?.thumbUrl || '').trim() ||
-          undefined,
-        type: String(file.type || '').trim() || undefined,
-        url,
-      };
-    })
+    .map((file) => normalizeUploadFile(file, '附件'))
     .filter(Boolean) as WorkOrderRequirementAttachment[];
 }
 
 function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
   if (info.file.status === 'done') {
-    const response = info.file.response as
-      | undefined
-      | {
-          code?: number;
-          data?: { thumbUrl?: string; url?: string };
-        };
-    if (response?.code === 0 && response.data?.url) {
-      info.file.url = response.data.url;
-      if (response.data.thumbUrl) {
-        info.file.thumbUrl = response.data.thumbUrl;
-      }
+    if (applyUploadResponse(info.file)) {
       message.success(`${info.file.name} 上传成功`);
     } else {
       message.warning('附件上传完成，但未返回有效地址');

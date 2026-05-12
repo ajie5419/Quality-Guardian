@@ -50,6 +50,10 @@ import { getBomList } from '#/api/qms/planning';
 import { getWorkOrderRequirements } from '#/api/qms/work-order';
 import { getUserList } from '#/api/system/user';
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
+import {
+  applyUploadResponse,
+  normalizeUploadFileList,
+} from '#/views/qms/shared/utils/upload-file';
 
 import IssuePhotoUpload from '../issues/components/IssuePhotoUpload.vue';
 import {
@@ -411,53 +415,14 @@ function resetRequestForm() {
   requestForm.team = '';
 }
 
-function getFileExtension(fileName: string) {
-  const suffix = fileName.split('.').pop();
-  return suffix ? suffix.toLowerCase() : '';
-}
-
 function syncAttachmentsFromFiles(files: UploadFile[]) {
-  requestForm.attachments = files
-    .map((file) => {
-      const response = file.response as
-        | undefined
-        | {
-            data?: {
-              originalName?: string;
-              size?: number;
-              url?: string;
-            };
-          };
-      const url = String(file.url || response?.data?.url || '').trim();
-      if (!url) return null;
-
-      const name = String(
-        file.name || response?.data?.originalName || '报检单',
-      ).trim();
-      return {
-        name,
-        size: Number(file.size ?? response?.data?.size ?? 0),
-        type: getFileExtension(name),
-        url,
-      };
-    })
-    .filter(Boolean) as InspectionRequestAttachment[];
+  requestForm.attachments =
+    normalizeUploadFileList<InspectionRequestAttachment>(files, '报检单');
 }
 
 function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
   if (info.file.status === 'done') {
-    const response = info.file.response as
-      | undefined
-      | {
-          code?: number;
-          data?: {
-            originalName?: string;
-            size?: number;
-            url?: string;
-          };
-        };
-    if (response?.code === 0 && response.data?.url) {
-      info.file.url = response.data.url;
+    if (applyUploadResponse(info.file)) {
       message.success(`${info.file.name} 上传成功`);
     } else {
       message.warning('报检单上传完成，但未返回有效地址');
@@ -474,18 +439,7 @@ function handleCloseAttachmentUploadChange(
   info: UploadChangeParam<UploadFile>,
 ) {
   if (info.file.status === 'done') {
-    const response = info.file.response as
-      | undefined
-      | {
-          code?: number;
-          data?: {
-            originalName?: string;
-            size?: number;
-            url?: string;
-          };
-        };
-    if (response?.code === 0 && response.data?.url) {
-      info.file.url = response.data.url;
+    if (applyUploadResponse(info.file)) {
       message.success(`${info.file.name} 上传成功`);
     } else {
       message.warning('附件上传完成，但未返回有效地址');
@@ -495,31 +449,10 @@ function handleCloseAttachmentUploadChange(
   }
 
   closeAttachmentFileList.value = [...info.fileList];
-  closeForm.attachments = closeAttachmentFileList.value
-    .map((file) => {
-      const response = file.response as
-        | undefined
-        | {
-            data?: {
-              originalName?: string;
-              size?: number;
-              url?: string;
-            };
-          };
-      const url = String(file.url || response?.data?.url || '').trim();
-      if (!url) return null;
-
-      const name = String(
-        file.name || response?.data?.originalName || '附件',
-      ).trim();
-      return {
-        name,
-        size: Number(file.size ?? response?.data?.size ?? 0),
-        type: getFileExtension(name),
-        url,
-      };
-    })
-    .filter(Boolean) as InspectionRequestAttachment[];
+  closeForm.attachments = normalizeUploadFileList<InspectionRequestAttachment>(
+    closeAttachmentFileList.value,
+    '附件',
+  );
 }
 
 async function loadBomPartOptions(workOrderNumber: string) {

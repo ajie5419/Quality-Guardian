@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { SystemLogService } from '~/services/system-log.service';
 import { WelderScoreService } from '~/services/welder-score.service';
 import { logApiError } from '~/utils/api-logger';
@@ -67,6 +68,15 @@ export default defineEventHandler(async (event) => {
       where: { id },
       data: updateData,
     });
+
+    if (bodyRecord.photos !== undefined) {
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: bodyRecord.photos,
+        bizId: String(id),
+        bizType: 'inspection_issue',
+        fieldName: 'photos',
+      });
+    }
 
     await SystemLogService.recordAuditLog({
       userId: String(userinfo.id),

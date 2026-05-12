@@ -77,6 +77,11 @@ export interface UploadFileWithResponse extends Omit<UploadFile, 'response'> {
   response?: {
     code?: number;
     data?: {
+      fileId?: string;
+      originalName?: string;
+      size?: number;
+      thumbUrl?: string;
+      type?: string;
       url?: string;
     };
     message?: string;

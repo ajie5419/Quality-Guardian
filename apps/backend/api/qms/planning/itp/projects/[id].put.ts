@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { awaitMockDelay } from '~/utils/index';
@@ -31,6 +32,15 @@ export default defineEventHandler(async (event) => {
       where: { id },
       data: updateData,
     });
+
+    if ((body as Record<string, unknown>).documents !== undefined) {
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: (body as Record<string, unknown>).documents,
+        bizId: String(id),
+        bizType: 'quality_plan',
+        fieldName: 'documents',
+      });
+    }
 
     await recordBusinessAuditLog(event, {
       userId: userinfo?.id,
