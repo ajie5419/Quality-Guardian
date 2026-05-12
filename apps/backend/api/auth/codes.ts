@@ -31,7 +31,14 @@ export default eventHandler(async (event) => {
     await ensureInspectionRequestMenu();
     await ensureMetrologyMenu();
     const codes = await RbacService.getUserPermissionCodes(String(userId));
-    return useResponseSuccess(codes);
+    const normalizedCodes = new Set(codes);
+    if (
+      normalizedCodes.has('QMS:Inspection:Requests:Close') ||
+      normalizedCodes.has('QMS:Inspection:Requests:Dispatch')
+    ) {
+      normalizedCodes.add('QMS:Inspection:Requests:List');
+    }
+    return useResponseSuccess([...normalizedCodes]);
   } catch (error) {
     logApiError('codes', error);
     setResponseStatus(event, 500);
