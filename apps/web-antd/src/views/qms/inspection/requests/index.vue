@@ -290,6 +290,11 @@ const processOptions = computed(() => {
 const requestEntryUrl = computed(() =>
   buildRequestUrl({ entry: 'submit' }, '/qms/inspection/requests/entry'),
 );
+const routeDispatchRequestId = computed(() =>
+  String(
+    route.query.dispatchRequestId || route.query.closeRequestId || '',
+  ).trim(),
+);
 const pendingDispatchCount = computed(
   () => requests.value.filter((item) => item.status === 'SUBMITTED').length,
 );
@@ -558,7 +563,7 @@ async function loadRequests() {
     });
     requests.value = res.items || [];
     total.value = res.total || 0;
-    openCloseFromRoute();
+    openDispatchDetailFromRoute();
   } finally {
     loading.value = false;
   }
@@ -621,6 +626,11 @@ function openDispatchDetail(record: InspectionRequest) {
   dispatchDetailOpen.value = true;
 }
 
+function openCloseFromDispatchDetail() {
+  if (!currentRequest.value) return;
+  openClose(currentRequest.value);
+}
+
 async function submitDispatch() {
   if (!currentRequest.value || !dispatchForm.inspectorId) {
     message.warning('请选择检验员');
@@ -643,8 +653,8 @@ async function submitDispatch() {
 }
 
 function deleteDisabledReason(record: InspectionRequest) {
+  void record;
   if (!canDelete.value) return '无删除权限';
-  if (record.status === 'CLOSED') return '检验完成的任务不能删除';
   return '';
 }
 
@@ -705,7 +715,9 @@ function openClose(record: InspectionRequest) {
 
 async function openCloseQr(record: InspectionRequest) {
   currentRequest.value = record;
-  closeQr.value = await makeQr(buildRequestUrl({ closeRequestId: record.id }));
+  closeQr.value = await makeQr(
+    buildRequestUrl({ dispatchRequestId: record.id }),
+  );
   closeQrOpen.value = true;
 }
 
@@ -755,18 +767,18 @@ function applyRoutePrefill() {
   requestForm.processName = String(route.query.processName || '');
   requestForm.reporter = String(route.query.reporter || '');
   requestForm.team = String(route.query.team || '');
-  const closeRequestId = String(route.query.closeRequestId || '').trim();
-  if (closeRequestId) {
-    query.keyword = closeRequestId;
+  if (routeDispatchRequestId.value) {
+    query.keyword = routeDispatchRequestId.value;
   }
 }
 
-function openCloseFromRoute() {
-  const closeRequestId = String(route.query.closeRequestId || '').trim();
-  if (!closeRequestId || closeOpen.value) return;
-  const matched = requests.value.find((item) => item.id === closeRequestId);
+function openDispatchDetailFromRoute() {
+  if (!routeDispatchRequestId.value || dispatchDetailOpen.value) return;
+  const matched = requests.value.find(
+    (item) => item.id === routeDispatchRequestId.value,
+  );
   if (matched) {
-    openClose(matched);
+    openDispatchDetail(matched);
   }
 }
 
@@ -1245,6 +1257,21 @@ watch(
           {{ currentRequest.dispatchRemark || '-' }}
         </Descriptions.Item>
       </Descriptions>
+      <div
+        v-if="currentRequest"
+        class="mt-4 flex justify-end border-t border-gray-100 pt-4"
+      >
+        <Button
+          type="primary"
+          :disabled="currentRequest.status === 'CLOSED'"
+          @click="openCloseFromDispatchDetail"
+        >
+          <template #icon>
+            <IconifyIcon icon="lucide:check-circle" />
+          </template>
+          完成检验
+        </Button>
+      </div>
     </Drawer>
 
     <Modal
