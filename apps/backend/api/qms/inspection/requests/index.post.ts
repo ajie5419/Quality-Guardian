@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import {
@@ -89,6 +90,12 @@ export default defineEventHandler(async (event) => {
         dispatcher: { select: { realName: true, username: true } },
         inspector: { select: { realName: true, username: true } },
       },
+    });
+
+    await FileStorageService.registerReferencesFromAttachments({
+      attachments,
+      bizId: created.id,
+      bizType: 'inspection_request',
     });
 
     await recordBusinessAuditLog(event, {

@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -136,6 +137,13 @@ export default defineEventHandler(async (event) => {
           workOrderNumber === undefined ? undefined : workOrderNumber,
       },
     });
+    if (body.attachments !== undefined) {
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: body.attachments,
+        bizId: id,
+        bizType: 'inspection_form_template',
+      });
+    }
     return useResponseSuccess(updated);
   } catch (error) {
     if (isPrismaSchemaMismatchError(error)) {

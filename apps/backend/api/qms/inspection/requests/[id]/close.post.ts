@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 
 import { defineEventHandler, readBody } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import {
@@ -268,6 +269,22 @@ export default defineEventHandler(async (event) => {
 
       return { issue: issueRecord, record };
     });
+
+    await FileStorageService.registerReferencesFromAttachments({
+      attachments: closeAttachments,
+      bizId: String(updated.id),
+      bizType: 'inspection_request',
+      fieldName: 'closeAttachments',
+    });
+
+    if (issue && linkedIssue?.photos !== undefined) {
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: linkedIssue.photos,
+        bizId: String(issue.id),
+        bizType: 'inspection_issue',
+        fieldName: 'photos',
+      });
+    }
 
     if (issue) {
       const { SystemLogService } = await import(

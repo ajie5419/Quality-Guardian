@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { SystemLogService } from '~/services/system-log.service';
 import { buildAfterSalesUpdateData } from '~/utils/after-sales-payload';
 import { logApiError } from '~/utils/api-logger';
@@ -52,6 +53,15 @@ export default defineEventHandler(async (event) => {
       where: { id },
       data: updateData,
     });
+
+    if (bodyRecord.photos !== undefined) {
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: bodyRecord.photos,
+        bizId: String(id),
+        bizType: 'after_sales',
+        fieldName: 'photos',
+      });
+    }
 
     await SystemLogService.recordAuditLog({
       userId: String(userinfo.id),

@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -76,6 +77,16 @@ export default defineEventHandler(async (event) => {
             requirementName: true,
             workOrderNumber: true,
           },
+        }),
+      ),
+    );
+
+    await Promise.all(
+      created.map((item, index) =>
+        FileStorageService.registerReferencesFromAttachments({
+          attachments: normalized[index]?.attachments,
+          bizId: item.id,
+          bizType: 'work_order_requirement',
         }),
       ),
     );

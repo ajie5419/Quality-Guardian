@@ -12,6 +12,7 @@ import {
   QMS_STATUS_OPEN_SET,
   tryParsePhotos,
 } from '@qgs/shared';
+import { FileStorageService } from '~/services/file-storage.service';
 import { buildAfterSalesDateRange } from '~/utils/after-sales-query';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -608,6 +609,11 @@ export const AfterSalesService = {
         isDeleted: true,
         updatedAt: new Date(),
       },
+    });
+
+    await FileStorageService.softDeleteReferences({
+      bizId: id,
+      bizType: 'after_sales',
     });
 
     // Record audit log

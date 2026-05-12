@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { parseNonEmptyIdList } from '~/utils/id-list';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -33,6 +34,14 @@ export default defineEventHandler(async (event) => {
         updatedAt: new Date(),
       },
     });
+    await Promise.all(
+      ids.map((id) =>
+        FileStorageService.softDeleteReferences({
+          bizId: id,
+          bizType: 'after_sales',
+        }),
+      ),
+    );
 
     return useResponseSuccess({ successCount: result.count });
   } catch (error) {

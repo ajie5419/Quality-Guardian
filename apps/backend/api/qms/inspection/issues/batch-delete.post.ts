@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { WelderScoreService } from '~/services/welder-score.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
@@ -38,6 +39,14 @@ export default defineEventHandler(async (event) => {
     if (result.count > 0) {
       await WelderScoreService.syncFromInspectionIssues();
     }
+    await Promise.all(
+      ids.map((id) =>
+        FileStorageService.softDeleteReferences({
+          bizId: id,
+          bizType: 'inspection_issue',
+        }),
+      ),
+    );
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
       action: 'DELETE',

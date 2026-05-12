@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -32,6 +33,10 @@ export default defineEventHandler(async (event) => {
         updatedAt: new Date(),
         updatedBy: userinfo.username,
       },
+    });
+    await FileStorageService.softDeleteReferences({
+      bizId: String(id),
+      bizType: 'inspection_form_template',
     });
 
     return useResponseSuccess({ message: 'Deleted' });

@@ -1,5 +1,6 @@
 import { QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { SystemLogService } from '~/services/system-log.service';
 import {
   createAfterSalesId,
@@ -38,6 +39,13 @@ export default defineEventHandler(async (event) => {
         id: createAfterSalesId(),
         serialNumber,
       }),
+    });
+
+    await FileStorageService.registerReferencesFromAttachments({
+      attachments: body.photos,
+      bizId: String(newItem.id),
+      bizType: 'after_sales',
+      fieldName: 'photos',
     });
 
     await SystemLogService.recordAuditLog({

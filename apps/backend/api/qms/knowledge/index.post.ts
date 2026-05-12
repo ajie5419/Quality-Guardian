@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { buildKnowledgeCreateData } from '~/utils/knowledge';
@@ -45,6 +46,12 @@ export default defineEventHandler(async (event) => {
           username: userinfo.username,
         },
       ),
+    });
+
+    await FileStorageService.registerReferencesFromAttachments({
+      attachments: body.attachments,
+      bizId: newItem.id,
+      bizType: 'knowledge_base',
     });
 
     return useResponseSuccess(newItem);

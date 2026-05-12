@@ -4,6 +4,7 @@ import { extname, relative, resolve } from 'node:path';
 
 import { defineEventHandler, setResponseStatus } from 'h3';
 import sharp from 'sharp';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { UPLOAD_DIR } from '~/utils/paths';
 import { useResponseError } from '~/utils/response';
@@ -90,6 +91,19 @@ export default defineEventHandler(async (event) => {
   await ensureThumbnailIfNeeded(filename, filePath);
 
   if (!existsSync(filePath)) {
+    const managedFile =
+      await FileStorageService.getFileBufferByStoredName(filename);
+    if (managedFile) {
+      event.node.res.setHeader('Content-Type', managedFile.mimeType);
+      event.node.res.setHeader('Content-Length', managedFile.buffer.length);
+      event.node.res.setHeader(
+        'Cache-Control',
+        'public, max-age=31536000, immutable',
+      );
+      event.node.res.setHeader('Access-Control-Allow-Origin', '*');
+      return managedFile.buffer;
+    }
+
     // Log absolute path to help identify shared DB vs local storage discrepancies
     console.error(`[Serving] File not found at absolute path: ${filePath}`);
     setResponseStatus(event, 404);

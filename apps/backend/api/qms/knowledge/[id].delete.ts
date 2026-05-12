@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3';
+import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -26,6 +27,10 @@ export default defineEventHandler(async (event) => {
     await prisma.knowledge_base.update({
       where: { id },
       data: { isDeleted: true },
+    });
+    await FileStorageService.softDeleteReferences({
+      bizId: String(id),
+      bizType: 'knowledge_base',
     });
 
     return useResponseSuccess(null);

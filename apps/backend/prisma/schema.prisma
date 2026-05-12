@@ -530,6 +530,48 @@ model standard_documents {
   @@index([isDeleted])
 }
 
+model file_assets {
+  id              String            @id @default(cuid())
+  storageProvider String            @default("LOCAL")
+  bucket          String?
+  objectKey       String
+  originalName    String
+  storedName      String
+  mimeType        String
+  size            Int
+  sha256          String
+  url             String
+  thumbObjectKey  String?
+  thumbUrl        String?
+  status          file_asset_status @default(ACTIVE)
+  uploadedBy      String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+  references      file_references[]
+
+  @@index([storageProvider])
+  @@index([objectKey])
+  @@index([sha256])
+  @@index([status])
+  @@index([uploadedBy])
+}
+
+model file_references {
+  id        String      @id @default(cuid())
+  fileId    String
+  bizType   String
+  bizId     String
+  fieldName String      @default("attachments")
+  sortOrder Int         @default(0)
+  createdAt DateTime    @default(now())
+  file      file_assets @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([fileId])
+  @@index([bizType, bizId])
+  @@index([fieldName])
+}
+
 model suppliers {
   id              String   @id @default(cuid())
   category        String?
@@ -946,6 +988,12 @@ enum quality_records_status {
   RESOLVED
   CLOSED
   CLAIMING
+}
+
+enum file_asset_status {
+  ACTIVE
+  DELETED
+  MISSING
 }
 
 enum after_sales_claimStatus {

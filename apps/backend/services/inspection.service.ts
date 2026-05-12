@@ -9,6 +9,7 @@ import process from 'node:process';
 
 import { Prisma } from '@prisma/client';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
+import { FileStorageService } from '~/services/file-storage.service';
 import { resolveInspectionFormProcessCandidates } from '~/utils/inspection-form';
 import { buildInspectionIssueDateRange } from '~/utils/inspection-issue';
 import { createModuleLogger } from '~/utils/logger';
@@ -1974,6 +1975,10 @@ export const InspectionService = {
         isDeleted: true,
         updatedAt: new Date(),
       },
+    });
+    await FileStorageService.softDeleteReferences({
+      bizId: id,
+      bizType: 'inspection_issue',
     });
     await WelderScoreService.syncFromInspectionIssues();
 

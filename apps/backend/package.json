@@ -24,6 +24,9 @@
     "db:migrate-itp-to-forms": "node prisma/migrate-itp-to-inspection-forms.js",
     "db:migrate-inspection-requests": "node prisma/migrate-inspection-requests.mjs",
     "db:migrate-bom-inspection-processes": "node prisma/migrate-bom-inspection-processes.mjs",
+    "db:migrate-file-center": "node prisma/migrate-file-center.mjs",
+    "db:backfill-file-references": "node prisma/backfill-file-references.mjs",
+    "db:register-local-files": "node prisma/register-local-files.mjs",
     "db:inspection-quantity-backfill": "node prisma/inspection-quantity-backfill.js",
     "db:rbac:check": "node prisma/rbac-consistency-check.js",
     "db:studio": "prisma studio"
@@ -31,6 +34,7 @@
   "dependencies": {
     "@prisma/client": "6.2.1",
     "@qgs/shared": "workspace:*",
+    "ali-oss": "^6.23.0",
     "bcrypt": "^6.0.0",
     "ioredis": "^5.9.2",
     "jsonwebtoken": "catalog:",
