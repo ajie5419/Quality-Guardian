@@ -80,7 +80,8 @@ async function main() {
     return;
   }
 
-  const filenames = (await readdir(uploadDir)).filter(
+  const uploadDirEntries = await readdir(uploadDir);
+  const filenames = uploadDirEntries.filter(
     (name) => !name.endsWith('_thumb.webp'),
   );
   let created = 0;

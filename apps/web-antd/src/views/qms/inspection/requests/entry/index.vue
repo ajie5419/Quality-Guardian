@@ -161,7 +161,7 @@ async function loadTeamOptions(keyword = '') {
 
 function syncAttachmentsFromFiles(files: UploadFile[]) {
   requestForm.attachments =
-    normalizeUploadFileList<InspectionRequestAttachment>(files, '报检单');
+    normalizeUploadFileList<InspectionRequestAttachment>(files, '自检记录');
 }
 
 function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
@@ -169,7 +169,7 @@ function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
     if (applyUploadResponse(info.file)) {
       message.success(`${info.file.name} 上传成功`);
     } else {
-      message.warning('报检单上传完成，但未返回有效地址');
+      message.warning('自检记录上传完成，但未返回有效地址');
     }
   } else if (info.file.status === 'error') {
     message.error(`${info.file.name} 上传失败`);
@@ -262,7 +262,7 @@ async function submitRequest() {
     requestForm.attachments.length === 0
   ) {
     message.warning(
-      '工单号、部件名称、工序、数量、班组、报检人、报检单不能为空',
+      '工单号、部件名称、工序、数量、班组、报检人、自检记录不能为空',
     );
     return;
   }
@@ -424,7 +424,7 @@ watch(
               placeholder="请输入补充说明"
             />
           </Form.Item>
-          <Form.Item label="报检单" required>
+          <Form.Item label="自检记录" required>
             <Upload
               v-model:file-list="attachmentFileList"
               action="/api/upload"
@@ -435,7 +435,7 @@ watch(
                 <template #icon>
                   <IconifyIcon icon="lucide:upload" />
                 </template>
-                上传报检单
+                上传自检记录
               </Button>
             </Upload>
           </Form.Item>

@@ -15,6 +15,7 @@ import type { SystemUserApi } from '#/api/system/user';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 import { $t } from '@vben/locales';
@@ -43,6 +44,7 @@ import QRCode from 'qrcode';
 import {
   closeInspectionRequest,
   createInspectionRequest,
+  deleteInspectionRequest,
   dispatchInspectionRequest,
   getInspectionRequests,
 } from '#/api/qms/inspection-request';
@@ -70,6 +72,7 @@ defineOptions({ name: 'QMSInspectionRequests' });
 const route = useRoute();
 const router = useRouter();
 const accessStore = useAccessStore();
+const { hasAccessByCodes } = useAccess();
 const loading = ref(false);
 const submitting = ref(false);
 const requests = ref<InspectionRequest[]>([]);
@@ -199,12 +202,12 @@ function validateCloseForm() {
   }
 
   if (closeForm.attachments.length === 0) {
-    message.warning('关闭附件不能为空');
+    message.warning('检验记录不能为空');
     return false;
   }
 
   if (hasBlockingCloseAttachmentState()) {
-    message.warning('关闭附件仍在上传或上传失败，请处理后再完成检验');
+    message.warning('检验记录仍在上传或上传失败，请处理后再完成检验');
     return false;
   }
 
@@ -293,6 +296,9 @@ const pendingDispatchCount = computed(
 const pendingInspectionCount = computed(
   () => requests.value.filter((item) => item.status === 'DISPATCHED').length,
 );
+const canDelete = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Requests:Delete']),
+);
 
 function statusColor(status: InspectionRequestStatus) {
   if (status === 'CLOSED') return 'success';
@@ -313,7 +319,20 @@ function checkResultLabel(result: InspectionRequestCheckResult) {
 
 function formatDateTime(value?: null | string) {
   if (!value) return '-';
-  return value.includes('T') ? value.slice(0, 19).replace('T', ' ') : value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return new Intl.DateTimeFormat('zh-CN', {
+    day: '2-digit',
+    hour: '2-digit',
+    hour12: false,
+    minute: '2-digit',
+    month: '2-digit',
+    second: '2-digit',
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+  })
+    .format(date)
+    .replaceAll('/', '-');
 }
 
 function durationText(start?: null | string, end?: null | string) {
@@ -417,7 +436,7 @@ function resetRequestForm() {
 
 function syncAttachmentsFromFiles(files: UploadFile[]) {
   requestForm.attachments =
-    normalizeUploadFileList<InspectionRequestAttachment>(files, '报检单');
+    normalizeUploadFileList<InspectionRequestAttachment>(files, '自检记录');
 }
 
 function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
@@ -425,7 +444,7 @@ function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
     if (applyUploadResponse(info.file)) {
       message.success(`${info.file.name} 上传成功`);
     } else {
-      message.warning('报检单上传完成，但未返回有效地址');
+      message.warning('自检记录上传完成，但未返回有效地址');
     }
   } else if (info.file.status === 'error') {
     message.error(`${info.file.name} 上传失败`);
@@ -442,7 +461,7 @@ function handleCloseAttachmentUploadChange(
     if (applyUploadResponse(info.file)) {
       message.success(`${info.file.name} 上传成功`);
     } else {
-      message.warning('附件上传完成，但未返回有效地址');
+      message.warning('检验记录上传完成，但未返回有效地址');
     }
   } else if (info.file.status === 'error') {
     message.error(`${info.file.name} 上传失败`);
@@ -451,7 +470,7 @@ function handleCloseAttachmentUploadChange(
   closeAttachmentFileList.value = [...info.fileList];
   closeForm.attachments = normalizeUploadFileList<InspectionRequestAttachment>(
     closeAttachmentFileList.value,
-    '附件',
+    '检验记录',
   );
 }
 
@@ -561,7 +580,7 @@ async function submitRequest() {
     requestForm.attachments.length === 0
   ) {
     message.warning(
-      '工单号、部件名称、工序、数量、班组、报检人、报检单不能为空',
+      '工单号、部件名称、工序、数量、班组、报检人、自检记录不能为空',
     );
     return;
   }
@@ -621,6 +640,32 @@ async function submitDispatch() {
   } finally {
     submitting.value = false;
   }
+}
+
+function deleteDisabledReason(record: InspectionRequest) {
+  if (!canDelete.value) return '无删除权限';
+  if (record.status === 'CLOSED') return '检验完成的任务不能删除';
+  return '';
+}
+
+function confirmDelete(record: InspectionRequest) {
+  const disabledReason = deleteDisabledReason(record);
+  if (disabledReason) {
+    message.warning(disabledReason);
+    return;
+  }
+
+  Modal.confirm({
+    content: `删除后任务会从列表隐藏，关联派单任务会同步取消：${record.requestNo}`,
+    okText: '删除',
+    okType: 'danger',
+    title: '删除报检任务',
+    async onOk() {
+      await deleteInspectionRequest(record.id);
+      message.success('报检任务已删除');
+      await loadRequests();
+    },
+  });
 }
 
 function openClose(record: InspectionRequest) {
@@ -832,7 +877,7 @@ watch(
           <Form.Item label="报检信息">
             <Input.TextArea v-model:value="requestForm.requestInfo" :rows="4" />
           </Form.Item>
-          <Form.Item label="报检单" required>
+          <Form.Item label="自检记录" required>
             <Upload
               v-model:file-list="attachmentFileList"
               action="/api/upload"
@@ -844,7 +889,7 @@ watch(
                 <template #icon>
                   <IconifyIcon icon="lucide:upload" />
                 </template>
-                上传报检单
+                上传自检记录
               </Button>
             </Upload>
           </Form.Item>
@@ -1057,6 +1102,18 @@ watch(
                   </template>
                   完成
                 </Button>
+                <Button
+                  v-if="canDelete"
+                  danger
+                  size="small"
+                  :disabled="Boolean(deleteDisabledReason(record))"
+                  @click="confirmDelete(record)"
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:trash-2" />
+                  </template>
+                  删除
+                </Button>
               </Space>
             </template>
           </Table.Column>
@@ -1150,13 +1207,30 @@ watch(
           </Button>
           <span v-else>-</span>
         </Descriptions.Item>
-        <Descriptions.Item label="报检单">
+        <Descriptions.Item label="自检记录">
           <div
             v-if="currentRequest.attachments?.length"
             class="flex flex-col gap-1"
           >
             <a
               v-for="file in currentRequest.attachments"
+              :key="file.url"
+              :href="file.url"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ file.name }}
+            </a>
+          </div>
+          <span v-else>-</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="检验记录">
+          <div
+            v-if="currentRequest.closeAttachments?.length"
+            class="flex flex-col gap-1"
+          >
+            <a
+              v-for="file in currentRequest.closeAttachments"
               :key="file.url"
               :href="file.url"
               target="_blank"
@@ -1227,7 +1301,7 @@ watch(
             />
           </Form.Item>
         </div>
-        <Form.Item label="关闭附件">
+        <Form.Item label="检验记录">
           <Upload
             v-model:file-list="closeAttachmentFileList"
             action="/api/upload"
@@ -1239,7 +1313,7 @@ watch(
               <template #icon>
                 <IconifyIcon icon="lucide:upload" />
               </template>
-              上传附件（检验报告等）
+              上传检验记录
             </Button>
           </Upload>
         </Form.Item>

@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
   ) {
     return badRequestResponse(
       event,
-      '工单号、部件名称、工序、班组、报检人、报检单不能为空',
+      '工单号、部件名称、工序、班组、报检人、自检记录不能为空',
     );
   }
 

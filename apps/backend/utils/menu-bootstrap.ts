@@ -47,6 +47,12 @@ const INSPECTION_REQUEST_BUTTONS = [
     order: 3,
     title: '关闭',
   },
+  {
+    authCode: 'QMS:Inspection:Requests:Delete',
+    name: 'QMSInspectionRequestsDelete',
+    order: 4,
+    title: '删除',
+  },
 ] as const;
 
 const FILE_CENTER_BUTTONS = [

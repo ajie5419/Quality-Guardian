@@ -48,7 +48,7 @@ function validateCloseRequestBody(body: Record<string, unknown>) {
     body.attachments,
   );
   if (closeAttachments.length === 0) {
-    throw new Error('VALIDATION:关闭附件不能为空');
+    throw new Error('VALIDATION:检验记录不能为空');
   }
 
   const quantity = parseInspectionRequestQuantity(body.quantity);

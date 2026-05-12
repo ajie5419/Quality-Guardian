@@ -99,3 +99,7 @@ export async function closeInspectionRequest(
     data,
   );
 }
+
+export async function deleteInspectionRequest(id: string) {
+  return requestClient.delete(`${QMS_API.INSPECTION_REQUESTS}/${id}`);
+}
