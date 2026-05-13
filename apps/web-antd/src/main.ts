@@ -3,30 +3,9 @@ import { unmountGlobalLoading } from '@vben/utils';
 
 import { overridesPreferences } from './preferences';
 import { setupClientLogger } from './utils/client-logger';
+import { redirectLegacyHashRoute } from './utils/router-redirect';
 
-const PUBLIC_ENTRY_PATHS = new Set([
-  '/qms/inspection/requests/entry',
-  '/qms/metrology/borrow/entry',
-]);
-
-function redirectLegacyPublicEntryPath() {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  if (import.meta.env.VITE_ROUTER_HISTORY !== 'hash') {
-    return;
-  }
-
-  if (!PUBLIC_ENTRY_PATHS.has(window.location.pathname)) {
-    return;
-  }
-
-  const target = `${window.location.origin}/#${window.location.pathname}${window.location.search}`;
-  window.location.replace(target);
-}
-
-redirectLegacyPublicEntryPath();
+redirectLegacyHashRoute();
 
 // 启动客户端错误记录
 setupClientLogger();

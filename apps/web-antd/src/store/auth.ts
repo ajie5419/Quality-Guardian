@@ -14,6 +14,7 @@ import { defineStore } from 'pinia';
 
 import { getAccessCodesApi, getUserInfoApi, loginApi, logoutApi } from '#/api';
 import { $t } from '#/locales';
+import { normalizeHashRedirectPath } from '#/utils/router-redirect';
 
 export const useAuthStore = defineStore('auth', () => {
   const accessStore = useAccessStore();
@@ -63,7 +64,7 @@ export const useAuthStore = defineStore('auth', () => {
               | undefined;
             await router.push(
               redirectPath
-                ? decodeURIComponent(redirectPath)
+                ? normalizeHashRedirectPath(decodeURIComponent(redirectPath))
                 : userInfo.homePath || preferences.app.defaultHomePath,
             );
           }

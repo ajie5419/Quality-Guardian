@@ -505,11 +505,17 @@ function buildRequestUrl(
     typeof window === 'undefined'
       ? 'http://localhost:5666'
       : window.location.origin;
-  const url = new URL(path, origin);
+  const routePath = path.startsWith('/') ? path : `/${path}`;
+  const routeUrl = new URL(routePath, origin);
   for (const [key, value] of Object.entries(params)) {
-    if (value) url.searchParams.set(key, value);
+    if (value) routeUrl.searchParams.set(key, value);
   }
-  return url.toString();
+
+  if (import.meta.env.VITE_ROUTER_HISTORY === 'hash') {
+    return `${origin}/#${routeUrl.pathname}${routeUrl.search}`;
+  }
+
+  return routeUrl.toString();
 }
 
 async function makeQr(url: string) {
