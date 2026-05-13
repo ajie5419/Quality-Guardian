@@ -8,6 +8,8 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+const INSPECTION_EXECUTION_CODES = new Set(['QMS:Inspection:Requests:Close']);
+
 function getShanghaiTodayRange(now = new Date()) {
   const shanghaiDate = new Intl.DateTimeFormat('en-CA', {
     day: '2-digit',
@@ -26,6 +28,22 @@ function durationMinutes(start: Date, end: Date) {
   return Math.floor(diff / 60_000);
 }
 
+function parsePermissionCodes(raw?: null | string) {
+  if (!raw) return [] as string[];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : [];
+  } catch {
+    return [] as string[];
+  }
+}
+
+function hasInspectionExecutionCode(codes: string[]) {
+  return codes.some((code) => INSPECTION_EXECUTION_CODES.has(code));
+}
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
@@ -40,6 +58,7 @@ export default defineEventHandler(async (event) => {
       activeInspectorRequests,
       pendingDispatchCount,
       pendingInspectionCount,
+      activeUsers,
     ] = await Promise.all([
       prisma.qms_inspection_requests.findMany({
         include: {
@@ -69,6 +88,40 @@ export default defineEventHandler(async (event) => {
       prisma.qms_inspection_requests.count({
         where: { isDeleted: false, status: 'DISPATCHED' },
       }),
+      prisma.users.findMany({
+        where: { isDeleted: false, status: 'ACTIVE' },
+        select: {
+          id: true,
+          realName: true,
+          username: true,
+          roles: {
+            select: {
+              name: true,
+              permissions: true,
+              rbac_role_permissions: {
+                select: {
+                  permission: { select: { code: true } },
+                },
+              },
+            },
+          },
+          rbac_user_roles: {
+            select: {
+              role: {
+                select: {
+                  name: true,
+                  permissions: true,
+                  rbac_role_permissions: {
+                    select: {
+                      permission: { select: { code: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
     ]);
 
     const now = new Date();
@@ -84,6 +137,51 @@ export default defineEventHandler(async (event) => {
         totalTaskMinutes: number;
       }
     >();
+
+    function createInspectorStatus(inspector: string) {
+      return {
+        activeTaskCount: 0,
+        averageTaskMinutes: 0,
+        completedTaskCount: 0,
+        currentTaskMinutes: 0,
+        inspector,
+        status: 'IDLE' as const,
+        totalTaskMinutes: 0,
+      };
+    }
+
+    function collectRolePermissionCodes(role?: {
+      name?: null | string;
+      permissions?: null | string;
+      rbac_role_permissions?: Array<{
+        permission?: null | { code?: null | string };
+      }>;
+    }) {
+      if (!role) return [] as string[];
+      return [
+        ...parsePermissionCodes(role.permissions),
+        ...(role.rbac_role_permissions || [])
+          .map((item) => item.permission?.code || '')
+          .filter(Boolean),
+      ];
+    }
+
+    function isInspectorUser(user: (typeof activeUsers)[number]) {
+      const roles = [
+        user.roles,
+        ...user.rbac_user_roles.map((link) => link.role).filter(Boolean),
+      ];
+      return roles.some((role) =>
+        hasInspectionExecutionCode(collectRolePermissionCodes(role)),
+      );
+    }
+
+    for (const user of activeUsers.filter((item) => isInspectorUser(item))) {
+      inspectorStatusMap.set(
+        user.id,
+        createInspectorStatus(user.realName || user.username || '未记录检验员'),
+      );
+    }
 
     function resolveInspectorKey(item: (typeof todayRequests)[number]) {
       return (
@@ -104,15 +202,7 @@ export default defineEventHandler(async (event) => {
       const key = resolveInspectorKey(item);
       const existing = inspectorStatusMap.get(key);
       if (existing) return existing;
-      const created = {
-        activeTaskCount: 0,
-        averageTaskMinutes: 0,
-        completedTaskCount: 0,
-        currentTaskMinutes: 0,
-        inspector: resolveInspectorName(item),
-        status: 'IDLE' as const,
-        totalTaskMinutes: 0,
-      };
+      const created = createInspectorStatus(resolveInspectorName(item));
       inspectorStatusMap.set(key, created);
       return created;
     }

@@ -24,7 +24,6 @@ import { useAccessStore, useUserStore } from '@vben/stores';
 import {
   Button,
   Card,
-  Descriptions,
   Drawer,
   Dropdown,
   Form,
@@ -316,8 +315,8 @@ const canDelete = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Requests:Delete']),
 );
 const topTeamStats = computed(() => requestStats.value.byTeam.slice(0, 4));
-const topInspectorStatus = computed(() =>
-  requestStats.value.inspectorStatus.slice(0, 4),
+const visibleInspectorStatus = computed(
+  () => requestStats.value.inspectorStatus,
 );
 
 function statusColor(status: InspectionRequestStatus) {
@@ -1123,9 +1122,12 @@ watch(
                   {{ requestStats.inspectorStatus.length }} 人
                 </div>
               </div>
-              <div v-if="topInspectorStatus.length > 0" class="mt-2 space-y-1">
+              <div
+                v-if="visibleInspectorStatus.length > 0"
+                class="mt-2 max-h-36 space-y-1 overflow-y-auto pr-1"
+              >
                 <div
-                  v-for="item in topInspectorStatus"
+                  v-for="item in visibleInspectorStatus"
                   :key="item.inspector"
                   class="grid grid-cols-[minmax(0,1fr)_auto] gap-2 text-xs"
                 >
@@ -1139,6 +1141,9 @@ watch(
                         "
                       >
                         {{ item.status === 'BUSY' ? '有任务' : '空闲' }}
+                      </Tag>
+                      <Tag v-if="item.completedTaskCount > 0" color="success">
+                        已完成检验
                       </Tag>
                     </div>
                     <div class="truncate text-emerald-700">
@@ -1390,128 +1395,202 @@ watch(
     <Drawer
       v-model:open="dispatchDetailOpen"
       title="派单详情"
-      :width="620"
+      width="min(100vw, 620px)"
       placement="right"
+      :body-style="{ padding: 0 }"
     >
-      <Descriptions v-if="currentRequest" bordered :column="1" size="small">
-        <Descriptions.Item label="报检单号">
-          {{ currentRequest.requestNo }}
-        </Descriptions.Item>
-        <Descriptions.Item label="工单号">
-          {{ currentRequest.workOrderNumber }}
-        </Descriptions.Item>
-        <Descriptions.Item label="部件 / 工序">
-          {{ currentRequest.partName }} / {{ currentRequest.processName }}
-        </Descriptions.Item>
-        <Descriptions.Item label="数量">
-          {{ currentRequest.quantity || 1 }}
-        </Descriptions.Item>
-        <Descriptions.Item label="状态">
-          <Tag :color="statusColor(currentRequest.status)">
-            {{ statusLabel(currentRequest.status) }}
-          </Tag>
-        </Descriptions.Item>
-        <Descriptions.Item label="报检人">
-          {{ currentRequest.reporter }}
-        </Descriptions.Item>
-        <Descriptions.Item label="报检时间">
-          {{ formatDateTime(currentRequest.submittedAt) }}
-        </Descriptions.Item>
-        <Descriptions.Item label="班组">
-          {{ currentRequest.team || '-' }}
-        </Descriptions.Item>
-        <Descriptions.Item label="调度人">
-          <span :class="missingValueClass(currentRequest.dispatcherName)">
-            {{ displayDispatcher(currentRequest) }}
-          </span>
-        </Descriptions.Item>
-        <Descriptions.Item label="检验员">
-          <span :class="missingValueClass(currentRequest.inspectorName)">
-            {{ displayInspector(currentRequest) }}
-          </span>
-        </Descriptions.Item>
-        <Descriptions.Item label="派单任务 ID">
-          <span :class="missingValueClass(currentRequest.dispatchTaskId)">
-            {{ currentRequest.dispatchTaskId || '-' }}
-          </span>
-        </Descriptions.Item>
-        <Descriptions.Item label="派单时间">
-          <span :class="directClosedClass(currentRequest)">
-            {{ displayDispatchTime(currentRequest) }}
-          </span>
-        </Descriptions.Item>
-        <Descriptions.Item label="等待派单时长">
-          {{ waitDuration(currentRequest) }}
-        </Descriptions.Item>
-        <Descriptions.Item
-          :label="`${executionDurationLabel(currentRequest)}时长`"
-        >
-          <span :class="directClosedClass(currentRequest)">
-            {{ displayExecutionDuration(currentRequest) }}
-          </span>
-        </Descriptions.Item>
-        <Descriptions.Item label="关联检验记录">
+      <div v-if="currentRequest" class="flex min-h-full flex-col bg-gray-50">
+        <div class="flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
+          <div class="rounded border border-blue-100 bg-white p-3">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="truncate text-base font-semibold text-gray-900">
+                  {{ currentRequest.requestNo }}
+                </div>
+                <div class="mt-1 break-words text-sm text-gray-600">
+                  {{ currentRequest.partName }} /
+                  {{ currentRequest.processName }}
+                </div>
+              </div>
+              <Tag :color="statusColor(currentRequest.status)" class="shrink-0">
+                {{ statusLabel(currentRequest.status) }}
+              </Tag>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              <div class="rounded bg-gray-50 px-2 py-2">
+                <div class="text-gray-500">数量</div>
+                <div class="mt-1 font-semibold text-gray-900">
+                  {{ currentRequest.quantity || 1 }}
+                </div>
+              </div>
+              <div class="rounded bg-gray-50 px-2 py-2">
+                <div class="text-gray-500">班组</div>
+                <div class="mt-1 truncate font-semibold text-gray-900">
+                  {{ currentRequest.team || '-' }}
+                </div>
+              </div>
+              <div class="rounded bg-gray-50 px-2 py-2">
+                <div class="text-gray-500">等待</div>
+                <div class="mt-1 font-semibold text-gray-900">
+                  {{ waitDuration(currentRequest) }}
+                </div>
+              </div>
+              <div class="rounded bg-gray-50 px-2 py-2">
+                <div class="text-gray-500">
+                  {{ executionDurationLabel(currentRequest) }}
+                </div>
+                <div class="mt-1 font-semibold text-gray-900">
+                  {{ displayExecutionDuration(currentRequest) }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded border border-gray-100 bg-white p-3">
+            <div class="mb-2 text-sm font-medium text-gray-900">报检信息</div>
+            <div class="grid gap-2 text-sm sm:grid-cols-2">
+              <div>
+                <div class="text-xs text-gray-500">工单号</div>
+                <div class="mt-0.5 break-words text-gray-900">
+                  {{ currentRequest.workOrderNumber }}
+                </div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500">报检人</div>
+                <div class="mt-0.5 break-words text-gray-900">
+                  {{ currentRequest.reporter || '-' }}
+                </div>
+              </div>
+              <div class="sm:col-span-2">
+                <div class="text-xs text-gray-500">报检时间</div>
+                <div class="mt-0.5 text-gray-900">
+                  {{ formatDateTime(currentRequest.submittedAt) }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded border border-gray-100 bg-white p-3">
+            <div class="mb-2 text-sm font-medium text-gray-900">执行信息</div>
+            <div class="grid gap-2 text-sm sm:grid-cols-2">
+              <div>
+                <div class="text-xs text-gray-500">调度人</div>
+                <div
+                  class="mt-0.5 break-words text-gray-900"
+                  :class="missingValueClass(currentRequest.dispatcherName)"
+                >
+                  {{ displayDispatcher(currentRequest) }}
+                </div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500">检验员</div>
+                <div
+                  class="mt-0.5 break-words text-gray-900"
+                  :class="missingValueClass(currentRequest.inspectorName)"
+                >
+                  {{ displayInspector(currentRequest) }}
+                </div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500">派单任务 ID</div>
+                <div
+                  class="mt-0.5 break-all text-gray-900"
+                  :class="missingValueClass(currentRequest.dispatchTaskId)"
+                >
+                  {{ currentRequest.dispatchTaskId || '-' }}
+                </div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500">派单时间</div>
+                <div
+                  class="mt-0.5 text-gray-900"
+                  :class="directClosedClass(currentRequest)"
+                >
+                  {{ displayDispatchTime(currentRequest) }}
+                </div>
+              </div>
+              <div class="sm:col-span-2">
+                <div class="text-xs text-gray-500">派单备注</div>
+                <div
+                  class="mt-0.5 whitespace-pre-wrap break-words text-gray-900"
+                >
+                  {{ currentRequest.dispatchRemark || '-' }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded border border-gray-100 bg-white p-3">
+            <div class="mb-2 text-sm font-medium text-gray-900">检验资料</div>
+            <div class="space-y-3 text-sm">
+              <div>
+                <div class="mb-1 text-xs text-gray-500">关联检验记录</div>
+                <Button
+                  v-if="currentRequest.inspectionId"
+                  type="link"
+                  class="h-auto p-0"
+                  @click="openInspectionRecord(currentRequest)"
+                >
+                  查看检验记录
+                </Button>
+                <span v-else class="text-gray-400">-</span>
+              </div>
+              <div>
+                <div class="mb-1 text-xs text-gray-500">自检记录</div>
+                <div
+                  v-if="currentRequest.attachments?.length"
+                  class="flex flex-col gap-1"
+                >
+                  <a
+                    v-for="file in currentRequest.attachments"
+                    :key="file.url"
+                    :href="file.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="break-all"
+                  >
+                    {{ file.name }}
+                  </a>
+                </div>
+                <span v-else class="text-gray-400">-</span>
+              </div>
+              <div>
+                <div class="mb-1 text-xs text-gray-500">检验记录</div>
+                <div
+                  v-if="currentRequest.closeAttachments?.length"
+                  class="flex flex-col gap-1"
+                >
+                  <a
+                    v-for="file in currentRequest.closeAttachments"
+                    :key="file.url"
+                    :href="file.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="break-all"
+                  >
+                    {{ file.name }}
+                  </a>
+                </div>
+                <span v-else class="text-gray-400">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-100 bg-white p-3 sm:p-4">
           <Button
-            v-if="currentRequest.inspectionId"
-            type="link"
-            @click="openInspectionRecord(currentRequest)"
+            type="primary"
+            class="w-full sm:w-auto"
+            size="large"
+            :disabled="currentRequest.status === 'CLOSED'"
+            @click="openCloseFromDispatchDetail"
           >
-            查看检验记录
+            <template #icon>
+              <IconifyIcon icon="lucide:check-circle" />
+            </template>
+            完成检验
           </Button>
-          <span v-else>-</span>
-        </Descriptions.Item>
-        <Descriptions.Item label="自检记录">
-          <div
-            v-if="currentRequest.attachments?.length"
-            class="flex flex-col gap-1"
-          >
-            <a
-              v-for="file in currentRequest.attachments"
-              :key="file.url"
-              :href="file.url"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {{ file.name }}
-            </a>
-          </div>
-          <span v-else>-</span>
-        </Descriptions.Item>
-        <Descriptions.Item label="检验记录">
-          <div
-            v-if="currentRequest.closeAttachments?.length"
-            class="flex flex-col gap-1"
-          >
-            <a
-              v-for="file in currentRequest.closeAttachments"
-              :key="file.url"
-              :href="file.url"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {{ file.name }}
-            </a>
-          </div>
-          <span v-else>-</span>
-        </Descriptions.Item>
-        <Descriptions.Item label="派单备注">
-          {{ currentRequest.dispatchRemark || '-' }}
-        </Descriptions.Item>
-      </Descriptions>
-      <div
-        v-if="currentRequest"
-        class="mt-4 flex justify-end border-t border-gray-100 pt-4"
-      >
-        <Button
-          type="primary"
-          :disabled="currentRequest.status === 'CLOSED'"
-          @click="openCloseFromDispatchDetail"
-        >
-          <template #icon>
-            <IconifyIcon icon="lucide:check-circle" />
-          </template>
-          完成检验
-        </Button>
+        </div>
       </div>
     </Drawer>
 
