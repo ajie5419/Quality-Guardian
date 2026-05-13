@@ -22,6 +22,8 @@ export default defineEventHandler(async (event) => {
 
   const query = getQuery(event);
   const keyword = normalizeInspectionRequestText(query.keyword);
+  const currentOnly = String(query.current || '') === 'true';
+  const includeClosed = String(query.includeClosed || '') === 'true';
   const mine = String(query.mine || '') === 'true';
   const status = normalizeInspectionRequestStatus(query.status);
   const workOrderNumber = normalizeInspectionRequestText(query.workOrderNumber);
@@ -32,10 +34,20 @@ export default defineEventHandler(async (event) => {
     const currentUserId = mine
       ? await resolveInspectionRequestCurrentUserId(userinfo, prisma)
       : null;
+    let statusWhere = {};
+    if (status) {
+      statusWhere = { status };
+    } else if (mine && includeClosed) {
+      statusWhere = { status: { in: ['DISPATCHED', 'CLOSED'] } };
+    } else if (currentOnly) {
+      statusWhere = {
+        status: { in: ['SUBMITTED', 'DISPATCHED'] },
+      };
+    }
     const where: any = {
       isDeleted: false,
       ...(mine && currentUserId ? { inspectorId: currentUserId } : {}),
-      ...(status ? { status } : {}),
+      ...statusWhere,
       ...(workOrderNumber ? { workOrderNumber } : {}),
       ...(keyword
         ? {

@@ -19,16 +19,18 @@ import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 import { $t } from '@vben/locales';
-import { useAccessStore } from '@vben/stores';
+import { useAccessStore, useUserStore } from '@vben/stores';
 
 import {
   Button,
   Card,
   Descriptions,
   Drawer,
+  Dropdown,
   Form,
   Input,
   InputNumber,
+  Menu,
   message,
   Modal,
   Segmented,
@@ -36,6 +38,7 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Upload,
 } from 'ant-design-vue';
 import dayjs from 'dayjs';
@@ -47,6 +50,7 @@ import {
   deleteInspectionRequest,
   dispatchInspectionRequest,
   getInspectionRequests,
+  getInspectionRequestStats,
 } from '#/api/qms/inspection-request';
 import { getBomList } from '#/api/qms/planning';
 import { getWorkOrderRequirements } from '#/api/qms/work-order';
@@ -72,10 +76,27 @@ defineOptions({ name: 'QMSInspectionRequests' });
 const route = useRoute();
 const router = useRouter();
 const accessStore = useAccessStore();
+const userStore = useUserStore();
 const { hasAccessByCodes } = useAccess();
 const loading = ref(false);
 const submitting = ref(false);
 const requests = ref<InspectionRequest[]>([]);
+const requestStats = ref({
+  byInspector: [] as Array<{ count: number; inspector: string }>,
+  byTeam: [] as Array<{ count: number; team: string }>,
+  inspectorStatus: [] as Array<{
+    activeTaskCount: number;
+    averageTaskMinutes: number;
+    completedTaskCount: number;
+    currentTaskMinutes: number;
+    inspector: string;
+    status: 'BUSY' | 'IDLE';
+  }>,
+  pendingDispatchCount: 0,
+  pendingInspectionCount: 0,
+  todayClosedCount: 0,
+  todaySubmittedCount: 0,
+});
 const total = ref(0);
 const page = ref(1);
 const pageSize = ref(20);
@@ -87,7 +108,7 @@ const closeQrOpen = ref(false);
 const currentRequest = ref<InspectionRequest>();
 const requestEntryQr = ref('');
 const closeQr = ref('');
-const activeView = ref('all');
+const activeView = ref('current');
 const attachmentFileList = ref<UploadFile[]>([]);
 const closeAttachmentFileList = ref<UploadFile[]>([]);
 const bomPartsLoading = ref(false);
@@ -246,17 +267,13 @@ function validateCloseForm() {
 const statusOptions = [
   { label: '已报检', value: 'SUBMITTED' },
   { label: '已派单', value: 'DISPATCHED' },
-  { label: '检验中', value: 'INSPECTING' },
-  { label: '检验完成', value: 'CLOSED' },
-  { label: '已取消', value: 'CANCELLED' },
 ];
 
 const viewOptions = [
-  { label: '全部任务', value: 'all' },
+  { label: '当前任务', value: 'current' },
   { label: '待派单', value: 'submitted' },
   { label: '已派单', value: 'dispatched' },
   { label: '我的检验', value: 'inspecting' },
-  { label: '检验完成', value: 'closed' },
 ];
 
 const checkResultOptions = [
@@ -295,14 +312,12 @@ const routeDispatchRequestId = computed(() =>
     route.query.dispatchRequestId || route.query.closeRequestId || '',
   ).trim(),
 );
-const pendingDispatchCount = computed(
-  () => requests.value.filter((item) => item.status === 'SUBMITTED').length,
-);
-const pendingInspectionCount = computed(
-  () => requests.value.filter((item) => item.status === 'DISPATCHED').length,
-);
 const canDelete = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Requests:Delete']),
+);
+const topTeamStats = computed(() => requestStats.value.byTeam.slice(0, 4));
+const topInspectorStatus = computed(() =>
+  requestStats.value.inspectorStatus.slice(0, 4),
 );
 
 function statusColor(status: InspectionRequestStatus) {
@@ -357,6 +372,14 @@ function durationText(start?: null | string, end?: null | string) {
   return `${minutes}分钟`;
 }
 
+function minutesText(value?: number) {
+  const totalMinutes = Math.max(0, Math.floor(Number(value || 0)));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) return `${hours}小时${minutes}分钟`;
+  return `${minutes}分钟`;
+}
+
 function waitDuration(record: InspectionRequest) {
   return durationText(
     record.submittedAt,
@@ -366,6 +389,112 @@ function waitDuration(record: InspectionRequest) {
 
 function executeDuration(record: InspectionRequest) {
   return durationText(record.dispatchedAt, record.closedAt);
+}
+
+function isDirectClosed(record: InspectionRequest) {
+  return record.status === 'CLOSED' && !record.dispatchedAt;
+}
+
+function isClosed(record: InspectionRequest) {
+  return record.status === 'CLOSED';
+}
+
+function isDispatchable(record: InspectionRequest) {
+  return record.status === 'SUBMITTED';
+}
+
+function isCompletable(record: InspectionRequest) {
+  return record.status === 'DISPATCHED' || record.status === 'INSPECTING';
+}
+
+function isSelfDispatched(record: InspectionRequest) {
+  return isDirectClosed(record) && Boolean(record.inspectorName);
+}
+
+function displayInspector(record: InspectionRequest) {
+  return record.inspectorName || (record.status === 'CLOSED' ? '未记录' : '-');
+}
+
+function displayDispatcher(record: InspectionRequest) {
+  if (record.dispatcherName) return record.dispatcherName;
+  if (isSelfDispatched(record)) return '自派单';
+  if (isDirectClosed(record)) return '未派单';
+  return '-';
+}
+
+function displayDispatchTime(record: InspectionRequest) {
+  if (record.dispatchedAt) return formatDateTime(record.dispatchedAt);
+  if (isDirectClosed(record)) return '未派单';
+  return '-';
+}
+
+function executionDurationLabel(record: InspectionRequest) {
+  if (record.dispatchedAt) return '执行';
+  if (isDirectClosed(record)) return '总耗时';
+  return '执行';
+}
+
+function displayExecutionDuration(record: InspectionRequest) {
+  if (record.dispatchedAt) return executeDuration(record);
+  return isDirectClosed(record)
+    ? durationText(record.submittedAt, record.closedAt)
+    : '-';
+}
+
+function missingValueClass(value?: null | string) {
+  return value ? '' : 'text-gray-400';
+}
+
+function directClosedClass(record: InspectionRequest) {
+  return isDirectClosed(record) ? 'text-gray-400' : '';
+}
+
+function rowClassName(record: InspectionRequest) {
+  return isClosed(record) ? 'inspection-request-row-closed' : '';
+}
+
+function actionMenuKeys(record: InspectionRequest) {
+  const keys = [];
+  if (!isClosed(record)) {
+    keys.push('qr');
+  }
+  if (record.inspectionId) {
+    keys.push('record');
+  }
+  if (canDelete.value) {
+    keys.push('delete');
+  }
+  return keys;
+}
+
+function hasActionMenu(record: InspectionRequest) {
+  return actionMenuKeys(record).length > 0;
+}
+
+function handleActionMenuClick(record: InspectionRequest, key: unknown) {
+  const action = String(key);
+  if (action === 'delete') {
+    confirmDelete(record);
+    return;
+  }
+  if (action === 'qr') {
+    void openCloseQr(record);
+    return;
+  }
+  if (action === 'record') {
+    openInspectionRecord(record);
+  }
+}
+
+function currentUserName() {
+  return (
+    normalizeCloseText(userStore.userInfo?.realName) ||
+    normalizeCloseText(userStore.userInfo?.username)
+  );
+}
+
+function displayCloseReadonlyValue(value?: null | string) {
+  return normalizeCloseText(value) || '系统自动创建';
 }
 
 function buildRequestUrl(
@@ -393,11 +522,6 @@ async function makeQr(url: string) {
 
 function applyViewStatus(value: string) {
   switch (value) {
-    case 'closed': {
-      query.status = 'CLOSED';
-
-      break;
-    }
     case 'dispatched':
     case 'inspecting': {
       query.status = 'DISPATCHED';
@@ -422,6 +546,24 @@ function shouldUseMineFilter() {
 async function handleViewChange(value: number | string) {
   activeView.value = String(value);
   applyViewStatus(activeView.value);
+  page.value = 1;
+  await loadRequests();
+}
+
+async function handleStatusFilterChange() {
+  switch (query.status) {
+    case 'DISPATCHED': {
+      activeView.value = 'dispatched';
+      break;
+    }
+    case 'SUBMITTED': {
+      activeView.value = 'submitted';
+      break;
+    }
+    default: {
+      activeView.value = 'current';
+    }
+  }
   page.value = 1;
   await loadRequests();
 }
@@ -555,6 +697,8 @@ async function loadRequests() {
   loading.value = true;
   try {
     const res = await getInspectionRequests({
+      current: !query.status,
+      includeClosed: shouldUseMineFilter(),
       keyword: query.keyword || undefined,
       mine: shouldUseMineFilter(),
       page: page.value,
@@ -567,6 +711,10 @@ async function loadRequests() {
   } finally {
     loading.value = false;
   }
+}
+
+async function loadRequestStats() {
+  requestStats.value = await getInspectionRequestStats();
 }
 
 async function loadUsers() {
@@ -596,7 +744,7 @@ async function submitRequest() {
     message.success('报检任务已报检');
     resetRequestForm();
     page.value = 1;
-    await loadRequests();
+    await Promise.all([loadRequests(), loadRequestStats()]);
   } finally {
     submitting.value = false;
   }
@@ -646,7 +794,7 @@ async function submitDispatch() {
     });
     message.success('报检任务已派单');
     dispatchOpen.value = false;
-    await loadRequests();
+    await Promise.all([loadRequests(), loadRequestStats()]);
   } finally {
     submitting.value = false;
   }
@@ -673,7 +821,7 @@ function confirmDelete(record: InspectionRequest) {
     async onOk() {
       await deleteInspectionRequest(record.id);
       message.success('报检任务已删除');
-      await loadRequests();
+      await Promise.all([loadRequests(), loadRequestStats()]);
     },
   });
 }
@@ -684,7 +832,7 @@ function openClose(record: InspectionRequest) {
   closeForm.attachments = [];
   closeForm.closeRemark = '';
   closeForm.inspectionId = record.inspectionId || '';
-  closeForm.inspector = record.inspectorName || record.reporter;
+  closeForm.inspector = record.inspectorName || currentUserName();
   closeForm.quantity = record.quantity || 1;
   closeForm.result = 'PASS';
 
@@ -698,7 +846,7 @@ function openClose(record: InspectionRequest) {
     processName: record.processName || '',
     qualifiedQuantity: 0,
     reportDate: dayjs().format('YYYY-MM-DD'),
-    reportedBy: record.inspectorName || record.reporter || '',
+    reportedBy: record.inspectorName || currentUserName() || '',
     responsibleWelder: '',
     rootCause: '',
     solution: '',
@@ -755,7 +903,7 @@ async function submitClose() {
     });
     message.success('报检任务检验完成');
     closeOpen.value = false;
-    await loadRequests();
+    await Promise.all([loadRequests(), loadRequestStats()]);
   } finally {
     submitting.value = false;
   }
@@ -785,7 +933,7 @@ function openDispatchDetailFromRoute() {
 onMounted(async () => {
   applyRoutePrefill();
   requestEntryQr.value = await makeQr(requestEntryUrl.value);
-  await Promise.all([loadUsers(), loadRequests()]);
+  await Promise.all([loadUsers(), loadRequests(), loadRequestStats()]);
 });
 
 watch(
@@ -919,29 +1067,91 @@ watch(
 
       <Card>
         <div class="mb-4 space-y-4">
-          <div
-            class="grid grid-cols-1 gap-3 lg:grid-cols-[160px_180px_minmax(0,1fr)]"
-          >
-            <div class="rounded border border-amber-100 bg-amber-50 px-4 py-3">
-              <div class="text-xs text-amber-700">调度待办</div>
-              <div class="mt-1 text-2xl font-semibold text-amber-900">
-                {{ pendingDispatchCount }}
-              </div>
-            </div>
+          <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <div class="rounded border border-blue-100 bg-blue-50 px-4 py-3">
-              <div class="text-xs text-blue-700">检验员待执行</div>
-              <div class="mt-1 text-2xl font-semibold text-blue-900">
-                {{ pendingInspectionCount }}
+              <div class="text-xs text-blue-700">今日报检</div>
+              <div class="mt-1 flex items-end gap-2">
+                <span class="text-3xl font-semibold text-blue-900">
+                  {{ requestStats.todaySubmittedCount }}
+                </span>
+                <span class="pb-1 text-xs text-blue-600">
+                  完成 {{ requestStats.todayClosedCount }}
+                </span>
+              </div>
+              <div class="mt-2 flex gap-3 text-xs text-blue-700">
+                <span>待派 {{ requestStats.pendingDispatchCount }}</span>
+                <span>待检 {{ requestStats.pendingInspectionCount }}</span>
               </div>
             </div>
-            <div
-              class="flex min-w-0 items-center rounded border border-gray-100 bg-gray-50 px-4 py-3"
-            >
-              <div class="min-w-0">
-                <div class="text-xs text-gray-600">通知方式</div>
-                <div class="mt-1 truncate text-xs text-gray-700">
-                  派单后进入检验员“我的检验”视图；也可扫码关闭处理
+
+            <div class="rounded border border-amber-100 bg-amber-50 px-4 py-3">
+              <div class="flex items-center justify-between">
+                <div class="text-xs text-amber-700">今日班组报检</div>
+                <div class="text-xs text-amber-600">
+                  {{ requestStats.byTeam.length }} 个班组
                 </div>
+              </div>
+              <div v-if="topTeamStats.length > 0" class="mt-2 space-y-1">
+                <div
+                  v-for="item in topTeamStats"
+                  :key="item.team"
+                  class="flex items-center justify-between text-xs"
+                >
+                  <span class="truncate text-amber-900">{{ item.team }}</span>
+                  <span class="font-semibold text-amber-900">
+                    {{ item.count }}
+                  </span>
+                </div>
+              </div>
+              <div v-else class="mt-2 text-xs text-amber-600">
+                今日暂无班组报检
+              </div>
+            </div>
+
+            <div
+              class="rounded border border-emerald-100 bg-emerald-50 px-4 py-3"
+            >
+              <div class="flex items-center justify-between">
+                <div class="text-xs text-emerald-700">检验员状态</div>
+                <div class="text-xs text-emerald-600">
+                  {{ requestStats.inspectorStatus.length }} 人
+                </div>
+              </div>
+              <div v-if="topInspectorStatus.length > 0" class="mt-2 space-y-1">
+                <div
+                  v-for="item in topInspectorStatus"
+                  :key="item.inspector"
+                  class="grid grid-cols-[minmax(0,1fr)_auto] gap-2 text-xs"
+                >
+                  <div class="min-w-0">
+                    <div class="truncate text-emerald-900">
+                      {{ item.inspector }}
+                      <Tag
+                        class="ml-1"
+                        :color="
+                          item.status === 'BUSY' ? 'processing' : 'default'
+                        "
+                      >
+                        {{ item.status === 'BUSY' ? '有任务' : '空闲' }}
+                      </Tag>
+                    </div>
+                    <div class="truncate text-emerald-700">
+                      当前 {{ item.activeTaskCount }} · 已用
+                      {{ minutesText(item.currentTaskMinutes) }}
+                    </div>
+                  </div>
+                  <div class="text-right text-emerald-900">
+                    <div class="font-semibold">
+                      完成 {{ item.completedTaskCount }}
+                    </div>
+                    <div class="text-emerald-700">
+                      均 {{ minutesText(item.averageTaskMinutes) }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="mt-2 text-xs text-emerald-600">
+                暂无检验员任务
               </div>
             </div>
           </div>
@@ -973,7 +1183,7 @@ watch(
                 class="w-36"
                 :options="statusOptions"
                 placeholder="状态"
-                @change="loadRequests"
+                @change="handleStatusFilterChange"
               />
               <Button @click="loadRequests">
                 <template #icon>
@@ -989,6 +1199,7 @@ watch(
           row-key="id"
           :data-source="requests"
           :loading="loading"
+          :row-class-name="rowClassName"
           :pagination="{
             current: page,
             pageSize,
@@ -1000,85 +1211,83 @@ watch(
               loadRequests();
             },
           }"
-          :scroll="{ x: 1180 }"
           size="small"
         >
-          <Table.Column title="任务信息" width="300">
+          <Table.Column title="任务" :min-width="280">
             <template #default="{ record }">
-              <div class="space-y-1">
-                <div class="font-medium text-gray-900">
+              <div class="min-w-0 space-y-0.5">
+                <div class="truncate font-medium text-gray-900">
                   {{ record.partName }}
                 </div>
-                <div class="text-xs text-gray-500">
-                  {{ record.processName }} · 数量 {{ record.quantity || 1 }}
+                <div class="truncate text-xs text-gray-500">
+                  {{ record.processName }} · {{ record.quantity || 1 }}
                 </div>
-                <div class="text-xs text-gray-500">
+                <div class="truncate text-xs text-gray-400">
                   {{ record.requestNo }} / {{ record.workOrderNumber }}
                 </div>
               </div>
             </template>
           </Table.Column>
-          <Table.Column title="报检信息" width="210">
+          <Table.Column title="报检" width="210">
             <template #default="{ record }">
-              <div class="space-y-1 text-xs">
-                <div>
-                  <span class="text-gray-500">报检人：</span
-                  >{{ record.reporter }}
+              <div class="space-y-0.5 text-xs">
+                <div class="truncate text-gray-700">
+                  {{ record.reporter }}
+                  <span class="text-gray-400">/ {{ record.team || '-' }}</span>
                 </div>
-                <div>
-                  <span class="text-gray-500">班组：</span
-                  >{{ record.team || '-' }}
+                <div class="truncate text-gray-500">
+                  {{ formatDateTime(record.submittedAt) }}
                 </div>
-                <div>
+                <div class="truncate text-gray-400">
                   自检 {{ checkResultLabel(record.selfCheckResult) }} / 互检
                   {{ checkResultLabel(record.mutualCheckResult) }}
                 </div>
               </div>
             </template>
           </Table.Column>
-          <Table.Column title="状态" width="120">
+          <Table.Column title="状态" width="110">
             <template #default="{ record }">
               <Tag :color="statusColor(record.status)">
                 {{ statusLabel(record.status) }}
               </Tag>
             </template>
           </Table.Column>
-          <Table.Column title="执行信息" width="260">
+          <Table.Column title="执行" width="260">
             <template #default="{ record }">
-              <div class="space-y-1 text-xs">
-                <div>
-                  <span class="text-gray-500">检验员：</span>
-                  {{ record.inspectorName || '-' }}
+              <div class="space-y-0.5 text-xs">
+                <div class="truncate">
+                  <span class="text-gray-500">检：</span>
+                  <span :class="missingValueClass(record.inspectorName)">
+                    {{ displayInspector(record) }}
+                  </span>
+                  <span class="mx-1 text-gray-300">/</span>
+                  <span class="text-gray-500">调：</span>
+                  <span :class="missingValueClass(record.dispatcherName)">
+                    {{ displayDispatcher(record) }}
+                  </span>
                 </div>
-                <div>
-                  <span class="text-gray-500">调度：</span>
-                  {{ record.dispatcherName || '-' }}
-                </div>
-                <div>
+                <div class="truncate">
                   <span class="text-gray-500">等待：</span>
-                  {{ waitDuration(record) }}
-                  <span class="ml-2 text-gray-500">执行：</span>
-                  {{ executeDuration(record) }}
+                  <span>{{ waitDuration(record) }}</span>
+                  <span class="mx-1 text-gray-300">/</span>
+                  <span class="text-gray-500"
+                    >{{ executionDurationLabel(record) }}：</span
+                  >
+                  <span :class="directClosedClass(record)">
+                    {{ displayExecutionDuration(record) }}
+                  </span>
+                </div>
+                <div class="truncate text-gray-400">
+                  派单：<span :class="directClosedClass(record)">
+                    {{ displayDispatchTime(record) }}
+                  </span>
                 </div>
               </div>
             </template>
           </Table.Column>
-          <Table.Column title="检验记录" width="110">
+          <Table.Column title="操作" width="180" fixed="right">
             <template #default="{ record }">
-              <Button
-                v-if="record.inspectionId"
-                size="small"
-                type="link"
-                @click="openInspectionRecord(record)"
-              >
-                查看记录
-              </Button>
-              <span v-else class="text-xs text-gray-400">未关联</span>
-            </template>
-          </Table.Column>
-          <Table.Column title="操作" width="220" fixed="right">
-            <template #default="{ record }">
-              <Space wrap size="small">
+              <Space size="small">
                 <Button size="small" @click="openDispatchDetail(record)">
                   <template #icon>
                     <IconifyIcon icon="lucide:list-checks" />
@@ -1086,27 +1295,17 @@ watch(
                   详情
                 </Button>
                 <Button
+                  v-if="isDispatchable(record)"
                   size="small"
-                  :disabled="record.status === 'CLOSED'"
                   @click="openDispatch(record)"
                 >
                   <template #icon><IconifyIcon icon="lucide:send" /></template>
                   派单
                 </Button>
                 <Button
-                  size="small"
-                  :disabled="record.status === 'CLOSED'"
-                  @click="openCloseQr(record)"
-                >
-                  <template #icon>
-                    <IconifyIcon icon="lucide:qr-code" />
-                  </template>
-                  二维码
-                </Button>
-                <Button
+                  v-if="isCompletable(record)"
                   size="small"
                   type="primary"
-                  :disabled="record.status === 'CLOSED'"
                   @click="openClose(record)"
                 >
                   <template #icon>
@@ -1114,18 +1313,39 @@ watch(
                   </template>
                   完成
                 </Button>
-                <Button
-                  v-if="canDelete"
-                  danger
-                  size="small"
-                  :disabled="Boolean(deleteDisabledReason(record))"
-                  @click="confirmDelete(record)"
-                >
-                  <template #icon>
-                    <IconifyIcon icon="lucide:trash-2" />
+                <Dropdown v-if="hasActionMenu(record)" trigger="click">
+                  <Tooltip title="更多操作">
+                    <Button size="small">
+                      <template #icon>
+                        <IconifyIcon icon="lucide:more-horizontal" />
+                      </template>
+                    </Button>
+                  </Tooltip>
+                  <template #overlay>
+                    <Menu
+                      @click="({ key }) => handleActionMenuClick(record, key)"
+                    >
+                      <Menu.Item v-if="!isClosed(record)" key="qr">
+                        <template #icon>
+                          <IconifyIcon icon="lucide:qr-code" />
+                        </template>
+                        二维码
+                      </Menu.Item>
+                      <Menu.Item v-if="record.inspectionId" key="record">
+                        <template #icon>
+                          <IconifyIcon icon="lucide:file-check-2" />
+                        </template>
+                        查看记录
+                      </Menu.Item>
+                      <Menu.Item v-if="canDelete" key="delete" danger>
+                        <template #icon>
+                          <IconifyIcon icon="lucide:trash-2" />
+                        </template>
+                        删除
+                      </Menu.Item>
+                    </Menu>
                   </template>
-                  删除
-                </Button>
+                </Dropdown>
               </Space>
             </template>
           </Table.Column>
@@ -1188,26 +1408,41 @@ watch(
         <Descriptions.Item label="报检人">
           {{ currentRequest.reporter }}
         </Descriptions.Item>
+        <Descriptions.Item label="报检时间">
+          {{ formatDateTime(currentRequest.submittedAt) }}
+        </Descriptions.Item>
         <Descriptions.Item label="班组">
           {{ currentRequest.team || '-' }}
         </Descriptions.Item>
         <Descriptions.Item label="调度人">
-          {{ currentRequest.dispatcherName || '-' }}
+          <span :class="missingValueClass(currentRequest.dispatcherName)">
+            {{ displayDispatcher(currentRequest) }}
+          </span>
         </Descriptions.Item>
         <Descriptions.Item label="检验员">
-          {{ currentRequest.inspectorName || '-' }}
+          <span :class="missingValueClass(currentRequest.inspectorName)">
+            {{ displayInspector(currentRequest) }}
+          </span>
         </Descriptions.Item>
         <Descriptions.Item label="派单任务 ID">
-          {{ currentRequest.dispatchTaskId || '-' }}
+          <span :class="missingValueClass(currentRequest.dispatchTaskId)">
+            {{ currentRequest.dispatchTaskId || '-' }}
+          </span>
         </Descriptions.Item>
         <Descriptions.Item label="派单时间">
-          {{ formatDateTime(currentRequest.dispatchedAt) }}
+          <span :class="directClosedClass(currentRequest)">
+            {{ displayDispatchTime(currentRequest) }}
+          </span>
         </Descriptions.Item>
         <Descriptions.Item label="等待派单时长">
           {{ waitDuration(currentRequest) }}
         </Descriptions.Item>
-        <Descriptions.Item label="检验执行时长">
-          {{ executeDuration(currentRequest) }}
+        <Descriptions.Item
+          :label="`${executionDurationLabel(currentRequest)}时长`"
+        >
+          <span :class="directClosedClass(currentRequest)">
+            {{ displayExecutionDuration(currentRequest) }}
+          </span>
         </Descriptions.Item>
         <Descriptions.Item label="关联检验记录">
           <Button
@@ -1291,7 +1526,7 @@ watch(
           {{ currentRequest.requestNo }}
         </div>
         <div class="text-center text-xs text-gray-500">
-          检验员扫码后会打开该任务的关闭窗口
+          检验员扫码后会打开派单详情，可在详情中完成检验
         </div>
       </div>
     </Modal>
@@ -1304,12 +1539,22 @@ watch(
       @ok="submitClose"
     >
       <Form layout="vertical">
-        <Form.Item label="已有检验记录 ID">
-          <Input v-model:value="closeForm.inspectionId" allow-clear />
-        </Form.Item>
-        <Form.Item label="检验员">
-          <Input v-model:value="closeForm.inspector" />
-        </Form.Item>
+        <div class="mb-4 rounded border border-gray-100 bg-gray-50 px-3 py-2">
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <div class="mb-1 text-gray-500">已有检验记录 ID</div>
+              <div class="truncate text-gray-400">
+                {{ displayCloseReadonlyValue(closeForm.inspectionId) }}
+              </div>
+            </div>
+            <div>
+              <div class="mb-1 text-gray-500">检验员</div>
+              <div class="truncate text-gray-500">
+                {{ closeForm.inspector || '当前登录用户' }}
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="grid grid-cols-2 gap-3">
           <Form.Item label="检验结果">
             <Select
@@ -1516,3 +1761,13 @@ watch(
     </Modal>
   </Page>
 </template>
+
+<style scoped>
+:deep(.inspection-request-row-closed) td {
+  background: #fafafa;
+}
+
+:deep(.inspection-request-row-closed .text-gray-900) {
+  color: #6b7280;
+}
+</style>

@@ -104,6 +104,35 @@ function getDetailString(key: string, fallback = '-') {
   return fallback;
 }
 
+function parseDetailDocuments() {
+  const value = getDetailValue('documents');
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(String(value)) as unknown;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function getDocumentName(file: unknown, index: number) {
+  if (file && typeof file === 'object') {
+    const record = file as Record<string, unknown>;
+    const name = String(record.name || record.originalName || '').trim();
+    if (name) return name;
+  }
+  return `附件 ${index + 1}`;
+}
+
+function getDocumentUrl(file: unknown) {
+  if (file && typeof file === 'object') {
+    const record = file as Record<string, unknown>;
+    return String(record.url || '').trim();
+  }
+  return typeof file === 'string' ? file : '';
+}
+
 function getDetailNumber(key: string, fallback = '-') {
   const value = getDetailValue(key);
   if (typeof value === 'number') return String(value);
@@ -259,8 +288,19 @@ watch(
             <Descriptions.Item label="部件名称">
               {{ getDetailString('materialName') }}
             </Descriptions.Item>
-            <Descriptions.Item label="随车资料">
-              {{ getDetailString('documents') }}
+            <Descriptions.Item label="随车资料" :span="2">
+              <div v-if="parseDetailDocuments().length > 0" class="space-y-1">
+                <a
+                  v-for="(file, index) in parseDetailDocuments()"
+                  :key="`${getDocumentUrl(file)}-${index}`"
+                  :href="getDocumentUrl(file)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {{ getDocumentName(file, index) }}
+                </a>
+              </div>
+              <span v-else>-</span>
             </Descriptions.Item>
             <Descriptions.Item label="装箱单归档">
               {{ getBoolLabel('packingListArchived') }}
@@ -301,6 +341,20 @@ watch(
                 getArchiveStatusLabel(getDetailString('archiveTaskStatus', ''))
               }}
             </Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="检验记录附件" :span="2">
+            <div v-if="parseDetailDocuments().length > 0" class="space-y-1">
+              <a
+                v-for="(file, index) in parseDetailDocuments()"
+                :key="`${getDocumentUrl(file)}-${index}`"
+                :href="getDocumentUrl(file)"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {{ getDocumentName(file, index) }}
+              </a>
+            </div>
+            <span v-else>-</span>
           </Descriptions.Item>
           <Descriptions.Item label="备注" :span="2">
             {{ getDetailString('remarks') }}

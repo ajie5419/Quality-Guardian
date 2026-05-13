@@ -8,9 +8,11 @@ import {
   buildInspectionRecordFromRequest,
   INSPECTION_REQUEST_STATUS,
   mapInspectionRequest,
+  mergeInspectionRequestAttachments,
   normalizeInspectionRequestAttachments,
   normalizeInspectionRequestText,
   parseInspectionRequestQuantity,
+  resolveInspectionRequestCurrentUserId,
 } from '~/utils/inspection-request';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -92,6 +94,12 @@ function validateCloseRequestBody(body: Record<string, unknown>) {
   }
 }
 
+function stringifyCloseInspectionDocuments(
+  attachments: ReturnType<typeof normalizeInspectionRequestAttachments>,
+) {
+  return attachments.length > 0 ? JSON.stringify(attachments) : null;
+}
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
@@ -166,6 +174,9 @@ export default defineEventHandler(async (event) => {
     const linkedIssue = body.linkedIssue as Record<string, unknown> | undefined;
     let issueCreateData: Prisma.quality_recordsCreateInput | undefined;
     let issueAuditDetails = '';
+    const closeInspectorId =
+      request.inspectorId ||
+      (await resolveInspectionRequestCurrentUserId(userinfo, prisma));
 
     if (result === 'FAIL' && linkedIssue && inspectionId) {
       const issueUtils = await import('~/utils/inspection-issue');
@@ -251,6 +262,7 @@ export default defineEventHandler(async (event) => {
           closeRemark: normalizeInspectionRequestText(body.closeRemark) || null,
           closedAt: new Date(),
           inspectionId,
+          inspectorId: closeInspectorId || request.inspectorId,
           status: INSPECTION_REQUEST_STATUS.CLOSED,
         },
         include: {
@@ -275,6 +287,27 @@ export default defineEventHandler(async (event) => {
       bizId: String(updated.id),
       bizType: 'inspection_request',
       fieldName: 'closeAttachments',
+    });
+    const currentInspection = await prisma.inspections.findUnique({
+      select: { documents: true },
+      where: { id: inspectionId },
+    });
+    const inspectionDocuments = mergeInspectionRequestAttachments(
+      currentInspection?.documents,
+      closeAttachments,
+    );
+    await prisma.inspections.update({
+      data: {
+        documents: stringifyCloseInspectionDocuments(inspectionDocuments),
+        hasDocuments: inspectionDocuments.length > 0,
+      },
+      where: { id: inspectionId },
+    });
+    await FileStorageService.registerReferencesFromAttachments({
+      attachments: inspectionDocuments,
+      bizId: String(inspectionId),
+      bizType: 'inspection_record',
+      fieldName: 'documents',
     });
 
     if (issue && linkedIssue?.photos !== undefined) {

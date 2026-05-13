@@ -13,7 +13,26 @@ import { QMS_API } from './constants';
 
 export * from '@qgs/shared';
 
+export interface InspectionRequestStats {
+  byInspector: Array<{ count: number; inspector: string }>;
+  byTeam: Array<{ count: number; team: string }>;
+  inspectorStatus: Array<{
+    activeTaskCount: number;
+    averageTaskMinutes: number;
+    completedTaskCount: number;
+    currentTaskMinutes: number;
+    inspector: string;
+    status: 'BUSY' | 'IDLE';
+  }>;
+  pendingDispatchCount: number;
+  pendingInspectionCount: number;
+  todayClosedCount: number;
+  todaySubmittedCount: number;
+}
+
 export async function getInspectionRequests(params?: {
+  current?: boolean;
+  includeClosed?: boolean;
   keyword?: string;
   mine?: boolean;
   page?: number;
@@ -26,6 +45,12 @@ export async function getInspectionRequests(params?: {
     total: number;
   }>(QMS_API.INSPECTION_REQUESTS, { params });
   return normalizeListResponse<InspectionRequest>(raw);
+}
+
+export async function getInspectionRequestStats() {
+  return requestClient.get<InspectionRequestStats>(
+    QMS_API.INSPECTION_REQUESTS_STATS,
+  );
 }
 
 export async function createInspectionRequest(

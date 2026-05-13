@@ -8,6 +8,7 @@ export type InspectionRequestStatus =
 export type InspectionRequestCheckResult = 'FAIL' | 'NA' | 'PASS';
 
 export interface InspectionRequestAttachment {
+  fileId?: string;
   name: string;
   size?: number;
   type?: string;

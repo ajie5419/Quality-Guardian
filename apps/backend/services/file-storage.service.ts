@@ -10,6 +10,7 @@ import sharp from 'sharp';
 import { logApiError } from '~/utils/api-logger';
 import { UPLOAD_DIR } from '~/utils/paths';
 import prisma from '~/utils/prisma';
+import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 
 type UploadFileParams = {
   data: Buffer;
@@ -489,33 +490,41 @@ export const FileStorageService = {
   },
 
   async softDeleteReferences(params: { bizId: string; bizType: string }) {
-    const references = await prisma.file_references.findMany({
-      select: { fileId: true },
-      where: {
-        bizId: params.bizId,
-        bizType: params.bizType,
-      },
-    });
-    const fileIds = [...new Set(references.map((item) => item.fileId))];
-
-    await prisma.file_references.deleteMany({
-      where: {
-        bizId: params.bizId,
-        bizType: params.bizType,
-      },
-    });
-
-    if (fileIds.length > 0) {
-      await prisma.file_assets.updateMany({
-        data: {
-          deletedAt: new Date(),
-          status: 'DELETED',
-        },
+    try {
+      const references = await prisma.file_references.findMany({
+        select: { fileId: true },
         where: {
-          id: { in: fileIds },
-          references: { none: {} },
+          bizId: params.bizId,
+          bizType: params.bizType,
         },
       });
+      const fileIds = [...new Set(references.map((item) => item.fileId))];
+
+      await prisma.file_references.deleteMany({
+        where: {
+          bizId: params.bizId,
+          bizType: params.bizType,
+        },
+      });
+
+      if (fileIds.length > 0) {
+        await prisma.file_assets.updateMany({
+          data: {
+            deletedAt: new Date(),
+            status: 'DELETED',
+          },
+          where: {
+            id: { in: fileIds },
+            references: { none: {} },
+          },
+        });
+      }
+    } catch (error) {
+      if (isPrismaSchemaMismatchError(error)) {
+        logApiError('file-reference-soft-delete-schema-missing', error, params);
+        return;
+      }
+      throw error;
     }
   },
 
