@@ -49,6 +49,21 @@ export interface FileListResponse {
   total: number;
 }
 
+export interface FileStorageStats {
+  activeCount: number;
+  activeSize: number;
+  byStatus: Array<{ count: number; size: number; status: string }>;
+  byStorageProvider: Array<{
+    count: number;
+    size: number;
+    storageProvider: string;
+  }>;
+  orphanCount: number;
+  referencedCount: number;
+  totalCount: number;
+  totalSize: number;
+}
+
 export interface ScanMissingResult {
   checked: number;
   marked: number;
@@ -57,6 +72,10 @@ export interface ScanMissingResult {
 
 export function getFileList(params?: FileListParams) {
   return requestClient.get<FileListResponse>('/files', { params });
+}
+
+export function getFileStorageStats() {
+  return requestClient.get<FileStorageStats>('/files/stats');
 }
 
 export function getOrphanFileList(

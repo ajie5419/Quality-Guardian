@@ -414,6 +414,63 @@ export const FileStorageService = {
     return { items, total };
   },
 
+  async getStorageStats() {
+    const [
+      totalAgg,
+      activeAgg,
+      orphanCount,
+      referencedCount,
+      byStatus,
+      byStorageProvider,
+    ] = await Promise.all([
+      prisma.file_assets.aggregate({
+        _count: { id: true },
+        _sum: { size: true },
+      }),
+      prisma.file_assets.aggregate({
+        _count: { id: true },
+        _sum: { size: true },
+        where: { status: 'ACTIVE' },
+      }),
+      prisma.file_assets.count({
+        where: { references: { none: {} }, status: 'ACTIVE' },
+      }),
+      prisma.file_assets.count({
+        where: { references: { some: {} }, status: 'ACTIVE' },
+      }),
+      prisma.file_assets.groupBy({
+        _count: { id: true },
+        _sum: { size: true },
+        by: ['status'],
+      }),
+      prisma.file_assets.groupBy({
+        _count: { id: true },
+        _sum: { size: true },
+        by: ['storageProvider'],
+        where: { status: 'ACTIVE' },
+      }),
+    ]);
+
+    return {
+      activeCount: activeAgg._count.id,
+      activeSize: Number(activeAgg._sum.size || 0),
+      byStatus: byStatus.map((item) => ({
+        count: item._count.id,
+        size: Number(item._sum.size || 0),
+        status: item.status,
+      })),
+      byStorageProvider: byStorageProvider.map((item) => ({
+        count: item._count.id,
+        size: Number(item._sum.size || 0),
+        storageProvider: item.storageProvider,
+      })),
+      orphanCount,
+      referencedCount,
+      totalCount: totalAgg._count.id,
+      totalSize: Number(totalAgg._sum.size || 0),
+    };
+  },
+
   async registerReference(params: {
     bizId: string;
     bizType: string;
