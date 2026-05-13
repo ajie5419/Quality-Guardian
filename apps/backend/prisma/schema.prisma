@@ -321,6 +321,7 @@ model project_boms {
   work_order_number  String
   part_name          String
   part_number        String?
+  material           String?
   required_processes String?     @db.LongText
   quantity           Int         @default(1)
   unit               String      @default("pcs")

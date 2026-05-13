@@ -5,6 +5,7 @@ import {
   mapProjectBomItem,
   normalizeBomProjectStatus,
   normalizeBomText,
+  projectBomItemSelect,
 } from '~/utils/bom';
 import { awaitMockDelay } from '~/utils/index';
 import { upsertPlanningProjectByWorkOrder } from '~/utils/planning-project';
@@ -64,6 +65,7 @@ export default defineEventHandler(async (event) => {
 
     const newItem = await prisma.project_boms.create({
       data: buildProjectBomCreateData(workOrderNumber, body),
+      select: projectBomItemSelect,
     });
 
     return useResponseSuccess({

@@ -1,6 +1,10 @@
 import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { groupBomItemsByWorkOrder, mapBomTreeProjectNode } from '~/utils/bom';
+import {
+  groupBomItemsByWorkOrder,
+  mapBomTreeProjectNode,
+  projectBomItemSelect,
+} from '~/utils/bom';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 import {
@@ -30,6 +34,7 @@ export default defineEventHandler(async (event) => {
 
     // 获取所有BOM项目
     const allBomItems = await prisma.project_boms.findMany({
+      select: projectBomItemSelect,
       orderBy: [{ part_number: 'asc' }, { created_at: 'asc' }],
     });
 

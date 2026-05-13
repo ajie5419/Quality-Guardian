@@ -1,9 +1,25 @@
+import { Prisma } from '@prisma/client';
 import { nanoid } from 'nanoid';
 
 const DEFAULT_BOM_PART_NAME = '未命名部件';
 const DEFAULT_BOM_PROJECT_STATUS = 'active';
 const DEFAULT_BOM_PROJECT_VERSION = 'V1.0';
 const DEFAULT_BOM_UNIT = 'PCS';
+
+export const projectBomItemSelect = {
+  id: true,
+  part_name: true,
+  part_number: true,
+  quantity: true,
+  remarks: true,
+  required_processes: true,
+  unit: true,
+  work_order_number: true,
+} as const;
+
+export type ProjectBomItemRow = Prisma.project_bomsGetPayload<{
+  select: typeof projectBomItemSelect;
+}>;
 
 export function createBomItemId(): string {
   return `BOM-${nanoid(6).toUpperCase()}`;

@@ -1,6 +1,10 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { buildProjectBomMutableData, mapProjectBomItem } from '~/utils/bom';
+import {
+  buildProjectBomMutableData,
+  mapProjectBomItem,
+  projectBomItemSelect,
+} from '~/utils/bom';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
@@ -23,6 +27,7 @@ export default defineEventHandler(async (event) => {
     const updated = await prisma.project_boms.update({
       where: { id },
       data: buildProjectBomMutableData(body),
+      select: projectBomItemSelect,
     });
 
     return useResponseSuccess(mapProjectBomItem(updated));

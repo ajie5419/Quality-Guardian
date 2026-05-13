@@ -1,4 +1,4 @@
-import type { BomInspectionProgress } from '~/utils/bom';
+import type { BomInspectionProgress, ProjectBomItemRow } from '~/utils/bom';
 
 import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
@@ -6,6 +6,7 @@ import {
   mapProjectBomItem,
   normalizeBomText,
   parseBomRequiredProcesses,
+  projectBomItemSelect,
 } from '~/utils/bom';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
@@ -13,10 +14,6 @@ import {
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
-
-type ProjectBomRow = Awaited<
-  ReturnType<typeof prisma.project_boms.findMany>
->[number];
 
 function normalizeCompareText(value: unknown) {
   return String(value || '')
@@ -28,7 +25,7 @@ function buildInspectionKey(partName: unknown, processName: unknown) {
   return `${normalizeCompareText(partName)}::${normalizeCompareText(processName)}`;
 }
 
-async function attachInspectionProgress(items: ProjectBomRow[]) {
+async function attachInspectionProgress(items: ProjectBomItemRow[]) {
   const workOrderNumbers = [
     ...new Set(items.map((item) => item.work_order_number)),
   ];
@@ -124,6 +121,7 @@ export default defineEventHandler(async (event) => {
 
       const items = await prisma.project_boms.findMany({
         where: { work_order_number: workOrderNumber },
+        select: projectBomItemSelect,
         orderBy: [{ part_number: 'asc' }, { created_at: 'desc' }],
       });
 
@@ -134,6 +132,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const allItems = await prisma.project_boms.findMany({
+      select: projectBomItemSelect,
       orderBy: [{ part_number: 'asc' }, { created_at: 'desc' }],
     });
     const enrichedItems = await attachInspectionProgress(allItems);
