@@ -142,6 +142,7 @@ jobs:
 
             run_with_timeout 300 docker compose -f "$COMPOSE_FILE" pull backend frontend
             run_with_timeout 120 docker compose -f "$COMPOSE_FILE" up -d redis
+            run_with_timeout 120 docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "cd /app && node prisma/migrate-audit-log-user-agent.mjs"
             run_with_timeout 120 docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "cd /app && node prisma/migrate-inspection-documents-longtext.mjs"
             run_with_timeout 180 docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "cd /app && node prisma/migrate-vehicle-commissioning-issues.mjs"
             run_with_timeout 300 docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "$PRISMA_CMD migrate deploy || $PRISMA_CMD db push --skip-generate"

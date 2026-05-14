@@ -22,6 +22,7 @@
     "db:rbac-backfill": "node prisma/rbac-backfill.js",
     "db:cleanup-legacy-itp-menu": "node prisma/cleanup-legacy-itp-menu.js",
     "db:migrate-itp-to-forms": "node prisma/migrate-itp-to-inspection-forms.js",
+    "db:migrate-audit-log-user-agent": "node prisma/migrate-audit-log-user-agent.mjs",
     "db:migrate-inspection-requests": "node prisma/migrate-inspection-requests.mjs",
     "db:migrate-inspection-documents-longtext": "node prisma/migrate-inspection-documents-longtext.mjs",
     "db:migrate-bom-inspection-processes": "node prisma/migrate-bom-inspection-processes.mjs",

@@ -161,7 +161,7 @@ model audit_logs {
   targetId   String
   details    String?           @db.Text
   ipAddress  String?
-  userAgent  String?
+  userAgent  String?           @db.Text
   timestamp  BigInt            @default(autoincrement())
   createdAt  DateTime          @default(now())
   users      users             @relation(fields: [userId], references: [id])
