@@ -315,6 +315,10 @@ const [Grid, gridApi] = useVbenVxeGrid<QualityLossItem>({
               label: t('qms.qualityLoss.source.external'),
               value: LossSource.EXTERNAL,
             },
+            {
+              label: t('qms.qualityLoss.source.commissioning'),
+              value: LossSource.COMMISSIONING,
+            },
           ],
         },
         colProps: { span: 6 },

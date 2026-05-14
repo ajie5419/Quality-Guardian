@@ -149,7 +149,7 @@ function buildVehicleCommissioningMeta() {
   return JSON.stringify({
     icon: 'carbon:vehicle-connected',
     orderNo: 95,
-    title: '车辆调试',
+    title: '调试验收',
   });
 }
 
@@ -376,8 +376,8 @@ export async function ensureFileCenterMenu() {
 }
 
 /**
- * 自动补齐车辆调试菜单：
- * - 解决老环境数据库缺失菜单导致权限树/侧边栏看不到“车辆调试”的问题
+ * 自动补齐调试验收菜单：
+ * - 解决老环境数据库缺失菜单导致权限树/侧边栏看不到“调试验收”的问题
  * - 幂等：存在则仅修正缺失字段，不重复创建
  */
 export async function ensureVehicleCommissioningMenu() {
@@ -440,7 +440,7 @@ export async function ensureVehicleCommissioningMenu() {
   if (!existing.authCode) {
     nextData.authCode = VEHICLE_COMMISSIONING_AUTH_CODE;
   }
-  if (!existing.meta) {
+  if (existing.meta !== buildVehicleCommissioningMeta()) {
     nextData.meta = buildVehicleCommissioningMeta();
   }
 

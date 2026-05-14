@@ -39,6 +39,15 @@ export async function updateVehicleCommissioningIssue(
   );
 }
 
+export async function exportVehicleCommissioningIssues(
+  params?: VehicleCommissioningIssueParams,
+) {
+  return requestClient.download<Blob>(
+    `${QMS_API.VEHICLE_COMMISSIONING_ISSUES}/export`,
+    { params },
+  );
+}
+
 export async function getVehicleCommissioningIssueLogs(id: string) {
   return requestClient.get<
     Array<{

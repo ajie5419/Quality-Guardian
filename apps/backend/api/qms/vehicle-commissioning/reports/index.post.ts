@@ -44,6 +44,9 @@ export default defineEventHandler(async (event) => {
       notes: body.notes ? String(body.notes) : undefined,
       projectName,
       reporters,
+      workOrderNumber: body.workOrderNumber
+        ? String(body.workOrderNumber)
+        : undefined,
     });
 
     return useResponseSuccess(created);

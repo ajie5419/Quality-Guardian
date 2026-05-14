@@ -494,7 +494,9 @@ const activeTab = ref('trends');
                   ? 'orange'
                   : text === 'EXTERNAL'
                     ? 'red'
-                    : 'green'
+                    : text === 'COMMISSIONING'
+                      ? 'purple'
+                      : 'green'
               "
             >
               {{
@@ -502,7 +504,9 @@ const activeTab = ref('trends');
                   ? t('qms.qualityLoss.source.internal')
                   : text === 'EXTERNAL'
                     ? t('qms.qualityLoss.source.external')
-                    : t('qms.qualityLoss.source.manual')
+                    : text === 'COMMISSIONING'
+                      ? t('qms.qualityLoss.source.commissioning')
+                      : t('qms.qualityLoss.source.manual')
               }}
             </Tag>
           </template>

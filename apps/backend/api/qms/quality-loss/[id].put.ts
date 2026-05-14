@@ -84,6 +84,23 @@ export default defineEventHandler(async (event) => {
         return;
       }
 
+      if (target.source === QUALITY_LOSS_SOURCE.COMMISSIONING) {
+        await tx.vehicle_commissioning_issues.update({
+          where: target.where,
+          data: {
+            ...(parsedBody.amount === undefined
+              ? {}
+              : { lossAmount: parsedBody.amount }),
+            ...(parsedBody.actualClaim === undefined
+              ? {}
+              : { recoveredAmount: parsedBody.actualClaim }),
+            ...(parsedBody.status ? { claimStatus: parsedBody.status } : {}),
+            updatedAt: new Date(),
+          },
+        });
+        return;
+      }
+
       await tx.quality_losses.update({
         where: target.where,
         data: {

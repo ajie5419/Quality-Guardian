@@ -62,10 +62,12 @@ export const DashboardService = {
         const [
           yearAfterSales,
           yearQualityRecords,
+          yearCommissioningIssues,
           yearWorkOrders,
           yearQualityLosses,
           weekAfterSalesCount,
           weekQualityRecordsCount,
+          weekCommissioningIssuesCount,
           weekWorkOrdersCount,
           weekLossesAggregate,
           recentWorkOrders,
@@ -77,6 +79,15 @@ export const DashboardService = {
           }),
           prisma.quality_records.aggregate({
             where: { ...baseWhere, date: { gte: yearStart } },
+            _count: { id: true },
+            _sum: { lossAmount: true },
+          }),
+          prisma.vehicle_commissioning_issues.aggregate({
+            where: {
+              ...baseWhere,
+              date: { gte: yearStart },
+              OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
+            },
             _count: { id: true },
             _sum: { lossAmount: true },
           }),
@@ -94,6 +105,13 @@ export const DashboardService = {
           prisma.quality_records.count({
             where: { ...baseWhere, date: { gte: weekStart } },
           }),
+          prisma.vehicle_commissioning_issues.count({
+            where: {
+              ...baseWhere,
+              date: { gte: weekStart },
+              OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
+            },
+          }),
           prisma.work_orders.count({
             where: { ...baseWhere, createdAt: { gte: weekStart } },
           }),
@@ -109,6 +127,14 @@ export const DashboardService = {
             prisma.quality_losses.aggregate({
               where: { ...baseWhere, occurDate: { gte: weekStart } },
               _sum: { amount: true },
+            }),
+            prisma.vehicle_commissioning_issues.aggregate({
+              where: {
+                ...baseWhere,
+                date: { gte: weekStart },
+                OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
+              },
+              _sum: { lossAmount: true },
             }),
           ]),
           prisma.work_orders.findMany({
@@ -128,14 +154,20 @@ export const DashboardService = {
           safeNumber(yearAfterSales._sum.materialCost) +
           safeNumber(yearAfterSales._sum.laborTravelCost) +
           safeNumber(yearQualityRecords._sum.lossAmount) +
+          safeNumber(yearCommissioningIssues._sum.lossAmount) +
           safeNumber(yearQualityLosses._sum.amount);
 
-        const [weekAfterSalesSum, weekRecordsSum, weekManualSum] =
-          weekLossesAggregate;
+        const [
+          weekAfterSalesSum,
+          weekRecordsSum,
+          weekManualSum,
+          weekCommissioningSum,
+        ] = weekLossesAggregate;
         const weeklyLossTotal =
           safeNumber(weekAfterSalesSum._sum.materialCost) +
           safeNumber(weekAfterSalesSum._sum.laborTravelCost) +
           safeNumber(weekRecordsSum._sum.lossAmount) +
+          safeNumber(weekCommissioningSum._sum.lossAmount) +
           safeNumber(weekManualSum._sum.amount);
 
         return {
@@ -145,8 +177,12 @@ export const DashboardService = {
               total: yearAfterSales._count.id || 0,
             },
             processIssues: {
-              open: weekQualityRecordsCount || 0,
-              total: yearQualityRecords._count.id || 0,
+              open:
+                (weekQualityRecordsCount || 0) +
+                (weekCommissioningIssuesCount || 0),
+              total:
+                (yearQualityRecords._count.id || 0) +
+                (yearCommissioningIssues._count.id || 0),
             },
             qualityLoss: {
               weekly: weeklyLossTotal,
@@ -156,7 +192,10 @@ export const DashboardService = {
               weekly: weekWorkOrdersCount || 0,
               total: yearWorkOrders._count.workOrderNumber || 0,
             },
-            openIssues: weekAfterSalesCount + weekQualityRecordsCount,
+            openIssues:
+              weekAfterSalesCount +
+              weekQualityRecordsCount +
+              weekCommissioningIssuesCount,
             passRate: 0,
             totalInspections: 0,
           },

@@ -20,7 +20,7 @@ model inspections {
   level1Component     String?
   level2Component     String?
   team                String?
-  documents           String?
+  documents           String?                   @db.LongText
   hasDocuments        Boolean                   @default(true)
   packingListArchived String?
   quantity            Int                       @default(1)
@@ -460,6 +460,37 @@ model quality_records {
   @@index([responsibleDepartment])
   @@index([defectType])
   @@index([processName])
+}
+
+model vehicle_commissioning_issues {
+  id                    String   @id
+  date                  DateTime
+  status                String   @default("OPEN")
+  partName              String?
+  description           String?  @db.Text
+  responsibleDepartment String?
+  projectName           String?
+  workOrderNumber       String?
+  severity              String?
+  solution              String?  @db.Text
+  issuePhoto            String?  @db.Text
+  isClaim               Boolean  @default(false)
+  lossAmount            Decimal  @default(0.00) @db.Decimal(10, 2)
+  recoveredAmount       Decimal  @default(0.00) @db.Decimal(10, 2)
+  claimStatus           String   @default("OPEN")
+  claimNotes            String?  @db.Text
+  createdBy             String?
+  closedAt              DateTime?
+  isDeleted             Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([date])
+  @@index([status])
+  @@index([isClaim])
+  @@index([workOrderNumber])
+  @@index([responsibleDepartment])
+  @@index([projectName])
 }
 
 model welders {

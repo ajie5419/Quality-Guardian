@@ -38,6 +38,10 @@ export const STATUS_OPTIONS = [
  * 损失来源样式映射
  */
 export const SOURCE_STYLE_MAP = {
+  [LossSource.COMMISSIONING]: {
+    color: 'purple',
+    labelKey: 'qms.qualityLoss.source.commissioning',
+  },
   [LossSource.INTERNAL]: {
     color: 'blue',
     labelKey: 'qms.qualityLoss.source.internal',

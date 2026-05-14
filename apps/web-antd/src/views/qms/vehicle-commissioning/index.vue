@@ -7,29 +7,37 @@ import {
   DatePicker,
   Form,
   Input,
+  InputNumber,
   Modal,
   Select,
   Space,
+  Switch,
   Table,
   Tabs,
   Tag,
+  TreeSelect,
 } from 'ant-design-vue';
 
+import IssuePhotoUpload from '#/views/qms/inspection/issues/components/IssuePhotoUpload.vue';
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
 
 import { useVehicleCommissioningPage } from './composables/useVehicleCommissioningPage';
 
 const {
+  claimStatusOptions,
   createReport,
+  deptTreeData,
+  exportIssuesAsExcel,
   exportReportAsPdf,
   exportReportAsWord,
+  groupedIssues,
+  groupedReports,
   issueEditId,
   issueForm,
   issueLogModalOpen,
   issueLogs,
   issueModalOpen,
   issueStatusOptions,
-  issues,
   issuesByStatus,
   loadIssues,
   loadReports,
@@ -41,12 +49,12 @@ const {
   openCreateIssue,
   openEditIssue,
   previewReportText,
+  projectTimeSummaries,
   quickCloseIssue,
   reportForm,
   reportPreviewModalOpen,
   reportPreviewText,
   reportPreviewTitle,
-  reports,
   selectedIssueIds,
   selectedReportWorkOrderValue,
   selectedWorkOrderValue,
@@ -59,7 +67,7 @@ const {
 <template>
   <Page content-class="p-4">
     <div class="space-y-4">
-      <Card title="车辆调试执行概览">
+      <Card title="调试验收执行概览">
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
           <div class="rounded border p-3">
             <div class="text-xs text-gray-500">待处理</div>
@@ -97,6 +105,7 @@ const {
                   新建问题
                 </Button>
                 <Button @click="loadIssues">刷新</Button>
+                <Button @click="exportIssuesAsExcel()">导出Excel</Button>
               </Space>
               <div class="text-xs text-gray-500">
                 选中问题将关联到日报：{{ selectedIssueIds.length }} 条
@@ -104,15 +113,23 @@ const {
             </div>
             <Table
               row-key="id"
-              :data-source="issues"
+              :data-source="groupedIssues"
               :loading="loadingIssues"
               :row-selection="{
                 selectedRowKeys: selectedIssueIds,
                 onChange: onIssueSelectionChange,
+                getCheckboxProps: (record) => ({
+                  disabled: Boolean(record.isGroup),
+                }),
               }"
+              :scroll="{ x: 1100 }"
               :pagination="{ pageSize: 10 }"
             >
-              <Table.Column title="日期" data-index="date" width="110" />
+              <Table.Column title="日期" data-index="date" width="110">
+                <template #default="{ record }">
+                  {{ record.isGroup ? '工单汇总' : record.date }}
+                </template>
+              </Table.Column>
               <Table.Column
                 title="项目名称"
                 data-index="projectName"
@@ -123,15 +140,54 @@ const {
                 data-index="workOrderNumber"
                 width="130"
               />
-              <Table.Column title="问题描述" data-index="description" />
+              <Table.Column title="问题描述" data-index="description">
+                <template #default="{ record }">
+                  <span v-if="record.isGroup">
+                    共 {{ record.issueCount }} 条，未关闭
+                    {{ record.openCount }} 条
+                  </span>
+                  <span v-else>{{ record.description }}</span>
+                </template>
+              </Table.Column>
               <Table.Column
                 title="责任部门"
                 data-index="responsibleDepartment"
                 width="110"
               />
+              <Table.Column title="照片" width="80">
+                <template #default="{ record }">
+                  <span v-if="record.isGroup">-</span>
+                  <Tag
+                    v-else-if="(record.photos || []).length > 0"
+                    color="blue"
+                  >
+                    {{ (record.photos || []).length }} 张
+                  </Tag>
+                  <span v-else>-</span>
+                </template>
+              </Table.Column>
+              <Table.Column title="索赔" width="80">
+                <template #default="{ record }">
+                  <span v-if="record.isGroup">-</span>
+                  <Tag v-else :color="record.isClaim ? 'red' : 'default'">
+                    {{ record.isClaim ? '是' : '否' }}
+                  </Tag>
+                </template>
+              </Table.Column>
               <Table.Column title="状态" data-index="status" width="100">
                 <template #default="{ record }">
                   <Tag
+                    v-if="record.isGroup"
+                    :color="record.openCount > 0 ? 'orange' : 'green'"
+                  >
+                    {{
+                      record.openCount > 0
+                        ? `未关闭 ${record.openCount}`
+                        : '全部关闭'
+                    }}
+                  </Tag>
+                  <Tag
+                    v-else
                     :color="
                       record.status === 'CLOSED'
                         ? 'green'
@@ -156,7 +212,16 @@ const {
               </Table.Column>
               <Table.Column title="操作" width="170" fixed="right">
                 <template #default="{ record }">
-                  <Space>
+                  <Space v-if="record.isGroup">
+                    <Button
+                      size="small"
+                      type="link"
+                      @click="exportIssuesAsExcel(record.workOrderNumber)"
+                    >
+                      导出
+                    </Button>
+                  </Space>
+                  <Space v-else>
                     <Button
                       size="small"
                       type="link"
@@ -187,7 +252,7 @@ const {
         </Tabs.TabPane>
 
         <Tabs.TabPane key="report" tab="日报生成与发布">
-          <Card title="生成试验日报">
+          <Card title="生成调试验收日报">
             <Form layout="vertical">
               <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <Form.Item label="关联工单">
@@ -196,12 +261,20 @@ const {
                     @change="onReportWorkOrderChange"
                   />
                 </Form.Item>
+                <Form.Item label="工单号">
+                  <Input
+                    v-model:value="reportForm.workOrderNumber"
+                    placeholder="选择工单后自动带出"
+                  />
+                </Form.Item>
                 <Form.Item label="项目名称" required>
                   <Input
                     v-model:value="reportForm.projectName"
                     placeholder="例如：75T抱罐车"
                   />
                 </Form.Item>
+              </div>
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <Form.Item label="日期" required>
                   <DatePicker
                     v-model:value="reportForm.date"
@@ -242,11 +315,21 @@ const {
           <Card title="历史日报" class="mt-4">
             <Table
               row-key="id"
-              :data-source="reports"
+              :data-source="groupedReports"
               :loading="loadingReports"
+              :scroll="{ x: 900 }"
               :pagination="{ pageSize: 8 }"
             >
-              <Table.Column title="日期" data-index="date" width="110" />
+              <Table.Column title="日期" data-index="date" width="110">
+                <template #default="{ record }">
+                  {{ record.isGroup ? '工单汇总' : record.date }}
+                </template>
+              </Table.Column>
+              <Table.Column
+                title="工单号"
+                data-index="workOrderNumber"
+                width="140"
+              />
               <Table.Column
                 title="项目名称"
                 data-index="projectName"
@@ -254,17 +337,26 @@ const {
               />
               <Table.Column title="汇报人" width="180">
                 <template #default="{ record }">
-                  {{ (record.reporters || []).join(' ') || '-' }}
+                  <span v-if="record.isGroup">
+                    共 {{ record.reportCount }} 份日报
+                  </span>
+                  <span v-else>
+                    {{ (record.reporters || []).join(' ') || '-' }}
+                  </span>
                 </template>
               </Table.Column>
               <Table.Column title="关联问题数" width="100">
                 <template #default="{ record }">
-                  {{ (record.issueIds || []).length }}
+                  {{
+                    record.isGroup
+                      ? record.issueCount
+                      : (record.issueIds || []).length
+                  }}
                 </template>
               </Table.Column>
               <Table.Column title="操作" width="120">
                 <template #default="{ record }">
-                  <Space>
+                  <Space v-if="!record.isGroup">
                     <Button
                       size="small"
                       type="link"
@@ -292,12 +384,55 @@ const {
             </Table>
           </Card>
         </Tabs.TabPane>
+
+        <Tabs.TabPane key="summary" tab="项目调试验收汇总">
+          <Card>
+            <Table
+              row-key="projectName"
+              :data-source="projectTimeSummaries"
+              :pagination="{ pageSize: 10 }"
+              :scroll="{ x: 760 }"
+              size="small"
+            >
+              <Table.Column
+                title="项目名称"
+                data-index="projectName"
+                width="180"
+              />
+              <Table.Column title="验收日期范围" width="180">
+                <template #default="{ record }">
+                  {{ record.firstDate }} 至 {{ record.lastDate }}
+                </template>
+              </Table.Column>
+              <Table.Column
+                title="验收天数"
+                data-index="workDays"
+                width="100"
+              />
+              <Table.Column
+                title="关联工单"
+                data-index="workOrderCount"
+                width="100"
+              />
+              <Table.Column
+                title="问题数量"
+                data-index="issueCount"
+                width="100"
+              />
+              <Table.Column
+                title="日报数量"
+                data-index="reportCount"
+                width="100"
+              />
+            </Table>
+          </Card>
+        </Tabs.TabPane>
       </Tabs>
     </div>
 
     <Modal
       v-model:open="issueModalOpen"
-      :title="issueEditId ? '编辑调试问题' : '新建调试问题'"
+      :title="issueEditId ? '编辑调试验收问题' : '新建调试验收问题'"
       ok-text="保存"
       cancel-text="取消"
       @ok="submitIssue"
@@ -310,14 +445,14 @@ const {
             class="w-full"
           />
         </Form.Item>
-        <Form.Item label="项目名称" required>
-          <Input v-model:value="issueForm.projectName" />
-        </Form.Item>
         <Form.Item label="工单号">
           <WorkOrderSelect
             v-model:value="selectedWorkOrderValue"
             @change="onWorkOrderChange"
           />
+        </Form.Item>
+        <Form.Item label="项目名称" required>
+          <Input v-model:value="issueForm.projectName" />
         </Form.Item>
         <Form.Item label="部件名称">
           <Input v-model:value="issueForm.partName" />
@@ -326,7 +461,12 @@ const {
           <Input.TextArea v-model:value="issueForm.description" :rows="4" />
         </Form.Item>
         <Form.Item label="责任部门">
-          <Input v-model:value="issueForm.responsibleDepartment" />
+          <TreeSelect
+            v-model:value="issueForm.responsibleDepartment"
+            :tree-data="deptTreeData"
+            placeholder="请选择责任部门"
+            tree-default-expand-all
+          />
         </Form.Item>
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Form.Item label="严重程度">
@@ -342,11 +482,50 @@ const {
             />
           </Form.Item>
         </div>
+        <Form.Item label="是否索赔">
+          <Switch
+            v-model:checked="issueForm.isClaim"
+            checked-children="是"
+            un-checked-children="否"
+          />
+        </Form.Item>
+        <div
+          v-if="issueForm.isClaim"
+          class="grid grid-cols-1 gap-3 md:grid-cols-2"
+        >
+          <Form.Item label="预计损失金额">
+            <InputNumber
+              v-model:value="issueForm.lossAmount"
+              :min="0"
+              :precision="2"
+              class="w-full"
+              prefix="¥"
+            />
+          </Form.Item>
+          <Form.Item label="已索赔金额">
+            <InputNumber
+              v-model:value="issueForm.recoveredAmount"
+              :min="0"
+              :precision="2"
+              class="w-full"
+              prefix="¥"
+            />
+          </Form.Item>
+          <Form.Item label="索赔状态">
+            <Select
+              v-model:value="issueForm.claimStatus"
+              :options="claimStatusOptions"
+            />
+          </Form.Item>
+          <Form.Item label="索赔备注">
+            <Input.TextArea v-model:value="issueForm.claimNotes" :rows="2" />
+          </Form.Item>
+        </div>
+        <Form.Item label="问题照片">
+          <IssuePhotoUpload v-model:value="issueForm.photos" />
+        </Form.Item>
         <Form.Item label="处理建议">
           <Input.TextArea v-model:value="issueForm.solution" :rows="3" />
-        </Form.Item>
-        <Form.Item label="责任人">
-          <Input v-model:value="issueForm.assignee" />
         </Form.Item>
       </Form>
     </Modal>

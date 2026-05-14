@@ -13,6 +13,9 @@ vi.mock('../../utils/prisma', () => ({
     quality_records: {
       findMany: vi.fn(),
     },
+    vehicle_commissioning_issues: {
+      findMany: vi.fn(),
+    },
     after_sales: {
       findMany: vi.fn(),
     },
@@ -87,10 +90,27 @@ describe('qualityLossService', () => {
           createdAt: new Date(),
         },
       ]);
+      (prisma.vehicle_commissioning_issues.findMany as any).mockResolvedValue([
+        {
+          id: 'da-1',
+          date: new Date('2024-01-04'),
+          lossAmount: '80.00',
+          recoveredAmount: '20.00',
+          responsibleDepartment: 'Debug',
+          partName: 'Hydraulic',
+          projectName: 'Project C',
+          workOrderNumber: 'WO003',
+          description: 'Commissioning issue',
+          claimNotes: '',
+          claimStatus: 'Processing',
+          isDeleted: false,
+          createdAt: new Date(),
+        },
+      ]);
 
       const result = await QualityLossService.getAllLosses();
 
-      expect(result.total).toBe(3);
+      expect(result.total).toBe(4);
 
       // Check individual mapping
       const manual = result.items.find((i) => i.lossSource === 'Manual');
@@ -104,12 +124,21 @@ describe('qualityLossService', () => {
       const external = result.items.find((i) => i.lossSource === 'External');
       expect(external?.amount).toBe(350); // 300 + 50
       expect(external?.id).toBe('EXT-201');
+
+      const commissioning = result.items.find(
+        (i) => i.lossSource === 'Commissioning',
+      );
+      expect(commissioning?.amount).toBe(80);
+      expect(commissioning?.id).toBe('da-1');
     });
 
     it('should handle empty results gracefully', async () => {
       (prisma.quality_losses.findMany as any).mockResolvedValue([]);
       (prisma.quality_records.findMany as any).mockResolvedValue([]);
       (prisma.after_sales.findMany as any).mockResolvedValue([]);
+      (prisma.vehicle_commissioning_issues.findMany as any).mockResolvedValue(
+        [],
+      );
 
       const result = await QualityLossService.getAllLosses();
       expect(result.items).toHaveLength(0);
@@ -163,6 +192,9 @@ describe('qualityLossService', () => {
           createdAt: new Date(),
         },
       ]);
+      (prisma.vehicle_commissioning_issues.findMany as any).mockResolvedValue(
+        [],
+      );
 
       const confirmedOnly = await QualityLossService.getAllLosses({
         status: 'Confirmed',
@@ -179,7 +211,8 @@ describe('qualityLossService', () => {
       (prisma.$queryRaw as any)
         .mockResolvedValueOnce([{ p: 1, a: 100 }]) // manual
         .mockResolvedValueOnce([{ p: 1, a: 200 }]) // internal
-        .mockResolvedValueOnce([{ p: 1, a: 300 }]); // external
+        .mockResolvedValueOnce([{ p: 1, a: 300 }]) // external
+        .mockResolvedValueOnce([{ p: 1, a: 50 }]); // commissioning
 
       const result = await QualityLossService.getTrendData('month');
 
@@ -187,25 +220,28 @@ describe('qualityLossService', () => {
         (t) => t.period === '1月' || t.period === 'Jan',
       );
       expect(jan).toBeDefined();
-      expect(jan?.totalAmount).toBe(600);
+      expect(jan?.totalAmount).toBe(650);
       expect(jan?.manualAmount).toBe(100);
       expect(jan?.internalAmount).toBe(200);
       expect(jan?.externalAmount).toBe(300);
+      expect(jan?.commissioningAmount).toBe(50);
     });
 
     it('should handle BigInt period and sum values', async () => {
       (prisma.$queryRaw as any)
         .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(1000) }]) // manual
         .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(2000) }]) // internal
-        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(3000) }]); // external
+        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(3000) }]) // external
+        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(500) }]); // commissioning
 
       const result = await QualityLossService.getTrendData('week');
       const w5 = result.trend.find((t) => t.period === 'W5');
       expect(w5).toBeDefined();
-      expect(w5?.totalAmount).toBe(6000);
+      expect(w5?.totalAmount).toBe(6500);
       expect(w5?.manualAmount).toBe(1000);
       expect(w5?.internalAmount).toBe(2000);
       expect(w5?.externalAmount).toBe(3000);
+      expect(w5?.commissioningAmount).toBe(500);
     });
   });
 });

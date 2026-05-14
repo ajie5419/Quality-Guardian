@@ -327,6 +327,7 @@
       "label": "来源",
       "internal": "内部损失",
       "external": "外部损失",
+      "commissioning": "调试验收",
       "manual": "手工录入"
     }
   },

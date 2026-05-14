@@ -22,6 +22,12 @@ type SourceLookupClient = {
       where: { serialNumber: number };
     }): Promise<null | { id: string }>;
   };
+  vehicle_commissioning_issues: {
+    findFirst(args: {
+      select: { id: true };
+      where: { id: string };
+    }): Promise<null | { id: string }>;
+  };
 };
 
 type ParseUpdateResult =
@@ -43,6 +49,11 @@ type ResolveTargetResult =
   | {
       message: string;
       valid: false;
+    }
+  | {
+      source: typeof QUALITY_LOSS_SOURCE.COMMISSIONING;
+      valid: true;
+      where: Prisma.vehicle_commissioning_issuesWhereUniqueInput;
     }
   | {
       source: typeof QUALITY_LOSS_SOURCE.EXTERNAL;
@@ -168,15 +179,30 @@ export async function resolveQualityLossUpdateTarget(params: {
 
   if (
     source === QUALITY_LOSS_SOURCE.INTERNAL &&
-    (identifier.startsWith('EXT-') || pathId.startsWith('EXT-'))
+    (identifier.startsWith('EXT-') ||
+      identifier.startsWith('DA-') ||
+      pathId.startsWith('EXT-') ||
+      pathId.startsWith('DA-'))
   ) {
     return { valid: false, message: '内部损失来源与目标ID不匹配' };
   }
   if (
     source === QUALITY_LOSS_SOURCE.EXTERNAL &&
-    (identifier.startsWith('INT-') || pathId.startsWith('INT-'))
+    (identifier.startsWith('INT-') ||
+      identifier.startsWith('DA-') ||
+      pathId.startsWith('INT-') ||
+      pathId.startsWith('DA-'))
   ) {
     return { valid: false, message: '外部损失来源与目标ID不匹配' };
+  }
+  if (
+    source === QUALITY_LOSS_SOURCE.COMMISSIONING &&
+    (identifier.startsWith('INT-') ||
+      identifier.startsWith('EXT-') ||
+      pathId.startsWith('INT-') ||
+      pathId.startsWith('EXT-'))
+  ) {
+    return { valid: false, message: '调试验收来源与目标ID不匹配' };
   }
 
   if (source === QUALITY_LOSS_SOURCE.INTERNAL) {
@@ -199,6 +225,21 @@ export async function resolveQualityLossUpdateTarget(params: {
       source: QUALITY_LOSS_SOURCE.INTERNAL,
       valid: true,
       where: { id: identifier },
+    };
+  }
+
+  if (source === QUALITY_LOSS_SOURCE.COMMISSIONING) {
+    const row = await client.vehicle_commissioning_issues.findFirst({
+      where: { id: identifier },
+      select: { id: true },
+    });
+    if (!row) {
+      return { valid: false, message: '调试验收问题不存在' };
+    }
+    return {
+      source: QUALITY_LOSS_SOURCE.COMMISSIONING,
+      valid: true,
+      where: { id: row.id },
     };
   }
 

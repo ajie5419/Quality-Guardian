@@ -19,6 +19,10 @@ vi.mock('../../utils/prisma', () => ({
       count: vi.fn(),
       groupBy: vi.fn(),
     },
+    vehicle_commissioning_issues: {
+      aggregate: vi.fn(),
+      count: vi.fn(),
+    },
     work_orders: {
       aggregate: vi.fn(),
       count: vi.fn(),
@@ -54,6 +58,12 @@ describe('dashboardService', () => {
         _count: { id: 5 },
         _sum: { lossAmount: 2000 },
       });
+      (
+        prisma.vehicle_commissioning_issues.aggregate as any
+      ).mockResolvedValueOnce({
+        _count: { id: 2 },
+        _sum: { lossAmount: 700 },
+      });
       (prisma.work_orders.aggregate as any).mockResolvedValueOnce({
         _count: { workOrderNumber: 20 },
       });
@@ -64,6 +74,7 @@ describe('dashboardService', () => {
       // Mock week data counts
       (prisma.after_sales.count as any).mockResolvedValue(2);
       (prisma.quality_records.count as any).mockResolvedValue(3);
+      (prisma.vehicle_commissioning_issues.count as any).mockResolvedValue(1);
       (prisma.work_orders.count as any).mockResolvedValue(4);
 
       // Mock week loss aggregate (Promise.all)
@@ -75,6 +86,11 @@ describe('dashboardService', () => {
       });
       (prisma.quality_losses.aggregate as any).mockResolvedValueOnce({
         _sum: { amount: 300 },
+      });
+      (
+        prisma.vehicle_commissioning_issues.aggregate as any
+      ).mockResolvedValueOnce({
+        _sum: { lossAmount: 70 },
       });
 
       // Mock recent work orders
@@ -93,10 +109,13 @@ describe('dashboardService', () => {
         weekly: number;
       };
 
-      expect(ql.total).toBe(6500); // 1000+500+2000+3000
-      expect(ql.weekly).toBe(650); // 100+50+200+300
+      expect(ql.total).toBe(7200); // 1000+500+2000+700+3000
+      expect(ql.weekly).toBe(720); // 100+50+200+70+300
       expect(stats.overview.fieldIssues?.total).toBe(10);
       expect(stats.overview.fieldIssues?.open).toBe(2);
+      expect(stats.overview.processIssues?.total).toBe(7);
+      expect(stats.overview.processIssues?.open).toBe(4);
+      expect(stats.overview.openIssues).toBe(6);
       expect(stats.recentWorkOrders).toHaveLength(1);
     });
 

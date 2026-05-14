@@ -33,6 +33,7 @@ interface TrendRow {
 }
 
 interface TrendItem {
+  commissioning: number;
   external: number;
   internal: number;
   manual: number;
@@ -86,6 +87,7 @@ const QL_CONSTANTS = {
     PENDING: 'Pending',
   },
   SOURCE: {
+    COMMISSIONING: 'Commissioning',
     MANUAL: 'Manual',
     INTERNAL: 'Internal',
     EXTERNAL: 'External',
@@ -128,6 +130,21 @@ function buildExternalSalesWhere(
 ): Prisma.after_salesWhereInput {
   return {
     isDeleted: false,
+    ...(params.workOrderNumber
+      ? { workOrderNumber: { contains: params.workOrderNumber } }
+      : {}),
+  };
+}
+
+/**
+ * 构建调试验收问题 where 条件。只纳入需要索赔或已填写损失金额的数据。
+ */
+function buildCommissioningIssuesWhere(
+  params: QualityLossQueryParams,
+): Prisma.vehicle_commissioning_issuesWhereInput {
+  return {
+    isDeleted: false,
+    OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
     ...(params.workOrderNumber
       ? { workOrderNumber: { contains: params.workOrderNumber } }
       : {}),
@@ -255,6 +272,41 @@ function formatExternalSalesItem(item: {
   };
 }
 
+/**
+ * 格式化调试验收问题产生的质量损失。
+ */
+function formatCommissioningIssueItem(item: {
+  claimNotes: null | string;
+  claimStatus: string;
+  createdAt: Date;
+  date: Date;
+  description: null | string;
+  id: string;
+  lossAmount: null | number | Prisma.Decimal;
+  partName: null | string;
+  projectName: null | string;
+  recoveredAmount: null | number | Prisma.Decimal;
+  responsibleDepartment: null | string;
+  workOrderNumber: null | string;
+}): QualityLossItem {
+  return {
+    id: item.id,
+    pk: item.id,
+    date: formatDateString(item.date),
+    amount: safeNumber(item.lossAmount),
+    responsibleDepartment: item.responsibleDepartment,
+    description: item.claimNotes || item.description || undefined,
+    status: normalizeQualityLossStatus(item.claimStatus),
+    type: QL_CONSTANTS.SOURCE.COMMISSIONING,
+    lossSource: QL_CONSTANTS.SOURCE.COMMISSIONING,
+    workOrderNumber: item.workOrderNumber || '-',
+    projectName: item.projectName || '-',
+    partName: item.partName || '-',
+    actualClaim: safeNumber(item.recoveredAmount),
+    createdAt: item.createdAt.toISOString(),
+  };
+}
+
 // ============ 辅助函数：排序 ============
 
 /**
@@ -272,17 +324,29 @@ async function getAllLossesUnpaginated(
   const { lossSource, status, userContext, workOrderNumber } = params;
 
   // 1. 并行获取所有来源的原始数据
-  const [manualRecords, internalRecords, externalRecords] = await Promise.all([
-    prisma.quality_losses.findMany({
-      where: buildManualLossesWhere(params),
-    }),
-    prisma.quality_records.findMany({
-      where: buildInternalRecordsWhere(params),
-    }),
-    prisma.after_sales.findMany({
-      where: buildExternalSalesWhere(params),
-    }),
-  ]);
+  const [manualRecords, internalRecords, externalRecords, commissioningIssues] =
+    await Promise.all([
+      prisma.quality_losses.findMany({
+        where: buildManualLossesWhere(params),
+      }),
+      prisma.quality_records.findMany({
+        where: buildInternalRecordsWhere(params),
+      }),
+      prisma.after_sales.findMany({
+        where: buildExternalSalesWhere(params),
+      }),
+      prisma.vehicle_commissioning_issues
+        .findMany({
+          where: buildCommissioningIssuesWhere(params),
+        })
+        .catch((error) => {
+          logger.warn(
+            { err: error },
+            'vehicle_commissioning_issues query failed, skip commissioning quality loss source',
+          );
+          return [];
+        }),
+    ]);
 
   // 部门树查询失败时不影响主流程，直接回退为原始部门ID
   const deptTree = ((await DeptService.findAll().catch((error) => {
@@ -362,6 +426,17 @@ async function getAllLossesUnpaginated(
     });
   }
 
+  // 5. 处理调试验收索赔记录
+  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.COMMISSIONING) {
+    commissioningIssues.forEach((item) => {
+      const formatted = formatCommissioningIssueItem(item);
+      formatted.responsibleDepartment = getDeptName(
+        formatted.responsibleDepartment,
+      );
+      result.push(formatted);
+    });
+  }
+
   const statusFiltered = status
     ? result.filter(
         (item) =>
@@ -417,6 +492,7 @@ function mergeTrendData(
   manual: TrendRow[],
   internal: TrendRow[],
   external: TrendRow[],
+  commissioning: TrendRow[],
   granularity: 'month' | 'week',
 ): Map<number, TrendItem> {
   const merged = new Map<number, TrendItem>();
@@ -427,7 +503,7 @@ function mergeTrendData(
       if (p === 0 && granularity !== 'week') return; // WEEK() can be 0, MONTH() is 1-12
       let item = merged.get(p);
       if (!item) {
-        item = { external: 0, internal: 0, manual: 0 };
+        item = { commissioning: 0, external: 0, internal: 0, manual: 0 };
         merged.set(p, item);
       }
       item[key] += safeNumber(r.a);
@@ -437,6 +513,7 @@ function mergeTrendData(
   process(manual, 'manual');
   process(internal, 'internal');
   process(external, 'external');
+  process(commissioning, 'commissioning');
 
   return merged;
 }
@@ -448,13 +525,15 @@ function formatTrendItem(
   period: string,
   item: TrendItem,
 ): QualityLossServiceTrendItem {
-  const total = item.manual + item.internal + item.external;
+  const total =
+    item.manual + item.internal + item.external + item.commissioning;
   return {
     period,
     totalAmount: formatNumber(total),
     manualAmount: formatNumber(item.manual),
     internalAmount: formatNumber(item.internal),
     externalAmount: formatNumber(item.external),
+    commissioningAmount: formatNumber(item.commissioning),
   };
 }
 
@@ -472,7 +551,7 @@ export const QualityLossService = {
 
     try {
       // Use Prisma.sql for safer raw queries
-      const [manual, internal, external] = await Promise.all([
+      const [manual, internal, external, commissioning] = await Promise.all([
         isWeek
           ? prisma.$queryRaw<
               TrendRow[]
@@ -494,9 +573,22 @@ export const QualityLossService = {
           : prisma.$queryRaw<
               TrendRow[]
             >`SELECT MONTH(occurDate) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
+        isWeek
+          ? prisma.$queryRaw<
+              TrendRow[]
+            >`SELECT WEEK(date, 3) as p, SUM(IFNULL(lossAmount, 0)) as a FROM vehicle_commissioning_issues WHERE YEAR(date) = ${year} AND isDeleted = 0 AND (isClaim = 1 OR IFNULL(lossAmount, 0) > 0) GROUP BY p`
+          : prisma.$queryRaw<
+              TrendRow[]
+            >`SELECT MONTH(date) as p, SUM(IFNULL(lossAmount, 0)) as a FROM vehicle_commissioning_issues WHERE YEAR(date) = ${year} AND isDeleted = 0 AND (isClaim = 1 OR IFNULL(lossAmount, 0) > 0) GROUP BY p`,
       ]);
 
-      const merged = mergeTrendData(manual, internal, external, granularity);
+      const merged = mergeTrendData(
+        manual,
+        internal,
+        external,
+        commissioning,
+        granularity,
+      );
       const result: QualityLossServiceTrendItem[] = [];
 
       if (isWeek) {
@@ -507,7 +599,12 @@ export const QualityLossService = {
           });
       } else {
         for (let k = 1; k <= 12; k++) {
-          const v = merged.get(k) || { external: 0, internal: 0, manual: 0 };
+          const v = merged.get(k) || {
+            commissioning: 0,
+            external: 0,
+            internal: 0,
+            manual: 0,
+          };
           result.push(
             formatTrendItem(QL_CONSTANTS.MONTHS[k - 1] ?? `${k}月`, v),
           );
@@ -771,28 +868,41 @@ export const QualityLossService = {
    * 获取钻取明细数据
    */
   async getDrillDown(start: Date, end: Date) {
-    const [manualLosses, internalLosses, externalLosses] = await Promise.all([
-      prisma.quality_losses.findMany({
-        where: {
-          isDeleted: false,
-          occurDate: { gte: start, lte: end },
-        },
-      }),
-      prisma.quality_records.findMany({
-        where: {
-          isDeleted: false,
-          date: { gte: start, lte: end },
-          lossAmount: { gt: 0 },
-        },
-      }),
-      prisma.after_sales.findMany({
-        where: {
-          isDeleted: false,
-          occurDate: { gte: start, lte: end },
-        },
-      }),
-    ]);
+    const [manualLosses, internalLosses, externalLosses, commissioningLosses] =
+      await Promise.all([
+        prisma.quality_losses.findMany({
+          where: {
+            isDeleted: false,
+            occurDate: { gte: start, lte: end },
+          },
+        }),
+        prisma.quality_records.findMany({
+          where: {
+            isDeleted: false,
+            date: { gte: start, lte: end },
+            lossAmount: { gt: 0 },
+          },
+        }),
+        prisma.after_sales.findMany({
+          where: {
+            isDeleted: false,
+            occurDate: { gte: start, lte: end },
+          },
+        }),
+        prisma.vehicle_commissioning_issues.findMany({
+          where: {
+            isDeleted: false,
+            date: { gte: start, lte: end },
+            OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
+          },
+        }),
+      ]);
 
-    return { manualLosses, internalLosses, externalLosses };
+    return {
+      manualLosses,
+      internalLosses,
+      externalLosses,
+      commissioningLosses,
+    };
   },
 };

@@ -4,6 +4,7 @@
 import type { Dept } from '@qgs/shared';
 
 export enum LossSource {
+  COMMISSIONING = 'Commissioning',
   EXTERNAL = 'External',
   INTERNAL = 'Internal',
   MANUAL = 'Manual',

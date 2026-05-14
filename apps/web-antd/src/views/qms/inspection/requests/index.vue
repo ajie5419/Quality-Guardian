@@ -279,6 +279,7 @@ const viewOptions = [
   { label: '待派单', value: 'submitted' },
   { label: '已派单', value: 'dispatched' },
   { label: '我的检验', value: 'inspecting' },
+  { label: '扫码报检入口', value: 'entry' },
 ];
 
 const checkResultOptions = [
@@ -330,6 +331,7 @@ const topHistoryInspectorStats = computed(() =>
 const visibleInspectorStatus = computed(
   () => requestStats.value.inspectorStatus,
 );
+const isEntryView = computed(() => activeView.value === 'entry');
 
 function statusColor(status: InspectionRequestStatus) {
   if (status === 'CLOSED') return 'success';
@@ -564,6 +566,7 @@ async function handleViewChange(value: number | string) {
   activeView.value = String(value);
   applyViewStatus(activeView.value);
   page.value = 1;
+  if (isEntryView.value) return;
   await loadRequests();
 }
 
@@ -983,105 +986,7 @@ watch(
 
 <template>
   <Page content-class="p-4">
-    <div class="grid grid-cols-1 gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
-      <Card title="扫码报检入口">
-        <div
-          class="mb-4 flex flex-col items-center rounded border bg-gray-50 p-3"
-        >
-          <img
-            v-if="requestEntryQr"
-            :src="requestEntryQr"
-            alt="扫码报检二维码"
-            class="size-[180px]"
-          />
-          <div class="mt-2 text-center text-xs text-gray-500">
-            车间扫码进入报检填报
-          </div>
-        </div>
-        <Form layout="vertical">
-          <Form.Item label="工单号" required>
-            <WorkOrderSelect v-model:value="requestForm.workOrderNumber" />
-          </Form.Item>
-          <Form.Item label="部件名称" required>
-            <Select
-              v-model:value="requestForm.partName"
-              :options="bomPartOptions"
-              :loading="bomPartsLoading"
-              :disabled="!requestForm.workOrderNumber"
-              placeholder="请选择BOM部件"
-              show-search
-              allow-clear
-            />
-          </Form.Item>
-          <Form.Item label="工序" required>
-            <Select
-              v-model:value="requestForm.processName"
-              :options="processOptions"
-              :loading="workOrderRequirementsLoading"
-              placeholder="请选择工序"
-              show-search
-              allow-clear
-            />
-          </Form.Item>
-          <Form.Item label="数量" required>
-            <InputNumber
-              v-model:value="requestForm.quantity"
-              :min="1"
-              :precision="0"
-              class="w-full"
-            />
-          </Form.Item>
-          <Form.Item label="班组" required>
-            <TeamSelect v-model:value="requestForm.team" />
-          </Form.Item>
-          <Form.Item label="报检人" required>
-            <Input v-model:value="requestForm.reporter" />
-          </Form.Item>
-          <div class="grid grid-cols-2 gap-3">
-            <Form.Item label="自检结果">
-              <Select
-                v-model:value="requestForm.selfCheckResult"
-                :options="checkResultOptions"
-              />
-            </Form.Item>
-            <Form.Item label="互检结果">
-              <Select
-                v-model:value="requestForm.mutualCheckResult"
-                :options="checkResultOptions"
-              />
-            </Form.Item>
-          </div>
-          <Form.Item label="报检信息">
-            <Input.TextArea v-model:value="requestForm.requestInfo" :rows="4" />
-          </Form.Item>
-          <Form.Item label="自检记录" required>
-            <Upload
-              v-model:file-list="attachmentFileList"
-              action="/api/upload"
-              :headers="uploadHeaders"
-              multiple
-              @change="handleAttachmentUploadChange"
-            >
-              <Button>
-                <template #icon>
-                  <IconifyIcon icon="lucide:upload" />
-                </template>
-                上传自检记录
-              </Button>
-            </Upload>
-          </Form.Item>
-          <Button
-            type="primary"
-            block
-            :loading="submitting"
-            @click="submitRequest"
-          >
-            <template #icon><IconifyIcon icon="lucide:plus" /></template>
-            提交报检
-          </Button>
-        </Form>
-      </Card>
-
+    <div class="space-y-4">
       <Card>
         <div class="mb-4 space-y-4">
           <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -1254,7 +1159,7 @@ watch(
                 @change="handleViewChange"
               />
             </div>
-            <div class="flex flex-wrap items-center gap-2">
+            <div v-if="!isEntryView" class="flex flex-wrap items-center gap-2">
               <Input
                 v-model:value="query.keyword"
                 allow-clear
@@ -1280,7 +1185,112 @@ watch(
           </div>
         </div>
 
+        <div
+          v-if="isEntryView"
+          class="max-w-[460px] rounded border bg-white p-4"
+        >
+          <div
+            class="mb-4 flex flex-col items-center rounded border bg-gray-50 p-3"
+          >
+            <img
+              v-if="requestEntryQr"
+              :src="requestEntryQr"
+              alt="扫码报检二维码"
+              class="size-[180px]"
+            />
+            <div class="mt-2 text-center text-xs text-gray-500">
+              车间扫码进入报检填报
+            </div>
+          </div>
+          <Form layout="vertical">
+            <Form.Item label="工单号" required>
+              <WorkOrderSelect v-model:value="requestForm.workOrderNumber" />
+            </Form.Item>
+            <Form.Item label="部件名称" required>
+              <Select
+                v-model:value="requestForm.partName"
+                :options="bomPartOptions"
+                :loading="bomPartsLoading"
+                :disabled="!requestForm.workOrderNumber"
+                placeholder="请选择BOM部件"
+                show-search
+                allow-clear
+              />
+            </Form.Item>
+            <Form.Item label="工序" required>
+              <Select
+                v-model:value="requestForm.processName"
+                :options="processOptions"
+                :loading="workOrderRequirementsLoading"
+                placeholder="请选择工序"
+                show-search
+                allow-clear
+              />
+            </Form.Item>
+            <Form.Item label="数量" required>
+              <InputNumber
+                v-model:value="requestForm.quantity"
+                :min="1"
+                :precision="0"
+                class="w-full"
+              />
+            </Form.Item>
+            <Form.Item label="班组" required>
+              <TeamSelect v-model:value="requestForm.team" />
+            </Form.Item>
+            <Form.Item label="报检人" required>
+              <Input v-model:value="requestForm.reporter" />
+            </Form.Item>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Form.Item label="自检结果">
+                <Select
+                  v-model:value="requestForm.selfCheckResult"
+                  :options="checkResultOptions"
+                />
+              </Form.Item>
+              <Form.Item label="互检结果">
+                <Select
+                  v-model:value="requestForm.mutualCheckResult"
+                  :options="checkResultOptions"
+                />
+              </Form.Item>
+            </div>
+            <Form.Item label="报检信息">
+              <Input.TextArea
+                v-model:value="requestForm.requestInfo"
+                :rows="4"
+              />
+            </Form.Item>
+            <Form.Item label="自检记录" required>
+              <Upload
+                v-model:file-list="attachmentFileList"
+                action="/api/upload"
+                :headers="uploadHeaders"
+                multiple
+                @change="handleAttachmentUploadChange"
+              >
+                <Button>
+                  <template #icon>
+                    <IconifyIcon icon="lucide:upload" />
+                  </template>
+                  上传自检记录
+                </Button>
+              </Upload>
+            </Form.Item>
+            <Button
+              type="primary"
+              block
+              :loading="submitting"
+              @click="submitRequest"
+            >
+              <template #icon><IconifyIcon icon="lucide:plus" /></template>
+              提交报检
+            </Button>
+          </Form>
+        </div>
+
         <Table
+          v-else
           row-key="id"
           :data-source="requests"
           :loading="loading"

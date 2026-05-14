@@ -6,13 +6,19 @@ export type VehicleCommissioningIssueStatus =
 
 export interface VehicleCommissioningIssue {
   assignee?: string;
+  claimNotes?: string;
+  claimStatus?: string;
   closedAt?: string;
   createdAt?: string;
   date: string;
   description: string;
   id: string;
+  isClaim?: boolean;
+  lossAmount?: number;
   partName: string;
+  photos?: string[];
   projectName: string;
+  recoveredAmount?: number;
   responsibleDepartment: string;
   severity?: string;
   solution?: string;
@@ -38,6 +44,7 @@ export interface VehicleCommissioningDailyReportPayload {
   notes?: string;
   projectName: string;
   reporters: string[];
+  workOrderNumber?: string;
 }
 
 export interface VehicleCommissioningDailyReport {
@@ -51,4 +58,5 @@ export interface VehicleCommissioningDailyReport {
   reporters: string[];
   reportText: string;
   updatedAt?: string;
+  workOrderNumber?: string;
 }

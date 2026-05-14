@@ -17,6 +17,7 @@ interface QualityLossDataItem {
   externalAmount?: number;
   internalAmount?: number;
   manualAmount?: number;
+  commissioningAmount?: number;
   period: string;
 }
 
@@ -55,6 +56,7 @@ function updateChart() {
       data: [
         t('qms.qualityLoss.source.internal'),
         t('qms.qualityLoss.source.external'),
+        t('qms.qualityLoss.source.commissioning'),
         t('qms.qualityLoss.source.manual'),
       ],
       bottom: 0,
@@ -87,6 +89,13 @@ function updateChart() {
         stack: 'total',
         data: props.data.map((i) => i.externalAmount),
         itemStyle: { color: '#EE6666' },
+      },
+      {
+        name: t('qms.qualityLoss.source.commissioning'),
+        type: 'bar' as const,
+        stack: 'total',
+        data: props.data.map((i) => i.commissioningAmount),
+        itemStyle: { color: '#9A60B4' },
       },
       {
         name: t('qms.qualityLoss.source.manual'),

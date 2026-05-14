@@ -65,10 +65,20 @@
     "hideChart": "Hide Chart"
   },
   "qualityLoss": {
+    "amountLabel": "Amount",
+    "actualClaim": "Actual Claim",
     "status": {
       "confirmed": "Confirmed",
       "pending": "Pending",
-      "processing": "Processing"
+      "processing": "Processing",
+      "resolved": "Resolved"
+    },
+    "source": {
+      "label": "Source",
+      "internal": "Internal Loss",
+      "external": "External Loss",
+      "commissioning": "Commissioning Acceptance",
+      "manual": "Manual"
     }
   },
   "inspection": {

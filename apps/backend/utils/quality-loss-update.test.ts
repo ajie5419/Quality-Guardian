@@ -44,6 +44,9 @@ describe('quality-loss update utils', () => {
       quality_records: {
         findFirst: vi.fn().mockResolvedValue({ id: 'qr-1' }),
       },
+      vehicle_commissioning_issues: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'da-1' }),
+      },
     };
 
     const internal = await resolveQualityLossUpdateTarget({
@@ -73,6 +76,7 @@ describe('quality-loss update utils', () => {
     const client = {
       after_sales: { findFirst: vi.fn() },
       quality_records: { findFirst: vi.fn() },
+      vehicle_commissioning_issues: { findFirst: vi.fn() },
     };
     const result = await resolveQualityLossUpdateTarget({
       client,

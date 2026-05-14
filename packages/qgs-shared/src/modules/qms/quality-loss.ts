@@ -16,6 +16,7 @@ export interface QualityLossItem {
 }
 
 export interface QualityLossServiceTrendItem {
+  commissioningAmount?: number;
   externalAmount: number;
   internalAmount: number;
   manualAmount: number;
