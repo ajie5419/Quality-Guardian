@@ -16,6 +16,12 @@ export * from '@qgs/shared';
 export interface InspectionRequestStats {
   byInspector: Array<{ count: number; inspector: string }>;
   byTeam: Array<{ count: number; team: string }>;
+  historyByInspector: Array<{
+    averageTaskMinutes: number;
+    completedTaskCount: number;
+    inspector: string;
+  }>;
+  historyByTeam: Array<{ count: number; team: string }>;
   inspectorStatus: Array<{
     activeTaskCount: number;
     averageTaskMinutes: number;

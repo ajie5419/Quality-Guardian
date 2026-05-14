@@ -83,6 +83,12 @@ const requests = ref<InspectionRequest[]>([]);
 const requestStats = ref({
   byInspector: [] as Array<{ count: number; inspector: string }>,
   byTeam: [] as Array<{ count: number; team: string }>,
+  historyByInspector: [] as Array<{
+    averageTaskMinutes: number;
+    completedTaskCount: number;
+    inspector: string;
+  }>,
+  historyByTeam: [] as Array<{ count: number; team: string }>,
   inspectorStatus: [] as Array<{
     activeTaskCount: number;
     averageTaskMinutes: number;
@@ -315,6 +321,12 @@ const canDelete = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Requests:Delete']),
 );
 const topTeamStats = computed(() => requestStats.value.byTeam.slice(0, 4));
+const topHistoryTeamStats = computed(() =>
+  requestStats.value.historyByTeam.slice(0, 5),
+);
+const topHistoryInspectorStats = computed(() =>
+  requestStats.value.historyByInspector.slice(0, 5),
+);
 const visibleInspectorStatus = computed(
   () => requestStats.value.inspectorStatus,
 );
@@ -1163,6 +1175,68 @@ watch(
               </div>
               <div v-else class="mt-2 text-xs text-emerald-600">
                 暂无检验员任务
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <div class="rounded border border-slate-100 bg-slate-50 px-4 py-3">
+              <div class="flex items-center justify-between">
+                <div class="text-xs text-slate-600">历史班组报检数量</div>
+                <div class="text-xs text-slate-500">
+                  {{ requestStats.historyByTeam.length }} 个班组
+                </div>
+              </div>
+              <div
+                v-if="topHistoryTeamStats.length > 0"
+                class="mt-2 grid gap-2 sm:grid-cols-2"
+              >
+                <div
+                  v-for="item in topHistoryTeamStats"
+                  :key="item.team"
+                  class="flex items-center justify-between gap-2 rounded bg-white px-3 py-2 text-xs"
+                >
+                  <span class="truncate text-slate-700">{{ item.team }}</span>
+                  <span class="font-semibold text-slate-900">
+                    {{ item.count }}
+                  </span>
+                </div>
+              </div>
+              <div v-else class="mt-2 text-xs text-slate-500">
+                暂无历史报检数据
+              </div>
+            </div>
+
+            <div class="rounded border border-cyan-100 bg-cyan-50 px-4 py-3">
+              <div class="flex items-center justify-between">
+                <div class="text-xs text-cyan-700">历史检验员效率</div>
+                <div class="text-xs text-cyan-600">
+                  {{ requestStats.historyByInspector.length }} 人
+                </div>
+              </div>
+              <div
+                v-if="topHistoryInspectorStats.length > 0"
+                class="mt-2 space-y-1"
+              >
+                <div
+                  v-for="item in topHistoryInspectorStats"
+                  :key="item.inspector"
+                  class="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded bg-white px-3 py-2 text-xs"
+                >
+                  <span class="truncate text-cyan-900">
+                    {{ item.inspector }}
+                  </span>
+                  <span class="text-right text-cyan-900">
+                    完成
+                    <span class="font-semibold">
+                      {{ item.completedTaskCount }}
+                    </span>
+                    · 均 {{ minutesText(item.averageTaskMinutes) }}
+                  </span>
+                </div>
+              </div>
+              <div v-else class="mt-2 text-xs text-cyan-600">
+                暂无历史检验数据
               </div>
             </div>
           </div>

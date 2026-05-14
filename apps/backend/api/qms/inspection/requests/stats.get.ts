@@ -56,6 +56,7 @@ export default defineEventHandler(async (event) => {
     const [
       todayRequests,
       activeInspectorRequests,
+      historyRequests,
       pendingDispatchCount,
       pendingInspectionCount,
       activeUsers,
@@ -81,6 +82,12 @@ export default defineEventHandler(async (event) => {
           isDeleted: false,
           status: 'DISPATCHED',
         },
+      }),
+      prisma.qms_inspection_requests.findMany({
+        include: {
+          inspector: { select: { id: true, realName: true, username: true } },
+        },
+        where: { isDeleted: false },
       }),
       prisma.qms_inspection_requests.count({
         where: { isDeleted: false, status: 'SUBMITTED' },
@@ -245,6 +252,16 @@ export default defineEventHandler(async (event) => {
 
     const teamMap = new Map<string, number>();
     const inspectorMap = new Map<string, number>();
+    const historyTeamMap = new Map<string, number>();
+    const historyInspectorMap = new Map<
+      string,
+      {
+        averageTaskMinutes: number;
+        completedTaskCount: number;
+        inspector: string;
+        totalTaskMinutes: number;
+      }
+    >();
     let todaySubmittedCount = 0;
     let todayClosedCount = 0;
 
@@ -269,16 +286,54 @@ export default defineEventHandler(async (event) => {
       }
     }
 
+    for (const item of historyRequests) {
+      if (item.submittedAt && item.status !== 'CANCELLED') {
+        const team = String(item.team || '未填写班组').trim();
+        historyTeamMap.set(team, (historyTeamMap.get(team) || 0) + 1);
+      }
+
+      if (item.closedAt) {
+        const inspector =
+          item.inspector?.realName ||
+          item.inspector?.username ||
+          '未记录检验员';
+        const existing = historyInspectorMap.get(inspector) || {
+          averageTaskMinutes: 0,
+          completedTaskCount: 0,
+          inspector,
+          totalTaskMinutes: 0,
+        };
+        const taskMinutes = durationMinutes(
+          item.dispatchedAt || item.submittedAt,
+          item.closedAt,
+        );
+        existing.completedTaskCount += 1;
+        existing.totalTaskMinutes += taskMinutes;
+        existing.averageTaskMinutes = Math.round(
+          existing.totalTaskMinutes / existing.completedTaskCount,
+        );
+        historyInspectorMap.set(inspector, existing);
+      }
+    }
+
     const byTeam = [...teamMap.entries()]
       .map(([team, count]) => ({ count, team }))
       .sort((a, b) => b.count - a.count);
     const byInspector = [...inspectorMap.entries()]
       .map(([inspector, count]) => ({ count, inspector }))
       .sort((a, b) => b.count - a.count);
+    const historyByTeam = [...historyTeamMap.entries()]
+      .map(([team, count]) => ({ count, team }))
+      .sort((a, b) => b.count - a.count);
+    const historyByInspector = [...historyInspectorMap.values()]
+      .filter((item) => item.inspector !== '未记录检验员')
+      .sort((a, b) => b.completedTaskCount - a.completedTaskCount);
 
     return useResponseSuccess({
       byInspector,
       byTeam,
+      historyByInspector,
+      historyByTeam,
       inspectorStatus,
       pendingDispatchCount,
       pendingInspectionCount,
