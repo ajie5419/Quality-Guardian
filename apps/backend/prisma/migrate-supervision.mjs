@@ -750,12 +750,7 @@ async function main() {
     'BOOLEAN NOT NULL DEFAULT false',
     dryRun,
   );
-  await addColumn(
-    'supervision_issues',
-    'taskId',
-    'VARCHAR(191) NULL',
-    dryRun,
-  );
+  await addColumn('supervision_issues', 'taskId', 'VARCHAR(191) NULL', dryRun);
   await addIndexes(dryRun);
 
   console.log('[supervision-migrate] done');

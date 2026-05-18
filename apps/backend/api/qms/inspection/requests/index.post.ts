@@ -11,6 +11,7 @@ import {
   normalizeInspectionRequestText,
   parseInspectionRequestQuantity,
 } from '~/utils/inspection-request';
+import { publishInspectionRequestCreated } from '~/utils/inspection-request-events';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
@@ -112,7 +113,10 @@ export default defineEventHandler(async (event) => {
       userId: userinfo?.id,
     });
 
-    return useResponseSuccess(mapInspectionRequest(created));
+    const mapped = mapInspectionRequest(created);
+    publishInspectionRequestCreated(mapped);
+
+    return useResponseSuccess(mapped);
   } catch (error) {
     logApiError('inspection-request-create', error);
     return internalServerErrorResponse(event, '创建报检任务失败');

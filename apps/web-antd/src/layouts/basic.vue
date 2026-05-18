@@ -7,6 +7,7 @@ import { BasicLayout, LockScreen, UserDropdown } from '@vben/layouts';
 import { preferences } from '@vben/preferences';
 import { useAccessStore, useUserStore } from '@vben/stores';
 
+import InspectionRequestGlobalAlert from '#/components/Qms/InspectionRequestGlobalAlert.vue';
 import { useAuthStore } from '#/store';
 import LoginForm from '#/views/_core/authentication/login.vue';
 
@@ -63,4 +64,5 @@ watch(
       <LockScreen :avatar @to-login="handleLogout" />
     </template>
   </BasicLayout>
+  <InspectionRequestGlobalAlert />
 </template>

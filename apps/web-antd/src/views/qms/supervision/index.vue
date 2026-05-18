@@ -395,12 +395,12 @@ const planTaskGroups = computed(() => {
 });
 const timelineBounds = computed(() => {
   const fallbackStart = dayjs();
-  const starts = planTasks.value
-    .map((task) => (task.plannedStartAt ? dayjs(task.plannedStartAt) : null))
-    .filter(Boolean);
-  const ends = planTasks.value
-    .map((task) => (task.plannedEndAt ? dayjs(task.plannedEndAt) : null))
-    .filter(Boolean);
+  const starts: dayjs.Dayjs[] = [];
+  const ends: dayjs.Dayjs[] = [];
+  for (const task of planTasks.value) {
+    if (task.plannedStartAt) starts.push(dayjs(task.plannedStartAt));
+    if (task.plannedEndAt) ends.push(dayjs(task.plannedEndAt));
+  }
   let start = starts[0] ?? fallbackStart;
   for (const item of starts.slice(1)) {
     if (item.isBefore(start)) start = item;

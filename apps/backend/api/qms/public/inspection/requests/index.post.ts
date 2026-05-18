@@ -10,6 +10,7 @@ import {
   normalizeInspectionRequestText,
   parseInspectionRequestQuantity,
 } from '~/utils/inspection-request';
+import { publishInspectionRequestCreated } from '~/utils/inspection-request-events';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
@@ -95,7 +96,10 @@ export default defineEventHandler(async (event) => {
       bizType: 'inspection_request',
     });
 
-    return useResponseSuccess(mapInspectionRequest(created));
+    const mapped = mapInspectionRequest(created);
+    publishInspectionRequestCreated(mapped);
+
+    return useResponseSuccess(mapped);
   } catch (error) {
     logApiError('public-inspection-request-create', error);
     return internalServerErrorResponse(event, '创建报检任务失败');

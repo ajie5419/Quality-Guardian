@@ -14,7 +14,7 @@ import type { SystemDeptApi } from '#/api/system/dept';
 import type { SystemUserApi } from '#/api/system/user';
 import type { TreeSelectNode } from '#/types';
 
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useAccess } from '@vben/access';
@@ -117,6 +117,10 @@ const dispatchOpen = ref(false);
 const closeOpen = ref(false);
 const dispatchDetailOpen = ref(false);
 const closeQrOpen = ref(false);
+const inspectorStatusOpen = ref(false);
+const routeDispatchDetailConsumed = ref(false);
+const routeDispatchDetailOpened = ref(false);
+const routeDispatchRestoreKeyword = ref<null | string>(null);
 const currentRequest = ref<InspectionRequest>();
 const requestEntryQr = ref('');
 const closeQr = ref('');
@@ -336,6 +340,34 @@ const isEntryView = computed(() => activeView.value === 'entry');
 const isRequestAssemblyProcess = computed(() =>
   String(requestForm.processName || '').includes('组装'),
 );
+const sortedInspectorStatus = computed(() =>
+  [...requestStats.value.inspectorStatus].sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'IDLE' ? -1 : 1;
+    if (a.status === 'BUSY') {
+      return b.currentTaskMinutes - a.currentTaskMinutes;
+    }
+    return b.completedTaskCount - a.completedTaskCount;
+  }),
+);
+const idleInspectorCount = computed(
+  () =>
+    requestStats.value.inspectorStatus.filter((item) => item.status === 'IDLE')
+      .length,
+);
+const busyInspectorCount = computed(
+  () =>
+    requestStats.value.inspectorStatus.filter((item) => item.status === 'BUSY')
+      .length,
+);
+const visibleInspectorStatus = computed(() => {
+  const idle = sortedInspectorStatus.value
+    .filter((item) => item.status === 'IDLE')
+    .slice(0, 4);
+  const busy = sortedInspectorStatus.value
+    .filter((item) => item.status === 'BUSY')
+    .slice(0, 4);
+  return [...idle, ...busy].slice(0, 8);
+});
 
 function statusColor(status: InspectionRequestStatus) {
   if (status === 'CLOSED') return 'success';
@@ -437,6 +469,14 @@ function durationText(start?: null | string, end?: null | string) {
   const hours = Math.floor((totalMinutes % 1440) / 60);
   const minutes = totalMinutes % 60;
   if (days > 0) return `${days}天${hours}小时`;
+  if (hours > 0) return `${hours}小时${minutes}分钟`;
+  return `${minutes}分钟`;
+}
+
+function minutesText(value?: number) {
+  const totalMinutes = Math.max(0, Math.floor(Number(value || 0)));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
   if (hours > 0) return `${hours}小时${minutes}分钟`;
   return `${minutes}分钟`;
 }
@@ -642,6 +682,7 @@ function shouldUseMineFilter() {
 
 async function handleViewChange(value: number | string) {
   activeView.value = String(value);
+  closeRouteDispatchDetail();
   applyViewStatus(activeView.value);
   page.value = 1;
   if (isEntryView.value) return;
@@ -816,6 +857,12 @@ async function loadRequestStats() {
   requestStats.value = await getInspectionRequestStats();
 }
 
+async function refreshInspectionRequestPage() {
+  if (isEntryView.value) return;
+  page.value = 1;
+  await Promise.all([loadRequests(), loadRequestStats()]);
+}
+
 async function loadUsers() {
   const res = await getUserList({ page: 1, pageSize: 200 });
   users.value = res.items || [];
@@ -883,6 +930,20 @@ function openDispatch(record: InspectionRequest) {
 function openDispatchDetail(record: InspectionRequest) {
   currentRequest.value = record;
   dispatchDetailOpen.value = true;
+}
+
+function closeRouteDispatchDetail() {
+  if (!routeDispatchDetailOpened.value) return;
+  dispatchDetailOpen.value = false;
+  currentRequest.value = undefined;
+  routeDispatchDetailOpened.value = false;
+  restoreRouteDispatchKeyword();
+}
+
+function restoreRouteDispatchKeyword() {
+  if (routeDispatchRestoreKeyword.value === null) return;
+  query.keyword = routeDispatchRestoreKeyword.value;
+  routeDispatchRestoreKeyword.value = null;
 }
 
 function openCloseFromDispatchDetail() {
@@ -1030,18 +1091,39 @@ function applyRoutePrefill() {
   requestForm.reporter = String(route.query.reporter || '');
   requestForm.team = String(route.query.team || '');
   if (routeDispatchRequestId.value) {
+    if (routeDispatchRestoreKeyword.value === null) {
+      routeDispatchRestoreKeyword.value = query.keyword;
+    }
     query.keyword = routeDispatchRequestId.value;
+    routeDispatchDetailConsumed.value = false;
   }
 }
 
 function openDispatchDetailFromRoute() {
-  if (!routeDispatchRequestId.value || dispatchDetailOpen.value) return;
+  if (
+    !routeDispatchRequestId.value ||
+    dispatchDetailOpen.value ||
+    routeDispatchDetailConsumed.value
+  ) {
+    return;
+  }
   const matched = requests.value.find(
     (item) => item.id === routeDispatchRequestId.value,
   );
   if (matched) {
     openDispatchDetail(matched);
+    routeDispatchDetailConsumed.value = true;
+    routeDispatchDetailOpened.value = true;
+    restoreRouteDispatchKeyword();
+    const nextQuery = { ...route.query };
+    delete nextQuery.dispatchRequestId;
+    delete nextQuery.closeRequestId;
+    void router.replace({ query: nextQuery });
   }
+}
+
+function handleInspectionRequestCreated() {
+  void refreshInspectionRequestPage();
 }
 
 onMounted(async () => {
@@ -1053,6 +1135,17 @@ onMounted(async () => {
     loadRequests(),
     loadRequestStats(),
   ]);
+  window.addEventListener(
+    'qms:inspection-request-created',
+    handleInspectionRequestCreated,
+  );
+});
+
+onUnmounted(() => {
+  window.removeEventListener(
+    'qms:inspection-request-created',
+    handleInspectionRequestCreated,
+  );
 });
 
 watch(
@@ -1124,6 +1217,60 @@ watch(
                 {{ requestStats.todayClosedCount }}
               </div>
               <div class="mt-1 text-xs text-emerald-600">看板中查看趋势</div>
+            </div>
+          </div>
+
+          <div v-if="!isEntryView" class="rounded border bg-gray-50 p-3">
+            <div class="mb-2 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-gray-900">
+                  检验员状态
+                </span>
+                <Tag color="success">空闲 {{ idleInspectorCount }}</Tag>
+                <Tag color="processing">忙碌 {{ busyInspectorCount }}</Tag>
+              </div>
+              <Button
+                v-if="requestStats.inspectorStatus.length > 0"
+                type="link"
+                size="small"
+                @click="inspectorStatusOpen = true"
+              >
+                查看全部
+              </Button>
+            </div>
+            <div
+              v-if="visibleInspectorStatus.length > 0"
+              class="flex gap-2 overflow-x-auto pb-1"
+            >
+              <button
+                v-for="item in visibleInspectorStatus"
+                :key="item.inspector"
+                class="min-w-[180px] rounded border bg-white px-3 py-2 text-left transition hover:border-blue-300 hover:shadow-sm"
+                type="button"
+                @click="inspectorStatusOpen = true"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <span class="truncate text-sm font-medium text-gray-900">
+                    {{ item.inspector || '未记录' }}
+                  </span>
+                  <Tag
+                    :color="item.status === 'BUSY' ? 'processing' : 'success'"
+                  >
+                    {{ item.status === 'BUSY' ? '有任务' : '空闲' }}
+                  </Tag>
+                </div>
+                <div class="mt-1 text-xs text-gray-500">
+                  当前 {{ item.activeTaskCount }} 项 · 已用
+                  {{ minutesText(item.currentTaskMinutes) }}
+                </div>
+                <div class="mt-0.5 text-xs text-gray-400">
+                  完成 {{ item.completedTaskCount }} · 均
+                  {{ minutesText(item.averageTaskMinutes) }}
+                </div>
+              </button>
+            </div>
+            <div v-else class="py-3 text-sm text-gray-400">
+              暂无检验员状态数据
             </div>
           </div>
 
@@ -1796,6 +1943,50 @@ watch(
         </div>
       </div>
     </Modal>
+
+    <Drawer v-model:open="inspectorStatusOpen" title="检验员状态" width="420">
+      <div v-if="sortedInspectorStatus.length > 0" class="space-y-2">
+        <div
+          v-for="item in sortedInspectorStatus"
+          :key="item.inspector"
+          class="rounded border bg-white px-3 py-2"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="truncate font-medium text-gray-900">
+                {{ item.inspector || '未记录' }}
+              </div>
+              <div class="mt-0.5 text-xs text-gray-500">
+                当前 {{ item.activeTaskCount }} 项 · 已用
+                {{ minutesText(item.currentTaskMinutes) }}
+              </div>
+            </div>
+            <Tag :color="item.status === 'BUSY' ? 'processing' : 'success'">
+              {{ item.status === 'BUSY' ? '有任务' : '空闲' }}
+            </Tag>
+          </div>
+          <div
+            class="mt-2 grid grid-cols-2 gap-2 rounded bg-gray-50 px-2 py-2 text-xs text-gray-500"
+          >
+            <div>
+              <div class="text-gray-400">完成数量</div>
+              <div class="mt-0.5 font-medium text-gray-800">
+                {{ item.completedTaskCount }}
+              </div>
+            </div>
+            <div>
+              <div class="text-gray-400">平均时长</div>
+              <div class="mt-0.5 font-medium text-gray-800">
+                {{ minutesText(item.averageTaskMinutes) }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="py-10 text-center text-sm text-gray-400">
+        暂无检验员状态数据
+      </div>
+    </Drawer>
 
     <Modal
       v-model:open="closeOpen"

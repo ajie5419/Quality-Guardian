@@ -32,6 +32,15 @@ function addDays(date: Date, days: number) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
+function formatShanghaiDate(date: Date) {
+  return new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+  }).format(date);
+}
+
 function getPeriodRange(period?: null | string, now = new Date()) {
   const today = getShanghaiTodayRange(now).start;
   switch (period) {
@@ -319,8 +328,25 @@ export default defineEventHandler(async (event) => {
         totalTaskMinutes: number;
       }
     >();
+    const dailyTrendMap = new Map<
+      string,
+      { closedCount: number; date: string; submittedCount: number }
+    >();
     let todaySubmittedCount = 0;
     let todayClosedCount = 0;
+
+    for (
+      let cursor = new Date(start);
+      cursor < end;
+      cursor = addDays(cursor, 1)
+    ) {
+      const date = formatShanghaiDate(cursor);
+      dailyTrendMap.set(date, {
+        closedCount: 0,
+        date,
+        submittedCount: 0,
+      });
+    }
 
     for (const item of periodRequests) {
       if (
@@ -329,6 +355,10 @@ export default defineEventHandler(async (event) => {
         item.status !== 'CANCELLED'
       ) {
         todaySubmittedCount += 1;
+        const date = formatShanghaiDate(item.submittedAt);
+        const daily = dailyTrendMap.get(date);
+        if (daily) daily.submittedCount += 1;
+
         const team = String(item.team || '未填写班组').trim();
         teamMap.set(team, (teamMap.get(team) || 0) + 1);
         historyTeamMap.set(team, (historyTeamMap.get(team) || 0) + 1);
@@ -370,6 +400,10 @@ export default defineEventHandler(async (event) => {
         item.status === 'CLOSED'
       ) {
         todayClosedCount += 1;
+        const date = formatShanghaiDate(item.closedAt);
+        const daily = dailyTrendMap.get(date);
+        if (daily) daily.closedCount += 1;
+
         const inspector =
           item.inspector?.realName ||
           item.inspector?.username ||
@@ -418,6 +452,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess({
       byInspector,
       byTeam,
+      dailyTrend: [...dailyTrendMap.values()],
       historyByInspector,
       historyByTeam,
       inspectorStatus,
