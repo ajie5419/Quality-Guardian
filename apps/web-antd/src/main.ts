@@ -2,10 +2,12 @@ import { initPreferences } from '@vben/preferences';
 import { unmountGlobalLoading } from '@vben/utils';
 
 import { overridesPreferences } from './preferences';
+import { setupChunkLoadRecovery } from './utils/chunk-reload';
 import { setupClientLogger } from './utils/client-logger';
 import { redirectLegacyHashRoute } from './utils/router-redirect';
 
 redirectLegacyHashRoute();
+setupChunkLoadRecovery();
 
 // 启动客户端错误记录
 setupClientLogger();

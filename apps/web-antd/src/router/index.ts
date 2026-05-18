@@ -6,6 +6,11 @@ import {
 
 import { resetStaticRoutes } from '@vben/utils';
 
+import {
+  isChunkLoadError,
+  reloadOnceForFreshAssets,
+} from '#/utils/chunk-reload';
+
 import { createRouterGuard } from './guard';
 import { routes } from './routes';
 
@@ -30,6 +35,12 @@ const router = createRouter({
 });
 
 const resetRoutes = () => resetStaticRoutes(router, routes);
+
+router.onError((error) => {
+  if (isChunkLoadError(error)) {
+    reloadOnceForFreshAssets();
+  }
+});
 
 // 创建路由守卫
 createRouterGuard(router);
