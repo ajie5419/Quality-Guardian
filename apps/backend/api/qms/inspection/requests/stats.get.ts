@@ -1,4 +1,4 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -20,6 +20,57 @@ function getShanghaiTodayRange(now = new Date()) {
   const start = new Date(`${shanghaiDate}T00:00:00+08:00`);
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
   return { end, start };
+}
+
+function parseShanghaiDate(value?: null | string) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = new Date(`${value}T00:00:00+08:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function addDays(date: Date, days: number) {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function getPeriodRange(period?: null | string, now = new Date()) {
+  const today = getShanghaiTodayRange(now).start;
+  switch (period) {
+    case 'halfYear': {
+      const start = new Date(today);
+      start.setMonth(start.getMonth() - 5, 1);
+      return { end: addDays(today, 1), start };
+    }
+    case 'quarter': {
+      const start = new Date(today);
+      start.setMonth(start.getMonth() - 2, 1);
+      return { end: addDays(today, 1), start };
+    }
+    case 'year': {
+      const start = new Date(today);
+      start.setMonth(0, 1);
+      return { end: addDays(today, 1), start };
+    }
+    default: {
+      const start = new Date(today);
+      start.setDate(1);
+      return { end: addDays(today, 1), start };
+    }
+  }
+}
+
+function resolveStatsRange(rawQuery: unknown) {
+  const query = (rawQuery || {}) as Record<string, unknown>;
+  const startDate = typeof query.startDate === 'string' ? query.startDate : '';
+  const endDate = typeof query.endDate === 'string' ? query.endDate : '';
+  const customStart = parseShanghaiDate(startDate);
+  const customEnd = parseShanghaiDate(endDate);
+
+  if (customStart && customEnd && customEnd >= customStart) {
+    return { end: addDays(customEnd, 1), start: customStart };
+  }
+
+  const period = typeof query.period === 'string' ? query.period : undefined;
+  return period ? getPeriodRange(period) : getShanghaiTodayRange();
 }
 
 function durationMinutes(start: Date, end: Date) {
@@ -50,13 +101,12 @@ export default defineEventHandler(async (event) => {
     return unAuthorizedResponse(event);
   }
 
-  const { end, start } = getShanghaiTodayRange();
+  const { end, start } = resolveStatsRange(getQuery(event));
 
   try {
     const [
-      todayRequests,
+      periodRequests,
       activeInspectorRequests,
-      historyRequests,
       pendingDispatchCount,
       pendingInspectionCount,
       activeUsers,
@@ -80,20 +130,17 @@ export default defineEventHandler(async (event) => {
         where: {
           inspectorId: { not: null },
           isDeleted: false,
-          status: 'DISPATCHED',
+          status: { in: ['DISPATCHED', 'INSPECTING'] },
         },
-      }),
-      prisma.qms_inspection_requests.findMany({
-        include: {
-          inspector: { select: { id: true, realName: true, username: true } },
-        },
-        where: { isDeleted: false },
       }),
       prisma.qms_inspection_requests.count({
         where: { isDeleted: false, status: 'SUBMITTED' },
       }),
       prisma.qms_inspection_requests.count({
-        where: { isDeleted: false, status: 'DISPATCHED' },
+        where: {
+          isDeleted: false,
+          status: { in: ['DISPATCHED', 'INSPECTING'] },
+        },
       }),
       prisma.users.findMany({
         where: { isDeleted: false, status: 'ACTIVE' },
@@ -190,7 +237,7 @@ export default defineEventHandler(async (event) => {
       );
     }
 
-    function resolveInspectorKey(item: (typeof todayRequests)[number]) {
+    function resolveInspectorKey(item: (typeof periodRequests)[number]) {
       return (
         item.inspectorId ||
         item.inspector?.username ||
@@ -199,13 +246,13 @@ export default defineEventHandler(async (event) => {
       );
     }
 
-    function resolveInspectorName(item: (typeof todayRequests)[number]) {
+    function resolveInspectorName(item: (typeof periodRequests)[number]) {
       return (
         item.inspector?.realName || item.inspector?.username || '未记录检验员'
       );
     }
 
-    function getInspectorStatus(item: (typeof todayRequests)[number]) {
+    function getInspectorStatus(item: (typeof periodRequests)[number]) {
       const key = resolveInspectorKey(item);
       const existing = inspectorStatusMap.get(key);
       if (existing) return existing;
@@ -225,7 +272,7 @@ export default defineEventHandler(async (event) => {
       );
     }
 
-    for (const item of todayRequests) {
+    for (const item of periodRequests) {
       if (item.closedAt && item.closedAt >= start && item.closedAt < end) {
         const stat = getInspectorStatus(item);
         const taskMinutes = durationMinutes(
@@ -253,6 +300,16 @@ export default defineEventHandler(async (event) => {
     const teamMap = new Map<string, number>();
     const inspectorMap = new Map<string, number>();
     const historyTeamMap = new Map<string, number>();
+    const teamReinspectionMap = new Map<
+      string,
+      {
+        inspectedCount: number;
+        reinspectionCount: number;
+        reinspectionRate: number;
+        submittedCount: number;
+        team: string;
+      }
+    >();
     const historyInspectorMap = new Map<
       string,
       {
@@ -265,7 +322,7 @@ export default defineEventHandler(async (event) => {
     let todaySubmittedCount = 0;
     let todayClosedCount = 0;
 
-    for (const item of todayRequests) {
+    for (const item of periodRequests) {
       if (
         item.submittedAt >= start &&
         item.submittedAt < end &&
@@ -274,29 +331,51 @@ export default defineEventHandler(async (event) => {
         todaySubmittedCount += 1;
         const team = String(item.team || '未填写班组').trim();
         teamMap.set(team, (teamMap.get(team) || 0) + 1);
+        historyTeamMap.set(team, (historyTeamMap.get(team) || 0) + 1);
+
+        const reinspectionStat = teamReinspectionMap.get(team) || {
+          inspectedCount: 0,
+          reinspectionCount: 0,
+          reinspectionRate: 0,
+          submittedCount: 0,
+          team,
+        };
+        reinspectionStat.submittedCount += 1;
+
+        const hasReinspection =
+          Boolean(item.linkedIssueId || item.linkedIssueNo) ||
+          item.inspectionResult === 'FAIL';
+        const hasInspectionResult = item.status === 'CLOSED' || hasReinspection;
+        if (hasInspectionResult) {
+          reinspectionStat.inspectedCount += 1;
+        }
+        if (hasReinspection) {
+          reinspectionStat.reinspectionCount += 1;
+        }
+        reinspectionStat.reinspectionRate =
+          reinspectionStat.inspectedCount > 0
+            ? Math.round(
+                (reinspectionStat.reinspectionCount /
+                  reinspectionStat.inspectedCount) *
+                  1000,
+              ) / 10
+            : 0;
+        teamReinspectionMap.set(team, reinspectionStat);
       }
 
-      if (item.closedAt && item.closedAt >= start && item.closedAt < end) {
+      if (
+        item.closedAt &&
+        item.closedAt >= start &&
+        item.closedAt < end &&
+        item.status === 'CLOSED'
+      ) {
         todayClosedCount += 1;
         const inspector =
           item.inspector?.realName ||
           item.inspector?.username ||
           '未记录检验员';
         inspectorMap.set(inspector, (inspectorMap.get(inspector) || 0) + 1);
-      }
-    }
 
-    for (const item of historyRequests) {
-      if (item.submittedAt && item.status !== 'CANCELLED') {
-        const team = String(item.team || '未填写班组').trim();
-        historyTeamMap.set(team, (historyTeamMap.get(team) || 0) + 1);
-      }
-
-      if (item.closedAt) {
-        const inspector =
-          item.inspector?.realName ||
-          item.inspector?.username ||
-          '未记录检验员';
         const existing = historyInspectorMap.get(inspector) || {
           averageTaskMinutes: 0,
           completedTaskCount: 0,
@@ -328,6 +407,13 @@ export default defineEventHandler(async (event) => {
     const historyByInspector = [...historyInspectorMap.values()]
       .filter((item) => item.inspector !== '未记录检验员')
       .sort((a, b) => b.completedTaskCount - a.completedTaskCount);
+    const reinspectionRateByTeam = [...teamReinspectionMap.values()].sort(
+      (a, b) =>
+        b.reinspectionRate - a.reinspectionRate ||
+        b.reinspectionCount - a.reinspectionCount ||
+        b.inspectedCount - a.inspectedCount ||
+        b.submittedCount - a.submittedCount,
+    );
 
     return useResponseSuccess({
       byInspector,
@@ -337,6 +423,7 @@ export default defineEventHandler(async (event) => {
       inspectorStatus,
       pendingDispatchCount,
       pendingInspectionCount,
+      reinspectionRateByTeam,
       todayClosedCount,
       todaySubmittedCount,
     });

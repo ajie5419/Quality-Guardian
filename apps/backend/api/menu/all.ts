@@ -6,6 +6,7 @@ import {
   ensureFileCenterMenu,
   ensureInspectionRequestMenu,
   ensureMetrologyMenu,
+  ensureSupervisionMenu,
   ensureVehicleCommissioningMenu,
 } from '~/utils/menu-bootstrap';
 import prisma from '~/utils/prisma';
@@ -178,6 +179,7 @@ export default eventHandler(async (event) => {
   const result = await (async () => {
     await ensureFileCenterMenu();
     await ensureVehicleCommissioningMenu();
+    await ensureSupervisionMenu();
     await ensureInspectionRequestMenu();
     await ensureMetrologyMenu();
 

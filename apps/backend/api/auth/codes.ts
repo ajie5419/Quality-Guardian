@@ -6,6 +6,7 @@ import {
   ensureFileCenterMenu,
   ensureInspectionRequestMenu,
   ensureMetrologyMenu,
+  ensureSupervisionMenu,
   ensureVehicleCommissioningMenu,
 } from '~/utils/menu-bootstrap';
 import {
@@ -28,6 +29,7 @@ export default eventHandler(async (event) => {
   try {
     await ensureFileCenterMenu();
     await ensureVehicleCommissioningMenu();
+    await ensureSupervisionMenu();
     await ensureInspectionRequestMenu();
     await ensureMetrologyMenu();
     const codes = await RbacService.getUserPermissionCodes(String(userId));

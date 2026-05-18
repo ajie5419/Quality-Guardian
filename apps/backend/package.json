@@ -28,6 +28,7 @@
     "db:migrate-bom-inspection-processes": "node prisma/migrate-bom-inspection-processes.mjs",
     "db:migrate-file-center": "node prisma/migrate-file-center.mjs",
     "db:migrate-vehicle-commissioning": "node prisma/migrate-vehicle-commissioning-issues.mjs",
+    "db:migrate-supervision": "node prisma/migrate-supervision.mjs",
     "db:backfill-file-references": "node prisma/backfill-file-references.mjs",
     "db:register-local-files": "node prisma/register-local-files.mjs",
     "db:inspection-quantity-backfill": "node prisma/inspection-quantity-backfill.js",
@@ -48,7 +49,8 @@
     "pino-pretty": "^13.0.0",
     "prisma": "6.2.1",
     "sharp": "^0.34.5",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

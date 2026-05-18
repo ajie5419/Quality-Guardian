@@ -32,6 +32,13 @@ export interface InspectionRequestStats {
   }>;
   pendingDispatchCount: number;
   pendingInspectionCount: number;
+  reinspectionRateByTeam: Array<{
+    inspectedCount: number;
+    reinspectionCount: number;
+    reinspectionRate: number;
+    submittedCount: number;
+    team: string;
+  }>;
   todayClosedCount: number;
   todaySubmittedCount: number;
 }
@@ -56,6 +63,17 @@ export async function getInspectionRequests(params?: {
 export async function getInspectionRequestStats() {
   return requestClient.get<InspectionRequestStats>(
     QMS_API.INSPECTION_REQUESTS_STATS,
+  );
+}
+
+export async function getInspectionRequestStatsWithParams(params?: {
+  endDate?: string;
+  period?: 'halfYear' | 'month' | 'quarter' | 'year';
+  startDate?: string;
+}) {
+  return requestClient.get<InspectionRequestStats>(
+    QMS_API.INSPECTION_REQUESTS_STATS,
+    { params },
   );
 }
 

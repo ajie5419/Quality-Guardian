@@ -667,6 +667,9 @@ importers:
       xlsx:
         specifier: ^0.18.5
         version: 0.18.5
+      zod:
+        specifier: ^3.25.0
+        version: 3.25.67
     devDependencies:
       '@types/bcrypt':
         specifier: ^6.0.0

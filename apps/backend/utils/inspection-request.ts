@@ -33,6 +33,10 @@ export function normalizeInspectionRequestStatus(value: unknown) {
   return REQUEST_STATUS_SET.has(normalized) ? normalized : '';
 }
 
+export function isInspectionRequestAssemblyProcess(value: unknown) {
+  return normalizeInspectionRequestText(value).includes('组装');
+}
+
 export function parseInspectionRequestPriority(value: unknown, fallback = 3) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
@@ -123,6 +127,10 @@ export async function generateInspectionRequestNo(
 }
 
 export function mapInspectionRequest(record: any) {
+  const issue = Array.isArray(record.qualityRecords)
+    ? record.qualityRecords.find((item: any) => !item?.isDeleted)
+    : null;
+
   return {
     ...record,
     attachments: parseInspectionRequestAttachments(record.attachments),
@@ -130,7 +138,19 @@ export function mapInspectionRequest(record: any) {
       record.closeAttachments,
     ),
     dispatcherName: record.dispatcher?.realName || record.dispatcher?.username,
+    inspectionResult:
+      record.inspectionResult || record.inspection?.result || 'PASS',
     inspectorName: record.inspector?.realName || record.inspector?.username,
+    linkedIssueId: record.linkedIssueId || issue?.id || null,
+    linkedIssueNo: record.linkedIssueNo || issue?.nonConformanceNumber || null,
+    linkedIssueStatus: issue?.status || record.linkedIssueStatus || null,
+    qualifiedQuantity:
+      record.qualifiedQuantity ?? record.inspection?.qualifiedQuantity ?? null,
+    unqualifiedQuantity:
+      record.unqualifiedQuantity ??
+      record.inspection?.unqualifiedQuantity ??
+      issue?.quantity ??
+      null,
   };
 }
 
@@ -148,6 +168,7 @@ export async function resolveInspectionRequestCurrentUserId(
 export async function buildInspectionRecordFromRequest(
   request: {
     closeRemark?: null | string;
+    componentName?: null | string;
     mutualCheckResult: string;
     partName: string;
     processName: string;
@@ -168,6 +189,7 @@ export async function buildInspectionRecordFromRequest(
   const closeAttachments = normalizeInspectionRequestAttachments(
     body.attachments,
   );
+  const componentName = normalizeInspectionRequestText(request.componentName);
 
   return InspectionService.create({
     category: 'PROCESS',
@@ -185,7 +207,7 @@ export async function buildInspectionRecordFromRequest(
         : [
             {
               acceptanceCriteria: '报检前已完成自检和互检。',
-              checkItem: `${request.processName} ${request.partName}`,
+              checkItem: `${request.processName} ${request.partName}${componentName ? ` ${componentName}` : ''}`,
               measuredValue: `${request.selfCheckResult}/${request.mutualCheckResult}`,
               remarks: request.requestInfo || '',
               result: result === 'FAIL' ? 'FAIL' : 'PASS',
@@ -193,7 +215,7 @@ export async function buildInspectionRecordFromRequest(
             },
           ],
     level1Component: request.partName,
-    level2Component: request.partName,
+    level2Component: componentName || undefined,
     processName: request.processName,
     projectName: request.work_order?.projectName || request.workOrderNumber,
     quantity: parseInspectionRequestQuantity(

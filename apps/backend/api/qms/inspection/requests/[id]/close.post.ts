@@ -1,5 +1,7 @@
 import type { Prisma } from '@prisma/client';
 
+import process from 'node:process';
+
 import { defineEventHandler, readBody } from 'h3';
 import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
@@ -79,7 +81,7 @@ function validateCloseRequestBody(body: Record<string, unknown>) {
 
   const linkedIssue = body.linkedIssue as Record<string, unknown>;
   for (const [key, label] of [
-    ['partName', '部件名称'],
+    ['partName', '组件名称'],
     ['processName', '工序'],
     ['responsibleDepartment', '责任部门'],
     ['defectType', '缺陷分类'],
@@ -98,6 +100,53 @@ function stringifyCloseInspectionDocuments(
   attachments: ReturnType<typeof normalizeInspectionRequestAttachments>,
 ) {
   return attachments.length > 0 ? JSON.stringify(attachments) : null;
+}
+
+function buildLinkedIssueWhere(
+  request: { linkedIssueId?: null | string; linkedIssueNo?: null | string },
+  issueId?: null | string,
+): null | Prisma.quality_recordsWhereInput {
+  const ids = [
+    normalizeInspectionRequestText(issueId),
+    normalizeInspectionRequestText(request.linkedIssueId),
+  ].filter(Boolean);
+  const issueNo = normalizeInspectionRequestText(request.linkedIssueNo);
+
+  const OR: Prisma.quality_recordsWhereInput[] = [];
+  if (ids.length > 0) {
+    OR.push({ id: { in: [...new Set(ids)] } });
+  }
+  if (issueNo) {
+    OR.push({ nonConformanceNumber: issueNo });
+  }
+
+  return OR.length > 0 ? { isDeleted: false, OR } : null;
+}
+
+function getCloseErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) return '关闭报检任务失败';
+
+  const message = String(error.message || '').trim();
+  if (!message) return '关闭报检任务失败';
+  if (message.startsWith('VALIDATION:')) {
+    return message.replace('VALIDATION:', '');
+  }
+  if (process.env.NODE_ENV === 'development') {
+    return `关闭报检任务失败：${message}`;
+  }
+
+  return '关闭报检任务失败';
+}
+
+async function runClosePostCommitTask(
+  label: string,
+  task: () => Promise<unknown>,
+) {
+  try {
+    await task();
+  } catch (error) {
+    logApiError(`inspection-request-close-${label}`, error);
+  }
 }
 
 export default defineEventHandler(async (event) => {
@@ -172,6 +221,22 @@ export default defineEventHandler(async (event) => {
 
     const result = normalizeInspectionRequestText(body.result).toUpperCase();
     const linkedIssue = body.linkedIssue as Record<string, unknown> | undefined;
+    const totalQuantity = parseInspectionRequestQuantity(
+      body.quantity,
+      request.quantity || 1,
+    );
+    const unqualifiedQuantity =
+      result === 'FAIL'
+        ? Math.max(
+            1,
+            Math.min(
+              totalQuantity,
+              Math.trunc(parseCloseRequestNumber(body.unqualifiedQuantity, 1)),
+            ),
+          )
+        : 0;
+    const qualifiedQuantity = Math.max(0, totalQuantity - unqualifiedQuantity);
+    const shouldCloseRequest = result === 'PASS';
     let issueCreateData: Prisma.quality_recordsCreateInput | undefined;
     let issueAuditDetails = '';
     const closeInspectorId =
@@ -211,6 +276,7 @@ export default defineEventHandler(async (event) => {
         lossAmount: Number(linkedIssue.lossAmount || 0),
         partName:
           normalizeInspectionRequestText(linkedIssue.partName) ||
+          normalizeInspectionRequestText(request.componentName) ||
           request.partName,
         processName:
           normalizeInspectionRequestText(linkedIssue.processName) ||
@@ -223,8 +289,7 @@ export default defineEventHandler(async (event) => {
           request.reporter,
         responsibleDepartment:
           normalizeInspectionRequestText(linkedIssue.responsibleDepartment) ||
-          request.team ||
-          '质量部',
+          '生产 OBU',
         responsibleWelder:
           normalizeInspectionRequestText(linkedIssue.responsibleWelder) ||
           undefined,
@@ -248,10 +313,48 @@ export default defineEventHandler(async (event) => {
       issueAuditDetails = `新增检验问题: ${issueBody.partName} (${newId})`;
     }
 
-    const { record: updated, issue } = await prisma.$transaction(async (tx) => {
+    const {
+      closedLinkedIssueCount,
+      record: updated,
+      issue,
+    } = await prisma.$transaction(async (tx) => {
       const issueRecord = issueCreateData
         ? await tx.quality_records.create({ data: issueCreateData })
         : null;
+      const linkedIssueWhere = buildLinkedIssueWhere(request, issueRecord?.id);
+      let linkedIssueStatus =
+        issueRecord?.status || request.linkedIssueStatus || null;
+      let closedLinkedIssueCount = 0;
+
+      if (shouldCloseRequest && linkedIssueWhere) {
+        const linkedIssueUpdate = await tx.quality_records.updateMany({
+          data: { status: 'CLOSED' },
+          where: {
+            ...linkedIssueWhere,
+            status: { not: 'CLOSED' },
+          },
+        });
+        closedLinkedIssueCount = linkedIssueUpdate.count;
+        linkedIssueStatus = 'CLOSED';
+      }
+
+      if (explicitInspectionId && inspectionId) {
+        await tx.inspections.update({
+          data: {
+            inspector:
+              normalizeInspectionRequestText(body.inspector) ||
+              request.reporter,
+            quantity: totalQuantity,
+            qualifiedQuantity,
+            remarks:
+              normalizeInspectionRequestText(body.closeRemark) ||
+              request.requestInfo,
+            result: result === 'FAIL' ? 'FAIL' : 'PASS',
+            unqualifiedQuantity,
+          },
+          where: { id: inspectionId },
+        });
+      }
 
       const record = await tx.qms_inspection_requests.update({
         data: {
@@ -260,13 +363,29 @@ export default defineEventHandler(async (event) => {
               ? JSON.stringify(closeAttachments)
               : null,
           closeRemark: normalizeInspectionRequestText(body.closeRemark) || null,
-          closedAt: new Date(),
+          closedAt: shouldCloseRequest ? new Date() : null,
           inspectionId,
+          inspectionResult: result === 'FAIL' ? 'FAIL' : 'PASS',
           inspectorId: closeInspectorId || request.inspectorId,
-          status: INSPECTION_REQUEST_STATUS.CLOSED,
+          linkedIssueId: issueRecord?.id || request.linkedIssueId || null,
+          linkedIssueNo:
+            issueRecord?.nonConformanceNumber || request.linkedIssueNo || null,
+          linkedIssueStatus,
+          qualifiedQuantity,
+          status: shouldCloseRequest
+            ? INSPECTION_REQUEST_STATUS.CLOSED
+            : INSPECTION_REQUEST_STATUS.INSPECTING,
+          unqualifiedQuantity,
         },
         include: {
           dispatcher: { select: { realName: true, username: true } },
+          inspection: {
+            select: {
+              qualifiedQuantity: true,
+              result: true,
+              unqualifiedQuantity: true,
+            },
+          },
           inspector: { select: { realName: true, username: true } },
         },
         where: { id },
@@ -274,20 +393,22 @@ export default defineEventHandler(async (event) => {
 
       if (record.dispatchTaskId) {
         await tx.qms_task_dispatches.updateMany({
-          data: { status: 'COMPLETED' },
+          data: { status: shouldCloseRequest ? 'COMPLETED' : 'PROCESSING' },
           where: { id: record.dispatchTaskId },
         });
       }
 
-      return { issue: issueRecord, record };
+      return { closedLinkedIssueCount, issue: issueRecord, record };
     });
 
-    await FileStorageService.registerReferencesFromAttachments({
-      attachments: closeAttachments,
-      bizId: String(updated.id),
-      bizType: 'inspection_request',
-      fieldName: 'closeAttachments',
-    });
+    await runClosePostCommitTask('request-file-references', () =>
+      FileStorageService.registerReferencesFromAttachments({
+        attachments: closeAttachments,
+        bizId: String(updated.id),
+        bizType: 'inspection_request',
+        fieldName: 'closeAttachments',
+      }),
+    );
     const currentInspection = await prisma.inspections.findUnique({
       select: { documents: true },
       where: { id: inspectionId },
@@ -296,30 +417,34 @@ export default defineEventHandler(async (event) => {
       currentInspection?.documents,
       closeAttachments,
     );
-    await prisma.inspections.update({
-      data: {
-        documents: stringifyCloseInspectionDocuments(inspectionDocuments),
-        hasDocuments: inspectionDocuments.length > 0,
-      },
-      where: { id: inspectionId },
-    });
-    await FileStorageService.registerReferencesFromAttachments({
-      attachments: inspectionDocuments,
-      bizId: String(inspectionId),
-      bizType: 'inspection_record',
-      fieldName: 'documents',
+    await runClosePostCommitTask('inspection-documents', async () => {
+      await prisma.inspections.update({
+        data: {
+          documents: stringifyCloseInspectionDocuments(inspectionDocuments),
+          hasDocuments: inspectionDocuments.length > 0,
+        },
+        where: { id: inspectionId },
+      });
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: inspectionDocuments,
+        bizId: String(inspectionId),
+        bizType: 'inspection_record',
+        fieldName: 'documents',
+      });
     });
 
     if (issue && linkedIssue?.photos !== undefined) {
-      await FileStorageService.registerReferencesFromAttachments({
-        attachments: linkedIssue.photos,
-        bizId: String(issue.id),
-        bizType: 'inspection_issue',
-        fieldName: 'photos',
-      });
+      await runClosePostCommitTask('issue-file-references', () =>
+        FileStorageService.registerReferencesFromAttachments({
+          attachments: linkedIssue.photos,
+          bizId: String(issue.id),
+          bizType: 'inspection_issue',
+          fieldName: 'photos',
+        }),
+      );
     }
 
-    if (issue) {
+    if (issue || closedLinkedIssueCount > 0) {
       const { SystemLogService } = await import(
         '~/services/system-log.service'
       );
@@ -327,16 +452,33 @@ export default defineEventHandler(async (event) => {
         '~/services/welder-score.service'
       );
 
-      await SystemLogService.recordAuditLog({
-        userId: String(userinfo.id),
-        action: 'CREATE',
-        targetType: 'inspection_issue',
-        targetId: String(issue.id),
-        details:
-          issueAuditDetails ||
-          `新增检验问题: ${issue.partName} (${issue.nonConformanceNumber || '无编号'})`,
-      });
-      await WelderScoreService.syncFromInspectionIssues();
+      if (issue) {
+        await runClosePostCommitTask('issue-audit-log', () =>
+          SystemLogService.recordAuditLog({
+            userId: String(userinfo.id),
+            action: 'CREATE',
+            targetType: 'inspection_issue',
+            targetId: String(issue.id),
+            details:
+              issueAuditDetails ||
+              `新增检验问题: ${issue.partName} (${issue.nonConformanceNumber || '无编号'})`,
+          }),
+        );
+      }
+      if (closedLinkedIssueCount > 0 && updated.linkedIssueId) {
+        await runClosePostCommitTask('linked-issue-close-audit-log', () =>
+          SystemLogService.recordAuditLog({
+            userId: String(userinfo.id),
+            action: 'UPDATE',
+            targetType: 'inspection_issue',
+            targetId: String(updated.linkedIssueId),
+            details: `复检合格关闭关联检验问题: ${updated.linkedIssueNo || updated.linkedIssueId}`,
+          }),
+        );
+      }
+      await runClosePostCommitTask('welder-score-sync', () =>
+        WelderScoreService.syncFromInspectionIssues(),
+      );
     }
 
     await recordBusinessAuditLog(event, {
@@ -350,15 +492,10 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(mapInspectionRequest(updated));
   } catch (error) {
     logApiError('inspection-request-close', error);
-    if (
-      error instanceof Error &&
-      String(error.message || '').startsWith('VALIDATION:')
-    ) {
-      return badRequestResponse(
-        event,
-        String(error.message || '').replace('VALIDATION:', ''),
-      );
+    const message = getCloseErrorMessage(error);
+    if (error instanceof Error && error.message.startsWith('VALIDATION:')) {
+      return badRequestResponse(event, message);
     }
-    return internalServerErrorResponse(event, '关闭报检任务失败');
+    return internalServerErrorResponse(event, message);
   }
 });

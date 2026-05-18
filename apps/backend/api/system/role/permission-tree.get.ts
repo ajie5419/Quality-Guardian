@@ -3,7 +3,9 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   ensureFileCenterMenu,
+  ensureInspectionRequestMenu,
   ensureMetrologyMenu,
+  ensureSupervisionMenu,
   ensureVehicleCommissioningMenu,
 } from '~/utils/menu-bootstrap';
 import prisma from '~/utils/prisma';
@@ -23,7 +25,9 @@ export default defineEventHandler(async (event) => {
 
   try {
     await ensureFileCenterMenu();
+    await ensureInspectionRequestMenu();
     await ensureVehicleCommissioningMenu();
+    await ensureSupervisionMenu();
     await ensureMetrologyMenu();
 
     // 1. 获取所有启用的菜单

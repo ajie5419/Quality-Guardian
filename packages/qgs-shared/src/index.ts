@@ -12,6 +12,7 @@ export * from './modules/qms/quality-loss';
 export * from './modules/qms/reports';
 export * from './modules/qms/reports-weekly';
 
+export * from './modules/qms/supervision';
 export * from './modules/qms/supplier';
 export * from './modules/qms/task';
 export * from './modules/qms/vehicle-commissioning';

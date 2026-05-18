@@ -7,6 +7,12 @@ export type InspectionRequestStatus =
 
 export type InspectionRequestCheckResult = 'FAIL' | 'NA' | 'PASS';
 
+export type InspectionRequestInspectionResult =
+  | 'CONDITIONAL'
+  | 'FAIL'
+  | 'NA'
+  | 'PASS';
+
 export interface InspectionRequestAttachment {
   fileId?: string;
   name: string;
@@ -20,6 +26,7 @@ export interface InspectionRequest {
   closeAttachments?: InspectionRequestAttachment[];
   closedAt?: null | string;
   closeRemark?: null | string;
+  componentName?: null | string;
   createdAt: string;
   dispatchedAt?: null | string;
   dispatcherId?: null | string;
@@ -28,12 +35,17 @@ export interface InspectionRequest {
   dispatchTaskId?: null | string;
   id: string;
   inspectionId?: null | string;
+  inspectionResult?: InspectionRequestInspectionResult;
   inspectorId?: null | string;
   inspectorName?: null | string;
+  linkedIssueId?: null | string;
+  linkedIssueNo?: null | string;
+  linkedIssueStatus?: null | string;
   mutualCheckResult: InspectionRequestCheckResult;
   partName: string;
   priority: number;
   processName: string;
+  qualifiedQuantity?: null | number;
   quantity: number;
   reporter: string;
   requestInfo?: null | string;
@@ -42,12 +54,14 @@ export interface InspectionRequest {
   status: InspectionRequestStatus;
   submittedAt: string;
   team?: null | string;
+  unqualifiedQuantity?: null | number;
   updatedAt: string;
   workOrderNumber: string;
 }
 
 export interface CreateInspectionRequestParams {
   attachments: InspectionRequestAttachment[];
+  componentName?: string;
   mutualCheckResult?: InspectionRequestCheckResult;
   partName: string;
   processName: string;

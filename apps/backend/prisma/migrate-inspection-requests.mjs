@@ -51,6 +51,15 @@ async function columnExists(tableName, columnName) {
   return rows.length > 0;
 }
 
+async function getColumnType(tableName, columnName) {
+  const rows = await prisma.$queryRawUnsafe(
+    'SELECT DATA_TYPE, COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+    tableName,
+    columnName,
+  );
+  return rows[0] || null;
+}
+
 async function addIndex(tableName, indexName, columns, unique = false) {
   if (await indexExists(tableName, indexName)) {
     return;
@@ -79,6 +88,7 @@ async function main() {
         \`requestNo\` VARCHAR(191) NOT NULL,
         \`workOrderNumber\` VARCHAR(191) NOT NULL,
         \`partName\` VARCHAR(191) NOT NULL,
+        \`componentName\` VARCHAR(191) NULL,
         \`processName\` VARCHAR(191) NOT NULL,
         \`team\` VARCHAR(191) NULL,
         \`quantity\` INTEGER NOT NULL DEFAULT 1,
@@ -93,8 +103,15 @@ async function main() {
         \`inspectorId\` VARCHAR(191) NULL,
         \`dispatchTaskId\` VARCHAR(191) NULL,
         \`inspectionId\` VARCHAR(191) NULL,
+        \`inspectionResult\` ENUM('PASS','FAIL','CONDITIONAL','NA') NOT NULL DEFAULT 'PASS',
+        \`qualifiedQuantity\` INTEGER NULL,
+        \`unqualifiedQuantity\` INTEGER NULL,
+        \`linkedIssueId\` VARCHAR(191) NULL,
+        \`linkedIssueNo\` VARCHAR(191) NULL,
+        \`linkedIssueStatus\` VARCHAR(191) NULL,
         \`dispatchRemark\` TEXT NULL,
         \`closeRemark\` TEXT NULL,
+        \`closeAttachments\` LONGTEXT NULL,
         \`submittedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
         \`dispatchedAt\` DATETIME(3) NULL,
         \`closedAt\` DATETIME(3) NULL,
@@ -123,9 +140,31 @@ async function main() {
   }
 
   if (!dryRun) {
+    const inspectionDocumentsColumn = await getColumnType(
+      'inspections',
+      'documents',
+    );
+    if (
+      inspectionDocumentsColumn &&
+      String(inspectionDocumentsColumn.DATA_TYPE || '').toLowerCase() !==
+        'longtext'
+    ) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE `inspections` MODIFY COLUMN `documents` LONGTEXT NULL',
+      );
+      console.log(
+        `[inspection-requests-migrate] changed inspections.documents from ${inspectionDocumentsColumn.COLUMN_TYPE} to LONGTEXT NULL`,
+      );
+    }
+
     if (!(await columnExists('qms_inspection_requests', 'team'))) {
       await prisma.$executeRawUnsafe(
         'ALTER TABLE `qms_inspection_requests` ADD COLUMN `team` VARCHAR(191) NULL AFTER `processName`',
+      );
+    }
+    if (!(await columnExists('qms_inspection_requests', 'componentName'))) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE `qms_inspection_requests` ADD COLUMN `componentName` VARCHAR(191) NULL AFTER `partName`',
       );
     }
     if (!(await columnExists('qms_inspection_requests', 'quantity'))) {
@@ -136,6 +175,43 @@ async function main() {
     if (!(await columnExists('qms_inspection_requests', 'attachments'))) {
       await prisma.$executeRawUnsafe(
         'ALTER TABLE `qms_inspection_requests` ADD COLUMN `attachments` LONGTEXT NULL AFTER `requestInfo`',
+      );
+    }
+    if (!(await columnExists('qms_inspection_requests', 'closeAttachments'))) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE `qms_inspection_requests` ADD COLUMN `closeAttachments` LONGTEXT NULL AFTER `closeRemark`',
+      );
+    }
+    if (!(await columnExists('qms_inspection_requests', 'inspectionResult'))) {
+      await prisma.$executeRawUnsafe(
+        "ALTER TABLE `qms_inspection_requests` ADD COLUMN `inspectionResult` ENUM('PASS','FAIL','CONDITIONAL','NA') NOT NULL DEFAULT 'PASS' AFTER `inspectionId`",
+      );
+    }
+    if (!(await columnExists('qms_inspection_requests', 'qualifiedQuantity'))) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE `qms_inspection_requests` ADD COLUMN `qualifiedQuantity` INTEGER NULL AFTER `inspectionResult`',
+      );
+    }
+    if (
+      !(await columnExists('qms_inspection_requests', 'unqualifiedQuantity'))
+    ) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE `qms_inspection_requests` ADD COLUMN `unqualifiedQuantity` INTEGER NULL AFTER `qualifiedQuantity`',
+      );
+    }
+    if (!(await columnExists('qms_inspection_requests', 'linkedIssueId'))) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE `qms_inspection_requests` ADD COLUMN `linkedIssueId` VARCHAR(191) NULL AFTER `unqualifiedQuantity`',
+      );
+    }
+    if (!(await columnExists('qms_inspection_requests', 'linkedIssueNo'))) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE `qms_inspection_requests` ADD COLUMN `linkedIssueNo` VARCHAR(191) NULL AFTER `linkedIssueId`',
+      );
+    }
+    if (!(await columnExists('qms_inspection_requests', 'linkedIssueStatus'))) {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE `qms_inspection_requests` ADD COLUMN `linkedIssueStatus` VARCHAR(191) NULL AFTER `linkedIssueNo`',
       );
     }
 
@@ -175,6 +251,16 @@ async function main() {
       'qms_inspection_requests',
       'qms_inspection_requests_submittedAt_idx',
       '`submittedAt`',
+    );
+    await addIndex(
+      'qms_inspection_requests',
+      'qms_inspection_requests_inspectionResult_idx',
+      '`inspectionResult`',
+    );
+    await addIndex(
+      'qms_inspection_requests',
+      'qms_inspection_requests_linkedIssueId_idx',
+      '`linkedIssueId`',
     );
     await addIndex(
       'qms_inspection_requests',

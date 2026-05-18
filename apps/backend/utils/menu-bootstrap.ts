@@ -4,9 +4,15 @@ import { redis } from '~/utils/redis';
 const VEHICLE_COMMISSIONING_PATH = '/qms/vehicle-commissioning';
 const VEHICLE_COMMISSIONING_NAME = 'QMSVehicleCommissioning';
 const VEHICLE_COMMISSIONING_AUTH_CODE = 'QMS:VehicleCommissioning:List';
+const SUPERVISION_PATH = '/qms/supervision';
+const SUPERVISION_NAME = 'QMSSupervision';
+const SUPERVISION_AUTH_CODE = 'QMS:Supervision:List';
 const FILE_CENTER_PATH = '/qms/file-center';
 const FILE_CENTER_NAME = 'QMSFileCenter';
 const FILE_CENTER_AUTH_CODE = 'QMS:FileCenter:List';
+const INSPECTION_DASHBOARD_PATH = '/qms/inspection/dashboard';
+const INSPECTION_DASHBOARD_NAME = 'QMSInspectionDashboard';
+const INSPECTION_DASHBOARD_AUTH_CODE = 'QMS:Inspection:Requests:List';
 const INSPECTION_REQUEST_PATH = '/qms/inspection/requests';
 const INSPECTION_REQUEST_NAME = 'QMSInspectionRequests';
 const INSPECTION_REQUEST_AUTH_CODE = 'QMS:Inspection:Requests:List';
@@ -153,6 +159,14 @@ function buildVehicleCommissioningMeta() {
   });
 }
 
+function buildSupervisionMeta() {
+  return JSON.stringify({
+    icon: 'carbon:location-company',
+    orderNo: 96,
+    title: '监造管理',
+  });
+}
+
 function buildFileCenterMeta() {
   return JSON.stringify({
     icon: 'carbon:document-attachment',
@@ -165,6 +179,13 @@ function buildInspectionRequestMeta() {
   return JSON.stringify({
     icon: 'carbon:qr-code',
     title: '报检任务',
+  });
+}
+
+function buildInspectionDashboardMeta() {
+  return JSON.stringify({
+    icon: 'carbon:chart-column',
+    title: '报检看板',
   });
 }
 
@@ -453,6 +474,79 @@ export async function ensureVehicleCommissioningMenu() {
   }
 }
 
+/**
+ * 自动补齐监造管理菜单：
+ * - 外地制造项目需要现场质量、进度、问题闭环的统一入口
+ * - 幂等：存在则修正必要字段，不重复创建
+ */
+export async function ensureSupervisionMenu() {
+  const qmsRootId = await getQmsRootId();
+  if (!qmsRootId) {
+    return;
+  }
+
+  const existing = await prisma.menus.findFirst({
+    where: {
+      OR: [{ name: SUPERVISION_NAME }, { path: SUPERVISION_PATH }],
+    },
+    select: {
+      authCode: true,
+      component: true,
+      id: true,
+      isDeleted: true,
+      meta: true,
+      name: true,
+      parentId: true,
+      path: true,
+      status: true,
+      type: true,
+    },
+  });
+
+  if (!existing) {
+    await prisma.menus.create({
+      data: {
+        id: `menu-${Date.now()}-supervision`,
+        authCode: SUPERVISION_AUTH_CODE,
+        component: 'qms/supervision/index',
+        isDeleted: false,
+        meta: buildSupervisionMeta(),
+        name: SUPERVISION_NAME,
+        order: 96,
+        parentId: qmsRootId,
+        path: SUPERVISION_PATH,
+        status: 1,
+        type: 'menu',
+      },
+    });
+    await redis.delByPattern('qms:menu:*');
+    return;
+  }
+
+  const nextData: Record<string, unknown> = {};
+  if (existing.isDeleted) nextData.isDeleted = false;
+  if (existing.status !== 1) nextData.status = 1;
+  if (existing.parentId !== qmsRootId) nextData.parentId = qmsRootId;
+  if (existing.type !== 'menu') nextData.type = 'menu';
+  if (existing.path !== SUPERVISION_PATH) nextData.path = SUPERVISION_PATH;
+  if (existing.component !== 'qms/supervision/index') {
+    nextData.component = 'qms/supervision/index';
+  }
+  if (!existing.authCode) nextData.authCode = SUPERVISION_AUTH_CODE;
+  if (existing.meta !== buildSupervisionMeta()) {
+    nextData.meta = buildSupervisionMeta();
+  }
+  if (existing.name !== SUPERVISION_NAME) nextData.name = SUPERVISION_NAME;
+
+  if (Object.keys(nextData).length > 0) {
+    await prisma.menus.update({
+      where: { id: existing.id },
+      data: nextData,
+    });
+    await redis.delByPattern('qms:menu:*');
+  }
+}
+
 export async function ensureInspectionRequestMenu() {
   const inspectionRoot = await prisma.menus.findFirst({
     where: {
@@ -468,6 +562,78 @@ export async function ensureInspectionRequestMenu() {
 
   let changed = false;
   const parentId = String(inspectionRoot.id);
+  const dashboardExisting = await prisma.menus.findFirst({
+    where: {
+      OR: [
+        { name: INSPECTION_DASHBOARD_NAME },
+        { path: INSPECTION_DASHBOARD_PATH },
+      ],
+    },
+    select: {
+      authCode: true,
+      component: true,
+      id: true,
+      isDeleted: true,
+      meta: true,
+      name: true,
+      parentId: true,
+      path: true,
+      status: true,
+      type: true,
+    },
+  });
+
+  if (dashboardExisting) {
+    const nextData: Record<string, unknown> = {};
+    if (dashboardExisting.isDeleted) nextData.isDeleted = false;
+    if (dashboardExisting.status !== 1) nextData.status = 1;
+    if (dashboardExisting.parentId !== parentId) nextData.parentId = parentId;
+    if (dashboardExisting.type !== 'menu') nextData.type = 'menu';
+    if (dashboardExisting.path !== INSPECTION_DASHBOARD_PATH) {
+      nextData.path = INSPECTION_DASHBOARD_PATH;
+    }
+    if (dashboardExisting.component !== 'qms/inspection/dashboard/index') {
+      nextData.component = 'qms/inspection/dashboard/index';
+    }
+    if (!dashboardExisting.authCode) {
+      nextData.authCode = INSPECTION_DASHBOARD_AUTH_CODE;
+    }
+    if (
+      !dashboardExisting.meta ||
+      !String(dashboardExisting.meta).includes('"icon"')
+    ) {
+      nextData.meta = buildInspectionDashboardMeta();
+    }
+    if (dashboardExisting.name !== INSPECTION_DASHBOARD_NAME) {
+      nextData.name = INSPECTION_DASHBOARD_NAME;
+    }
+
+    if (Object.keys(nextData).length > 0) {
+      await prisma.menus.update({
+        data: nextData,
+        where: { id: dashboardExisting.id },
+      });
+      changed = true;
+    }
+  } else {
+    await prisma.menus.create({
+      data: {
+        id: `menu-${Date.now()}-inspection-dashboard`,
+        authCode: INSPECTION_DASHBOARD_AUTH_CODE,
+        component: 'qms/inspection/dashboard/index',
+        isDeleted: false,
+        meta: buildInspectionDashboardMeta(),
+        name: INSPECTION_DASHBOARD_NAME,
+        order: 2,
+        parentId,
+        path: INSPECTION_DASHBOARD_PATH,
+        status: 1,
+        type: 'menu',
+      },
+    });
+    changed = true;
+  }
+
   const existing = await prisma.menus.findFirst({
     where: {
       OR: [

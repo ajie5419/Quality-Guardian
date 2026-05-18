@@ -62,6 +62,7 @@ const workOrderProcessOptions = ref<Array<{ label: string; value: string }>>(
 
 const requestForm = reactive({
   attachments: [] as InspectionRequestAttachment[],
+  componentName: '',
   mutualCheckResult: 'PASS' as InspectionRequestCheckResult,
   partName: '',
   processName: '',
@@ -90,9 +91,14 @@ const processOptions = computed(() => {
   return [...map.values()];
 });
 
+const isAssemblyProcess = computed(() =>
+  String(requestForm.processName || '').includes('组装'),
+);
+
 function applyRoutePrefill() {
   requestForm.workOrderNumber = String(route.query.workOrderNumber || '');
   requestForm.partName = String(route.query.partName || '');
+  requestForm.componentName = String(route.query.componentName || '');
   requestForm.processName = String(route.query.processName || '');
   requestForm.reporter = String(route.query.reporter || '');
   requestForm.team = String(route.query.team || '');
@@ -101,6 +107,7 @@ function applyRoutePrefill() {
 function resetRequestForm() {
   attachmentFileList.value = [];
   requestForm.attachments = [];
+  requestForm.componentName = '';
   requestForm.partName = '';
   requestForm.processName = '';
   requestForm.quantity = 1;
@@ -256,24 +263,29 @@ async function submitRequest() {
     !requestForm.workOrderNumber ||
     !requestForm.partName ||
     !requestForm.processName ||
+    (!isAssemblyProcess.value && !requestForm.componentName) ||
     !requestForm.quantity ||
     !requestForm.team ||
     !requestForm.reporter ||
     requestForm.attachments.length === 0
   ) {
     message.warning(
-      '工单号、部件名称、工序、数量、班组、报检人、自检记录不能为空',
+      '工单号、工序、一级部件名称、组件名称、数量、班组、报检人、自检记录不能为空',
     );
     return;
   }
 
   submitting.value = true;
   try {
-    const created = await createPublicInspectionRequest({ ...requestForm });
+    const created = await createPublicInspectionRequest({
+      ...requestForm,
+      componentName: isAssemblyProcess.value ? '' : requestForm.componentName,
+    });
     message.success(`报检任务已提交：${created.requestNo}`);
     resetRequestForm();
     const nextQuery = { ...route.query };
     delete nextQuery.partName;
+    delete nextQuery.componentName;
     delete nextQuery.processName;
     delete nextQuery.reporter;
     delete nextQuery.team;
@@ -305,6 +317,15 @@ watch(
     ]);
   },
   { immediate: true },
+);
+
+watch(
+  () => requestForm.processName,
+  () => {
+    if (isAssemblyProcess.value) {
+      requestForm.componentName = '';
+    }
+  },
 );
 </script>
 
@@ -346,18 +367,6 @@ watch(
               @search="loadWorkOrderOptions"
             />
           </Form.Item>
-          <Form.Item label="部件名称" required>
-            <Select
-              v-model:value="requestForm.partName"
-              :options="bomPartOptions"
-              :loading="bomPartsLoading"
-              :disabled="!requestForm.workOrderNumber"
-              class="w-full"
-              placeholder="请选择BOM部件"
-              show-search
-              allow-clear
-            />
-          </Form.Item>
           <Form.Item label="工序" required>
             <Select
               v-model:value="requestForm.processName"
@@ -366,6 +375,26 @@ watch(
               class="w-full"
               placeholder="请选择工序"
               show-search
+              allow-clear
+            />
+          </Form.Item>
+          <Form.Item label="一级部件名称" required>
+            <Select
+              v-model:value="requestForm.partName"
+              :options="bomPartOptions"
+              :loading="bomPartsLoading"
+              :disabled="!requestForm.workOrderNumber"
+              class="w-full"
+              placeholder="请选择BOM一级部件"
+              show-search
+              allow-clear
+            />
+          </Form.Item>
+          <Form.Item v-if="!isAssemblyProcess" label="组件名称" required>
+            <Input
+              v-model:value="requestForm.componentName"
+              class="w-full"
+              placeholder="请输入组件名称"
               allow-clear
             />
           </Form.Item>

@@ -3,6 +3,7 @@ import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import {
   generateInspectionRequestNo,
+  isInspectionRequestAssemblyProcess,
   mapInspectionRequest,
   normalizeInspectionRequestAttachments,
   normalizeInspectionRequestCheckResult,
@@ -32,6 +33,9 @@ export default defineEventHandler(async (event) => {
   const workOrderNumber = normalizeInspectionRequestText(body.workOrderNumber);
   const partName = normalizeInspectionRequestText(body.partName);
   const processName = normalizeInspectionRequestText(body.processName);
+  const componentName = isInspectionRequestAssemblyProcess(processName)
+    ? ''
+    : normalizeInspectionRequestText(body.componentName);
   const reporter = normalizeInspectionRequestText(body.reporter);
   const team = normalizeInspectionRequestText(body.team);
   const quantity = parseInspectionRequestQuantity(body.quantity);
@@ -40,13 +44,14 @@ export default defineEventHandler(async (event) => {
     !workOrderNumber ||
     !partName ||
     !processName ||
+    (!isInspectionRequestAssemblyProcess(processName) && !componentName) ||
     !team ||
     !reporter ||
     attachments.length === 0
   ) {
     return badRequestResponse(
       event,
-      '工单号、部件名称、工序、班组、报检人、自检记录不能为空',
+      '工单号、工序、一级部件名称、组件名称、班组、报检人、自检记录不能为空',
     );
   }
 
@@ -62,6 +67,7 @@ export default defineEventHandler(async (event) => {
     const created = await prisma.qms_inspection_requests.create({
       data: {
         attachments: JSON.stringify(attachments),
+        componentName: componentName || null,
         mutualCheckResult: normalizeInspectionRequestCheckResult(
           body.mutualCheckResult,
         ),

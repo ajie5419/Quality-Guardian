@@ -68,6 +68,10 @@ export const QMS_API = {
   // After Sales
   AFTER_SALES: '/qms/after-sales',
   AFTER_SALES_BATCH_DELETE: '/qms/after-sales/batch-delete',
+  SUPERVISION_ISSUES: '/qms/supervision/issues',
+  SUPERVISION_OVERVIEW: '/qms/supervision/overview',
+  SUPERVISION_PROJECTS: '/qms/supervision/projects',
+  SUPERVISION_REPORTS: '/qms/supervision/reports',
   VEHICLE_COMMISSIONING_ISSUES: '/qms/vehicle-commissioning/issues',
   VEHICLE_COMMISSIONING_REPORTS: '/qms/vehicle-commissioning/reports',
 

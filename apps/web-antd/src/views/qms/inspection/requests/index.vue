@@ -10,7 +10,9 @@ import type {
   InspectionRequestStatus,
 } from '#/api/qms/inspection-request';
 import type { BomItem } from '#/api/qms/planning';
+import type { SystemDeptApi } from '#/api/system/dept';
 import type { SystemUserApi } from '#/api/system/user';
+import type { TreeSelectNode } from '#/types';
 
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -38,6 +40,7 @@ import {
   Table,
   Tag,
   Tooltip,
+  TreeSelect,
   Upload,
 } from 'ant-design-vue';
 import dayjs from 'dayjs';
@@ -53,7 +56,10 @@ import {
 } from '#/api/qms/inspection-request';
 import { getBomList } from '#/api/qms/planning';
 import { getWorkOrderRequirements } from '#/api/qms/work-order';
+import { getDeptList } from '#/api/system/dept';
 import { getUserList } from '#/api/system/user';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { convertToTreeSelectData } from '#/types';
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
 import {
   applyUploadResponse,
@@ -77,6 +83,7 @@ const router = useRouter();
 const accessStore = useAccessStore();
 const userStore = useUserStore();
 const { hasAccessByCodes } = useAccess();
+const { handleApiError } = useErrorHandler();
 const loading = ref(false);
 const submitting = ref(false);
 const requests = ref<InspectionRequest[]>([]);
@@ -118,6 +125,8 @@ const attachmentFileList = ref<UploadFile[]>([]);
 const closeAttachmentFileList = ref<UploadFile[]>([]);
 const bomPartsLoading = ref(false);
 const bomPartOptions = ref<Array<{ label: string; value: string }>>([]);
+const deptRawData = ref<SystemDeptApi.Dept[]>([]);
+const deptTreeData = ref<TreeSelectNode[]>([]);
 const workOrderRequirementsLoading = ref(false);
 const requirementProcessOptions = ref<Array<{ label: string; value: string }>>(
   [],
@@ -134,6 +143,7 @@ const query = reactive({
 
 const requestForm = reactive({
   attachments: [] as InspectionRequestAttachment[],
+  componentName: '',
   mutualCheckResult: 'PASS' as InspectionRequestCheckResult,
   partName: '',
   processName: '',
@@ -272,6 +282,7 @@ function validateCloseForm() {
 const statusOptions = [
   { label: '已报检', value: 'SUBMITTED' },
   { label: '已派单', value: 'DISPATCHED' },
+  { label: '待复检', value: 'INSPECTING' },
 ];
 
 const viewOptions = [
@@ -321,17 +332,10 @@ const routeDispatchRequestId = computed(() =>
 const canDelete = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Requests:Delete']),
 );
-const topTeamStats = computed(() => requestStats.value.byTeam.slice(0, 4));
-const topHistoryTeamStats = computed(() =>
-  requestStats.value.historyByTeam.slice(0, 5),
-);
-const topHistoryInspectorStats = computed(() =>
-  requestStats.value.historyByInspector.slice(0, 5),
-);
-const visibleInspectorStatus = computed(
-  () => requestStats.value.inspectorStatus,
-);
 const isEntryView = computed(() => activeView.value === 'entry');
+const isRequestAssemblyProcess = computed(() =>
+  String(requestForm.processName || '').includes('组装'),
+);
 
 function statusColor(status: InspectionRequestStatus) {
   if (status === 'CLOSED') return 'success';
@@ -342,6 +346,58 @@ function statusColor(status: InspectionRequestStatus) {
 
 function statusLabel(status: InspectionRequestStatus) {
   return statusOptions.find((item) => item.value === status)?.label || status;
+}
+
+function hasLinkedIssue(record: InspectionRequest) {
+  return Boolean(record.linkedIssueId || record.linkedIssueNo);
+}
+
+function isReinspectionPassed(record: InspectionRequest) {
+  return record.inspectionResult === 'PASS' && hasLinkedIssue(record);
+}
+
+function inspectionResultColor(record: InspectionRequest) {
+  if (isReinspectionPassed(record)) return 'processing';
+  return record.inspectionResult === 'FAIL' ? 'error' : 'success';
+}
+
+function inspectionResultLabel(record: InspectionRequest) {
+  if (record.inspectionResult === 'FAIL') {
+    return record.status === 'CLOSED' ? '不合格关闭' : '不合格待复检';
+  }
+  if (isReinspectionPassed(record)) return '复检合格';
+  if (record.status === 'CLOSED') return '合格';
+  return '未完成';
+}
+
+function issueStatusLabel(status?: null | string) {
+  const map: Record<string, string> = {
+    CLAIMING: '索赔中',
+    CLOSED: '已关闭',
+    IN_PROGRESS: '处理中',
+    OPEN: '待处理',
+    RESOLVED: '已解决',
+  };
+  return status ? map[status] || status : '-';
+}
+
+function issueStatusColor(status?: null | string) {
+  if (status === 'CLOSED' || status === 'RESOLVED') return 'success';
+  if (status === 'IN_PROGRESS' || status === 'CLAIMING') return 'processing';
+  return 'warning';
+}
+
+function inspectionQuantityText(record: InspectionRequest) {
+  const total = Number(record.quantity || 1);
+  const qualified = Number(record.qualifiedQuantity ?? total);
+  const unqualified = Number(record.unqualifiedQuantity ?? 0);
+  if (record.inspectionResult === 'FAIL' || hasLinkedIssue(record)) {
+    const unqualifiedLabel =
+      record.inspectionResult === 'FAIL' ? '不合格' : '曾不合格';
+    return `合格 ${qualified} / ${unqualifiedLabel} ${unqualified}`;
+  }
+  if (record.status === 'CLOSED') return `合格 ${qualified}`;
+  return '-';
 }
 
 function checkResultLabel(result: InspectionRequestCheckResult) {
@@ -381,14 +437,6 @@ function durationText(start?: null | string, end?: null | string) {
   const hours = Math.floor((totalMinutes % 1440) / 60);
   const minutes = totalMinutes % 60;
   if (days > 0) return `${days}天${hours}小时`;
-  if (hours > 0) return `${hours}小时${minutes}分钟`;
-  return `${minutes}分钟`;
-}
-
-function minutesText(value?: number) {
-  const totalMinutes = Math.max(0, Math.floor(Number(value || 0)));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
   if (hours > 0) return `${hours}小时${minutes}分钟`;
   return `${minutes}分钟`;
 }
@@ -510,6 +558,32 @@ function displayCloseReadonlyValue(value?: null | string) {
   return normalizeCloseText(value) || '系统自动创建';
 }
 
+function findDeptIdByName(
+  departments: SystemDeptApi.Dept[],
+  targetName: string,
+): string {
+  const normalizedTarget = targetName.trim();
+  if (!normalizedTarget) return '';
+
+  for (const dept of departments) {
+    const name = String(dept.name || '').trim();
+    if (name === normalizedTarget || name.includes(normalizedTarget)) {
+      return String(dept.id);
+    }
+    const childId = findDeptIdByName(
+      (dept.children || []) as SystemDeptApi.Dept[],
+      normalizedTarget,
+    );
+    if (childId) return childId;
+  }
+
+  return '';
+}
+
+function defaultIssueResponsibleDepartment() {
+  return findDeptIdByName(deptRawData.value, '生产 OBU') || '生产 OBU';
+}
+
 function buildRequestUrl(
   params: Record<string, string>,
   path = '/qms/inspection/requests',
@@ -541,9 +615,13 @@ async function makeQr(url: string) {
 
 function applyViewStatus(value: string) {
   switch (value) {
-    case 'dispatched':
-    case 'inspecting': {
+    case 'dispatched': {
       query.status = 'DISPATCHED';
+
+      break;
+    }
+    case 'inspecting': {
+      query.status = undefined;
 
       break;
     }
@@ -591,6 +669,7 @@ async function handleStatusFilterChange() {
 function resetRequestForm() {
   attachmentFileList.value = [];
   requestForm.attachments = [];
+  requestForm.componentName = '';
   requestForm.partName = '';
   requestForm.processName = '';
   requestForm.quantity = 1;
@@ -742,25 +821,37 @@ async function loadUsers() {
   users.value = res.items || [];
 }
 
+async function loadDeptData() {
+  const data = await getDeptList();
+  deptRawData.value = data;
+  deptTreeData.value = convertToTreeSelectData(data);
+}
+
 async function submitRequest() {
   if (
     !requestForm.workOrderNumber ||
     !requestForm.partName ||
     !requestForm.processName ||
+    (!isRequestAssemblyProcess.value && !requestForm.componentName) ||
     !requestForm.quantity ||
     !requestForm.team ||
     !requestForm.reporter ||
     requestForm.attachments.length === 0
   ) {
     message.warning(
-      '工单号、部件名称、工序、数量、班组、报检人、自检记录不能为空',
+      '工单号、一级部件名称、工序、组件名称、数量、班组、报检人、自检记录不能为空',
     );
     return;
   }
 
   submitting.value = true;
   try {
-    await createInspectionRequest({ ...requestForm });
+    await createInspectionRequest({
+      ...requestForm,
+      componentName: isRequestAssemblyProcess.value
+        ? ''
+        : requestForm.componentName,
+    });
     message.success('报检任务已报检');
     resetRequestForm();
     page.value = 1;
@@ -862,7 +953,7 @@ function openClose(record: InspectionRequest) {
     defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE,
     description: '',
     lossAmount: 0,
-    partName: record.partName || '',
+    partName: record.componentName || record.partName || '',
     processName: record.processName || '',
     qualifiedQuantity: 0,
     reportDate: dayjs().format('YYYY-MM-DD'),
@@ -874,7 +965,7 @@ function openClose(record: InspectionRequest) {
     supplierName: '',
     photos: [] as UploadFileWithResponse[],
     unqualifiedQuantity: record.quantity || 1,
-    responsibleDepartment: record.team || '',
+    responsibleDepartment: defaultIssueResponsibleDepartment(),
     severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
   };
 
@@ -924,6 +1015,8 @@ async function submitClose() {
     message.success('报检任务检验完成');
     closeOpen.value = false;
     await Promise.all([loadRequests(), loadRequestStats()]);
+  } catch (error) {
+    handleApiError(error, 'Close Inspection Request');
   } finally {
     submitting.value = false;
   }
@@ -932,6 +1025,7 @@ async function submitClose() {
 function applyRoutePrefill() {
   requestForm.workOrderNumber = String(route.query.workOrderNumber || '');
   requestForm.partName = String(route.query.partName || '');
+  requestForm.componentName = String(route.query.componentName || '');
   requestForm.processName = String(route.query.processName || '');
   requestForm.reporter = String(route.query.reporter || '');
   requestForm.team = String(route.query.team || '');
@@ -953,7 +1047,12 @@ function openDispatchDetailFromRoute() {
 onMounted(async () => {
   applyRoutePrefill();
   requestEntryQr.value = await makeQr(requestEntryUrl.value);
-  await Promise.all([loadUsers(), loadRequests(), loadRequestStats()]);
+  await Promise.all([
+    loadDeptData(),
+    loadUsers(),
+    loadRequests(),
+    loadRequestStats(),
+  ]);
 });
 
 watch(
@@ -982,6 +1081,15 @@ watch(
     ]);
   },
 );
+
+watch(
+  () => requestForm.processName,
+  () => {
+    if (isRequestAssemblyProcess.value) {
+      requestForm.componentName = '';
+    }
+  },
+);
 </script>
 
 <template>
@@ -989,160 +1097,33 @@ watch(
     <div class="space-y-4">
       <Card>
         <div class="mb-4 space-y-4">
-          <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div class="rounded border border-blue-100 bg-blue-50 px-4 py-3">
-              <div class="text-xs text-blue-700">今日报检</div>
-              <div class="mt-1 flex items-end gap-2">
-                <span class="text-3xl font-semibold text-blue-900">
-                  {{ requestStats.todaySubmittedCount }}
-                </span>
-                <span class="pb-1 text-xs text-blue-600">
-                  完成 {{ requestStats.todayClosedCount }}
-                </span>
+              <div class="text-xs text-blue-700">待派单</div>
+              <div class="mt-1 text-2xl font-semibold text-blue-900">
+                {{ requestStats.pendingDispatchCount }}
               </div>
-              <div class="mt-2 flex gap-3 text-xs text-blue-700">
-                <span>待派 {{ requestStats.pendingDispatchCount }}</span>
-                <span>待检 {{ requestStats.pendingInspectionCount }}</span>
+              <div class="mt-1 text-xs text-blue-600">
+                今日报检 {{ requestStats.todaySubmittedCount }}
               </div>
             </div>
 
             <div class="rounded border border-amber-100 bg-amber-50 px-4 py-3">
-              <div class="flex items-center justify-between">
-                <div class="text-xs text-amber-700">今日班组报检</div>
-                <div class="text-xs text-amber-600">
-                  {{ requestStats.byTeam.length }} 个班组
-                </div>
+              <div class="text-xs text-amber-700">待检验</div>
+              <div class="mt-1 text-2xl font-semibold text-amber-900">
+                {{ requestStats.pendingInspectionCount }}
               </div>
-              <div v-if="topTeamStats.length > 0" class="mt-2 space-y-1">
-                <div
-                  v-for="item in topTeamStats"
-                  :key="item.team"
-                  class="flex items-center justify-between text-xs"
-                >
-                  <span class="truncate text-amber-900">{{ item.team }}</span>
-                  <span class="font-semibold text-amber-900">
-                    {{ item.count }}
-                  </span>
-                </div>
-              </div>
-              <div v-else class="mt-2 text-xs text-amber-600">
-                今日暂无班组报检
-              </div>
+              <div class="mt-1 text-xs text-amber-600">含待复检任务</div>
             </div>
 
             <div
               class="rounded border border-emerald-100 bg-emerald-50 px-4 py-3"
             >
-              <div class="flex items-center justify-between">
-                <div class="text-xs text-emerald-700">检验员状态</div>
-                <div class="text-xs text-emerald-600">
-                  {{ requestStats.inspectorStatus.length }} 人
-                </div>
+              <div class="text-xs text-emerald-700">今日完成</div>
+              <div class="mt-1 text-2xl font-semibold text-emerald-900">
+                {{ requestStats.todayClosedCount }}
               </div>
-              <div
-                v-if="visibleInspectorStatus.length > 0"
-                class="mt-2 max-h-36 space-y-1 overflow-y-auto pr-1"
-              >
-                <div
-                  v-for="item in visibleInspectorStatus"
-                  :key="item.inspector"
-                  class="grid grid-cols-[minmax(0,1fr)_auto] gap-2 text-xs"
-                >
-                  <div class="min-w-0">
-                    <div class="truncate text-emerald-900">
-                      {{ item.inspector }}
-                      <Tag
-                        class="ml-1"
-                        :color="
-                          item.status === 'BUSY' ? 'processing' : 'default'
-                        "
-                      >
-                        {{ item.status === 'BUSY' ? '有任务' : '空闲' }}
-                      </Tag>
-                      <Tag v-if="item.completedTaskCount > 0" color="success">
-                        已完成检验
-                      </Tag>
-                    </div>
-                    <div class="truncate text-emerald-700">
-                      当前 {{ item.activeTaskCount }} · 已用
-                      {{ minutesText(item.currentTaskMinutes) }}
-                    </div>
-                  </div>
-                  <div class="text-right text-emerald-900">
-                    <div class="font-semibold">
-                      完成 {{ item.completedTaskCount }}
-                    </div>
-                    <div class="text-emerald-700">
-                      均 {{ minutesText(item.averageTaskMinutes) }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="mt-2 text-xs text-emerald-600">
-                暂无检验员任务
-              </div>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <div class="rounded border border-slate-100 bg-slate-50 px-4 py-3">
-              <div class="flex items-center justify-between">
-                <div class="text-xs text-slate-600">历史班组报检数量</div>
-                <div class="text-xs text-slate-500">
-                  {{ requestStats.historyByTeam.length }} 个班组
-                </div>
-              </div>
-              <div
-                v-if="topHistoryTeamStats.length > 0"
-                class="mt-2 grid gap-2 sm:grid-cols-2"
-              >
-                <div
-                  v-for="item in topHistoryTeamStats"
-                  :key="item.team"
-                  class="flex items-center justify-between gap-2 rounded bg-white px-3 py-2 text-xs"
-                >
-                  <span class="truncate text-slate-700">{{ item.team }}</span>
-                  <span class="font-semibold text-slate-900">
-                    {{ item.count }}
-                  </span>
-                </div>
-              </div>
-              <div v-else class="mt-2 text-xs text-slate-500">
-                暂无历史报检数据
-              </div>
-            </div>
-
-            <div class="rounded border border-cyan-100 bg-cyan-50 px-4 py-3">
-              <div class="flex items-center justify-between">
-                <div class="text-xs text-cyan-700">历史检验员效率</div>
-                <div class="text-xs text-cyan-600">
-                  {{ requestStats.historyByInspector.length }} 人
-                </div>
-              </div>
-              <div
-                v-if="topHistoryInspectorStats.length > 0"
-                class="mt-2 space-y-1"
-              >
-                <div
-                  v-for="item in topHistoryInspectorStats"
-                  :key="item.inspector"
-                  class="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded bg-white px-3 py-2 text-xs"
-                >
-                  <span class="truncate text-cyan-900">
-                    {{ item.inspector }}
-                  </span>
-                  <span class="text-right text-cyan-900">
-                    完成
-                    <span class="font-semibold">
-                      {{ item.completedTaskCount }}
-                    </span>
-                    · 均 {{ minutesText(item.averageTaskMinutes) }}
-                  </span>
-                </div>
-              </div>
-              <div v-else class="mt-2 text-xs text-cyan-600">
-                暂无历史检验数据
-              </div>
+              <div class="mt-1 text-xs text-emerald-600">看板中查看趋势</div>
             </div>
           </div>
 
@@ -1206,17 +1187,6 @@ watch(
             <Form.Item label="工单号" required>
               <WorkOrderSelect v-model:value="requestForm.workOrderNumber" />
             </Form.Item>
-            <Form.Item label="部件名称" required>
-              <Select
-                v-model:value="requestForm.partName"
-                :options="bomPartOptions"
-                :loading="bomPartsLoading"
-                :disabled="!requestForm.workOrderNumber"
-                placeholder="请选择BOM部件"
-                show-search
-                allow-clear
-              />
-            </Form.Item>
             <Form.Item label="工序" required>
               <Select
                 v-model:value="requestForm.processName"
@@ -1224,6 +1194,28 @@ watch(
                 :loading="workOrderRequirementsLoading"
                 placeholder="请选择工序"
                 show-search
+                allow-clear
+              />
+            </Form.Item>
+            <Form.Item label="一级部件名称" required>
+              <Select
+                v-model:value="requestForm.partName"
+                :options="bomPartOptions"
+                :loading="bomPartsLoading"
+                :disabled="!requestForm.workOrderNumber"
+                placeholder="请选择BOM一级部件"
+                show-search
+                allow-clear
+              />
+            </Form.Item>
+            <Form.Item
+              v-if="!isRequestAssemblyProcess"
+              label="组件名称"
+              required
+            >
+              <Input
+                v-model:value="requestForm.componentName"
+                placeholder="请输入组件名称"
                 allow-clear
               />
             </Form.Item>
@@ -1313,6 +1305,9 @@ watch(
               <div class="min-w-0 space-y-0.5">
                 <div class="truncate font-medium text-gray-900">
                   {{ record.partName }}
+                  <span v-if="record.componentName">
+                    / {{ record.componentName }}
+                  </span>
                 </div>
                 <div class="truncate text-xs text-gray-500">
                   {{ record.processName }} · {{ record.quantity || 1 }}
@@ -1342,9 +1337,32 @@ watch(
           </Table.Column>
           <Table.Column title="状态" width="110">
             <template #default="{ record }">
-              <Tag :color="statusColor(record.status)">
-                {{ statusLabel(record.status) }}
-              </Tag>
+              <div class="space-y-1">
+                <Tag :color="statusColor(record.status)">
+                  {{ statusLabel(record.status) }}
+                </Tag>
+                <Tag
+                  v-if="
+                    record.status === 'CLOSED' ||
+                    record.inspectionResult === 'FAIL'
+                  "
+                  :color="inspectionResultColor(record)"
+                >
+                  {{ inspectionResultLabel(record) }}
+                </Tag>
+                <div
+                  v-if="
+                    record.status === 'CLOSED' ||
+                    record.inspectionResult === 'FAIL'
+                  "
+                  class="text-xs text-gray-500"
+                >
+                  {{ inspectionQuantityText(record) }}
+                </div>
+                <div v-if="hasLinkedIssue(record)" class="text-xs text-red-500">
+                  {{ record.linkedIssueNo || '已生成不合格项' }}
+                </div>
+              </div>
             </template>
           </Table.Column>
           <Table.Column title="执行" width="260">
@@ -1492,13 +1510,27 @@ watch(
                   {{ currentRequest.requestNo }}
                 </div>
                 <div class="mt-1 break-words text-sm text-gray-600">
-                  {{ currentRequest.partName }} /
-                  {{ currentRequest.processName }}
+                  {{ currentRequest.partName }}
+                  <template v-if="currentRequest.componentName">
+                    / {{ currentRequest.componentName }}
+                  </template>
+                  / {{ currentRequest.processName }}
                 </div>
               </div>
-              <Tag :color="statusColor(currentRequest.status)" class="shrink-0">
-                {{ statusLabel(currentRequest.status) }}
-              </Tag>
+              <div class="flex shrink-0 flex-wrap justify-end gap-1">
+                <Tag :color="statusColor(currentRequest.status)">
+                  {{ statusLabel(currentRequest.status) }}
+                </Tag>
+                <Tag
+                  v-if="
+                    currentRequest.status === 'CLOSED' ||
+                    currentRequest.inspectionResult === 'FAIL'
+                  "
+                  :color="inspectionResultColor(currentRequest)"
+                >
+                  {{ inspectionResultLabel(currentRequest) }}
+                </Tag>
+              </div>
             </div>
             <div class="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
               <div class="rounded bg-gray-50 px-2 py-2">
@@ -1525,6 +1557,37 @@ watch(
                 </div>
                 <div class="mt-1 font-semibold text-gray-900">
                   {{ displayExecutionDuration(currentRequest) }}
+                </div>
+              </div>
+              <div
+                v-if="
+                  currentRequest.status === 'CLOSED' ||
+                  currentRequest.inspectionResult === 'FAIL'
+                "
+                class="rounded bg-gray-50 px-2 py-2"
+              >
+                <div class="text-gray-500">检验结果</div>
+                <div
+                  class="mt-1 font-semibold"
+                  :class="
+                    currentRequest.inspectionResult === 'FAIL'
+                      ? 'text-red-600'
+                      : 'text-green-600'
+                  "
+                >
+                  {{ inspectionResultLabel(currentRequest) }}
+                </div>
+              </div>
+              <div
+                v-if="
+                  currentRequest.status === 'CLOSED' ||
+                  currentRequest.inspectionResult === 'FAIL'
+                "
+                class="rounded bg-gray-50 px-2 py-2"
+              >
+                <div class="text-gray-500">检验数量</div>
+                <div class="mt-1 font-semibold text-gray-900">
+                  {{ inspectionQuantityText(currentRequest) }}
                 </div>
               </div>
             </div>
@@ -1619,6 +1682,19 @@ watch(
                 </Button>
                 <span v-else class="text-gray-400">-</span>
               </div>
+              <div v-if="hasLinkedIssue(currentRequest)">
+                <div class="mb-1 text-xs text-gray-500">关联不合格项</div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <Tag :color="inspectionResultColor(currentRequest)">
+                    {{ currentRequest.linkedIssueNo || '已生成不合格项' }}
+                  </Tag>
+                  <Tag
+                    :color="issueStatusColor(currentRequest.linkedIssueStatus)"
+                  >
+                    {{ issueStatusLabel(currentRequest.linkedIssueStatus) }}
+                  </Tag>
+                </div>
+              </div>
               <div>
                 <div class="mb-1 text-xs text-gray-500">自检记录</div>
                 <div
@@ -1693,6 +1769,27 @@ watch(
         />
         <div class="text-center text-sm font-medium">
           {{ currentRequest.requestNo }}
+        </div>
+        <div
+          class="w-full rounded border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-700"
+        >
+          <div class="grid grid-cols-[64px_minmax(0,1fr)] gap-x-2 gap-y-1">
+            <span class="text-gray-500">报检人</span>
+            <span class="break-words font-medium text-gray-900">
+              {{ currentRequest.reporter || '-' }}
+            </span>
+            <span class="text-gray-500">报检部件</span>
+            <span class="break-words font-medium text-gray-900">
+              {{ currentRequest.partName }}
+              <template v-if="currentRequest.componentName">
+                / {{ currentRequest.componentName }}
+              </template>
+            </span>
+            <span class="text-gray-500">工序</span>
+            <span class="break-words font-medium text-gray-900">
+              {{ currentRequest.processName || '-' }}
+            </span>
+          </div>
         </div>
         <div class="text-center text-xs text-gray-500">
           检验员扫码后会打开派单详情，可在详情中完成检验
@@ -1775,8 +1872,12 @@ watch(
               <div class="mb-1 text-gray-600">部件名称</div>
               <Input
                 v-model:value="linkedIssueDraft.partName"
-                :disabled="Boolean(currentRequest?.partName)"
-                placeholder="自动沿用，可手动补充"
+                :disabled="
+                  Boolean(
+                    currentRequest?.componentName || currentRequest?.partName,
+                  )
+                "
+                placeholder="自动沿用组件名称，可手动补充"
               />
             </div>
             <div>
@@ -1789,9 +1890,14 @@ watch(
             </div>
             <div>
               <div class="mb-1 text-gray-600">责任部门</div>
-              <Input
+              <TreeSelect
                 v-model:value="linkedIssueDraft.responsibleDepartment"
-                placeholder="自动沿用班组，可手动补充"
+                :tree-data="deptTreeData"
+                tree-default-expand-all
+                show-search
+                allow-clear
+                class="w-full"
+                placeholder="请选择责任部门"
               />
             </div>
             <div>
