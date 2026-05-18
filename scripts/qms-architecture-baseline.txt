@@ -1,0 +1,21 @@
+# QMS architecture baseline
+#
+# Format:
+#   R1|<repo-relative file>
+#   R3|<repo-relative index.vue>|<current max line count>
+#
+# Existing violations are allowed only up to this baseline. New direct
+# requestClient usage or index.vue files above 500 lines fail the gate.
+R1|apps/web-antd/src/views/qms/supervision/composables/useDeadlineBoard.ts
+R3|apps/web-antd/src/views/qms/after-sales/index.vue|703
+R3|apps/web-antd/src/views/qms/dashboard/index.vue|521
+R3|apps/web-antd/src/views/qms/file-center/index.vue|507
+R3|apps/web-antd/src/views/qms/inspection/dashboard/index.vue|705
+R3|apps/web-antd/src/views/qms/inspection/issues/index.vue|642
+R3|apps/web-antd/src/views/qms/inspection/requests/entry/index.vue|556
+R3|apps/web-antd/src/views/qms/inspection/requests/index.vue|2239
+R3|apps/web-antd/src/views/qms/knowledge/index.vue|767
+R3|apps/web-antd/src/views/qms/planning/bom/index.vue|825
+R3|apps/web-antd/src/views/qms/supervision/index.vue|2302
+R3|apps/web-antd/src/views/qms/vehicle-commissioning/index.vue|563
+R3|apps/web-antd/src/views/qms/welder/index.vue|1246

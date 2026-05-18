@@ -70,3 +70,9 @@ Enforced by `AGENTS.md` and `scripts/check-qms-architecture.sh`:
 1. no `requestClient` in `views/qms/**`
 2. index line threshold for changed files
 3. mandatory checks before submission
+
+Full baseline gate:
+
+- `pnpm check:qms-arch` checks changed QMS view files, including committed diff, staged changes, unstaged changes, and untracked files.
+- `pnpm check:qms-arch:all` checks all tracked QMS view files against `scripts/qms-architecture-baseline.txt`.
+- Existing baseline violations are tolerated only up to the recorded baseline; new direct `requestClient` usage and newly oversized `index.vue` files fail.
