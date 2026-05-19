@@ -52,11 +52,12 @@ import {
 } from '#/api/qms/supervision';
 import { getUserList } from '#/api/system/user';
 import QmsFileUpload from '#/views/qms/shared/components/QmsFileUpload.vue';
-import SupplierSelect from '#/views/qms/shared/components/SupplierSelect.vue';
 import { getUploadResponse } from '#/views/qms/shared/utils/upload-file';
 
 import DeadlineBoard from './components/DeadlineBoard.vue';
 import GanttTaskEditor from './components/GanttTaskEditor.vue';
+import SupervisionProjectDetailDrawer from './components/SupervisionProjectDetailDrawer.vue';
+import SupervisionProjectFormDrawer from './components/SupervisionProjectFormDrawer.vue';
 
 type ProjectFormState = {
   plannedEndAt?: dayjs.Dayjs;
@@ -760,6 +761,10 @@ function resetProjectForm() {
     supervisor: '',
   });
   editingProjectId.value = '';
+}
+
+function handleProjectFormUpdate(nextValue: ProjectFormState) {
+  Object.assign(projectForm, nextValue);
 }
 
 async function openProjectDrawer(record?: SupervisionProject) {
@@ -1770,137 +1775,25 @@ onMounted(refreshAll);
       </Tabs>
     </div>
 
-    <Drawer
-      v-model:open="projectDetailDrawerOpen"
-      title="监造项目详情"
-      width="640"
-    >
-      <div v-if="detailProject" class="space-y-4">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <div class="text-lg font-semibold">
-              {{ detailProject.projectName }}
-            </div>
-          </div>
-          <Space wrap>
-            <Tag :color="projectStatusColor(detailProject.status)">
-              {{ statusLabel(detailProject.status) }}
-            </Tag>
-          </Space>
-        </div>
+    <SupervisionProjectDetailDrawer
+      :open="projectDetailDrawerOpen"
+      :project="detailProject"
+      :project-status-color="projectStatusColor"
+      :status-label="statusLabel"
+      @update:open="(value) => (projectDetailDrawerOpen = value)"
+      @view-plan="openProjectPlan"
+      @edit="openProjectDrawer"
+    />
 
-        <Progress :percent="detailProject.progressPercent" />
-
-        <div class="grid grid-cols-2 gap-3 text-sm md:grid-cols-2">
-          <div class="rounded bg-blue-50 px-3 py-2 text-blue-700">
-            <div class="text-xs">未闭环问题</div>
-            <div class="font-semibold">
-              {{ detailProject.openIssueCount || 0 }} /
-              {{ detailProject.totalIssueCount || 0 }}
-            </div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
-          <div>
-            <div class="text-xs text-gray-500">供应商</div>
-            <div>{{ detailProject.supplierName || '-' }}</div>
-          </div>
-          <div>
-            <div class="text-xs text-gray-500">监造人员</div>
-            <div>{{ detailProject.supervisor || '-' }}</div>
-          </div>
-          <div>
-            <div class="text-xs text-gray-500">计划周期</div>
-            <div>
-              {{ detailProject.plannedStartAt || '-' }} 至
-              {{ detailProject.plannedEndAt || '-' }}
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <div class="text-xs text-gray-500">项目说明</div>
-          <div class="mt-1 whitespace-pre-wrap text-sm">
-            {{ detailProject.summary || '-' }}
-          </div>
-        </div>
-      </div>
-      <template #footer>
-        <Space>
-          <Button @click="projectDetailDrawerOpen = false">关闭</Button>
-          <Button
-            v-if="detailProject"
-            @click="
-              projectDetailDrawerOpen = false;
-              openProjectPlan(detailProject);
-            "
-          >
-            甘特计划
-          </Button>
-          <Button
-            v-if="detailProject"
-            type="primary"
-            @click="
-              projectDetailDrawerOpen = false;
-              openProjectDrawer(detailProject);
-            "
-          >
-            编辑
-          </Button>
-        </Space>
-      </template>
-    </Drawer>
-
-    <Drawer
-      v-model:open="projectDrawerOpen"
-      :title="editingProjectId ? '编辑监造项目' : '新建监造项目'"
-      width="480"
-    >
-      <Form layout="vertical">
-        <Form.Item label="项目名称" required>
-          <Input
-            v-model:value="projectForm.projectName"
-            placeholder="输入项目名称"
-          />
-        </Form.Item>
-        <Form.Item label="供应商">
-          <SupplierSelect
-            v-model:value="projectForm.supplierName"
-            category="Supplier"
-          />
-        </Form.Item>
-        <Form.Item label="监造员">
-          <Select
-            v-model:value="projectForm.supervisor"
-            show-search
-            allow-clear
-            :options="userOptions"
-            placeholder="选择监造员"
-          />
-        </Form.Item>
-        <div class="grid grid-cols-2 gap-3">
-          <Form.Item label="计划开始">
-            <DatePicker
-              v-model:value="projectForm.plannedStartAt"
-              class="w-full"
-            />
-          </Form.Item>
-          <Form.Item label="计划结束">
-            <DatePicker
-              v-model:value="projectForm.plannedEndAt"
-              class="w-full"
-            />
-          </Form.Item>
-        </div>
-      </Form>
-      <template #footer>
-        <Space>
-          <Button @click="projectDrawerOpen = false">取消</Button>
-          <Button type="primary" @click="submitProject">保存</Button>
-        </Space>
-      </template>
-    </Drawer>
+    <SupervisionProjectFormDrawer
+      :open="projectDrawerOpen"
+      :editing-project-id="editingProjectId"
+      :form="projectForm"
+      :user-options="userOptions"
+      @update:open="(value) => (projectDrawerOpen = value)"
+      @update:form="handleProjectFormUpdate"
+      @submit="submitProject"
+    />
 
     <Drawer
       v-model:open="reportDrawerOpen"
