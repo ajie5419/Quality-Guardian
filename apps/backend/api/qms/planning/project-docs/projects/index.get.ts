@@ -7,7 +7,7 @@ import { parseProjectDocuments } from '~/utils/project-documents';
 import {
   internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseSuccess,
+  useListResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -80,7 +80,7 @@ export default defineEventHandler(async (event) => {
       }));
     }
 
-    return useResponseSuccess(result);
+    return useListResponseSuccess(result);
   } catch (error) {
     logApiError('project-docs-projects', error);
     return internalServerErrorResponse(event, '获取项目资料列表失败');

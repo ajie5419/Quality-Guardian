@@ -10,7 +10,7 @@ import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseSuccess,
+  useListResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -47,7 +47,7 @@ export default defineEventHandler(async (event) => {
       };
     });
 
-    return useResponseSuccess(data);
+    return useListResponseSuccess(data);
   } catch (error) {
     logApiError('bom-projects', error);
     return internalServerErrorResponse(event, '获取 BOM 项目失败');

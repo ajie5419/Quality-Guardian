@@ -454,19 +454,36 @@ watch(
             />
           </Form.Item>
           <Form.Item label="自检记录" required>
-            <Upload
-              v-model:file-list="attachmentFileList"
-              action="/api/upload"
-              multiple
-              @change="handleAttachmentUploadChange"
-            >
-              <Button class="w-full sm:w-auto">
-                <template #icon>
-                  <IconifyIcon icon="lucide:upload" />
-                </template>
-                上传自检记录
-              </Button>
-            </Upload>
+            <div class="flex flex-col gap-2 sm:flex-row">
+              <Upload
+                v-model:file-list="attachmentFileList"
+                accept="image/*"
+                action="/api/upload"
+                capture="environment"
+                :show-upload-list="false"
+                @change="handleAttachmentUploadChange"
+              >
+                <Button class="w-full sm:w-auto">
+                  <template #icon>
+                    <IconifyIcon icon="lucide:camera" />
+                  </template>
+                  拍照上传
+                </Button>
+              </Upload>
+              <Upload
+                v-model:file-list="attachmentFileList"
+                action="/api/upload"
+                multiple
+                @change="handleAttachmentUploadChange"
+              >
+                <Button class="w-full sm:w-auto">
+                  <template #icon>
+                    <IconifyIcon icon="lucide:upload" />
+                  </template>
+                  选择文件
+                </Button>
+              </Upload>
+            </div>
           </Form.Item>
           <div
             class="inspection-entry-submit fixed inset-x-0 bottom-0 z-20 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:static sm:inset-auto sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none"

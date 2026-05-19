@@ -4,10 +4,9 @@ import type {
   DailySummaryData as SharedDailySummaryData,
 } from '@qgs/shared';
 
-import {
-  normalizeListResponse,
-  normalizeMutationResponse,
-} from '#/api/qms/adapters';
+import type { QmsListResponse } from '#/api/qms/types';
+
+import { normalizeMutationResponse } from '#/api/qms/adapters';
 import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
@@ -65,12 +64,12 @@ export function saveDailySummary(data: {
  * Get Reports list
  */
 export async function getReportsList() {
-  return requestClient.get<ReportItem[]>(QMS_API.REPORTS);
+  const page = await getReportsListPage();
+  return page.items;
 }
 
 export async function getReportsListPage() {
-  const raw = await getReportsList();
-  return normalizeListResponse<ReportItem>(raw);
+  return requestClient.get<QmsListResponse<ReportItem>>(QMS_API.REPORTS);
 }
 
 /**

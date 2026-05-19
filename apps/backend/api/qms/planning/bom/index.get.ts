@@ -12,7 +12,7 @@ import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,
-  useResponseSuccess,
+  useListResponseSuccess,
 } from '~/utils/response';
 
 function normalizeCompareText(value: unknown) {
@@ -126,7 +126,7 @@ export default defineEventHandler(async (event) => {
       });
 
       const enrichedItems = await attachInspectionProgress(items);
-      return useResponseSuccess(
+      return useListResponseSuccess(
         enrichedItems.map((item) => mapProjectBomItem(item)),
       );
     }
@@ -136,7 +136,7 @@ export default defineEventHandler(async (event) => {
       orderBy: [{ part_number: 'asc' }, { created_at: 'desc' }],
     });
     const enrichedItems = await attachInspectionProgress(allItems);
-    return useResponseSuccess(
+    return useListResponseSuccess(
       enrichedItems.map((item) => mapProjectBomItem(item)),
     );
   } catch (error) {

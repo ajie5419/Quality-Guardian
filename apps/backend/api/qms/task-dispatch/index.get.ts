@@ -6,7 +6,7 @@ import {
   badRequestResponse,
   internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseSuccess,
+  useListResponseSuccess,
 } from '~/utils/response';
 import {
   getTaskDispatchArchiveFilter,
@@ -67,7 +67,7 @@ export default defineEventHandler(async (event) => {
         t.users_qms_task_dispatches_assigneeIdTousers?.realName || t.assigneeId,
     }));
 
-    return useResponseSuccess(result);
+    return useListResponseSuccess(result);
   } catch (error) {
     logApiError('task-dispatch', error);
     return internalServerErrorResponse(

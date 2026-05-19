@@ -4,9 +4,8 @@ import type {
   AfterSalesStats,
 } from '@qgs/shared';
 
-import type { QmsImportSummary } from '#/api/qms/types';
+import type { QmsImportSummary, QmsListResponse } from '#/api/qms/types';
 
-import { normalizeListResponse } from '#/api/qms/adapters';
 import { QMS_IMPORT_TIMEOUT } from '#/api/qms/constants';
 import { requestClient } from '#/api/request';
 
@@ -14,20 +13,23 @@ import { requestClient } from '#/api/request';
 export * from '@qgs/shared';
 
 /**
- * Get After-sales list
+ * Get After-sales list items for legacy array consumers.
  */
 export async function getAfterSalesList(params?: AfterSalesParams) {
-  return requestClient.get<AfterSalesItem[]>('/qms/after-sales', { params });
+  const page = await getAfterSalesListPage(params);
+  return page.items;
 }
 
 /**
- * Get After-sales list (normalized pagination shape for page layer)
+ * Get After-sales list (standard pagination shape for page layer)
  */
 export async function getAfterSalesListPage(
   params?: AfterSalesParams,
-): Promise<{ items: AfterSalesItem[]; total: number }> {
-  const raw = await getAfterSalesList(params);
-  return normalizeListResponse<AfterSalesItem>(raw);
+): Promise<QmsListResponse<AfterSalesItem>> {
+  return requestClient.get<QmsListResponse<AfterSalesItem>>(
+    '/qms/after-sales',
+    { params },
+  );
 }
 
 /**

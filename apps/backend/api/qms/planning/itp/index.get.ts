@@ -6,7 +6,7 @@ import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  useResponseSuccess,
+  useListResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
       },
     });
 
-    return useResponseSuccess(
+    return useListResponseSuccess(
       items.map((item) => ({
         ...item,
         quantitativeItems: parseItpQuantitativeItems(item.quantitativeItems),

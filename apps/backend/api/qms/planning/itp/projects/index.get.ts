@@ -5,7 +5,7 @@ import { toItpPlanStatusText, toItpProjectVersionText } from '~/utils/itp';
 import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,
-  useResponseSuccess,
+  useListResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
       updatedAt: p.updatedAt,
     }));
 
-    return useResponseSuccess(mapped);
+    return useListResponseSuccess(mapped);
   } catch (error) {
     logApiError('itp-projects', error);
     return internalServerErrorResponse(event, '获取 ITP 项目失败');

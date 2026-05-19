@@ -6,7 +6,7 @@ import { formatReportDate } from '~/utils/report';
 import {
   internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseSuccess,
+  useListResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
       date: formatReportDate(r.date),
     }));
 
-    return useResponseSuccess(items);
+    return useListResponseSuccess(items);
   } catch (error) {
     logApiError('reports', error);
     return internalServerErrorResponse(event, 'Failed to fetch reports');

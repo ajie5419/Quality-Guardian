@@ -1,6 +1,7 @@
 import type { CreateTaskParams, TaskDispatch, TaskStatus } from '@qgs/shared';
 
-import { normalizeListResponse } from '#/api/qms/adapters';
+import type { QmsListResponse } from '#/api/qms/types';
+
 import { requestClient } from '#/api/request';
 
 // Re-export shared types
@@ -13,7 +14,8 @@ export async function getTaskList(params?: {
   parentId?: string;
   status?: string;
 }) {
-  return requestClient.get<TaskDispatch[]>('/qms/task-dispatch', { params });
+  const page = await getTaskListPage(params);
+  return page.items;
 }
 
 export async function getTaskListPage(params?: {
@@ -23,8 +25,10 @@ export async function getTaskListPage(params?: {
   parentId?: string;
   status?: string;
 }) {
-  const raw = await getTaskList(params);
-  return normalizeListResponse<TaskDispatch>(raw);
+  return requestClient.get<QmsListResponse<TaskDispatch>>(
+    '/qms/task-dispatch',
+    { params },
+  );
 }
 
 export async function createTask(data: CreateTaskParams) {

@@ -6,7 +6,7 @@ import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseSuccess,
+  useListResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
         username: userinfo.username,
       },
     });
-    return useResponseSuccess(list);
+    return useListResponseSuccess(list);
   } catch (error) {
     logApiError('after-sales', error);
     return internalServerErrorResponse(

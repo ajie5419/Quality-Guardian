@@ -4,7 +4,7 @@ import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,
-  useResponseSuccess,
+  useListResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    return useResponseSuccess(projects);
+    return useListResponseSuccess(projects);
   } catch (error) {
     logApiError('dfmea-projects', error);
     return internalServerErrorResponse(event, '获取 DFMEA 项目失败');

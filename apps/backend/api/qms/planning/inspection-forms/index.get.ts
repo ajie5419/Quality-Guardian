@@ -10,7 +10,7 @@ import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseSuccess,
+  useListResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
@@ -60,7 +60,7 @@ export default defineEventHandler(async (event) => {
       orderBy: [{ updatedAt: 'desc' }],
     });
 
-    return useResponseSuccess(
+    return useListResponseSuccess(
       list.map((item) => ({
         attachments: item.attachments,
         createdAt: item.createdAt,
@@ -83,7 +83,7 @@ export default defineEventHandler(async (event) => {
     );
   } catch (error) {
     if (isPrismaSchemaMismatchError(error)) {
-      return useResponseSuccess([]);
+      return useListResponseSuccess([]);
     }
     logApiError('inspection-form-list', error);
     return internalServerErrorResponse(event, '获取检验表列表失败');

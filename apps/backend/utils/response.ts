@@ -35,6 +35,19 @@ export function usePageResponseSuccess<T = unknown>(
   };
 }
 
+export function useListResponseSuccess<T = unknown>(
+  items: T[],
+  { message = 'ok', total }: { message?: string; total?: number } = {},
+) {
+  return {
+    ...useResponseSuccess({
+      items,
+      total: total === undefined ? items.length : total,
+    }),
+    message,
+  };
+}
+
 export function useResponseError(message: string, error: unknown = null) {
   return {
     code: -1,
