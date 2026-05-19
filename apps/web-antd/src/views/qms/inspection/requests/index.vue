@@ -15,13 +15,11 @@ import { useAccessStore, useUserStore } from '@vben/stores';
 import {
   Button,
   Card,
-  Drawer,
   Dropdown,
   Form,
   Input,
   InputNumber,
   Menu,
-  Modal,
   Segmented,
   Select,
   Space,
@@ -45,7 +43,10 @@ import {
 } from '../issues/constants';
 import TeamSelect from '../records/components/form/TeamSelect.vue';
 import CloseInspectionModal from './components/CloseInspectionModal.vue';
+import CloseQrModal from './components/CloseQrModal.vue';
 import DispatchDetailDrawer from './components/DispatchDetailDrawer.vue';
+import DispatchTaskModal from './components/DispatchTaskModal.vue';
+import InspectorStatusDrawer from './components/InspectorStatusDrawer.vue';
 import { useInspectionRequestEntryForm } from './composables/useInspectionRequestEntryForm';
 import { useInspectionRequestListing } from './composables/useInspectionRequestListing';
 import { useInspectionRequestPresentation } from './composables/useInspectionRequestPresentation';
@@ -238,7 +239,6 @@ const {
   dispatchOpen,
   linkedDefectSubtypeOptions,
   linkedIssueDraft,
-  shouldCreateLinkedIssue,
   submitting,
   applyRouteDispatchDetail,
   closeRouteDispatchDetail,
@@ -307,6 +307,10 @@ function handleLinkedIssueDraftUpdate(
     ...nextValue,
     photos: [...nextValue.photos],
   };
+}
+
+function handleDispatchFormUpdate(nextValue: typeof dispatchForm) {
+  Object.assign(dispatchForm, nextValue);
 }
 
 onMounted(async () => {
@@ -770,33 +774,15 @@ watch(
       </Card>
     </div>
 
-    <Modal
-      v-model:open="dispatchOpen"
-      title="派发检验任务"
-      :confirm-loading="submitting"
-      @ok="submitDispatch"
-    >
-      <Form layout="vertical">
-        <Form.Item label="检验员" required>
-          <Select
-            v-model:value="dispatchForm.inspectorId"
-            show-search
-            :options="userOptions"
-          />
-        </Form.Item>
-        <Form.Item label="优先级">
-          <InputNumber
-            v-model:value="dispatchForm.priority"
-            :min="1"
-            :max="5"
-            class="w-full"
-          />
-        </Form.Item>
-        <Form.Item label="派单备注">
-          <Input.TextArea v-model:value="dispatchForm.dispatchRemark" />
-        </Form.Item>
-      </Form>
-    </Modal>
+    <DispatchTaskModal
+      :open="dispatchOpen"
+      :submitting="submitting"
+      :user-options="userOptions"
+      :form="dispatchForm"
+      @update:open="(value) => (dispatchOpen = value)"
+      @update:form="handleDispatchFormUpdate"
+      @submit="submitDispatch"
+    />
 
     <DispatchDetailDrawer
       :open="dispatchDetailOpen"
@@ -823,97 +809,23 @@ watch(
       @open-inspection-record="openInspectionRecord"
     />
 
-    <Modal
-      v-model:open="closeQrOpen"
-      title="扫码关闭二维码"
-      :footer="null"
-      width="360px"
-    >
-      <div v-if="currentRequest" class="flex flex-col items-center gap-3">
-        <img
-          v-if="closeQr"
-          :src="closeQr"
-          alt="扫码关闭二维码"
-          class="size-[180px]"
-        />
-        <div class="text-center text-sm font-medium">
-          {{ currentRequest.requestNo }}
-        </div>
-        <div
-          class="w-full rounded border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-700"
-        >
-          <div class="grid grid-cols-[64px_minmax(0,1fr)] gap-x-2 gap-y-1">
-            <span class="text-gray-500">报检人</span>
-            <span class="break-words font-medium text-gray-900">
-              {{ currentRequest.reporter || '-' }}
-            </span>
-            <span class="text-gray-500">报检部件</span>
-            <span class="break-words font-medium text-gray-900">
-              {{ currentRequest.partName }}
-              <template v-if="currentRequest.componentName">
-                / {{ currentRequest.componentName }}
-              </template>
-            </span>
-            <span class="text-gray-500">工序</span>
-            <span class="break-words font-medium text-gray-900">
-              {{ currentRequest.processName || '-' }}
-            </span>
-          </div>
-        </div>
-        <div class="text-center text-xs text-gray-500">
-          检验员扫码后会打开派单详情，可在详情中完成检验
-        </div>
-      </div>
-    </Modal>
+    <CloseQrModal
+      :open="closeQrOpen"
+      :qr-code="closeQr"
+      :request="currentRequest"
+      @update:open="(value) => (closeQrOpen = value)"
+    />
 
-    <Drawer v-model:open="inspectorStatusOpen" title="检验员状态" width="420">
-      <div v-if="sortedInspectorStatus.length > 0" class="space-y-2">
-        <div
-          v-for="item in sortedInspectorStatus"
-          :key="item.inspector"
-          class="rounded border bg-white px-3 py-2"
-        >
-          <div class="flex items-center justify-between gap-2">
-            <div class="min-w-0">
-              <div class="truncate font-medium text-gray-900">
-                {{ item.inspector || '未记录' }}
-              </div>
-              <div class="mt-0.5 text-xs text-gray-500">
-                当前 {{ item.activeTaskCount }} 项 · 已用
-                {{ minutesText(item.currentTaskMinutes) }}
-              </div>
-            </div>
-            <Tag :color="item.status === 'BUSY' ? 'processing' : 'success'">
-              {{ item.status === 'BUSY' ? '有任务' : '空闲' }}
-            </Tag>
-          </div>
-          <div
-            class="mt-2 grid grid-cols-2 gap-2 rounded bg-gray-50 px-2 py-2 text-xs text-gray-500"
-          >
-            <div>
-              <div class="text-gray-400">完成数量</div>
-              <div class="mt-0.5 font-medium text-gray-800">
-                {{ item.completedTaskCount }}
-              </div>
-            </div>
-            <div>
-              <div class="text-gray-400">平均时长</div>
-              <div class="mt-0.5 font-medium text-gray-800">
-                {{ minutesText(item.averageTaskMinutes) }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div v-else class="py-10 text-center text-sm text-gray-400">
-        暂无检验员状态数据
-      </div>
-    </Drawer>
+    <InspectorStatusDrawer
+      :open="inspectorStatusOpen"
+      :items="sortedInspectorStatus"
+      :minutes-text="minutesText"
+      @update:open="(value) => (inspectorStatusOpen = value)"
+    />
 
     <CloseInspectionModal
       :open="closeOpen"
       :submitting="submitting"
-      :should-create-linked-issue="shouldCreateLinkedIssue"
       :close-form="closeForm"
       :linked-issue-draft="linkedIssueDraft"
       :close-attachment-file-list="closeAttachmentFileList"
