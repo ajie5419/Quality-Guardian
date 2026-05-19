@@ -1,13 +1,10 @@
 <script lang="ts" setup>
-import type {
-  InspectionRequest,
-  InspectionRequestStatus,
-} from '#/api/qms/inspection-request';
+import type { InspectionRequest } from '#/api/qms/inspection-request';
 import type { SystemDeptApi } from '#/api/system/dept';
 import type { SystemUserApi } from '#/api/system/user';
 import type { TreeSelectNode } from '#/types';
 
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useAccess } from '@vben/access';
@@ -36,10 +33,6 @@ import {
 } from 'ant-design-vue';
 import QRCode from 'qrcode';
 
-import {
-  getInspectionRequests,
-  getInspectionRequestStats,
-} from '#/api/qms/inspection-request';
 import { getDeptList } from '#/api/system/dept';
 import { getUserList } from '#/api/system/user';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
@@ -54,6 +47,7 @@ import {
 } from '../issues/constants';
 import TeamSelect from '../records/components/form/TeamSelect.vue';
 import { useInspectionRequestEntryForm } from './composables/useInspectionRequestEntryForm';
+import { useInspectionRequestListing } from './composables/useInspectionRequestListing';
 import { useInspectionRequestPresentation } from './composables/useInspectionRequestPresentation';
 import { useInspectionRequestTaskActions } from './composables/useInspectionRequestTaskActions';
 
@@ -65,37 +59,9 @@ const accessStore = useAccessStore();
 const userStore = useUserStore();
 const { hasAccessByCodes } = useAccess();
 const { handleApiError } = useErrorHandler();
-const loading = ref(false);
-const requests = ref<InspectionRequest[]>([]);
-const requestStats = ref({
-  byInspector: [] as Array<{ count: number; inspector: string }>,
-  byTeam: [] as Array<{ count: number; team: string }>,
-  historyByInspector: [] as Array<{
-    averageTaskMinutes: number;
-    completedTaskCount: number;
-    inspector: string;
-  }>,
-  historyByTeam: [] as Array<{ count: number; team: string }>,
-  inspectorStatus: [] as Array<{
-    activeTaskCount: number;
-    averageTaskMinutes: number;
-    completedTaskCount: number;
-    currentTaskMinutes: number;
-    inspector: string;
-    status: 'BUSY' | 'IDLE';
-  }>,
-  pendingDispatchCount: 0,
-  pendingInspectionCount: 0,
-  todayClosedCount: 0,
-  todaySubmittedCount: 0,
-});
-const total = ref(0);
-const page = ref(1);
-const pageSize = ref(20);
 const users = ref<SystemUserApi.User[]>([]);
 const inspectorStatusOpen = ref(false);
 const requestEntryQr = ref('');
-const activeView = ref('current');
 const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const deptTreeData = ref<TreeSelectNode[]>([]);
 
@@ -103,9 +69,25 @@ const { defectOptions, defectSubtypes } = useDefectOptions();
 const { severityOptions } = useSeverityOptions();
 const { claimOptions } = useClaimOptions();
 
-const query = reactive({
-  keyword: '',
-  status: undefined as InspectionRequestStatus | undefined,
+const {
+  activeView,
+  isEntryView,
+  loading,
+  page,
+  pageSize,
+  query,
+  requestStats,
+  requests,
+  total,
+  handleStatusFilterChange,
+  handleViewChange: handleListingViewChange,
+  loadRequestStats,
+  loadRequests,
+  refreshInspectionRequestPage,
+} = useInspectionRequestListing({
+  onRequestsLoaded() {
+    openDispatchDetailFromRoute();
+  },
 });
 
 const {
@@ -153,7 +135,6 @@ const uploadHeaders = computed(() => ({
 const requestEntryUrl = computed(() =>
   buildRequestUrl({ entry: 'submit' }, '/qms/inspection/requests/entry'),
 );
-const isEntryView = computed(() => activeView.value === 'entry');
 const {
   busyInspectorCount,
   idleInspectorCount,
@@ -241,88 +222,8 @@ async function makeQr(url: string) {
   });
 }
 
-function applyViewStatus(value: string) {
-  switch (value) {
-    case 'dispatched': {
-      query.status = 'DISPATCHED';
-
-      break;
-    }
-    case 'inspecting': {
-      query.status = undefined;
-
-      break;
-    }
-    case 'submitted': {
-      query.status = 'SUBMITTED';
-
-      break;
-    }
-    default: {
-      query.status = undefined;
-    }
-  }
-}
-
-function shouldUseMineFilter() {
-  return activeView.value === 'inspecting';
-}
-
 async function handleViewChange(value: number | string) {
-  activeView.value = String(value);
-  closeRouteDispatchDetail();
-  applyViewStatus(activeView.value);
-  page.value = 1;
-  if (isEntryView.value) return;
-  await loadRequests();
-}
-
-async function handleStatusFilterChange() {
-  switch (query.status) {
-    case 'DISPATCHED': {
-      activeView.value = 'dispatched';
-      break;
-    }
-    case 'SUBMITTED': {
-      activeView.value = 'submitted';
-      break;
-    }
-    default: {
-      activeView.value = 'current';
-    }
-  }
-  page.value = 1;
-  await loadRequests();
-}
-
-async function loadRequests() {
-  loading.value = true;
-  try {
-    const res = await getInspectionRequests({
-      current: !query.status,
-      includeClosed: shouldUseMineFilter(),
-      keyword: query.keyword || undefined,
-      mine: shouldUseMineFilter(),
-      page: page.value,
-      pageSize: pageSize.value,
-      status: query.status,
-    });
-    requests.value = res.items || [];
-    total.value = res.total || 0;
-    openDispatchDetailFromRoute();
-  } finally {
-    loading.value = false;
-  }
-}
-
-async function loadRequestStats() {
-  requestStats.value = await getInspectionRequestStats();
-}
-
-async function refreshInspectionRequestPage() {
-  if (isEntryView.value) return;
-  page.value = 1;
-  await Promise.all([loadRequests(), loadRequestStats()]);
+  await handleListingViewChange(value, closeRouteDispatchDetail);
 }
 
 const {
