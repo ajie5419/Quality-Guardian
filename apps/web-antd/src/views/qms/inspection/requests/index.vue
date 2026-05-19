@@ -1,11 +1,6 @@
 <script lang="ts" setup>
-import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
-
-import type { UploadFileWithResponse } from '../issues/types';
-
 import type {
   InspectionRequest,
-  InspectionRequestAttachment,
   InspectionRequestCheckResult,
   InspectionRequestStatus,
 } from '#/api/qms/inspection-request';
@@ -30,7 +25,6 @@ import {
   Input,
   InputNumber,
   Menu,
-  message,
   Modal,
   Segmented,
   Select,
@@ -41,13 +35,9 @@ import {
   TreeSelect,
   Upload,
 } from 'ant-design-vue';
-import dayjs from 'dayjs';
 import QRCode from 'qrcode';
 
 import {
-  closeInspectionRequest,
-  deleteInspectionRequest,
-  dispatchInspectionRequest,
   getInspectionRequests,
   getInspectionRequestStats,
 } from '#/api/qms/inspection-request';
@@ -56,20 +46,16 @@ import { getUserList } from '#/api/system/user';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { convertToTreeSelectData } from '#/types';
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
-import {
-  applyUploadResponse,
-  normalizeUploadFileList,
-} from '#/views/qms/shared/utils/upload-file';
 
 import IssuePhotoUpload from '../issues/components/IssuePhotoUpload.vue';
 import {
-  DEFAULT_VALUES,
   useClaimOptions,
   useDefectOptions,
   useSeverityOptions,
 } from '../issues/constants';
 import TeamSelect from '../records/components/form/TeamSelect.vue';
 import { useInspectionRequestEntryForm } from './composables/useInspectionRequestEntryForm';
+import { useInspectionRequestTaskActions } from './composables/useInspectionRequestTaskActions';
 
 defineOptions({ name: 'QMSInspectionRequests' });
 
@@ -80,7 +66,6 @@ const userStore = useUserStore();
 const { hasAccessByCodes } = useAccess();
 const { handleApiError } = useErrorHandler();
 const loading = ref(false);
-const submitting = ref(false);
 const requests = ref<InspectionRequest[]>([]);
 const requestStats = ref({
   byInspector: [] as Array<{ count: number; inspector: string }>,
@@ -108,19 +93,9 @@ const total = ref(0);
 const page = ref(1);
 const pageSize = ref(20);
 const users = ref<SystemUserApi.User[]>([]);
-const dispatchOpen = ref(false);
-const closeOpen = ref(false);
-const dispatchDetailOpen = ref(false);
-const closeQrOpen = ref(false);
 const inspectorStatusOpen = ref(false);
-const routeDispatchDetailConsumed = ref(false);
-const routeDispatchDetailOpened = ref(false);
-const routeDispatchRestoreKeyword = ref<null | string>(null);
-const currentRequest = ref<InspectionRequest>();
 const requestEntryQr = ref('');
-const closeQr = ref('');
 const activeView = ref('current');
-const closeAttachmentFileList = ref<UploadFile[]>([]);
 const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const deptTreeData = ref<TreeSelectNode[]>([]);
 
@@ -131,21 +106,6 @@ const { claimOptions } = useClaimOptions();
 const query = reactive({
   keyword: '',
   status: undefined as InspectionRequestStatus | undefined,
-});
-
-const dispatchForm = reactive({
-  dispatchRemark: '',
-  inspectorId: '',
-  priority: 3,
-});
-
-const closeForm = reactive({
-  attachments: [] as InspectionRequestAttachment[],
-  closeRemark: '',
-  inspectionId: '',
-  inspector: '',
-  quantity: 1,
-  result: 'PASS' as 'FAIL' | 'PASS',
 });
 
 const {
@@ -167,115 +127,9 @@ const {
     await Promise.all([loadRequests(), loadRequestStats()]);
   },
 });
-
-const linkedIssueDraft = ref({
-  claim: DEFAULT_VALUES.DEFAULT_CLAIM as string,
-  defectSubtype: DEFAULT_VALUES.DEFAULT_DEFECT_SUBTYPE as string,
-  defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE as string,
-  description: '',
-  lossAmount: 0,
-  partName: '',
-  processName: '',
-  qualifiedQuantity: 1,
-  reportDate: dayjs().format('YYYY-MM-DD'),
-  reportedBy: '',
-  responsibleWelder: '',
-  rootCause: '',
-  solution: '',
-  status: 'OPEN',
-  supplierName: '',
-  photos: [] as UploadFileWithResponse[],
-  unqualifiedQuantity: 0,
-  responsibleDepartment: '',
-  severity: DEFAULT_VALUES.DEFAULT_SEVERITY as string,
-});
-
-const linkedDefectSubtypeOptions = computed(() => {
-  const defectType = linkedIssueDraft.value.defectType;
-  return defectSubtypes.value[defectType] || [];
-});
-
-const shouldCreateLinkedIssue = computed(() => closeForm.result === 'FAIL');
-
-function normalizeCloseText(value: unknown) {
-  return String(value ?? '').trim();
-}
-
-function normalizeCloseQuantity(value: unknown, fallback = 1) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(1, Math.trunc(parsed));
-}
-
-function syncLinkedIssueQuantities(unqualifiedValue?: unknown) {
-  const totalQuantity = normalizeCloseQuantity(closeForm.quantity);
-  const rawUnqualified =
-    unqualifiedValue === undefined
-      ? linkedIssueDraft.value.unqualifiedQuantity
-      : unqualifiedValue;
-  const unqualifiedQuantity = Math.max(
-    0,
-    Math.min(totalQuantity, Number(rawUnqualified) || 0),
-  );
-
-  linkedIssueDraft.value.unqualifiedQuantity = unqualifiedQuantity;
-  linkedIssueDraft.value.qualifiedQuantity =
-    totalQuantity - unqualifiedQuantity;
-}
-
-function hasBlockingCloseAttachmentState() {
-  return closeAttachmentFileList.value.some((file) =>
-    ['error', 'uploading'].includes(String(file.status || '')),
-  );
-}
-
-function validateCloseForm() {
-  if (!normalizeCloseText(closeForm.inspector)) {
-    message.warning('检验员不能为空');
-    return false;
-  }
-
-  if (closeForm.attachments.length === 0) {
-    message.warning('检验记录不能为空');
-    return false;
-  }
-
-  if (hasBlockingCloseAttachmentState()) {
-    message.warning('检验记录仍在上传或上传失败，请处理后再完成检验');
-    return false;
-  }
-
-  if (!shouldCreateLinkedIssue.value) return true;
-
-  syncLinkedIssueQuantities();
-
-  const requiredFields = [
-    [linkedIssueDraft.value.partName, '部件名称'],
-    [linkedIssueDraft.value.processName, '工序'],
-    [linkedIssueDraft.value.responsibleDepartment, '责任部门'],
-    [linkedIssueDraft.value.defectType, '缺陷分类'],
-    [linkedIssueDraft.value.defectSubtype, '二级分类'],
-    [linkedIssueDraft.value.severity, '严重程度'],
-    [linkedIssueDraft.value.status, '状态'],
-    [linkedIssueDraft.value.description, '不合格描述'],
-    [linkedIssueDraft.value.rootCause, '原因分析'],
-    [linkedIssueDraft.value.solution, '解决方案'],
-  ] as const;
-  const missingField = requiredFields.find(
-    ([value]) => !normalizeCloseText(value),
-  );
-  if (missingField) {
-    message.warning(`不合格项${missingField[1]}不能为空`);
-    return false;
-  }
-
-  if (linkedIssueDraft.value.unqualifiedQuantity <= 0) {
-    message.warning('不合格数量必须大于 0');
-    return false;
-  }
-
-  return true;
-}
+const canDelete = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Requests:Delete']),
+);
 
 const statusOptions = [
   { label: '已报检', value: 'SUBMITTED' },
@@ -304,14 +158,6 @@ const uploadHeaders = computed(() => ({
 
 const requestEntryUrl = computed(() =>
   buildRequestUrl({ entry: 'submit' }, '/qms/inspection/requests/entry'),
-);
-const routeDispatchRequestId = computed(() =>
-  String(
-    route.query.dispatchRequestId || route.query.closeRequestId || '',
-  ).trim(),
-);
-const canDelete = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Requests:Delete']),
 );
 const isEntryView = computed(() => activeView.value === 'entry');
 const sortedInspectorStatus = computed(() =>
@@ -563,39 +409,9 @@ function handleActionMenuClick(record: InspectionRequest, key: unknown) {
 
 function currentUserName() {
   return (
-    normalizeCloseText(userStore.userInfo?.realName) ||
-    normalizeCloseText(userStore.userInfo?.username)
+    String(userStore.userInfo?.realName || '').trim() ||
+    String(userStore.userInfo?.username || '').trim()
   );
-}
-
-function displayCloseReadonlyValue(value?: null | string) {
-  return normalizeCloseText(value) || '系统自动创建';
-}
-
-function findDeptIdByName(
-  departments: SystemDeptApi.Dept[],
-  targetName: string,
-): string {
-  const normalizedTarget = targetName.trim();
-  if (!normalizedTarget) return '';
-
-  for (const dept of departments) {
-    const name = String(dept.name || '').trim();
-    if (name === normalizedTarget || name.includes(normalizedTarget)) {
-      return String(dept.id);
-    }
-    const childId = findDeptIdByName(
-      (dept.children || []) as SystemDeptApi.Dept[],
-      normalizedTarget,
-    );
-    if (childId) return childId;
-  }
-
-  return '';
-}
-
-function defaultIssueResponsibleDepartment() {
-  return findDeptIdByName(deptRawData.value, '生产 OBU') || '生产 OBU';
 }
 
 function buildRequestUrl(
@@ -681,26 +497,6 @@ async function handleStatusFilterChange() {
   await loadRequests();
 }
 
-function handleCloseAttachmentUploadChange(
-  info: UploadChangeParam<UploadFile>,
-) {
-  if (info.file.status === 'done') {
-    if (applyUploadResponse(info.file)) {
-      message.success(`${info.file.name} 上传成功`);
-    } else {
-      message.warning('检验记录上传完成，但未返回有效地址');
-    }
-  } else if (info.file.status === 'error') {
-    message.error(`${info.file.name} 上传失败`);
-  }
-
-  closeAttachmentFileList.value = [...info.fileList];
-  closeForm.attachments = normalizeUploadFileList<InspectionRequestAttachment>(
-    closeAttachmentFileList.value,
-    '检验记录',
-  );
-}
-
 async function loadRequests() {
   loading.value = true;
   try {
@@ -731,6 +527,51 @@ async function refreshInspectionRequestPage() {
   await Promise.all([loadRequests(), loadRequestStats()]);
 }
 
+const {
+  closeAttachmentFileList,
+  closeForm,
+  closeOpen,
+  closeQr,
+  closeQrOpen,
+  currentRequest,
+  dispatchDetailOpen,
+  dispatchForm,
+  dispatchOpen,
+  linkedDefectSubtypeOptions,
+  linkedIssueDraft,
+  shouldCreateLinkedIssue,
+  submitting,
+  applyRouteDispatchDetail,
+  closeRouteDispatchDetail,
+  confirmDelete,
+  displayCloseReadonlyValue,
+  handleCloseAttachmentUploadChange,
+  openClose,
+  openCloseFromDispatchDetail,
+  openCloseQr,
+  openDispatch,
+  openDispatchDetail,
+  openDispatchDetailFromRoute,
+  submitClose,
+  submitDispatch,
+  syncLinkedIssueQuantities,
+} = useInspectionRequestTaskActions({
+  canDelete,
+  defectSubtypes,
+  deptRawData,
+  async onAfterMutation() {
+    await Promise.all([loadRequests(), loadRequestStats()]);
+  },
+  buildRequestUrl,
+  getCurrentUserName: currentUserName,
+  handleApiError,
+  makeQr,
+  query,
+  requests,
+  route,
+  router,
+});
+
 async function loadUsers() {
   const res = await getUserList({ page: 1, pageSize: 200 });
   users.value = res.items || [];
@@ -751,203 +592,6 @@ function openInspectionRecord(record: InspectionRequest) {
       type: 'process',
     },
   });
-}
-
-function openDispatch(record: InspectionRequest) {
-  currentRequest.value = record;
-  dispatchForm.dispatchRemark = '';
-  dispatchForm.inspectorId = record.inspectorId || '';
-  dispatchForm.priority = record.priority || 3;
-  dispatchOpen.value = true;
-}
-
-function openDispatchDetail(record: InspectionRequest) {
-  currentRequest.value = record;
-  dispatchDetailOpen.value = true;
-}
-
-function closeRouteDispatchDetail() {
-  if (!routeDispatchDetailOpened.value) return;
-  dispatchDetailOpen.value = false;
-  currentRequest.value = undefined;
-  routeDispatchDetailOpened.value = false;
-  restoreRouteDispatchKeyword();
-}
-
-function restoreRouteDispatchKeyword() {
-  if (routeDispatchRestoreKeyword.value === null) return;
-  query.keyword = routeDispatchRestoreKeyword.value;
-  routeDispatchRestoreKeyword.value = null;
-}
-
-function openCloseFromDispatchDetail() {
-  if (!currentRequest.value) return;
-  openClose(currentRequest.value);
-}
-
-async function submitDispatch() {
-  if (!currentRequest.value || !dispatchForm.inspectorId) {
-    message.warning('请选择检验员');
-    return;
-  }
-
-  submitting.value = true;
-  try {
-    await dispatchInspectionRequest(currentRequest.value.id, {
-      dispatchRemark: dispatchForm.dispatchRemark,
-      inspectorId: dispatchForm.inspectorId,
-      priority: dispatchForm.priority,
-    });
-    message.success('报检任务已派单');
-    dispatchOpen.value = false;
-    await Promise.all([loadRequests(), loadRequestStats()]);
-  } finally {
-    submitting.value = false;
-  }
-}
-
-function deleteDisabledReason(record: InspectionRequest) {
-  void record;
-  if (!canDelete.value) return '无删除权限';
-  return '';
-}
-
-function confirmDelete(record: InspectionRequest) {
-  const disabledReason = deleteDisabledReason(record);
-  if (disabledReason) {
-    message.warning(disabledReason);
-    return;
-  }
-
-  Modal.confirm({
-    content: `删除后任务会从列表隐藏，关联派单任务会同步取消：${record.requestNo}`,
-    okText: '删除',
-    okType: 'danger',
-    title: '删除报检任务',
-    async onOk() {
-      await deleteInspectionRequest(record.id);
-      message.success('报检任务已删除');
-      await Promise.all([loadRequests(), loadRequestStats()]);
-    },
-  });
-}
-
-function openClose(record: InspectionRequest) {
-  currentRequest.value = record;
-  closeAttachmentFileList.value = [];
-  closeForm.attachments = [];
-  closeForm.closeRemark = '';
-  closeForm.inspectionId = record.inspectionId || '';
-  closeForm.inspector = record.inspectorName || currentUserName();
-  closeForm.quantity = record.quantity || 1;
-  closeForm.result = 'PASS';
-
-  linkedIssueDraft.value = {
-    claim: DEFAULT_VALUES.DEFAULT_CLAIM,
-    defectSubtype: DEFAULT_VALUES.DEFAULT_DEFECT_SUBTYPE,
-    defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE,
-    description: '',
-    lossAmount: 0,
-    partName: record.componentName || record.partName || '',
-    processName: record.processName || '',
-    qualifiedQuantity: 0,
-    reportDate: dayjs().format('YYYY-MM-DD'),
-    reportedBy: record.inspectorName || currentUserName() || '',
-    responsibleWelder: '',
-    rootCause: '',
-    solution: '',
-    status: 'OPEN',
-    supplierName: '',
-    photos: [] as UploadFileWithResponse[],
-    unqualifiedQuantity: record.quantity || 1,
-    responsibleDepartment: defaultIssueResponsibleDepartment(),
-    severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
-  };
-
-  closeOpen.value = true;
-}
-
-async function openCloseQr(record: InspectionRequest) {
-  currentRequest.value = record;
-  closeQr.value = await makeQr(
-    buildRequestUrl({ dispatchRequestId: record.id }),
-  );
-  closeQrOpen.value = true;
-}
-
-async function submitClose() {
-  if (!currentRequest.value) return;
-  if (!validateCloseForm()) return;
-
-  submitting.value = true;
-  try {
-    syncLinkedIssueQuantities();
-    const payloadLinkedIssue = shouldCreateLinkedIssue.value
-      ? {
-          ...linkedIssueDraft.value,
-          photos: linkedIssueDraft.value.photos
-            .map((p) => p.url)
-            .filter(Boolean) as string[],
-          quantity: linkedIssueDraft.value.unqualifiedQuantity,
-        }
-      : undefined;
-
-    await closeInspectionRequest(currentRequest.value.id, {
-      attachments: closeForm.attachments,
-      closeRemark: closeForm.closeRemark,
-      inspectionId: closeForm.inspectionId || undefined,
-      inspector: closeForm.inspector,
-      linkedIssue: payloadLinkedIssue,
-      qualifiedQuantity: shouldCreateLinkedIssue.value
-        ? linkedIssueDraft.value.qualifiedQuantity
-        : closeForm.quantity,
-      quantity: closeForm.quantity,
-      result: closeForm.result,
-      unqualifiedQuantity: shouldCreateLinkedIssue.value
-        ? linkedIssueDraft.value.unqualifiedQuantity
-        : 0,
-    });
-    message.success('报检任务检验完成');
-    closeOpen.value = false;
-    await Promise.all([loadRequests(), loadRequestStats()]);
-  } catch (error) {
-    handleApiError(error, 'Close Inspection Request');
-  } finally {
-    submitting.value = false;
-  }
-}
-
-function applyRouteDispatchDetail() {
-  if (routeDispatchRequestId.value) {
-    if (routeDispatchRestoreKeyword.value === null) {
-      routeDispatchRestoreKeyword.value = query.keyword;
-    }
-    query.keyword = routeDispatchRequestId.value;
-    routeDispatchDetailConsumed.value = false;
-  }
-}
-
-function openDispatchDetailFromRoute() {
-  if (
-    !routeDispatchRequestId.value ||
-    dispatchDetailOpen.value ||
-    routeDispatchDetailConsumed.value
-  ) {
-    return;
-  }
-  const matched = requests.value.find(
-    (item) => item.id === routeDispatchRequestId.value,
-  );
-  if (matched) {
-    openDispatchDetail(matched);
-    routeDispatchDetailConsumed.value = true;
-    routeDispatchDetailOpened.value = true;
-    restoreRouteDispatchKeyword();
-    const nextQuery = { ...route.query };
-    delete nextQuery.dispatchRequestId;
-    delete nextQuery.closeRequestId;
-    void router.replace({ query: nextQuery });
-  }
 }
 
 function handleInspectionRequestCreated() {
@@ -983,15 +627,6 @@ watch(
     applyEntryRoutePrefill(route.query);
     applyRouteDispatchDetail();
     await loadRequests();
-  },
-);
-
-watch(
-  () => closeForm.quantity,
-  () => {
-    if (shouldCreateLinkedIssue.value) {
-      syncLinkedIssueQuantities();
-    }
   },
 );
 </script>
