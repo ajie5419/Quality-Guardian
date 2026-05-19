@@ -1,152 +1,32 @@
+import {
+  buildInspectionIssueDateRange,
+  hasInspectionIssueAdminAccess,
+  hasInspectionIssueWriteAccess,
+  normalizeOptionalInspectionIssueDate,
+  normalizeOptionalInspectionIssueNumber,
+  normalizeOptionalInspectionIssueString,
+  parseInspectionIssueDateMode,
+  parseInspectionIssueDateValue,
+  parseInspectionIssueListQuery,
+  parseOptionalIssueYear,
+} from '@qgs/domain';
 import { nanoid } from 'nanoid';
 import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 
 import prisma from './prisma';
 
-const DEFAULT_PAGE = 1;
-const DEFAULT_PAGE_SIZE = 20;
-const MAX_PAGE_SIZE = 200;
-
-export type InspectionIssueDateMode = 'month' | 'week' | 'year';
-
-function getQueryValue(query: Record<string, unknown>, key: string) {
-  return query[key] ?? query[`${key}[]`];
-}
-
-function normalizeString(value: unknown): string | undefined {
-  const normalized = String(Array.isArray(value) ? value[0] : (value ?? ''))
-    .trim()
-    .replaceAll(/\s+/g, ' ');
-  return normalized || undefined;
-}
-
-function parsePositiveInt(value: unknown, defaultValue: number): number {
-  const parsed = Number.parseInt(String(value ?? ''), 10);
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    return defaultValue;
-  }
-  return parsed;
-}
-
-export function parseOptionalIssueYear(value: unknown): number | undefined {
-  if (value === undefined || value === null || value === '') {
-    return undefined;
-  }
-  const parsed = Number.parseInt(String(value), 10);
-  return Number.isNaN(parsed) ? undefined : parsed;
-}
-
-export function parseInspectionIssueDateMode(
-  value: unknown,
-): InspectionIssueDateMode {
-  const normalized = normalizeString(value)?.toLowerCase();
-  if (normalized === 'month' || normalized === 'week') {
-    return normalized;
-  }
-  return 'year';
-}
-
-export function parseInspectionIssueDateValue(value: unknown) {
-  return normalizeString(value);
-}
-
-function parseLocalDate(value: string): Date | undefined {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  if (!match) {
-    return undefined;
-  }
-
-  const year = Number(match[1]);
-  const monthIndex = Number(match[2]) - 1;
-  const day = Number(match[3]);
-  const date = new Date(year, monthIndex, day);
-
-  if (
-    Number.isNaN(date.getTime()) ||
-    date.getFullYear() !== year ||
-    date.getMonth() !== monthIndex ||
-    date.getDate() !== day
-  ) {
-    return undefined;
-  }
-
-  return date;
-}
-
-function getWeekStart(date: Date) {
-  const start = new Date(date);
-  start.setHours(0, 0, 0, 0);
-  const day = start.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  start.setDate(start.getDate() + diff);
-  return start;
-}
-
-export function buildInspectionIssueDateRange(params: {
-  dateMode?: InspectionIssueDateMode;
-  dateValue?: string;
-  year?: number;
-}) {
-  const dateMode = params.dateMode || 'year';
-
-  if (dateMode === 'month' && params.dateValue) {
-    const match = /^(\d{4})-(\d{2})$/.exec(params.dateValue.trim());
-    if (match) {
-      const year = Number(match[1]);
-      const monthIndex = Number(match[2]) - 1;
-      if (
-        Number.isInteger(year) &&
-        Number.isInteger(monthIndex) &&
-        monthIndex >= 0 &&
-        monthIndex <= 11
-      ) {
-        const start = new Date(year, monthIndex, 1);
-        const end = new Date(year, monthIndex + 1, 1);
-        return { end, start };
-      }
-    }
-  }
-
-  if (dateMode === 'week' && params.dateValue) {
-    const baseDate = parseLocalDate(params.dateValue);
-    if (baseDate) {
-      const start = getWeekStart(baseDate);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 7);
-      return { end, start };
-    }
-  }
-
-  const currentYear = params.year || new Date().getFullYear();
-  const start = new Date(currentYear, 0, 1);
-  const end = new Date(currentYear + 1, 0, 1);
-  return { end, start };
-}
-
-function parseMultiString(value: unknown): string | string[] | undefined {
-  if (value === undefined || value === null || value === '') {
-    return undefined;
-  }
-
-  if (Array.isArray(value)) {
-    const normalized = value
-      .map((item) => normalizeString(item))
-      .filter(Boolean) as string[];
-    if (normalized.length === 0) return undefined;
-    return normalized.length === 1 ? normalized[0] : normalized;
-  }
-
-  const normalized = normalizeString(value);
-  if (!normalized) return undefined;
-  if (!normalized.includes(',')) return normalized;
-
-  const parts = normalized
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-  if (parts.length === 0) return undefined;
-  return parts.length === 1 ? parts[0] : parts;
-}
+export {
+  buildInspectionIssueDateRange,
+  hasInspectionIssueAdminAccess,
+  hasInspectionIssueWriteAccess,
+  normalizeOptionalInspectionIssueDate,
+  normalizeOptionalInspectionIssueNumber,
+  normalizeOptionalInspectionIssueString,
+  parseInspectionIssueDateMode,
+  parseInspectionIssueDateValue,
+  parseInspectionIssueListQuery,
+  parseOptionalIssueYear,
+};
 
 export function createInspectionIssueId(): string {
   return `ISS-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`;
@@ -157,49 +37,6 @@ export async function getNextInspectionIssueSerialNumber(): Promise<number> {
     _max: { serialNumber: true },
   });
   return (result._max.serialNumber || 0) + 1;
-}
-
-export function parseInspectionIssueListQuery(query: Record<string, unknown>) {
-  const page = parsePositiveInt(getQueryValue(query, 'page'), DEFAULT_PAGE);
-  const pageSize = Math.min(
-    parsePositiveInt(getQueryValue(query, 'pageSize'), DEFAULT_PAGE_SIZE),
-    MAX_PAGE_SIZE,
-  );
-  const yearValue = getQueryValue(query, 'year');
-  const year = yearValue
-    ? Number.parseInt(String(yearValue), 10) || undefined
-    : undefined;
-
-  const sortOrderRaw = normalizeString(
-    getQueryValue(query, 'sortOrder'),
-  )?.toLowerCase();
-  let sortOrder: 'asc' | 'desc' | undefined;
-  if (sortOrderRaw === 'asc' || sortOrderRaw === 'desc') {
-    sortOrder = sortOrderRaw;
-  }
-
-  return {
-    dateMode: parseInspectionIssueDateMode(getQueryValue(query, 'dateMode')),
-    dateValue: parseInspectionIssueDateValue(getQueryValue(query, 'dateValue')),
-    defectType: parseMultiString(getQueryValue(query, 'defectType')),
-    page,
-    pageSize,
-    processName: normalizeString(getQueryValue(query, 'processName')),
-    projectName: normalizeString(getQueryValue(query, 'projectName')),
-    responsibleDepartment: parseMultiString(
-      getQueryValue(query, 'responsibleDepartment'),
-    ),
-    responsibleWelder: normalizeString(
-      getQueryValue(query, 'responsibleWelder'),
-    ),
-    severity: parseMultiString(getQueryValue(query, 'severity')),
-    sortBy: normalizeString(getQueryValue(query, 'sortBy')),
-    sortOrder,
-    status: parseMultiString(getQueryValue(query, 'status')),
-    supplierName: normalizeString(getQueryValue(query, 'supplierName')),
-    workOrderNumber: normalizeString(getQueryValue(query, 'workOrderNumber')),
-    year,
-  };
 }
 
 interface InspectionIssueImportItem {
@@ -214,51 +51,6 @@ interface InspectionIssueImportItem {
   responsibleWelder?: unknown;
   status?: unknown;
   workOrderNumber?: unknown;
-}
-
-function normalizeOptionalString(value: unknown): string | undefined {
-  const normalized = normalizeString(value);
-  if (!normalized) {
-    return undefined;
-  }
-  return normalized;
-}
-
-function normalizeOptionalNumber(value: unknown): number | undefined {
-  if (value === undefined || value === null || value === '') {
-    return undefined;
-  }
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    return undefined;
-  }
-  return parsed;
-}
-
-function normalizeOptionalDate(value: unknown): Date | undefined {
-  const normalized = normalizeOptionalString(value);
-  if (!normalized) {
-    return undefined;
-  }
-  const parsed = new Date(normalized);
-  if (Number.isNaN(parsed.getTime())) {
-    return undefined;
-  }
-  return parsed;
-}
-
-export function hasInspectionIssueAdminAccess(roles: unknown): boolean {
-  if (!Array.isArray(roles)) {
-    return false;
-  }
-
-  const normalizedRoles = roles
-    .map((role) => normalizeOptionalString(role)?.toLowerCase())
-    .filter(Boolean) as string[];
-
-  return normalizedRoles.some(
-    (role) => role === 'admin' || role === 'super' || role === 'super admin',
-  );
 }
 
 export async function findInspectionIssueAccessRecord(id: string) {
@@ -310,7 +102,7 @@ function deriveIssueProcessNameFromInspection(inspection?: {
 }
 
 export async function findInspectionForIssue(inspectionId?: string) {
-  const normalizedId = normalizeOptionalString(inspectionId);
+  const normalizedId = normalizeOptionalInspectionIssueString(inspectionId);
   if (!normalizedId) {
     return null;
   }
@@ -327,16 +119,6 @@ export async function findInspectionForIssue(inspectionId?: string) {
   });
 }
 
-export function hasInspectionIssueWriteAccess(params: {
-  inspector: null | string;
-  roles: unknown;
-  username: unknown;
-}): boolean {
-  const isAdmin = hasInspectionIssueAdminAccess(params.roles);
-  const isOwner = params.inspector === String(params.username ?? '');
-  return isAdmin || isOwner;
-}
-
 export function buildInspectionIssueCreateData(
   body: Record<string, unknown>,
   options: {
@@ -346,28 +128,32 @@ export function buildInspectionIssueCreateData(
     serialNumber: number;
   },
 ) {
-  const issueDate = normalizeOptionalDate(body.reportDate) ?? new Date();
+  const issueDate =
+    normalizeOptionalInspectionIssueDate(body.reportDate) ?? new Date();
   const linkedInspection = options.inspection;
   const workOrderNumber =
     linkedInspection?.workOrderNumber ||
-    normalizeOptionalString(body.workOrderNumber);
+    normalizeOptionalInspectionIssueString(body.workOrderNumber);
   const projectName =
-    linkedInspection?.projectName || normalizeOptionalString(body.projectName);
+    linkedInspection?.projectName ||
+    normalizeOptionalInspectionIssueString(body.projectName);
   const processName =
     deriveIssueProcessNameFromInspection(linkedInspection || undefined) ||
-    normalizeOptionalString(body.processName);
+    normalizeOptionalInspectionIssueString(body.processName);
   const partName =
-    normalizeOptionalString(body.partName) ||
+    normalizeOptionalInspectionIssueString(body.partName) ||
     deriveIssuePartNameFromInspection(linkedInspection || undefined) ||
     'Unknown';
   const supplierName =
     linkedInspection?.supplierName ||
-    normalizeOptionalString(body.supplierName);
+    normalizeOptionalInspectionIssueString(body.supplierName);
   const division =
     linkedInspection?.work_order?.division ||
-    normalizeOptionalString(body.division);
+    normalizeOptionalInspectionIssueString(body.division);
   const quantity =
-    normalizeOptionalNumber(body.quantity) ?? linkedInspection?.quantity ?? 1;
+    normalizeOptionalInspectionIssueNumber(body.quantity) ??
+    linkedInspection?.quantity ??
+    1;
 
   return {
     id: options.id,
@@ -380,8 +166,11 @@ export function buildInspectionIssueCreateData(
           },
         }
       : undefined,
-    status: toQualityRecordStatus(normalizeOptionalString(body.status)),
-    nonConformanceNumber: normalizeOptionalString(body.ncNumber) ?? null,
+    status: toQualityRecordStatus(
+      normalizeOptionalInspectionIssueString(body.status),
+    ),
+    nonConformanceNumber:
+      normalizeOptionalInspectionIssueString(body.ncNumber) ?? null,
     work_orders: workOrderNumber
       ? {
           connect: {
@@ -393,20 +182,23 @@ export function buildInspectionIssueCreateData(
     processName,
     partName,
     division,
-    defectType: normalizeOptionalString(body.defectType),
-    defectSubtype: normalizeOptionalString(body.defectSubtype),
-    severity: normalizeOptionalString(body.severity) ?? 'Minor',
-    rootCause: normalizeOptionalString(body.rootCause),
-    solution: normalizeOptionalString(body.solution),
-    description: normalizeOptionalString(body.description),
+    defectType: normalizeOptionalInspectionIssueString(body.defectType),
+    defectSubtype: normalizeOptionalInspectionIssueString(body.defectSubtype),
+    severity: normalizeOptionalInspectionIssueString(body.severity) ?? 'Minor',
+    rootCause: normalizeOptionalInspectionIssueString(body.rootCause),
+    solution: normalizeOptionalInspectionIssueString(body.solution),
+    description: normalizeOptionalInspectionIssueString(body.description),
     quantity,
-    lossAmount: normalizeOptionalNumber(body.lossAmount) ?? 0,
+    lossAmount: normalizeOptionalInspectionIssueNumber(body.lossAmount) ?? 0,
     responsibleDepartment:
-      normalizeOptionalString(body.responsibleDepartment) ?? 'Unknown',
-    responsibleWelder: normalizeOptionalString(body.responsibleWelder) ?? null,
+      normalizeOptionalInspectionIssueString(body.responsibleDepartment) ??
+      'Unknown',
+    responsibleWelder:
+      normalizeOptionalInspectionIssueString(body.responsibleWelder) ?? null,
     supplierName: supplierName ?? null,
     category:
-      linkedInspection?.category ?? normalizeOptionalString(body.category),
+      linkedInspection?.category ??
+      normalizeOptionalInspectionIssueString(body.category),
     users_quality_records_inspectorTousers: options.inspectorUsername
       ? { connect: { username: options.inspectorUsername } }
       : undefined,
@@ -428,7 +220,7 @@ export function buildInspectionIssueUpdateData(
 
   if (body.ncNumber !== undefined && body.ncNumber !== existingNcNumber) {
     updateData.nonConformanceNumber =
-      normalizeOptionalString(body.ncNumber) ?? null;
+      normalizeOptionalInspectionIssueString(body.ncNumber) ?? null;
   }
 
   const stringFields = [
@@ -449,21 +241,22 @@ export function buildInspectionIssueUpdateData(
   ];
   for (const field of stringFields) {
     if (body[field] !== undefined) {
-      updateData[field] = normalizeOptionalString(body[field]) ?? null;
+      updateData[field] =
+        normalizeOptionalInspectionIssueString(body[field]) ?? null;
     }
   }
 
-  const quantity = normalizeOptionalNumber(body.quantity);
+  const quantity = normalizeOptionalInspectionIssueNumber(body.quantity);
   if (quantity !== undefined) {
     updateData.quantity = quantity;
   }
 
-  const lossAmount = normalizeOptionalNumber(body.lossAmount);
+  const lossAmount = normalizeOptionalInspectionIssueNumber(body.lossAmount);
   if (lossAmount !== undefined) {
     updateData.lossAmount = lossAmount;
   }
 
-  const reportDate = normalizeOptionalDate(body.reportDate);
+  const reportDate = normalizeOptionalInspectionIssueDate(body.reportDate);
   if (reportDate) {
     updateData.date = reportDate;
   }
@@ -478,7 +271,7 @@ export function buildInspectionIssueUpdateData(
 
   if (body.status !== undefined) {
     updateData.status = toQualityRecordStatus(
-      normalizeOptionalString(body.status),
+      normalizeOptionalInspectionIssueString(body.status),
     );
   }
 
@@ -490,14 +283,16 @@ export function buildInspectionIssueUpsertPayload(
   serialNumber: number,
 ) {
   const ncNumber =
-    normalizeOptionalString(item.nonConformanceNumber) ??
-    normalizeOptionalString(item.ncNumber);
+    normalizeOptionalInspectionIssueString(item.nonConformanceNumber) ??
+    normalizeOptionalInspectionIssueString(item.ncNumber);
   if (!ncNumber) {
     return null;
   }
 
-  const quantity = normalizeOptionalNumber(item.quantity);
-  const status = toQualityRecordStatus(normalizeOptionalString(item.status));
+  const quantity = normalizeOptionalInspectionIssueNumber(item.quantity);
+  const status = toQualityRecordStatus(
+    normalizeOptionalInspectionIssueString(item.status),
+  );
 
   return {
     create: {
@@ -505,29 +300,38 @@ export function buildInspectionIssueUpsertPayload(
       serialNumber,
       date: new Date(),
       status,
-      partName: normalizeOptionalString(item.partName) ?? '未知零件',
-      description: normalizeOptionalString(item.description) ?? '',
+      partName:
+        normalizeOptionalInspectionIssueString(item.partName) ?? '未知零件',
+      description:
+        normalizeOptionalInspectionIssueString(item.description) ?? '',
       quantity: quantity ?? 0,
-      projectName: normalizeOptionalString(item.projectName) ?? '',
-      division: normalizeOptionalString(item.division) ?? '',
+      projectName:
+        normalizeOptionalInspectionIssueString(item.projectName) ?? '',
+      division: normalizeOptionalInspectionIssueString(item.division) ?? '',
       responsibleDepartment:
-        normalizeOptionalString(item.responsibleDepartment) ?? '质量部',
+        normalizeOptionalInspectionIssueString(item.responsibleDepartment) ??
+        '质量部',
       responsibleWelder:
-        normalizeOptionalString(item.responsibleWelder) ?? null,
+        normalizeOptionalInspectionIssueString(item.responsibleWelder) ?? null,
       nonConformanceNumber: ncNumber,
-      workOrderNumber: normalizeOptionalString(item.workOrderNumber) ?? null,
+      workOrderNumber:
+        normalizeOptionalInspectionIssueString(item.workOrderNumber) ?? null,
     },
     update: {
-      partName: normalizeOptionalString(item.partName),
-      description: normalizeOptionalString(item.description),
+      partName: normalizeOptionalInspectionIssueString(item.partName),
+      description: normalizeOptionalInspectionIssueString(item.description),
       quantity,
-      projectName: normalizeOptionalString(item.projectName),
-      responsibleDepartment: normalizeOptionalString(
+      projectName: normalizeOptionalInspectionIssueString(item.projectName),
+      responsibleDepartment: normalizeOptionalInspectionIssueString(
         item.responsibleDepartment,
       ),
-      responsibleWelder: normalizeOptionalString(item.responsibleWelder),
+      responsibleWelder: normalizeOptionalInspectionIssueString(
+        item.responsibleWelder,
+      ),
       status,
     },
     where: { nonConformanceNumber: ncNumber },
   };
 }
+
+export { type InspectionIssueDateMode } from '@qgs/domain';

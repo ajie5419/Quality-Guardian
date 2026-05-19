@@ -1,7 +1,10 @@
 import { defineEventHandler, readBody } from 'h3';
 import { callAi, extractJson } from '~/utils/ai';
 import { logApiError } from '~/utils/api-logger';
-import { useResponseSuccess } from '~/utils/response';
+import {
+  internalServerErrorResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
@@ -59,15 +62,13 @@ export default defineEventHandler(async (event) => {
       solution: finalSolution,
     });
   } catch (error: unknown) {
-    // ... 原有的错误处理 logic
     logApiError('analyze', error);
     const err = error as { message?: string };
-    return {
-      code: 500,
-      message:
-        typeof err.message === 'string'
-          ? err.message
-          : 'AI 分析过程中发生未知错误',
-    };
+    return internalServerErrorResponse(
+      event,
+      typeof err.message === 'string'
+        ? err.message
+        : 'AI 分析过程中发生未知错误',
+    );
   }
 });

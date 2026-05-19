@@ -1,10 +1,16 @@
 import { defineEventHandler } from 'h3';
 import prisma from '~/utils/prisma';
+import {
+  internalServerErrorResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 
-export default defineEventHandler(async (_event) => {
+export default defineEventHandler(async (event) => {
   try {
     const users = await prisma.users.findMany({ take: 3 });
-    if (users.length === 0) return { success: false, message: 'No users' };
+    if (users.length === 0) {
+      return internalServerErrorResponse(event, 'No users');
+    }
 
     const admin = users[0];
 
@@ -37,8 +43,9 @@ export default defineEventHandler(async (_event) => {
       ],
     });
 
-    return { success: true };
+    return useResponseSuccess({ success: true });
   } catch (error) {
-    return { success: false, error: error.message };
+    const message = error instanceof Error ? error.message : 'Seed failed';
+    return internalServerErrorResponse(event, message);
   }
 });

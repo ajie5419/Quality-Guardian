@@ -129,6 +129,10 @@
       "path": "packages/preferences",
     },
     {
+      "name": "@qgs/domain",
+      "path": "packages/qgs-domain",
+    },
+    {
       "name": "@qgs/shared",
       "path": "packages/qgs-shared",
     },

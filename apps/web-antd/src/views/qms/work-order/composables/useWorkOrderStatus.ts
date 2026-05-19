@@ -1,5 +1,7 @@
 import type { StatusUIConfig } from '../types/workOrder';
 
+import { mapWorkOrderStatus } from '@qgs/domain';
+
 import { WorkOrderStatusEnum } from '#/api/qms/enums';
 
 import { WORK_ORDER_STATUS_UI_MAP } from '../constants';
@@ -13,32 +15,6 @@ import { WORK_ORDER_STATUS_UI_MAP } from '../constants';
  * - COMPLETED: 已完成/已结束
  * - CANCELLED: 已取消
  */
-const STATUS_MAPPING_TABLE: Record<string, WorkOrderStatusEnum> = {
-  // 进行中
-  IN_PROGRESS: WorkOrderStatusEnum.IN_PROGRESS,
-  'IN PROGRESS': WorkOrderStatusEnum.IN_PROGRESS,
-  进行中: WorkOrderStatusEnum.IN_PROGRESS,
-  处理中: WorkOrderStatusEnum.IN_PROGRESS,
-  InProgress: WorkOrderStatusEnum.IN_PROGRESS,
-  PROCESSING: WorkOrderStatusEnum.IN_PROGRESS,
-  // 已完成
-  COMPLETED: WorkOrderStatusEnum.COMPLETED,
-  已完成: WorkOrderStatusEnum.COMPLETED,
-  Completed: WorkOrderStatusEnum.COMPLETED,
-  DONE: WorkOrderStatusEnum.COMPLETED,
-  已结束: WorkOrderStatusEnum.COMPLETED,
-  // 未开始/待处理 - 统一映射到 OPEN
-  PENDING: WorkOrderStatusEnum.OPEN,
-  未开始: WorkOrderStatusEnum.OPEN,
-  Pending: WorkOrderStatusEnum.OPEN,
-  OPEN: WorkOrderStatusEnum.OPEN,
-  待处理: WorkOrderStatusEnum.OPEN,
-  // 已取消
-  CANCELLED: WorkOrderStatusEnum.CANCELLED,
-  已取消: WorkOrderStatusEnum.CANCELLED,
-  Cancelled: WorkOrderStatusEnum.CANCELLED,
-};
-
 /**
  * Normalize status string to WorkOrderStatusEnum
  * @param s 原始状态（可能为 null/undefined/任意字符串）
@@ -47,22 +23,7 @@ const STATUS_MAPPING_TABLE: Record<string, WorkOrderStatusEnum> = {
 export function normalizeStatus(
   s: null | string | undefined,
 ): WorkOrderStatusEnum {
-  if (!s) return WorkOrderStatusEnum.OPEN;
-
-  const normalized = String(s).trim();
-  const upper = normalized.toUpperCase();
-
-  // 优先匹配映射表（O(1)）
-  const mapped =
-    STATUS_MAPPING_TABLE[normalized] || STATUS_MAPPING_TABLE[upper];
-  if (mapped) return mapped;
-
-  // 兜底：匹配枚举本身
-  const enumValues = Object.values(WorkOrderStatusEnum);
-  return (
-    enumValues.find((v) => v.toUpperCase() === upper) ||
-    WorkOrderStatusEnum.OPEN
-  );
+  return mapWorkOrderStatus(s) as WorkOrderStatusEnum;
 }
 
 /**

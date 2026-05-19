@@ -1,0 +1,109 @@
+export type UnifiedQualityLossStatus =
+  | 'Confirmed'
+  | 'Pending'
+  | 'Processing'
+  | 'Resolved';
+
+export type QualityLossSource =
+  | 'Commissioning'
+  | 'External'
+  | 'Internal'
+  | 'Manual';
+
+export const QUALITY_LOSS_SOURCE = {
+  COMMISSIONING: 'Commissioning',
+  EXTERNAL: 'External',
+  INTERNAL: 'Internal',
+  MANUAL: 'Manual',
+} as const;
+
+export type AfterSalesClaimStatus =
+  | 'COMPLETED'
+  | 'IN_PROGRESS'
+  | 'OPEN'
+  | 'RESOLVED';
+export type QualityRecordStatus =
+  | 'CLOSED'
+  | 'IN_PROGRESS'
+  | 'OPEN'
+  | 'RESOLVED';
+
+export function normalizeQualityLossStatus(
+  status: null | string | undefined,
+): UnifiedQualityLossStatus {
+  const normalized = String(status || '')
+    .trim()
+    .toUpperCase();
+
+  if (['CLOSED', 'COMPLETED', 'CONFIRMED'].includes(normalized)) {
+    return 'Confirmed';
+  }
+  if (
+    [
+      'CLAIMING',
+      'IN_PROGRESS',
+      'NEGOTIATING',
+      'PROCESSING',
+      'SUBMITTED',
+    ].includes(normalized)
+  ) {
+    return 'Processing';
+  }
+  if (normalized === 'RESOLVED') {
+    return 'Resolved';
+  }
+  return 'Pending';
+}
+
+export function toAfterSalesClaimStatus(
+  status: null | string | undefined,
+): AfterSalesClaimStatus {
+  const unified = normalizeQualityLossStatus(status);
+  if (unified === 'Confirmed') return 'COMPLETED';
+  if (unified === 'Processing') return 'IN_PROGRESS';
+  if (unified === 'Resolved') return 'RESOLVED';
+  return 'OPEN';
+}
+
+export function toQualityRecordStatus(
+  status: null | string | undefined,
+): QualityRecordStatus {
+  const unified = normalizeQualityLossStatus(status);
+  if (unified === 'Confirmed') return 'CLOSED';
+  if (unified === 'Processing') return 'IN_PROGRESS';
+  if (unified === 'Resolved') return 'RESOLVED';
+  return 'OPEN';
+}
+
+export function normalizeQualityLossSource(
+  source: null | string | undefined,
+): QualityLossSource {
+  const normalized = String(source || '')
+    .trim()
+    .toUpperCase();
+  if (
+    ['COMMISSIONING', 'VEHICLE', 'VEHICLE_COMMISSIONING', '调试验收'].includes(
+      normalized,
+    )
+  ) {
+    return QUALITY_LOSS_SOURCE.COMMISSIONING;
+  }
+  if (normalized === 'INTERNAL') return QUALITY_LOSS_SOURCE.INTERNAL;
+  if (normalized === 'EXTERNAL') return QUALITY_LOSS_SOURCE.EXTERNAL;
+  return QUALITY_LOSS_SOURCE.MANUAL;
+}
+
+export function toQualityLossTargetType(
+  source: QualityLossSource,
+):
+  | 'after_sales'
+  | 'inspection_issue'
+  | 'quality_loss'
+  | 'vehicle_commissioning_issue' {
+  if (source === QUALITY_LOSS_SOURCE.COMMISSIONING) {
+    return 'vehicle_commissioning_issue';
+  }
+  if (source === QUALITY_LOSS_SOURCE.INTERNAL) return 'inspection_issue';
+  if (source === QUALITY_LOSS_SOURCE.EXTERNAL) return 'after_sales';
+  return 'quality_loss';
+}

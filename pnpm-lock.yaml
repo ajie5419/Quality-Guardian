@@ -628,6 +628,9 @@ importers:
       '@prisma/client':
         specifier: 6.2.1
         version: 6.2.1(prisma@6.2.1)
+      '@qgs/domain':
+        specifier: workspace:*
+        version: link:../../packages/qgs-domain
       '@qgs/shared':
         specifier: workspace:*
         version: link:../../packages/qgs-shared
@@ -686,6 +689,9 @@ importers:
 
   apps/web-antd:
     dependencies:
+      '@qgs/domain':
+        specifier: workspace:*
+        version: link:../../packages/qgs-domain
       '@qgs/shared':
         specifier: workspace:*
         version: link:../../packages/qgs-shared
@@ -1715,6 +1721,15 @@ importers:
       '@vben-core/typings':
         specifier: workspace:*
         version: link:../@core/base/typings
+
+  packages/qgs-domain:
+    devDependencies:
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(@microsoft/api-extractor@7.52.5(@types/node@22.16.0))(jiti@2.4.2)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.0)
+      typescript:
+        specifier: ^5.0.0
+        version: 5.8.3
 
   packages/qgs-shared:
     devDependencies:

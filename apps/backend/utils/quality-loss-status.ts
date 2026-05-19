@@ -2,89 +2,43 @@ import type {
   after_sales_claimStatus,
   quality_records_status,
 } from '@prisma/client';
+import type { QualityLossSource, UnifiedQualityLossStatus } from '@qgs/domain';
 
-export type UnifiedQualityLossStatus =
-  | 'Confirmed'
-  | 'Pending'
-  | 'Processing'
-  | 'Resolved';
+import {
+  normalizeQualityLossSource as normalizeQualityLossSourceRule,
+  normalizeQualityLossStatus as normalizeQualityLossStatusRule,
+  QUALITY_LOSS_SOURCE,
+  toAfterSalesClaimStatus as toAfterSalesClaimStatusRule,
+  toQualityLossTargetType as toQualityLossTargetTypeRule,
+  toQualityRecordStatus as toQualityRecordStatusRule,
+} from '@qgs/domain';
 
-export type QualityLossSource =
-  | 'Commissioning'
-  | 'External'
-  | 'Internal'
-  | 'Manual';
+export type { QualityLossSource, UnifiedQualityLossStatus };
 
-export const QUALITY_LOSS_SOURCE = {
-  COMMISSIONING: 'Commissioning',
-  EXTERNAL: 'External',
-  INTERNAL: 'Internal',
-  MANUAL: 'Manual',
-} as const;
+export { QUALITY_LOSS_SOURCE };
 
 export function normalizeQualityLossStatus(
   status: null | string | undefined,
 ): UnifiedQualityLossStatus {
-  const normalized = String(status || '')
-    .trim()
-    .toUpperCase();
-
-  if (['CLOSED', 'COMPLETED', 'CONFIRMED'].includes(normalized)) {
-    return 'Confirmed';
-  }
-  if (
-    [
-      'CLAIMING',
-      'IN_PROGRESS',
-      'NEGOTIATING',
-      'PROCESSING',
-      'SUBMITTED',
-    ].includes(normalized)
-  ) {
-    return 'Processing';
-  }
-  if (normalized === 'RESOLVED') {
-    return 'Resolved';
-  }
-  return 'Pending';
+  return normalizeQualityLossStatusRule(status);
 }
 
 export function toAfterSalesClaimStatus(
   status: null | string | undefined,
 ): after_sales_claimStatus {
-  const unified = normalizeQualityLossStatus(status);
-  if (unified === 'Confirmed') return 'COMPLETED';
-  if (unified === 'Processing') return 'IN_PROGRESS';
-  if (unified === 'Resolved') return 'RESOLVED';
-  return 'OPEN';
+  return toAfterSalesClaimStatusRule(status) as after_sales_claimStatus;
 }
 
 export function toQualityRecordStatus(
   status: null | string | undefined,
 ): quality_records_status {
-  const unified = normalizeQualityLossStatus(status);
-  if (unified === 'Confirmed') return 'CLOSED';
-  if (unified === 'Processing') return 'IN_PROGRESS';
-  if (unified === 'Resolved') return 'RESOLVED';
-  return 'OPEN';
+  return toQualityRecordStatusRule(status) as quality_records_status;
 }
 
 export function normalizeQualityLossSource(
   source: null | string | undefined,
 ): QualityLossSource {
-  const normalized = String(source || '')
-    .trim()
-    .toUpperCase();
-  if (
-    ['COMMISSIONING', 'VEHICLE', 'VEHICLE_COMMISSIONING', '调试验收'].includes(
-      normalized,
-    )
-  ) {
-    return QUALITY_LOSS_SOURCE.COMMISSIONING;
-  }
-  if (normalized === 'INTERNAL') return QUALITY_LOSS_SOURCE.INTERNAL;
-  if (normalized === 'EXTERNAL') return QUALITY_LOSS_SOURCE.EXTERNAL;
-  return QUALITY_LOSS_SOURCE.MANUAL;
+  return normalizeQualityLossSourceRule(source);
 }
 
 export function toQualityLossTargetType(
@@ -94,10 +48,5 @@ export function toQualityLossTargetType(
   | 'inspection_issue'
   | 'quality_loss'
   | 'vehicle_commissioning_issue' {
-  if (source === QUALITY_LOSS_SOURCE.COMMISSIONING) {
-    return 'vehicle_commissioning_issue';
-  }
-  if (source === QUALITY_LOSS_SOURCE.INTERNAL) return 'inspection_issue';
-  if (source === QUALITY_LOSS_SOURCE.EXTERNAL) return 'after_sales';
-  return 'quality_loss';
+  return toQualityLossTargetTypeRule(source);
 }
