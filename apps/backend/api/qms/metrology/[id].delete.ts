@@ -38,7 +38,11 @@ export default defineEventHandler(async (event) => {
       action: 'DELETE',
       targetType: 'metrology',
       targetId: String(id),
-      details: `删除计量器具: ${deleted.instrumentName} (${deleted.instrumentCode})`,
+      detailsTemplate: '删除计量器具: {{instrumentName}} ({{instrumentCode}})',
+      detailsVariables: {
+        instrumentCode: deleted.instrumentCode,
+        instrumentName: deleted.instrumentName,
+      },
     });
 
     return useResponseSuccess(null);

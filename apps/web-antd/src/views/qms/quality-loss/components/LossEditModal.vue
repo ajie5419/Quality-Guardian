@@ -27,9 +27,9 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 
 import {
-  LOSS_TYPE_OPTIONS,
+  mapDictionaryOptionsToLossType,
+  mapDictionaryOptionsToQualityLossStatus,
   SOURCE_STYLE_MAP,
-  STATUS_OPTIONS,
 } from '../constants';
 import { LossSource } from '../types';
 
@@ -38,6 +38,8 @@ const props = defineProps<{
   initialData: Partial<QmsQualityLossApi.QualityLossItem>;
   isEditMode: boolean;
   open: boolean;
+  statusOptions?: Array<{ color?: string; label: string; value: string }>;
+  typeOptions?: Array<{ label: string; value: string }>;
 }>();
 
 const emit = defineEmits<{
@@ -187,7 +189,7 @@ const responsibleDepartmentValue = computed<string | undefined>({
           <FormItem label="损失类型" name="type" required>
             <Select
               v-model:value="formState.type"
-              :options="LOSS_TYPE_OPTIONS"
+              :options="props.typeOptions || mapDictionaryOptionsToLossType()"
               :disabled="!isManualSource"
             />
           </FormItem>
@@ -232,9 +234,14 @@ const responsibleDepartmentValue = computed<string | undefined>({
         <Select
           v-model:value="formState.status"
           :options="
-            STATUS_OPTIONS.map((opt) => ({
+            (
+              props.statusOptions || mapDictionaryOptionsToQualityLossStatus()
+            ).map((opt) => ({
               value: opt.value,
-              label: t(opt.label),
+              label:
+                typeof opt.label === 'string' && opt.label.includes('.')
+                  ? t(opt.label)
+                  : opt.label,
             }))
           "
         />

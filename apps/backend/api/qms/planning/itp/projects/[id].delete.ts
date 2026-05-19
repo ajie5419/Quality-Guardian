@@ -36,7 +36,10 @@ export default defineEventHandler(async (event) => {
       action: 'DELETE',
       targetType: 'planning_itp_project',
       targetId: String(id),
-      details: `删除 ITP 项目: ${deleted.projectName}`,
+      detailsTemplate: '删除 ITP 项目: {{projectName}}',
+      detailsVariables: {
+        projectName: deleted.projectName,
+      },
     });
 
     return useResponseSuccess(null);

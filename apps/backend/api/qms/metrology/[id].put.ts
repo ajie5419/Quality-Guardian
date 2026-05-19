@@ -48,7 +48,11 @@ export default defineEventHandler(async (event) => {
       action: 'UPDATE',
       targetType: 'metrology',
       targetId: String(id),
-      details: `修改计量器具: ${updated.instrumentName} (${updated.instrumentCode})`,
+      detailsTemplate: '修改计量器具: {{instrumentName}} ({{instrumentCode}})',
+      detailsVariables: {
+        instrumentCode: updated.instrumentCode,
+        instrumentName: updated.instrumentName,
+      },
     });
 
     return useResponseSuccess(null);

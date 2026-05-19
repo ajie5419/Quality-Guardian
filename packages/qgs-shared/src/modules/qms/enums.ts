@@ -9,16 +9,17 @@ export enum SupplierStatusEnum {
   FROZEN = 'Frozen',
   OBSERVATION = 'Observation',
   QUALIFIED = 'Qualified',
+  TRIAL = 'Trial',
 }
 
 /**
  * QMS Work Order Status
  */
 export enum WorkOrderStatusEnum {
-  CLOSED = 'Closed',
-  COMPLETED = 'Completed',
-  IN_PROGRESS = 'In Progress',
-  PENDING = 'Pending',
+  CANCELLED = 'CANCELLED',
+  COMPLETED = 'COMPLETED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  OPEN = 'OPEN',
 }
 
 /**

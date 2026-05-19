@@ -52,7 +52,10 @@ export default defineEventHandler(async (event) => {
       action: 'DELETE',
       targetType: 'inspection_issue',
       targetId: ids.join(','),
-      details: `批量删除不合格品项: ${result.count} 条`,
+      detailsTemplate: '批量删除不合格品项: {{count}} 条',
+      detailsVariables: {
+        count: result.count,
+      },
     });
 
     return useResponseSuccess({ successCount: result.count });

@@ -57,7 +57,10 @@ export default defineEventHandler(async (event) => {
       action: 'EXPORT',
       targetType: 'work_order',
       targetId: 'export',
-      details: `导出工单: ${result.total || 0} 条`,
+      detailsTemplate: '导出工单: {{count}} 条',
+      detailsVariables: {
+        count: result.total || 0,
+      },
     });
 
     return useResponseSuccess({

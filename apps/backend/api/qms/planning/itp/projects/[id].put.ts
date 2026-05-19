@@ -47,7 +47,10 @@ export default defineEventHandler(async (event) => {
       action: 'UPDATE',
       targetType: 'planning_itp_project',
       targetId: String(id),
-      details: `修改 ITP 项目: ${updated.projectName}`,
+      detailsTemplate: '修改 ITP 项目: {{projectName}}',
+      detailsVariables: {
+        projectName: updated.projectName,
+      },
     });
 
     return useResponseSuccess(updated);

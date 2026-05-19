@@ -1,76 +1,88 @@
+import type { StatusOption } from './constants';
+
 import type { VbenFormSchema } from '#/adapter/form';
 import type { VxeGridProps } from '#/adapter/vxe-table';
 
 import { InspectionIssueStatusEnum } from '#/api/qms/enums';
 import { $t } from '#/locales';
 
-export const searchFormSchema: VbenFormSchema[] = [
-  {
-    fieldName: 'workOrderNumber',
-    label: $t('qms.workOrder.workOrderNumber'),
-    component: 'Input',
-    colProps: { span: 6 },
-  },
-  {
-    fieldName: 'projectName',
-    label: $t('qms.workOrder.projectName'),
-    component: 'Input',
-    colProps: { span: 6 },
-  },
-  {
-    fieldName: 'responsibleDepartment',
-    label: $t('qms.inspection.issues.responsibleDepartment'),
-    component: 'Input',
-    colProps: { span: 6 },
-  },
-  {
-    fieldName: 'responsibleWelder',
-    label: $t('qms.inspection.issues.responsibleWelder'),
-    component: 'Input',
-    colProps: { span: 6 },
-  },
-  {
-    fieldName: 'status',
-    label: $t('common.status'),
-    component: 'Select',
-    componentProps: {
-      options: [
-        { label: $t('common.all'), value: '' },
-        {
-          label: $t('qms.inspection.issues.status.open'),
-          value: InspectionIssueStatusEnum.OPEN,
-        },
-        {
-          label: $t('qms.inspection.issues.status.inProgress'),
-          value: InspectionIssueStatusEnum.IN_PROGRESS,
-        },
-        {
-          label: $t('qms.inspection.issues.status.closed'),
-          value: InspectionIssueStatusEnum.CLOSED,
-        },
-      ],
+import { cloneInspectionProcessFallbackOptions } from '../../shared/constants/inspection-process-fallback';
+
+export function getIssueSearchFormSchema(
+  statusOptions: StatusOption[] = [
+    {
+      value: InspectionIssueStatusEnum.OPEN,
+      label: $t('qms.inspection.issues.status.open'),
+      color: 'red',
     },
-    colProps: { span: 4 },
-  },
-  {
-    fieldName: 'processName',
-    label: $t('qms.inspection.issues.processName'),
-    component: 'Select',
-    componentProps: {
-      options: [
-        { label: '设计', value: '设计' },
-        { label: '下料', value: '下料' },
-        { label: '组对', value: '组对' },
-        { label: '焊接', value: '焊接' },
-        { label: '机加', value: '机加' },
-        { label: '涂装', value: '涂装' },
-        { label: '组装', value: '组装' },
-        { label: '成品检验', value: '成品检验' },
-      ],
+    {
+      value: InspectionIssueStatusEnum.IN_PROGRESS,
+      label: $t('qms.inspection.issues.status.inProgress'),
+      color: 'orange',
     },
-    colProps: { span: 4 },
-  },
-] as unknown as VbenFormSchema[];
+    {
+      value: InspectionIssueStatusEnum.CLOSED,
+      label: $t('qms.inspection.issues.status.closed'),
+      color: 'green',
+    },
+  ],
+  processOptions = cloneInspectionProcessFallbackOptions(),
+): VbenFormSchema[] {
+  const statusSearchOptions = [
+    { label: $t('common.all'), value: '' },
+    ...statusOptions.map((item) => ({
+      label: item.label,
+      value: item.value,
+    })),
+  ];
+
+  return [
+    {
+      fieldName: 'workOrderNumber',
+      label: $t('qms.workOrder.workOrderNumber'),
+      component: 'Input',
+      colProps: { span: 6 },
+    },
+    {
+      fieldName: 'projectName',
+      label: $t('qms.workOrder.projectName'),
+      component: 'Input',
+      colProps: { span: 6 },
+    },
+    {
+      fieldName: 'responsibleDepartment',
+      label: $t('qms.inspection.issues.responsibleDepartment'),
+      component: 'Input',
+      colProps: { span: 6 },
+    },
+    {
+      fieldName: 'responsibleWelder',
+      label: $t('qms.inspection.issues.responsibleWelder'),
+      component: 'Input',
+      colProps: { span: 6 },
+    },
+    {
+      fieldName: 'status',
+      label: $t('common.status'),
+      component: 'Select',
+      componentProps: {
+        options: statusSearchOptions,
+      },
+      colProps: { span: 4 },
+    },
+    {
+      fieldName: 'processName',
+      label: $t('qms.inspection.issues.processName'),
+      component: 'Select',
+      componentProps: {
+        options: processOptions,
+        allowClear: true,
+        showSearch: true,
+      },
+      colProps: { span: 4 },
+    },
+  ] as unknown as VbenFormSchema[];
+}
 
 export const gridColumns: VxeGridProps['columns'] = [
   { type: 'seq', title: $t('common.seq'), width: 60, fixed: 'left' as const },

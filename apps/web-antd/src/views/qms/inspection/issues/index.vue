@@ -11,6 +11,7 @@ import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Button,
   Card,
@@ -34,6 +35,9 @@ import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { findNameById } from '#/types';
 
+import { useDictionaryOptions } from '../../shared/composables/useDictionaryOptions';
+import { cloneInspectionProcessFallbackOptions } from '../../shared/constants/inspection-process-fallback';
+import { mapDictionaryOptionsToInspectionProcess } from '../records/config';
 import IssueChartDashboard from './components/IssueChartDashboard.vue';
 import IssueEditModal from './components/IssueEditModal.vue';
 import { useAiReport } from './composables/useAiReport';
@@ -42,7 +46,11 @@ import { useIssueChartPreferences } from './composables/useIssueChartPreferences
 import { useIssueData } from './composables/useIssueData';
 import { useIssueGridOptions } from './composables/useIssueGridOptions';
 import { useIssueRemoteStatistics } from './composables/useIssueRemoteStatistics';
-import { searchFormSchema } from './data';
+import {
+  mapDictionaryOptionsToIssueStatus,
+  useStatusOptions,
+} from './constants';
+import { getIssueSearchFormSchema } from './data';
 import {
   getSeverityColor,
   getSeverityLabel,
@@ -133,6 +141,58 @@ function onCellClick(params: {
 
 const { invalidateInspectionIssues } = useInvalidateQmsQueries();
 const { deptTreeData, deptRawData, loadInitialData } = useIssueData();
+const { statusOptions: fallbackIssueStatusOptions } = useStatusOptions();
+const {
+  options: issueStatusOptions,
+  loadOptions: loadIssueStatusDictionaryOptions,
+} = useDictionaryOptions({
+  dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionIssueStatus,
+  fallbackOptions: fallbackIssueStatusOptions.value,
+  mapOptions: (options, fallbackOptions) =>
+    mapDictionaryOptionsToIssueStatus(options, fallbackOptions),
+});
+const {
+  options: issueProcessOptions,
+  loadOptions: loadIssueProcessDictionaryOptions,
+} = useDictionaryOptions({
+  dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
+  fallbackOptions: cloneInspectionProcessFallbackOptions(),
+  mapOptions: (options, fallbackOptions) =>
+    mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
+});
+
+function refreshIssueSearchSchema() {
+  gridApi.setState({
+    formOptions: {
+      schema: getIssueSearchFormSchema(
+        issueStatusOptions.value,
+        issueProcessOptions.value,
+      ),
+      submitOnChange: true,
+    },
+  });
+}
+
+async function loadIssueStatusOptions() {
+  try {
+    await loadIssueStatusDictionaryOptions();
+    refreshIssueSearchSchema();
+    gridApi.setGridOptions({
+      columns: gridOptions.value?.columns || [],
+    });
+  } catch {
+    // Keep local fallback options.
+  }
+}
+
+async function loadIssueProcessOptions() {
+  try {
+    await loadIssueProcessDictionaryOptions();
+    refreshIssueSearchSchema();
+  } catch {
+    // Keep local fallback options.
+  }
+}
 
 const { years: dynamicYears } = useAvailableYears();
 const currentYear = ref<number>(new Date().getFullYear());
@@ -217,6 +277,7 @@ const { gridOptions } = useIssueGridOptions({
   canEdit,
   canImport,
   canSettle,
+  issueStatusOptions,
   currentYear: currentFilterYear,
   defaultProjectName: routeProjectName,
   defaultSourceIssueId: routeSourceIssueId,
@@ -239,12 +300,16 @@ const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions: gridOptions.value,
   gridEvents,
   formOptions: {
-    schema: searchFormSchema,
+    schema: getIssueSearchFormSchema(
+      issueStatusOptions.value,
+      issueProcessOptions.value,
+    ),
     submitOnChange: true,
   },
 });
 
 gridApiProxyRef.value = gridApi;
+void Promise.all([loadIssueStatusOptions(), loadIssueProcessOptions()]);
 
 const { showCharts, loadPreferences, handleSaveSystemDefault } =
   useIssueChartPreferences();
@@ -602,6 +667,8 @@ async function handleGenerateInsight() {
       :is-edit-mode="isEditMode"
       :initial-data="currentRecord || undefined"
       :dept-tree-data="deptTreeData"
+      :status-options="issueStatusOptions"
+      :process-options="issueProcessOptions"
       @success="
         () => {
           gridApi.reload();

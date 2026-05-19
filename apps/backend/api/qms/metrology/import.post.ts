@@ -34,7 +34,11 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'metrology',
       targetId: 'batch-import',
-      details: `导入计量器具: ${result.successCount}/${body.items.length} 条`,
+      detailsTemplate: '导入计量器具: {{successCount}}/{{totalCount}} 条',
+      detailsVariables: {
+        successCount: result.successCount,
+        totalCount: body.items.length,
+      },
     });
     return useResponseSuccess(result);
   } catch (error) {

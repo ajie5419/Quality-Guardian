@@ -42,7 +42,10 @@ export default defineEventHandler(async (event) => {
       action: 'DELETE',
       targetType: 'metrology',
       targetId: ids.join(','),
-      details: `批量删除计量器具: ${result.count} 条`,
+      detailsTemplate: '批量删除计量器具: {{count}} 条',
+      detailsVariables: {
+        count: result.count,
+      },
     });
 
     return useResponseSuccess({ count: result.count });

@@ -649,6 +649,8 @@
   "supplier": {
     "title": "供应商管理",
     "entityName": "供应商",
+    "code": "供应商编码",
+    "stats": "供应商统计",
     "totalCount": "在册供应商总数",
     "qualifiedCount": "合格供应商",
     "warningCount": "质量预警项",

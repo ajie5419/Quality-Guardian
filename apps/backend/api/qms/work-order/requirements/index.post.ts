@@ -96,7 +96,10 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'work_order_requirement',
       targetId: created.map((item) => item.id).join(','),
-      details: `新增工单要求: ${created.length} 条`,
+      detailsTemplate: '新增工单要求: {{count}} 条',
+      detailsVariables: {
+        count: created.length,
+      },
     });
 
     return useResponseSuccess({

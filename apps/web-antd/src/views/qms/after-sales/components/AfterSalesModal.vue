@@ -24,6 +24,7 @@ const props = defineProps<{
   initialData?: QmsAfterSalesApi.AfterSalesItem;
   isEditMode: boolean;
   open: boolean;
+  statusOptions?: Array<{ color: string; label: string; value: string }>;
 }>();
 
 const emit = defineEmits<{
@@ -32,7 +33,10 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const { statusOptions } = useStatusOptions();
+const { statusOptions: fallbackStatusOptions } = useStatusOptions();
+const statusOptions = computed(
+  () => props.statusOptions ?? fallbackStatusOptions.value,
+);
 const formRef = ref();
 
 const openRef = toRef(props, 'open');

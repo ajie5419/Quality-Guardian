@@ -1,0 +1,78 @@
+{
+  "title": "System Management",
+  "menu": {
+    "title": "Menu Management",
+    "addMenu": "Add Menu",
+    "editMenu": "Edit Menu",
+    "addChildMenu": "Add Child Menu",
+    "menuName": "Menu Name",
+    "routeName": "Route Name",
+    "routePath": "Route Path",
+    "componentPath": "Component Path",
+    "icon": "Icon",
+    "order": "Order",
+    "parentMenu": "Parent Menu",
+    "selectParentMenu": "Select Parent Menu",
+    "topMenu": "Top Menu (No Parent)"
+  },
+  "aiSettings": {
+    "title": "AI Settings",
+    "infrastructure": "AI Infrastructure Settings",
+    "configDesc": "Configuration Description",
+    "configHelp": "You can configure independent API keys and base URLs for different AI providers. The selected provider will be used as the global default model.",
+    "providerSettings": "AI Provider Settings",
+    "currentProvider": "Current Active Provider (Global Default)",
+    "detailConfig": "{provider} Detailed Configuration",
+    "apiKey": "API Key",
+    "apiKeyTooltip": "Each provider uses its own API key",
+    "baseUrl": "Base URL",
+    "defaultModel": "Default Model",
+    "availableModels": "Available Models (comma-separated)",
+    "saveConfig": "Save All Configurations",
+    "testConnection": "Test Current Connection",
+    "commonUrlRef": "Common URL References"
+  },
+  "user": {
+    "title": "User Management",
+    "addUser": "Add User",
+    "editUser": "Edit User",
+    "username": "Username",
+    "realName": "Real Name",
+    "email": "Email",
+    "phone": "Phone",
+    "deptName": "Department",
+    "createTime": "Created At",
+    "remark": "Remark",
+    "remarkPlaceholder": "Enter remark",
+    "selectDept": "Select department"
+  },
+  "role": {
+    "title": "Role Management",
+    "addRole": "Add Role",
+    "editRole": "Edit Role",
+    "roleName": "Role Name",
+    "roleValue": "Role Value",
+    "permSettings": "Permission Settings"
+  },
+  "dept": {
+    "title": "Department Management",
+    "addDept": "Add Department",
+    "editDept": "Edit Department",
+    "addChildDept": "Add Child Department",
+    "deptName": "Department Name",
+    "parentDept": "Parent Department",
+    "topDept": "Top Department (No Parent)",
+    "purchase": "Purchase",
+    "production": "Production"
+  },
+  "dictionary": {
+    "title": "Dictionary Management",
+    "dictType": "Dictionary Type",
+    "dictTypePlaceholder": "For example: supplier_status",
+    "dictKey": "Dictionary Key",
+    "dictKeyPlaceholder": "For example: Qualified",
+    "dictValue": "Dictionary Value",
+    "dictValuePlaceholder": "For example: Qualified",
+    "sort": "Sort"
+  }
+}

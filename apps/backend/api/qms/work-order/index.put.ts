@@ -71,7 +71,11 @@ export default defineEventHandler(async (event) => {
       action: 'UPDATE',
       targetType: 'work_order',
       targetId: String(id),
-      details: `修改工单: ${updated.workOrderNumber} (${updated.customerName})`,
+      detailsTemplate: '修改工单: {{workOrderNumber}} ({{customerName}})',
+      detailsVariables: {
+        customerName: updated.customerName,
+        workOrderNumber: updated.workOrderNumber,
+      },
     });
 
     return useResponseSuccess(null);

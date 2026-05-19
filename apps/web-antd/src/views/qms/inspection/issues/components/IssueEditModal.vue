@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import type { StatusOption } from '../constants';
 import type { DeptNode, InspectionIssue } from '../types';
 
 import { computed, onMounted, ref, toRef, watch } from 'vue';
@@ -16,7 +17,7 @@ import { useAiAnalysis } from '../composables/useAiAnalysis';
 import { useIssueForm } from '../composables/useIssueForm';
 import { useNcNumber } from '../composables/useNcNumber';
 import { DEPT_TYPE_KEYWORDS } from '../constants';
-import { getIssueFormSchema } from './issueFormData';
+import { getIssueFormSchemaWithStatusOptions } from './issueFormData';
 import IssuePhotoUpload from './IssuePhotoUpload.vue';
 import IssueSimilarCases from './IssueSimilarCases.vue';
 
@@ -25,6 +26,8 @@ const props = defineProps<{
   initialData?: Partial<InspectionIssue>;
   isEditMode: boolean;
   open: boolean;
+  processOptions?: Array<{ label: string; value: string }>;
+  statusOptions?: StatusOption[];
 }>();
 
 const emit = defineEmits<{
@@ -100,7 +103,10 @@ const [Form, formApi] = useVbenForm({
   handleValuesChange: (vals) => {
     formValues.value = vals as IssueFormValues;
   },
-  schema: getIssueFormSchema(),
+  schema: getIssueFormSchemaWithStatusOptions(
+    props.statusOptions,
+    props.processOptions,
+  ),
   showDefaultActions: false, // Handle submit via Modal OK button
 });
 
@@ -212,6 +218,40 @@ watch(openRef, (val) => {
     clearMatchedCases();
   }
 });
+
+watch(
+  () => props.statusOptions,
+  (options) => {
+    if (!options) return;
+    formApi.updateSchema([
+      {
+        fieldName: 'status',
+        componentProps: {
+          options,
+        },
+      },
+    ]);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.processOptions,
+  (options) => {
+    if (!options) return;
+    formApi.updateSchema([
+      {
+        fieldName: 'processName',
+        componentProps: {
+          options,
+          allowClear: true,
+          showSearch: true,
+        },
+      },
+    ]);
+  },
+  { immediate: true },
+);
 
 onMounted(async () => {
   try {

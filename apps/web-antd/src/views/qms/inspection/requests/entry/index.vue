@@ -16,8 +16,8 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { IconifyIcon } from '@vben/icons';
-import { $t } from '@vben/locales';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Alert,
   Button,
@@ -41,7 +41,9 @@ import {
   normalizeUploadFileList,
 } from '#/views/qms/shared/utils/upload-file';
 
-import { getProcessOptions } from '../../records/config';
+import { useDictionaryOptions } from '../../../shared/composables/useDictionaryOptions';
+import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
+import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
 
 defineOptions({ name: 'PublicInspectionRequestEntry' });
 
@@ -59,6 +61,15 @@ const workOrderProcessesLoading = ref(false);
 const workOrderProcessOptions = ref<Array<{ label: string; value: string }>>(
   [],
 );
+const {
+  options: dictionaryProcessOptions,
+  loadOptions: loadInspectionProcessOptions,
+} = useDictionaryOptions({
+  dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
+  fallbackOptions: cloneInspectionProcessFallbackOptions(),
+  mapOptions: (options, fallbackOptions) =>
+    mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
+});
 
 const requestForm = reactive({
   attachments: [] as InspectionRequestAttachment[],
@@ -81,11 +92,18 @@ const checkResultOptions = [
 ];
 
 const processOptions = computed(() => {
+  const fallbackOptions = cloneInspectionProcessFallbackOptions();
   const map = new Map<string, { label: string; value: string }>();
-  for (const option of workOrderProcessOptions.value) {
+  for (const option of mapDictionaryOptionsToInspectionProcess(
+    undefined,
+    fallbackOptions,
+  )) {
     map.set(option.value, option);
   }
-  for (const option of getProcessOptions($t)) {
+  for (const option of dictionaryProcessOptions.value) {
+    map.set(option.value, option);
+  }
+  for (const option of workOrderProcessOptions.value) {
     map.set(option.value, option);
   }
   return [...map.values()];
@@ -297,6 +315,7 @@ async function submitRequest() {
 
 onMounted(() => {
   applyRoutePrefill();
+  void loadInspectionProcessOptions();
   void loadWorkOrderOptions(requestForm.workOrderNumber);
   void loadTeamOptions(requestForm.team);
 });

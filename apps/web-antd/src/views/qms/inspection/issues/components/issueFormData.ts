@@ -1,7 +1,11 @@
+import type { StatusOption } from '../constants';
+
 import type { VbenFormSchema } from '#/adapter/form';
 
 import { useI18n } from '@vben/locales';
 
+import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
+import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
 import {
   useClaimOptions,
   useDefectOptions,
@@ -9,10 +13,12 @@ import {
   useStatusOptions,
 } from '../constants';
 
-export function getIssueFormSchema(): VbenFormSchema[] {
+export function getIssueFormSchema(
+  processOptionsOverride?: Array<{ label: string; value: string }>,
+): VbenFormSchema[] {
   const { t } = useI18n();
   const { defectOptions, defectSubtypes } = useDefectOptions();
-  const { statusOptions } = useStatusOptions();
+  const { statusOptions: fallbackStatusOptions } = useStatusOptions();
   const { severityOptions } = useSeverityOptions();
   const { claimOptions } = useClaimOptions();
 
@@ -82,20 +88,12 @@ export function getIssueFormSchema(): VbenFormSchema[] {
       component: 'Select',
       rules: 'selectRequired',
       componentProps: {
-        options: [
-          { label: '外购件', value: '外购件' },
-          { label: '原材料', value: '原材料' },
-          { label: '辅材', value: '辅材' },
-          { label: '机加成品件', value: '机加成品件' },
-          { label: '设计', value: '设计' },
-          { label: '下料', value: '下料' },
-          { label: '组对', value: '组对' },
-          { label: '焊接', value: '焊接' },
-          { label: '机加', value: '机加' },
-          { label: '涂装', value: '涂装' },
-          { label: '组装', value: '组装' },
-          { label: '成品检验', value: '成品检验' },
-        ],
+        options:
+          processOptionsOverride ||
+          mapDictionaryOptionsToInspectionProcess(
+            undefined,
+            cloneInspectionProcessFallbackOptions(),
+          ),
         allowClear: true,
         showSearch: true,
       },
@@ -167,7 +165,7 @@ export function getIssueFormSchema(): VbenFormSchema[] {
       component: 'Select',
       rules: 'selectRequired',
       componentProps: {
-        options: statusOptions.value,
+        options: fallbackStatusOptions.value,
       },
     },
     {
@@ -260,5 +258,20 @@ export function getIssueFormSchema(): VbenFormSchema[] {
     },
   ];
 
+  return schema;
+}
+
+export function getIssueFormSchemaWithStatusOptions(
+  options?: StatusOption[],
+  processOptions?: Array<{ label: string; value: string }>,
+): VbenFormSchema[] {
+  const schema = getIssueFormSchema(processOptions);
+  const target = schema.find((item) => item.fieldName === 'status');
+  if (target) {
+    target.componentProps = {
+      ...target.componentProps,
+      options: options || [],
+    };
+  }
   return schema;
 }

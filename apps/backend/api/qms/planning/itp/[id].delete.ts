@@ -32,7 +32,10 @@ export default defineEventHandler(async (event) => {
       action: 'DELETE',
       targetType: 'planning_itp_item',
       targetId: String(id),
-      details: `删除 ITP 条目: ${deleted.processStep || deleted.activity || id}`,
+      detailsTemplate: '删除 ITP 条目: {{item}}',
+      detailsVariables: {
+        item: deleted.processStep || deleted.activity || id,
+      },
     });
 
     return useResponseSuccess(null);

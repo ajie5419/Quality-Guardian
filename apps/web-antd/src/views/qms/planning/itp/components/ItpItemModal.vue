@@ -7,6 +7,7 @@ import { computed, reactive, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Button,
   Form,
@@ -20,6 +21,9 @@ import {
 
 import { createItp, updateItp } from '#/api/qms/planning';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { mapDictionaryOptionsToInspectionProcess } from '#/views/qms/inspection/records/config';
+import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
+import { cloneInspectionProcessFallbackOptions } from '#/views/qms/shared/constants/inspection-process-fallback';
 
 import { CONTROL_POINT_MAP } from '../../constants';
 
@@ -41,23 +45,13 @@ const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
 
-const processOptions = [
-  '外购件',
-  '原材料',
-  '辅材',
-  '机加成品件',
-  '下料',
-  '组对',
-  '焊接',
-  '焊后尺寸',
-  '外观',
-  '整体拼装',
-  '组装',
-  '装配',
-  '组拼',
-  '打砂',
-  '喷漆',
-].map((opt) => ({ label: opt, value: opt }));
+const { options: processOptions, loadOptions: loadInspectionProcessOptions } =
+  useDictionaryOptions({
+    dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
+    fallbackOptions: cloneInspectionProcessFallbackOptions(),
+    mapOptions: (options, fallbackOptions) =>
+      mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
+  });
 
 const controlPointOptions = computed(() =>
   Object.entries(CONTROL_POINT_MAP).map(([key, val]) => ({
@@ -95,6 +89,7 @@ watch(
   () => props.open,
   (val) => {
     if (val) {
+      void loadInspectionProcessOptions();
       Object.assign(formState, {
         processStep: props.initialData.processStep || '组对',
         activity: props.initialData.activity || '',

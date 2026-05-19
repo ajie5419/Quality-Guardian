@@ -61,7 +61,10 @@ export default defineEventHandler(async (event) => {
 
     await recordBusinessAuditLog(event, {
       action: 'DELETE',
-      details: `删除报检任务: ${existing.requestNo}`,
+      detailsTemplate: '删除报检任务: {{requestNo}}',
+      detailsVariables: {
+        requestNo: existing.requestNo,
+      },
       targetId: id,
       targetType: 'inspection_request',
       userId: userinfo.id,

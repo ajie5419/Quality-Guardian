@@ -11,6 +11,7 @@ import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 import { downloadFileFromBlob } from '@vben/utils';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Button,
   Card,
@@ -40,9 +41,14 @@ import {
 } from '#/utils/import-summary';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
+import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
 import MetrologyEditModal from './components/MetrologyEditModal.vue';
 import MetrologyOverviewCards from './components/MetrologyOverviewCards.vue';
-import { getColumns, getSearchFormSchema } from './data';
+import {
+  getColumns,
+  getSearchFormSchema,
+  mapDictionaryOptionsToMetrologyStatus,
+} from './data';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
@@ -64,6 +70,14 @@ const overview = ref<QmsMetrologyApi.MetrologyOverview>({
   expiredCount: 0,
   totalCount: 0,
   validCount: 0,
+});
+const {
+  options: statusOptions,
+  loadOptions: loadMetrologyStatusDictionaryOptions,
+} = useDictionaryOptions({
+  dictType: QMS_DICTIONARY_TYPE_KEYS.metrologyInspectionStatus,
+  fallbackOptions: mapDictionaryOptionsToMetrologyStatus(),
+  mapOptions: mapDictionaryOptionsToMetrologyStatus,
 });
 const editModalOpen = computed({
   get: () => modalVisible.value,
@@ -189,10 +203,26 @@ const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions: gridOptions.value as VxeGridProps<QmsMetrologyApi.MetrologyItem>,
   gridEvents,
   formOptions: {
-    schema: getSearchFormSchema(),
+    schema: getSearchFormSchema(statusOptions.value),
     submitOnChange: true,
   },
 });
+
+async function loadMetrologyStatusOptions() {
+  try {
+    await loadMetrologyStatusDictionaryOptions();
+    gridApi.setState({
+      formOptions: {
+        schema: getSearchFormSchema(statusOptions.value),
+        submitOnChange: true,
+      },
+    });
+  } catch {
+    // Keep local fallback options.
+  }
+}
+
+loadMetrologyStatusOptions();
 
 function getStatusColor(status: QmsMetrologyApi.MetrologyInspectionStatus) {
   switch (status) {

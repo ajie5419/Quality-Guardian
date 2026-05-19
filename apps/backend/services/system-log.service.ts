@@ -9,6 +9,7 @@ import type {
 
 import { Prisma } from '@prisma/client';
 import { LoginMethodEnum, LoginStatusEnum } from '@qgs/shared';
+import { renderAuditTemplateText } from '~/constants/audit-templates';
 import prisma from '~/utils/prisma';
 import { parseUA } from '~/utils/ua-parser';
 
@@ -101,19 +102,29 @@ export const SystemLogService = {
   async recordAuditLog(params: {
     action: any;
     details?: string;
+    detailsTemplate?: string;
+    detailsVariables?: Record<string, unknown>;
     ipAddress?: string;
     targetId: string;
     targetType: string;
     userAgent?: string;
     userId: string;
   }): Promise<any> {
+    const details =
+      params.detailsTemplate === undefined
+        ? params.details || ''
+        : renderAuditTemplateText(
+            params.detailsTemplate,
+            params.detailsVariables || {},
+          );
+
     return (prisma.audit_logs as any).create({
       data: {
         userId: params.userId,
         action: params.action,
         targetType: params.targetType,
         targetId: params.targetId,
-        details: params.details,
+        details,
         ipAddress: params.ipAddress || 'Unknown',
         userAgent: params.userAgent || 'Unknown',
       } as any,

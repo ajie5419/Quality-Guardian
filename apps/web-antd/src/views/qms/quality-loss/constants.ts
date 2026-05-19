@@ -1,4 +1,4 @@
-import { QualityLossStatusEnum } from '#/api/qms/enums';
+import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
 import { LossSource, LossType } from './types';
 
@@ -13,26 +13,57 @@ export const LOSS_TYPE_OPTIONS = [
   { label: '其他', value: LossType.OTHER },
 ];
 
-/**
- * 状态选项配置
- */
-export const STATUS_OPTIONS = [
-  {
-    value: QualityLossStatusEnum.CONFIRMED,
-    label: 'qms.qualityLoss.status.confirmed',
-    color: 'green',
-  },
-  {
-    value: QualityLossStatusEnum.PENDING,
-    label: 'qms.qualityLoss.status.pending',
-    color: 'orange',
-  },
-  {
-    value: QualityLossStatusEnum.PROCESSING,
-    label: 'qms.qualityLoss.status.processing',
-    color: 'blue',
-  },
+export function mapDictionaryOptionsToLossType(
+  options?: DictionaryOptionItem[],
+) {
+  if (!options || options.length === 0) {
+    return LOSS_TYPE_OPTIONS;
+  }
+  return options.map((item) => ({
+    label: item.dictValue || item.dictKey,
+    value: item.dictKey,
+  }));
+}
+
+const QUALITY_LOSS_STATUS_FALLBACK_VALUES = [
+  'Pending',
+  'Processing',
+  'Confirmed',
+  'Resolved',
 ];
+const QUALITY_LOSS_STATUS_COLOR_MAP: Record<string, string> = {
+  CONFIRMED: 'green',
+  PENDING: 'orange',
+  PROCESSING: 'blue',
+  RESOLVED: 'cyan',
+};
+
+function normalizeStatusKey(value: string) {
+  return String(value || '')
+    .trim()
+    .toUpperCase();
+}
+
+export function mapDictionaryOptionsToQualityLossStatus(
+  options?: DictionaryOptionItem[],
+) {
+  if (!options || options.length === 0) {
+    return QUALITY_LOSS_STATUS_FALLBACK_VALUES.map((value) => ({
+      value,
+      label: value,
+      color:
+        QUALITY_LOSS_STATUS_COLOR_MAP[normalizeStatusKey(value)] || 'default',
+    }));
+  }
+
+  return options.map((item) => ({
+    value: item.dictKey,
+    label: item.dictValue || item.dictKey,
+    color:
+      QUALITY_LOSS_STATUS_COLOR_MAP[normalizeStatusKey(item.dictKey)] ||
+      'default',
+  }));
+}
 
 /**
  * 损失来源样式映射

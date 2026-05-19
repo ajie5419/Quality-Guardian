@@ -21,7 +21,13 @@ export default defineEventHandler(async (event) => {
     });
     await recordBusinessAuditLog(event, {
       action: 'UPDATE',
-      details: `扫描缺失文件: checked=${result.checked}, missing=${result.missingIds.length}, marked=${result.marked}`,
+      detailsTemplate:
+        '扫描缺失文件: checked={{checked}}, missing={{missing}}, marked={{marked}}',
+      detailsVariables: {
+        checked: result.checked,
+        marked: result.marked,
+        missing: result.missingIds.length,
+      },
       targetId: 'file-assets',
       targetType: 'file_center',
       userId: userinfo.id,

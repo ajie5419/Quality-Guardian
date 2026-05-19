@@ -129,7 +129,12 @@ export default defineEventHandler(async (event) => {
         action: 'UPDATE',
         targetType,
         targetId: String(id),
-        details: `修改质量损失相关记录: ${id}${source === QUALITY_LOSS_SOURCE.MANUAL ? '' : ` (${source} 来源)`}`,
+        detailsTemplate: '修改质量损失相关记录: {{id}}{{sourcePart}}',
+        detailsVariables: {
+          id,
+          sourcePart:
+            source === QUALITY_LOSS_SOURCE.MANUAL ? '' : ` (${source} 来源)`,
+        },
       });
     } catch (logError) {
       logApiError('quality-loss-log', logError);

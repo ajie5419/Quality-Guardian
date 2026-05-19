@@ -68,7 +68,11 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'inspection_issue',
       targetId: String(newRecord.id),
-      details: `新增检验问题: ${newRecord.partName} (${newRecord.nonConformanceNumber || '无编号'})`,
+      detailsTemplate: '新增检验问题: {{partName}} ({{nonConformanceNumber}})',
+      detailsVariables: {
+        nonConformanceNumber: newRecord.nonConformanceNumber || '无编号',
+        partName: newRecord.partName,
+      },
     });
     await WelderScoreService.syncFromInspectionIssues();
 

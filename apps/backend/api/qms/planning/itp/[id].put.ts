@@ -51,7 +51,10 @@ export default defineEventHandler(async (event) => {
       action: 'UPDATE',
       targetType: 'planning_itp_item',
       targetId: String(id),
-      details: `修改 ITP 条目: ${updated.processStep || updated.activity || id}`,
+      detailsTemplate: '修改 ITP 条目: {{item}}',
+      detailsVariables: {
+        item: updated.processStep || updated.activity || id,
+      },
     });
 
     return useResponseSuccess({

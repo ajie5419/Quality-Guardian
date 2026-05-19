@@ -7,6 +7,7 @@ import { reactive, ref } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import { Badge, Button, Card, Space, Tag, Tooltip } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
@@ -15,6 +16,7 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
+import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
 import {
   RATING_COLORS,
   SUPPLIER_STATUS_UI_MAP,
@@ -24,7 +26,11 @@ import SupplierDetailDrawer from './components/SupplierDetailDrawer.vue';
 import SupplierEditModal from './components/SupplierEditModal.vue';
 import SupplierStats from './components/SupplierStats.vue';
 import { useSupplierActions } from './composables/useSupplierActions';
-import { getColumns, getSearchFormSchema } from './data';
+import {
+  getColumns,
+  getSearchFormSchema,
+  mapDictionaryOptionsToSelect,
+} from './data';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
@@ -74,6 +80,15 @@ const stats = ref<QmsSupplierApi.SupplierStats>({
   qualified: 0,
   total: 0,
   warning: 0,
+});
+
+const {
+  options: supplierStatusOptions,
+  loadOptions: loadSupplierStatusDictionaryOptions,
+} = useDictionaryOptions({
+  dictType: QMS_DICTIONARY_TYPE_KEYS.supplierStatus,
+  fallbackOptions: mapDictionaryOptionsToSelect(),
+  mapOptions: mapDictionaryOptionsToSelect,
 });
 
 function onCheckChange(
@@ -206,10 +221,26 @@ const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions,
   gridEvents,
   formOptions: {
-    schema: getSearchFormSchema('Supplier'),
+    schema: getSearchFormSchema('Supplier', supplierStatusOptions.value),
     submitOnChange: true,
   },
 });
+
+async function loadSupplierStatusOptions() {
+  try {
+    await loadSupplierStatusDictionaryOptions();
+    gridApi.setState({
+      formOptions: {
+        schema: getSearchFormSchema('Supplier', supplierStatusOptions.value),
+        submitOnChange: true,
+      },
+    });
+  } catch {
+    // Keep local fallback options.
+  }
+}
+
+loadSupplierStatusOptions();
 
 // ================= 操作逻辑 =================
 

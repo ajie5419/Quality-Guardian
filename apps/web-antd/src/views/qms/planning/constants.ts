@@ -1,3 +1,5 @@
+import type { DictionaryOptionItem } from '#/api/system/dictionary';
+
 import { ProjectStatusEnum } from '#/api/qms/enums';
 
 /**
@@ -50,3 +52,16 @@ export const CONTROL_POINT_MAP: Record<string, ControlPointInfo> = {
     label: 'Witness (W)',
   },
 };
+
+export function mapDictionaryOptionsToPlanningProjectStatus(
+  options: DictionaryOptionItem[] | undefined,
+  fallbackOptions: Array<{ label: string; value: string }> = [],
+) {
+  if (!options || options.length === 0) {
+    return fallbackOptions;
+  }
+  return options.map((item) => ({
+    label: item.dictValue || item.dictKey,
+    value: item.dictKey,
+  }));
+}

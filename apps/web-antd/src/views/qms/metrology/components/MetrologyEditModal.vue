@@ -7,6 +7,7 @@ import { reactive, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Form,
   Input,
@@ -22,7 +23,11 @@ import {
 } from '#/api/qms/metrology';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
-import { getEditStatusOptions } from '../data';
+import { useDictionaryOptions } from '../../shared/composables/useDictionaryOptions';
+import {
+  getEditStatusOptions,
+  mapDictionaryOptionsToMetrologyStatus,
+} from '../data';
 
 const props = defineProps<{
   open: boolean;
@@ -38,6 +43,12 @@ const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
+const { options: statusOptions, loadOptions: loadStatusOptions } =
+  useDictionaryOptions({
+    dictType: QMS_DICTIONARY_TYPE_KEYS.metrologyInspectionStatus,
+    fallbackOptions: getEditStatusOptions(),
+    mapOptions: mapDictionaryOptionsToMetrologyStatus,
+  });
 
 interface MetrologyFormState {
   inspectionStatus: QmsMetrologyApi.MetrologyInspectionStatus;
@@ -89,6 +100,8 @@ watch(
     formRef.value?.resetFields();
   },
 );
+
+loadStatusOptions();
 
 async function handleOk() {
   try {
@@ -185,7 +198,7 @@ async function handleOk() {
         >
           <Select
             v-model:value="formState.inspectionStatus"
-            :options="getEditStatusOptions()"
+            :options="statusOptions"
           />
         </Form.Item>
       </div>

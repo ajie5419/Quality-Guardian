@@ -25,7 +25,10 @@ export default defineEventHandler(async (event) => {
     event.node.res.setHeader('Cache-Control', 'private, max-age=300');
     await recordBusinessAuditLog(event, {
       action: 'READ',
-      details: `查看缩略图: ${result.file.originalName}`,
+      detailsTemplate: '查看缩略图: {{filename}}',
+      detailsVariables: {
+        filename: result.file.originalName,
+      },
       targetId: String(id),
       targetType: 'file_asset',
       userId: userinfo.id,

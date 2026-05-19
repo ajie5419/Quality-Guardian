@@ -45,7 +45,13 @@ export default defineEventHandler(async (event) => {
       action: 'DELETE',
       targetType: 'metrology_calibration_plan',
       targetId: String(id),
-      details: `删除计量校准计划: ${deleted.instrumentId} (${deleted.planYear}-${deleted.planMonth})`,
+      detailsTemplate:
+        '删除计量校准计划: {{instrumentId}} ({{planYear}}-{{planMonth}})',
+      detailsVariables: {
+        instrumentId: deleted.instrumentId,
+        planMonth: deleted.planMonth,
+        planYear: deleted.planYear,
+      },
     });
 
     return useResponseSuccess(null);

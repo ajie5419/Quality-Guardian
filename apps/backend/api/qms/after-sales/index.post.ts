@@ -53,7 +53,11 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'after_sales',
       targetId: String(newItem.id),
-      details: `新增售后记录: ${newItem.projectName} (${newItem.id})`,
+      detailsTemplate: '新增售后记录: {{projectName}} ({{id}})',
+      detailsVariables: {
+        id: newItem.id,
+        projectName: newItem.projectName,
+      },
     });
 
     return useResponseSuccess(newItem);

@@ -79,7 +79,11 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'inspection_issue',
       targetId: 'batch-import',
-      details: `导入不合格品项: ${successCount}/${items.length} 条`,
+      detailsTemplate: '导入不合格品项: {{successCount}}/{{totalCount}} 条',
+      detailsVariables: {
+        successCount,
+        totalCount: items.length,
+      },
     });
 
     return useResponseSuccess(

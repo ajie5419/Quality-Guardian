@@ -1,5 +1,7 @@
 import type { ComputedRef, Ref } from 'vue';
 
+import type { StatusOption } from '../constants';
+
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
 import type { BaseTreeNode } from '#/types/tree';
@@ -13,8 +15,6 @@ import {
   extractPhotoUrl,
   isNonEmptyString,
 } from '#/views/qms/shared/utils/photo-url';
-
-import { useStatusOptions } from '../constants';
 
 type GridFormSchema = NonNullable<
   NonNullable<VxeGridProps['formOptions']>['schema']
@@ -37,6 +37,7 @@ interface UseAfterSalesGridParams {
   currentDateMode: Ref<'month' | 'week' | 'year'>;
   currentDateValue: ComputedRef<string> | Ref<string>;
   currentYear: ComputedRef<number> | Ref<number>;
+  statusOptions: Ref<StatusOption[]>;
   deptRawData: Ref<BaseTreeNode[]>;
   getAfterSalesListPage: (
     params?: QmsAfterSalesApi.AfterSalesParams,
@@ -89,6 +90,7 @@ export function useAfterSalesGrid({
   currentDateMode,
   currentDateValue,
   currentYear,
+  statusOptions,
   deptRawData,
   getAfterSalesListPage,
   handleDelete,
@@ -97,7 +99,6 @@ export function useAfterSalesGrid({
   handleSettleToKnowledge,
   t,
 }: UseAfterSalesGridParams) {
-  const { statusOptions } = useStatusOptions();
   const statusOptionsList = computed(() =>
     statusOptions.value.map((opt) => ({
       label: opt.label,

@@ -137,6 +137,121 @@ const customConfig: Linter.Config[] = [
       ],
     },
   },
+  {
+    // 审计日志强制模板化：禁止 details 使用模板字符串直写
+    files: ['apps/backend/**/**'],
+    ignores: ['apps/backend/constants/audit-templates.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          message:
+            'Audit log `details` cannot use template literals directly. Use `detailsTemplate` + `detailsVariables`, or `renderAuditTemplateText`.',
+          selector:
+            "Property[key.name='details'][value.type='TemplateLiteral'], Property[key.value='details'][value.type='TemplateLiteral']",
+        },
+      ],
+    },
+  },
+  {
+    // 审计日志强制模板化：recordAuditLog/recordBusinessAuditLog 禁止直接传 details
+    files: ['apps/backend/api/**/**', 'apps/backend/services/**/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          message:
+            'Do not pass raw `details` to recordAuditLog. Use `detailsTemplate` + `detailsVariables`.',
+          selector:
+            "CallExpression[callee.property.name='recordAuditLog'] Property[key.name='details'], CallExpression[callee.property.name='recordAuditLog'] Property[key.value='details']",
+        },
+        {
+          message:
+            'Do not pass raw `details` to recordBusinessAuditLog. Use `detailsTemplate` + `detailsVariables`.',
+          selector:
+            "CallExpression[callee.name='recordBusinessAuditLog'] Property[key.name='details'], CallExpression[callee.name='recordBusinessAuditLog'] Property[key.value='details']",
+        },
+      ],
+    },
+  },
+  {
+    // 已迁移模块的状态字典强制：禁止继续使用本地 STATUS_OPTIONS 常量
+    files: [
+      'apps/web-antd/src/views/qms/supplier/**/**',
+      'apps/web-antd/src/views/qms/metrology/**/**',
+      'apps/web-antd/src/views/qms/after-sales/**/**',
+      'apps/web-antd/src/views/qms/inspection/issues/**/**',
+      'apps/web-antd/src/views/qms/quality-loss/**/**',
+      'apps/web-antd/src/views/qms/supervision/**/**',
+      'apps/web-antd/src/views/qms/planning/itp/**/**',
+      'apps/web-antd/src/views/qms/planning/dfmea/**/**',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          message:
+            'Legacy local status constants are not allowed in migrated modules. Use dictionary options via useDictionaryOptions.',
+          selector:
+            "VariableDeclarator[id.name='STATUS_OPTIONS'], VariableDeclarator[id.name='PROJECT_STATUS_OPTIONS'], VariableDeclarator[id.name='ISSUE_STATUS_OPTIONS']",
+        },
+        {
+          message:
+            'Do not use inline dictType literals in migrated modules. Use QMS_DICTIONARY_TYPE_KEYS from @qgs/shared.',
+          selector: "Property[key.name='dictType'][value.type='Literal']",
+        },
+      ],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/constants', '**/constants.ts'],
+              importNames: ['STATUS_OPTIONS'],
+              message:
+                'Status options in migrated modules must come from dictionary APIs. Do not import local STATUS_OPTIONS constants.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // 已迁移模块的工序字典强制：必须通过字典 API/共享 composable 加载，不得直接硬编码本地工序列表
+    files: [
+      'apps/web-antd/src/views/qms/inspection/issues/**/**',
+      'apps/web-antd/src/views/qms/inspection/requests/**/**',
+      'apps/web-antd/src/views/qms/inspection/records/**/**',
+      'apps/web-antd/src/views/qms/planning/bom/**/**',
+      'apps/web-antd/src/views/qms/planning/inspection-forms/**/**',
+      'apps/web-antd/src/views/qms/workspace/**/**',
+      'apps/web-antd/src/views/qms/planning/itp/**/**',
+    ],
+    ignores: [
+      'apps/web-antd/src/views/qms/inspection/records/config.ts',
+      'apps/web-antd/src/views/qms/shared/constants/inspection-process-fallback.ts',
+      'apps/web-antd/src/views/qms/shared/composables/useDictionaryOptions.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '#/views/qms/inspection/records/config',
+                '../records/config',
+                '../../records/config',
+              ],
+              importNames: ['getProcessOptions'],
+              message:
+                'Migrated modules must not directly use local getProcessOptions fallback list. Use dictionary options via useDictionaryOptions/mapDictionaryOptions helpers.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   // 后端模拟代码，不需要太多规则
   {
     files: ['apps/backend-mock/**/**', 'docs/**/**'],

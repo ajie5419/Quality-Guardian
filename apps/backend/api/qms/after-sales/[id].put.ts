@@ -68,7 +68,8 @@ export default defineEventHandler(async (event) => {
       action: 'UPDATE',
       targetType: 'after_sales',
       targetId: String(id),
-      details: `修改售后记录: ${id}`,
+      detailsTemplate: '修改售后记录: {{id}}',
+      detailsVariables: { id },
     });
 
     return useResponseSuccess(null);

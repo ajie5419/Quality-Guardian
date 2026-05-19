@@ -41,7 +41,10 @@ export default defineEventHandler(async (event) => {
       action: 'DELETE',
       targetType: 'supplier',
       targetId: ids.join(','),
-      details: `批量删除供应商/外协单位: ${result.count} 条`,
+      detailsTemplate: '批量删除供应商/外协单位: {{count}} 条',
+      detailsVariables: {
+        count: result.count,
+      },
     });
 
     return useResponseSuccess({ count: result.count });

@@ -30,8 +30,10 @@
     "dataLoadFailed": "Failed to load data",
     "unit": {
       "year": " Year",
-      "project": " Projects"
-    }
+      "project": " Projects",
+      "decrease": "Decrease"
+    },
+    "noData": "No Data"
   },
   "task": {
     "status": {
@@ -62,7 +64,26 @@
       "unknown": "Unknown Status"
     },
     "showChart": "Show Chart",
-    "hideChart": "Hide Chart"
+    "hideChart": "Hide Chart",
+    "title": "Work Order Title",
+    "workOrderNumber": "Work Order Number",
+    "division": "Division",
+    "projectName": "Project Name",
+    "customerName": "Customer Name",
+    "quantity": "Quantity",
+    "deliveryDate": "Delivery Date",
+    "createTime": "Create Time",
+    "divisionRatio": "Division Ratio",
+    "outputRanking": "Output Ranking",
+    "totalOutput": "Total Output",
+    "executionOverview": "Execution Overview",
+    "totalProjects": "Total Projects",
+    "manufacturing": "Manufacturing",
+    "completedOnly": "Completed Only",
+    "effectiveTime": "Effective Time",
+    "completionRate": "Completion Rate",
+    "excellent": "Excellent",
+    "createWorkOrder": "Create Work Order"
   },
   "qualityLoss": {
     "amountLabel": "Amount",
@@ -79,7 +100,8 @@
       "external": "External Loss",
       "commissioning": "Commissioning Acceptance",
       "manual": "Manual"
-    }
+    },
+    "title": "Quality Loss Title"
   },
   "inspection": {
     "issues": {
@@ -127,7 +149,11 @@
       "severityLevel": {
         "critical": "Critical",
         "major": "Major",
-        "minor": "Minor"
+        "minor": "Minor",
+        "p0": "P0",
+        "p1": "P1",
+        "p2": "P2",
+        "p3": "P3"
       },
       "generateNumber": "Gen. Number",
       "generateNumberPlaceholder": "Click button to generate if needed",
@@ -148,8 +174,48 @@
         "process": "Process Defect",
         "manufacturing": "Manufacturing Defect",
         "part": "Part Defect",
-        "other": "Other Defect"
-      }
+        "other": "Other Defect",
+        "designSub": {
+          "interference": "Interference",
+          "sizeError": "Size Error",
+          "programError": "Program Error",
+          "selection": "Selection",
+          "other": "Other"
+        },
+        "processSub": {
+          "bomError": "BOM Error",
+          "welding": "Welding",
+          "assembly": "Assembly",
+          "mounting": "Mounting",
+          "other": "Other"
+        },
+        "manufacturingSub": {
+          "precision": "Precision",
+          "assembly": "Assembly",
+          "welding": "Welding",
+          "surface": "Surface",
+          "operation": "Operation",
+          "equipment": "Equipment",
+          "appearance": "Appearance",
+          "other": "Other"
+        },
+        "partSub": {
+          "mismatch": "Mismatch",
+          "appearance": "Appearance",
+          "failure": "Failure",
+          "wrongModel": "Wrong Model",
+          "other": "Other"
+        }
+      },
+      "title": "Issues Title",
+      "dateMode": {
+        "label": "Date Mode Label",
+        "year": "Year",
+        "month": "Month",
+        "week": "Week"
+      },
+      "processName": "Process Name",
+      "responsibleWelder": "Responsible Welder"
     },
     "records": {
       "title": "Inspection Records",
@@ -166,13 +232,84 @@
       "tab": {
         "incoming": "Incoming",
         "process": "In-Process",
-        "shipment": "Shipment"
+        "shipment": "Shipment",
+        "detailed": "Detailed"
       },
       "result": {
         "pass": "Pass",
-        "fail": "Fail"
-      }
-    }
+        "fail": "Fail",
+        "concession": "Concession",
+        "na": "Na"
+      },
+      "relatedItp": "Related ITP",
+      "form": {
+        "materialName": "Material Name",
+        "inspector": "Inspector",
+        "result": "Result",
+        "process": "Process",
+        "componentName": "Component Name",
+        "team": "Team",
+        "teamOrOutsourcing": "Team Or Outsourcing",
+        "workOrder": "Work Order",
+        "project": "Project",
+        "incomingType": "Incoming Type",
+        "hasDocuments": "Has Documents",
+        "documentName": "Document Name",
+        "quantity": "Quantity",
+        "inspectionDate": "Inspection Date",
+        "reportDate": "Report Date",
+        "reportTeam": "Report Team",
+        "outsourcing": "Outsourcing",
+        "reporter": "Reporter",
+        "level1": "Level1",
+        "archived": "Archived",
+        "documents": "Documents",
+        "packingListArchived": "Packing List Archived",
+        "singleResult": "Single Result",
+        "overallResult": "Overall Result",
+        "auditor": "Auditor",
+        "relatedItp": "Related ITP",
+        "placeholder": {
+          "team": "Team",
+          "outsourcing": "Outsourcing",
+          "level1": "Level1",
+          "component": "Component",
+          "documents": "Documents",
+          "remarks": "...",
+          "itp": "ITP"
+        }
+      },
+      "options": {
+        "yes": "Yes",
+        "no": "No",
+        "have": "Have",
+        "none": "None",
+        "process": {
+          "outsourced": "Outsourced",
+          "rawMaterial": "Raw Material",
+          "auxiliary": "Auxiliary",
+          "machined": "Machined",
+          "cutting": "Cutting",
+          "assembly": "Assembly",
+          "welding": "Welding",
+          "flawDetection": "Flaw Detection",
+          "weldSize": "Weld Size",
+          "appearance": "Appearance",
+          "overallAssembly": "Overall Assembly",
+          "assembling": "Assembling",
+          "mounting": "Mounting",
+          "grouping": "Grouping",
+          "sandblasting": "Sandblasting",
+          "painting": "Painting"
+        }
+      },
+      "createIncoming": "Create Incoming",
+      "createProcess": "Create Process",
+      "createShipment": "Create Shipment",
+      "createRecord": "Create Record",
+      "editRecord": "Edit Record"
+    },
+    "title": "Inspection Title"
   },
   "supplier": {
     "title": "Supplier Management",
@@ -188,6 +325,39 @@
       "trial": "Trial",
       "observation": "Observation",
       "frozen": "Frozen"
+    },
+    "totalCount": "Total Count",
+    "qualifiedCount": "Qualified Count",
+    "warningCount": "Warning Count",
+    "scoringRules": "Scoring Rules",
+    "avgScore": "Avg Score",
+    "mainProduct": "Main Product",
+    "origin": "Origin",
+    "brand": "Brand",
+    "qualityLevel": "Quality Level",
+    "realTimeScore": "Real Time Score",
+    "qualifiedRate": "Qualified Rate",
+    "engIssue": "Eng Issue",
+    "afterSalesIssue": "After Sales Issue",
+    "buyer": "Buyer",
+    "performanceList": "Performance List",
+    "addSupplier": "Add Supplier",
+    "warningPrompt": "Warning Prompt",
+    "portrait": {
+      "overallScore": "Overall Score",
+      "scoreDesc": "Score Desc",
+      "riskOverview": "Risk Overview",
+      "batchCount": "Batch Count",
+      "totalQuantity": "Total Quantity",
+      "passRate": "Pass Rate",
+      "engLoss": "Eng Loss",
+      "afterSalesLoss": "After Sales Loss",
+      "tabs": {
+        "basic": "Basic",
+        "engineering": "Engineering",
+        "afterSales": "After Sales",
+        "incoming": "Incoming"
+      }
     }
   },
   "outsourcing": {
@@ -207,7 +377,14 @@
     "qualifiedRate": "Qualified Rate",
     "engIssue": "Engineering Issues",
     "afterSalesIssue": "After-sales Issues",
-    "addUnit": "Add Outsourcing Unit"
+    "addUnit": "Add Outsourcing Unit",
+    "totalCount": "Total Count",
+    "status": {
+      "qualified": "Qualified",
+      "observation": "Observation",
+      "frozen": "Frozen"
+    },
+    "performanceList": "Performance List"
   },
   "metrology": {
     "title": "Measuring Instrument Ledger",
@@ -352,7 +529,8 @@
     "title": "Quality Planning",
     "status": {
       "active": "Active",
-      "archived": "Archived"
+      "archived": "Archived",
+      "draft": "Draft"
     },
     "itp": {
       "title": "Inspection ITP",
@@ -362,14 +540,434 @@
       "criteria": "Criteria",
       "frequency": "Frequency",
       "controlPoint": {
-        "label": "CP"
-      }
+        "label": "CP",
+        "holdDesc": "Hold Desc",
+        "reviewDesc": "Review Desc",
+        "surveillanceDesc": "Surveillance Desc",
+        "witnessDesc": "Witness Desc"
+      },
+      "stepCount": "Step Count",
+      "executionStatus": "Execution Status",
+      "verifyingDocument": "Verifying Document",
+      "quantitative": "Quantitative",
+      "searchPlaceholder": "Search Placeholder",
+      "createProject": "Create Project",
+      "editProject": "Edit Project",
+      "assignLeader": "Assign Leader",
+      "assignTaskTitle": "Assign Task Title",
+      "taskSubject": "Task Subject",
+      "assignInfoMissing": "Assign Info Missing",
+      "assignSuccess": "Assign Success",
+      "addStep": "Add Step",
+      "editStep": "Edit Step",
+      "standardValue": "Standard Value",
+      "tolerance": "Tolerance",
+      "executed": "Executed",
+      "exception": "Exception",
+      "notStarted": "Not Started",
+      "selectProjectHint": "Select Project Hint",
+      "deleteStepTitle": "Delete Step Title",
+      "deleteStepContent": "Delete Step Content {activity}",
+      "deleteProjectTitle": "Delete Project Title",
+      "deleteProjectContent": "Delete Project Content {name}",
+      "planName": "Plan Name",
+      "multipleTasksHint": "Multiple Tasks Hint",
+      "relatedWorkOrder": "Related Work Order"
+    },
+    "unit": {
+      "steps": "Steps"
+    },
+    "common": {
+      "selectProjectHint": "Select Project Hint"
+    },
+    "dfmea": {
+      "title": "DFMEA",
+      "projectList": "Project List",
+      "planning": "Planning",
+      "itemCount": "Item Count",
+      "item": "Item",
+      "failureMode": "Failure Mode",
+      "effects": "Effects",
+      "severity": "S",
+      "occurrence": "O",
+      "detection": "D",
+      "rpn": "RPN",
+      "selectProjectHint": "Select Project Hint",
+      "assignLeader": "Assign Leader"
+    },
+    "bom": {
+      "title": "BOM Title",
+      "projectList": "Project List",
+      "itemCount": "Item Count",
+      "itemCountUnit": "Item Count Unit",
+      "workOrderNo": "Work Order No",
+      "materialItems": "Material Items",
+      "version": "Version",
+      "editProject": "Edit Project",
+      "projectName": "Project Name",
+      "addItem": "Add Item",
+      "editItem": "Edit Item",
+      "selectProjectHint": "Select Project Hint",
+      "partName": "Part Name",
+      "partNumber": "Part Number",
+      "material": "Material",
+      "quantity": "Quantity",
+      "unit": "Unit",
+      "remarks": "Remarks",
+      "placeholder": {
+        "search": "Search",
+        "partName": "Part Name",
+        "partNumber": "Part Number",
+        "material": "Material",
+        "unit": "Unit",
+        "remarks": "Remarks"
+      },
+      "deleteTitle": "Delete Title",
+      "deleteContent": "Delete Content {name}"
+    },
+    "projectDocs": {
+      "title": "Project Docs Title",
+      "recordCount": "Record Count",
+      "documentList": "Document List"
+    },
+    "itpGenerator": {
+      "title": "ITP Generator Title",
+      "step1": "Step1",
+      "step2": "Step2",
+      "step3": "Step3",
+      "uploadTitle": "Upload Title",
+      "uploadHint": "Upload Hint",
+      "uploadSupport": "Upload Support",
+      "modelStrengthHint": "Model Strength Hint",
+      "extraInfo": "Extra Info",
+      "fillExample": "Fill Example",
+      "fastModeHint": "Fast Mode Hint",
+      "startAiParse": "Start AI Parse",
+      "defaultPrompt": "Default Prompt",
+      "parseLogs": "Parse Logs",
+      "parseCompleted": "Parse Completed",
+      "parseFailed": "Parse Failed",
+      "importSuccess": "Import Success",
+      "uploadOrDescribe": "Upload Or Describe",
+      "startParseLog": "Start Parse Log",
+      "readingFileLog": "Reading File Log",
+      "extractedCompletedLog": "Extracted Completed Log",
+      "aiRequestLog": "AI Request Log",
+      "noItemsIdentified": "No Items Identified",
+      "parseSuccessLog": "Parse Success Log {count}",
+      "selectImportTarget": "Select Import Target",
+      "quantitativeExtracted": "Quantitative Extracted",
+      "std": "Std",
+      "qualitative": "Qualitative",
+      "confirmImportTarget": "Confirm Import Target",
+      "targetItp": "Target ITP",
+      "successTitle": "Success Title",
+      "successSubTitle": "Success Sub Title",
+      "viewItp": "View ITP"
     }
   },
   "knowledge": {
     "title": "Knowledge Base",
     "allKnowledge": "All Knowledge",
     "latestUpdate": "Last Updated",
-    "categories": "Categories"
+    "categories": "Categories",
+    "searchPlaceholder": "Search Placeholder",
+    "noData": "No Data",
+    "create": "Create",
+    "edit": "Edit",
+    "deleteConfirm": "Delete Confirm",
+    "saveSuccess": "Save Success",
+    "prefillFromIssue": "Prefill From Issue"
+  },
+  "portrait": "Portrait",
+  "workspace": {
+    "title": "Workspace Title",
+    "startWork": "Start Work {user}",
+    "todayWorkOrders": "Today Work Orders",
+    "todayInspections": "Today Inspections",
+    "openIssues": "Open Issues",
+    "taskStats": {
+      "pendingLevel1": "Pending Level1",
+      "pendingLevel2": "Pending Level2",
+      "processingTasks": "Processing Tasks",
+      "closureRate": "Closure Rate"
+    },
+    "allDispatched": "All Dispatched",
+    "secondaryDispatchSuccess": "Secondary Dispatch Success",
+    "taskWorkbench": "Task Workbench",
+    "myTask": "My Task",
+    "unassigned": "Unassigned",
+    "deconstruct": "Deconstruct",
+    "goToFill": "Go To Fill",
+    "ongoingWorkOrders": "Ongoing Work Orders",
+    "workOrderList": "Work Order List",
+    "latestIssueTrends": "Latest Issue Trends",
+    "secondaryDispatch": "Secondary Dispatch",
+    "selectItemsToDispatch": "Select Items To Dispatch"
+  },
+  "dashboard": {
+    "title": "Dashboard Title",
+    "passRateTrend": "Pass Rate Trend",
+    "qualityLossStats": "Quality Loss Stats",
+    "vehicleFailureRate": "Vehicle Failure Rate",
+    "vehicleFailureRateRanking": "Vehicle Failure Rate Ranking",
+    "failedVehicles": "Failed Vehicles",
+    "totalVehicles": "Total Vehicles",
+    "vehicleFailureRateTrend": "Vehicle Failure Rate Trend",
+    "overallVehicleFailureRateTrend": "Overall Vehicle Failure Rate Trend",
+    "yearToMonthByVehicle": "Year To Month By Vehicle",
+    "lastYearData": "Last Year Data",
+    "lastYearManual": "Last Year Manual",
+    "currentYearData": "Current Year Data",
+    "warningLine": "Warning Line",
+    "weeklyPassRateTrend": "Weekly Pass Rate Trend",
+    "monthlyPassRateTrend": "Monthly Pass Rate Trend",
+    "recentOrders": "Recent Orders",
+    "passRateDetail": "Pass Rate Detail",
+    "qualityLossDetail": "Quality Loss Detail",
+    "targetPassRate": "Target Pass Rate",
+    "passRate": "Pass Rate",
+    "totalInspection": "Total Inspection",
+    "qualifiedCount": "Qualified Count",
+    "chartClickTip": "Chart Click Tip",
+    "weeklyQualityLossTrend": "Weekly Quality Loss Trend",
+    "monthlyQualityLossTrend": "Monthly Quality Loss Trend",
+    "overview": {
+      "fieldIssues": "Field Issues",
+      "processIssues": "Process Issues",
+      "totalIssues": "Total Issues",
+      "totalLoss": "Total Loss",
+      "totalOrders": "Total Orders"
+    }
+  },
+  "afterSales": {
+    "title": "After Sales Title",
+    "dateMode": {
+      "label": "Date Mode Label",
+      "year": "Year",
+      "month": "Month",
+      "week": "Week"
+    },
+    "status": {
+      "open": "Open",
+      "resolved": "Resolved",
+      "pending": "Pending",
+      "processing": "Processing",
+      "closed": "Closed"
+    },
+    "severity": {
+      "critical": "Critical",
+      "major": "Major",
+      "minor": "Minor",
+      "p0": "P0",
+      "p1": "P1",
+      "p2": "P2",
+      "p3": "P3"
+    },
+    "form": {
+      "workOrderNumber": "Work Order Number",
+      "division": "Division",
+      "projectName": "Project Name",
+      "customerName": "Customer Name",
+      "partName": "Part Name",
+      "productType": "Product Type",
+      "productSubtype": "Product Subtype",
+      "factoryDate": "Factory Date",
+      "warrantyStatus": "Warranty Status",
+      "runningHours": "Running Hours",
+      "issueDate": "Issue Date",
+      "location": "Location",
+      "severity": "Severity",
+      "defectType": "Defect Type",
+      "defectSubtype": "Defect Subtype",
+      "quantity": "Quantity",
+      "handler": "Handler",
+      "issueDescription": "Issue Description",
+      "responsibleDept": "Responsible Dept",
+      "supplierBrand": "Supplier Brand",
+      "materialCost": "Material Cost",
+      "laborTravelCost": "Labor Travel Cost",
+      "status": "Status",
+      "isClaim": "Is Claim",
+      "closeDate": "Close Date",
+      "resolutionPlan": "Resolution Plan",
+      "create": "Create",
+      "edit": "Edit",
+      "baseInfo": "Base Info",
+      "productInfo": "Product Info",
+      "issueDetails": "Issue Details",
+      "responsibility": "Responsibility",
+      "processingStatus": "Processing Status",
+      "photos": "Photos",
+      "upload-image": "Upload-image"
+    },
+    "placeholder": {
+      "inputWorkOrder": "Input Work Order",
+      "selectDivision": "Select Division",
+      "selectType": "Select Type",
+      "selectSubtype": "Select Subtype",
+      "inputPartName": "Input Part Name",
+      "selectSupplier": "Select Supplier"
+    },
+    "options": {
+      "underWarranty": "Under Warranty",
+      "expired": "Expired",
+      "yes": "Yes",
+      "no": "No"
+    },
+    "columns": {
+      "seq": "Seq",
+      "isClaim": "Is Claim",
+      "action": "Action",
+      "reportMonth": "Report Month"
+    },
+    "chart": {
+      "add": "Add",
+      "addTitle": "Add Title",
+      "editTitle": "Edit Title",
+      "defaultTitle": "Default Title",
+      "autoTitle": "Auto Title {0} {1}",
+      "empty": "Empty",
+      "confirmDelete": "Confirm Delete",
+      "form": {
+        "title": "Form Title",
+        "dimension": "Dimension",
+        "metric": "Metric",
+        "chartType": "Chart Type"
+      },
+      "type": {
+        "bar": "Bar",
+        "line": "Line",
+        "pie": "Pie",
+        "ring": "Ring"
+      },
+      "metrics": {
+        "count": "Count",
+        "totalLoss": "Total Loss"
+      }
+    }
+  },
+  "welder": {
+    "title": "Welder Title",
+    "welderCode": "Welder Code",
+    "name": "Name",
+    "team": "Team",
+    "welding_method": "Welding Method",
+    "examDate": "Exam Date",
+    "examPassed": "Exam Passed",
+    "employmentStatus": "Employment Status",
+    "onDuty": "On Duty",
+    "resigned": "Resigned",
+    "certificationNo": "Certification No",
+    "score": "Score",
+    "scoreLevel": {
+      "label": "Score Level Label",
+      "safe": "Safe",
+      "warning": "Warning",
+      "danger": "Danger"
+    },
+    "total": "Total",
+    "examPassedCount": "Exam Passed Count",
+    "certifiedCount": "Certified Count",
+    "averageScore": "Average Score",
+    "warningCount": "Warning Count"
+  },
+  "reports": {
+    "title": "Reports Title",
+    "dailyTitle": "Daily Title",
+    "summaryTitle": "Summary Title",
+    "daily": {
+      "inspections": "Inspections",
+      "issues": "Issues",
+      "noInspections": "No Inspections",
+      "noIssues": "No Issues",
+      "summaryTitle": "Summary Title",
+      "summaryPlaceholder": "Summary Placeholder",
+      "date": "Date",
+      "export": "Export",
+      "exportSuccess": "Export Success",
+      "exportFailed": "Export Failed"
+    },
+    "summary": {
+      "title": "Summary Title",
+      "titleEn": "Title En",
+      "reportType": "Report Type",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "selectPeriod": "Select Period",
+      "generatePdf": "Generate PDF",
+      "reportNo": "Report No",
+      "qmDept": "Qm Dept",
+      "internalOnly": "Internal Only",
+      "keyKpis": "Key Kpis",
+      "defectsAnalysis": "Defects Analysis",
+      "noSignificantDefects": "No Significant Defects",
+      "supplierPerformance": "Supplier Performance",
+      "topPerformers": "Top Performers",
+      "atRiskPerformers": "At Risk Performers",
+      "majorEvents": "Major Events",
+      "noMajorEvents": "No Major Events",
+      "topProjectLoss": "Top Project Loss",
+      "managementInsights": "Management Insights",
+      "trends": "Trends",
+      "actions": "Actions",
+      "insight": {
+        "passRateDown": "Pass Rate Down",
+        "passRateAction": "Pass Rate Action",
+        "lossUp": "Loss Up",
+        "lossAction": "Loss Action",
+        "qualityStable": "Quality Stable",
+        "supplierWorst": "Supplier Worst {name}",
+        "defectHigh": "Defect High {name}",
+        "itpReview": "ITP Review",
+        "majorEventAction": "Major Event Action"
+      },
+      "loss": "Loss",
+      "noSignificantLoss": "No Significant Loss",
+      "preparedBy": "Prepared By",
+      "deptReview": "Dept Review",
+      "approvalDate": "Approval Date",
+      "managementSignOff": "Management Sign Off",
+      "noData": "No Data",
+      "invalidDateRange": "Invalid Date Range",
+      "targetPassRate": "Target Pass Rate",
+      "issueCount": "Issue Count",
+      "issueCountSuffix": "Issue Count Suffix",
+      "cumulativeLoss": "Cumulative Loss",
+      "noProcessData": "No Process Data",
+      "noKeyProjectRisk": "No Key Project Risk",
+      "unknownCategory": "Unknown Category",
+      "unknownProcessName": "Unknown Process Name",
+      "sections": {
+        "overview": "Overview",
+        "analysis": "Analysis",
+        "defectDistribution": "Defect Distribution",
+        "processQuality": "Process Quality",
+        "keyProjects": "Key Projects",
+        "supplierPerformance": "Supplier Performance",
+        "nextActions": "Next Actions"
+      },
+      "analysis": {
+        "trendUp": "Trend Up",
+        "trendDown": "Trend Down",
+        "passRate": "Pass Rate {value} {unit} {trendWord} {trend}",
+        "lossTotal": "Loss Total {totalLoss} {internalLoss} {externalLoss}",
+        "closingRate": "Closing Rate {value} {unit}",
+        "defectTop": "Defect Top {name} {count}",
+        "projectTop": "Project Top {name} {issues} {loss}",
+        "supplierWorst": "Supplier Worst {name} {issues}"
+      },
+      "actionsPlan": {
+        "supplierRectify": "Supplier Rectify {name}",
+        "defectControl": "Defect Control {name}",
+        "projectWeeklyTrack": "Project Weekly Track",
+        "knowledgeReuse": "Knowledge Reuse"
+      }
+    },
+    "reporter": "Reporter",
+    "status": {
+      "published": "Published",
+      "draft": "Draft"
+    }
   }
 }

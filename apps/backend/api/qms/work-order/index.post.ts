@@ -93,7 +93,11 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'work_order',
       targetId: String(newWO.workOrderNumber),
-      details: `新增工单: ${newWO.workOrderNumber} (${newWO.customerName})`,
+      detailsTemplate: '新增工单: {{workOrderNumber}} ({{customerName}})',
+      detailsVariables: {
+        customerName: newWO.customerName,
+        workOrderNumber: newWO.workOrderNumber,
+      },
     });
 
     return useResponseSuccess(formattedWO);

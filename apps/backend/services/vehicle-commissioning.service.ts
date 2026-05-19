@@ -7,6 +7,7 @@ import type {
 
 import { formatDate, safeNumber, tryParsePhotos } from '@qgs/shared';
 import { nanoid } from 'nanoid';
+import { AUDIT_TEMPLATES } from '~/constants/audit-templates';
 import { SystemLogService } from '~/services/system-log.service';
 import prisma from '~/utils/prisma';
 
@@ -363,7 +364,10 @@ export const VehicleCommissioningService = {
     if (operatorUserId) {
       await SystemLogService.recordAuditLog({
         action: 'CREATE',
-        details: `创建调试验收问题: ${row.description || row.id}`,
+        detailsTemplate: AUDIT_TEMPLATES.VEHICLE_COMMISSIONING_ISSUE_CREATE,
+        detailsVariables: {
+          issue: row.description || row.id,
+        },
         targetId: row.id,
         targetType: 'vehicle_commissioning_issue',
         userId: operatorUserId,
@@ -527,7 +531,11 @@ export const VehicleCommissioningService = {
     if (operatorUserId) {
       await SystemLogService.recordAuditLog({
         action: 'UPDATE',
-        details: `更新调试验收问题: ${row.description || row.id}, 状态=${row.status}`,
+        detailsTemplate: AUDIT_TEMPLATES.VEHICLE_COMMISSIONING_ISSUE_UPDATE,
+        detailsVariables: {
+          issue: row.description || row.id,
+          status: String(row.status || ''),
+        },
         targetId: row.id,
         targetType: 'vehicle_commissioning_issue',
         userId: operatorUserId,

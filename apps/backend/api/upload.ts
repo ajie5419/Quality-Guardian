@@ -30,7 +30,10 @@ export default eventHandler(async (event) => {
 
     await recordBusinessAuditLog(event, {
       action: 'CREATE',
-      details: `上传文件: ${uploaded.originalName}`,
+      detailsTemplate: '上传文件: {{filename}}',
+      detailsVariables: {
+        filename: uploaded.originalName,
+      },
       targetId: String(uploaded.id),
       targetType: 'file_asset',
       userId: userinfo?.id,

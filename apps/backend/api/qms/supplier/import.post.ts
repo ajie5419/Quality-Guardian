@@ -49,7 +49,12 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'supplier',
       targetId: 'batch-import',
-      details: `导入供应商/外协单位: ${successCount}/${items.length} 条`,
+      detailsTemplate:
+        '导入供应商/外协单位: {{successCount}}/{{totalCount}} 条',
+      detailsVariables: {
+        successCount,
+        totalCount: items.length,
+      },
     });
 
     return useResponseSuccess({ successCount, totalCount: items.length });

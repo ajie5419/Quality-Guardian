@@ -1,5 +1,7 @@
 import type { ComputedRef } from 'vue';
 
+import type { DictionaryOptionItem } from '#/api/system/dictionary';
+
 import { computed } from 'vue';
 
 import { useI18n } from '@vben/locales';
@@ -22,6 +24,12 @@ export interface StatusOption {
   value: string;
   label: string;
   color: string;
+}
+
+function normalizeStatusKey(value: string) {
+  return String(value || '')
+    .trim()
+    .toUpperCase();
 }
 
 export function useStatusOptions() {
@@ -92,6 +100,27 @@ export function useStatusOptions() {
   }
 
   return { statusOptions, statusMap, getStatusInfo };
+}
+
+export function mapDictionaryOptionsToAfterSalesStatus(
+  options: DictionaryOptionItem[] | undefined,
+  fallbackOptions: StatusOption[] = [],
+): StatusOption[] {
+  if (!options || options.length === 0) {
+    return fallbackOptions;
+  }
+  const colorMap: Record<string, string> = {};
+  for (const item of fallbackOptions) {
+    colorMap[normalizeStatusKey(item.value)] = item.color;
+  }
+  return options.map((item) => {
+    const key = normalizeStatusKey(item.dictKey);
+    return {
+      value: item.dictKey,
+      label: item.dictValue || item.dictKey,
+      color: colorMap[key] || 'default',
+    };
+  });
 }
 
 // ==================== 自定义图表配置 (Labels will be localized in UI) ====================

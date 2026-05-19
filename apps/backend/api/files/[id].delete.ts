@@ -21,7 +21,10 @@ export default defineEventHandler(async (event) => {
     const result = await FileStorageService.deleteFile(id, userinfo.id);
     await recordBusinessAuditLog(event, {
       action: 'DELETE',
-      details: `删除文件: ${result.file.originalName}`,
+      detailsTemplate: '删除文件: {{filename}}',
+      detailsVariables: {
+        filename: result.file.originalName,
+      },
       targetId: String(id),
       targetType: 'file_asset',
       userId: userinfo.id,

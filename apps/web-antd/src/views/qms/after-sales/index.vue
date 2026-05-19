@@ -11,6 +11,7 @@ import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Button,
   DatePicker,
@@ -41,11 +42,16 @@ import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { findNameById } from '#/types';
 
+import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
 import AfterSalesCharts from './components/AfterSalesCharts.vue';
 import AfterSalesModal from './components/AfterSalesModal.vue';
 import { useAfterSalesChartPreferences } from './composables/useAfterSalesChartPreferences';
 import { useAfterSalesDeptData } from './composables/useAfterSalesDeptData';
 import { useAfterSalesGrid } from './composables/useAfterSalesGrid';
+import {
+  mapDictionaryOptionsToAfterSalesStatus,
+  useStatusOptions,
+} from './constants';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
@@ -87,6 +93,16 @@ const isAdmin = computed(() => {
 });
 
 const canToolbarExport = computed(() => canExport.value || isAdmin.value);
+const { statusOptions: fallbackStatusOptions } = useStatusOptions();
+const {
+  options: afterSalesStatusOptions,
+  loadOptions: loadAfterSalesStatusDictionaryOptions,
+} = useDictionaryOptions({
+  dictType: QMS_DICTIONARY_TYPE_KEYS.afterSalesStatus,
+  fallbackOptions: fallbackStatusOptions.value,
+  mapOptions: (options, fallbackOptions) =>
+    mapDictionaryOptionsToAfterSalesStatus(options, fallbackOptions),
+});
 
 async function loadData() {
   try {
@@ -95,6 +111,22 @@ async function loadData() {
   } catch (error) {
     handleApiError(error, 'Load After Sales Base Data');
     message.error(t('common.dataLoadFailed'));
+  }
+}
+
+async function loadAfterSalesStatusOptions() {
+  try {
+    await loadAfterSalesStatusDictionaryOptions();
+    gridApi.setState({
+      formOptions: {
+        schema: formSchema,
+        showCollapseButton: true,
+        submitOnChange: true,
+        submitOnEnter: true,
+      },
+    });
+  } catch {
+    // Keep local fallback options.
   }
 }
 
@@ -351,6 +383,7 @@ const { gridOptions, formSchema } = useAfterSalesGrid({
   currentDateMode,
   currentDateValue,
   currentYear: currentFilterYear,
+  statusOptions: afterSalesStatusOptions,
   deptRawData,
   getAfterSalesListPage,
   handleDelete,
@@ -373,6 +406,7 @@ const [Grid, gridApi] = useVbenVxeGrid({
 });
 
 gridApiProxy.value = gridApi;
+loadAfterSalesStatusOptions();
 
 watch(deptRawData, () => {
   gridApi.reload();
@@ -549,6 +583,7 @@ function handleModalSuccess() {
         :is-edit-mode="isEditMode"
         :initial-data="currentRecord"
         :dept-tree-data="deptTreeData"
+        :status-options="afterSalesStatusOptions"
         @success="handleModalSuccess"
       />
 

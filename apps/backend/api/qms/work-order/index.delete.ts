@@ -38,7 +38,11 @@ export default defineEventHandler(async (event) => {
       action: 'DELETE',
       targetType: 'work_order',
       targetId: String(id),
-      details: `删除工单: ${deleted.workOrderNumber} (${deleted.customerName})`,
+      detailsTemplate: '删除工单: {{workOrderNumber}} ({{customerName}})',
+      detailsVariables: {
+        customerName: deleted.customerName,
+        workOrderNumber: deleted.workOrderNumber,
+      },
     });
 
     return useResponseSuccess(null);

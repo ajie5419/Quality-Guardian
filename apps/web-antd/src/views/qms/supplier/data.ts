@@ -1,5 +1,6 @@
 import type { VbenFormSchema } from '#/adapter/form';
 import type { VxeGridProps } from '#/adapter/vxe-table';
+import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
 import { $t } from '@vben/locales';
 
@@ -12,6 +13,16 @@ export const getStatusOptions = () => [
   { label: $t('qms.supplier.status.observation'), value: 'Observation' },
   { label: $t('qms.supplier.status.frozen'), value: 'Frozen' },
 ];
+
+export function mapDictionaryOptionsToSelect(options?: DictionaryOptionItem[]) {
+  if (!options || options.length === 0) {
+    return getStatusOptions();
+  }
+  return options.map((item) => ({
+    label: item.dictValue || item.dictKey,
+    value: item.dictKey,
+  }));
+}
 
 export const getOutsourcingModeOptions = () => [
   {
@@ -146,6 +157,7 @@ export const getColumns = (
  */
 export const getFormSchema = (
   category: 'Outsourcing' | 'Supplier',
+  statusOptions = getStatusOptions(),
 ): SupplierFormSchema[] => [
   {
     fieldName: 'name',
@@ -205,7 +217,7 @@ export const getFormSchema = (
     label: $t('common.status'),
     component: 'Select',
     componentProps: {
-      options: getStatusOptions(),
+      options: statusOptions,
       style: { width: '100%' },
     },
     defaultValue: 'Qualified',
@@ -228,6 +240,7 @@ export const getFormSchema = (
  */
 export const getSearchFormSchema = (
   category: 'Outsourcing' | 'Supplier',
+  statusOptions = getStatusOptions(),
 ): SupplierFormSchema[] => [
   {
     fieldName: 'name',
@@ -243,7 +256,7 @@ export const getSearchFormSchema = (
     label: $t('common.status'),
     component: 'Select',
     componentProps: {
-      options: getStatusOptions(),
+      options: statusOptions,
     },
     colProps: { span: 6 },
   },

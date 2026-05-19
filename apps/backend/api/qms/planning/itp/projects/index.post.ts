@@ -43,7 +43,10 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'planning_itp_project',
       targetId: String(newProject.id),
-      details: `新增 ITP 项目: ${newProject.projectName}`,
+      detailsTemplate: '新增 ITP 项目: {{projectName}}',
+      detailsVariables: {
+        projectName: newProject.projectName,
+      },
     });
 
     return useResponseSuccess({

@@ -238,7 +238,9 @@ export default defineEventHandler(async (event) => {
     const qualifiedQuantity = Math.max(0, totalQuantity - unqualifiedQuantity);
     const shouldCloseRequest = result === 'PASS';
     let issueCreateData: Prisma.quality_recordsCreateInput | undefined;
-    let issueAuditDetails = '';
+    let issueAuditVariables:
+      | undefined
+      | { issue: string; nonConformanceNumber: string };
     const closeInspectorId =
       request.inspectorId ||
       (await resolveInspectionRequestCurrentUserId(userinfo, prisma));
@@ -310,7 +312,10 @@ export default defineEventHandler(async (event) => {
         inspectorUsername: userinfo.username,
         serialNumber,
       });
-      issueAuditDetails = `新增检验问题: ${issueBody.partName} (${newId})`;
+      issueAuditVariables = {
+        issue: issueBody.partName,
+        nonConformanceNumber: newId,
+      };
     }
 
     const {
@@ -459,9 +464,15 @@ export default defineEventHandler(async (event) => {
             action: 'CREATE',
             targetType: 'inspection_issue',
             targetId: String(issue.id),
-            details:
-              issueAuditDetails ||
-              `新增检验问题: ${issue.partName} (${issue.nonConformanceNumber || '无编号'})`,
+            detailsTemplate:
+              '新增检验问题: {{issue}} ({{nonConformanceNumber}})',
+            detailsVariables: {
+              issue: issueAuditVariables?.issue || issue.partName,
+              nonConformanceNumber:
+                issueAuditVariables?.nonConformanceNumber ||
+                issue.nonConformanceNumber ||
+                '无编号',
+            },
           }),
         );
       }
@@ -472,7 +483,10 @@ export default defineEventHandler(async (event) => {
             action: 'UPDATE',
             targetType: 'inspection_issue',
             targetId: String(updated.linkedIssueId),
-            details: `复检合格关闭关联检验问题: ${updated.linkedIssueNo || updated.linkedIssueId}`,
+            detailsTemplate: '复检合格关闭关联检验问题: {{linkedIssue}}',
+            detailsVariables: {
+              linkedIssue: updated.linkedIssueNo || updated.linkedIssueId,
+            },
           }),
         );
       }
@@ -483,7 +497,12 @@ export default defineEventHandler(async (event) => {
 
     await recordBusinessAuditLog(event, {
       action: 'UPDATE',
-      details: `关闭报检任务: ${updated.requestNo}，关联检验记录: ${inspectionId}`,
+      detailsTemplate:
+        '关闭报检任务: {{requestNo}}，关联检验记录: {{inspectionId}}',
+      detailsVariables: {
+        inspectionId,
+        requestNo: updated.requestNo,
+      },
       targetId: String(updated.id),
       targetType: 'inspection_request',
       userId: userinfo?.id,

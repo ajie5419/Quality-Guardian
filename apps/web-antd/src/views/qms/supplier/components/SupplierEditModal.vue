@@ -6,6 +6,7 @@ import { ref } from 'vue';
 import { useVbenModal } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import { message } from 'ant-design-vue';
 
 import { useVbenForm } from '#/adapter/form';
@@ -15,7 +16,8 @@ import {
 } from '#/api/qms/supplier';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
-import { getFormSchema } from '../data';
+import { useDictionaryOptions } from '../../shared/composables/useDictionaryOptions';
+import { getFormSchema, mapDictionaryOptionsToSelect } from '../data';
 
 interface OpenOptions {
   isUpdate: boolean;
@@ -35,6 +37,14 @@ const currentCategory = ref<'Outsourcing' | 'Supplier'>('Supplier');
 const [Form, formApi] = useVbenForm({
   schema: [], // Will be updated dynamically
   showDefaultActions: false,
+});
+const {
+  options: supplierStatusOptions,
+  loadOptions: loadSupplierStatusOptions,
+} = useDictionaryOptions({
+  dictType: QMS_DICTIONARY_TYPE_KEYS.supplierStatus,
+  fallbackOptions: mapDictionaryOptionsToSelect(),
+  mapOptions: mapDictionaryOptionsToSelect,
 });
 
 const [Modal, modalApi] = useVbenModal({
@@ -79,8 +89,11 @@ async function open(options: OpenOptions) {
   currentCategory.value = category;
   recordId.value = record?.id || null;
 
-  // Update schema based on category
-  formApi.setState({ schema: getFormSchema(category) });
+  // Update schema based on category. Dictionary options take priority with local fallback.
+  await loadSupplierStatusOptions();
+  formApi.setState({
+    schema: getFormSchema(category, supplierStatusOptions.value),
+  });
 
   // Set title
   const entityName =

@@ -107,7 +107,14 @@ export default defineEventHandler(async (event) => {
 
     await recordBusinessAuditLog(event, {
       action: 'CREATE',
-      details: `新增报检任务: ${created.requestNo} (${created.workOrderNumber}/${created.processName}/${created.partName})`,
+      detailsTemplate:
+        '新增报检任务: {{requestNo}} ({{workOrderNumber}}/{{processName}}/{{partName}})',
+      detailsVariables: {
+        partName: created.partName,
+        processName: created.processName,
+        requestNo: created.requestNo,
+        workOrderNumber: created.workOrderNumber,
+      },
       targetId: String(created.id),
       targetType: 'inspection_request',
       userId: userinfo?.id,

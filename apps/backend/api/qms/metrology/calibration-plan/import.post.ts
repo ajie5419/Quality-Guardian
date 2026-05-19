@@ -38,7 +38,11 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'metrology_calibration_plan',
       targetId: `batch-import-${year}`,
-      details: `导入计量校准计划: ${result.successCount}/${result.totalCount} 条`,
+      detailsTemplate: '导入计量校准计划: {{successCount}}/{{totalCount}} 条',
+      detailsVariables: {
+        successCount: result.successCount,
+        totalCount: result.totalCount,
+      },
     });
     return useResponseSuccess(result);
   } catch (error) {

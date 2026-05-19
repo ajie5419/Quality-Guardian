@@ -1,0 +1,18 @@
+{
+  "common.json::zh-CN": {
+    "missingCount": 0,
+    "extraCount": 0
+  },
+  "page.json::zh-CN": {
+    "missingCount": 0,
+    "extraCount": 0
+  },
+  "qms.json::zh-CN": {
+    "missingCount": 0,
+    "extraCount": 0
+  },
+  "sys.json::zh-CN": {
+    "missingCount": 0,
+    "extraCount": 0
+  }
+}

@@ -55,7 +55,10 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'planning_itp_item',
       targetId: String(newItem.id),
-      details: `新增 ITP 条目: ${newItem.processStep || newItem.activity || newItem.id}`,
+      detailsTemplate: '新增 ITP 条目: {{item}}',
+      detailsVariables: {
+        item: newItem.processStep || newItem.activity || newItem.id,
+      },
     });
 
     return useResponseSuccess({

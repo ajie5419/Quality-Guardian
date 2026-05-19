@@ -35,7 +35,10 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'supplier',
       targetId: String(newSupplier.id),
-      details: `新增供应商/外协单位: ${newSupplier.name}`,
+      detailsTemplate: '新增供应商/外协单位: {{name}}',
+      detailsVariables: {
+        name: newSupplier.name,
+      },
     });
 
     return useResponseSuccess(newSupplier);

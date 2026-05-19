@@ -40,7 +40,11 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'quality_loss',
       targetId: String(newItem.id),
-      details: `新增质量损失记录: ${newItem.type} (${newItem.amount})`,
+      detailsTemplate: '新增质量损失记录: {{type}} ({{amount}})',
+      detailsVariables: {
+        amount: newItem.amount,
+        type: newItem.type,
+      },
     });
 
     return useResponseSuccess(buildQualityLossCreateResponse(newItem));

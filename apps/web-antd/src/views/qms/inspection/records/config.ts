@@ -1,4 +1,7 @@
 import type { VxeGridPropTypes } from '#/adapter/vxe-table';
+import type { DictionaryOptionItem } from '#/api/system/dictionary';
+
+import { cloneInspectionProcessFallbackOptions } from '../../shared/constants/inspection-process-fallback';
 
 export const INSPECTION_TYPES = {
   INCOMING: 'INCOMING',
@@ -12,72 +15,53 @@ export const INSPECTION_TABS = [
   { label: '发货检验', value: 'shipment' },
 ];
 
-export const getProcessOptions = (t: (key: string) => string) => [
-  {
-    label: t('qms.inspection.records.options.process.outsourced'),
-    value: '外购件',
-  },
-  {
-    label: t('qms.inspection.records.options.process.rawMaterial'),
-    value: '原材料',
-  },
-  {
-    label: t('qms.inspection.records.options.process.auxiliary'),
-    value: '辅材',
-  },
-  {
-    label: t('qms.inspection.records.options.process.machined'),
-    value: '机加成品件',
-  },
-  {
-    label: t('qms.inspection.records.options.process.cutting'),
-    value: '下料',
-  },
-  {
-    label: t('qms.inspection.records.options.process.assembly'),
-    value: '组对',
-  },
-  {
-    label: t('qms.inspection.records.options.process.welding'),
-    value: '焊接',
-  },
-  {
-    label: t('qms.inspection.records.options.process.flawDetection'),
-    value: '探伤',
-  },
-  {
-    label: t('qms.inspection.records.options.process.weldSize'),
-    value: '焊后尺寸',
-  },
-  {
-    label: t('qms.inspection.records.options.process.appearance'),
-    value: '外观',
-  },
-  {
-    label: t('qms.inspection.records.options.process.overallAssembly'),
-    value: '整体拼装',
-  },
-  {
-    label: t('qms.inspection.records.options.process.assembling'),
-    value: '组装',
-  },
-  {
-    label: t('qms.inspection.records.options.process.mounting'),
-    value: '装配',
-  },
-  {
-    label: t('qms.inspection.records.options.process.grouping'),
-    value: '组拼',
-  },
-  {
-    label: t('qms.inspection.records.options.process.sandblasting'),
-    value: '打砂',
-  },
-  {
-    label: t('qms.inspection.records.options.process.painting'),
-    value: '喷漆',
-  },
-];
+export const getProcessOptions = (_t: (key: string) => string) =>
+  cloneInspectionProcessFallbackOptions();
+
+export function mapDictionaryOptionsToInspectionProcess(
+  options: DictionaryOptionItem[] | undefined,
+  fallbackOptions: Array<{ label: string; value: string }> = [],
+) {
+  if (!options || options.length === 0) {
+    return fallbackOptions;
+  }
+
+  const merged = new Map<string, { label: string; value: string }>();
+  for (const item of options) {
+    const value = String(item.dictKey || '').trim();
+    if (!value) continue;
+    merged.set(value, {
+      label: String(item.dictValue || value).trim() || value,
+      value,
+    });
+  }
+  for (const option of fallbackOptions) {
+    if (!merged.has(option.value)) {
+      merged.set(option.value, option);
+    }
+  }
+
+  return [...merged.values()];
+}
+
+export function mapDictionaryOptionsToInspectionProcessOnly(
+  options: DictionaryOptionItem[] | undefined,
+  fallbackOptions: Array<{ label: string; value: string }> = [],
+) {
+  if (!options || options.length === 0) {
+    return fallbackOptions;
+  }
+  return options
+    .map((item) => {
+      const value = String(item.dictKey || '').trim();
+      if (!value) return null;
+      return {
+        label: String(item.dictValue || value).trim() || value,
+        value,
+      };
+    })
+    .filter(Boolean) as Array<{ label: string; value: string }>;
+}
 
 export const getColumns = (
   type: string,

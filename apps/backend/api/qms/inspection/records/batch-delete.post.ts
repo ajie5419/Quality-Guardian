@@ -25,7 +25,10 @@ export default defineEventHandler(async (event) => {
       action: 'DELETE',
       targetType: 'inspection_record',
       targetId: ids.join(','),
-      details: `批量删除检验记录: ${result.count} 条`,
+      detailsTemplate: '批量删除检验记录: {{count}} 条',
+      detailsVariables: {
+        count: result.count,
+      },
     });
     return useResponseSuccess({ successCount: result.count });
   } catch (error: unknown) {

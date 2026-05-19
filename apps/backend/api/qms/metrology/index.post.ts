@@ -38,7 +38,11 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'metrology',
       targetId: String(created.id),
-      details: `新增计量器具: ${created.instrumentName} (${created.instrumentCode})`,
+      detailsTemplate: '新增计量器具: {{instrumentName}} ({{instrumentCode}})',
+      detailsVariables: {
+        instrumentCode: created.instrumentCode,
+        instrumentName: created.instrumentName,
+      },
     });
 
     return useResponseSuccess(created);

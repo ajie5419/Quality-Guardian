@@ -11,7 +11,7 @@ import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
-import { PERMISSION_CODES } from '@qgs/shared';
+import { PERMISSION_CODES, QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import { Button, Card, message, Space, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
@@ -30,6 +30,7 @@ import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData, findNameById } from '#/types';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
+import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
 import LossCharts from './components/LossCharts.vue';
 import LossClaimModal from './components/LossClaimModal.vue';
 import LossEditModal from './components/LossEditModal.vue';
@@ -37,7 +38,11 @@ import LossEditModal from './components/LossEditModal.vue';
 import LossKpiCards from './components/LossKpiCards.vue';
 import { useLossOverview } from './composables/useLossOverview';
 import { useQualityLossActions } from './composables/useQualityLossActions';
-import { SOURCE_STYLE_MAP, STATUS_OPTIONS } from './constants';
+import {
+  mapDictionaryOptionsToLossType,
+  mapDictionaryOptionsToQualityLossStatus,
+  SOURCE_STYLE_MAP,
+} from './constants';
 import { LossSource } from './types';
 
 type QualityLossItem =
@@ -86,6 +91,22 @@ const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const deptTreeData = ref<TreeSelectNode[]>([]);
 const showCharts = ref(true);
 const isFirstLoad = ref(true);
+const {
+  options: qualityLossStatusOptions,
+  loadOptions: loadQualityLossStatusDictionaryOptions,
+} = useDictionaryOptions({
+  dictType: QMS_DICTIONARY_TYPE_KEYS.qualityLossStatus,
+  fallbackOptions: mapDictionaryOptionsToQualityLossStatus(),
+  mapOptions: mapDictionaryOptionsToQualityLossStatus,
+});
+const {
+  options: qualityLossTypeOptions,
+  loadOptions: loadQualityLossTypeDictionaryOptions,
+} = useDictionaryOptions({
+  dictType: QMS_DICTIONARY_TYPE_KEYS.qualityLossType,
+  fallbackOptions: mapDictionaryOptionsToLossType(),
+  mapOptions: mapDictionaryOptionsToLossType,
+});
 
 const userStore = useUserStore();
 const isAdmin = computed(() => {
@@ -328,7 +349,7 @@ const [Grid, gridApi] = useVbenVxeGrid<QualityLossItem>({
         label: t('common.status'),
         component: 'Select',
         componentProps: {
-          options: STATUS_OPTIONS,
+          options: qualityLossStatusOptions.value,
         },
         colProps: { span: 6 },
       },
@@ -366,16 +387,81 @@ async function loadInitialData() {
   }
 }
 
+async function loadQualityLossStatusOptions() {
+  try {
+    await loadQualityLossStatusDictionaryOptions();
+    gridApi.setState({
+      formOptions: {
+        schema: [
+          {
+            fieldName: 'workOrderNumber',
+            label: t('qms.workOrder.workOrderNumber'),
+            component: 'Input',
+          },
+          {
+            fieldName: 'lossSource',
+            label: t('qms.qualityLoss.source.label'),
+            component: 'Select',
+            componentProps: {
+              options: [
+                { label: t('common.all'), value: '' },
+                {
+                  label: t('qms.qualityLoss.source.manual'),
+                  value: LossSource.MANUAL,
+                },
+                {
+                  label: t('qms.qualityLoss.source.internal'),
+                  value: LossSource.INTERNAL,
+                },
+                {
+                  label: t('qms.qualityLoss.source.external'),
+                  value: LossSource.EXTERNAL,
+                },
+                {
+                  label: t('qms.qualityLoss.source.commissioning'),
+                  value: LossSource.COMMISSIONING,
+                },
+              ],
+            },
+          },
+          {
+            fieldName: 'status',
+            label: t('common.status'),
+            component: 'Select',
+            componentProps: {
+              options: qualityLossStatusOptions.value,
+            },
+          },
+        ],
+        submitOnChange: true,
+      },
+    });
+  } catch {
+    // Keep local fallback options.
+  }
+}
+
+async function loadQualityLossTypeOptions() {
+  await loadQualityLossTypeDictionaryOptions();
+}
+
 // ================= 初始加载与联动 =================
 onMounted(async () => {
   await loadInitialData();
   await loadPreferences();
+  await Promise.all([
+    loadQualityLossStatusOptions(),
+    loadQualityLossTypeOptions(),
+  ]);
 });
 
 // 辅助函数
 function getStatusConfig(s: string) {
   return (
-    STATUS_OPTIONS.find((o) => o.value === s) || { label: s, color: 'default' }
+    qualityLossStatusOptions.value.find((o) => o.value === s) || {
+      label: s,
+      color: 'default',
+    }
   );
 }
 </script>
@@ -403,7 +489,7 @@ function getStatusConfig(s: string) {
           <!-- 状态列 -->
           <template #status="{ row }">
             <Tag :color="getStatusConfig(row.status).color">
-              {{ t(getStatusConfig(row.status).label) }}
+              {{ getStatusConfig(row.status).label }}
             </Tag>
           </template>
 
@@ -476,6 +562,8 @@ function getStatusConfig(s: string) {
       :is-edit-mode="isEditMode"
       :initial-data="currentRecord"
       :dept-tree-data="deptTreeData"
+      :status-options="qualityLossStatusOptions"
+      :type-options="qualityLossTypeOptions"
       @success="
         () => {
           onLossDataChanged();

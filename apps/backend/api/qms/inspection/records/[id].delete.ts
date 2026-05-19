@@ -25,7 +25,10 @@ export default defineEventHandler(async (event) => {
       action: 'DELETE',
       targetType: 'inspection_record',
       targetId: String(id),
-      details: `删除检验记录: ${id}`,
+      detailsTemplate: '删除检验记录: {{id}}',
+      detailsVariables: {
+        id,
+      },
     });
     return useResponseSuccess(null);
   } catch (error: unknown) {

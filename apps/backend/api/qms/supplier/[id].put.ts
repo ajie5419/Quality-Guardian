@@ -41,7 +41,10 @@ export default defineEventHandler(async (event) => {
       action: 'UPDATE',
       targetType: 'supplier',
       targetId: String(id),
-      details: `修改供应商/外协单位: ${updated.name}`,
+      detailsTemplate: '修改供应商/外协单位: {{name}}',
+      detailsVariables: {
+        name: updated.name,
+      },
     });
 
     return useResponseSuccess(null);

@@ -52,7 +52,13 @@ export default defineEventHandler(async (event) => {
       action: 'UPDATE',
       targetType: 'metrology_calibration_plan',
       targetId: String(id),
-      details: `修改计量校准计划: ${updated.instrumentId} (${updated.planYear}-${updated.planMonth})`,
+      detailsTemplate:
+        '修改计量校准计划: {{instrumentId}} ({{planYear}}-{{planMonth}})',
+      detailsVariables: {
+        instrumentId: updated.instrumentId,
+        planMonth: updated.planMonth,
+        planYear: updated.planYear,
+      },
     });
 
     return useResponseSuccess(null);

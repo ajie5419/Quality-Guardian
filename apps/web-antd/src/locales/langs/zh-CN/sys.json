@@ -64,5 +64,15 @@
     "topDept": "顶级部门（无上级）",
     "purchase": "采购",
     "production": "履约"
+  },
+  "dictionary": {
+    "title": "字典管理",
+    "dictType": "字典类型",
+    "dictTypePlaceholder": "例如：supplier_status",
+    "dictKey": "字典键",
+    "dictKeyPlaceholder": "例如：Qualified",
+    "dictValue": "字典值",
+    "dictValuePlaceholder": "例如：合格",
+    "sort": "排序"
   }
 }

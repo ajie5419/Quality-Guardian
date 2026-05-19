@@ -199,6 +199,27 @@ model departments {
   @@index([parentId])
 }
 
+model dictionaries {
+  id        String   @id @default(cuid())
+  dictType  String
+  dictKey   String
+  dictValue String
+  sort      Int      @default(0)
+  status    Int      @default(1)
+  remark    String?  @db.Text
+  isSystem  Boolean  @default(false)
+  isDeleted Boolean  @default(false)
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dictType])
+  @@index([dictType, status])
+  @@index([dictType, dictKey])
+  @@unique([dictType, dictKey, isDeleted])
+}
+
 model dfmea_projects {
   id              String                @id @default(cuid())
   projectName     String

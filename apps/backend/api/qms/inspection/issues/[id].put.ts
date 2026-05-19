@@ -83,7 +83,12 @@ export default defineEventHandler(async (event) => {
       action: 'UPDATE',
       targetType: 'inspection_issue',
       targetId: String(id),
-      details: `修改检验问题: ${updateData.partName || '未修改名称'} (${updateData.nonConformanceNumber || existingNcNumber || '无编号'})`,
+      detailsTemplate: '修改检验问题: {{partName}} ({{nonConformanceNumber}})',
+      detailsVariables: {
+        nonConformanceNumber:
+          updateData.nonConformanceNumber || existingNcNumber || '无编号',
+        partName: updateData.partName || '未修改名称',
+      },
     });
     await WelderScoreService.syncFromInspectionIssues();
 

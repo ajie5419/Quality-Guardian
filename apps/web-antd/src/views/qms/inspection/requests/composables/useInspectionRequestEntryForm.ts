@@ -1,22 +1,20 @@
 import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
+
 import type { LocationQuery } from 'vue-router';
 
 import type {
   InspectionRequestAttachment,
   InspectionRequestCheckResult,
+  InspectionRequestCheckResult as InspectionRequestCheckResultValue,
 } from '#/api/qms/inspection-request';
 import type { BomItem } from '#/api/qms/planning';
 
 import { computed, reactive, ref, watch } from 'vue';
 
-import { $t } from '@vben/locales';
-
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import { message } from 'ant-design-vue';
 
-import {
-  createInspectionRequest,
-  type InspectionRequestCheckResult as InspectionRequestCheckResultValue,
-} from '#/api/qms/inspection-request';
+import { createInspectionRequest } from '#/api/qms/inspection-request';
 import { getBomList } from '#/api/qms/planning';
 import { getWorkOrderRequirements } from '#/api/qms/work-order';
 import {
@@ -24,7 +22,9 @@ import {
   normalizeUploadFileList,
 } from '#/views/qms/shared/utils/upload-file';
 
-import { getProcessOptions } from '../../records/config';
+import { useDictionaryOptions } from '../../../shared/composables/useDictionaryOptions';
+import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
+import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
 
 interface UseInspectionRequestEntryFormOptions {
   onSubmitted: () => Promise<void> | void;
@@ -59,6 +59,15 @@ export function useInspectionRequestEntryForm(
   const requirementProcessOptions = ref<
     Array<{ label: string; value: string }>
   >([]);
+  const {
+    options: dictionaryProcessOptions,
+    loadOptions: loadInspectionProcessOptions,
+  } = useDictionaryOptions({
+    dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
+    fallbackOptions: cloneInspectionProcessFallbackOptions(),
+    mapOptions: (options, fallbackOptions) =>
+      mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
+  });
 
   const requestForm = reactive<RequestFormState>({
     attachments: [],
@@ -81,11 +90,18 @@ export function useInspectionRequestEntryForm(
   ];
 
   const processOptions = computed(() => {
+    const fallbackOptions = cloneInspectionProcessFallbackOptions();
     const map = new Map<string, { label: string; value: string }>();
-    for (const option of requirementProcessOptions.value) {
+    for (const option of mapDictionaryOptionsToInspectionProcess(
+      undefined,
+      fallbackOptions,
+    )) {
       map.set(option.value, option);
     }
-    for (const option of getProcessOptions($t)) {
+    for (const option of dictionaryProcessOptions.value) {
+      map.set(option.value, option);
+    }
+    for (const option of requirementProcessOptions.value) {
       map.set(option.value, option);
     }
     return [...map.values()];
@@ -265,6 +281,8 @@ export function useInspectionRequestEntryForm(
       }
     },
   );
+
+  void loadInspectionProcessOptions();
 
   return {
     attachmentFileList,

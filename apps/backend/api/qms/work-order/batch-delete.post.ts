@@ -42,7 +42,10 @@ export default defineEventHandler(async (event) => {
       action: 'DELETE',
       targetType: 'work_order',
       targetId: ids.join(','),
-      details: `批量删除工单: ${result.count} 条`,
+      detailsTemplate: '批量删除工单: {{count}} 条',
+      detailsVariables: {
+        count: result.count,
+      },
     });
 
     return useResponseSuccess({ successCount: result.count });

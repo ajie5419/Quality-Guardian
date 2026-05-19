@@ -37,7 +37,10 @@ export default defineEventHandler(async (event) => {
       action: 'DELETE',
       targetType: 'supplier',
       targetId: String(id),
-      details: `删除供应商/外协单位: ${deleted.name}`,
+      detailsTemplate: '删除供应商/外协单位: {{name}}',
+      detailsVariables: {
+        name: deleted.name,
+      },
     });
 
     return useResponseSuccess(null);

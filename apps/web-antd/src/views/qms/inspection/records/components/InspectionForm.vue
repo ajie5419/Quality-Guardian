@@ -7,6 +7,7 @@ import { computed, ref, watch } from 'vue';
 
 import { useUserStore } from '@vben/stores';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import { Input, InputNumber, message, Select } from 'ant-design-vue';
 import dayjs from 'dayjs';
 
@@ -16,6 +17,8 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
+import { useDictionaryOptions } from '../../../shared/composables/useDictionaryOptions';
+import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
 import IssuePhotoUpload from '../../issues/components/IssuePhotoUpload.vue';
 import {
   DEFAULT_VALUES,
@@ -23,6 +26,7 @@ import {
   useDefectOptions,
   useSeverityOptions,
 } from '../../issues/constants';
+import { mapDictionaryOptionsToInspectionProcess } from '../config';
 import BomItemSelect from './form/BomItemSelect.vue';
 import TeamSelect from './form/TeamSelect.vue';
 import { getFormSchema } from './formData';
@@ -99,10 +103,19 @@ const shouldCreateLinkedIssue = computed(
 const activeValues = ref<Record<string, unknown>>({});
 const welderOptions = ref<Array<{ label: string; value: string }>>([]);
 const welderLoading = ref(false);
+const {
+  options: processOptions,
+  loadOptions: loadInspectionProcessDictionaryOptions,
+} = useDictionaryOptions({
+  dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
+  fallbackOptions: cloneInspectionProcessFallbackOptions(),
+  mapOptions: (options, fallbackOptions) =>
+    mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
+});
 
 const [Form, formApi] = useVbenForm({
   handleSubmit: () => {}, // Handled by parent
-  schema: getFormSchema(props.type),
+  schema: getFormSchema(props.type, processOptions.value),
   showDefaultActions: false,
   wrapperClass: 'grid grid-cols-3 gap-x-4 gap-y-1',
   commonConfig: {
@@ -139,6 +152,13 @@ async function loadWelderOptions() {
   } finally {
     welderLoading.value = false;
   }
+}
+
+async function loadInspectionProcessOptions() {
+  await loadInspectionProcessDictionaryOptions();
+  formApi.setState({
+    schema: getFormSchema(props.type, processOptions.value),
+  });
 }
 
 // Watch form state changes to sync linked issue draft
@@ -220,7 +240,7 @@ function clearFieldValidator(fieldName: string) {
 watch(
   () => props.type,
   (newType) => {
-    formApi.setState({ schema: getFormSchema(newType) });
+    formApi.setState({ schema: getFormSchema(newType, processOptions.value) });
   },
   { immediate: true },
 );
@@ -300,7 +320,7 @@ watch(
   { immediate: true },
 );
 
-void loadWelderOptions();
+void Promise.all([loadWelderOptions(), loadInspectionProcessOptions()]);
 
 defineExpose({
   getValues: async () => {

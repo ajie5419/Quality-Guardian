@@ -61,7 +61,13 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'supplier',
       targetId: 'batch-upsert',
-      details: `批量导入供应商/外协单位: 成功 ${results.success} 条，跳过 ${results.skipped} 条，失败 ${results.errors} 条`,
+      detailsTemplate:
+        '批量导入供应商/外协单位: 成功 {{success}} 条，跳过 {{skipped}} 条，失败 {{errors}} 条',
+      detailsVariables: {
+        errors: results.errors,
+        skipped: results.skipped,
+        success: results.success,
+      },
     });
 
     return useResponseSuccess(results);

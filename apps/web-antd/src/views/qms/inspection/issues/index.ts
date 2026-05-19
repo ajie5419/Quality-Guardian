@@ -6,7 +6,19 @@
 export * from './composables';
 
 // Constants
-export * from './constants';
+export {
+  CLAIM_OPTIONS,
+  DEFAULT_VALUES,
+  DEPT_TYPE_KEYWORDS,
+  NC_NUMBER_PREFIX,
+  NC_NUMBER_SEQUENCE_LENGTH,
+  NC_NUMBER_SUFFIX,
+  SEVERITY_OPTIONS,
+  UI_CONSTANTS,
+  useClaimOptions,
+  useDefectOptions,
+  useSeverityOptions,
+} from './constants';
 
 // Types
 export * from './types';

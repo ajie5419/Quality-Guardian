@@ -3,10 +3,11 @@ import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
 
 import type { SheetMerge, TemplateField } from './template-modal.utils';
 
-import { computed, nextTick, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 
 import { useAccessStore } from '@vben/stores';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Button,
   Input,
@@ -19,7 +20,9 @@ import {
 } from 'ant-design-vue';
 
 import { parseExcelWorkbookFromArrayBuffer } from '#/utils/excel-sheet';
+import { mapDictionaryOptionsToInspectionProcess } from '#/views/qms/inspection/records/config';
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
+import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
 
 import {
   autoBuildFormFieldsFromRows,
@@ -96,7 +99,7 @@ const formState = reactive<TemplatePayload>({
 
 const isEdit = computed(() => Boolean(props.current?.id));
 
-const processOptions = [
+const fallbackOptions = [
   { label: '原材料', value: '原材料' },
   { label: '外购件', value: '外购件' },
   { label: '辅材', value: '辅材' },
@@ -116,6 +119,13 @@ const processOptions = [
   { label: '打砂', value: '打砂' },
   { label: '发货检验', value: '发货检验' },
 ];
+const { options: processOptions, loadOptions: loadInspectionProcessOptions } =
+  useDictionaryOptions({
+    dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
+    fallbackOptions,
+    mapOptions: (options, fallbackOptions) =>
+      mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
+  });
 
 const uploadHeaders = computed(() => ({
   Authorization: `Bearer ${accessStore.accessToken}`,
@@ -859,6 +869,10 @@ watch(
   },
   { immediate: true },
 );
+
+onMounted(() => {
+  void loadInspectionProcessOptions();
+});
 
 watch(showRawSpreadsheetEditor, (visible) => {
   if (!visible) return;

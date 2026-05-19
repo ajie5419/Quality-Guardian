@@ -1,5 +1,6 @@
 import type { VbenFormSchema } from '#/adapter/form';
 import type { VxeGridProps } from '#/adapter/vxe-table';
+import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
 import { $t } from '@vben/locales';
 
@@ -9,6 +10,18 @@ export const getStatusOptions = () => [
   { label: $t('qms.metrology.status.pending'), value: 'PENDING' },
   { label: $t('qms.metrology.status.disabled'), value: 'DISABLED' },
 ];
+
+export function mapDictionaryOptionsToMetrologyStatus(
+  options?: DictionaryOptionItem[],
+) {
+  if (!options || options.length === 0) {
+    return getStatusOptions();
+  }
+  return options.map((item) => ({
+    label: item.dictValue || item.dictKey,
+    value: item.dictKey,
+  }));
+}
 
 export const getColumns = (): VxeGridProps['columns'] => [
   {
@@ -82,7 +95,9 @@ type MetrologySearchFormSchema = VbenFormSchema & {
   colProps?: { span: number };
 };
 
-export const getSearchFormSchema = (): MetrologySearchFormSchema[] => [
+export const getSearchFormSchema = (
+  statusOptions = getStatusOptions(),
+): MetrologySearchFormSchema[] => [
   {
     fieldName: 'instrumentName',
     label: $t('qms.metrology.instrumentName'),
@@ -112,7 +127,7 @@ export const getSearchFormSchema = (): MetrologySearchFormSchema[] => [
     label: $t('qms.metrology.inspectionStatus'),
     component: 'Select',
     componentProps: {
-      options: getStatusOptions(),
+      options: statusOptions,
       allowClear: true,
     },
     colProps: { span: 6 },
@@ -137,9 +152,5 @@ export const getSearchFormSchema = (): MetrologySearchFormSchema[] => [
   },
 ];
 
-export const getEditStatusOptions = () => [
-  { label: $t('qms.metrology.status.valid'), value: 'VALID' },
-  { label: $t('qms.metrology.status.expired'), value: 'EXPIRED' },
-  { label: $t('qms.metrology.status.pending'), value: 'PENDING' },
-  { label: $t('qms.metrology.status.disabled'), value: 'DISABLED' },
-];
+export const getEditStatusOptions = (statusOptions = getStatusOptions()) =>
+  statusOptions;

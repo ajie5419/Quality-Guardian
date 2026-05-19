@@ -1,14 +1,9 @@
+import type { DictionaryOptionItem } from '#/api/system/dictionary';
+
 export const PROJECT_TYPE_OPTIONS = [
   { label: '模具', value: 'MOLD' },
   { label: '车辆', value: 'VEHICLE' },
   { label: '桥梁', value: 'BRIDGE' },
-];
-
-export const PROJECT_STATUS_OPTIONS = [
-  { label: '计划中', value: 'PLANNED' },
-  { label: '进行中', value: 'IN_PROGRESS' },
-  { label: '暂停', value: 'PAUSED' },
-  { label: '已完成', value: 'COMPLETED' },
 ];
 
 export const ISSUE_TYPE_OPTIONS = [
@@ -18,12 +13,54 @@ export const ISSUE_TYPE_OPTIONS = [
   { label: '其他', value: 'OTHER' },
 ];
 
-export const ISSUE_STATUS_OPTIONS = [
-  { label: '待处理', value: 'OPEN' },
-  { label: '处理中', value: 'IN_PROGRESS' },
-  { label: '验证中', value: 'VERIFYING' },
-  { label: '已关闭', value: 'CLOSED' },
+const SUPERVISION_PROJECT_STATUS_FALLBACK_VALUES = [
+  'PLANNED',
+  'IN_PROGRESS',
+  'PAUSED',
+  'COMPLETED',
 ];
+const SUPERVISION_ISSUE_STATUS_FALLBACK_VALUES = [
+  'OPEN',
+  'IN_PROGRESS',
+  'VERIFYING',
+  'CLOSED',
+];
+
+function normalizeStatusKey(value: string) {
+  return String(value || '')
+    .trim()
+    .toUpperCase();
+}
+
+export function mapDictionaryOptionsToSupervisionProjectStatus(
+  options?: DictionaryOptionItem[],
+) {
+  if (!options || options.length === 0) {
+    return SUPERVISION_PROJECT_STATUS_FALLBACK_VALUES.map((value) => ({
+      label: value,
+      value,
+    }));
+  }
+  return options.map((item) => ({
+    label: item.dictValue || item.dictKey,
+    value: item.dictKey,
+  }));
+}
+
+export function mapDictionaryOptionsToSupervisionIssueStatus(
+  options?: DictionaryOptionItem[],
+) {
+  if (!options || options.length === 0) {
+    return SUPERVISION_ISSUE_STATUS_FALLBACK_VALUES.map((value) => ({
+      label: value,
+      value,
+    }));
+  }
+  return options.map((item) => ({
+    label: item.dictValue || item.dictKey,
+    value: item.dictKey,
+  }));
+}
 
 export const SEVERITY_OPTIONS = [
   { label: '轻微', value: 'minor' },
@@ -45,12 +82,6 @@ export const GANTT_VIEW_OPTIONS = [
   { label: '全部', value: 'all' },
 ];
 
-export function statusLabel(value?: string) {
-  return (
-    PROJECT_STATUS_OPTIONS.find((o) => o.value === value)?.label || value || ''
-  );
-}
-
 export function projectTypeLabel(value?: string) {
   return (
     PROJECT_TYPE_OPTIONS.find((o) => o.value === value)?.label || value || ''
@@ -67,23 +98,25 @@ export function projectTypeColor(value?: string) {
 }
 
 export function projectStatusColor(value?: string) {
+  const key = normalizeStatusKey(String(value || ''));
   const map: Record<string, string> = {
     COMPLETED: 'green',
     IN_PROGRESS: 'blue',
     PAUSED: 'orange',
     PLANNED: 'default',
   };
-  return map[value || ''] || 'default';
+  return map[key] || 'default';
 }
 
 export function issueStatusColor(value?: string) {
+  const key = normalizeStatusKey(String(value || ''));
   const map: Record<string, string> = {
     CLOSED: 'green',
     IN_PROGRESS: 'blue',
     OPEN: 'red',
-    VERIFYING: 'orange',
+    VERIFYING: 'purple',
   };
-  return map[value || ''] || 'default';
+  return map[key] || 'default';
 }
 
 export function riskColor(value?: string) {

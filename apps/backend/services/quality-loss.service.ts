@@ -7,6 +7,7 @@ import type {
 import type { PaginationParams } from './base.service';
 
 import { Prisma } from '@prisma/client';
+import { AUDIT_TEMPLATES } from '~/constants/audit-templates';
 import { MONTHS } from '~/constants/locale';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -822,7 +823,8 @@ export const QualityLossService = {
       action: 'DELETE',
       targetType: 'quality_loss',
       targetId: target.id,
-      details: 'Soft deleted quality loss record',
+      detailsTemplate: AUDIT_TEMPLATES.QUALITY_LOSS_SOFT_DELETE,
+      detailsVariables: {},
     });
   },
 
@@ -858,7 +860,10 @@ export const QualityLossService = {
       action: 'DELETE',
       targetType: 'quality_loss',
       targetId: normalizedIds.join(','),
-      details: `Batch soft deleted ${result.count} quality loss records`,
+      detailsTemplate: AUDIT_TEMPLATES.QUALITY_LOSS_BATCH_SOFT_DELETE,
+      detailsVariables: {
+        count: result.count,
+      },
     });
 
     return result;

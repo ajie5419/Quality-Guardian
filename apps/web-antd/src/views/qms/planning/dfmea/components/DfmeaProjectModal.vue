@@ -7,12 +7,15 @@ import { computed, reactive, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import { Form, Input, message, Modal, Select } from 'ant-design-vue';
 
 import { createDfmeaProject, updateDfmeaProject } from '#/api/qms/planning';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
 
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
+import { mapDictionaryOptionsToPlanningProjectStatus } from '../../constants';
 
 const props = defineProps<{
   initialData: Partial<DfmeaProject> & { workOrderNumber?: string };
@@ -38,10 +41,17 @@ const formState = reactive({
   status: 'active' as 'active' | 'archived' | 'draft',
 });
 
-const statusOptions = computed(() => [
+const fallbackStatusOptions = computed(() => [
   { value: 'draft', label: t('qms.planning.status.draft') },
   { value: 'active', label: t('qms.planning.status.active') },
 ]);
+const { options: statusOptions, loadOptions: loadPlanningStatusOptions } =
+  useDictionaryOptions({
+    dictType: QMS_DICTIONARY_TYPE_KEYS.planningProjectStatus,
+    fallbackOptions: fallbackStatusOptions.value,
+    mapOptions: (options, fallbackOptions) =>
+      mapDictionaryOptionsToPlanningProjectStatus(options, fallbackOptions),
+  });
 
 const rules: Record<string, Rule[]> = {
   projectName: [
@@ -62,6 +72,7 @@ watch(
   () => props.open,
   (val) => {
     if (val) {
+      void loadPlanningStatusOptions();
       Object.assign(formState, {
         projectName: props.initialData.projectName || '',
         workOrderId:

@@ -3,10 +3,11 @@ import type { Rule } from 'ant-design-vue/es/form';
 
 import type { QmsPlanningApi } from '#/api/qms/planning';
 
-import { computed, reactive, ref, watch } from 'vue';
+import { onMounted, reactive, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Col,
   Form,
@@ -20,7 +21,9 @@ import {
 
 import { createBom, updateBom } from '#/api/qms/planning';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
-import { getProcessOptions } from '#/views/qms/inspection/records/config';
+import { mapDictionaryOptionsToInspectionProcess } from '#/views/qms/inspection/records/config';
+import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
+import { cloneInspectionProcessFallbackOptions } from '#/views/qms/shared/constants/inspection-process-fallback';
 
 const props = defineProps<{
   currentId: null | string;
@@ -38,7 +41,13 @@ const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
-const processOptions = computed(() => getProcessOptions(t));
+const { options: processOptions, loadOptions: loadInspectionProcessOptions } =
+  useDictionaryOptions({
+    dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
+    fallbackOptions: cloneInspectionProcessFallbackOptions(),
+    mapOptions: (options, fallbackOptions) =>
+      mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
+  });
 
 const formState = reactive<
   Partial<QmsPlanningApi.BomItem> & { workOrderNumber?: string }
@@ -122,6 +131,10 @@ async function handleOk() {
     confirmLoading.value = false;
   }
 }
+
+onMounted(() => {
+  void loadInspectionProcessOptions();
+});
 </script>
 
 <template>

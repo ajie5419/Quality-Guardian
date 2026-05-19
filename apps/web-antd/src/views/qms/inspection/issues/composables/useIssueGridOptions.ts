@@ -1,5 +1,6 @@
 import type { ComputedRef, Ref } from 'vue';
 
+import type { StatusOption } from '../constants';
 import type { InspectionIssue } from '../types';
 
 import type { VxeGridProps } from '#/adapter/vxe-table';
@@ -38,6 +39,7 @@ interface UseIssueGridOptionsParams {
   canEdit: Ref<boolean>;
   canImport: Ref<boolean>;
   canSettle: ComputedRef<boolean>;
+  issueStatusOptions: Ref<StatusOption[]>;
   currentYear: ComputedRef<number> | Ref<number>;
   defaultProjectName?: ComputedRef<string> | Ref<string>;
   defaultSourceIssueId?: ComputedRef<string> | Ref<string>;
@@ -102,6 +104,7 @@ export function useIssueGridOptions({
   canEdit,
   canImport,
   canSettle,
+  issueStatusOptions,
   currentYear,
   defaultProjectName,
   defaultSourceIssueId,
@@ -114,6 +117,12 @@ export function useIssueGridOptions({
   t,
 }: UseIssueGridOptionsParams) {
   const deptFilters = computed(() => flattenDeptFilters(deptRawData.value));
+  const gridStatusFilters = computed(() =>
+    issueStatusOptions.value.map((item) => ({
+      label: item.label,
+      value: item.value,
+    })),
+  );
 
   function filterBySourceIssueId(items: InspectionIssue[] = []) {
     return defaultSourceIssueId?.value
@@ -194,21 +203,7 @@ export function useIssueGridOptions({
         if (col.field === 'status') {
           return {
             ...col,
-            filters: [
-              { label: t('qms.inspection.issues.status.open'), value: 'OPEN' },
-              {
-                label: t('qms.inspection.issues.status.in_progress'),
-                value: 'IN_PROGRESS',
-              },
-              {
-                label: t('qms.inspection.issues.status.resolved'),
-                value: 'RESOLVED',
-              },
-              {
-                label: t('qms.inspection.issues.status.closed'),
-                value: 'CLOSED',
-              },
-            ],
+            filters: gridStatusFilters.value,
           };
         }
         if (col.field === 'severity') {

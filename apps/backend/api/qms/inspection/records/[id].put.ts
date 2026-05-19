@@ -27,7 +27,10 @@ export default defineEventHandler(async (event) => {
       action: 'UPDATE',
       targetType: 'inspection_record',
       targetId: String(id),
-      details: `修改检验记录: ${result.projectName || result.workOrderNumber || id}`,
+      detailsTemplate: '修改检验记录: {{record}}',
+      detailsVariables: {
+        record: result.projectName || result.workOrderNumber || id,
+      },
     });
     return useResponseSuccess(result);
   } catch (error: unknown) {

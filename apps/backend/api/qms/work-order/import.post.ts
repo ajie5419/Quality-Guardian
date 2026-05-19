@@ -113,7 +113,11 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'work_order',
       targetId: 'batch-import',
-      details: `导入工单: ${successCount}/${items.length} 条`,
+      detailsTemplate: '导入工单: {{successCount}}/{{totalCount}} 条',
+      detailsVariables: {
+        successCount,
+        totalCount: items.length,
+      },
     });
 
     return useResponseSuccess(

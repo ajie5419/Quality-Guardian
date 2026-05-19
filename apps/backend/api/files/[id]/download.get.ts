@@ -32,7 +32,10 @@ export default defineEventHandler(async (event) => {
     );
     await recordBusinessAuditLog(event, {
       action: 'READ',
-      details: `下载文件: ${result.file.originalName}`,
+      detailsTemplate: '下载文件: {{filename}}',
+      detailsVariables: {
+        filename: result.file.originalName,
+      },
       targetId: String(id),
       targetType: 'file_asset',
       userId: userinfo.id,

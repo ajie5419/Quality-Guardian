@@ -6,11 +6,11 @@ import type {
   WorkspaceWorkOrderAggregateResponse,
 } from '#/api/qms/workspace';
 
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
-import { useI18n } from '@vben/locales';
 import { useAccessStore } from '@vben/stores';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Alert,
   Button,
@@ -33,7 +33,9 @@ import {
 } from '#/api/qms/work-order';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import TeamSelect from '#/views/qms/inspection/records/components/form/TeamSelect.vue';
-import { getProcessOptions } from '#/views/qms/inspection/records/config';
+import { mapDictionaryOptionsToInspectionProcess } from '#/views/qms/inspection/records/config';
+import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
+import { cloneInspectionProcessFallbackOptions } from '#/views/qms/shared/constants/inspection-process-fallback';
 import {
   applyUploadResponse,
   normalizeUploadFile,
@@ -55,11 +57,16 @@ const emit = defineEmits<{
   (e: 'refresh'): void;
 }>();
 
-const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const accessStore = useAccessStore();
 
-const processOptions = computed(() => getProcessOptions(t));
+const { options: processOptions, loadOptions: loadInspectionProcessOptions } =
+  useDictionaryOptions({
+    dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
+    fallbackOptions: cloneInspectionProcessFallbackOptions(),
+    mapOptions: (options, fallbackOptions) =>
+      mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
+  });
 const uploadHeaders = computed(() => ({
   Authorization: `Bearer ${accessStore.accessToken}`,
 }));
@@ -298,6 +305,10 @@ function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
   }
   requirementForm.value.attachments = [...info.fileList];
 }
+
+onMounted(() => {
+  void loadInspectionProcessOptions();
+});
 </script>
 
 <template>

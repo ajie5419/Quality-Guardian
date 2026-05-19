@@ -107,7 +107,10 @@ export default defineEventHandler(async (event) => {
 
     await recordBusinessAuditLog(event, {
       action: 'UPDATE',
-      details: `派发报检任务: ${updated.requestNo}`,
+      detailsTemplate: '派发报检任务: {{requestNo}}',
+      detailsVariables: {
+        requestNo: updated.requestNo,
+      },
       targetId: String(updated.id),
       targetType: 'inspection_request',
       userId: userinfo?.id,

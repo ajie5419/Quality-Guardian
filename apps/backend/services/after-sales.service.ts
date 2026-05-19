@@ -12,6 +12,7 @@ import {
   QMS_STATUS_OPEN_SET,
   tryParsePhotos,
 } from '@qgs/shared';
+import { AUDIT_TEMPLATES } from '~/constants/audit-templates';
 import { FileStorageService } from '~/services/file-storage.service';
 import { buildAfterSalesDateRange } from '~/utils/after-sales-query';
 import { createModuleLogger } from '~/utils/logger';
@@ -622,7 +623,8 @@ export const AfterSalesService = {
       action: 'DELETE',
       targetType: 'after_sales',
       targetId: id,
-      details: 'Soft deleted after-sales record',
+      detailsTemplate: AUDIT_TEMPLATES.AFTER_SALES_SOFT_DELETE,
+      detailsVariables: {},
     });
   },
 };

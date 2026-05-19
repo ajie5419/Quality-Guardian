@@ -1,15 +1,33 @@
 import type { VbenFormSchema } from '#/adapter/form';
+import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
 import { $t } from '@vben/locales';
 
 import { Modal } from 'ant-design-vue';
 
-import { getProcessOptions } from '../config';
+import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
 
-export const getFormSchema = (type: string): VbenFormSchema[] => {
+export const getFormSchema = (
+  type: string,
+  processOptionsOverride?:
+    | Array<{ label: string; value: string }>
+    | DictionaryOptionItem[],
+): VbenFormSchema[] => {
   const isIncoming = type === 'incoming';
   const isProcess = type === 'process';
   const isShipment = type === 'shipment';
+
+  const processOptions = Array.isArray(processOptionsOverride)
+    ? processOptionsOverride.map((item) => {
+        if ('dictKey' in item) {
+          return {
+            label: item.dictValue || item.dictKey,
+            value: item.dictKey,
+          };
+        }
+        return item;
+      })
+    : cloneInspectionProcessFallbackOptions();
 
   const schema: VbenFormSchema[] = [
     {
@@ -110,7 +128,7 @@ export const getFormSchema = (type: string): VbenFormSchema[] => {
         rules: 'selectRequired',
         modelPropName: 'value',
         componentProps: {
-          options: getProcessOptions($t),
+          options: processOptions,
         },
       },
       {

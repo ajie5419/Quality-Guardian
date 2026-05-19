@@ -9,6 +9,7 @@ import process from 'node:process';
 
 import { Prisma } from '@prisma/client';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
+import { AUDIT_TEMPLATES } from '~/constants/audit-templates';
 import { FileStorageService } from '~/services/file-storage.service';
 import { resolveInspectionFormProcessCandidates } from '~/utils/inspection-form';
 import { buildInspectionIssueDateRange } from '~/utils/inspection-issue';
@@ -2068,7 +2069,8 @@ export const InspectionService = {
       action: 'DELETE',
       targetType: 'inspection_issue',
       targetId: id,
-      details: 'Soft deleted inspection issue record',
+      detailsTemplate: AUDIT_TEMPLATES.INSPECTION_ISSUE_SOFT_DELETE,
+      detailsVariables: {},
     });
   },
 };

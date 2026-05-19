@@ -13,6 +13,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Button,
   Card,
@@ -52,12 +53,17 @@ import {
 } from '#/api/qms/supervision';
 import { getUserList } from '#/api/system/user';
 import QmsFileUpload from '#/views/qms/shared/components/QmsFileUpload.vue';
+import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
 import { getUploadResponse } from '#/views/qms/shared/utils/upload-file';
 
 import DeadlineBoard from './components/DeadlineBoard.vue';
 import GanttTaskEditor from './components/GanttTaskEditor.vue';
 import SupervisionProjectDetailDrawer from './components/SupervisionProjectDetailDrawer.vue';
 import SupervisionProjectFormDrawer from './components/SupervisionProjectFormDrawer.vue';
+import {
+  mapDictionaryOptionsToSupervisionIssueStatus,
+  mapDictionaryOptionsToSupervisionProjectStatus,
+} from './constants';
 
 type ProjectFormState = {
   plannedEndAt?: dayjs.Dayjs;
@@ -215,18 +221,24 @@ const projectTypeOptions = [
   { color: 'purple', label: '车辆产品', value: 'VEHICLE' },
 ];
 
-const projectStatusOptions = [
-  { label: '计划中', value: 'PLANNED' },
-  { label: '进行中', value: 'IN_PROGRESS' },
-  { label: '暂停', value: 'PAUSED' },
-  { label: '已完成', value: 'COMPLETED' },
-];
-const issueStatusOptions = [
-  { label: '待处理', value: 'OPEN' },
-  { label: '处理中', value: 'IN_PROGRESS' },
-  { label: '待验证', value: 'VERIFYING' },
-  { label: '已关闭', value: 'CLOSED' },
-];
+const {
+  options: projectStatusOptions,
+  loadOptions: loadSupervisionProjectStatusOptions,
+} = useDictionaryOptions({
+  dictType: QMS_DICTIONARY_TYPE_KEYS.supervisionProjectStatus,
+  fallbackOptions: mapDictionaryOptionsToSupervisionProjectStatus(),
+  mapOptions: (options) =>
+    mapDictionaryOptionsToSupervisionProjectStatus(options),
+});
+const {
+  options: issueStatusOptions,
+  loadOptions: loadSupervisionIssueStatusOptions,
+} = useDictionaryOptions({
+  dictType: QMS_DICTIONARY_TYPE_KEYS.supervisionIssueStatus,
+  fallbackOptions: mapDictionaryOptionsToSupervisionIssueStatus(),
+  mapOptions: (options) =>
+    mapDictionaryOptionsToSupervisionIssueStatus(options),
+});
 const severityOptions = [
   { label: '轻微', value: 'minor' },
   { label: '一般', value: 'major' },
@@ -428,9 +440,15 @@ const timelineMonths = computed(() => {
 });
 
 function statusLabel(value?: string) {
+  const key = String(value || '')
+    .trim()
+    .toUpperCase();
   return (
-    [...projectStatusOptions, ...issueStatusOptions].find(
-      (item) => item.value === value,
+    [...projectStatusOptions.value, ...issueStatusOptions.value].find(
+      (item) =>
+        String(item.value || '')
+          .trim()
+          .toUpperCase() === key,
     )?.label ||
     value ||
     '-'
@@ -993,7 +1011,13 @@ async function submitAction() {
   await refreshAll();
 }
 
-onMounted(refreshAll);
+onMounted(async () => {
+  await Promise.all([
+    loadSupervisionProjectStatusOptions(),
+    loadSupervisionIssueStatusOptions(),
+  ]);
+  await refreshAll();
+});
 </script>
 
 <template>

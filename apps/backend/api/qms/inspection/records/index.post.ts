@@ -19,7 +19,10 @@ export default defineEventHandler(async (event) => {
       action: 'CREATE',
       targetType: 'inspection_record',
       targetId: String(result.id),
-      details: `新增检验记录: ${result.projectName || result.workOrderNumber || result.id}`,
+      detailsTemplate: '新增检验记录: {{record}}',
+      detailsVariables: {
+        record: result.projectName || result.workOrderNumber || result.id,
+      },
     });
     return useResponseSuccess(result);
   } catch (error: unknown) {
