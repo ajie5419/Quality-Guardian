@@ -15,17 +15,12 @@ import { useAccessStore, useUserStore } from '@vben/stores';
 import {
   Button,
   Card,
-  Dropdown,
   Form,
   Input,
   InputNumber,
-  Menu,
   Segmented,
   Select,
-  Space,
-  Table,
   Tag,
-  Tooltip,
   Upload,
 } from 'ant-design-vue';
 import QRCode from 'qrcode';
@@ -46,6 +41,7 @@ import CloseInspectionModal from './components/CloseInspectionModal.vue';
 import CloseQrModal from './components/CloseQrModal.vue';
 import DispatchDetailDrawer from './components/DispatchDetailDrawer.vue';
 import DispatchTaskModal from './components/DispatchTaskModal.vue';
+import InspectionRequestTable from './components/InspectionRequestTable.vue';
 import InspectorStatusDrawer from './components/InspectorStatusDrawer.vue';
 import { useInspectionRequestEntryForm } from './composables/useInspectionRequestEntryForm';
 import { useInspectionRequestListing } from './composables/useInspectionRequestListing';
@@ -172,19 +168,18 @@ const {
   requestStats,
 });
 
-function handleActionMenuClick(record: InspectionRequest, key: unknown) {
-  const action = String(key);
-  if (action === 'delete') {
-    confirmDelete(record);
-    return;
-  }
-  if (action === 'qr') {
-    void openCloseQr(record);
-    return;
-  }
-  if (action === 'record') {
-    openInspectionRecord(record);
-  }
+function handleTableActionDelete(record: InspectionRequest) {
+  confirmDelete(record);
+}
+
+function handleTableActionQr(record: InspectionRequest) {
+  void openCloseQr(record);
+}
+
+function handleTablePageChange(nextPage: number, nextPageSize: number) {
+  page.value = nextPage;
+  pageSize.value = nextPageSize;
+  void loadRequests();
 }
 
 function currentUserName() {
@@ -589,188 +584,43 @@ watch(
           </Form>
         </div>
 
-        <Table
+        <InspectionRequestTable
           v-else
-          row-key="id"
-          :data-source="requests"
+          :requests="requests"
           :loading="loading"
+          :page="page"
+          :page-size="pageSize"
+          :total="total"
+          :can-delete="canDelete"
           :row-class-name="rowClassName"
-          :pagination="{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            onChange: (nextPage: number, nextPageSize: number) => {
-              page = nextPage;
-              pageSize = nextPageSize;
-              loadRequests();
-            },
-          }"
-          size="small"
-        >
-          <Table.Column title="任务" :min-width="280">
-            <template #default="{ record }">
-              <div class="min-w-0 space-y-0.5">
-                <div class="truncate font-medium text-gray-900">
-                  {{ record.partName }}
-                  <span v-if="record.componentName">
-                    / {{ record.componentName }}
-                  </span>
-                </div>
-                <div class="truncate text-xs text-gray-500">
-                  {{ record.processName }} · {{ record.quantity || 1 }}
-                </div>
-                <div class="truncate text-xs text-gray-400">
-                  {{ record.requestNo }} / {{ record.workOrderNumber }}
-                </div>
-              </div>
-            </template>
-          </Table.Column>
-          <Table.Column title="报检" width="210">
-            <template #default="{ record }">
-              <div class="space-y-0.5 text-xs">
-                <div class="truncate text-gray-700">
-                  {{ record.reporter }}
-                  <span class="text-gray-400">/ {{ record.team || '-' }}</span>
-                </div>
-                <div class="truncate text-gray-500">
-                  {{ formatDateTime(record.submittedAt) }}
-                </div>
-                <div class="truncate text-gray-400">
-                  自检 {{ checkResultLabel(record.selfCheckResult) }} / 互检
-                  {{ checkResultLabel(record.mutualCheckResult) }}
-                </div>
-              </div>
-            </template>
-          </Table.Column>
-          <Table.Column title="状态" width="110">
-            <template #default="{ record }">
-              <div class="space-y-1">
-                <Tag :color="statusColor(record.status)">
-                  {{ statusLabel(record.status) }}
-                </Tag>
-                <Tag
-                  v-if="
-                    record.status === 'CLOSED' ||
-                    record.inspectionResult === 'FAIL'
-                  "
-                  :color="inspectionResultColor(record)"
-                >
-                  {{ inspectionResultLabel(record) }}
-                </Tag>
-                <div
-                  v-if="
-                    record.status === 'CLOSED' ||
-                    record.inspectionResult === 'FAIL'
-                  "
-                  class="text-xs text-gray-500"
-                >
-                  {{ inspectionQuantityText(record) }}
-                </div>
-                <div v-if="hasLinkedIssue(record)" class="text-xs text-red-500">
-                  {{ record.linkedIssueNo || '已生成不合格项' }}
-                </div>
-              </div>
-            </template>
-          </Table.Column>
-          <Table.Column title="执行" width="260">
-            <template #default="{ record }">
-              <div class="space-y-0.5 text-xs">
-                <div class="truncate">
-                  <span class="text-gray-500">检：</span>
-                  <span :class="missingValueClass(record.inspectorName)">
-                    {{ displayInspector(record) }}
-                  </span>
-                  <span class="mx-1 text-gray-300">/</span>
-                  <span class="text-gray-500">调：</span>
-                  <span :class="missingValueClass(record.dispatcherName)">
-                    {{ displayDispatcher(record) }}
-                  </span>
-                </div>
-                <div class="truncate">
-                  <span class="text-gray-500">等待：</span>
-                  <span>{{ waitDuration(record) }}</span>
-                  <span class="mx-1 text-gray-300">/</span>
-                  <span class="text-gray-500"
-                    >{{ executionDurationLabel(record) }}：</span
-                  >
-                  <span :class="directClosedClass(record)">
-                    {{ displayExecutionDuration(record) }}
-                  </span>
-                </div>
-                <div class="truncate text-gray-400">
-                  派单：<span :class="directClosedClass(record)">
-                    {{ displayDispatchTime(record) }}
-                  </span>
-                </div>
-              </div>
-            </template>
-          </Table.Column>
-          <Table.Column title="操作" width="180" fixed="right">
-            <template #default="{ record }">
-              <Space size="small">
-                <Button size="small" @click="openDispatchDetail(record)">
-                  <template #icon>
-                    <IconifyIcon icon="lucide:list-checks" />
-                  </template>
-                  详情
-                </Button>
-                <Button
-                  v-if="isDispatchable(record)"
-                  size="small"
-                  @click="openDispatch(record)"
-                >
-                  <template #icon><IconifyIcon icon="lucide:send" /></template>
-                  派单
-                </Button>
-                <Button
-                  v-if="isCompletable(record)"
-                  size="small"
-                  type="primary"
-                  @click="openClose(record)"
-                >
-                  <template #icon>
-                    <IconifyIcon icon="lucide:check-circle" />
-                  </template>
-                  完成
-                </Button>
-                <Dropdown v-if="hasActionMenu(record)" trigger="click">
-                  <Tooltip title="更多操作">
-                    <Button size="small">
-                      <template #icon>
-                        <IconifyIcon icon="lucide:more-horizontal" />
-                      </template>
-                    </Button>
-                  </Tooltip>
-                  <template #overlay>
-                    <Menu
-                      @click="({ key }) => handleActionMenuClick(record, key)"
-                    >
-                      <Menu.Item v-if="!isClosed(record)" key="qr">
-                        <template #icon>
-                          <IconifyIcon icon="lucide:qr-code" />
-                        </template>
-                        二维码
-                      </Menu.Item>
-                      <Menu.Item v-if="record.inspectionId" key="record">
-                        <template #icon>
-                          <IconifyIcon icon="lucide:file-check-2" />
-                        </template>
-                        查看记录
-                      </Menu.Item>
-                      <Menu.Item v-if="canDelete" key="delete" danger>
-                        <template #icon>
-                          <IconifyIcon icon="lucide:trash-2" />
-                        </template>
-                        删除
-                      </Menu.Item>
-                    </Menu>
-                  </template>
-                </Dropdown>
-              </Space>
-            </template>
-          </Table.Column>
-        </Table>
+          :status-color="statusColor"
+          :status-label="statusLabel"
+          :inspection-result-color="inspectionResultColor"
+          :inspection-result-label="inspectionResultLabel"
+          :inspection-quantity-text="inspectionQuantityText"
+          :has-linked-issue="hasLinkedIssue"
+          :missing-value-class="missingValueClass"
+          :display-inspector="displayInspector"
+          :display-dispatcher="displayDispatcher"
+          :wait-duration="waitDuration"
+          :execution-duration-label="executionDurationLabel"
+          :direct-closed-class="directClosedClass"
+          :display-execution-duration="displayExecutionDuration"
+          :display-dispatch-time="displayDispatchTime"
+          :format-date-time="formatDateTime"
+          :check-result-label="checkResultLabel"
+          :is-dispatchable="isDispatchable"
+          :is-completable="isCompletable"
+          :is-closed="isClosed"
+          :has-action-menu="hasActionMenu"
+          @page-change="handleTablePageChange"
+          @detail="openDispatchDetail"
+          @dispatch="openDispatch"
+          @close="openClose"
+          @record="openInspectionRecord"
+          @qr="handleTableActionQr"
+          @delete="handleTableActionDelete"
+        />
       </Card>
     </div>
 
