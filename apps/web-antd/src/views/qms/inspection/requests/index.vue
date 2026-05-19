@@ -9,7 +9,6 @@ import type {
   InspectionRequestCheckResult,
   InspectionRequestStatus,
 } from '#/api/qms/inspection-request';
-import type { BomItem } from '#/api/qms/planning';
 import type { SystemDeptApi } from '#/api/system/dept';
 import type { SystemUserApi } from '#/api/system/user';
 import type { TreeSelectNode } from '#/types';
@@ -20,7 +19,6 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
-import { $t } from '@vben/locales';
 import { useAccessStore, useUserStore } from '@vben/stores';
 
 import {
@@ -48,14 +46,11 @@ import QRCode from 'qrcode';
 
 import {
   closeInspectionRequest,
-  createInspectionRequest,
   deleteInspectionRequest,
   dispatchInspectionRequest,
   getInspectionRequests,
   getInspectionRequestStats,
 } from '#/api/qms/inspection-request';
-import { getBomList } from '#/api/qms/planning';
-import { getWorkOrderRequirements } from '#/api/qms/work-order';
 import { getDeptList } from '#/api/system/dept';
 import { getUserList } from '#/api/system/user';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
@@ -74,7 +69,7 @@ import {
   useSeverityOptions,
 } from '../issues/constants';
 import TeamSelect from '../records/components/form/TeamSelect.vue';
-import { getProcessOptions } from '../records/config';
+import { useInspectionRequestEntryForm } from './composables/useInspectionRequestEntryForm';
 
 defineOptions({ name: 'QMSInspectionRequests' });
 
@@ -125,16 +120,9 @@ const currentRequest = ref<InspectionRequest>();
 const requestEntryQr = ref('');
 const closeQr = ref('');
 const activeView = ref('current');
-const attachmentFileList = ref<UploadFile[]>([]);
 const closeAttachmentFileList = ref<UploadFile[]>([]);
-const bomPartsLoading = ref(false);
-const bomPartOptions = ref<Array<{ label: string; value: string }>>([]);
 const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const deptTreeData = ref<TreeSelectNode[]>([]);
-const workOrderRequirementsLoading = ref(false);
-const requirementProcessOptions = ref<Array<{ label: string; value: string }>>(
-  [],
-);
 
 const { defectOptions, defectSubtypes } = useDefectOptions();
 const { severityOptions } = useSeverityOptions();
@@ -143,20 +131,6 @@ const { claimOptions } = useClaimOptions();
 const query = reactive({
   keyword: '',
   status: undefined as InspectionRequestStatus | undefined,
-});
-
-const requestForm = reactive({
-  attachments: [] as InspectionRequestAttachment[],
-  componentName: '',
-  mutualCheckResult: 'PASS' as InspectionRequestCheckResult,
-  partName: '',
-  processName: '',
-  quantity: 1,
-  reporter: '',
-  requestInfo: '',
-  selfCheckResult: 'PASS' as InspectionRequestCheckResult,
-  team: '',
-  workOrderNumber: '',
 });
 
 const dispatchForm = reactive({
@@ -172,6 +146,26 @@ const closeForm = reactive({
   inspector: '',
   quantity: 1,
   result: 'PASS' as 'FAIL' | 'PASS',
+});
+
+const {
+  attachmentFileList,
+  bomPartOptions,
+  bomPartsLoading,
+  checkResultOptions,
+  isRequestAssemblyProcess,
+  processOptions,
+  requestForm,
+  submitting: entrySubmitting,
+  workOrderRequirementsLoading,
+  applyRoutePrefill: applyEntryRoutePrefill,
+  handleAttachmentUploadChange,
+  submitRequest: submitEntryRequest,
+} = useInspectionRequestEntryForm({
+  async onSubmitted() {
+    page.value = 1;
+    await Promise.all([loadRequests(), loadRequestStats()]);
+  },
 });
 
 const linkedIssueDraft = ref({
@@ -297,12 +291,6 @@ const viewOptions = [
   { label: '扫码报检入口', value: 'entry' },
 ];
 
-const checkResultOptions = [
-  { label: '合格', value: 'PASS' },
-  { label: '不合格', value: 'FAIL' },
-  { label: '不适用', value: 'NA' },
-];
-
 const userOptions = computed(() =>
   users.value.map((user) => ({
     label: user.realName || user.username,
@@ -313,17 +301,6 @@ const userOptions = computed(() =>
 const uploadHeaders = computed(() => ({
   Authorization: `Bearer ${accessStore.accessToken}`,
 }));
-
-const processOptions = computed(() => {
-  const map = new Map<string, { label: string; value: string }>();
-  for (const option of requirementProcessOptions.value) {
-    map.set(option.value, option);
-  }
-  for (const option of getProcessOptions($t)) {
-    map.set(option.value, option);
-  }
-  return [...map.values()];
-});
 
 const requestEntryUrl = computed(() =>
   buildRequestUrl({ entry: 'submit' }, '/qms/inspection/requests/entry'),
@@ -337,9 +314,6 @@ const canDelete = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Requests:Delete']),
 );
 const isEntryView = computed(() => activeView.value === 'entry');
-const isRequestAssemblyProcess = computed(() =>
-  String(requestForm.processName || '').includes('组装'),
-);
 const sortedInspectorStatus = computed(() =>
   [...requestStats.value.inspectorStatus].sort((a, b) => {
     if (a.status !== b.status) return a.status === 'IDLE' ? -1 : 1;
@@ -707,40 +681,6 @@ async function handleStatusFilterChange() {
   await loadRequests();
 }
 
-function resetRequestForm() {
-  attachmentFileList.value = [];
-  requestForm.attachments = [];
-  requestForm.componentName = '';
-  requestForm.partName = '';
-  requestForm.processName = '';
-  requestForm.quantity = 1;
-  requestForm.reporter = '';
-  requestForm.requestInfo = '';
-  requestForm.selfCheckResult = 'PASS';
-  requestForm.mutualCheckResult = 'PASS';
-  requestForm.team = '';
-}
-
-function syncAttachmentsFromFiles(files: UploadFile[]) {
-  requestForm.attachments =
-    normalizeUploadFileList<InspectionRequestAttachment>(files, '自检记录');
-}
-
-function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
-  if (info.file.status === 'done') {
-    if (applyUploadResponse(info.file)) {
-      message.success(`${info.file.name} 上传成功`);
-    } else {
-      message.warning('自检记录上传完成，但未返回有效地址');
-    }
-  } else if (info.file.status === 'error') {
-    message.error(`${info.file.name} 上传失败`);
-  }
-
-  attachmentFileList.value = [...info.fileList];
-  syncAttachmentsFromFiles(attachmentFileList.value);
-}
-
 function handleCloseAttachmentUploadChange(
   info: UploadChangeParam<UploadFile>,
 ) {
@@ -759,78 +699,6 @@ function handleCloseAttachmentUploadChange(
     closeAttachmentFileList.value,
     '检验记录',
   );
-}
-
-async function loadBomPartOptions(workOrderNumber: string) {
-  const normalized = workOrderNumber.trim();
-  if (!normalized) {
-    bomPartOptions.value = [];
-    requestForm.partName = '';
-    return;
-  }
-
-  bomPartsLoading.value = true;
-  try {
-    const list = await getBomList({ projectId: normalized });
-    if (requestForm.workOrderNumber !== normalized) return;
-
-    const parts = new Map<string, BomItem>();
-    for (const item of list || []) {
-      const partName = String(item.partName || '').trim();
-      if (partName) parts.set(partName, item);
-    }
-    bomPartOptions.value = [...parts.values()].map((item) => ({
-      label: item.partNumber
-        ? `${item.partName} (${item.partNumber})`
-        : item.partName,
-      value: item.partName,
-    }));
-
-    if (
-      requestForm.partName &&
-      !bomPartOptions.value.some((item) => item.value === requestForm.partName)
-    ) {
-      requestForm.partName = '';
-    }
-  } catch {
-    bomPartOptions.value = [];
-  } finally {
-    if (requestForm.workOrderNumber === normalized) {
-      bomPartsLoading.value = false;
-    }
-  }
-}
-
-async function loadWorkOrderRequirementOptions(workOrderNumber: string) {
-  const normalized = workOrderNumber.trim();
-  if (!normalized) {
-    requirementProcessOptions.value = [];
-    return;
-  }
-
-  workOrderRequirementsLoading.value = true;
-  try {
-    const list = await getWorkOrderRequirements({
-      workOrderNumber: normalized,
-    });
-    if (requestForm.workOrderNumber !== normalized) return;
-
-    const processNames = new Set<string>();
-    for (const item of list || []) {
-      const processName = String(item.processName || '').trim();
-      if (processName) processNames.add(processName);
-    }
-    requirementProcessOptions.value = [...processNames].map((processName) => ({
-      label: processName,
-      value: processName,
-    }));
-  } catch {
-    requirementProcessOptions.value = [];
-  } finally {
-    if (requestForm.workOrderNumber === normalized) {
-      workOrderRequirementsLoading.value = false;
-    }
-  }
 }
 
 async function loadRequests() {
@@ -872,40 +740,6 @@ async function loadDeptData() {
   const data = await getDeptList();
   deptRawData.value = data;
   deptTreeData.value = convertToTreeSelectData(data);
-}
-
-async function submitRequest() {
-  if (
-    !requestForm.workOrderNumber ||
-    !requestForm.partName ||
-    !requestForm.processName ||
-    (!isRequestAssemblyProcess.value && !requestForm.componentName) ||
-    !requestForm.quantity ||
-    !requestForm.team ||
-    !requestForm.reporter ||
-    requestForm.attachments.length === 0
-  ) {
-    message.warning(
-      '工单号、一级部件名称、工序、组件名称、数量、班组、报检人、自检记录不能为空',
-    );
-    return;
-  }
-
-  submitting.value = true;
-  try {
-    await createInspectionRequest({
-      ...requestForm,
-      componentName: isRequestAssemblyProcess.value
-        ? ''
-        : requestForm.componentName,
-    });
-    message.success('报检任务已报检');
-    resetRequestForm();
-    page.value = 1;
-    await Promise.all([loadRequests(), loadRequestStats()]);
-  } finally {
-    submitting.value = false;
-  }
 }
 
 function openInspectionRecord(record: InspectionRequest) {
@@ -1083,13 +917,7 @@ async function submitClose() {
   }
 }
 
-function applyRoutePrefill() {
-  requestForm.workOrderNumber = String(route.query.workOrderNumber || '');
-  requestForm.partName = String(route.query.partName || '');
-  requestForm.componentName = String(route.query.componentName || '');
-  requestForm.processName = String(route.query.processName || '');
-  requestForm.reporter = String(route.query.reporter || '');
-  requestForm.team = String(route.query.team || '');
+function applyRouteDispatchDetail() {
   if (routeDispatchRequestId.value) {
     if (routeDispatchRestoreKeyword.value === null) {
       routeDispatchRestoreKeyword.value = query.keyword;
@@ -1127,7 +955,8 @@ function handleInspectionRequestCreated() {
 }
 
 onMounted(async () => {
-  applyRoutePrefill();
+  applyEntryRoutePrefill(route.query);
+  applyRouteDispatchDetail();
   requestEntryQr.value = await makeQr(requestEntryUrl.value);
   await Promise.all([
     loadDeptData(),
@@ -1151,7 +980,8 @@ onUnmounted(() => {
 watch(
   () => route.query,
   async () => {
-    applyRoutePrefill();
+    applyEntryRoutePrefill(route.query);
+    applyRouteDispatchDetail();
     await loadRequests();
   },
 );
@@ -1161,25 +991,6 @@ watch(
   () => {
     if (shouldCreateLinkedIssue.value) {
       syncLinkedIssueQuantities();
-    }
-  },
-);
-
-watch(
-  () => requestForm.workOrderNumber,
-  (workOrderNumber) => {
-    void Promise.all([
-      loadBomPartOptions(workOrderNumber),
-      loadWorkOrderRequirementOptions(workOrderNumber),
-    ]);
-  },
-);
-
-watch(
-  () => requestForm.processName,
-  () => {
-    if (isRequestAssemblyProcess.value) {
-      requestForm.componentName = '';
     }
   },
 );
@@ -1419,8 +1230,8 @@ watch(
             <Button
               type="primary"
               block
-              :loading="submitting"
-              @click="submitRequest"
+              :loading="entrySubmitting"
+              @click="submitEntryRequest"
             >
               <template #icon><IconifyIcon icon="lucide:plus" /></template>
               提交报检
