@@ -28,7 +28,6 @@ import {
   Table,
   Tag,
   Tooltip,
-  TreeSelect,
   Upload,
 } from 'ant-design-vue';
 import QRCode from 'qrcode';
@@ -39,13 +38,14 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { convertToTreeSelectData } from '#/types';
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
 
-import IssuePhotoUpload from '../issues/components/IssuePhotoUpload.vue';
 import {
   useClaimOptions,
   useDefectOptions,
   useSeverityOptions,
 } from '../issues/constants';
 import TeamSelect from '../records/components/form/TeamSelect.vue';
+import CloseInspectionModal from './components/CloseInspectionModal.vue';
+import DispatchDetailDrawer from './components/DispatchDetailDrawer.vue';
 import { useInspectionRequestEntryForm } from './composables/useInspectionRequestEntryForm';
 import { useInspectionRequestListing } from './composables/useInspectionRequestListing';
 import { useInspectionRequestPresentation } from './composables/useInspectionRequestPresentation';
@@ -253,7 +253,6 @@ const {
   openDispatchDetailFromRoute,
   submitClose,
   submitDispatch,
-  syncLinkedIssueQuantities,
 } = useInspectionRequestTaskActions({
   canDelete,
   defectSubtypes,
@@ -295,6 +294,19 @@ function openInspectionRecord(record: InspectionRequest) {
 
 function handleInspectionRequestCreated() {
   void refreshInspectionRequestPage();
+}
+
+function handleCloseFormUpdate(nextValue: typeof closeForm) {
+  Object.assign(closeForm, nextValue);
+}
+
+function handleLinkedIssueDraftUpdate(
+  nextValue: typeof linkedIssueDraft.value,
+) {
+  linkedIssueDraft.value = {
+    ...nextValue,
+    photos: [...nextValue.photos],
+  };
 }
 
 onMounted(async () => {
@@ -786,265 +798,30 @@ watch(
       </Form>
     </Modal>
 
-    <Drawer
-      v-model:open="dispatchDetailOpen"
-      title="派单详情"
-      width="min(100vw, 620px)"
-      placement="right"
-      :body-style="{ padding: 0 }"
-    >
-      <div v-if="currentRequest" class="flex min-h-full flex-col bg-gray-50">
-        <div class="flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
-          <div class="rounded border border-blue-100 bg-white p-3">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="truncate text-base font-semibold text-gray-900">
-                  {{ currentRequest.requestNo }}
-                </div>
-                <div class="mt-1 break-words text-sm text-gray-600">
-                  {{ currentRequest.partName }}
-                  <template v-if="currentRequest.componentName">
-                    / {{ currentRequest.componentName }}
-                  </template>
-                  / {{ currentRequest.processName }}
-                </div>
-              </div>
-              <div class="flex shrink-0 flex-wrap justify-end gap-1">
-                <Tag :color="statusColor(currentRequest.status)">
-                  {{ statusLabel(currentRequest.status) }}
-                </Tag>
-                <Tag
-                  v-if="
-                    currentRequest.status === 'CLOSED' ||
-                    currentRequest.inspectionResult === 'FAIL'
-                  "
-                  :color="inspectionResultColor(currentRequest)"
-                >
-                  {{ inspectionResultLabel(currentRequest) }}
-                </Tag>
-              </div>
-            </div>
-            <div class="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-              <div class="rounded bg-gray-50 px-2 py-2">
-                <div class="text-gray-500">数量</div>
-                <div class="mt-1 font-semibold text-gray-900">
-                  {{ currentRequest.quantity || 1 }}
-                </div>
-              </div>
-              <div class="rounded bg-gray-50 px-2 py-2">
-                <div class="text-gray-500">班组</div>
-                <div class="mt-1 truncate font-semibold text-gray-900">
-                  {{ currentRequest.team || '-' }}
-                </div>
-              </div>
-              <div class="rounded bg-gray-50 px-2 py-2">
-                <div class="text-gray-500">等待</div>
-                <div class="mt-1 font-semibold text-gray-900">
-                  {{ waitDuration(currentRequest) }}
-                </div>
-              </div>
-              <div class="rounded bg-gray-50 px-2 py-2">
-                <div class="text-gray-500">
-                  {{ executionDurationLabel(currentRequest) }}
-                </div>
-                <div class="mt-1 font-semibold text-gray-900">
-                  {{ displayExecutionDuration(currentRequest) }}
-                </div>
-              </div>
-              <div
-                v-if="
-                  currentRequest.status === 'CLOSED' ||
-                  currentRequest.inspectionResult === 'FAIL'
-                "
-                class="rounded bg-gray-50 px-2 py-2"
-              >
-                <div class="text-gray-500">检验结果</div>
-                <div
-                  class="mt-1 font-semibold"
-                  :class="
-                    currentRequest.inspectionResult === 'FAIL'
-                      ? 'text-red-600'
-                      : 'text-green-600'
-                  "
-                >
-                  {{ inspectionResultLabel(currentRequest) }}
-                </div>
-              </div>
-              <div
-                v-if="
-                  currentRequest.status === 'CLOSED' ||
-                  currentRequest.inspectionResult === 'FAIL'
-                "
-                class="rounded bg-gray-50 px-2 py-2"
-              >
-                <div class="text-gray-500">检验数量</div>
-                <div class="mt-1 font-semibold text-gray-900">
-                  {{ inspectionQuantityText(currentRequest) }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="rounded border border-gray-100 bg-white p-3">
-            <div class="mb-2 text-sm font-medium text-gray-900">报检信息</div>
-            <div class="grid gap-2 text-sm sm:grid-cols-2">
-              <div>
-                <div class="text-xs text-gray-500">工单号</div>
-                <div class="mt-0.5 break-words text-gray-900">
-                  {{ currentRequest.workOrderNumber }}
-                </div>
-              </div>
-              <div>
-                <div class="text-xs text-gray-500">报检人</div>
-                <div class="mt-0.5 break-words text-gray-900">
-                  {{ currentRequest.reporter || '-' }}
-                </div>
-              </div>
-              <div class="sm:col-span-2">
-                <div class="text-xs text-gray-500">报检时间</div>
-                <div class="mt-0.5 text-gray-900">
-                  {{ formatDateTime(currentRequest.submittedAt) }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="rounded border border-gray-100 bg-white p-3">
-            <div class="mb-2 text-sm font-medium text-gray-900">执行信息</div>
-            <div class="grid gap-2 text-sm sm:grid-cols-2">
-              <div>
-                <div class="text-xs text-gray-500">调度人</div>
-                <div
-                  class="mt-0.5 break-words text-gray-900"
-                  :class="missingValueClass(currentRequest.dispatcherName)"
-                >
-                  {{ displayDispatcher(currentRequest) }}
-                </div>
-              </div>
-              <div>
-                <div class="text-xs text-gray-500">检验员</div>
-                <div
-                  class="mt-0.5 break-words text-gray-900"
-                  :class="missingValueClass(currentRequest.inspectorName)"
-                >
-                  {{ displayInspector(currentRequest) }}
-                </div>
-              </div>
-              <div>
-                <div class="text-xs text-gray-500">派单任务 ID</div>
-                <div
-                  class="mt-0.5 break-all text-gray-900"
-                  :class="missingValueClass(currentRequest.dispatchTaskId)"
-                >
-                  {{ currentRequest.dispatchTaskId || '-' }}
-                </div>
-              </div>
-              <div>
-                <div class="text-xs text-gray-500">派单时间</div>
-                <div
-                  class="mt-0.5 text-gray-900"
-                  :class="directClosedClass(currentRequest)"
-                >
-                  {{ displayDispatchTime(currentRequest) }}
-                </div>
-              </div>
-              <div class="sm:col-span-2">
-                <div class="text-xs text-gray-500">派单备注</div>
-                <div
-                  class="mt-0.5 whitespace-pre-wrap break-words text-gray-900"
-                >
-                  {{ currentRequest.dispatchRemark || '-' }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="rounded border border-gray-100 bg-white p-3">
-            <div class="mb-2 text-sm font-medium text-gray-900">检验资料</div>
-            <div class="space-y-3 text-sm">
-              <div>
-                <div class="mb-1 text-xs text-gray-500">关联检验记录</div>
-                <Button
-                  v-if="currentRequest.inspectionId"
-                  type="link"
-                  class="h-auto p-0"
-                  @click="openInspectionRecord(currentRequest)"
-                >
-                  查看检验记录
-                </Button>
-                <span v-else class="text-gray-400">-</span>
-              </div>
-              <div v-if="hasLinkedIssue(currentRequest)">
-                <div class="mb-1 text-xs text-gray-500">关联不合格项</div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <Tag :color="inspectionResultColor(currentRequest)">
-                    {{ currentRequest.linkedIssueNo || '已生成不合格项' }}
-                  </Tag>
-                  <Tag
-                    :color="issueStatusColor(currentRequest.linkedIssueStatus)"
-                  >
-                    {{ issueStatusLabel(currentRequest.linkedIssueStatus) }}
-                  </Tag>
-                </div>
-              </div>
-              <div>
-                <div class="mb-1 text-xs text-gray-500">自检记录</div>
-                <div
-                  v-if="currentRequest.attachments?.length"
-                  class="flex flex-col gap-1"
-                >
-                  <a
-                    v-for="file in currentRequest.attachments"
-                    :key="file.url"
-                    :href="file.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="break-all"
-                  >
-                    {{ file.name }}
-                  </a>
-                </div>
-                <span v-else class="text-gray-400">-</span>
-              </div>
-              <div>
-                <div class="mb-1 text-xs text-gray-500">检验记录</div>
-                <div
-                  v-if="currentRequest.closeAttachments?.length"
-                  class="flex flex-col gap-1"
-                >
-                  <a
-                    v-for="file in currentRequest.closeAttachments"
-                    :key="file.url"
-                    :href="file.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="break-all"
-                  >
-                    {{ file.name }}
-                  </a>
-                </div>
-                <span v-else class="text-gray-400">-</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="border-t border-gray-100 bg-white p-3 sm:p-4">
-          <Button
-            type="primary"
-            class="w-full sm:w-auto"
-            size="large"
-            :disabled="currentRequest.status === 'CLOSED'"
-            @click="openCloseFromDispatchDetail"
-          >
-            <template #icon>
-              <IconifyIcon icon="lucide:check-circle" />
-            </template>
-            完成检验
-          </Button>
-        </div>
-      </div>
-    </Drawer>
+    <DispatchDetailDrawer
+      :open="dispatchDetailOpen"
+      :request="currentRequest"
+      :status-color="statusColor"
+      :status-label="statusLabel"
+      :inspection-result-color="inspectionResultColor"
+      :inspection-result-label="inspectionResultLabel"
+      :inspection-quantity-text="inspectionQuantityText"
+      :wait-duration="waitDuration"
+      :execution-duration-label="executionDurationLabel"
+      :display-execution-duration="displayExecutionDuration"
+      :format-date-time="formatDateTime"
+      :missing-value-class="missingValueClass"
+      :display-dispatcher="displayDispatcher"
+      :display-inspector="displayInspector"
+      :direct-closed-class="directClosedClass"
+      :display-dispatch-time="displayDispatchTime"
+      :has-linked-issue="hasLinkedIssue"
+      :issue-status-color="issueStatusColor"
+      :issue-status-label="issueStatusLabel"
+      @update:open="(value) => (dispatchDetailOpen = value)"
+      @open-close="openCloseFromDispatchDetail"
+      @open-inspection-record="openInspectionRecord"
+    />
 
     <Modal
       v-model:open="closeQrOpen"
@@ -1133,243 +910,27 @@ watch(
       </div>
     </Drawer>
 
-    <Modal
-      v-model:open="closeOpen"
-      title="完成检验"
-      :confirm-loading="submitting"
-      :width="shouldCreateLinkedIssue ? 800 : 520"
-      @ok="submitClose"
-    >
-      <Form layout="vertical">
-        <div class="mb-4 rounded border border-gray-100 bg-gray-50 px-3 py-2">
-          <div class="grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <div class="mb-1 text-gray-500">已有检验记录 ID</div>
-              <div class="truncate text-gray-400">
-                {{ displayCloseReadonlyValue(closeForm.inspectionId) }}
-              </div>
-            </div>
-            <div>
-              <div class="mb-1 text-gray-500">检验员</div>
-              <div class="truncate text-gray-500">
-                {{ closeForm.inspector || '当前登录用户' }}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <Form.Item label="检验结果">
-            <Select
-              v-model:value="closeForm.result"
-              :options="[
-                { label: '合格', value: 'PASS' },
-                { label: '不合格', value: 'FAIL' },
-              ]"
-            />
-          </Form.Item>
-          <Form.Item label="数量">
-            <InputNumber
-              v-model:value="closeForm.quantity"
-              :min="1"
-              class="w-full"
-            />
-          </Form.Item>
-        </div>
-        <Form.Item label="检验记录">
-          <Upload
-            v-model:file-list="closeAttachmentFileList"
-            action="/api/upload"
-            :headers="uploadHeaders"
-            multiple
-            @change="handleCloseAttachmentUploadChange"
-          >
-            <Button>
-              <template #icon>
-                <IconifyIcon icon="lucide:upload" />
-              </template>
-              上传检验记录
-            </Button>
-          </Upload>
-        </Form.Item>
-        <Form.Item label="关闭备注">
-          <Input.TextArea v-model:value="closeForm.closeRemark" />
-        </Form.Item>
-
-        <!-- 不合格项填写区域 -->
-        <div
-          v-if="shouldCreateLinkedIssue"
-          class="mt-4 rounded border border-orange-200 bg-orange-50 p-4"
-        >
-          <div class="mb-3 font-medium text-orange-700">
-            当前判定为“不合格”，请补充不合格项信息（保存时自动建立关联）
-          </div>
-          <div class="grid grid-cols-3 gap-4">
-            <div>
-              <div class="mb-1 text-gray-600">部件名称</div>
-              <Input
-                v-model:value="linkedIssueDraft.partName"
-                :disabled="
-                  Boolean(
-                    currentRequest?.componentName || currentRequest?.partName,
-                  )
-                "
-                placeholder="自动沿用组件名称，可手动补充"
-              />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">工序</div>
-              <Input
-                v-model:value="linkedIssueDraft.processName"
-                :disabled="Boolean(currentRequest?.processName)"
-                placeholder="自动沿用，可手动补充"
-              />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">责任部门</div>
-              <TreeSelect
-                v-model:value="linkedIssueDraft.responsibleDepartment"
-                :tree-data="deptTreeData"
-                tree-default-expand-all
-                show-search
-                allow-clear
-                class="w-full"
-                placeholder="请选择责任部门"
-              />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">责任焊工</div>
-              <Input
-                v-model:value="linkedIssueDraft.responsibleWelder"
-                placeholder="请填写责任焊工"
-              />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">责任单位（供应商）</div>
-              <Input
-                v-model:value="linkedIssueDraft.supplierName"
-                placeholder="自动沿用供应商，可手动补充"
-              />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">报告日期</div>
-              <Input :value="linkedIssueDraft.reportDate" disabled />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">检验员</div>
-              <Input :value="linkedIssueDraft.reportedBy" disabled />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">缺陷分类</div>
-              <Select
-                v-model:value="linkedIssueDraft.defectType"
-                :options="defectOptions"
-                class="w-full"
-                @change="
-                  () => {
-                    linkedIssueDraft.defectSubtype =
-                      linkedDefectSubtypeOptions[0]?.value || '';
-                  }
-                "
-              />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">二级分类</div>
-              <Select
-                v-model:value="linkedIssueDraft.defectSubtype"
-                :options="linkedDefectSubtypeOptions"
-                class="w-full"
-              />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">合格数量</div>
-              <InputNumber
-                :value="linkedIssueDraft.qualifiedQuantity"
-                :min="0"
-                class="w-full"
-                disabled
-              />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">不合格数量</div>
-              <InputNumber
-                v-model:value="linkedIssueDraft.unqualifiedQuantity"
-                :min="0"
-                :max="Math.max(1, Number(closeForm.quantity) || 1)"
-                class="w-full"
-                @change="syncLinkedIssueQuantities"
-              />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">严重程度</div>
-              <Select
-                v-model:value="linkedIssueDraft.severity"
-                :options="severityOptions"
-                class="w-full"
-              />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">状态</div>
-              <Select
-                v-model:value="linkedIssueDraft.status"
-                :options="[
-                  { label: '待处理', value: 'OPEN' },
-                  { label: '处理中', value: 'IN_PROGRESS' },
-                  { label: '已关闭', value: 'CLOSED' },
-                ]"
-                class="w-full"
-              />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">是否索赔</div>
-              <Select
-                v-model:value="linkedIssueDraft.claim"
-                :options="claimOptions"
-                class="w-full"
-              />
-            </div>
-            <div>
-              <div class="mb-1 text-gray-600">损失金额</div>
-              <InputNumber
-                v-model:value="linkedIssueDraft.lossAmount"
-                :min="0"
-                :step="0.01"
-                class="w-full"
-              />
-            </div>
-            <div class="col-span-3">
-              <div class="mb-1 text-gray-600">不合格描述</div>
-              <Input.TextArea
-                v-model:value="linkedIssueDraft.description"
-                :rows="3"
-                placeholder="请填写不合格描述"
-              />
-            </div>
-            <div class="col-span-3">
-              <div class="mb-1 text-gray-600">原因分析</div>
-              <Input.TextArea
-                v-model:value="linkedIssueDraft.rootCause"
-                :rows="2"
-                placeholder="请填写原因分析"
-              />
-            </div>
-            <div class="col-span-3">
-              <div class="mb-1 text-gray-600">解决方案</div>
-              <Input.TextArea
-                v-model:value="linkedIssueDraft.solution"
-                :rows="2"
-                placeholder="请填写解决方案"
-              />
-            </div>
-            <div class="col-span-3">
-              <IssuePhotoUpload
-                v-model:value="linkedIssueDraft.photos"
-                :max-count="8"
-              />
-            </div>
-          </div>
-        </div>
-      </Form>
-    </Modal>
+    <CloseInspectionModal
+      :open="closeOpen"
+      :submitting="submitting"
+      :should-create-linked-issue="shouldCreateLinkedIssue"
+      :close-form="closeForm"
+      :linked-issue-draft="linkedIssueDraft"
+      :close-attachment-file-list="closeAttachmentFileList"
+      :upload-headers="uploadHeaders"
+      :current-request="currentRequest"
+      :dept-tree-data="deptTreeData"
+      :defect-options="defectOptions"
+      :linked-defect-subtype-options="linkedDefectSubtypeOptions"
+      :severity-options="severityOptions"
+      :claim-options="claimOptions"
+      :display-close-readonly-value="displayCloseReadonlyValue"
+      :handle-close-attachment-upload-change="handleCloseAttachmentUploadChange"
+      @update:open="(value) => (closeOpen = value)"
+      @update:close-form="handleCloseFormUpdate"
+      @update:linked-issue-draft="handleLinkedIssueDraftUpdate"
+      @submit="submitClose"
+    />
   </Page>
 </template>
 
