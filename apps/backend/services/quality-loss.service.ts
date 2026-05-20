@@ -186,16 +186,6 @@ function formatManualLossItem(item: {
   };
 }
 
-// ============ 状态映射处理 ============
-
-function mapInternalStatus(status: string): string {
-  return normalizeQualityLossStatus(status);
-}
-
-function mapExternalStatus(status: string): string {
-  return normalizeQualityLossStatus(status);
-}
-
 /**
  * 格式化内部质量记录
  */
@@ -220,7 +210,7 @@ function formatInternalRecordItem(item: {
     amount: safeNumber(item.lossAmount),
     responsibleDepartment: item.responsibleDepartment,
     description: item.description || undefined,
-    status: mapInternalStatus(item.status),
+    status: normalizeQualityLossStatus(item.status),
     type: QL_CONSTANTS.SOURCE.INTERNAL,
     lossSource: QL_CONSTANTS.SOURCE.INTERNAL,
     workOrderNumber: item.workOrderNumber || '-',
@@ -262,7 +252,7 @@ function formatExternalSalesItem(item: {
     amount,
     responsibleDepartment: item.respDept,
     description: item.issueDescription || undefined,
-    status: mapExternalStatus(item.claimStatus),
+    status: normalizeQualityLossStatus(item.claimStatus),
     type: QL_CONSTANTS.SOURCE.EXTERNAL,
     lossSource: QL_CONSTANTS.SOURCE.EXTERNAL,
     workOrderNumber: item.workOrderNumber || '-',
