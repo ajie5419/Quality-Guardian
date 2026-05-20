@@ -287,10 +287,14 @@ export const VehicleCommissioningService = {
     const reportIssues = await resolveReportIssues(payload);
     const mappedIssues = reportIssues.map((row) => mapIssueToDto(row));
     const closedIssues = sortIssuesForReport(
-      mappedIssues.filter((item) => item.status === ISSUE_TRACKING_STATUS.CLOSED),
+      mappedIssues.filter(
+        (item) => item.status === ISSUE_TRACKING_STATUS.CLOSED,
+      ),
     );
     const openIssues = sortIssuesForReport(
-      mappedIssues.filter((item) => item.status !== ISSUE_TRACKING_STATUS.CLOSED),
+      mappedIssues.filter(
+        (item) => item.status !== ISSUE_TRACKING_STATUS.CLOSED,
+      ),
     );
     const issueIds = mappedIssues.map((item) => item.id);
 

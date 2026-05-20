@@ -8,7 +8,10 @@ import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
-import { ISSUE_TRACKING_STATUS, normalizeIssueTrackingStatus } from '@qgs/domain';
+import {
+  ISSUE_TRACKING_STATUS,
+  normalizeIssueTrackingStatus,
+} from '@qgs/domain';
 import { Button, DatePicker, Input, message, Tag } from 'ant-design-vue';
 
 import { getDailySummary, saveDailySummary } from '#/api/qms/reports';

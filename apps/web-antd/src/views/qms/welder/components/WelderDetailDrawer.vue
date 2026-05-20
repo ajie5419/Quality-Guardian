@@ -11,7 +11,6 @@ import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
 } from '@qgs/domain';
-
 import {
   Button,
   Descriptions,

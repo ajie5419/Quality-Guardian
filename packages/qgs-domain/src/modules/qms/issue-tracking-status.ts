@@ -52,7 +52,10 @@ const DEFAULT_ALLOWED_ISSUE_TRACKING_STATUSES: IssueTrackingStatus[] = [
 ];
 
 function normalizeIssueTrackingStatusKey(value: unknown): string {
-  return String(value ?? '').trim().replaceAll(/\s+/g, '_').toUpperCase();
+  return String(value ?? '')
+    .trim()
+    .replaceAll(/\s+/g, '_')
+    .toUpperCase();
 }
 
 export function normalizeIssueTrackingStatus(

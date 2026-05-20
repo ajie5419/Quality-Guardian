@@ -11,12 +11,12 @@ import type { UploadFileWithResponse } from '#/views/qms/inspection/issues/types
 
 import { computed, onMounted, reactive, ref } from 'vue';
 
+import { downloadFileFromBlob } from '@vben/utils';
+
 import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
 } from '@qgs/domain';
-import { downloadFileFromBlob } from '@vben/utils';
-
 import { message } from 'ant-design-vue';
 import dayjs from 'dayjs';
 

@@ -1,8 +1,10 @@
 <script lang="ts" setup>
 import { Page } from '@vben/common-ui';
 
-import { ISSUE_TRACKING_STATUS, normalizeIssueTrackingStatus } from '@qgs/domain';
-
+import {
+  ISSUE_TRACKING_STATUS,
+  normalizeIssueTrackingStatus,
+} from '@qgs/domain';
 import {
   Button,
   Card,
@@ -24,7 +26,6 @@ import IssuePhotoUpload from '#/views/qms/inspection/issues/components/IssuePhot
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
 
 import { useVehicleCommissioningPage } from './composables/useVehicleCommissioningPage';
-
 
 function resolveIssueDisplayStatus(status: unknown) {
   return normalizeIssueTrackingStatus(status, {
@@ -217,10 +218,7 @@ const {
                         : '全部关闭'
                     }}
                   </Tag>
-                  <Tag
-                    v-else
-                    :color="issueStatusColor(record.status)"
-                  >
+                  <Tag v-else :color="issueStatusColor(record.status)">
                     {{ issueStatusLabel(record.status) }}
                   </Tag>
                 </template>

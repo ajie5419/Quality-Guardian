@@ -8,10 +8,7 @@ import { basename, extname, join } from 'node:path';
 import process from 'node:process';
 
 import { Prisma } from '@prisma/client';
-import {
-  deriveIssueTrackingStatus,
-  ISSUE_TRACKING_STATUS,
-} from '@qgs/domain';
+import { deriveIssueTrackingStatus, ISSUE_TRACKING_STATUS } from '@qgs/domain';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
 import { AUDIT_TEMPLATES } from '~/constants/audit-templates';
 import { FileStorageService } from '~/services/file-storage.service';
@@ -64,9 +61,7 @@ type InspectionQuantitySummary = {
 };
 
 function deriveInspectionIssueStatus(issues: LinkedIssueSummary[]): string {
-  const status = deriveIssueTrackingStatus(
-    issues.map((issue) => issue.status),
-  );
+  const status = deriveIssueTrackingStatus(issues.map((issue) => issue.status));
   return status === ISSUE_TRACKING_STATUS.NO_ISSUE
     ? ISSUE_TRACKING_STATUS.NO_ISSUE
     : status;

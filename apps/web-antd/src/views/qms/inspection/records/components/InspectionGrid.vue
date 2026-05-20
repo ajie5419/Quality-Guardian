@@ -8,7 +8,10 @@ import { computed, ref, watch } from 'vue';
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
-import { ISSUE_TRACKING_STATUS, normalizeIssueTrackingStatus } from '@qgs/domain';
+import {
+  ISSUE_TRACKING_STATUS,
+  normalizeIssueTrackingStatus,
+} from '@qgs/domain';
 import { Button, message, Modal, Space, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
@@ -404,7 +407,12 @@ defineExpose({ reload });
     </template>
 
     <template #issueStatus="{ row }">
-      <Tag v-if="normalizeIssueStatus(row.issueStatus) === ISSUE_TRACKING_STATUS.NO_ISSUE">
+      <Tag
+        v-if="
+          normalizeIssueStatus(row.issueStatus) ===
+          ISSUE_TRACKING_STATUS.NO_ISSUE
+        "
+      >
         无问题
       </Tag>
       <QmsStatusTag
