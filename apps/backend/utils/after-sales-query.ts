@@ -1,7 +1,7 @@
 export {
+  type AfterSalesDateMode,
   buildAfterSalesDateRange,
   parseAfterSalesDateMode,
   parseAfterSalesDateValue,
   parseAfterSalesListQuery,
-  type AfterSalesDateMode,
 } from '@qgs/domain';

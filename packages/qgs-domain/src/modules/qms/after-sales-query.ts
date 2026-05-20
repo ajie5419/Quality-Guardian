@@ -104,4 +104,3 @@ export function parseAfterSalesListQuery(query: Record<string, unknown>) {
     supplierBrand: normalizeQueryText(query.supplierBrand),
   };
 }
-
