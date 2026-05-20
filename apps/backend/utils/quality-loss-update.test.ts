@@ -1,3 +1,4 @@
+import { resolveQualityLossTargetLocator } from '@qgs/domain';
 import { describe, expect, it, vi } from 'vitest';
 
 import { QUALITY_LOSS_SOURCE } from './quality-loss-status';
@@ -5,7 +6,6 @@ import {
   parseQualityLossUpdateBody,
   resolveQualityLossUpdateTarget,
 } from './quality-loss-update';
-import { resolveQualityLossTargetLocator } from '@qgs/domain';
 
 describe('quality-loss update utils', () => {
   it('parses optional update fields with validation', () => {

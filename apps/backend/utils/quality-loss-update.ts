@@ -51,7 +51,10 @@ type ResolveTargetResult =
       where: Prisma.quality_lossesWhereUniqueInput;
     };
 
-export { normalizeQualityLossUpdateText, parseQualityLossUpdateBody } from '@qgs/domain';
+export {
+  normalizeQualityLossUpdateText,
+  parseQualityLossUpdateBody,
+} from '@qgs/domain';
 export { parseOptionalFiniteNumber } from '@qgs/domain';
 export { parseQualityLossOptionalDate as parseQualityLossUpdateDate } from '@qgs/domain';
 

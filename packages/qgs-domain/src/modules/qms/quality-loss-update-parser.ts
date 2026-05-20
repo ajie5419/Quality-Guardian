@@ -1,5 +1,9 @@
-import { normalizeQualityLossStatus } from './quality-loss-status';
-import { QUALITY_LOSS_SOURCE, type QualityLossSource } from './quality-loss-status';
+import type { QualityLossSource } from './quality-loss-status';
+
+import {
+  normalizeQualityLossStatus,
+  QUALITY_LOSS_SOURCE,
+} from './quality-loss-status';
 
 type ParseOptionalFiniteNumberResult =
   | { message: string; valid: false }
@@ -25,14 +29,19 @@ export type QualityLossUpdateParseResult =
     };
 
 export type QualityLossTargetLocatorResult =
-  | { message: string; valid: false }
   | {
       identifier: string;
-      lookup: 'commissioning' | 'external' | 'internal' | 'manualId' | 'manualLossId';
+      lookup:
+        | 'commissioning'
+        | 'external'
+        | 'internal'
+        | 'manualId'
+        | 'manualLossId';
       serial: null | number;
       source: QualityLossSource;
       valid: true;
-    };
+    }
+  | { message: string; valid: false };
 
 export function normalizeQualityLossUpdateText(value: unknown): string {
   return String(value ?? '').trim();
