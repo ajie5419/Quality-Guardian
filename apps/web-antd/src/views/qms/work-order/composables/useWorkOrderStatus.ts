@@ -7,15 +7,6 @@ import { WorkOrderStatusEnum } from '#/api/qms/enums';
 import { WORK_ORDER_STATUS_UI_MAP } from '../constants';
 
 /**
- * 状态映射表（与导入逻辑保持一致）
- * 必须包含：normalizeStatus、IMPORT_STATUS_MAP 中出现的所有变体
- * 映射原则：
- * - OPEN: 未开始/待处理/新工单
- * - IN_PROGRESS: 进行中/处理中
- * - COMPLETED: 已完成/已结束
- * - CANCELLED: 已取消
- */
-/**
  * Normalize status string to WorkOrderStatusEnum
  * @param s 原始状态（可能为 null/undefined/任意字符串）
  * @returns 标准化枚举值（兜底 OPEN）

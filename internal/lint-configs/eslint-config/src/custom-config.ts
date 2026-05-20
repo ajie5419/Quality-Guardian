@@ -302,6 +302,7 @@ const customConfig: Linter.Config[] = [
       'apps/web-antd/src/views/qms/inspection/records/config.ts',
       'apps/web-antd/src/views/qms/inspection/issues/supplier-constants.ts',
       'apps/web-antd/src/api/qms/enums.ts',
+      'apps/web-antd/src/views/qms/work-order/constants.ts',
     ],
     rules: {
       'no-restricted-syntax': [
@@ -329,6 +330,12 @@ const customConfig: Linter.Config[] = [
             'Do not redefine local `SOURCE_STYLE_MAP`; use `QUALITY_LOSS_SOURCE_STYLE_MAP` from @qgs/enums.',
           selector:
             "VariableDeclarator[id.name='SOURCE_STYLE_MAP'] > ObjectExpression.init",
+        },
+        {
+          message:
+            'Do not define local `IMPORT_STATUS_MAP` in work-order constants. Use `mapWorkOrderStatus` from @qgs/domain as single source of truth.',
+          selector:
+            "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator[id.name='IMPORT_STATUS_MAP']",
         },
       ],
     },

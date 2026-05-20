@@ -4,7 +4,8 @@ import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { importWorkOrders } from '#/api/qms/work-order';
 import { useGridImport } from '#/hooks/useGridImport';
 
-import { IMPORT_STATUS_MAP, WORK_ORDER_FIELD_MAP } from '../constants';
+import { WORK_ORDER_FIELD_MAP } from '../constants';
+import { normalizeStatus } from './useWorkOrderStatus';
 
 export function useWorkOrderImport(onSuccess: () => void) {
   // Use the common grid import logic but with specific configuration
@@ -14,7 +15,7 @@ export function useWorkOrderImport(onSuccess: () => void) {
   const { handleImport, loading } = useGridImport({
     gridApi,
     importApi: importWorkOrders,
-    statusMap: IMPORT_STATUS_MAP,
+    statusNormalizer: normalizeStatus,
     fieldMap: WORK_ORDER_FIELD_MAP,
     onSuccess,
     maxRows: 10_000,

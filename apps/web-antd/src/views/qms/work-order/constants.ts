@@ -159,33 +159,6 @@ export const WORK_ORDER_FIELD_MAP: Record<string, string[]> = {
   effectiveTime: ['生效日期', '合同生效日期', '生效时间', 'Effective Date'],
 };
 
-/** 导入状态值映射表（与 STATUS_MAPPING_TABLE 保持一致） */
-export const IMPORT_STATUS_MAP: Record<string, string> = {
-  // 进行中
-  IN_PROGRESS: 'IN_PROGRESS',
-  'IN PROGRESS': 'IN_PROGRESS',
-  进行中: 'IN_PROGRESS',
-  处理中: 'IN_PROGRESS',
-  InProgress: 'IN_PROGRESS',
-  PROCESSING: 'IN_PROGRESS',
-  // 已完成
-  COMPLETED: 'COMPLETED',
-  已完成: 'COMPLETED',
-  Completed: 'COMPLETED',
-  DONE: 'COMPLETED',
-  已结束: 'COMPLETED',
-  // 未开始/待处理 - 全部映射到 OPEN
-  PENDING: 'OPEN',
-  未开始: 'OPEN',
-  Pending: 'OPEN',
-  OPEN: 'OPEN',
-  待处理: 'OPEN',
-  // 已取消
-  CANCELLED: 'CANCELLED',
-  已取消: 'CANCELLED',
-  Cancelled: 'CANCELLED',
-};
-
 /** 支持的导入文件类型 */
 export const SUPPORTED_IMPORT_TYPES = {
   extensions: ['.xlsx', '.xls'],

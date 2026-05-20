@@ -23,6 +23,8 @@ interface ImportOptions<T = Record<string, any>> {
   importApi: (items: T[]) => Promise<QmsImportSummary>;
   /** Optional status mapping */
   statusMap?: Record<string, string>;
+  /** Optional status normalizer, takes precedence over statusMap when provided */
+  statusNormalizer?: (status: string) => string;
   /** Optional field mapping for aliases (field -> possible headers) */
   fieldMap?: Record<string, string[]>;
   /** Optional callback on success */
@@ -135,12 +137,12 @@ export function useGridImport<T = Record<string, any>>(
             }
 
             // Normalize Status if map provided
-            if (
-              options.statusMap &&
-              c.field === 'status' &&
-              typeof val === 'string'
-            ) {
-              val = options.statusMap[val] || val;
+            if (c.field === 'status' && typeof val === 'string') {
+              if (options.statusNormalizer) {
+                val = options.statusNormalizer(val);
+              } else if (options.statusMap) {
+                val = options.statusMap[val] || val;
+              }
             }
 
             item[c.field] = val;
