@@ -1,5 +1,9 @@
 import type { PassRateSource } from '~/utils/pass-rate';
 
+import {
+  resolveReportPeriodRangeFromLabel,
+  resolveReportWeekNumber,
+} from '@qgs/domain';
 import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -151,57 +155,15 @@ async function getDrillDownData(
 }
 
 function getPeriodRangeFromTrend(periodLabel: string, granularity: string) {
-  const now = new Date();
-  const yearStart = new Date(now.getFullYear(), 0, 1);
-  yearStart.setHours(0, 0, 0, 0);
-
-  if (granularity === 'week') {
-    const tempDate = new Date(yearStart);
-    const dayOfWeek = tempDate.getDay() || 7;
-    tempDate.setDate(tempDate.getDate() - dayOfWeek + 1);
-    while (tempDate.getTime() <= now.getTime()) {
-      const weekStart = new Date(tempDate);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-      if (
-        weekEnd.getFullYear() === now.getFullYear() ||
-        weekStart.getFullYear() === now.getFullYear()
-      ) {
-        const weekNum = getWeekNumber(weekStart);
-        if (`W${weekNum}` === periodLabel)
-          return { start: weekStart, end: weekEnd };
-      }
-      tempDate.setDate(tempDate.getDate() + 7);
-    }
-  } else {
-    const months = [
-      '1月',
-      '2月',
-      '3月',
-      '4月',
-      '5月',
-      '6月',
-      '7月',
-      '8月',
-      '9月',
-      '10月',
-      '11月',
-      '12月',
-    ];
-    const index = months.indexOf(periodLabel);
-    if (index !== -1) {
-      const monthStart = new Date(now.getFullYear(), index, 1);
-      const monthEnd = new Date(now.getFullYear(), index + 1, 0, 23, 59, 59);
-      return { start: monthStart, end: monthEnd };
-    }
+  if (granularity !== 'week' && granularity !== 'month') {
+    return null;
   }
-  return null;
+  return resolveReportPeriodRangeFromLabel({
+    granularity,
+    label: periodLabel,
+  });
 }
 
 function getWeekNumber(date: Date) {
-  const start = new Date(date.getFullYear(), 0, 1);
-  const diff = date.getTime() - start.getTime();
-  const oneWeek = 604_800_000;
-  return Math.ceil(diff / oneWeek + 1);
+  return resolveReportWeekNumber(date);
 }

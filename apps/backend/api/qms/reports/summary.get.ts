@@ -1,3 +1,8 @@
+import {
+  resolveReportPeriodRange,
+  resolveReportShortLabel,
+  shiftReportAnchorDate,
+} from '@qgs/domain';
 import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -262,28 +267,20 @@ async function fetchMajorEvents(start: Date, end: Date) {
 }
 
 function getReportPeriods(date: Date, type: string) {
-  const currentStart = new Date(date);
-  const currentEnd = new Date(date);
-  if (type === 'weekly') {
-    const day = currentStart.getDay() || 7;
-    currentStart.setDate(currentStart.getDate() - day + 1);
-    currentStart.setHours(0, 0, 0, 0);
-    currentEnd.setDate(currentStart.getDate() + 6);
-    currentEnd.setHours(23, 59, 59, 999);
-  } else {
-    currentStart.setDate(1);
-    currentStart.setHours(0, 0, 0, 0);
-    currentEnd.setMonth(currentStart.getMonth() + 1, 0);
-    currentEnd.setHours(23, 59, 59, 999);
-  }
-  return { current: { start: currentStart, end: currentEnd } };
+  const granularity = type === 'weekly' ? 'week' : 'month';
+  const current = resolveReportPeriodRange({
+    anchorDate: date,
+    granularity,
+  });
+  return { current };
 }
 
 function shiftDate(date: Date, type: string, amount: number) {
-  const d = new Date(date);
-  if (type === 'weekly') d.setDate(d.getDate() + amount * 7);
-  else d.setMonth(d.getMonth() + amount);
-  return d;
+  return shiftReportAnchorDate({
+    amount,
+    anchorDate: date,
+    granularity: type === 'weekly' ? 'week' : 'month',
+  });
 }
 
 function calculateTrend(curr: number, prev: number, lowerIsBetter = false) {
@@ -294,16 +291,8 @@ function calculateTrend(curr: number, prev: number, lowerIsBetter = false) {
 }
 
 function formatDateShort(date: Date, type: string) {
-  if (type === 'weekly') {
-    const d = new Date(date);
-    const startOfYear = new Date(d.getFullYear(), 0, 1);
-    const week = Math.ceil(
-      ((d.getTime() - startOfYear.getTime()) / 86_400_000 +
-        startOfYear.getDay() +
-        1) /
-        7,
-    );
-    return `W${week}`;
-  }
-  return `${date.getMonth() + 1}月`;
+  return resolveReportShortLabel({
+    date,
+    granularity: type === 'weekly' ? 'week' : 'month',
+  });
 }

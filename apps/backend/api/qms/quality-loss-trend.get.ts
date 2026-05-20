@@ -1,3 +1,6 @@
+import {
+  resolveReportPeriodRangeFromLabel,
+} from '@qgs/domain';
 import { defineEventHandler, getQuery } from 'h3';
 import { QualityLossService } from '~/services/quality-loss.service';
 import { logApiError } from '~/utils/api-logger';
@@ -128,62 +131,11 @@ export default defineEventHandler(async (event) => {
 });
 
 function getPeriodRangeFromTrend(periodLabel: string, granularity: string) {
-  const now = new Date();
-  const yearStart = new Date(now.getFullYear(), 0, 1);
-  yearStart.setHours(0, 0, 0, 0);
-
-  if (granularity === 'week') {
-    const tempDate = new Date(yearStart);
-    const d = tempDate.getDay() || 7;
-    tempDate.setDate(tempDate.getDate() - d + 1);
-    while (tempDate.getTime() <= now.getTime()) {
-      const weekStart = new Date(tempDate);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-      if (
-        (weekEnd.getFullYear() === now.getFullYear() ||
-          weekStart.getFullYear() === now.getFullYear()) &&
-        `W${getWeekNumber(weekStart)}` === periodLabel
-      )
-        return { start: weekStart, end: weekEnd };
-      tempDate.setDate(tempDate.getDate() + 7);
-    }
-  } else {
-    const months = [
-      '1月',
-      '2月',
-      '3月',
-      '4月',
-      '5月',
-      '6月',
-      '7月',
-      '8月',
-      '9月',
-      '10月',
-      '11月',
-      '12月',
-    ];
-    const monthIndex = months.indexOf(periodLabel);
-    if (monthIndex !== -1) {
-      const monthStart = new Date(now.getFullYear(), monthIndex, 1);
-      const monthEnd = new Date(
-        now.getFullYear(),
-        monthIndex + 1,
-        0,
-        23,
-        59,
-        59,
-      );
-      return { start: monthStart, end: monthEnd };
-    }
+  if (granularity !== 'week' && granularity !== 'month') {
+    return null;
   }
-  return null;
-}
-
-function getWeekNumber(date: Date) {
-  const start = new Date(date.getFullYear(), 0, 1);
-  const diff = date.getTime() - start.getTime();
-  const oneWeek = 604_800_000;
-  return Math.ceil(diff / oneWeek + 1);
+  return resolveReportPeriodRangeFromLabel({
+    granularity,
+    label: periodLabel,
+  });
 }
