@@ -20,7 +20,11 @@ export function clampWelderScore(value: number): number {
   return Math.max(WELDER_SCORE_MIN, Math.min(WELDER_SCORE_MAX, value));
 }
 
-function addIndexItem(map: Map<string, string[]>, key: string, welderId: string): void {
+function addIndexItem(
+  map: Map<string, string[]>,
+  key: string,
+  welderId: string,
+): void {
   if (!key) return;
   const existing = map.get(key) || [];
   if (!existing.includes(welderId)) {
@@ -94,7 +98,11 @@ export function resolveWelderIdByResponsibleText(params: {
   const codeIndex = new Map<string, string[]>();
   const nameIndex = new Map<string, string[]>();
   for (const welder of params.welderCandidates) {
-    addIndexItem(codeIndex, normalizeWelderScoreText(welder.welderCode), welder.id);
+    addIndexItem(
+      codeIndex,
+      normalizeWelderScoreText(welder.welderCode),
+      welder.id,
+    );
     addIndexItem(nameIndex, normalizeWelderScoreText(welder.name), welder.id);
   }
 
@@ -110,8 +118,9 @@ export function resolveWelderIdByResponsibleText(params: {
     if (byName) return byName;
   }
 
-  const byCodeContain = resolveByContainMatch(rawText, [...codeIndex.entries()]);
+  const byCodeContain = resolveByContainMatch(rawText, [
+    ...codeIndex.entries(),
+  ]);
   if (byCodeContain) return byCodeContain;
   return resolveByContainMatch(rawText, [...nameIndex.entries()]);
 }
-
