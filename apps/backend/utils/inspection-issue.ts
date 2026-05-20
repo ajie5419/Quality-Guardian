@@ -1,7 +1,7 @@
 import {
   buildInspectionIssueDateRange,
-  hasInspectionIssueAdminAccess,
-  hasInspectionIssueWriteAccess,
+  hasInspectionIssueAdminAccess as domainHasInspectionIssueAdminAccess,
+  hasInspectionIssueWriteAccess as domainHasInspectionIssueWriteAccess,
   normalizeOptionalInspectionIssueDate,
   normalizeOptionalInspectionIssueNumber,
   normalizeOptionalInspectionIssueString,
@@ -17,8 +17,6 @@ import prisma from './prisma';
 
 export {
   buildInspectionIssueDateRange,
-  hasInspectionIssueAdminAccess,
-  hasInspectionIssueWriteAccess,
   normalizeOptionalInspectionIssueDate,
   normalizeOptionalInspectionIssueNumber,
   normalizeOptionalInspectionIssueString,
@@ -27,6 +25,18 @@ export {
   parseInspectionIssueListQuery,
   parseOptionalIssueYear,
 };
+
+export function hasInspectionIssueAdminAccess(roles: unknown): boolean {
+  return domainHasInspectionIssueAdminAccess(roles);
+}
+
+export function hasInspectionIssueWriteAccess(params: {
+  inspector: null | string;
+  roles: unknown;
+  username: unknown;
+}): boolean {
+  return domainHasInspectionIssueWriteAccess(params);
+}
 
 export function createInspectionIssueId(): string {
   return `ISS-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`;

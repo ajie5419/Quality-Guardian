@@ -6,7 +6,6 @@ import {
   normalizeTaskDispatchStatus,
   resolveTaskDispatchAssigneeCandidates,
   resolveTaskDispatchItpProjectIdForValidation,
-  resolveTaskDispatchLevel,
   resolveTaskDispatchParentIdForPromotion,
   resolveTaskDispatchUserId,
   TASK_DISPATCH_STATUS,
@@ -117,9 +116,9 @@ export {
   isTaskDispatchLevelTwo,
   resolveTaskDispatchAssigneeCandidates,
   resolveTaskDispatchItpProjectIdForValidation,
-  resolveTaskDispatchLevel,
   resolveTaskDispatchParentIdForPromotion,
 };
+export { resolveTaskDispatchLevel } from '@qgs/domain';
 
 export function buildTaskDispatchCreateData(
   body: Record<string, unknown>,

@@ -5,98 +5,73 @@ import type {
 
 import {
   ISSUE_TRACKING_STATUS,
-  normalizeIssueTrackingStatus,
+  SUPERVISION_PROJECT_STATUS,
+  SUPERVISION_PROJECT_TYPE,
+  calculateSupervisionPlanTaskStatus,
+  calculateSupervisionQuantityProgress,
+  normalizeSupervisionDate,
+  normalizeSupervisionDurationDays,
+  normalizeSupervisionIssueStatus,
+  normalizeSupervisionPercent,
+  normalizeSupervisionPositiveQuantity,
+  normalizeSupervisionProjectStatus,
+  normalizeSupervisionProjectType,
+  normalizeSupervisionQuantity,
+  normalizeSupervisionText,
+  parseSupervisionList,
+  stringifySupervisionList,
 } from '@qgs/domain';
 
-export const PROJECT_STATUSES = new Set([
-  'COMPLETED',
-  'IN_PROGRESS',
-  'PAUSED',
-  'PLANNED',
-]);
-export const PROJECT_TYPES = new Set(['BRIDGE', 'MOLD', 'VEHICLE']);
+export const PROJECT_STATUSES = new Set(Object.values(SUPERVISION_PROJECT_STATUS));
+export const PROJECT_TYPES = new Set(Object.values(SUPERVISION_PROJECT_TYPE));
 export const EXCEL_EXTENSIONS = new Set(['.xls', '.xlsx']);
 
 export function normalizeText(value: unknown) {
-  return String(value ?? '').trim();
+  return normalizeSupervisionText(value);
 }
 
 export function normalizeDate(value: unknown) {
-  const text = normalizeText(value);
-  if (!text) return undefined;
-  const date = new Date(text);
-  return Number.isNaN(date.getTime()) ? undefined : date;
+  return normalizeSupervisionDate(value);
 }
 
 export function normalizePercent(value: unknown, fallback = 0) {
-  const text =
-    typeof value === 'string' ? value.replace('%', '').trim() : value;
-  const parsed = Number(text);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(100, Math.max(0, Math.trunc(parsed)));
+  return normalizeSupervisionPercent(value, fallback);
 }
 
 export function normalizeQuantity(value: unknown, fallback = 0) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(0, Math.round(parsed * 100) / 100);
+  return normalizeSupervisionQuantity(value, fallback);
 }
 
 export function normalizePositiveQuantity(value: unknown, fallback = 1) {
-  const quantity = normalizeQuantity(value, fallback);
-  return quantity > 0 ? quantity : fallback;
+  return normalizeSupervisionPositiveQuantity(value, fallback);
 }
 
 export function calculateQuantityProgress(completed: number, planned: number) {
-  if (planned <= 0) return 0;
-  return normalizePercent((completed / planned) * 100);
+  return calculateSupervisionQuantityProgress(completed, planned);
 }
 
 export function normalizeDurationDays(value: unknown) {
-  const text = normalizeText(value);
-  if (!text) return undefined;
-  const matched = text.match(/-?\d+(?:\.\d+)?/);
-  if (!matched) return undefined;
-  const parsed = Number(matched[0]);
-  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : undefined;
+  return normalizeSupervisionDurationDays(value);
 }
 
 export function stringifyList(value: unknown) {
-  if (!Array.isArray(value)) return null;
-  const list = value.map((item) => normalizeText(item)).filter(Boolean);
-  return list.length > 0 ? JSON.stringify(list) : null;
+  return stringifySupervisionList(value);
 }
 
 export function parseList(value?: null | string) {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
-  } catch {
-    return [];
-  }
+  return parseSupervisionList(value);
 }
 
 export function normalizeProjectStatus(value: unknown) {
-  const status = normalizeText(value).toUpperCase();
-  return PROJECT_STATUSES.has(status) ? status : 'PLANNED';
+  return normalizeSupervisionProjectStatus(value);
 }
 
 export function normalizeProjectType(value: unknown) {
-  const type = normalizeText(value).toUpperCase();
-  return PROJECT_TYPES.has(type) ? type : 'MOLD';
+  return normalizeSupervisionProjectType(value);
 }
 
 export function normalizeIssueStatus(value: unknown) {
-  return normalizeIssueTrackingStatus(value, {
-    allowed: [
-      ISSUE_TRACKING_STATUS.OPEN,
-      ISSUE_TRACKING_STATUS.IN_PROGRESS,
-      ISSUE_TRACKING_STATUS.CLOSED,
-      ISSUE_TRACKING_STATUS.VERIFYING,
-    ],
-    fallback: ISSUE_TRACKING_STATUS.OPEN,
-  });
+  return normalizeSupervisionIssueStatus(value);
 }
 
 export function calculatePlanTaskStatus(task: {
@@ -107,31 +82,7 @@ export function calculatePlanTaskStatus(task: {
   progressPercent?: null | number;
   riskLevel?: null | string;
 }): SupervisionPlanTaskStatus {
-  const progress = normalizePercent(task.progressPercent);
-  if (progress >= 100 || task.actualEndAt) return 'DONE';
-  const now = new Date();
-  const startAt = task.plannedStartAt ? new Date(task.plannedStartAt) : null;
-  const endAt = task.plannedEndAt ? new Date(task.plannedEndAt) : null;
-  const hasStarted = Boolean(task.actualStartAt) || progress > 0;
-  const isRisk = normalizeText(task.riskLevel).toUpperCase() === 'RISK';
-  if (!hasStarted) {
-    if (startAt) {
-      const startOfDay = new Date(startAt);
-      startOfDay.setHours(0, 0, 0, 0);
-      if (startOfDay <= now) return 'DELAYED';
-    }
-    if (isRisk) return 'RISK';
-    return 'NOT_STARTED';
-  }
-  if (endAt) {
-    const endOfDay = new Date(endAt);
-    endOfDay.setHours(23, 59, 59, 999);
-    if (endOfDay < now) return 'DELAYED';
-    const sevenDays = 7 * 24 * 60 * 60 * 1000;
-    if (endOfDay.getTime() - now.getTime() <= sevenDays) return 'DUE_SOON';
-  }
-  if (isRisk) return 'RISK';
-  return 'IN_PROGRESS';
+  return calculateSupervisionPlanTaskStatus(task);
 }
 
 export function mapPlanTask(row: any) {

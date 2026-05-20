@@ -3,8 +3,6 @@ import type { QualityLossSource } from '~/utils/quality-loss-status';
 
 import {
   normalizeQualityLossUpdateText,
-  parseOptionalFiniteNumber,
-  parseQualityLossOptionalDate,
   parseQualityLossUpdateBody,
 } from '@qgs/domain';
 import { QUALITY_LOSS_SOURCE } from '~/utils/quality-loss-status';
@@ -72,10 +70,10 @@ function parseSerialFromPrefixedId(
 
 export {
   normalizeQualityLossUpdateText,
-  parseQualityLossOptionalDate as parseOptionalDate,
-  parseOptionalFiniteNumber,
   parseQualityLossUpdateBody,
 };
+export { parseOptionalFiniteNumber } from '@qgs/domain';
+export { parseQualityLossOptionalDate as parseQualityLossUpdateDate } from '@qgs/domain';
 
 export async function resolveQualityLossUpdateTarget(params: {
   client: SourceLookupClient;
