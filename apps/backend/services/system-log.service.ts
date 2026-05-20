@@ -101,22 +101,18 @@ export const SystemLogService = {
    */
   async recordAuditLog(params: {
     action: any;
-    details?: string;
-    detailsTemplate?: string;
-    detailsVariables?: Record<string, unknown>;
+    detailsTemplate: string;
+    detailsVariables: Record<string, unknown>;
     ipAddress?: string;
     targetId: string;
     targetType: string;
     userAgent?: string;
     userId: string;
   }): Promise<any> {
-    const details =
-      params.detailsTemplate === undefined
-        ? params.details || ''
-        : renderAuditTemplateText(
-            params.detailsTemplate,
-            params.detailsVariables || {},
-          );
+    const details = renderAuditTemplateText(
+      params.detailsTemplate,
+      params.detailsVariables,
+    );
 
     return (prisma.audit_logs as any).create({
       data: {

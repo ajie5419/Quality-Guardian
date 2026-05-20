@@ -26,8 +26,12 @@ function hasDetailsTemplate(block) {
   return /detailsTemplate\s*:/.test(block);
 }
 
+function hasDetailsVariables(block) {
+  return /detailsVariables\s*:/.test(block);
+}
+
 function hasRawDetails(block) {
-  return /details\s*:/.test(block);
+  return /(^|[^\w])details\s*:/.test(block);
 }
 
 function extractObjectLiteral(content, startIndex) {
@@ -62,10 +66,18 @@ function findViolations(filePath) {
       const start = content.indexOf(callPattern, from);
       if (start === -1) break;
       const block = extractObjectLiteral(content, start + callPattern.length);
-      if (block && hasRawDetails(block) && !hasDetailsTemplate(block)) {
+      if (!block) {
+        from = start + callPattern.length;
+        continue;
+      }
+      const hasTemplate = hasDetailsTemplate(block);
+      const hasVariables = hasDetailsVariables(block);
+      const hasLegacyDetails = hasRawDetails(block);
+
+      if (!hasTemplate || !hasVariables || hasLegacyDetails) {
         const line = content.slice(0, start).split('\n').length;
         violations.push(
-          `${rel}:${line} uses raw details in ${callPattern.replace('(', '')}`,
+          `${rel}:${line} must use detailsTemplate+detailsVariables only in ${callPattern.replace('(', '')}`,
         );
       }
       from = start + callPattern.length;

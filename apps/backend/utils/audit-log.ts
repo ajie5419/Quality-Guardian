@@ -1,7 +1,6 @@
 import type { EventHandlerRequest, H3Event } from 'h3';
 
 import { getHeader } from 'h3';
-import { renderAuditTemplateText } from '~/constants/audit-templates';
 import { SystemLogService } from '~/services/system-log.service';
 
 import { logApiError } from './api-logger';
@@ -10,9 +9,8 @@ type AuditAction = 'CREATE' | 'DELETE' | 'EXPORT' | 'READ' | 'UPDATE';
 
 interface BusinessAuditLogParams {
   action: AuditAction;
-  details?: string;
-  detailsTemplate?: string;
-  detailsVariables?: Record<string, unknown>;
+  detailsTemplate: string;
+  detailsVariables: Record<string, unknown>;
   targetId: string;
   targetType: string;
   userId?: number | string;
@@ -32,18 +30,12 @@ export async function recordBusinessAuditLog(
   params: BusinessAuditLogParams,
 ) {
   if (params.userId === undefined || params.userId === null) return;
-  const details =
-    params.detailsTemplate === undefined
-      ? params.details || ''
-      : renderAuditTemplateText(
-          params.detailsTemplate,
-          params.detailsVariables || {},
-        );
 
   try {
     await SystemLogService.recordAuditLog({
       action: params.action,
-      details,
+      detailsTemplate: params.detailsTemplate,
+      detailsVariables: params.detailsVariables,
       ipAddress: resolveRequestIp(event),
       targetId: params.targetId,
       targetType: params.targetType,
