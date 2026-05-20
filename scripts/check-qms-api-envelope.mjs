@@ -70,8 +70,9 @@ function findViolations(filePath) {
       handlerFn.body &&
       ts.isObjectLiteralExpression(handlerFn.body)
     ) {
-      const line = source.getLineAndCharacterOfPosition(handlerFn.body.getStart())
-        .line + 1;
+      const line =
+        source.getLineAndCharacterOfPosition(handlerFn.body.getStart()).line +
+        1;
       violations.push(
         `${rel}:${line} handler must not return raw object literal`,
       );
@@ -84,8 +85,8 @@ function findViolations(filePath) {
       }
       if (ts.isReturnStatement(node) && node.expression) {
         if (ts.isObjectLiteralExpression(node.expression)) {
-          const line = source.getLineAndCharacterOfPosition(node.getStart())
-            .line + 1;
+          const line =
+            source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
           violations.push(
             `${rel}:${line} handler must not return raw object literal`,
           );

@@ -46,10 +46,15 @@ export default defineEventHandler(async (event) => {
       total: result.total || 0,
     });
   } catch (error: unknown) {
-    logApiError('supplier-export', error, {
-      latencyMs: Date.now() - startedAt,
-      module: 'supplier',
-    }, event);
+    logApiError(
+      'supplier-export',
+      error,
+      {
+        latencyMs: Date.now() - startedAt,
+        module: 'supplier',
+      },
+      event,
+    );
     return internalServerErrorResponse(event, 'Failed to export suppliers');
   }
 });

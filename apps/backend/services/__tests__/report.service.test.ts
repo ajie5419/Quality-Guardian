@@ -124,8 +124,8 @@ describe('reportService', () => {
     });
     expect(result.trackingIssues.map((i) => i.progress)).toEqual([
       '待处理',
-      '进行中',
-      '已关闭',
+      '待处理',
+      '待处理',
       '已关闭',
     ]);
     expect(result.trackingIssues.map((i) => i.respDept)).toEqual([

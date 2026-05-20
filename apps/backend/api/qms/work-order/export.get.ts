@@ -68,11 +68,16 @@ export default defineEventHandler(async (event) => {
       total: result.total || 0,
     });
   } catch (error) {
-    logApiError('work-order-export', error, {
-      latencyMs: Date.now() - startedAt,
-      module: 'work-order',
-      userId: userinfo.userId,
-    }, event);
+    logApiError(
+      'work-order-export',
+      error,
+      {
+        latencyMs: Date.now() - startedAt,
+        module: 'work-order',
+        userId: userinfo.userId,
+      },
+      event,
+    );
     return internalServerErrorResponse(
       event,
       'Failed to export work order list',

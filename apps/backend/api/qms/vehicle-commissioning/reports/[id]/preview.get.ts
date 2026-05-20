@@ -27,7 +27,12 @@ export default defineEventHandler(async (event) => {
     }
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('vehicle-commissioning-reports-preview', error, undefined, event);
+    logApiError(
+      'vehicle-commissioning-reports-preview',
+      error,
+      undefined,
+      event,
+    );
     return internalServerErrorResponse(event, 'Failed to preview daily report');
   }
 });

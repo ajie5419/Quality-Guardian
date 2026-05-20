@@ -78,12 +78,12 @@
     "drawingno",
     "formno",
     "formnorev",
-    "onduty"
-    ,"spreadsheetml"
-    ,"wordprocessingml"
-    ,"aliyun"
-    ,"GANTT"
-    ,"inhouseteam"
+    "onduty",
+    "spreadsheetml",
+    "wordprocessingml",
+    "aliyun",
+    "GANTT",
+    "inhouseteam"
   ],
   "ignorePaths": [
     "**/node_modules/**",

@@ -87,9 +87,14 @@ export default defineEventHandler(async (event) => {
         where: { id: itpProjectId },
       });
       if (!project) {
-        logApiError('task-dispatch', new Error('Project not found'), {
-          itpProjectId,
-        }, event);
+        logApiError(
+          'task-dispatch',
+          new Error('Project not found'),
+          {
+            itpProjectId,
+          },
+          event,
+        );
         return badRequestResponse(
           event,
           `关联的 ITP 计划 (ID: ${itpProjectId}) 不存在，请刷新后重试`,
