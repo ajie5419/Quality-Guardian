@@ -17,6 +17,7 @@ export * from './modules/qms/knowledge-category';
 export * from './modules/qms/metrology-status';
 export * from './modules/qms/param-validation';
 export * from './modules/qms/planning-project';
+export * from './modules/qms/project-documents';
 export * from './modules/qms/quality-loss-payload';
 export * from './modules/qms/quality-loss-query';
 export * from './modules/qms/quality-loss-status';
