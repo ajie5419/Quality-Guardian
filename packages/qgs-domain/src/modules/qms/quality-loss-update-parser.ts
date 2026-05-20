@@ -1,4 +1,5 @@
 import { normalizeQualityLossStatus } from './quality-loss-status';
+import { QUALITY_LOSS_SOURCE, type QualityLossSource } from './quality-loss-status';
 
 type ParseOptionalFiniteNumberResult =
   | { message: string; valid: false }
@@ -21,6 +22,16 @@ export type QualityLossUpdateParseResult =
   | {
       message: string;
       valid: false;
+    };
+
+export type QualityLossTargetLocatorResult =
+  | { message: string; valid: false }
+  | {
+      identifier: string;
+      lookup: 'commissioning' | 'external' | 'internal' | 'manualId' | 'manualLossId';
+      serial: null | number;
+      source: QualityLossSource;
+      valid: true;
     };
 
 export function normalizeQualityLossUpdateText(value: unknown): string {
@@ -84,6 +95,110 @@ export function parseQualityLossUpdateBody(
     respDept,
     status,
     type,
+    valid: true,
+  };
+}
+
+export function parseSerialFromPrefixedId(
+  value: string,
+  prefix: string,
+): null | number {
+  if (!value.startsWith(prefix)) {
+    return null;
+  }
+  const serial = Number.parseInt(value.slice(prefix.length), 10);
+  if (!Number.isFinite(serial) || serial <= 0) {
+    return null;
+  }
+  return serial;
+}
+
+export function resolveQualityLossTargetLocator(params: {
+  pathId: string;
+  pk: unknown;
+  source: QualityLossSource;
+}): QualityLossTargetLocatorResult {
+  const { pathId, pk, source } = params;
+  const identifier =
+    normalizeQualityLossUpdateText(pk) ||
+    normalizeQualityLossUpdateText(pathId);
+
+  if (source === QUALITY_LOSS_SOURCE.MANUAL) {
+    if (pathId.startsWith('QL-')) {
+      return {
+        identifier: pathId,
+        lookup: 'manualLossId',
+        serial: null,
+        source: QUALITY_LOSS_SOURCE.MANUAL,
+        valid: true,
+      };
+    }
+    return {
+      identifier,
+      lookup: 'manualId',
+      serial: null,
+      source: QUALITY_LOSS_SOURCE.MANUAL,
+      valid: true,
+    };
+  }
+
+  if (!identifier) {
+    return { valid: false, message: '缺少目标记录ID' };
+  }
+
+  if (
+    source === QUALITY_LOSS_SOURCE.INTERNAL &&
+    (identifier.startsWith('EXT-') ||
+      identifier.startsWith('DA-') ||
+      pathId.startsWith('EXT-') ||
+      pathId.startsWith('DA-'))
+  ) {
+    return { valid: false, message: '内部损失来源与目标ID不匹配' };
+  }
+  if (
+    source === QUALITY_LOSS_SOURCE.EXTERNAL &&
+    (identifier.startsWith('INT-') ||
+      identifier.startsWith('DA-') ||
+      pathId.startsWith('INT-') ||
+      pathId.startsWith('DA-'))
+  ) {
+    return { valid: false, message: '外部损失来源与目标ID不匹配' };
+  }
+  if (
+    source === QUALITY_LOSS_SOURCE.COMMISSIONING &&
+    (identifier.startsWith('INT-') ||
+      identifier.startsWith('EXT-') ||
+      pathId.startsWith('INT-') ||
+      pathId.startsWith('EXT-'))
+  ) {
+    return { valid: false, message: '调试验收来源与目标ID不匹配' };
+  }
+
+  if (source === QUALITY_LOSS_SOURCE.INTERNAL) {
+    return {
+      identifier,
+      lookup: 'internal',
+      serial: parseSerialFromPrefixedId(identifier, 'INT-'),
+      source: QUALITY_LOSS_SOURCE.INTERNAL,
+      valid: true,
+    };
+  }
+
+  if (source === QUALITY_LOSS_SOURCE.COMMISSIONING) {
+    return {
+      identifier,
+      lookup: 'commissioning',
+      serial: null,
+      source: QUALITY_LOSS_SOURCE.COMMISSIONING,
+      valid: true,
+    };
+  }
+
+  return {
+    identifier,
+    lookup: 'external',
+    serial: parseSerialFromPrefixedId(identifier, 'EXT-'),
+    source: QUALITY_LOSS_SOURCE.EXTERNAL,
     valid: true,
   };
 }

@@ -5,6 +5,7 @@ import {
   parseQualityLossUpdateBody,
   resolveQualityLossUpdateTarget,
 } from './quality-loss-update';
+import { resolveQualityLossTargetLocator } from '@qgs/domain';
 
 describe('quality-loss update utils', () => {
   it('parses optional update fields with validation', () => {
@@ -85,5 +86,24 @@ describe('quality-loss update utils', () => {
       source: QUALITY_LOSS_SOURCE.INTERNAL,
     });
     expect(result.valid).toBe(false);
+  });
+
+  it('resolves target locator in domain rules', () => {
+    const manual = resolveQualityLossTargetLocator({
+      pathId: 'QL-123',
+      pk: undefined,
+      source: QUALITY_LOSS_SOURCE.MANUAL,
+    });
+    expect(manual.valid).toBe(true);
+    if (manual.valid) {
+      expect(manual.lookup).toBe('manualLossId');
+    }
+
+    const mismatch = resolveQualityLossTargetLocator({
+      pathId: 'EXT-8',
+      pk: undefined,
+      source: QUALITY_LOSS_SOURCE.INTERNAL,
+    });
+    expect(mismatch.valid).toBe(false);
   });
 });

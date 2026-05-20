@@ -1,10 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import type { QualityLossSource } from '~/utils/quality-loss-status';
 
-import {
-  normalizeQualityLossUpdateText,
-  parseQualityLossUpdateBody,
-} from '@qgs/domain';
+import { resolveQualityLossTargetLocator } from '@qgs/domain';
 import { QUALITY_LOSS_SOURCE } from '~/utils/quality-loss-status';
 
 type SourceLookupClient = {
@@ -54,21 +51,7 @@ type ResolveTargetResult =
       where: Prisma.quality_lossesWhereUniqueInput;
     };
 
-function parseSerialFromPrefixedId(
-  value: string,
-  prefix: string,
-): null | number {
-  if (!value.startsWith(prefix)) {
-    return null;
-  }
-  const serial = Number.parseInt(value.slice(prefix.length), 10);
-  if (!Number.isFinite(serial) || serial <= 0) {
-    return null;
-  }
-  return serial;
-}
-
-export { normalizeQualityLossUpdateText, parseQualityLossUpdateBody };
+export { normalizeQualityLossUpdateText, parseQualityLossUpdateBody } from '@qgs/domain';
 export { parseOptionalFiniteNumber } from '@qgs/domain';
 export { parseQualityLossOptionalDate as parseQualityLossUpdateDate } from '@qgs/domain';
 
@@ -79,62 +62,31 @@ export async function resolveQualityLossUpdateTarget(params: {
   source: QualityLossSource;
 }): Promise<ResolveTargetResult> {
   const { client, pathId, pk, source } = params;
-  const identifier =
-    normalizeQualityLossUpdateText(pk) ||
-    normalizeQualityLossUpdateText(pathId);
+  const target = resolveQualityLossTargetLocator({ pathId, pk, source });
+  if ('message' in target) {
+    return { valid: false, message: target.message };
+  }
 
-  if (source === QUALITY_LOSS_SOURCE.MANUAL) {
-    if (pathId.startsWith('QL-')) {
-      return {
-        source: QUALITY_LOSS_SOURCE.MANUAL,
-        valid: true,
-        where: { lossId: pathId },
-      };
-    }
+  if (target.lookup === 'manualLossId') {
     return {
       source: QUALITY_LOSS_SOURCE.MANUAL,
       valid: true,
-      where: { id: identifier },
+      where: { lossId: target.identifier },
     };
   }
 
-  if (!identifier) {
-    return { valid: false, message: '缺少目标记录ID' };
+  if (target.lookup === 'manualId') {
+    return {
+      source: QUALITY_LOSS_SOURCE.MANUAL,
+      valid: true,
+      where: { id: target.identifier },
+    };
   }
 
-  if (
-    source === QUALITY_LOSS_SOURCE.INTERNAL &&
-    (identifier.startsWith('EXT-') ||
-      identifier.startsWith('DA-') ||
-      pathId.startsWith('EXT-') ||
-      pathId.startsWith('DA-'))
-  ) {
-    return { valid: false, message: '内部损失来源与目标ID不匹配' };
-  }
-  if (
-    source === QUALITY_LOSS_SOURCE.EXTERNAL &&
-    (identifier.startsWith('INT-') ||
-      identifier.startsWith('DA-') ||
-      pathId.startsWith('INT-') ||
-      pathId.startsWith('DA-'))
-  ) {
-    return { valid: false, message: '外部损失来源与目标ID不匹配' };
-  }
-  if (
-    source === QUALITY_LOSS_SOURCE.COMMISSIONING &&
-    (identifier.startsWith('INT-') ||
-      identifier.startsWith('EXT-') ||
-      pathId.startsWith('INT-') ||
-      pathId.startsWith('EXT-'))
-  ) {
-    return { valid: false, message: '调试验收来源与目标ID不匹配' };
-  }
-
-  if (source === QUALITY_LOSS_SOURCE.INTERNAL) {
-    const serial = parseSerialFromPrefixedId(identifier, 'INT-');
-    if (serial !== null) {
+  if (target.lookup === 'internal') {
+    if (target.serial !== null) {
       const row = await client.quality_records.findFirst({
-        where: { serialNumber: serial },
+        where: { serialNumber: target.serial },
         select: { id: true },
       });
       if (!row) {
@@ -149,13 +101,13 @@ export async function resolveQualityLossUpdateTarget(params: {
     return {
       source: QUALITY_LOSS_SOURCE.INTERNAL,
       valid: true,
-      where: { id: identifier },
+      where: { id: target.identifier },
     };
   }
 
-  if (source === QUALITY_LOSS_SOURCE.COMMISSIONING) {
+  if (target.lookup === 'commissioning') {
     const row = await client.vehicle_commissioning_issues.findFirst({
-      where: { id: identifier },
+      where: { id: target.identifier },
       select: { id: true },
     });
     if (!row) {
@@ -168,10 +120,9 @@ export async function resolveQualityLossUpdateTarget(params: {
     };
   }
 
-  const serial = parseSerialFromPrefixedId(identifier, 'EXT-');
-  if (serial !== null) {
+  if (target.serial !== null) {
     const row = await client.after_sales.findFirst({
-      where: { serialNumber: serial },
+      where: { serialNumber: target.serial },
       select: { id: true },
     });
     if (!row) {
@@ -187,6 +138,6 @@ export async function resolveQualityLossUpdateTarget(params: {
   return {
     source: QUALITY_LOSS_SOURCE.EXTERNAL,
     valid: true,
-    where: { id: identifier },
+    where: { id: target.identifier },
   };
 }
