@@ -1,5 +1,4 @@
 <script lang="ts" setup>
-import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { SystemDeptApi } from '#/api/system/dept';
 import type { TreeSelectNode, VxeCheckboxChangeParams } from '#/types';
 
@@ -27,7 +26,7 @@ import {
 } from '#/api/system/preference';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
-import { convertToTreeSelectData, findNameById } from '#/types';
+import { convertToTreeSelectData } from '#/types';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
 import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
@@ -38,12 +37,15 @@ import LossEditModal from './components/LossEditModal.vue';
 import LossKpiCards from './components/LossKpiCards.vue';
 import { useLossOverview } from './composables/useLossOverview';
 import { useQualityLossActions } from './composables/useQualityLossActions';
+import { useQualityLossGrid } from './composables/useQualityLossGrid';
 import {
   mapDictionaryOptionsToLossType,
   mapDictionaryOptionsToQualityLossStatus,
   SOURCE_STYLE_MAP,
 } from './constants';
 import { LossSource } from './types';
+
+import './index.css';
 
 type QualityLossItem =
   import('#/api/qms/quality-loss').QmsQualityLossApi.QualityLossItem;
@@ -178,182 +180,38 @@ const {
   handleYearChange,
 } = useLossOverview(handleApiError);
 
-// ================= 表格配置 =================
-const gridOptions = computed<VxeGridProps<QualityLossItem>>(() => ({
-  checkboxConfig: {
-    reserve: true,
-    highlight: true,
-    range: true,
-  },
-  toolbarConfig: {
-    slots: { buttons: 'toolbar-actions' },
-    export: canExport.value,
-    search: true,
-    zoom: true,
-    refresh: true,
-    custom: true,
-  },
-  exportConfig: {
-    remote: true,
-    exportMethod: exportQualityLossAsXlsx,
-    types: ['xlsx'],
-    modes: ['current', 'selected', 'all'],
-  },
-  columns: [
-    { type: 'checkbox', width: 50, fixed: 'left' },
-    { type: 'seq', title: t('common.seq'), width: 60, fixed: 'left' },
-    {
-      field: 'lossSource',
-      title: t('qms.qualityLoss.source.label'),
-      width: 100,
-      slots: { default: 'lossSource' },
-    },
-    {
-      field: 'workOrderNumber',
-      title: t('qms.workOrder.workOrderNumber'),
-      width: 120,
-    },
-    {
-      field: 'projectName',
-      title: t('qms.workOrder.projectName'),
-      minWidth: 150,
-    },
-    {
-      field: 'partName',
-      title: t('qms.inspection.issues.partName'),
-      minWidth: 150,
-    },
-    {
-      field: 'date',
-      title: t('qms.inspection.issues.reportDate'),
-      width: 120,
-    },
-    {
-      field: 'amount',
-      title: t('qms.inspection.issues.lossAmount'),
-      width: 130,
-      formatter: ({ cellValue }) => `¥${Number(cellValue).toLocaleString()}`,
-    },
-    {
-      field: 'actualClaim',
-      title: t('qms.qualityLoss.actualClaim'),
-      width: 130,
-      formatter: ({ cellValue }) =>
-        `¥${Number(cellValue || 0).toLocaleString()}`,
-    },
-    {
-      field: 'responsibleDepartment',
-      title: t('qms.inspection.issues.responsibleDepartment'),
-      width: 140,
-      formatter: ({ cellValue }) => {
-        if (!cellValue) return '';
-        return findNameById(deptRawData.value, cellValue) || cellValue;
-      },
-    },
-    {
-      field: 'status',
-      title: t('common.status'),
-      width: 100,
-      slots: { default: 'status' },
-    },
-    {
-      title: t('common.action'),
-      width: 130,
-      fixed: 'right',
-      cellRender: {
-        name: 'CellOperation',
-        props: {
-          options: [
-            {
-              code: 'claim',
-              icon: 'ant-design:solution-outlined',
-              label: '索赔',
-              type: 'primary',
-              ghost: true,
-            },
-            ...(canEdit.value ? ['edit'] : []),
-            ...(canDelete.value ? ['delete'] : []),
-          ],
-          onClick: ({ code, row }: { code: string; row: QualityLossItem }) => {
-            if (code === 'claim') handleClaim(row);
-            if (code === 'edit') handleEdit(row);
-            if (code === 'delete') handleDelete(row);
-          },
-        },
-      },
-    },
-  ],
-  proxyConfig: {
-    ajax: {
-      query: async ({ page, form }) => {
-        const params = {
-          page: page?.currentPage,
-          pageSize: page?.pageSize,
-          ...form,
-        };
-        const [result] = await Promise.all([
-          getQualityLossList(params),
-          refreshOverview(form),
-        ]);
-        return result;
-      },
-    },
-  },
-}));
+let actionsInstance: null | ReturnType<typeof useQualityLossActions> = null;
+const triggerClaim = (row: QualityLossItem) =>
+  actionsInstance?.handleClaim(row);
+const triggerDelete = (row: QualityLossItem) =>
+  actionsInstance?.handleDelete(row);
+const triggerEdit = (row: QualityLossItem) => actionsInstance?.handleEdit(row);
+const handleCheckChange = (params: VxeCheckboxChangeParams<QualityLossItem>) =>
+  actionsInstance?.onCheckChange(params);
+
+const { formSchema, gridOptions, getStatusConfig } = useQualityLossGrid({
+  canDelete,
+  canEdit,
+  canExport,
+  deptRawData,
+  exportQualityLossAsXlsx,
+  getQualityLossList,
+  handleClaim: triggerClaim,
+  handleDelete: triggerDelete,
+  handleEdit: triggerEdit,
+  qualityLossStatusOptions,
+  refreshOverview,
+  t,
+});
 
 const [Grid, gridApi] = useVbenVxeGrid<QualityLossItem>({
-  gridOptions: gridOptions as unknown as VxeGridProps<QualityLossItem>,
+  gridOptions: gridOptions.value,
   gridEvents: {
-    checkboxChange: (params: VxeCheckboxChangeParams<QualityLossItem>) =>
-      actions.onCheckChange(params),
-    checkboxAll: (params: VxeCheckboxChangeParams<QualityLossItem>) =>
-      actions.onCheckChange(params),
+    checkboxChange: handleCheckChange,
+    checkboxAll: handleCheckChange,
   },
   formOptions: {
-    schema: [
-      {
-        fieldName: 'workOrderNumber',
-        label: t('qms.workOrder.workOrderNumber'),
-        component: 'Input',
-        colProps: { span: 6 },
-      },
-      {
-        fieldName: 'lossSource',
-        label: t('qms.qualityLoss.source.label'),
-        component: 'Select',
-        componentProps: {
-          options: [
-            { label: t('common.all'), value: '' },
-            {
-              label: t('qms.qualityLoss.source.manual'),
-              value: LossSource.MANUAL,
-            },
-            {
-              label: t('qms.qualityLoss.source.internal'),
-              value: LossSource.INTERNAL,
-            },
-            {
-              label: t('qms.qualityLoss.source.external'),
-              value: LossSource.EXTERNAL,
-            },
-            {
-              label: t('qms.qualityLoss.source.commissioning'),
-              value: LossSource.COMMISSIONING,
-            },
-          ],
-        },
-        colProps: { span: 6 },
-      },
-      {
-        fieldName: 'status',
-        label: t('common.status'),
-        component: 'Select',
-        componentProps: {
-          options: qualityLossStatusOptions.value,
-        },
-        colProps: { span: 6 },
-      },
-    ],
+    schema: formSchema.value,
     submitOnChange: true,
   },
 } as unknown as QualityLossGridSetupOptions);
@@ -364,6 +222,7 @@ const onLossDataChanged = () => {
 };
 
 const actions = useQualityLossActions(gridApi, onLossDataChanged);
+actionsInstance = actions;
 const {
   checkedRows,
   modalVisible,
@@ -371,9 +230,6 @@ const {
   claimModalVisible,
   currentRecord,
   handleOpenModal,
-  handleEdit,
-  handleClaim,
-  handleDelete,
   handleBatchDelete,
 } = actions;
 
@@ -392,47 +248,7 @@ async function loadQualityLossStatusOptions() {
     await loadQualityLossStatusDictionaryOptions();
     gridApi.setState({
       formOptions: {
-        schema: [
-          {
-            fieldName: 'workOrderNumber',
-            label: t('qms.workOrder.workOrderNumber'),
-            component: 'Input',
-          },
-          {
-            fieldName: 'lossSource',
-            label: t('qms.qualityLoss.source.label'),
-            component: 'Select',
-            componentProps: {
-              options: [
-                { label: t('common.all'), value: '' },
-                {
-                  label: t('qms.qualityLoss.source.manual'),
-                  value: LossSource.MANUAL,
-                },
-                {
-                  label: t('qms.qualityLoss.source.internal'),
-                  value: LossSource.INTERNAL,
-                },
-                {
-                  label: t('qms.qualityLoss.source.external'),
-                  value: LossSource.EXTERNAL,
-                },
-                {
-                  label: t('qms.qualityLoss.source.commissioning'),
-                  value: LossSource.COMMISSIONING,
-                },
-              ],
-            },
-          },
-          {
-            fieldName: 'status',
-            label: t('common.status'),
-            component: 'Select',
-            componentProps: {
-              options: qualityLossStatusOptions.value,
-            },
-          },
-        ],
+        schema: formSchema.value,
         submitOnChange: true,
       },
     });
@@ -454,16 +270,6 @@ onMounted(async () => {
     loadQualityLossTypeOptions(),
   ]);
 });
-
-// 辅助函数
-function getStatusConfig(s: string) {
-  return (
-    qualityLossStatusOptions.value.find((o) => o.value === s) || {
-      label: s,
-      color: 'default',
-    }
-  );
-}
 </script>
 
 <template>
@@ -579,9 +385,3 @@ function getStatusConfig(s: string) {
     />
   </Page>
 </template>
-
-<style scoped>
-:deep(.ant-card-head) {
-  border-bottom: 1px solid #f0f0f0;
-}
-</style>

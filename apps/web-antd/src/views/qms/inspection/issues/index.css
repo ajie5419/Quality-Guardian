@@ -1,0 +1,26 @@
+.vxe-table--filter-wrapper.is--multiple .vxe-table--filter-body {
+  max-height: 180px;
+}
+
+.vxe-table--filter-wrapper .vxe-table--filter-footer {
+  position: sticky;
+  bottom: 0;
+  background: var(--vxe-ui-layout-background-color);
+}
+
+/* 针对表格内图片的样式优化 */
+.vxe-cell .ant-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px !important;
+  height: 40px !important;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.vxe-cell .ant-image-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

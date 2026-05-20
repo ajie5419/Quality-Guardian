@@ -79,6 +79,11 @@
     "formno",
     "formnorev",
     "onduty"
+    ,"spreadsheetml"
+    ,"wordprocessingml"
+    ,"aliyun"
+    ,"GANTT"
+    ,"inhouseteam"
   ],
   "ignorePaths": [
     "**/node_modules/**",

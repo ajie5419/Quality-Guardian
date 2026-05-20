@@ -2,10 +2,6 @@
 import { Page } from '@vben/common-ui';
 
 import {
-  ISSUE_TRACKING_STATUS,
-  normalizeIssueTrackingStatus,
-} from '@qgs/domain';
-import {
   Button,
   Card,
   DatePicker,
@@ -31,27 +27,15 @@ import {
 
 import { useVehicleCommissioningPage } from './composables/useVehicleCommissioningPage';
 
-function resolveIssueDisplayStatus(status: unknown) {
-  return normalizeIssueTrackingStatus(status, {
-    allowed: [
-      ISSUE_TRACKING_STATUS.OPEN,
-      ISSUE_TRACKING_STATUS.IN_PROGRESS,
-      ISSUE_TRACKING_STATUS.RESOLVED,
-      ISSUE_TRACKING_STATUS.CLOSED,
-    ],
-    fallback: ISSUE_TRACKING_STATUS.OPEN,
-  });
-}
-
 function issueStatusColor(status: unknown) {
-  return getIssueTrackingPaletteColor(resolveIssueDisplayStatus(status), {
+  return getIssueTrackingPaletteColor(status, {
     fallback: 'orange',
     resolvedColor: 'purple',
   });
 }
 
 function issueStatusLabel(status: unknown) {
-  return getIssueTrackingLabel(resolveIssueDisplayStatus(status), {
+  return getIssueTrackingLabel(status, {
     labelPreset: 'verify',
   });
 }

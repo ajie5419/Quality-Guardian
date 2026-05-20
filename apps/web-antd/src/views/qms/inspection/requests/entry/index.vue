@@ -45,6 +45,8 @@ import { useDictionaryOptions } from '../../../shared/composables/useDictionaryO
 import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
 import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
 
+import './index.css';
+
 defineOptions({ name: 'PublicInspectionRequestEntry' });
 
 const route = useRoute();
@@ -523,53 +525,3 @@ watch(
     </div>
   </div>
 </template>
-
-<style scoped>
-.inspection-entry-page {
-  text-size-adjust: 100%;
-}
-
-.inspection-entry-form :deep(.ant-form-item) {
-  margin-bottom: 14px;
-}
-
-.inspection-entry-form :deep(.ant-form-item-label > label) {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.inspection-entry-form :deep(.ant-input),
-.inspection-entry-form :deep(.ant-input-number),
-.inspection-entry-form :deep(.ant-select-selector) {
-  min-height: 42px;
-}
-
-.inspection-entry-form :deep(.ant-input-number-input) {
-  height: 40px;
-}
-
-.inspection-entry-form :deep(.ant-select-selection-item),
-.inspection-entry-form :deep(.ant-select-selection-placeholder) {
-  line-height: 40px;
-  white-space: normal;
-}
-
-.inspection-entry-form :deep(.ant-upload) {
-  width: 100%;
-}
-
-.inspection-entry-form :deep(.ant-upload-list-item-name) {
-  word-break: break-all;
-  white-space: normal;
-}
-
-@media (min-width: 640px) {
-  .inspection-entry-form :deep(.ant-upload) {
-    width: auto;
-  }
-
-  .inspection-entry-form :deep(.ant-form-item) {
-    margin-bottom: 16px;
-  }
-}
-</style>

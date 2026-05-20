@@ -46,6 +46,7 @@ import { findNameById } from '#/types';
 import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
 import AfterSalesCharts from './components/AfterSalesCharts.vue';
 import AfterSalesModal from './components/AfterSalesModal.vue';
+import { buildAfterSalesKnowledgePayload } from './composables/knowledge-settlement';
 import { useAfterSalesChartPreferences } from './composables/useAfterSalesChartPreferences';
 import { useAfterSalesDeptData } from './composables/useAfterSalesDeptData';
 import { useAfterSalesGrid } from './composables/useAfterSalesGrid';
@@ -53,6 +54,8 @@ import {
   mapDictionaryOptionsToAfterSalesStatus,
   useStatusOptions,
 } from './constants';
+
+import './index.css';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
@@ -313,58 +316,7 @@ function handleBatchDelete() {
 const { settle: settleToKnowledge } = useKnowledgeSettlement();
 
 function handleSettleToKnowledge(row: QmsAfterSalesApi.AfterSalesItem) {
-  settleToKnowledge({
-    title: `【${t('qms.afterSales.title')}】${row.workOrderNumber} - ${row.partName || row.projectName}`,
-    summary: row.issueDescription,
-    categoryId: 'CAT-DEFAULT',
-    photos: row.photos,
-    attachmentNamePrefix: t('qms.afterSales.title'),
-    tags: [row.defectType, row.productType, row.partName, row.projectName],
-    sections: [
-      {
-        title: t('qms.afterSales.form.baseInfo'),
-        fields: [
-          {
-            label: t('qms.afterSales.form.workOrderNumber'),
-            value: row.workOrderNumber,
-          },
-          {
-            label: t('qms.afterSales.form.projectName'),
-            value: row.projectName,
-          },
-          {
-            label: t('qms.afterSales.form.partName'),
-            value: row.partName || '-',
-          },
-          {
-            label: t('qms.afterSales.form.customerName'),
-            value: row.customerName,
-          },
-        ],
-      },
-      {
-        title: t('qms.afterSales.form.issueDetails'),
-        content: row.issueDescription,
-      },
-      {
-        title: t('qms.afterSales.form.resolutionPlan'),
-        content: row.resolutionPlan || t('common.notSet'),
-      },
-      {
-        title: t('qms.afterSales.form.responsibility'),
-        fields: [
-          {
-            label: t('qms.afterSales.form.materialCost'),
-            value: `¥${row.materialCost}`,
-          },
-          {
-            label: t('qms.afterSales.form.laborTravelCost'),
-            value: `¥${row.laborTravelCost}`,
-          },
-        ],
-      },
-    ],
-  });
+  settleToKnowledge(buildAfterSalesKnowledgePayload(row, t));
 }
 
 const { gridOptions, formSchema } = useAfterSalesGrid({
@@ -710,22 +662,3 @@ function handleModalSuccess() {
     </ErrorBoundary>
   </Page>
 </template>
-
-<style scoped>
-/* 针对表格内图片的样式优化 */
-:deep(.vxe-cell .ant-image) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px !important;
-  height: 40px !important;
-  overflow: hidden;
-  border-radius: 4px;
-}
-
-:deep(.vxe-cell .ant-image-img) {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-</style>

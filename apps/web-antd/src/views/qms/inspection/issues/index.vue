@@ -1,8 +1,6 @@
 <script lang="ts" setup>
 import type { InspectionIssue } from './types';
 
-import type { VxeCheckboxChangeParams } from '#/types';
-
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
@@ -33,7 +31,6 @@ import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useGridImport } from '#/hooks/useGridImport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
-import { findNameById } from '#/types';
 
 import { useDictionaryOptions } from '../../shared/composables/useDictionaryOptions';
 import { cloneInspectionProcessFallbackOptions } from '../../shared/constants/inspection-process-fallback';
@@ -44,6 +41,8 @@ import { useAiReport } from './composables/useAiReport';
 import { useIssueActions } from './composables/useIssueActions';
 import { useIssueChartPreferences } from './composables/useIssueChartPreferences';
 import { useIssueData } from './composables/useIssueData';
+import { useIssueDetail } from './composables/useIssueDetail';
+import { useIssueGridEvents } from './composables/useIssueGridEvents';
 import { useIssueGridOptions } from './composables/useIssueGridOptions';
 import { useIssueRemoteStatistics } from './composables/useIssueRemoteStatistics';
 import {
@@ -57,6 +56,8 @@ import {
   getStatusColor,
   getStatusLabel,
 } from './utils/statusHelper';
+
+import './index.css';
 
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
@@ -84,63 +85,17 @@ const isAdmin = computed(() => {
 });
 
 const checkedRows = ref<InspectionIssue[]>([]);
-const detailVisible = ref(false);
-const detailRecord = ref<InspectionIssue | undefined>(undefined);
-
-function openDetail(row: InspectionIssue) {
-  detailRecord.value = row;
-  detailVisible.value = true;
-}
-
-function parsePhotos(photos: unknown): string[] {
-  if (!Array.isArray(photos)) return [];
-  const result: string[] = [];
-  for (const item of photos) {
-    if (typeof item === 'string') {
-      result.push(item);
-      continue;
-    }
-    if (
-      item &&
-      typeof item === 'object' &&
-      'url' in item &&
-      typeof item.url === 'string'
-    ) {
-      result.push(item.url);
-    }
-  }
-  return result;
-}
-
-const detailPhotos = computed(() => parsePhotos(detailRecord.value?.photos));
-
-function formatDept(value: string | undefined) {
-  if (!value) return '-';
-  return findNameById(deptRawData.value, value) || value;
-}
-
-function formatDisplayDate(value: string | undefined) {
-  if (!value) return '-';
-  return value.includes('T') ? value.slice(0, 10) : value;
-}
-
-function onCheckChange(params: VxeCheckboxChangeParams) {
-  const records = params.$grid.getCheckboxRecords() || [];
-  checkedRows.value = records as unknown as InspectionIssue[];
-}
-
-function onCellClick(params: {
-  column?: { field?: string; type?: string };
-  row: InspectionIssue;
-}) {
-  if (!params?.row) return;
-  if (params.column?.type === 'checkbox') return;
-  if (!params.column?.field) return;
-  openDetail(params.row);
-}
 
 const { invalidateInspectionIssues } = useInvalidateQmsQueries();
 const { deptTreeData, deptRawData, loadInitialData } = useIssueData();
+const {
+  detailVisible,
+  detailRecord,
+  detailPhotos,
+  openDetail,
+  formatDept,
+  formatDisplayDate,
+} = useIssueDetail(deptRawData);
 const { statusOptions: fallbackIssueStatusOptions } = useStatusOptions();
 const {
   options: issueStatusOptions,
@@ -288,6 +243,11 @@ const { gridOptions } = useIssueGridOptions({
   handleImport,
   handleSettleToKnowledge,
   t,
+});
+
+const { onCheckChange, onCellClick } = useIssueGridEvents({
+  checkedRows,
+  onOpenDetail: openDetail,
 });
 
 const gridEvents = {
@@ -678,32 +638,3 @@ async function handleGenerateInsight() {
     />
   </Page>
 </template>
-
-<style scoped>
-:deep(.vxe-table--filter-wrapper.is--multiple .vxe-table--filter-body) {
-  max-height: 180px;
-}
-
-:deep(.vxe-table--filter-wrapper .vxe-table--filter-footer) {
-  position: sticky;
-  bottom: 0;
-  background: var(--vxe-ui-layout-background-color);
-}
-
-/* 针对表格内图片的样式优化 */
-:deep(.vxe-cell .ant-image) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px !important;
-  height: 40px !important;
-  overflow: hidden;
-  border-radius: 4px;
-}
-
-:deep(.vxe-cell .ant-image-img) {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-</style>
