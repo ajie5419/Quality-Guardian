@@ -1,6 +1,7 @@
 export * from './modules/qms/after-sales-payload';
 export * from './modules/qms/after-sales-query';
 export * from './modules/qms/after-sales-status';
+export * from './modules/qms/bom';
 export * from './modules/qms/dfmea';
 export * from './modules/qms/id-list';
 export * from './modules/qms/inspection-archive';
