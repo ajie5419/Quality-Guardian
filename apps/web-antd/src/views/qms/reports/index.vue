@@ -17,6 +17,10 @@ import { Button, DatePicker, Input, message, Tag } from 'ant-design-vue';
 import { getDailySummary, saveDailySummary } from '#/api/qms/reports';
 import { getDeptList } from '#/api/system/dept';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import {
+  getIssueTrackingLabel,
+  getIssueTrackingTagColor,
+} from '#/views/qms/shared/utils/issue-tracking';
 
 import ReportTable from './components/ReportTable.vue';
 
@@ -37,11 +41,7 @@ function normalizeReportIssueStatus(status: unknown) {
 }
 
 function getIssueStatusColor(status: string) {
-  const normalized = normalizeReportIssueStatus(status);
-  if (normalized === ISSUE_TRACKING_STATUS.CLOSED) return 'success';
-  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return 'processing';
-  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return 'warning';
-  return 'error';
+  return getIssueTrackingTagColor(status, { preset: 'report' });
 }
 
 function getIssueStatusLabel(status: string) {
@@ -49,9 +49,10 @@ function getIssueStatusLabel(status: string) {
   if (normalized === ISSUE_TRACKING_STATUS.CLOSED) {
     return t('qms.inspection.issues.status.closed');
   }
-  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return '处理中';
-  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return '待验证';
-  return t('qms.inspection.issues.status.open');
+  if (normalized === ISSUE_TRACKING_STATUS.OPEN) {
+    return t('qms.inspection.issues.status.open');
+  }
+  return getIssueTrackingLabel(normalized, { labelPreset: 'verify' });
 }
 
 const canExport = computed(() => {

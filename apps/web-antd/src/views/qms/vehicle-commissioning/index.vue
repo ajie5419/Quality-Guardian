@@ -24,6 +24,10 @@ import {
 
 import IssuePhotoUpload from '#/views/qms/inspection/issues/components/IssuePhotoUpload.vue';
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
+import {
+  getIssueTrackingLabel,
+  getIssueTrackingPaletteColor,
+} from '#/views/qms/shared/utils/issue-tracking';
 
 import { useVehicleCommissioningPage } from './composables/useVehicleCommissioningPage';
 
@@ -40,19 +44,16 @@ function resolveIssueDisplayStatus(status: unknown) {
 }
 
 function issueStatusColor(status: unknown) {
-  const normalized = resolveIssueDisplayStatus(status);
-  if (normalized === ISSUE_TRACKING_STATUS.CLOSED) return 'green';
-  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return 'blue';
-  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return 'purple';
-  return 'orange';
+  return getIssueTrackingPaletteColor(resolveIssueDisplayStatus(status), {
+    fallback: 'orange',
+    resolvedColor: 'purple',
+  });
 }
 
 function issueStatusLabel(status: unknown) {
-  const normalized = resolveIssueDisplayStatus(status);
-  if (normalized === ISSUE_TRACKING_STATUS.CLOSED) return '已关闭';
-  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return '处理中';
-  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return '待验证';
-  return '待处理';
+  return getIssueTrackingLabel(resolveIssueDisplayStatus(status), {
+    labelPreset: 'verify',
+  });
 }
 
 const {

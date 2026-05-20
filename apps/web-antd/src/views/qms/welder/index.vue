@@ -58,6 +58,7 @@ import {
   resolveImportErrorCount,
 } from '#/utils/import-summary';
 import TeamSelect from '#/views/qms/inspection/records/components/form/TeamSelect.vue';
+import { getIssueTrackingLabel } from '#/views/qms/shared/utils/issue-tracking';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
@@ -235,12 +236,10 @@ function mapIssueStatusLabel(status: unknown) {
     ],
     fallback: ISSUE_TRACKING_STATUS.OPEN,
   });
-
-  if (normalized === ISSUE_TRACKING_STATUS.OPEN) return '待处理';
-  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return '处理中';
-  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return '已解决';
-  if (normalized === ISSUE_TRACKING_STATUS.CLOSED) return '已关闭';
-  return String(status || '-');
+  return getIssueTrackingLabel(normalized, {
+    fallbackText: String(status || '-'),
+    labelPreset: 'resolved',
+  });
 }
 
 function readIssueField(issue: InspectionIssue | undefined, fieldName: string) {

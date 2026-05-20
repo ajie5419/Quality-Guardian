@@ -20,6 +20,10 @@ import {
 } from 'ant-design-vue';
 
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
+import {
+  getIssueTrackingLabel,
+  getIssueTrackingTagColor,
+} from '#/views/qms/shared/utils/issue-tracking';
 
 import InspectionForm from './components/InspectionForm.vue';
 import InspectionGrid from './components/InspectionGrid.vue';
@@ -64,22 +68,20 @@ function normalizeInspectionRecordIssueStatus(status: unknown) {
   });
 }
 
-function getIssueStatusLabel(status: unknown) {
+function getInspectionRecordIssueStatusLabel(status: unknown) {
   const normalized = normalizeInspectionRecordIssueStatus(status);
-  if (normalized === ISSUE_TRACKING_STATUS.OPEN) return '待处理';
-  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return '处理中';
-  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return '待验证';
-  if (normalized === ISSUE_TRACKING_STATUS.CLOSED) return '已关闭';
-  return '无问题';
+  return getIssueTrackingLabel(normalized, {
+    fallbackText: '无问题',
+    labelPreset: 'verify',
+  });
 }
 
-function getIssueStatusColor(status: unknown) {
+function getInspectionRecordIssueStatusColor(status: unknown) {
   const normalized = normalizeInspectionRecordIssueStatus(status);
-  if (normalized === ISSUE_TRACKING_STATUS.OPEN) return 'default';
-  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return 'processing';
-  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return 'warning';
-  if (normalized === ISSUE_TRACKING_STATUS.CLOSED) return 'success';
-  return 'default';
+  return getIssueTrackingTagColor(normalized, {
+    fallback: 'default',
+    preset: 'record',
+  });
 }
 
 function getArchiveStatusLabel(status: unknown) {
@@ -339,9 +341,17 @@ watch(
           </Descriptions.Item>
           <Descriptions.Item label="问题状态">
             <Tag
-              :color="getIssueStatusColor(getDetailString('issueStatus', ''))"
+              :color="
+                getInspectionRecordIssueStatusColor(
+                  getDetailString('issueStatus', ''),
+                )
+              "
             >
-              {{ getIssueStatusLabel(getDetailString('issueStatus', '')) }}
+              {{
+                getInspectionRecordIssueStatusLabel(
+                  getDetailString('issueStatus', ''),
+                )
+              }}
             </Tag>
           </Descriptions.Item>
           <Descriptions.Item label="资料归档状态">

@@ -12,6 +12,10 @@ import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
 } from '@qgs/domain';
+import {
+  getIssueTrackingLabel,
+  getIssueTrackingTagColor,
+} from '#/views/qms/shared/utils/issue-tracking';
 
 interface RequestStatsState {
   inspectorStatus: Array<{
@@ -109,8 +113,6 @@ export function useInspectionRequestPresentation(
   }
 
   function issueStatusLabel(status?: null | string) {
-    if (!status) return '-';
-
     const normalized = normalizeIssueTrackingStatus(status, {
       allowed: [
         ISSUE_TRACKING_STATUS.CLAIMING,
@@ -121,12 +123,10 @@ export function useInspectionRequestPresentation(
       ],
       fallback: ISSUE_TRACKING_STATUS.OPEN,
     });
-
-    if (normalized === ISSUE_TRACKING_STATUS.CLAIMING) return '索赔中';
-    if (normalized === ISSUE_TRACKING_STATUS.OPEN) return '待处理';
-    if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return '处理中';
-    if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return '已解决';
-    return '已关闭';
+    return getIssueTrackingLabel(normalized, {
+      fallbackText: '-',
+      labelPreset: 'resolved',
+    });
   }
 
   function issueStatusColor(status?: null | string) {
@@ -140,19 +140,10 @@ export function useInspectionRequestPresentation(
       ],
       fallback: ISSUE_TRACKING_STATUS.OPEN,
     });
-    if (
-      normalized === ISSUE_TRACKING_STATUS.CLOSED ||
-      normalized === ISSUE_TRACKING_STATUS.RESOLVED
-    ) {
-      return 'success';
-    }
-    if (
-      normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS ||
-      normalized === ISSUE_TRACKING_STATUS.CLAIMING
-    ) {
-      return 'processing';
-    }
-    return 'warning';
+    return getIssueTrackingTagColor(normalized, {
+      fallback: 'warning',
+      preset: 'request',
+    });
   }
 
   function inspectionQuantityText(record: InspectionRequest) {
