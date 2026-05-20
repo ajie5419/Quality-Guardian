@@ -1,10 +1,10 @@
 import type { Prisma, quality_losses } from '@prisma/client';
 
-import { nanoid } from 'nanoid';
 import {
   buildQualityLossCreateData as buildQualityLossCreateDataRule,
   buildQualityLossCreateResponse as buildQualityLossCreateResponseRule,
 } from '@qgs/domain';
+import { nanoid } from 'nanoid';
 
 export function createQualityLossId(now = new Date()): string {
   return `QL-${now.getFullYear()}-${nanoid(6).toUpperCase()}`;
