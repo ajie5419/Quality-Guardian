@@ -1,10 +1,19 @@
-import type { ProcessPassRateTargetKey } from '~/utils/pass-rate-process';
+import type {
+  InspectionQuantitySource,
+  IssuePassRateBucketInput,
+} from '~/utils/pass-rate-process';
 
 import { getTargetPassRate as getTargetPassRateByStd } from '~/constants/quality-standards';
 import {
   buildCanonicalProcessPassRateTargets,
+  getIssueQuantity,
   mapInspectionToPassRateBucket,
+  normalizeInspectionQuantitySummary,
   parsePassRateTargets,
+  resolveIssueIncomingBucket,
+  resolveIssuePassRateCategory,
+  resolveIssueProcessBucket,
+  roundPercent,
 } from '~/utils/pass-rate-process';
 import prisma from '~/utils/prisma';
 
@@ -25,23 +34,6 @@ interface NetPassRateSummary {
 
 export type PassRateSource = 'inspection' | 'issue';
 
-type InspectionPassRateRow = {
-  category: string;
-  incomingType: null | string;
-  processName: null | string;
-  qualifiedQuantity: null | number;
-  quantity: number;
-  result: string;
-  team: null | string;
-  unqualifiedQuantity: null | number;
-};
-
-type InspectionQuantitySummary = {
-  qualifiedQuantity: number;
-  quantity: number;
-  unqualifiedQuantity: number;
-};
-
 type IssuePassRateRow = {
   category: null | string;
   incomingType: null | string;
@@ -55,27 +47,6 @@ type IssuePassRateRow = {
 };
 
 const GLOBAL_DEFAULT_TARGET = 99.85;
-
-function roundPercent(value: number) {
-  return Number(value.toFixed(2));
-}
-
-function normalizeInspectionQuantitySummary(
-  item: InspectionPassRateRow,
-): InspectionQuantitySummary {
-  const totalQuantity = Math.max(0, Number(item.quantity) || 0);
-  const rawUnqualified = Number(item.unqualifiedQuantity);
-  const hasUnqualified = Number.isFinite(rawUnqualified);
-  const unqualifiedQuantity = hasUnqualified
-    ? Math.max(0, Math.min(totalQuantity, rawUnqualified))
-    : 0;
-
-  return {
-    quantity: totalQuantity,
-    qualifiedQuantity: totalQuantity - unqualifiedQuantity,
-    unqualifiedQuantity,
-  };
-}
 
 async function getInspectionPassRateRows(start: Date, end: Date) {
   return prisma.inspections.findMany({
@@ -217,69 +188,6 @@ async function getIssuePassRateRows(start: Date, end: Date) {
   }));
 }
 
-const INCOMING_ISSUE_BUCKET_ALIASES: Record<string, string> = {
-  原材料: '原材料',
-  外购件: '外购件',
-  辅材: '辅材',
-  机加成品件: '机加成品件',
-  成品检验: '外购件',
-};
-
-function normalizeIssueBucketText(value: null | string) {
-  return String(value || '')
-    .trim()
-    .replaceAll(/\s+/g, '')
-    .replaceAll(/[：:]/g, '');
-}
-
-function getIssueQuantity(item: IssuePassRateRow) {
-  return Math.max(0, Number(item.quantity) || 0);
-}
-
-function getLinkedIssueCategory(item: IssuePassRateRow) {
-  const category = String(item.inspectionCategory || '')
-    .trim()
-    .toUpperCase();
-  if (category === 'PROCESS' || category === 'INCOMING') return category;
-  return undefined;
-}
-
-function resolveIssueProcessBucket(
-  item: IssuePassRateRow,
-): ProcessPassRateTargetKey | undefined {
-  return mapInspectionToPassRateBucket({
-    processName: item.inspectionProcessName || item.processName,
-    team: item.inspectionTeam || item.responsibleDepartment,
-  });
-}
-
-function resolveIssueIncomingBucket(item: IssuePassRateRow) {
-  const candidates = [
-    item.inspectionIncomingType,
-    item.incomingType,
-    item.processName,
-    item.category,
-    item.inspectionProcessName,
-  ];
-
-  for (const candidate of candidates) {
-    const normalized = normalizeIssueBucketText(candidate);
-    if (normalized && INCOMING_ISSUE_BUCKET_ALIASES[normalized]) {
-      return INCOMING_ISSUE_BUCKET_ALIASES[normalized];
-    }
-  }
-
-  return undefined;
-}
-
-function resolveIssuePassRateCategory(item: IssuePassRateRow) {
-  const linkedCategory = getLinkedIssueCategory(item);
-  if (linkedCategory) return linkedCategory;
-  if (resolveIssueIncomingBucket(item)) return 'INCOMING';
-  if (resolveIssueProcessBucket(item)) return 'PROCESS';
-  return undefined;
-}
-
 export async function getPassRateDrillDownByRange(
   start: Date,
   end: Date,
@@ -313,7 +221,9 @@ export async function getPassRateDrillDownByRange(
       };
     }
 
-    const quantities = normalizeInspectionQuantitySummary(item);
+    const quantities = normalizeInspectionQuantitySummary(
+      item as InspectionQuantitySource,
+    );
     processStats[mappedName].totalCount += quantities.quantity;
     if (source === 'inspection') {
       processStats[mappedName].passCount += quantities.qualifiedQuantity;
@@ -321,10 +231,12 @@ export async function getPassRateDrillDownByRange(
   }
 
   for (const item of issueRows) {
-    if (resolveIssuePassRateCategory(item) !== 'PROCESS') continue;
-    const mappedName = resolveIssueProcessBucket(item);
+    const issueBucketInput = item as IssuePassRateBucketInput;
+    if (resolveIssuePassRateCategory(issueBucketInput) !== 'PROCESS') continue;
+    const mappedName = resolveIssueProcessBucket(issueBucketInput);
     if (!mappedName || !processStats[mappedName]) continue;
-    processStats[mappedName].unqualifiedCount += getIssueQuantity(item);
+    processStats[mappedName].unqualifiedCount +=
+      getIssueQuantity(issueBucketInput);
   }
 
   for (const [name, stats] of Object.entries(processStats)) {
@@ -367,7 +279,9 @@ export async function getPassRateDrillDownByRange(
       };
     }
 
-    const quantities = normalizeInspectionQuantitySummary(item);
+    const quantities = normalizeInspectionQuantitySummary(
+      item as InspectionQuantitySource,
+    );
     incomingStats[bucketName].totalCount += quantities.quantity;
     if (source === 'inspection') {
       incomingStats[bucketName].passCount += quantities.qualifiedQuantity;
@@ -375,16 +289,18 @@ export async function getPassRateDrillDownByRange(
   }
 
   for (const item of issueRows) {
-    if (resolveIssuePassRateCategory(item) !== 'INCOMING') continue;
+    const issueBucketInput = item as IssuePassRateBucketInput;
+    if (resolveIssuePassRateCategory(issueBucketInput) !== 'INCOMING') continue;
     const bucketName = String(
-      resolveIssueIncomingBucket(item) ||
+      resolveIssueIncomingBucket(issueBucketInput) ||
         item.inspectionIncomingType ||
         item.incomingType ||
         item.processName ||
         '',
     ).trim();
     if (!bucketName || !incomingStats[bucketName]) continue;
-    incomingStats[bucketName].unqualifiedCount += getIssueQuantity(item);
+    incomingStats[bucketName].unqualifiedCount +=
+      getIssueQuantity(issueBucketInput);
   }
 
   for (const [name, stats] of Object.entries(incomingStats)) {
