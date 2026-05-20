@@ -47,9 +47,15 @@
 基础字段：
 
 - `traceId`
+- `requestId`
 - `userId`
 - `endpoint`
 - `method`
+
+安全要求：
+
+- 严禁记录明文 `password` / `token` / `authorization` / `cookie`
+- 客户端上报日志仅允许白名单字段，不得透传原始请求体
 
 业务上下文字段：
 

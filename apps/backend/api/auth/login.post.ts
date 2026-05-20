@@ -6,19 +6,30 @@ import {
   clearRefreshTokenCookie,
   setRefreshTokenCookie,
 } from '~/utils/cookie-utils';
+import { createModuleLogger } from '~/utils/logger';
 import {
   forbiddenResponse,
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
+const logger = createModuleLogger('AuthLoginAPI');
+
 async function recordLoginLog(
   params: Parameters<typeof SystemLogService.recordLogin>[0],
+  context: Record<string, unknown>,
 ) {
   try {
     await SystemLogService.recordLogin(params);
   } catch (error) {
-    console.warn('Failed to record login log:', error);
+    logger.warn(
+      {
+        context,
+        err: error,
+        username: params.username,
+      },
+      'Failed to record login log',
+    );
   }
 }
 
@@ -45,12 +56,19 @@ export default defineEventHandler(async (event) => {
       password,
     );
 
-    void recordLoginLog({
-      username,
-      ip: String(ip),
-      userAgent,
-      status: LoginStatusEnum.SUCCESS,
-    });
+    void recordLoginLog(
+      {
+        username,
+        ip: String(ip),
+        userAgent,
+        status: LoginStatusEnum.SUCCESS,
+      },
+      {
+        path: event.path,
+        requestId: event.context.requestId,
+        traceId: event.context.traceId,
+      },
+    );
 
     setRefreshTokenCookie(event, refreshToken);
 
@@ -59,13 +77,20 @@ export default defineEventHandler(async (event) => {
       accessToken,
     });
   } catch (error: any) {
-    void recordLoginLog({
-      username,
-      ip: String(ip),
-      userAgent,
-      status: LoginStatusEnum.FAIL,
-      message: error.message,
-    });
+    void recordLoginLog(
+      {
+        username,
+        ip: String(ip),
+        userAgent,
+        status: LoginStatusEnum.FAIL,
+        message: error.message,
+      },
+      {
+        path: event.path,
+        requestId: event.context.requestId,
+        traceId: event.context.traceId,
+      },
+    );
 
     clearRefreshTokenCookie(event);
     return forbiddenResponse(event, error.message || '登录失败');

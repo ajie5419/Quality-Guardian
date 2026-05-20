@@ -63,6 +63,10 @@ export function verifyAccessToken(
       token,
       ACCESS_TOKEN_SECRET,
     ) as unknown as UserPayload;
+    const resolvedUserId = decoded.id ?? decoded.userId;
+    if (resolvedUserId !== undefined && resolvedUserId !== null) {
+      event.context.userId = String(resolvedUserId);
+    }
 
     return decoded;
   } catch {

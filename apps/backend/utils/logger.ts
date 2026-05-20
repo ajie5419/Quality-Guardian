@@ -1,40 +1,186 @@
 /**
- * Logger - 基于 Pino 的日志系统（带备用方案）
+ * Logger - 基于 Pino 的统一日志模块
  *
- * 功能特性：
- * - 结构化 JSON 日志（生产环境）
- * - 美化输出（开发环境）
- * - 日志级别控制
- * - 预留日志收集平台接入点
- * - 备用 console 日志（当 pino 不可用时）
+ * 目标：
+ * 1) 统一结构化字段，支持 traceId/requestId 全链路追踪
+ * 2) 默认上下文脱敏，避免 token/password 等敏感信息泄露
+ * 3) 保持对历史调用方式兼容，允许渐进迁移
  */
 
+import type { EventHandlerRequest, H3Event } from 'h3';
+
+import { randomUUID } from 'node:crypto';
 import process from 'node:process';
 
+import { getHeader } from 'h3';
 import pino from 'pino';
-
-// ============ 配置 ============
 
 const isDev = process.env.NODE_ENV !== 'production';
 const LOG_LEVEL = process.env.LOG_LEVEL || (isDev ? 'debug' : 'info');
+const REDACTED_VALUE = '[REDACTED]';
+const SENSITIVE_KEY_PATTERN =
+  /pass(?:word)?|token|secret|authorization|cookie|api[-_]?key|session/i;
 
-// ============ 备用 Logger（Console-based）============
+const REQUEST_ID_HEADER = 'x-request-id';
+const TRACE_ID_HEADER = 'x-trace-id';
 
-interface LoggerLike {
+type LogMethod = (objOrMsg?: unknown, msg?: string) => void;
+
+export interface LoggerLike {
   child: (bindings: Record<string, unknown>) => LoggerLike;
-  debug: (obj: unknown, msg?: string) => void;
-  error: (obj: unknown, msg?: string) => void;
-  fatal: (obj: unknown, msg?: string) => void;
-  info: (obj: unknown, msg?: string) => void;
-  trace: (obj: unknown, msg?: string) => void;
-  warn: (obj: unknown, msg?: string) => void;
+  debug: LogMethod;
+  error: LogMethod;
+  fatal: LogMethod;
+  info: LogMethod;
+  trace: LogMethod;
+  warn: LogMethod;
 }
 
-function formatLogObj(obj: unknown): Record<string, unknown> {
-  if (obj && typeof obj === 'object') {
-    return obj as Record<string, unknown>;
+export interface RequestLogContext {
+  method?: string;
+  path?: string;
+  requestId: string;
+  traceId: string;
+  userId?: string;
+}
+
+interface SanitizerState {
+  depth: number;
+  seen: WeakSet<object>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function normalizeLogInput(
+  objOrMsg?: unknown,
+  msg?: string,
+): { data: Record<string, unknown>; message?: string } {
+  if (typeof objOrMsg === 'string') {
+    return { data: {}, message: objOrMsg };
   }
-  return { value: obj };
+
+  if (isRecord(objOrMsg)) {
+    return { data: objOrMsg, message: msg };
+  }
+
+  if (objOrMsg === undefined) {
+    return { data: {}, message: msg };
+  }
+
+  return {
+    data: { value: objOrMsg },
+    message: msg,
+  };
+}
+
+function sanitizeError(error: Error) {
+  return {
+    message: error.message,
+    name: error.name,
+    stack: error.stack,
+  };
+}
+
+function sanitizeValue(value: unknown, state: SanitizerState): unknown {
+  if (value === null || value === undefined) return value;
+  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Error) return sanitizeError(value);
+  if (typeof value === 'bigint') return value.toString();
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'string'
+  ) {
+    return value;
+  }
+
+  if (!isRecord(value) && !Array.isArray(value)) {
+    return String(value);
+  }
+
+  if (state.depth > 6) return '[MaxDepth]';
+  if (isRecord(value) && state.seen.has(value)) return '[Circular]';
+  if (isRecord(value)) state.seen.add(value);
+
+  if (Array.isArray(value)) {
+    return value.map((item) =>
+      sanitizeValue(item, {
+        depth: state.depth + 1,
+        seen: state.seen,
+      }),
+    );
+  }
+
+  const next: Record<string, unknown> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    if (SENSITIVE_KEY_PATTERN.test(key)) {
+      next[key] = REDACTED_VALUE;
+      continue;
+    }
+
+    next[key] = sanitizeValue(raw, {
+      depth: state.depth + 1,
+      seen: state.seen,
+    });
+  }
+  return next;
+}
+
+export function sanitizeContext(
+  context?: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!context) return {};
+  return sanitizeValue(context, {
+    depth: 0,
+    seen: new WeakSet<object>(),
+  }) as Record<string, unknown>;
+}
+
+function createConsoleMethod(
+  level: 'debug' | 'error' | 'fatal' | 'info' | 'trace' | 'warn',
+  bindings: Record<string, unknown>,
+): LogMethod {
+  return (objOrMsg?: unknown, msg?: string) => {
+    const { data, message } = normalizeLogInput(objOrMsg, msg);
+    const merged = sanitizeContext({
+      ...bindings,
+      ...data,
+    });
+
+    if (level === 'trace' && LOG_LEVEL !== 'trace') return;
+    if (level === 'debug' && !['debug', 'trace'].includes(LOG_LEVEL)) return;
+
+    /* eslint-disable no-console */
+    switch (level) {
+      case 'debug': {
+        console.debug('[DEBUG]', merged, message);
+
+        break;
+      }
+      case 'error':
+      case 'fatal': {
+        console.error(`[${level.toUpperCase()}]`, merged, message);
+
+        break;
+      }
+      case 'trace': {
+        console.debug('[TRACE]', merged, message);
+
+        break;
+      }
+      case 'warn': {
+        console.warn('[WARN]', merged, message);
+
+        break;
+      }
+      default: {
+        console.info('[INFO]', merged, message);
+      }
+    }
+    /* eslint-enable no-console */
+  };
 }
 
 const createConsoleLogger = (
@@ -42,134 +188,186 @@ const createConsoleLogger = (
 ): LoggerLike => ({
   child: (newBindings: Record<string, unknown>) =>
     createConsoleLogger({ ...bindings, ...newBindings }),
-  debug: (obj: unknown, msg?: string) => {
-    if (['debug', 'trace'].includes(LOG_LEVEL)) {
-      /* eslint-disable no-console */
-      console.debug('[DEBUG]', { ...bindings, ...formatLogObj(obj) }, msg);
-      /* eslint-enable no-console */
-    }
-  },
-  error: (obj: unknown, msg?: string) => {
-    console.error('[ERROR]', { ...bindings, ...formatLogObj(obj) }, msg);
-  },
-  fatal: (obj: unknown, msg?: string) => {
-    console.error('[FATAL]', { ...bindings, ...formatLogObj(obj) }, msg);
-  },
-  info: (obj: unknown, msg?: string) => {
-    /* eslint-disable no-console */
-    console.info('[INFO]', { ...bindings, ...formatLogObj(obj) }, msg);
-    /* eslint-enable no-console */
-  },
-  trace: (obj: unknown, msg?: string) => {
-    if (LOG_LEVEL === 'trace') {
-      /* eslint-disable no-console */
-      console.debug('[TRACE]', { ...bindings, ...formatLogObj(obj) }, msg);
-      /* eslint-enable no-console */
-    }
-  },
-  warn: (obj: unknown, msg?: string) => {
-    console.warn('[WARN]', { ...bindings, ...formatLogObj(obj) }, msg);
-  },
+  debug: createConsoleMethod('debug', bindings),
+  error: createConsoleMethod('error', bindings),
+  fatal: createConsoleMethod('fatal', bindings),
+  info: createConsoleMethod('info', bindings),
+  trace: createConsoleMethod('trace', bindings),
+  warn: createConsoleMethod('warn', bindings),
 });
 
-// ============ Logger 实例创建 ============
+function withSanitizer(target: LoggerLike): LoggerLike {
+  const wrap = (method: LogMethod): LogMethod => {
+    return (objOrMsg?: unknown, msg?: string) => {
+      const { data, message } = normalizeLogInput(objOrMsg, msg);
+      method(sanitizeContext(data), message);
+    };
+  };
 
-const getBaseOptions = () => ({
+  return {
+    child(bindings: Record<string, unknown>) {
+      return withSanitizer(target.child(sanitizeContext(bindings)));
+    },
+    debug: wrap(target.debug.bind(target)),
+    error: wrap(target.error.bind(target)),
+    fatal: wrap(target.fatal.bind(target)),
+    info: wrap(target.info.bind(target)),
+    trace: wrap(target.trace.bind(target)),
+    warn: wrap(target.warn.bind(target)),
+  };
+}
+
+const getBaseOptions = (): pino.LoggerOptions => ({
   level: LOG_LEVEL,
   base: {
     app: 'qgs-backend',
     env: process.env.NODE_ENV || 'development',
   },
-  timestamp: () =>
-    `,"time":"${new Date().toLocaleString('zh-CN', { hour12: false }).replaceAll('/', '-')}"`,
+  timestamp: pino.stdTimeFunctions.isoTime,
   formatters: {
     level: (label: string) => ({ level: label }),
   },
 });
 
-const createLogger = (): LoggerLike => {
+function createLogger(): LoggerLike {
   try {
     const baseOptions = getBaseOptions();
 
-    // 开发环境使用 pino-pretty（如果可用）
     if (isDev) {
       try {
-        return pino(
-          baseOptions,
-          pino.transport({
-            target: 'pino-pretty',
-            options: {
-              colorize: true,
-              ignore: 'pid,hostname',
-              translateTime: 'SYS:standard',
-            },
-          }),
-        ) as unknown as LoggerLike;
+        return withSanitizer(
+          pino(
+            baseOptions,
+            pino.transport({
+              target: 'pino-pretty',
+              options: {
+                colorize: true,
+                ignore: 'pid,hostname',
+                translateTime: 'SYS:standard',
+              },
+            }),
+          ) as unknown as LoggerLike,
+        );
       } catch {
-        // pino-pretty 不可用，使用普通 pino
-        return pino(baseOptions) as unknown as LoggerLike;
+        return withSanitizer(pino(baseOptions) as unknown as LoggerLike);
       }
-    } else {
-      return pino(baseOptions) as unknown as LoggerLike;
     }
+
+    return withSanitizer(pino(baseOptions) as unknown as LoggerLike);
   } catch {
-    // pino 不可用，使用 console 备用方案
-
     console.warn('[Logger] pino initialization failed, using console fallback');
-
     return createConsoleLogger({
       app: 'qgs-backend',
       env: process.env.NODE_ENV || 'development',
     });
   }
-};
+}
+
+function pickHeaderValue(raw: string | undefined) {
+  if (!raw) return undefined;
+  const value = raw.split(',')[0]?.trim();
+  return value || undefined;
+}
+
+function makeGeneratedId() {
+  return randomUUID().replaceAll('-', '');
+}
+
+export function resolveRequestLogContext(
+  event: H3Event<EventHandlerRequest>,
+): RequestLogContext {
+  const requestId =
+    pickHeaderValue(getHeader(event, REQUEST_ID_HEADER)) || makeGeneratedId();
+  const traceId =
+    pickHeaderValue(getHeader(event, TRACE_ID_HEADER)) || requestId;
+
+  return {
+    method: event.method || event.node.req.method || undefined,
+    path: event.path || event.node.req.url || undefined,
+    requestId,
+    traceId,
+    userId: event.context.userId,
+  };
+}
 
 const logger = createLogger();
 
-// ============ 导出 Logger ============
-
 export { logger };
 
-// ============ 便捷方法 ============
-
-/**
- * 创建带模块名的子 logger
- */
 export function createModuleLogger(moduleName: string): LoggerLike {
   return logger.child({ module: moduleName });
 }
 
-/**
- * 请求级别日志（用于 API 端点）
- */
 export function createRequestLogger(
   requestId: string,
   path: string,
+): LoggerLike;
+export function createRequestLogger(context: RequestLogContext): LoggerLike;
+export function createRequestLogger(
+  requestIdOrContext: RequestLogContext | string,
+  path?: string,
 ): LoggerLike {
-  return logger.child({ requestId, path });
+  if (typeof requestIdOrContext === 'string') {
+    return logger.child({
+      path,
+      requestId: requestIdOrContext,
+      traceId: requestIdOrContext,
+    });
+  }
+
+  return logger.child({
+    ...requestIdOrContext,
+  });
 }
 
-// ============ 全局错误日志 ============
+export function bindRequestLogger(
+  event: H3Event<EventHandlerRequest>,
+  context?: Partial<RequestLogContext>,
+) {
+  const resolved = {
+    ...resolveRequestLogContext(event),
+    ...context,
+  };
+  const requestLogger = createRequestLogger(resolved);
+  event.context.requestId = resolved.requestId;
+  event.context.traceId = resolved.traceId;
+  if (resolved.userId) {
+    event.context.userId = resolved.userId;
+  }
+  event.context.logger = requestLogger;
+  return requestLogger;
+}
+
+export function getRequestLogger(event: H3Event<EventHandlerRequest>) {
+  return event.context.logger || bindRequestLogger(event);
+}
 
 export function logError(
   error: Error | unknown,
   context?: Record<string, unknown>,
 ) {
   if (error instanceof Error) {
-    logger.error({
-      err: {
-        message: error.message,
-        name: error.name,
-        stack: error.stack,
+    logger.error(
+      {
+        err: sanitizeError(error),
+        ...sanitizeContext(context),
       },
-      ...context,
-    });
-  } else {
-    logger.error({ err: error, ...context });
+      'Unhandled error',
+    );
+    return;
   }
-}
 
-// ============ 性能日志 ============
+  logger.error(
+    {
+      err: sanitizeValue(error, {
+        depth: 0,
+        seen: new WeakSet<object>(),
+      }),
+      ...sanitizeContext(context),
+    },
+    'Unhandled error',
+  );
+}
 
 export function logPerformance(
   operation: string,
@@ -180,11 +378,9 @@ export function logPerformance(
     durationMs,
     operation,
     type: 'performance',
-    ...context,
+    ...sanitizeContext(context),
   });
 }
-
-// ============ 审计日志 ============
 
 export function logAudit(
   action: string,
@@ -195,10 +391,8 @@ export function logAudit(
     action,
     type: 'audit',
     userId,
-    ...details,
+    ...sanitizeContext(details),
   });
 }
-
-// ============ 导出默认实例 ============
 
 export default logger;
