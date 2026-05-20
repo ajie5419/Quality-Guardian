@@ -44,6 +44,36 @@ const TARGETS = [
       { re: /const\s+STATUS_KEY_MAP\s*:\s*Record<string,\s*IssueStatus>/g, reason: 'frontend duplicate inspection-issue status map' },
     ],
   },
+  {
+    dir: path.join(ROOT, 'apps/backend/services'),
+    patterns: [
+      { re: /const\s+ISSUE_STATUS\s*=\s*\{/g, reason: 'backend duplicate issue tracking status constant map' },
+      { re: /function\s+parseIssueStatus\s*\([\s\S]{0,600}String\(value\s*\|\|\s*''\)\.toUpperCase\(\)/g, reason: 'backend duplicate issue status parser implementation' },
+      { re: /function\s+normalizeIssueStatus\s*\([\s\S]{0,400}toUpperCase\(\)/g, reason: 'backend duplicate issue status normalizer implementation' },
+      { re: /function\s+deriveInspectionIssueStatus\s*\([\s\S]{0,800}statusSet\.has\('OPEN'\)/g, reason: 'backend duplicate inspection issue status derivation implementation' },
+    ],
+  },
+  {
+    dir: path.join(ROOT, 'apps/web-antd/src/views/qms/reports'),
+    patterns: [
+      { re: /function\s+getIssueStatusColor\s*\([\s\S]{0,600}(?:'OPEN'|'IN_PROGRESS'|'RESOLVED'|'CLOSED'|"OPEN"|"IN_PROGRESS"|"RESOLVED"|"CLOSED")/g, reason: 'frontend duplicate report issue status color mapping' },
+      { re: /function\s+getIssueStatusLabel\s*\([\s\S]{0,600}(?:'OPEN'|'IN_PROGRESS'|'RESOLVED'|'CLOSED'|"OPEN"|"IN_PROGRESS"|"RESOLVED"|"CLOSED")/g, reason: 'frontend duplicate report issue status label mapping' },
+    ],
+  },
+  {
+    dir: path.join(ROOT, 'apps/web-antd/src/views/qms/inspection/records'),
+    patterns: [
+      { re: /function\s+getIssueStatusLabel\s*\([\s\S]{0,600}(?:'OPEN'|'IN_PROGRESS'|'RESOLVED'|'CLOSED'|"OPEN"|"IN_PROGRESS"|"RESOLVED"|"CLOSED")/g, reason: 'frontend duplicate inspection-record issue status label mapping' },
+      { re: /function\s+getIssueStatusColor\s*\([\s\S]{0,600}(?:'OPEN'|'IN_PROGRESS'|'RESOLVED'|'CLOSED'|"OPEN"|"IN_PROGRESS"|"RESOLVED"|"CLOSED")/g, reason: 'frontend duplicate inspection-record issue status color mapping' },
+      { re: /function\s+normalizeIssueStatus\s*\([\s\S]{0,260}toUpperCase\(\)/g, reason: 'frontend duplicate inspection-record issue status normalizer implementation' },
+    ],
+  },
+  {
+    dir: path.join(ROOT, 'apps/web-antd/src/views/qms/welder'),
+    patterns: [
+      { re: /function\s+mapIssueStatusLabel\s*\([\s\S]{0,600}(?:'OPEN'|'IN_PROGRESS'|'RESOLVED'|'CLOSED'|"OPEN"|"IN_PROGRESS"|"RESOLVED"|"CLOSED")/g, reason: 'frontend duplicate welder issue status label mapping' },
+    ],
+  },
 ];
 
 const TARGET_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs', '.vue']);

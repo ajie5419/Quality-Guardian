@@ -13,6 +13,11 @@ import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
 import {
+  ISSUE_TRACKING_STATUS,
+  normalizeIssueTrackingStatus,
+} from '@qgs/domain';
+
+import {
   Badge,
   Button,
   Card,
@@ -222,13 +227,20 @@ function mapSeverityLabel(severity: unknown): '一般' | '严重' | '轻微' {
 }
 
 function mapIssueStatusLabel(status: unknown) {
-  const value = String(status ?? '')
-    .trim()
-    .toUpperCase();
-  if (value === 'OPEN') return '待处理';
-  if (value === 'IN_PROGRESS') return '处理中';
-  if (value === 'RESOLVED') return '已解决';
-  if (value === 'CLOSED') return '已关闭';
+  const normalized = normalizeIssueTrackingStatus(status, {
+    allowed: [
+      ISSUE_TRACKING_STATUS.OPEN,
+      ISSUE_TRACKING_STATUS.IN_PROGRESS,
+      ISSUE_TRACKING_STATUS.RESOLVED,
+      ISSUE_TRACKING_STATUS.CLOSED,
+    ],
+    fallback: ISSUE_TRACKING_STATUS.OPEN,
+  });
+
+  if (normalized === ISSUE_TRACKING_STATUS.OPEN) return '待处理';
+  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return '处理中';
+  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return '已解决';
+  if (normalized === ISSUE_TRACKING_STATUS.CLOSED) return '已关闭';
   return String(status || '-');
 }
 

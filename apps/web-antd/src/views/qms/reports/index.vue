@@ -8,6 +8,7 @@ import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
+import { ISSUE_TRACKING_STATUS, normalizeIssueTrackingStatus } from '@qgs/domain';
 import { Button, DatePicker, Input, message, Tag } from 'ant-design-vue';
 
 import { getDailySummary, saveDailySummary } from '#/api/qms/reports';
@@ -20,22 +21,33 @@ const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const userStore = useUserStore();
 
-// Constants for status
-const STATUS_CLOSED = new Set(['Closed', 'CLOSED']);
+function normalizeReportIssueStatus(status: unknown) {
+  return normalizeIssueTrackingStatus(status, {
+    allowed: [
+      ISSUE_TRACKING_STATUS.OPEN,
+      ISSUE_TRACKING_STATUS.IN_PROGRESS,
+      ISSUE_TRACKING_STATUS.RESOLVED,
+      ISSUE_TRACKING_STATUS.CLOSED,
+    ],
+    fallback: ISSUE_TRACKING_STATUS.OPEN,
+  });
+}
 
 function getIssueStatusColor(status: string) {
-  if (STATUS_CLOSED.has(status)) return 'success';
-  if (['IN_PROGRESS', '处理中'].includes(status)) return 'processing';
-  if (['RESOLVED', '待验证'].includes(status)) return 'warning';
+  const normalized = normalizeReportIssueStatus(status);
+  if (normalized === ISSUE_TRACKING_STATUS.CLOSED) return 'success';
+  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return 'processing';
+  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return 'warning';
   return 'error';
 }
 
 function getIssueStatusLabel(status: string) {
-  if (STATUS_CLOSED.has(status)) {
+  const normalized = normalizeReportIssueStatus(status);
+  if (normalized === ISSUE_TRACKING_STATUS.CLOSED) {
     return t('qms.inspection.issues.status.closed');
   }
-  if (['IN_PROGRESS', '处理中'].includes(status)) return '处理中';
-  if (['RESOLVED', '待验证'].includes(status)) return '待验证';
+  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return '处理中';
+  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return '待验证';
   return t('qms.inspection.issues.status.open');
 }
 

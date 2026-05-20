@@ -11,6 +11,10 @@ import type { UploadFileWithResponse } from '#/views/qms/inspection/issues/types
 
 import { computed, onMounted, reactive, ref } from 'vue';
 
+import {
+  ISSUE_TRACKING_STATUS,
+  normalizeIssueTrackingStatus,
+} from '@qgs/domain';
 import { downloadFileFromBlob } from '@vben/utils';
 
 import { message } from 'ant-design-vue';
@@ -119,10 +123,10 @@ export function useVehicleCommissioningPage() {
   });
 
   const issueStatusOptions = [
-    { label: '待处理', value: 'OPEN' },
-    { label: '处理中', value: 'IN_PROGRESS' },
-    { label: '待验证', value: 'RESOLVED' },
-    { label: '已关闭', value: 'CLOSED' },
+    { label: '待处理', value: ISSUE_TRACKING_STATUS.OPEN },
+    { label: '处理中', value: ISSUE_TRACKING_STATUS.IN_PROGRESS },
+    { label: '待验证', value: ISSUE_TRACKING_STATUS.RESOLVED },
+    { label: '已关闭', value: ISSUE_TRACKING_STATUS.CLOSED },
   ];
 
   const claimStatusOptions = [
@@ -159,7 +163,15 @@ export function useVehicleCommissioningPage() {
       RESOLVED: 0,
     };
     issues.value.forEach((item: VehicleCommissioningIssue) => {
-      const key = item.status as keyof typeof stats;
+      const key = normalizeIssueTrackingStatus(item.status, {
+        allowed: [
+          ISSUE_TRACKING_STATUS.OPEN,
+          ISSUE_TRACKING_STATUS.IN_PROGRESS,
+          ISSUE_TRACKING_STATUS.RESOLVED,
+          ISSUE_TRACKING_STATUS.CLOSED,
+        ],
+        fallback: ISSUE_TRACKING_STATUS.OPEN,
+      }) as keyof typeof stats;
       if (stats[key] !== undefined) stats[key]++;
     });
     return stats;

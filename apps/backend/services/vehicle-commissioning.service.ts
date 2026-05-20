@@ -5,18 +5,16 @@ import type {
   VehicleCommissioningIssueParams,
 } from '@qgs/shared';
 
+import {
+  ISSUE_TRACKING_STATUS,
+  normalizeIssueTrackingStatus,
+} from '@qgs/domain';
 import { formatDate, safeNumber, tryParsePhotos } from '@qgs/shared';
 import { nanoid } from 'nanoid';
 import { AUDIT_TEMPLATES } from '~/constants/audit-templates';
 import { SystemLogService } from '~/services/system-log.service';
 import prisma from '~/utils/prisma';
 
-const ISSUE_STATUS = {
-  CLOSED: 'CLOSED',
-  IN_PROGRESS: 'IN_PROGRESS',
-  OPEN: 'OPEN',
-  RESOLVED: 'RESOLVED',
-} as const;
 const ISSUE_SEVERITY_RANK: Record<string, number> = {
   critical: 3,
   major: 2,
@@ -28,12 +26,16 @@ type VehicleIssueRow = Awaited<
   ReturnType<typeof prisma.vehicle_commissioning_issues.findMany>
 >[number];
 
-function parseIssueStatus(value: unknown) {
-  const raw = String(value || '').toUpperCase();
-  if (raw === ISSUE_STATUS.CLOSED) return ISSUE_STATUS.CLOSED;
-  if (raw === ISSUE_STATUS.RESOLVED) return ISSUE_STATUS.RESOLVED;
-  if (raw === ISSUE_STATUS.IN_PROGRESS) return ISSUE_STATUS.IN_PROGRESS;
-  return ISSUE_STATUS.OPEN;
+function parseIssueStatus(value: unknown): VehicleCommissioningIssue['status'] {
+  return normalizeIssueTrackingStatus(value, {
+    allowed: [
+      ISSUE_TRACKING_STATUS.OPEN,
+      ISSUE_TRACKING_STATUS.IN_PROGRESS,
+      ISSUE_TRACKING_STATUS.RESOLVED,
+      ISSUE_TRACKING_STATUS.CLOSED,
+    ],
+    fallback: ISSUE_TRACKING_STATUS.OPEN,
+  }) as VehicleCommissioningIssue['status'];
 }
 
 function normalizePhotos(photos?: string[]) {
@@ -95,9 +97,9 @@ function formatIssueLine(item: VehicleCommissioningIssue) {
   const desc = String(item.description || item.title || '').trim();
   const part = String(item.partName || '').trim();
   let statusText = '待处理';
-  if (item.status === 'CLOSED') statusText = '已关闭';
-  if (item.status === 'IN_PROGRESS') statusText = '处理中';
-  if (item.status === 'RESOLVED') statusText = '待验证';
+  if (item.status === ISSUE_TRACKING_STATUS.CLOSED) statusText = '已关闭';
+  if (item.status === ISSUE_TRACKING_STATUS.IN_PROGRESS) statusText = '处理中';
+  if (item.status === ISSUE_TRACKING_STATUS.RESOLVED) statusText = '待验证';
   const sections = [
     `[${getSeverityLabel(item.severity)}]`,
     part ? `部件:${part}` : '',
@@ -191,9 +193,9 @@ async function resolveReportIssues(
             ...baseWhere,
             status: {
               in: [
-                ISSUE_STATUS.OPEN,
-                ISSUE_STATUS.IN_PROGRESS,
-                ISSUE_STATUS.RESOLVED,
+                ISSUE_TRACKING_STATUS.OPEN,
+                ISSUE_TRACKING_STATUS.IN_PROGRESS,
+                ISSUE_TRACKING_STATUS.RESOLVED,
               ],
             },
           },
@@ -255,10 +257,10 @@ async function buildRealtimeReportData(row: {
   const reportIssues = await resolveReportIssues(reportPayload);
   const mappedIssues = reportIssues.map((issue) => mapIssueToDto(issue));
   const openIssues = sortIssuesForReport(
-    mappedIssues.filter((item) => item.status !== 'CLOSED'),
+    mappedIssues.filter((item) => item.status !== ISSUE_TRACKING_STATUS.CLOSED),
   );
   const closedIssues = sortIssuesForReport(
-    mappedIssues.filter((item) => item.status === 'CLOSED'),
+    mappedIssues.filter((item) => item.status === ISSUE_TRACKING_STATUS.CLOSED),
   );
 
   return {
@@ -285,10 +287,10 @@ export const VehicleCommissioningService = {
     const reportIssues = await resolveReportIssues(payload);
     const mappedIssues = reportIssues.map((row) => mapIssueToDto(row));
     const closedIssues = sortIssuesForReport(
-      mappedIssues.filter((item) => item.status === 'CLOSED'),
+      mappedIssues.filter((item) => item.status === ISSUE_TRACKING_STATUS.CLOSED),
     );
     const openIssues = sortIssuesForReport(
-      mappedIssues.filter((item) => item.status !== 'CLOSED'),
+      mappedIssues.filter((item) => item.status !== ISSUE_TRACKING_STATUS.CLOSED),
     );
     const issueIds = mappedIssues.map((item) => item.id);
 
@@ -342,7 +344,7 @@ export const VehicleCommissioningService = {
         id: `DA-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`,
         date: payload.date ? new Date(payload.date) : now,
         status,
-        closedAt: status === ISSUE_STATUS.CLOSED ? now : null,
+        closedAt: status === ISSUE_TRACKING_STATUS.CLOSED ? now : null,
         partName: payload.partName || '车辆总成',
         description: payload.description || payload.title || '',
         issuePhoto: normalizePhotos(payload.photos),
@@ -491,7 +493,7 @@ export const VehicleCommissioningService = {
         ? undefined
         : parseIssueStatus(payload.status);
     let closedAt: Date | null | undefined;
-    if (status === ISSUE_STATUS.CLOSED) {
+    if (status === ISSUE_TRACKING_STATUS.CLOSED) {
       closedAt = new Date();
     } else if (status !== undefined) {
       closedAt = null;

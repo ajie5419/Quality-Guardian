@@ -8,6 +8,10 @@ import { basename, extname, join } from 'node:path';
 import process from 'node:process';
 
 import { Prisma } from '@prisma/client';
+import {
+  deriveIssueTrackingStatus,
+  ISSUE_TRACKING_STATUS,
+} from '@qgs/domain';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
 import { AUDIT_TEMPLATES } from '~/constants/audit-templates';
 import { FileStorageService } from '~/services/file-storage.service';
@@ -60,22 +64,12 @@ type InspectionQuantitySummary = {
 };
 
 function deriveInspectionIssueStatus(issues: LinkedIssueSummary[]): string {
-  if (issues.length === 0) {
-    return 'NO_ISSUE';
-  }
-
-  const statusSet = new Set(
-    issues.map((issue) => String(issue.status || '').toUpperCase()),
+  const status = deriveIssueTrackingStatus(
+    issues.map((issue) => issue.status),
   );
-
-  if (statusSet.has('OPEN')) return 'OPEN';
-  if (statusSet.has('IN_PROGRESS') || statusSet.has('CLAIMING')) {
-    return 'IN_PROGRESS';
-  }
-  if (statusSet.has('RESOLVED')) return 'RESOLVED';
-  if (statusSet.has('CLOSED')) return 'CLOSED';
-
-  return issues[0]?.status || 'OPEN';
+  return status === ISSUE_TRACKING_STATUS.NO_ISSUE
+    ? ISSUE_TRACKING_STATUS.NO_ISSUE
+    : status;
 }
 
 interface InspectionItemInput {

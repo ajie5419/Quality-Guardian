@@ -3,17 +3,16 @@ import type {
   SupervisionPlanTaskStatus,
 } from '@qgs/shared';
 
+import {
+  ISSUE_TRACKING_STATUS,
+  normalizeIssueTrackingStatus,
+} from '@qgs/domain';
+
 export const PROJECT_STATUSES = new Set([
   'COMPLETED',
   'IN_PROGRESS',
   'PAUSED',
   'PLANNED',
-]);
-export const ISSUE_STATUSES = new Set([
-  'CLOSED',
-  'IN_PROGRESS',
-  'OPEN',
-  'VERIFYING',
 ]);
 export const PROJECT_TYPES = new Set(['BRIDGE', 'MOLD', 'VEHICLE']);
 export const EXCEL_EXTENSIONS = new Set(['.xls', '.xlsx']);
@@ -89,8 +88,15 @@ export function normalizeProjectType(value: unknown) {
 }
 
 export function normalizeIssueStatus(value: unknown) {
-  const status = normalizeText(value).toUpperCase();
-  return ISSUE_STATUSES.has(status) ? status : 'OPEN';
+  return normalizeIssueTrackingStatus(value, {
+    allowed: [
+      ISSUE_TRACKING_STATUS.OPEN,
+      ISSUE_TRACKING_STATUS.IN_PROGRESS,
+      ISSUE_TRACKING_STATUS.CLOSED,
+      ISSUE_TRACKING_STATUS.VERIFYING,
+    ],
+    fallback: ISSUE_TRACKING_STATUS.OPEN,
+  });
 }
 
 export function calculatePlanTaskStatus(task: {

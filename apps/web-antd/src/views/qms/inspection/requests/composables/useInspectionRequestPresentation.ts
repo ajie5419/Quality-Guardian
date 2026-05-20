@@ -8,6 +8,11 @@ import type {
 
 import { computed } from 'vue';
 
+import {
+  ISSUE_TRACKING_STATUS,
+  normalizeIssueTrackingStatus,
+} from '@qgs/domain';
+
 interface RequestStatsState {
   inspectorStatus: Array<{
     activeTaskCount: number;
@@ -104,19 +109,49 @@ export function useInspectionRequestPresentation(
   }
 
   function issueStatusLabel(status?: null | string) {
-    const map: Record<string, string> = {
-      CLAIMING: '索赔中',
-      CLOSED: '已关闭',
-      IN_PROGRESS: '处理中',
-      OPEN: '待处理',
-      RESOLVED: '已解决',
-    };
-    return status ? map[status] || status : '-';
+    if (!status) return '-';
+
+    const normalized = normalizeIssueTrackingStatus(status, {
+      allowed: [
+        ISSUE_TRACKING_STATUS.CLAIMING,
+        ISSUE_TRACKING_STATUS.OPEN,
+        ISSUE_TRACKING_STATUS.IN_PROGRESS,
+        ISSUE_TRACKING_STATUS.RESOLVED,
+        ISSUE_TRACKING_STATUS.CLOSED,
+      ],
+      fallback: ISSUE_TRACKING_STATUS.OPEN,
+    });
+
+    if (normalized === ISSUE_TRACKING_STATUS.CLAIMING) return '索赔中';
+    if (normalized === ISSUE_TRACKING_STATUS.OPEN) return '待处理';
+    if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return '处理中';
+    if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return '已解决';
+    return '已关闭';
   }
 
   function issueStatusColor(status?: null | string) {
-    if (status === 'CLOSED' || status === 'RESOLVED') return 'success';
-    if (status === 'IN_PROGRESS' || status === 'CLAIMING') return 'processing';
+    const normalized = normalizeIssueTrackingStatus(status, {
+      allowed: [
+        ISSUE_TRACKING_STATUS.CLAIMING,
+        ISSUE_TRACKING_STATUS.OPEN,
+        ISSUE_TRACKING_STATUS.IN_PROGRESS,
+        ISSUE_TRACKING_STATUS.RESOLVED,
+        ISSUE_TRACKING_STATUS.CLOSED,
+      ],
+      fallback: ISSUE_TRACKING_STATUS.OPEN,
+    });
+    if (
+      normalized === ISSUE_TRACKING_STATUS.CLOSED ||
+      normalized === ISSUE_TRACKING_STATUS.RESOLVED
+    ) {
+      return 'success';
+    }
+    if (
+      normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS ||
+      normalized === ISSUE_TRACKING_STATUS.CLAIMING
+    ) {
+      return 'processing';
+    }
     return 'warning';
   }
 

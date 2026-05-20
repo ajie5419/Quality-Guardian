@@ -7,6 +7,10 @@ import { useRoute } from 'vue-router';
 import { Page } from '@vben/common-ui';
 
 import {
+  ISSUE_TRACKING_STATUS,
+  normalizeIssueTrackingStatus,
+} from '@qgs/domain';
+import {
   Descriptions,
   Drawer,
   Modal,
@@ -47,25 +51,34 @@ function openDetail(record: QmsInspectionApi.InspectionRecord) {
   detailVisible.value = true;
 }
 
+function normalizeInspectionRecordIssueStatus(status: unknown) {
+  return normalizeIssueTrackingStatus(status, {
+    allowed: [
+      ISSUE_TRACKING_STATUS.NO_ISSUE,
+      ISSUE_TRACKING_STATUS.OPEN,
+      ISSUE_TRACKING_STATUS.IN_PROGRESS,
+      ISSUE_TRACKING_STATUS.RESOLVED,
+      ISSUE_TRACKING_STATUS.CLOSED,
+    ],
+    fallback: ISSUE_TRACKING_STATUS.NO_ISSUE,
+  });
+}
+
 function getIssueStatusLabel(status: unknown) {
-  const value = String(status || '')
-    .trim()
-    .toUpperCase();
-  if (value === 'OPEN') return '待处理';
-  if (value === 'IN_PROGRESS') return '处理中';
-  if (value === 'RESOLVED') return '待验证';
-  if (value === 'CLOSED') return '已关闭';
+  const normalized = normalizeInspectionRecordIssueStatus(status);
+  if (normalized === ISSUE_TRACKING_STATUS.OPEN) return '待处理';
+  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return '处理中';
+  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return '待验证';
+  if (normalized === ISSUE_TRACKING_STATUS.CLOSED) return '已关闭';
   return '无问题';
 }
 
 function getIssueStatusColor(status: unknown) {
-  const value = String(status || '')
-    .trim()
-    .toUpperCase();
-  if (value === 'OPEN') return 'default';
-  if (value === 'IN_PROGRESS') return 'processing';
-  if (value === 'RESOLVED') return 'warning';
-  if (value === 'CLOSED') return 'success';
+  const normalized = normalizeInspectionRecordIssueStatus(status);
+  if (normalized === ISSUE_TRACKING_STATUS.OPEN) return 'default';
+  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return 'processing';
+  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return 'warning';
+  if (normalized === ISSUE_TRACKING_STATUS.CLOSED) return 'success';
   return 'default';
 }
 

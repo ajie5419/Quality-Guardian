@@ -8,6 +8,7 @@ import { computed, ref, watch } from 'vue';
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 
+import { ISSUE_TRACKING_STATUS, normalizeIssueTrackingStatus } from '@qgs/domain';
 import { Button, message, Modal, Space, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
@@ -218,10 +219,16 @@ const gridOptions = computed(() => ({
 const checkedRows = ref<QmsInspectionApi.InspectionRecord[]>([]);
 
 function normalizeIssueStatus(status: unknown) {
-  const normalized = String(status || '')
-    .trim()
-    .toUpperCase();
-  return normalized || 'NO_ISSUE';
+  return normalizeIssueTrackingStatus(status, {
+    allowed: [
+      ISSUE_TRACKING_STATUS.NO_ISSUE,
+      ISSUE_TRACKING_STATUS.OPEN,
+      ISSUE_TRACKING_STATUS.IN_PROGRESS,
+      ISSUE_TRACKING_STATUS.RESOLVED,
+      ISSUE_TRACKING_STATUS.CLOSED,
+    ],
+    fallback: ISSUE_TRACKING_STATUS.NO_ISSUE,
+  });
 }
 
 function filterBySourceInspectionId(
@@ -397,7 +404,7 @@ defineExpose({ reload });
     </template>
 
     <template #issueStatus="{ row }">
-      <Tag v-if="normalizeIssueStatus(row.issueStatus) === 'NO_ISSUE'">
+      <Tag v-if="normalizeIssueStatus(row.issueStatus) === ISSUE_TRACKING_STATUS.NO_ISSUE">
         无问题
       </Tag>
       <QmsStatusTag

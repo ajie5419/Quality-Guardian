@@ -9,3 +9,4 @@ export * from './modules/qms/quality-loss-update-parser';
 export * from './modules/qms/task-dispatch';
 export * from './modules/qms/work-order';
 export * from './modules/qms/work-order-status';
+export * from './modules/qms/issue-tracking-status';

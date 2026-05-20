@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 import { Page } from '@vben/common-ui';
 
+import { ISSUE_TRACKING_STATUS, normalizeIssueTrackingStatus } from '@qgs/domain';
+
 import {
   Button,
   Card,
@@ -22,6 +24,35 @@ import IssuePhotoUpload from '#/views/qms/inspection/issues/components/IssuePhot
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
 
 import { useVehicleCommissioningPage } from './composables/useVehicleCommissioningPage';
+
+
+function resolveIssueDisplayStatus(status: unknown) {
+  return normalizeIssueTrackingStatus(status, {
+    allowed: [
+      ISSUE_TRACKING_STATUS.OPEN,
+      ISSUE_TRACKING_STATUS.IN_PROGRESS,
+      ISSUE_TRACKING_STATUS.RESOLVED,
+      ISSUE_TRACKING_STATUS.CLOSED,
+    ],
+    fallback: ISSUE_TRACKING_STATUS.OPEN,
+  });
+}
+
+function issueStatusColor(status: unknown) {
+  const normalized = resolveIssueDisplayStatus(status);
+  if (normalized === ISSUE_TRACKING_STATUS.CLOSED) return 'green';
+  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return 'blue';
+  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return 'purple';
+  return 'orange';
+}
+
+function issueStatusLabel(status: unknown) {
+  const normalized = resolveIssueDisplayStatus(status);
+  if (normalized === ISSUE_TRACKING_STATUS.CLOSED) return '已关闭';
+  if (normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS) return '处理中';
+  if (normalized === ISSUE_TRACKING_STATUS.RESOLVED) return '待验证';
+  return '待处理';
+}
 
 const {
   claimStatusOptions,
@@ -188,25 +219,9 @@ const {
                   </Tag>
                   <Tag
                     v-else
-                    :color="
-                      record.status === 'CLOSED'
-                        ? 'green'
-                        : record.status === 'IN_PROGRESS'
-                          ? 'blue'
-                          : record.status === 'RESOLVED'
-                            ? 'purple'
-                            : 'orange'
-                    "
+                    :color="issueStatusColor(record.status)"
                   >
-                    {{
-                      record.status === 'CLOSED'
-                        ? '已关闭'
-                        : record.status === 'IN_PROGRESS'
-                          ? '处理中'
-                          : record.status === 'RESOLVED'
-                            ? '待验证'
-                            : '待处理'
-                    }}
+                    {{ issueStatusLabel(record.status) }}
                   </Tag>
                 </template>
               </Table.Column>

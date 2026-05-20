@@ -1,5 +1,9 @@
 import type { IssueItem, WeeklyReportData } from '@qgs/shared';
 
+import {
+  ISSUE_TRACKING_STATUS,
+  normalizeIssueTrackingStatus,
+} from '@qgs/domain';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
@@ -18,12 +22,25 @@ function formatDate(date: Date): string {
 }
 
 function mapTrackingProgress(status?: null | string): string {
-  const normalized = String(status || '').toUpperCase();
-  if (normalized === 'PENDING') return '待处理';
-  if (['IN_PROGRESS', 'OPEN', 'PROCESSING'].includes(normalized))
+  const normalized = normalizeIssueTrackingStatus(status, {
+    allowed: [
+      ISSUE_TRACKING_STATUS.OPEN,
+      ISSUE_TRACKING_STATUS.IN_PROGRESS,
+      ISSUE_TRACKING_STATUS.CLAIMING,
+      ISSUE_TRACKING_STATUS.RESOLVED,
+      ISSUE_TRACKING_STATUS.CLOSED,
+    ],
+    fallback: ISSUE_TRACKING_STATUS.OPEN,
+  });
+
+  if (normalized === ISSUE_TRACKING_STATUS.OPEN) return '待处理';
+  if (
+    normalized === ISSUE_TRACKING_STATUS.IN_PROGRESS ||
+    normalized === ISSUE_TRACKING_STATUS.CLAIMING
+  ) {
     return '进行中';
-  if (CLOSED_TRACKING_STATUSES.includes(normalized)) return '已关闭';
-  return '待处理';
+  }
+  return '已关闭';
 }
 
 async function createDepartmentNameResolver(): Promise<
