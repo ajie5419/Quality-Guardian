@@ -1,4 +1,4 @@
-import { mapAfterSalesStatus } from '~/utils/after-sales-status';
+import { mapAfterSalesStatus } from '@qgs/domain';
 
 export type AfterSalesDateMode = 'month' | 'week' | 'year';
 

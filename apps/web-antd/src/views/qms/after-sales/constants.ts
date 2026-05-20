@@ -6,6 +6,13 @@ import { computed } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
+import {
+  AFTER_SALES_STATUS,
+  AFTER_SALES_STATUS_COLOR_MAP,
+  isKnownAfterSalesStatusInput,
+  mapAfterSalesStatus,
+} from '@qgs/domain';
+
 // ==================== 产品选项 ====================
 
 // ==================== 缺陷选项 ====================
@@ -32,74 +39,56 @@ function normalizeStatusKey(value: string) {
     .toUpperCase();
 }
 
+function buildAfterSalesStatusLabelMap(
+  t: ReturnType<typeof useI18n>['t'],
+): Record<keyof typeof AFTER_SALES_STATUS, string> {
+  return {
+    [AFTER_SALES_STATUS.OPEN]: t('qms.afterSales.status.pending'),
+    [AFTER_SALES_STATUS.IN_PROGRESS]: t('qms.afterSales.status.processing'),
+    [AFTER_SALES_STATUS.SUBMITTED]: t('qms.afterSales.status.processing'),
+    [AFTER_SALES_STATUS.NEGOTIATING]: t('qms.afterSales.status.processing'),
+    [AFTER_SALES_STATUS.RESOLVED]: t('qms.afterSales.status.resolved'),
+    [AFTER_SALES_STATUS.COMPLETED]: t('qms.workOrder.status.completed'),
+    [AFTER_SALES_STATUS.CLOSED]: t('qms.afterSales.status.closed'),
+    [AFTER_SALES_STATUS.CANCELLED]: t('workOrder.status.cancelled'),
+  };
+}
+
+function buildStatusInfo(
+  status: string,
+  labelMap: Record<keyof typeof AFTER_SALES_STATUS, string>,
+): { color: string; label: string } {
+  const canonical = mapAfterSalesStatus(status);
+  return {
+    color: AFTER_SALES_STATUS_COLOR_MAP[canonical] || 'default',
+    label: labelMap[canonical] || status,
+  };
+}
+
 export function useStatusOptions() {
   const { t } = useI18n();
 
+  const labelMap = computed(() => buildAfterSalesStatusLabelMap(t));
+
   const statusOptions: ComputedRef<StatusOption[]> = computed(() => [
     {
-      value: 'IN_PROGRESS',
-      label: t('qms.afterSales.status.processing'),
-      color: 'blue',
+      value: AFTER_SALES_STATUS.IN_PROGRESS,
+      label: labelMap.value[AFTER_SALES_STATUS.IN_PROGRESS],
+      color: AFTER_SALES_STATUS_COLOR_MAP[AFTER_SALES_STATUS.IN_PROGRESS],
     },
     {
-      value: 'COMPLETED',
-      label: t('qms.workOrder.status.completed'),
-      color: 'green',
+      value: AFTER_SALES_STATUS.COMPLETED,
+      label: labelMap.value[AFTER_SALES_STATUS.COMPLETED],
+      color: AFTER_SALES_STATUS_COLOR_MAP[AFTER_SALES_STATUS.COMPLETED],
     },
   ]);
 
-  const statusMap = computed(() => {
-    const processing = {
-      label: t('qms.afterSales.status.processing'),
-      color: 'blue',
-    };
-    const pending = {
-      label: t('qms.afterSales.status.pending'),
-      color: 'orange',
-    };
-    const resolved = {
-      label: t('qms.afterSales.status.resolved'),
-      color: 'green',
-    };
-    const closed = { label: t('qms.afterSales.status.closed'), color: 'gray' };
-    const completed = {
-      label: t('qms.workOrder.status.completed'),
-      color: 'green',
-    };
-    const cancelled = {
-      label: t('workOrder.status.cancelled'),
-      color: 'red',
-    };
-
-    return {
-      PENDING: pending,
-      IN_PROGRESS: processing,
-      'IN PROGRESS': processing,
-      PROCESSING: processing,
-      RESOLVED: resolved,
-      COMPLETED: completed,
-      CLOSED: closed,
-      CANCELLED: cancelled,
-      OPEN: pending,
-      待处理: pending,
-      处理中: processing,
-      已结束: resolved,
-      已完成: completed,
-      已关闭: closed,
-      已取消: cancelled,
-    } as Record<string, { color: string; label: string }>;
-  });
-
   function getStatusInfo(status: string) {
     if (!status) return { label: '-', color: 'default' };
-    const key = String(status).toUpperCase();
-    return (
-      statusMap.value[status] ||
-      statusMap.value[key] || { label: status, color: 'default' }
-    );
+    return buildStatusInfo(status, labelMap.value);
   }
 
-  return { statusOptions, statusMap, getStatusInfo };
+  return { statusOptions, getStatusInfo };
 }
 
 export function mapDictionaryOptionsToAfterSalesStatus(
@@ -115,10 +104,15 @@ export function mapDictionaryOptionsToAfterSalesStatus(
   }
   return options.map((item) => {
     const key = normalizeStatusKey(item.dictKey);
+    const canonical = mapAfterSalesStatus(item.dictKey);
+    const knownStatus = isKnownAfterSalesStatusInput(item.dictKey);
     return {
       value: item.dictKey,
       label: item.dictValue || item.dictKey,
-      color: colorMap[key] || 'default',
+      color:
+        colorMap[key] ||
+        (knownStatus ? AFTER_SALES_STATUS_COLOR_MAP[canonical] : undefined) ||
+        'default',
     };
   });
 }
@@ -161,7 +155,7 @@ export function createInitialFormState() {
     quantity: 1,
     runningHours: 0,
     severity: 'P2 级',
-    status: 'IN_PROGRESS',
+    status: AFTER_SALES_STATUS.IN_PROGRESS,
     supplierBrand: '',
     warrantyStatus: '在保',
     photos: [],

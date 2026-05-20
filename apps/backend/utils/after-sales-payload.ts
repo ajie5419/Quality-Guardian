@@ -1,4 +1,4 @@
-import { mapAfterSalesStatus } from '~/utils/after-sales-status';
+import { mapAfterSalesStatus } from '@qgs/domain';
 
 function normalizeString(value: unknown): string | undefined {
   const normalized = String(value ?? '').trim();

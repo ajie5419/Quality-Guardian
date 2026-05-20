@@ -1,5 +1,7 @@
+export * from './modules/qms/after-sales-status';
 export * from './modules/qms/inspection-issue-core';
 export * from './modules/qms/inspection-issue-query';
+export * from './modules/qms/inspection-issue-status';
 export * from './modules/qms/inspection-request';
 export * from './modules/qms/quality-loss-query';
 export * from './modules/qms/quality-loss-status';

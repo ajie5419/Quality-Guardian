@@ -1,31 +1,15 @@
 import type { InspectionIssue } from '../types';
 
+import { INSPECTION_ISSUE_STATUS, mapInspectionIssueStatus } from '@qgs/domain';
+
 import { ISSUE_STATUS_UI_MAP, SEVERITY_OPTIONS } from '../constants';
 import { IssueStatus, Severity } from '../types';
-
-/**
- * 状态映射表：支持多种格式（中英文）到枚举的转换
- */
-const STATUS_KEY_MAP: Record<string, IssueStatus> = {
-  // 英文
-  OPEN: IssueStatus.OPEN,
-  IN_PROGRESS: IssueStatus.IN_PROGRESS,
-  CLOSED: IssueStatus.CLOSED,
-  // 中文
-  开启: IssueStatus.OPEN,
-  进行中: IssueStatus.IN_PROGRESS,
-  已关闭: IssueStatus.CLOSED,
-  待处理: IssueStatus.OPEN,
-  处理中: IssueStatus.IN_PROGRESS,
-  // 兼容 IssueStatus 枚举本身可能有的其他变体
-};
 
 /**
  * 获取状态枚举值
  */
 export function getStatusKey(status: IssueStatus | string): IssueStatus {
-  const s = String(status || '').toUpperCase();
-  return STATUS_KEY_MAP[s] || STATUS_KEY_MAP[status] || (s as IssueStatus);
+  return mapInspectionIssueStatus(status) as IssueStatus;
 }
 
 /**
@@ -65,7 +49,7 @@ export function getSeverityLabel(severity: Severity | string): string {
  * 检查是否已关闭
  */
 export function isStatusClosed(issue: InspectionIssue): boolean {
-  return issue.status === IssueStatus.CLOSED;
+  return issue.status === INSPECTION_ISSUE_STATUS.CLOSED;
 }
 
 /**
@@ -73,7 +57,7 @@ export function isStatusClosed(issue: InspectionIssue): boolean {
  */
 export function isStatusOpenOrInProgress(issue: InspectionIssue): boolean {
   return (
-    issue.status === IssueStatus.OPEN ||
-    issue.status === IssueStatus.IN_PROGRESS
+    issue.status === INSPECTION_ISSUE_STATUS.OPEN ||
+    issue.status === INSPECTION_ISSUE_STATUS.IN_PROGRESS
   );
 }

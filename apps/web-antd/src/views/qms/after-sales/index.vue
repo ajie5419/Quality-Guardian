@@ -11,6 +11,7 @@ import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
+import { AFTER_SALES_IMPORT_STATUS_MAP } from '@qgs/domain';
 import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Button,
@@ -178,15 +179,7 @@ const { handleImport } = useGridImport({
     ReturnType<typeof useVbenVxeGrid>[1] | undefined
   >,
   importApi: importAfterSalesExcel,
-  statusMap: {
-    待处理: 'OPEN',
-    处理中: 'IN_PROGRESS',
-    已解决: 'RESOLVED',
-    已结束: 'CLOSED',
-    已完结: 'CLOSED',
-    已完成: 'COMPLETED',
-    已取消: 'CANCELLED',
-  },
+  statusMap: AFTER_SALES_IMPORT_STATUS_MAP,
   onSuccess: () => {
     invalidateAfterSales();
     chartRefreshKey.value++;

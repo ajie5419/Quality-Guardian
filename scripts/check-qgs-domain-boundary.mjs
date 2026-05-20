@@ -10,6 +10,10 @@ const TARGETS = [
         re: /const\s+STATUS_MAPPING_TABLE\s*:[\s\S]{0,800}WORK_ORDER_STATUS/g,
         reason: 'duplicate work-order status mapping table',
       },
+      {
+        re: /const\s+STATUS_MAPPING_TABLE\s*:[\s\S]{0,1200}AFTER_SALES_STATUS/g,
+        reason: 'duplicate after-sales status mapping table',
+      },
       { re: /const\s+TASK_DISPATCH_STATUS_SET\s*=\s*new\s+Set/g, reason: 'duplicate task-dispatch status set' },
       { re: /function\s+normalizeTaskDispatchText\s*\(/g, reason: 'duplicate task-dispatch text normalizer' },
       { re: /function\s+parseTaskDispatchInt\s*\(/g, reason: 'duplicate task-dispatch integer parser' },
@@ -25,6 +29,19 @@ const TARGETS = [
     dir: path.join(ROOT, 'apps/web-antd/src/views/qms/work-order'),
     patterns: [
       { re: /const\s+STATUS_MAPPING_TABLE\s*:/g, reason: 'frontend duplicate work-order status mapping table' },
+    ],
+  },
+  {
+    dir: path.join(ROOT, 'apps/web-antd/src/views/qms/after-sales'),
+    patterns: [
+      { re: /statusMap:\s*\{[\s\S]{0,1000}待处理[\s\S]{0,1000}已取消[\s\S]{0,1000}\}/g, reason: 'frontend duplicate after-sales import status map' },
+      { re: /const\s+statusMap\s*=\s*computed\s*\(\s*\(\)\s*=>\s*\{/g, reason: 'frontend duplicate after-sales status map' },
+    ],
+  },
+  {
+    dir: path.join(ROOT, 'apps/web-antd/src/views/qms/inspection/issues'),
+    patterns: [
+      { re: /const\s+STATUS_KEY_MAP\s*:\s*Record<string,\s*IssueStatus>/g, reason: 'frontend duplicate inspection-issue status map' },
     ],
   },
 ];
