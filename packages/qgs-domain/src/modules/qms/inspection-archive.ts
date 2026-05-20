@@ -25,4 +25,3 @@ export function mapInspectionArchiveStatusLabel(status?: string) {
   if (normalized === 'REJECTED') return '已退回';
   return '待整理';
 }
-
