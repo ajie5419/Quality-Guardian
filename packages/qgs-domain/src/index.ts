@@ -32,6 +32,7 @@ export * from './modules/qms/request-validation';
 export * from './modules/qms/supervision-core';
 export * from './modules/qms/supplier';
 export * from './modules/qms/task-dispatch';
+export * from './modules/qms/ua-parser';
 export * from './modules/qms/welder';
 export * from './modules/qms/welder-score';
 export * from './modules/qms/work-order';
