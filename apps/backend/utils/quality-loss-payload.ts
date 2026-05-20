@@ -3,11 +3,11 @@ import type { Prisma, quality_losses } from '@prisma/client';
 import {
   buildQualityLossCreateData as buildQualityLossCreateDataRule,
   buildQualityLossCreateResponse as buildQualityLossCreateResponseRule,
+  createQualityLossId as createQualityLossIdRule,
 } from '@qgs/domain';
-import { nanoid } from 'nanoid';
 
 export function createQualityLossId(now = new Date()): string {
-  return `QL-${now.getFullYear()}-${nanoid(6).toUpperCase()}`;
+  return createQualityLossIdRule(now);
 }
 
 export function buildQualityLossCreateData(

@@ -1,4 +1,17 @@
 import { normalizeQualityLossStatus } from './quality-loss-status';
+const QUALITY_LOSS_ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const QUALITY_LOSS_ID_SIZE = 6;
+
+function createQualityLossIdSuffix(size = QUALITY_LOSS_ID_SIZE) {
+  let output = '';
+  for (let index = 0; index < size; index += 1) {
+    const randomIndex = Math.floor(
+      Math.random() * QUALITY_LOSS_ID_ALPHABET.length,
+    );
+    output += QUALITY_LOSS_ID_ALPHABET[randomIndex];
+  }
+  return output;
+}
 
 function parseQualityLossNumber(value: unknown, fallback: number): number {
   const parsed = Number(value);
@@ -14,6 +27,10 @@ function parseQualityLossDate(value: unknown): Date {
   }
   const parsed = new Date(String(value));
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+export function createQualityLossId(now = new Date()): string {
+  return `QL-${now.getFullYear()}-${createQualityLossIdSuffix()}`;
 }
 
 export function buildQualityLossCreateData(
