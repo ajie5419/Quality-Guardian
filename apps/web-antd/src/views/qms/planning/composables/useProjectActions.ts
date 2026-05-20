@@ -3,8 +3,8 @@ import type { PlanningTreeNode } from '../types';
 import { useI18n } from '@vben/locales';
 
 import { message, Modal } from 'ant-design-vue';
+import { ProjectStatusEnum } from '@qgs/enums';
 
-import { ProjectStatusEnum } from '#/api/qms/enums';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 /**

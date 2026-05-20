@@ -295,6 +295,24 @@ const customConfig: Linter.Config[] = [
     },
   },
   {
+    // 已迁移 QMS 视图层枚举强制：禁止继续经由 #/api/qms/enums 中转
+    files: ['apps/web-antd/src/views/qms/**/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['#/api/qms/enums'],
+              message:
+                'Use @qgs/enums directly in QMS view modules instead of #/api/qms/enums.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // 已迁移常量强制：禁止在迁移文件里回退到本地枚举派生常量
     files: [
       'apps/web-antd/src/views/qms/quality-loss/constants.ts',

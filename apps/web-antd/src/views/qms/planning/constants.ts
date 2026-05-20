@@ -1,6 +1,6 @@
 import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
-import { ProjectStatusEnum } from '#/api/qms/enums';
+import { ProjectStatusEnum } from '@qgs/enums';
 
 /**
  * Project Status UI Map

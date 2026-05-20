@@ -4,7 +4,7 @@ import type { PlanningTreeNode } from '../types';
 
 import { computed, ref } from 'vue';
 
-import { ProjectStatusEnum } from '#/api/qms/enums';
+import { ProjectStatusEnum } from '@qgs/enums';
 
 /**
  * 通用的项目列表管理 Hook

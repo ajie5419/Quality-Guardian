@@ -1,4 +1,4 @@
-import { SupplierStatusEnum } from '#/api/qms/enums';
+import { SupplierStatusEnum } from '@qgs/enums';
 
 /**
  * Shared rating colors for supplier-related pages.
