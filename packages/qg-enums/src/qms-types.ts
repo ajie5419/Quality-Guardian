@@ -102,3 +102,38 @@ export enum ProjectStatusEnum {
   ACTIVE = 'active',
   ARCHIVED = 'archived',
 }
+
+export const INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS = {
+  OUTSOURCED: ISSUE_DEPT_TYPE.OUTSOURCED,
+  PRODUCTION: ISSUE_DEPT_TYPE.PRODUCTION,
+  PURCHASE: ISSUE_DEPT_TYPE.PURCHASE,
+} as const;
+
+export const INSPECTION_ISSUE_SEVERITY_OPTIONS = [
+  { color: 'blue', label: '轻微', value: ISSUE_SEVERITY.MINOR },
+  { color: 'orange', label: '严重', value: ISSUE_SEVERITY.MAJOR },
+  { color: 'red', label: '重大', value: ISSUE_SEVERITY.CRITICAL },
+] as const;
+
+export const INSPECTION_ISSUE_CLAIM_OPTIONS = [
+  { label: '是', value: CLAIM_STATUS.YES },
+  { label: '否', value: CLAIM_STATUS.NO },
+] as const;
+
+export const INSPECTION_ISSUE_DEFAULT_VALUES = {
+  DEFAULT_CLAIM: CLAIM_STATUS.NO,
+  DEFAULT_DEFECT_SUBTYPE: '加工精度缺陷',
+  DEFAULT_DEFECT_TYPE: '制造缺陷',
+  DEFAULT_QUANTITY: 1,
+  DEFAULT_SEVERITY: ISSUE_SEVERITY.MINOR,
+  DEFAULT_STATUS: InspectionIssueStatusEnum.OPEN,
+} as const;
+
+export const INSPECTION_ISSUE_STATUS_UI_MAP = {
+  [InspectionIssueStatusEnum.CLOSED]: { color: 'green', label: '已关闭' },
+  [InspectionIssueStatusEnum.IN_PROGRESS]: {
+    color: 'orange',
+    label: '处理中',
+  },
+  [InspectionIssueStatusEnum.OPEN]: { color: 'red', label: '待处理' },
+} as const;

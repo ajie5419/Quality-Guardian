@@ -4,9 +4,16 @@ import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
 import { computed } from 'vue';
 
+import {
+  INSPECTION_ISSUE_CLAIM_OPTIONS,
+  INSPECTION_ISSUE_DEFAULT_VALUES,
+  INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS,
+  INSPECTION_ISSUE_SEVERITY_OPTIONS,
+  INSPECTION_ISSUE_STATUS_UI_MAP,
+} from '@qgs/enums';
 import { useI18n } from '@vben/locales';
 
-import { ClaimStatus, DeptType, IssueStatus, Severity } from './types';
+import { ClaimStatus, IssueStatus, Severity } from './types';
 
 /**
  * NC 编号相关常量
@@ -19,38 +26,28 @@ export const NC_NUMBER_SEQUENCE_LENGTH = 3;
  * 部门类型相关常量
  */
 export const DEPT_TYPE_KEYWORDS = {
-  PURCHASE: DeptType.PURCHASE,
-  PRODUCTION: DeptType.PRODUCTION,
-  OUTSOURCED: DeptType.OUTSOURCED,
+  ...INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS,
 } as const;
 
 /**
  * 严重程度选项
  */
 export const SEVERITY_OPTIONS = [
-  { label: '轻微', value: Severity.MINOR, color: 'blue' },
-  { label: '严重', value: Severity.MAJOR, color: 'orange' },
-  { label: '重大', value: Severity.CRITICAL, color: 'red' },
+  ...INSPECTION_ISSUE_SEVERITY_OPTIONS,
 ] as const;
 
 /**
  * 索赔选项
  */
 export const CLAIM_OPTIONS = [
-  { label: '是', value: ClaimStatus.YES },
-  { label: '否', value: ClaimStatus.NO },
+  ...INSPECTION_ISSUE_CLAIM_OPTIONS,
 ] as const;
 
 /**
  * 默认值常量
  */
 export const DEFAULT_VALUES = {
-  DEFAULT_QUANTITY: 1,
-  DEFAULT_STATUS: IssueStatus.OPEN,
-  DEFAULT_CLAIM: ClaimStatus.NO,
-  DEFAULT_SEVERITY: Severity.MINOR,
-  DEFAULT_DEFECT_TYPE: '制造缺陷',
-  DEFAULT_DEFECT_SUBTYPE: '加工精度缺陷',
+  ...INSPECTION_ISSUE_DEFAULT_VALUES,
 } as const;
 
 /**
@@ -304,7 +301,5 @@ export const ISSUE_STATUS_UI_MAP: Record<
   string,
   { color: string; label: string }
 > = {
-  [IssueStatus.CLOSED]: { color: 'green', label: '已关闭' },
-  [IssueStatus.IN_PROGRESS]: { color: 'orange', label: '处理中' },
-  [IssueStatus.OPEN]: { color: 'red', label: '待处理' },
+  ...INSPECTION_ISSUE_STATUS_UI_MAP,
 };
