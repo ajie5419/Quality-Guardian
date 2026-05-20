@@ -81,7 +81,9 @@ export function normalizeSupervisionDurationDays(value: unknown) {
 
 export function stringifySupervisionList(value: unknown) {
   if (!Array.isArray(value)) return null;
-  const list = value.map((item) => normalizeSupervisionText(item)).filter(Boolean);
+  const list = value
+    .map((item) => normalizeSupervisionText(item))
+    .filter(Boolean);
   return list.length > 0 ? JSON.stringify(list) : null;
 }
 
@@ -147,7 +149,8 @@ export function calculateSupervisionPlanTaskStatus(task: {
   const startAt = task.plannedStartAt ? new Date(task.plannedStartAt) : null;
   const endAt = task.plannedEndAt ? new Date(task.plannedEndAt) : null;
   const hasStarted = Boolean(task.actualStartAt) || progress > 0;
-  const isRisk = normalizeSupervisionText(task.riskLevel).toUpperCase() === 'RISK';
+  const isRisk =
+    normalizeSupervisionText(task.riskLevel).toUpperCase() === 'RISK';
   if (!hasStarted) {
     if (startAt) {
       const startOfDay = new Date(startAt);

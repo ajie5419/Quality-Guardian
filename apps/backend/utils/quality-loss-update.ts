@@ -68,10 +68,7 @@ function parseSerialFromPrefixedId(
   return serial;
 }
 
-export {
-  normalizeQualityLossUpdateText,
-  parseQualityLossUpdateBody,
-};
+export { normalizeQualityLossUpdateText, parseQualityLossUpdateBody };
 export { parseOptionalFiniteNumber } from '@qgs/domain';
 export { parseQualityLossOptionalDate as parseQualityLossUpdateDate } from '@qgs/domain';
 

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 
 const ROOT = process.cwd();
 const SCAN_DIR = path.join(ROOT, 'apps/backend/api/qms');
@@ -36,6 +37,56 @@ function findViolations(filePath) {
     const index = match.index ?? 0;
     const line = content.slice(0, index).split('\n').length;
     violations.push(`${rel}:${line} raw code envelope is forbidden`);
+  }
+
+  const source = ts.createSourceFile(
+    rel,
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+
+  const handlerFns = [];
+  const visitForHandlers = (node) => {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+      if (
+        node.expression.text === 'defineEventHandler' &&
+        node.arguments.length > 0
+      ) {
+        const firstArg = node.arguments[0];
+        if (ts.isArrowFunction(firstArg) || ts.isFunctionExpression(firstArg)) {
+          handlerFns.push(firstArg);
+        }
+      }
+    }
+    ts.forEachChild(node, visitForHandlers);
+  };
+  visitForHandlers(source);
+
+  const collectDirectObjectReturns = (handlerFn) => {
+    const walk = (node) => {
+      if (node !== handlerFn && ts.isFunctionLike(node)) {
+        return;
+      }
+      if (ts.isReturnStatement(node) && node.expression) {
+        if (ts.isObjectLiteralExpression(node.expression)) {
+          const line = source.getLineAndCharacterOfPosition(node.getStart())
+            .line + 1;
+          violations.push(
+            `${rel}:${line} handler must not return raw object literal`,
+          );
+        }
+      }
+      ts.forEachChild(node, walk);
+    };
+    if (handlerFn.body) {
+      walk(handlerFn.body);
+    }
+  };
+
+  for (const handlerFn of handlerFns) {
+    collectDirectObjectReturns(handlerFn);
   }
 
   return violations;

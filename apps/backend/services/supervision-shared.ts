@@ -4,9 +4,6 @@ import type {
 } from '@qgs/shared';
 
 import {
-  ISSUE_TRACKING_STATUS,
-  SUPERVISION_PROJECT_STATUS,
-  SUPERVISION_PROJECT_TYPE,
   calculateSupervisionPlanTaskStatus,
   calculateSupervisionQuantityProgress,
   normalizeSupervisionDate,
@@ -20,9 +17,13 @@ import {
   normalizeSupervisionText,
   parseSupervisionList,
   stringifySupervisionList,
+  SUPERVISION_PROJECT_STATUS,
+  SUPERVISION_PROJECT_TYPE,
 } from '@qgs/domain';
 
-export const PROJECT_STATUSES = new Set(Object.values(SUPERVISION_PROJECT_STATUS));
+export const PROJECT_STATUSES = new Set(
+  Object.values(SUPERVISION_PROJECT_STATUS),
+);
 export const PROJECT_TYPES = new Set(Object.values(SUPERVISION_PROJECT_TYPE));
 export const EXCEL_EXTENSIONS = new Set(['.xls', '.xlsx']);
 
