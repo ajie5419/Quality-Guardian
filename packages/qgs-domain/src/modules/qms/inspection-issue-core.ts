@@ -123,18 +123,20 @@ export function deriveIssueProcessNameFromInspection(
 
 export interface InspectionIssueCreateDataInput {
   body: Record<string, unknown>;
-  inspection?: (LinkedInspectionPartView &
-    LinkedInspectionProcessView & {
-      category?: null | string;
-      id?: string;
-      projectName?: null | string;
-      quantity?: null | number;
-      supplierName?: null | string;
-      workOrderNumber?: null | string;
-      work_order?: null | {
-        division?: null | string;
-      };
-    }) | null;
+  inspection?:
+    | (LinkedInspectionPartView &
+        LinkedInspectionProcessView & {
+          category?: null | string;
+          id?: string;
+          projectName?: null | string;
+          quantity?: null | number;
+          supplierName?: null | string;
+          work_order?: null | {
+            division?: null | string;
+          };
+          workOrderNumber?: null | string;
+        })
+    | null;
   inspectorUsername?: string;
   mapStatus: (value: null | string | undefined) => string;
   now?: Date;
@@ -147,7 +149,8 @@ export function buildInspectionIssueCreateDataCore(
 ) {
   const issueDate =
     normalizeOptionalInspectionIssueDate(input.body.reportDate) ??
-    (input.now ?? new Date());
+    input.now ??
+    new Date();
   const linkedInspection = input.inspection ?? undefined;
   const workOrderNumber =
     linkedInspection?.workOrderNumber ||
@@ -210,10 +213,12 @@ export function buildInspectionIssueCreateDataCore(
     solution: normalizeOptionalInspectionIssueString(input.body.solution),
     description: normalizeOptionalInspectionIssueString(input.body.description),
     quantity,
-    lossAmount: normalizeOptionalInspectionIssueNumber(input.body.lossAmount) ?? 0,
+    lossAmount:
+      normalizeOptionalInspectionIssueNumber(input.body.lossAmount) ?? 0,
     responsibleDepartment:
-      normalizeOptionalInspectionIssueString(input.body.responsibleDepartment) ??
-      'Unknown',
+      normalizeOptionalInspectionIssueString(
+        input.body.responsibleDepartment,
+      ) ?? 'Unknown',
     responsibleWelder:
       normalizeOptionalInspectionIssueString(input.body.responsibleWelder) ??
       null,

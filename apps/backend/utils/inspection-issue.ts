@@ -1,5 +1,7 @@
+import type { Prisma } from '@prisma/client';
+import type { InspectionIssueDateMode } from '@qgs/domain';
+
 import {
-  type InspectionIssueDateMode,
   buildInspectionIssueCreateDataCore,
   buildInspectionIssueDateRange as buildInspectionIssueDateRangeRule,
   buildInspectionIssueUpdateDataCore,
@@ -141,10 +143,8 @@ export function buildInspectionIssueUpdateData(
   body: Record<string, unknown>,
   existingNcNumber: null | string,
 ) {
-  return buildInspectionIssueUpdateDataCore(
-    body,
-    existingNcNumber,
-    (value) => toQualityRecordStatus(value),
+  return buildInspectionIssueUpdateDataCore(body, existingNcNumber, (value) =>
+    toQualityRecordStatus(value),
   ) as Prisma.quality_recordsUpdateInput;
 }
 
@@ -161,4 +161,3 @@ export function buildInspectionIssueUpsertPayload(
 }
 
 export { type InspectionIssueDateMode } from '@qgs/domain';
-import type { Prisma } from '@prisma/client';

@@ -6,13 +6,13 @@ import {
   getTaskDispatchArchiveFilterRule,
   isTaskDispatchLevelTwo,
   normalizeTaskDispatchStatus,
-  resolveTaskDispatchUsername,
   resolveTaskDispatchAssigneeCandidates,
   resolveTaskDispatchAssigneeFilterRule,
   resolveTaskDispatchItpProjectIdForValidation,
   resolveTaskDispatchParentIdForPromotion,
   resolveTaskDispatchStatusFilterRule,
   resolveTaskDispatchUserId,
+  resolveTaskDispatchUsername,
   TASK_DISPATCH_STATUS,
 } from '@qgs/domain';
 
