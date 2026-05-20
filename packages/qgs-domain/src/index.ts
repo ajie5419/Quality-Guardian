@@ -14,6 +14,7 @@ export * from './modules/qms/quality-loss-payload';
 export * from './modules/qms/quality-loss-query';
 export * from './modules/qms/quality-loss-status';
 export * from './modules/qms/quality-loss-update-parser';
+export * from './modules/qms/request-validation';
 export * from './modules/qms/report-period';
 export * from './modules/qms/supervision-core';
 export * from './modules/qms/task-dispatch';
