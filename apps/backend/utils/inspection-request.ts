@@ -1,6 +1,8 @@
 import type { PrismaClient } from '@prisma/client';
 
 import {
+  buildInspectionRecordPayloadCore,
+  buildInspectionRequestNo,
   INSPECTION_REQUEST_STATUS,
   isInspectionRequestAssemblyProcess,
   mapInspectionRequestRecord,
@@ -17,6 +19,8 @@ import { InspectionService } from '~/services/inspection.service';
 import { resolveTaskDispatchCurrentUserId } from '~/utils/task-dispatch';
 
 export {
+  buildInspectionRecordPayloadCore,
+  buildInspectionRequestNo,
   INSPECTION_REQUEST_STATUS,
   isInspectionRequestAssemblyProcess,
   mapInspectionRequestRecord,
@@ -42,7 +46,7 @@ export async function generateInspectionRequestNo(
     },
   });
 
-  return `${prefix}-${String(count + 1).padStart(4, '0')}`;
+  return buildInspectionRequestNo({ count, now });
 }
 
 export function mapInspectionRequest(record: any) {
@@ -77,61 +81,10 @@ export async function buildInspectionRecordFromRequest(
   },
   body: Record<string, unknown>,
 ) {
-  const result = normalizeInspectionRequestText(body.result).toUpperCase();
-  const inspectionItems = Array.isArray(body.inspectionItems)
-    ? body.inspectionItems
-    : [];
-  const closeAttachments = normalizeInspectionRequestAttachments(
-    body.attachments,
+  return InspectionService.create(
+    buildInspectionRecordPayloadCore({
+      body,
+      request,
+    }),
   );
-  const componentName = normalizeInspectionRequestText(request.componentName);
-
-  return InspectionService.create({
-    category: 'PROCESS',
-    documents:
-      closeAttachments.length > 0 ? JSON.stringify(closeAttachments) : null,
-    hasDocuments: closeAttachments.length > 0,
-    inspectionDate:
-      normalizeInspectionRequestText(body.inspectionDate) || new Date(),
-    inspector:
-      normalizeInspectionRequestText(body.inspector) ||
-      normalizeInspectionRequestText(request.reporter),
-    items:
-      inspectionItems.length > 0
-        ? inspectionItems
-        : [
-            {
-              acceptanceCriteria: '报检前已完成自检和互检。',
-              checkItem: `${request.processName} ${request.partName}${componentName ? ` ${componentName}` : ''}`,
-              measuredValue: `${request.selfCheckResult}/${request.mutualCheckResult}`,
-              remarks: request.requestInfo || '',
-              result: result === 'FAIL' ? 'FAIL' : 'PASS',
-              standardValue: 'PASS/PASS',
-            },
-          ],
-    level1Component: request.partName,
-    level2Component: componentName || undefined,
-    processName: request.processName,
-    projectName: request.work_order?.projectName || request.workOrderNumber,
-    quantity: parseInspectionRequestQuantity(
-      body.quantity,
-      request.quantity || 1,
-    ),
-    qualifiedQuantity:
-      typeof body.qualifiedQuantity === 'string' ||
-      typeof body.qualifiedQuantity === 'number'
-        ? body.qualifiedQuantity
-        : undefined,
-    remarks:
-      normalizeInspectionRequestText(body.closeRemark) ||
-      normalizeInspectionRequestText(request.requestInfo),
-    result: result === 'FAIL' ? 'FAIL' : 'PASS',
-    team: normalizeInspectionRequestText(request.team),
-    unqualifiedQuantity:
-      typeof body.unqualifiedQuantity === 'string' ||
-      typeof body.unqualifiedQuantity === 'number'
-        ? body.unqualifiedQuantity
-        : undefined,
-    workOrderNumber: request.workOrderNumber,
-  });
 }

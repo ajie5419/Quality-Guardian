@@ -199,3 +199,97 @@ export function mapInspectionRequestRecord<
       null,
   };
 }
+
+export function buildInspectionRequestNo(params: {
+  count: number;
+  now?: Date;
+}): string {
+  const datePart = (params.now ?? new Date())
+    .toISOString()
+    .slice(0, 10)
+    .replaceAll('-', '');
+  return `IR-${datePart}-${String(params.count + 1).padStart(4, '0')}`;
+}
+
+export interface InspectionRecordPayloadInput {
+  body: Record<string, unknown>;
+  request: {
+    closeRemark?: null | string;
+    componentName?: null | string;
+    mutualCheckResult: string;
+    partName: string;
+    processName: string;
+    quantity?: number;
+    reporter: string;
+    requestInfo?: null | string;
+    selfCheckResult: string;
+    team?: null | string;
+    work_order?: null | { projectName?: null | string };
+    workOrderNumber: string;
+  };
+}
+
+export function buildInspectionRecordPayloadCore(
+  input: InspectionRecordPayloadInput,
+) {
+  const result = normalizeInspectionRequestText(input.body.result).toUpperCase();
+  const inspectionItems = Array.isArray(input.body.inspectionItems)
+    ? input.body.inspectionItems
+    : [];
+  const closeAttachments = normalizeInspectionRequestAttachments(
+    input.body.attachments,
+  );
+  const componentName = normalizeInspectionRequestText(
+    input.request.componentName,
+  );
+
+  return {
+    category: 'PROCESS' as const,
+    documents:
+      closeAttachments.length > 0 ? JSON.stringify(closeAttachments) : null,
+    hasDocuments: closeAttachments.length > 0,
+    inspectionDate:
+      normalizeInspectionRequestText(input.body.inspectionDate) || new Date(),
+    inspector:
+      normalizeInspectionRequestText(input.body.inspector) ||
+      normalizeInspectionRequestText(input.request.reporter),
+    items:
+      inspectionItems.length > 0
+        ? inspectionItems
+        : [
+            {
+              acceptanceCriteria: '报检前已完成自检和互检。',
+              checkItem: `${input.request.processName} ${input.request.partName}${componentName ? ` ${componentName}` : ''}`,
+              measuredValue: `${input.request.selfCheckResult}/${input.request.mutualCheckResult}`,
+              remarks: input.request.requestInfo || '',
+              result: result === 'FAIL' ? 'FAIL' : 'PASS',
+              standardValue: 'PASS/PASS',
+            },
+          ],
+    level1Component: input.request.partName,
+    level2Component: componentName || undefined,
+    processName: input.request.processName,
+    projectName:
+      input.request.work_order?.projectName || input.request.workOrderNumber,
+    quantity: parseInspectionRequestQuantity(
+      input.body.quantity,
+      input.request.quantity || 1,
+    ),
+    qualifiedQuantity:
+      typeof input.body.qualifiedQuantity === 'string' ||
+      typeof input.body.qualifiedQuantity === 'number'
+        ? input.body.qualifiedQuantity
+        : undefined,
+    remarks:
+      normalizeInspectionRequestText(input.body.closeRemark) ||
+      normalizeInspectionRequestText(input.request.requestInfo),
+    result: result === 'FAIL' ? 'FAIL' : 'PASS',
+    team: normalizeInspectionRequestText(input.request.team),
+    unqualifiedQuantity:
+      typeof input.body.unqualifiedQuantity === 'string' ||
+      typeof input.body.unqualifiedQuantity === 'number'
+        ? input.body.unqualifiedQuantity
+        : undefined,
+    workOrderNumber: input.request.workOrderNumber,
+  };
+}
