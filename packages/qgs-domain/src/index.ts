@@ -23,6 +23,7 @@ export * from './modules/qms/pass-rate-core';
 export * from './modules/qms/pass-rate-process';
 export * from './modules/qms/planning-project';
 export * from './modules/qms/project-documents';
+export * from './modules/qms/prisma-error';
 export * from './modules/qms/quality-loss-payload';
 export * from './modules/qms/quality-loss-query';
 export * from './modules/qms/quality-loss-status';
