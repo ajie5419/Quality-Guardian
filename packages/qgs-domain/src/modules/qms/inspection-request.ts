@@ -150,7 +150,9 @@ export interface InspectionRequestRecordLike {
   unqualifiedQuantity?: null | number;
 }
 
-export function mapInspectionRequestRecord<T extends InspectionRequestRecordLike>(
+export function mapInspectionRequestRecord<
+  T extends InspectionRequestRecordLike,
+>(
   record: T,
 ): T & {
   attachments: InspectionRequestAttachment[];
@@ -166,17 +168,25 @@ export function mapInspectionRequestRecord<T extends InspectionRequestRecordLike
 } {
   const issue = Array.isArray(record.qualityRecords)
     ? (record.qualityRecords.find(
-        (item) => item && typeof item === 'object' && !(item as { isDeleted?: unknown }).isDeleted,
+        (item) =>
+          item &&
+          typeof item === 'object' &&
+          !(item as { isDeleted?: unknown }).isDeleted,
       ) as InspectionRequestIssueLike | undefined)
     : undefined;
 
   return {
     ...record,
     attachments: parseInspectionRequestAttachments(record.attachments),
-    closeAttachments: parseInspectionRequestAttachments(record.closeAttachments),
-    dispatcherName: record.dispatcher?.realName || record.dispatcher?.username || null,
-    inspectionResult: record.inspectionResult || record.inspection?.result || 'PASS',
-    inspectorName: record.inspector?.realName || record.inspector?.username || null,
+    closeAttachments: parseInspectionRequestAttachments(
+      record.closeAttachments,
+    ),
+    dispatcherName:
+      record.dispatcher?.realName || record.dispatcher?.username || null,
+    inspectionResult:
+      record.inspectionResult || record.inspection?.result || 'PASS',
+    inspectorName:
+      record.inspector?.realName || record.inspector?.username || null,
     linkedIssueId: record.linkedIssueId || issue?.id || null,
     linkedIssueNo: record.linkedIssueNo || issue?.nonConformanceNumber || null,
     linkedIssueStatus: issue?.status || record.linkedIssueStatus || null,

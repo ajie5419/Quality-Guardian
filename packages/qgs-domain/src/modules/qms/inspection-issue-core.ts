@@ -68,10 +68,7 @@ export function hasInspectionIssueWriteAccess(params: {
   return isAdmin || isOwner;
 }
 
-export function createInspectionIssueId(
-  now: Date,
-  idPart: string,
-): string {
+export function createInspectionIssueId(now: Date, idPart: string): string {
   return `ISS-${now.getFullYear()}-${idPart.toUpperCase()}`;
 }
 
