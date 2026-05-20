@@ -8,6 +8,7 @@ export * from './modules/qms/inspection-issue-status';
 export * from './modules/qms/inspection-record';
 export * from './modules/qms/inspection-request';
 export * from './modules/qms/issue-tracking-status';
+export * from './modules/qms/planning-project';
 export * from './modules/qms/quality-loss-payload';
 export * from './modules/qms/quality-loss-query';
 export * from './modules/qms/quality-loss-status';
