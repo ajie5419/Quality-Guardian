@@ -29,4 +29,5 @@ export * from './modules/qms/task-dispatch';
 export * from './modules/qms/welder-score';
 export * from './modules/qms/work-order';
 export * from './modules/qms/work-order-requirement-summary';
+export * from './modules/qms/work-order-requirement-attachments';
 export * from './modules/qms/work-order-status';
