@@ -1,7 +1,7 @@
-import { env } from 'node:process';
+import { readRuntimeEnv } from './env';
 
 function parseBooleanEnv(name: string, defaultValue: boolean) {
-  const raw = env[name];
+  const raw = readRuntimeEnv(name);
   if (raw === undefined) return defaultValue;
   const value = raw.trim().toLowerCase();
   return value === '1' || value === 'true' || value === 'yes';

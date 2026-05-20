@@ -1,9 +1,9 @@
-import { env } from 'node:process';
+import { readRuntimeEnv } from './env';
 
 export const PUBLIC_METROLOGY_BORROW_OPERATOR = 'PUBLIC_QR';
 
 export function readPublicMetrologyBorrowExpectedToken(): string {
-  return String(env.METROLOGY_PUBLIC_BORROW_TOKEN || '').trim();
+  return String(readRuntimeEnv('METROLOGY_PUBLIC_BORROW_TOKEN') || '').trim();
 }
 
 export function resolvePublicMetrologyBorrowToken(params: {

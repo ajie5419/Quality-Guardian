@@ -1,11 +1,11 @@
-import { env } from 'node:process';
+import { readRuntimeEnv } from './env';
 
 export const USER_RESET_PASSWORD_ENV_KEY = 'USER_RESET_DEFAULT_PASSWORD';
 
 const FALLBACK_RESET_PASSWORD = '123456';
 
 export function getDefaultResetPassword(): string {
-  const envPassword = env[USER_RESET_PASSWORD_ENV_KEY];
+  const envPassword = readRuntimeEnv(USER_RESET_PASSWORD_ENV_KEY);
   const normalized = typeof envPassword === 'string' ? envPassword.trim() : '';
   return normalized || FALLBACK_RESET_PASSWORD;
 }
