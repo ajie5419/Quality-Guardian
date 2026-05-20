@@ -4,14 +4,17 @@ function normalizeRoleText(value: unknown): string {
 
 export function isAdminRole(role: unknown): boolean {
   const normalizedRole = normalizeRoleText(role);
-  return (
-    normalizedRole.includes('admin') || normalizedRole.includes('super')
-  );
+  return normalizedRole.includes('admin') || normalizedRole.includes('super');
 }
 
-export function isSystemAdmin(userinfo: {
-  roles?: unknown;
-} | null | undefined): boolean {
+export function isSystemAdmin(
+  userinfo:
+    | null
+    | undefined
+    | {
+        roles?: unknown;
+      },
+): boolean {
   if (!userinfo || !Array.isArray(userinfo.roles)) {
     return false;
   }

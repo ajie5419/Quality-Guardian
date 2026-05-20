@@ -44,10 +44,7 @@ export interface TaskDispatchArchiveFilterRule {
       ];
     },
     {
-      OR: [
-        { dfmeaId: null },
-        { dfmea_project: { status: { not: string } } },
-      ];
+      OR: [{ dfmeaId: null }, { dfmea_project: { status: { not: string } } }];
     },
   ];
 }
@@ -99,7 +96,10 @@ export function resolveTaskDispatchAssigneeFilterRule(
   return { assigneeId: currentUserId };
 }
 
-export type TaskDispatchStatusFilterRule = string | { in: string[] } | undefined;
+export type TaskDispatchStatusFilterRule =
+  | string
+  | undefined
+  | { in: string[] };
 
 export function resolveTaskDispatchStatusFilterRule(
   status: unknown,
