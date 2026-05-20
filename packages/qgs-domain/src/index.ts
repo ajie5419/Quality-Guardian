@@ -1,4 +1,5 @@
 export * from './modules/qms/after-sales-query';
+export * from './modules/qms/after-sales-payload';
 export * from './modules/qms/after-sales-status';
 export * from './modules/qms/inspection-archive';
 export * from './modules/qms/inspection-issue-core';
