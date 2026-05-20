@@ -232,7 +232,9 @@ export interface InspectionRecordPayloadInput {
 export function buildInspectionRecordPayloadCore(
   input: InspectionRecordPayloadInput,
 ) {
-  const result = normalizeInspectionRequestText(input.body.result).toUpperCase();
+  const result = normalizeInspectionRequestText(
+    input.body.result,
+  ).toUpperCase();
   const inspectionItems = Array.isArray(input.body.inspectionItems)
     ? input.body.inspectionItems
     : [];
