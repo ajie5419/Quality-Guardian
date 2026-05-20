@@ -309,7 +309,8 @@ const customConfig: Linter.Config[] = [
         {
           message:
             'Do not redefine local `LOSS_TYPE_OPTIONS`; use `QUALITY_LOSS_TYPE_OPTIONS` from @qgs/enums.',
-          selector: "VariableDeclarator[id.name='LOSS_TYPE_OPTIONS'] > ArrayExpression.init",
+          selector:
+            "VariableDeclarator[id.name='LOSS_TYPE_OPTIONS'] > ArrayExpression.init",
         },
         {
           message:
@@ -326,7 +327,8 @@ const customConfig: Linter.Config[] = [
         {
           message:
             'Do not redefine local `SOURCE_STYLE_MAP`; use `QUALITY_LOSS_SOURCE_STYLE_MAP` from @qgs/enums.',
-          selector: "VariableDeclarator[id.name='SOURCE_STYLE_MAP'] > ObjectExpression.init",
+          selector:
+            "VariableDeclarator[id.name='SOURCE_STYLE_MAP'] > ObjectExpression.init",
         },
       ],
     },
