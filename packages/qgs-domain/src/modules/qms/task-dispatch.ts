@@ -133,6 +133,22 @@ export function resolveTaskDispatchUserId(userinfo: {
   return userId || null;
 }
 
+export function resolveTaskDispatchUsername(userinfo: {
+  username?: unknown;
+}): string {
+  return typeof userinfo.username === 'string' ? userinfo.username.trim() : '';
+}
+
+export function buildTaskDispatchCurrentUserLookupConditions(params: {
+  tokenUserId: null | string;
+  username: string;
+}): Array<{ id: string } | { username: string }> {
+  return [
+    ...(params.tokenUserId ? [{ id: params.tokenUserId }] : []),
+    ...(params.username ? [{ username: params.username }] : []),
+  ];
+}
+
 export function resolveTaskDispatchLevel(value: unknown, fallback = 1): number {
   return parseTaskDispatchInt(value, fallback);
 }

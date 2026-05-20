@@ -1,10 +1,12 @@
 import type { Prisma } from '@prisma/client';
 
 import {
+  buildTaskDispatchCurrentUserLookupConditions,
   buildTaskDispatchPayloadCore,
   getTaskDispatchArchiveFilterRule,
   isTaskDispatchLevelTwo,
   normalizeTaskDispatchStatus,
+  resolveTaskDispatchUsername,
   resolveTaskDispatchAssigneeCandidates,
   resolveTaskDispatchAssigneeFilterRule,
   resolveTaskDispatchItpProjectIdForValidation,
@@ -61,8 +63,7 @@ export async function resolveTaskDispatchCurrentUserId(
   userLookupClient: TaskDispatchUserLookupClient,
 ): Promise<null | string> {
   const tokenUserId = resolveTaskDispatchUserId(userinfo);
-  const username =
-    typeof userinfo.username === 'string' ? userinfo.username.trim() : '';
+  const username = resolveTaskDispatchUsername(userinfo);
 
   if (!tokenUserId && !username) {
     return null;
@@ -70,10 +71,10 @@ export async function resolveTaskDispatchCurrentUserId(
 
   const currentUser = await userLookupClient.users.findFirst({
     where: {
-      OR: [
-        ...(tokenUserId ? [{ id: tokenUserId }] : []),
-        ...(username ? [{ username }] : []),
-      ],
+      OR: buildTaskDispatchCurrentUserLookupConditions({
+        tokenUserId,
+        username,
+      }),
     },
     select: { id: true },
   });
