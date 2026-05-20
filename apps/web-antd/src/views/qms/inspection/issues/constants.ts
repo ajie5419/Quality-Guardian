@@ -4,6 +4,8 @@ import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
 import { computed } from 'vue';
 
+import { useI18n } from '@vben/locales';
+
 import {
   INSPECTION_ISSUE_CLAIM_OPTIONS,
   INSPECTION_ISSUE_DEFAULT_VALUES,
@@ -11,7 +13,6 @@ import {
   INSPECTION_ISSUE_SEVERITY_OPTIONS,
   INSPECTION_ISSUE_STATUS_UI_MAP,
 } from '@qgs/enums';
-import { useI18n } from '@vben/locales';
 
 import { ClaimStatus, IssueStatus, Severity } from './types';
 
@@ -32,16 +33,12 @@ export const DEPT_TYPE_KEYWORDS = {
 /**
  * 严重程度选项
  */
-export const SEVERITY_OPTIONS = [
-  ...INSPECTION_ISSUE_SEVERITY_OPTIONS,
-] as const;
+export const SEVERITY_OPTIONS = [...INSPECTION_ISSUE_SEVERITY_OPTIONS] as const;
 
 /**
  * 索赔选项
  */
-export const CLAIM_OPTIONS = [
-  ...INSPECTION_ISSUE_CLAIM_OPTIONS,
-] as const;
+export const CLAIM_OPTIONS = [...INSPECTION_ISSUE_CLAIM_OPTIONS] as const;
 
 /**
  * 默认值常量
