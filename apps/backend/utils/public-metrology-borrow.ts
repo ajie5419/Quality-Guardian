@@ -1,30 +1,32 @@
 import type { EventHandlerRequest, H3Event } from 'h3';
 
-import process from 'node:process';
-
+import {
+  PUBLIC_METROLOGY_BORROW_OPERATOR,
+  readPublicMetrologyBorrowExpectedToken,
+  verifyPublicMetrologyBorrowToken,
+} from '@qgs/domain';
 import { getHeader } from 'h3';
 import { forbiddenResponse } from '~/utils/response';
 
-export const PUBLIC_METROLOGY_BORROW_OPERATOR = 'PUBLIC_QR';
+export { PUBLIC_METROLOGY_BORROW_OPERATOR };
 
 export function verifyPublicMetrologyBorrowAccess(
   event: H3Event<EventHandlerRequest>,
   payloadToken?: unknown,
 ) {
-  const expectedToken = String(
-    process.env.METROLOGY_PUBLIC_BORROW_TOKEN || '',
-  ).trim();
+  const expectedToken = readPublicMetrologyBorrowExpectedToken();
 
   if (!expectedToken) {
     return true;
   }
 
-  const headerToken = String(
-    getHeader(event, 'x-metrology-borrow-token') || '',
-  ).trim();
-  const token = String(payloadToken || '').trim() || headerToken;
-
-  if (token === expectedToken) {
+  if (
+    verifyPublicMetrologyBorrowToken({
+      expectedToken,
+      headerToken: getHeader(event, 'x-metrology-borrow-token'),
+      payloadToken,
+    })
+  ) {
     return true;
   }
 
