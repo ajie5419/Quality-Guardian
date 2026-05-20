@@ -9,7 +9,9 @@ const KNOWLEDGE_ID_SUFFIX_SIZE = 6;
 function createKnowledgeIdSuffix(size = KNOWLEDGE_ID_SUFFIX_SIZE) {
   let output = '';
   for (let index = 0; index < size; index += 1) {
-    const randomIndex = Math.floor(Math.random() * KNOWLEDGE_ID_ALPHABET.length);
+    const randomIndex = Math.floor(
+      Math.random() * KNOWLEDGE_ID_ALPHABET.length,
+    );
     output += KNOWLEDGE_ID_ALPHABET[randomIndex];
   }
   return output;

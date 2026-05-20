@@ -1,6 +1,9 @@
 import type { Prisma } from '@prisma/client';
 
-import { buildKnowledgeCreateDataCore, buildKnowledgeUpdateDataCore } from '@qgs/domain';
+import {
+  buildKnowledgeCreateDataCore,
+  buildKnowledgeUpdateDataCore,
+} from '@qgs/domain';
 
 type KnowledgeAuthorContext = {
   realName?: string;
