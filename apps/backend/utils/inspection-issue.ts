@@ -1,35 +1,60 @@
 import {
-  buildInspectionIssueDateRange,
+  type InspectionIssueDateMode,
+  buildInspectionIssueCreateDataCore,
+  buildInspectionIssueDateRange as buildInspectionIssueDateRangeRule,
+  buildInspectionIssueUpdateDataCore,
+  buildInspectionIssueUpsertPayloadCore,
   createInspectionIssueId as createInspectionIssueIdRule,
-  deriveIssuePartNameFromInspection,
-  deriveIssueProcessNameFromInspection,
   hasInspectionIssueAdminAccess as domainHasInspectionIssueAdminAccess,
   hasInspectionIssueWriteAccess as domainHasInspectionIssueWriteAccess,
-  normalizeOptionalInspectionIssueDate,
-  normalizeOptionalInspectionIssueNumber,
-  normalizeOptionalInspectionIssueString,
-  parseInspectionIssueDateMode,
-  parseInspectionIssueDateValue,
-  parseInspectionIssueListQuery,
-  parseOptionalIssueYear,
+  normalizeOptionalInspectionIssueDate as normalizeOptionalInspectionIssueDateRule,
+  normalizeOptionalInspectionIssueNumber as normalizeOptionalInspectionIssueNumberRule,
+  normalizeOptionalInspectionIssueString as normalizeOptionalInspectionIssueStringRule,
+  parseInspectionIssueDateMode as parseInspectionIssueDateModeRule,
+  parseInspectionIssueDateValue as parseInspectionIssueDateValueRule,
+  parseInspectionIssueListQuery as parseInspectionIssueListQueryRule,
+  parseOptionalIssueYear as parseOptionalIssueYearRule,
 } from '@qgs/domain';
 import { nanoid } from 'nanoid';
 import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 
 import prisma from './prisma';
 
-export {
-  buildInspectionIssueDateRange,
-  deriveIssuePartNameFromInspection,
-  deriveIssueProcessNameFromInspection,
-  normalizeOptionalInspectionIssueDate,
-  normalizeOptionalInspectionIssueNumber,
-  normalizeOptionalInspectionIssueString,
-  parseInspectionIssueDateMode,
-  parseInspectionIssueDateValue,
-  parseInspectionIssueListQuery,
-  parseOptionalIssueYear,
-};
+export function buildInspectionIssueDateRange(params: {
+  dateMode?: InspectionIssueDateMode;
+  dateValue?: string;
+  year?: number;
+}) {
+  return buildInspectionIssueDateRangeRule(params);
+}
+
+export function normalizeOptionalInspectionIssueDate(value: unknown) {
+  return normalizeOptionalInspectionIssueDateRule(value);
+}
+
+export function normalizeOptionalInspectionIssueNumber(value: unknown) {
+  return normalizeOptionalInspectionIssueNumberRule(value);
+}
+
+export function normalizeOptionalInspectionIssueString(value: unknown) {
+  return normalizeOptionalInspectionIssueStringRule(value);
+}
+
+export function parseInspectionIssueDateMode(value: unknown) {
+  return parseInspectionIssueDateModeRule(value);
+}
+
+export function parseInspectionIssueDateValue(value: unknown) {
+  return parseInspectionIssueDateValueRule(value);
+}
+
+export function parseInspectionIssueListQuery(query: Record<string, unknown>) {
+  return parseInspectionIssueListQueryRule(query);
+}
+
+export function parseOptionalIssueYear(value: unknown) {
+  return parseOptionalIssueYearRule(value);
+}
 
 export function hasInspectionIssueAdminAccess(roles: unknown): boolean {
   return domainHasInspectionIssueAdminAccess(roles);
@@ -102,210 +127,38 @@ export function buildInspectionIssueCreateData(
     serialNumber: number;
   },
 ) {
-  const issueDate =
-    normalizeOptionalInspectionIssueDate(body.reportDate) ?? new Date();
-  const linkedInspection = options.inspection;
-  const workOrderNumber =
-    linkedInspection?.workOrderNumber ||
-    normalizeOptionalInspectionIssueString(body.workOrderNumber);
-  const projectName =
-    linkedInspection?.projectName ||
-    normalizeOptionalInspectionIssueString(body.projectName);
-  const processName =
-    deriveIssueProcessNameFromInspection(linkedInspection || undefined) ||
-    normalizeOptionalInspectionIssueString(body.processName);
-  const partName =
-    normalizeOptionalInspectionIssueString(body.partName) ||
-    deriveIssuePartNameFromInspection(linkedInspection || undefined) ||
-    'Unknown';
-  const supplierName =
-    linkedInspection?.supplierName ||
-    normalizeOptionalInspectionIssueString(body.supplierName);
-  const division =
-    linkedInspection?.work_order?.division ||
-    normalizeOptionalInspectionIssueString(body.division);
-  const quantity =
-    normalizeOptionalInspectionIssueNumber(body.quantity) ??
-    linkedInspection?.quantity ??
-    1;
-
-  return {
-    id: options.id,
+  return buildInspectionIssueCreateDataCore({
+    body,
+    inspection: options.inspection,
+    inspectorUsername: options.inspectorUsername,
+    mapStatus: (value) => toQualityRecordStatus(value),
     serialNumber: options.serialNumber,
-    date: issueDate,
-    inspection: linkedInspection
-      ? {
-          connect: {
-            id: linkedInspection.id,
-          },
-        }
-      : undefined,
-    status: toQualityRecordStatus(
-      normalizeOptionalInspectionIssueString(body.status),
-    ),
-    nonConformanceNumber:
-      normalizeOptionalInspectionIssueString(body.ncNumber) ?? null,
-    work_orders: workOrderNumber
-      ? {
-          connect: {
-            workOrderNumber,
-          },
-        }
-      : undefined,
-    projectName,
-    processName,
-    partName,
-    division,
-    defectType: normalizeOptionalInspectionIssueString(body.defectType),
-    defectSubtype: normalizeOptionalInspectionIssueString(body.defectSubtype),
-    severity: normalizeOptionalInspectionIssueString(body.severity) ?? 'Minor',
-    rootCause: normalizeOptionalInspectionIssueString(body.rootCause),
-    solution: normalizeOptionalInspectionIssueString(body.solution),
-    description: normalizeOptionalInspectionIssueString(body.description),
-    quantity,
-    lossAmount: normalizeOptionalInspectionIssueNumber(body.lossAmount) ?? 0,
-    responsibleDepartment:
-      normalizeOptionalInspectionIssueString(body.responsibleDepartment) ??
-      'Unknown',
-    responsibleWelder:
-      normalizeOptionalInspectionIssueString(body.responsibleWelder) ?? null,
-    supplierName: supplierName ?? null,
-    category:
-      linkedInspection?.category ??
-      normalizeOptionalInspectionIssueString(body.category),
-    users_quality_records_inspectorTousers: options.inspectorUsername
-      ? { connect: { username: options.inspectorUsername } }
-      : undefined,
-    isClaim: body.claim === 'Yes' || body.claim === true,
-    issuePhoto:
-      body.photos === undefined ? '[]' : JSON.stringify(body.photos ?? []),
-    isDeleted: false,
-    updatedAt: new Date(),
-  };
+    uuid: options.id,
+  }) as Prisma.quality_recordsCreateInput;
 }
 
 export function buildInspectionIssueUpdateData(
   body: Record<string, unknown>,
   existingNcNumber: null | string,
 ) {
-  const updateData: Record<string, unknown> = {
-    updatedAt: new Date(),
-  };
-
-  if (body.ncNumber !== undefined && body.ncNumber !== existingNcNumber) {
-    updateData.nonConformanceNumber =
-      normalizeOptionalInspectionIssueString(body.ncNumber) ?? null;
-  }
-
-  const stringFields = [
-    'workOrderNumber',
-    'projectName',
-    'processName',
-    'partName',
-    'inspector',
-    'description',
-    'responsibleDepartment',
-    'responsibleWelder',
-    'supplierName',
-    'rootCause',
-    'solution',
-    'defectType',
-    'defectSubtype',
-    'severity',
-  ];
-  for (const field of stringFields) {
-    if (body[field] !== undefined) {
-      updateData[field] =
-        normalizeOptionalInspectionIssueString(body[field]) ?? null;
-    }
-  }
-
-  const quantity = normalizeOptionalInspectionIssueNumber(body.quantity);
-  if (quantity !== undefined) {
-    updateData.quantity = quantity;
-  }
-
-  const lossAmount = normalizeOptionalInspectionIssueNumber(body.lossAmount);
-  if (lossAmount !== undefined) {
-    updateData.lossAmount = lossAmount;
-  }
-
-  const reportDate = normalizeOptionalInspectionIssueDate(body.reportDate);
-  if (reportDate) {
-    updateData.date = reportDate;
-  }
-
-  if (body.photos !== undefined) {
-    updateData.issuePhoto = JSON.stringify(body.photos ?? []);
-  }
-
-  if (body.claim !== undefined) {
-    updateData.isClaim = body.claim === 'Yes' || body.claim === true;
-  }
-
-  if (body.status !== undefined) {
-    updateData.status = toQualityRecordStatus(
-      normalizeOptionalInspectionIssueString(body.status),
-    );
-  }
-
-  return updateData;
+  return buildInspectionIssueUpdateDataCore(
+    body,
+    existingNcNumber,
+    (value) => toQualityRecordStatus(value),
+  ) as Prisma.quality_recordsUpdateInput;
 }
 
 export function buildInspectionIssueUpsertPayload(
   item: InspectionIssueImportItem,
   serialNumber: number,
 ) {
-  const ncNumber =
-    normalizeOptionalInspectionIssueString(item.nonConformanceNumber) ??
-    normalizeOptionalInspectionIssueString(item.ncNumber);
-  if (!ncNumber) {
-    return null;
-  }
-
-  const quantity = normalizeOptionalInspectionIssueNumber(item.quantity);
-  const status = toQualityRecordStatus(
-    normalizeOptionalInspectionIssueString(item.status),
-  );
-
-  return {
-    create: {
-      id: createInspectionIssueId(),
-      serialNumber,
-      date: new Date(),
-      status,
-      partName:
-        normalizeOptionalInspectionIssueString(item.partName) ?? '未知零件',
-      description:
-        normalizeOptionalInspectionIssueString(item.description) ?? '',
-      quantity: quantity ?? 0,
-      projectName:
-        normalizeOptionalInspectionIssueString(item.projectName) ?? '',
-      division: normalizeOptionalInspectionIssueString(item.division) ?? '',
-      responsibleDepartment:
-        normalizeOptionalInspectionIssueString(item.responsibleDepartment) ??
-        '质量部',
-      responsibleWelder:
-        normalizeOptionalInspectionIssueString(item.responsibleWelder) ?? null,
-      nonConformanceNumber: ncNumber,
-      workOrderNumber:
-        normalizeOptionalInspectionIssueString(item.workOrderNumber) ?? null,
-    },
-    update: {
-      partName: normalizeOptionalInspectionIssueString(item.partName),
-      description: normalizeOptionalInspectionIssueString(item.description),
-      quantity,
-      projectName: normalizeOptionalInspectionIssueString(item.projectName),
-      responsibleDepartment: normalizeOptionalInspectionIssueString(
-        item.responsibleDepartment,
-      ),
-      responsibleWelder: normalizeOptionalInspectionIssueString(
-        item.responsibleWelder,
-      ),
-      status,
-    },
-    where: { nonConformanceNumber: ncNumber },
-  };
+  return buildInspectionIssueUpsertPayloadCore(
+    item,
+    serialNumber,
+    (value) => toQualityRecordStatus(value),
+    createInspectionIssueId,
+  ) as null | Prisma.quality_recordsUpsertArgs;
 }
 
 export { type InspectionIssueDateMode } from '@qgs/domain';
+import type { Prisma } from '@prisma/client';

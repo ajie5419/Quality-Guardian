@@ -120,3 +120,256 @@ export function deriveIssueProcessNameFromInspection(
 
   return inspection.processName || undefined;
 }
+
+export interface InspectionIssueCreateDataInput {
+  body: Record<string, unknown>;
+  inspection?: (LinkedInspectionPartView &
+    LinkedInspectionProcessView & {
+      category?: null | string;
+      id?: string;
+      projectName?: null | string;
+      quantity?: null | number;
+      supplierName?: null | string;
+      workOrderNumber?: null | string;
+      work_order?: null | {
+        division?: null | string;
+      };
+    }) | null;
+  inspectorUsername?: string;
+  mapStatus: (value: null | string | undefined) => string;
+  now?: Date;
+  serialNumber: number;
+  uuid: string;
+}
+
+export function buildInspectionIssueCreateDataCore(
+  input: InspectionIssueCreateDataInput,
+) {
+  const issueDate =
+    normalizeOptionalInspectionIssueDate(input.body.reportDate) ??
+    (input.now ?? new Date());
+  const linkedInspection = input.inspection ?? undefined;
+  const workOrderNumber =
+    linkedInspection?.workOrderNumber ||
+    normalizeOptionalInspectionIssueString(input.body.workOrderNumber);
+  const projectName =
+    linkedInspection?.projectName ||
+    normalizeOptionalInspectionIssueString(input.body.projectName);
+  const processName =
+    deriveIssueProcessNameFromInspection(linkedInspection || undefined) ||
+    normalizeOptionalInspectionIssueString(input.body.processName);
+  const partName =
+    normalizeOptionalInspectionIssueString(input.body.partName) ||
+    deriveIssuePartNameFromInspection(linkedInspection || undefined) ||
+    'Unknown';
+  const supplierName =
+    linkedInspection?.supplierName ||
+    normalizeOptionalInspectionIssueString(input.body.supplierName);
+  const division =
+    linkedInspection?.work_order?.division ||
+    normalizeOptionalInspectionIssueString(input.body.division);
+  const quantity =
+    normalizeOptionalInspectionIssueNumber(input.body.quantity) ??
+    linkedInspection?.quantity ??
+    1;
+
+  return {
+    id: input.uuid,
+    serialNumber: input.serialNumber,
+    date: issueDate,
+    inspection: linkedInspection
+      ? {
+          connect: {
+            id: linkedInspection.id,
+          },
+        }
+      : undefined,
+    status: input.mapStatus(
+      normalizeOptionalInspectionIssueString(input.body.status),
+    ),
+    nonConformanceNumber:
+      normalizeOptionalInspectionIssueString(input.body.ncNumber) ?? null,
+    work_orders: workOrderNumber
+      ? {
+          connect: {
+            workOrderNumber,
+          },
+        }
+      : undefined,
+    projectName,
+    processName,
+    partName,
+    division,
+    defectType: normalizeOptionalInspectionIssueString(input.body.defectType),
+    defectSubtype: normalizeOptionalInspectionIssueString(
+      input.body.defectSubtype,
+    ),
+    severity:
+      normalizeOptionalInspectionIssueString(input.body.severity) ?? 'Minor',
+    rootCause: normalizeOptionalInspectionIssueString(input.body.rootCause),
+    solution: normalizeOptionalInspectionIssueString(input.body.solution),
+    description: normalizeOptionalInspectionIssueString(input.body.description),
+    quantity,
+    lossAmount: normalizeOptionalInspectionIssueNumber(input.body.lossAmount) ?? 0,
+    responsibleDepartment:
+      normalizeOptionalInspectionIssueString(input.body.responsibleDepartment) ??
+      'Unknown',
+    responsibleWelder:
+      normalizeOptionalInspectionIssueString(input.body.responsibleWelder) ??
+      null,
+    supplierName: supplierName ?? null,
+    category:
+      linkedInspection?.category ??
+      normalizeOptionalInspectionIssueString(input.body.category),
+    users_quality_records_inspectorTousers: input.inspectorUsername
+      ? { connect: { username: input.inspectorUsername } }
+      : undefined,
+    isClaim: input.body.claim === 'Yes' || input.body.claim === true,
+    issuePhoto:
+      input.body.photos === undefined
+        ? '[]'
+        : JSON.stringify(input.body.photos ?? []),
+    isDeleted: false,
+    updatedAt: input.now ?? new Date(),
+  };
+}
+
+export function buildInspectionIssueUpdateDataCore(
+  body: Record<string, unknown>,
+  existingNcNumber: null | string,
+  mapStatus: (value: null | string | undefined) => string,
+  now = new Date(),
+) {
+  const updateData: Record<string, unknown> = {
+    updatedAt: now,
+  };
+
+  if (body.ncNumber !== undefined && body.ncNumber !== existingNcNumber) {
+    updateData.nonConformanceNumber =
+      normalizeOptionalInspectionIssueString(body.ncNumber) ?? null;
+  }
+
+  const stringFields = [
+    'workOrderNumber',
+    'projectName',
+    'processName',
+    'partName',
+    'inspector',
+    'description',
+    'responsibleDepartment',
+    'responsibleWelder',
+    'supplierName',
+    'rootCause',
+    'solution',
+    'defectType',
+    'defectSubtype',
+    'severity',
+  ];
+  for (const field of stringFields) {
+    if (body[field] !== undefined) {
+      updateData[field] =
+        normalizeOptionalInspectionIssueString(body[field]) ?? null;
+    }
+  }
+
+  const quantity = normalizeOptionalInspectionIssueNumber(body.quantity);
+  if (quantity !== undefined) {
+    updateData.quantity = quantity;
+  }
+
+  const lossAmount = normalizeOptionalInspectionIssueNumber(body.lossAmount);
+  if (lossAmount !== undefined) {
+    updateData.lossAmount = lossAmount;
+  }
+
+  const reportDate = normalizeOptionalInspectionIssueDate(body.reportDate);
+  if (reportDate) {
+    updateData.date = reportDate;
+  }
+
+  if (body.photos !== undefined) {
+    updateData.issuePhoto = JSON.stringify(body.photos ?? []);
+  }
+
+  if (body.claim !== undefined) {
+    updateData.isClaim = body.claim === 'Yes' || body.claim === true;
+  }
+
+  if (body.status !== undefined) {
+    updateData.status = mapStatus(
+      normalizeOptionalInspectionIssueString(body.status),
+    );
+  }
+
+  return updateData;
+}
+
+export interface InspectionIssueUpsertPayloadItem {
+  description?: unknown;
+  division?: unknown;
+  ncNumber?: unknown;
+  nonConformanceNumber?: unknown;
+  partName?: unknown;
+  projectName?: unknown;
+  quantity?: unknown;
+  responsibleDepartment?: unknown;
+  responsibleWelder?: unknown;
+  status?: unknown;
+  workOrderNumber?: unknown;
+}
+
+export function buildInspectionIssueUpsertPayloadCore(
+  item: InspectionIssueUpsertPayloadItem,
+  serialNumber: number,
+  mapStatus: (value: null | string | undefined) => string,
+  createId: () => string,
+) {
+  const ncNumber =
+    normalizeOptionalInspectionIssueString(item.nonConformanceNumber) ??
+    normalizeOptionalInspectionIssueString(item.ncNumber);
+  if (!ncNumber) {
+    return null;
+  }
+
+  const quantity = normalizeOptionalInspectionIssueNumber(item.quantity);
+  const status = mapStatus(normalizeOptionalInspectionIssueString(item.status));
+
+  return {
+    create: {
+      id: createId(),
+      serialNumber,
+      date: new Date(),
+      status,
+      partName:
+        normalizeOptionalInspectionIssueString(item.partName) ?? '未知零件',
+      description:
+        normalizeOptionalInspectionIssueString(item.description) ?? '',
+      quantity: quantity ?? 0,
+      projectName:
+        normalizeOptionalInspectionIssueString(item.projectName) ?? '',
+      division: normalizeOptionalInspectionIssueString(item.division) ?? '',
+      responsibleDepartment:
+        normalizeOptionalInspectionIssueString(item.responsibleDepartment) ??
+        '质量部',
+      responsibleWelder:
+        normalizeOptionalInspectionIssueString(item.responsibleWelder) ?? null,
+      nonConformanceNumber: ncNumber,
+      workOrderNumber:
+        normalizeOptionalInspectionIssueString(item.workOrderNumber) ?? null,
+    },
+    update: {
+      partName: normalizeOptionalInspectionIssueString(item.partName),
+      description: normalizeOptionalInspectionIssueString(item.description),
+      quantity,
+      projectName: normalizeOptionalInspectionIssueString(item.projectName),
+      responsibleDepartment: normalizeOptionalInspectionIssueString(
+        item.responsibleDepartment,
+      ),
+      responsibleWelder: normalizeOptionalInspectionIssueString(
+        item.responsibleWelder,
+      ),
+      status,
+    },
+    where: { nonConformanceNumber: ncNumber },
+  };
+}
