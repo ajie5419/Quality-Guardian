@@ -15,6 +15,7 @@ export * from './modules/qms/inspection-request';
 export * from './modules/qms/issue-tracking-status';
 export * from './modules/qms/itp';
 export * from './modules/qms/knowledge-category';
+export * from './modules/qms/knowledge';
 export * from './modules/qms/metrology-status';
 export * from './modules/qms/param-validation';
 export * from './modules/qms/pass-rate-core';
