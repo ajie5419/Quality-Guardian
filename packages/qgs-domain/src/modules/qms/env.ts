@@ -7,7 +7,7 @@ export function readRuntimeEnv(name: string): string | undefined {
     return undefined;
   }
   const value = (
-    descriptor.value as { env?: Record<string, string | undefined> } | undefined
+    descriptor.value as undefined | { env?: Record<string, string | undefined> }
   )?.env?.[name];
   return typeof value === 'string' ? value : undefined;
 }
