@@ -631,6 +631,9 @@ importers:
       '@qgs/domain':
         specifier: workspace:*
         version: link:../../packages/qgs-domain
+      '@qgs/enums':
+        specifier: workspace:*
+        version: link:../../packages/qg-enums
       '@qgs/shared':
         specifier: workspace:*
         version: link:../../packages/qgs-shared
@@ -1721,6 +1724,15 @@ importers:
       '@vben-core/typings':
         specifier: workspace:*
         version: link:../@core/base/typings
+
+  packages/qg-enums:
+    devDependencies:
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(@microsoft/api-extractor@7.52.5(@types/node@22.16.0))(jiti@2.4.2)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.0)
+      typescript:
+        specifier: ^5.0.0
+        version: 5.8.3
 
   packages/qgs-domain:
     devDependencies:

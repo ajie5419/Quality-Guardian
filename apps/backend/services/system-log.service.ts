@@ -9,7 +9,7 @@ import type {
 
 import { Prisma } from '@prisma/client';
 import { LoginMethodEnum, LoginStatusEnum } from '@qgs/shared';
-import { renderAuditTemplateText } from '~/constants/audit-templates';
+import { renderAuditTemplateText } from '@qgs/enums';
 import prisma from '~/utils/prisma';
 import { parseUA } from '~/utils/ua-parser';
 

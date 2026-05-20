@@ -9,9 +9,9 @@ import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
 } from '@qgs/domain';
+import { AUDIT_TEMPLATES } from '@qgs/enums';
 import { formatDate, safeNumber, tryParsePhotos } from '@qgs/shared';
 import { nanoid } from 'nanoid';
-import { AUDIT_TEMPLATES } from '~/constants/audit-templates';
 import { SystemLogService } from '~/services/system-log.service';
 import prisma from '~/utils/prisma';
 

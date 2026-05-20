@@ -7,7 +7,7 @@ import type {
 import type { PaginationParams } from './base.service';
 
 import { Prisma } from '@prisma/client';
-import { AUDIT_TEMPLATES } from '~/constants/audit-templates';
+import { AUDIT_TEMPLATES } from '@qgs/enums';
 import { MONTHS } from '~/constants/locale';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';

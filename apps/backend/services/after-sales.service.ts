@@ -6,13 +6,13 @@ import type {
 import type { AfterSalesDateMode } from '~/utils/after-sales-query';
 
 import { Prisma } from '@prisma/client';
+import { AUDIT_TEMPLATES } from '@qgs/enums';
 import {
   formatDate,
   QMS_DEFAULT_VALUES,
   QMS_STATUS_OPEN_SET,
   tryParsePhotos,
 } from '@qgs/shared';
-import { AUDIT_TEMPLATES } from '~/constants/audit-templates';
 import { FileStorageService } from '~/services/file-storage.service';
 import { buildAfterSalesDateRange } from '~/utils/after-sales-query';
 import { createModuleLogger } from '~/utils/logger';

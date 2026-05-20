@@ -10,7 +10,7 @@ import process from 'node:process';
 import { Prisma } from '@prisma/client';
 import { deriveIssueTrackingStatus, ISSUE_TRACKING_STATUS } from '@qgs/domain';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
-import { AUDIT_TEMPLATES } from '~/constants/audit-templates';
+import { AUDIT_TEMPLATES } from '@qgs/enums';
 import { FileStorageService } from '~/services/file-storage.service';
 import { resolveInspectionFormProcessCandidates } from '~/utils/inspection-form';
 import { buildInspectionIssueDateRange } from '~/utils/inspection-issue';

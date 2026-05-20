@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@prisma/client": "6.2.1",
+    "@qgs/enums": "workspace:*",
     "@qgs/domain": "workspace:*",
     "@qgs/shared": "workspace:*",
     "ali-oss": "^6.23.0",
