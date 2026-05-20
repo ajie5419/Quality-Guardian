@@ -1,3 +1,4 @@
+export * from './modules/qms/after-sales-id';
 export * from './modules/qms/after-sales-payload';
 export * from './modules/qms/after-sales-query';
 export * from './modules/qms/after-sales-status';

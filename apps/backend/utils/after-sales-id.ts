@@ -1,10 +1,6 @@
-import { nanoid } from 'nanoid';
-
+import { createAfterSalesId } from '@qgs/domain';
 import prisma from './prisma';
-
-export function createAfterSalesId(): string {
-  return `AS-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`;
-}
+export { createAfterSalesId };
 
 export async function getNextAfterSalesSerialNumber(): Promise<number> {
   const result = await prisma.after_sales.aggregate({
