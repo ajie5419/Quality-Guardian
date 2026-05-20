@@ -1,5 +1,6 @@
 import type { EventHandlerRequest, H3Event } from 'h3';
 
+import { parseRequiredParamValue } from '@qgs/domain';
 import { getRouterParam, setResponseStatus } from 'h3';
 import { useResponseError } from '~/utils/response';
 
@@ -8,7 +9,7 @@ export function getRequiredRouterParam(
   paramName: string,
   errorMessage: string,
 ): ReturnType<typeof useResponseError> | string {
-  const value = getRouterParam(event, paramName);
+  const value = parseRequiredParamValue(getRouterParam(event, paramName));
   if (!value) {
     setResponseStatus(event, 400);
     return useResponseError(errorMessage);
