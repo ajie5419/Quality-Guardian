@@ -1,8 +1,9 @@
+import type { Dept } from '@qgs/shared';
+
 /**
  * 损失来源枚举
  */
 import { LOSS_SOURCE, LOSS_TYPE } from '@qgs/enums';
-import type { Dept } from '@qgs/shared';
 
 /**
  * 损失类型枚举

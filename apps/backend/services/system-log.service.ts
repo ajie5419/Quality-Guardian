@@ -8,8 +8,8 @@ import type {
 } from '@qgs/shared';
 
 import { Prisma } from '@prisma/client';
-import { LoginMethodEnum, LoginStatusEnum } from '@qgs/shared';
 import { renderAuditTemplateText } from '@qgs/enums';
+import { LoginMethodEnum, LoginStatusEnum } from '@qgs/shared';
 import prisma from '~/utils/prisma';
 import { parseUA } from '~/utils/ua-parser';
 
