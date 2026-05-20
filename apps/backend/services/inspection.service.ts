@@ -1,5 +1,5 @@
 import type { archive_task_status, inspection_result } from '@prisma/client';
-import type { InspectionIssue, InspectionIssueStatusEnum } from '@qgs/shared';
+import type { InspectionIssue } from '@qgs/shared';
 import type { InspectionIssueDateMode } from '~/utils/inspection-issue';
 
 import { existsSync } from 'node:fs';
@@ -9,7 +9,7 @@ import process from 'node:process';
 
 import { Prisma } from '@prisma/client';
 import { deriveIssueTrackingStatus, ISSUE_TRACKING_STATUS } from '@qgs/domain';
-import { AUDIT_TEMPLATES } from '@qgs/enums';
+import { AUDIT_TEMPLATES, InspectionIssueStatusEnum } from '@qgs/enums';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
 import { FileStorageService } from '~/services/file-storage.service';
 import { resolveInspectionFormProcessCandidates } from '~/utils/inspection-form';
