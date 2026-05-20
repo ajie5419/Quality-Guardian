@@ -4,6 +4,13 @@
 
 import type { UploadFile } from 'ant-design-vue';
 
+import {
+  CLAIM_STATUS,
+  ISSUE_DEFECT_TYPE,
+  ISSUE_DEPT_TYPE,
+  ISSUE_SEVERITY,
+} from '@qgs/enums';
+
 import { InspectionIssueStatusEnum } from '#/api/qms/enums';
 
 /**
@@ -15,39 +22,26 @@ export type IssueStatus = InspectionIssueStatusEnum;
 /**
  * 索赔状态枚举
  */
-export enum ClaimStatus {
-  NO = 'No',
-  YES = 'Yes',
-}
+export const ClaimStatus = CLAIM_STATUS;
+export type ClaimStatus = (typeof ClaimStatus)[keyof typeof ClaimStatus];
 
 /**
  * 严重程度枚举
  */
-export enum Severity {
-  CRITICAL = 'Critical',
-  MAJOR = 'Major',
-  MINOR = 'Minor',
-}
+export const Severity = ISSUE_SEVERITY;
+export type Severity = (typeof Severity)[keyof typeof Severity];
 
 /**
  * 部门类型枚举
  */
-export enum DeptType {
-  OUTSOURCED = '外协',
-  PRODUCTION = '履约',
-  PURCHASE = '采购',
-}
+export const DeptType = ISSUE_DEPT_TYPE;
+export type DeptType = (typeof DeptType)[keyof typeof DeptType];
 
 /**
  * 缺陷类型
  */
-export enum DefectType {
-  DESIGN = '设计缺陷',
-  MANUFACTURING = '制造缺陷',
-  OTHER = '其他缺陷',
-  PART = '零部件缺陷',
-  PROCESS = '工艺缺陷',
-}
+export const DefectType = ISSUE_DEFECT_TYPE;
+export type DefectType = (typeof DefectType)[keyof typeof DefectType];
 
 /**
  * 质量问题实体

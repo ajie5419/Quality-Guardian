@@ -1,25 +1,17 @@
 /**
  * 损失来源枚举
  */
+import { LOSS_SOURCE, LOSS_TYPE } from '@qgs/enums';
 import type { Dept } from '@qgs/shared';
-
-export enum LossSource {
-  COMMISSIONING = 'Commissioning',
-  EXTERNAL = 'External',
-  INTERNAL = 'Internal',
-  MANUAL = 'Manual',
-}
 
 /**
  * 损失类型枚举
  */
-export enum LossType {
-  OTHER = 'Other',
-  RETURN = 'Return',
-  REWORK = 'Rework',
-  SCRAP = 'Scrap',
-  TRANSPORT = 'Transport',
-}
+export const LossSource = LOSS_SOURCE;
+export type LossSource = (typeof LossSource)[keyof typeof LossSource];
+
+export const LossType = LOSS_TYPE;
+export type LossType = (typeof LossType)[keyof typeof LossType];
 
 /**
  * 统计数据接口

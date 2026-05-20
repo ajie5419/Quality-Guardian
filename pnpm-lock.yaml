@@ -695,6 +695,9 @@ importers:
       '@qgs/domain':
         specifier: workspace:*
         version: link:../../packages/qgs-domain
+      '@qgs/enums':
+        specifier: workspace:*
+        version: link:../../packages/qg-enums
       '@qgs/shared':
         specifier: workspace:*
         version: link:../../packages/qgs-shared
