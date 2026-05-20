@@ -70,3 +70,35 @@ export const INSPECTION_RECORD_TYPE = {
 
 export type InspectionRecordType =
   (typeof INSPECTION_RECORD_TYPE)[keyof typeof INSPECTION_RECORD_TYPE];
+
+export enum SupplierStatusEnum {
+  FROZEN = 'Frozen',
+  OBSERVATION = 'Observation',
+  QUALIFIED = 'Qualified',
+  TRIAL = 'Trial',
+}
+
+export enum WorkOrderStatusEnum {
+  CANCELLED = 'CANCELLED',
+  COMPLETED = 'COMPLETED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  OPEN = 'OPEN',
+}
+
+export enum InspectionIssueStatusEnum {
+  CLOSED = 'CLOSED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  OPEN = 'OPEN',
+}
+
+export enum QualityLossStatusEnum {
+  CONFIRMED = 'Confirmed',
+  PENDING = 'Pending',
+  PROCESSING = 'Processing',
+  RESOLVED = 'Resolved',
+}
+
+export enum ProjectStatusEnum {
+  ACTIVE = 'active',
+  ARCHIVED = 'archived',
+}
