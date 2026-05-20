@@ -70,6 +70,29 @@ export interface ScanMissingResult {
   missingIds: string[];
 }
 
+export interface DirectUploadPolicyResponse {
+  expiresAt: number;
+  maxBytes: number;
+  mimeType: string;
+  objectKey: string;
+  provider: 'OSS';
+  storedName: string;
+  ticket: string;
+  uploadMethod: 'PUT';
+  uploadUrl: string;
+}
+
+export interface DirectUploadCompleteResponse {
+  fileId?: string;
+  filename?: string;
+  originalName?: string;
+  size?: number;
+  thumbFilename?: null | string;
+  thumbUrl?: null | string;
+  type?: string;
+  url?: string;
+}
+
 export function getFileList(params?: FileListParams) {
   return requestClient.get<FileListResponse>('/files', { params });
 }
@@ -97,4 +120,22 @@ export function scanMissingFiles(data: {
   markMissing?: boolean;
 }) {
   return requestClient.post<ScanMissingResult>('/files/scan-missing', data);
+}
+
+export function createDirectUploadPolicy(data: {
+  filename: string;
+  mimeType?: string;
+  size?: number;
+}) {
+  return requestClient.post<DirectUploadPolicyResponse>(
+    '/files/upload-policy',
+    data,
+  );
+}
+
+export function completeDirectUpload(data: { ticket: string }) {
+  return requestClient.post<DirectUploadCompleteResponse>(
+    '/files/complete',
+    data,
+  );
 }
