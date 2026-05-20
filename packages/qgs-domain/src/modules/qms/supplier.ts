@@ -125,8 +125,8 @@ interface SupplierImportItem {
   origin?: unknown;
   outsourcingMode?: unknown;
   phone?: unknown;
-  project?: unknown;
   productName?: unknown;
+  project?: unknown;
   score2025?: unknown;
   status?: unknown;
 }

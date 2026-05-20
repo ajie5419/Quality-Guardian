@@ -8,17 +8,17 @@ import {
 } from '@qgs/domain';
 
 export {
+  createSupplierId,
   DEFAULT_OUTSOURCING_MODE,
   IN_HOUSE_OUTSOURCING_MODE,
-  OUTSOURCING_CATEGORY,
-  OUTSOURCING_MODES,
-  createSupplierId,
   isOutsourcingCategory,
   normalizeOutsourcingMode,
   normalizeSupplierName,
   normalizeSupplierScore,
   normalizeSupplierStatus,
   normalizeSupplierString,
+  OUTSOURCING_CATEGORY,
+  OUTSOURCING_MODES,
 } from '@qgs/domain';
 
 interface SupplierImportItem {
