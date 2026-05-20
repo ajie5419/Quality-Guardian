@@ -252,6 +252,48 @@ const customConfig: Linter.Config[] = [
       ],
     },
   },
+  {
+    // 已迁移 QMS 枚举强制：禁止在迁移入口继续声明本地 enum，统一使用 @qgs/enums
+    files: [
+      'apps/web-antd/src/views/qms/quality-loss/types.ts',
+      'apps/web-antd/src/views/qms/inspection/issues/types/index.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          message:
+            'Do not define local `LossSource` enum. Use `LOSS_SOURCE` from @qgs/enums.',
+          selector: "TSEnumDeclaration[id.name='LossSource']",
+        },
+        {
+          message:
+            'Do not define local `LossType` enum. Use `LOSS_TYPE` from @qgs/enums.',
+          selector: "TSEnumDeclaration[id.name='LossType']",
+        },
+        {
+          message:
+            'Do not define local `ClaimStatus` enum. Use `CLAIM_STATUS` from @qgs/enums.',
+          selector: "TSEnumDeclaration[id.name='ClaimStatus']",
+        },
+        {
+          message:
+            'Do not define local `Severity` enum. Use `ISSUE_SEVERITY` from @qgs/enums.',
+          selector: "TSEnumDeclaration[id.name='Severity']",
+        },
+        {
+          message:
+            'Do not define local `DeptType` enum. Use `ISSUE_DEPT_TYPE` from @qgs/enums.',
+          selector: "TSEnumDeclaration[id.name='DeptType']",
+        },
+        {
+          message:
+            'Do not define local `DefectType` enum. Use `ISSUE_DEFECT_TYPE` from @qgs/enums.',
+          selector: "TSEnumDeclaration[id.name='DefectType']",
+        },
+      ],
+    },
+  },
   // 后端模拟代码，不需要太多规则
   {
     files: ['apps/backend-mock/**/**', 'docs/**/**'],
