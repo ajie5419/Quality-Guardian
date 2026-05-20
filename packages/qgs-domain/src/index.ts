@@ -10,6 +10,7 @@ export * from './modules/qms/inspection-issue-query';
 export * from './modules/qms/inspection-issue-status';
 export * from './modules/qms/inspection-record';
 export * from './modules/qms/inspection-request';
+export * from './modules/qms/itp';
 export * from './modules/qms/issue-tracking-status';
 export * from './modules/qms/knowledge-category';
 export * from './modules/qms/param-validation';
