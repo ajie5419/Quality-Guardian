@@ -1,9 +1,9 @@
-import prisma from '~/utils/prisma';
 import {
   buildWelderCreateDataCore,
   buildWelderUpdateDataCore,
   parseWelderListQuery as parseWelderListQueryCore,
 } from '@qgs/domain';
+import prisma from '~/utils/prisma';
 
 function hasWelderField(fieldName: string) {
   const fields = (

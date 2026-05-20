@@ -48,9 +48,7 @@ export function normalizeWelderScore(value: unknown): number {
   return Math.max(0, Math.min(DEFAULT_SCORE, Math.round(parsed)));
 }
 
-export function normalizeWelderDate(
-  value: unknown,
-): Date | null | undefined {
+export function normalizeWelderDate(value: unknown): Date | null | undefined {
   if (value === undefined) return undefined;
   const text = normalizeWelderString(value);
   if (!text) return null;
