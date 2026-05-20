@@ -6,7 +6,7 @@ export {
   parseReportDate,
   parseReportNumber,
   parseReportPeriodType,
+  type ReportPeriodType,
   resolveReportDateRangeQuery,
   resolveReportQueryDate,
-  type ReportPeriodType,
 } from '@qgs/domain';
