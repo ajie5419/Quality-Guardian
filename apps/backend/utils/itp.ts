@@ -7,8 +7,8 @@ export {
   normalizeItpPlanStatus,
   normalizeItpText,
   parseItpQuantitativeItems,
+  type ItpPlanStatus as quality_plans_planStatus,
   stringifyItpQuantitativeItems,
   toItpPlanStatusText,
   toItpProjectVersionText,
-  type ItpPlanStatus as quality_plans_planStatus,
 } from '@qgs/domain';
