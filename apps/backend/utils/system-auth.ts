@@ -1,19 +1,9 @@
 import type { EventHandlerRequest, H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
+import { isSystemAdmin } from '@qgs/domain';
 import { forbiddenResponse } from '~/utils/response';
-
-function isAdminRole(role: string) {
-  const normalizedRole = role.trim().toLowerCase();
-  return normalizedRole.includes('admin') || normalizedRole.includes('super');
-}
-
-export function isSystemAdmin(userinfo: null | UserSession) {
-  if (!userinfo) {
-    return false;
-  }
-  return (userinfo.roles || []).some((role) => isAdminRole(role));
-}
+export { isSystemAdmin };
 
 export function requireSystemAdmin(
   event: H3Event<EventHandlerRequest>,
