@@ -1,21 +1,22 @@
 import type { Prisma } from '@prisma/client';
 
+import {
+  buildKnowledgeCategoryCreateData as buildKnowledgeCategoryCreateDataRule,
+  buildKnowledgeCategoryUpdateData as buildKnowledgeCategoryUpdateDataRule,
+} from '@qgs/domain';
+
 export function buildKnowledgeCategoryCreateData(
   input: Record<string, unknown>,
 ): Prisma.knowledge_categoriesUncheckedCreateInput {
-  return {
-    name: input.name as string,
-    description: input.description as null | string | undefined,
-    parentId: (input.parentId || null) as null | string,
-  };
+  return buildKnowledgeCategoryCreateDataRule(
+    input,
+  ) as Prisma.knowledge_categoriesUncheckedCreateInput;
 }
 
 export function buildKnowledgeCategoryUpdateData(
   input: Record<string, unknown>,
 ): Prisma.knowledge_categoriesUncheckedUpdateInput {
-  return {
-    name: input.name as string,
-    description: input.description as null | string | undefined,
-    parentId: input.parentId as null | string | undefined,
-  };
+  return buildKnowledgeCategoryUpdateDataRule(
+    input,
+  ) as Prisma.knowledge_categoriesUncheckedUpdateInput;
 }
