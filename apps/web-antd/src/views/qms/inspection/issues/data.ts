@@ -4,6 +4,7 @@ import type { VbenFormSchema } from '#/adapter/form';
 import type { VxeGridProps } from '#/adapter/vxe-table';
 
 import { InspectionIssueStatusEnum } from '@qgs/enums';
+
 import { $t } from '#/locales';
 
 import { cloneInspectionProcessFallbackOptions } from '../../shared/constants/inspection-process-fallback';
