@@ -67,3 +67,59 @@ export function hasInspectionIssueWriteAccess(params: {
   const isOwner = params.inspector === String(params.username ?? '');
   return isAdmin || isOwner;
 }
+
+export function createInspectionIssueId(
+  now: Date,
+  idPart: string,
+): string {
+  return `ISS-${now.getFullYear()}-${idPart.toUpperCase()}`;
+}
+
+export interface LinkedInspectionPartView {
+  category: string;
+  level1Component: null | string;
+  level2Component: null | string;
+  materialName: null | string;
+  processName: null | string;
+}
+
+export function deriveIssuePartNameFromInspection(
+  inspection?: LinkedInspectionPartView,
+): string | undefined {
+  if (!inspection) {
+    return undefined;
+  }
+  if (inspection.category === 'PROCESS') {
+    return (
+      inspection.level2Component ||
+      inspection.level1Component ||
+      inspection.processName ||
+      undefined
+    );
+  }
+
+  return inspection.materialName || inspection.level2Component || undefined;
+}
+
+export interface LinkedInspectionProcessView {
+  category: string;
+  incomingType: null | string;
+  processName: null | string;
+}
+
+export function deriveIssueProcessNameFromInspection(
+  inspection?: LinkedInspectionProcessView,
+): string | undefined {
+  if (!inspection) {
+    return undefined;
+  }
+  if (inspection.category === 'INCOMING') {
+    return inspection.incomingType || inspection.processName || undefined;
+  }
+
+  if (inspection.category === 'SHIPMENT') {
+    return '成品检验';
+  }
+
+  return inspection.processName || undefined;
+}

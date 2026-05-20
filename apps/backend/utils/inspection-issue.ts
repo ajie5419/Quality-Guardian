@@ -1,5 +1,8 @@
 import {
   buildInspectionIssueDateRange,
+  createInspectionIssueId as createInspectionIssueIdRule,
+  deriveIssuePartNameFromInspection,
+  deriveIssueProcessNameFromInspection,
   hasInspectionIssueAdminAccess as domainHasInspectionIssueAdminAccess,
   hasInspectionIssueWriteAccess as domainHasInspectionIssueWriteAccess,
   normalizeOptionalInspectionIssueDate,
@@ -17,6 +20,8 @@ import prisma from './prisma';
 
 export {
   buildInspectionIssueDateRange,
+  deriveIssuePartNameFromInspection,
+  deriveIssueProcessNameFromInspection,
   normalizeOptionalInspectionIssueDate,
   normalizeOptionalInspectionIssueNumber,
   normalizeOptionalInspectionIssueString,
@@ -39,7 +44,7 @@ export function hasInspectionIssueWriteAccess(params: {
 }
 
 export function createInspectionIssueId(): string {
-  return `ISS-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`;
+  return createInspectionIssueIdRule(new Date(), nanoid(8));
 }
 
 export async function getNextInspectionIssueSerialNumber(): Promise<number> {
@@ -68,47 +73,6 @@ export async function findInspectionIssueAccessRecord(id: string) {
     where: { id },
     select: { inspector: true, nonConformanceNumber: true, inspectionId: true },
   });
-}
-
-function deriveIssuePartNameFromInspection(inspection?: {
-  category: string;
-  level1Component: null | string;
-  level2Component: null | string;
-  materialName: null | string;
-  processName: null | string;
-}) {
-  if (!inspection) {
-    return undefined;
-  }
-  if (inspection.category === 'PROCESS') {
-    return (
-      inspection.level2Component ||
-      inspection.level1Component ||
-      inspection.processName ||
-      undefined
-    );
-  }
-
-  return inspection.materialName || inspection.level2Component || undefined;
-}
-
-function deriveIssueProcessNameFromInspection(inspection?: {
-  category: string;
-  incomingType: null | string;
-  processName: null | string;
-}) {
-  if (!inspection) {
-    return undefined;
-  }
-  if (inspection.category === 'INCOMING') {
-    return inspection.incomingType || inspection.processName || undefined;
-  }
-
-  if (inspection.category === 'SHIPMENT') {
-    return '成品检验';
-  }
-
-  return inspection.processName || undefined;
 }
 
 export async function findInspectionForIssue(inspectionId?: string) {
