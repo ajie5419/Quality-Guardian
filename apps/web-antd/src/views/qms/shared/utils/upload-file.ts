@@ -204,8 +204,10 @@ async function directOssUpload(
  */
 export function createQmsUploadRequest(options?: {
   fallbackAction?: string;
+  preferDirectOss?: boolean;
 }): UploadProps['customRequest'] {
   const fallbackAction = options?.fallbackAction || '/api/upload';
+  const preferDirectOss = options?.preferDirectOss === true;
 
   return async (request) => {
     let target: File;
@@ -213,6 +215,20 @@ export function createQmsUploadRequest(options?: {
       target = resolveUploadFile(request.file);
     } catch {
       request.onError?.(new Error('invalid upload file'));
+      return;
+    }
+
+    if (!preferDirectOss) {
+      try {
+        const response = await fallbackUpload(
+          request,
+          target,
+          request.action || fallbackAction,
+        );
+        request.onSuccess?.(response as any);
+      } catch (error) {
+        request.onError?.(error as Error);
+      }
       return;
     }
 

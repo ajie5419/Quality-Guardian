@@ -409,7 +409,11 @@ async function saveOssFile(params: {
 
 export const FileStorageService = {
   isDirectUploadEnabled() {
-    return shouldUseOss();
+    return (
+      shouldUseOss() &&
+      String(process.env.OSS_DIRECT_UPLOAD_ENABLED || '').toLowerCase() ===
+        'true'
+    );
   },
 
   async createDirectUploadPolicy(params: DirectUploadPolicyParams) {
