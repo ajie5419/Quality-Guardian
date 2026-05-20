@@ -14,6 +14,7 @@ export * from './modules/qms/inspection-request';
 export * from './modules/qms/issue-tracking-status';
 export * from './modules/qms/itp';
 export * from './modules/qms/knowledge-category';
+export * from './modules/qms/metrology-status';
 export * from './modules/qms/param-validation';
 export * from './modules/qms/planning-project';
 export * from './modules/qms/quality-loss-payload';
