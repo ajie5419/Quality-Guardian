@@ -3,9 +3,12 @@ import type { PrismaClient } from '@prisma/client';
 import {
   INSPECTION_REQUEST_STATUS,
   isInspectionRequestAssemblyProcess,
+  mergeInspectionRequestAttachments,
+  normalizeInspectionRequestAttachments,
   normalizeInspectionRequestCheckResult,
   normalizeInspectionRequestStatus,
   normalizeInspectionRequestText,
+  parseInspectionRequestAttachments,
   parseInspectionRequestPriority,
   parseInspectionRequestQuantity,
 } from '@qgs/domain';
@@ -15,68 +18,15 @@ import { resolveTaskDispatchCurrentUserId } from '~/utils/task-dispatch';
 export {
   INSPECTION_REQUEST_STATUS,
   isInspectionRequestAssemblyProcess,
+  mergeInspectionRequestAttachments,
+  normalizeInspectionRequestAttachments,
   normalizeInspectionRequestCheckResult,
   normalizeInspectionRequestStatus,
   normalizeInspectionRequestText,
+  parseInspectionRequestAttachments,
   parseInspectionRequestPriority,
   parseInspectionRequestQuantity,
 };
-
-export function normalizeInspectionRequestAttachments(value: unknown) {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .map((item) => {
-      if (!item || typeof item !== 'object') return null;
-      const source = item as Record<string, unknown>;
-      const url = normalizeInspectionRequestText(source.url);
-      if (!url) return null;
-
-      const name =
-        normalizeInspectionRequestText(source.name) ||
-        normalizeInspectionRequestText(source.originalName) ||
-        '报检单';
-      return {
-        fileId: normalizeInspectionRequestText(source.fileId) || undefined,
-        name,
-        size: Number(source.size || 0),
-        type: normalizeInspectionRequestText(source.type),
-        url,
-      };
-    })
-    .filter(Boolean);
-}
-
-export function parseInspectionRequestAttachments(value: unknown) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-  try {
-    const parsed = JSON.parse(String(value));
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-export function mergeInspectionRequestAttachments(...sources: unknown[]) {
-  const merged = [];
-  const seen = new Set<string>();
-
-  for (const source of sources) {
-    for (const item of parseInspectionRequestAttachments(source)) {
-      if (!item || typeof item !== 'object') continue;
-      const record = item as Record<string, unknown>;
-      const url = normalizeInspectionRequestText(record.url);
-      if (!url) continue;
-      const key = normalizeInspectionRequestText(record.fileId) || url;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged.push(item);
-    }
-  }
-
-  return normalizeInspectionRequestAttachments(merged);
-}
 
 export async function generateInspectionRequestNo(
   client: PrismaClient,
