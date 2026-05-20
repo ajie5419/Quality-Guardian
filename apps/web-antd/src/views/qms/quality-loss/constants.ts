@@ -1,17 +1,16 @@
 import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
-import { LossSource, LossType } from './types';
+import {
+  QUALITY_LOSS_SOURCE_STYLE_MAP,
+  QUALITY_LOSS_STATUS_COLOR_MAP,
+  QUALITY_LOSS_STATUS_FALLBACK_VALUES,
+  QUALITY_LOSS_TYPE_OPTIONS,
+} from '@qgs/enums';
 
 /**
  * 损失类型选项
  */
-export const LOSS_TYPE_OPTIONS = [
-  { label: '报废 (Scrap)', value: LossType.SCRAP },
-  { label: '返工 (Rework)', value: LossType.REWORK },
-  { label: '退货 (Return)', value: LossType.RETURN },
-  { label: '额外物流', value: LossType.TRANSPORT },
-  { label: '其他', value: LossType.OTHER },
-];
+export const LOSS_TYPE_OPTIONS = [...QUALITY_LOSS_TYPE_OPTIONS];
 
 export function mapDictionaryOptionsToLossType(
   options?: DictionaryOptionItem[],
@@ -25,24 +24,14 @@ export function mapDictionaryOptionsToLossType(
   }));
 }
 
-const QUALITY_LOSS_STATUS_FALLBACK_VALUES = [
-  'Pending',
-  'Processing',
-  'Confirmed',
-  'Resolved',
-];
-const QUALITY_LOSS_STATUS_COLOR_MAP: Record<string, string> = {
-  CONFIRMED: 'green',
-  PENDING: 'orange',
-  PROCESSING: 'blue',
-  RESOLVED: 'cyan',
-};
-
 function normalizeStatusKey(value: string) {
   return String(value || '')
     .trim()
     .toUpperCase();
 }
+
+const QUALITY_LOSS_STATUS_COLOR_LOOKUP: Record<string, string> =
+  QUALITY_LOSS_STATUS_COLOR_MAP;
 
 export function mapDictionaryOptionsToQualityLossStatus(
   options?: DictionaryOptionItem[],
@@ -52,7 +41,8 @@ export function mapDictionaryOptionsToQualityLossStatus(
       value,
       label: value,
       color:
-        QUALITY_LOSS_STATUS_COLOR_MAP[normalizeStatusKey(value)] || 'default',
+        QUALITY_LOSS_STATUS_COLOR_LOOKUP[normalizeStatusKey(value)] ||
+        'default',
     }));
   }
 
@@ -60,7 +50,7 @@ export function mapDictionaryOptionsToQualityLossStatus(
     value: item.dictKey,
     label: item.dictValue || item.dictKey,
     color:
-      QUALITY_LOSS_STATUS_COLOR_MAP[normalizeStatusKey(item.dictKey)] ||
+      QUALITY_LOSS_STATUS_COLOR_LOOKUP[normalizeStatusKey(item.dictKey)] ||
       'default',
   }));
 }
@@ -69,20 +59,5 @@ export function mapDictionaryOptionsToQualityLossStatus(
  * 损失来源样式映射
  */
 export const SOURCE_STYLE_MAP = {
-  [LossSource.COMMISSIONING]: {
-    color: 'purple',
-    labelKey: 'qms.qualityLoss.source.commissioning',
-  },
-  [LossSource.INTERNAL]: {
-    color: 'blue',
-    labelKey: 'qms.qualityLoss.source.internal',
-  },
-  [LossSource.EXTERNAL]: {
-    color: 'red',
-    labelKey: 'qms.qualityLoss.source.external',
-  },
-  [LossSource.MANUAL]: {
-    color: 'default',
-    labelKey: 'qms.qualityLoss.source.manual',
-  },
+  ...QUALITY_LOSS_SOURCE_STYLE_MAP,
 };

@@ -137,3 +137,44 @@ export const INSPECTION_ISSUE_STATUS_UI_MAP = {
   },
   [InspectionIssueStatusEnum.OPEN]: { color: 'red', label: '待处理' },
 } as const;
+
+export const QUALITY_LOSS_TYPE_OPTIONS = [
+  { label: '报废 (Scrap)', value: LOSS_TYPE.SCRAP },
+  { label: '返工 (Rework)', value: LOSS_TYPE.REWORK },
+  { label: '退货 (Return)', value: LOSS_TYPE.RETURN },
+  { label: '额外物流', value: LOSS_TYPE.TRANSPORT },
+  { label: '其他', value: LOSS_TYPE.OTHER },
+] as const;
+
+export const QUALITY_LOSS_STATUS_FALLBACK_VALUES = [
+  'Pending',
+  'Processing',
+  'Confirmed',
+  'Resolved',
+] as const;
+
+export const QUALITY_LOSS_STATUS_COLOR_MAP = {
+  CONFIRMED: 'green',
+  PENDING: 'orange',
+  PROCESSING: 'blue',
+  RESOLVED: 'cyan',
+} as const;
+
+export const QUALITY_LOSS_SOURCE_STYLE_MAP = {
+  [LOSS_SOURCE.COMMISSIONING]: {
+    color: 'purple',
+    labelKey: 'qms.qualityLoss.source.commissioning',
+  },
+  [LOSS_SOURCE.EXTERNAL]: {
+    color: 'red',
+    labelKey: 'qms.qualityLoss.source.external',
+  },
+  [LOSS_SOURCE.INTERNAL]: {
+    color: 'blue',
+    labelKey: 'qms.qualityLoss.source.internal',
+  },
+  [LOSS_SOURCE.MANUAL]: {
+    color: 'default',
+    labelKey: 'qms.qualityLoss.source.manual',
+  },
+} as const;
