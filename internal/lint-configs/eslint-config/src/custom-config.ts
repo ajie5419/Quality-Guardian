@@ -294,6 +294,43 @@ const customConfig: Linter.Config[] = [
       ],
     },
   },
+  {
+    // 已迁移常量强制：禁止在迁移文件里回退到本地枚举派生常量
+    files: [
+      'apps/web-antd/src/views/qms/quality-loss/constants.ts',
+      'apps/web-antd/src/views/qms/inspection/issues/constants.ts',
+      'apps/web-antd/src/views/qms/inspection/records/config.ts',
+      'apps/web-antd/src/views/qms/inspection/issues/supplier-constants.ts',
+      'apps/web-antd/src/api/qms/enums.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          message:
+            'Do not redefine local `LOSS_TYPE_OPTIONS`; use `QUALITY_LOSS_TYPE_OPTIONS` from @qgs/enums.',
+          selector: "VariableDeclarator[id.name='LOSS_TYPE_OPTIONS'] > ArrayExpression.init",
+        },
+        {
+          message:
+            'Do not redefine local `QUALITY_LOSS_STATUS_FALLBACK_VALUES`; use `@qgs/enums` constants.',
+          selector:
+            "VariableDeclarator[id.name='QUALITY_LOSS_STATUS_FALLBACK_VALUES'] > ArrayExpression.init",
+        },
+        {
+          message:
+            'Do not redefine local `QUALITY_LOSS_STATUS_COLOR_MAP`; use `@qgs/enums` constants.',
+          selector:
+            "VariableDeclarator[id.name='QUALITY_LOSS_STATUS_COLOR_MAP'] > ObjectExpression.init",
+        },
+        {
+          message:
+            'Do not redefine local `SOURCE_STYLE_MAP`; use `QUALITY_LOSS_SOURCE_STYLE_MAP` from @qgs/enums.',
+          selector: "VariableDeclarator[id.name='SOURCE_STYLE_MAP'] > ObjectExpression.init",
+        },
+      ],
+    },
+  },
   // 后端模拟代码，不需要太多规则
   {
     files: ['apps/backend-mock/**/**', 'docs/**/**'],
