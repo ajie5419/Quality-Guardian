@@ -1,9 +1,4 @@
 import prisma from '~/utils/prisma';
-import {
-  buildPlanningProjectUpdateData,
-  normalizePlanningProjectName,
-  normalizePlanningWorkOrderNumber,
-} from '@qgs/domain';
 
 interface PlanningProjectRecord {
   id: string;
@@ -30,12 +25,6 @@ type UpsertPlanningProjectResult<TResult> =
   | { code: 'CREATED'; data: TResult }
   | { code: 'MISSING_WORK_ORDER' }
   | { code: 'RESTORED'; data: TResult };
-
-export {
-  buildPlanningProjectUpdateData,
-  normalizePlanningProjectName,
-  normalizePlanningWorkOrderNumber,
-};
 
 export async function upsertPlanningProjectByWorkOrder<
   TExisting extends PlanningProjectRecord,
@@ -74,3 +63,9 @@ export async function upsertPlanningProjectByWorkOrder<
   });
   return { code: 'CREATED', data: created };
 }
+
+export {
+  buildPlanningProjectUpdateData,
+  normalizePlanningProjectName,
+  normalizePlanningWorkOrderNumber,
+} from '@qgs/domain';
