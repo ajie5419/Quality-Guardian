@@ -2,11 +2,14 @@ import type { Prisma } from '@prisma/client';
 
 import {
   buildTaskDispatchPayloadCore,
+  getTaskDispatchArchiveFilterRule,
   isTaskDispatchLevelTwo,
   normalizeTaskDispatchStatus,
+  resolveTaskDispatchAssigneeFilterRule,
   resolveTaskDispatchAssigneeCandidates,
   resolveTaskDispatchItpProjectIdForValidation,
   resolveTaskDispatchParentIdForPromotion,
+  resolveTaskDispatchStatusFilterRule,
   resolveTaskDispatchUserId,
   TASK_DISPATCH_STATUS,
 } from '@qgs/domain';
@@ -14,22 +17,7 @@ import {
 export { TASK_DISPATCH_STATUS };
 
 export function getTaskDispatchArchiveFilter(): Prisma.qms_task_dispatchesWhereInput {
-  return {
-    AND: [
-      {
-        OR: [
-          { itpProjectId: null },
-          { itp_project: { planStatus: { not: 'ARCHIVED' } } },
-        ],
-      },
-      {
-        OR: [
-          { dfmeaId: null },
-          { dfmea_project: { status: { not: 'archived' } } },
-        ],
-      },
-    ],
-  };
+  return getTaskDispatchArchiveFilterRule() as Prisma.qms_task_dispatchesWhereInput;
 }
 
 export function resolveTaskDispatchAssigneeFilter(params: {
@@ -38,36 +26,17 @@ export function resolveTaskDispatchAssigneeFilter(params: {
   isAdmin: boolean;
   parentId: unknown;
 }): Prisma.qms_task_dispatchesWhereInput {
-  const { all, currentUserId, isAdmin, parentId } = params;
-
-  if (parentId) {
-    return { parentId: String(parentId) };
-  }
-
-  if (isAdmin && all === 'true') {
-    return {};
-  }
-
-  return { assigneeId: currentUserId };
+  return resolveTaskDispatchAssigneeFilterRule(
+    params,
+  ) as Prisma.qms_task_dispatchesWhereInput;
 }
 
 export function resolveTaskDispatchStatusFilter(
   status: unknown,
 ): Prisma.qms_task_dispatchesWhereInput['status'] {
-  if (!status) {
-    return undefined;
-  }
-
-  const statusList = String(status)
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  if (statusList.length === 0) {
-    return undefined;
-  }
-
-  return statusList.length > 1 ? { in: statusList } : statusList[0];
+  return resolveTaskDispatchStatusFilterRule(
+    status,
+  ) as Prisma.qms_task_dispatchesWhereInput['status'];
 }
 
 export { normalizeTaskDispatchStatus, resolveTaskDispatchUserId };

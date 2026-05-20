@@ -35,6 +35,91 @@ export function normalizeTaskDispatchStatus(status: unknown): null | string {
   return TASK_DISPATCH_STATUS_SET.has(normalized) ? normalized : null;
 }
 
+export interface TaskDispatchArchiveFilterRule {
+  AND: [
+    {
+      OR: [
+        { itpProjectId: null },
+        { itp_project: { planStatus: { not: string } } },
+      ];
+    },
+    {
+      OR: [
+        { dfmeaId: null },
+        { dfmea_project: { status: { not: string } } },
+      ];
+    },
+  ];
+}
+
+export function getTaskDispatchArchiveFilterRule(): TaskDispatchArchiveFilterRule {
+  return {
+    AND: [
+      {
+        OR: [
+          { itpProjectId: null },
+          { itp_project: { planStatus: { not: 'ARCHIVED' } } },
+        ],
+      },
+      {
+        OR: [
+          { dfmeaId: null },
+          { dfmea_project: { status: { not: 'archived' } } },
+        ],
+      },
+    ],
+  };
+}
+
+export interface TaskDispatchAssigneeFilterInput {
+  all: unknown;
+  currentUserId: string;
+  isAdmin: boolean;
+  parentId: unknown;
+}
+
+export interface TaskDispatchAssigneeFilterRule {
+  assigneeId?: string;
+  parentId?: string;
+}
+
+export function resolveTaskDispatchAssigneeFilterRule(
+  params: TaskDispatchAssigneeFilterInput,
+): TaskDispatchAssigneeFilterRule {
+  const { all, currentUserId, isAdmin, parentId } = params;
+
+  if (parentId) {
+    return { parentId: String(parentId) };
+  }
+
+  if (isAdmin && all === 'true') {
+    return {};
+  }
+
+  return { assigneeId: currentUserId };
+}
+
+export type TaskDispatchStatusFilterRule = string | { in: string[] } | undefined;
+
+export function resolveTaskDispatchStatusFilterRule(
+  status: unknown,
+): TaskDispatchStatusFilterRule {
+  if (!status) {
+    return undefined;
+  }
+
+  const statusList = String(status)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (statusList.length === 0) {
+    return undefined;
+  }
+
+  return statusList.length > 1 ? { in: statusList } : statusList[0];
+}
+
 export function resolveTaskDispatchUserId(userinfo: {
   id?: unknown;
   userId?: unknown;
