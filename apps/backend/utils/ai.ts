@@ -1,3 +1,5 @@
+import { extractAiJson } from '@qgs/domain';
+
 import prisma from './prisma';
 import { AI_SETTINGS } from './system-data';
 
@@ -137,36 +139,10 @@ export async function callAi(
  * 提取 JSON 块（增强版）
  */
 export function extractJson(content: string) {
-  if (!content) throw new Error('AI 未返回任何内容');
-
-  // 清除可能存在的 Unicode 零宽字符或特殊空格
-  const cleanContent = content.trim().replaceAll(/[\u200B-\u200D\uFEFF]/g, '');
-
-  // 1. 尝试直接解析
   try {
-    return JSON.parse(cleanContent);
-  } catch {}
-
-  // 2. 尝试从 Markdown 代码块提取 (支持 json 或无语言标记)
-  const markdownRegex = /```(?:json)?([\s\S]*?)```/g;
-  let match = markdownRegex.exec(cleanContent);
-  while (match !== null) {
-    try {
-      return JSON.parse(match[1].trim());
-    } catch {}
-    match = markdownRegex.exec(cleanContent);
+    return extractAiJson(content) as any;
+  } catch (error) {
+    console.error('[AI-JSON-Parse-Error] Raw Content:', content);
+    throw error;
   }
-
-  // 3. 尝试搜索第一个 { 和最后一个 } 之间的内容
-  const firstBrace = cleanContent.indexOf('{');
-  const lastBrace = cleanContent.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    const jsonStr = cleanContent.slice(firstBrace, lastBrace + 1);
-    try {
-      return JSON.parse(jsonStr);
-    } catch {}
-  }
-
-  console.error('[AI-JSON-Parse-Error] Raw Content:', content);
-  throw new Error('AI 返回数据格式异常，无法解析分析结果，请重试。');
 }
