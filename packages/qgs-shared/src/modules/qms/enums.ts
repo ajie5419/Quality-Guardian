@@ -1,3 +1,11 @@
+import {
+  InspectionIssueStatusEnum,
+  ProjectStatusEnum,
+  QualityLossStatusEnum,
+  SupplierStatusEnum,
+  WorkOrderStatusEnum,
+} from '@qgs/enums';
+
 /**
  * QMS Business Logic Enums
  */
@@ -5,46 +13,24 @@
 /**
  * QMS Supplier Status
  */
-export enum SupplierStatusEnum {
-  FROZEN = 'Frozen',
-  OBSERVATION = 'Observation',
-  QUALIFIED = 'Qualified',
-  TRIAL = 'Trial',
-}
+export { SupplierStatusEnum };
 
 /**
  * QMS Work Order Status
  */
-export enum WorkOrderStatusEnum {
-  CANCELLED = 'CANCELLED',
-  COMPLETED = 'COMPLETED',
-  IN_PROGRESS = 'IN_PROGRESS',
-  OPEN = 'OPEN',
-}
+export { WorkOrderStatusEnum };
 
 /**
  * QMS Inspection Issue Status
  */
-export enum InspectionIssueStatusEnum {
-  CLOSED = 'CLOSED',
-  IN_PROGRESS = 'IN_PROGRESS',
-  OPEN = 'OPEN',
-}
+export { InspectionIssueStatusEnum };
 
 /**
  * QMS Quality Loss Status
  */
-export enum QualityLossStatusEnum {
-  CONFIRMED = 'Confirmed',
-  PENDING = 'Pending',
-  PROCESSING = 'Processing',
-  RESOLVED = 'Resolved',
-}
+export { QualityLossStatusEnum };
 
 /**
  * QMS Project Status (Planning)
  */
-export enum ProjectStatusEnum {
-  ACTIVE = 'active',
-  ARCHIVED = 'archived',
-}
+export { ProjectStatusEnum };
