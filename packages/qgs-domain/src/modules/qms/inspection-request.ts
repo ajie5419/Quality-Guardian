@@ -122,3 +122,70 @@ export function mergeInspectionRequestAttachments(
 
   return normalizeInspectionRequestAttachments(merged);
 }
+
+export interface InspectionRequestIssueLike {
+  id?: null | string;
+  isDeleted?: unknown;
+  nonConformanceNumber?: null | string;
+  quantity?: null | number;
+  status?: null | string;
+}
+
+export interface InspectionRequestRecordLike {
+  attachments?: unknown;
+  closeAttachments?: unknown;
+  dispatcher?: null | { realName?: null | string; username?: null | string };
+  inspection?: null | {
+    qualifiedQuantity?: null | number;
+    result?: null | string;
+    unqualifiedQuantity?: null | number;
+  };
+  inspectionResult?: null | string;
+  inspector?: null | { realName?: null | string; username?: null | string };
+  linkedIssueId?: null | string;
+  linkedIssueNo?: null | string;
+  linkedIssueStatus?: null | string;
+  qualifiedQuantity?: null | number;
+  qualityRecords?: unknown;
+  unqualifiedQuantity?: null | number;
+}
+
+export function mapInspectionRequestRecord<T extends InspectionRequestRecordLike>(
+  record: T,
+): T & {
+  attachments: InspectionRequestAttachment[];
+  closeAttachments: InspectionRequestAttachment[];
+  dispatcherName: null | string;
+  inspectionResult: string;
+  inspectorName: null | string;
+  linkedIssueId: null | string;
+  linkedIssueNo: null | string;
+  linkedIssueStatus: null | string;
+  qualifiedQuantity: null | number;
+  unqualifiedQuantity: null | number;
+} {
+  const issue = Array.isArray(record.qualityRecords)
+    ? (record.qualityRecords.find(
+        (item) => item && typeof item === 'object' && !(item as { isDeleted?: unknown }).isDeleted,
+      ) as InspectionRequestIssueLike | undefined)
+    : undefined;
+
+  return {
+    ...record,
+    attachments: parseInspectionRequestAttachments(record.attachments),
+    closeAttachments: parseInspectionRequestAttachments(record.closeAttachments),
+    dispatcherName: record.dispatcher?.realName || record.dispatcher?.username || null,
+    inspectionResult: record.inspectionResult || record.inspection?.result || 'PASS',
+    inspectorName: record.inspector?.realName || record.inspector?.username || null,
+    linkedIssueId: record.linkedIssueId || issue?.id || null,
+    linkedIssueNo: record.linkedIssueNo || issue?.nonConformanceNumber || null,
+    linkedIssueStatus: issue?.status || record.linkedIssueStatus || null,
+    qualifiedQuantity:
+      record.qualifiedQuantity ?? record.inspection?.qualifiedQuantity ?? null,
+    unqualifiedQuantity:
+      record.unqualifiedQuantity ??
+      record.inspection?.unqualifiedQuantity ??
+      issue?.quantity ??
+      null,
+  };
+}

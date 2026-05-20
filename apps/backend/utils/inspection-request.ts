@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import {
   INSPECTION_REQUEST_STATUS,
   isInspectionRequestAssemblyProcess,
+  mapInspectionRequestRecord,
   mergeInspectionRequestAttachments,
   normalizeInspectionRequestAttachments,
   normalizeInspectionRequestCheckResult,
@@ -18,6 +19,7 @@ import { resolveTaskDispatchCurrentUserId } from '~/utils/task-dispatch';
 export {
   INSPECTION_REQUEST_STATUS,
   isInspectionRequestAssemblyProcess,
+  mapInspectionRequestRecord,
   mergeInspectionRequestAttachments,
   normalizeInspectionRequestAttachments,
   normalizeInspectionRequestCheckResult,
@@ -44,31 +46,7 @@ export async function generateInspectionRequestNo(
 }
 
 export function mapInspectionRequest(record: any) {
-  const issue = Array.isArray(record.qualityRecords)
-    ? record.qualityRecords.find((item: any) => !item?.isDeleted)
-    : null;
-
-  return {
-    ...record,
-    attachments: parseInspectionRequestAttachments(record.attachments),
-    closeAttachments: parseInspectionRequestAttachments(
-      record.closeAttachments,
-    ),
-    dispatcherName: record.dispatcher?.realName || record.dispatcher?.username,
-    inspectionResult:
-      record.inspectionResult || record.inspection?.result || 'PASS',
-    inspectorName: record.inspector?.realName || record.inspector?.username,
-    linkedIssueId: record.linkedIssueId || issue?.id || null,
-    linkedIssueNo: record.linkedIssueNo || issue?.nonConformanceNumber || null,
-    linkedIssueStatus: issue?.status || record.linkedIssueStatus || null,
-    qualifiedQuantity:
-      record.qualifiedQuantity ?? record.inspection?.qualifiedQuantity ?? null,
-    unqualifiedQuantity:
-      record.unqualifiedQuantity ??
-      record.inspection?.unqualifiedQuantity ??
-      issue?.quantity ??
-      null,
-  };
+  return mapInspectionRequestRecord(record);
 }
 
 export async function resolveInspectionRequestCurrentUserId(
