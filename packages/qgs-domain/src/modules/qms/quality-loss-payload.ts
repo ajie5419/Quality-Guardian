@@ -1,4 +1,5 @@
 import { normalizeQualityLossStatus } from './quality-loss-status';
+
 const QUALITY_LOSS_ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const QUALITY_LOSS_ID_SIZE = 6;
 
