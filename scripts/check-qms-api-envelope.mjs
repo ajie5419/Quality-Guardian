@@ -65,6 +65,19 @@ function findViolations(filePath) {
   visitForHandlers(source);
 
   const collectDirectObjectReturns = (handlerFn) => {
+    if (
+      ts.isArrowFunction(handlerFn) &&
+      handlerFn.body &&
+      ts.isObjectLiteralExpression(handlerFn.body)
+    ) {
+      const line = source.getLineAndCharacterOfPosition(handlerFn.body.getStart())
+        .line + 1;
+      violations.push(
+        `${rel}:${line} handler must not return raw object literal`,
+      );
+      return;
+    }
+
     const walk = (node) => {
       if (node !== handlerFn && ts.isFunctionLike(node)) {
         return;
