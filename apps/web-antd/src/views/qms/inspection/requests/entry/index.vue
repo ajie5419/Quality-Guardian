@@ -38,7 +38,6 @@ import {
 import { getBomList } from '#/api/qms/planning';
 import {
   applyUploadResponse,
-  createQmsUploadRequest,
   normalizeUploadFileList,
 } from '#/views/qms/shared/utils/upload-file';
 
@@ -86,9 +85,6 @@ const requestForm = reactive({
   selfCheckResult: 'PASS' as InspectionRequestCheckResult,
   team: '',
   workOrderNumber: '',
-});
-const uploadRequest = createQmsUploadRequest({
-  fallbackAction: '/api/upload',
 });
 
 const checkResultOptions = [
@@ -485,7 +481,6 @@ watch(
                 accept="image/*"
                 action="/api/upload"
                 capture="environment"
-                :custom-request="uploadRequest"
                 :show-upload-list="false"
                 @change="handleAttachmentUploadChange"
               >
@@ -499,7 +494,6 @@ watch(
               <Upload
                 v-model:file-list="attachmentFileList"
                 action="/api/upload"
-                :custom-request="uploadRequest"
                 multiple
                 @change="handleAttachmentUploadChange"
               >

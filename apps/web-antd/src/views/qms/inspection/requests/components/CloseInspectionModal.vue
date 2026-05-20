@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { UploadFile, UploadProps } from 'ant-design-vue';
+import type { UploadFile } from 'ant-design-vue';
 
 import type {
   InspectionRequest,
@@ -57,7 +57,7 @@ interface Props {
     unqualifiedQuantity: number;
   };
   closeAttachmentFileList: UploadFile[];
-  uploadRequest: UploadProps['customRequest'];
+  uploadHeaders: Record<string, string>;
   currentRequest?: InspectionRequest;
   deptTreeData: TreeSelectNode[];
   defectOptions: Array<{ label: string; value: string }>;
@@ -226,7 +226,7 @@ function handleUpdateOpen(value: boolean) {
         <Upload
           :file-list="props.closeAttachmentFileList"
           action="/api/upload"
-          :custom-request="props.uploadRequest"
+          :headers="props.uploadHeaders"
           multiple
           @change="props.handleCloseAttachmentUploadChange"
         >

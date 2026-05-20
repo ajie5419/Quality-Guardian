@@ -7,10 +7,7 @@ import { useAccessStore } from '@vben/stores';
 
 import { message, Upload } from 'ant-design-vue';
 
-import {
-  applyUploadResponse,
-  createQmsUploadRequest,
-} from '#/views/qms/shared/utils/upload-file';
+import { applyUploadResponse } from '#/views/qms/shared/utils/upload-file';
 
 const props = withDefaults(
   defineProps<{
@@ -45,9 +42,6 @@ const accessStore = useAccessStore();
 const uploadHeaders = computed(() => ({
   Authorization: `Bearer ${accessStore.accessToken}`,
 }));
-const customUploadRequest = createQmsUploadRequest({
-  fallbackAction: '/api/upload',
-});
 
 const canAddFile = computed(
   () => props.maxCount === undefined || files.value.length < props.maxCount,
@@ -74,7 +68,6 @@ function handleChange(info: UploadChangeParam<UploadFile>) {
     :accept="accept"
     :disabled="disabled"
     :headers="uploadHeaders"
-    :custom-request="customUploadRequest"
     :list-type="listType"
     :max-count="maxCount"
     :multiple="multiple"

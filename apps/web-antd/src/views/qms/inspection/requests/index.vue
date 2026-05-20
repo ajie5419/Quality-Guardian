@@ -10,7 +10,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
-import { useUserStore } from '@vben/stores';
+import { useAccessStore, useUserStore } from '@vben/stores';
 
 import {
   Button,
@@ -30,7 +30,6 @@ import { getUserList } from '#/api/system/user';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { convertToTreeSelectData } from '#/types';
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
-import { createQmsUploadRequest } from '#/views/qms/shared/utils/upload-file';
 
 import {
   useClaimOptions,
@@ -53,6 +52,7 @@ defineOptions({ name: 'QMSInspectionRequests' });
 
 const route = useRoute();
 const router = useRouter();
+const accessStore = useAccessStore();
 const userStore = useUserStore();
 const { hasAccessByCodes } = useAccess();
 const { handleApiError } = useErrorHandler();
@@ -125,9 +125,9 @@ const userOptions = computed(() =>
   })),
 );
 
-const uploadRequest = createQmsUploadRequest({
-  fallbackAction: '/api/upload',
-});
+const uploadHeaders = computed(() => ({
+  Authorization: `Bearer ${accessStore.accessToken}`,
+}));
 
 const requestEntryUrl = computed(() =>
   buildRequestUrl({ entry: 'submit' }, '/qms/inspection/requests/entry'),
@@ -560,7 +560,7 @@ watch(
               <Upload
                 v-model:file-list="attachmentFileList"
                 action="/api/upload"
-                :custom-request="uploadRequest"
+                :headers="uploadHeaders"
                 multiple
                 @change="handleAttachmentUploadChange"
               >
@@ -679,7 +679,7 @@ watch(
       :close-form="closeForm"
       :linked-issue-draft="linkedIssueDraft"
       :close-attachment-file-list="closeAttachmentFileList"
-      :upload-request="uploadRequest"
+      :upload-headers="uploadHeaders"
       :current-request="currentRequest"
       :dept-tree-data="deptTreeData"
       :defect-options="defectOptions"

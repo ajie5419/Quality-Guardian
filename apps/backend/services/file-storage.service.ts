@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
@@ -17,29 +17,6 @@ type UploadFileParams = {
   filename?: string;
   mimeType?: null | string;
   uploadedBy?: number | string;
-};
-
-type CompleteDirectUploadParams = {
-  ticket: string;
-  uploadedBy?: number | string;
-};
-
-type DirectUploadPolicyParams = {
-  filename: string;
-  mimeType?: null | string;
-  size?: number;
-  uploadedBy?: number | string;
-};
-
-type DirectUploadPolicyPayload = {
-  exp: number;
-  mimeType: string;
-  objectKey: string;
-  originalName: string;
-  size: number;
-  storageProvider: 'OSS';
-  storedName: string;
-  uploadedBy?: string;
 };
 
 type FileAssetPayload = {
@@ -83,9 +60,9 @@ const MIME_TYPES: Record<string, string> = {
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
 
-const DEFAULT_DIRECT_UPLOAD_EXPIRES_SECONDS = 10 * 60;
-const DEFAULT_DIRECT_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
-const UPLOAD_TICKET_VERSION = 'v1';
+const DEFAULT_MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+let ossClientInstance: null | OSS = null;
 
 function isImageMimeType(type: null | string | undefined): boolean {
   return typeof type === 'string' && type.startsWith('image/');
@@ -134,116 +111,14 @@ function parsePositiveInteger(value: unknown, fallback: number) {
   return Math.trunc(parsed);
 }
 
-function getDirectUploadExpiresSeconds() {
-  return Math.max(
-    60,
-    Math.min(
-      3600,
-      parsePositiveInteger(
-        process.env.OSS_DIRECT_UPLOAD_EXPIRES_SECONDS,
-        DEFAULT_DIRECT_UPLOAD_EXPIRES_SECONDS,
-      ),
-    ),
-  );
-}
-
-function getDirectUploadMaxBytes() {
+function getMaxUploadBytes() {
   return Math.max(
     1,
     parsePositiveInteger(
-      process.env.OSS_DIRECT_UPLOAD_MAX_BYTES,
-      DEFAULT_DIRECT_UPLOAD_MAX_BYTES,
+      process.env.MAX_UPLOAD_BYTES,
+      DEFAULT_MAX_UPLOAD_BYTES,
     ),
   );
-}
-
-function getUploadTicketSecret() {
-  return (
-    process.env.UPLOAD_SIGN_SECRET ||
-    process.env.JWT_ACCESS_SECRET ||
-    process.env.OSS_ACCESS_KEY_SECRET ||
-    'qgs-upload-sign-secret-fallback'
-  );
-}
-
-function signUploadTicket(payload: DirectUploadPolicyPayload) {
-  const encodedPayload = Buffer.from(
-    JSON.stringify({
-      ...payload,
-      v: UPLOAD_TICKET_VERSION,
-    }),
-    'utf8',
-  ).toString('base64url');
-  const signature = createHmac('sha256', getUploadTicketSecret())
-    .update(encodedPayload)
-    .digest('base64url');
-  return `${encodedPayload}.${signature}`;
-}
-
-function verifyUploadTicket(ticket: string): DirectUploadPolicyPayload {
-  const [encodedPayload, signature] = String(ticket || '').split('.');
-  if (!encodedPayload || !signature) {
-    throw new Error('invalid upload ticket format');
-  }
-
-  const expectedSignature = createHmac('sha256', getUploadTicketSecret())
-    .update(encodedPayload)
-    .digest('base64url');
-
-  const signatureBuffer = Buffer.from(signature);
-  const expectedBuffer = Buffer.from(expectedSignature);
-  if (
-    signatureBuffer.length !== expectedBuffer.length ||
-    !timingSafeEqual(signatureBuffer, expectedBuffer)
-  ) {
-    throw new Error('invalid upload ticket signature');
-  }
-
-  const payload = JSON.parse(
-    Buffer.from(encodedPayload, 'base64url').toString('utf8'),
-  ) as DirectUploadPolicyPayload & { v?: string };
-  if (payload.v !== UPLOAD_TICKET_VERSION) {
-    throw new Error('unsupported upload ticket version');
-  }
-  if (Number(payload.exp || 0) * 1000 <= Date.now()) {
-    throw new Error('upload ticket expired');
-  }
-  if (payload.storageProvider !== 'OSS') {
-    throw new Error('unsupported upload provider');
-  }
-  if (!payload.objectKey || !payload.storedName || !payload.originalName) {
-    throw new Error('invalid upload ticket payload');
-  }
-
-  return {
-    exp: Number(payload.exp),
-    mimeType: payload.mimeType || 'application/octet-stream',
-    objectKey: payload.objectKey,
-    originalName: payload.originalName,
-    size: Number(payload.size || 0),
-    storageProvider: 'OSS',
-    storedName: payload.storedName,
-    uploadedBy: payload.uploadedBy ? String(payload.uploadedBy) : undefined,
-  };
-}
-
-function normalizeEtag(value: unknown) {
-  return String(value || '')
-    .replaceAll('"', '')
-    .trim();
-}
-
-function resolveOssHeadHeader(
-  headers: Record<string, unknown>,
-  key: string,
-): string {
-  const direct = headers[key] ?? headers[key.toLowerCase()];
-  if (direct !== undefined) return String(direct);
-
-  const matched = Object.entries(headers).find(
-    ([headerKey]) => headerKey.toLowerCase() === key.toLowerCase(),
-  );
-  return matched ? String(matched[1]) : '';
 }
 
 function shouldUseOss() {
@@ -271,8 +146,11 @@ function createOssClient() {
   });
 }
 
-function toPublicFileUrl(id: string, mode: 'download' | 'preview' | 'thumb') {
-  return `/api/files/${id}/${mode}`;
+function getOssClient() {
+  if (!ossClientInstance) {
+    ossClientInstance = createOssClient();
+  }
+  return ossClientInstance;
 }
 
 function parseAttachmentItems(value: unknown): unknown[] {
@@ -344,15 +222,22 @@ async function saveLocalFile(params: {
     await mkdir(UPLOAD_DIR, { recursive: true });
   }
 
-  await writeFile(join(UPLOAD_DIR, params.storedName), params.data);
-
   let thumbObjectKey: string | undefined;
   let thumbUrl: string | undefined;
   if (params.thumbBuffer) {
     thumbObjectKey = params.storedName.replace(/\.[^.]+$/, '_thumb.webp');
-    await writeFile(join(UPLOAD_DIR, thumbObjectKey), params.thumbBuffer);
     thumbUrl = `/uploads/${thumbObjectKey}`;
   }
+
+  const writeTasks = [
+    writeFile(join(UPLOAD_DIR, params.storedName), params.data),
+  ];
+  if (params.thumbBuffer && thumbObjectKey) {
+    writeTasks.push(
+      writeFile(join(UPLOAD_DIR, thumbObjectKey), params.thumbBuffer),
+    );
+  }
+  await Promise.all(writeTasks);
 
   return {
     mimeType: params.mimeType,
@@ -378,19 +263,27 @@ async function saveOssFile(params: {
   thumbBuffer: Buffer | null;
   uploadedBy?: string;
 }): Promise<FileAssetPayload> {
-  const client = createOssClient();
+  const client = getOssClient();
   const objectKey = buildOssObjectKey(params.storedName);
-  await client.put(objectKey, params.data, {
-    headers: { 'Content-Type': params.mimeType },
-  });
 
   let thumbObjectKey: string | undefined;
   if (params.thumbBuffer) {
     thumbObjectKey = objectKey.replace(/\.[^.]+$/, '_thumb.webp');
-    await client.put(thumbObjectKey, params.thumbBuffer, {
-      headers: { 'Content-Type': 'image/webp' },
-    });
   }
+
+  const uploadTasks = [
+    client.put(objectKey, params.data, {
+      headers: { 'Content-Type': params.mimeType },
+    }),
+  ];
+  if (params.thumbBuffer && thumbObjectKey) {
+    uploadTasks.push(
+      client.put(thumbObjectKey, params.thumbBuffer, {
+        headers: { 'Content-Type': 'image/webp' },
+      }),
+    );
+  }
+  await Promise.all(uploadTasks);
 
   return {
     bucket: process.env.OSS_BUCKET,
@@ -408,136 +301,8 @@ async function saveOssFile(params: {
 }
 
 export const FileStorageService = {
-  isDirectUploadEnabled() {
-    return (
-      shouldUseOss() &&
-      String(process.env.OSS_DIRECT_UPLOAD_ENABLED || '').toLowerCase() ===
-        'true'
-    );
-  },
-
-  async createDirectUploadPolicy(params: DirectUploadPolicyParams) {
-    if (!this.isDirectUploadEnabled()) {
-      throw new Error('direct upload is not enabled');
-    }
-
-    const originalName = basename(params.filename || 'upload');
-    const mimeType = getMimeType(originalName, params.mimeType);
-    const storedName = createStoredName(originalName, mimeType);
-    const objectKey = buildOssObjectKey(storedName);
-    const uploadedBy =
-      params.uploadedBy === undefined ? undefined : String(params.uploadedBy);
-    const maxBytes = getDirectUploadMaxBytes();
-    const requestedSize = Number(params.size || 0);
-    const size = Math.max(0, requestedSize);
-
-    if (size > 0 && size > maxBytes) {
-      throw new Error(`file exceeds max size limit (${maxBytes} bytes)`);
-    }
-
-    const expiresSeconds = getDirectUploadExpiresSeconds();
-    const expiresAt = Math.floor(Date.now() / 1000) + expiresSeconds;
-    const ticket = signUploadTicket({
-      exp: expiresAt,
-      mimeType,
-      objectKey,
-      originalName,
-      size,
-      storageProvider: 'OSS',
-      storedName,
-      uploadedBy,
-    });
-
-    const client = createOssClient();
-    const uploadUrl = client.signatureUrl(objectKey, {
-      expires: expiresSeconds,
-      method: 'PUT',
-      'Content-Type': mimeType,
-    });
-
-    return {
-      expiresAt,
-      maxBytes,
-      mimeType,
-      objectKey,
-      provider: 'OSS' as const,
-      storedName,
-      ticket,
-      uploadMethod: 'PUT' as const,
-      uploadUrl,
-    };
-  },
-
-  async completeDirectUpload(params: CompleteDirectUploadParams) {
-    if (!this.isDirectUploadEnabled()) {
-      throw new Error('direct upload is not enabled');
-    }
-
-    const payload = verifyUploadTicket(params.ticket);
-    const uploadedBy =
-      params.uploadedBy === undefined
-        ? payload.uploadedBy
-        : String(params.uploadedBy);
-
-    const existed = await prisma.file_assets.findFirst({
-      where: {
-        objectKey: payload.objectKey,
-        status: 'ACTIVE',
-        storedName: payload.storedName,
-      },
-    });
-    if (existed) {
-      return {
-        ...existed,
-        thumbFilename:
-          existed.thumbObjectKey?.split('/').findLast(Boolean) || null,
-      };
-    }
-
-    const client = createOssClient();
-    const headResult = await client.head(payload.objectKey);
-    const headers = (
-      headResult as { res?: { headers?: Record<string, unknown> } }
-    )?.res?.headers || { ...(headResult as Record<string, unknown>) };
-
-    const contentLength = Number(
-      resolveOssHeadHeader(headers, 'content-length') || 0,
-    );
-    if (!Number.isFinite(contentLength) || contentLength <= 0) {
-      throw new Error('uploaded object is empty');
-    }
-
-    const contentType =
-      resolveOssHeadHeader(headers, 'content-type') ||
-      payload.mimeType ||
-      'application/octet-stream';
-    const etag = normalizeEtag(resolveOssHeadHeader(headers, 'etag'));
-    const sha256 =
-      etag && /^[0-9a-f]{32}$/i.test(etag)
-        ? etag.toLowerCase()
-        : createHash('sha256')
-            .update(`${payload.objectKey}:${contentLength}:${contentType}`)
-            .digest('hex');
-
-    const asset = await (prisma.file_assets as any).create({
-      data: {
-        bucket: process.env.OSS_BUCKET,
-        mimeType: contentType,
-        objectKey: payload.objectKey,
-        originalName: payload.originalName,
-        sha256,
-        size: contentLength,
-        storageProvider: 'OSS',
-        storedName: payload.storedName,
-        uploadedBy,
-        url: `/api/uploads/${getLegacyOssProxyName(payload.storedName)}`,
-      },
-    });
-
-    return {
-      ...asset,
-      thumbFilename: null,
-    };
+  isImageFilename(filename: string) {
+    return IMAGE_EXTENSIONS.has(extname(filename).toLowerCase());
   },
 
   async deleteFile(id: string, userId?: number | string) {
@@ -569,7 +334,7 @@ export const FileStorageService = {
       preferThumb && file.thumbObjectKey ? file.thumbObjectKey : file.objectKey;
 
     if (file.storageProvider === 'OSS') {
-      const client = createOssClient();
+      const client = getOssClient();
       const result = await client.get(objectKey);
       const content = result.content;
       return {
@@ -614,10 +379,6 @@ export const FileStorageService = {
     });
     if (!file) return null;
     return this.getFileBuffer(file.id, preferThumb);
-  },
-
-  isImageFilename(filename: string) {
-    return IMAGE_EXTENSIONS.has(extname(filename).toLowerCase());
   },
 
   async getFileDetail(id: string) {
@@ -894,7 +655,7 @@ export const FileStorageService = {
     for (const file of files) {
       try {
         if (file.storageProvider === 'OSS') {
-          const client = createOssClient();
+          const client = getOssClient();
           await client.head(file.objectKey);
         } else if (!existsSync(join(UPLOAD_DIR, file.objectKey))) {
           missingIds.push(file.id);
@@ -918,7 +679,18 @@ export const FileStorageService = {
     };
   },
 
+  getMaxUploadBytes,
+
   async uploadFile(params: UploadFileParams) {
+    if (!params.data || params.data.length === 0) {
+      throw new Error('upload file payload is empty');
+    }
+
+    const maxUploadBytes = getMaxUploadBytes();
+    if (params.data.length > maxUploadBytes) {
+      throw new Error(`file exceeds max upload size (${maxUploadBytes} bytes)`);
+    }
+
     const originalName = basename(params.filename || 'upload');
     const mimeType = getMimeType(originalName, params.mimeType);
     const storedName = createStoredName(originalName, mimeType);
@@ -947,25 +719,17 @@ export const FileStorageService = {
           uploadedBy,
         });
 
-    const asset = await (prisma.file_assets as any).create({
-      data: saved,
-    });
-
-    const previewUrl =
-      saved.storageProvider === 'OSS'
-        ? saved.url
-        : saved.url || toPublicFileUrl(asset.id, 'preview');
+    const previewUrl = saved.storageProvider === 'OSS' ? saved.url : saved.url;
     const thumbUrl =
-      saved.storageProvider === 'OSS' && asset.thumbObjectKey
+      saved.storageProvider === 'OSS' && saved.thumbObjectKey
         ? `/api/uploads/${getLegacyOssProxyName(
-            asset.storedName.replace(/\.[^.]+$/, '_thumb.webp'),
+            saved.storedName.replace(/\.[^.]+$/, '_thumb.webp'),
           )}`
-        : saved.thumbUrl ||
-          (asset.thumbObjectKey ? toPublicFileUrl(asset.id, 'thumb') : '');
+        : saved.thumbUrl || '';
 
-    await (prisma.file_assets as any).update({
-      where: { id: asset.id },
+    const asset = await (prisma.file_assets as any).create({
       data: {
+        ...saved,
         thumbUrl: thumbUrl || null,
         url: previewUrl,
       },
@@ -975,11 +739,11 @@ export const FileStorageService = {
       ...asset,
       legacyUrl: saved.url,
       thumbFilename:
-        saved.storageProvider === 'OSS' && asset.thumbObjectKey
+        saved.storageProvider === 'OSS' && saved.thumbObjectKey
           ? getLegacyOssProxyName(
-              asset.storedName.replace(/\.[^.]+$/, '_thumb.webp'),
+              saved.storedName.replace(/\.[^.]+$/, '_thumb.webp'),
             )
-          : asset.thumbObjectKey || null,
+          : saved.thumbObjectKey || null,
       thumbUrl,
       url: previewUrl,
     };

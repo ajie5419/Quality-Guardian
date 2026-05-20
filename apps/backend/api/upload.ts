@@ -21,6 +21,12 @@ export default eventHandler(async (event) => {
       return useResponseError('Invalid file');
     }
 
+    const maxUploadBytes = FileStorageService.getMaxUploadBytes();
+    if (file.data.length > maxUploadBytes) {
+      setResponseStatus(event, 413);
+      return useResponseError(`File too large (max ${maxUploadBytes} bytes)`);
+    }
+
     const uploaded = await FileStorageService.uploadFile({
       data: file.data,
       filename: file.filename,
