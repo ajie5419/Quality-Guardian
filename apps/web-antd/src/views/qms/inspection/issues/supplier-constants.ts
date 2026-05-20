@@ -1,5 +1,1 @@
-export const SUPPLIER_CATEGORY = {
-  OUTSOURCING: 'Outsourcing',
-  PRODUCTION: 'ProductionUnit',
-  SUPPLIER: 'Supplier',
-};
+export { SUPPLIER_CATEGORY } from '@qgs/enums';

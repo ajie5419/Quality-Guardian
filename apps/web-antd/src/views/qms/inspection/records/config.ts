@@ -1,13 +1,11 @@
 import type { VxeGridPropTypes } from '#/adapter/vxe-table';
 import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
+import { INSPECTION_RECORD_TYPE } from '@qgs/enums';
+
 import { cloneInspectionProcessFallbackOptions } from '../../shared/constants/inspection-process-fallback';
 
-export const INSPECTION_TYPES = {
-  INCOMING: 'INCOMING',
-  PROCESS: 'PROCESS',
-  SHIPMENT: 'SHIPMENT',
-} as const;
+export const INSPECTION_TYPES = INSPECTION_RECORD_TYPE;
 
 export const INSPECTION_TABS = [
   { label: '进货检验', value: 'incoming' },

@@ -52,3 +52,21 @@ export const ISSUE_DEFECT_TYPE = {
 
 export type IssueDefectType =
   (typeof ISSUE_DEFECT_TYPE)[keyof typeof ISSUE_DEFECT_TYPE];
+
+export const SUPPLIER_CATEGORY = {
+  OUTSOURCING: 'Outsourcing',
+  PRODUCTION: 'ProductionUnit',
+  SUPPLIER: 'Supplier',
+} as const;
+
+export type SupplierCategory =
+  (typeof SUPPLIER_CATEGORY)[keyof typeof SUPPLIER_CATEGORY];
+
+export const INSPECTION_RECORD_TYPE = {
+  INCOMING: 'INCOMING',
+  PROCESS: 'PROCESS',
+  SHIPMENT: 'SHIPMENT',
+} as const;
+
+export type InspectionRecordType =
+  (typeof INSPECTION_RECORD_TYPE)[keyof typeof INSPECTION_RECORD_TYPE];
