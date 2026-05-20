@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     const data = await SupervisionService.updateProject(id, body);
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('supervision-projects-update', error);
+    logApiError('supervision-projects-update', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to update supervision project',

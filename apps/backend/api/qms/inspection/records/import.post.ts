@@ -51,7 +51,7 @@ export default defineEventHandler(async (event) => {
         await InspectionService.create(payload);
         successCount++;
       } catch (error) {
-        logApiError('records-import-item', error);
+        logApiError('records-import-item', error, undefined, event);
         const message = toImportErrorMessage(error);
         rowErrors.push(
           buildImportRowError({
@@ -73,7 +73,7 @@ export default defineEventHandler(async (event) => {
       }),
     );
   } catch (error: unknown) {
-    logApiError('records-import', error);
+    logApiError('records-import', error, undefined, event);
     return internalServerErrorResponse(event, '数据解析失败');
   }
 });

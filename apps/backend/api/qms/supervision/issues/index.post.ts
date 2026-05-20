@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
     }
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('supervision-issues-create', error);
+    logApiError('supervision-issues-create', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to create supervision issue',

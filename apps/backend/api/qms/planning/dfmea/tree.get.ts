@@ -70,7 +70,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(treeNodes);
   } catch (error) {
-    logApiError('dfmea-tree', error);
+    logApiError('dfmea-tree', error, undefined, event);
     return internalServerErrorResponse(event, '获取 DFMEA 树失败');
   }
 });

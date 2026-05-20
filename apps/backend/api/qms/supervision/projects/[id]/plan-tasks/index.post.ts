@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
         error.issues[0]?.message || '参数校验失败',
       );
     }
-    logApiError('supervision-plan-task-create', error);
+    logApiError('supervision-plan-task-create', error, undefined, event);
     return internalServerErrorResponse(event, '创建甘特任务失败');
   }
 });

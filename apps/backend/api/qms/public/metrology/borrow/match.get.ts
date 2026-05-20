@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
     );
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('public-metrology-borrow-match', error);
+    logApiError('public-metrology-borrow-match', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to match instruments');
   }
 });

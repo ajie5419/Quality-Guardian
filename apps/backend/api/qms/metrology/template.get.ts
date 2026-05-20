@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
     );
     return buffer;
   } catch (error) {
-    logApiError('metrology-template', error);
+    logApiError('metrology-template', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to generate metrology template',

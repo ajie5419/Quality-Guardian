@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     );
     return useResponseSuccess({ items, total });
   } catch (error: unknown) {
-    logApiError('inspection-list', error);
+    logApiError('inspection-list', error, undefined, event);
     if (isPrismaSchemaMismatchError(error)) {
       return badRequestResponse(
         event,

@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('categories', error);
+    logApiError('categories', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '分类不存在');
     }

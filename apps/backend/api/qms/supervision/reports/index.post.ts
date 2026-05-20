@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
     }
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('supervision-reports-create', error);
+    logApiError('supervision-reports-create', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to create supervision report',

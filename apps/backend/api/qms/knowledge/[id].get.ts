@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('knowledge', error);
+    logApiError('knowledge', error, undefined, event);
     return internalServerErrorResponse(event, '读取详情失败');
   }
 });

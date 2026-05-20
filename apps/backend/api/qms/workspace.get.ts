@@ -181,7 +181,7 @@ export default defineEventHandler(async (event) => {
       },
     });
   } catch (error) {
-    logApiError('workspace', error);
+    logApiError('workspace', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch workspace data');
   }
 });

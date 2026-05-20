@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
     await AfterSalesService.deleteRecord(id, String(userinfo.id));
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('after-sales', error);
+    logApiError('after-sales', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'After-sales record not found');
     }

@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     }
     return useResponseSuccess(result);
   } catch (error: unknown) {
-    logApiError('inspection-detail', error);
+    logApiError('inspection-detail', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch inspection record detail',

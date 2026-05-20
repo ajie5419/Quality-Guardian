@@ -55,7 +55,7 @@ export default defineEventHandler(async (event) => {
       workOrderId: newProject.workOrderNumber,
     });
   } catch (error: unknown) {
-    logApiError('itp-project-create', error);
+    logApiError('itp-project-create', error, undefined, event);
     if (isPrismaForeignKeyError(error)) {
       return badRequestResponse(event, '关联工单不存在');
     }

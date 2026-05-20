@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
       count: result.count,
     });
   } catch (error: unknown) {
-    logApiError('login-log', error);
+    logApiError('login-log', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to batch delete login logs');
   }

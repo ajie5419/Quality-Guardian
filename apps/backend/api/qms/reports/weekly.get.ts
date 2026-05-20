@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    logApiError('weekly-report', error);
+    logApiError('weekly-report', error, undefined, event);
     return internalServerErrorResponse(
       event,
       `Failed to generate weekly report: ${errorMessage}`,

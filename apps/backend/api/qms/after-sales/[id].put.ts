@@ -74,7 +74,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('after-sales', error);
+    logApiError('after-sales', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '售后记录不存在');
     }

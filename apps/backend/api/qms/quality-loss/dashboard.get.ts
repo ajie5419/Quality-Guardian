@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('quality-loss-dashboard', error);
+    logApiError('quality-loss-dashboard', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch quality loss dashboard summary',

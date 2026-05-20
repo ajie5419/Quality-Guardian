@@ -32,7 +32,7 @@ export default eventHandler(async (event) => {
 
     return useResponseSuccess({ message: 'Preference saved' });
   } catch (error) {
-    logApiError(`save_preference_${module}`, error);
+    logApiError(`save_preference_${module}`, error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to save preference');
   }

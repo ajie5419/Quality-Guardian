@@ -85,7 +85,7 @@ export default defineEventHandler(async (event) => {
     if (isPrismaSchemaMismatchError(error)) {
       return useListResponseSuccess([]);
     }
-    logApiError('inspection-form-list', error);
+    logApiError('inspection-form-list', error, undefined, event);
     return internalServerErrorResponse(event, '获取检验表列表失败');
   }
 });

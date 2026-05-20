@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('metrology-calibration-plan-delete', error);
+    logApiError('metrology-calibration-plan-delete', error, undefined, event);
     return internalServerErrorResponse(event, '删除校准计划失败');
   }
 });

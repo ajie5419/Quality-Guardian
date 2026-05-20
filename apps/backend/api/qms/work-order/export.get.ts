@@ -72,7 +72,7 @@ export default defineEventHandler(async (event) => {
       latencyMs: Date.now() - startedAt,
       module: 'work-order',
       userId: userinfo.userId,
-    });
+    }, event);
     return internalServerErrorResponse(
       event,
       'Failed to export work order list',

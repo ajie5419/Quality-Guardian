@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(record);
   } catch (error: unknown) {
-    logApiError('welder', error);
+    logApiError('welder', error, undefined, event);
     if (isPrismaUniqueConstraintError(error)) {
       return conflictResponse(event, '焊工数据已存在');
     }

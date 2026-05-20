@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ message: 'Deleted' });
   } catch (error: unknown) {
-    logApiError('dfmea-projects', error);
+    logApiError('dfmea-projects', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'DFMEA 项目不存在');
     }

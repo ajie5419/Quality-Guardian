@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
       })),
     );
   } catch (error) {
-    logApiError('itp', error);
+    logApiError('itp', error, undefined, event);
     return internalServerErrorResponse(event, '获取 ITP 条目失败');
   }
 });

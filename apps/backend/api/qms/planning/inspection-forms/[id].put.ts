@@ -152,7 +152,7 @@ export default defineEventHandler(async (event) => {
         '数据库缺少检验表模块表，请先执行 db push',
       );
     }
-    logApiError('inspection-form-update', error);
+    logApiError('inspection-form-update', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '检验表不存在');
     }

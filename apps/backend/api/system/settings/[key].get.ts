@@ -34,7 +34,7 @@ export default eventHandler(async (event) => {
 
     return useResponseSuccess(value);
   } catch (error) {
-    logApiError(`get_system_setting_${key}`, error);
+    logApiError(`get_system_setting_${key}`, error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to fetch system setting');
   }

@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ message: 'Deleted' });
   } catch (error) {
-    logApiError('project-docs-projects', error);
+    logApiError('project-docs-projects', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'Project not found');
     }

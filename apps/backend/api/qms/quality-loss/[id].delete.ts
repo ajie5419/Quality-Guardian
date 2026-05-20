@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
     await QualityLossService.deleteRecord(id, String(userinfo.id));
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('quality-loss', error);
+    logApiError('quality-loss', error, undefined, event);
     const errorCode = (error as { code?: string }).code;
     setResponseStatus(event, errorCode === 'NOT_FOUND' ? 404 : 500);
     return useResponseError(

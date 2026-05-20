@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
     );
     return useResponseSuccess(updated);
   } catch (error: unknown) {
-    logApiError('dictionary-update', error);
+    logApiError('dictionary-update', error, undefined, event);
     const message = error instanceof Error ? error.message : '更新字典项失败';
     if (message === 'NOT_FOUND') {
       return notFoundResponse(event, '字典项不存在');

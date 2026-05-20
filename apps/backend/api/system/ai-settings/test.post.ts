@@ -65,7 +65,7 @@ export default defineEventHandler(async (event) => {
       );
     }
   } catch (error: unknown) {
-    logApiError('test', error);
+    logApiError('test', error, undefined, event);
     const err = error as { message?: string; name?: string };
     if (err.name === 'AbortError') {
       setResponseStatus(event, 504);

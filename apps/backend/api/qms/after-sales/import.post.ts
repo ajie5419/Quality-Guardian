@@ -64,7 +64,7 @@ export default defineEventHandler(async (event) => {
         });
         successCount++;
       } catch (error) {
-        logApiError('import', error);
+        logApiError('import', error, undefined, event);
         const message = toImportErrorMessage(error);
         rowErrors.push(
           buildImportRowError({
@@ -86,7 +86,7 @@ export default defineEventHandler(async (event) => {
       }),
     );
   } catch (error: unknown) {
-    logApiError('after-sales-import', error);
+    logApiError('after-sales-import', error, undefined, event);
     return internalServerErrorResponse(event, '导入异常');
   }
 });

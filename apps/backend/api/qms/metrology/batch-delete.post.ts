@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ count: result.count });
   } catch (error) {
-    logApiError('metrology-batch-delete', error);
+    logApiError('metrology-batch-delete', error, undefined, event);
     return internalServerErrorResponse(event, '批量删除计量器具失败');
   }
 });

@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess({ items: result });
   } catch (error) {
-    logApiError('inspection-issue-chart-aggregate', error);
+    logApiError('inspection-issue-chart-aggregate', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch inspection issue chart aggregate',

@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('user-reset-password', error);
+    logApiError('user-reset-password', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '用户不存在');
     }

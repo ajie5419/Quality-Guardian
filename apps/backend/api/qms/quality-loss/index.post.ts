@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(buildQualityLossCreateResponse(newItem));
   } catch (error) {
-    logApiError('quality-loss', error);
+    logApiError('quality-loss', error, undefined, event);
     return internalServerErrorResponse(event, '创建质量损失记录失败');
   }
 });

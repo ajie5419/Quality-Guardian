@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('vehicle-commissioning-reports-list', error);
+    logApiError('vehicle-commissioning-reports-list', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch daily reports');
   }
 });

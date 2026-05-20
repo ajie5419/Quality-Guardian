@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
     });
     return result.buffer;
   } catch (error) {
-    logApiError('file-thumb', error, { id, userId: userinfo.id });
+    logApiError('file-thumb', error, { id, userId: userinfo.id }, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to load thumbnail');
   }

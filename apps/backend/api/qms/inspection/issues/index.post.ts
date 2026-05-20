@@ -81,7 +81,7 @@ export default defineEventHandler(async (event) => {
       ncNumber: newRecord.nonConformanceNumber,
     });
   } catch (error) {
-    logApiError('issues', error);
+    logApiError('issues', error, undefined, event);
     if (isPrismaUniqueConstraintError(error)) {
       return conflictResponse(event, 'NC number already exists');
     }

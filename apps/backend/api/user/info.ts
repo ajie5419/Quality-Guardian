@@ -49,7 +49,7 @@ export default eventHandler(async (event) => {
       });
     }
   } catch (error) {
-    logApiError('info', error);
+    logApiError('info', error, undefined, event);
     // Fall back to token data if DB lookup fails
   }
 

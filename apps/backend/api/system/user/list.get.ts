@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
       },
     );
   } catch (error) {
-    logApiError('user', error);
+    logApiError('user', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to fetch user list');
   }

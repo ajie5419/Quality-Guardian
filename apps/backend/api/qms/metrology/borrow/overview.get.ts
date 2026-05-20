@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('metrology-borrow-overview', error);
+    logApiError('metrology-borrow-overview', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch metrology borrow overview',

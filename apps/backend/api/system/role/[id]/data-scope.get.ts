@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
     const data = await RbacService.getRoleDataScope(id, module);
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('role-data-scope-get', error);
+    logApiError('role-data-scope-get', error, undefined, event);
     return internalServerErrorResponse(event, '获取数据权限策略失败');
   }
 });

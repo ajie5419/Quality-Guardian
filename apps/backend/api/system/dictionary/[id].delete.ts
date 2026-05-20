@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
     );
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('dictionary-delete', error);
+    logApiError('dictionary-delete', error, undefined, event);
     const message = error instanceof Error ? error.message : '删除字典项失败';
     if (message === 'NOT_FOUND') {
       return notFoundResponse(event, '字典项不存在');

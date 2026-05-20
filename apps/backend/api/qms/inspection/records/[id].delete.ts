@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('inspection-delete', error);
+    logApiError('inspection-delete', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'Inspection record not found');
     }

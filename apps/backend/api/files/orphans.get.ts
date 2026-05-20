@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('file-orphans', error);
+    logApiError('file-orphans', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to list orphan files');
   }
 });

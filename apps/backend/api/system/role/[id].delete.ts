@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('role', error);
+    logApiError('role', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '角色不存在');
     }

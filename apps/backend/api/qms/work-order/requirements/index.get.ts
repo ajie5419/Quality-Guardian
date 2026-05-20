@@ -63,7 +63,7 @@ export default defineEventHandler(async (event) => {
       })),
     );
   } catch (error) {
-    logApiError('work-order-requirement-list', error);
+    logApiError('work-order-requirement-list', error, undefined, event);
     return internalServerErrorResponse(event, '获取工单要求失败');
   }
 });

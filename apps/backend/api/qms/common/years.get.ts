@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(uniqueYears);
   } catch (error) {
-    logApiError('years', error);
+    logApiError('years', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch available years',

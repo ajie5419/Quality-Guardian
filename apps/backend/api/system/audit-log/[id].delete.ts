@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     await SystemLogService.deleteAuditLog(id);
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('audit-log', error);
+    logApiError('audit-log', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'Audit log not found');
     }

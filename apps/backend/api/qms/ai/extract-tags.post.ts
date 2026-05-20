@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    logApiError('extract-tags', error);
+    logApiError('extract-tags', error, undefined, event);
     return internalServerErrorResponse(
       event,
       `AI 提取标签失败: ${errorMessage}`,

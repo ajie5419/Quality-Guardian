@@ -62,7 +62,7 @@ export default defineEventHandler(async (event) => {
       lowRiskCount,
     });
   } catch (error) {
-    logApiError('dfmea-project-stats', error);
+    logApiError('dfmea-project-stats', error, undefined, event);
     return internalServerErrorResponse(event, '获取 DFMEA 项目统计失败');
   }
 });

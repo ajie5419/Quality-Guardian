@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(updated);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '更新归档状态失败';
-    logApiError('inspection-archive-task-status', error);
+    logApiError('inspection-archive-task-status', error, undefined, event);
     return internalServerErrorResponse(event, message);
   }
 });

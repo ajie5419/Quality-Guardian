@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
     );
     return buffer;
   } catch (error) {
-    logApiError('metrology-calibration-plan-template', error);
+    logApiError('metrology-calibration-plan-template', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to generate metrology calibration plan template',

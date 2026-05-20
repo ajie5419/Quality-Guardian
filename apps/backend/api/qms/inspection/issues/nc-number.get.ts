@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
     const ncNumber = await InspectionService.generateNextNcNumber();
     return useResponseSuccess({ ncNumber });
   } catch (error) {
-    logApiError('nc-number', error);
+    logApiError('nc-number', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to generate nc number');
   }
 });

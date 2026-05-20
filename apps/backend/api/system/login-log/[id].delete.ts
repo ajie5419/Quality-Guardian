@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     await SystemLogService.deleteLog(id);
     return useResponseSuccess({ message: 'Log deleted successfully' });
   } catch (error: unknown) {
-    logApiError('login-log', error);
+    logApiError('login-log', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'Login log not found');
     }

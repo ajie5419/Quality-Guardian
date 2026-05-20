@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('supervision-projects-list', error);
+    logApiError('supervision-projects-list', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch supervision projects',

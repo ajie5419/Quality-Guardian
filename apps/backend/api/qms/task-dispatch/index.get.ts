@@ -69,7 +69,7 @@ export default defineEventHandler(async (event) => {
 
     return useListResponseSuccess(result);
   } catch (error) {
-    logApiError('task-dispatch', error);
+    logApiError('task-dispatch', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch task dispatch list',

@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
     const data = await SupervisionReportService.updateReport(id, body);
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('supervision-report-update', error);
+    logApiError('supervision-report-update', error, undefined, event);
     return internalServerErrorResponse(event, '更新日报失败');
   }
 });

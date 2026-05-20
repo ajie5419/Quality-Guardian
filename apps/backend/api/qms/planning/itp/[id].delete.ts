@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('itp', error);
+    logApiError('itp', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'ITP 条目不存在');
     }

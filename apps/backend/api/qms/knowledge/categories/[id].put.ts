@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('categories', error);
+    logApiError('categories', error, undefined, event);
     if (isPrismaUniqueConstraintError(error)) {
       return conflictResponse(event, '分类名称已存在');
     }

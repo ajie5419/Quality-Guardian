@@ -57,7 +57,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('metrology-update', error);
+    logApiError('metrology-update', error, undefined, event);
     if (
       error instanceof Error &&
       (error.message === '量具名称不能为空' ||

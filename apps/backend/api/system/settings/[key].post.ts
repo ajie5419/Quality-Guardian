@@ -57,7 +57,7 @@ export default eventHandler(async (event) => {
 
     return useResponseSuccess({ message: 'System setting saved' });
   } catch (error) {
-    logApiError(`save_system_setting_${key}`, error);
+    logApiError(`save_system_setting_${key}`, error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to save system setting');
   }

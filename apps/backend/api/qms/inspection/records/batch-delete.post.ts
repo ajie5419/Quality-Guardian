@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess({ successCount: result.count });
   } catch (error: unknown) {
-    logApiError('inspection-batch-delete', error);
+    logApiError('inspection-batch-delete', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to batch delete inspection records',

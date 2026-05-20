@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
     );
     return useResponseSuccess({ successCount: result.count });
   } catch (error: unknown) {
-    logApiError('quality-loss-batch-delete', error);
+    logApiError('quality-loss-batch-delete', error, undefined, event);
     return internalServerErrorResponse(event, '批量删除质量损失记录失败');
   }
 });

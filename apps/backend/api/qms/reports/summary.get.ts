@@ -147,7 +147,7 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    logApiError('summary', error);
+    logApiError('summary', error, undefined, event);
     return internalServerErrorResponse(event, `报告生成失败: ${errorMessage}`);
   }
 });

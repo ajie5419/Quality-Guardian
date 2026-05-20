@@ -80,7 +80,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('work-order', error);
+    logApiError('work-order', error, undefined, event);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     // Check for "Record to update not found"

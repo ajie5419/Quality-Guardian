@@ -76,7 +76,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('menu-update', error);
+    logApiError('menu-update', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '菜单不存在');
     }

@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
       total,
     });
   } catch (error) {
-    logApiError('public-inspection-request-work-order-list', error);
+    logApiError('public-inspection-request-work-order-list', error, undefined, event);
     return internalServerErrorResponse(event, '获取工单列表失败');
   }
 });

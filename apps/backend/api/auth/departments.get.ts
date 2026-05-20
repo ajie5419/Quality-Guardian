@@ -60,7 +60,7 @@ export default defineEventHandler(async (event) => {
     const tree = buildDeptTree(departments);
     return useResponseSuccess(tree);
   } catch (error) {
-    logApiError('departments', error);
+    logApiError('departments', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to fetch departments');
   }

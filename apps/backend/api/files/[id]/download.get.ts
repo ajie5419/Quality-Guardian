@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
     });
     return result.buffer;
   } catch (error) {
-    logApiError('file-download', error, { id, userId: userinfo.id });
+    logApiError('file-download', error, { id, userId: userinfo.id }, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to download file');
   }

@@ -24,7 +24,7 @@ export default eventHandler(async (event) => {
     await PreferenceService.deleteUserPreference(String(userinfo.id), module);
     return useResponseSuccess({ message: 'Preference reset to default' });
   } catch (error) {
-    logApiError(`delete_preference_${module}`, error);
+    logApiError(`delete_preference_${module}`, error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to reset preference');
   }

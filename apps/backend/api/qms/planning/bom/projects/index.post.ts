@@ -59,7 +59,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(upsertResult.data);
   } catch (error) {
-    logApiError('bom-projects', error);
+    logApiError('bom-projects', error, undefined, event);
     return internalServerErrorResponse(event, '添加 BOM 项目失败');
   }
 });

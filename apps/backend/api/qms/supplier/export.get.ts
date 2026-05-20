@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
     logApiError('supplier-export', error, {
       latencyMs: Date.now() - startedAt,
       module: 'supplier',
-    });
+    }, event);
     return internalServerErrorResponse(event, 'Failed to export suppliers');
   }
 });

@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
     });
     return useListResponseSuccess(list);
   } catch (error) {
-    logApiError('after-sales', error);
+    logApiError('after-sales', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch after-sales list',

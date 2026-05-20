@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ items, total });
   } catch (error) {
-    logApiError('knowledge', error);
+    logApiError('knowledge', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch knowledge list');
   }
 });

@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     await DeptService.delete(id);
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('dept', error);
+    logApiError('dept', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '部门不存在');
     }

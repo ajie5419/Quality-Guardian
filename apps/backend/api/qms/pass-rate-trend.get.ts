@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
       );
     return useResponseSuccess(await getTrendData(granularity, source));
   } catch (error) {
-    logApiError('pass-rate-trend', error);
+    logApiError('pass-rate-trend', error, undefined, event);
     return internalServerErrorResponse(
       event,
       `Failed to fetch pass rate trend: ${(error as Error).message}`,

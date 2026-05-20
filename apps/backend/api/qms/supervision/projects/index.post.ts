@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     const data = await SupervisionService.createProject(body);
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('supervision-projects-create', error);
+    logApiError('supervision-projects-create', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to create supervision project',

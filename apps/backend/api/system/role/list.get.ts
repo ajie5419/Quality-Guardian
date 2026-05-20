@@ -60,7 +60,7 @@ export default defineEventHandler(async (event) => {
       { total },
     );
   } catch (error) {
-    logApiError('list', error);
+    logApiError('list', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to fetch role list');
   }

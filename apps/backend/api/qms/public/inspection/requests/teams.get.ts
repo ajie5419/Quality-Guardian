@@ -84,7 +84,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess([...internalTeams, ...externalTeams]);
   } catch (error) {
-    logApiError('public-inspection-request-team-list', error);
+    logApiError('public-inspection-request-team-list', error, undefined, event);
     return internalServerErrorResponse(event, '获取班组列表失败');
   }
 });

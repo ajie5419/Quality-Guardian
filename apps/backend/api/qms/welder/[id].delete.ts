@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('welder', error);
+    logApiError('welder', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '焊工不存在');
     }

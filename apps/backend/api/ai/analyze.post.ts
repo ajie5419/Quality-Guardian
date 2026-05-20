@@ -62,7 +62,7 @@ export default defineEventHandler(async (event) => {
       solution: finalSolution,
     });
   } catch (error: unknown) {
-    logApiError('analyze', error);
+    logApiError('analyze', error, undefined, event);
     const err = error as { message?: string };
     return internalServerErrorResponse(
       event,

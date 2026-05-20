@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
         await prisma.quality_records.upsert(payload);
         successCount++;
       } catch (error) {
-        logApiError('import', error);
+        logApiError('import', error, undefined, event);
         const message = toImportErrorMessage(error);
         rowErrors.push(
           buildImportRowError({
@@ -94,7 +94,7 @@ export default defineEventHandler(async (event) => {
       }),
     );
   } catch (error: unknown) {
-    logApiError('import', error);
+    logApiError('import', error, undefined, event);
     return internalServerErrorResponse(event, '数据解析失败');
   }
 });

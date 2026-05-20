@@ -78,7 +78,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(responsePayload);
   } catch (error) {
-    logApiError('vehicle-failure-rate-manual', error);
+    logApiError('vehicle-failure-rate-manual', error, undefined, event);
     return internalServerErrorResponse(
       event,
       `Failed to save manual vehicle feedback data: ${(error as Error).message}`,

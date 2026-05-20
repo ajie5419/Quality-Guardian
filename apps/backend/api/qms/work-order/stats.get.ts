@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('work-order-stats', error);
+    logApiError('work-order-stats', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch work order dashboard stats',

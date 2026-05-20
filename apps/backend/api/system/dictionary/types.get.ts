@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
     const items = DictionaryService.getSupportedTypes();
     return useResponseSuccess(items);
   } catch (error: unknown) {
-    logApiError('dictionary-types', error);
+    logApiError('dictionary-types', error, undefined, event);
     return internalServerErrorResponse(event, '获取字典类型失败');
   }
 });

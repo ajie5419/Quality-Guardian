@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('bom', error);
+    logApiError('bom', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'BOM item not found');
     }

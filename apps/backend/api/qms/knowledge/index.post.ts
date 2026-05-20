@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newItem);
   } catch (error) {
-    logApiError('knowledge', error);
+    logApiError('knowledge', error, undefined, event);
     if (isPrismaUniqueConstraintError(error)) {
       return conflictResponse(event, '沉淀失败: 文档编号已存在');
     }

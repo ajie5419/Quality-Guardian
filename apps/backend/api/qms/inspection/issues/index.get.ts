@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('issues', error);
+    logApiError('issues', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch inspection issues',

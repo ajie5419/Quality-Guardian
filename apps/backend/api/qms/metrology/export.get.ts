@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('metrology-export', error);
+    logApiError('metrology-export', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to export metrology list',

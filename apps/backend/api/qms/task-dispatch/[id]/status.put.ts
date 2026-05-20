@@ -41,7 +41,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(updatedTask);
   } catch (error: unknown) {
-    logApiError('status', error);
+    logApiError('status', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'Task not found');
     }

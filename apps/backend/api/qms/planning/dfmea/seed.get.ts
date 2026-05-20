@@ -128,7 +128,7 @@ export default defineEventHandler(async (event) => {
       totalCount: SEED_PROJECTS.length,
     });
   } catch (error: unknown) {
-    logApiError('dfmea-seed', error);
+    logApiError('dfmea-seed', error, undefined, event);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return internalServerErrorResponse(

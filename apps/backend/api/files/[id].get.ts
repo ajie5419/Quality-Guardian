@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
     if (!file) return notFoundResponse(event, 'File not found');
     return useResponseSuccess(file);
   } catch (error) {
-    logApiError('file-detail', error, { id });
+    logApiError('file-detail', error, { id }, event);
     return internalServerErrorResponse(event, 'Failed to get file detail');
   }
 });

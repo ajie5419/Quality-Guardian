@@ -126,7 +126,7 @@ export default defineEventHandler(async (event) => {
 
     return fileBuffer;
   } catch (error) {
-    logApiError('uploads', error);
+    logApiError('uploads', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('读取文件失败');
   }

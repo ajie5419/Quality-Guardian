@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('work-order', error);
+    logApiError('work-order', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch work order list',

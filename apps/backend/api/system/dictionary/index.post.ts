@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     );
     return useResponseSuccess(created);
   } catch (error: unknown) {
-    logApiError('dictionary-create', error);
+    logApiError('dictionary-create', error, undefined, event);
     const message = error instanceof Error ? error.message : '创建字典项失败';
     if (message.startsWith('VALIDATION:')) {
       return badRequestResponse(event, message.replace('VALIDATION:', ''));

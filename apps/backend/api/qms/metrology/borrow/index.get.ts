@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('metrology-borrow-list', error);
+    logApiError('metrology-borrow-list', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch borrow list');
   }
 });

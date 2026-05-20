@@ -96,7 +96,7 @@ export default defineEventHandler(async (event) => {
         '数据库缺少检验表模块表，请先执行 db push',
       );
     }
-    logApiError('inspection-form-create', error);
+    logApiError('inspection-form-create', error, undefined, event);
     return internalServerErrorResponse(event, '创建检验表失败');
   }
 });

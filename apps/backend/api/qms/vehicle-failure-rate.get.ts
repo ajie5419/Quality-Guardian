@@ -131,7 +131,7 @@ export default defineEventHandler(async (event) => {
       yearWarrantySeries,
     });
   } catch (error) {
-    logApiError('vehicle-failure-rate', error);
+    logApiError('vehicle-failure-rate', error, undefined, event);
     return useResponseSuccess({
       ranking: [],
       trend: [],

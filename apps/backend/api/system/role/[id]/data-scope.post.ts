@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
     );
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('role-data-scope-save', error);
+    logApiError('role-data-scope-save', error, undefined, event);
     return internalServerErrorResponse(event, '保存数据权限策略失败');
   }
 });

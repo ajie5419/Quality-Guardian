@@ -78,7 +78,7 @@ export default defineEventHandler(async (event) => {
     }
     return useResponseSuccess(created);
   } catch (error) {
-    logApiError('vehicle-commissioning-issues-create', error);
+    logApiError('vehicle-commissioning-issues-create', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to create issue');
   }
 });

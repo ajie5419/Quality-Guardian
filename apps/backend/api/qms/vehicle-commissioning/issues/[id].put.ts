@@ -82,7 +82,7 @@ export default defineEventHandler(async (event) => {
     }
     return useResponseSuccess(updated);
   } catch (error) {
-    logApiError('vehicle-commissioning-issues-update', error);
+    logApiError('vehicle-commissioning-issues-update', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to update issue');
   }
 });

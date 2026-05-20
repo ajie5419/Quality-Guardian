@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('work-order-requirement-overview', error);
+    logApiError('work-order-requirement-overview', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch requirement overview',

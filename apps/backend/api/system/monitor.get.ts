@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
         .replaceAll('/', '-'),
     });
   } catch (error) {
-    logApiError('system-monitor', error);
+    logApiError('system-monitor', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError(
       `Failed to fetch system monitor data: ${(error as Error).message}`,

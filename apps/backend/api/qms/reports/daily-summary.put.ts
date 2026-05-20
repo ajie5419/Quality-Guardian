@@ -55,7 +55,7 @@ export default defineEventHandler(async (event) => {
       summary,
     });
   } catch (error) {
-    logApiError('daily-summary-save', error);
+    logApiError('daily-summary-save', error, undefined, event);
     return internalServerErrorResponse(event, '保存日报失败');
   }
 });

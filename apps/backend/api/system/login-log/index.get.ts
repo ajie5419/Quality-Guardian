@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(result);
   } catch (error: unknown) {
-    logApiError('login-log', error);
+    logApiError('login-log', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to fetch login logs');
   }

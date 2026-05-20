@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
     });
     return useListResponseSuccess(items);
   } catch (error) {
-    logApiError('dfmea', error);
+    logApiError('dfmea', error, undefined, event);
     return internalServerErrorResponse(event, '获取 DFMEA 条目失败');
   }
 });

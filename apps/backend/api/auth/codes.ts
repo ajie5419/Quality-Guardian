@@ -42,7 +42,7 @@ export default eventHandler(async (event) => {
     }
     return useResponseSuccess([...normalizedCodes]);
   } catch (error) {
-    logApiError('codes', error);
+    logApiError('codes', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to fetch permission codes');
   }

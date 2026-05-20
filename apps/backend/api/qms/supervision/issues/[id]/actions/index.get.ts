@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
     const data = await SupervisionService.listIssueActions(id);
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('supervision-issue-actions-list', error);
+    logApiError('supervision-issue-actions-list', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch supervision issue actions',

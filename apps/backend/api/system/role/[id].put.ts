@@ -67,7 +67,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('role', error);
+    logApiError('role', error, undefined, event);
     if (isPrismaUniqueConstraintError(error)) {
       return conflictResponse(event, '角色值已存在');
     }

@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('supervision-deadline-board', error);
+    logApiError('supervision-deadline-board', error, undefined, event);
     return internalServerErrorResponse(event, '获取纳期看板数据失败');
   }
 });

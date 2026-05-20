@@ -60,7 +60,7 @@ export default defineEventHandler(async (event) => {
       message: 'Deleted',
     });
   } catch (error) {
-    logApiError('bom-projects', error);
+    logApiError('bom-projects', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'BOM project not found');
     }

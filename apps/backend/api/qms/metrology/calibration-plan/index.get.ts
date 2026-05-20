@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('metrology-calibration-plan-list', error);
+    logApiError('metrology-calibration-plan-list', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch metrology calibration plan list',

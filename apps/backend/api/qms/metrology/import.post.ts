@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('metrology-import', error);
+    logApiError('metrology-import', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to import metrology data',

@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(created);
   } catch (error: unknown) {
-    logApiError('metrology-calibration-plan-create', error);
+    logApiError('metrology-calibration-plan-create', error, undefined, event);
     if (
       error instanceof Error &&
       [

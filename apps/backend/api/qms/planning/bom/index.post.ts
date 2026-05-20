@@ -73,7 +73,7 @@ export default defineEventHandler(async (event) => {
       projectId: bomProject.id,
     });
   } catch (error) {
-    logApiError('bom', error);
+    logApiError('bom', error, undefined, event);
     return internalServerErrorResponse(event, '添加物料失败');
   }
 });

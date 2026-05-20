@@ -63,7 +63,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess({ items: data });
   } catch (error) {
-    logApiError('after-sales-chart-aggregate', error);
+    logApiError('after-sales-chart-aggregate', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch after-sales chart aggregate',

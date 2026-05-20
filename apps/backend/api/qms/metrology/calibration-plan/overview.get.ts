@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('metrology-calibration-plan-overview', error);
+    logApiError('metrology-calibration-plan-overview', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch metrology calibration plan overview',

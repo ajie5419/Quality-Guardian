@@ -199,7 +199,7 @@ export default eventHandler(async (event) => {
       const roles = await RbacService.getUserRoles(String(userId));
       roleNames = roles.map((role) => role.name || '');
     } catch (error) {
-      logApiError('all', error);
+      logApiError('all', error, undefined, event);
     }
 
     // 3. 构建完整树

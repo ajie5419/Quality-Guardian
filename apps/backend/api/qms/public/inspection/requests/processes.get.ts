@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
       processNames.map((processName) => ({ processName })),
     );
   } catch (error) {
-    logApiError('public-inspection-request-process-list', error);
+    logApiError('public-inspection-request-process-list', error, undefined, event);
     return internalServerErrorResponse(event, '获取工单工序失败');
   }
 });

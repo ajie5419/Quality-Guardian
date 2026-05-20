@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('inspection-issue-stats', error);
+    logApiError('inspection-issue-stats', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch inspection issue stats',

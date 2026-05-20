@@ -47,7 +47,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('work-order', error);
+    logApiError('work-order', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '删除工单失败：记录不存在');
     }

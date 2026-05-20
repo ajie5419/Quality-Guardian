@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(result);
   } catch (error: unknown) {
-    logApiError('supplier', error);
+    logApiError('supplier', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch suppliers');
   }
 });

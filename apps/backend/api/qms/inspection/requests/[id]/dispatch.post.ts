@@ -118,7 +118,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(mapInspectionRequest(updated));
   } catch (error) {
-    logApiError('inspection-request-dispatch', error);
+    logApiError('inspection-request-dispatch', error, undefined, event);
     return internalServerErrorResponse(event, '报检派单失败');
   }
 });

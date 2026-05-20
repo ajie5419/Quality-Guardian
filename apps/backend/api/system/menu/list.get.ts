@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
     const menuTree = buildMenuTree(menus);
     return useResponseSuccess(menuTree);
   } catch (error) {
-    logApiError('list', error);
+    logApiError('list', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to fetch menu list');
   }

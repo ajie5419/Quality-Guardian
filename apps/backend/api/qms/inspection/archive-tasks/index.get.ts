@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('inspection-archive-tasks', error);
+    logApiError('inspection-archive-tasks', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch archive tasks');
   }
 });

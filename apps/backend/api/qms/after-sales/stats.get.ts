@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(stats);
   } catch (error) {
-    logApiError('after-sales-stats', error);
+    logApiError('after-sales-stats', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch after-sales stats',

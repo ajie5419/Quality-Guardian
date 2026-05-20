@@ -47,7 +47,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('metrology-delete', error);
+    logApiError('metrology-delete', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '计量器具不存在');
     }

@@ -101,7 +101,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(mapped);
   } catch (error) {
-    logApiError('public-inspection-request-create', error);
+    logApiError('public-inspection-request-create', error, undefined, event);
     return internalServerErrorResponse(event, '创建报检任务失败');
   }
 });

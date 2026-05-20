@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
     const tree = buildTree(null);
     return useResponseSuccess(tree);
   } catch (error) {
-    logApiError('categories', error);
+    logApiError('categories', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch knowledge categories',

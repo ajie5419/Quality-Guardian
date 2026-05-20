@@ -81,7 +81,7 @@ export default defineEventHandler(async (event) => {
         }
         successCount++;
       } catch (error: unknown) {
-        logApiError('welder-import-item', error);
+        logApiError('welder-import-item', error, undefined, event);
         const reason = toImportErrorMessage(error);
         rowErrors.push(
           buildImportRowError({
@@ -103,7 +103,7 @@ export default defineEventHandler(async (event) => {
       }),
     );
   } catch (error: unknown) {
-    logApiError('welder-import', error);
+    logApiError('welder-import', error, undefined, event);
     return internalServerErrorResponse(event, '焊工导入失败');
   }
 });

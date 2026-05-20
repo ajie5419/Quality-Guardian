@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
       return forbiddenResponse(event, '无权删除：您只能删除自己创建的数据');
     }
   } catch (error: unknown) {
-    logApiError('issues', error);
+    logApiError('issues', error, undefined, event);
     return internalServerErrorResponse(event, '权限校验失败');
   }
 
@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
     await InspectionService.deleteRecord(id, String(userinfo.id));
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('issues', error);
+    logApiError('issues', error, undefined, event);
     return internalServerErrorResponse(event, '删除问题失败');
   }
 });

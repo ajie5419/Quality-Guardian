@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
     await UserService.update(id, body);
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('user', error);
+    logApiError('user', error, undefined, event);
     if (isPrismaUniqueConstraintError(error)) {
       return conflictResponse(event, '用户名已存在');
     }

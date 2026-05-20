@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
       permissions,
     });
   } catch (error) {
-    logApiError('role', error);
+    logApiError('role', error, undefined, event);
     // Check for unique constraint violation
     if (isPrismaUniqueConflictError(error)) {
       return conflictResponse(event, '角色值已存在');

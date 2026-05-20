@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   try {
     return useResponseSuccess(await FileStorageService.getStorageStats());
   } catch (error) {
-    logApiError('file-storage-stats', error);
+    logApiError('file-storage-stats', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to get file storage stats',

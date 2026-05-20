@@ -110,7 +110,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(permissionTree);
   } catch (error: unknown) {
-    logApiError('permission-tree', error);
+    logApiError('permission-tree', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to fetch permission tree');
   }

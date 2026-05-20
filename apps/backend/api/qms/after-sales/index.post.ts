@@ -62,7 +62,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newItem);
   } catch (error: unknown) {
-    logApiError('after-sales-create', error);
+    logApiError('after-sales-create', error, undefined, event);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return internalServerErrorResponse(

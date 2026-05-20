@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
       latencyMs: Date.now() - startedAt,
       module: 'quality-loss',
       userId: userinfo.userId,
-    });
+    }, event);
     return internalServerErrorResponse(
       event,
       'Failed to export quality loss data',

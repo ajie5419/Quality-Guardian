@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ successCount: result.count });
   } catch (error) {
-    logApiError('batch-delete', error);
+    logApiError('batch-delete', error, undefined, event);
     return internalServerErrorResponse(event, '批量删除失败');
   }
 });

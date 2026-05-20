@@ -107,7 +107,7 @@ export default defineEventHandler(async (event) => {
       success: true,
     });
   } catch (error) {
-    logApiError('work-order-requirement-create', error);
+    logApiError('work-order-requirement-create', error, undefined, event);
     return internalServerErrorResponse(event, '上传工单要求失败');
   }
 });

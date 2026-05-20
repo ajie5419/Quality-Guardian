@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    logApiError('dfmea-projects', error);
+    logApiError('dfmea-projects', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'DFMEA 项目不存在');
     }

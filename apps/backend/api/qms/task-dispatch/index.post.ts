@@ -89,7 +89,7 @@ export default defineEventHandler(async (event) => {
       if (!project) {
         logApiError('task-dispatch', new Error('Project not found'), {
           itpProjectId,
-        });
+        }, event);
         return badRequestResponse(
           event,
           `关联的 ITP 计划 (ID: ${itpProjectId}) 不存在，请刷新后重试`,
@@ -139,7 +139,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newTask);
   } catch (error: unknown) {
-    logApiError('task-dispatch', error);
+    logApiError('task-dispatch', error, undefined, event);
     const err = error as { code?: string; message?: string };
     if (isPrismaForeignKeyError(error)) {
       return badRequestResponse(

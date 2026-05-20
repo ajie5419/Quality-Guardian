@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
       date: formatReportDate(created.date),
     });
   } catch (error) {
-    logApiError('reports', error);
+    logApiError('reports', error, undefined, event);
     return internalServerErrorResponse(event, '创建报告失败');
   }
 });

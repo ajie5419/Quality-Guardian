@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     );
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('public-metrology-borrow-return', error);
+    logApiError('public-metrology-borrow-return', error, undefined, event);
     if (error instanceof Error) {
       return badRequestResponse(event, error.message);
     }

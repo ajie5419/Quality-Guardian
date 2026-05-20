@@ -510,7 +510,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(mapInspectionRequest(updated));
   } catch (error) {
-    logApiError('inspection-request-close', error);
+    logApiError('inspection-request-close', error, undefined, event);
     const message = getCloseErrorMessage(error);
     if (error instanceof Error && error.message.startsWith('VALIDATION:')) {
       return badRequestResponse(event, message);

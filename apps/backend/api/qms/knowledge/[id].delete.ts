@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('knowledge', error);
+    logApiError('knowledge', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '知识条目不存在');
     }

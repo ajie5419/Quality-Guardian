@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(overview);
   } catch (error) {
-    logApiError('metrology-overview', error);
+    logApiError('metrology-overview', error, undefined, event);
     return internalServerErrorResponse(event, '获取计量器具概览失败');
   }
 });

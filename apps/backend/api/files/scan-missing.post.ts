@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('file-scan-missing', error);
+    logApiError('file-scan-missing', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to scan missing files');
   }
 });

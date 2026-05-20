@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('supplier', error);
+    logApiError('supplier', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '供应商不存在');
     }

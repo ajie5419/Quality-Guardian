@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
 
     return useListResponseSuccess(items);
   } catch (error) {
-    logApiError('reports', error);
+    logApiError('reports', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch reports');
   }
 });

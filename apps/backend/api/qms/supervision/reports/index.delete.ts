@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     await SupervisionReportService.deleteReport(id);
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('supervision-report-delete', error);
+    logApiError('supervision-report-delete', error, undefined, event);
     return internalServerErrorResponse(event, '删除日报失败');
   }
 });

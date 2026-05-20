@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
         error.issues[0]?.message || '参数校验失败',
       );
     }
-    logApiError('supervision-plan-task-reorder', error);
+    logApiError('supervision-plan-task-reorder', error, undefined, event);
     return internalServerErrorResponse(event, '排序甘特任务失败');
   }
 });

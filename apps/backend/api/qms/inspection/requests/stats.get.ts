@@ -463,7 +463,7 @@ export default defineEventHandler(async (event) => {
       todaySubmittedCount,
     });
   } catch (error) {
-    logApiError('inspection-request-stats', error);
+    logApiError('inspection-request-stats', error, undefined, event);
     return internalServerErrorResponse(event, '获取报检任务统计失败');
   }
 });

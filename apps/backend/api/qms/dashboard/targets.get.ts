@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(orderedTargets);
   } catch (error) {
-    logApiError('dashboard-targets', error);
+    logApiError('dashboard-targets', error, undefined, event);
     return internalServerErrorResponse(
       event,
       `Failed to fetch quality targets: ${(error as Error).message}`,

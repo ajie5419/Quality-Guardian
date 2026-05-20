@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
       total: result.total,
     });
   } catch (error) {
-    logApiError('dictionary-list', error);
+    logApiError('dictionary-list', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to fetch dictionaries');
   }

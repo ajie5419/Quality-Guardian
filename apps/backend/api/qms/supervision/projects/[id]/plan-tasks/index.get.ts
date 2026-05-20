@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
     const data = await SupervisionService.listPlanTasks(projectId);
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('supervision-plan-tasks-list', error);
+    logApiError('supervision-plan-tasks-list', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch supervision plan tasks',

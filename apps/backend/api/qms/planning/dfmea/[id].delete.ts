@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('dfmea', error);
+    logApiError('dfmea', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'DFMEA 条目不存在');
     }

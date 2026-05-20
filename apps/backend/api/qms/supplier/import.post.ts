@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
         await prisma.suppliers.upsert(payload);
         successCount++;
       } catch (error) {
-        logApiError('import', error);
+        logApiError('import', error, undefined, event);
       }
     }
 
@@ -59,7 +59,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ successCount, totalCount: items.length });
   } catch (error: unknown) {
-    logApiError('import', error);
+    logApiError('import', error, undefined, event);
     return internalServerErrorResponse(event, '导入异常');
   }
 });

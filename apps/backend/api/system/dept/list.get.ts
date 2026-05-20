@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
     const tree = await DeptService.findAll();
     return useResponseSuccess(tree);
   } catch (error) {
-    logApiError('dept', error);
+    logApiError('dept', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to fetch departments');
   }

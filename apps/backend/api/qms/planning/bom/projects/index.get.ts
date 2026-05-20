@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
 
     return useListResponseSuccess(data);
   } catch (error) {
-    logApiError('bom-projects', error);
+    logApiError('bom-projects', error, undefined, event);
     return internalServerErrorResponse(event, '获取 BOM 项目失败');
   }
 });

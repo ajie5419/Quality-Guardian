@@ -66,7 +66,7 @@ export default defineEventHandler(async (event) => {
       quantitativeItems: parseItpQuantitativeItems(newItem.quantitativeItems),
     });
   } catch (error) {
-    logApiError('itp', error);
+    logApiError('itp', error, undefined, event);
     return internalServerErrorResponse(event, '创建 ITP 条目失败');
   }
 });

@@ -456,7 +456,7 @@ export default defineEventHandler(async (event) => {
       summary: storedContent.summary,
     });
   } catch (error: unknown) {
-    logApiError('daily-summary', error);
+    logApiError('daily-summary', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch daily summary');
   }
 });

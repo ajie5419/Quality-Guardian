@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('file-delete', error, { id, userId: userinfo.id });
+    logApiError('file-delete', error, { id, userId: userinfo.id }, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to delete file');
   }

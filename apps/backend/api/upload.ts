@@ -50,7 +50,7 @@ export default eventHandler(async (event) => {
       url: uploaded.url,
     });
   } catch (error) {
-    logApiError('upload', error);
+    logApiError('upload', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Upload failed');
   }

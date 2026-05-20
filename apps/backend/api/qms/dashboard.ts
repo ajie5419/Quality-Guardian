@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
       })),
     });
   } catch (error) {
-    logApiError('dashboard', error);
+    logApiError('dashboard', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch dashboard data');
   }
 });

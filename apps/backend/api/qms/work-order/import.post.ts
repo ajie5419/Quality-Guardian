@@ -94,7 +94,7 @@ export default defineEventHandler(async (event) => {
         });
         successCount++;
       } catch (error: unknown) {
-        logApiError('import', error);
+        logApiError('import', error, undefined, event);
         const message = toImportErrorMessage(error);
         rowErrors.push(
           buildImportRowError({
@@ -128,7 +128,7 @@ export default defineEventHandler(async (event) => {
       }),
     );
   } catch (error: unknown) {
-    logApiError('import', error);
+    logApiError('import', error, undefined, event);
     return internalServerErrorResponse(event, '数据处理异常');
   }
 });

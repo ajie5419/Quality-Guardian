@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
 
     return useListResponseSuccess(projects);
   } catch (error) {
-    logApiError('dfmea-projects', error);
+    logApiError('dfmea-projects', error, undefined, event);
     return internalServerErrorResponse(event, '获取 DFMEA 项目失败');
   }
 });

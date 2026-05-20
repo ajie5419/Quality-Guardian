@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error: unknown) {
-    logApiError('inspection-create', error);
+    logApiError('inspection-create', error, undefined, event);
     if (
       error instanceof Error &&
       String(error.message || '').startsWith('VALIDATION:')

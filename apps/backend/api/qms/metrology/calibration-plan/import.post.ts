@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('metrology-calibration-plan-import', error);
+    logApiError('metrology-calibration-plan-import', error, undefined, event);
     return internalServerErrorResponse(event, '导入校准计划失败');
   }
 });

@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newSupplier);
   } catch (error: unknown) {
-    logApiError('supplier', error);
+    logApiError('supplier', error, undefined, event);
     if (isPrismaUniqueConstraintError(error)) {
       return conflictResponse(event, '供应商名称已存在');
     }

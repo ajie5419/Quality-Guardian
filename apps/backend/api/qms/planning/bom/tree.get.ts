@@ -47,7 +47,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(treeNodes);
   } catch (error) {
-    logApiError('bom-tree', error);
+    logApiError('bom-tree', error, undefined, event);
     return internalServerErrorResponse(event, '获取 BOM 树失败');
   }
 });

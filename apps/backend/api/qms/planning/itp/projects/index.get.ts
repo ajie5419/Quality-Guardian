@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
 
     return useListResponseSuccess(mapped);
   } catch (error) {
-    logApiError('itp-projects', error);
+    logApiError('itp-projects', error, undefined, event);
     return internalServerErrorResponse(event, '获取 ITP 项目失败');
   }
 });

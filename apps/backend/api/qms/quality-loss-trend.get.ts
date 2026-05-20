@@ -120,7 +120,7 @@ export default defineEventHandler(async (event) => {
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    logApiError('quality-loss-trend', error);
+    logApiError('quality-loss-trend', error, undefined, event);
     return internalServerErrorResponse(
       event,
       `Failed to fetch quality loss trend: ${errorMessage}`,

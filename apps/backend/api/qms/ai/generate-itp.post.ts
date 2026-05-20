@@ -162,7 +162,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(normalizedItems);
   } catch (error: unknown) {
-    logApiError('generate-itp', error);
+    logApiError('generate-itp', error, undefined, event);
     const axiosError = error as { message?: string };
     const errorMessage = `AI 解析失败: ${axiosError.message}`;
     if (!event.node.res.statusCode || event.node.res.statusCode < 400) {

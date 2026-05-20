@@ -51,7 +51,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newItem);
   } catch (error) {
-    logApiError('dfmea', error);
+    logApiError('dfmea', error, undefined, event);
     return internalServerErrorResponse(event, '添加 DFMEA 条目失败');
   }
 });

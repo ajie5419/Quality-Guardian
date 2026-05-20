@@ -67,7 +67,7 @@ export default defineEventHandler(async (event) => {
       overdue: 0,
     });
   } catch (error) {
-    logApiError('task-dispatch-stats', error);
+    logApiError('task-dispatch-stats', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch task dispatch stats',

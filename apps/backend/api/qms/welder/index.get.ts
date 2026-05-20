@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
     const result = await WelderService.findAll(parseWelderListQuery(query));
     return useResponseSuccess(result);
   } catch (error: unknown) {
-    logApiError('welder', error);
+    logApiError('welder', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch welders');
   }
 });

@@ -140,7 +140,7 @@ export default defineEventHandler(async (event) => {
       enrichedItems.map((item) => mapProjectBomItem(item)),
     );
   } catch (error) {
-    logApiError('bom-list', error);
+    logApiError('bom-list', error, undefined, event);
     return internalServerErrorResponse(event, '获取 BOM 条目失败');
   }
 });

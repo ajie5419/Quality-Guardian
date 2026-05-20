@@ -115,7 +115,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(treeData);
   } catch (error) {
-    logApiError('itp-tree', error);
+    logApiError('itp-tree', error, undefined, event);
     return internalServerErrorResponse(event, '获取 ITP 树失败');
   }
 });

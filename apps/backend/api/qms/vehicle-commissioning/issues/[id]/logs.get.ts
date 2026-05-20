@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
     const data = await VehicleCommissioningService.getIssueLogs(id);
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('vehicle-commissioning-issues-logs', error);
+    logApiError('vehicle-commissioning-issues-logs', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch issue logs');
   }
 });

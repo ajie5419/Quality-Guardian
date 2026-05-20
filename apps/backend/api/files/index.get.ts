@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('file-list', error);
+    logApiError('file-list', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to list files');
   }
 });

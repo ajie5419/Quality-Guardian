@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(result);
   } catch (error: unknown) {
-    logApiError('audit-log', error);
+    logApiError('audit-log', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to fetch audit logs');
   }

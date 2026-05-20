@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     await UserService.delete(id);
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('user', error);
+    logApiError('user', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '用户不存在');
     }

@@ -68,7 +68,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(updated);
   } catch (error) {
-    logApiError('work-order-requirement-update', error);
+    logApiError('work-order-requirement-update', error, undefined, event);
     return internalServerErrorResponse(event, '更新工单要求失败');
   }
 });

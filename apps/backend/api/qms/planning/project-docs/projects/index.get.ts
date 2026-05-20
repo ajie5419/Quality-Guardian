@@ -82,7 +82,7 @@ export default defineEventHandler(async (event) => {
 
     return useListResponseSuccess(result);
   } catch (error) {
-    logApiError('project-docs-projects', error);
+    logApiError('project-docs-projects', error, undefined, event);
     return internalServerErrorResponse(event, '获取项目资料列表失败');
   }
 });

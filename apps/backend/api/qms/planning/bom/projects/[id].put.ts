@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(updated);
   } catch (error) {
-    logApiError('bom-projects', error);
+    logApiError('bom-projects', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'BOM project not found');
     }

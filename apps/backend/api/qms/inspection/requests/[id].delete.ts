@@ -72,7 +72,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error) {
-    logApiError('inspection-request-delete', error, { id });
+    logApiError('inspection-request-delete', error, { id }, event);
     return internalServerErrorResponse(event, '删除报检任务失败');
   }
 });

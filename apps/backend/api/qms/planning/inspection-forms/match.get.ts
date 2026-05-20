@@ -107,7 +107,7 @@ export default defineEventHandler(async (event) => {
         template: null,
       });
     }
-    logApiError('inspection-form-match', error);
+    logApiError('inspection-form-match', error, undefined, event);
     return internalServerErrorResponse(event, '匹配检验表失败');
   }
 });

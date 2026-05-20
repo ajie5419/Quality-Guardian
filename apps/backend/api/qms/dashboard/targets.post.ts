@@ -48,7 +48,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ success: true, targets: body });
   } catch (error) {
-    logApiError('dashboard-targets', error);
+    logApiError('dashboard-targets', error, undefined, event);
     return internalServerErrorResponse(
       event,
       `Failed to save quality targets: ${(error as Error).message}`,

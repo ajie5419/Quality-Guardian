@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
     logApiError('inspection-records-export', error, {
       latencyMs: Date.now() - startedAt,
       module: 'inspection-records',
-    });
+    }, event);
     return internalServerErrorResponse(
       event,
       'Failed to export inspection records',

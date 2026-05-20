@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
       total: result.total,
     });
   } catch (error) {
-    logApiError('work-order-requirement-board', error);
+    logApiError('work-order-requirement-board', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to fetch requirement board',

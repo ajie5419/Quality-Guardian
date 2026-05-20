@@ -61,7 +61,7 @@ export default defineEventHandler(async (event) => {
 
     createResults.forEach((result, index) => {
       if (result.status === 'rejected') {
-        logApiError('bom-import-item', result.reason);
+        logApiError('bom-import-item', result.reason, undefined, event);
         const message = toImportErrorMessage(result.reason);
         rowErrors.push(
           buildImportRowError({
@@ -83,7 +83,7 @@ export default defineEventHandler(async (event) => {
       }),
     );
   } catch (error) {
-    logApiError('bom-import', error);
+    logApiError('bom-import', error, undefined, event);
     return internalServerErrorResponse(event, '导入 BOM 失败');
   }
 });

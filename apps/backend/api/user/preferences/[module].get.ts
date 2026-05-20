@@ -33,7 +33,7 @@ export default eventHandler(async (event) => {
 
     return useResponseSuccess(preference);
   } catch (error) {
-    logApiError(`get_preference_${module}`, error);
+    logApiError(`get_preference_${module}`, error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to fetch preference');
   }

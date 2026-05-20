@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
     const result = await UserService.create(body);
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('user', error);
+    logApiError('user', error, undefined, event);
     if (isPrismaUniqueConflictError(error)) {
       return conflictResponse(event, '用户名已存在');
     }

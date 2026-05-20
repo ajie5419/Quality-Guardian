@@ -137,12 +137,12 @@ export default defineEventHandler(async (event) => {
         },
       });
     } catch (logError) {
-      logApiError('quality-loss-log', logError);
+      logApiError('quality-loss-log', logError, undefined, event);
     }
 
     return useResponseSuccess({ message: '更新成功' });
   } catch (error: unknown) {
-    logApiError('quality-loss', error);
+    logApiError('quality-loss', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '目标记录不存在');
     }

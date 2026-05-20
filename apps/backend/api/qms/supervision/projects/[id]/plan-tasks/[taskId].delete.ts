@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     const data = await SupervisionPlanTaskService.deleteTask(projectId, taskId);
     return useResponseSuccess(data);
   } catch (error: any) {
-    logApiError('supervision-plan-task-delete', error);
+    logApiError('supervision-plan-task-delete', error, undefined, event);
     return internalServerErrorResponse(event, '删除甘特任务失败');
   }
 });

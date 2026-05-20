@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
     );
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('metrology-borrow-return', error);
+    logApiError('metrology-borrow-return', error, undefined, event);
     if (error instanceof Error) {
       return badRequestResponse(event, error.message);
     }

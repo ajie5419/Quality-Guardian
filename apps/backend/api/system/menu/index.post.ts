@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newMenu);
   } catch (error) {
-    logApiError('menu', error);
+    logApiError('menu', error, undefined, event);
     if (isPrismaUniqueConstraintError(error)) {
       return conflictResponse(event, '菜单名称或路径已存在');
     }

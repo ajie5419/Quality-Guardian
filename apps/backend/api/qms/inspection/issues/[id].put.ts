@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
       return forbiddenResponse(event, '无权修改：您只能修改自己创建的数据');
     }
   } catch (error) {
-    logApiError('issues', error);
+    logApiError('issues', error, undefined, event);
     return internalServerErrorResponse(event, '权限校验失败');
   }
 
@@ -94,7 +94,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('issues', error);
+    logApiError('issues', error, undefined, event);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '记录不存在');
     }

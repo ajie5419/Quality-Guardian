@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess({ report: aiResponse });
   } catch (error: unknown) {
-    logApiError('generate-report', error);
+    logApiError('generate-report', error, undefined, event);
     const axiosError = error as { message?: string };
     return internalServerErrorResponse(
       event,

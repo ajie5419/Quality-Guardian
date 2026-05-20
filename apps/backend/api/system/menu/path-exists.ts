@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(!!exists);
   } catch (error) {
-    logApiError('menu-path-exists', error);
+    logApiError('menu-path-exists', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to validate menu path');
   }

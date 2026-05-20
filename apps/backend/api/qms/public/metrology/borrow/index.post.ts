@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
     );
     return useResponseSuccess(null);
   } catch (error: unknown) {
-    logApiError('public-metrology-borrow-create', error);
+    logApiError('public-metrology-borrow-create', error, undefined, event);
     if (error instanceof Error) {
       return badRequestResponse(event, error.message);
     }

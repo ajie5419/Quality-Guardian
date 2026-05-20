@@ -92,7 +92,7 @@ export default defineEventHandler(async (event) => {
       }),
     );
   } catch (error: unknown) {
-    logApiError('import', error);
+    logApiError('import', error, undefined, event);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return internalServerErrorResponse(event, `导入失败: ${errorMessage}`);

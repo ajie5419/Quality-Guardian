@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
         error.issues[0]?.message || '参数校验失败',
       );
     }
-    logApiError('supervision-plan-task-update', error);
+    logApiError('supervision-plan-task-update', error, undefined, event);
     return internalServerErrorResponse(event, '更新甘特任务失败');
   }
 });

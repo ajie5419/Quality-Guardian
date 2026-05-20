@@ -102,7 +102,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(formattedWO);
   } catch (error: unknown) {
-    logApiError('work-order-create', error);
+    logApiError('work-order-create', error, undefined, event);
     const err = error as { code?: string; message?: string; meta?: unknown };
     const errorMessage = err.message || String(error);
 

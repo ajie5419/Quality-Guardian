@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(newProject);
   } catch (error) {
-    logApiError('dfmea-projects', error);
+    logApiError('dfmea-projects', error, undefined, event);
     if (isPrismaForeignKeyError(error)) {
       return badRequestResponse(event, '创建项目失败，请检查工单号是否存在');
     }

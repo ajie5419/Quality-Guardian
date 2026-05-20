@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
     }
     return useResponseSuccess(data);
   } catch (error) {
-    logApiError('supervision-issues-update', error);
+    logApiError('supervision-issues-update', error, undefined, event);
     return internalServerErrorResponse(
       event,
       'Failed to update supervision issue',

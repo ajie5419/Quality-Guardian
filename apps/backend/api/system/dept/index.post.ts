@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
     const newDept = await DeptService.create(body);
     return useResponseSuccess(newDept);
   } catch (error) {
-    logApiError('dept', error);
+    logApiError('dept', error, undefined, event);
     if (isPrismaUniqueConstraintError(error)) {
       return conflictResponse(event, '部门名称已存在');
     }

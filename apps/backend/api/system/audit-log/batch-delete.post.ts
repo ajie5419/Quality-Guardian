@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     const result = await SystemLogService.batchDeleteAuditLogs(ids);
     return useResponseSuccess({ successCount: result.count });
   } catch (error: unknown) {
-    logApiError('audit-log', error);
+    logApiError('audit-log', error, undefined, event);
     setResponseStatus(event, 500);
     return useResponseError('Failed to batch delete audit logs');
   }

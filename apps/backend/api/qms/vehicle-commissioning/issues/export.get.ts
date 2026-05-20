@@ -204,7 +204,7 @@ export default defineEventHandler(async (event) => {
     );
     return Buffer.from(buffer);
   } catch (error) {
-    logApiError('vehicle-commissioning-issues-export', error);
+    logApiError('vehicle-commissioning-issues-export', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to export issues');
   }
 });

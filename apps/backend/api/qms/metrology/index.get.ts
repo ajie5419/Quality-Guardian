@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(result);
   } catch (error) {
-    logApiError('metrology-list', error);
+    logApiError('metrology-list', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch metrology list');
   }
 });

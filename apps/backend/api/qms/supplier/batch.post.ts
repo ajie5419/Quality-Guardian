@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
             await prisma.suppliers.upsert(payload);
             results.success++;
           } catch (error) {
-            logApiError('batch', error);
+            logApiError('batch', error, undefined, event);
             results.errors++;
           }
         }),
@@ -72,7 +72,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(results);
   } catch (error) {
-    logApiError('batch', error);
+    logApiError('batch', error, undefined, event);
     return internalServerErrorResponse(event, '批量导入失败');
   }
 });

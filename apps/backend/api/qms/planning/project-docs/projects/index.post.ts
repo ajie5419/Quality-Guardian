@@ -63,7 +63,7 @@ export default defineEventHandler(async (event) => {
 
     return useResponseSuccess(upsertResult.data);
   } catch (error) {
-    logApiError('project-docs-projects', error);
+    logApiError('project-docs-projects', error, undefined, event);
     return internalServerErrorResponse(event, '添加项目资料失败');
   }
 });

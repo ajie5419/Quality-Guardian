@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess({ message: 'Deleted' });
   } catch (error: unknown) {
-    logApiError('reports', error);
+    logApiError('reports', error, undefined, event);
     const typedError = error as { code?: string; message?: string };
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'Report not found');

@@ -441,7 +441,7 @@ export default defineEventHandler(async (event) => {
       },
     });
   } catch (error) {
-    logApiError('workspace-work-order-aggregate', error);
+    logApiError('workspace-work-order-aggregate', error, undefined, event);
     return internalServerErrorResponse(event, '获取工单聚合信息失败');
   }
 });

@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
     const items = await DictionaryService.getOptions(dictType);
     return useResponseSuccess(items);
   } catch (error: unknown) {
-    logApiError('dictionary-options', error);
+    logApiError('dictionary-options', error, undefined, event);
     const message = error instanceof Error ? error.message : '获取字典选项失败';
     if (message.startsWith('VALIDATION:')) {
       return badRequestResponse(event, message.replace('VALIDATION:', ''));

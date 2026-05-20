@@ -138,7 +138,7 @@ export default defineEventHandler(async (event) => {
       total,
     });
   } catch (error) {
-    logApiError('inspection-request-list', error);
+    logApiError('inspection-request-list', error, undefined, event);
     return internalServerErrorResponse(event, '获取报检任务失败');
   }
 });
