@@ -1,5 +1,4 @@
 export function parseRequiredParamValue(value: unknown): null | string {
-  const normalized =
-    value === undefined || value === null ? '' : String(value);
-  return normalized ? normalized : null;
+  const normalized = value === undefined || value === null ? '' : String(value);
+  return normalized || null;
 }
