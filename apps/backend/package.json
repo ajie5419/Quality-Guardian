@@ -30,6 +30,7 @@
     "db:migrate-vehicle-commissioning": "node prisma/migrate-vehicle-commissioning-issues.mjs",
     "db:migrate-supervision": "node prisma/migrate-supervision.mjs",
     "db:migrate-dictionaries": "node prisma/migrate-dictionaries.mjs",
+    "db:check-process-id-consistency": "tsx ./scripts/check-process-id-consistency.ts",
     "db:backfill-file-references": "node prisma/backfill-file-references.mjs",
     "db:register-local-files": "node prisma/register-local-files.mjs",
     "db:inspection-quantity-backfill": "node prisma/inspection-quantity-backfill.js",

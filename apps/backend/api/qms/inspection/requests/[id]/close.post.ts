@@ -182,7 +182,14 @@ export default defineEventHandler(async (event) => {
 
   try {
     const request = await prisma.qms_inspection_requests.findFirst({
-      include: { work_order: { select: { projectName: true } } },
+      include: {
+        process: {
+          select: {
+            name: true,
+          },
+        },
+        work_order: { select: { projectName: true } },
+      },
       where: { id, isDeleted: false },
     });
 
@@ -282,6 +289,7 @@ export default defineEventHandler(async (event) => {
           request.partName,
         processName:
           normalizeInspectionRequestText(linkedIssue.processName) ||
+          normalizeInspectionRequestText(request.process?.name) ||
           request.processName,
         projectName: request.work_order?.projectName || request.workOrderNumber,
         quantity: issueQuantity,
