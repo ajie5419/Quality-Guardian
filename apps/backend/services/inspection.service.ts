@@ -12,7 +12,7 @@ import { deriveIssueTrackingStatus, ISSUE_TRACKING_STATUS } from '@qgs/domain';
 import { AUDIT_TEMPLATES, InspectionIssueStatusEnum } from '@qgs/enums';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
 import { FileStorageService } from '~/services/file-storage.service';
-import { resolveInspectionFormProcessCandidates } from '~/utils/inspection-form';
+import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import { buildInspectionIssueDateRange } from '~/utils/inspection-issue';
 import { createModuleLogger } from '~/utils/logger';
 import { UPLOAD_DIR } from '~/utils/paths';
@@ -406,35 +406,18 @@ async function resolveInspectionTemplateBinding(
       templateName: null,
     };
   }
-  const processCandidates = resolveInspectionFormProcessCandidates({
+  const processFilter = await buildInspectionFormProcessFilter({
     category: data.category,
     incomingType: data.incomingType || null,
-    processName: data.processName || null,
+    processId: data.processId,
+    processName: data.processName || '',
   });
-  const resolvedProcessId =
-    data.processId === undefined
-      ? await resolveProcessId(data.processName || '')
-      : data.processId;
-  if (processCandidates.length === 0 && !resolvedProcessId) {
+  if (Object.keys(processFilter).length === 0) {
     return {
       templateId: null,
       templateName: null,
     };
   }
-  const processFilter = {
-    OR: [
-      ...(resolvedProcessId ? [{ processId: resolvedProcessId }] : []),
-      ...(processCandidates.length > 0
-        ? [
-            {
-              processName: {
-                in: processCandidates,
-              },
-            },
-          ]
-        : []),
-    ],
-  };
 
   const partCandidates = [
     String(data.materialName || '').trim(),
