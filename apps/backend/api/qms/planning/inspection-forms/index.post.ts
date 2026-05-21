@@ -1,7 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
-import { resolveInspectionFormProcessCandidates } from '~/utils/inspection-form';
+import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
@@ -38,7 +38,7 @@ export default defineEventHandler(async (event) => {
     }
     const status = String(body.status || 'active').trim() || 'active';
     const processId = await resolveProcessId(processName);
-    const processCandidates = resolveInspectionFormProcessCandidates({
+    const processFilter = await buildInspectionFormProcessFilter({
       category: 'PROCESS',
       processName,
     });
@@ -50,17 +50,7 @@ export default defineEventHandler(async (event) => {
             ...(partName
               ? { partName }
               : { OR: [{ partName: null }, { partName: '' }] }),
-            OR: [
-              ...(processId ? [{ processId }] : []),
-              {
-                processName: {
-                  in:
-                    processCandidates.length > 0
-                      ? processCandidates
-                      : [processName],
-                },
-              },
-            ],
+            ...processFilter,
             status: 'active',
             workOrderNumber,
           },

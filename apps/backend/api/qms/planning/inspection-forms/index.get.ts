@@ -1,16 +1,13 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {
+  buildInspectionFormProcessFilter,
   resolveInspectionFormProcess,
-  resolveInspectionFormProcessCandidates,
 } from '~/utils/inspection-form';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
-import {
-  resolveCanonicalProcessName,
-  resolveProcessId,
-} from '~/utils/process-resolver';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import {
   internalServerErrorResponse,
   unAuthorizedResponse,
@@ -25,30 +22,12 @@ export default defineEventHandler(async (event) => {
   const workOrderNumber = String(query.workOrderNumber || '').trim();
   const processName = String(query.processName || '').trim();
   const partName = String(query.partName || '').trim();
-  const processCandidates = resolveInspectionFormProcessCandidates({
-    category: 'PROCESS',
-    processName,
-  });
 
   try {
-    const resolvedProcessId = processName
-      ? await resolveProcessId(processName)
-      : null;
-    const processWhere = processName
-      ? {
-          OR: [
-            ...(resolvedProcessId ? [{ processId: resolvedProcessId }] : []),
-            {
-              processName: {
-                in:
-                  processCandidates.length > 0
-                    ? processCandidates
-                    : [processName],
-              },
-            },
-          ],
-        }
-      : {};
+    const processWhere = await buildInspectionFormProcessFilter({
+      category: 'PROCESS',
+      processName,
+    });
     const list = await prisma.inspection_form_templates.findMany({
       where: {
         isDeleted: false,

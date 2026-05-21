@@ -1,17 +1,14 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {
+  buildInspectionFormProcessFilter,
   parseInspectionFormFields,
   resolveInspectionFormProcess,
-  resolveInspectionFormProcessCandidates,
 } from '~/utils/inspection-form';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
-import {
-  resolveCanonicalProcessName,
-  resolveProcessId,
-} from '~/utils/process-resolver';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -34,11 +31,8 @@ export default defineEventHandler(async (event) => {
     incomingType: String(query.incomingType || ''),
     processName: String(query.processName || ''),
   });
-  const processCandidates = resolveInspectionFormProcessCandidates({
-    category: String(query.category || ''),
-    incomingType: String(query.incomingType || ''),
-    processName: String(query.processName || ''),
-  });
+  const category = String(query.category || '');
+  const incomingType = String(query.incomingType || '');
   const partName = String(query.partName || '').trim();
 
   if (!processName) {
@@ -50,27 +44,11 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const resolvedProcessId = await resolveProcessId(processName);
-    const processFilter = resolvedProcessId
-      ? {
-          OR: [
-            { processId: resolvedProcessId },
-            {
-              processName: {
-                in:
-                  processCandidates.length > 0
-                    ? processCandidates
-                    : [processName],
-              },
-            },
-          ],
-        }
-      : {
-          processName: {
-            in:
-              processCandidates.length > 0 ? processCandidates : [processName],
-          },
-        };
+    const processFilter = await buildInspectionFormProcessFilter({
+      category,
+      incomingType,
+      processName,
+    });
     let template = null;
     if (partName) {
       template = await prisma.inspection_form_templates.findFirst({

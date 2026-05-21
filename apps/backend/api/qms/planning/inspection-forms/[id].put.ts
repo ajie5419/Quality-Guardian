@@ -1,7 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
-import { resolveInspectionFormProcessCandidates } from '~/utils/inspection-form';
+import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -85,18 +85,12 @@ export default defineEventHandler(async (event) => {
       const finalWorkOrderNumber = workOrderNumber ?? current?.workOrderNumber;
       const finalProcessName = processName ?? currentProcessName;
       const finalPartName = partName ?? String(current?.partName || '').trim();
-      const finalProcessCandidates = resolveInspectionFormProcessCandidates({
-        category: 'PROCESS',
-        processName: finalProcessName || '',
-      });
       if (finalWorkOrderNumber && finalProcessName) {
-        const resolvedFinalProcessId = await resolveProcessId(
-          finalProcessName || '',
-        );
-        const finalProcessId =
-          processName === undefined
-            ? (resolvedFinalProcessId ?? current.processId)
-            : resolvedFinalProcessId;
+        const processFilter = await buildInspectionFormProcessFilter({
+          category: 'PROCESS',
+          processId: processName === undefined ? current.processId : null,
+          processName: finalProcessName,
+        });
         const duplicatedActiveTemplate =
           await prisma.inspection_form_templates.findFirst({
             where: {
@@ -105,17 +99,7 @@ export default defineEventHandler(async (event) => {
               ...(finalPartName
                 ? { partName: finalPartName }
                 : { OR: [{ partName: null }, { partName: '' }] }),
-              OR: [
-                ...(finalProcessId ? [{ processId: finalProcessId }] : []),
-                {
-                  processName: {
-                    in:
-                      finalProcessCandidates.length > 0
-                        ? finalProcessCandidates
-                        : [finalProcessName],
-                  },
-                },
-              ],
+              ...processFilter,
               status: 'active',
               workOrderNumber: finalWorkOrderNumber,
             },
