@@ -413,6 +413,20 @@ async function resolveInspectionTemplateBinding(
       templateName: null,
     };
   }
+  const resolvedProcessId =
+    data.processId === undefined
+      ? await resolveProcessId(data.processName || '')
+      : data.processId;
+  const processFilter = {
+    OR: [
+      ...(resolvedProcessId ? [{ processId: resolvedProcessId }] : []),
+      {
+        processName: {
+          in: processCandidates,
+        },
+      },
+    ],
+  };
 
   const partCandidates = [
     String(data.materialName || '').trim(),
@@ -425,9 +439,7 @@ async function resolveInspectionTemplateBinding(
       where: {
         isDeleted: false,
         partName,
-        processName: {
-          in: processCandidates,
-        },
+        ...processFilter,
         status: 'active',
         workOrderNumber,
       },
@@ -446,9 +458,7 @@ async function resolveInspectionTemplateBinding(
       where: {
         isDeleted: false,
         OR: [{ partName: null }, { partName: '' }],
-        processName: {
-          in: processCandidates,
-        },
+        ...processFilter,
         status: 'active',
         workOrderNumber,
       },
@@ -1204,6 +1214,7 @@ export const InspectionService = {
         select: {
           category: true,
           incomingType: true,
+          processId: true,
           processName: true,
           templateId: true,
           templateName: true,
@@ -1217,6 +1228,10 @@ export const InspectionService = {
           data.incomingType === undefined
             ? previousInspection?.incomingType || undefined
             : data.incomingType,
+        processId:
+          data.processId === undefined
+            ? previousInspection?.processId || undefined
+            : data.processId,
         processName:
           data.processName === undefined
             ? previousInspection?.processName || undefined
