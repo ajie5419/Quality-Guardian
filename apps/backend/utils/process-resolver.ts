@@ -67,27 +67,8 @@ export async function resolveProcessId(
   if (!normalizedName) {
     return null;
   }
-
-  const now = Date.now();
-  const cached = processIdCache.get(normalizedName);
-  if (cached && cached.expiresAt > now) {
-    return cached.processId;
-  }
-
-  const processItem = await prisma.processes.findFirst({
-    where: {
-      isDeleted: false,
-      name: normalizedName,
-    },
-    select: { id: true },
-  });
-
-  const processId = processItem?.id || null;
-  processIdCache.set(normalizedName, {
-    processId,
-    expiresAt: now + PROCESS_ID_CACHE_TTL_MS,
-  });
-  return processId;
+  const resolvedMap = await resolveProcessIdsByNames([normalizedName]);
+  return resolvedMap.get(normalizedName) ?? null;
 }
 
 export async function resolveProcessIdsByNames(
