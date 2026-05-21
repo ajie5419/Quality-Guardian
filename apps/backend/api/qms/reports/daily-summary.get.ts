@@ -88,6 +88,11 @@ async function loadDailyArchiveTasks(inspections: DailyInspectionRow[]) {
             },
             select: {
               id: true,
+              process: {
+                select: {
+                  name: true,
+                },
+              },
               processName: true,
               workOrderNumber: true,
             },
@@ -100,7 +105,9 @@ async function loadDailyArchiveTasks(inspections: DailyInspectionRow[]) {
       const workOrderNumber = String(template.workOrderNumber || '').trim();
       if (!workOrderNumber) continue;
       const stepSet = planProcessMap.get(workOrderNumber) || new Set<string>();
-      const step = String(template.processName || '').trim();
+      const step =
+        String(template.process?.name || '').trim() ||
+        String(template.processName || '').trim();
       if (step) {
         stepSet.add(step);
       }

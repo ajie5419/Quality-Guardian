@@ -1571,7 +1571,14 @@ export const InspectionService = {
     let where: Prisma.quality_recordsWhereInput = { isDeleted: false };
 
     if (params.processName) {
-      where.processName = params.processName;
+      const resolvedProcessId = await resolveProcessId(params.processName);
+      where = {
+        ...where,
+        OR: [
+          { processName: params.processName },
+          ...(resolvedProcessId ? [{ processId: resolvedProcessId }] : []),
+        ],
+      };
     }
 
     const { start, end } = buildInspectionIssueDateRange({
