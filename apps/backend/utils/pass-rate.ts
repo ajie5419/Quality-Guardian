@@ -54,6 +54,11 @@ async function getInspectionPassRateRows(start: Date, end: Date) {
     select: {
       category: true,
       incomingType: true,
+      process: {
+        select: {
+          name: true,
+        },
+      },
       processName: true,
       quantity: true,
       qualifiedQuantity: true,
@@ -168,6 +173,11 @@ async function getIssuePassRateRows(start: Date, end: Date) {
         select: {
           category: true,
           incomingType: true,
+          process: {
+            select: {
+              name: true,
+            },
+          },
           processName: true,
           team: true,
         },
@@ -180,7 +190,8 @@ async function getIssuePassRateRows(start: Date, end: Date) {
     incomingType: null,
     inspectionCategory: item.inspection?.category || null,
     inspectionIncomingType: item.inspection?.incomingType || null,
-    inspectionProcessName: item.inspection?.processName || null,
+    inspectionProcessName:
+      item.inspection?.process?.name || item.inspection?.processName || null,
     inspectionTeam: item.inspection?.team || null,
     processName: item.processName,
     quantity: item.quantity,
@@ -208,7 +219,7 @@ export async function getPassRateDrillDownByRange(
     (record) => record.category === 'PROCESS',
   )) {
     const mappedName = mapInspectionToPassRateBucket({
-      processName: item.processName,
+      processName: item.process?.name || item.processName,
       team: item.team,
     });
     if (!mappedName) continue;
