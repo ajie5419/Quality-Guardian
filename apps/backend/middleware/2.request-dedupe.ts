@@ -1,15 +1,14 @@
+import type { EventHandlerRequest, H3Event } from 'h3';
+
 import { createHash } from 'node:crypto';
 
 import {
-  type EventHandlerRequest,
-  type H3Event,
   defineEventHandler,
   getHeader,
   getRequestIP,
   getRequestURL,
   readBody,
 } from 'h3';
-
 import { conflictResponse } from '~/utils/response';
 
 const DEDUPE_WINDOW_MS = 3000;
