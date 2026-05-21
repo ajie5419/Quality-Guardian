@@ -227,4 +227,63 @@ describe('inspectionService', () => {
       expect(where.OR).toBeUndefined();
     });
   });
+
+  describe('update', () => {
+    it('should use resolved processId for template binding when processName changes', async () => {
+      const stopError = new Error('stop-after-template-binding');
+      const inspectionFormFindFirst = vi.fn().mockResolvedValue(null);
+      (prisma.processes.findMany as any).mockResolvedValue([
+        { id: 'process-new', name: '新工序' },
+      ]);
+      (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+        callback({
+          inspections: {
+            findUnique: vi.fn().mockResolvedValue({
+              category: 'PROCESS',
+              incomingType: null,
+              processId: 'process-old',
+              processName: '旧工序',
+              templateId: null,
+              templateName: null,
+              workOrderNumber: 'WO-1001',
+            }),
+            update: vi.fn().mockResolvedValue({
+              id: 'inspection-1',
+              processId: 'process-new',
+              processName: '新工序',
+              documents: null,
+              workOrderNumber: 'WO-1001',
+            }),
+          },
+          inspection_form_templates: {
+            findFirst: inspectionFormFindFirst,
+          },
+          inspection_items: {
+            deleteMany: vi.fn().mockRejectedValue(stopError),
+            createMany: vi.fn(),
+          },
+        }),
+      );
+
+      await expect(
+        InspectionService.update('inspection-1', {
+          category: 'PROCESS',
+          workOrderNumber: 'WO-1001',
+          projectName: 'P-1',
+          processName: '新工序',
+          quantity: 1,
+          inspector: 'tester',
+          inspectionDate: new Date('2026-01-01'),
+        } as any),
+      ).rejects.toThrow('stop-after-template-binding');
+
+      expect(inspectionFormFindFirst).toHaveBeenCalled();
+      const templateQuery = inspectionFormFindFirst.mock.calls[0][0];
+      expect(templateQuery.where.OR).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ processId: 'process-new' }),
+        ]),
+      );
+    });
+  });
 });
