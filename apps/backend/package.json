@@ -37,6 +37,7 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@fastify/busboy": "^3.2.0",
     "@prisma/client": "6.2.1",
     "@qgs/domain": "workspace:*",
     "@qgs/enums": "workspace:*",

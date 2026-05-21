@@ -1,9 +1,11 @@
 import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createWriteStream, existsSync } from 'node:fs';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import process from 'node:process';
+import { Readable, Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
 import OSS from 'ali-oss';
 import sharp from 'sharp';
@@ -16,6 +18,13 @@ type UploadFileParams = {
   data: Buffer;
   filename?: string;
   mimeType?: null | string;
+  uploadedBy?: number | string;
+};
+
+type UploadFileStreamParams = {
+  filename?: string;
+  mimeType?: null | string;
+  stream: Readable;
   uploadedBy?: number | string;
 };
 
@@ -61,6 +70,7 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 const DEFAULT_MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+const DEFAULT_MAX_THUMB_SOURCE_BYTES = 10 * 1024 * 1024;
 
 let ossClientInstance: null | OSS = null;
 
@@ -117,6 +127,16 @@ function getMaxUploadBytes() {
     parsePositiveInteger(
       process.env.MAX_UPLOAD_BYTES,
       DEFAULT_MAX_UPLOAD_BYTES,
+    ),
+  );
+}
+
+function getMaxThumbnailSourceBytes() {
+  return Math.max(
+    0,
+    parsePositiveInteger(
+      process.env.THUMBNAIL_SOURCE_MAX_BYTES,
+      DEFAULT_MAX_THUMB_SOURCE_BYTES,
     ),
   );
 }
@@ -209,42 +229,115 @@ async function buildThumbnail(data: Buffer, mimeType: string) {
   }
 }
 
-async function saveLocalFile(params: {
-  data: Buffer;
+function createThumbnailStoredName(storedName: string) {
+  const ext = extname(storedName);
+  if (!ext) return `${storedName}_thumb.webp`;
+  return `${storedName.slice(0, -ext.length)}_thumb.webp`;
+}
+
+function createUploadProbe(params: {
+  maxThumbnailSourceBytes: number;
+  maxUploadBytes: number;
+}) {
+  const hash = createHash('sha256');
+  let size = 0;
+  let thumbSize = 0;
+  let thumbExceeded = false;
+  const thumbChunks: Buffer[] = [];
+
+  const stream = new Transform({
+    transform(chunk, _encoding, callback) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      size += buffer.length;
+      if (size > params.maxUploadBytes) {
+        callback(
+          new Error(
+            `file exceeds max upload size (${params.maxUploadBytes} bytes)`,
+          ),
+        );
+        return;
+      }
+
+      hash.update(buffer);
+
+      if (!thumbExceeded && params.maxThumbnailSourceBytes > 0) {
+        const remain = params.maxThumbnailSourceBytes - thumbSize;
+        if (remain <= 0) {
+          thumbExceeded = true;
+        } else if (buffer.length <= remain) {
+          thumbChunks.push(buffer);
+          thumbSize += buffer.length;
+        } else {
+          thumbChunks.push(buffer.subarray(0, remain));
+          thumbSize += remain;
+          thumbExceeded = true;
+        }
+      }
+
+      callback(null, buffer);
+    },
+  });
+
+  return {
+    stream,
+    summary() {
+      return {
+        sha256: hash.digest('hex'),
+        size,
+        thumbSource:
+          !thumbExceeded && thumbSize > 0
+            ? Buffer.concat(thumbChunks, thumbSize)
+            : null,
+      };
+    },
+  };
+}
+
+async function saveLocalFileStream(params: {
+  maxThumbnailSourceBytes: number;
+  maxUploadBytes: number;
   mimeType: string;
   originalName: string;
-  sha256: string;
   storedName: string;
-  thumbBuffer: Buffer | null;
+  stream: Readable;
   uploadedBy?: string;
 }): Promise<FileAssetPayload> {
   if (!existsSync(UPLOAD_DIR)) {
     await mkdir(UPLOAD_DIR, { recursive: true });
   }
 
-  let thumbObjectKey: string | undefined;
-  let thumbUrl: string | undefined;
-  if (params.thumbBuffer) {
-    thumbObjectKey = params.storedName.replace(/\.[^.]+$/, '_thumb.webp');
-    thumbUrl = `/uploads/${thumbObjectKey}`;
+  const filePath = join(UPLOAD_DIR, params.storedName);
+  const writer = createWriteStream(filePath);
+  const probe = createUploadProbe({
+    maxThumbnailSourceBytes: params.maxThumbnailSourceBytes,
+    maxUploadBytes: params.maxUploadBytes,
+  });
+  try {
+    await pipeline(params.stream, probe.stream, writer);
+  } catch (error) {
+    await unlink(filePath).catch(() => undefined);
+    throw error;
   }
 
-  const writeTasks = [
-    writeFile(join(UPLOAD_DIR, params.storedName), params.data),
-  ];
-  if (params.thumbBuffer && thumbObjectKey) {
-    writeTasks.push(
-      writeFile(join(UPLOAD_DIR, thumbObjectKey), params.thumbBuffer),
-    );
+  const measured = probe.summary();
+  const thumbBuffer = measured.thumbSource
+    ? await buildThumbnail(measured.thumbSource, params.mimeType)
+    : null;
+
+  let thumbObjectKey: string | undefined;
+  let thumbUrl: string | undefined;
+  if (thumbBuffer) {
+    thumbObjectKey = createThumbnailStoredName(params.storedName);
+    thumbUrl = `/uploads/${thumbObjectKey}`;
+    await writeFile(join(UPLOAD_DIR, thumbObjectKey), thumbBuffer);
   }
-  await Promise.all(writeTasks);
 
   return {
     mimeType: params.mimeType,
     objectKey: params.storedName,
     originalName: params.originalName,
-    sha256: params.sha256,
-    size: params.data.length,
+    sha256: measured.sha256,
+    size: measured.size,
     storageProvider: 'LOCAL',
     storedName: params.storedName,
     thumbObjectKey,
@@ -254,44 +347,46 @@ async function saveLocalFile(params: {
   };
 }
 
-async function saveOssFile(params: {
-  data: Buffer;
+async function saveOssFileStream(params: {
+  maxThumbnailSourceBytes: number;
+  maxUploadBytes: number;
   mimeType: string;
   originalName: string;
-  sha256: string;
   storedName: string;
-  thumbBuffer: Buffer | null;
+  stream: Readable;
   uploadedBy?: string;
 }): Promise<FileAssetPayload> {
   const client = getOssClient();
   const objectKey = buildOssObjectKey(params.storedName);
+  const probe = createUploadProbe({
+    maxThumbnailSourceBytes: params.maxThumbnailSourceBytes,
+    maxUploadBytes: params.maxUploadBytes,
+  });
+
+  await (client as any).putStream(objectKey, params.stream.pipe(probe.stream), {
+    headers: { 'Content-Type': params.mimeType },
+  });
+
+  const measured = probe.summary();
+  const thumbBuffer = measured.thumbSource
+    ? await buildThumbnail(measured.thumbSource, params.mimeType)
+    : null;
 
   let thumbObjectKey: string | undefined;
-  if (params.thumbBuffer) {
-    thumbObjectKey = objectKey.replace(/\.[^.]+$/, '_thumb.webp');
+  if (thumbBuffer) {
+    thumbObjectKey = buildOssObjectKey(createThumbnailStoredName(params.storedName));
+    await client.put(thumbObjectKey, thumbBuffer, {
+      headers: { 'Content-Type': 'image/webp' },
+    });
   }
-
-  const uploadTasks = [
-    client.put(objectKey, params.data, {
-      headers: { 'Content-Type': params.mimeType },
-    }),
-  ];
-  if (params.thumbBuffer && thumbObjectKey) {
-    uploadTasks.push(
-      client.put(thumbObjectKey, params.thumbBuffer, {
-        headers: { 'Content-Type': 'image/webp' },
-      }),
-    );
-  }
-  await Promise.all(uploadTasks);
 
   return {
     bucket: process.env.OSS_BUCKET,
     mimeType: params.mimeType,
     objectKey,
     originalName: params.originalName,
-    sha256: params.sha256,
-    size: params.data.length,
+    sha256: measured.sha256,
+    size: measured.size,
     storageProvider: 'OSS',
     storedName: params.storedName,
     thumbObjectKey,
@@ -681,41 +776,32 @@ export const FileStorageService = {
 
   getMaxUploadBytes,
 
-  async uploadFile(params: UploadFileParams) {
-    if (!params.data || params.data.length === 0) {
-      throw new Error('upload file payload is empty');
-    }
-
-    const maxUploadBytes = getMaxUploadBytes();
-    if (params.data.length > maxUploadBytes) {
-      throw new Error(`file exceeds max upload size (${maxUploadBytes} bytes)`);
-    }
-
+  async uploadFileStream(params: UploadFileStreamParams) {
     const originalName = basename(params.filename || 'upload');
     const mimeType = getMimeType(originalName, params.mimeType);
     const storedName = createStoredName(originalName, mimeType);
-    const sha256 = createHash('sha256').update(params.data).digest('hex');
     const uploadedBy =
       params.uploadedBy === undefined ? undefined : String(params.uploadedBy);
-    const thumbBuffer = await buildThumbnail(params.data, mimeType);
+    const maxUploadBytes = getMaxUploadBytes();
+    const maxThumbnailSourceBytes = getMaxThumbnailSourceBytes();
 
     const saved = shouldUseOss()
-      ? await saveOssFile({
-          data: params.data,
+      ? await saveOssFileStream({
+          maxThumbnailSourceBytes,
+          maxUploadBytes,
           mimeType,
           originalName,
-          sha256,
           storedName,
-          thumbBuffer,
+          stream: params.stream,
           uploadedBy,
         })
-      : await saveLocalFile({
-          data: params.data,
+      : await saveLocalFileStream({
+          maxThumbnailSourceBytes,
+          maxUploadBytes,
           mimeType,
           originalName,
-          sha256,
           storedName,
-          thumbBuffer,
+          stream: params.stream,
           uploadedBy,
         });
 
@@ -723,7 +809,7 @@ export const FileStorageService = {
     const thumbUrl =
       saved.storageProvider === 'OSS' && saved.thumbObjectKey
         ? `/api/uploads/${getLegacyOssProxyName(
-            saved.storedName.replace(/\.[^.]+$/, '_thumb.webp'),
+            createThumbnailStoredName(saved.storedName),
           )}`
         : saved.thumbUrl || '';
 
@@ -740,12 +826,23 @@ export const FileStorageService = {
       legacyUrl: saved.url,
       thumbFilename:
         saved.storageProvider === 'OSS' && saved.thumbObjectKey
-          ? getLegacyOssProxyName(
-              saved.storedName.replace(/\.[^.]+$/, '_thumb.webp'),
-            )
+          ? getLegacyOssProxyName(createThumbnailStoredName(saved.storedName))
           : saved.thumbObjectKey || null,
       thumbUrl,
       url: previewUrl,
     };
+  },
+
+  async uploadFile(params: UploadFileParams) {
+    if (!params.data || params.data.length === 0) {
+      throw new Error('upload file payload is empty');
+    }
+
+    return this.uploadFileStream({
+      filename: params.filename,
+      mimeType: params.mimeType,
+      stream: Readable.from(params.data),
+      uploadedBy: params.uploadedBy,
+    });
   },
 };
