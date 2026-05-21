@@ -77,6 +77,11 @@ export default defineEventHandler(async (event) => {
           id: true,
           partName: true,
           processName: true,
+          process: {
+            select: {
+              name: true,
+            },
+          },
           responsiblePerson: true,
           responsibleTeam: true,
         },
@@ -95,6 +100,11 @@ export default defineEventHandler(async (event) => {
               result: true,
             },
           },
+          process: {
+            select: {
+              name: true,
+            },
+          },
         },
       }),
     ]);
@@ -102,7 +112,9 @@ export default defineEventHandler(async (event) => {
     const byGroup = new Map<string, GroupStats>();
     const requirementList = requirements.map((item) => {
       const partName = normalizeLabel(item.partName);
-      const processName = normalizeLabel(item.processName);
+      const processName = normalizeLabel(
+        item.process?.name || item.processName,
+      );
       const plannedPoints = resolveRequirementPoints(item.requirementItems);
       const key = getGroupKey(partName, processName);
       const current = byGroup.get(key) || {
@@ -161,7 +173,9 @@ export default defineEventHandler(async (event) => {
       const partName = normalizeLabel(
         inspection.level2Component || inspection.level1Component,
       );
-      const processName = normalizeLabel(inspection.processName);
+      const processName = normalizeLabel(
+        inspection.process?.name || inspection.processName,
+      );
       const key = getGroupKey(partName, processName);
       const pointCount = Math.max(inspection.items.length, 0);
       inspectedPoints += pointCount;

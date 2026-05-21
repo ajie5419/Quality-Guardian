@@ -41,6 +41,11 @@ async function attachInspectionProgress(items: ProjectBomItemRow[]) {
       level1Component: true,
       level2Component: true,
       materialName: true,
+      process: {
+        select: {
+          name: true,
+        },
+      },
       processName: true,
       qualifiedQuantity: true,
       quantity: true,
@@ -61,7 +66,7 @@ async function attachInspectionProgress(items: ProjectBomItemRow[]) {
     for (const partName of partCandidates) {
       const key = `${inspection.workOrderNumber}::${buildInspectionKey(
         partName,
-        inspection.processName,
+        inspection.process?.name || inspection.processName,
       )}`;
       completedQuantityMap.set(
         key,

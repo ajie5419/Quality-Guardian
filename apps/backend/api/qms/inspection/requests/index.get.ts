@@ -58,6 +58,7 @@ export default defineEventHandler(async (event) => {
               { partName: { contains: keyword } },
               { componentName: { contains: keyword } },
               { processName: { contains: keyword } },
+              { process: { is: { name: { contains: keyword } } } },
               { reporter: { contains: keyword } },
               { team: { contains: keyword } },
             ],

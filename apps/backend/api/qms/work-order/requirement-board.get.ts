@@ -41,7 +41,8 @@ export default defineEventHandler(async (event) => {
         division: item.work_order?.division || '',
         id: item.id,
         partName: item.partName || '',
-        processName: item.processName || '',
+        processName:
+          String(item.process?.name || '').trim() || item.processName || '',
         projectName: item.work_order?.projectName || '',
         requirementName: item.requirementName || '',
         responsiblePerson: item.responsiblePerson || '',

@@ -8,6 +8,7 @@ import {
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
+import { resolveProcessId } from '~/utils/process-resolver';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -46,19 +47,45 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const resolvedProcessId = await resolveProcessId(processName);
+    const processFilter = resolvedProcessId
+      ? {
+          OR: [
+            { processId: resolvedProcessId },
+            {
+              processName: {
+                in:
+                  processCandidates.length > 0
+                    ? processCandidates
+                    : [processName],
+              },
+            },
+          ],
+        }
+      : {
+          processName: {
+            in:
+              processCandidates.length > 0 ? processCandidates : [processName],
+          },
+        };
     let template = null;
     if (partName) {
       template = await prisma.inspection_form_templates.findFirst({
         where: {
           isDeleted: false,
           partName,
-          processName: {
-            in: processCandidates,
-          },
+          ...processFilter,
           status: 'active',
           workOrderNumber,
         },
         orderBy: [{ updatedAt: 'desc' }],
+        include: {
+          process: {
+            select: {
+              name: true,
+            },
+          },
+        },
       });
     }
     if (!template) {
@@ -66,13 +93,18 @@ export default defineEventHandler(async (event) => {
         where: {
           isDeleted: false,
           OR: [{ partName: null }, { partName: '' }],
-          processName: {
-            in: processCandidates,
-          },
+          ...processFilter,
           status: 'active',
           workOrderNumber,
         },
         orderBy: [{ updatedAt: 'desc' }],
+        include: {
+          process: {
+            select: {
+              name: true,
+            },
+          },
+        },
       });
     }
 
@@ -95,6 +127,9 @@ export default defineEventHandler(async (event) => {
         formNo: String(template.formNo || ''),
         id: template.id,
         partName: String(template.partName || ''),
+        processName:
+          String(template.process?.name || '').trim() ||
+          String(template.processName || '').trim(),
         templateQuantity: template.templateQuantity ?? null,
         workOrderNumber: template.workOrderNumber,
       },

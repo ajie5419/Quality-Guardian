@@ -28,6 +28,9 @@ type DailyInspectionRow = {
   id: string;
   incomingType?: null | string;
   inspectionDate?: Date;
+  process?: null | {
+    name?: null | string;
+  };
   processName?: null | string;
   projectName?: null | string;
   workOrderNumber: string;
@@ -62,6 +65,11 @@ async function loadDailyArchiveTasks(inspections: DailyInspectionRow[]) {
                 select: {
                   category: true,
                   incomingType: true,
+                  process: {
+                    select: {
+                      name: true,
+                    },
+                  },
                   processName: true,
                 },
               },
@@ -107,7 +115,8 @@ async function loadDailyArchiveTasks(inspections: DailyInspectionRow[]) {
       const candidates = resolveInspectionFormProcessCandidates({
         category: task.inspection.category || '',
         incomingType: task.inspection.incomingType || '',
-        processName: task.inspection.processName || '',
+        processName:
+          task.inspection.process?.name || task.inspection.processName || '',
       });
       for (const candidate of candidates) {
         const key = `${taskWorkOrder}::${candidate}`;
@@ -265,6 +274,11 @@ export default defineEventHandler(async (event) => {
         OR: [{ inspector: queryUser }, { inspector: realName }],
       },
       include: {
+        process: {
+          select: {
+            name: true,
+          },
+        },
         work_order: {
           select: {
             projectName: true,
@@ -347,7 +361,8 @@ export default defineEventHandler(async (event) => {
           break;
         }
         case 'PROCESS': {
-          proc = item.processName || '';
+          proc =
+            String(item.process?.name || '').trim() || item.processName || '';
           name = item.level2Component || item.level1Component || '';
 
           break;

@@ -22,11 +22,24 @@ export default defineEventHandler(async (event) => {
         workOrderNumber,
       },
       orderBy: [{ updatedAt: 'desc' }],
-      select: { processName: true },
+      select: {
+        process: {
+          select: {
+            name: true,
+          },
+        },
+        processName: true,
+      },
     });
 
     const processNames = [...new Set(
-      list.map((item) => String(item.processName || '').trim()).filter(Boolean),
+      list
+        .map(
+          (item) =>
+            String(item.process?.name || '').trim() ||
+            String(item.processName || '').trim(),
+        )
+        .filter(Boolean),
     )];
     return useResponseSuccess(
       processNames.map((processName) => ({ processName })),

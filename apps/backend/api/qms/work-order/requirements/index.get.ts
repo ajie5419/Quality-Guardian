@@ -37,6 +37,11 @@ export default defineEventHandler(async (event) => {
         id: true,
         partName: true,
         processName: true,
+        process: {
+          select: {
+            name: true,
+          },
+        },
         requirementItems: true,
         requirementName: true,
         responsiblePerson: true,
@@ -55,7 +60,8 @@ export default defineEventHandler(async (event) => {
         id: item.id,
         items: parseRequirementItems(item.requirementItems),
         partName: item.partName || '',
-        processName: item.processName || '',
+        processName:
+          String(item.process?.name || '').trim() || item.processName || '',
         requirementName: item.requirementName || '',
         responsiblePerson: item.responsiblePerson || '',
         responsibleTeam: item.responsibleTeam || '',

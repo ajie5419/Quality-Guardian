@@ -97,6 +97,11 @@ export const WorkOrderRequirementService = {
           id: true,
           partName: true,
           processName: true,
+          process: {
+            select: {
+              name: true,
+            },
+          },
           requirementName: true,
           responsiblePerson: true,
           responsibleTeam: true,

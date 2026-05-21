@@ -7,6 +7,7 @@ import {
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
+import { resolveProcessId } from '~/utils/process-resolver';
 import {
   internalServerErrorResponse,
   unAuthorizedResponse,
@@ -27,20 +28,29 @@ export default defineEventHandler(async (event) => {
   });
 
   try {
-    const list = await prisma.inspection_form_templates.findMany({
-      where: {
-        isDeleted: false,
-        ...(workOrderNumber ? { workOrderNumber } : {}),
-        ...(processName
-          ? {
+    const resolvedProcessId = processName
+      ? await resolveProcessId(processName)
+      : null;
+    const processWhere = processName
+      ? {
+          OR: [
+            ...(resolvedProcessId ? [{ processId: resolvedProcessId }] : []),
+            {
               processName: {
                 in:
                   processCandidates.length > 0
                     ? processCandidates
                     : [processName],
               },
-            }
-          : {}),
+            },
+          ],
+        }
+      : {};
+    const list = await prisma.inspection_form_templates.findMany({
+      where: {
+        isDeleted: false,
+        ...(workOrderNumber ? { workOrderNumber } : {}),
+        ...processWhere,
         ...(partName
           ? {
               partName: {

@@ -685,6 +685,11 @@ export const InspectionService = {
         items: {
           orderBy: [{ order: 'asc' }],
         },
+        process: {
+          select: {
+            name: true,
+          },
+        },
       },
     });
 
@@ -733,6 +738,8 @@ export const InspectionService = {
       drawingNo: templateMeta.drawingNo,
       formNo: templateMeta.formNo,
       inspectionDate: formatDate(inspection.inspectionDate),
+      processName:
+        String(inspection.process?.name || '').trim() || inspection.processName,
       printHeaders,
       reportDate: inspection.reportDate
         ? formatDate(inspection.reportDate)
@@ -808,6 +815,11 @@ export const InspectionService = {
             }
           : {}),
         items: true,
+        process: {
+          select: {
+            name: true,
+          },
+        },
         qualityRecords: {
           select: {
             quantity: true,
@@ -875,6 +887,8 @@ export const InspectionService = {
         archiveIsOverdue: Boolean(item.archiveTask?.isOverdue),
         archiveTaskStatus: item.archiveTask?.status || null,
         issueStatus: deriveInspectionIssueStatus(linkedIssues),
+        processName:
+          String(item.process?.name || '').trim() || item.processName,
         qualifiedQuantity:
           item.qualifiedQuantity === null ||
           item.qualifiedQuantity === undefined
