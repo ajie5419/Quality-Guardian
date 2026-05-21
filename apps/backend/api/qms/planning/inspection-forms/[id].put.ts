@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
+import { resolveInspectionFormProcessCandidates } from '~/utils/inspection-form';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
@@ -74,6 +75,11 @@ export default defineEventHandler(async (event) => {
       const finalWorkOrderNumber = workOrderNumber ?? current?.workOrderNumber;
       const finalProcessName = processName ?? current?.processName;
       const finalPartName = partName ?? String(current?.partName || '').trim();
+      const finalProcessId = await resolveProcessId(finalProcessName || '');
+      const finalProcessCandidates = resolveInspectionFormProcessCandidates({
+        category: 'PROCESS',
+        processName: finalProcessName || '',
+      });
       if (finalWorkOrderNumber && finalProcessName) {
         const duplicatedActiveTemplate =
           await prisma.inspection_form_templates.findFirst({
@@ -83,7 +89,17 @@ export default defineEventHandler(async (event) => {
               ...(finalPartName
                 ? { partName: finalPartName }
                 : { OR: [{ partName: null }, { partName: '' }] }),
-              processName: finalProcessName,
+              OR: [
+                ...(finalProcessId ? [{ processId: finalProcessId }] : []),
+                {
+                  processName: {
+                    in:
+                      finalProcessCandidates.length > 0
+                        ? finalProcessCandidates
+                        : [finalProcessName],
+                  },
+                },
+              ],
               status: 'active',
               workOrderNumber: finalWorkOrderNumber,
             },
