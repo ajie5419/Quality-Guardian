@@ -1221,6 +1221,10 @@ export const InspectionService = {
         keepExistingWhenNameMissing: true,
         processName: data.processName,
       });
+      const templateProcessId =
+        resolvedProcessId === undefined
+          ? (previousInspection?.processId ?? undefined)
+          : resolvedProcessId;
       const templateBinding = await resolveInspectionTemplateBinding(tx, {
         ...data,
         category: data.category || previousInspection?.category || 'PROCESS',
@@ -1228,10 +1232,7 @@ export const InspectionService = {
           data.incomingType === undefined
             ? previousInspection?.incomingType || undefined
             : data.incomingType,
-        processId:
-          data.processId === undefined
-            ? previousInspection?.processId || undefined
-            : data.processId,
+        processId: templateProcessId,
         processName:
           data.processName === undefined
             ? previousInspection?.processName || undefined
