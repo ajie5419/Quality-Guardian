@@ -16,7 +16,7 @@ import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
   resolveCanonicalProcessName,
-  resolveProcessId,
+  resolveProcessIdForWrite,
 } from '~/utils/process-resolver';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
@@ -69,7 +69,9 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const processId = await resolveProcessId(processName);
+    const processId = await resolveProcessIdForWrite({
+      processName,
+    });
     const workOrder = await prisma.work_orders.findUnique({
       select: { workOrderNumber: true },
       where: { workOrderNumber },

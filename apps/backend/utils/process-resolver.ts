@@ -165,3 +165,23 @@ export async function buildProcessNameWhere(
     OR: [fieldCondition, { processId: resolvedProcessId }],
   };
 }
+
+export async function resolveProcessIdForWrite(options: {
+  explicitProcessId?: null | string;
+  fallbackProcessId?: null | string;
+  keepExistingWhenNameMissing?: boolean;
+  processName?: null | string;
+}): Promise<null | string | undefined> {
+  const explicitProcessId = options.explicitProcessId;
+  if (explicitProcessId !== undefined) {
+    return explicitProcessId;
+  }
+  const normalizedProcessName = normalizeProcessName(options.processName);
+  if (!normalizedProcessName) {
+    if (options.keepExistingWhenNameMissing) {
+      return undefined;
+    }
+    return options.fallbackProcessId ?? null;
+  }
+  return resolveProcessId(normalizedProcessName);
+}

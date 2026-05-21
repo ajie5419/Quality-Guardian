@@ -12,7 +12,7 @@ import {
 } from '~/utils/inspection-request';
 import { publishInspectionRequestCreated } from '~/utils/inspection-request-events';
 import prisma from '~/utils/prisma';
-import { resolveProcessId } from '~/utils/process-resolver';
+import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
@@ -58,7 +58,9 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const processId = await resolveProcessId(processName);
+    const processId = await resolveProcessIdForWrite({
+      processName,
+    });
     const workOrder = await prisma.work_orders.findUnique({
       select: { workOrderNumber: true },
       where: { workOrderNumber },

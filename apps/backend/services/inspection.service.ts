@@ -26,7 +26,7 @@ import {
   buildProcessNameWhere,
   resolveCanonicalProcessNameById,
   resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation,
-  resolveProcessId,
+  resolveProcessIdForWrite,
 } from '~/utils/process-resolver';
 import {
   parseProjectDocuments,
@@ -1088,10 +1088,10 @@ export const InspectionService = {
     for (let attempt = 1; attempt <= maxRetry; attempt++) {
       try {
         const serialNumber = await this.generateSerialNumber();
-        const resolvedProcessId =
-          data.processId === undefined
-            ? await resolveProcessId(data.processName || '')
-            : data.processId;
+        const resolvedProcessId = await resolveProcessIdForWrite({
+          explicitProcessId: data.processId,
+          processName: data.processName,
+        });
         return await prisma.$transaction(async (tx) => {
           const templateBinding = await resolveInspectionTemplateBinding(
             tx,
@@ -1204,10 +1204,6 @@ export const InspectionService = {
     this.assertResultQuantityConsistency(overallResult, quantitySummary);
 
     return prisma.$transaction(async (tx) => {
-      const resolvedProcessId =
-        data.processName === undefined
-          ? data.processId
-          : await resolveProcessId(data.processName || '');
       const previousInspection = await tx.inspections.findUnique({
         where: { id },
         select: {
@@ -1219,6 +1215,11 @@ export const InspectionService = {
           templateName: true,
           workOrderNumber: true,
         },
+      });
+      const resolvedProcessId = await resolveProcessIdForWrite({
+        explicitProcessId: data.processId,
+        keepExistingWhenNameMissing: true,
+        processName: data.processName,
       });
       const templateBinding = await resolveInspectionTemplateBinding(tx, {
         ...data,
