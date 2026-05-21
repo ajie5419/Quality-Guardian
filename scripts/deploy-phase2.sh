@@ -1,8 +1,11 @@
 #!/bin/bash
 set -e
 
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT_DIR"
+
 echo '=== Step 1: Apply database migration ==='
-npx prisma migrate deploy
+pnpm --dir apps/backend exec prisma migrate deploy
 
 echo '=== Step 2: Seed dictionary data (defect_type/defect_subtype/team) ==='
 npx tsx apps/backend/scripts/seed-master-data-dictionaries.ts
