@@ -166,6 +166,11 @@ async function getIssuePassRateRows(start: Date, end: Date) {
     where: { isDeleted: false, date: { gte: start, lte: end } },
     select: {
       category: true,
+      process: {
+        select: {
+          name: true,
+        },
+      },
       processName: true,
       quantity: true,
       responsibleDepartment: true,
@@ -193,7 +198,7 @@ async function getIssuePassRateRows(start: Date, end: Date) {
     inspectionProcessName:
       item.inspection?.process?.name || item.inspection?.processName || null,
     inspectionTeam: item.inspection?.team || null,
-    processName: item.processName,
+    processName: item.process?.name || item.processName,
     quantity: item.quantity,
     responsibleDepartment: item.responsibleDepartment,
   }));
