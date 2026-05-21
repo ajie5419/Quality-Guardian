@@ -11,6 +11,7 @@ import {
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import {
   formatReportDate,
   getReportDayRange,
@@ -105,9 +106,7 @@ async function loadDailyArchiveTasks(inspections: DailyInspectionRow[]) {
       const workOrderNumber = String(template.workOrderNumber || '').trim();
       if (!workOrderNumber) continue;
       const stepSet = planProcessMap.get(workOrderNumber) || new Set<string>();
-      const step =
-        String(template.process?.name || '').trim() ||
-        String(template.processName || '').trim();
+      const step = resolveCanonicalProcessName(template);
       if (step) {
         stepSet.add(step);
       }
@@ -122,8 +121,7 @@ async function loadDailyArchiveTasks(inspections: DailyInspectionRow[]) {
       const candidates = resolveInspectionFormProcessCandidates({
         category: task.inspection.category || '',
         incomingType: task.inspection.incomingType || '',
-        processName:
-          task.inspection.process?.name || task.inspection.processName || '',
+        processName: resolveCanonicalProcessName(task.inspection) || '',
       });
       for (const candidate of candidates) {
         const key = `${taskWorkOrder}::${candidate}`;
@@ -155,9 +153,7 @@ async function loadDailyArchiveTasks(inspections: DailyInspectionRow[]) {
       const workOrder = String(inspection.workOrderNumber || '').trim();
       const normalizedInspection = {
         ...inspection,
-        processName:
-          String(inspection.process?.name || '').trim() ||
-          String(inspection.processName || '').trim(),
+        processName: resolveCanonicalProcessName(inspection) || '',
       };
       const processName = resolveInspectionFormProcess(normalizedInspection);
       const processCandidates =
@@ -374,8 +370,7 @@ export default defineEventHandler(async (event) => {
           break;
         }
         case 'PROCESS': {
-          proc =
-            String(item.process?.name || '').trim() || item.processName || '';
+          proc = resolveCanonicalProcessName(item) || '';
           name = item.level2Component || item.level1Component || '';
 
           break;
@@ -394,7 +389,7 @@ export default defineEventHandler(async (event) => {
         default: {
           // Fallback
           proc =
-            String(item.process?.name || '').trim() ||
+            resolveCanonicalProcessName(item) ||
             item.processName ||
             item.category ||
             '';

@@ -16,6 +16,7 @@ import {
   roundPercent,
 } from '~/utils/pass-rate-process';
 import prisma from '~/utils/prisma';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 interface DrillDownItem {
   category: string;
@@ -195,10 +196,12 @@ async function getIssuePassRateRows(start: Date, end: Date) {
     incomingType: null,
     inspectionCategory: item.inspection?.category || null,
     inspectionIncomingType: item.inspection?.incomingType || null,
-    inspectionProcessName:
-      item.inspection?.process?.name || item.inspection?.processName || null,
+    inspectionProcessName: resolveCanonicalProcessName({
+      process: item.inspection?.process,
+      processName: item.inspection?.processName,
+    }),
     inspectionTeam: item.inspection?.team || null,
-    processName: item.process?.name || item.processName,
+    processName: resolveCanonicalProcessName(item),
     quantity: item.quantity,
     responsibleDepartment: item.responsibleDepartment,
   }));
@@ -224,7 +227,7 @@ export async function getPassRateDrillDownByRange(
     (record) => record.category === 'PROCESS',
   )) {
     const mappedName = mapInspectionToPassRateBucket({
-      processName: item.process?.name || item.processName,
+      processName: resolveCanonicalProcessName(item),
       team: item.team,
     });
     if (!mappedName) continue;

@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -60,8 +61,7 @@ export default defineEventHandler(async (event) => {
         id: item.id,
         items: parseRequirementItems(item.requirementItems),
         partName: item.partName || '',
-        processName:
-          String(item.process?.name || '').trim() || item.processName || '',
+        processName: resolveCanonicalProcessName(item) || '',
         requirementName: item.requirementName || '',
         responsiblePerson: item.responsiblePerson || '',
         responsibleTeam: item.responsibleTeam || '',

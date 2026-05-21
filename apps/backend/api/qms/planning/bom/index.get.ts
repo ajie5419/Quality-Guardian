@@ -10,6 +10,7 @@ import {
 } from '~/utils/bom';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import {
   internalServerErrorResponse,
   useListResponseSuccess,
@@ -66,7 +67,7 @@ async function attachInspectionProgress(items: ProjectBomItemRow[]) {
     for (const partName of partCandidates) {
       const key = `${inspection.workOrderNumber}::${buildInspectionKey(
         partName,
-        inspection.process?.name || inspection.processName,
+        resolveCanonicalProcessName(inspection),
       )}`;
       completedQuantityMap.set(
         key,

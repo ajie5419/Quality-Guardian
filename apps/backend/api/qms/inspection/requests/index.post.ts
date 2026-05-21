@@ -14,7 +14,10 @@ import {
 import { publishInspectionRequestCreated } from '~/utils/inspection-request-events';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { resolveProcessId } from '~/utils/process-resolver';
+import {
+  resolveCanonicalProcessName,
+  resolveProcessId,
+} from '~/utils/process-resolver';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
@@ -115,8 +118,7 @@ export default defineEventHandler(async (event) => {
         '新增报检任务: {{requestNo}} ({{workOrderNumber}}/{{processName}}/{{partName}})',
       detailsVariables: {
         partName: created.partName,
-        processName:
-          String(created.process?.name || '').trim() || created.processName,
+        processName: resolveCanonicalProcessName(created) || '',
         requestNo: created.requestNo,
         workOrderNumber: created.workOrderNumber,
       },

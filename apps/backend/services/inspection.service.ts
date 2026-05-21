@@ -22,7 +22,10 @@ import {
   isPrismaSchemaMismatchError,
   isPrismaUniqueConstraintError,
 } from '~/utils/prisma-error';
-import { resolveProcessId } from '~/utils/process-resolver';
+import {
+  resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation,
+  resolveProcessId,
+} from '~/utils/process-resolver';
 import {
   parseProjectDocuments,
   stringifyProjectDocuments,
@@ -779,8 +782,7 @@ export const InspectionService = {
       drawingNo: templateMeta.drawingNo,
       formNo: templateMeta.formNo,
       inspectionDate: formatDate(inspection.inspectionDate),
-      processName:
-        String(inspection.process?.name || '').trim() || inspection.processName,
+      processName: resolveCanonicalProcessNameByRelation(inspection),
       printHeaders,
       reportDate: inspection.reportDate
         ? formatDate(inspection.reportDate)
@@ -928,8 +930,7 @@ export const InspectionService = {
         archiveIsOverdue: Boolean(item.archiveTask?.isOverdue),
         archiveTaskStatus: item.archiveTask?.status || null,
         issueStatus: deriveInspectionIssueStatus(linkedIssues),
-        processName:
-          String(item.process?.name || '').trim() || item.processName,
+        processName: resolveCanonicalProcessNameByRelation(item),
         qualifiedQuantity:
           item.qualifiedQuantity === null ||
           item.qualifiedQuantity === undefined
@@ -1435,9 +1436,7 @@ export const InspectionService = {
           where: { inspectionId: inspection.id },
         });
         const processName =
-          String(inspection.process?.name || '').trim() ||
-          String(inspection.processName || '').trim() ||
-          null;
+          resolveCanonicalProcessNameByRelation(inspection) || null;
         await syncInspectionProjectDocuments(tx, {
           ...inspection,
           hasDocuments: false,
@@ -1501,9 +1500,7 @@ export const InspectionService = {
           where: { inspectionId: inspection.id },
         });
         const processName =
-          String(inspection.process?.name || '').trim() ||
-          String(inspection.processName || '').trim() ||
-          null;
+          resolveCanonicalProcessNameByRelation(inspection) || null;
         await syncInspectionProjectDocuments(tx, {
           ...inspection,
           hasDocuments: false,
@@ -1837,8 +1834,7 @@ export const InspectionService = {
 
     const items: InspectionIssue[] = issues.map((issue) => {
       const photos = tryParsePhotos(issue.issuePhoto as string);
-      const canonicalProcessName =
-        String(issue.process?.name || '').trim() || issue.processName;
+      const canonicalProcessName = resolveCanonicalProcessNameByRelation(issue);
 
       return {
         ...issue,

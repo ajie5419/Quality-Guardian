@@ -16,6 +16,7 @@ import {
   parseInspectionRequestQuantity as parseInspectionRequestQuantityRule,
 } from '@qgs/domain';
 import { InspectionService } from '~/services/inspection.service';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import { resolveTaskDispatchCurrentUserId } from '~/utils/task-dispatch';
 
 export { INSPECTION_REQUEST_STATUS, isInspectionRequestAssemblyProcess };
@@ -106,9 +107,7 @@ export async function generateInspectionRequestNo(
 export function mapInspectionRequest(record: any) {
   return mapInspectionRequestRecordRule({
     ...record,
-    processName:
-      String(record?.process?.name || '').trim() ||
-      String(record?.processName || '').trim(),
+    processName: resolveCanonicalProcessName(record) || '',
   });
 }
 
@@ -146,9 +145,7 @@ export async function buildInspectionRecordFromRequest(
       body,
       request: {
         ...request,
-        processName:
-          String(request.process?.name || '').trim() ||
-          String(request.processName || '').trim(),
+        processName: resolveCanonicalProcessName(request) || '',
       },
     }),
   );

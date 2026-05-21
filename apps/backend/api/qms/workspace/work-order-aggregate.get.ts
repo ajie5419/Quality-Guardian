@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -112,9 +113,7 @@ export default defineEventHandler(async (event) => {
     const byGroup = new Map<string, GroupStats>();
     const requirementList = requirements.map((item) => {
       const partName = normalizeLabel(item.partName);
-      const processName = normalizeLabel(
-        item.process?.name || item.processName,
-      );
+      const processName = normalizeLabel(resolveCanonicalProcessName(item));
       const plannedPoints = resolveRequirementPoints(item.requirementItems);
       const key = getGroupKey(partName, processName);
       const current = byGroup.get(key) || {
@@ -174,7 +173,7 @@ export default defineEventHandler(async (event) => {
         inspection.level2Component || inspection.level1Component,
       );
       const processName = normalizeLabel(
-        inspection.process?.name || inspection.processName,
+        resolveCanonicalProcessName(inspection),
       );
       const key = getGroupKey(partName, processName);
       const pointCount = Math.max(inspection.items.length, 0);

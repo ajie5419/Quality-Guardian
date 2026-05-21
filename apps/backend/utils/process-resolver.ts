@@ -12,6 +12,18 @@ function normalizeProcessName(processName: unknown) {
   return String(processName || '').trim();
 }
 
+export function resolveCanonicalProcessName(record?: {
+  process?: null | { name?: null | string };
+  processName?: null | string;
+}) {
+  const relationName = normalizeProcessName(record?.process?.name);
+  if (relationName) {
+    return relationName;
+  }
+  const fallbackName = normalizeProcessName(record?.processName);
+  return fallbackName || null;
+}
+
 export async function resolveProcessId(
   processName: string,
 ): Promise<null | string> {
