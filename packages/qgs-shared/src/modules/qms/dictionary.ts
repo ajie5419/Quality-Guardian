@@ -4,6 +4,8 @@
  */
 export const QMS_DICTIONARY_TYPES = [
   'after_sales_status',
+  'defect_subtype',
+  'defect_type',
   'inspection_issue_status',
   'inspection_process_name',
   'metrology_inspection_status',
@@ -13,12 +15,15 @@ export const QMS_DICTIONARY_TYPES = [
   'supplier_status',
   'supervision_issue_status',
   'supervision_project_status',
+  'team',
 ] as const;
 
 export type QmsDictionaryType = (typeof QMS_DICTIONARY_TYPES)[number];
 
 export const QMS_DICTIONARY_TYPE_LABELS: Record<QmsDictionaryType, string> = {
   after_sales_status: 'After Sales Status',
+  defect_subtype: 'Defect Subtype',
+  defect_type: 'Defect Type',
   inspection_issue_status: 'Inspection Issue Status',
   inspection_process_name: 'Inspection Process Name',
   metrology_inspection_status: 'Metrology Inspection Status',
@@ -28,6 +33,7 @@ export const QMS_DICTIONARY_TYPE_LABELS: Record<QmsDictionaryType, string> = {
   supplier_status: 'Supplier Status',
   supervision_issue_status: 'Supervision Issue Status',
   supervision_project_status: 'Supervision Project Status',
+  team: 'Team',
 };
 
 export const QMS_DICTIONARY_TYPE_OPTIONS = QMS_DICTIONARY_TYPES.map(
@@ -39,6 +45,8 @@ export const QMS_DICTIONARY_TYPE_OPTIONS = QMS_DICTIONARY_TYPES.map(
 
 export const QMS_DICTIONARY_TYPE_KEYS = {
   afterSalesStatus: 'after_sales_status',
+  defectSubtype: 'defect_subtype',
+  defectType: 'defect_type',
   inspectionIssueStatus: 'inspection_issue_status',
   inspectionProcessName: 'inspection_process_name',
   metrologyInspectionStatus: 'metrology_inspection_status',
@@ -48,4 +56,5 @@ export const QMS_DICTIONARY_TYPE_KEYS = {
   supplierStatus: 'supplier_status',
   supervisionIssueStatus: 'supervision_issue_status',
   supervisionProjectStatus: 'supervision_project_status',
+  team: 'team',
 } as const satisfies Record<string, QmsDictionaryType>;
