@@ -688,6 +688,33 @@ async function syncInspectionProjectDocuments(
   }
 }
 
+async function resolveCanonicalProcessName(
+  tx: Prisma.TransactionClient,
+  processId?: null | string,
+  processName?: null | string,
+) {
+  const normalizedProcessId = String(processId || '').trim();
+  if (!normalizedProcessId) {
+    const fallbackName = String(processName || '').trim();
+    return fallbackName || null;
+  }
+  const process = await tx.processes.findFirst({
+    where: {
+      id: normalizedProcessId,
+      isDeleted: false,
+    },
+    select: {
+      name: true,
+    },
+  });
+  const canonicalName = String(process?.name || '').trim();
+  if (canonicalName) {
+    return canonicalName;
+  }
+  const fallbackName = String(processName || '').trim();
+  return fallbackName || null;
+}
+
 export const InspectionService = {
   async findById(id: string) {
     const inspection = await prisma.inspections.findFirst({
@@ -1173,7 +1200,16 @@ export const InspectionService = {
               },
             },
           });
-          await syncInspectionProjectDocuments(tx, inspection);
+          const canonicalProcessName = await resolveCanonicalProcessName(
+            tx,
+            inspection.processId,
+            inspection.processName,
+          );
+          const normalizedInspection = {
+            ...inspection,
+            processName: canonicalProcessName,
+          };
+          await syncInspectionProjectDocuments(tx, normalizedInspection);
           await syncInspectionArchiveTask(tx, inspection);
           await FileStorageService.registerReferencesFromAttachments({
             attachments: inspection.documents,
@@ -1323,14 +1359,34 @@ export const InspectionService = {
         previousInspection?.workOrderNumber &&
         previousInspection.workOrderNumber !== inspection.workOrderNumber
       ) {
-        await syncInspectionProjectDocuments(tx, {
+        const canonicalProcessName = await resolveCanonicalProcessName(
+          tx,
+          inspection.processId,
+          inspection.processName,
+        );
+        const normalizedInspection = {
           ...inspection,
+          processName: canonicalProcessName,
+        };
+        await syncInspectionProjectDocuments(tx, {
+          ...normalizedInspection,
           hasDocuments: false,
           workOrderNumber: previousInspection.workOrderNumber,
         });
+        await syncInspectionProjectDocuments(tx, normalizedInspection);
+      } else {
+        const canonicalProcessName = await resolveCanonicalProcessName(
+          tx,
+          inspection.processId,
+          inspection.processName,
+        );
+        const normalizedInspection = {
+          ...inspection,
+          processName: canonicalProcessName,
+        };
+        await syncInspectionProjectDocuments(tx, normalizedInspection);
       }
 
-      await syncInspectionProjectDocuments(tx, inspection);
       await syncInspectionArchiveTask(tx, inspection);
       await FileStorageService.registerReferencesFromAttachments({
         attachments: inspection.documents,
