@@ -33,8 +33,9 @@ export default eventHandler(async (event) => {
     });
 
     let hasFile = false;
-    let uploaded: Awaited<ReturnType<typeof FileStorageService.uploadFile>> | null =
-      null;
+    let uploaded: Awaited<
+      ReturnType<typeof FileStorageService.uploadFile>
+    > | null = null;
     let uploadError: Error | null = null;
     let uploadTask: null | Promise<void> = null;
 
@@ -109,7 +110,9 @@ export default eventHandler(async (event) => {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes('max upload size')) {
       setResponseStatus(event, 413);
-      return useResponseError(`File too large (max ${FileStorageService.getMaxUploadBytes()} bytes)`);
+      return useResponseError(
+        `File too large (max ${FileStorageService.getMaxUploadBytes()} bytes)`,
+      );
     }
     logApiError('upload', error, undefined, event);
     setResponseStatus(event, 500);

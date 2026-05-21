@@ -374,7 +374,9 @@ async function saveOssFileStream(params: {
 
   let thumbObjectKey: string | undefined;
   if (thumbBuffer) {
-    thumbObjectKey = buildOssObjectKey(createThumbnailStoredName(params.storedName));
+    thumbObjectKey = buildOssObjectKey(
+      createThumbnailStoredName(params.storedName),
+    );
     await client.put(thumbObjectKey, thumbBuffer, {
       headers: { 'Content-Type': 'image/webp' },
     });

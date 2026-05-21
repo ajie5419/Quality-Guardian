@@ -5,6 +5,7 @@ import type {
   InspectionRequest,
   WorkOrderItem,
 } from '@qgs/shared';
+import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
 import { normalizeListResponse } from '#/api/qms/adapters';
 import { requestClient } from '#/api/request';
@@ -106,6 +107,12 @@ export async function getPublicInspectionRequestProcesses(params: {
   return requestClient.get<Array<{ processName: string }>>(
     QMS_API.PUBLIC_INSPECTION_REQUEST_PROCESSES,
     { params },
+  );
+}
+
+export async function getPublicInspectionRequestProcessDictionaryOptions() {
+  return requestClient.get<DictionaryOptionItem[]>(
+    QMS_API.PUBLIC_INSPECTION_REQUEST_PROCESS_DICTIONARY_OPTIONS,
   );
 }
 

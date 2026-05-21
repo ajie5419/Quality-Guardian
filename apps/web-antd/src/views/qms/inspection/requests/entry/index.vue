@@ -17,7 +17,6 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { IconifyIcon } from '@vben/icons';
 
-import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Alert,
   Button,
@@ -31,6 +30,7 @@ import {
 
 import {
   createPublicInspectionRequest,
+  getPublicInspectionRequestProcessDictionaryOptions,
   getPublicInspectionRequestProcesses,
   getPublicInspectionRequestTeams,
   getPublicInspectionRequestWorkOrders,
@@ -41,7 +41,6 @@ import {
   normalizeUploadFileList,
 } from '#/views/qms/shared/utils/upload-file';
 
-import { useDictionaryOptions } from '../../../shared/composables/useDictionaryOptions';
 import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
 import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
 
@@ -63,15 +62,9 @@ const workOrderProcessesLoading = ref(false);
 const workOrderProcessOptions = ref<Array<{ label: string; value: string }>>(
   [],
 );
-const {
-  options: dictionaryProcessOptions,
-  loadOptions: loadInspectionProcessOptions,
-} = useDictionaryOptions({
-  dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
-  fallbackOptions: cloneInspectionProcessFallbackOptions(),
-  mapOptions: (options, fallbackOptions) =>
-    mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
-});
+const dictionaryProcessOptions = ref<Array<{ label: string; value: string }>>(
+  cloneInspectionProcessFallbackOptions(),
+);
 
 const requestForm = reactive({
   attachments: [] as InspectionRequestAttachment[],
@@ -278,6 +271,18 @@ async function loadWorkOrderProcessOptions(workOrderNumber: string) {
   }
 }
 
+async function loadPublicInspectionProcessDictionaryOptions() {
+  try {
+    const options = await getPublicInspectionRequestProcessDictionaryOptions();
+    dictionaryProcessOptions.value = mapDictionaryOptionsToInspectionProcess(
+      options,
+      cloneInspectionProcessFallbackOptions(),
+    );
+  } catch {
+    dictionaryProcessOptions.value = cloneInspectionProcessFallbackOptions();
+  }
+}
+
 async function submitRequest() {
   if (
     !requestForm.workOrderNumber ||
@@ -317,7 +322,7 @@ async function submitRequest() {
 
 onMounted(() => {
   applyRoutePrefill();
-  void loadInspectionProcessOptions();
+  void loadPublicInspectionProcessDictionaryOptions();
   void loadWorkOrderOptions(requestForm.workOrderNumber);
   void loadTeamOptions(requestForm.team);
 });
