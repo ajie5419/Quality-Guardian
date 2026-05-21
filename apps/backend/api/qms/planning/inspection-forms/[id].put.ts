@@ -10,7 +10,7 @@ import {
 } from '~/utils/prisma-error';
 import {
   resolveCanonicalProcessName,
-  resolveProcessId,
+  resolveProcessIdForWrite,
 } from '~/utils/process-resolver';
 import {
   badRequestResponse,
@@ -128,7 +128,9 @@ export default defineEventHandler(async (event) => {
     if (processName === undefined) {
       resolvedProcessId = undefined;
     } else if (processNameChanged) {
-      resolvedProcessId = await resolveProcessId(processName);
+      resolvedProcessId = await resolveProcessIdForWrite({
+        processName,
+      });
     } else {
       resolvedProcessId = undefined;
     }

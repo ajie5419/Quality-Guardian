@@ -5,7 +5,7 @@ import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
-import { resolveProcessId } from '~/utils/process-resolver';
+import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
@@ -37,7 +37,9 @@ export default defineEventHandler(async (event) => {
       return badRequestResponse(event, '工单号、工序、检验表名称不能为空');
     }
     const status = String(body.status || 'active').trim() || 'active';
-    const processId = await resolveProcessId(processName);
+    const processId = await resolveProcessIdForWrite({
+      processName,
+    });
     const processFilter = await buildInspectionFormProcessFilter({
       category: 'PROCESS',
       processName,
