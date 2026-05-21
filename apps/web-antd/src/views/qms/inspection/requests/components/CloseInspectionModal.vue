@@ -22,6 +22,8 @@ import {
   Upload,
 } from 'ant-design-vue';
 
+import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
+
 import IssuePhotoUpload from '../../issues/components/IssuePhotoUpload.vue';
 
 interface Props {
@@ -79,6 +81,7 @@ const emit = defineEmits<{
   'update:linkedIssueDraft': [value: Props['linkedIssueDraft']];
   'update:open': [value: boolean];
 }>();
+const { isMobile, modalWidth, modalWrapClassName } = useAdaptivePopup();
 
 function cloneCloseForm(source: Props['closeForm']): Props['closeForm'] {
   return {
@@ -168,6 +171,10 @@ watch(
 );
 
 function handleSubmit() {
+  if (props.submitting) return;
+  // Upload component updates attachments in parent state directly.
+  // Ensure local draft keeps the latest uploaded attachments before submit.
+  localCloseForm.attachments = [...props.closeForm.attachments];
   emit('update:closeForm', cloneCloseForm(localCloseForm));
   emit('update:linkedIssueDraft', cloneLinkedIssueDraft(localLinkedIssueDraft));
   emit('submit');
@@ -183,7 +190,8 @@ function handleUpdateOpen(value: boolean) {
     :open="props.open"
     title="完成检验"
     :confirm-loading="props.submitting"
-    :width="shouldCreateLinkedIssue ? 800 : 520"
+    :width="isMobile ? modalWidth : shouldCreateLinkedIssue ? 800 : 520"
+    :wrap-class-name="modalWrapClassName"
     @ok="handleSubmit"
     @update:open="handleUpdateOpen"
   >
@@ -204,7 +212,7 @@ function handleUpdateOpen(value: boolean) {
           </div>
         </div>
       </div>
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Form.Item label="检验结果">
           <Select
             v-model:value="localCloseForm.result"
@@ -227,10 +235,11 @@ function handleUpdateOpen(value: boolean) {
           :file-list="props.closeAttachmentFileList"
           action="/api/upload"
           :headers="props.uploadHeaders"
+          :disabled="props.submitting"
           multiple
           @change="props.handleCloseAttachmentUploadChange"
         >
-          <Button>
+          <Button :disabled="props.submitting">
             <template #icon>
               <IconifyIcon icon="lucide:upload" />
             </template>
@@ -249,7 +258,7 @@ function handleUpdateOpen(value: boolean) {
         <div class="mb-3 font-medium text-orange-700">
           当前判定为“不合格”，请补充不合格项信息（保存时自动建立关联）
         </div>
-        <div class="grid grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <div class="mb-1 text-gray-600">部件名称</div>
             <Input
@@ -383,7 +392,7 @@ function handleUpdateOpen(value: boolean) {
               class="w-full"
             />
           </div>
-          <div class="col-span-3">
+          <div class="sm:col-span-2 lg:col-span-3">
             <div class="mb-1 text-gray-600">不合格描述</div>
             <Input.TextArea
               v-model:value="localLinkedIssueDraft.description"
@@ -391,7 +400,7 @@ function handleUpdateOpen(value: boolean) {
               placeholder="请填写不合格描述"
             />
           </div>
-          <div class="col-span-3">
+          <div class="sm:col-span-2 lg:col-span-3">
             <div class="mb-1 text-gray-600">原因分析</div>
             <Input.TextArea
               v-model:value="localLinkedIssueDraft.rootCause"
@@ -399,7 +408,7 @@ function handleUpdateOpen(value: boolean) {
               placeholder="请填写原因分析"
             />
           </div>
-          <div class="col-span-3">
+          <div class="sm:col-span-2 lg:col-span-3">
             <div class="mb-1 text-gray-600">解决方案</div>
             <Input.TextArea
               v-model:value="localLinkedIssueDraft.solution"
@@ -407,7 +416,7 @@ function handleUpdateOpen(value: boolean) {
               placeholder="请填写解决方案"
             />
           </div>
-          <div class="col-span-3">
+          <div class="sm:col-span-2 lg:col-span-3">
             <IssuePhotoUpload
               v-model:value="localLinkedIssueDraft.photos"
               :max-count="8"

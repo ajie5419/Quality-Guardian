@@ -21,6 +21,7 @@ import {
   createMetrologyMutation,
   updateMetrologyMutation,
 } from '#/api/qms/metrology';
+import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { useDictionaryOptions } from '../../shared/composables/useDictionaryOptions';
@@ -41,6 +42,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
+const { isMobile, modalWidth, modalWrapClassName } = useAdaptivePopup();
 const confirmLoading = ref(false);
 const formRef = ref();
 const { options: statusOptions, loadOptions: loadStatusOptions } =
@@ -142,6 +144,8 @@ async function handleOk() {
     :title="
       isEditMode ? t('qms.metrology.editTitle') : t('qms.metrology.createTitle')
     "
+    :width="isMobile ? modalWidth : undefined"
+    :wrap-class-name="modalWrapClassName"
     :confirm-loading="confirmLoading"
     @ok="handleOk"
     @cancel="emit('update:open', false)"
@@ -154,7 +158,7 @@ async function handleOk() {
       layout="vertical"
       class="pt-4"
     >
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Form.Item :label="t('qms.metrology.orderNo')" name="orderNo">
           <InputNumber
             v-model:value="formState.orderNo"

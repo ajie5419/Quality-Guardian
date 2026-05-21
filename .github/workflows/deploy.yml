@@ -5,7 +5,7 @@ on:
     branches:
       - main
     tags:
-      - 'release-v*'
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -49,10 +49,10 @@ jobs:
 
           if [ -n "$INPUT_VERSION" ]; then
             VERSION="$INPUT_VERSION"
-          elif [[ "$REF_NAME" == release-v* ]]; then
-            VERSION="${REF_NAME#release-v}"
+          elif [[ "$REF_NAME" == v* ]]; then
+            VERSION="$REF_NAME"
           else
-            VERSION="$(date +%Y%m%d%H%M)-${GITHUB_SHA::7}"
+            VERSION="v$(node -p "require('./package.json').version")-${GITHUB_SHA::7}"
           fi
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"

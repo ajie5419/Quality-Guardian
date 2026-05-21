@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { QmsInspectionApi } from '#/api/qms/inspection';
 
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { Page } from '@vben/common-ui';
@@ -20,6 +20,9 @@ import {
 } from 'ant-design-vue';
 
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
+import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
+import { useMobileViewport } from '#/hooks/useMobileViewport';
+import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
 import {
   getIssueTrackingLabel,
   getIssueTrackingTagColor,
@@ -49,6 +52,11 @@ const detailRecord = ref<QmsInspectionApi.InspectionRecord>();
 const routeKeyword = ref('');
 const routeSourceInspectionId = ref('');
 const routeInspectionTypeSet = new Set(['incoming', 'process', 'shipment']);
+const { isMobile } = useMobileViewport();
+const { modalWidth, modalWrapClassName } = useAdaptivePopup();
+const detailDrawerWidth = computed(() =>
+  isMobile.value ? '100vw' : 'min(100vw, 880px)',
+);
 
 function openDetail(record: QmsInspectionApi.InspectionRecord) {
   detailRecord.value = record;
@@ -215,36 +223,44 @@ watch(
 </script>
 
 <template>
-  <Page>
+  <Page content-class="p-0">
     <ErrorBoundary>
-      <div class="bg-white p-4">
-        <div class="mb-4 flex justify-between">
-          <Segmented v-model:value="activeKey" :options="INSPECTION_TABS" />
-          <Select
-            v-model:value="currentYear"
-            :options="yearOptions"
-            class="w-32"
-          />
-        </div>
+      <MobilePageShell>
+        <div class="bg-white p-3 sm:p-4">
+          <div
+            class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <Segmented
+              v-model:value="activeKey"
+              :options="INSPECTION_TABS"
+              :block="isMobile"
+            />
+            <Select
+              v-model:value="currentYear"
+              :options="yearOptions"
+              :class="isMobile ? 'w-full' : 'w-32'"
+            />
+          </div>
 
-        <div>
           <InspectionGrid
             ref="gridRef"
             :keyword="routeKeyword"
             :source-inspection-id="routeSourceInspectionId"
             :type="activeKey"
             :year="currentYear"
+            :is-mobile="isMobile"
             @create="openModal()"
             @edit="openModal"
             @view="openDetail"
           />
         </div>
-      </div>
+      </MobilePageShell>
 
       <Modal
         v-model:open="modalVisible"
         :title="isEdit ? '编辑记录' : '新建记录'"
-        width="1000px"
+        :width="isMobile ? modalWidth : '1000px'"
+        :wrap-class-name="modalWrapClassName"
         :destroy-on-close="true"
         @ok="handleSubmit"
       >
@@ -258,10 +274,15 @@ watch(
       <Drawer
         v-model:open="detailVisible"
         title="检验记录详情"
-        :width="880"
+        :width="detailDrawerWidth"
         placement="right"
       >
-        <Descriptions v-if="detailRecord" bordered :column="2" size="small">
+        <Descriptions
+          v-if="detailRecord"
+          bordered
+          :column="isMobile ? 1 : 2"
+          size="small"
+        >
           <Descriptions.Item label="工单号">
             {{ getDetailString('workOrderNumber') }}
           </Descriptions.Item>

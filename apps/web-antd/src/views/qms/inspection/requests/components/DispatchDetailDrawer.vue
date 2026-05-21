@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import type { InspectionRequest } from '#/api/qms/inspection-request';
 
+import { computed } from 'vue';
+
 import { Button, Drawer, Tag } from 'ant-design-vue';
+
+import { useMobileViewport } from '#/hooks/useMobileViewport';
 
 interface Props {
   open: boolean;
@@ -36,13 +40,18 @@ const emit = defineEmits<{
 function handleUpdateOpen(value: boolean) {
   emit('update:open', value);
 }
+
+const { isMobile } = useMobileViewport();
+const drawerWidth = computed(() =>
+  isMobile.value ? '100vw' : 'min(100vw, 620px)',
+);
 </script>
 
 <template>
   <Drawer
     :open="props.open"
     title="派单详情"
-    width="min(100vw, 620px)"
+    :width="drawerWidth"
     placement="right"
     :body-style="{ padding: 0 }"
     @update:open="handleUpdateOpen"

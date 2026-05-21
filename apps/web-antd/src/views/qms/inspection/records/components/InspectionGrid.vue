@@ -40,6 +40,7 @@ type GridFormSchema = NonNullable<
 >[number];
 
 const props = defineProps<{
+  isMobile?: boolean;
   keyword?: string;
   sourceInspectionId?: string;
   type: string;
@@ -289,7 +290,7 @@ const [Grid, gridApi] = useVbenVxeGrid({
         },
         defaultValue: props.keyword,
         colProps: {
-          span: 8,
+          span: props.isMobile ? 24 : 8,
         },
       } as unknown as GridFormSchema,
     ],
@@ -375,7 +376,7 @@ defineExpose({ reload });
 <template>
   <Grid>
     <template #toolbar-actions>
-      <Space>
+      <Space :direction="props.isMobile ? 'vertical' : 'horizontal'">
         <Button
           v-if="canCreate"
           shape="round"

@@ -16,7 +16,6 @@ import {
   message,
   RadioButton,
   RadioGroup,
-  Space,
   Spin,
   Tag,
   TypographyTitle,
@@ -25,12 +24,15 @@ import dayjs from 'dayjs';
 
 import { getSummaryReport } from '#/api/qms/reports';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { useMobileViewport } from '#/hooks/useMobileViewport';
+import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
 
 import MonthlyReportContent from '../MonthlyReportContent.vue';
 import WeeklyReport from '../WeeklyReport.vue';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
+const { isMobile } = useMobileViewport();
 const loading = ref(false);
 
 const canExport = computed(() => {
@@ -124,144 +126,165 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
 <template>
   <Page
     :title="t('qms.reports.summary.title')"
-    content-class="p-4 bg-gray-100 min-h-screen"
+    content-class="p-0 bg-gray-100 min-h-screen"
   >
-    <div class="mx-auto max-w-7xl space-y-4">
-      <!-- 1. 顶部筛选 (非打印区) -->
-      <Card size="small" class="no-print shadow-sm">
-        <div class="flex items-center justify-between">
-          <Space size="large">
-            <div class="flex items-center gap-2">
-              <span class="font-medium text-gray-500"
-                >{{ t('qms.reports.summary.reportType') }}:</span
-              >
-              <RadioGroup
-                v-model:value="reportType"
-                button-style="solid"
-                size="small"
-              >
-                <RadioButton value="weekly">{{
-                  t('qms.reports.summary.weekly')
-                }}</RadioButton>
-                <RadioButton value="monthly">{{
-                  t('qms.reports.summary.monthly')
-                }}</RadioButton>
-              </RadioGroup>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="font-medium text-gray-500"
-                >{{ t('qms.reports.summary.selectPeriod') }}:</span
-              >
-              <DatePicker
-                v-model:value="targetDate"
-                :picker="reportType === 'weekly' ? 'week' : 'month'"
-                :allow-clear="false"
-                size="small"
-              />
-            </div>
-          </Space>
-          <Button v-if="canExport" @click="handlePrint" type="primary">
-            <span class="i-lucide-printer mr-1"></span>
-            {{
-              reportType === 'weekly'
-                ? '导出图片'
-                : t('qms.reports.summary.generatePdf')
-            }}
-          </Button>
-        </div>
-      </Card>
-
-      <Spin :spinning="loading">
-        <div
-          class="print-area rounded-sm border-t-8 border-blue-600 bg-white p-10 shadow-xl"
-        >
-          <!-- 2. 报告抬头 (Shared Header) -->
-          <div class="mb-10 flex items-start justify-between">
-            <div>
-              <div
-                class="mb-1 text-2xl font-black tracking-tighter text-blue-600"
-              >
-                {{ t('qms.reports.summary.title') }}
+    <MobilePageShell>
+      <div class="mx-auto max-w-7xl space-y-3 sm:space-y-4">
+        <!-- 1. 顶部筛选 (非打印区) -->
+        <Card size="small" class="no-print shadow-sm">
+          <div
+            class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+          >
+            <div
+              class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4"
+            >
+              <div class="flex items-center gap-2">
+                <span class="font-medium text-gray-500"
+                  >{{ t('qms.reports.summary.reportType') }}:</span
+                >
+                <RadioGroup
+                  v-model:value="reportType"
+                  button-style="solid"
+                  size="small"
+                >
+                  <RadioButton value="weekly">{{
+                    t('qms.reports.summary.weekly')
+                  }}</RadioButton>
+                  <RadioButton value="monthly">{{
+                    t('qms.reports.summary.monthly')
+                  }}</RadioButton>
+                </RadioGroup>
               </div>
-              <TypographyTitle :level="1" class="m-0 text-gray-800">
-                {{
-                  reportType === 'weekly' ? '周质量分析报告' : reportData?.title
-                }}
-              </TypographyTitle>
-              <div class="mt-2 flex items-center gap-4">
-                <Tag color="blue" class="font-mono">
+              <div class="flex items-center gap-2">
+                <span class="font-medium text-gray-500"
+                  >{{ t('qms.reports.summary.selectPeriod') }}:</span
+                >
+                <DatePicker
+                  v-model:value="targetDate"
+                  :picker="reportType === 'weekly' ? 'week' : 'month'"
+                  :allow-clear="false"
+                  size="small"
+                  :class="isMobile ? 'w-full' : ''"
+                />
+              </div>
+            </div>
+            <Button
+              v-if="canExport"
+              @click="handlePrint"
+              type="primary"
+              :block="isMobile"
+            >
+              <span class="i-lucide-printer mr-1"></span>
+              {{
+                reportType === 'weekly'
+                  ? '导出图片'
+                  : t('qms.reports.summary.generatePdf')
+              }}
+            </Button>
+          </div>
+        </Card>
+
+        <Spin :spinning="loading">
+          <div
+            class="print-area rounded-sm border-t-8 border-blue-600 bg-white p-3 shadow-xl sm:p-10"
+          >
+            <!-- 2. 报告抬头 (Shared Header) -->
+            <div
+              class="mb-6 flex flex-col gap-3 sm:mb-10 sm:flex-row sm:items-start sm:justify-between"
+            >
+              <div>
+                <div
+                  class="mb-1 text-xl font-black tracking-tighter text-blue-600 sm:text-2xl"
+                >
+                  {{ t('qms.reports.summary.title') }}
+                </div>
+                <TypographyTitle
+                  :level="1"
+                  class="m-0 text-xl text-gray-800 sm:text-3xl"
+                >
                   {{
                     reportType === 'weekly'
-                      ? `${weeklyRange.start} ~ ${weeklyRange.end}`
-                      : reportData?.period
+                      ? '周质量分析报告'
+                      : reportData?.title
                   }}
-                </Tag>
-                <span class="text-xs text-gray-400"
-                  >{{ t('qms.reports.summary.reportNo') }}: QMS-RPT-{{
-                    dayjs(targetDate).format('YYYYMMDD')
-                  }}-{{ reportTypeText }}</span
-                >
+                </TypographyTitle>
+                <div class="mt-2 flex flex-wrap items-center gap-2 sm:gap-4">
+                  <Tag color="blue" class="font-mono">
+                    {{
+                      reportType === 'weekly'
+                        ? `${weeklyRange.start} ~ ${weeklyRange.end}`
+                        : reportData?.period
+                    }}
+                  </Tag>
+                  <span class="text-xs text-gray-400"
+                    >{{ t('qms.reports.summary.reportNo') }}: QMS-RPT-{{
+                      dayjs(targetDate).format('YYYYMMDD')
+                    }}-{{ reportTypeText }}</span
+                  >
+                </div>
+              </div>
+              <div class="text-left sm:text-right">
+                <div class="font-bold text-gray-700">
+                  {{ t('qms.reports.summary.qmDept') }}
+                </div>
+                <div class="mt-1 text-xs italic text-gray-400">
+                  {{ t('qms.reports.summary.internalOnly') }}
+                </div>
               </div>
             </div>
-            <div class="text-right">
-              <div class="font-bold text-gray-700">
-                {{ t('qms.reports.summary.qmDept') }}
-              </div>
-              <div class="mt-1 text-xs italic text-gray-400">
-                {{ t('qms.reports.summary.internalOnly') }}
-              </div>
-            </div>
-          </div>
 
-          <!-- Weekly Report Content -->
-          <div v-if="reportType === 'weekly'">
-            <WeeklyReport
-              v-if="weeklyRange.start && weeklyRange.end"
-              :start-date="weeklyRange.start"
-              :end-date="weeklyRange.end"
+            <!-- Weekly Report Content -->
+            <div v-if="reportType === 'weekly'">
+              <WeeklyReport
+                v-if="weeklyRange.start && weeklyRange.end"
+                :start-date="weeklyRange.start"
+                :end-date="weeklyRange.end"
+              />
+              <div v-else class="py-10 text-center text-gray-400">
+                {{ t('qms.reports.summary.invalidDateRange') }}
+              </div>
+            </div>
+
+            <MonthlyReportContent
+              v-else-if="reportData"
+              :report-data="reportData"
+              :render-sparkline="renderSparkline"
+              :t="t"
             />
-            <div v-else class="py-10 text-center text-gray-400">
-              {{ t('qms.reports.summary.invalidDateRange') }}
-            </div>
-          </div>
 
-          <MonthlyReportContent
-            v-else-if="reportData"
-            :report-data="reportData"
-            :render-sparkline="renderSparkline"
-            :t="t"
-          />
+            <Empty v-else :description="t('qms.reports.summary.noData')" />
 
-          <Empty v-else :description="t('qms.reports.summary.noData')" />
-
-          <!-- 8. 签字确认区 (Shared Footer) -->
-          <div class="mt-16 flex justify-between border-t pt-10 text-sm">
-            <div class="space-y-10">
-              <div>
-                {{ t('qms.reports.summary.preparedBy') }}:
-                <span class="ml-2 inline-block w-32 border-b text-center">{{
-                  dayjs().format('YYYY-MM-DD')
-                }}</span>
+            <!-- 8. 签字确认区 (Shared Footer) -->
+            <div
+              class="mt-10 flex flex-col gap-6 border-t pt-6 text-sm sm:mt-16 sm:flex-row sm:justify-between sm:pt-10"
+            >
+              <div class="space-y-6 sm:space-y-10">
+                <div>
+                  {{ t('qms.reports.summary.preparedBy') }}:
+                  <span class="ml-2 inline-block w-32 border-b text-center">{{
+                    dayjs().format('YYYY-MM-DD')
+                  }}</span>
+                </div>
+                <div>
+                  {{ t('qms.reports.summary.deptReview') }}:
+                  <span class="ml-2 inline-block w-32 border-b"></span>
+                </div>
               </div>
-              <div>
-                {{ t('qms.reports.summary.deptReview') }}:
-                <span class="ml-2 inline-block w-32 border-b"></span>
-              </div>
-            </div>
-            <div class="space-y-10 text-right">
-              <div>
-                {{ t('qms.reports.summary.approvalDate') }}:
-                <span class="ml-2 inline-block w-32 border-b"></span>
-              </div>
-              <div>
-                {{ t('qms.reports.summary.managementSignOff') }}:
-                <span class="ml-2 inline-block w-48 border-b"></span>
+              <div class="space-y-6 text-left sm:space-y-10 sm:text-right">
+                <div>
+                  {{ t('qms.reports.summary.approvalDate') }}:
+                  <span class="ml-2 inline-block w-32 border-b"></span>
+                </div>
+                <div>
+                  {{ t('qms.reports.summary.managementSignOff') }}:
+                  <span class="ml-2 inline-block w-48 border-b"></span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </Spin>
-    </div>
+        </Spin>
+      </div>
+    </MobilePageShell>
   </Page>
 </template>
 

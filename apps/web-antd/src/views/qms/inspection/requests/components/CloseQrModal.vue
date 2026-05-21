@@ -3,6 +3,8 @@ import type { InspectionRequest } from '#/api/qms/inspection-request';
 
 import { Modal } from 'ant-design-vue';
 
+import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
+
 interface Props {
   open: boolean;
   qrCode: string;
@@ -18,6 +20,8 @@ const emit = defineEmits<{
 function handleUpdateOpen(value: boolean) {
   emit('update:open', value);
 }
+
+const { modalWidth, modalWrapClassName } = useAdaptivePopup();
 </script>
 
 <template>
@@ -25,7 +29,8 @@ function handleUpdateOpen(value: boolean) {
     :open="props.open"
     title="扫码关闭二维码"
     :footer="null"
-    width="360px"
+    :width="modalWidth || '360px'"
+    :wrap-class-name="modalWrapClassName"
     @update:open="handleUpdateOpen"
   >
     <div v-if="props.request" class="flex flex-col items-center gap-3">

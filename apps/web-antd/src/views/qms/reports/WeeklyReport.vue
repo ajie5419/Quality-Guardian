@@ -132,6 +132,7 @@ defineExpose({
         bordered
         size="small"
         row-key="id"
+        :scroll="{ x: 980 }"
       />
     </div>
 
@@ -147,6 +148,7 @@ defineExpose({
         bordered
         size="small"
         row-key="description"
+        :scroll="{ x: 980 }"
       />
     </div>
 
@@ -162,6 +164,7 @@ defineExpose({
         bordered
         size="small"
         row-key="description"
+        :scroll="{ x: 980 }"
       />
     </div>
 
@@ -177,6 +180,7 @@ defineExpose({
         bordered
         size="small"
         row-key="goal"
+        :scroll="{ x: 900 }"
       >
         <template #bodyCell="{ column, record }">
           <template

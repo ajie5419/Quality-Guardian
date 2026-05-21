@@ -3,6 +3,8 @@ import { reactive, watch } from 'vue';
 
 import { Form, Input, InputNumber, Modal, Select } from 'ant-design-vue';
 
+import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
+
 interface Props {
   open: boolean;
   submitting: boolean;
@@ -15,12 +17,12 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
 const emit = defineEmits<{
   submit: [];
   'update:form': [value: Props['form']];
   'update:open': [value: boolean];
 }>();
+const { modalWidth, modalWrapClassName } = useAdaptivePopup();
 
 const localForm = reactive({
   dispatchRemark: '',
@@ -74,6 +76,8 @@ function handleSubmit() {
   <Modal
     :open="props.open"
     title="派发检验任务"
+    :width="modalWidth"
+    :wrap-class-name="modalWrapClassName"
     :confirm-loading="props.submitting"
     @ok="handleSubmit"
     @update:open="handleUpdateOpen"

@@ -7,6 +7,8 @@ import { computed } from 'vue';
 
 import { Button, Drawer, Table, Tag } from 'ant-design-vue';
 
+import { useMobileViewport } from '#/hooks/useMobileViewport';
+
 const props = defineProps<{
   filter: WorkOrderRequirementBoardFilter;
   items: Array<{
@@ -42,6 +44,7 @@ const emit = defineEmits<{
   (e: 'openWorkOrder', workOrderNumber: string): void;
   (e: 'pageChange', page: number, pageSize: number): void;
 }>();
+const { isMobile } = useMobileViewport();
 
 const title = computed(() => {
   if (props.filter === 'confirmed') return '已完成任务';
@@ -49,6 +52,9 @@ const title = computed(() => {
   if (props.filter === 'overdue') return '超10天未关注任务';
   return '全部任务';
 });
+const drawerWidth = computed(() =>
+  isMobile.value ? '100vw' : 'min(100vw, 1280px)',
+);
 
 const columns = computed<TableColumnType[]>(() => [
   {
@@ -133,9 +139,14 @@ function formatDateTime(value?: null | string) {
 </script>
 
 <template>
-  <Drawer :open="open" :title="title" width="1280" @close="emit('close')">
+  <Drawer
+    :open="open"
+    :title="title"
+    :width="drawerWidth"
+    @close="emit('close')"
+  >
     <Table
-      size="middle"
+      :size="isMobile ? 'small' : 'middle'"
       :columns="columns"
       :data-source="items"
       :loading="loading"

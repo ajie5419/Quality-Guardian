@@ -31,7 +31,9 @@ import {
   confirmWorkOrderRequirement,
   uploadWorkOrderRequirements,
 } from '#/api/qms/work-order';
+import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { useMobileViewport } from '#/hooks/useMobileViewport';
 import TeamSelect from '#/views/qms/inspection/records/components/form/TeamSelect.vue';
 import { mapDictionaryOptionsToInspectionProcess } from '#/views/qms/inspection/records/config';
 import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
@@ -58,6 +60,8 @@ const emit = defineEmits<{
 }>();
 
 const { handleApiError } = useErrorHandler();
+const { isMobile } = useMobileViewport();
+const { modalWidth, modalWrapClassName } = useAdaptivePopup();
 const accessStore = useAccessStore();
 
 const { options: processOptions, loadOptions: loadInspectionProcessOptions } =
@@ -94,6 +98,9 @@ const workOrderStatusLabel = computed(() => {
   if (status === 'OPEN') return '未开始';
   return props.aggregateData?.workOrder.status || '-';
 });
+const drawerWidth = computed(() =>
+  isMobile.value ? '100vw' : 'min(100vw, 1100px)',
+);
 
 const summarySentence = computed(() => {
   const summary = props.aggregateData?.summary;
@@ -315,7 +322,7 @@ onMounted(() => {
   <Drawer
     :open="open"
     :title="`工单聚合看板 - ${workOrderNumber || '-'}`"
-    width="1100"
+    :width="drawerWidth"
     @close="emit('close')"
   >
     <template #extra>
@@ -391,6 +398,7 @@ onMounted(() => {
           <div class="tab-toolbar">
             <Segmented
               v-model:value="requirementFilter"
+              :block="isMobile"
               :options="[
                 { label: '全部', value: 'all' },
                 { label: '未完成', value: 'pending' },
@@ -402,7 +410,7 @@ onMounted(() => {
 
           <Table
             class="aggregate-table"
-            size="middle"
+            :size="isMobile ? 'small' : 'middle'"
             :pagination="false"
             :scroll="{ x: 1180 }"
             :data-source="filteredRequirements"
@@ -548,7 +556,7 @@ onMounted(() => {
             <div class="progress-card__title">过程部件进度</div>
             <Table
               class="process-progress-table"
-              size="middle"
+              :size="isMobile ? 'small' : 'middle'"
               :pagination="false"
               :data-source="aggregateData.productionProgress?.process || []"
               :scroll="{ x: 980 }"
@@ -634,6 +642,8 @@ onMounted(() => {
     <Modal
       v-model:open="requirementModalVisible"
       title="新增工单要求"
+      :width="modalWidth"
+      :wrap-class-name="modalWrapClassName"
       :confirm-loading="creatingRequirement"
       @ok="submitRequirement"
     >
@@ -913,6 +923,14 @@ onMounted(() => {
 }
 
 @media (max-width: 960px) {
+  .tab-toolbar {
+    justify-content: stretch;
+  }
+
+  .tab-toolbar :deep(.ant-segmented) {
+    width: 100%;
+  }
+
   .stats-grid,
   .progress-stats,
   .progress-grid {

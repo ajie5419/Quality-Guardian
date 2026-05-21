@@ -10,6 +10,7 @@ import { Button, Modal, Select, Switch, Tooltip } from 'ant-design-vue';
 
 import { useVbenForm } from '#/adapter/form';
 import { getWelderListPage } from '#/api/qms/welder';
+import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 
 import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
@@ -35,6 +36,7 @@ const emit = defineEmits<{
   success: [];
   'update:open': [boolean];
 }>();
+const { isMobile, modalWidth, modalWrapClassName } = useAdaptivePopup();
 
 const { t } = useI18n();
 
@@ -98,7 +100,7 @@ const [Form, formApi] = useVbenForm({
       class: 'w-full',
     },
   },
-  wrapperClass: 'grid grid-cols-2 gap-x-4 gap-y-0',
+  wrapperClass: 'grid grid-cols-1 gap-x-4 gap-y-0 sm:grid-cols-2',
   handleSubmit: () => submit(),
   handleValuesChange: (vals) => {
     formValues.value = vals as IssueFormValues;
@@ -325,11 +327,12 @@ function handleCancel() {
         ? t('qms.inspection.issues.editIssue')
         : t('qms.inspection.issues.createIssue')
     "
-    width="900px"
+    :width="isMobile ? modalWidth : '900px'"
+    :wrap-class-name="modalWrapClassName"
     @cancel="handleCancel"
     @ok="handleOk"
   >
-    <div class="max-h-[700px] overflow-y-auto p-2">
+    <div class="max-h-[70vh] overflow-y-auto p-1 sm:max-h-[700px] sm:p-2">
       <Form>
         <!-- NC Number Slot: Add Auto Switch -->
         <template #ncNumber="{ modelValue }">
@@ -405,7 +408,9 @@ function handleCancel() {
 
         <!-- Description Slot: AI Buttons in Label/Top -->
         <template #description-label>
-          <div class="flex w-full items-center justify-between">
+          <div
+            class="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+          >
             <span>{{ t('qms.inspection.issues.description') }}</span>
             <div class="flex gap-2">
               <Tooltip :title="t('qms.inspection.issues.aiAnalyzeTooltip')">

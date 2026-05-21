@@ -13,6 +13,7 @@ import {
   createWorkOrderMutation,
   updateWorkOrderMutation,
 } from '#/api/qms/work-order';
+import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { getFormSchema } from '../data';
@@ -21,6 +22,7 @@ import { getFormSchema } from '../data';
 const emit = defineEmits(['success']);
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
+const { isMobile } = useAdaptivePopup();
 const isUpdate = ref(false);
 const recordId = ref<null | string>(null);
 
@@ -35,6 +37,7 @@ const [Form, formApi] = useVbenForm({
 // ========== 4. 弹窗配置 ==========
 const [Modal, modalApi] = useVbenModal({
   title: t('qms.workOrder.createWorkOrder'),
+  fullscreen: isMobile.value,
   onConfirm: handleSubmit,
 });
 
@@ -90,6 +93,7 @@ async function open({ record, deptData = [] }: OpenParams = {}) {
       title: isUpdate.value
         ? t('common.edit')
         : t('qms.workOrder.createWorkOrder'),
+      fullscreen: isMobile.value,
     });
     modalApi.open();
 

@@ -33,6 +33,7 @@ import {
   importMetrology,
 } from '#/api/qms/metrology';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { readImportRowsFromFile } from '#/utils/import-sheet';
 import {
@@ -40,6 +41,7 @@ import {
   resolveImportErrorCount,
 } from '#/utils/import-summary';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
+import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
 
 import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
 import MetrologyEditModal from './components/MetrologyEditModal.vue';
@@ -52,6 +54,7 @@ import {
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
+const { isMobile } = useMobileViewport();
 const { canCreate, canDelete, canEdit, canExport, canImport, canList } =
   useQmsPermissions('QMS:Metrology');
 const canCreateAction = computed(() => canCreate.value || canList.value);
@@ -363,86 +366,98 @@ const handleImportUpload: UploadProps['beforeUpload'] = async (file) => {
 </script>
 
 <template>
-  <Page>
-    <div class="m-4 flex flex-col gap-4">
-      <MetrologyOverviewCards :overview="overview" :loading="overviewLoading" />
-      <Card :bordered="false" class="shadow-sm">
-        <Grid>
-          <template #toolbar-actions>
-            <Space>
-              <Button v-if="canCreateAction" type="primary" @click="handleAdd">
-                <template #icon>
-                  <IconifyIcon icon="lucide:plus" />
-                </template>
-                {{ t('common.create') }}
-              </Button>
-              <Button
-                v-if="canDeleteAction && checkedRows.length > 0"
-                danger
-                type="primary"
-                @click="handleBatchDelete"
+  <Page content-class="p-0">
+    <MobilePageShell>
+      <div class="flex flex-col gap-3 sm:gap-4">
+        <MetrologyOverviewCards
+          :overview="overview"
+          :loading="overviewLoading"
+        />
+        <Card :bordered="false" class="shadow-sm">
+          <Grid>
+            <template #toolbar-actions>
+              <Space
+                :direction="isMobile ? 'vertical' : 'horizontal'"
+                :wrap="!isMobile"
               >
-                <template #icon>
-                  <IconifyIcon icon="lucide:trash-2" />
-                </template>
-                {{ t('common.batchDelete') }}
-              </Button>
-              <Upload
-                v-if="canImportAction"
-                :before-upload="handleImportUpload"
-                :show-upload-list="false"
-                accept=".xlsx,.xls"
-              >
-                <Button type="primary">
-                  {{ t('qms.metrology.importExcel') }}
+                <Button
+                  v-if="canCreateAction"
+                  type="primary"
+                  @click="handleAdd"
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:plus" />
+                  </template>
+                  {{ t('common.create') }}
                 </Button>
-              </Upload>
-              <Button @click="handleTemplateDownload">
-                {{ t('qms.metrology.downloadTemplate') }}
-              </Button>
-            </Space>
-          </template>
+                <Button
+                  v-if="canDeleteAction && checkedRows.length > 0"
+                  danger
+                  type="primary"
+                  @click="handleBatchDelete"
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:trash-2" />
+                  </template>
+                  {{ t('common.batchDelete') }}
+                </Button>
+                <Upload
+                  v-if="canImportAction"
+                  :before-upload="handleImportUpload"
+                  :show-upload-list="false"
+                  accept=".xlsx,.xls"
+                >
+                  <Button type="primary" :block="isMobile">
+                    {{ t('qms.metrology.importExcel') }}
+                  </Button>
+                </Upload>
+                <Button :block="isMobile" @click="handleTemplateDownload">
+                  {{ t('qms.metrology.downloadTemplate') }}
+                </Button>
+              </Space>
+            </template>
 
-          <template #inspection_status="{ row }">
-            <Tag :color="getStatusColor(row.inspectionStatus)">
-              {{ row.inspectionStatusLabel }}
-            </Tag>
-          </template>
+            <template #inspection_status="{ row }">
+              <Tag :color="getStatusColor(row.inspectionStatus)">
+                {{ row.inspectionStatusLabel }}
+              </Tag>
+            </template>
 
-          <template #borrow_status="{ row }">
-            <Tag :color="getBorrowStatusColor(row.borrowStatus)">
-              {{ row.borrowStatusLabel }}
-            </Tag>
-          </template>
+            <template #borrow_status="{ row }">
+              <Tag :color="getBorrowStatusColor(row.borrowStatus)">
+                {{ row.borrowStatusLabel }}
+              </Tag>
+            </template>
 
-          <template #remaining_days="{ row }">
-            <span>{{ getRemainingDaysText(row.remainingDays) }}</span>
-          </template>
+            <template #remaining_days="{ row }">
+              <span>{{ getRemainingDaysText(row.remainingDays) }}</span>
+            </template>
 
-          <template #action="{ row }">
-            <Space>
-              <Button
-                v-if="canEditAction"
-                type="link"
-                size="small"
-                @click="handleEdit(row)"
-              >
-                {{ t('common.edit') }}
-              </Button>
-              <Button
-                v-if="canDeleteAction"
-                danger
-                type="link"
-                size="small"
-                @click="handleDelete(row)"
-              >
-                {{ t('common.delete') }}
-              </Button>
-            </Space>
-          </template>
-        </Grid>
-      </Card>
-    </div>
+            <template #action="{ row }">
+              <Space>
+                <Button
+                  v-if="canEditAction"
+                  type="link"
+                  size="small"
+                  @click="handleEdit(row)"
+                >
+                  {{ t('common.edit') }}
+                </Button>
+                <Button
+                  v-if="canDeleteAction"
+                  danger
+                  type="link"
+                  size="small"
+                  @click="handleDelete(row)"
+                >
+                  {{ t('common.delete') }}
+                </Button>
+              </Space>
+            </template>
+          </Grid>
+        </Card>
+      </div>
+    </MobilePageShell>
     <MetrologyEditModal
       v-model:open="editModalOpen"
       :record="currentRecord"

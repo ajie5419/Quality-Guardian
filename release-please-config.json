@@ -1,0 +1,8 @@
+{
+  "packages": {
+    ".": {
+      "package-name": "qgs",
+      "release-type": "node"
+    }
+  }
+}

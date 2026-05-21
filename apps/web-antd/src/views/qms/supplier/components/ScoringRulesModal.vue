@@ -3,10 +3,13 @@ import { ref } from 'vue';
 
 import { Modal, Table, Tag } from 'ant-design-vue';
 
+import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
+
 defineProps<{
   // category?: string; // If we need to distinguish rules later
 }>();
 const open = ref(false);
+const { isMobile, modalWidth, modalWrapClassName } = useAdaptivePopup();
 // const { t: _t } = useI18n(); // Removed unused variable
 
 const columns = [
@@ -167,7 +170,8 @@ defineExpose({ openModal });
     v-model:open="open"
     :footer="null"
     title="供应商动态评分与降级规则"
-    width="800px"
+    :width="isMobile ? modalWidth : '800px'"
+    :wrap-class-name="modalWrapClassName"
   >
     <div class="mb-4 text-gray-500">
       <p>

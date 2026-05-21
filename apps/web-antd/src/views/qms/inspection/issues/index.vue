@@ -13,12 +13,10 @@ import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Button,
   Card,
-  Col,
   DatePicker,
   Descriptions,
   Drawer,
   Image,
-  Row,
   Select,
   Statistic,
   Tag,
@@ -29,8 +27,10 @@ import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { importInspectionIssues } from '#/api/qms/inspection';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useGridImport } from '#/hooks/useGridImport';
+import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
+import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
 
 import { useDictionaryOptions } from '../../shared/composables/useDictionaryOptions';
 import { cloneInspectionProcessFallbackOptions } from '../../shared/constants/inspection-process-fallback';
@@ -85,6 +85,10 @@ const isAdmin = computed(() => {
 });
 
 const checkedRows = ref<InspectionIssue[]>([]);
+const { isMobile } = useMobileViewport();
+const detailDrawerWidth = computed(() =>
+  isMobile.value ? '100vw' : 'min(100vw, 960px)',
+);
 
 const { invalidateInspectionIssues } = useInvalidateQmsQueries();
 const { deptTreeData, deptRawData, loadInitialData } = useIssueData();
@@ -170,18 +174,14 @@ const currentDateValue = computed(() => {
   }
   return String(currentYear.value);
 });
-const routeProjectName = computed(() =>
-  typeof route.query.projectName === 'string' ? route.query.projectName : '',
-);
-const routeSourceIssueId = computed(() =>
-  typeof route.query.sourceIssueId === 'string'
-    ? route.query.sourceIssueId
-    : '',
-);
+function getRouteQueryText(key: string) {
+  const value = route.query[key];
+  return typeof value === 'string' ? value : '';
+}
+const routeProjectName = computed(() => getRouteQueryText('projectName'));
+const routeSourceIssueId = computed(() => getRouteQueryText('sourceIssueId'));
 const routeWorkOrderNumber = computed(() =>
-  typeof route.query.workOrderNumber === 'string'
-    ? route.query.workOrderNumber
-    : '',
+  getRouteQueryText('workOrderNumber'),
 );
 
 const gridApiProxyRef = ref<null | { reload: () => void }>(null);
@@ -322,48 +322,41 @@ async function handleGenerateInsight() {
 </script>
 
 <template>
-  <Page class="h-full">
-    <div v-if="showCharts" class="mb-4">
-      <IssueChartDashboard
-        ref="chartDashboardRef"
-        :date-mode="currentDateMode"
-        :date-value="currentDateValue"
-        :year="currentFilterYear"
-      />
-    </div>
+  <Page class="h-full" content-class="p-0">
+    <MobilePageShell>
+      <div v-if="showCharts" class="mb-4">
+        <IssueChartDashboard
+          ref="chartDashboardRef"
+          :date-mode="currentDateMode"
+          :date-value="currentDateValue"
+          :year="currentFilterYear"
+        />
+      </div>
 
-    <!-- 核心统计概览 -->
-    <Card size="small" class="mb-4 border-none bg-gray-50 shadow-sm">
-      <Row :gutter="16" class="items-center text-center">
-        <Col :span="5">
+      <Card size="small" class="mb-4 border-none bg-gray-50 shadow-sm">
+        <div
+          class="grid grid-cols-1 gap-3 text-center sm:grid-cols-2 lg:grid-cols-5"
+        >
           <Statistic
             :title="t('qms.inspection.issues.totalCount')"
             :value="statistics.totalCount"
           />
-        </Col>
-        <Col :span="5">
           <Statistic
             :title="t('qms.inspection.issues.status.open')"
             :value="statistics.openCount"
             :value-style="{ color: '#cf1322' }"
           />
-        </Col>
-        <Col :span="5">
           <Statistic
             :title="t('qms.inspection.issues.status.closed')"
             :value="statistics.closedCount"
             :value-style="{ color: '#3f8600' }"
           />
-        </Col>
-        <Col :span="5">
           <Statistic
             :title="`${t('qms.inspection.issues.lossAmount')} (RMB)`"
             :value="statistics.totalLoss"
             prefix="¥"
             :precision="2"
           />
-        </Col>
-        <Col :span="4">
           <Button
             type="primary"
             shape="round"
@@ -374,142 +367,151 @@ async function handleGenerateInsight() {
             <span class="i-lucide-scroll-text mr-1"></span>
             {{ t('qms.inspection.issues.aiInsightReport') }}
           </Button>
-        </Col>
-      </Row>
-    </Card>
-
-    <Grid class="h-full" :grid-api="gridApi" :grid-events="gridEvents">
-      <template #status="{ row }">
-        <Tag :color="getStatusColor(row.status)">
-          {{ getStatusLabel(row.status) }}
-        </Tag>
-      </template>
-      <template #claim="{ row }">
-        <Tag
-          :color="row.claim === 'Yes' || row.claim === true ? 'red' : 'green'"
-        >
-          {{
-            row.claim === 'Yes' || row.claim === true
-              ? t('common.yes')
-              : t('common.no')
-          }}
-        </Tag>
-      </template>
-      <template #photos="{ row }">
-        <div
-          v-if="row.photos && row.photos.length > 0"
-          class="flex items-center justify-center"
-        >
-          <Image
-            :width="40"
-            :height="40"
-            :src="
-              row.photoThumbUrl ||
-              (Array.isArray(row.photos) ? row.photos[0] : row.photos)
-            "
-            :fallback="Array.isArray(row.photos) ? row.photos[0] : row.photos"
-            class="rounded shadow-sm"
-          />
         </div>
-      </template>
-      <template #severity="{ row }">
-        <Tag :color="getSeverityColor(row.severity)">
-          {{ getSeverityLabel(row.severity) }}
-        </Tag>
-      </template>
-      <template #toolbar-actions>
-        <div class="flex flex-wrap items-center gap-2">
-          <Button
-            v-access:code="'QMS:Inspection:Issues:Create'"
-            shape="round"
-            type="primary"
-            @click="handleOpenModal"
+      </Card>
+
+      <Grid class="h-full" :grid-api="gridApi" :grid-events="gridEvents">
+        <template #status="{ row }">
+          <Tag :color="getStatusColor(row.status)">
+            {{ getStatusLabel(row.status) }}
+          </Tag>
+        </template>
+        <template #claim="{ row }">
+          <Tag
+            :color="row.claim === 'Yes' || row.claim === true ? 'red' : 'green'"
           >
-            <template #icon>
-              <IconifyIcon icon="lucide:plus" />
-            </template>
-            {{ t('qms.inspection.issues.createIssue') }}
-          </Button>
-          <Button
-            v-if="checkedRows.length > 0 && canDelete"
-            danger
-            shape="round"
-            type="primary"
-            @click="handleBatchDelete"
+            {{
+              row.claim === 'Yes' || row.claim === true
+                ? t('common.yes')
+                : t('common.no')
+            }}
+          </Tag>
+        </template>
+        <template #photos="{ row }">
+          <div
+            v-if="row.photos && row.photos.length > 0"
+            class="flex items-center justify-center"
           >
-            <template #icon>
-              <IconifyIcon icon="lucide:trash-2" />
-            </template>
-            {{ t('common.batchDelete') }}
-          </Button>
-          <Button
-            v-if="canAddChart"
-            shape="round"
-            @click="
-              () => {
-                showCharts = true;
-                chartDashboardRef?.handleAddCustomChart();
-              }
-            "
-          >
-            <template #icon>
-              <IconifyIcon icon="lucide:plus" />
-            </template>
-            新增图表
-          </Button>
-          <Button shape="round" @click="showCharts = !showCharts">
-            <template #icon>
-              <IconifyIcon
-                :icon="showCharts ? 'lucide:bar-chart-3' : 'lucide:bar-chart-3'"
-              />
-            </template>
-            {{ showCharts ? t('common.hideChart') : t('common.showChart') }}
-          </Button>
-          <div class="flex items-center gap-2">
-            <span class="text-gray-500">
-              {{ t('qms.inspection.issues.dateMode.label') }}:
-            </span>
-            <Select
-              v-model:value="currentDateMode"
-              :options="dateModeOptions"
-              class="w-[100px]"
-            />
-            <Select
-              v-if="currentDateMode === 'year'"
-              v-model:value="currentYear"
-              :options="yearOptions"
-              class="w-[120px]"
-            />
-            <DatePicker
-              v-else
-              v-model:value="currentDate"
-              :allow-clear="false"
-              :picker="currentDateMode"
-              class="w-[160px]"
+            <Image
+              :width="40"
+              :height="40"
+              :src="
+                row.photoThumbUrl ||
+                (Array.isArray(row.photos) ? row.photos[0] : row.photos)
+              "
+              :fallback="Array.isArray(row.photos) ? row.photos[0] : row.photos"
+              class="rounded shadow-sm"
             />
           </div>
-          <Button
-            v-if="isAdmin"
-            shape="round"
-            type="link"
-            @click="handleSaveSystemDefault"
-          >
-            <template #icon>
-              <IconifyIcon icon="lucide:save" />
-            </template>
-            存为系统默认
-          </Button>
-        </div>
-      </template>
-    </Grid>
+        </template>
+        <template #severity="{ row }">
+          <Tag :color="getSeverityColor(row.severity)">
+            {{ getSeverityLabel(row.severity) }}
+          </Tag>
+        </template>
+        <template #toolbar-actions>
+          <div class="flex flex-wrap items-center gap-2">
+            <Button
+              v-access:code="'QMS:Inspection:Issues:Create'"
+              shape="round"
+              type="primary"
+              @click="handleOpenModal"
+            >
+              <template #icon>
+                <IconifyIcon icon="lucide:plus" />
+              </template>
+              {{ t('qms.inspection.issues.createIssue') }}
+            </Button>
+            <Button
+              v-if="checkedRows.length > 0 && canDelete"
+              danger
+              shape="round"
+              type="primary"
+              @click="handleBatchDelete"
+            >
+              <template #icon>
+                <IconifyIcon icon="lucide:trash-2" />
+              </template>
+              {{ t('common.batchDelete') }}
+            </Button>
+            <Button
+              v-if="canAddChart"
+              shape="round"
+              @click="
+                () => {
+                  showCharts = true;
+                  chartDashboardRef?.handleAddCustomChart();
+                }
+              "
+            >
+              <template #icon>
+                <IconifyIcon icon="lucide:plus" />
+              </template>
+              新增图表
+            </Button>
+            <Button shape="round" @click="showCharts = !showCharts">
+              <template #icon>
+                <IconifyIcon
+                  :icon="
+                    showCharts ? 'lucide:bar-chart-3' : 'lucide:bar-chart-3'
+                  "
+                />
+              </template>
+              {{ showCharts ? t('common.hideChart') : t('common.showChart') }}
+            </Button>
+            <div
+              class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center"
+            >
+              <span class="text-gray-500">
+                {{ t('qms.inspection.issues.dateMode.label') }}:
+              </span>
+              <Select
+                v-model:value="currentDateMode"
+                :options="dateModeOptions"
+                :class="isMobile ? 'w-full' : 'w-[100px]'"
+              />
+              <Select
+                v-if="currentDateMode === 'year'"
+                v-model:value="currentYear"
+                :options="yearOptions"
+                :class="isMobile ? 'w-full' : 'w-[120px]'"
+              />
+              <DatePicker
+                v-else
+                v-model:value="currentDate"
+                :allow-clear="false"
+                :picker="currentDateMode"
+                :class="isMobile ? 'w-full' : 'w-[160px]'"
+              />
+            </div>
+            <Button
+              v-if="isAdmin"
+              shape="round"
+              type="link"
+              @click="handleSaveSystemDefault"
+            >
+              <template #icon>
+                <IconifyIcon icon="lucide:save" />
+              </template>
+              存为系统默认
+            </Button>
+          </div>
+        </template>
+      </Grid>
+    </MobilePageShell>
 
     <Drawer
       v-model:open="detailVisible"
       :title="`不合格项详情 - ${detailRecord?.ncNumber || ''}`"
-      :width="960"
+      :width="detailDrawerWidth"
       placement="right"
     >
-      <Descriptions v-if="detailRecord" bordered :column="2" size="small">
+      <Descriptions
+        v-if="detailRecord"
+        bordered
+        :column="isMobile ? 1 : 2"
+        size="small"
+      >
         <Descriptions.Item :label="t('qms.inspection.issues.ncNumber')">
           {{ detailRecord.ncNumber || '-' }}
         </Descriptions.Item>

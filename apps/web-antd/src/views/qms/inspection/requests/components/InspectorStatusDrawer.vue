@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+
 import { Drawer, Tag } from 'ant-design-vue';
+
+import { useMobileViewport } from '#/hooks/useMobileViewport';
 
 type InspectorStatusItem = {
   activeTaskCount: number;
@@ -25,13 +29,18 @@ const emit = defineEmits<{
 function handleUpdateOpen(value: boolean) {
   emit('update:open', value);
 }
+
+const { isMobile } = useMobileViewport();
+const drawerWidth = computed(() =>
+  isMobile.value ? '100vw' : 'min(100vw, 420px)',
+);
 </script>
 
 <template>
   <Drawer
     :open="props.open"
     title="检验员状态"
-    width="420"
+    :width="drawerWidth"
     @update:open="handleUpdateOpen"
   >
     <div v-if="props.items.length > 0" class="space-y-2">

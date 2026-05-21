@@ -19,6 +19,8 @@ import {
   SelectOption,
 } from 'ant-design-vue';
 
+import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
+
 import {
   ISSUE_CHART_DIMENSIONS,
   ISSUE_CHART_METRICS,
@@ -38,6 +40,7 @@ const emit = defineEmits<{
   save: [config: ChartConfig];
   'update:open': [boolean];
 }>();
+const { isMobile, modalWidth, modalWrapClassName } = useAdaptivePopup();
 
 const formState = reactive<Omit<ChartConfig, 'id'>>({
   title: '自定义图表',
@@ -138,18 +141,19 @@ function handleCancel() {
   <Modal
     :open="open"
     :title="initialConfig ? '编辑图表' : '添加自定义图表'"
-    width="900px"
+    :width="isMobile ? modalWidth : '900px'"
+    :wrap-class-name="modalWrapClassName"
     @cancel="handleCancel"
     @ok="handleSave"
   >
-    <div class="flex h-[400px] gap-4">
+    <div class="flex h-auto flex-col gap-4 sm:h-[400px] sm:flex-row">
       <div class="flex-1 rounded border border-gray-200 bg-gray-50 p-2">
-        <div class="h-full w-full">
+        <div class="h-[260px] w-full sm:h-full">
           <EchartsUI ref="previewChartRef" height="100%" width="100%" />
         </div>
       </div>
 
-      <div class="w-[300px] flex-shrink-0 space-y-4 pt-2">
+      <div class="w-full flex-shrink-0 space-y-4 pt-2 sm:w-[300px]">
         <Form layout="vertical">
           <FormItem label="图表标题">
             <Input v-model:value="formState.title" />
@@ -189,6 +193,7 @@ function handleCancel() {
             <RadioGroup
               v-model:value="formState.chartType"
               button-style="solid"
+              class="w-full"
             >
               <RadioButton value="bar">柱状图</RadioButton>
               <RadioButton value="line">折线图</RadioButton>

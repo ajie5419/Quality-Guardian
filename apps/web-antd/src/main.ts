@@ -6,6 +6,8 @@ import { setupChunkLoadRecovery } from './utils/chunk-reload';
 import { setupClientLogger } from './utils/client-logger';
 import { redirectLegacyHashRoute } from './utils/router-redirect';
 
+import './mobile.css';
+
 redirectLegacyHashRoute();
 setupChunkLoadRecovery();
 

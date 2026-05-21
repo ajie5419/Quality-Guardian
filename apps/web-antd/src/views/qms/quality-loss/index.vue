@@ -25,9 +25,11 @@ import {
   saveUserPreferenceApi,
 } from '#/api/system/preference';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData } from '#/types';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
+import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
 
 import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
 import LossCharts from './components/LossCharts.vue';
@@ -58,6 +60,7 @@ type QualityLossGridSetupOptions = Parameters<
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const { hasAccessByCodes } = useAccess();
+const { isMobile } = useMobileViewport();
 const { invalidateQualityLoss } = useInvalidateQmsQueries();
 
 const { LOSS_ANALYSIS } = PERMISSION_CODES.QMS;
@@ -273,94 +276,110 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Page>
-    <div class="flex flex-col gap-4 bg-gray-50/50 p-4">
-      <!-- 1. KPI 核心指标卡片 -->
-      <LossKpiCards :stats="stats" />
+  <Page content-class="p-0">
+    <MobilePageShell>
+      <div class="flex flex-col gap-3 bg-gray-50/50 sm:gap-4">
+        <!-- 1. KPI 核心指标卡片 -->
+        <LossKpiCards :stats="stats" />
 
-      <!-- 2. 分析图表区 -->
-      <LossCharts
-        v-if="showCharts"
-        :chart-data="chartData"
-        :selected-granularity="selectedGranularity"
-        :selected-year="selectedYear"
-        :year-options="yearOptions"
-        @update:selected-granularity="handleGranularityChange"
-        @update:selected-year="handleYearChange"
-      />
+        <!-- 2. 分析图表区 -->
+        <LossCharts
+          v-if="showCharts"
+          :chart-data="chartData"
+          :selected-granularity="selectedGranularity"
+          :selected-year="selectedYear"
+          :year-options="yearOptions"
+          @update:selected-granularity="handleGranularityChange"
+          @update:selected-year="handleYearChange"
+        />
 
-      <!-- 3. 明细列表区 -->
-      <Card :bordered="false" class="shadow-sm">
-        <Grid>
-          <!-- 状态列 -->
-          <template #status="{ row }">
-            <Tag :color="getStatusConfig(row.status).color">
-              {{ getStatusConfig(row.status).label }}
-            </Tag>
-          </template>
+        <!-- 3. 明细列表区 -->
+        <Card :bordered="false" class="shadow-sm">
+          <Grid>
+            <!-- 状态列 -->
+            <template #status="{ row }">
+              <Tag :color="getStatusConfig(row.status).color">
+                {{ getStatusConfig(row.status).label }}
+              </Tag>
+            </template>
 
-          <!-- 来源列 -->
-          <template #lossSource="{ row }">
-            <Tag :color="SOURCE_STYLE_MAP[row.lossSource as LossSource]?.color">
-              {{
-                t(
-                  SOURCE_STYLE_MAP[row.lossSource as LossSource]?.labelKey ||
-                    row.lossSource,
-                )
-              }}
-            </Tag>
-          </template>
-
-          <!-- 工具栏 -->
-          <template #toolbar-actions>
-            <Space>
-              <Button
-                v-access:code="'QMS:LossAnalysis:Create'"
-                type="primary"
-                @click="handleOpenModal"
+            <!-- 来源列 -->
+            <template #lossSource="{ row }">
+              <Tag
+                :color="SOURCE_STYLE_MAP[row.lossSource as LossSource]?.color"
               >
-                <template #icon>
-                  <IconifyIcon icon="lucide:plus" />
-                </template>
-                新增损失录入
-              </Button>
-              <Button
-                v-if="checkedRows.length > 0 && canDelete"
-                danger
-                type="primary"
-                @click="handleBatchDelete"
+                {{
+                  t(
+                    SOURCE_STYLE_MAP[row.lossSource as LossSource]?.labelKey ||
+                      row.lossSource,
+                  )
+                }}
+              </Tag>
+            </template>
+
+            <!-- 工具栏 -->
+            <template #toolbar-actions>
+              <Space
+                :direction="isMobile ? 'vertical' : 'horizontal'"
+                :wrap="!isMobile"
               >
-                <template #icon>
-                  <IconifyIcon icon="lucide:trash-2" />
-                </template>
-                {{ t('common.batchDelete') }}
-              </Button>
-              <Button shape="round" @click="showCharts = !showCharts">
-                <template #icon>
-                  <IconifyIcon
-                    :icon="
-                      showCharts ? 'lucide:bar-chart-3' : 'lucide:bar-chart-3'
-                    "
-                  />
-                </template>
-                {{ showCharts ? t('common.hideChart') : t('common.showChart') }}
-              </Button>
-              <Button
-                v-if="isAdmin"
-                shape="round"
-                type="link"
-                @click="handleSaveSystemDefault"
-              >
-                <template #icon>
-                  <IconifyIcon icon="lucide:save" />
-                </template>
-                存为系统默认
-              </Button>
-            </Space>
-          </template>
-        </Grid>
-      </Card>
-    </div>
+                <Button
+                  v-access:code="'QMS:LossAnalysis:Create'"
+                  type="primary"
+                  :block="isMobile"
+                  @click="handleOpenModal"
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:plus" />
+                  </template>
+                  新增损失录入
+                </Button>
+                <Button
+                  v-if="checkedRows.length > 0 && canDelete"
+                  danger
+                  type="primary"
+                  :block="isMobile"
+                  @click="handleBatchDelete"
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:trash-2" />
+                  </template>
+                  {{ t('common.batchDelete') }}
+                </Button>
+                <Button
+                  shape="round"
+                  :block="isMobile"
+                  @click="showCharts = !showCharts"
+                >
+                  <template #icon>
+                    <IconifyIcon
+                      :icon="
+                        showCharts ? 'lucide:bar-chart-3' : 'lucide:bar-chart-3'
+                      "
+                    />
+                  </template>
+                  {{
+                    showCharts ? t('common.hideChart') : t('common.showChart')
+                  }}
+                </Button>
+                <Button
+                  v-if="isAdmin"
+                  shape="round"
+                  type="link"
+                  :block="isMobile"
+                  @click="handleSaveSystemDefault"
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:save" />
+                  </template>
+                  存为系统默认
+                </Button>
+              </Space>
+            </template>
+          </Grid>
+        </Card>
+      </div>
+    </MobilePageShell>
 
     <!-- 录入/编辑弹窗组件 -->
     <LossEditModal

@@ -26,11 +26,13 @@ import {
   getInspectionRecords,
 } from '#/api/qms/inspection';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { useMobileViewport } from '#/hooks/useMobileViewport';
 
 import { getOutsourcingModeLabel } from '../data';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
+const { isMobile } = useMobileViewport();
 
 const selectedSupplier = ref<null | QmsSupplierApi.SupplierItem>(null);
 const isDetailLoading = ref(false);
@@ -40,7 +42,7 @@ const supplierEngineeringIssues = ref<QmsInspectionApi.InspectionIssue[]>([]);
 
 const [Drawer, drawerApi] = useVbenDrawer({
   title: t('common.detail'),
-  class: 'w-[950px]',
+  class: isMobile.value ? 'w-[100vw]' : 'w-[950px]',
 });
 
 async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {

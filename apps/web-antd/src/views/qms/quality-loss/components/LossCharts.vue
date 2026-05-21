@@ -139,11 +139,11 @@ onUnmounted(() => {
 <template>
   <Row :gutter="16">
     <!-- 责任部门损失构成 -->
-    <Col :span="8">
+    <Col :xs="24" :xl="8">
       <Card
         title="责任部门损失构成"
         :bordered="false"
-        class="h-[380px] shadow-sm"
+        class="shadow-sm xl:h-[380px]"
       >
         <EchartsUI v-if="hasDeptData" ref="typeChartRef" height="300px" />
         <div v-else class="flex h-[300px] items-center justify-center">
@@ -153,15 +153,19 @@ onUnmounted(() => {
     </Col>
 
     <!-- 月度损失与索赔趋势 -->
-    <Col :span="16">
-      <Card :bordered="false" class="h-[380px] shadow-sm">
+    <Col :xs="24" :xl="16">
+      <Card :bordered="false" class="shadow-sm xl:h-[380px]">
         <template #title>
-          <div class="flex items-center justify-between">
+          <div
+            class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+          >
             <span>损失与索赔趋势</span>
-            <div class="flex items-center gap-2">
+            <div
+              class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center"
+            >
               <Select
                 v-model:value="selectedGranularityModel"
-                style="width: 90px"
+                class="w-full sm:w-[90px]"
                 size="small"
               >
                 <Select.Option value="year">年</Select.Option>
@@ -171,7 +175,7 @@ onUnmounted(() => {
               <Select
                 v-if="selectedGranularityModel !== 'year'"
                 v-model:value="selectedYearModel"
-                style="width: 100px"
+                class="w-full sm:w-[100px]"
                 size="small"
                 placeholder="请选择年份"
               >

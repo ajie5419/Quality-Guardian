@@ -17,6 +17,8 @@ import { Button, DatePicker, Input, message, Tag } from 'ant-design-vue';
 import { getDailySummary, saveDailySummary } from '#/api/qms/reports';
 import { getDeptList } from '#/api/system/dept';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { useMobileViewport } from '#/hooks/useMobileViewport';
+import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
 import {
   getIssueTrackingLabel,
   getIssueTrackingTagColor,
@@ -26,6 +28,7 @@ import ReportTable from './components/ReportTable.vue';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
+const { isMobile } = useMobileViewport();
 const userStore = useUserStore();
 
 function normalizeReportIssueStatus(status: unknown) {
@@ -267,91 +270,104 @@ onMounted(() => {
 </script>
 
 <template>
-  <Page>
-    <div ref="reportRef" class="space-y-6 rounded-lg bg-white p-8 text-lg">
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b pb-4">
-        <div>
-          <h1 class="mb-2 text-4xl font-bold">
-            {{ t('qms.reports.dailyTitle') }}
-          </h1>
-          <div class="text-xl uppercase text-gray-500">
-            {{ t('qms.reports.title') }}
-          </div>
-        </div>
-        <div class="space-y-2 text-right">
-          <div>
-            <span class="mr-2 text-xl font-bold"
-              >{{ t('qms.reports.reporter') }}:</span
-            >
-            <span class="text-xl">{{
-              reportData.reporter || userStore.userInfo?.realName
-            }}</span>
-          </div>
-          <div>
-            <span class="mr-2 text-xl font-bold"
-              >{{ t('qms.reports.daily.date') }}:</span
-            >
-            <DatePicker
-              v-model:value="currentDate"
-              value-format="YYYY-MM-DD"
-              :allow-clear="false"
-              size="large"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Section 1: Inspection Work -->
-      <ReportTable
-        :title="t('qms.reports.daily.inspections')"
-        :columns="inspectionColumns"
-        :data-source="reportData.inspections"
-        :empty-text="t('qms.reports.daily.noInspections')"
-      />
-
-      <!-- Section 2: Exceptions & Issues -->
-      <ReportTable
-        :title="t('qms.reports.daily.issues')"
-        :columns="issueColumns"
-        :data-source="reportData.issues"
-        :empty-text="t('qms.reports.daily.noIssues')"
+  <Page content-class="p-0">
+    <MobilePageShell>
+      <div
+        ref="reportRef"
+        class="space-y-4 rounded-lg bg-white p-3 text-base sm:space-y-6 sm:p-8 sm:text-lg"
       >
-        <template #status="{ record }">
-          <Tag :color="getIssueStatusColor(String(record.status || ''))">
-            {{ getIssueStatusLabel(String(record.status || '')) }}
-          </Tag>
-        </template>
-        <template #dept="{ record }">
-          {{ deptMap[String(record.dept)] || String(record.dept || '') }}
-        </template>
-      </ReportTable>
-
-      <!-- Section 3: Summary -->
-      <div class="relative border border-gray-300 p-4">
-        <div class="mb-2 text-xl font-bold text-gray-500">
-          {{ t('qms.reports.daily.summaryTitle') }}
+        <!-- Header -->
+        <div
+          class="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div>
+            <h1 class="mb-2 text-2xl font-bold sm:text-4xl">
+              {{ t('qms.reports.dailyTitle') }}
+            </h1>
+            <div class="text-base uppercase text-gray-500 sm:text-xl">
+              {{ t('qms.reports.title') }}
+            </div>
+          </div>
+          <div class="space-y-2 sm:text-right">
+            <div>
+              <span class="mr-2 text-base font-bold sm:text-xl"
+                >{{ t('qms.reports.reporter') }}:</span
+              >
+              <span class="text-base sm:text-xl">{{
+                reportData.reporter || userStore.userInfo?.realName
+              }}</span>
+            </div>
+            <div>
+              <span class="mr-2 text-base font-bold sm:text-xl"
+                >{{ t('qms.reports.daily.date') }}:</span
+              >
+              <DatePicker
+                v-model:value="currentDate"
+                value-format="YYYY-MM-DD"
+                :allow-clear="false"
+                :size="isMobile ? 'middle' : 'large'"
+                :class="isMobile ? 'w-full' : ''"
+              />
+            </div>
+          </div>
         </div>
-        <Input.TextArea
-          v-model:value="summary"
-          :rows="3"
-          :placeholder="t('qms.reports.daily.summaryPlaceholder')"
-          class="w-full resize-none !border-0 p-0 text-lg focus:!shadow-none"
+
+        <!-- Section 1: Inspection Work -->
+        <ReportTable
+          :title="t('qms.reports.daily.inspections')"
+          :columns="inspectionColumns"
+          :data-source="reportData.inspections"
+          :empty-text="t('qms.reports.daily.noInspections')"
+          :is-mobile="isMobile"
         />
+
+        <!-- Section 2: Exceptions & Issues -->
+        <ReportTable
+          :title="t('qms.reports.daily.issues')"
+          :columns="issueColumns"
+          :data-source="reportData.issues"
+          :empty-text="t('qms.reports.daily.noIssues')"
+          :is-mobile="isMobile"
+        >
+          <template #status="{ record }">
+            <Tag :color="getIssueStatusColor(String(record.status || ''))">
+              {{ getIssueStatusLabel(String(record.status || '')) }}
+            </Tag>
+          </template>
+          <template #dept="{ record }">
+            {{ deptMap[String(record.dept)] || String(record.dept || '') }}
+          </template>
+        </ReportTable>
+
+        <!-- Section 3: Summary -->
+        <div class="relative border border-gray-300 p-3 sm:p-4">
+          <div class="mb-2 text-base font-bold text-gray-500 sm:text-xl">
+            {{ t('qms.reports.daily.summaryTitle') }}
+          </div>
+          <Input.TextArea
+            v-model:value="summary"
+            :rows="3"
+            :placeholder="t('qms.reports.daily.summaryPlaceholder')"
+            class="w-full resize-none !border-0 p-0 text-base focus:!shadow-none sm:text-lg"
+          />
+        </div>
       </div>
-    </div>
+    </MobilePageShell>
 
     <!-- Footer Actions -->
-    <div v-if="canExport" class="space-x-4 pt-4 text-center">
+    <div
+      v-if="canExport"
+      class="flex flex-col gap-2 pt-3 text-center sm:flex-row sm:justify-center sm:gap-4 sm:pt-4"
+    >
       <Button
-        class="mr-4"
+        :block="isMobile"
         type="primary"
         @click="handleSaveDailySummary"
         :loading="saving"
       >
         保存日报
       </Button>
-      <Button class="mr-4" @click="handleExportImage" :loading="loading">
+      <Button :block="isMobile" @click="handleExportImage" :loading="loading">
         {{ t('qms.reports.daily.export') }}
       </Button>
     </div>

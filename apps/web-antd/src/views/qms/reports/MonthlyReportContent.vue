@@ -148,7 +148,13 @@ const insightRows = computed(() => {
         </span>
       </div>
       <Row :gutter="16">
-        <Col v-for="item in reportData.metrics" :key="item.label" :span="6">
+        <Col
+          v-for="item in reportData.metrics"
+          :key="item.label"
+          :xs="24"
+          :sm="12"
+          :xl="6"
+        >
           <div
             class="group relative overflow-hidden rounded-lg border border-gray-100 bg-gray-50 p-4"
           >
@@ -214,7 +220,7 @@ const insightRows = computed(() => {
     </div>
 
     <Row :gutter="32">
-      <Col :span="12">
+      <Col :xs="24" :xl="12">
         <div class="mb-4 flex items-center gap-2 border-b pb-2">
           <span class="i-lucide-pie-chart text-blue-500"></span>
           <span class="text-lg font-bold tracking-wider text-gray-700">
@@ -249,7 +255,7 @@ const insightRows = computed(() => {
         </div>
       </Col>
 
-      <Col :span="12">
+      <Col :xs="24" :xl="12">
         <div class="mb-4 flex items-center gap-2 border-b pb-2">
           <span class="i-lucide-chart-no-axes-combined text-blue-500"></span>
           <span class="text-lg font-bold tracking-wider text-gray-700">

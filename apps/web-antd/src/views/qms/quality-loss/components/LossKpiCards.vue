@@ -11,7 +11,7 @@ defineProps<{
 <template>
   <Row :gutter="16">
     <!-- 年度累计总损失 -->
-    <Col :span="6">
+    <Col :xs="24" :sm="12" :xl="6">
       <Card :bordered="false" class="shadow-sm transition-all hover:shadow-md">
         <div class="flex items-center justify-between">
           <div>
@@ -34,7 +34,7 @@ defineProps<{
     </Col>
 
     <!-- 实际索赔回收额 -->
-    <Col :span="6">
+    <Col :xs="24" :sm="12" :xl="6">
       <Card :bordered="false" class="shadow-sm transition-all hover:shadow-md">
         <div class="flex items-center justify-between">
           <div>
@@ -57,7 +57,7 @@ defineProps<{
     </Col>
 
     <!-- 索赔挽回率 -->
-    <Col :span="6">
+    <Col :xs="24" :sm="12" :xl="6">
       <Card :bordered="false" class="shadow-sm transition-all hover:shadow-md">
         <div class="flex items-center justify-between">
           <div>
@@ -80,7 +80,7 @@ defineProps<{
     </Col>
 
     <!-- 待处理损失额 -->
-    <Col :span="6">
+    <Col :xs="24" :sm="12" :xl="6">
       <Card :bordered="false" class="shadow-sm transition-all hover:shadow-md">
         <div class="flex items-center justify-between">
           <div>

@@ -23,6 +23,7 @@ import {
 } from 'ant-design-vue';
 
 import { createQualityLoss, updateQualityLoss } from '#/api/qms/quality-loss';
+import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 
@@ -50,6 +51,7 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const { invalidateQualityLoss } = useInvalidateQmsQueries();
 const { handleApiError } = useErrorHandler();
+const { isMobile, modalWidth, modalWrapClassName } = useAdaptivePopup();
 
 const formRef = ref<{ validate: () => Promise<void> }>();
 const formState = reactive<Partial<QmsQualityLossApi.QualityLossItem>>({});
@@ -151,10 +153,11 @@ const responsibleDepartmentValue = computed<string | undefined>({
   <Modal
     :open="open"
     :title="isEditMode ? '编辑损失记录' : '新增损失录入'"
+    :width="isMobile ? modalWidth : '640px'"
+    :wrap-class-name="modalWrapClassName"
     :confirm-loading="confirmLoading"
     @ok="handleOk"
     @cancel="emit('update:open', false)"
-    width="640px"
     destroy-on-close
   >
     <Form
@@ -175,7 +178,7 @@ const responsibleDepartmentValue = computed<string | undefined>({
       />
 
       <Row :gutter="16">
-        <Col :span="12">
+        <Col :span="isMobile ? 24 : 12">
           <FormItem label="日期" name="date" required>
             <Input
               v-model:value="dateValue"
@@ -185,7 +188,7 @@ const responsibleDepartmentValue = computed<string | undefined>({
             />
           </FormItem>
         </Col>
-        <Col :span="12">
+        <Col :span="isMobile ? 24 : 12">
           <FormItem label="损失类型" name="type" required>
             <Select
               v-model:value="formState.type"
@@ -197,7 +200,7 @@ const responsibleDepartmentValue = computed<string | undefined>({
       </Row>
 
       <Row :gutter="16">
-        <Col :span="12">
+        <Col :span="isMobile ? 24 : 12">
           <FormItem label="预计损失金额 (¥)" name="amount" required>
             <InputNumber
               v-model:value="formState.amount"
@@ -208,7 +211,7 @@ const responsibleDepartmentValue = computed<string | undefined>({
             />
           </FormItem>
         </Col>
-        <Col :span="12">
+        <Col :span="isMobile ? 24 : 12">
           <FormItem label="实际索赔金额 (¥)" name="actualClaim">
             <InputNumber
               v-model:value="formState.actualClaim"

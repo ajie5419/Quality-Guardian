@@ -24,9 +24,11 @@ import { getDeptList } from '#/api/system/dept';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { QmsStatusTag } from '#/components/Qms';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { convertToTreeSelectData, findNameById } from '#/types';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
+import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
 
 import WorkOrderAggregateDrawer from '../workspace/components/WorkOrderAggregateDrawer.vue';
 import WorkOrderCharts from './components/WorkOrderCharts.vue';
@@ -46,6 +48,7 @@ const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const route = useRoute();
 const router = useRouter();
+const { isMobile } = useMobileViewport();
 const { canCreate, canEdit, canDelete, canExport, canImport } =
   useQmsPermissions('QMS:WorkOrder');
 const deptTreeData = ref<TreeSelectNode[]>([]);
@@ -381,64 +384,67 @@ const {
 </script>
 
 <template>
-  <Page>
+  <Page content-class="p-0">
     <ErrorBoundary>
-      <div class="flex flex-col gap-4 p-4">
-        <WorkOrderCharts
-          v-if="showDashboard"
-          :stats-data="workOrderStats"
-          :dept-data="deptRawData"
-          :loading="isStatsLoading || isDeptLoading"
-        />
-        <WorkOrderRequirementSummaryCards
-          :overview="overview"
-          :loading="boardLoading"
-          @open="openBoard"
-        />
+      <MobilePageShell>
+        <div class="flex flex-col gap-3 sm:gap-4">
+          <WorkOrderCharts
+            v-if="showDashboard"
+            :stats-data="workOrderStats"
+            :dept-data="deptRawData"
+            :loading="isStatsLoading || isDeptLoading"
+          />
+          <WorkOrderRequirementSummaryCards
+            :overview="overview"
+            :loading="boardLoading"
+            @open="openBoard"
+          />
 
-        <div class="rounded-lg bg-white shadow-sm">
-          <Grid>
-            <template #toolbar-actions>
-              <WorkOrderToolbarActions
-                :can-create="canCreate"
-                :can-delete="canDelete"
-                :checked-rows-length="checkedRows.length"
-                :current-date="currentDate"
-                :current-date-mode="currentDateMode"
-                :current-year="currentYear"
-                :date-mode-options="dateModeOptions"
-                :show-dashboard="showDashboard"
-                :year-options="yearOptions"
-                @add="handleAdd"
-                @batch-delete="handleBatchDelete"
-                @reload="reloadGrid"
-                @toggle-dashboard="showDashboard = !showDashboard"
-                @update:current-date="currentDate = $event"
-                @update:current-date-mode="currentDateMode = $event"
-                @update:current-year="currentYear = $event"
-              />
-            </template>
+          <div class="rounded-lg bg-white shadow-sm">
+            <Grid>
+              <template #toolbar-actions>
+                <WorkOrderToolbarActions
+                  :can-create="canCreate"
+                  :can-delete="canDelete"
+                  :checked-rows-length="checkedRows.length"
+                  :current-date="currentDate"
+                  :current-date-mode="currentDateMode"
+                  :current-year="currentYear"
+                  :date-mode-options="dateModeOptions"
+                  :show-dashboard="showDashboard"
+                  :year-options="yearOptions"
+                  :is-mobile="isMobile"
+                  @add="handleAdd"
+                  @batch-delete="handleBatchDelete"
+                  @reload="reloadGrid"
+                  @toggle-dashboard="showDashboard = !showDashboard"
+                  @update:current-date="currentDate = $event"
+                  @update:current-date-mode="currentDateMode = $event"
+                  @update:current-year="currentYear = $event"
+                />
+              </template>
 
-            <template #status="{ row }">
-              <QmsStatusTag :status="row.status" type="work-order" />
-            </template>
+              <template #status="{ row }">
+                <QmsStatusTag :status="row.status" type="work-order" />
+              </template>
 
-            <template #workOrderNumber="{ row }">
-              <Button
-                type="link"
-                class="!px-0"
-                @click="
-                  openWorkOrderAggregate(row.workOrderNumber, {
-                    syncRoute: false,
-                  })
-                "
-              >
-                {{ row.workOrderNumber }}
-              </Button>
-            </template>
-          </Grid>
+              <template #workOrderNumber="{ row }">
+                <Button
+                  type="link"
+                  class="!px-0"
+                  @click="
+                    openWorkOrderAggregate(row.workOrderNumber, {
+                      syncRoute: false,
+                    })
+                  "
+                >
+                  {{ row.workOrderNumber }}
+                </Button>
+              </template>
+            </Grid>
+          </div>
         </div>
-      </div>
+      </MobilePageShell>
 
       <WorkOrderEditModal ref="editModalRef" @success="handleSuccess" />
       <WorkOrderRequirementBoardDrawer

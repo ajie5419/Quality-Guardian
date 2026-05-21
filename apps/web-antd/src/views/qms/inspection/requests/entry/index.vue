@@ -184,6 +184,12 @@ function syncAttachmentsFromFiles(files: UploadFile[]) {
     normalizeUploadFileList<InspectionRequestAttachment>(files, '自检记录');
 }
 
+function hasBlockingAttachmentState() {
+  return attachmentFileList.value.some((file) =>
+    ['error', 'uploading'].includes(String(file.status || '')),
+  );
+}
+
 function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
   if (info.file.status === 'done') {
     if (applyUploadResponse(info.file)) {
@@ -284,6 +290,8 @@ async function loadPublicInspectionProcessDictionaryOptions() {
 }
 
 async function submitRequest() {
+  if (submitting.value) return;
+
   if (
     !requestForm.workOrderNumber ||
     !requestForm.partName ||
@@ -297,6 +305,11 @@ async function submitRequest() {
     message.warning(
       '工单号、工序、一级部件名称、组件名称、数量、班组、报检人、自检记录不能为空',
     );
+    return;
+  }
+
+  if (hasBlockingAttachmentState()) {
+    message.warning('自检记录仍在上传或上传失败，请处理后再提交');
     return;
   }
 
@@ -486,6 +499,7 @@ watch(
                 accept="image/*"
                 action="/api/upload"
                 capture="environment"
+                :disabled="submitting"
                 :show-upload-list="false"
                 @change="handleAttachmentUploadChange"
               >
@@ -499,6 +513,7 @@ watch(
               <Upload
                 v-model:file-list="attachmentFileList"
                 action="/api/upload"
+                :disabled="submitting"
                 multiple
                 @change="handleAttachmentUploadChange"
               >
@@ -519,10 +534,13 @@ watch(
               block
               size="large"
               :loading="submitting"
+              :disabled="submitting"
               @click="submitRequest"
             >
-              <template #icon><IconifyIcon icon="lucide:plus" /></template>
-              提交报检
+              <template v-if="!submitting" #icon>
+                <IconifyIcon icon="lucide:plus" />
+              </template>
+              {{ submitting ? '提交中，请勿重复点击' : '提交报检' }}
             </Button>
           </div>
         </Form>

@@ -117,7 +117,8 @@ const [Form, formApi] = useVbenForm({
   handleSubmit: () => {}, // Handled by parent
   schema: getFormSchema(props.type, processOptions.value),
   showDefaultActions: false,
-  wrapperClass: 'grid grid-cols-3 gap-x-4 gap-y-1',
+  wrapperClass:
+    'grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2 xl:grid-cols-3',
   commonConfig: {
     componentProps: {
       class: 'w-full',
@@ -472,7 +473,7 @@ defineExpose({
     <div class="mb-3 font-medium text-orange-700">
       当前判定为“不合格”，请补充不合格项信息（保存时自动建立关联）
     </div>
-    <div class="grid grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <div>
         <div class="mb-1 text-gray-600">部件名称</div>
         <Input
@@ -616,7 +617,7 @@ defineExpose({
           class="w-full"
         />
       </div>
-      <div class="col-span-3">
+      <div class="sm:col-span-2 lg:col-span-3">
         <div class="mb-1 text-gray-600">不合格描述</div>
         <Input.TextArea
           v-model:value="linkedIssueDraft.description"
@@ -624,7 +625,7 @@ defineExpose({
           placeholder="请填写不合格描述"
         />
       </div>
-      <div class="col-span-3">
+      <div class="sm:col-span-2 lg:col-span-3">
         <div class="mb-1 text-gray-600">原因分析</div>
         <Input.TextArea
           v-model:value="linkedIssueDraft.rootCause"
@@ -632,7 +633,7 @@ defineExpose({
           placeholder="请填写原因分析"
         />
       </div>
-      <div class="col-span-3">
+      <div class="sm:col-span-2 lg:col-span-3">
         <div class="mb-1 text-gray-600">解决方案</div>
         <Input.TextArea
           v-model:value="linkedIssueDraft.solution"
@@ -640,7 +641,7 @@ defineExpose({
           placeholder="请填写解决方案"
         />
       </div>
-      <div class="col-span-3">
+      <div class="sm:col-span-2 lg:col-span-3">
         <IssuePhotoUpload
           v-model:value="linkedIssueDraft.photos"
           :max-count="8"

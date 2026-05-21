@@ -7,6 +7,8 @@ import { IconifyIcon } from '@vben/icons';
 
 import { Button, Input, InputNumber, Modal, Space } from 'ant-design-vue';
 
+import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
+
 const props = defineProps<{
   initialData: Partial<QmsQualityLossApi.QualityLossItem>;
   open: boolean;
@@ -15,6 +17,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:open': [boolean];
 }>();
+const { isMobile, modalWidth, modalWrapClassName } = useAdaptivePopup();
 
 // 可编辑的表单数据
 const formData = reactive({
@@ -144,11 +147,12 @@ function handlePrint() {
     :open="open"
     title="生成索赔赔偿表"
     @cancel="emit('update:open', false)"
-    width="900px"
+    :width="isMobile ? modalWidth : '900px'"
+    :wrap-class-name="modalWrapClassName"
     destroy-on-close
     :footer="null"
   >
-    <div class="flex flex-col items-center bg-gray-50 p-6">
+    <div class="flex flex-col items-center bg-gray-50 p-3 sm:p-6">
       <Space class="no-print mb-4">
         <Button type="primary" @click="handlePrint">
           <template #icon><IconifyIcon icon="lucide:printer" /></template>
