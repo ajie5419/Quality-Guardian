@@ -119,8 +119,16 @@ export const WorkOrderRequirementService = {
       prisma.work_order_requirements.count({ where }),
     ]);
 
+    const normalizedItems = items.map((item) => ({
+      ...item,
+      processName:
+        String(item.process?.name || '').trim() ||
+        String(item.processName || '').trim() ||
+        null,
+    }));
+
     return {
-      items,
+      items: normalizedItems,
       total,
     };
   },
