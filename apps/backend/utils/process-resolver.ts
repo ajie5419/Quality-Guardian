@@ -24,6 +24,40 @@ export function resolveCanonicalProcessName(record?: {
   return fallbackName || null;
 }
 
+export async function resolveCanonicalProcessNameById(
+  tx: {
+    processes: {
+      findFirst(args: {
+        select: { name: true };
+        where: { id: string; isDeleted: boolean };
+      }): Promise<null | { name: null | string }>;
+    };
+  },
+  processId?: null | string,
+  processName?: null | string,
+) {
+  const normalizedProcessId = String(processId || '').trim();
+  if (!normalizedProcessId) {
+    const fallbackName = normalizeProcessName(processName);
+    return fallbackName || null;
+  }
+  const process = await tx.processes.findFirst({
+    where: {
+      id: normalizedProcessId,
+      isDeleted: false,
+    },
+    select: {
+      name: true,
+    },
+  });
+  const canonicalName = normalizeProcessName(process?.name);
+  if (canonicalName) {
+    return canonicalName;
+  }
+  const fallbackName = normalizeProcessName(processName);
+  return fallbackName || null;
+}
+
 export async function resolveProcessId(
   processName: string,
 ): Promise<null | string> {

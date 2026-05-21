@@ -23,6 +23,7 @@ import {
   isPrismaUniqueConstraintError,
 } from '~/utils/prisma-error';
 import {
+  resolveCanonicalProcessNameById,
   resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation,
   resolveProcessId,
 } from '~/utils/process-resolver';
@@ -691,33 +692,6 @@ async function syncInspectionProjectDocuments(
   }
 }
 
-async function resolveCanonicalProcessName(
-  tx: Prisma.TransactionClient,
-  processId?: null | string,
-  processName?: null | string,
-) {
-  const normalizedProcessId = String(processId || '').trim();
-  if (!normalizedProcessId) {
-    const fallbackName = String(processName || '').trim();
-    return fallbackName || null;
-  }
-  const process = await tx.processes.findFirst({
-    where: {
-      id: normalizedProcessId,
-      isDeleted: false,
-    },
-    select: {
-      name: true,
-    },
-  });
-  const canonicalName = String(process?.name || '').trim();
-  if (canonicalName) {
-    return canonicalName;
-  }
-  const fallbackName = String(processName || '').trim();
-  return fallbackName || null;
-}
-
 export const InspectionService = {
   async findById(id: string) {
     const inspection = await prisma.inspections.findFirst({
@@ -1201,7 +1175,7 @@ export const InspectionService = {
               },
             },
           });
-          const canonicalProcessName = await resolveCanonicalProcessName(
+          const canonicalProcessName = await resolveCanonicalProcessNameById(
             tx,
             inspection.processId,
             inspection.processName,
@@ -1360,7 +1334,7 @@ export const InspectionService = {
         previousInspection?.workOrderNumber &&
         previousInspection.workOrderNumber !== inspection.workOrderNumber
       ) {
-        const canonicalProcessName = await resolveCanonicalProcessName(
+        const canonicalProcessName = await resolveCanonicalProcessNameById(
           tx,
           inspection.processId,
           inspection.processName,
@@ -1376,7 +1350,7 @@ export const InspectionService = {
         });
         await syncInspectionProjectDocuments(tx, normalizedInspection);
       } else {
-        const canonicalProcessName = await resolveCanonicalProcessName(
+        const canonicalProcessName = await resolveCanonicalProcessNameById(
           tx,
           inspection.processId,
           inspection.processName,
