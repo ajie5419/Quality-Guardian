@@ -153,9 +153,15 @@ async function loadDailyArchiveTasks(inspections: DailyInspectionRow[]) {
     const items = orderedInspections.map((inspection, index) => {
       const inspectionId = String(inspection.id || '').trim();
       const workOrder = String(inspection.workOrderNumber || '').trim();
-      const processName = resolveInspectionFormProcess(inspection);
+      const normalizedInspection = {
+        ...inspection,
+        processName:
+          String(inspection.process?.name || '').trim() ||
+          String(inspection.processName || '').trim(),
+      };
+      const processName = resolveInspectionFormProcess(normalizedInspection);
       const processCandidates =
-        resolveInspectionFormProcessCandidates(inspection);
+        resolveInspectionFormProcessCandidates(normalizedInspection);
       const processSet = planProcessMap.get(workOrder);
       const hasTemplate = Boolean(
         processSet &&
