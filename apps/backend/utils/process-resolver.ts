@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 import prisma from '~/utils/prisma';
 
 type CacheEntry = {
@@ -86,4 +88,27 @@ export async function resolveProcessId(
     expiresAt: now + PROCESS_ID_CACHE_TTL_MS,
   });
   return processId;
+}
+
+export async function buildProcessNameWhere(
+  processName: string,
+  options?: {
+    field?: string;
+  },
+): Promise<Prisma.quality_recordsWhereInput> {
+  const normalizedProcessName = normalizeProcessName(processName);
+  if (!normalizedProcessName) {
+    return {};
+  }
+  const field = String(options?.field || 'processName').trim() || 'processName';
+  const resolvedProcessId = await resolveProcessId(normalizedProcessName);
+  const fieldCondition = {
+    [field]: normalizedProcessName,
+  } as Prisma.quality_recordsWhereInput;
+  if (!resolvedProcessId) {
+    return fieldCondition;
+  }
+  return {
+    OR: [fieldCondition, { processId: resolvedProcessId }],
+  };
 }

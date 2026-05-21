@@ -23,6 +23,7 @@ import {
   isPrismaUniqueConstraintError,
 } from '~/utils/prisma-error';
 import {
+  buildProcessNameWhere,
   resolveCanonicalProcessNameById,
   resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation,
   resolveProcessId,
@@ -1620,13 +1621,10 @@ export const InspectionService = {
     let where: Prisma.quality_recordsWhereInput = { isDeleted: false };
 
     if (params.processName) {
-      const resolvedProcessId = await resolveProcessId(params.processName);
+      const processWhere = await buildProcessNameWhere(params.processName);
       where = {
         ...where,
-        OR: [
-          { processName: params.processName },
-          ...(resolvedProcessId ? [{ processId: resolvedProcessId }] : []),
-        ],
+        ...processWhere,
       };
     }
 
