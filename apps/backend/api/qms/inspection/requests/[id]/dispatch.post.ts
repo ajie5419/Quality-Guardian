@@ -100,6 +100,7 @@ export default defineEventHandler(async (event) => {
         include: {
           dispatcher: { select: { realName: true, username: true } },
           inspector: { select: { realName: true, username: true } },
+          process: { select: { name: true } },
         },
         where: { id },
       });

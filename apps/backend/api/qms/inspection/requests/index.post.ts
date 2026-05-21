@@ -125,10 +125,7 @@ export default defineEventHandler(async (event) => {
       userId: userinfo?.id,
     });
 
-    const mapped = mapInspectionRequest({
-      ...created,
-      processName: created.process?.name || created.processName,
-    });
+    const mapped = mapInspectionRequest(created);
     publishInspectionRequestCreated(mapped);
 
     return useResponseSuccess(mapped);

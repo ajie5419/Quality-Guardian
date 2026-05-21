@@ -400,6 +400,7 @@ export default defineEventHandler(async (event) => {
             },
           },
           inspector: { select: { realName: true, username: true } },
+          process: { select: { name: true } },
         },
         where: { id },
       });

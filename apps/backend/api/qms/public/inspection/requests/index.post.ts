@@ -100,10 +100,7 @@ export default defineEventHandler(async (event) => {
       bizType: 'inspection_request',
     });
 
-    const mapped = mapInspectionRequest({
-      ...created,
-      processName: created.process?.name || created.processName,
-    });
+    const mapped = mapInspectionRequest(created);
     publishInspectionRequestCreated(mapped);
 
     return useResponseSuccess(mapped);

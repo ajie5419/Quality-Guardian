@@ -104,7 +104,12 @@ export async function generateInspectionRequestNo(
 }
 
 export function mapInspectionRequest(record: any) {
-  return mapInspectionRequestRecordRule(record);
+  return mapInspectionRequestRecordRule({
+    ...record,
+    processName:
+      String(record?.process?.name || '').trim() ||
+      String(record?.processName || '').trim(),
+  });
 }
 
 export async function resolveInspectionRequestCurrentUserId(

@@ -129,7 +129,6 @@ export default defineEventHandler(async (event) => {
       items: items.map((item) =>
         mapInspectionRequest({
           ...item,
-          processName: item.process?.name || item.processName,
           qualityRecords: [
             item.linkedIssueId ? issueById.get(item.linkedIssueId) : null,
             item.inspectionId
