@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client';
 
 import { resolveInspectionFormProcessCandidates } from '@qgs/domain';
-import { resolveProcessId } from '~/utils/process-resolver';
+import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 
 export {
   parseInspectionFormFields,
@@ -29,7 +29,7 @@ export async function buildInspectionFormProcessFilter(params: {
     incomingType: String(params.incomingType || '').trim(),
     processName,
   });
-  const resolvedProcessId = await resolveProcessId(processName);
+  const resolvedProcessId = await resolveProcessIdForWrite({ processName });
   const processId = resolvedProcessId || fallbackProcessId;
   const candidateNames =
     processCandidates.length > 0 ? processCandidates : [processName];
