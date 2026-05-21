@@ -8,7 +8,10 @@ import {
   isPrismaNotFoundError,
   isPrismaSchemaMismatchError,
 } from '~/utils/prisma-error';
-import { resolveProcessId } from '~/utils/process-resolver';
+import {
+  resolveCanonicalProcessName,
+  resolveProcessId,
+} from '~/utils/process-resolver';
 import {
   badRequestResponse,
   conflictResponse,
@@ -76,9 +79,7 @@ export default defineEventHandler(async (event) => {
         ? undefined
         : Number(body.templateQuantity);
     const finalStatus = status ?? String(current.status || '').trim();
-    const currentProcessName =
-      String(current.process?.name || '').trim() ||
-      String(current.processName || '').trim();
+    const currentProcessName = resolveCanonicalProcessName(current) || '';
 
     if (finalStatus === 'active') {
       const finalWorkOrderNumber = workOrderNumber ?? current?.workOrderNumber;

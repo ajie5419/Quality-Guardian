@@ -7,7 +7,10 @@ import {
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
-import { resolveProcessId } from '~/utils/process-resolver';
+import {
+  resolveCanonicalProcessName,
+  resolveProcessId,
+} from '~/utils/process-resolver';
 import {
   internalServerErrorResponse,
   unAuthorizedResponse,
@@ -88,7 +91,7 @@ export default defineEventHandler(async (event) => {
         id: item.id,
         partName: String(item.partName || ''),
         processName:
-          String(item.process?.name || '').trim() ||
+          resolveCanonicalProcessName(item) ||
           resolveInspectionFormProcess(item),
         projectName: item.projectName || item.work_order?.projectName || '',
         status: item.status,

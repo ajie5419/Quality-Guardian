@@ -18,6 +18,7 @@ import {
 } from '~/utils/inspection-request';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -289,7 +290,9 @@ export default defineEventHandler(async (event) => {
           request.partName,
         processName:
           normalizeInspectionRequestText(linkedIssue.processName) ||
-          normalizeInspectionRequestText(request.process?.name) ||
+          normalizeInspectionRequestText(
+            resolveCanonicalProcessName(request),
+          ) ||
           request.processName,
         projectName: request.work_order?.projectName || request.workOrderNumber,
         quantity: issueQuantity,

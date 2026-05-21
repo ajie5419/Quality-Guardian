@@ -1,6 +1,7 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -34,11 +35,7 @@ export default defineEventHandler(async (event) => {
 
     const processNames = [...new Set(
       list
-        .map(
-          (item) =>
-            String(item.process?.name || '').trim() ||
-            String(item.processName || '').trim(),
-        )
+        .map((item) => resolveCanonicalProcessName(item))
         .filter(Boolean),
     )];
     return useResponseSuccess(

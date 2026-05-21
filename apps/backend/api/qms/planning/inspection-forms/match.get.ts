@@ -8,7 +8,10 @@ import {
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
-import { resolveProcessId } from '~/utils/process-resolver';
+import {
+  resolveCanonicalProcessName,
+  resolveProcessId,
+} from '~/utils/process-resolver';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -127,9 +130,7 @@ export default defineEventHandler(async (event) => {
         formNo: String(template.formNo || ''),
         id: template.id,
         partName: String(template.partName || ''),
-        processName:
-          String(template.process?.name || '').trim() ||
-          String(template.processName || '').trim(),
+        processName: resolveCanonicalProcessName(template) || '',
         templateQuantity: template.templateQuantity ?? null,
         workOrderNumber: template.workOrderNumber,
       },

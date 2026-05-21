@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import prisma from '~/utils/prisma';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import { buildWorkOrderWhereCondition } from './work-order.service';
 
@@ -124,9 +125,10 @@ export const WorkOrderRequirementService = {
       return {
         ...rest,
         processName:
-          String(process?.name || '').trim() ||
-          String(item.processName || '').trim() ||
-          null,
+          resolveCanonicalProcessName({
+            process,
+            processName: item.processName,
+          }) || null,
       };
     });
 
