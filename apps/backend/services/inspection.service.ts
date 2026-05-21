@@ -407,24 +407,28 @@ async function resolveInspectionTemplateBinding(
     incomingType: data.incomingType || null,
     processName: data.processName || null,
   });
-  if (processCandidates.length === 0) {
+  const resolvedProcessId =
+    data.processId === undefined
+      ? await resolveProcessId(data.processName || '')
+      : data.processId;
+  if (processCandidates.length === 0 && !resolvedProcessId) {
     return {
       templateId: null,
       templateName: null,
     };
   }
-  const resolvedProcessId =
-    data.processId === undefined
-      ? await resolveProcessId(data.processName || '')
-      : data.processId;
   const processFilter = {
     OR: [
       ...(resolvedProcessId ? [{ processId: resolvedProcessId }] : []),
-      {
-        processName: {
-          in: processCandidates,
-        },
-      },
+      ...(processCandidates.length > 0
+        ? [
+            {
+              processName: {
+                in: processCandidates,
+              },
+            },
+          ]
+        : []),
     ],
   };
 
