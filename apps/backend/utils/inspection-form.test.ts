@@ -74,4 +74,25 @@ describe('inspection-form helpers', () => {
       },
     });
   });
+
+  it('returns OR filter with fallback process id when resolver misses process id', async () => {
+    const { resolveInspectionFormProcessCandidates } = await import(
+      '@qgs/domain'
+    );
+    const { resolveProcessIdForWrite } = await import(
+      '~/utils/process-resolver'
+    );
+
+    vi.mocked(resolveInspectionFormProcessCandidates).mockReturnValue(['打磨']);
+    vi.mocked(resolveProcessIdForWrite).mockResolvedValue(null);
+
+    const where = await buildInspectionFormProcessFilter({
+      processId: 'p-fallback',
+      processName: '打磨',
+    });
+
+    expect(where).toEqual({
+      OR: [{ processId: 'p-fallback' }, { processName: { in: ['打磨'] } }],
+    });
+  });
 });

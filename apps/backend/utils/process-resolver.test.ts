@@ -39,6 +39,15 @@ describe('process-resolver helpers', () => {
     expect(processId).toBeUndefined();
   });
 
+  it('resolveProcessIdForWrite returns fallback process id when name missing', async () => {
+    const processId = await resolveProcessIdForWrite({
+      fallbackProcessId: 'p-fallback',
+      processName: '',
+    });
+
+    expect(processId).toBe('p-fallback');
+  });
+
   it('resolveProcessIdsByNames batches lookup and de-duplicates names', async () => {
     (prisma.processes.findMany as any).mockResolvedValue([
       { id: 'p-weld', name: '焊接' },
