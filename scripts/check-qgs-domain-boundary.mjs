@@ -149,7 +149,7 @@ const TARGETS = [
   },
 ];
 
-const TARGET_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs', '.vue']);
+const TARGET_EXTENSIONS = new Set(['.js', '.mjs', '.ts', '.tsx', '.vue']);
 
 function walkFiles(dir, result = []) {
   if (!fs.existsSync(dir)) return result;

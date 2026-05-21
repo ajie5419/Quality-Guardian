@@ -53,8 +53,8 @@ interface ProjectBomInput {
   partName?: unknown;
   partNumber?: unknown;
   quantity?: unknown;
-  requiredProcesses?: unknown;
   remarks?: unknown;
+  requiredProcesses?: unknown;
   unit?: unknown;
 }
 
@@ -62,8 +62,8 @@ export interface BomInspectionProgress {
   completed: boolean;
   completedQuantity: number;
   processName: string;
-  requiredQuantity: number;
   remainingQuantity: number;
+  requiredQuantity: number;
 }
 
 function normalizeBomProcessList(value: unknown): string[] {
@@ -164,7 +164,6 @@ interface BomTreeProjectInput {
   id: string;
   projectName: string;
   status: string;
-  workOrderNumber: string;
   work_order?: null | {
     customerName?: null | string;
     deliveryDate?: Date | null;
@@ -172,6 +171,7 @@ interface BomTreeProjectInput {
     projectName?: null | string;
     quantity?: null | number;
   };
+  workOrderNumber: string;
 }
 
 export function mapBomTreeProjectNode(

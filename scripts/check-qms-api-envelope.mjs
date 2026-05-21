@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+
 import ts from 'typescript';
 
 const ROOT = process.cwd();
@@ -49,15 +50,15 @@ function findViolations(filePath) {
 
   const handlerFns = [];
   const visitForHandlers = (node) => {
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
-      if (
-        node.expression.text === 'defineEventHandler' &&
-        node.arguments.length > 0
-      ) {
-        const firstArg = node.arguments[0];
-        if (ts.isArrowFunction(firstArg) || ts.isFunctionExpression(firstArg)) {
-          handlerFns.push(firstArg);
-        }
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'defineEventHandler' &&
+      node.arguments.length > 0
+    ) {
+      const firstArg = node.arguments[0];
+      if (ts.isArrowFunction(firstArg) || ts.isFunctionExpression(firstArg)) {
+        handlerFns.push(firstArg);
       }
     }
     ts.forEachChild(node, visitForHandlers);
@@ -83,14 +84,16 @@ function findViolations(filePath) {
       if (node !== handlerFn && ts.isFunctionLike(node)) {
         return;
       }
-      if (ts.isReturnStatement(node) && node.expression) {
-        if (ts.isObjectLiteralExpression(node.expression)) {
-          const line =
-            source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
-          violations.push(
-            `${rel}:${line} handler must not return raw object literal`,
-          );
-        }
+      if (
+        ts.isReturnStatement(node) &&
+        node.expression &&
+        ts.isObjectLiteralExpression(node.expression)
+      ) {
+        const line =
+          source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+        violations.push(
+          `${rel}:${line} handler must not return raw object literal`,
+        );
       }
       ts.forEachChild(node, walk);
     };

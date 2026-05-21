@@ -31,7 +31,7 @@ function hasDetailsVariables(block) {
 }
 
 function hasRawDetails(block) {
-  return /(^|[^\w])details\s*:/.test(block);
+  return /\bdetails\s*:/.test(block);
 }
 
 function extractObjectLiteral(content, startIndex) {

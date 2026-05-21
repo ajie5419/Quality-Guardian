@@ -10,13 +10,11 @@ import {
 /**
  * 损失类型选项
  */
-export const LOSS_TYPE_OPTIONS = [...QUALITY_LOSS_TYPE_OPTIONS];
-
 export function mapDictionaryOptionsToLossType(
   options?: DictionaryOptionItem[],
 ) {
   if (!options || options.length === 0) {
-    return LOSS_TYPE_OPTIONS;
+    return [...QUALITY_LOSS_TYPE_OPTIONS];
   }
   return options.map((item) => ({
     label: item.dictValue || item.dictKey,
@@ -58,6 +56,4 @@ export function mapDictionaryOptionsToQualityLossStatus(
 /**
  * 损失来源样式映射
  */
-export const SOURCE_STYLE_MAP = {
-  ...QUALITY_LOSS_SOURCE_STYLE_MAP,
-};
+export const SOURCE_STYLE_MAP = QUALITY_LOSS_SOURCE_STYLE_MAP;
