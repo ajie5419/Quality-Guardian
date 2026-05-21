@@ -388,11 +388,7 @@ export default defineEventHandler(async (event) => {
         }
         default: {
           // Fallback
-          proc =
-            resolveCanonicalProcessName(item) ||
-            item.processName ||
-            item.category ||
-            '';
+          proc = resolveCanonicalProcessName(item) || item.category || '';
           name = item.materialName || item.level1Component || '';
         }
       }
