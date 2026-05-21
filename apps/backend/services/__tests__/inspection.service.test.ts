@@ -22,6 +22,9 @@ vi.mock('../../utils/prisma', () => ({
       groupBy: vi.fn(),
       findMany: vi.fn(),
     },
+    processes: {
+      findMany: vi.fn(),
+    },
     $queryRaw: vi.fn(),
     $transaction: vi.fn((cb) =>
       cb({
@@ -181,6 +184,29 @@ describe('inspectionService', () => {
           where: expect.objectContaining({
             isDeleted: false,
             supplierName: { contains: '江西子轩电气有限公司' },
+          }),
+        }),
+      );
+    });
+
+    it('should query by processName with processId fallback when process exists', async () => {
+      (prisma.processes.findMany as any).mockResolvedValue([
+        { id: 'process-1', name: '焊接' },
+      ]);
+      (prisma.quality_records.count as any).mockResolvedValue(0);
+      (prisma.quality_records.findMany as any).mockResolvedValue([]);
+
+      await InspectionService.getIssues({
+        processName: '焊接',
+      });
+
+      expect(prisma.quality_records.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.arrayContaining([
+              { processName: '焊接' },
+              { processId: 'process-1' },
+            ]),
           }),
         }),
       );
