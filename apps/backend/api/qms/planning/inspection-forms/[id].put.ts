@@ -35,6 +35,11 @@ export default defineEventHandler(async (event) => {
       select: {
         partName: true,
         processId: true,
+        process: {
+          select: {
+            name: true,
+          },
+        },
         processName: true,
         status: true,
         workOrderNumber: true,
@@ -71,10 +76,13 @@ export default defineEventHandler(async (event) => {
         ? undefined
         : Number(body.templateQuantity);
     const finalStatus = status ?? String(current.status || '').trim();
+    const currentProcessName =
+      String(current.process?.name || '').trim() ||
+      String(current.processName || '').trim();
 
     if (finalStatus === 'active') {
       const finalWorkOrderNumber = workOrderNumber ?? current?.workOrderNumber;
-      const finalProcessName = processName ?? current?.processName;
+      const finalProcessName = processName ?? currentProcessName;
       const finalPartName = partName ?? String(current?.partName || '').trim();
       const finalProcessCandidates = resolveInspectionFormProcessCandidates({
         category: 'PROCESS',
@@ -121,7 +129,7 @@ export default defineEventHandler(async (event) => {
       }
     }
     const processNameChanged =
-      processName !== undefined && processName !== current.processName;
+      processName !== undefined && processName !== currentProcessName;
 
     let normalizedTemplateQuantity: null | number | undefined;
     if (templateQuantity === undefined) {
