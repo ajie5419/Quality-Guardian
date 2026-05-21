@@ -124,6 +124,7 @@ export async function buildInspectionRecordFromRequest(
     componentName?: null | string;
     mutualCheckResult: string;
     partName: string;
+    process?: null | { name?: null | string };
     processName: string;
     quantity?: number;
     reporter: string;
@@ -138,7 +139,12 @@ export async function buildInspectionRecordFromRequest(
   return InspectionService.create(
     buildInspectionRecordPayloadCore({
       body,
-      request,
+      request: {
+        ...request,
+        processName:
+          String(request.process?.name || '').trim() ||
+          String(request.processName || '').trim(),
+      },
     }),
   );
 }

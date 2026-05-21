@@ -115,7 +115,8 @@ export default defineEventHandler(async (event) => {
         '新增报检任务: {{requestNo}} ({{workOrderNumber}}/{{processName}}/{{partName}})',
       detailsVariables: {
         partName: created.partName,
-        processName: created.processName,
+        processName:
+          String(created.process?.name || '').trim() || created.processName,
         requestNo: created.requestNo,
         workOrderNumber: created.workOrderNumber,
       },
