@@ -14,6 +14,7 @@ import {
 import { publishInspectionRequestCreated } from '~/utils/inspection-request-events';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { resolveProcessId } from '~/utils/process-resolver';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
@@ -65,6 +66,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const processId = await resolveProcessId(processName);
     const workOrder = await prisma.work_orders.findUnique({
       select: { workOrderNumber: true },
       where: { workOrderNumber },
@@ -82,6 +84,7 @@ export default defineEventHandler(async (event) => {
           attachments.length > 0 ? JSON.stringify(attachments) : null,
         componentName: componentName || null,
         partName,
+        processId,
         processName,
         quantity,
         reporter,
@@ -96,6 +99,7 @@ export default defineEventHandler(async (event) => {
       include: {
         dispatcher: { select: { realName: true, username: true } },
         inspector: { select: { realName: true, username: true } },
+        process: { select: { name: true } },
       },
     });
 
@@ -120,7 +124,10 @@ export default defineEventHandler(async (event) => {
       userId: userinfo?.id,
     });
 
-    const mapped = mapInspectionRequest(created);
+    const mapped = mapInspectionRequest({
+      ...created,
+      processName: created.process?.name || created.processName,
+    });
     publishInspectionRequestCreated(mapped);
 
     return useResponseSuccess(mapped);

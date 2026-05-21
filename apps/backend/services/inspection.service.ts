@@ -22,6 +22,7 @@ import {
   isPrismaSchemaMismatchError,
   isPrismaUniqueConstraintError,
 } from '~/utils/prisma-error';
+import { resolveProcessId } from '~/utils/process-resolver';
 import {
   parseProjectDocuments,
   stringifyProjectDocuments,
@@ -348,6 +349,7 @@ interface InspectionRecordInput {
   materialName?: string;
   incomingType?: string;
   processName?: string;
+  processId?: null | string;
   level1Component?: string;
   level2Component?: string;
 
@@ -1072,6 +1074,10 @@ export const InspectionService = {
     for (let attempt = 1; attempt <= maxRetry; attempt++) {
       try {
         const serialNumber = await this.generateSerialNumber();
+        const resolvedProcessId =
+          data.processId === undefined
+            ? await resolveProcessId(data.processName || '')
+            : data.processId;
         return await prisma.$transaction(async (tx) => {
           const templateBinding = await resolveInspectionTemplateBinding(
             tx,
@@ -1086,6 +1092,7 @@ export const InspectionService = {
               supplierName: data.supplierName,
               materialName: data.materialName,
               incomingType: data.incomingType,
+              processId: resolvedProcessId,
               processName: data.processName,
               level1Component: data.level1Component,
               level2Component: data.level2Component,
@@ -1174,6 +1181,10 @@ export const InspectionService = {
     this.assertResultQuantityConsistency(overallResult, quantitySummary);
 
     return prisma.$transaction(async (tx) => {
+      const resolvedProcessId =
+        data.processName === undefined
+          ? data.processId
+          : await resolveProcessId(data.processName || '');
       const previousInspection = await tx.inspections.findUnique({
         where: { id },
         select: {
@@ -1209,6 +1220,7 @@ export const InspectionService = {
           supplierName: data.supplierName,
           materialName: data.materialName,
           incomingType: data.incomingType,
+          processId: resolvedProcessId,
           processName: data.processName,
           level1Component: data.level1Component,
           level2Component: data.level2Component,

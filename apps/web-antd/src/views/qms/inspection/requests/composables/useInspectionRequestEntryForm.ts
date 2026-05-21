@@ -146,7 +146,7 @@ export function useInspectionRequestEntryForm(
   }
 
   async function loadBomPartOptions(workOrderNumber: string) {
-    const normalized = workOrderNumber.trim();
+    const normalized = (workOrderNumber || '').trim();
     if (!normalized) {
       bomPartOptions.value = [];
       requestForm.partName = '';

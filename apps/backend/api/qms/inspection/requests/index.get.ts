@@ -77,6 +77,7 @@ export default defineEventHandler(async (event) => {
             },
           },
           inspector: { select: { realName: true, username: true } },
+          process: { select: { name: true } },
         },
         orderBy: { submittedAt: 'desc' },
         skip: (page - 1) * pageSize,
@@ -127,6 +128,7 @@ export default defineEventHandler(async (event) => {
       items: items.map((item) =>
         mapInspectionRequest({
           ...item,
+          processName: item.process?.name || item.processName,
           qualityRecords: [
             item.linkedIssueId ? issueById.get(item.linkedIssueId) : null,
             item.inspectionId

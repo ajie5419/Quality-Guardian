@@ -50,6 +50,11 @@ export default defineEventHandler(async (event) => {
           : {}),
       },
       include: {
+        process: {
+          select: {
+            name: true,
+          },
+        },
         work_order: {
           select: {
             customerName: true,
@@ -72,7 +77,9 @@ export default defineEventHandler(async (event) => {
         formNo: item.formNo || '',
         id: item.id,
         partName: String(item.partName || ''),
-        processName: resolveInspectionFormProcess(item),
+        processName:
+          String(item.process?.name || '').trim() ||
+          resolveInspectionFormProcess(item),
         projectName: item.projectName || item.work_order?.projectName || '',
         status: item.status,
         templateQuantity: item.templateQuantity ?? null,

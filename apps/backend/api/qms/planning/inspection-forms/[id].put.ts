@@ -7,6 +7,7 @@ import {
   isPrismaNotFoundError,
   isPrismaSchemaMismatchError,
 } from '~/utils/prisma-error';
+import { resolveProcessId } from '~/utils/process-resolver';
 import {
   badRequestResponse,
   conflictResponse,
@@ -96,6 +97,8 @@ export default defineEventHandler(async (event) => {
         }
       }
     }
+    const processNameChanged =
+      processName !== undefined && processName !== current.processName;
 
     let normalizedTemplateQuantity: null | number | undefined;
     if (templateQuantity === undefined) {
@@ -104,6 +107,14 @@ export default defineEventHandler(async (event) => {
       normalizedTemplateQuantity = Math.trunc(templateQuantity);
     } else {
       normalizedTemplateQuantity = null;
+    }
+    let resolvedProcessId: null | string | undefined;
+    if (processName === undefined) {
+      resolvedProcessId = undefined;
+    } else if (processNameChanged) {
+      resolvedProcessId = await resolveProcessId(processName);
+    } else {
+      resolvedProcessId = undefined;
     }
 
     const updated = await prisma.inspection_form_templates.update({
@@ -123,6 +134,7 @@ export default defineEventHandler(async (event) => {
             : String(body.formName || '').trim(),
         formNo: formNo === undefined ? undefined : formNo || null,
         partName: partName === undefined ? undefined : partName || null,
+        processId: resolvedProcessId,
         processName: processName === undefined ? undefined : processName,
         projectName:
           body.projectName === undefined

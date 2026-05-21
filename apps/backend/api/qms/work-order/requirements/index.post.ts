@@ -4,6 +4,7 @@ import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { resolveProcessId } from '~/utils/process-resolver';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -49,6 +50,16 @@ export default defineEventHandler(async (event) => {
       responsibleTeam: String(item.responsibleTeam || '').trim() || null,
       workOrderNumber: String(item.workOrderNumber || '').trim(),
     }));
+    const processIdByName = new Map<null | string, null | string>();
+    for (const item of normalized) {
+      if (!item.processName || processIdByName.has(item.processName)) {
+        continue;
+      }
+      processIdByName.set(
+        item.processName,
+        await resolveProcessId(item.processName),
+      );
+    }
 
     for (const item of normalized) {
       if (!item.workOrderNumber || !item.requirementName) {
@@ -63,6 +74,9 @@ export default defineEventHandler(async (event) => {
             attachment: item.attachments,
             createdBy: userinfo.username,
             partName: item.partName,
+            processId: item.processName
+              ? (processIdByName.get(item.processName) ?? null)
+              : null,
             processName: item.processName,
             requirementItems: JSON.stringify(item.items || []),
             requirementName: item.requirementName,

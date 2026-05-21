@@ -4,6 +4,7 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
+import { resolveProcessId } from '~/utils/process-resolver';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
@@ -56,6 +57,7 @@ export default defineEventHandler(async (event) => {
         );
       }
     }
+    const processId = await resolveProcessId(processName);
 
     const created = await prisma.inspection_form_templates.create({
       data: {
@@ -71,6 +73,7 @@ export default defineEventHandler(async (event) => {
         formName,
         formNo: formNo || null,
         partName: partName || null,
+        processId,
         processName,
         projectName: String(body.projectName || '').trim() || null,
         templateQuantity:
