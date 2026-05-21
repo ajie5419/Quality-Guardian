@@ -39,7 +39,10 @@ export default defineEventHandler(async (event) => {
     let serialSeed = await getNextInspectionIssueSerialNumber();
     for (const [index, item] of items.entries()) {
       try {
-        const payload = buildInspectionIssueUpsertPayload(item, serialSeed);
+        const payload = await buildInspectionIssueUpsertPayload(
+          item,
+          serialSeed,
+        );
         if (!payload) {
           rowErrors.push(
             buildImportRowError({

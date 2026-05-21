@@ -48,7 +48,7 @@ export default defineEventHandler(async (event) => {
     const serialNumber = await getNextInspectionIssueSerialNumber();
 
     const newRecord = await prisma.quality_records.create({
-      data: buildInspectionIssueCreateData(bodyRecord, {
+      data: await buildInspectionIssueCreateData(bodyRecord, {
         id: newId,
         inspection: linkedInspection,
         inspectorUsername: userinfo.username,

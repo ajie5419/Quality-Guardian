@@ -18,6 +18,7 @@ import {
   parseOptionalIssueYear as parseOptionalIssueYearRule,
 } from '@qgs/domain';
 import { nanoid } from 'nanoid';
+import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 
 import prisma from './prisma';
@@ -89,6 +90,7 @@ interface InspectionIssueImportItem {
   partName?: unknown;
   projectName?: unknown;
   quantity?: unknown;
+  processName?: unknown;
   responsibleDepartment?: unknown;
   responsibleWelder?: unknown;
   status?: unknown;
@@ -120,7 +122,7 @@ export async function findInspectionForIssue(inspectionId?: string) {
   });
 }
 
-export function buildInspectionIssueCreateData(
+export async function buildInspectionIssueCreateData(
   body: Record<string, unknown>,
   options: {
     id: string;
@@ -129,7 +131,7 @@ export function buildInspectionIssueCreateData(
     serialNumber: number;
   },
 ) {
-  return buildInspectionIssueCreateDataCore({
+  const createData = buildInspectionIssueCreateDataCore({
     body,
     inspection: options.inspection,
     inspectorUsername: options.inspectorUsername,
@@ -137,27 +139,113 @@ export function buildInspectionIssueCreateData(
     serialNumber: options.serialNumber,
     uuid: options.id,
   }) as Prisma.quality_recordsCreateInput;
+  return attachProcessIdToIssueCreateData(createData);
 }
 
-export function buildInspectionIssueUpdateData(
+async function attachProcessIdToIssueCreateData(
+  createData: Prisma.quality_recordsCreateInput,
+) {
+  const processName = normalizeOptionalInspectionIssueString(
+    createData.processName,
+  );
+  const processId = await resolveProcessIdForWrite({ processName });
+  if (!processId) {
+    return createData;
+  }
+  return {
+    ...createData,
+    process: {
+      connect: {
+        id: processId,
+      },
+    },
+  } as Prisma.quality_recordsCreateInput;
+}
+
+async function attachProcessIdToIssueUpdateData(
+  body: Record<string, unknown>,
+  updateData: Prisma.quality_recordsUpdateInput,
+) {
+  if (body.processName === undefined) {
+    return updateData;
+  }
+  const processName = normalizeOptionalInspectionIssueString(body.processName);
+  const processId = await resolveProcessIdForWrite({ processName });
+  if (!processId) {
+    return {
+      ...updateData,
+      process: {
+        disconnect: true,
+      },
+    } as Prisma.quality_recordsUpdateInput;
+  }
+  return {
+    ...updateData,
+    process: {
+      connect: {
+        id: processId,
+      },
+    },
+  } as Prisma.quality_recordsUpdateInput;
+}
+
+export async function buildInspectionIssueUpdateData(
   body: Record<string, unknown>,
   existingNcNumber: null | string,
 ) {
-  return buildInspectionIssueUpdateDataCore(body, existingNcNumber, (value) =>
-    toQualityRecordStatus(value),
+  const updateData = buildInspectionIssueUpdateDataCore(
+    body,
+    existingNcNumber,
+    (value) => toQualityRecordStatus(value),
   ) as Prisma.quality_recordsUpdateInput;
+  return attachProcessIdToIssueUpdateData(body, updateData);
 }
 
-export function buildInspectionIssueUpsertPayload(
+export async function buildInspectionIssueUpsertPayload(
   item: InspectionIssueImportItem,
   serialNumber: number,
 ) {
-  return buildInspectionIssueUpsertPayloadCore(
+  const payload = buildInspectionIssueUpsertPayloadCore(
     item,
     serialNumber,
     (value) => toQualityRecordStatus(value),
     createInspectionIssueId,
   ) as null | Prisma.quality_recordsUpsertArgs;
+  if (!payload) {
+    return null;
+  }
+
+  const processName = normalizeOptionalInspectionIssueString(
+    (item as { processName?: unknown }).processName,
+  );
+  if (!processName) {
+    return payload;
+  }
+  const processId = await resolveProcessIdForWrite({ processName });
+  const processWrite = processId
+    ? {
+        connect: {
+          id: processId,
+        },
+      }
+    : { disconnect: true };
+  return {
+    ...payload,
+    create: {
+      ...payload.create,
+      processName,
+      ...(processId
+        ? {
+            process: processWrite,
+          }
+        : {}),
+    },
+    update: {
+      ...payload.update,
+      processName,
+      process: processWrite,
+    },
+  } as Prisma.quality_recordsUpsertArgs;
 }
 
 export { type InspectionIssueDateMode } from '@qgs/domain';

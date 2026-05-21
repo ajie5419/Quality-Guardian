@@ -317,12 +317,15 @@ export default defineEventHandler(async (event) => {
         workOrderNumber: request.workOrderNumber,
       };
 
-      issueCreateData = issueUtils.buildInspectionIssueCreateData(issueBody, {
-        id: newId,
-        inspection: linkedInspection,
-        inspectorUsername: userinfo.username,
-        serialNumber,
-      });
+      issueCreateData = await issueUtils.buildInspectionIssueCreateData(
+        issueBody,
+        {
+          id: newId,
+          inspection: linkedInspection,
+          inspectorUsername: userinfo.username,
+          serialNumber,
+        },
+      );
       issueAuditVariables = {
         issue: issueBody.partName,
         nonConformanceNumber: newId,

@@ -59,7 +59,7 @@ export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
     const bodyRecord = body as Record<string, unknown>;
-    const updateData = buildInspectionIssueUpdateData(
+    const updateData = await buildInspectionIssueUpdateData(
       bodyRecord,
       existingNcNumber,
     );
