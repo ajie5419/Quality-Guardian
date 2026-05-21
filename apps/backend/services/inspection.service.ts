@@ -1352,6 +1352,11 @@ export const InspectionService = {
           level1Component: true,
           level2Component: true,
           materialName: true,
+          process: {
+            select: {
+              name: true,
+            },
+          },
           processName: true,
           projectName: true,
           result: true,
@@ -1369,9 +1374,14 @@ export const InspectionService = {
           select: { id: true },
           where: { inspectionId: inspection.id },
         });
+        const processName =
+          String(inspection.process?.name || '').trim() ||
+          String(inspection.processName || '').trim() ||
+          null;
         await syncInspectionProjectDocuments(tx, {
           ...inspection,
           hasDocuments: false,
+          processName,
         });
         await tx.inspection_archive_tasks.deleteMany({
           where: { inspectionId: inspection.id },
@@ -1408,6 +1418,11 @@ export const InspectionService = {
           level1Component: true,
           level2Component: true,
           materialName: true,
+          process: {
+            select: {
+              name: true,
+            },
+          },
           processName: true,
           projectName: true,
           result: true,
@@ -1425,9 +1440,14 @@ export const InspectionService = {
           select: { id: true },
           where: { inspectionId: inspection.id },
         });
+        const processName =
+          String(inspection.process?.name || '').trim() ||
+          String(inspection.processName || '').trim() ||
+          null;
         await syncInspectionProjectDocuments(tx, {
           ...inspection,
           hasDocuments: false,
+          processName,
         });
         await tx.inspection_archive_tasks.deleteMany({
           where: { inspectionId: inspection.id },
