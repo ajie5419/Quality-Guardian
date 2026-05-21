@@ -17,6 +17,7 @@ model inspections {
   materialName        String?
   incomingType        String?
   processName         String?
+  processId           String?
   level1Component     String?
   level2Component     String?
   team                String?
@@ -39,12 +40,14 @@ model inspections {
   items               inspection_items[]
   archiveTask         inspection_archive_tasks?
   inspectionRequest   qms_inspection_requests?
+  process             processes?                 @relation(fields: [processId], references: [id], onDelete: SetNull)
   qualityRecords      quality_records[]
   work_order          work_orders               @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([workOrderNumber])
   @@index([category])
   @@index([inspectionDate])
+  @@index([processId])
 }
 
 model inspection_items {
@@ -218,6 +221,25 @@ model dictionaries {
   @@index([dictType, status])
   @@index([dictType, dictKey])
   @@unique([dictType, dictKey, isDeleted])
+}
+
+model processes {
+  id                        String                      @id @default(cuid())
+  name                      String                      @unique
+  code                      String?
+  sort                      Int                         @default(0)
+  status                    Int                         @default(1)
+  isDeleted                 Boolean                     @default(false)
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @updatedAt
+  inspections               inspections[]
+  quality_records           quality_records[]
+  work_order_requirements   work_order_requirements[]
+  qms_inspection_requests   qms_inspection_requests[]
+  inspection_form_templates inspection_form_templates[]
+
+  @@index([name])
+  @@index([status])
 }
 
 model dfmea_projects {
@@ -458,6 +480,7 @@ model quality_records {
   supplierName                            String?
   category                                String?
   processName                             String?
+  processId                               String?
   defectType                              String?
   defectSubtype                           String?
   responsibleWelder                       String?
@@ -466,6 +489,7 @@ model quality_records {
   users_quality_records_inspectorTousers  users?                      @relation("quality_records_inspectorTousers", fields: [inspector], references: [username])
   users_quality_records_lastEditorTousers users?                      @relation("quality_records_lastEditorTousers", fields: [lastEditor], references: [username])
   inspection                              inspections?                @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  process                                 processes?                  @relation(fields: [processId], references: [id], onDelete: SetNull)
   work_orders                             work_orders?                @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([createdAt])
@@ -481,6 +505,7 @@ model quality_records {
   @@index([responsibleDepartment])
   @@index([defectType])
   @@index([processName])
+  @@index([processId])
 }
 
 model vehicle_commissioning_issues {
@@ -1064,6 +1089,7 @@ model work_order_requirements {
   requirementName   String
   partName          String?
   processName       String?
+  processId         String?
   responsiblePerson String?
   responsibleTeam   String?
   requirementItems  String?     @db.LongText
@@ -1077,11 +1103,13 @@ model work_order_requirements {
   isDeleted         Boolean     @default(false)
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
+  process           processes?  @relation(fields: [processId], references: [id], onDelete: SetNull)
   work_order        work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([workOrderNumber])
   @@index([status])
   @@index([workOrderNumber, processName, partName])
+  @@index([processId])
 }
 
 model qms_task_dispatches {
@@ -1119,6 +1147,7 @@ model qms_inspection_requests {
   partName            String
   componentName       String?
   processName         String
+  processId           String?
   team                String?
   quantity            Int                       @default(1)
   reporter            String
@@ -1147,6 +1176,7 @@ model qms_inspection_requests {
   isDeleted           Boolean                   @default(false)
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
+  process             processes?                @relation(fields: [processId], references: [id], onDelete: SetNull)
   work_order          work_orders               @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
   dispatcher          users?                    @relation("qms_inspection_requests_dispatcherIdTousers", fields: [dispatcherId], references: [id])
   inspector           users?                    @relation("qms_inspection_requests_inspectorIdTousers", fields: [inspectorId], references: [id])
@@ -1159,6 +1189,7 @@ model qms_inspection_requests {
   @@index([dispatcherId])
   @@index([submittedAt])
   @@index([workOrderNumber, processName, partName])
+  @@index([processId])
 }
 
 model quality_losses {
@@ -1250,6 +1281,7 @@ model inspection_form_templates {
   projectName      String?
   templateQuantity Int?
   processName      String
+  processId        String?
   partName         String?
   formName         String
   formNo           String?
@@ -1262,6 +1294,7 @@ model inspection_form_templates {
   isDeleted        Boolean     @default(false)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
+  process          processes?  @relation(fields: [processId], references: [id], onDelete: SetNull)
   work_order       work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([workOrderNumber])
@@ -1269,6 +1302,7 @@ model inspection_form_templates {
   @@index([partName])
   @@index([status])
   @@index([workOrderNumber, processName, partName])
+  @@index([processId])
 }
 
 enum inspection_category {
