@@ -34,6 +34,7 @@ export default defineEventHandler(async (event) => {
       where: { id },
       select: {
         partName: true,
+        processId: true,
         processName: true,
         status: true,
         workOrderNumber: true,
@@ -75,12 +76,18 @@ export default defineEventHandler(async (event) => {
       const finalWorkOrderNumber = workOrderNumber ?? current?.workOrderNumber;
       const finalProcessName = processName ?? current?.processName;
       const finalPartName = partName ?? String(current?.partName || '').trim();
-      const finalProcessId = await resolveProcessId(finalProcessName || '');
       const finalProcessCandidates = resolveInspectionFormProcessCandidates({
         category: 'PROCESS',
         processName: finalProcessName || '',
       });
       if (finalWorkOrderNumber && finalProcessName) {
+        const resolvedFinalProcessId = await resolveProcessId(
+          finalProcessName || '',
+        );
+        const finalProcessId =
+          processName === undefined
+            ? (resolvedFinalProcessId ?? current.processId)
+            : resolvedFinalProcessId;
         const duplicatedActiveTemplate =
           await prisma.inspection_form_templates.findFirst({
             where: {
