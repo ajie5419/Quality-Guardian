@@ -4,7 +4,7 @@ import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
-import { resolveProcessId } from '~/utils/process-resolver';
+import { resolveProcessIdsByNames } from '~/utils/process-resolver';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -50,16 +50,9 @@ export default defineEventHandler(async (event) => {
       responsibleTeam: String(item.responsibleTeam || '').trim() || null,
       workOrderNumber: String(item.workOrderNumber || '').trim(),
     }));
-    const processIdByName = new Map<null | string, null | string>();
-    for (const item of normalized) {
-      if (!item.processName || processIdByName.has(item.processName)) {
-        continue;
-      }
-      processIdByName.set(
-        item.processName,
-        await resolveProcessId(item.processName),
-      );
-    }
+    const processIdByName = await resolveProcessIdsByNames(
+      normalized.map((item) => item.processName),
+    );
 
     for (const item of normalized) {
       if (!item.workOrderNumber || !item.requirementName) {

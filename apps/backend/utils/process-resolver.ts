@@ -90,6 +90,59 @@ export async function resolveProcessId(
   return processId;
 }
 
+export async function resolveProcessIdsByNames(
+  processNames: Array<null | string | undefined>,
+) {
+  const normalizedNames = [
+    ...new Set(
+      processNames.map((item) => normalizeProcessName(item)).filter(Boolean),
+    ),
+  ];
+  const resolvedMap = new Map<string, null | string>();
+  if (normalizedNames.length === 0) {
+    return resolvedMap;
+  }
+
+  const now = Date.now();
+  const pendingNames: string[] = [];
+  for (const processName of normalizedNames) {
+    const cached = processIdCache.get(processName);
+    if (cached && cached.expiresAt > now) {
+      resolvedMap.set(processName, cached.processId);
+      continue;
+    }
+    pendingNames.push(processName);
+  }
+
+  if (pendingNames.length > 0) {
+    const processRows = await prisma.processes.findMany({
+      where: {
+        isDeleted: false,
+        name: {
+          in: pendingNames,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+    const processIdByName = new Map(
+      processRows.map((item) => [normalizeProcessName(item.name), item.id]),
+    );
+    for (const processName of pendingNames) {
+      const processId = processIdByName.get(processName) || null;
+      processIdCache.set(processName, {
+        processId,
+        expiresAt: now + PROCESS_ID_CACHE_TTL_MS,
+      });
+      resolvedMap.set(processName, processId);
+    }
+  }
+
+  return resolvedMap;
+}
+
 export async function buildProcessNameWhere(
   processName: string,
   options?: {
