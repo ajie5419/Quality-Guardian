@@ -1825,11 +1825,20 @@ export const InspectionService = {
         orderBy,
         skip,
         take,
+        include: {
+          process: {
+            select: {
+              name: true,
+            },
+          },
+        },
       }),
     ]);
 
     const items: InspectionIssue[] = issues.map((issue) => {
       const photos = tryParsePhotos(issue.issuePhoto as string);
+      const canonicalProcessName =
+        String(issue.process?.name || '').trim() || issue.processName;
 
       return {
         ...issue,
@@ -1856,6 +1865,7 @@ export const InspectionService = {
         inspector: issue.inspector || '',
         description: issue.description || '',
         partName: issue.partName || '',
+        processName: canonicalProcessName || '',
       };
     });
 
