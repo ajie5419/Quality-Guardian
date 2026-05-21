@@ -211,5 +211,20 @@ describe('inspectionService', () => {
         }),
       );
     });
+
+    it('should query by processName only when process id is not resolved', async () => {
+      (prisma.processes.findMany as any).mockResolvedValue([]);
+      (prisma.quality_records.count as any).mockResolvedValue(0);
+      (prisma.quality_records.findMany as any).mockResolvedValue([]);
+
+      await InspectionService.getIssues({
+        processName: '未知工序',
+      });
+
+      const where = (prisma.quality_records.count as any).mock.calls[0][0]
+        .where;
+      expect(where.processName).toBe('未知工序');
+      expect(where.OR).toBeUndefined();
+    });
   });
 });
