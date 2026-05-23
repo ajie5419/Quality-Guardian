@@ -1,7 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { FileStorageService } from '~/services/file-storage.service';
 import { SystemLogService } from '~/services/system-log.service';
-import { buildAfterSalesUpdateData } from '~/utils/after-sales-payload';
+import { buildGovernedAfterSalesUpdateData } from '~/utils/after-sales-payload';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event);
     const bodyRecord = body as Record<string, unknown>;
     const { costsChanged, data: updateData } =
-      buildAfterSalesUpdateData(bodyRecord);
+      await buildGovernedAfterSalesUpdateData(bodyRecord);
 
     if (costsChanged) {
       const current = await prisma.after_sales.findUnique({

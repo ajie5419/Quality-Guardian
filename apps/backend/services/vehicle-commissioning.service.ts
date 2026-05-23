@@ -13,6 +13,7 @@ import { AUDIT_TEMPLATES } from '@qgs/enums';
 import { formatDate, safeNumber, tryParsePhotos } from '@qgs/shared';
 import { nanoid } from 'nanoid';
 import { SystemLogService } from '~/services/system-log.service';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 
 const ISSUE_SEVERITY_RANK: Record<string, number> = {
@@ -343,6 +344,12 @@ export const VehicleCommissioningService = {
   ) {
     const now = new Date();
     const status = parseIssueStatus(payload.status);
+    const governedFields = buildGovernedWriteFieldsForTable(
+      'vehicle_commissioning_issues',
+      {
+        responsibleDepartment: payload.responsibleDepartment || '调试组',
+      },
+    );
     const row = await prisma.vehicle_commissioning_issues.create({
       data: {
         id: `DA-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`,
@@ -357,7 +364,7 @@ export const VehicleCommissioningService = {
         recoveredAmount: safeNumber(payload.recoveredAmount),
         claimStatus: payload.claimStatus || DEFAULT_CLAIM_STATUS,
         claimNotes: payload.claimNotes || null,
-        responsibleDepartment: payload.responsibleDepartment || '调试组',
+        ...governedFields,
         projectName: payload.projectName || '',
         workOrderNumber: payload.workOrderNumber || null,
         severity: payload.severity || 'minor',
@@ -502,6 +509,12 @@ export const VehicleCommissioningService = {
     } else if (status !== undefined) {
       closedAt = null;
     }
+    const governedFields = buildGovernedWriteFieldsForTable(
+      'vehicle_commissioning_issues',
+      {
+        responsibleDepartment: payload.responsibleDepartment,
+      },
+    );
     const row = await prisma.vehicle_commissioning_issues.update({
       where: { id },
       data: {
@@ -510,7 +523,7 @@ export const VehicleCommissioningService = {
         description: payload.description,
         partName: payload.partName,
         projectName: payload.projectName,
-        responsibleDepartment: payload.responsibleDepartment,
+        ...governedFields,
         severity: payload.severity,
         solution: payload.solution,
         issuePhoto:

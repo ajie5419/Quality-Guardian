@@ -15,6 +15,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const [project, projectItems] = await Promise.all([
+      // governance-allow-direct-canonical-read: stats page projects by route id and displays label only.
       prisma.dfmea_projects.findUnique({
         where: { id: projectId },
         select: { projectName: true },

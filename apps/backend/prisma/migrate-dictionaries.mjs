@@ -156,6 +156,66 @@ const DEFAULT_DICTIONARIES = [
     ],
   },
   {
+    dictType: 'inspection_form_name',
+    items: [],
+  },
+  {
+    dictType: 'defect_type',
+    items: [],
+  },
+  {
+    dictType: 'defect_subtype',
+    items: [],
+  },
+  {
+    dictType: 'dfmea_cause',
+    items: [],
+  },
+  {
+    dictType: 'itp_process_step',
+    items: [],
+  },
+  {
+    dictType: 'task_dispatch_type',
+    items: [],
+  },
+  {
+    dictType: 'team',
+    items: [],
+  },
+  {
+    dictType: 'incoming_type',
+    items: [],
+  },
+  {
+    dictType: 'material_name',
+    items: [],
+  },
+  {
+    dictType: 'component_name',
+    items: [],
+  },
+  {
+    dictType: 'customer_name',
+    items: [],
+  },
+  {
+    dictType: 'requirement_name',
+    items: [],
+  },
+  {
+    dictType: 'instrument_name',
+    items: [],
+  },
+  {
+    dictType: 'quality_record_category',
+    items: [],
+  },
+  {
+    dictType: 'division',
+    items: [],
+  },
+  {
     dictType: 'planning_project_status',
     items: [
       { dictKey: 'draft', dictValue: '草稿', sort: 10 },
@@ -180,6 +240,50 @@ const DEFAULT_DICTIONARIES = [
       { dictKey: 'VERIFYING', dictValue: '验证中', sort: 30 },
       { dictKey: 'CLOSED', dictValue: '已关闭', sort: 40 },
     ],
+  },
+  {
+    dictType: 'standard_document_category',
+    items: [],
+  },
+  {
+    dictType: 'supplier_brand',
+    items: [],
+  },
+  {
+    dictType: 'supplier_entity_name',
+    items: [],
+  },
+  {
+    dictType: 'supplier_product_name',
+    items: [],
+  },
+  {
+    dictType: 'borrower_name',
+    items: [],
+  },
+  {
+    dictType: 'supplier_project',
+    items: [],
+  },
+  {
+    dictType: 'root_cause',
+    items: [],
+  },
+  {
+    dictType: 'supplier_category',
+    items: [],
+  },
+  {
+    dictType: 'supervision_issue_type',
+    items: [],
+  },
+  {
+    dictType: 'supervision_issue_action_type',
+    items: [],
+  },
+  {
+    dictType: 'supervision_project_type',
+    items: [],
   },
 ];
 

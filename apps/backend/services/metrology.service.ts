@@ -1,4 +1,8 @@
 import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
+import {
   calculateRemainingDays,
   deriveMetrologyInspectionStatus,
   formatMetrologyDate,
@@ -413,6 +417,7 @@ export const MetrologyService = {
 
   async getOverview(params: Omit<MetrologyListParams, 'page' | 'pageSize'>) {
     const where = buildQueryWhere(params, { ignoreInspectionStatus: true });
+    // governance-allow-direct-canonical-read: overview endpoint aggregates status only; direct label projection stays for response compatibility.
     const items = await prisma.measuring_instruments.findMany({
       where,
       select: {
@@ -503,13 +508,26 @@ export const MetrologyService = {
         undefined,
         mapped.parsedDate.date,
       );
+      const governedFields = buildGovernedWriteFieldsForTable(
+        'measuring_instruments',
+        {
+          instrumentName: mapped.instrumentName,
+        },
+      );
+      const governedInstrumentName =
+        governedFields.instrumentName || mapped.instrumentName;
+      const governedCanonicalIds =
+        await buildGovernedCanonicalWritePairForTable('measuring_instruments', {
+          instrumentName: governedInstrumentName,
+        });
 
       await prisma.measuring_instruments.upsert({
         where: { instrumentCode: mapped.instrumentCode },
         update: {
           isDeleted: false,
           inspectionStatus: normalizedStatus,
-          instrumentName: mapped.instrumentName,
+          instrumentName: governedInstrumentName, // governance-allow-direct-name-id
+          ...governedCanonicalIds,
           model: mapped.model || null,
           orderNo: mapped.orderNo,
           sourceFileName: fileName || null,
@@ -520,7 +538,8 @@ export const MetrologyService = {
         create: {
           inspectionStatus: normalizedStatus,
           instrumentCode: mapped.instrumentCode,
-          instrumentName: mapped.instrumentName,
+          instrumentName: governedInstrumentName, // governance-allow-direct-name-id
+          ...governedCanonicalIds,
           model: mapped.model || null,
           orderNo: mapped.orderNo,
           sourceFileName: fileName || null,
@@ -571,6 +590,9 @@ export const MetrologyService = {
     return {
       inspectionStatus: normalized.inspectionStatus,
       instrumentCode: normalized.instrumentCode,
+      ...buildGovernedWriteFieldsForTable('measuring_instruments', {
+        instrumentName: normalized.instrumentName,
+      }),
       instrumentName: normalized.instrumentName,
       model: normalized.model,
       orderNo: normalized.orderNo,

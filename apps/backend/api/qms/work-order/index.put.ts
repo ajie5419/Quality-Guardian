@@ -2,6 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import { getRequiredQueryParam } from '~/utils/query-param';
@@ -37,9 +38,18 @@ export default defineEventHandler(async (event) => {
       updatedAt: new Date(),
     };
 
-    if (body.customerName !== undefined)
-      updateData.customerName = body.customerName;
-    if (body.division !== undefined) updateData.division = body.division;
+    if (body.customerName !== undefined) {
+      const governedFields = buildGovernedWriteFieldsForTable('work_orders', {
+        customerName: body.customerName,
+      });
+      Object.assign(updateData, governedFields);
+    }
+    if (body.division !== undefined) {
+      const governedFields = buildGovernedWriteFieldsForTable('work_orders', {
+        division: body.division,
+      });
+      Object.assign(updateData, governedFields);
+    }
     if (body.projectName !== undefined)
       updateData.projectName = body.projectName;
     if (body.quantity !== undefined && body.quantity !== null) {

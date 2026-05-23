@@ -2,6 +2,10 @@ import { defineEventHandler, readBody } from 'h3';
 import { SystemLogService } from '~/services/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
@@ -103,22 +107,42 @@ export default defineEventHandler(async (event) => {
 
       await tx.quality_losses.update({
         where: target.where,
-        data: {
-          ...(parsedBody.occurDate ? { occurDate: parsedBody.occurDate } : {}),
-          ...(parsedBody.type ? { type: parsedBody.type } : {}),
-          ...(parsedBody.amount === undefined
-            ? {}
-            : { amount: parsedBody.amount }),
-          ...(parsedBody.actualClaim === undefined
-            ? {}
-            : { actualClaim: parsedBody.actualClaim }),
-          ...(body.description === undefined
-            ? {}
-            : { description: body.description }),
-          ...(parsedBody.respDept ? { respDept: parsedBody.respDept } : {}),
-          ...(parsedBody.status ? { status: parsedBody.status } : {}),
-          updatedAt: new Date(),
-        },
+        data: await (async () => {
+          const baseUpdateData = {
+            ...(parsedBody.occurDate
+              ? { occurDate: parsedBody.occurDate }
+              : {}),
+            ...(parsedBody.type ? { type: parsedBody.type } : {}),
+            ...(parsedBody.amount === undefined
+              ? {}
+              : { amount: parsedBody.amount }),
+            ...(parsedBody.actualClaim === undefined
+              ? {}
+              : { actualClaim: parsedBody.actualClaim }),
+            ...(parsedBody.respDept === undefined
+              ? {}
+              : { respDept: parsedBody.respDept }),
+            ...(body.description === undefined
+              ? {}
+              : { description: body.description }),
+            ...(parsedBody.status ? { status: parsedBody.status } : {}),
+            updatedAt: new Date(),
+          };
+          const governedCanonicalIds =
+            await buildGovernedCanonicalWritePairForTable(
+              'quality_losses',
+              baseUpdateData as Record<string, unknown>,
+            );
+          const governedFields = buildGovernedWriteFieldsForTable(
+            'quality_losses',
+            baseUpdateData as Record<string, unknown>,
+          );
+          return {
+            ...baseUpdateData,
+            ...governedFields,
+            ...governedCanonicalIds,
+          };
+        })(),
       });
     });
 

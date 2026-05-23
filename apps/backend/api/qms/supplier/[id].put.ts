@@ -15,7 +15,7 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
-import { buildSupplierUpdateData } from '~/utils/supplier';
+import { buildSupplierUpdateDataWithCanonical } from '~/utils/supplier';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -33,7 +33,9 @@ export default defineEventHandler(async (event) => {
 
     const updated = await prisma.suppliers.update({
       where: { id },
-      data: buildSupplierUpdateData(body as Record<string, unknown>),
+      data: await buildSupplierUpdateDataWithCanonical(
+        body as Record<string, unknown>,
+      ),
     });
 
     await recordBusinessAuditLog(event, {

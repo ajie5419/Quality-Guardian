@@ -27,6 +27,7 @@ export default defineEventHandler(async (event) => {
     }>;
 
     try {
+      // governance-allow-direct-canonical-read: fallback path reads project labels for degraded schema mode.
       const projects = await prisma.doc_projects.findMany({
         where: { isDeleted: false },
         include: {

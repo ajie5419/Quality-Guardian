@@ -5,6 +5,7 @@ import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { awaitMockDelay } from '~/utils/index';
 import { buildItpProjectCreateData, normalizeItpText } from '~/utils/itp';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaForeignKeyError } from '~/utils/prisma-error';
 import { getMissingRequiredFields } from '~/utils/request-validation';
@@ -27,8 +28,18 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const createData = buildItpProjectCreateData(
+      body as Record<string, unknown>,
+    );
+    const governedFields = buildGovernedWriteFieldsForTable('quality_plans', {
+      ...createData,
+      projectName: createData.projectName,
+    });
     const newProject = await prisma.quality_plans.create({
-      data: buildItpProjectCreateData(body as Record<string, unknown>),
+      data: {
+        ...createData,
+        ...governedFields,
+      },
     });
 
     await FileStorageService.registerReferencesFromAttachments({

@@ -15,6 +15,11 @@ import { FileStorageService } from '~/services/file-storage.service';
 import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import { buildInspectionIssueDateRange } from '~/utils/inspection-issue';
 import { createModuleLogger } from '~/utils/logger';
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import { UPLOAD_DIR } from '~/utils/paths';
 import prisma from '~/utils/prisma';
 import {
@@ -33,6 +38,7 @@ import {
   stringifyProjectDocuments,
   upsertInspectionProjectDocuments,
 } from '~/utils/project-documents';
+import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 import { BaseService } from './base.service';
 import { DataScopeService } from './data-scope.service';
@@ -349,7 +355,7 @@ type ArchiveTaskStatus = 'ARCHIVED' | 'IN_PROGRESS' | 'PENDING' | 'REJECTED';
 interface InspectionRecordInput {
   category: 'INCOMING' | 'PROCESS' | 'SHIPMENT';
   workOrderNumber: string;
-  projectName: string;
+  projectName?: string;
   supplierName?: string;
   materialName?: string;
   incomingType?: string;
@@ -359,6 +365,7 @@ interface InspectionRecordInput {
   level2Component?: string;
 
   team?: string;
+  teamId?: null | string;
   documents?: string;
   hasDocuments?: boolean;
   packingListArchived?: string;
@@ -427,6 +434,7 @@ async function resolveInspectionTemplateBinding(
   ].filter((item, index, arr) => Boolean(item) && arr.indexOf(item) === index);
   let matchedTemplate = null;
   for (const partName of partCandidates) {
+    // governance-allow-direct-canonical-read: template match still relies on part-name fallback strategy.
     matchedTemplate = await tx.inspection_form_templates.findFirst({
       where: {
         isDeleted: false,
@@ -446,6 +454,7 @@ async function resolveInspectionTemplateBinding(
     }
   }
   if (!matchedTemplate) {
+    // governance-allow-direct-canonical-read: fallback empty-part template lookup is name-based by design.
     matchedTemplate = await tx.inspection_form_templates.findFirst({
       where: {
         isDeleted: false,
@@ -567,6 +576,12 @@ async function syncInspectionArchiveTask(
       status === 'ARCHIVED' ? existing?.archivedAt || new Date() : null;
     const now = new Date();
 
+    const governedFields = buildGovernedWriteFieldsForTable(
+      'inspection_archive_tasks',
+      {
+        projectName: source.projectName,
+      },
+    );
     const task = await tx.inspection_archive_tasks.upsert({
       where: { inspectionId: source.id },
       update: {
@@ -576,7 +591,7 @@ async function syncInspectionArchiveTask(
         inspectionDate: source.inspectionDate || now,
         inspector: source.inspector,
         isOverdue: status !== 'ARCHIVED' && now > dueAt,
-        projectName: source.projectName || null,
+        ...governedFields,
         status,
         workContent: buildArchiveWorkContent(source),
         workOrderNumber: source.workOrderNumber,
@@ -587,7 +602,7 @@ async function syncInspectionArchiveTask(
         inspectionDate: source.inspectionDate || now,
         inspector: source.inspector,
         isOverdue: status !== 'ARCHIVED' && now > dueAt,
-        projectName: source.projectName || null,
+        ...governedFields,
         status,
         workContent: buildArchiveWorkContent(source),
         workOrderNumber: source.workOrderNumber,
@@ -615,6 +630,7 @@ async function syncInspectionProjectDocuments(
   source: InspectionProjectDocSyncSource,
 ) {
   try {
+    // governance-allow-direct-canonical-read: project-doc sync reads project label for compatibility.
     const currentProject = await tx.doc_projects.findUnique({
       where: { workOrderNumber: source.workOrderNumber },
       select: {
@@ -630,11 +646,18 @@ async function syncInspectionProjectDocuments(
     );
 
     if (currentProject) {
+      const governedProjectFields = buildGovernedWriteFieldsForTable(
+        'doc_projects',
+        {
+          projectName: source.projectName || currentProject.projectName,
+        },
+      );
       await tx.doc_projects.update({
         where: { id: currentProject.id },
         data: {
           documents: stringifyProjectDocuments(nextDocuments),
           projectName: source.projectName || currentProject.projectName,
+          ...governedProjectFields,
           updatedAt: new Date(),
         },
       });
@@ -651,10 +674,18 @@ async function syncInspectionProjectDocuments(
       return;
     }
 
+    const createProjectName = source.projectName || source.workOrderNumber;
+    const governedProjectFields = buildGovernedWriteFieldsForTable(
+      'doc_projects',
+      {
+        projectName: createProjectName,
+      },
+    );
     const created = await tx.doc_projects.create({
       data: {
         documents: stringifyProjectDocuments(nextDocuments),
-        projectName: source.projectName || source.workOrderNumber,
+        projectName: createProjectName,
+        ...governedProjectFields,
         status: 'active',
         workOrderNumber: source.workOrderNumber,
       },
@@ -1088,11 +1119,32 @@ export const InspectionService = {
     for (let attempt = 1; attempt <= maxRetry; attempt++) {
       try {
         const serialNumber = await this.generateSerialNumber();
+        const inputTeam = data.team;
         const resolvedProcessId = await resolveProcessIdForWrite({
           explicitProcessId: data.processId,
           processName: data.processName,
         });
+        const resolvedTeamId = await resolveTeamIdForWrite({
+          explicitTeamId: data.teamId,
+          team: inputTeam, // governance-allow-direct-name-id
+        });
         return await prisma.$transaction(async (tx) => {
+          const governedFields = buildGovernedWriteFieldsForTable(
+            'inspections',
+            {
+              incomingType: data.incomingType,
+              materialName: data.materialName,
+              processName: data.processName,
+              projectName: data.projectName,
+              supplierName: data.supplierName,
+              team: inputTeam,
+            },
+          );
+          const governedCanonicalIds =
+            await buildGovernedCanonicalWritePairForTable(
+              'inspections',
+              governedFields as Record<string, unknown>,
+            );
           const templateBinding = await resolveInspectionTemplateBinding(
             tx,
             data,
@@ -1102,15 +1154,14 @@ export const InspectionService = {
               serialNumber,
               category: data.category,
               workOrderNumber: data.workOrderNumber,
-              projectName: data.projectName,
-              supplierName: data.supplierName,
               materialName: data.materialName,
               incomingType: data.incomingType,
               processId: resolvedProcessId,
-              processName: data.processName,
+              teamId: resolvedTeamId, // governance-allow-direct-name-id
               level1Component: data.level1Component,
               level2Component: data.level2Component,
-              team: data.team,
+              ...governedFields,
+              ...governedCanonicalIds,
               documents: data.documents,
               hasDocuments:
                 data.hasDocuments === undefined ? true : data.hasDocuments,
@@ -1204,6 +1255,20 @@ export const InspectionService = {
     this.assertResultQuantityConsistency(overallResult, quantitySummary);
 
     return prisma.$transaction(async (tx) => {
+      const inputTeam = data.team;
+      const governedFields = buildGovernedWriteFieldsForTable('inspections', {
+        incomingType: data.incomingType,
+        materialName: data.materialName,
+        processName: data.processName,
+        projectName: data.projectName,
+        supplierName: data.supplierName,
+        team: inputTeam,
+      });
+      const governedCanonicalIds =
+        await buildGovernedCanonicalWritePairForTable(
+          'inspections',
+          governedFields as Record<string, unknown>,
+        );
       const previousInspection = await tx.inspections.findUnique({
         where: { id },
         select: {
@@ -1216,10 +1281,22 @@ export const InspectionService = {
           workOrderNumber: true,
         },
       });
+      const previousCanonicalProcessName = previousInspection
+        ? await resolveCanonicalProcessNameById(
+            tx,
+            previousInspection.processId,
+            previousInspection.processName,
+          )
+        : null;
       const resolvedProcessId = await resolveProcessIdForWrite({
         explicitProcessId: data.processId,
         keepExistingWhenNameMissing: true,
         processName: data.processName,
+      });
+      const resolvedTeamId = await resolveTeamIdForWrite({
+        explicitTeamId: data.teamId,
+        keepExistingWhenNameMissing: true,
+        team: inputTeam, // governance-allow-direct-name-id
       });
       const templateProcessId =
         resolvedProcessId === undefined
@@ -1235,7 +1312,7 @@ export const InspectionService = {
         processId: templateProcessId,
         processName:
           data.processName === undefined
-            ? previousInspection?.processName || undefined
+            ? previousCanonicalProcessName || undefined
             : data.processName,
         workOrderNumber:
           data.workOrderNumber || previousInspection?.workOrderNumber || '',
@@ -1246,15 +1323,14 @@ export const InspectionService = {
         where: { id },
         data: {
           workOrderNumber: data.workOrderNumber,
-          projectName: data.projectName,
-          supplierName: data.supplierName,
           materialName: data.materialName,
           incomingType: data.incomingType,
           processId: resolvedProcessId,
-          processName: data.processName,
+          teamId: resolvedTeamId, // governance-allow-direct-name-id
           level1Component: data.level1Component,
           level2Component: data.level2Component,
-          team: data.team,
+          ...governedFields,
+          ...governedCanonicalIds,
           documents: data.documents,
           hasDocuments: data.hasDocuments,
           packingListArchived: data.packingListArchived,
@@ -1940,6 +2016,8 @@ export const InspectionService = {
       where,
       select: {
         date: true,
+        defectSubtypeId: true, // governance-allow-direct-name-id
+        defectTypeId: true, // governance-allow-direct-name-id
         defectSubtype: true,
         defectType: true,
         division: true,
@@ -1954,6 +2032,17 @@ export const InspectionService = {
       },
     });
 
+    const [defectTypeNameById, defectSubtypeNameById] = await Promise.all([
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        configKey: 'defectType',
+        canonicalIds: rows.map((item) => item.defectTypeId),
+      }),
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        configKey: 'defectSubtype',
+        canonicalIds: rows.map((item) => item.defectSubtypeId),
+      }),
+    ]);
+
     const aggregateMap = new Map<string, number>();
     for (const row of rows) {
       let key = '未分类';
@@ -1963,11 +2052,17 @@ export const InspectionService = {
           break;
         }
         case 'defectSubtype': {
-          key = row.defectSubtype || '未分类';
+          key =
+            defectSubtypeNameById.get(String(row.defectSubtypeId || '')) ||
+            row.defectSubtype ||
+            '未分类';
           break;
         }
         case 'defectType': {
-          key = row.defectType || '未分类';
+          key =
+            defectTypeNameById.get(String(row.defectTypeId || '')) ||
+            row.defectType ||
+            '未分类';
           break;
         }
         case 'division': {

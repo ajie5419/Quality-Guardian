@@ -7,6 +7,10 @@ import {
   stringifyItpQuantitativeItems,
 } from '~/utils/itp';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
@@ -26,23 +30,36 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
+    const baseUpdateData = {
+      processStep: body.processStep,
+      activity: body.activity,
+      controlPoint: body.controlPoint,
+      acceptanceCriteria: body.acceptanceCriteria,
+      referenceDoc: body.referenceDoc,
+      frequency: body.frequency,
+      verifyingDocument: body.verifyingDocument,
+      isQuantitative:
+        body.isQuantitative === undefined ? undefined : !!body.isQuantitative,
+      quantitativeItems:
+        body.quantitativeItems === undefined
+          ? undefined
+          : stringifyItpQuantitativeItems(body.quantitativeItems),
+      order: body.order === undefined ? undefined : Number(body.order),
+    };
+    const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+      'itp_items',
+      baseUpdateData as Record<string, unknown>,
+    );
+    const governedFields = buildGovernedWriteFieldsForTable(
+      'itp_items',
+      baseUpdateData as Record<string, unknown>,
+    );
     const updated = await prisma.itp_items.update({
       where: { id },
       data: {
-        processStep: body.processStep,
-        activity: body.activity,
-        controlPoint: body.controlPoint,
-        acceptanceCriteria: body.acceptanceCriteria,
-        referenceDoc: body.referenceDoc,
-        frequency: body.frequency,
-        verifyingDocument: body.verifyingDocument,
-        isQuantitative:
-          body.isQuantitative === undefined ? undefined : !!body.isQuantitative,
-        quantitativeItems:
-          body.quantitativeItems === undefined
-            ? undefined
-            : stringifyItpQuantitativeItems(body.quantitativeItems),
-        order: body.order === undefined ? undefined : Number(body.order),
+        ...baseUpdateData,
+        ...governedFields,
+        ...governedCanonicalIds,
       },
     });
 

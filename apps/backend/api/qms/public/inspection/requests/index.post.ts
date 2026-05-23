@@ -11,6 +11,10 @@ import {
   parseInspectionRequestQuantity,
 } from '~/utils/inspection-request';
 import { publishInspectionRequestCreated } from '~/utils/inspection-request-events';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 import { getMissingRequiredFields } from '~/utils/request-validation';
@@ -19,6 +23,7 @@ import {
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
+import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 export default defineEventHandler(async (event) => {
   const body = (await readBody(event)) as Record<string, unknown>;
@@ -58,8 +63,22 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const governedFields = buildGovernedWriteFieldsForTable(
+      'qms_inspection_requests',
+      {
+        componentName: componentName || null,
+        team,
+      },
+    );
+    const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+      'qms_inspection_requests',
+      governedFields as Record<string, unknown>,
+    );
     const processId = await resolveProcessIdForWrite({
       processName,
+    });
+    const teamId = await resolveTeamIdForWrite({
+      team,
     });
     const workOrder = await prisma.work_orders.findUnique({
       select: { workOrderNumber: true },
@@ -78,6 +97,7 @@ export default defineEventHandler(async (event) => {
         ),
         partName,
         processId,
+        teamId,
         processName,
         quantity,
         reporter,
@@ -86,7 +106,8 @@ export default defineEventHandler(async (event) => {
         selfCheckResult: normalizeInspectionRequestCheckResult(
           body.selfCheckResult,
         ),
-        team,
+        ...governedFields,
+        ...governedCanonicalIds,
         workOrderNumber,
       },
       include: {

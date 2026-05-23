@@ -211,6 +211,7 @@ export const WorkOrderService = {
           orderBy: { createdAt: 'desc' },
         }),
         prisma.work_orders.count({ where: whereCondition }),
+        // governance-allow-direct-canonical-read: summary list reads aggregate labels only.
         prisma.work_orders.findMany({
           where: whereCondition,
           select: {
@@ -290,6 +291,7 @@ export const WorkOrderService = {
     params: Omit<WorkOrderListParams, 'page' | 'pageSize'>,
   ): Promise<WorkOrderDashboardStats> {
     const whereCondition = await buildWorkOrderWhereCondition(params);
+    // governance-allow-direct-canonical-read: dashboard stats reads project labels only.
     const summary = await prisma.work_orders.findMany({
       where: whereCondition,
       select: {

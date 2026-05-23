@@ -4,6 +4,7 @@ import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { awaitMockDelay } from '~/utils/index';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
@@ -22,9 +23,15 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const governedFields = buildGovernedWriteFieldsForTable('quality_plans', {
+      projectName: undefined,
+    });
     const deleted = await prisma.quality_plans.update({
       where: { id },
-      data: { isDeleted: true },
+      data: {
+        ...governedFields,
+        isDeleted: true,
+      },
     });
     await FileStorageService.softDeleteReferences({
       bizId: String(id),

@@ -30,6 +30,7 @@ export default defineEventHandler(async (event) => {
           : {})),
     };
     const [items, total] = await Promise.all([
+      // governance-allow-direct-canonical-read: public picker keeps projectName fuzzy search for UX compatibility.
       prisma.work_orders.findMany({
         where,
         orderBy: { createdAt: 'desc' },

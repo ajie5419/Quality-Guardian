@@ -9,6 +9,10 @@ import {
   parseItpQuantitativeItems,
 } from '~/utils/itp';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
@@ -42,12 +46,25 @@ export default defineEventHandler(async (event) => {
 
     const maxOrder = getMaxItpItemOrder(plan.items || []);
 
+    const createData = buildItpItemCreateData({
+      item: itemData,
+      order: Number(itemData.order) || maxOrder + 1,
+      projectId: String(projectId),
+    });
+    const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+      'itp_items',
+      createData as Record<string, unknown>,
+    );
+    const governedFields = buildGovernedWriteFieldsForTable(
+      'itp_items',
+      createData as Record<string, unknown>,
+    );
     const newItem = await prisma.itp_items.create({
-      data: buildItpItemCreateData({
-        item: itemData,
-        order: Number(itemData.order) || maxOrder + 1,
-        projectId: String(projectId),
-      }),
+      data: {
+        ...createData,
+        ...governedFields,
+        ...governedCanonicalIds,
+      },
     });
 
     await recordBusinessAuditLog(event, {

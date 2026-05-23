@@ -2,7 +2,10 @@ import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { normalizeBomProjectStatus } from '~/utils/bom';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { buildPlanningProjectUpdateData } from '~/utils/planning-project';
+import {
+  applyGovernedProjectNameByTable,
+  buildPlanningProjectUpdateData,
+} from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
@@ -24,9 +27,13 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
+    const updateData = buildPlanningProjectUpdateData(
+      body,
+      normalizeBomProjectStatus,
+    );
     const updated = await prisma.bom_projects.update({
       where: { id },
-      data: buildPlanningProjectUpdateData(body, normalizeBomProjectStatus),
+      data: applyGovernedProjectNameByTable('bom_projects', updateData),
     });
     return useResponseSuccess(updated);
   } catch (error) {

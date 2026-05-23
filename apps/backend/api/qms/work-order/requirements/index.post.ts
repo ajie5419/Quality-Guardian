@@ -3,8 +3,11 @@ import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
-import { resolveProcessIdsByNames } from '~/utils/process-resolver';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -50,9 +53,6 @@ export default defineEventHandler(async (event) => {
       responsibleTeam: String(item.responsibleTeam || '').trim() || null,
       workOrderNumber: String(item.workOrderNumber || '').trim(),
     }));
-    const processIdByName = await resolveProcessIdsByNames(
-      normalized.map((item) => item.processName),
-    );
 
     for (const item of normalized) {
       if (!item.workOrderNumber || !item.requirementName) {
@@ -60,25 +60,42 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    const created = await prisma.$transaction(
-      normalized.map((item) =>
-        prisma.work_order_requirements.create({
-          data: {
-            attachment: item.attachments,
-            createdBy: userinfo.username,
+    const createPayloads = await Promise.all(
+      normalized.map(async (item) => {
+        const governedFields = buildGovernedWriteFieldsForTable(
+          'work_order_requirements',
+          {
             partName: item.partName,
-            processId: item.processName
-              ? (processIdByName.get(item.processName) ?? null)
-              : null,
             processName: item.processName,
-            requirementItems: JSON.stringify(item.items || []),
             requirementName: item.requirementName,
-            responsiblePerson: item.responsiblePerson,
             responsibleTeam: item.responsibleTeam,
-            status: 'active',
-            updatedBy: userinfo.username,
-            workOrderNumber: item.workOrderNumber,
           },
+        );
+        const governedCanonicalIds =
+          await buildGovernedCanonicalWritePairForTable(
+            'work_order_requirements',
+            governedFields as Record<string, unknown>,
+          );
+        return {
+          attachment: item.attachments,
+          createdBy: userinfo.username,
+          ...governedFields,
+          ...governedCanonicalIds,
+          requirementItems: JSON.stringify(item.items || []),
+          requirementName: item.requirementName,
+          responsiblePerson: item.responsiblePerson,
+          responsibleTeam: item.responsibleTeam,
+          status: 'active',
+          updatedBy: userinfo.username,
+          workOrderNumber: item.workOrderNumber,
+        };
+      }),
+    );
+
+    const created = await prisma.$transaction(
+      createPayloads.map((data) =>
+        prisma.work_order_requirements.create({
+          data,
           select: {
             id: true,
             requirementName: true,

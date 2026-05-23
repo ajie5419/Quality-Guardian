@@ -2,6 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { RbacService } from '~/services/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   isPrismaNotFoundError,
@@ -35,6 +36,9 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
+    const governedFields = buildGovernedWriteFieldsForTable('roles', {
+      name: body.value,
+    });
 
     const updateData: Record<string, unknown> = {
       description: body.name || body.remark || body.description, // Use 'name' from FE as description
@@ -44,8 +48,8 @@ export default defineEventHandler(async (event) => {
     // Only update name (identifier) if provided and we really want to allow it
     // But usually identifier shouldn't change.
     // In our DB mapping, name = role value.
-    if (body.value) {
-      updateData.name = body.value;
+    if (governedFields.name) {
+      updateData.name = governedFields.name;
     }
 
     if (body.status !== undefined) {

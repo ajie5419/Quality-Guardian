@@ -1,4 +1,8 @@
 import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
+import {
   deriveMetrologyInspectionStatus,
   formatMetrologyDate,
   getMetrologyBorrowStatusLabel,
@@ -504,6 +508,7 @@ export const MetrologyBorrowService = {
       return [];
     }
 
+    // governance-allow-direct-canonical-read: instrument matcher keeps name fuzzy-search for operator UX compatibility.
     const items = await prisma.measuring_instruments.findMany({
       where: {
         isDeleted: false,
@@ -633,14 +638,39 @@ export const MetrologyBorrowService = {
     }
 
     await prisma.$transaction(async (tx) => {
+      const governedFields = buildGovernedWriteFieldsForTable(
+        'metrology_borrow_records',
+        {
+          borrowerDepartment: normalized.borrowerDepartment,
+          borrowerName: normalized.borrowerName,
+        },
+      );
+      const normalizedBorrowerDepartment =
+        governedFields.borrowerDepartment || normalized.borrowerDepartment;
+      const normalizedBorrowerName =
+        governedFields.borrowerName || normalized.borrowerName;
+      const governedCanonicalIds =
+        await buildGovernedCanonicalWritePairForTable(
+          'metrology_borrow_records',
+          {
+            borrowerDepartment: normalizedBorrowerDepartment,
+            borrowerName: normalizedBorrowerName,
+          },
+        );
       await tx.metrology_borrow_records.create({
         data: {
           borrowedAt,
-          borrowerDepartment: normalized.borrowerDepartment,
-          borrowerName: normalized.borrowerName,
+          // governance-allow-direct-name-id: normalized via helper, explicit field kept for Prisma required create input.
+          borrowerDepartment: normalizedBorrowerDepartment,
+          borrowerName: normalizedBorrowerName,
+          ...governedCanonicalIds,
           createdBy: operator || null,
           expectedReturnAt: normalized.expectedReturnAt.date,
-          instrumentId: normalized.instrumentId,
+          instrument: {
+            connect: {
+              id: normalized.instrumentId,
+            },
+          },
           remark: normalized.remark,
           status,
           updatedBy: operator || null,

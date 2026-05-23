@@ -3,6 +3,7 @@ import { FileStorageService } from '~/services/file-storage.service';
 import { VehicleCommissioningService } from '~/services/vehicle-commissioning.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import {
   badRequestResponse,
@@ -42,6 +43,14 @@ export default defineEventHandler(async (event) => {
   try {
     const body = (await readBody(event)) as Record<string, unknown>;
     const photos = normalizePhotos(body.photos);
+    const governedFields = buildGovernedWriteFieldsForTable(
+      'vehicle_commissioning_issues',
+      {
+        responsibleDepartment: body.responsibleDepartment
+          ? String(body.responsibleDepartment)
+          : undefined,
+      },
+    );
     const updated = await VehicleCommissioningService.updateIssue(
       id,
       {
@@ -54,9 +63,7 @@ export default defineEventHandler(async (event) => {
         photos,
         projectName: body.projectName ? String(body.projectName) : undefined,
         recoveredAmount: normalizeNumber(body.recoveredAmount),
-        responsibleDepartment: body.responsibleDepartment
-          ? String(body.responsibleDepartment)
-          : undefined,
+        ...governedFields,
         claimNotes: body.claimNotes ? String(body.claimNotes) : undefined,
         claimStatus: body.claimStatus ? String(body.claimStatus) : undefined,
         severity: body.severity ? String(body.severity) : undefined,

@@ -1,4 +1,5 @@
 import prisma from '~/utils/prisma';
+import { buildTeamContainsWhere } from '~/utils/team-resolver';
 import { hasWelderCodeField } from '~/utils/welder';
 
 export interface WelderQueryParams {
@@ -40,7 +41,12 @@ export const WelderService = {
 
     const where: Record<string, unknown> = { isDeleted: false };
     if (team) {
-      where.team = { contains: team };
+      Object.assign(
+        where,
+        await buildTeamContainsWhere({
+          keyword: team,
+        }),
+      );
     }
     if (supportsWelderCode && welderCode) {
       where.welderCode = { contains: welderCode };
@@ -51,7 +57,9 @@ export const WelderService = {
     if (keyword) {
       const searchOr: Array<Record<string, unknown>> = [
         { name: { contains: keyword } },
-        { team: { contains: keyword } },
+        await buildTeamContainsWhere({
+          keyword,
+        }),
         { certificationNo: { contains: keyword } },
       ];
       if (supportsWelderCode) {

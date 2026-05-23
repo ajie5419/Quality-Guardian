@@ -69,7 +69,9 @@ const selectOptions = computed<SelectProps['options']>(() => {
     ...item,
     item,
     label: item.workOrderNumber,
-    value: item.id || item.workOrderNumber,
+    // Backend relations use workOrderNumber as the canonical key.
+    // Keep select value aligned to avoid nested connect failures.
+    value: item.workOrderNumber,
   }));
 });
 

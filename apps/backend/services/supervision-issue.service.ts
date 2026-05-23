@@ -5,6 +5,10 @@ import type {
 } from '@qgs/shared';
 
 import { safeNumber, tryParsePhotos } from '@qgs/shared';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 
 import {
   normalizeDate,
@@ -65,6 +69,21 @@ async function generateIssueNo() {
 export const SupervisionIssueService = {
   async createIssue(payload: Record<string, unknown>, operatorUserId?: string) {
     const status = normalizeIssueStatus(payload.status);
+    const normalizedIssueType =
+      normalizeText(payload.issueType).toUpperCase() || 'QUALITY';
+    const governedIssueFields = buildGovernedWriteFieldsForTable(
+      'supervision_issues',
+      {
+        issueType: normalizedIssueType, // governance-allow-direct-name-id
+      },
+    );
+    const governedIssueCanonicalIds =
+      await buildGovernedCanonicalWritePairForTable('supervision_issues', {
+        issueType:
+          governedIssueFields.issueType === undefined
+            ? normalizedIssueType
+            : governedIssueFields.issueType,
+      });
     const row = await prisma.supervision_issues.create({
       data: {
         affectsProgress: Boolean(payload.affectsProgress),
@@ -76,7 +95,9 @@ export const SupervisionIssueService = {
         estimatedLoss: safeNumber(payload.estimatedLoss),
         isClaim: Boolean(payload.isClaim),
         issueNo: await generateIssueNo(),
-        issueType: normalizeText(payload.issueType).toUpperCase() || 'QUALITY',
+        issueType: normalizedIssueType, // governance-allow-direct-name-id
+        ...governedIssueFields,
+        ...governedIssueCanonicalIds,
         photos: stringifyList(payload.photos),
         projectId: normalizeText(payload.projectId),
         rectificationPhotos: stringifyList(payload.rectificationPhotos),
@@ -99,9 +120,27 @@ export const SupervisionIssueService = {
     return prisma.$transaction(async (tx) => {
       const actionType =
         normalizeText(payload.actionType).toUpperCase() || 'FOLLOW_UP';
+      const governedActionFields = buildGovernedWriteFieldsForTable(
+        'supervision_issue_actions',
+        {
+          actionType,
+        },
+      );
+      const governedActionCanonicalIds =
+        await buildGovernedCanonicalWritePairForTable(
+          'supervision_issue_actions',
+          {
+            actionType:
+              governedActionFields.actionType === undefined
+                ? actionType
+                : governedActionFields.actionType,
+          },
+        );
       const row = await tx.supervision_issue_actions.create({
         data: {
           actionType,
+          ...governedActionFields,
+          ...governedActionCanonicalIds,
           attachments: stringifyList(payload.attachments),
           createdBy: operatorUserId || null,
           description: normalizeText(payload.description) || null,
@@ -167,6 +206,27 @@ export const SupervisionIssueService = {
       payload.status === undefined
         ? undefined
         : normalizeIssueStatus(payload.status);
+    const normalizedIssueType =
+      payload.issueType === undefined
+        ? undefined
+        : normalizeText(payload.issueType).toUpperCase() || 'QUALITY';
+    const governedIssueFields = buildGovernedWriteFieldsForTable(
+      'supervision_issues',
+      {
+        issueType: normalizedIssueType, // governance-allow-direct-name-id
+      },
+    );
+    const governedIssueCanonicalIds =
+      await buildGovernedCanonicalWritePairForTable('supervision_issues', {
+        issueType:
+          governedIssueFields.issueType === undefined
+            ? normalizedIssueType
+            : governedIssueFields.issueType,
+      });
+    const normalizedIssuePayload = {
+      ...governedIssueFields,
+      ...governedIssueCanonicalIds,
+    };
     const row = await prisma.supervision_issues.update({
       data: {
         affectsProgress:
@@ -192,10 +252,7 @@ export const SupervisionIssueService = {
             : safeNumber(payload.estimatedLoss),
         isClaim:
           payload.isClaim === undefined ? undefined : Boolean(payload.isClaim),
-        issueType:
-          payload.issueType === undefined
-            ? undefined
-            : normalizeText(payload.issueType).toUpperCase() || 'QUALITY',
+        ...normalizedIssuePayload,
         photos:
           payload.photos === undefined
             ? undefined

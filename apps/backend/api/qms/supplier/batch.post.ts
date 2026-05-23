@@ -2,6 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedCanonicalWritePairForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { parseNonEmptyArray } from '~/utils/request-validation';
 import {
@@ -46,6 +47,24 @@ export default defineEventHandler(async (event) => {
           }
 
           try {
+            const createCanonicalIds =
+              await buildGovernedCanonicalWritePairForTable(
+                'suppliers',
+                payload.create,
+              );
+            const updateCanonicalIds =
+              await buildGovernedCanonicalWritePairForTable(
+                'suppliers',
+                payload.update,
+              );
+            payload.create = {
+              ...payload.create,
+              ...createCanonicalIds,
+            };
+            payload.update = {
+              ...payload.update,
+              ...updateCanonicalIds,
+            };
             await prisma.suppliers.upsert(payload);
             results.success++;
           } catch (error) {

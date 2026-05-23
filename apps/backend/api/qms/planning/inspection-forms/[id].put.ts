@@ -3,6 +3,10 @@ import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   isPrismaNotFoundError,
@@ -134,6 +138,43 @@ export default defineEventHandler(async (event) => {
     } else {
       resolvedProcessId = undefined;
     }
+    const governedFields = buildGovernedWriteFieldsForTable(
+      'inspection_form_templates',
+      {
+        formName:
+          body.formName === undefined
+            ? undefined
+            : String(body.formName || '').trim(),
+        partName: partName === undefined ? undefined : partName || null,
+        processName: processName === undefined ? undefined : processName,
+        projectName:
+          body.projectName === undefined
+            ? undefined
+            : String(body.projectName || '').trim() || null,
+      },
+    );
+    const governedPartName =
+      governedFields.partName === undefined
+        ? undefined
+        : governedFields.partName;
+    const governedProcessName =
+      governedFields.processName === undefined
+        ? undefined
+        : governedFields.processName;
+    const governedProjectName =
+      governedFields.projectName === undefined
+        ? undefined
+        : governedFields.projectName;
+    const governedFormName =
+      governedFields.formName === undefined
+        ? undefined
+        : governedFields.formName;
+    const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+      'inspection_form_templates',
+      {
+        formName: governedFormName,
+      },
+    );
 
     const updated = await prisma.inspection_form_templates.update({
       where: { id },
@@ -146,18 +187,13 @@ export default defineEventHandler(async (event) => {
           body.formFields === undefined
             ? undefined
             : JSON.stringify(body.formFields || []),
-        formName:
-          body.formName === undefined
-            ? undefined
-            : String(body.formName || '').trim(),
+        formName: governedFormName,
         formNo: formNo === undefined ? undefined : formNo || null,
-        partName: partName === undefined ? undefined : partName || null,
         processId: resolvedProcessId,
-        processName: processName === undefined ? undefined : processName,
-        projectName:
-          body.projectName === undefined
-            ? undefined
-            : String(body.projectName || '').trim() || null,
+        partName: governedPartName,
+        processName: governedProcessName,
+        projectName: governedProjectName,
+        ...governedCanonicalIds,
         templateQuantity: normalizedTemplateQuantity,
         drawingNo: drawingNo === undefined ? undefined : drawingNo || null,
         status: status === undefined ? undefined : status,

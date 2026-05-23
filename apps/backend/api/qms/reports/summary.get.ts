@@ -6,6 +6,7 @@ import {
 import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 import {
   createPassRateTargetResolver,
   getNetPassRateSummaryByRange,
@@ -222,13 +223,35 @@ async function fetchProcessPassRates(start: Date, end: Date) {
 }
 
 async function fetchDefectDistribution(start: Date, end: Date) {
-  return prisma.quality_records.groupBy({
-    by: ['defectType'],
+  const rows = await prisma.quality_records.findMany({
     where: { date: { gte: start, lte: end }, isDeleted: false },
-    _count: true,
-    orderBy: { _count: { defectType: 'desc' } },
-    take: 5,
+    select: {
+      defectType: true,
+      defectTypeId: true,
+    },
   });
+  const defectTypeNameById =
+    await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+      configKey: 'defectType',
+      canonicalIds: rows.map((item) => item.defectTypeId),
+    });
+  const countByDefectType = new Map<string, number>();
+  for (const row of rows) {
+    const key =
+      defectTypeNameById.get(String(row.defectTypeId || '')) ||
+      String(row.defectType || '').trim() ||
+      '未分类';
+    countByDefectType.set(key, (countByDefectType.get(key) || 0) + 1);
+  }
+  return [...countByDefectType.entries()]
+    .map(([defectType, count]) => ({
+      defectType,
+      _count: {
+        defectType: count,
+      },
+    }))
+    .sort((a, b) => b._count.defectType - a._count.defectType)
+    .slice(0, 5);
 }
 
 async function fetchTopRiskProjects(start: Date, end: Date) {

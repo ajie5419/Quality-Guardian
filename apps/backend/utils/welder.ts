@@ -3,7 +3,9 @@ import {
   buildWelderUpdateDataCore,
   parseWelderListQuery as parseWelderListQueryCore,
 } from '@qgs/domain';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
+import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 function hasWelderField(fieldName: string) {
   const fields = (
@@ -41,12 +43,28 @@ export function parseWelderListQuery(query: Record<string, unknown>) {
   return parseWelderListQueryCore(query);
 }
 
-export function buildWelderCreateData(input: Record<string, unknown>) {
+export async function buildWelderCreateData(input: Record<string, unknown>) {
   const createData = buildWelderCreateDataCore(input);
   if (!createData) return null;
-  return sanitizeWelderWriteData(createData);
+  const teamId = await resolveTeamIdForWrite({
+    team: String(createData.team || ''), // governance-allow-direct-name-id
+  });
+  return sanitizeWelderWriteData({
+    ...createData,
+    teamId,
+    ...buildGovernedWriteFieldsForTable('welders', createData),
+  });
 }
 
-export function buildWelderUpdateData(input: Record<string, unknown>) {
-  return sanitizeWelderWriteData(buildWelderUpdateDataCore(input));
+export async function buildWelderUpdateData(input: Record<string, unknown>) {
+  const updateData = buildWelderUpdateDataCore(input);
+  const teamId = await resolveTeamIdForWrite({
+    keepExistingWhenNameMissing: true,
+    team: String(updateData.team || ''), // governance-allow-direct-name-id
+  });
+  return sanitizeWelderWriteData({
+    ...updateData,
+    teamId,
+    ...buildGovernedWriteFieldsForTable('welders', updateData),
+  });
 }

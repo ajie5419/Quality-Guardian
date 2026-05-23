@@ -5,6 +5,10 @@ import type {
 } from '@qgs/shared';
 
 import { formatDate } from '@qgs/shared';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 
 import {
   normalizeDate,
@@ -46,22 +50,38 @@ function mapProject(row: any, extras?: Partial<SupervisionProject>) {
 
 export const SupervisionProjectService = {
   async createProject(payload: Record<string, unknown>) {
+    const normalizedParticipants = stringifyList(payload.participants);
+    const normalizedProjectType = normalizeProjectType(payload.projectType);
+    const governedFields = buildGovernedWriteFieldsForTable(
+      'supervision_projects',
+      {
+        participants: normalizedParticipants, // governance-allow-direct-name-id
+        projectType: normalizedProjectType, // governance-allow-direct-name-id
+        supplierName: normalizeText(payload.supplierName) || null,
+      },
+    );
+    const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+      'supervision_projects',
+      governedFields as Record<string, unknown>,
+    );
+    const normalizedGovernedFields = {
+      ...governedFields,
+      ...governedCanonicalIds,
+    };
     const row = await prisma.supervision_projects.create({
       data: {
         actualEndAt: normalizeDate(payload.actualEndAt),
         actualStartAt: normalizeDate(payload.actualStartAt),
         location: normalizeText(payload.location) || null,
-        participants: stringifyList(payload.participants),
         plannedEndAt: normalizeDate(payload.plannedEndAt),
         plannedStartAt: normalizeDate(payload.plannedStartAt),
         progressPercent: normalizePercent(payload.progressPercent),
         projectName: normalizeText(payload.projectName),
-        projectType: normalizeProjectType(payload.projectType),
         riskLevel: normalizeText(payload.riskLevel).toUpperCase() || 'LOW',
         stage: normalizeText(payload.stage) || null,
         status: normalizeProjectStatus(payload.status),
         summary: normalizeText(payload.summary) || null,
-        supplierName: normalizeText(payload.supplierName) || null,
+        ...normalizedGovernedFields,
         supervisor: normalizeText(payload.supervisor) || null,
         workOrderNumber: normalizeText(payload.workOrderNumber) || null,
       },
@@ -150,6 +170,33 @@ export const SupervisionProjectService = {
   },
 
   async updateProject(id: string, payload: Record<string, unknown>) {
+    const normalizedParticipants =
+      payload.participants === undefined
+        ? undefined
+        : stringifyList(payload.participants);
+    const normalizedProjectType =
+      payload.projectType === undefined
+        ? undefined
+        : normalizeProjectType(payload.projectType);
+    const governedFields = buildGovernedWriteFieldsForTable(
+      'supervision_projects',
+      {
+        participants: normalizedParticipants, // governance-allow-direct-name-id
+        projectType: normalizedProjectType, // governance-allow-direct-name-id
+        supplierName:
+          payload.supplierName === undefined
+            ? undefined
+            : normalizeText(payload.supplierName) || null,
+      },
+    );
+    const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+      'supervision_projects',
+      governedFields as Record<string, unknown>,
+    );
+    const normalizedGovernedFields = {
+      ...governedFields,
+      ...governedCanonicalIds,
+    };
     const row = await prisma.supervision_projects.update({
       data: {
         actualEndAt:
@@ -164,10 +211,6 @@ export const SupervisionProjectService = {
           payload.location === undefined
             ? undefined
             : normalizeText(payload.location) || null,
-        participants:
-          payload.participants === undefined
-            ? undefined
-            : stringifyList(payload.participants),
         plannedEndAt:
           payload.plannedEndAt === undefined
             ? undefined
@@ -184,10 +227,6 @@ export const SupervisionProjectService = {
           payload.projectName === undefined
             ? undefined
             : normalizeText(payload.projectName),
-        projectType:
-          payload.projectType === undefined
-            ? undefined
-            : normalizeProjectType(payload.projectType),
         riskLevel:
           payload.riskLevel === undefined
             ? undefined
@@ -204,10 +243,7 @@ export const SupervisionProjectService = {
           payload.summary === undefined
             ? undefined
             : normalizeText(payload.summary) || null,
-        supplierName:
-          payload.supplierName === undefined
-            ? undefined
-            : normalizeText(payload.supplierName) || null,
+        ...normalizedGovernedFields,
         supervisor:
           payload.supervisor === undefined
             ? undefined

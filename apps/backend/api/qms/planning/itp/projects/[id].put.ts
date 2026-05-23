@@ -5,6 +5,7 @@ import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { awaitMockDelay } from '~/utils/index';
 import { buildItpProjectUpdateData } from '~/utils/itp';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
@@ -27,10 +28,17 @@ export default defineEventHandler(async (event) => {
     const updateData = buildItpProjectUpdateData(
       body as Record<string, unknown>,
     );
+    const governedFields = buildGovernedWriteFieldsForTable('quality_plans', {
+      ...updateData,
+      projectName: updateData.projectName,
+    });
 
     const updated = await prisma.quality_plans.update({
       where: { id },
-      data: updateData,
+      data: {
+        ...updateData,
+        ...governedFields,
+      },
     });
 
     if ((body as Record<string, unknown>).documents !== undefined) {

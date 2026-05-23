@@ -2,6 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { RbacService } from '~/services/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConflictError } from '~/utils/prisma-error';
 import { redis } from '~/utils/redis';
@@ -25,6 +26,9 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
+    const governedFields = buildGovernedWriteFieldsForTable('roles', {
+      name: body.value || body.name,
+    });
 
     const permissions = Array.isArray(body.permissions) ? body.permissions : [];
 
@@ -32,7 +36,7 @@ export default defineEventHandler(async (event) => {
     const newRole = await prisma.roles.create({
       data: {
         id: `role-${Date.now()}`,
-        name: body.value || body.name, // Use 'value' as the unique name identifier
+        name: String(governedFields.name || ''), // Use 'value' as the unique name identifier
         description: body.remark || body.description || body.name, // Use 'name' as description/display name
         status: body.status ?? 1,
         permissions: JSON.stringify(permissions),

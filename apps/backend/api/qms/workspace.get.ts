@@ -35,6 +35,7 @@ export default defineEventHandler(async (event) => {
         orderBy: { createdAt: 'desc' },
       }),
       // 2. 获取未关闭的工程问题
+      // governance-allow-direct-canonical-read: workspace summary keeps direct label reads for feed cards.
       prisma.quality_records.findMany({
         where: { status: 'OPEN', isDeleted: false },
         take: 5,

@@ -9,6 +9,7 @@ import {
   resolveInspectionRequestCurrentUserId,
 } from '~/utils/inspection-request';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
@@ -71,19 +72,27 @@ export default defineEventHandler(async (event) => {
       normalizeInspectionRequestText(body.dispatchRemark) || null;
 
     const updated = await prisma.$transaction(async (tx) => {
+      const taskCreateData = {
+        assigneeId: inspector.id,
+        assignorId: dispatcherId,
+        content: JSON.stringify({
+          inspectionRequestId: request.id,
+          requestNo: request.requestNo,
+          workOrderNumber: request.workOrderNumber,
+        }),
+        priority,
+        status: 'DISPATCHED',
+        title: `报检任务 ${request.requestNo}`,
+        type: 'INSPECTION_REQUEST',
+      };
+      const governedTaskFields = buildGovernedWriteFieldsForTable(
+        'qms_task_dispatches',
+        taskCreateData,
+      );
       const task = await tx.qms_task_dispatches.create({
         data: {
-          assigneeId: inspector.id,
-          assignorId: dispatcherId,
-          content: JSON.stringify({
-            inspectionRequestId: request.id,
-            requestNo: request.requestNo,
-            workOrderNumber: request.workOrderNumber,
-          }),
-          priority,
-          status: 'DISPATCHED',
-          title: `报检任务 ${request.requestNo}`,
-          type: 'INSPECTION_REQUEST',
+          ...taskCreateData,
+          ...governedTaskFields,
         },
       });
 

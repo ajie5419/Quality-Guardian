@@ -6,6 +6,10 @@ import {
   buildSupplierUpsertPayload as buildSupplierUpsertPayloadRule,
   parseSupplierListQuery as parseSupplierListQueryRule,
 } from '@qgs/domain';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 
 export {
   createSupplierId,
@@ -51,11 +55,49 @@ export function buildSupplierUpsertPayload(
 }
 
 export function buildSupplierCreateData(input: SupplierImportItem) {
-  return buildSupplierCreateDataRule(input);
+  const data = buildSupplierCreateDataRule(input);
+  if (!data) return data;
+  return {
+    ...data,
+    ...buildGovernedWriteFieldsForTable('suppliers', data),
+  };
+}
+
+export async function buildSupplierCreateDataWithCanonical(
+  input: SupplierImportItem,
+) {
+  const data = buildSupplierCreateData(input);
+  if (!data) return data;
+  const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+    'suppliers',
+    data,
+  );
+  return {
+    ...data,
+    ...governedCanonicalIds,
+  };
 }
 
 export function buildSupplierUpdateData(input: SupplierImportItem) {
-  return buildSupplierUpdateDataRule(input);
+  const data = buildSupplierUpdateDataRule(input);
+  return {
+    ...data,
+    ...buildGovernedWriteFieldsForTable('suppliers', data),
+  };
+}
+
+export async function buildSupplierUpdateDataWithCanonical(
+  input: SupplierImportItem,
+) {
+  const data = buildSupplierUpdateData(input);
+  const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+    'suppliers',
+    data,
+  );
+  return {
+    ...data,
+    ...governedCanonicalIds,
+  };
 }
 
 export function parseSupplierListQuery(

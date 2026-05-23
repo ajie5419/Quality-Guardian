@@ -1,6 +1,10 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaForeignKeyError } from '~/utils/prisma-error';
 import { getMissingRequiredFields } from '~/utils/request-validation';
@@ -121,11 +125,25 @@ export default defineEventHandler(async (event) => {
     }
 
     const newTask = await prisma.$transaction(async (tx) => {
+      const baseCreateData = buildTaskDispatchCreateData(body, {
+        assigneeId: assignee.id,
+        assignorId: currentUserId,
+      });
+      const governedCanonicalIds =
+        await buildGovernedCanonicalWritePairForTable(
+          'qms_task_dispatches',
+          baseCreateData as Record<string, unknown>,
+        );
+      const governedFields = buildGovernedWriteFieldsForTable(
+        'qms_task_dispatches',
+        baseCreateData,
+      );
       const createdTask = await tx.qms_task_dispatches.create({
-        data: buildTaskDispatchCreateData(body, {
-          assigneeId: assignee.id,
-          assignorId: currentUserId,
-        }),
+        data: {
+          ...baseCreateData,
+          ...governedFields,
+          ...governedCanonicalIds,
+        },
       });
 
       // 如果是二级指派，且父任务仍为待处理，则推进为已派发

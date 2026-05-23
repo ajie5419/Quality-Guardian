@@ -1,3 +1,4 @@
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 import prisma from '~/utils/prisma';
 import {
   DEFAULT_OUTSOURCING_MODE,
@@ -267,6 +268,27 @@ export const SupplierService = {
     oneYearAgo.setFullYear(now.getFullYear() - 1);
 
     if (supplierNames.length > 0) {
+      const supplierNameToId =
+        await MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
+          configKey: 'supplierName',
+          names: supplierNames,
+        });
+      const supplierIds = [...supplierNameToId.values()].filter(
+        Boolean,
+      ) as string[];
+      const supplierWhereOr =
+        supplierIds.length > 0
+          ? [
+              // governance-allow-direct-name-id: read-side compatibility filter keeps legacy name branch + canonical id branch.
+              { supplierName: { in: supplierNames } },
+              { supplierId: { in: supplierIds } },
+            ]
+          : [
+              // governance-allow-direct-name-id: fallback branch for rows not yet fully canonicalized.
+              { supplierName: { in: supplierNames } },
+            ];
+      const resolveCanonicalSupplierWhere = supplierWhereOr;
+
       const [
         incomingStats,
         afterSalesStats,
@@ -279,7 +301,7 @@ export const SupplierService = {
         prisma.inspections.groupBy({
           by: ['supplierName', 'result'],
           where: {
-            supplierName: { in: supplierNames },
+            OR: supplierWhereOr,
             category: 'INCOMING',
             isDeleted: false,
             inspectionDate: { gte: oneYearAgo },
@@ -300,7 +322,7 @@ export const SupplierService = {
         prisma.quality_records.groupBy({
           by: ['supplierName'],
           where: {
-            supplierName: { in: supplierNames },
+            OR: supplierWhereOr,
             isDeleted: false,
             date: { gte: oneYearAgo },
           },
@@ -310,7 +332,7 @@ export const SupplierService = {
         prisma.quality_records.groupBy({
           by: ['supplierName', 'status'],
           where: {
-            supplierName: { in: supplierNames },
+            OR: supplierWhereOr,
             isDeleted: false,
             date: { gte: oneYearAgo },
           },
@@ -342,7 +364,7 @@ export const SupplierService = {
         }),
         prisma.quality_records.findMany({
           where: {
-            supplierName: { in: supplierNames },
+            OR: resolveCanonicalSupplierWhere,
             isDeleted: false,
             date: { gte: oneYearAgo },
           },

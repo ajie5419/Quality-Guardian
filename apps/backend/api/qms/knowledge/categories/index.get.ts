@@ -1,6 +1,8 @@
 import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildKnowledgeCategoryCreateData } from '~/utils/knowledge-category';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,
@@ -22,12 +24,19 @@ export default defineEventHandler(async (event) => {
 
     // 如果数据库中完全没有分类，则自动创建一个默认分类
     if (categories.length === 0) {
+      const defaultCategorySeedInput = {
+        id: 'CAT-DEFAULT',
+        name: '通用知识',
+        description: '系统自动创建的默认知识分类',
+        sort: 0,
+      };
       const defaultCat = await prisma.knowledge_categories.create({
         data: {
-          id: 'CAT-DEFAULT',
-          name: '通用知识',
-          description: '系统自动创建的默认知识分类',
-          sort: 0,
+          ...buildKnowledgeCategoryCreateData(defaultCategorySeedInput),
+          ...buildGovernedWriteFieldsForTable(
+            'knowledge_categories',
+            defaultCategorySeedInput,
+          ),
         },
       });
       categories = [defaultCat];

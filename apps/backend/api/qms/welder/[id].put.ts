@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
     const body = (await readBody(event)) as Record<string, unknown>;
     await prisma.welders.update({
       where: { id },
-      data: buildWelderUpdateData(body),
+      data: await buildWelderUpdateData(body),
     });
     return useResponseSuccess(null);
   } catch (error: unknown) {

@@ -13,11 +13,16 @@ model inspections {
   category            inspection_category
   workOrderNumber     String
   projectName         String?
+  projectId           String?
   supplierName        String?
+  supplierId          String?
   materialName        String?
+  materialNameId      String?
   incomingType        String?
+  incomingTypeId      String?
   processName         String?
   processId           String?
+  teamId              String?
   level1Component     String?
   level2Component     String?
   team                String?
@@ -48,6 +53,11 @@ model inspections {
   @@index([category])
   @@index([inspectionDate])
   @@index([processId])
+  @@index([teamId])
+  @@index([supplierId])
+  @@index([projectId])
+  @@index([materialNameId])
+  @@index([incomingTypeId])
 }
 
 model inspection_items {
@@ -107,23 +117,29 @@ model after_sales {
   occurDate           DateTime
   claimStatus         after_sales_claimStatus
   projectName         String
+  projectId           String?
   productType         String?
   shipDate            DateTime?
   warrantyStatus      String?
   issueDescription    String?                 @db.Text
   quantity            Int
   feedbackDept        String?
+  feedbackDeptId      String?
   solution            String?                 @db.Text
   actualSolution      String?                 @db.Text
   qualityLoss         Decimal                 @default(0.00) @db.Decimal(10, 2)
   actualClaim         Decimal                 @default(0.00) @db.Decimal(10, 2)
   respDept            String?
+  respDeptId          String?
   supplierBrand       String?
+  supplierBrandId     String?
   photos              String?                 @db.LongText
   isClaim             Boolean                 @default(false)
   remarks             String?                 @db.Text
   failureType         String?
+  failureTypeId       String?
   failureCause        String?
+  failureCauseId      String?
   linkedEngineeringId String?
   createdAt           DateTime                @default(now())
   updatedAt           DateTime                @updatedAt
@@ -139,21 +155,41 @@ model after_sales {
   closeDate           DateTime?
   defectType          String?
   defectSubtype       String?
+  defectTypeId        String?
+  defectSubtypeId     String?
   severity            String?
   productSubtype      String?
+  productSubtypeId    String?
+  productTypeId       String?
   runningHours        Decimal?
   division            String?
+  divisionId          String?
+  customerNameId      String?
   partName            String?
+  partId              String?
   work_orders         work_orders             @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([claimStatus])
   @@index([occurDate])
   @@index([supplierBrand])
+  @@index([supplierBrandId])
   @@index([workOrderNumber])
   @@index([projectName])
+  @@index([projectId])
   @@index([isDeleted])
   @@index([respDept])
+  @@index([respDeptId])
+  @@index([feedbackDeptId])
   @@index([defectType])
+  @@index([defectTypeId])
+  @@index([defectSubtypeId])
+  @@index([divisionId])
+  @@index([customerNameId])
+  @@index([partId])
+  @@index([productTypeId])
+  @@index([productSubtypeId])
+  @@index([failureTypeId])
+  @@index([failureCauseId])
 }
 
 model audit_logs {
@@ -245,6 +281,7 @@ model processes {
 model dfmea_projects {
   id              String                @id @default(cuid())
   projectName     String
+  projectId       String?
   workOrderId     String?
   version         String                @default("V1.0")
   status          String                @default("draft")
@@ -259,6 +296,7 @@ model dfmea_projects {
 
   @@index([workOrderId])
   @@index([projectName])
+  @@index([projectId])
   @@index([status])
 }
 
@@ -271,6 +309,7 @@ model dfmea {
   effect            String?        @db.Text
   severity          Int
   cause             String?        @db.Text
+  causeId           String?
   occurrence        Int
   detection         Int
   rpn               Int
@@ -288,6 +327,7 @@ model dfmea {
   projectId         String
   dfmea_projects    dfmea_projects @relation(fields: [projectId], references: [id])
 
+  @@index([causeId])
   @@index([projectId])
 }
 
@@ -363,6 +403,7 @@ model project_boms {
   id                 String      @id
   work_order_number  String
   part_name          String
+  partId             String?
   part_number        String?
   material           String?
   required_processes String?     @db.LongText
@@ -376,35 +417,44 @@ model project_boms {
 
   @@index([work_order_number])
   @@index([part_number])
+  @@index([partId])
 }
 
 model bom_projects {
   id              String      @id @default(cuid())
   workOrderNumber String      @unique
   projectName     String
+  projectId       String?
   status          String      @default("active")
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   isDeleted       Boolean     @default(false)
   work_order      work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+
+  @@index([projectId])
 }
 
 model doc_projects {
   id              String      @id @default(cuid())
   workOrderNumber String      @unique
   projectName     String
+  projectId       String?
   documents       String?     @db.LongText
   status          String      @default("active")
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   isDeleted       Boolean     @default(false)
   work_order      work_orders @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+
+  @@index([projectId])
 }
 
 model quality_plans {
   id              String                   @id
   projectName     String
+  projectId       String?
   customer        String
+  customerId      String?
   documents       String?                  @db.LongText
   itpItems        String?                  @db.LongText
   planStatus      quality_plans_planStatus @default(DRAFT)
@@ -420,12 +470,15 @@ model quality_plans {
 
   @@index([planStatus])
   @@index([workOrderNumber])
+  @@index([customerId])
+  @@index([projectId])
 }
 
 model itp_items {
   id                 String        @id @default(cuid())
   projectId          String
   processStep        String
+  processStepId      String?
   activity           String
   controlPoint       String
   acceptanceCriteria String?       @db.Text
@@ -442,6 +495,7 @@ model itp_items {
 
   @@index([projectId])
   @@index([processStep])
+  @@index([processStepId])
 }
 
 model quality_records {
@@ -450,13 +504,17 @@ model quality_records {
   date                                    DateTime
   status                                  quality_records_status
   partName                                String
+  partId                                  String?
   description                             String?                     @db.Text
   quantity                                Int
   lossHours                               Decimal                     @default(0.00) @db.Decimal(10, 2)
   lossAmount                              Decimal                     @default(0.00) @db.Decimal(10, 2)
   projectName                             String?
+  projectId                               String?
   division                                String?
+  divisionId                              String?
   responsibleDepartment                   String
+  responsibleDepartmentId                 String?
   responsibleBU                           String?
   inspector                               String?
   analysis                                String?                     @db.Text
@@ -478,13 +536,18 @@ model quality_records {
   recoveredAmount                         Decimal                     @default(0.00) @db.Decimal(10, 2)
   hourlyRate                              Decimal                     @default(0.00) @db.Decimal(10, 2)
   supplierName                            String?
+  supplierId                              String?
   category                                String?
+  categoryId                              String?
   processName                             String?
   processId                               String?
+  defectTypeId                            String?
+  defectSubtypeId                         String?
   defectType                              String?
   defectSubtype                           String?
   responsibleWelder                       String?
   rootCause                               String?                     @db.Text
+  rootCauseId                             String?
   severity                                String?
   users_quality_records_inspectorTousers  users?                      @relation("quality_records_inspectorTousers", fields: [inspector], references: [username])
   users_quality_records_lastEditorTousers users?                      @relation("quality_records_lastEditorTousers", fields: [lastEditor], references: [username])
@@ -498,14 +561,23 @@ model quality_records {
   @@index([inspector], map: "quality_records_inspector_fkey")
   @@index([lastEditor], map: "quality_records_lastEditor_fkey")
   @@index([partName])
+  @@index([partId])
   @@index([serialNumber])
   @@index([status])
   @@index([status, isDeleted])
   @@index([workOrderNumber])
   @@index([responsibleDepartment])
+  @@index([responsibleDepartmentId])
+  @@index([supplierId])
+  @@index([projectId])
+  @@index([divisionId])
+  @@index([categoryId])
   @@index([defectType])
+  @@index([defectTypeId])
+  @@index([defectSubtypeId])
   @@index([processName])
   @@index([processId])
+  @@index([rootCauseId])
 }
 
 model vehicle_commissioning_issues {
@@ -513,9 +585,12 @@ model vehicle_commissioning_issues {
   date                  DateTime
   status                String    @default("OPEN")
   partName              String?
+  partId                String?
   description           String?   @db.Text
   responsibleDepartment String?
+  responsibleDepartmentId String?
   projectName           String?
+  projectId             String?
   workOrderNumber       String?
   severity              String?
   solution              String?   @db.Text
@@ -536,15 +611,21 @@ model vehicle_commissioning_issues {
   @@index([isClaim])
   @@index([workOrderNumber])
   @@index([responsibleDepartment])
+  @@index([responsibleDepartmentId])
   @@index([projectName])
+  @@index([projectId])
+  @@index([partId])
 }
 
 model supervision_projects {
   id                String                            @id @default(cuid())
   projectName       String
+  projectId         String?
   projectType       String                            @default("MOLD")
+  projectTypeId     String?
   workOrderNumber   String?
   supplierName      String?
+  supplierId        String?
   location          String?
   supervisor        String?
   participants      String?                           @db.LongText
@@ -569,8 +650,11 @@ model supervision_projects {
 
   @@index([projectName])
   @@index([projectType])
+  @@index([projectTypeId])
   @@index([workOrderNumber])
   @@index([supplierName])
+  @@index([supplierId])
+  @@index([projectId])
   @@index([status])
   @@index([riskLevel])
   @@index([isDeleted])
@@ -747,6 +831,7 @@ model supervision_issues {
   projectId           String
   issueNo             String                      @unique
   issueType           String                      @default("QUALITY")
+  issueTypeId         String?
   description         String                      @db.Text
   responsibleUnit     String?
   severity            String                      @default("minor")
@@ -771,6 +856,7 @@ model supervision_issues {
 
   @@index([projectId])
   @@index([issueType])
+  @@index([issueTypeId])
   @@index([status])
   @@index([severity])
   @@index([dueAt])
@@ -783,6 +869,7 @@ model supervision_issue_actions {
   id          String             @id @default(cuid())
   issueId     String
   actionType  String             @default("FOLLOW_UP")
+  actionTypeId String?
   description String?            @db.Text
   attachments String?            @db.LongText
   createdBy   String?
@@ -791,6 +878,7 @@ model supervision_issue_actions {
 
   @@index([issueId])
   @@index([actionType])
+  @@index([actionTypeId])
   @@index([createdAt])
 }
 
@@ -799,6 +887,7 @@ model welders {
   welderCode       String?                  @unique
   name             String
   team             String
+  teamId           String?
   examDate         DateTime?
   examPassed       Boolean                  @default(false)
   employmentStatus welder_employment_status @default(ON_DUTY)
@@ -811,6 +900,7 @@ model welders {
   @@index([name])
   @@index([welderCode])
   @@index([team])
+  @@index([teamId])
   @@index([examDate])
   @@index([employmentStatus])
   @@index([score])
@@ -847,6 +937,7 @@ model standard_documents {
   id          String   @id
   name        String
   category    String
+  categoryId  String?
   path        String
   size        Int
   uploadedBy  String
@@ -858,6 +949,7 @@ model standard_documents {
   isDeleted   Boolean  @default(false)
 
   @@index([category])
+  @@index([categoryId])
   @@index([name])
   @@index([isDeleted])
 }
@@ -907,12 +999,16 @@ model file_references {
 model suppliers {
   id              String   @id @default(cuid())
   category        String?
+  categoryId      String?
   outsourcingMode String?
   name            String   @unique
+  nameId          String?
   productName     String?
+  productNameId   String?
   brand           String?
   origin          String?
   project         String?
+  projectId       String?
   buyer           String?
   score2025       Float?
   contact         String?
@@ -928,12 +1024,17 @@ model suppliers {
   status          String   @default("Qualified")
 
   @@index([status])
+  @@index([nameId])
+  @@index([categoryId])
+  @@index([productNameId])
+  @@index([projectId])
 }
 
 model measuring_instruments {
   id               String                        @id @default(cuid())
   orderNo          Int?
   instrumentName   String
+  instrumentNameId String?
   instrumentCode   String                        @unique
   model            String?
   usingUnit        String?
@@ -950,6 +1051,7 @@ model measuring_instruments {
   borrowRecords    metrology_borrow_records[]
 
   @@index([instrumentName])
+  @@index([instrumentNameId])
   @@index([usingUnit])
   @@index([inspectionStatus])
   @@index([borrowStatus])
@@ -960,7 +1062,9 @@ model metrology_borrow_records {
   id                 String                @id @default(cuid())
   instrumentId       String
   borrowerDepartment String
+  borrowerDepartmentId String?
   borrowerName       String
+  borrowerNameId     String?
   borrowedAt         DateTime
   expectedReturnAt   DateTime?
   returnedAt         DateTime?
@@ -974,6 +1078,8 @@ model metrology_borrow_records {
   instrument         measuring_instruments @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
 
   @@index([instrumentId])
+  @@index([borrowerDepartmentId])
+  @@index([borrowerNameId])
   @@index([status])
   @@index([borrowedAt])
   @@index([expectedReturnAt])
@@ -1056,8 +1162,11 @@ model users {
 model work_orders {
   workOrderNumber           String                      @id
   customerName              String
+  customerNameId            String?
   projectName               String?
+  projectId                 String?
   division                  String?
+  divisionId                String?
   quantity                  Int
   deliveryDate              DateTime
   status                    work_orders_status          @default(OPEN)
@@ -1079,19 +1188,25 @@ model work_orders {
   work_order_requirements   work_order_requirements[]
 
   @@index([customerName])
+  @@index([customerNameId])
+  @@index([divisionId])
   @@index([deliveryDate])
   @@index([status])
+  @@index([projectId])
 }
 
 model work_order_requirements {
   id                String      @id @default(cuid())
   workOrderNumber   String
   requirementName   String
+  requirementId     String?
   partName          String?
+  partId            String?
   processName       String?
   processId         String?
   responsiblePerson String?
   responsibleTeam   String?
+  responsibleTeamId String?
   requirementItems  String?     @db.LongText
   attachment        String?     @db.LongText
   status            String      @default("active")
@@ -1108,13 +1223,17 @@ model work_order_requirements {
 
   @@index([workOrderNumber])
   @@index([status])
+  @@index([partId])
   @@index([workOrderNumber, processName, partName])
   @@index([processId])
+  @@index([requirementId])
+  @@index([responsibleTeamId])
 }
 
 model qms_task_dispatches {
   id                                          String                    @id @default(cuid())
   type                                        String
+  typeId                                      String?
   title                                       String
   level                                       Int                       @default(1)
   itpProjectId                                String?
@@ -1138,6 +1257,7 @@ model qms_task_dispatches {
   @@index([assignorId], map: "qms_task_dispatches_assignorId_fkey")
   @@index([dfmeaId], map: "qms_task_dispatches_dfmeaId_fkey")
   @@index([itpProjectId], map: "qms_task_dispatches_itpProjectId_fkey")
+  @@index([typeId], map: "qms_task_dispatches_typeId_fkey")
 }
 
 model qms_inspection_requests {
@@ -1145,9 +1265,12 @@ model qms_inspection_requests {
   requestNo           String                    @unique
   workOrderNumber     String
   partName            String
+  partId              String?
   componentName       String?
+  componentId         String?
   processName         String
   processId           String?
+  teamId              String?
   team                String?
   quantity            Int                       @default(1)
   reporter            String
@@ -1190,6 +1313,9 @@ model qms_inspection_requests {
   @@index([submittedAt])
   @@index([workOrderNumber, processName, partName])
   @@index([processId])
+  @@index([teamId])
+  @@index([partId])
+  @@index([componentId])
 }
 
 model quality_losses {
@@ -1197,14 +1323,19 @@ model quality_losses {
   lossId      String   @unique
   occurDate   DateTime
   type        String
+  typeId      String?
   amount      Decimal  @default(0.00) @db.Decimal(10, 2)
   actualClaim Decimal  @default(0.00) @db.Decimal(10, 2)
   description String?  @db.Text
   respDept    String?
+  respDeptId  String?
   status      String   @default("Pending")
   isDeleted   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([respDeptId])
+  @@index([typeId])
 }
 
 model knowledge_categories {
@@ -1256,6 +1387,7 @@ model inspection_archive_tasks {
   inspectionId    String              @unique
   workOrderNumber String
   projectName     String?
+  projectId       String?
   inspector       String
   workContent     String?             @db.Text
   attachments     String?             @db.LongText
@@ -1270,6 +1402,7 @@ model inspection_archive_tasks {
   inspection      inspections         @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
 
   @@index([workOrderNumber])
+  @@index([projectId])
   @@index([inspectionDate])
   @@index([inspector, inspectionDate])
   @@index([status, isOverdue])
@@ -1279,11 +1412,14 @@ model inspection_form_templates {
   id               String      @id @default(cuid())
   workOrderNumber  String
   projectName      String?
+  projectId        String?
   templateQuantity Int?
   processName      String
   processId        String?
   partName         String?
+  partId           String?
   formName         String
+  formNameId       String?
   formNo           String?
   drawingNo        String?
   formFields       String?     @db.LongText
@@ -1300,9 +1436,36 @@ model inspection_form_templates {
   @@index([workOrderNumber])
   @@index([processName])
   @@index([partName])
+  @@index([formNameId])
+  @@index([projectId])
+  @@index([partId])
   @@index([status])
   @@index([workOrderNumber, processName, partName])
   @@index([processId])
+}
+
+model master_projects {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  status    Int      @default(1)
+  sort      Int      @default(0)
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
+model master_parts {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  status    Int      @default(1)
+  sort      Int      @default(0)
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
 }
 
 enum inspection_category {

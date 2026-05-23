@@ -17,6 +17,7 @@ import {
   resolveInspectionRequestCurrentUserId,
 } from '~/utils/inspection-request';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import {
@@ -274,13 +275,25 @@ export default defineEventHandler(async (event) => {
         ),
       );
 
+      const governedIssueFields = buildGovernedWriteFieldsForTable(
+        'quality_records',
+        {
+          defectSubtype: normalizeInspectionRequestText(
+            linkedIssue.defectSubtype,
+          ),
+          defectType:
+            normalizeInspectionRequestText(linkedIssue.defectType) ||
+            '制造缺陷',
+          division:
+            normalizeInspectionRequestText(linkedIssue.division) ||
+            linkedInspection?.work_order?.division ||
+            undefined,
+        },
+      );
+
       const issueBody = {
         claim: normalizeInspectionRequestText(linkedIssue.claim) || 'No',
-        defectSubtype: normalizeInspectionRequestText(
-          linkedIssue.defectSubtype,
-        ),
-        defectType:
-          normalizeInspectionRequestText(linkedIssue.defectType) || '制造缺陷',
+        ...governedIssueFields,
         description: normalizeInspectionRequestText(linkedIssue.description),
         inspectionId,
         lossAmount: Number(linkedIssue.lossAmount || 0),

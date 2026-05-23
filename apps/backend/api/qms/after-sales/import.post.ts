@@ -3,7 +3,7 @@ import {
   createAfterSalesId,
   getNextAfterSalesSerialNumber,
 } from '~/utils/after-sales-id';
-import { buildAfterSalesCreateData } from '~/utils/after-sales-payload';
+import { buildGovernedAfterSalesCreateData } from '~/utils/after-sales-payload';
 import { logApiError } from '~/utils/api-logger';
 import {
   buildImportRowError,
@@ -56,11 +56,14 @@ export default defineEventHandler(async (event) => {
         const serialNumber = serialSeed++;
 
         await prisma.after_sales.create({
-          data: buildAfterSalesCreateData(item as Record<string, unknown>, {
-            defaultWorkOrderNumber: woNumber,
-            id: createAfterSalesId(),
-            serialNumber,
-          }),
+          data: await buildGovernedAfterSalesCreateData(
+            item as Record<string, unknown>,
+            {
+              defaultWorkOrderNumber: woNumber,
+              id: createAfterSalesId(),
+              serialNumber,
+            },
+          ),
         });
         successCount++;
       } catch (error) {

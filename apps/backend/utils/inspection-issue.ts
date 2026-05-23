@@ -18,6 +18,10 @@ import {
   parseOptionalIssueYear as parseOptionalIssueYearRule,
 } from '@qgs/domain';
 import { nanoid } from 'nanoid';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 
@@ -149,11 +153,26 @@ async function attachProcessIdToIssueCreateData(
     createData.processName,
   );
   const processId = await resolveProcessIdForWrite({ processName });
+  const governedCanonicalIdsRaw = await buildGovernedCanonicalWritePairForTable(
+    'quality_records',
+    createData as Record<string, unknown>,
+  );
+  const { processId: _ignoredProcessId, ...governedCanonicalIds } =
+    governedCanonicalIdsRaw;
+  const governedFields = buildGovernedWriteFieldsForTable(
+    'quality_records',
+    createData as Record<string, unknown>,
+  );
+  const normalizedCreateData = {
+    ...createData,
+    ...governedFields,
+    ...governedCanonicalIds,
+  } as Prisma.quality_recordsCreateInput;
   if (!processId) {
-    return createData;
+    return normalizedCreateData;
   }
   return {
-    ...createData,
+    ...normalizedCreateData,
     process: {
       connect: {
         id: processId,
@@ -166,21 +185,36 @@ async function attachProcessIdToIssueUpdateData(
   body: Record<string, unknown>,
   updateData: Prisma.quality_recordsUpdateInput,
 ) {
+  const governedCanonicalIdsRaw = await buildGovernedCanonicalWritePairForTable(
+    'quality_records',
+    updateData as Record<string, unknown>,
+  );
+  const { processId: _ignoredProcessId, ...governedCanonicalIds } =
+    governedCanonicalIdsRaw;
+  const governedFields = buildGovernedWriteFieldsForTable(
+    'quality_records',
+    updateData as Record<string, unknown>,
+  );
+  const normalizedUpdateData = {
+    ...updateData,
+    ...governedFields,
+    ...governedCanonicalIds,
+  } as Prisma.quality_recordsUpdateInput;
   if (body.processName === undefined) {
-    return updateData;
+    return normalizedUpdateData;
   }
   const processName = normalizeOptionalInspectionIssueString(body.processName);
   const processId = await resolveProcessIdForWrite({ processName });
   if (!processId) {
     return {
-      ...updateData,
+      ...normalizedUpdateData,
       process: {
         disconnect: true,
       },
     } as Prisma.quality_recordsUpdateInput;
   }
   return {
-    ...updateData,
+    ...normalizedUpdateData,
     process: {
       connect: {
         id: processId,
@@ -218,8 +252,28 @@ export async function buildInspectionIssueUpsertPayload(
   const processName = normalizeOptionalInspectionIssueString(
     (item as { processName?: unknown }).processName,
   );
+  const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+    'quality_records',
+    item as Record<string, unknown>,
+  );
+  const governedFields = buildGovernedWriteFieldsForTable(
+    'quality_records',
+    item as Record<string, unknown>,
+  );
   if (!processName) {
-    return payload;
+    return {
+      ...payload,
+      create: {
+        ...payload.create,
+        ...governedFields,
+        ...governedCanonicalIds,
+      },
+      update: {
+        ...payload.update,
+        ...governedFields,
+        ...governedCanonicalIds,
+      },
+    } as Prisma.quality_recordsUpsertArgs;
   }
   const processId = await resolveProcessIdForWrite({ processName });
   const processWrite = processId
@@ -233,6 +287,8 @@ export async function buildInspectionIssueUpsertPayload(
     ...payload,
     create: {
       ...payload.create,
+      ...governedFields,
+      ...governedCanonicalIds,
       processName,
       ...(processId
         ? {
@@ -242,6 +298,8 @@ export async function buildInspectionIssueUpsertPayload(
     },
     update: {
       ...payload.update,
+      ...governedFields,
+      ...governedCanonicalIds,
       processName,
       process: processWrite,
     },

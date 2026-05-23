@@ -4,7 +4,7 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import {
-  buildQualityLossCreateData,
+  buildQualityLossCreateDataWithCanonical,
   buildQualityLossCreateResponse,
   createQualityLossId,
 } from '~/utils/quality-loss-payload';
@@ -32,7 +32,10 @@ export default defineEventHandler(async (event) => {
     const lossId = createQualityLossId();
 
     const newItem = await prisma.quality_losses.create({
-      data: buildQualityLossCreateData(body as Record<string, unknown>, lossId),
+      data: await buildQualityLossCreateDataWithCanonical(
+        body as Record<string, unknown>,
+        lossId,
+      ),
     });
 
     await SystemLogService.recordAuditLog({

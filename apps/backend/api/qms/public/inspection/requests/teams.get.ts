@@ -58,6 +58,7 @@ export default defineEventHandler(async (event) => {
         select: { id: true, name: true, parentId: true },
       }),
       prisma.suppliers.findMany({
+        // governance-allow-direct-canonical-read: team selector intentionally filters by outsourcing category name for public UX compatibility.
         where: {
           category: OUTSOURCING_CATEGORY,
           isDeleted: false,

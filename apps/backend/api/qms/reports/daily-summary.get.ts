@@ -273,6 +273,7 @@ export default defineEventHandler(async (event) => {
       new Date(queryDate),
     );
 
+    // governance-allow-direct-canonical-read: daily summary consumes display labels from inspection/work-order.
     const inspections = await prisma.inspections.findMany({
       where: {
         isDeleted: false,

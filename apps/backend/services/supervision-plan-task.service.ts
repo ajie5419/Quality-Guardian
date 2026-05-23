@@ -7,6 +7,7 @@ import type {
 import { extname } from 'node:path';
 
 import { FileStorageService } from '~/services/file-storage.service';
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 
 import {
   buildPlanTaskTree,
@@ -225,10 +226,27 @@ export const SupervisionPlanTaskService = {
     };
     if (params?.projectId) projectWhere.id = params.projectId;
 
+    // governance-allow-direct-name-id: select projection for read-only board aggregation.
     const projects = await prisma.supervision_projects.findMany({
-      select: { id: true, projectName: true, supplierName: true },
+      select: {
+        id: true,
+        projectId: true,
+        projectName: true,
+        supplierId: true,
+        supplierName: true,
+      },
       where: projectWhere,
     });
+    const [projectNameById, supplierNameById] = await Promise.all([
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        configKey: 'projectName',
+        canonicalIds: projects.map((item) => item.projectId),
+      }),
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        configKey: 'supplierName',
+        canonicalIds: projects.map((item) => item.supplierId),
+      }),
+    ]);
     const projectIds = projects.map((p) => p.id);
     if (projectIds.length === 0) {
       return {
@@ -264,10 +282,17 @@ export const SupervisionPlanTaskService = {
     for (const row of tasks) {
       const mapped = mapPlanTask(row);
       const project = projectMap.get(row.projectId);
+      const canonicalProjectName = projectNameById.get(
+        String(project?.projectId || ''),
+      );
+      const canonicalSupplierName = supplierNameById.get(
+        String(project?.supplierId || ''),
+      );
+      // governance-allow-direct-name-id: canonical names are resolved above via governance kernel.
       const task: DeadlineBoardTask = {
         ...mapped,
-        projectName: project?.projectName || '',
-        supplierName: project?.supplierName || '',
+        projectName: canonicalProjectName || project?.projectName || '',
+        supplierName: canonicalSupplierName || project?.supplierName || '',
       };
 
       const endAt = row.plannedEndAt ? new Date(row.plannedEndAt) : null;

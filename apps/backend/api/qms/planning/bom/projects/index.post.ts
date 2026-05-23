@@ -2,7 +2,10 @@ import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { normalizeBomProjectStatus, normalizeBomText } from '~/utils/bom';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { upsertPlanningProjectByWorkOrder } from '~/utils/planning-project';
+import {
+  applyGovernedProjectNameByTable,
+  upsertPlanningProjectByWorkOrder,
+} from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
@@ -42,11 +45,11 @@ export default defineEventHandler(async (event) => {
         }),
       createProject: ({ projectName, workOrderNumber: value }) =>
         prisma.bom_projects.create({
-          data: {
+          data: applyGovernedProjectNameByTable('bom_projects', {
             workOrderNumber: value,
             projectName,
             status: normalizeBomProjectStatus(body.status),
-          },
+          }),
         }),
     });
 

@@ -25,6 +25,7 @@ vi.mock('../../utils/prisma', () => ({
     processes: {
       findMany: vi.fn(),
     },
+    $queryRawUnsafe: vi.fn(),
     $queryRaw: vi.fn(),
     $transaction: vi.fn((cb) =>
       cb({
@@ -44,6 +45,7 @@ vi.mock('../../utils/prisma', () => ({
 describe('inspectionService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma.$queryRawUnsafe as any).mockResolvedValue([]);
   });
 
   describe('determineItemResult', () => {
@@ -190,7 +192,7 @@ describe('inspectionService', () => {
     });
 
     it('should query by processName with processId fallback when process exists', async () => {
-      (prisma.processes.findMany as any).mockResolvedValue([
+      (prisma.$queryRawUnsafe as any).mockResolvedValue([
         { id: 'process-1', name: '焊接' },
       ]);
       (prisma.quality_records.count as any).mockResolvedValue(0);
@@ -213,7 +215,7 @@ describe('inspectionService', () => {
     });
 
     it('should query by processName only when process id is not resolved', async () => {
-      (prisma.processes.findMany as any).mockResolvedValue([]);
+      (prisma.$queryRawUnsafe as any).mockResolvedValue([]);
       (prisma.quality_records.count as any).mockResolvedValue(0);
       (prisma.quality_records.findMany as any).mockResolvedValue([]);
 
@@ -232,7 +234,7 @@ describe('inspectionService', () => {
     it('should use resolved processId for template binding when processName changes', async () => {
       const stopError = new Error('stop-after-template-binding');
       const inspectionFormFindFirst = vi.fn().mockResolvedValue(null);
-      (prisma.processes.findMany as any).mockResolvedValue([
+      (prisma.$queryRawUnsafe as any).mockResolvedValue([
         { id: 'process-new', name: '新工序' },
       ]);
       (prisma.$transaction as any).mockImplementation(async (callback: any) =>
@@ -253,6 +255,11 @@ describe('inspectionService', () => {
               processName: '新工序',
               documents: null,
               workOrderNumber: 'WO-1001',
+            }),
+          },
+          processes: {
+            findFirst: vi.fn().mockResolvedValue({
+              name: '旧工序',
             }),
           },
           inspection_form_templates: {
@@ -283,6 +290,66 @@ describe('inspectionService', () => {
         expect.arrayContaining([
           expect.objectContaining({ processId: 'process-new' }),
         ]),
+      );
+    });
+
+    it('normalizes team through governance helper when updating inspection', async () => {
+      const stopError = new Error('stop-after-template-binding');
+      const inspectionFormFindFirst = vi.fn().mockResolvedValue(null);
+      const inspectionsUpdate = vi.fn().mockResolvedValue({
+        id: 'inspection-2',
+        processId: null,
+        processName: null,
+        documents: null,
+        workOrderNumber: 'WO-1002',
+      });
+      (prisma.$queryRawUnsafe as any).mockResolvedValue([]);
+      (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+        callback({
+          inspections: {
+            findUnique: vi.fn().mockResolvedValue({
+              category: 'PROCESS',
+              incomingType: null,
+              processId: null,
+              processName: null,
+              templateId: null,
+              templateName: null,
+              workOrderNumber: 'WO-1002',
+            }),
+            update: inspectionsUpdate,
+          },
+          processes: {
+            findFirst: vi.fn().mockResolvedValue(null),
+          },
+          inspection_form_templates: {
+            findFirst: inspectionFormFindFirst,
+          },
+          inspection_items: {
+            deleteMany: vi.fn().mockRejectedValue(stopError),
+            createMany: vi.fn(),
+          },
+        }),
+      );
+
+      await expect(
+        InspectionService.update('inspection-2', {
+          category: 'PROCESS',
+          workOrderNumber: 'WO-1002',
+          projectName: 'P-2',
+          processName: '',
+          quantity: 1,
+          inspector: 'tester',
+          inspectionDate: new Date('2026-01-01'),
+          team: '  A班 ',
+        } as any),
+      ).rejects.toThrow('stop-after-template-binding');
+
+      expect(inspectionsUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            team: 'A班',
+          }),
+        }),
       );
     });
   });

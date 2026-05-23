@@ -50,6 +50,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const [workOrder, requirements, inspections] = await Promise.all([
+      // governance-allow-direct-canonical-read: aggregate view reads label fields for display.
       prisma.work_orders.findFirst({
         where: { isDeleted: false, workOrderNumber },
         select: {

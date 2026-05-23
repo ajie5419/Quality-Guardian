@@ -2,6 +2,10 @@ import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
@@ -22,10 +26,28 @@ export default defineEventHandler(async (event) => {
   try {
     const body = (await readBody(event)) as {
       confirm?: boolean;
+      requirementName?: string;
       responsiblePerson?: string;
       responsibleTeam?: string;
     };
     const confirm = Boolean(body.confirm);
+    const governedFields = buildGovernedWriteFieldsForTable(
+      'work_order_requirements',
+      {
+        requirementName:
+          body.requirementName === undefined
+            ? undefined
+            : String(body.requirementName || '').trim() || null,
+        responsibleTeam:
+          body.responsibleTeam === undefined
+            ? undefined
+            : String(body.responsibleTeam || '').trim() || null,
+      },
+    );
+    const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+      'work_order_requirements',
+      governedFields as Record<string, unknown>,
+    );
 
     const updated = await prisma.work_order_requirements.update({
       where: { id },
@@ -33,14 +55,16 @@ export default defineEventHandler(async (event) => {
         confirmedAt: confirm ? new Date() : null,
         confirmer: confirm ? userinfo.username : null,
         confirmStatus: confirm ? 'CONFIRMED' : 'PENDING',
+        requirementName:
+          body.requirementName === undefined
+            ? undefined
+            : String(body.requirementName || '').trim(),
         responsiblePerson:
           body.responsiblePerson === undefined
             ? undefined
             : String(body.responsiblePerson || '').trim() || null,
-        responsibleTeam:
-          body.responsibleTeam === undefined
-            ? undefined
-            : String(body.responsibleTeam || '').trim() || null,
+        ...governedFields,
+        ...governedCanonicalIds,
         updatedBy: userinfo.username,
       },
       select: {

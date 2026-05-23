@@ -1,3 +1,4 @@
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 
 import { RbacService } from './rbac.service';
@@ -102,16 +103,24 @@ export const UserService = {
     }
 
     const statusEnum = data.status === 1 ? 'ACTIVE' : 'INACTIVE';
+    const governedFields = buildGovernedWriteFieldsForTable('users', {
+      department: data.deptId || 'Unknown',
+      realName: data.realName,
+      username: data.username,
+    });
 
     const newUser = await prisma.users.create({
       data: {
         id: `user-${Date.now()}`,
-        username: data.username,
+        username: String(governedFields.username || ''),
         password: '$2a$10$placeholder', // Default placeholder
-        realName: data.realName,
+        realName:
+          governedFields.realName === undefined
+            ? null
+            : String(governedFields.realName),
         email: data.email || '',
         phone: data.phone || '',
-        department: data.deptId || 'Unknown',
+        department: String(governedFields.department || 'Unknown'), // governance-allow-direct-name-id
         status: statusEnum,
         isDeleted: false,
         roleId: finalRoleId,
@@ -132,16 +141,23 @@ export const UserService = {
    * Update an existing user
    */
   async update(id: string, data: UpdateUserDto) {
+    const governedFields = buildGovernedWriteFieldsForTable('users', {
+      department: data.department || data.deptId,
+      realName: data.realName,
+      username: data.username,
+    });
     const updateData: Record<string, any> = {
       updatedAt: new Date(),
     };
 
-    if (data.department || data.deptId)
-      updateData.department = data.department || data.deptId;
+    if (governedFields.department !== undefined)
+      updateData.department = governedFields.department;
     if (data.email !== undefined) updateData.email = data.email;
     if (data.phone !== undefined) updateData.phone = data.phone;
-    if (data.realName !== undefined) updateData.realName = data.realName;
-    if (data.username !== undefined) updateData.username = data.username;
+    if (governedFields.realName !== undefined)
+      updateData.realName = governedFields.realName;
+    if (governedFields.username !== undefined)
+      updateData.username = governedFields.username;
 
     // Handle Roles
     const rolesArray = data.roles || data.roleIds;

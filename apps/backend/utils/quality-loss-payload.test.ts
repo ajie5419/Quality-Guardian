@@ -41,14 +41,16 @@ describe('quality-loss payload utils', () => {
       actualClaim: new Decimal(20),
       amount: new Decimal(100),
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      description: null,
+      description: '',
       id: 'cuid-1',
       isDeleted: false,
       lossId: 'QL-2026-ABC123',
       occurDate: new Date('2026-01-02T00:00:00.000Z'),
       respDept: 'QA',
+      respDeptId: 'dept-qa',
       status: 'Pending',
       type: 'Process',
+      typeId: null,
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     });
 

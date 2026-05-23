@@ -16,6 +16,7 @@ export default defineEventHandler(async (event) => {
   await awaitMockDelay();
 
   try {
+    // governance-allow-direct-canonical-read: BOM tree renders project labels for listing.
     const projects = await prisma.bom_projects.findMany({
       where: { isDeleted: false },
       include: {

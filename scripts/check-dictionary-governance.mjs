@@ -96,12 +96,16 @@ function parseFrontendUsedTypes() {
       used.push(
         {
           afterSalesStatus: 'after_sales_status',
+          componentName: 'component_name',
+          incomingType: 'incoming_type',
           inspectionIssueStatus: 'inspection_issue_status',
           inspectionProcessName: 'inspection_process_name',
           metrologyInspectionStatus: 'metrology_inspection_status',
+          materialName: 'material_name',
           planningProjectStatus: 'planning_project_status',
           qualityLossStatus: 'quality_loss_status',
           qualityLossType: 'quality_loss_type',
+          requirementName: 'requirement_name',
           supplierStatus: 'supplier_status',
           supervisionIssueStatus: 'supervision_issue_status',
           supervisionProjectStatus: 'supervision_project_status',

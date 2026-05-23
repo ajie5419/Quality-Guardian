@@ -6,7 +6,7 @@ import {
   createAfterSalesId,
   getNextAfterSalesSerialNumber,
 } from '~/utils/after-sales-id';
-import { buildAfterSalesCreateData } from '~/utils/after-sales-payload';
+import { buildGovernedAfterSalesCreateData } from '~/utils/after-sales-payload';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -34,11 +34,14 @@ export default defineEventHandler(async (event) => {
     const serialNumber = await getNextAfterSalesSerialNumber();
 
     const newItem = await prisma.after_sales.create({
-      data: buildAfterSalesCreateData(body, {
-        defaultWorkOrderNumber: QMS_DEFAULT_VALUES.UNKNOWN_WORK_ORDER,
-        id: createAfterSalesId(),
-        serialNumber,
-      }),
+      data: await buildGovernedAfterSalesCreateData(
+        body as Record<string, unknown>,
+        {
+          defaultWorkOrderNumber: QMS_DEFAULT_VALUES.UNKNOWN_WORK_ORDER,
+          id: createAfterSalesId(),
+          serialNumber,
+        },
+      ),
     });
 
     await FileStorageService.registerReferencesFromAttachments({

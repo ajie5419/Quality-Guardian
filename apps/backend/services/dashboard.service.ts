@@ -137,6 +137,7 @@ export const DashboardService = {
               _sum: { lossAmount: true },
             }),
           ]),
+          // governance-allow-direct-canonical-read: dashboard list keeps label-only projection for compatibility.
           prisma.work_orders.findMany({
             where: baseWhere,
             take: DASHBOARD_CONSTANTS.RECENT_WO_LIMIT,

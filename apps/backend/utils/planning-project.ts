@@ -1,3 +1,4 @@
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 
 interface PlanningProjectRecord {
@@ -39,6 +40,7 @@ export async function upsertPlanningProjectByWorkOrder<
     workOrderNumber,
   } = params;
 
+  // governance-allow-direct-canonical-read: planning bootstrap reads current project label from work order.
   const workOrder = await prisma.work_orders.findUnique({
     where: { workOrderNumber },
     select: { projectName: true },
@@ -62,6 +64,15 @@ export async function upsertPlanningProjectByWorkOrder<
     workOrderNumber,
   });
   return { code: 'CREATED', data: created };
+}
+
+export function applyGovernedProjectNameByTable<
+  T extends Record<string, unknown>,
+>(targetTable: 'bom_projects' | 'doc_projects', data: T): T {
+  return {
+    ...data,
+    ...buildGovernedWriteFieldsForTable(targetTable, data),
+  } as T;
 }
 
 export {

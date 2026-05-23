@@ -8,7 +8,11 @@ import {
   projectBomItemSelect,
 } from '~/utils/bom';
 import { awaitMockDelay } from '~/utils/index';
-import { upsertPlanningProjectByWorkOrder } from '~/utils/planning-project';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
+import {
+  applyGovernedProjectNameByTable,
+  upsertPlanningProjectByWorkOrder,
+} from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
@@ -39,12 +43,13 @@ export default defineEventHandler(async (event) => {
         }),
       createProject: ({ projectName, workOrderNumber: value }) =>
         prisma.bom_projects.create({
-          data: {
+          // governance-allow-direct-name-id: normalized through governed helper before create payload commit.
+          data: applyGovernedProjectNameByTable('bom_projects', {
             workOrderNumber: value,
             projectName:
               normalizeBomText(body.projectName) || projectName || value,
             status: normalizeBomProjectStatus(body.status),
-          },
+          }),
         }),
     });
 
@@ -63,8 +68,16 @@ export default defineEventHandler(async (event) => {
       return internalServerErrorResponse(event, 'BOM 项目状态异常');
     }
 
+    const newItemPayload = buildProjectBomCreateData(workOrderNumber, body);
+    const governedBomPayload = buildGovernedWriteFieldsForTable(
+      'project_boms',
+      newItemPayload,
+    );
     const newItem = await prisma.project_boms.create({
-      data: buildProjectBomCreateData(workOrderNumber, body),
+      data: {
+        ...newItemPayload,
+        ...governedBomPayload,
+      },
       select: projectBomItemSelect,
     });
 

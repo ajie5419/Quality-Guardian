@@ -1,5 +1,6 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 import prisma from '~/utils/prisma';
 import { useResponseSuccess } from '~/utils/response';
 import { addYearsToDate } from '~/utils/work-order';
@@ -143,9 +144,11 @@ export default defineEventHandler(async (event) => {
 });
 
 async function buildRanking(start: Date, end: Date, vehicleDeptIds: string[]) {
+  // governance-allow-direct-canonical-read: yearly trend metric only needs grouped counts; productType filter is kept for compatibility.
   const records = await prisma.after_sales.findMany({
     select: {
       defectType: true,
+      defectTypeId: true,
     },
     where: {
       isDeleted: false,
@@ -165,10 +168,18 @@ async function buildRanking(start: Date, end: Date, vehicleDeptIds: string[]) {
   });
 
   const total = records.length;
+  const defectTypeNameById =
+    await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+      configKey: 'defectType',
+      canonicalIds: records.map((item) => item.defectTypeId),
+    });
   const counts = new Map<string, number>();
 
   for (const record of records) {
-    const defectType = record.defectType?.trim() || '未分类';
+    const defectType =
+      defectTypeNameById.get(String(record.defectTypeId || '')) ||
+      record.defectType?.trim() ||
+      '未分类';
     counts.set(defectType, (counts.get(defectType) || 0) + 1);
   }
 
@@ -238,6 +249,7 @@ async function loadMonthlyCounts(
   const start = new Date(startYear, 0, 1);
   const end = new Date(endYear, endMonthIndex + 1, 0, 23, 59, 59, 999);
 
+  // governance-allow-direct-canonical-read: monthly count query reads occurDate only; keeps productType branch for historical metric compatibility.
   const records = await prisma.after_sales.findMany({
     select: { occurDate: true },
     where: {
@@ -295,6 +307,7 @@ async function loadMonthlyWarrantyCounts(
   const minYearStart = new Date(startYear, 0, 1);
   const maxYearEnd = new Date(endYear, 11, 31, 23, 59, 59, 999);
   const minDeliveryDate = addYearsToDate(minYearStart, -1);
+  // governance-allow-direct-canonical-read: warranty window seed needs raw delivery/quantity and keeps legacy division matching semantics for historical trend compatibility.
   const candidates = await prisma.work_orders.findMany({
     select: {
       deliveryDate: true,
@@ -467,6 +480,7 @@ async function getDisplayYears(
   manualData: Record<string, number>,
   vehicleDeptIds: string[],
 ) {
+  // governance-allow-direct-canonical-read: baseline year probe keeps legacy productType branch to avoid changing historical trend scope.
   const earliestAutoRecord = await prisma.after_sales.findFirst({
     orderBy: { occurDate: 'asc' },
     select: { occurDate: true },

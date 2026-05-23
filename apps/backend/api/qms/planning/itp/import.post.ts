@@ -11,6 +11,10 @@ import {
   getMaxItpItemOrder,
   normalizeItpText,
 } from '~/utils/itp';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   getMissingRequiredFields,
@@ -55,15 +59,29 @@ export default defineEventHandler(async (event) => {
       row: index + 1,
     }));
     const createResults = await Promise.allSettled(
-      validItems.map(({ item, row }, index) =>
-        prisma.itp_items
+      validItems.map(async ({ item, row }, index) => {
+        const baseCreateData = buildItpItemCreateData({
+          item,
+          order: maxOrder + index + 1,
+          projectId: normalizedProjectId,
+          useImportDefaults: true,
+        });
+        const governedCanonicalIds =
+          await buildGovernedCanonicalWritePairForTable(
+            'itp_items',
+            baseCreateData as Record<string, unknown>,
+          );
+        const governedFields = buildGovernedWriteFieldsForTable(
+          'itp_items',
+          baseCreateData as Record<string, unknown>,
+        );
+        return prisma.itp_items
           .create({
-            data: buildItpItemCreateData({
-              item,
-              order: maxOrder + index + 1,
-              projectId: normalizedProjectId,
-              useImportDefaults: true,
-            }),
+            data: {
+              ...baseCreateData,
+              ...governedFields,
+              ...governedCanonicalIds,
+            },
           })
           .catch((error) => {
             const message = toImportErrorMessage(error);
@@ -77,8 +95,8 @@ export default defineEventHandler(async (event) => {
               }),
             );
             throw error;
-          }),
-      ),
+          });
+      }),
     );
     const successCount = createResults.filter(
       (result) => result.status === 'fulfilled',

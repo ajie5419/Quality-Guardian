@@ -10,6 +10,7 @@ export default defineEventHandler(async (event) => {
 
   // 1. 获取历史案例 (排除当前正在处理的，如果存在 ID 的话)
   // 这里简单获取最近的 20 条相关或所有记录
+  // governance-allow-direct-canonical-read: AI retrieval keeps part-name semantic recall.
   const historyIssues = await prisma.quality_records.findMany({
     where: {
       isDeleted: false,

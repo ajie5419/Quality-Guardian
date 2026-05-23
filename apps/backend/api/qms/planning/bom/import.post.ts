@@ -8,6 +8,7 @@ import {
   toImportErrorMessage,
 } from '~/utils/import-report';
 import { awaitMockDelay } from '~/utils/index';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   getMissingRequiredFields,
@@ -48,11 +49,22 @@ export default defineEventHandler(async (event) => {
 
     const rowErrors = [];
     const createResults = await Promise.allSettled(
-      normalizedItems.map((item) =>
-        prisma.project_boms.create({
-          data: buildProjectBomCreateData(bomProject.workOrderNumber, item),
-        }),
-      ),
+      normalizedItems.map((item) => {
+        const createPayload = buildProjectBomCreateData(
+          bomProject.workOrderNumber,
+          item,
+        );
+        const governedBomPayload = buildGovernedWriteFieldsForTable(
+          'project_boms',
+          createPayload,
+        );
+        return prisma.project_boms.create({
+          data: {
+            ...createPayload,
+            ...governedBomPayload,
+          },
+        });
+      }),
     );
 
     const successCount = createResults.filter(

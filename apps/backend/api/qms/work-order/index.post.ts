@@ -2,6 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   isPrismaRequiredValueError,
@@ -55,13 +56,17 @@ export default defineEventHandler(async (event) => {
 
     // 使用统一的状态映射工具
     const statusValue = mapWorkOrderStatus(body.status);
+    const governedFields = buildGovernedWriteFieldsForTable('work_orders', {
+      customerName: body.customerName,
+      division: body.division,
+    });
 
     const newWO = await prisma.work_orders.create({
       data: {
         workOrderNumber: woNum,
         customerName: body.customerName,
         projectName: body.projectName,
-        division: body.division,
+        ...governedFields,
         quantity: parseWorkOrderQuantity(body.quantity, 1),
         deliveryDate: parseRequiredDate(body.deliveryDate),
         effectiveTime: parseOptionalDate(body.effectiveTime),

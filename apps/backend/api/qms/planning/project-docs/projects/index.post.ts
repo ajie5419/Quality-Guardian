@@ -2,6 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
+  applyGovernedProjectNameByTable,
   normalizePlanningWorkOrderNumber,
   upsertPlanningProjectByWorkOrder,
 } from '~/utils/planning-project';
@@ -46,11 +47,11 @@ export default defineEventHandler(async (event) => {
         }),
       createProject: ({ projectName, workOrderNumber: value }) =>
         prisma.doc_projects.create({
-          data: {
+          data: applyGovernedProjectNameByTable('doc_projects', {
             workOrderNumber: value,
             projectName,
             status: 'active',
-          },
+          }),
         }),
     });
 

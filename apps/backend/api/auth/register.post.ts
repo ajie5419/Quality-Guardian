@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import { defineEventHandler, readBody } from 'h3';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
@@ -9,8 +10,13 @@ import {
 
 export default defineEventHandler(async (event) => {
   const { deptId, password, username } = await readBody(event);
+  const governedFields = buildGovernedWriteFieldsForTable('users', {
+    department: deptId,
+    realName: username,
+    username,
+  });
 
-  if (!username || !password || !deptId) {
+  if (!governedFields.username || !password || !governedFields.department) {
     return badRequestResponse(
       event,
       '用户名、密码和部门均为必填项',
@@ -29,7 +35,7 @@ export default defineEventHandler(async (event) => {
 
   // 检查用户名是否已存在
   const existingUser = await prisma.users.findUnique({
-    where: { username },
+    where: { username: String(governedFields.username) },
   });
 
   if (existingUser) {
@@ -77,11 +83,14 @@ export default defineEventHandler(async (event) => {
   const newUser = await prisma.users.create({
     data: {
       id: `USR-${Date.now()}`,
-      username,
+      username: String(governedFields.username),
       password: hashedPassword,
-      realName: username,
+      realName:
+        governedFields.realName === undefined
+          ? null
+          : String(governedFields.realName),
       roleId: defaultRole.id,
-      department: deptId,
+      department: String(governedFields.department),
       status: 'INACTIVE', // 默认禁用，需审核
     },
   });

@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = (await readBody(event)) as Record<string, unknown>;
-    const createData = buildWelderCreateData(body);
+    const createData = await buildWelderCreateData(body);
     if (!createData) {
       return badRequestResponse(event, '缺少必填字段: name/team');
     }

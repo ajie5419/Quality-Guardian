@@ -1,6 +1,9 @@
 import type { Prisma } from '@prisma/client';
 
-import prisma from '~/utils/prisma';
+import process from 'node:process';
+
+import { createModuleLogger } from '~/utils/logger';
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 
 type CacheEntry = {
   expiresAt: number;
@@ -8,10 +11,68 @@ type CacheEntry = {
 };
 
 const PROCESS_ID_CACHE_TTL_MS = 5 * 60 * 1000;
+const PROCESS_GOVERNANCE_FAILOVER_ENABLED =
+  process.env.PROCESS_GOVERNANCE_FAILOVER_ENABLED !== 'false';
+const PROCESS_GOVERNANCE_FAILOVER_COOLDOWN_MS = Math.max(
+  1000,
+  Number(process.env.PROCESS_GOVERNANCE_FAILOVER_COOLDOWN_MS || 30_000),
+);
 const processIdCache = new Map<string, CacheEntry>();
+const logger = createModuleLogger('ProcessResolver');
+let processGovernanceFailoverUntil = 0;
 
 function normalizeProcessName(processName: unknown) {
   return String(processName || '').trim();
+}
+
+function shouldBypassGovernanceLookup() {
+  if (!PROCESS_GOVERNANCE_FAILOVER_ENABLED) {
+    return false;
+  }
+  return Date.now() < processGovernanceFailoverUntil;
+}
+
+function markGovernanceLookupFailure(error: unknown, operation: string) {
+  if (!PROCESS_GOVERNANCE_FAILOVER_ENABLED) {
+    return;
+  }
+  processGovernanceFailoverUntil =
+    Date.now() + PROCESS_GOVERNANCE_FAILOVER_COOLDOWN_MS;
+  logger.warn(
+    {
+      operation,
+      cooldownMs: PROCESS_GOVERNANCE_FAILOVER_COOLDOWN_MS,
+      error: error instanceof Error ? error.message : String(error),
+      failoverUntil: processGovernanceFailoverUntil,
+    },
+    'master-data governance lookup failed, fallback mode enabled',
+  );
+}
+
+function markGovernanceLookupSuccess() {
+  if (!PROCESS_GOVERNANCE_FAILOVER_ENABLED) {
+    return;
+  }
+  processGovernanceFailoverUntil = 0;
+}
+
+function resolveProcessIdForWriteFallback(options: {
+  explicitProcessId?: null | string;
+  fallbackProcessId?: null | string;
+  keepExistingWhenNameMissing?: boolean;
+  processName?: null | string;
+}): null | string | undefined {
+  if (options.explicitProcessId !== undefined) {
+    return options.explicitProcessId;
+  }
+  const normalizedProcessName = normalizeProcessName(options.processName);
+  if (!normalizedProcessName) {
+    if (options.keepExistingWhenNameMissing) {
+      return undefined;
+    }
+    return options.fallbackProcessId ?? null;
+  }
+  return options.fallbackProcessId ?? null;
 }
 
 export function resolveCanonicalProcessName(record?: {
@@ -39,10 +100,11 @@ export async function resolveCanonicalProcessNameById(
   processName?: null | string,
 ) {
   const normalizedProcessId = String(processId || '').trim();
+  const normalizedProcessName = normalizeProcessName(processName);
   if (!normalizedProcessId) {
-    const fallbackName = normalizeProcessName(processName);
-    return fallbackName || null;
+    return normalizedProcessName || null;
   }
+  // Use current transaction first to preserve read-your-write semantics.
   const process = await tx.processes.findFirst({
     where: {
       id: normalizedProcessId,
@@ -52,12 +114,26 @@ export async function resolveCanonicalProcessNameById(
       name: true,
     },
   });
-  const canonicalName = normalizeProcessName(process?.name);
-  if (canonicalName) {
-    return canonicalName;
+  const txCanonicalName = normalizeProcessName(process?.name);
+  if (txCanonicalName) {
+    return txCanonicalName;
   }
-  const fallbackName = normalizeProcessName(processName);
-  return fallbackName || null;
+  if (shouldBypassGovernanceLookup()) {
+    return normalizedProcessName || null;
+  }
+  try {
+    const canonicalName =
+      await MasterDataGovernanceKernel.resolveCanonicalNameById({
+        configKey: 'processName',
+        canonicalId: normalizedProcessId,
+        fallbackName: normalizedProcessName,
+      });
+    markGovernanceLookupSuccess();
+    return canonicalName;
+  } catch (error) {
+    markGovernanceLookupFailure(error, 'resolveCanonicalProcessNameById');
+    return normalizedProcessName || null;
+  }
 }
 
 export async function resolveProcessId(
@@ -96,21 +172,20 @@ export async function resolveProcessIdsByNames(
   }
 
   if (pendingNames.length > 0) {
-    const processRows = await prisma.processes.findMany({
-      where: {
-        isDeleted: false,
-        name: {
-          in: pendingNames,
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-      },
-    });
-    const processIdByName = new Map(
-      processRows.map((item) => [normalizeProcessName(item.name), item.id]),
-    );
+    let processIdByName = new Map<string, null | string>();
+    if (!shouldBypassGovernanceLookup()) {
+      try {
+        processIdByName =
+          await MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
+            configKey: 'processName',
+            names: pendingNames,
+          });
+        markGovernanceLookupSuccess();
+      } catch (error) {
+        markGovernanceLookupFailure(error, 'resolveProcessIdsByNames');
+        processIdByName = new Map<string, null | string>();
+      }
+    }
     for (const processName of pendingNames) {
       const processId = processIdByName.get(processName) || null;
       processIdCache.set(processName, {
@@ -130,21 +205,30 @@ export async function buildProcessNameWhere(
     field?: string;
   },
 ): Promise<Prisma.quality_recordsWhereInput> {
-  const normalizedProcessName = normalizeProcessName(processName);
-  if (!normalizedProcessName) {
+  const field = String(options?.field || '').trim() || 'processName';
+  const normalizedName = normalizeProcessName(processName);
+  if (!normalizedName) {
     return {};
   }
-  const field = String(options?.field || 'processName').trim() || 'processName';
-  const resolvedProcessId = await resolveProcessId(normalizedProcessName);
-  const fieldCondition = {
-    [field]: normalizedProcessName,
-  } as Prisma.quality_recordsWhereInput;
-  if (!resolvedProcessId) {
-    return fieldCondition;
+  if (shouldBypassGovernanceLookup()) {
+    return {
+      [field]: normalizedName,
+    } as Prisma.quality_recordsWhereInput;
   }
-  return {
-    OR: [fieldCondition, { processId: resolvedProcessId }],
-  };
+  try {
+    const where = (await MasterDataGovernanceKernel.buildNameWhere({
+      configKey: 'processName',
+      field: options?.field,
+      name: normalizedName,
+    })) as Prisma.quality_recordsWhereInput;
+    markGovernanceLookupSuccess();
+    return where;
+  } catch (error) {
+    markGovernanceLookupFailure(error, 'buildProcessNameWhere');
+    return {
+      [field]: normalizedName,
+    } as Prisma.quality_recordsWhereInput;
+  }
 }
 
 export async function resolveProcessIdForWrite(options: {
@@ -153,16 +237,27 @@ export async function resolveProcessIdForWrite(options: {
   keepExistingWhenNameMissing?: boolean;
   processName?: null | string;
 }): Promise<null | string | undefined> {
-  const explicitProcessId = options.explicitProcessId;
-  if (explicitProcessId !== undefined) {
-    return explicitProcessId;
+  if (shouldBypassGovernanceLookup()) {
+    return resolveProcessIdForWriteFallback(options);
   }
-  const normalizedProcessName = normalizeProcessName(options.processName);
-  if (!normalizedProcessName) {
-    if (options.keepExistingWhenNameMissing) {
-      return undefined;
-    }
-    return options.fallbackProcessId ?? null;
+  try {
+    const processId =
+      await MasterDataGovernanceKernel.resolveCanonicalIdForWrite({
+        configKey: 'processName',
+        explicitCanonicalId: options.explicitProcessId,
+        fallbackCanonicalId: options.fallbackProcessId,
+        keepExistingWhenNameMissing: options.keepExistingWhenNameMissing,
+        name: options.processName,
+      });
+    markGovernanceLookupSuccess();
+    return processId;
+  } catch (error) {
+    markGovernanceLookupFailure(error, 'resolveProcessIdForWrite');
+    return resolveProcessIdForWriteFallback(options);
   }
-  return resolveProcessId(normalizedProcessName);
+}
+
+export function __resetProcessResolverRuntimeForTest() {
+  processIdCache.clear();
+  processGovernanceFailoverUntil = 0;
 }

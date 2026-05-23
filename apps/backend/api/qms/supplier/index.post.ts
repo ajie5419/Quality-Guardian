@@ -11,7 +11,7 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import { buildSupplierCreateData } from '~/utils/supplier';
+import { buildSupplierCreateDataWithCanonical } from '~/utils/supplier';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -21,7 +21,9 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
-    const createData = buildSupplierCreateData(body as Record<string, unknown>);
+    const createData = await buildSupplierCreateDataWithCanonical(
+      body as Record<string, unknown>,
+    );
     if (!createData) {
       return badRequestResponse(event, '缺少必填字段: name');
     }

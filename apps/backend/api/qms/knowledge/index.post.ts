@@ -3,6 +3,8 @@ import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { buildKnowledgeCreateData } from '~/utils/knowledge';
+import { buildKnowledgeCategoryCreateData } from '~/utils/knowledge-category';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
@@ -28,9 +30,20 @@ export default defineEventHandler(async (event) => {
         where: { id: 'CAT-DEFAULT' },
       });
       if (!defaultCat) {
+        const defaultCategorySeedInput = {
+          id: 'CAT-DEFAULT',
+          name: '通用知识',
+          sort: 0,
+        };
         // Create it if it doesn't exist
         await prisma.knowledge_categories.create({
-          data: { id: 'CAT-DEFAULT', name: '通用知识', sort: 0 },
+          data: {
+            ...buildKnowledgeCategoryCreateData(defaultCategorySeedInput),
+            ...buildGovernedWriteFieldsForTable(
+              'knowledge_categories',
+              defaultCategorySeedInput,
+            ),
+          },
         });
       }
       targetCategoryId = 'CAT-DEFAULT';

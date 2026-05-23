@@ -13,6 +13,7 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
+import { buildTeamContainsWhere } from '~/utils/team-resolver';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -27,6 +28,7 @@ export default defineEventHandler(async (event) => {
   const mine = String(query.mine || '') === 'true';
   const status = normalizeInspectionRequestStatus(query.status);
   const workOrderNumber = normalizeInspectionRequestText(query.workOrderNumber);
+  const team = normalizeInspectionRequestText(query.team);
   const page = Math.max(Number(query.page || 1), 1);
   const pageSize = Math.min(Math.max(Number(query.pageSize || 20), 1), 100);
 
@@ -49,6 +51,11 @@ export default defineEventHandler(async (event) => {
       ...(mine && currentUserId ? { inspectorId: currentUserId } : {}),
       ...statusWhere,
       ...(workOrderNumber ? { workOrderNumber } : {}),
+      ...(team
+        ? await buildTeamContainsWhere({
+            keyword: team,
+          })
+        : {}),
       ...(keyword
         ? {
             OR: [
@@ -60,7 +67,9 @@ export default defineEventHandler(async (event) => {
               { processName: { contains: keyword } },
               { process: { is: { name: { contains: keyword } } } },
               { reporter: { contains: keyword } },
-              { team: { contains: keyword } },
+              await buildTeamContainsWhere({
+                keyword,
+              }),
             ],
           }
         : {}),

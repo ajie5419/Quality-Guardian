@@ -1,6 +1,7 @@
 import { defineEventHandler } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import { calculateDfmeaRpn, createDfmeaProjectId } from '~/utils/dfmea';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,
@@ -56,6 +57,7 @@ const SEED_PROJECTS = [
 
 export default defineEventHandler(async (event) => {
   try {
+    // governance-allow-direct-canonical-read: seed dedup keeps name-based existence check.
     const existingNames = await prisma.dfmea_projects.findMany({
       select: { projectName: true },
       where: {
@@ -90,6 +92,9 @@ export default defineEventHandler(async (event) => {
 
       await prisma.dfmea_projects.create({
         data: {
+          ...buildGovernedWriteFieldsForTable('dfmea_projects', {
+            projectName: project.projectName,
+          }),
           createdBy: 'seed',
           description: project.description,
           id: createDfmeaProjectId(),

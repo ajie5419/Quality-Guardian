@@ -3,6 +3,10 @@ import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import { resolveProcessIdForWrite } from '~/utils/process-resolver';
@@ -40,12 +44,44 @@ export default defineEventHandler(async (event) => {
     const processId = await resolveProcessIdForWrite({
       processName,
     });
+    const governedFields = buildGovernedWriteFieldsForTable(
+      'inspection_form_templates',
+      {
+        formName,
+        partName,
+        processName,
+        projectName: body.projectName,
+      },
+    );
+    const governedPartName =
+      governedFields.partName === undefined
+        ? undefined
+        : governedFields.partName;
+    const governedProcessName =
+      governedFields.processName === undefined
+        ? undefined
+        : governedFields.processName;
+    const governedProjectName =
+      governedFields.projectName === undefined
+        ? undefined
+        : governedFields.projectName;
+    const governedFormName =
+      governedFields.formName === undefined
+        ? formName
+        : governedFields.formName;
+    const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+      'inspection_form_templates',
+      {
+        formName: governedFormName,
+      },
+    );
     const processFilter = await buildInspectionFormProcessFilter({
       category: 'PROCESS',
       processName,
     });
     if (status === 'active') {
       const duplicatedActiveTemplate =
+        // governance-allow-direct-canonical-read: duplicate-template guard keeps part-name matching semantics.
         await prisma.inspection_form_templates.findFirst({
           where: {
             isDeleted: false,
@@ -77,12 +113,13 @@ export default defineEventHandler(async (event) => {
           body.formFields === undefined
             ? null
             : JSON.stringify(body.formFields || []),
-        formName,
+        formName: governedFormName,
         formNo: formNo || null,
-        partName: partName || null,
+        partName: governedPartName ?? null,
         processId,
-        processName,
-        projectName: String(body.projectName || '').trim() || null,
+        processName: governedProcessName || '',
+        projectName: governedProjectName ?? null,
+        ...governedCanonicalIds,
         templateQuantity:
           Number.isFinite(templateQuantity) && templateQuantity > 0
             ? Math.trunc(templateQuantity)

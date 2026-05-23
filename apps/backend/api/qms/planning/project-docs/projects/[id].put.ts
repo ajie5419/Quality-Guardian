@@ -2,6 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { normalizePlanningProjectName } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
@@ -32,12 +33,19 @@ export default defineEventHandler(async (event) => {
       body.documents === undefined
         ? undefined
         : stringifyProjectDocuments(normalizeProjectDocuments(body.documents));
+    const normalizedProjectName = normalizePlanningProjectName(
+      body.projectName,
+    );
+    const governedFields = buildGovernedWriteFieldsForTable('doc_projects', {
+      projectName: normalizedProjectName,
+    });
     const updated = await prisma.doc_projects.update({
       where: { id },
       data: {
         status:
           body.status === undefined ? undefined : String(body.status).trim(),
-        projectName: normalizePlanningProjectName(body.projectName),
+        projectName: normalizedProjectName,
+        ...governedFields,
         documents,
         updatedAt: new Date(),
       },

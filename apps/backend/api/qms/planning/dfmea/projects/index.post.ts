@@ -7,6 +7,7 @@ import {
   toDfmeaProjectVersionText,
 } from '~/utils/dfmea';
 import { awaitMockDelay } from '~/utils/index';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaForeignKeyError } from '~/utils/prisma-error';
 import { getMissingRequiredFields } from '~/utils/request-validation';
@@ -30,6 +31,9 @@ export default defineEventHandler(async (event) => {
 
     const newProject = await prisma.dfmea_projects.create({
       data: {
+        ...buildGovernedWriteFieldsForTable('dfmea_projects', {
+          projectName,
+        }),
         id: createDfmeaProjectId(),
         projectName,
         workOrderId: normalizeDfmeaText(body.workOrderId) || null,

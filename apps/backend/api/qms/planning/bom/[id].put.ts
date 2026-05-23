@@ -6,6 +6,7 @@ import {
   projectBomItemSelect,
 } from '~/utils/bom';
 import { awaitMockDelay } from '~/utils/index';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
@@ -24,9 +25,17 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event);
+    const mutablePayload = buildProjectBomMutableData(body);
+    const governedBomPayload = buildGovernedWriteFieldsForTable(
+      'project_boms',
+      mutablePayload,
+    );
     const updated = await prisma.project_boms.update({
       where: { id },
-      data: buildProjectBomMutableData(body),
+      data: {
+        ...mutablePayload,
+        ...governedBomPayload,
+      },
       select: projectBomItemSelect,
     });
 

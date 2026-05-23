@@ -8,6 +8,7 @@ import {
   toImportErrorMessage,
 } from '~/utils/import-report';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { parseNonEmptyArray } from '~/utils/request-validation';
 import {
@@ -61,6 +62,10 @@ export default defineEventHandler(async (event) => {
         const deliveryDate = parseRequiredDate(item.deliveryDate);
         const effectiveTime = parseOptionalDate(item.effectiveTime);
         const status = mapWorkOrderStatus(item.status);
+        const governedFields = buildGovernedWriteFieldsForTable('work_orders', {
+          customerName: item.customerName,
+          division: item.division,
+        });
 
         await prisma.work_orders.upsert({
           where: { workOrderNumber: woNumber },
@@ -71,7 +76,7 @@ export default defineEventHandler(async (event) => {
             projectName: item.projectName
               ? String(item.projectName)
               : undefined,
-            division: item.division ? String(item.division) : undefined,
+            ...governedFields,
             quantity:
               item.quantity !== undefined && item.quantity !== null
                 ? parseWorkOrderQuantity(item.quantity, 1)
@@ -85,7 +90,7 @@ export default defineEventHandler(async (event) => {
             workOrderNumber: woNumber,
             customerName: String(item.customerName || '未知客户'),
             projectName: String(item.projectName || ''),
-            division: String(item.division || ''),
+            ...governedFields,
             quantity: parseWorkOrderQuantity(item.quantity, 1),
             deliveryDate,
             effectiveTime,

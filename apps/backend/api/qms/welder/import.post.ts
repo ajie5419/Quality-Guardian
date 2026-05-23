@@ -38,7 +38,7 @@ export default defineEventHandler(async (event) => {
 
     for (const [index, item] of items.entries()) {
       try {
-        const createData = buildWelderCreateData(item);
+        const createData = await buildWelderCreateData(item);
         if (!createData) {
           rowErrors.push(
             buildImportRowError({
