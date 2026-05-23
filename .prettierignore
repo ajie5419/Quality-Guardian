@@ -8,6 +8,7 @@ coverage
 CODEOWNERS
 .nitro
 .output
+tmp/master-data-governance
 
 
 **/*.svg
