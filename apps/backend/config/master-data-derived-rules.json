@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-22T15:40:00.000Z",
+  "rules": [
+    {
+      "fieldKey": "projectName",
+      "frozenAt": "2026-05-22T00:00:00.000Z",
+      "owner": "qms-governance",
+      "normalization": ["trim", "preserve-case", "reject-empty"],
+      "matchingPriority": [
+        "work_orders.projectName",
+        "inspections.projectName",
+        "quality_records.projectName"
+      ],
+      "sourceSql": "SELECT DISTINCT value FROM ( SELECT projectName AS value FROM work_orders WHERE isDeleted = 0 AND projectName IS NOT NULL AND TRIM(projectName) <> '' UNION SELECT projectName AS value FROM inspections WHERE isDeleted = 0 AND projectName IS NOT NULL AND TRIM(projectName) <> '' UNION SELECT projectName AS value FROM quality_records WHERE isDeleted = 0 AND projectName IS NOT NULL AND TRIM(projectName) <> '' UNION SELECT projectName AS value FROM supervision_projects WHERE isDeleted = 0 AND projectName IS NOT NULL AND TRIM(projectName) <> '' ) t",
+      "notes": [
+        "Wave3 prerequisite: keep project name derivation stable before migration.",
+        "Any sourceSql or matching priority change must update frozenAt and go through governance review."
+      ]
+    },
+    {
+      "fieldKey": "partName",
+      "frozenAt": "2026-05-22T15:40:00.000Z",
+      "owner": "qms-governance",
+      "normalization": ["trim", "preserve-case", "reject-empty"],
+      "matchingPriority": [
+        "quality_records.partName",
+        "qms_inspection_requests.partName",
+        "work_order_requirements.partName",
+        "after_sales.partName",
+        "project_boms.part_name"
+      ],
+      "sourceSql": "SELECT DISTINCT value FROM ( SELECT partName AS value FROM quality_records WHERE isDeleted = 0 AND partName IS NOT NULL AND TRIM(partName) <> '' UNION SELECT partName AS value FROM qms_inspection_requests WHERE isDeleted = 0 AND partName IS NOT NULL AND TRIM(partName) <> '' UNION SELECT partName AS value FROM work_order_requirements WHERE isDeleted = 0 AND partName IS NOT NULL AND TRIM(partName) <> '' UNION SELECT partName AS value FROM vehicle_commissioning_issues WHERE isDeleted = 0 AND partName IS NOT NULL AND TRIM(partName) <> '' UNION SELECT partName AS value FROM after_sales WHERE isDeleted = 0 AND partName IS NOT NULL AND TRIM(partName) <> '' UNION SELECT part_name AS value FROM project_boms WHERE part_name IS NOT NULL AND TRIM(part_name) <> '' ) t",
+      "notes": [
+        "Wave3 prerequisite: keep part name derivation stable before migration.",
+        "Any sourceSql or matching priority change must update frozenAt and go through governance review."
+      ]
+    }
+  ]
+}

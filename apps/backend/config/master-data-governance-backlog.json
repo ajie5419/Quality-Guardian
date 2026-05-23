@@ -1,0 +1,331 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-23T04:15:18.220Z",
+  "decisions": [
+    {
+      "key": "after_sales.customerName",
+      "status": "excluded",
+      "note": "Covered by governance field customerName with source at work_orders.customerName."
+    },
+    {
+      "key": "after_sales.failureCause",
+      "status": "excluded",
+      "note": "Covered by governance field failureCause with after_sales.failureCause target."
+    },
+    {
+      "key": "after_sales.failureType",
+      "status": "excluded",
+      "note": "Covered by governance field failureType with after_sales.failureType target."
+    },
+    {
+      "key": "after_sales.feedbackDept",
+      "status": "excluded",
+      "note": "Covered by governance field responsibleDepartment via after_sales.feedbackDept target mapping."
+    },
+    {
+      "key": "after_sales.productSubtype",
+      "status": "excluded",
+      "note": "Covered by governance field productSubtype with after_sales.productSubtype target."
+    },
+    {
+      "key": "after_sales.productType",
+      "status": "excluded",
+      "note": "Covered by governance field productType with after_sales.productType target."
+    },
+    {
+      "key": "after_sales.supplierBrand",
+      "status": "excluded",
+      "note": "Covered by governance field supplierBrand with after_sales.supplierBrand target."
+    },
+    {
+      "key": "bom_projects.projectName",
+      "status": "excluded",
+      "note": "Covered by governance field projectName with bom_projects.projectName target."
+    },
+    {
+      "key": "data_permission_policies.deptIds",
+      "status": "excluded",
+      "note": "Authorization policy field, not business master-data naming field."
+    },
+    {
+      "key": "departments.name",
+      "status": "excluded",
+      "note": "Canonical source entity field, excluded from target-field governance backlog."
+    },
+    {
+      "key": "dfmea_projects.projectName",
+      "status": "excluded",
+      "note": "Covered by governance field projectName with dfmea_projects.projectName target."
+    },
+    {
+      "key": "dfmea.cause",
+      "status": "excluded",
+      "note": "Covered by governance field dfmeaCause with dfmea.cause target."
+    },
+    {
+      "key": "dictionaries.dictType",
+      "status": "excluded",
+      "note": "Dictionary metadata key, not target business field."
+    },
+    {
+      "key": "doc_projects.projectName",
+      "status": "excluded",
+      "note": "Covered by governance field projectName with doc_projects.projectName target."
+    },
+    {
+      "key": "inspection_form_templates.formName",
+      "status": "excluded",
+      "note": "Covered by governance field inspectionFormName with inspection_form_templates.formName target."
+    },
+    {
+      "key": "inspections.incomingType",
+      "status": "excluded",
+      "note": "Covered by governance field incomingType with inspections.incomingType target."
+    },
+    {
+      "key": "inspections.materialName",
+      "status": "excluded",
+      "note": "Covered by governance field materialName with inspections.materialName target."
+    },
+    {
+      "key": "inspections.templateName",
+      "status": "excluded",
+      "note": "Display/derived template label; governance target should be canonical template id relation."
+    },
+    {
+      "key": "itp_items.processStep",
+      "status": "excluded",
+      "note": "Covered by governance field itpProcessStep with itp_items.processStep target."
+    },
+    {
+      "key": "knowledge_categories.name",
+      "status": "planned",
+      "note": "Adopted by governance field knowledgeCategoryName in name-only mode."
+    },
+    {
+      "key": "login_logs.username",
+      "status": "excluded",
+      "note": "Audit/login identity field, out of master-data naming governance scope."
+    },
+    {
+      "key": "measuring_instruments.instrumentName",
+      "status": "excluded",
+      "note": "Covered by governance field instrumentName with measuring_instruments.instrumentName target."
+    },
+    {
+      "key": "menus.name",
+      "status": "excluded",
+      "note": "System menu metadata, not business master-data field."
+    },
+    {
+      "key": "menus.type",
+      "status": "excluded",
+      "note": "System menu metadata, not business master-data field."
+    },
+    {
+      "key": "metrology_borrow_records.borrowerName",
+      "status": "excluded",
+      "note": "Covered by governance field borrowerName with metrology_borrow_records.borrowerName target."
+    },
+    {
+      "key": "permissions.name",
+      "status": "excluded",
+      "note": "RBAC metadata field, out of business master-data governance scope."
+    },
+    {
+      "key": "processes.name",
+      "status": "excluded",
+      "note": "Canonical source entity primary label; excluded from propagated target-field backlog."
+    },
+    {
+      "key": "project_boms.part_name",
+      "status": "excluded",
+      "note": "Covered by governance field partName with project_boms.part_name target."
+    },
+    {
+      "key": "project_boms.part_number",
+      "status": "excluded",
+      "note": "Covered by governance field bomPartNumber with project_boms.part_number target."
+    },
+    {
+      "key": "project_boms.required_processes",
+      "status": "excluded",
+      "note": "Covered by governance field bomRequiredProcesses with project_boms.required_processes target."
+    },
+    {
+      "key": "qms_inspection_requests.componentName",
+      "status": "excluded",
+      "note": "Covered by governance field componentName with qms_inspection_requests.componentName target."
+    },
+    {
+      "key": "qms_task_dispatches.type",
+      "status": "excluded",
+      "note": "Covered by governance field taskDispatchType with qms_task_dispatches.type target."
+    },
+    {
+      "key": "quality_losses.type",
+      "status": "excluded",
+      "note": "Covered by governance field qualityLossType with quality_losses.type target."
+    },
+    {
+      "key": "quality_plans.customer",
+      "status": "excluded",
+      "note": "Covered by governance field customerName with quality_plans.customer target."
+    },
+    {
+      "key": "quality_plans.projectName",
+      "status": "excluded",
+      "note": "Covered by governance field projectName with quality_plans.projectName target."
+    },
+    {
+      "key": "quality_records.category",
+      "status": "excluded",
+      "note": "Covered by governance field qualityRecordCategory with quality_records.category target."
+    },
+    {
+      "key": "quality_records.rootCause",
+      "status": "excluded",
+      "note": "Covered by governance field rootCause with quality_records.rootCause target."
+    },
+    {
+      "key": "rbac_permissions.name",
+      "status": "excluded",
+      "note": "RBAC metadata field, out of business master-data governance scope."
+    },
+    {
+      "key": "roles.name",
+      "status": "planned",
+      "note": "Adopted by governance field roleName in name-only mode."
+    },
+    {
+      "key": "sequences.name",
+      "status": "planned",
+      "note": "Adopted by governance field sequenceName in name-only mode."
+    },
+    {
+      "key": "standard_documents.category",
+      "status": "excluded",
+      "note": "Covered by governance field standardDocumentCategory with standard_documents.category target; no active create/update/upsert write entry found in backend scan, keep excluded backlog evidence until a real write path is introduced."
+    },
+    {
+      "key": "standard_documents.name",
+      "status": "planned",
+      "note": "Adopted by governance field standardDocumentName in name-only mode."
+    },
+    {
+      "key": "supervision_issue_actions.actionType",
+      "status": "excluded",
+      "note": "Covered by governance field supervisionIssueActionType with supervision_issue_actions.actionType target."
+    },
+    {
+      "key": "supervision_issues.issueType",
+      "status": "excluded",
+      "note": "Covered by governance field supervisionIssueType with supervision_issues.issueType target."
+    },
+    {
+      "key": "supervision_milestones.delayReason",
+      "status": "excluded",
+      "note": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_milestones.name",
+      "status": "excluded",
+      "note": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_plan_steps.stepName",
+      "status": "excluded",
+      "note": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_plan_tasks.resourceName",
+      "status": "excluded",
+      "note": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_plan_tasks.riskReason",
+      "status": "excluded",
+      "note": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_plan_tasks.taskName",
+      "status": "excluded",
+      "note": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_projects.participants",
+      "status": "excluded",
+      "note": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_projects.projectType",
+      "status": "excluded",
+      "note": "Covered by governance field supervisionProjectType with supervision_projects.projectType target."
+    },
+    {
+      "key": "supervision_report_task_updates.riskReason",
+      "status": "excluded",
+      "note": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_report_task_updates.taskName",
+      "status": "excluded",
+      "note": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "suppliers.category",
+      "status": "excluded",
+      "note": "Covered by governance field supplierCategory with suppliers.category target."
+    },
+    {
+      "key": "suppliers.name",
+      "status": "excluded",
+      "note": "Covered by governance field supplierEntityName with suppliers.name target."
+    },
+    {
+      "key": "suppliers.productName",
+      "status": "excluded",
+      "note": "Covered by governance field supplierProductName with suppliers.productName target."
+    },
+    {
+      "key": "suppliers.project",
+      "status": "excluded",
+      "note": "Covered by governance field supplierProject with suppliers.project target."
+    },
+    {
+      "key": "users.department",
+      "status": "planned",
+      "note": "Adopted by governance field userDepartment in name-only mode."
+    },
+    {
+      "key": "users.realName",
+      "status": "planned",
+      "note": "Adopted by governance field userRealName in name-only mode."
+    },
+    {
+      "key": "users.username",
+      "status": "planned",
+      "note": "Adopted by governance field userUsername in name-only mode."
+    },
+    {
+      "key": "welders.name",
+      "status": "planned",
+      "note": "Adopted by governance field welderName in name-only mode."
+    },
+    {
+      "key": "work_order_requirements.requirementName",
+      "status": "excluded",
+      "note": "Covered by governance field requirementName with work_order_requirements.requirementName target."
+    },
+    {
+      "key": "work_order_requirements.responsibleTeam",
+      "status": "excluded",
+      "note": "Covered by governance field responsibleTeam with work_order_requirements.responsibleTeam target."
+    },
+    {
+      "key": "work_orders.customerName",
+      "status": "excluded",
+      "note": "Covered by governance field customerName in registry targets."
+    }
+  ]
+}
