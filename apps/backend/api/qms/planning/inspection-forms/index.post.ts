@@ -2,7 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/core/master-data/governance-write';
+} from '~/utils/master-data-governance-write';
 import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';

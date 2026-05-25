@@ -5,7 +5,7 @@ import { extname, relative, resolve } from 'node:path';
 import { setHeader } from 'h3';
 import sharp from 'sharp';
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/core/validation/define-validated-handler';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { FileStorageService } from '~/services/file-storage.service';
 import { VehicleCommissioningService } from '~/services/vehicle-commissioning.service';
 import { logApiError } from '~/utils/api-logger';

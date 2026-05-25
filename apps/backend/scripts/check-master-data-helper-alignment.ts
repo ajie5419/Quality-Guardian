@@ -1,9 +1,9 @@
-import type { GovernedWriteHelperSpec } from '../core/master-data/governance-write';
+import type { GovernedWriteHelperSpec } from '../utils/master-data-governance-write';
 
 import process from 'node:process';
 
-import { listMasterDataGovernanceFields } from '../core/master-data/governance-registry';
-import { listGovernedWriteHelperSpecs } from '../core/master-data/governance-write';
+import { listMasterDataGovernanceFields } from '../utils/master-data-governance-registry';
+import { listGovernedWriteHelperSpecs } from '../utils/master-data-governance-write';
 
 interface HelperFieldIssue {
   configKey: string;

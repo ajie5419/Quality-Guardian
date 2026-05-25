@@ -7,7 +7,7 @@ import {
   getMasterDataGovernanceFieldKeys,
   listMasterDataGovernanceFieldsByWave,
   listMasterDataGovernanceWaves,
-} from '../core/master-data/governance-registry';
+} from '../utils/master-data-governance-registry';
 
 interface FieldEvidence {
   audit: {

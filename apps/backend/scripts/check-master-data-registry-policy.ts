@@ -1,6 +1,6 @@
 import process from 'node:process';
 
-import { listMasterDataGovernanceFields } from '../core/master-data/governance-registry';
+import { listMasterDataGovernanceFields } from '../utils/master-data-governance-registry';
 
 type PolicyIssueCode =
   | 'audit-policy-mismatch-with-canonical'

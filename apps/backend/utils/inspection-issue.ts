@@ -21,7 +21,7 @@ import { nanoid } from 'nanoid';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/core/master-data/governance-write';
+} from '~/utils/master-data-governance-write';
 import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 

@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import { defineEventHandler, readBody } from 'h3';
-import { buildGovernedWriteFieldsForTable } from '~/core/master-data/governance-write';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   badRequestResponse,

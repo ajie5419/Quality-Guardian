@@ -8,7 +8,7 @@ import { formatDate } from '@qgs/shared';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/core/master-data/governance-write';
+} from '~/utils/master-data-governance-write';
 
 import {
   normalizeDate,

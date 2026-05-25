@@ -5,7 +5,7 @@ import process from 'node:process';
 import {
   listMasterDataGovernanceFields,
   listMasterDataGovernanceWaves,
-} from '../core/master-data/governance-registry';
+} from '../utils/master-data-governance-registry';
 
 type AuditStatus = 'fail' | 'pass' | 'warn';
 

@@ -4,13 +4,13 @@ import process from 'node:process';
 import {
   getMasterDataGovernanceField,
   listMasterDataGovernanceFields,
-} from '../core/master-data/governance-registry';
+} from '../utils/master-data-governance-registry';
 import prisma from '../utils/prisma';
 
 type ValueCountRow = { count: bigint | number | string; value: null | string };
 type ValueRow = { value: null | string };
 type MasterDataGovernanceField =
-  import('../core/master-data/governance-registry').MasterDataGovernanceField;
+  import('../utils/master-data-governance-registry').MasterDataGovernanceField;
 
 function parseArgs(argv: string[]) {
   const args = new Map<string, string>();

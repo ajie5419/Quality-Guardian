@@ -11,11 +11,11 @@ import { Prisma } from '@prisma/client';
 import { deriveIssueTrackingStatus, ISSUE_TRACKING_STATUS } from '@qgs/domain';
 import { AUDIT_TEMPLATES, InspectionIssueStatusEnum } from '@qgs/enums';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
-import { MasterDataGovernanceKernel } from '~/core/master-data/governance-kernel';
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/core/master-data/governance-write';
+} from '~/utils/master-data-governance-write';
 import { BaseService } from '~/modules/base/base.service';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept/dept.service';

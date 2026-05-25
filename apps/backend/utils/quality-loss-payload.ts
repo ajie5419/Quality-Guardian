@@ -8,7 +8,7 @@ import {
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/core/master-data/governance-write';
+} from '~/utils/master-data-governance-write';
 
 export function createQualityLossId(now = new Date()): string {
   return createQualityLossIdRule(now);

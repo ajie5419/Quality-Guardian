@@ -12,7 +12,7 @@ import {
 import { AUDIT_TEMPLATES } from '@qgs/enums';
 import { formatDate, safeNumber, tryParsePhotos } from '@qgs/shared';
 import { nanoid } from 'nanoid';
-import { buildGovernedWriteFieldsForTable } from '~/core/master-data/governance-write';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import prisma from '~/utils/prisma';
 

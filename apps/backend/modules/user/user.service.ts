@@ -1,4 +1,4 @@
-import { buildGovernedWriteFieldsForTable } from '~/core/master-data/governance-write';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import prisma from '~/utils/prisma';
 

@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { MasterDataGovernanceKernel } from '~/core/master-data/governance-kernel';
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import { useResponseSuccess } from '~/utils/response';

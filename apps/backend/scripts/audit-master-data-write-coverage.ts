@@ -1,4 +1,4 @@
-import type { MasterDataGovernanceField } from '../core/master-data/governance-registry';
+import type { MasterDataGovernanceField } from '../utils/master-data-governance-registry';
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -8,7 +8,7 @@ import process from 'node:process';
 import {
   listMasterDataGovernanceFields,
   listMasterDataGovernanceWaves,
-} from '../core/master-data/governance-registry';
+} from '../utils/master-data-governance-registry';
 
 interface CoverageHit {
   file: string;

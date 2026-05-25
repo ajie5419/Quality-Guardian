@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3';
-import { buildGovernedWriteFieldsForTable } from '~/core/master-data/governance-write';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';

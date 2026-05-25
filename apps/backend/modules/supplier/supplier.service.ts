@@ -1,4 +1,4 @@
-import { MasterDataGovernanceKernel } from '~/core/master-data/governance-kernel';
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import prisma from '~/utils/prisma';
 import {

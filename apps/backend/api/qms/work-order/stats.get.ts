@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/core/validation/define-validated-handler';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { WorkOrderService } from '~/services/work-order.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';

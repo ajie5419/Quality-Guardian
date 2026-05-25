@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/core/validation/define-validated-handler';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { AfterSalesService } from '~/services/after-sales.service';
 import { parseAfterSalesListQuery } from '~/utils/after-sales-query';
 import { logApiError } from '~/utils/api-logger';

@@ -1,7 +1,7 @@
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/core/master-data/governance-write';
+} from '~/utils/master-data-governance-write';
 import {
   deriveMetrologyInspectionStatus,
   formatMetrologyDate,

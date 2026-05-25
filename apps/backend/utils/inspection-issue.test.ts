@@ -14,10 +14,10 @@ vi.mock('~/utils/process-resolver', () => ({
   resolveProcessIdForWrite: vi.fn(),
 }));
 
-vi.mock('~/core/master-data/governance-write', async () => {
+vi.mock('~/utils/master-data-governance-write', async () => {
   const actual = await vi.importActual<
-    typeof import('~/core/master-data/governance-write')
-  >('~/core/master-data/governance-write');
+    typeof import('~/utils/master-data-governance-write')
+  >('~/utils/master-data-governance-write');
   return {
     ...actual,
     buildGovernedCanonicalWritePairForTable: vi.fn(async () => ({})),
@@ -151,7 +151,7 @@ describe('inspection-issue processId dual write', () => {
       '~/utils/process-resolver'
     );
     const { buildGovernedCanonicalWritePairForTable } = await import(
-      '~/core/master-data/governance-write'
+      '~/utils/master-data-governance-write'
     );
     vi.mocked(resolveProcessIdForWrite).mockResolvedValue(null);
     vi.mocked(buildGovernedCanonicalWritePairForTable).mockResolvedValue({
@@ -179,7 +179,7 @@ describe('inspection-issue processId dual write', () => {
       '~/utils/process-resolver'
     );
     const { buildGovernedCanonicalWritePairForTable } = await import(
-      '~/core/master-data/governance-write'
+      '~/utils/master-data-governance-write'
     );
     vi.mocked(resolveProcessIdForWrite).mockResolvedValue(null);
     vi.mocked(buildGovernedCanonicalWritePairForTable).mockResolvedValue({

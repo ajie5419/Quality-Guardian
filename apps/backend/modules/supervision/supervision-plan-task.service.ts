@@ -6,7 +6,7 @@ import type {
 
 import { extname } from 'node:path';
 
-import { MasterDataGovernanceKernel } from '~/core/master-data/governance-kernel';
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 
 import {

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/core/validation/define-validated-handler';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { logApiError } from '~/utils/api-logger';
 import prisma from '~/utils/prisma';
 import {

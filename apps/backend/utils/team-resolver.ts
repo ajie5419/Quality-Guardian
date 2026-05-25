@@ -1,6 +1,6 @@
 import process from 'node:process';
 
-import { MasterDataGovernanceKernel } from '~/core/master-data/governance-kernel';
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 import { createModuleLogger } from '~/utils/logger';
 
 type CacheEntry = {

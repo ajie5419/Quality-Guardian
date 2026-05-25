@@ -1,9 +1,9 @@
 import type {
   MasterDataOrphanItem,
   MasterDataRenameResult,
-} from '~/core/master-data/governance-kernel';
+} from '~/utils/master-data-governance-kernel';
 
-import { MasterDataGovernanceKernel } from '~/core/master-data/governance-kernel';
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 
 export interface RenameRequest {
   configKey: string;

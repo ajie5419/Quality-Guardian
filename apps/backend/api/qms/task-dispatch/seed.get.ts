@@ -2,7 +2,7 @@ import { defineEventHandler } from 'h3';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/core/master-data/governance-write';
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,
