@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import bcrypt from 'bcrypt';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
@@ -30,6 +32,10 @@ export interface UpdateUserDto {
   status?: number;
   roles?: string[];
   roleIds?: string[];
+}
+
+function generateTemporaryPassword() {
+  return randomBytes(18).toString('base64url');
 }
 
 export const UserService = {
@@ -104,6 +110,8 @@ export const UserService = {
     }
 
     const statusEnum = data.status === 1 ? 'ACTIVE' : 'INACTIVE';
+    const temporaryPassword = generateTemporaryPassword();
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
     const governedFields = buildGovernedWriteFieldsForTable('users', {
       department: data.deptId || 'Unknown',
       realName: data.realName,
@@ -114,7 +122,7 @@ export const UserService = {
       data: {
         id: `user-${Date.now()}`,
         username: String(governedFields.username || ''),
-        password: '$2a$10$placeholder', // Default placeholder
+        password: hashedPassword,
         realName:
           governedFields.realName === undefined
             ? null
@@ -135,6 +143,7 @@ export const UserService = {
       deptId: newUser.department,
       roleIds: [newUser.roleId],
       status: newUser.status === 'ACTIVE' ? 1 : 0,
+      temporaryPassword,
     };
   },
 
