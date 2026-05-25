@@ -19,6 +19,29 @@ async function runSystemCommand(command: string) {
 }
 
 export const SystemService = {
+  async getSettingValue(key: string) {
+    const setting = await prisma.system_settings.findUnique({
+      where: { key },
+    });
+    return setting?.value || null;
+  },
+
+  async saveSettingValue(params: {
+    description?: string;
+    key: string;
+    value: string;
+  }) {
+    await prisma.system_settings.upsert({
+      where: { key: params.key },
+      update: { value: params.value, updatedAt: new Date() },
+      create: {
+        key: params.key,
+        value: params.value,
+        description: params.description,
+      },
+    });
+  },
+
   getDefaultAiConfig() {
     return {
       provider: 'deepseek',

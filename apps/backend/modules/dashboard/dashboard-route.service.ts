@@ -1,5 +1,6 @@
-import prisma from '~/utils/prisma';
-import { buildRequirementSummaryMap } from '~/utils/work-order-requirement-summary';
+import { InspectionService } from '~/modules/inspection';
+import { WorkOrderService } from '~/modules/work-order';
+import { WorkOrderRequirementService } from '~/modules/work-order-requirement';
 
 function formatRelativeTime(date: Date | string): string {
   const now = new Date();
@@ -19,69 +20,18 @@ export const DashboardRouteService = {
   async getWorkspaceSummary() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const [
-      workOrders,
-      openIssues,
-      todayWorkOrders,
-      todayInspections,
-      todayIssues,
-      openIssuesCount,
-      recentIssues,
-    ] = await Promise.all([
-      prisma.work_orders.findMany({
-        where: { isDeleted: false },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.quality_records.findMany({
-        where: { status: 'OPEN', isDeleted: false },
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.work_orders.count({
-        where: { createdAt: { gte: today }, isDeleted: false },
-      }),
-      prisma.inspections.count({
-        where: { createdAt: { gte: today }, isDeleted: false },
-      }),
-      prisma.quality_records.count({
-        where: { createdAt: { gte: today }, isDeleted: false },
-      }),
-      prisma.quality_records.count({
-        where: { status: 'OPEN', isDeleted: false },
-      }),
-      prisma.quality_records.findMany({
-        take: 8,
-        orderBy: { createdAt: 'desc' },
-        where: { isDeleted: false },
-        select: {
-          id: true,
-          partName: true,
-          description: true,
-          createdAt: true,
-          status: true,
-          inspector: true,
-        },
-      }),
+    const [workOrders, todayWorkOrders, issueSummary] = await Promise.all([
+      WorkOrderService.getWorkspaceWorkOrders(),
+      WorkOrderService.countCreatedSince(today),
+      InspectionService.getWorkspaceIssueSummary({ today }),
     ]);
     const workOrderNumbers = workOrders
       .map((item) => String(item.workOrderNumber || '').trim())
       .filter(Boolean);
-    const requirementRows =
-      workOrderNumbers.length > 0
-        ? await prisma.work_order_requirements.findMany({
-            where: {
-              isDeleted: false,
-              status: 'active',
-              workOrderNumber: { in: workOrderNumbers },
-            },
-            select: {
-              confirmStatus: true,
-              createdAt: true,
-              workOrderNumber: true,
-            },
-          })
-        : [];
-    const requirementSummaryMap = buildRequirementSummaryMap(requirementRows);
+    const requirementSummaryMap =
+      await WorkOrderRequirementService.getSummaryByWorkOrderNumbers(
+        workOrderNumbers,
+      );
     const projectItems = workOrders
       .map((wo) => {
         let color = '#999';
@@ -139,7 +89,7 @@ export const DashboardRouteService = {
       );
     return {
       projectItems,
-      todoItems: openIssues.map((issue) => ({
+      todoItems: issueSummary.openIssues.map((issue) => ({
         id: issue.id,
         title: `[${issue.workOrderNumber || '无工单'}] ${issue.partName}`,
         content: issue.description || '',
@@ -148,7 +98,7 @@ export const DashboardRouteService = {
           : '',
         completed: issue.status === 'CLOSED',
       })),
-      trendItems: recentIssues.map((issue) => ({
+      trendItems: issueSummary.recentIssues.map((issue) => ({
         avatar: 'svg:avatar-1',
         title: issue.inspector || '系统',
         content: `${issue.status === 'CLOSED' ? '关闭' : '创建'}了问题 <a>${issue.partName}</a>`,
@@ -156,9 +106,9 @@ export const DashboardRouteService = {
       })),
       stats: {
         todayWorkOrders,
-        todayInspections,
-        todayIssues,
-        openIssuesCount,
+        todayInspections: issueSummary.todayInspections,
+        todayIssues: issueSummary.todayIssues,
+        openIssuesCount: issueSummary.openIssuesCount,
       },
     };
   },

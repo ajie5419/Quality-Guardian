@@ -713,6 +713,52 @@ async function syncInspectionProjectDocuments(
 }
 
 export const InspectionCoreService = {
+  async getWorkspaceIssueSummary(params: { today: Date }) {
+    const [
+      openIssues,
+      todayInspections,
+      todayIssues,
+      openIssuesCount,
+      recentIssues,
+    ] = await Promise.all([
+      prisma.quality_records.findMany({
+        where: { status: 'OPEN', isDeleted: false },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.inspections.count({
+        where: { createdAt: { gte: params.today }, isDeleted: false },
+      }),
+      prisma.quality_records.count({
+        where: { createdAt: { gte: params.today }, isDeleted: false },
+      }),
+      prisma.quality_records.count({
+        where: { status: 'OPEN', isDeleted: false },
+      }),
+      prisma.quality_records.findMany({
+        take: 8,
+        orderBy: { createdAt: 'desc' },
+        where: { isDeleted: false },
+        select: {
+          id: true,
+          partName: true,
+          description: true,
+          createdAt: true,
+          status: true,
+          inspector: true,
+        },
+      }),
+    ]);
+
+    return {
+      openIssues,
+      openIssuesCount,
+      recentIssues,
+      todayInspections,
+      todayIssues,
+    };
+  },
+
   async getLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
     return prisma.quality_records.findMany({
       where: {

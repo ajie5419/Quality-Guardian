@@ -1,17 +1,17 @@
 import type { DashboardChartItem, DashboardOverview } from '@qgs/shared';
 
-import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
-import { InspectionService } from '~/modules/inspection/inspection.service';
-import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
-import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
-import { WorkOrderService } from '~/modules/work-order/work-order.service';
+import { AfterSalesService } from '~/modules/after-sales';
+import { InspectionService } from '~/modules/inspection';
+import { QualityLossService } from '~/modules/quality-loss';
+import { SystemService } from '~/modules/system';
+import { VehicleCommissioningService } from '~/modules/vehicle-commissioning';
+import { WorkOrderService } from '~/modules/work-order';
 import { createModuleLogger } from '~/utils/logger';
 import { getNetPassRateSummaryByRange } from '~/utils/pass-rate';
 import {
   buildCanonicalProcessPassRateTargets,
   PROCESS_PASS_RATE_TARGET_ORDER,
 } from '~/utils/pass-rate-process';
-import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
 // 创建模块级 logger
@@ -40,10 +40,8 @@ const getStartOfWeek = (date: Date = new Date()): Date => {
 
 export const DashboardService = {
   async getPassRateTargets() {
-    const setting = await prisma.system_settings.findUnique({
-      where: { key: 'QMS_PASS_RATE_TARGETS' },
-    });
-    const savedTargets = setting?.value ? JSON.parse(setting.value) : {};
+    const value = await SystemService.getSettingValue('QMS_PASS_RATE_TARGETS');
+    const savedTargets = value ? JSON.parse(value) : {};
     const canonicalTargets = buildCanonicalProcessPassRateTargets(savedTargets);
     return Object.fromEntries(
       PROCESS_PASS_RATE_TARGET_ORDER.map((key) => [key, canonicalTargets[key]]),
@@ -52,14 +50,10 @@ export const DashboardService = {
 
   async savePassRateTargets(targets: Record<string, number>) {
     const value = JSON.stringify(targets);
-    await prisma.system_settings.upsert({
-      where: { key: 'QMS_PASS_RATE_TARGETS' },
-      update: { value, updatedAt: new Date() },
-      create: {
-        key: 'QMS_PASS_RATE_TARGETS',
-        value,
-        description: 'QMS各工序目标合格率配置 (Quality Pass Rate Targets)',
-      },
+    await SystemService.saveSettingValue({
+      key: 'QMS_PASS_RATE_TARGETS',
+      value,
+      description: 'QMS各工序目标合格率配置 (Quality Pass Rate Targets)',
     });
   },
 

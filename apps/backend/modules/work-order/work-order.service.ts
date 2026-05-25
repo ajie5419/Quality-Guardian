@@ -190,6 +190,28 @@ export async function buildWorkOrderWhereCondition(
 }
 
 export const WorkOrderService = {
+  async countCreatedSince(date: Date) {
+    return prisma.work_orders.count({
+      where: { createdAt: { gte: date }, isDeleted: false },
+    });
+  },
+
+  async getWorkspaceWorkOrders() {
+    return prisma.work_orders.findMany({
+      where: { isDeleted: false },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        createdAt: true,
+        customerName: true,
+        deliveryDate: true,
+        division: true,
+        projectName: true,
+        status: true,
+        workOrderNumber: true,
+      },
+    });
+  },
+
   async getAvailableYears() {
     interface YearRow {
       year: bigint | number;

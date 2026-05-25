@@ -2,8 +2,30 @@ import { Prisma } from '@prisma/client';
 import { buildWorkOrderWhereCondition } from '~/modules/work-order/work-order.service';
 import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
+import { buildRequirementSummaryMap } from '~/utils/work-order-requirement-summary';
 
 export const WorkOrderRequirementService = {
+  async getSummaryByWorkOrderNumbers(workOrderNumbers: string[]) {
+    const normalized = [
+      ...new Set(workOrderNumbers.map((item) => item.trim())),
+    ].filter(Boolean);
+    if (normalized.length === 0) return buildRequirementSummaryMap([]);
+
+    const rows = await prisma.work_order_requirements.findMany({
+      where: {
+        isDeleted: false,
+        status: 'active',
+        workOrderNumber: { in: normalized },
+      },
+      select: {
+        confirmStatus: true,
+        createdAt: true,
+        workOrderNumber: true,
+      },
+    });
+    return buildRequirementSummaryMap(rows);
+  },
+
   async getRequirementOverview(
     params: Parameters<typeof buildWorkOrderWhereCondition>[0],
   ) {

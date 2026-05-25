@@ -21,6 +21,7 @@ export const InspectionService = {
   getIssueStats: InspectionIssueService.getIssueStats,
   getLossRecordsForAggregation:
     InspectionCoreService.getLossRecordsForAggregation,
+  getWorkspaceIssueSummary: InspectionCoreService.getWorkspaceIssueSummary,
   normalizeQuantitySummary: InspectionCoreService.normalizeQuantitySummary,
   resolveOverallResult: InspectionCoreService.resolveOverallResult,
   update: InspectionCoreService.update,
