@@ -3,21 +3,24 @@ import type {
   QualityLossItem,
   QualityLossServiceTrendItem,
 } from '@qgs/shared';
-import type { PaginationParams } from '~/modules/base/base.service';
+import type { PaginationParams } from '~/utils/query-helpers';
 import type { QualityLossSource } from '~/utils/quality-loss-status';
 
 import { Prisma } from '@prisma/client';
 import { AUDIT_TEMPLATES } from '@qgs/shared';
 import {
-  applyPagination,
+  applyPagination as paginateList,
   formatDateString,
   formatNumber,
   safeNumber,
-} from '~/modules/base/base.service';
+} from '~/utils/query-helpers';
+import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept/dept.service';
+import { InspectionService } from '~/modules/inspection/inspection.service';
 import { MONTHS } from '~/modules/quality-loss/locale';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
@@ -59,6 +62,19 @@ interface QualityLossQueryParams extends PaginationParams {
   workOrderNumber?: string;
   year?: number;
 }
+
+type AggregationSourceRecords = {
+  commissioningIssues: Awaited<
+    ReturnType<typeof VehicleCommissioningService.getLossRecordsForAggregation>
+  >;
+  externalRecords: Awaited<
+    ReturnType<typeof AfterSalesService.getLossRecordsForAggregation>
+  >;
+  internalRecords: Awaited<
+    ReturnType<typeof InspectionService.getLossRecordsForAggregation>
+  >;
+  manualRecords: Awaited<ReturnType<typeof prisma.quality_losses.findMany>>;
+};
 
 type QualityLossDashboardSummary = {
   kpi: {
@@ -122,47 +138,6 @@ function buildManualLossesWhere(
 /**
  * 构建 quality_records 表的 where 条件
  */
-function buildInternalRecordsWhere(
-  params: QualityLossQueryParams,
-): Prisma.quality_recordsWhereInput {
-  return {
-    isDeleted: false,
-    lossAmount: { gt: 0 },
-    ...(params.workOrderNumber
-      ? { workOrderNumber: { contains: params.workOrderNumber } }
-      : {}),
-  };
-}
-
-/**
- * 构建 after_sales 表的 where 条件
- */
-function buildExternalSalesWhere(
-  params: QualityLossQueryParams,
-): Prisma.after_salesWhereInput {
-  return {
-    isDeleted: false,
-    ...(params.workOrderNumber
-      ? { workOrderNumber: { contains: params.workOrderNumber } }
-      : {}),
-  };
-}
-
-/**
- * 构建调试验收问题 where 条件。只纳入需要索赔或已填写损失金额的数据。
- */
-function buildCommissioningIssuesWhere(
-  params: QualityLossQueryParams,
-): Prisma.vehicle_commissioning_issuesWhereInput {
-  return {
-    isDeleted: false,
-    OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
-    ...(params.workOrderNumber
-      ? { workOrderNumber: { contains: params.workOrderNumber } }
-      : {}),
-  };
-}
-
 // ============ 辅助函数：响应格式化 ============
 
 /**
@@ -323,129 +298,16 @@ function sortByDateDesc(items: QualityLossItem[]): QualityLossItem[] {
 async function getAllLossesUnpaginated(
   params: Omit<QualityLossQueryParams, 'page' | 'pageSize'> = {},
 ): Promise<QualityLossItem[]> {
-  const { lossSource, status, userContext, workOrderNumber } = params;
-
-  // 1. 并行获取所有来源的原始数据
-  const [manualRecords, internalRecords, externalRecords, commissioningIssues] =
-    await Promise.all([
-      prisma.quality_losses.findMany({
-        where: buildManualLossesWhere(params),
-      }),
-      prisma.quality_records.findMany({
-        where: buildInternalRecordsWhere(params),
-      }),
-      prisma.after_sales.findMany({
-        where: buildExternalSalesWhere(params),
-      }),
-      prisma.vehicle_commissioning_issues
-        .findMany({
-          where: buildCommissioningIssuesWhere(params),
-        })
-        .catch((error) => {
-          logger.warn(
-            { err: error },
-            'vehicle_commissioning_issues query failed, skip commissioning quality loss source',
-          );
-          return [];
-        }),
-    ]);
-
-  // 部门树查询失败时不影响主流程，直接回退为原始部门ID
-  const deptTree = ((await DeptService.findAll().catch((error) => {
-    logger.warn(
-      { err: error },
-      'DeptService.findAll failed, fallback to raw dept id',
-    );
-    return [];
-  })) || []) as any[];
-
-  // Flatten dept tree for easy lookup
-  const deptMap = new Map<string, string>();
-  const processDeptNode = (nodes: any[]) => {
-    nodes.forEach((node) => {
-      deptMap.set(node.id, node.name);
-      if (node.children && node.children.length > 0) {
-        processDeptNode(node.children);
-      }
-    });
-  };
-  processDeptNode(deptTree);
-
-  const getDeptName = (id: null | string | undefined) => {
-    if (!id) return null;
-    return deptMap.get(id) || id;
-  };
-
-  const result: QualityLossItem[] = [];
-
-  // 2. 处理手工录入记录
-  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.MANUAL) {
-    const filteredManual = workOrderNumber
-      ? manualRecords.filter((r) => {
-          const record = r as typeof r & {
-            workOrderNumber?: null | string;
-          };
-          return record.workOrderNumber?.includes(workOrderNumber);
-        })
-      : manualRecords;
-
-    filteredManual.forEach((item) => {
-      const itemRecord = item as typeof item & {
-        projectName?: null | string;
-        workOrderNumber?: null | string;
-      };
-      const amount = safeNumber(item.amount);
-      if (amount <= 0) return;
-      const formatted = formatManualLossItem({ ...item, ...itemRecord });
-      formatted.responsibleDepartment = getDeptName(
-        formatted.responsibleDepartment,
-      );
-      result.push(formatted);
-    });
-  }
-
-  // 3. 处理内部质量记录
-  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.INTERNAL) {
-    internalRecords.forEach((item) => {
-      const formatted = formatInternalRecordItem(item);
-      formatted.responsibleDepartment = getDeptName(
-        formatted.responsibleDepartment,
-      );
-      result.push(formatted);
-    });
-  }
-
-  // 4. 处理售后记录
-  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.EXTERNAL) {
-    externalRecords.forEach((item) => {
-      const formatted = formatExternalSalesItem(item);
-      if (formatted) {
-        formatted.responsibleDepartment = getDeptName(
-          formatted.responsibleDepartment,
-        );
-        result.push(formatted);
-      }
-    });
-  }
-
-  // 5. 处理调试验收索赔记录
-  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.COMMISSIONING) {
-    commissioningIssues.forEach((item) => {
-      const formatted = formatCommissioningIssueItem(item);
-      formatted.responsibleDepartment = getDeptName(
-        formatted.responsibleDepartment,
-      );
-      result.push(formatted);
-    });
-  }
-
+  const sourceRecords = await fetchFromAllSources(params);
+  const merged = await mergeAndFilter(sourceRecords, params);
+  const { status, userContext } = params;
   const statusFiltered = status
-    ? result.filter(
+    ? merged.filter(
         (item) =>
           normalizeQualityLossStatus(item.status) ===
           normalizeQualityLossStatus(status),
       )
-    : result;
+    : merged;
 
   if (!userContext?.userId) {
     return sortByDateDesc(statusFiltered);
@@ -483,6 +345,132 @@ async function getAllLossesUnpaginated(
       deptCandidates.includes(String(item.responsibleDepartment || '')),
     ),
   );
+}
+
+async function fetchFromAllSources(
+  params: Omit<QualityLossQueryParams, 'page' | 'pageSize'> = {},
+): Promise<AggregationSourceRecords> {
+  const workOrderNumber = params.workOrderNumber;
+  const [manualRecords, internalRecords, externalRecords, commissioningIssues] =
+    await Promise.all([
+      prisma.quality_losses.findMany({
+        where: buildManualLossesWhere(params),
+      }),
+      InspectionService.getLossRecordsForAggregation({ workOrderNumber }),
+      AfterSalesService.getLossRecordsForAggregation({ workOrderNumber }),
+      VehicleCommissioningService.getLossRecordsForAggregation({
+        workOrderNumber,
+      }).catch((error) => {
+        logger.warn(
+          { err: error },
+          'vehicle_commissioning_issues query failed, skip commissioning quality loss source',
+        );
+        return [];
+      }),
+    ]);
+
+  return {
+    manualRecords,
+    internalRecords,
+    externalRecords,
+    commissioningIssues,
+  };
+}
+
+async function mergeAndFilter(
+  sourceRecords: AggregationSourceRecords,
+  params: Omit<QualityLossQueryParams, 'page' | 'pageSize'> = {},
+): Promise<QualityLossItem[]> {
+  const { lossSource, workOrderNumber } = params;
+
+  const deptTree = ((await DeptService.findAll().catch((error) => {
+    logger.warn(
+      { err: error },
+      'DeptService.findAll failed, fallback to raw dept id',
+    );
+    return [];
+  })) || []) as any[];
+  const deptMap = new Map<string, string>();
+  const processDeptNode = (nodes: any[]) => {
+    nodes.forEach((node) => {
+      deptMap.set(node.id, node.name);
+      if (node.children && node.children.length > 0) {
+        processDeptNode(node.children);
+      }
+    });
+  };
+  processDeptNode(deptTree);
+  const getDeptName = (id: null | string | undefined) => {
+    if (!id) return null;
+    return deptMap.get(id) || id;
+  };
+
+  const result: QualityLossItem[] = [];
+
+  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.MANUAL) {
+    const filteredManual = workOrderNumber
+      ? sourceRecords.manualRecords.filter((r) => {
+          const record = r as typeof r & {
+            workOrderNumber?: null | string;
+          };
+          return record.workOrderNumber?.includes(workOrderNumber);
+        })
+      : sourceRecords.manualRecords;
+    filteredManual.forEach((item) => {
+      const itemRecord = item as typeof item & {
+        projectName?: null | string;
+        workOrderNumber?: null | string;
+      };
+      const amount = safeNumber(item.amount);
+      if (amount <= 0) return;
+      const formatted = formatManualLossItem({ ...item, ...itemRecord });
+      formatted.responsibleDepartment = getDeptName(
+        formatted.responsibleDepartment,
+      );
+      result.push(formatted);
+    });
+  }
+
+  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.INTERNAL) {
+    sourceRecords.internalRecords.forEach((item) => {
+      const formatted = formatInternalRecordItem(item);
+      formatted.responsibleDepartment = getDeptName(
+        formatted.responsibleDepartment,
+      );
+      result.push(formatted);
+    });
+  }
+
+  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.EXTERNAL) {
+    sourceRecords.externalRecords.forEach((item) => {
+      const formatted = formatExternalSalesItem(item);
+      if (formatted) {
+        formatted.responsibleDepartment = getDeptName(
+          formatted.responsibleDepartment,
+        );
+        result.push(formatted);
+      }
+    });
+  }
+
+  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.COMMISSIONING) {
+    sourceRecords.commissioningIssues.forEach((item) => {
+      const formatted = formatCommissioningIssueItem(item);
+      formatted.responsibleDepartment = getDeptName(
+        formatted.responsibleDepartment,
+      );
+      result.push(formatted);
+    });
+  }
+
+  return result;
+}
+
+function applyPagination(
+  items: QualityLossItem[],
+  params: QualityLossQueryParams,
+): PageResult<QualityLossItem> {
+  return paginateList(items, params);
 }
 
 // ============ 辅助函数：趋势数据处理 ============
@@ -542,6 +530,24 @@ function formatTrendItem(
 // ============ 主服务导出 ============
 
 export const QualityLossService = {
+  async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
+    const baseWhere = { isDeleted: false };
+    const [yearAggregate, weekAggregate] = await Promise.all([
+      prisma.quality_losses.aggregate({
+        where: { ...baseWhere, occurDate: { gte: params.yearStart } },
+        _sum: { amount: true },
+      }),
+      prisma.quality_losses.aggregate({
+        where: { ...baseWhere, occurDate: { gte: params.weekStart } },
+        _sum: { amount: true },
+      }),
+    ]);
+    return {
+      totalLoss: Number(yearAggregate._sum.amount || 0),
+      weeklyLoss: Number(weekAggregate._sum.amount || 0),
+    };
+  },
+
   async updateByRouteId(params: {
     body: Record<string, unknown>;
     id: string;

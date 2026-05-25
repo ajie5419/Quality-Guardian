@@ -5,7 +5,7 @@ import type {
 } from '@qgs/shared';
 
 import { Prisma } from '@prisma/client';
-import { formatDateString } from '~/modules/base/base.service';
+import { formatDateString } from '~/utils/query-helpers';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -208,6 +208,36 @@ export const WorkOrderService = {
         ? result.map((r) => Number(r.year)).filter((y) => y > 0)
         : [currentYear];
     return [...new Set(years)].sort((a, b) => b - a);
+  },
+
+  async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
+    const baseWhere = { isDeleted: false };
+    const [yearAggregate, weekCount, recentWorkOrders] = await Promise.all([
+      prisma.work_orders.aggregate({
+        where: { ...baseWhere, createdAt: { gte: params.yearStart } },
+        _count: { workOrderNumber: true },
+      }),
+      prisma.work_orders.count({
+        where: { ...baseWhere, createdAt: { gte: params.weekStart } },
+      }),
+      prisma.work_orders.findMany({
+        where: baseWhere,
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          workOrderNumber: true,
+          projectName: true,
+          status: true,
+          customerName: true,
+        },
+      }),
+    ]);
+
+    return {
+      totalCount: yearAggregate._count.workOrderNumber || 0,
+      weeklyCount: weekCount || 0,
+      recentWorkOrders,
+    };
   },
 
   /**

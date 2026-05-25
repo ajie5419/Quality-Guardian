@@ -1,6 +1,10 @@
 import type { DashboardChartItem, DashboardOverview } from '@qgs/shared';
 
-import { safeNumber } from '@qgs/shared';
+import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
+import { InspectionService } from '~/modules/inspection/inspection.service';
+import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
+import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
+import { WorkOrderService } from '~/modules/work-order/work-order.service';
 import { createModuleLogger } from '~/utils/logger';
 import { getNetPassRateSummaryByRange } from '~/utils/pass-rate';
 import {
@@ -12,11 +16,6 @@ import { redis } from '~/utils/redis';
 
 // 创建模块级 logger
 const logger = createModuleLogger('DashboardService');
-
-// 抽离常量：集中管理可配置项
-const DASHBOARD_CONSTANTS = {
-  RECENT_WO_LIMIT: 5,
-};
 
 /**
  * 获取当前年份的起始时间 (YYYY-01-01 00:00:00)
@@ -85,150 +84,52 @@ export const DashboardService = {
       try {
         const yearStart = getStartOfYear();
         const weekStart = getStartOfWeek();
-        const baseWhere = { isDeleted: false };
-
-        const [
-          yearAfterSales,
-          yearQualityRecords,
-          yearCommissioningIssues,
-          yearWorkOrders,
-          yearQualityLosses,
-          weekAfterSalesCount,
-          weekQualityRecordsCount,
-          weekCommissioningIssuesCount,
-          weekWorkOrdersCount,
-          weekLossesAggregate,
-          recentWorkOrders,
-        ] = await Promise.all([
-          prisma.after_sales.aggregate({
-            where: { ...baseWhere, occurDate: { gte: yearStart } },
-            _count: { id: true },
-            _sum: { materialCost: true, laborTravelCost: true },
-          }),
-          prisma.quality_records.aggregate({
-            where: { ...baseWhere, date: { gte: yearStart } },
-            _count: { id: true },
-            _sum: { lossAmount: true },
-          }),
-          prisma.vehicle_commissioning_issues.aggregate({
-            where: {
-              ...baseWhere,
-              date: { gte: yearStart },
-              OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
-            },
-            _count: { id: true },
-            _sum: { lossAmount: true },
-          }),
-          prisma.work_orders.aggregate({
-            where: { ...baseWhere, createdAt: { gte: yearStart } },
-            _count: { workOrderNumber: true },
-          }),
-          prisma.quality_losses.aggregate({
-            where: { ...baseWhere, occurDate: { gte: yearStart } },
-            _sum: { amount: true },
-          }),
-          prisma.after_sales.count({
-            where: { ...baseWhere, occurDate: { gte: weekStart } },
-          }),
-          prisma.quality_records.count({
-            where: { ...baseWhere, date: { gte: weekStart } },
-          }),
-          prisma.vehicle_commissioning_issues.count({
-            where: {
-              ...baseWhere,
-              date: { gte: weekStart },
-              OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
-            },
-          }),
-          prisma.work_orders.count({
-            where: { ...baseWhere, createdAt: { gte: weekStart } },
-          }),
-          Promise.all([
-            prisma.after_sales.aggregate({
-              where: { ...baseWhere, occurDate: { gte: weekStart } },
-              _sum: { materialCost: true, laborTravelCost: true },
+        const [afterSales, inspection, commissioning, workOrder, qualityLoss] =
+          await Promise.all([
+            AfterSalesService.getStatsForDashboard({ weekStart, yearStart }),
+            InspectionService.getStatsForDashboard({ weekStart, yearStart }),
+            VehicleCommissioningService.getStatsForDashboard({
+              weekStart,
+              yearStart,
             }),
-            prisma.quality_records.aggregate({
-              where: { ...baseWhere, date: { gte: weekStart } },
-              _sum: { lossAmount: true },
-            }),
-            prisma.quality_losses.aggregate({
-              where: { ...baseWhere, occurDate: { gte: weekStart } },
-              _sum: { amount: true },
-            }),
-            prisma.vehicle_commissioning_issues.aggregate({
-              where: {
-                ...baseWhere,
-                date: { gte: weekStart },
-                OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
-              },
-              _sum: { lossAmount: true },
-            }),
-          ]),
-          // governance-allow-direct-canonical-read: dashboard list keeps label-only projection for compatibility.
-          prisma.work_orders.findMany({
-            where: baseWhere,
-            take: DASHBOARD_CONSTANTS.RECENT_WO_LIMIT,
-            orderBy: { createdAt: 'desc' },
-            select: {
-              workOrderNumber: true,
-              projectName: true,
-              status: true,
-              customerName: true,
-            },
-          }),
-        ]);
-
-        const totalLoss =
-          safeNumber(yearAfterSales._sum.materialCost) +
-          safeNumber(yearAfterSales._sum.laborTravelCost) +
-          safeNumber(yearQualityRecords._sum.lossAmount) +
-          safeNumber(yearCommissioningIssues._sum.lossAmount) +
-          safeNumber(yearQualityLosses._sum.amount);
-
-        const [
-          weekAfterSalesSum,
-          weekRecordsSum,
-          weekManualSum,
-          weekCommissioningSum,
-        ] = weekLossesAggregate;
-        const weeklyLossTotal =
-          safeNumber(weekAfterSalesSum._sum.materialCost) +
-          safeNumber(weekAfterSalesSum._sum.laborTravelCost) +
-          safeNumber(weekRecordsSum._sum.lossAmount) +
-          safeNumber(weekCommissioningSum._sum.lossAmount) +
-          safeNumber(weekManualSum._sum.amount);
+            WorkOrderService.getStatsForDashboard({ weekStart, yearStart }),
+            QualityLossService.getStatsForDashboard({ weekStart, yearStart }),
+          ]);
 
         return {
           overview: {
             fieldIssues: {
-              open: weekAfterSalesCount || 0,
-              total: yearAfterSales._count.id || 0,
+              open: afterSales.weeklyCount,
+              total: afterSales.totalCount,
             },
             processIssues: {
-              open:
-                (weekQualityRecordsCount || 0) +
-                (weekCommissioningIssuesCount || 0),
-              total:
-                (yearQualityRecords._count.id || 0) +
-                (yearCommissioningIssues._count.id || 0),
+              open: inspection.weeklyCount + commissioning.weeklyCount,
+              total: inspection.totalCount + commissioning.totalCount,
             },
             qualityLoss: {
-              weekly: weeklyLossTotal,
-              total: totalLoss,
+              weekly:
+                afterSales.weeklyLoss +
+                inspection.weeklyLoss +
+                commissioning.weeklyLoss +
+                qualityLoss.weeklyLoss,
+              total:
+                afterSales.totalLoss +
+                inspection.totalLoss +
+                commissioning.totalLoss +
+                qualityLoss.totalLoss,
             },
             workOrders: {
-              weekly: weekWorkOrdersCount || 0,
-              total: yearWorkOrders._count.workOrderNumber || 0,
+              weekly: workOrder.weeklyCount,
+              total: workOrder.totalCount,
             },
             openIssues:
-              weekAfterSalesCount +
-              weekQualityRecordsCount +
-              weekCommissioningIssuesCount,
+              afterSales.weeklyCount +
+              inspection.weeklyCount +
+              commissioning.weeklyCount,
             passRate: 0,
             totalInspections: 0,
           },
-          recentWorkOrders: recentWorkOrders || [],
+          recentWorkOrders: workOrder.recentWorkOrders || [],
         };
       } catch (error) {
         logger.error({ err: error }, 'getStats 执行失败');
@@ -317,21 +218,11 @@ export const DashboardService = {
    */
   async getIssueDistribution(): Promise<DashboardChartItem[]> {
     try {
-      const currentYearStart = getStartOfYear();
-
-      const stats = await prisma.quality_records.groupBy({
-        by: ['defectType'],
-        where: {
-          isDeleted: false,
-          date: { gte: currentYearStart },
-        },
-        _count: true,
+      const stats = await InspectionService.getStatsForDashboard({
+        weekStart: getStartOfWeek(),
+        yearStart: getStartOfYear(),
       });
-
-      return stats.map((s) => ({
-        type: s.defectType || 'Unknown',
-        value: s._count,
-      }));
+      return stats.issueDistribution;
     } catch (error) {
       logger.error({ err: error }, 'getIssueDistribution 执行失败');
       return [];

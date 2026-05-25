@@ -365,6 +365,46 @@ async function buildRealtimeReportData(row: {
 }
 
 export const VehicleCommissioningService = {
+  async getLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
+    return prisma.vehicle_commissioning_issues.findMany({
+      where: {
+        isDeleted: false,
+        OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
+        ...(params?.workOrderNumber
+          ? { workOrderNumber: { contains: params.workOrderNumber } }
+          : {}),
+      },
+    });
+  },
+
+  async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
+    const baseWhere = {
+      isDeleted: false,
+      OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
+    };
+    const [yearAggregate, weekAggregate, weekCount] = await Promise.all([
+      prisma.vehicle_commissioning_issues.aggregate({
+        where: { ...baseWhere, date: { gte: params.yearStart } },
+        _count: { id: true },
+        _sum: { lossAmount: true },
+      }),
+      prisma.vehicle_commissioning_issues.aggregate({
+        where: { ...baseWhere, date: { gte: params.weekStart } },
+        _sum: { lossAmount: true },
+      }),
+      prisma.vehicle_commissioning_issues.count({
+        where: { ...baseWhere, date: { gte: params.weekStart } },
+      }),
+    ]);
+
+    return {
+      totalCount: yearAggregate._count.id || 0,
+      weeklyCount: weekCount || 0,
+      totalLoss: Number(yearAggregate._sum.lossAmount || 0),
+      weeklyLoss: Number(weekAggregate._sum.lossAmount || 0),
+    };
+  },
+
   async createIssueFromBody(
     body: Record<string, unknown>,
     operatorUserId?: string,

@@ -272,6 +272,46 @@ async function buildDeptNameMap() {
 }
 
 export const AfterSalesService = {
+  async getLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
+    return prisma.after_sales.findMany({
+      where: {
+        isDeleted: false,
+        ...(params?.workOrderNumber
+          ? { workOrderNumber: { contains: params.workOrderNumber } }
+          : {}),
+      },
+    });
+  },
+
+  async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
+    const baseWhere = { isDeleted: false };
+    const [yearAggregate, weekAggregate, weekCount] = await Promise.all([
+      prisma.after_sales.aggregate({
+        where: { ...baseWhere, occurDate: { gte: params.yearStart } },
+        _count: { id: true },
+        _sum: { materialCost: true, laborTravelCost: true },
+      }),
+      prisma.after_sales.aggregate({
+        where: { ...baseWhere, occurDate: { gte: params.weekStart } },
+        _sum: { materialCost: true, laborTravelCost: true },
+      }),
+      prisma.after_sales.count({
+        where: { ...baseWhere, occurDate: { gte: params.weekStart } },
+      }),
+    ]);
+
+    return {
+      totalCount: yearAggregate._count.id || 0,
+      weeklyCount: weekCount || 0,
+      totalLoss:
+        Number(yearAggregate._sum.materialCost || 0) +
+        Number(yearAggregate._sum.laborTravelCost || 0),
+      weeklyLoss:
+        Number(weekAggregate._sum.materialCost || 0) +
+        Number(weekAggregate._sum.laborTravelCost || 0),
+    };
+  },
+
   async updateByRoute(
     id: string,
     bodyRecord: Record<string, unknown>,

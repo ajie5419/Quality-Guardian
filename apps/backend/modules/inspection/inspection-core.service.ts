@@ -16,12 +16,12 @@ import {
   ISSUE_TRACKING_STATUS,
   tryParsePhotos,
 } from '@qgs/shared';
-import { BaseService } from '~/modules/base/base.service';
+import { buildYearFilter, parsePagination } from '~/utils/query-helpers';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept/dept.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { WelderScoreService } from '~/modules/welder-score/welder-score.service';
+import { WelderScoreService } from '~/modules/welder/welder-score.service';
 import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import { buildInspectionIssueDateRange } from '~/utils/inspection-issue';
 import { createModuleLogger } from '~/utils/logger';
@@ -712,6 +712,55 @@ async function syncInspectionProjectDocuments(
 }
 
 export const InspectionCoreService = {
+  async getLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
+    return prisma.quality_records.findMany({
+      where: {
+        isDeleted: false,
+        lossAmount: { gt: 0 },
+        ...(params?.workOrderNumber
+          ? { workOrderNumber: { contains: params.workOrderNumber } }
+          : {}),
+      },
+    });
+  },
+
+  async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
+    const baseWhere: Prisma.quality_recordsWhereInput = {
+      isDeleted: false,
+    };
+    const [yearAggregate, weekAggregate, weekCount, yearTypeStats] =
+      await Promise.all([
+        prisma.quality_records.aggregate({
+          where: { ...baseWhere, date: { gte: params.yearStart } },
+          _count: { id: true },
+          _sum: { lossAmount: true },
+        }),
+        prisma.quality_records.aggregate({
+          where: { ...baseWhere, date: { gte: params.weekStart } },
+          _sum: { lossAmount: true },
+        }),
+        prisma.quality_records.count({
+          where: { ...baseWhere, date: { gte: params.weekStart } },
+        }),
+        prisma.quality_records.groupBy({
+          by: ['defectType'],
+          where: { ...baseWhere, date: { gte: params.yearStart } },
+          _count: { id: true },
+        }),
+      ]);
+
+    return {
+      totalCount: yearAggregate._count.id || 0,
+      weeklyCount: weekCount || 0,
+      totalLoss: Number(yearAggregate._sum.lossAmount || 0),
+      weeklyLoss: Number(weekAggregate._sum.lossAmount || 0),
+      issueDistribution: yearTypeStats.map((item) => ({
+        type: item.defectType || 'Unknown',
+        value: item._count.id,
+      })),
+    };
+  },
+
   async findById(id: string) {
     const inspection = await prisma.inspections.findFirst({
       where: {
@@ -833,7 +882,7 @@ export const InspectionCoreService = {
 
     // Date Range (Year)
     if (year) {
-      where.inspectionDate = BaseService.buildYearFilter(year);
+      where.inspectionDate = buildYearFilter(year);
     }
 
     const runQuery = async (withArchiveTask: boolean) => {
@@ -876,7 +925,7 @@ export const InspectionCoreService = {
         ]);
       }
 
-      const { skip, take } = BaseService.parsePagination({
+      const { skip, take } = parsePagination({
         page,
         pageSize,
       });
