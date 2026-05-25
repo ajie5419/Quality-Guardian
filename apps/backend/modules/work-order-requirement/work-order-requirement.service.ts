@@ -1,10 +1,98 @@
 import { Prisma } from '@prisma/client';
+import { FileStorageService } from '~/modules/file-storage';
 import { buildWorkOrderWhereCondition } from '~/modules/work-order/work-order.service';
 import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import { buildRequirementSummaryMap } from '~/utils/work-order-requirement-summary';
 
+type WorkOrderRequirementCreatePayload =
+  Prisma.work_order_requirementsUncheckedCreateInput;
+
 export const WorkOrderRequirementService = {
+  async registerAttachmentReferences(params: {
+    attachments?: string;
+    bizId: string;
+  }) {
+    await FileStorageService.registerReferencesFromAttachments({
+      attachments: params.attachments,
+      bizId: params.bizId,
+      bizType: 'work_order_requirement',
+    });
+  },
+
+  async createMany(payloads: WorkOrderRequirementCreatePayload[]) {
+    return prisma.$transaction(
+      payloads.map((data) =>
+        prisma.work_order_requirements.create({
+          data,
+          select: { id: true, requirementName: true, workOrderNumber: true },
+        }),
+      ),
+    );
+  },
+
+  async updateById(
+    id: string,
+    data: Prisma.work_order_requirementsUpdateInput,
+  ) {
+    return prisma.work_order_requirements.update({
+      where: { id },
+      data,
+      select: {
+        confirmedAt: true,
+        confirmer: true,
+        confirmStatus: true,
+        id: true,
+        requirementName: true,
+        workOrderNumber: true,
+      },
+    });
+  },
+
+  async findActiveByWorkOrder(workOrderNumber: string) {
+    return prisma.work_order_requirements.findMany({
+      where: { isDeleted: false, status: 'active', workOrderNumber },
+      orderBy: [{ updatedAt: 'desc' }],
+      select: {
+        attachment: true,
+        confirmer: true,
+        confirmedAt: true,
+        confirmStatus: true,
+        createdAt: true,
+        id: true,
+        partName: true,
+        processName: true,
+        process: { select: { name: true } },
+        requirementItems: true,
+        requirementName: true,
+        responsiblePerson: true,
+        responsibleTeam: true,
+        workOrderNumber: true,
+      },
+    });
+  },
+
+  async findActiveForAggregate(workOrderNumber: string) {
+    return prisma.work_order_requirements.findMany({
+      where: { isDeleted: false, status: 'active', workOrderNumber },
+      select: {
+        attachment: true,
+        confirmer: true,
+        confirmedAt: true,
+        confirmStatus: true,
+        createdAt: true,
+        requirementItems: true,
+        requirementName: true,
+        id: true,
+        partName: true,
+        processName: true,
+        process: { select: { name: true } },
+        responsiblePerson: true,
+        responsibleTeam: true,
+      },
+    });
+  },
+
   async getSummaryByWorkOrderNumbers(workOrderNumbers: string[]) {
     const normalized = [
       ...new Set(workOrderNumbers.map((item) => item.trim())),

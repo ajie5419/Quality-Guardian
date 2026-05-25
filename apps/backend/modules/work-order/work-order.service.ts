@@ -6,11 +6,11 @@ import type {
 
 import { Prisma } from '@prisma/client';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import { WorkOrderRequirementService } from '~/modules/work-order-requirement';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { formatDateString } from '~/utils/query-helpers';
 import { addYearsToDate } from '~/utils/work-order';
-import { buildRequirementSummaryMap } from '~/utils/work-order-requirement-summary';
 import {
   mapToDisplayStatus,
   WORK_ORDER_STATUS,
@@ -312,22 +312,10 @@ export const WorkOrderService = {
       const workOrderNumbers = workOrders
         .map((item) => String(item.workOrderNumber || '').trim())
         .filter(Boolean);
-      const requirementRows =
-        workOrderNumbers.length > 0
-          ? await prisma.work_order_requirements.findMany({
-              where: {
-                isDeleted: false,
-                status: 'active',
-                workOrderNumber: { in: workOrderNumbers },
-              },
-              select: {
-                confirmStatus: true,
-                createdAt: true,
-                workOrderNumber: true,
-              },
-            })
-          : [];
-      const requirementSummaryMap = buildRequirementSummaryMap(requirementRows);
+      const requirementSummaryMap =
+        await WorkOrderRequirementService.getSummaryByWorkOrderNumbers(
+          workOrderNumbers,
+        );
 
       // 5. 数据映射与返回
       const items: WorkOrderItem[] = workOrders.map((wo) => {

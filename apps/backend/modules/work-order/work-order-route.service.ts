@@ -2,7 +2,6 @@ import type { H3Event } from 'h3';
 import type { ImportRowError } from '~/utils/import-report';
 import type { UserSession } from '~/utils/jwt-utils';
 
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { WorkOrderRequirementService } from '~/modules/work-order-requirement/work-order-requirement.service';
 import { WorkOrderService } from '~/modules/work-order/work-order.service';
 import { logApiError } from '~/utils/api-logger';
@@ -401,20 +400,13 @@ export const WorkOrderRouteService = {
         workOrderNumber: item.workOrderNumber,
       })),
     );
-    const created = await prisma.$transaction(
-      createPayloads.map((data) =>
-        prisma.work_order_requirements.create({
-          data,
-          select: { id: true, requirementName: true, workOrderNumber: true },
-        }),
-      ),
-    );
+    const created =
+      await WorkOrderRequirementService.createMany(createPayloads);
     await Promise.all(
       created.map((item, index) =>
-        FileStorageService.registerReferencesFromAttachments({
+        WorkOrderRequirementService.registerAttachmentReferences({
           attachments: normalized[index]?.attachments,
           bizId: item.id,
-          bizType: 'work_order_requirement',
         }),
       ),
     );
@@ -452,32 +444,21 @@ export const WorkOrderRouteService = {
       'work_order_requirements',
       governedFields as Record<string, unknown>,
     );
-    const updated = await prisma.work_order_requirements.update({
-      where: { id },
-      data: {
-        confirmedAt: confirm ? new Date() : null,
-        confirmer: confirm ? userinfo.username : null,
-        confirmStatus: confirm ? 'CONFIRMED' : 'PENDING',
-        requirementName:
-          body.requirementName === undefined
-            ? undefined
-            : String(body.requirementName || '').trim(),
-        responsiblePerson:
-          body.responsiblePerson === undefined
-            ? undefined
-            : String(body.responsiblePerson || '').trim() || null,
-        ...governedFields,
-        ...governedCanonicalIds,
-        updatedBy: userinfo.username,
-      },
-      select: {
-        confirmedAt: true,
-        confirmer: true,
-        confirmStatus: true,
-        id: true,
-        requirementName: true,
-        workOrderNumber: true,
-      },
+    const updated = await WorkOrderRequirementService.updateById(id, {
+      confirmedAt: confirm ? new Date() : null,
+      confirmer: confirm ? userinfo.username : null,
+      confirmStatus: confirm ? 'CONFIRMED' : 'PENDING',
+      requirementName:
+        body.requirementName === undefined
+          ? undefined
+          : String(body.requirementName || '').trim(),
+      responsiblePerson:
+        body.responsiblePerson === undefined
+          ? undefined
+          : String(body.responsiblePerson || '').trim() || null,
+      ...governedFields,
+      ...governedCanonicalIds,
+      updatedBy: userinfo.username,
     });
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
@@ -494,26 +475,8 @@ export const WorkOrderRouteService = {
     return updated;
   },
   async getRequirements(workOrderNumber: string) {
-    const list = await prisma.work_order_requirements.findMany({
-      where: { isDeleted: false, status: 'active', workOrderNumber },
-      orderBy: [{ updatedAt: 'desc' }],
-      select: {
-        attachment: true,
-        confirmer: true,
-        confirmedAt: true,
-        confirmStatus: true,
-        createdAt: true,
-        id: true,
-        partName: true,
-        processName: true,
-        process: { select: { name: true } },
-        requirementItems: true,
-        requirementName: true,
-        responsiblePerson: true,
-        responsibleTeam: true,
-        workOrderNumber: true,
-      },
-    });
+    const list =
+      await WorkOrderRequirementService.findActiveByWorkOrder(workOrderNumber);
     return list.map((item) => ({
       attachments: parseRequirementAttachments(item.attachment),
       confirmer: item.confirmer || '',
@@ -613,24 +576,7 @@ export const WorkOrderRouteService = {
           workOrderNumber: true,
         },
       }),
-      prisma.work_order_requirements.findMany({
-        where: { isDeleted: false, status: 'active', workOrderNumber },
-        select: {
-          attachment: true,
-          confirmer: true,
-          confirmedAt: true,
-          confirmStatus: true,
-          createdAt: true,
-          requirementItems: true,
-          requirementName: true,
-          id: true,
-          partName: true,
-          processName: true,
-          process: { select: { name: true } },
-          responsiblePerson: true,
-          responsibleTeam: true,
-        },
-      }),
+      WorkOrderRequirementService.findActiveForAggregate(workOrderNumber),
       prisma.inspections.findMany({
         where: { isDeleted: false, workOrderNumber },
         orderBy: [{ inspectionDate: 'desc' }],
