@@ -53,6 +53,14 @@
 7. **禁止全量加载到内存再分页** — 分页在 DB 层（skip + take），聚合用 groupBy/aggregate
 8. **禁止在 service 中嵌入文件解析逻辑** — Excel/CSV 解析提取到 utils/excel-parser.ts
 
+## 类型安全规范
+
+1. **禁止 `as any`** — 全项目范围（api/ + modules/ + utils/），测试文件除外
+2. **禁止非空断言 `!`** — 用条件判断或 early return 代替，测试文件除外
+3. **禁止 `as unknown as T` 双重断言** — 说明类型设计有问题，需修正类型定义
+4. **允许 `as const`** — 安全的类型收窄
+5. **允许测试文件中的 `as any`** — mock 场景需要
+
 ## 模块边界规范
 
 1. **每个模块只操作自己拥有的表** — 表归属见 prisma/schema.prisma
@@ -92,6 +100,12 @@
 - 不得出现 `execSync`
 - 不得出现 `Date.now()` 用于 ID 生成
 - 不得出现 console.log、console.warn、console.error
+
+**类型安全：**
+
+- 不得出现 `as any`（排除 __tests__/ 和 *.test.ts）
+- 不得出现非空断言 `!`（排除 __tests__/ 和 *.test.ts）
+- 不得出现 `as unknown as T` 双重断言
 
 **模块边界：**
 
