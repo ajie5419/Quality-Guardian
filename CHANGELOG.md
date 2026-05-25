@@ -121,3 +121,30 @@
 **遗留问题：**
 
 - `pnpm --dir apps/backend add @paralleldrive/cuid2` 已更新依赖与 lockfile，但 postinstall 中既有 `nitro prepare` 会触发 route-handler 顶层 `readBody` 报错；本阶段验证改用明确的 `prisma generate`、`tsc --noEmit` 与 vitest，均通过。
+
+### 2026-05-25 阶段五：消除跨模块直接查表（步骤22-29）
+
+**执行内容：**
+
+- 步骤22：新增 `apps/backend/utils/dept-tree.ts`，提取部门树构建、扁平化和子树查找纯函数，并替换 `dept`、`report`、`after-sales`、`quality-loss`、`inspection` 中重复部门树遍历。
+- 步骤23：`dashboard` 移除对 `work_orders`、`quality_records`、`inspections`、`work_order_requirements`、`system_settings` 的直接访问，改为调用 `work-order`、`inspection`、`work-order-requirement`、`system` 模块 service。
+- 步骤24：`quality-loss` 外部来源读取、趋势、钻取和更新逻辑改为调用 `inspection`、`after-sales`、`vehicle-commissioning` service，模块内仅保留 `quality_losses` 自有表访问。
+- 步骤25：`supplier` 评分聚合改为调用 `inspection` 与 `after-sales` 的供应商评分数据接口，模块内仅保留 `suppliers` 自有表访问。
+- 步骤26：`report` 周报、日报汇总、质量分析和车辆故障率报表改为调用对应业务模块 service；`report` 内仅保留 `reports` 与 `daily_reports` 自有表访问。
+- 步骤27：`welder` 评分扣分问题改为通过 `inspection` service 获取，避免直接访问 `quality_records`，并用懒加载规避 `inspection`/`welder` 初始化环依赖。
+- 步骤28：`work-order` 对工单要求的创建、更新、列表、汇总读取改为调用 `work-order-requirement` service，模块内不再直接访问 `work_order_requirements`。
+- 步骤29：`vehicle-commissioning` 审计日志读取改为调用 `system-log` service，不再直接访问 `audit_logs`。
+- 收尾：补齐最终验收发现的 `work-order` 读取 `inspections`、`vehicle-commissioning` 读取 `daily_reports` 残留，分别改为 `inspection` 与 `report` 模块 service。
+
+**验证结果：**
+
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec vitest run`: 32 文件 / 212 测试全部通过
+- 阶段收尾执行跨模块直接查表扫描：目标模块仅剩各自拥有表访问，未发现非自有表直接访问
+- 阶段结束 `git status --short | wc -l`: 0
+
+**commit:** `84523e85` / `befd32f3` / `4f2acf4a` / `99f21147` / `7012a271` / `8ef38671` / `5591528f` / `dc7bca5c` / `d6008b8a`
+
+**遗留问题：**
+
+- 无阻塞；`pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
