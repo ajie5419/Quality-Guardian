@@ -35,3 +35,30 @@
 1. **单元测试通过** — `pnpm --dir apps/backend exec vitest run`
 2. **集成测试通过** — 相关模块联合验证
 3. **端到端流程验证通过** — 完整业务路径走通
+
+## 路由层规范
+
+1. **路由文件不超过 50 行** — 超过说明业务逻辑该提到 modules/ 的 service 里
+2. **路由文件禁止直接 import prisma** — 通过 modules/ 下的 service 访问数据
+3. **readBody 必须过 zod schema 校验** — 不允许 `as Record<string, unknown>` 或 `as any`
+
+## 字段与数据规范
+
+1. **禁止**在代码中硬编码业务数据值（工序名、供应商名、字典项等），必须从数据库或配置读取
+2. **禁止**在多处重复定义字段名/列名，表结构以 `prisma/schema.prisma` 为唯一真源
+3. **禁止**用字符串字面量做业务分支判断（如 `if (status === '已完成')`），必须用枚举常量
+4. **必须**新增主数据类型时提供对应的管理接口（CRUD），不允许只在代码里写死列表
+5. **必须**引用主数据时存 ID（外键），不能只存 name 文本
+
+## 架构守护（自动化）
+
+`pnpm run check:qms-arch` 在提交前自动执行，检查以下规则：
+
+- api/ 文件不得 import prisma
+- api/ 文件不超过 50 行
+- utils/ 只允许白名单内的基础设施文件
+- 不得存在 services/、core/module-registry/、core/master-data/ 目录
+- modules/ 之间不得 import 对方内部文件（只能通过 index.ts）
+- 不得出现中文字符串字面量做条件判断（检测 `=== '..中文..'` 模式）
+
+违反任一条即阻断提交。
