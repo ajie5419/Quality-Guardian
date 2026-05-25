@@ -3,7 +3,7 @@ import type { IssueItem, WeeklyReportData } from '@qgs/shared';
 import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
-} from '@qgs/domain';
+} from '@qgs/shared';
 import { DeptService } from '~/modules/dept/dept.service';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';

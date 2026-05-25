@@ -17,9 +17,7 @@ import {
   normalizeSupervisionText,
   parseSupervisionList,
   stringifySupervisionList,
-  SUPERVISION_PROJECT_STATUS,
   SUPERVISION_PROJECT_STATUS_SET,
-  SUPERVISION_PROJECT_TYPE,
   SUPERVISION_PROJECT_TYPE_SET,
 } from '@qgs/shared';
 

@@ -22,8 +22,6 @@
     "#/*": "./src/*"
   },
   "dependencies": {
-    "@qgs/domain": "workspace:*",
-    "@qgs/enums": "workspace:*",
     "@qgs/shared": "workspace:*",
     "@tanstack/vue-query": "catalog:",
     "@univerjs/preset-sheets-core": "0.16.1",

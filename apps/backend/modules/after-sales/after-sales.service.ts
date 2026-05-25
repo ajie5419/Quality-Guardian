@@ -6,7 +6,7 @@ import type {
 import type { AfterSalesDateMode } from '~/utils/after-sales-query';
 
 import { Prisma } from '@prisma/client';
-import { AUDIT_TEMPLATES } from '@qgs/enums';
+import { AUDIT_TEMPLATES } from '@qgs/shared';
 import {
   formatDate,
   QMS_DEFAULT_VALUES,

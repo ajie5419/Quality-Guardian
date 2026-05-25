@@ -2,7 +2,7 @@ import {
   clampWelderScore,
   resolveWelderIdByResponsibleText,
   resolveWelderSeverityDeduction,
-} from '@qgs/domain';
+} from '@qgs/shared';
 import prisma from '~/utils/prisma';
 
 const WELDER_SCORE_MAX = 12;

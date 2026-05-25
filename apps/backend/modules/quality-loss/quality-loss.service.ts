@@ -6,8 +6,8 @@ import type {
 import type { PaginationParams } from '~/modules/base/base.service';
 
 import { Prisma } from '@prisma/client';
-import { AUDIT_TEMPLATES } from '@qgs/enums';
-import { MONTHS } from '~/constants/locale';
+import { AUDIT_TEMPLATES } from '@qgs/shared';
+import { MONTHS } from '~/modules/quality-loss/locale';
 import {
   applyPagination,
   formatDateString,

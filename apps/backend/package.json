@@ -39,8 +39,6 @@
   "dependencies": {
     "@fastify/busboy": "^3.2.0",
     "@prisma/client": "6.2.1",
-    "@qgs/domain": "workspace:*",
-    "@qgs/enums": "workspace:*",
     "@qgs/shared": "workspace:*",
     "ali-oss": "^6.23.0",
     "bcrypt": "^6.0.0",

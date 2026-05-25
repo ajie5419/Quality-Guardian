@@ -28,4 +28,4 @@ export {
   QualityLossStatusEnum,
   SupplierStatusEnum,
   WorkOrderStatusEnum,
-} from '@qgs/enums';
+} from '../../enums/qms-types';

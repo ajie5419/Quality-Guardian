@@ -8,8 +8,8 @@ import { basename, extname, join } from 'node:path';
 import process from 'node:process';
 
 import { Prisma } from '@prisma/client';
-import { deriveIssueTrackingStatus, ISSUE_TRACKING_STATUS } from '@qgs/domain';
-import { AUDIT_TEMPLATES, InspectionIssueStatusEnum } from '@qgs/enums';
+import { deriveIssueTrackingStatus, ISSUE_TRACKING_STATUS } from '@qgs/shared';
+import { AUDIT_TEMPLATES, InspectionIssueStatusEnum } from '@qgs/shared';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
 import { BaseService } from '~/modules/base/base.service';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';

@@ -8,8 +8,8 @@ import type {
 import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
-} from '@qgs/domain';
-import { AUDIT_TEMPLATES } from '@qgs/enums';
+} from '@qgs/shared';
+import { AUDIT_TEMPLATES } from '@qgs/shared';
 import { formatDate, safeNumber, tryParsePhotos } from '@qgs/shared';
 import { nanoid } from 'nanoid';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
