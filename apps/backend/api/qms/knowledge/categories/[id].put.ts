@@ -6,7 +6,7 @@ import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   isPrismaNotFoundError,
   isPrismaUniqueConstraintError,
-} from '~/utils/prisma-error';
+} from '~/utils/db-error';
 import {
   conflictResponse,
   internalServerErrorResponse,

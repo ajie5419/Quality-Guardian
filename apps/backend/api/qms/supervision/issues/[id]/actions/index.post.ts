@@ -4,7 +4,7 @@ import { FileStorageService } from '~/modules/file-storage/file-storage.service'
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
+import { isPrismaSchemaMismatchError } from '~/utils/db-error';
 import {
   badRequestResponse,
   internalServerErrorResponse,

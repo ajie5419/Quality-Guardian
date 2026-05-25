@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
+import { isPrismaUniqueConstraintError } from '~/utils/db-error';
 import {
   badRequestResponse,
   conflictResponse,

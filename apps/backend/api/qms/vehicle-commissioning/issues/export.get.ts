@@ -5,10 +5,7 @@ import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/veh
 import { logApiError } from '~/utils/api-logger';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import {
-  internalServerErrorResponse,
-  unAuthorizedResponse,
-} from '~/utils/response';
+import { internalServerErrorResponse, unAuthorizedResponse } from '~/utils/response';
 
 const querySchema = z.object({
   date: z.string().optional(),
@@ -37,16 +34,8 @@ export default defineValidatedHandler(querySchema, async (event, query) => {
       status: query.status,
       workOrderNumber: query.workOrderNumber,
     });
-    setHeader(
-      event,
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
-    setHeader(
-      event,
-      'Content-Disposition',
-      `attachment; filename*=UTF-8''${encodeURIComponent('调试验收问题台账.xlsx')}`,
-    );
+    setHeader(event, 'Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    setHeader(event, 'Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent('调试验收问题台账.xlsx')}`);
     return buffer;
   } catch (error) {
     logApiError('vehicle-commissioning-issues-export', error, undefined, event);

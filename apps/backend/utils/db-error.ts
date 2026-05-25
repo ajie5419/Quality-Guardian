@@ -1,4 +1,5 @@
 export {
+  isPrismaUniqueConflictError,
   isPrismaNotFoundError,
   isPrismaSchemaMismatchError,
   isPrismaUniqueConstraintError,

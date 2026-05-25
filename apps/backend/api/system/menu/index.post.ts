@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
+import { isPrismaUniqueConstraintError } from '~/utils/db-error';
 import {
   conflictResponse,
   internalServerErrorResponse,

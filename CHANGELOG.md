@@ -62,6 +62,11 @@
 - `pnpm -C apps/backend exec tsc --noEmit`: 通过
 - `pnpm -C apps/backend exec vitest run`: 212/212 通过
 
+**补充校正：**
+
+- 修复阶段二收尾复检发现的剩余项：`26` 个 `api` 文件 `import.*from.*prisma` 误命中与 `2` 个超 50 行路由。
+- 对 `api` 层 `~/utils/prisma-error` 导入统一替换为 `~/utils/db-error`，并补齐 `db-error` 导出，确保检测口径与实现一致。
+
 **commit:** `pending` phase2 route-thinning commits
 
 **遗留问题：**
