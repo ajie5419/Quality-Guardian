@@ -3,6 +3,13 @@ import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kerne
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
+  applyRecordsToStats,
+  classifyDefect,
+  createEmptyStats,
+  scoreSupplierListItem,
+  type SupplierStats,
+} from './supplier-scoring';
+import {
   buildSupplierCreateDataWithCanonical,
   buildSupplierUpdateDataWithCanonical,
   buildSupplierUpsertPayload,
@@ -12,157 +19,6 @@ import {
   normalizeOutsourcingMode,
   normalizeSupplierString,
 } from '~/utils/supplier';
-
-// --- Scoring Constants (Configurable) ---
-const THRESHOLD_CLASS_A_AMOUNT = 5000; // Class A: Loss > 5000
-const THRESHOLD_CRITICAL_AMOUNT = 80_000; // Blacklist: Loss > 80000
-const THRESHOLD_SCORE_WARNING = 75;
-const THRESHOLD_INCOMING_YIELD_WARNING = 90;
-
-const LIMIT_CONSECUTIVE_FAILURE = 3; // 3x Consecutive A/B -> Blacklist
-const LIMIT_MIN_ISSUE_COUNT_FOR_STRICT_ACTION = 3;
-const OPEN_IN_HOUSE_ISSUE_WARNING_LIMIT = 3;
-
-interface SupplierStats {
-  afterSalesClassA: number;
-  afterSalesClassB: number;
-  afterSalesClassC: number;
-  afterSalesCount: number;
-  afterSalesLoss: number;
-  consecutiveBigFailures: number;
-  count: number;
-  engineeringClassA: number;
-  engineeringClassB: number;
-  engineeringClassC: number;
-  engineeringCount: number;
-  engineeringDefectQuantity: number;
-  engineeringLoss: number;
-  failures: number;
-  failuresQuantity: number;
-  maxSingleLoss: number;
-  openAfterSalesCount: number;
-  openEngineeringCount: number;
-  qualifiedCount: number;
-  quantity: number;
-}
-
-function createEmptyStats(): SupplierStats {
-  return {
-    count: 0,
-    quantity: 0,
-    qualifiedCount: 0,
-    failures: 0,
-    failuresQuantity: 0,
-    afterSalesLoss: 0,
-    engineeringLoss: 0,
-    afterSalesCount: 0,
-    engineeringCount: 0,
-    engineeringDefectQuantity: 0,
-    engineeringClassA: 0,
-    engineeringClassB: 0,
-    engineeringClassC: 0,
-    afterSalesClassA: 0,
-    afterSalesClassB: 0,
-    afterSalesClassC: 0,
-    openEngineeringCount: 0,
-    openAfterSalesCount: 0,
-    consecutiveBigFailures: 0,
-    maxSingleLoss: 0,
-  };
-}
-
-function clamp100(value: number) {
-  return Math.max(0, Math.min(100, value));
-}
-
-function buildSupplierScore(input: {
-  incomingQualifiedRate: number;
-  stat: SupplierStats;
-  totalIssueCount: number;
-}) {
-  const { incomingQualifiedRate, stat, totalIssueCount } = input;
-  const engineeringDeduction =
-    stat.engineeringClassA * 15 +
-    stat.engineeringClassB * 5 +
-    stat.engineeringClassC * 1;
-  const afterSalesDeduction =
-    stat.afterSalesClassA * 15 +
-    stat.afterSalesClassB * 5 +
-    stat.afterSalesClassC * 1;
-  const incomingDeduction = stat.failures * 3;
-  const totalDeduction =
-    engineeringDeduction + afterSalesDeduction + incomingDeduction;
-
-  return {
-    afterSalesScore: clamp100(100 - afterSalesDeduction),
-    engineeringScore: clamp100(100 - engineeringDeduction),
-    incomingScore: clamp100(100 - incomingDeduction),
-    score: Math.round(clamp100(100 - totalDeduction)),
-    shouldDowngradeToC:
-      stat.engineeringClassA + stat.afterSalesClassA >= 2 ||
-      stat.engineeringClassB + stat.afterSalesClassB >= 3 ||
-      (stat.count > 5 &&
-        incomingQualifiedRate < THRESHOLD_INCOMING_YIELD_WARNING),
-    shouldFreeze:
-      totalIssueCount >= LIMIT_MIN_ISSUE_COUNT_FOR_STRICT_ACTION &&
-      (stat.consecutiveBigFailures >= LIMIT_CONSECUTIVE_FAILURE ||
-        stat.maxSingleLoss > THRESHOLD_CRITICAL_AMOUNT),
-    stabilityScore: 100,
-  };
-}
-
-function buildInHouseOutsourcingScore(input: {
-  stat: SupplierStats;
-  totalIssueCount: number;
-}) {
-  const { stat, totalIssueCount } = input;
-  const openIssueCount = stat.openEngineeringCount + stat.openAfterSalesCount;
-
-  const engineeringDeduction =
-    stat.engineeringClassA * 12 +
-    stat.engineeringClassB * 4 +
-    stat.engineeringClassC * 0.5 +
-    Math.max(
-      0,
-      stat.engineeringCount -
-        stat.engineeringClassA -
-        stat.engineeringClassB -
-        stat.engineeringClassC,
-    ) *
-      0.5;
-  const afterSalesDeduction =
-    stat.afterSalesClassA * 12 +
-    stat.afterSalesClassB * 4 +
-    stat.afterSalesClassC * 0.5 +
-    Math.max(
-      0,
-      stat.afterSalesCount -
-        stat.afterSalesClassA -
-        stat.afterSalesClassB -
-        stat.afterSalesClassC,
-    ) *
-      0.5;
-  const openIssueDeduction = openIssueCount * 2;
-  const totalDeduction =
-    engineeringDeduction + afterSalesDeduction + openIssueDeduction;
-
-  return {
-    afterSalesScore: clamp100(100 - afterSalesDeduction),
-    engineeringScore: clamp100(100 - engineeringDeduction),
-    incomingScore: 100,
-    openIssueCount,
-    score: Math.round(clamp100(100 - totalDeduction)),
-    shouldDowngradeToC:
-      stat.engineeringClassA + stat.afterSalesClassA >= 2 ||
-      stat.engineeringClassB + stat.afterSalesClassB >= 3 ||
-      openIssueCount >= OPEN_IN_HOUSE_ISSUE_WARNING_LIMIT,
-    shouldFreeze:
-      totalIssueCount >= LIMIT_MIN_ISSUE_COUNT_FOR_STRICT_ACTION &&
-      (stat.consecutiveBigFailures >= LIMIT_CONSECUTIVE_FAILURE ||
-        stat.maxSingleLoss > THRESHOLD_CRITICAL_AMOUNT),
-    stabilityScore: clamp100(100 - openIssueCount * 10),
-  };
-}
 
 export interface SupplierQueryParams {
   page?: number;
@@ -482,18 +338,6 @@ export const SupplierService = {
         }),
       ]);
 
-      const classifyDefect = (
-        loss: number,
-        severity?: string,
-      ): 'A' | 'B' | 'C' | null => {
-        const sev = (severity || '').toLowerCase();
-        if (loss > THRESHOLD_CLASS_A_AMOUNT) return 'A';
-        if (['critical', 'fatal', 'p0', 'p1', '致命'].includes(sev)) return 'A';
-        if (['high', 'major', 'p2'].includes(sev)) return 'B';
-        if (['low', 'minor', 'p3'].includes(sev)) return 'C';
-        return null;
-      };
-
       incomingStats.forEach((s) => {
         if (s.supplierName) {
           const current = statsMap.get(s.supplierName) || createEmptyStats();
@@ -600,123 +444,15 @@ export const SupplierService = {
 
       Object.entries(supplierRecords).forEach(([name, records]) => {
         const current = statsMap.get(name) || createEmptyStats();
-
         records.sort((a, b) => b.date.getTime() - a.date.getTime());
-
-        let consecutiveCount = 0;
-        records.forEach((r) => {
-          if (r.loss > current.maxSingleLoss) current.maxSingleLoss = r.loss;
-          if (r.origin === 'qualityRecords') {
-            if (r.type === 'A') current.engineeringClassA++;
-            if (r.type === 'B') current.engineeringClassB++;
-            if (r.type === 'C') current.engineeringClassC++;
-          } else {
-            if (r.type === 'A') current.afterSalesClassA++;
-            if (r.type === 'B') current.afterSalesClassB++;
-            if (r.type === 'C') current.afterSalesClassC++;
-          }
-
-          if (r.type === 'A' || r.type === 'B') {
-            consecutiveCount++;
-          } else {
-            consecutiveCount = 0;
-          }
-          if (consecutiveCount > current.consecutiveBigFailures) {
-            current.consecutiveBigFailures = consecutiveCount;
-          }
-        });
-        statsMap.set(name, current);
+        statsMap.set(name, applyRecordsToStats(current, records));
       });
     }
 
     // 5. [Process FULL List for Global Stats]
-    const processedFullList = listData.map((item) => {
-      const stat = statsMap.get(item.name) || createEmptyStats();
-      const incomingPassRate =
-        stat.count > 0 ? stat.qualifiedCount / stat.count : 1;
-      const incomingQualifiedRate = Math.round(incomingPassRate * 100);
-      const totalIssueCount = stat.engineeringCount + stat.afterSalesCount;
-      const outsourcingMode = normalizeOutsourcingMode(
-        item.outsourcingMode,
-        item.category,
-      );
-      const usesInHouseOutsourcingScore =
-        isOutsourcingCategory(item.category) &&
-        outsourcingMode === IN_HOUSE_OUTSOURCING_MODE;
-      const scoring = usesInHouseOutsourcingScore
-        ? buildInHouseOutsourcingScore({ stat, totalIssueCount })
-        : buildSupplierScore({ incomingQualifiedRate, stat, totalIssueCount });
-
-      const incomingScore = scoring.incomingScore;
-      const engineeringScore = scoring.engineeringScore;
-      const afterSalesScore = scoring.afterSalesScore;
-      const stabilityScore = scoring.stabilityScore;
-
-      let score = scoring.score;
-      const warningReasons: string[] = [];
-
-      const manualStatus = item.status;
-      let finalStatus = manualStatus || 'Qualified';
-      if (finalStatus.toLowerCase() === 'qualified') {
-        if (scoring.shouldFreeze) {
-          finalStatus = 'Frozen';
-          score = 0;
-          warningReasons.push('连续重大问题/单次超大损失');
-        } else if (scoring.shouldDowngradeToC) {
-          finalStatus = 'Observation';
-          score = Math.min(score, usesInHouseOutsourcingScore ? 85 : 70);
-          warningReasons.push(
-            usesInHouseOutsourcingScore
-              ? '未关闭/严重问题触发观察'
-              : '累计问题触发C级降级',
-          );
-        } else if (score < THRESHOLD_SCORE_WARNING) {
-          finalStatus = 'Observation';
-          score = Math.min(score, 75);
-          warningReasons.push('综合分过低');
-        } else {
-          finalStatus = 'Qualified';
-        }
-      } else {
-        if (finalStatus.toLowerCase() === 'frozen') finalStatus = 'Frozen';
-        else if (finalStatus.toLowerCase() === 'observation') {
-          finalStatus = 'Observation';
-        } else if (finalStatus.toLowerCase() === 'trial') {
-          finalStatus = 'Trial';
-        }
-      }
-
-      let finalRating = 'A';
-      if (score >= 90) finalRating = 'A';
-      else if (score >= 80) finalRating = 'B';
-      else if (score >= 65) finalRating = 'C';
-      else finalRating = 'D';
-
-      return {
-        ...item,
-        incomingBatchCount: stat.count,
-        incomingTotalQuantity: stat.quantity,
-        incomingQualifiedRate,
-        totalAfterSalesLoss: stat.afterSalesLoss,
-        totalEngineeringLoss: stat.engineeringLoss,
-        engineeringIssueCount: stat.engineeringCount,
-        afterSalesIssueCount: stat.afterSalesCount,
-        incomingScore: Math.round(incomingScore),
-        engineeringScore: Math.round(engineeringScore),
-        afterSalesScore: Math.round(afterSalesScore),
-        stabilityScore: Math.round(stabilityScore),
-        status: finalStatus,
-        rating: finalRating,
-        level: finalRating,
-        outsourcingMode,
-        scoringModel: usesInHouseOutsourcingScore
-          ? 'IN_HOUSE_OUTSOURCING'
-          : 'SUPPLIER',
-        isWarning: finalStatus === 'Observation' || finalStatus === 'Frozen',
-        warningReasons,
-        qualityScore: score,
-      };
-    });
+    const processedFullList = listData.map((item) =>
+      scoreSupplierListItem(item, statsMap.get(item.name) || createEmptyStats()),
+    );
 
     interface SupplierListItem extends Record<string, unknown> {
       name: string;
