@@ -103,8 +103,8 @@
 
 **类型安全：**
 
-- 不得出现 `as any`（排除 __tests__/ 和 *.test.ts）
-- 不得出现非空断言 `!`（排除 __tests__/ 和 *.test.ts）
+- 不得出现 `as any`（排除 `__tests__/` 和 `*.test.ts`）
+- 不得出现非空断言 `!`（排除 `__tests__/` 和 `*.test.ts`）
 - 不得出现 `as unknown as T` 双重断言
 
 **模块边界：**
