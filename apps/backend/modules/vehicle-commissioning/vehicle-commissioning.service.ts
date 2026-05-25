@@ -779,20 +779,9 @@ export const VehicleCommissioningService = {
   },
 
   async getIssueLogs(id: string) {
-    const items = await prisma.audit_logs.findMany({
-      where: {
-        targetId: id,
-        targetType: 'vehicle_commissioning_issue',
-      },
-      include: {
-        users: {
-          select: {
-            realName: true,
-            username: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
+    const items = await SystemLogService.getAuditLogsByTarget({
+      targetId: id,
+      targetType: 'vehicle_commissioning_issue',
     });
 
     return items.map((item) => ({

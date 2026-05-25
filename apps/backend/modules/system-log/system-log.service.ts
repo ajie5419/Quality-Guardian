@@ -182,6 +182,24 @@ export const SystemLogService = {
     };
   },
 
+  async getAuditLogsByTarget(params: { targetId: string; targetType: string }) {
+    return prisma.audit_logs.findMany({
+      where: {
+        targetId: params.targetId,
+        targetType: params.targetType,
+      },
+      include: {
+        users: {
+          select: {
+            realName: true,
+            username: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  },
+
   /**
    * Delete an audit log
    */
