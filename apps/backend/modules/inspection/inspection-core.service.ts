@@ -1070,6 +1070,13 @@ export const InspectionCoreService = {
     });
   },
 
+  async getWelderScoreIssues() {
+    return prisma.quality_records.findMany({
+      where: { isDeleted: false, responsibleWelder: { not: null } },
+      select: { id: true, responsibleWelder: true, severity: true },
+    });
+  },
+
   async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
     const baseWhere: Prisma.quality_recordsWhereInput = {
       isDeleted: false,

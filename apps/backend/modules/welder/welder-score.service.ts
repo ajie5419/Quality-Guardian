@@ -13,15 +13,13 @@ export const WelderScoreService = {
     matchedIssueCount: number;
     updatedCount: number;
   }> {
+    const { InspectionService } = await import('~/modules/inspection');
     const [welders, issues] = await Promise.all([
       prisma.welders.findMany({
         where: { isDeleted: false },
         select: { id: true, name: true, score: true, welderCode: true },
       }),
-      prisma.quality_records.findMany({
-        where: { isDeleted: false, responsibleWelder: { not: null } },
-        select: { id: true, responsibleWelder: true, severity: true },
-      }),
+      InspectionService.getWelderScoreIssues(),
     ]);
 
     if (welders.length === 0) {
