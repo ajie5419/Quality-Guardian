@@ -72,3 +72,21 @@
 **遗留问题：**
 
 - 无阻塞；全部门禁通过。
+
+### 2026-05-25 阶段三：模块逻辑优化（步骤11-13）
+
+**执行内容：**
+
+- 步骤11：`inspection` 拆分为聚合入口 + 子服务，新增 `inspection-core/template/archive/issue` 四层分工，`inspection.service.ts` 缩减到 500 行以内。
+- 步骤12：`supplier` 评分逻辑提取到 `supplier-scoring.ts`，`supplier.service.ts` 查询与评分解耦。
+- 步骤13：`after-sales` 将 `getStats` 分解为 `buildKpiSummary/buildTrendData/formatStatsResponse`，`getChartAggregation` 改为映射表驱动聚合。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+
+**commit:** `pending` phase3 step11-13 commits
+
+**遗留问题：**
+
+- 待继续执行步骤14-16与全量验证。
