@@ -1,6 +1,6 @@
 export {
-  isPrismaUniqueConflictError,
   isPrismaNotFoundError,
   isPrismaSchemaMismatchError,
+  isPrismaUniqueConflictError,
   isPrismaUniqueConstraintError,
 } from './prisma-error';

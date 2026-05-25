@@ -1,8 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
 import { DeptService } from '~/modules/dept/dept.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaUniqueConstraintError } from '~/utils/db-error';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   conflictResponse,
   internalServerErrorResponse,

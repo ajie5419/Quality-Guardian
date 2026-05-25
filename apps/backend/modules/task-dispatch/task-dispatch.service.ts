@@ -14,8 +14,10 @@ import {
 export function getTaskDispatchErrorMessage(message: string) {
   if (message === 'CURRENT_USER_NOT_FOUND') return '无法识别当前操作人身份';
   if (message === 'ASSIGNEE_NOT_FOUND') return '受派人不存在';
-  if (message === 'ITP_PROJECT_NOT_FOUND') return '关联的 ITP 计划不存在，请刷新后重试';
-  if (message === 'LEVEL_TWO_PARENT_REQUIRED') return '二级任务必须提供父任务ID';
+  if (message === 'ITP_PROJECT_NOT_FOUND')
+    return '关联的 ITP 计划不存在，请刷新后重试';
+  if (message === 'LEVEL_TWO_PARENT_REQUIRED')
+    return '二级任务必须提供父任务ID';
   if (message === 'PARENT_NOT_FOUND') return '父任务不存在';
   if (message === 'PARENT_LEVEL_INVALID') return '仅允许挂载到一级任务';
   return null;

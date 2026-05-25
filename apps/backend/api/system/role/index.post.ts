@@ -1,8 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaUniqueConflictError } from '~/utils/db-error';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   conflictResponse,
   internalServerErrorResponse,

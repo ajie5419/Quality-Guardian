@@ -2,8 +2,8 @@ import { defineEventHandler } from 'h3';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaNotFoundError } from '~/utils/db-error';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
   notFoundResponse,

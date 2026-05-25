@@ -1,11 +1,11 @@
 import { defineEventHandler, readBody } from 'h3';
 import { UserService } from '~/modules/user/user.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   isPrismaNotFoundError,
   isPrismaUniqueConstraintError,
 } from '~/utils/db-error';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   conflictResponse,
   internalServerErrorResponse,

@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
+import { isPrismaSchemaMismatchError } from '~/utils/db-error';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { parseInspectionRecordListQuery } from '~/utils/inspection-record';
-import { isPrismaSchemaMismatchError } from '~/utils/db-error';
 import {
   badRequestResponse,
   internalServerErrorResponse,

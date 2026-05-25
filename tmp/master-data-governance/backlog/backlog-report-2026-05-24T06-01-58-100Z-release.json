@@ -1,0 +1,186 @@
+{
+  "generatedAt": "2026-05-24T06:01:58.100Z",
+  "reportLabel": "release",
+  "summary": {
+    "semanticFields": 104,
+    "governedFields": 87,
+    "pendingFields": 17,
+    "undecidedFields": 0,
+    "actionablePendingFields": 0,
+    "decisionCoverage": 1,
+    "excludedBreakdown": {
+      "business_excluded": 9,
+      "canonical_source": 0,
+      "covered_by_governance": 0,
+      "system_metadata": 7,
+      "other": 1
+    }
+  },
+  "backlogConfig": {
+    "path": "/Users/zhaoxiaojie/代码/Quality-Guardian/apps/backend/config/master-data-governance-backlog.json",
+    "version": 1,
+    "updatedAt": "2026-05-23T04:15:18.220Z",
+    "decisionCount": 65
+  },
+  "statusBreakdown": {
+    "planned": 0,
+    "deferred": 0,
+    "excluded": 17
+  },
+  "undecided": [],
+  "pending": [
+    {
+      "key": "inspections.templateName",
+      "model": "inspections",
+      "field": "templateName",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "Display/derived template label; governance target should be canonical template id relation."
+    },
+    {
+      "key": "menus.name",
+      "model": "menus",
+      "field": "name",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "System menu metadata, not business master-data field."
+    },
+    {
+      "key": "menus.type",
+      "model": "menus",
+      "field": "type",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "System menu metadata, not business master-data field."
+    },
+    {
+      "key": "login_logs.username",
+      "model": "login_logs",
+      "field": "username",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "Audit/login identity field, out of master-data naming governance scope."
+    },
+    {
+      "key": "dictionaries.dictType",
+      "model": "dictionaries",
+      "field": "dictType",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "Dictionary metadata key, not target business field."
+    },
+    {
+      "key": "permissions.name",
+      "model": "permissions",
+      "field": "name",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "RBAC metadata field, out of business master-data governance scope."
+    },
+    {
+      "key": "rbac_permissions.name",
+      "model": "rbac_permissions",
+      "field": "name",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "RBAC metadata field, out of business master-data governance scope."
+    },
+    {
+      "key": "data_permission_policies.deptIds",
+      "model": "data_permission_policies",
+      "field": "deptIds",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "Authorization policy field, not business master-data naming field."
+    },
+    {
+      "key": "supervision_projects.participants",
+      "model": "supervision_projects",
+      "field": "participants",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_milestones.name",
+      "model": "supervision_milestones",
+      "field": "name",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_milestones.delayReason",
+      "model": "supervision_milestones",
+      "field": "delayReason",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_plan_steps.stepName",
+      "model": "supervision_plan_steps",
+      "field": "stepName",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_plan_tasks.taskName",
+      "model": "supervision_plan_tasks",
+      "field": "taskName",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_plan_tasks.resourceName",
+      "model": "supervision_plan_tasks",
+      "field": "resourceName",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_plan_tasks.riskReason",
+      "model": "supervision_plan_tasks",
+      "field": "riskReason",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_report_task_updates.taskName",
+      "model": "supervision_report_task_updates",
+      "field": "taskName",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    },
+    {
+      "key": "supervision_report_task_updates.riskReason",
+      "model": "supervision_report_task_updates",
+      "field": "riskReason",
+      "type": "String",
+      "status": "excluded",
+      "decisionStatus": "excluded",
+      "decisionNote": "Business-excluded by product decision; not governed by master-data canonicalization scope."
+    }
+  ]
+}
