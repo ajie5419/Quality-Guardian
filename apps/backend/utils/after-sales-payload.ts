@@ -2,11 +2,6 @@ import type { Prisma } from '@prisma/client';
 
 import * as qgsDomain from '@qgs/shared';
 
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from './master-data-governance-write';
-
 const { buildAfterSalesCreateData, buildAfterSalesUpdateData } = qgsDomain;
 export { buildAfterSalesCreateData, buildAfterSalesUpdateData };
 
@@ -30,22 +25,10 @@ export async function buildGovernedAfterSalesCreateData(
   },
 ): Promise<Prisma.after_salesUncheckedCreateInput> {
   assertAfterSalesPayloadBuilders();
-  const data = buildAfterSalesCreateData(
+  return buildAfterSalesCreateData(
     body,
     options,
   ) as unknown as Prisma.after_salesUncheckedCreateInput;
-  const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
-    'after_sales',
-    data as Record<string, unknown>,
-  );
-  return {
-    ...data,
-    ...buildGovernedWriteFieldsForTable(
-      'after_sales',
-      data as Record<string, unknown>,
-    ),
-    ...governedCanonicalIds,
-  } as Prisma.after_salesUncheckedCreateInput;
 }
 
 export async function buildGovernedAfterSalesUpdateData(
@@ -55,23 +38,8 @@ export async function buildGovernedAfterSalesUpdateData(
   data: Prisma.after_salesUncheckedUpdateInput;
 }> {
   assertAfterSalesPayloadBuilders();
-  const payload = buildAfterSalesUpdateData(body) as unknown as {
+  return buildAfterSalesUpdateData(body) as unknown as {
     costsChanged: boolean;
     data: Prisma.after_salesUncheckedUpdateInput;
-  };
-  const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
-    'after_sales',
-    payload.data as Record<string, unknown>,
-  );
-  return {
-    ...payload,
-    data: {
-      ...payload.data,
-      ...buildGovernedWriteFieldsForTable(
-        'after_sales',
-        payload.data as Record<string, unknown>,
-      ),
-      ...governedCanonicalIds,
-    } as Prisma.after_salesUncheckedUpdateInput,
   };
 }

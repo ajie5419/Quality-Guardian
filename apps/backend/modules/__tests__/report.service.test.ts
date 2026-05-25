@@ -18,7 +18,7 @@ vi.mock('../../utils/prisma', () => ({
   },
 }));
 
-vi.mock('../dept.service', () => ({
+vi.mock('~/modules/dept/dept.service', () => ({
   DeptService: {
     findAll: vi.fn(),
   },
