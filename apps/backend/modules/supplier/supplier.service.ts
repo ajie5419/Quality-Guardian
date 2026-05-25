@@ -1,6 +1,8 @@
 import type { SupplierStats } from './supplier-scoring';
 
+import { AfterSalesService } from '~/modules/after-sales';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import { InspectionService } from '~/modules/inspection';
 import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
@@ -236,107 +238,28 @@ export const SupplierService = {
       const supplierIds = [...supplierNameToId.values()].filter(
         Boolean,
       ) as string[];
-      const supplierWhereOr =
-        supplierIds.length > 0
-          ? [
-              // governance-allow-direct-name-id: read-side compatibility filter keeps legacy name branch + canonical id branch.
-              { supplierName: { in: supplierNames } },
-              { supplierId: { in: supplierIds } },
-            ]
-          : [
-              // governance-allow-direct-name-id: fallback branch for rows not yet fully canonicalized.
-              { supplierName: { in: supplierNames } },
-            ];
-      const resolveCanonicalSupplierWhere = supplierWhereOr;
-
-      const [
-        incomingStats,
-        afterSalesStats,
-        engineeringStats,
-        engineeringStatusStats,
-        afterSalesStatusStats,
-        recentAfterSales,
-        recentQualityRecords,
-      ] = await Promise.all([
-        prisma.inspections.groupBy({
-          by: ['supplierName', 'result'],
-          where: {
-            OR: supplierWhereOr,
-            category: 'INCOMING',
-            isDeleted: false,
-            inspectionDate: { gte: oneYearAgo },
-          },
-          _count: { id: true },
-          _sum: { quantity: true },
+      const [inspectionScoring, afterSalesScoring] = await Promise.all([
+        InspectionService.getSupplierScoringData({
+          since: oneYearAgo,
+          supplierIds,
+          supplierNames,
         }),
-        prisma.after_sales.groupBy({
-          by: ['supplierBrand'],
-          where: {
-            supplierBrand: { in: supplierNames },
-            isDeleted: false,
-            occurDate: { gte: oneYearAgo },
-          },
-          _sum: { materialCost: true, laborTravelCost: true },
-          _count: { id: true },
-        }),
-        prisma.quality_records.groupBy({
-          by: ['supplierName'],
-          where: {
-            OR: supplierWhereOr,
-            isDeleted: false,
-            date: { gte: oneYearAgo },
-          },
-          _sum: { lossAmount: true, quantity: true },
-          _count: { id: true },
-        }),
-        prisma.quality_records.groupBy({
-          by: ['supplierName', 'status'],
-          where: {
-            OR: supplierWhereOr,
-            isDeleted: false,
-            date: { gte: oneYearAgo },
-          },
-          _count: { id: true },
-        }),
-        prisma.after_sales.groupBy({
-          by: ['supplierBrand', 'claimStatus'],
-          where: {
-            supplierBrand: { in: supplierNames },
-            isDeleted: false,
-            occurDate: { gte: oneYearAgo },
-          },
-          _count: { id: true },
-        }),
-        prisma.after_sales.findMany({
-          where: {
-            supplierBrand: { in: supplierNames },
-            isDeleted: false,
-            occurDate: { gte: oneYearAgo },
-          },
-          select: {
-            supplierBrand: true,
-            materialCost: true,
-            laborTravelCost: true,
-            severity: true,
-            occurDate: true,
-          },
-          orderBy: { occurDate: 'desc' },
-        }),
-        prisma.quality_records.findMany({
-          where: {
-            OR: resolveCanonicalSupplierWhere,
-            isDeleted: false,
-            date: { gte: oneYearAgo },
-          },
-          select: {
-            supplierName: true,
-            lossAmount: true,
-            severity: true,
-            date: true,
-          },
-          orderBy: { date: 'desc' },
+        AfterSalesService.getSupplierScoringData({
+          since: oneYearAgo,
+          supplierNames,
         }),
       ]);
+      const {
+        incomingStats,
+        engineeringStats,
+        engineeringStatusStats,
+        records: recentQualityRecords,
+      } = inspectionScoring;
+      const {
+        stats: afterSalesStats,
+        statusStats: afterSalesStatusStats,
+        records: recentAfterSales,
+      } = afterSalesScoring;
 
       incomingStats.forEach((s) => {
         if (s.supplierName) {

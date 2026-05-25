@@ -328,6 +328,50 @@ export const AfterSalesService = {
     });
   },
 
+  async getSupplierScoringData(params: {
+    since: Date;
+    supplierNames: string[];
+  }) {
+    const [stats, statusStats, records] = await Promise.all([
+      prisma.after_sales.groupBy({
+        by: ['supplierBrand'],
+        where: {
+          supplierBrand: { in: params.supplierNames },
+          isDeleted: false,
+          occurDate: { gte: params.since },
+        },
+        _sum: { materialCost: true, laborTravelCost: true },
+        _count: { id: true },
+      }),
+      prisma.after_sales.groupBy({
+        by: ['supplierBrand', 'claimStatus'],
+        where: {
+          supplierBrand: { in: params.supplierNames },
+          isDeleted: false,
+          occurDate: { gte: params.since },
+        },
+        _count: { id: true },
+      }),
+      prisma.after_sales.findMany({
+        where: {
+          supplierBrand: { in: params.supplierNames },
+          isDeleted: false,
+          occurDate: { gte: params.since },
+        },
+        select: {
+          supplierBrand: true,
+          materialCost: true,
+          laborTravelCost: true,
+          severity: true,
+          occurDate: true,
+        },
+        orderBy: { occurDate: 'desc' },
+      }),
+    ]);
+
+    return { records, stats, statusStats };
+  },
+
   async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
     const baseWhere = { isDeleted: false };
     const [yearAggregate, weekAggregate, weekCount] = await Promise.all([

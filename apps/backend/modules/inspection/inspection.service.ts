@@ -23,6 +23,7 @@ export const InspectionService = {
   getQualityLossTrendRows: InspectionCoreService.getQualityLossTrendRows,
   getQualityLossDrillDownRecords:
     InspectionCoreService.getQualityLossDrillDownRecords,
+  getSupplierScoringData: InspectionCoreService.getSupplierScoringData,
   getLossRecordsForAggregation:
     InspectionCoreService.getLossRecordsForAggregation,
   getWorkspaceIssueSummary: InspectionCoreService.getWorkspaceIssueSummary,

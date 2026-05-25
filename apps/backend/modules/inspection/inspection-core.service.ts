@@ -826,6 +826,69 @@ export const InspectionCoreService = {
     });
   },
 
+  async getSupplierScoringData(params: {
+    since: Date;
+    supplierIds: string[];
+    supplierNames: string[];
+  }) {
+    const supplierWhereOr =
+      params.supplierIds.length > 0
+        ? [
+            { supplierName: { in: params.supplierNames } },
+            { supplierId: { in: params.supplierIds } },
+          ]
+        : [{ supplierName: { in: params.supplierNames } }];
+    const [incomingStats, engineeringStats, engineeringStatusStats, records] =
+      await Promise.all([
+        prisma.inspections.groupBy({
+          by: ['supplierName', 'result'],
+          where: {
+            OR: supplierWhereOr,
+            category: 'INCOMING',
+            isDeleted: false,
+            inspectionDate: { gte: params.since },
+          },
+          _count: { id: true },
+          _sum: { quantity: true },
+        }),
+        prisma.quality_records.groupBy({
+          by: ['supplierName'],
+          where: {
+            OR: supplierWhereOr,
+            isDeleted: false,
+            date: { gte: params.since },
+          },
+          _sum: { lossAmount: true, quantity: true },
+          _count: { id: true },
+        }),
+        prisma.quality_records.groupBy({
+          by: ['supplierName', 'status'],
+          where: {
+            OR: supplierWhereOr,
+            isDeleted: false,
+            date: { gte: params.since },
+          },
+          _count: { id: true },
+        }),
+        prisma.quality_records.findMany({
+          where: {
+            OR: supplierWhereOr,
+            isDeleted: false,
+            date: { gte: params.since },
+          },
+          select: {
+            supplierName: true,
+            lossAmount: true,
+            severity: true,
+            date: true,
+          },
+          orderBy: { date: 'desc' },
+        }),
+      ]);
+
+    return { incomingStats, engineeringStats, engineeringStatusStats, records };
+  },
+
   async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
     const baseWhere: Prisma.quality_recordsWhereInput = {
       isDeleted: false,
