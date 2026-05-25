@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { AfterSalesService } from '~/services/after-sales.service';
+import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { parseAfterSalesListQuery } from '~/utils/after-sales-query';
 import { logApiError } from '~/utils/api-logger';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,

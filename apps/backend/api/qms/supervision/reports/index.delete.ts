@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { SupervisionReportService } from '~/services/supervision-report.service';
+import { SupervisionReportService } from '~/modules/supervision/supervision-report.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {

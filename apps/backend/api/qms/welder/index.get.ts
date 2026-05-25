@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { WelderScoreService } from '~/services/welder-score.service';
-import { WelderService } from '~/services/welder.service';
+import { WelderScoreService } from '~/modules/welder-score/welder-score.service';
+import { WelderService } from '~/modules/welder/welder.service';
 import { logApiError } from '~/utils/api-logger';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,

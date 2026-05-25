@@ -1,5 +1,4 @@
 import { defineEventHandler, readBody } from 'h3';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { logApiError } from '~/utils/api-logger';
 import {
   buildProjectBomCreateData,
@@ -9,6 +8,7 @@ import {
   projectBomItemSelect,
 } from '~/utils/bom';
 import { awaitMockDelay } from '~/utils/index';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import {
   applyGovernedProjectNameByTable,
   upsertPlanningProjectByWorkOrder,

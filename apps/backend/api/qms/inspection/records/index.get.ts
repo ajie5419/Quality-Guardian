@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { InspectionService } from '~/services/inspection.service';
+import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { parseInspectionRecordListQuery } from '~/utils/inspection-record';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import {

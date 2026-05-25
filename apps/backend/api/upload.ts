@@ -2,7 +2,7 @@ import { once } from 'node:events';
 
 import Busboy from '@fastify/busboy';
 import { eventHandler, setResponseStatus } from 'h3';
-import { FileStorageService } from '~/services/file-storage.service';
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';

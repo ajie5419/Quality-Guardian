@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { QualityLossService } from '~/services/quality-loss.service';
+import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
 import { logApiDebug, logApiError, logApiWarn } from '~/utils/api-logger';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { parseQualityLossCommonQuery } from '~/utils/quality-loss-query';
 import {

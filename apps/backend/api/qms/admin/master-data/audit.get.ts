@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3';
-import { MasterDataRenameService } from '~/services/master-data-rename.service';
+import { MasterDataRenameService } from '~/modules/master-data-rename/master-data-rename.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {

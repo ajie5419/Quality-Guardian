@@ -1,5 +1,5 @@
 import { eventHandler } from 'h3';
-import { RbacService } from '~/services/rbac.service';
+import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';

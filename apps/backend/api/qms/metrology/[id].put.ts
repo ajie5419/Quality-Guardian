@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
-import { MetrologyService } from '~/services/metrology.service';
+import { MetrologyService } from '~/modules/metrology/metrology.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';

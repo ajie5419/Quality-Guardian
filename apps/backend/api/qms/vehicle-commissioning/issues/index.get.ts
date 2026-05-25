@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { VehicleCommissioningService } from '~/services/vehicle-commissioning.service';
+import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { logApiError } from '~/utils/api-logger';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,

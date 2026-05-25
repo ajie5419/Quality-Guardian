@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import prisma from '../../utils/prisma';
-import { QualityLossService } from '../quality-loss.service';
+import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
 
 // Mock prisma and logger
 vi.mock('../../utils/prisma', () => ({

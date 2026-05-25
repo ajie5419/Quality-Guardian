@@ -1,5 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3';
-import { VehicleCommissioningService } from '~/services/vehicle-commissioning.service';
+import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {

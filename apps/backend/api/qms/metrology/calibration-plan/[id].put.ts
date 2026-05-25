@@ -1,5 +1,5 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
-import { MetrologyCalibrationPlanService } from '~/services/metrology-calibration-plan.service';
+import { MetrologyCalibrationPlanService } from '~/modules/metrology/calibration-plan/metrology-calibration-plan.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';

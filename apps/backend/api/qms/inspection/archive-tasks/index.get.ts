@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { InspectionService } from '~/services/inspection.service';
+import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {

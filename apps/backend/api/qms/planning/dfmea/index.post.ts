@@ -1,8 +1,4 @@
 import { defineEventHandler, readBody } from 'h3';
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
 import { logApiError } from '~/utils/api-logger';
 import {
   calculateDfmeaRpn,
@@ -12,6 +8,10 @@ import {
   parseDfmeaScore,
 } from '~/utils/dfmea';
 import { awaitMockDelay } from '~/utils/index';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {

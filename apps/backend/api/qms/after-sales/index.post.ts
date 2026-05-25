@@ -1,7 +1,7 @@
 import { QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
-import { FileStorageService } from '~/services/file-storage.service';
-import { SystemLogService } from '~/services/system-log.service';
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { SystemLogService } from '~/modules/system-log/system-log.service';
 import {
   createAfterSalesId,
   getNextAfterSalesSerialNumber,

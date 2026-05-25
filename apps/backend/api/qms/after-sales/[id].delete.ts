@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3';
-import { AfterSalesService } from '~/services/after-sales.service';
+import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';

@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { SupplierService } from '~/services/supplier.service';
+import { SupplierService } from '~/modules/supplier/supplier.service';
 import { logApiDebug, logApiError, logApiWarn } from '~/utils/api-logger';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import {
   badRequestResponse,
   internalServerErrorResponse,

@@ -1,6 +1,6 @@
 import { resolveReportPeriodRangeFromLabel } from '@qgs/domain';
 import { defineEventHandler, getQuery } from 'h3';
-import { QualityLossService } from '~/services/quality-loss.service';
+import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { QUALITY_LOSS_SOURCE } from '~/utils/quality-loss-status';

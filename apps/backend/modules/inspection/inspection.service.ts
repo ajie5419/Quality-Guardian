@@ -11,11 +11,6 @@ import { Prisma } from '@prisma/client';
 import { deriveIssueTrackingStatus, ISSUE_TRACKING_STATUS } from '@qgs/domain';
 import { AUDIT_TEMPLATES, InspectionIssueStatusEnum } from '@qgs/enums';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
-import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
 import { BaseService } from '~/modules/base/base.service';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept/dept.service';
@@ -25,6 +20,11 @@ import { WelderScoreService } from '~/modules/welder-score/welder-score.service'
 import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import { buildInspectionIssueDateRange } from '~/utils/inspection-issue';
 import { createModuleLogger } from '~/utils/logger';
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import { UPLOAD_DIR } from '~/utils/paths';
 import prisma from '~/utils/prisma';
 import {

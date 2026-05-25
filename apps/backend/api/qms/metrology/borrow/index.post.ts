@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
-import { MetrologyBorrowService } from '~/services/metrology-borrow.service';
+import { MetrologyBorrowService } from '~/modules/metrology/borrow/metrology-borrow.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {

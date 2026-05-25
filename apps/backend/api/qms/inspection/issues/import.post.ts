@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
-import { WelderScoreService } from '~/services/welder-score.service';
+import { WelderScoreService } from '~/modules/welder-score/welder-score.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import {

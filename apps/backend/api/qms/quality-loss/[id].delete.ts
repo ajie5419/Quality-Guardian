@@ -1,5 +1,5 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
-import { QualityLossService } from '~/services/quality-loss.service';
+import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {

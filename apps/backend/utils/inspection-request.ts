@@ -15,7 +15,7 @@ import {
   parseInspectionRequestPriority as parseInspectionRequestPriorityRule,
   parseInspectionRequestQuantity as parseInspectionRequestQuantityRule,
 } from '@qgs/domain';
-import { InspectionService } from '~/services/inspection.service';
+import { InspectionService } from '~/modules/inspection/inspection.service';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import { resolveTaskDispatchCurrentUserId } from '~/utils/task-dispatch';
 

@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { AfterSalesService } from '~/services/after-sales.service';
+import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import {
   parseAfterSalesDateMode,
   parseAfterSalesDateValue,

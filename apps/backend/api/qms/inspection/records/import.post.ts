@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
-import { InspectionService } from '~/services/inspection.service';
+import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import {
   buildImportRowError,

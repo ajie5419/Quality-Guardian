@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3';
-import { UserService } from '~/services/user.service';
+import { UserService } from '~/modules/user/user.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';

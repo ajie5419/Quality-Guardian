@@ -1,6 +1,6 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { updatePlanTaskSchema } from '~/schemas/supervision';
-import { SupervisionPlanTaskService } from '~/services/supervision-plan-task.service';
+import { SupervisionPlanTaskService } from '~/modules/supervision/supervision-plan-task.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {

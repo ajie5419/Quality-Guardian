@@ -1,8 +1,8 @@
 import { defineEventHandler } from 'h3';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { buildKnowledgeCategoryCreateData } from '~/utils/knowledge-category';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,

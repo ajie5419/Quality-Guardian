@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { InspectionService } from '~/services/inspection.service';
+import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiDebug, logApiError, logApiWarn } from '~/utils/api-logger';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { parseInspectionRecordListQuery } from '~/utils/inspection-record';
 import {
   badRequestResponse,

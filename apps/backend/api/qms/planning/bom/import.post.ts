@@ -1,5 +1,4 @@
 import { defineEventHandler, readBody } from 'h3';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { logApiError } from '~/utils/api-logger';
 import { buildProjectBomCreateData, normalizeBomText } from '~/utils/bom';
 import {
@@ -9,6 +8,7 @@ import {
   toImportErrorMessage,
 } from '~/utils/import-report';
 import { awaitMockDelay } from '~/utils/index';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   getMissingRequiredFields,

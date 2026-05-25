@@ -59,7 +59,7 @@ vi.mock('h3', () => ({
   setResponseStatus: mockSetResponseStatus,
 }));
 
-vi.mock('~/services/dictionary.service', () => ({
+vi.mock('~/modules/dictionary/dictionary.service', () => ({
   DictionaryService: {
     create: mockDictionaryCreate,
     getSupportedTypes: mockDictionaryGetSupportedTypes,

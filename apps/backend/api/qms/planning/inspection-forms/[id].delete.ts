@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3';
-import { FileStorageService } from '~/services/file-storage.service';
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';

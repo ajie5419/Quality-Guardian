@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import prisma from '~/utils/prisma';
 
-import { SystemLogService } from '../system-log.service';
+import { SystemLogService } from '~/modules/system-log/system-log.service';
 
 vi.mock('~/utils/prisma', () => ({
   default: {

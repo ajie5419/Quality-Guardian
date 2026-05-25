@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { ReportService } from '~/services/report.service';
+import { ReportService } from '~/modules/report/report.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { resolveReportDateRangeQuery } from '~/utils/report';

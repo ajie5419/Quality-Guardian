@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
-import { SystemLogService } from '~/services/system-log.service';
+import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';

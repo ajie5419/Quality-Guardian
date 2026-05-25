@@ -1,5 +1,5 @@
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { RbacService } from '~/modules/rbac/rbac.service';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 
 export interface UserQueryParams {

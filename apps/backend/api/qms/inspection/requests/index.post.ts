@@ -1,9 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
-import { FileStorageService } from '~/services/file-storage.service';
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import {
@@ -17,6 +13,10 @@ import {
 } from '~/utils/inspection-request';
 import { publishInspectionRequestCreated } from '~/utils/inspection-request-events';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   resolveCanonicalProcessName,

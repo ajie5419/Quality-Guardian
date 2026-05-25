@@ -1,6 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
-import { FileStorageService } from '~/services/file-storage.service';
-import { SupervisionService } from '~/services/supervision.service';
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';

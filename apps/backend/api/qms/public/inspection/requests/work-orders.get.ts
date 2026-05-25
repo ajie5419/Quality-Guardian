@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { logApiError } from '~/utils/api-logger';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,

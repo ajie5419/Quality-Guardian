@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3';
-import { DashboardService } from '~/services/dashboard.service';
+import { DashboardService } from '~/modules/dashboard/dashboard.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {

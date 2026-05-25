@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { MetrologyService } from '~/services/metrology.service';
+import { MetrologyService } from '~/modules/metrology/metrology.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {

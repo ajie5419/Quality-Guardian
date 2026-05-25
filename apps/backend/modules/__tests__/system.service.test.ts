@@ -5,7 +5,7 @@ import os from 'node:os';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import prisma from '../../utils/prisma';
-import { SystemService } from '../system.service';
+import { SystemService } from '~/modules/system/system.service';
 
 // Mock os, child_process and prisma
 vi.mock('os', () => {

@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { WorkOrderService } from '~/services/work-order.service';
+import { WorkOrderService } from '~/modules/work-order/work-order.service';
 import { logApiDebug, logApiError, logApiWarn } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,

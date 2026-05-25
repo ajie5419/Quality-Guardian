@@ -1,8 +1,4 @@
 import { defineEventHandler, readBody } from 'h3';
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
 import { logApiError } from '~/utils/api-logger';
 import {
   buildImportRowError,
@@ -15,6 +11,10 @@ import {
   getMaxItpItemOrder,
   normalizeItpText,
 } from '~/utils/itp';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   getMissingRequiredFields,

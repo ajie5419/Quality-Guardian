@@ -2,8 +2,8 @@ import type { Prisma } from '@prisma/client';
 
 import process from 'node:process';
 
-import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 import { createModuleLogger } from '~/utils/logger';
+import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 
 type CacheEntry = {
   expiresAt: number;

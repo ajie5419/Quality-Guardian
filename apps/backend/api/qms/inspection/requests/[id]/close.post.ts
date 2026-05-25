@@ -3,8 +3,7 @@ import type { Prisma } from '@prisma/client';
 import process from 'node:process';
 
 import { defineEventHandler, readBody } from 'h3';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
-import { FileStorageService } from '~/services/file-storage.service';
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import {
@@ -18,6 +17,7 @@ import {
   resolveInspectionRequestCurrentUserId,
 } from '~/utils/inspection-request';
 import { verifyAccessToken } from '~/utils/jwt-utils';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import {
@@ -479,10 +479,10 @@ export default defineEventHandler(async (event) => {
 
     if (issue || closedLinkedIssueCount > 0) {
       const { SystemLogService } = await import(
-        '~/services/system-log.service'
+        '~/modules/system-log/system-log.service'
       );
       const { WelderScoreService } = await import(
-        '~/services/welder-score.service'
+        '~/modules/welder-score/welder-score.service'
       );
 
       if (issue) {

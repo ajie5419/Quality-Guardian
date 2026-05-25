@@ -1,7 +1,7 @@
 import type { MetrologyCalibrationPlanStatus } from '@qgs/shared';
 
 import { defineEventHandler, getQuery } from 'h3';
-import { MetrologyCalibrationPlanService } from '~/services/metrology-calibration-plan.service';
+import { MetrologyCalibrationPlanService } from '~/modules/metrology/calibration-plan/metrology-calibration-plan.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {

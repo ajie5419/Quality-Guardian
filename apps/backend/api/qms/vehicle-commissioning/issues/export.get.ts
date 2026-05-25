@@ -5,10 +5,10 @@ import { extname, relative, resolve } from 'node:path';
 import { setHeader } from 'h3';
 import sharp from 'sharp';
 import { z } from 'zod';
-import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { FileStorageService } from '~/services/file-storage.service';
-import { VehicleCommissioningService } from '~/services/vehicle-commissioning.service';
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { logApiError } from '~/utils/api-logger';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { UPLOAD_DIR } from '~/utils/paths';
 import {

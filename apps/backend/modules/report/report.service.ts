@@ -7,7 +7,7 @@ import {
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
-import { DeptService } from '../../services/dept.service';
+import { DeptService } from '~/modules/dept/dept.service';
 
 const logger = createModuleLogger('ReportService');
 const CLOSED_TRACKING_STATUSES = [

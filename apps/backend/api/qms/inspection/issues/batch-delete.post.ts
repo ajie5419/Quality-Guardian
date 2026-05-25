@@ -1,6 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
-import { FileStorageService } from '~/services/file-storage.service';
-import { WelderScoreService } from '~/services/welder-score.service';
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { WelderScoreService } from '~/modules/welder-score/welder-score.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { parseNonEmptyIdList } from '~/utils/id-list';

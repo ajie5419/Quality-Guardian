@@ -1,5 +1,5 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
-import { SystemService } from '~/services/system.service';
+import { SystemService } from '~/modules/system/system.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {

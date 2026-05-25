@@ -1,5 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3';
-import { SupervisionPlanTaskService } from '~/services/supervision-plan-task.service';
+import { SupervisionPlanTaskService } from '~/modules/supervision/supervision-plan-task.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
