@@ -49,6 +49,20 @@ type AfterSalesChartMetric =
   | 'runningHours'
   | 'totalLoss';
 
+type TrendResultYear = {
+  closed: bigint;
+  costs: number;
+  issues: bigint;
+  period: number;
+};
+
+type TrendResultDay = {
+  closed: bigint;
+  costs: number;
+  issues: bigint;
+  period: Date;
+};
+
 function getMetricValueFromRow(
   metric: AfterSalesChartMetric,
   row: {
@@ -107,6 +121,116 @@ function getMetricValueFromGroupedItem(
       );
     }
   }
+}
+
+function buildKpiSummary(input: {
+  kpiAggregate: {
+    _count: { id: null | number };
+    _sum: {
+      laborTravelCost: null | number | Prisma.Decimal;
+      materialCost: null | number | Prisma.Decimal;
+    };
+  };
+  openCount: number;
+  resolvedStats: Array<{ avgDays: number }>;
+}) {
+  const total = input.kpiAggregate._count.id || 0;
+  const totalCost =
+    (Number(input.kpiAggregate._sum.materialCost) || 0) +
+    (Number(input.kpiAggregate._sum.laborTravelCost) || 0);
+  const avgTime = Number(input.resolvedStats?.[0]?.avgDays) || 0;
+  return {
+    avgTime: Number(avgTime.toFixed(1)),
+    cost: Number(totalCost.toFixed(2)),
+    open: input.openCount,
+    total,
+  };
+}
+
+function buildTrendData(input: {
+  isYearMode: boolean;
+  months: string[];
+  startDate: Date;
+  trendResults: TrendResultDay[] | TrendResultYear[];
+}) {
+  const monthlyIssues: number[] = Array.from(
+    { length: input.months.length },
+    () => 0,
+  );
+  const monthlyClosed: number[] = Array.from(
+    { length: input.months.length },
+    () => 0,
+  );
+  const monthlyCosts: number[] = Array.from(
+    { length: input.months.length },
+    () => 0,
+  );
+  if (input.isYearMode) {
+    (input.trendResults as TrendResultYear[]).forEach((r) => {
+      const mIdx = Number(r.period) - input.startDate.getMonth() - 1;
+      if (mIdx < 0 || mIdx >= input.months.length) return;
+      monthlyIssues[mIdx] = Number(r.issues);
+      monthlyClosed[mIdx] = Number(r.closed);
+      monthlyCosts[mIdx] = Number(r.costs.toFixed(2));
+    });
+  } else {
+    const periodMap = new Map<string, TrendResultDay>(
+      (input.trendResults as TrendResultDay[]).map((item) => [
+        formatDate(item.period).slice(0, 10),
+        item,
+      ]),
+    );
+    input.months.forEach((_, index) => {
+      const date = new Date(input.startDate);
+      date.setDate(input.startDate.getDate() + index);
+      const key = formatDate(date).slice(0, 10);
+      const item = periodMap.get(key);
+      if (!item) return;
+      monthlyIssues[index] = Number(item.issues);
+      monthlyClosed[index] = Number(item.closed);
+      monthlyCosts[index] = Number(item.costs.toFixed(2));
+    });
+  }
+  return {
+    category: input.months,
+    closed: monthlyClosed,
+    costs: monthlyCosts,
+    issues: monthlyIssues,
+  };
+}
+
+function formatStatsResponse(input: {
+  defectStats: Array<{ _count: { id: number }; defectType: null | string }>;
+  deptStats: Array<{ _count: { id: number }; respDept: null | string }>;
+  kpi: { avgTime: number; cost: number; open: number; total: number };
+  months: string[];
+  supplierStats: Array<{
+    _count: { id: number };
+    supplierBrand: null | string;
+  }>;
+  trend: {
+    category: string[];
+    closed: number[];
+    costs: number[];
+    issues: number[];
+  };
+}) {
+  return {
+    kpi: input.kpi,
+    trend: input.trend,
+    defectDistribution: input.defectStats.map((s) => ({
+      name: s.defectType || QMS_DEFAULT_VALUES.UNCLASSIFIED,
+      value: s._count.id,
+    })),
+    supplierRanking: {
+      categories: input.supplierStats.map((s) => s.supplierBrand || 'Unknown'),
+      data: input.supplierStats.map((s) => s._count.id),
+    },
+    deptDistribution: input.deptStats.map((s) => ({
+      name: s.respDept || QMS_DEFAULT_VALUES.UNASSIGNED,
+      value: s._count.id,
+    })),
+  } as AfterSalesStats;
 }
 
 const CHART_DB_FIELD_MAP: Record<
@@ -239,12 +363,6 @@ export const AfterSalesService = {
         `,
       ]);
 
-      const total = kpiAggregate._count.id || 0;
-      const totalCost =
-        (Number(kpiAggregate._sum.materialCost) || 0) +
-        (Number(kpiAggregate._sum.laborTravelCost) || 0);
-      const avgTime = Number(resolvedStats?.[0]?.avgDays) || 0;
-
       // 2. Distributions (Defect, Supplier, Dept)
       const [defectStats, supplierStats, deptStats] = await Promise.all([
         prisma.after_sales.groupBy({
@@ -314,76 +432,21 @@ export const AfterSalesService = {
             GROUP BY period
           `;
 
-      // 4. Format Result
-      const monthlyIssues: number[] = Array.from(
-        { length: months.length },
-        () => 0,
-      );
-      const monthlyClosed: number[] = Array.from(
-        { length: months.length },
-        () => 0,
-      );
-      const monthlyCosts: number[] = Array.from(
-        { length: months.length },
-        () => 0,
-      );
-
-      if (isYearMode) {
-        trendResults.forEach((r) => {
-          const mIdx = Number(r.period) - startDate.getMonth() - 1;
-          if (mIdx >= 0 && mIdx < months.length) {
-            monthlyIssues[mIdx] = Number(r.issues);
-            monthlyClosed[mIdx] = Number(r.closed);
-            monthlyCosts[mIdx] = Number(r.costs.toFixed(2));
-          }
-        });
-      } else {
-        const periodMap = new Map<
-          string,
-          { closed: bigint; costs: number; issues: bigint; period: Date }
-        >(
-          trendResults.map(
-            (item) => [formatDate(item.period).slice(0, 10), item] as const,
-          ),
-        );
-        months.forEach((_, index) => {
-          const date = new Date(startDate);
-          date.setDate(startDate.getDate() + index);
-          const key = formatDate(date).slice(0, 10);
-          const item = periodMap.get(key);
-          if (!item) return;
-          monthlyIssues[index] = Number(item.issues);
-          monthlyClosed[index] = Number(item.closed);
-          monthlyCosts[index] = Number(item.costs.toFixed(2));
-        });
-      }
-
-      return {
-        kpi: {
-          total,
-          open: openCount,
-          cost: Number(totalCost.toFixed(2)),
-          avgTime: Number(avgTime.toFixed(1)),
-        },
-        trend: {
-          category: months,
-          issues: monthlyIssues,
-          closed: monthlyClosed,
-          costs: monthlyCosts,
-        },
-        defectDistribution: defectStats.map((s) => ({
-          name: s.defectType || QMS_DEFAULT_VALUES.UNCLASSIFIED,
-          value: s._count.id,
-        })),
-        supplierRanking: {
-          categories: supplierStats.map((s) => s.supplierBrand || 'Unknown'),
-          data: supplierStats.map((s) => s._count.id),
-        },
-        deptDistribution: deptStats.map((s) => ({
-          name: s.respDept || QMS_DEFAULT_VALUES.UNASSIGNED,
-          value: s._count.id,
-        })),
-      };
+      const kpi = buildKpiSummary({ kpiAggregate, openCount, resolvedStats });
+      const trend = buildTrendData({
+        isYearMode,
+        months,
+        startDate,
+        trendResults: trendResults as TrendResultDay[] | TrendResultYear[],
+      });
+      return formatStatsResponse({
+        defectStats,
+        deptStats,
+        kpi,
+        months,
+        supplierStats,
+        trend,
+      });
     } catch (error) {
       logger.error({ err: error, params }, 'getStats failed');
       const emptyMonthly = (): number[] =>
@@ -461,56 +524,33 @@ export const AfterSalesService = {
     }
 
     const byField = CHART_DB_FIELD_MAP[dimension];
-    let grouped: any[] = [];
-    switch (metric) {
-      case 'count': {
-        grouped = await (prisma.after_sales as any).groupBy({
-          by: [byField] as any,
-          where,
-          _count: { id: true },
-        });
-        break;
+    const metricConfig: Record<
+      AfterSalesChartMetric,
+      {
+        count?: boolean;
+        sumFields: Array<
+          'laborTravelCost' | 'materialCost' | 'quantity' | 'runningHours'
+        >;
       }
-      case 'laborTravelCost': {
-        grouped = await (prisma.after_sales as any).groupBy({
-          by: [byField] as any,
-          where,
-          _sum: { laborTravelCost: true },
-        });
-        break;
-      }
-      case 'materialCost': {
-        grouped = await (prisma.after_sales as any).groupBy({
-          by: [byField] as any,
-          where,
-          _sum: { materialCost: true },
-        });
-        break;
-      }
-      case 'quantity': {
-        grouped = await (prisma.after_sales as any).groupBy({
-          by: [byField] as any,
-          where,
-          _sum: { quantity: true },
-        });
-        break;
-      }
-      case 'runningHours': {
-        grouped = await (prisma.after_sales as any).groupBy({
-          by: [byField] as any,
-          where,
-          _sum: { runningHours: true },
-        });
-        break;
-      }
-      default: {
-        grouped = await (prisma.after_sales as any).groupBy({
-          by: [byField] as any,
-          where,
-          _sum: { laborTravelCost: true, materialCost: true },
-        });
-      }
+    > = {
+      count: { count: true, sumFields: [] },
+      laborTravelCost: { sumFields: ['laborTravelCost'] },
+      materialCost: { sumFields: ['materialCost'] },
+      quantity: { sumFields: ['quantity'] },
+      runningHours: { sumFields: ['runningHours'] },
+      totalLoss: { sumFields: ['laborTravelCost', 'materialCost'] },
+    };
+    const conf = metricConfig[metric];
+    const sumPayload: Record<string, true> = {};
+    for (const field of conf.sumFields) {
+      sumPayload[field] = true;
     }
+    const grouped = await (prisma.after_sales as any).groupBy({
+      by: [byField] as any,
+      where,
+      ...(conf.count ? { _count: { id: true } } : {}),
+      ...(conf.sumFields.length > 0 ? { _sum: sumPayload } : {}),
+    });
 
     const deptNameMap =
       dimension === 'responsibleDept' ? await buildDeptNameMap() : null;
