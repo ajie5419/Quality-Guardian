@@ -22,6 +22,7 @@ import { buildAfterSalesDateRange } from '~/utils/after-sales-query';
 import { flattenDeptTree } from '~/utils/dept-tree';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+import { toAfterSalesClaimStatus } from '~/utils/quality-loss-status';
 
 // 创建模块级 logger
 const logger = createModuleLogger('AfterSalesService');
@@ -263,6 +264,50 @@ async function buildDeptNameMap() {
 }
 
 export const AfterSalesService = {
+  async findIdBySerialNumber(serialNumber: number) {
+    const row = await prisma.after_sales.findFirst({
+      where: { serialNumber },
+      select: { id: true },
+    });
+    return row?.id || null;
+  },
+
+  async updateQualityLossFields(params: {
+    actualClaim?: number;
+    id: string;
+    status?: string;
+  }) {
+    await prisma.after_sales.update({
+      where: { id: params.id },
+      data: {
+        actualClaim: params.actualClaim,
+        ...(params.status
+          ? { claimStatus: toAfterSalesClaimStatus(params.status) }
+          : {}),
+        updatedAt: new Date(),
+      },
+    });
+  },
+
+  async getQualityLossTrendRows(params: {
+    granularity: 'month' | 'week';
+    year: number;
+  }) {
+    return params.granularity === 'week'
+      ? prisma.$queryRaw<
+          Array<{
+            a: bigint | null | number | Prisma.Decimal;
+            p: bigint | number;
+          }>
+        >`SELECT WEEK(occurDate, 3) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${params.year} AND isDeleted = 0 GROUP BY p`
+      : prisma.$queryRaw<
+          Array<{
+            a: bigint | null | number | Prisma.Decimal;
+            p: bigint | number;
+          }>
+        >`SELECT MONTH(occurDate) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${params.year} AND isDeleted = 0 GROUP BY p`;
+  },
+
   async getLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
     return prisma.after_sales.findMany({
       where: {
@@ -270,6 +315,15 @@ export const AfterSalesService = {
         ...(params?.workOrderNumber
           ? { workOrderNumber: { contains: params.workOrderNumber } }
           : {}),
+      },
+    });
+  },
+
+  async getQualityLossDrillDownRecords(params: { end: Date; start: Date }) {
+    return prisma.after_sales.findMany({
+      where: {
+        isDeleted: false,
+        occurDate: { gte: params.start, lte: params.end },
       },
     });
   },

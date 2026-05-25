@@ -48,6 +48,7 @@ import {
   stringifyProjectDocuments,
   upsertInspectionProjectDocuments,
 } from '~/utils/project-documents';
+import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 import { buildYearFilter, parsePagination } from '~/utils/query-helpers';
 import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
@@ -713,6 +714,50 @@ async function syncInspectionProjectDocuments(
 }
 
 export const InspectionCoreService = {
+  async findIssueIdBySerialNumber(serialNumber: number) {
+    const row = await prisma.quality_records.findFirst({
+      where: { serialNumber },
+      select: { id: true },
+    });
+    return row?.id || null;
+  },
+
+  async updateQualityLossFields(params: {
+    actualClaim?: number;
+    id: string;
+    status?: string;
+  }) {
+    await prisma.quality_records.update({
+      where: { id: params.id },
+      data: {
+        recoveredAmount: params.actualClaim,
+        ...(params.status
+          ? { status: toQualityRecordStatus(params.status) }
+          : {}),
+        updatedAt: new Date(),
+      },
+    });
+  },
+
+  async getQualityLossTrendRows(params: {
+    granularity: 'month' | 'week';
+    year: number;
+  }) {
+    return params.granularity === 'week'
+      ? prisma.$queryRaw<
+          Array<{
+            a: bigint | null | number | Prisma.Decimal;
+            p: bigint | number;
+          }>
+        >`SELECT WEEK(date, 3) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${params.year} AND isDeleted = 0 GROUP BY p`
+      : prisma.$queryRaw<
+          Array<{
+            a: bigint | null | number | Prisma.Decimal;
+            p: bigint | number;
+          }>
+        >`SELECT MONTH(date) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${params.year} AND isDeleted = 0 GROUP BY p`;
+  },
+
   async getWorkspaceIssueSummary(params: { today: Date }) {
     const [
       openIssues,
@@ -767,6 +812,16 @@ export const InspectionCoreService = {
         ...(params?.workOrderNumber
           ? { workOrderNumber: { contains: params.workOrderNumber } }
           : {}),
+      },
+    });
+  },
+
+  async getQualityLossDrillDownRecords(params: { end: Date; start: Date }) {
+    return prisma.quality_records.findMany({
+      where: {
+        isDeleted: false,
+        date: { gte: params.start, lte: params.end },
+        lossAmount: { gt: 0 },
       },
     });
   },

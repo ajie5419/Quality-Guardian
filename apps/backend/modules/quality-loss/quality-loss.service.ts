@@ -7,7 +7,7 @@ import type { QualityLossSource } from '~/utils/quality-loss-status';
 import type { PaginationParams } from '~/utils/query-helpers';
 
 import { Prisma } from '@prisma/client';
-import { AUDIT_TEMPLATES } from '@qgs/shared';
+import { AUDIT_TEMPLATES, resolveQualityLossTargetLocator } from '@qgs/shared';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept/dept.service';
@@ -23,14 +23,9 @@ import {
   normalizeQualityLossSource,
   normalizeQualityLossStatus,
   QUALITY_LOSS_SOURCE,
-  toAfterSalesClaimStatus,
   toQualityLossTargetType,
-  toQualityRecordStatus,
 } from '~/utils/quality-loss-status';
-import {
-  parseQualityLossUpdateBody,
-  resolveQualityLossUpdateTarget,
-} from '~/utils/quality-loss-update';
+import { parseQualityLossUpdateBody } from '~/utils/quality-loss-update';
 import {
   formatDateString,
   formatNumber,
@@ -97,6 +92,71 @@ type QualityLossYearlyCharts = {
     totalAmount: number;
   }>;
 };
+
+type QualityLossUpdateTarget =
+  | { id: string; source: 'Commissioning'; valid: true }
+  | { id: string; source: 'External'; valid: true }
+  | { id: string; source: 'Internal'; valid: true }
+  | { message: string; valid: false }
+  | {
+      source: 'Manual';
+      valid: true;
+      where: Prisma.quality_lossesWhereUniqueInput;
+    };
+
+async function resolveQualityLossUpdateTarget(params: {
+  pathId: string;
+  pk: unknown;
+  source: QualityLossSource;
+}): Promise<QualityLossUpdateTarget> {
+  const target = resolveQualityLossTargetLocator(params);
+  if ('message' in target) return { valid: false, message: target.message };
+
+  if (target.lookup === 'manualLossId') {
+    return {
+      source: QUALITY_LOSS_SOURCE.MANUAL,
+      valid: true,
+      where: { lossId: target.identifier },
+    };
+  }
+  if (target.lookup === 'manualId') {
+    return {
+      source: QUALITY_LOSS_SOURCE.MANUAL,
+      valid: true,
+      where: { id: target.identifier },
+    };
+  }
+  if (target.lookup === 'internal') {
+    if (target.serial === null) {
+      return {
+        source: QUALITY_LOSS_SOURCE.INTERNAL,
+        valid: true,
+        id: target.identifier,
+      };
+    }
+    const id = await InspectionService.findIssueIdBySerialNumber(target.serial);
+    return id
+      ? { source: QUALITY_LOSS_SOURCE.INTERNAL, valid: true, id }
+      : { valid: false, message: '内部质量记录不存在' };
+  }
+  if (target.lookup === 'commissioning') {
+    const id = await VehicleCommissioningService.findIssueId(target.identifier);
+    return id
+      ? { source: QUALITY_LOSS_SOURCE.COMMISSIONING, valid: true, id }
+      : { valid: false, message: '调试验收问题不存在' };
+  }
+  if (target.serial === null) {
+    return {
+      source: QUALITY_LOSS_SOURCE.EXTERNAL,
+      valid: true,
+      id: target.identifier,
+    };
+  }
+  const id = await AfterSalesService.findIdBySerialNumber(target.serial);
+  return id
+    ? { source: QUALITY_LOSS_SOURCE.EXTERNAL, valid: true, id }
+    : { valid: false, message: '外部售后记录不存在' };
+}
 
 function getWeekOfYear(date: Date): number {
   const start = new Date(date.getFullYear(), 0, 1);
@@ -560,7 +620,6 @@ export const QualityLossService = {
     }
 
     const target = await resolveQualityLossUpdateTarget({
-      client: prisma,
       pathId: params.id,
       pk: params.body.pk,
       source,
@@ -574,73 +633,63 @@ export const QualityLossService = {
     }
 
     try {
-      await prisma.$transaction(async (tx) => {
-        if (target.source === QUALITY_LOSS_SOURCE.INTERNAL) {
-          await tx.quality_records.update({
-            where: target.where,
-            data: {
-              recoveredAmount: parsedBody.actualClaim,
-              ...(parsedBody.status
-                ? { status: toQualityRecordStatus(parsedBody.status) }
-                : {}),
-              updatedAt: new Date(),
-            },
+      switch (target.source) {
+        case QUALITY_LOSS_SOURCE.COMMISSIONING: {
+          await VehicleCommissioningService.updateQualityLossFields({
+            id: target.id,
+            amount: parsedBody.amount,
+            actualClaim: parsedBody.actualClaim,
+            status: parsedBody.status,
           });
-          return;
+
+          break;
         }
-        if (target.source === QUALITY_LOSS_SOURCE.EXTERNAL) {
-          await tx.after_sales.update({
-            where: target.where,
-            data: {
-              actualClaim: parsedBody.actualClaim,
-              ...(parsedBody.status
-                ? { claimStatus: toAfterSalesClaimStatus(parsedBody.status) }
-                : {}),
-              updatedAt: new Date(),
-            },
+        case QUALITY_LOSS_SOURCE.EXTERNAL: {
+          await AfterSalesService.updateQualityLossFields({
+            id: target.id,
+            actualClaim: parsedBody.actualClaim,
+            status: parsedBody.status,
           });
-          return;
+
+          break;
         }
-        if (target.source === QUALITY_LOSS_SOURCE.COMMISSIONING) {
-          await tx.vehicle_commissioning_issues.update({
-            where: target.where,
-            data: {
-              ...(parsedBody.amount === undefined
-                ? {}
-                : { lossAmount: parsedBody.amount }),
-              ...(parsedBody.actualClaim === undefined
-                ? {}
-                : { recoveredAmount: parsedBody.actualClaim }),
-              ...(parsedBody.status ? { claimStatus: parsedBody.status } : {}),
-              updatedAt: new Date(),
-            },
+        case QUALITY_LOSS_SOURCE.INTERNAL: {
+          await InspectionService.updateQualityLossFields({
+            id: target.id,
+            actualClaim: parsedBody.actualClaim,
+            status: parsedBody.status,
           });
-          return;
+
+          break;
         }
-        await tx.quality_losses.update({
-          where: target.where,
-          data: {
-            ...(parsedBody.occurDate
-              ? { occurDate: parsedBody.occurDate }
-              : {}),
-            ...(parsedBody.type ? { type: parsedBody.type } : {}),
-            ...(parsedBody.amount === undefined
-              ? {}
-              : { amount: parsedBody.amount }),
-            ...(parsedBody.actualClaim === undefined
-              ? {}
-              : { actualClaim: parsedBody.actualClaim }),
-            ...(parsedBody.respDept === undefined
-              ? {}
-              : { respDept: parsedBody.respDept }),
-            ...(params.body.description === undefined
-              ? {}
-              : { description: params.body.description }),
-            ...(parsedBody.status ? { status: parsedBody.status } : {}),
-            updatedAt: new Date(),
-          },
-        });
-      });
+        default: {
+          await prisma.$transaction(async (tx) => {
+            await tx.quality_losses.update({
+              where: target.where,
+              data: {
+                ...(parsedBody.occurDate
+                  ? { occurDate: parsedBody.occurDate }
+                  : {}),
+                ...(parsedBody.type ? { type: parsedBody.type } : {}),
+                ...(parsedBody.amount === undefined
+                  ? {}
+                  : { amount: parsedBody.amount }),
+                ...(parsedBody.actualClaim === undefined
+                  ? {}
+                  : { actualClaim: parsedBody.actualClaim }),
+                ...(parsedBody.respDept === undefined
+                  ? {}
+                  : { respDept: parsedBody.respDept }),
+                ...(params.body.description === undefined
+                  ? {}
+                  : { description: params.body.description }),
+                ...(parsedBody.status ? { status: parsedBody.status } : {}),
+                updatedAt: new Date(),
+              },
+            });
+          });
+        }
+      }
     } catch (error) {
       if (isPrismaNotFoundError(error)) {
         return {
@@ -691,27 +740,12 @@ export const QualityLossService = {
           : prisma.$queryRaw<
               TrendRow[]
             >`SELECT MONTH(occurDate) as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
-        isWeek
-          ? prisma.$queryRaw<
-              TrendRow[]
-            >`SELECT WEEK(date, 3) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${year} AND isDeleted = 0 GROUP BY p`
-          : prisma.$queryRaw<
-              TrendRow[]
-            >`SELECT MONTH(date) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${year} AND isDeleted = 0 GROUP BY p`,
-        isWeek
-          ? prisma.$queryRaw<
-              TrendRow[]
-            >`SELECT WEEK(occurDate, 3) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`
-          : prisma.$queryRaw<
-              TrendRow[]
-            >`SELECT MONTH(occurDate) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
-        isWeek
-          ? prisma.$queryRaw<
-              TrendRow[]
-            >`SELECT WEEK(date, 3) as p, SUM(IFNULL(lossAmount, 0)) as a FROM vehicle_commissioning_issues WHERE YEAR(date) = ${year} AND isDeleted = 0 AND (isClaim = 1 OR IFNULL(lossAmount, 0) > 0) GROUP BY p`
-          : prisma.$queryRaw<
-              TrendRow[]
-            >`SELECT MONTH(date) as p, SUM(IFNULL(lossAmount, 0)) as a FROM vehicle_commissioning_issues WHERE YEAR(date) = ${year} AND isDeleted = 0 AND (isClaim = 1 OR IFNULL(lossAmount, 0) > 0) GROUP BY p`,
+        InspectionService.getQualityLossTrendRows({ granularity, year }),
+        AfterSalesService.getQualityLossTrendRows({ granularity, year }),
+        VehicleCommissioningService.getQualityLossTrendRows({
+          granularity,
+          year,
+        }),
       ]);
 
       const merged = mergeTrendData(
@@ -1012,25 +1046,11 @@ export const QualityLossService = {
             occurDate: { gte: start, lte: end },
           },
         }),
-        prisma.quality_records.findMany({
-          where: {
-            isDeleted: false,
-            date: { gte: start, lte: end },
-            lossAmount: { gt: 0 },
-          },
-        }),
-        prisma.after_sales.findMany({
-          where: {
-            isDeleted: false,
-            occurDate: { gte: start, lte: end },
-          },
-        }),
-        prisma.vehicle_commissioning_issues.findMany({
-          where: {
-            isDeleted: false,
-            date: { gte: start, lte: end },
-            OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
-          },
+        InspectionService.getQualityLossDrillDownRecords({ start, end }),
+        AfterSalesService.getQualityLossDrillDownRecords({ start, end }),
+        VehicleCommissioningService.getQualityLossDrillDownRecords({
+          start,
+          end,
         }),
       ]);
 

@@ -12,6 +12,7 @@ export const InspectionService = {
   determineItemResult: InspectionCoreService.determineItemResult,
   findAll: InspectionCoreService.findAll,
   findById: InspectionTemplateService.findById,
+  findIssueIdBySerialNumber: InspectionCoreService.findIssueIdBySerialNumber,
   generateNextNcNumber: InspectionIssueService.generateNextNcNumber,
   getStatsForDashboard: InspectionCoreService.getStatsForDashboard,
   generateSerialNumber: InspectionCoreService.generateSerialNumber,
@@ -19,6 +20,9 @@ export const InspectionService = {
   getIssueChartAggregation: InspectionIssueService.getIssueChartAggregation,
   getIssues: InspectionIssueService.getIssues,
   getIssueStats: InspectionIssueService.getIssueStats,
+  getQualityLossTrendRows: InspectionCoreService.getQualityLossTrendRows,
+  getQualityLossDrillDownRecords:
+    InspectionCoreService.getQualityLossDrillDownRecords,
   getLossRecordsForAggregation:
     InspectionCoreService.getLossRecordsForAggregation,
   getWorkspaceIssueSummary: InspectionCoreService.getWorkspaceIssueSummary,
@@ -26,4 +30,5 @@ export const InspectionService = {
   resolveOverallResult: InspectionCoreService.resolveOverallResult,
   update: InspectionCoreService.update,
   updateArchiveTaskStatus: InspectionArchiveService.updateArchiveTaskStatus,
+  updateQualityLossFields: InspectionCoreService.updateQualityLossFields,
 };

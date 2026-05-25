@@ -365,6 +365,46 @@ async function buildRealtimeReportData(row: {
 }
 
 export const VehicleCommissioningService = {
+  async findIssueId(id: string) {
+    const row = await prisma.vehicle_commissioning_issues.findFirst({
+      where: { id },
+      select: { id: true },
+    });
+    return row?.id || null;
+  },
+
+  async updateQualityLossFields(params: {
+    actualClaim?: number;
+    amount?: number;
+    id: string;
+    status?: string;
+  }) {
+    await prisma.vehicle_commissioning_issues.update({
+      where: { id: params.id },
+      data: {
+        ...(params.amount === undefined ? {} : { lossAmount: params.amount }),
+        ...(params.actualClaim === undefined
+          ? {}
+          : { recoveredAmount: params.actualClaim }),
+        ...(params.status ? { claimStatus: params.status } : {}),
+        updatedAt: new Date(),
+      },
+    });
+  },
+
+  async getQualityLossTrendRows(params: {
+    granularity: 'month' | 'week';
+    year: number;
+  }) {
+    return params.granularity === 'week'
+      ? prisma.$queryRaw<
+          Array<{ a: bigint | null | number; p: bigint | number }>
+        >`SELECT WEEK(date, 3) as p, SUM(IFNULL(lossAmount, 0)) as a FROM vehicle_commissioning_issues WHERE YEAR(date) = ${params.year} AND isDeleted = 0 AND (isClaim = 1 OR IFNULL(lossAmount, 0) > 0) GROUP BY p`
+      : prisma.$queryRaw<
+          Array<{ a: bigint | null | number; p: bigint | number }>
+        >`SELECT MONTH(date) as p, SUM(IFNULL(lossAmount, 0)) as a FROM vehicle_commissioning_issues WHERE YEAR(date) = ${params.year} AND isDeleted = 0 AND (isClaim = 1 OR IFNULL(lossAmount, 0) > 0) GROUP BY p`;
+  },
+
   async getLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
     return prisma.vehicle_commissioning_issues.findMany({
       where: {
@@ -373,6 +413,16 @@ export const VehicleCommissioningService = {
         ...(params?.workOrderNumber
           ? { workOrderNumber: { contains: params.workOrderNumber } }
           : {}),
+      },
+    });
+  },
+
+  async getQualityLossDrillDownRecords(params: { end: Date; start: Date }) {
+    return prisma.vehicle_commissioning_issues.findMany({
+      where: {
+        isDeleted: false,
+        date: { gte: params.start, lte: params.end },
+        OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
       },
     });
   },
