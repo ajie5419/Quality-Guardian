@@ -16,7 +16,6 @@ import {
   ISSUE_TRACKING_STATUS,
   tryParsePhotos,
 } from '@qgs/shared';
-import { buildYearFilter, parsePagination } from '~/utils/query-helpers';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept/dept.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
@@ -48,6 +47,7 @@ import {
   stringifyProjectDocuments,
   upsertInspectionProjectDocuments,
 } from '~/utils/project-documents';
+import { buildYearFilter, parsePagination } from '~/utils/query-helpers';
 import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 const logger = createModuleLogger('InspectionService');

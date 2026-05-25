@@ -19,7 +19,8 @@ export const InspectionService = {
   getIssueChartAggregation: InspectionIssueService.getIssueChartAggregation,
   getIssues: InspectionIssueService.getIssues,
   getIssueStats: InspectionIssueService.getIssueStats,
-  getLossRecordsForAggregation: InspectionCoreService.getLossRecordsForAggregation,
+  getLossRecordsForAggregation:
+    InspectionCoreService.getLossRecordsForAggregation,
   normalizeQuantitySummary: InspectionCoreService.normalizeQuantitySummary,
   resolveOverallResult: InspectionCoreService.resolveOverallResult,
   update: InspectionCoreService.update,

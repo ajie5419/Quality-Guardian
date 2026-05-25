@@ -3,17 +3,11 @@ import type {
   QualityLossItem,
   QualityLossServiceTrendItem,
 } from '@qgs/shared';
-import type { PaginationParams } from '~/utils/query-helpers';
 import type { QualityLossSource } from '~/utils/quality-loss-status';
+import type { PaginationParams } from '~/utils/query-helpers';
 
 import { Prisma } from '@prisma/client';
 import { AUDIT_TEMPLATES } from '@qgs/shared';
-import {
-  applyPagination as paginateList,
-  formatDateString,
-  formatNumber,
-  safeNumber,
-} from '~/utils/query-helpers';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept/dept.service';
@@ -36,6 +30,12 @@ import {
   parseQualityLossUpdateBody,
   resolveQualityLossUpdateTarget,
 } from '~/utils/quality-loss-update';
+import {
+  formatDateString,
+  formatNumber,
+  applyPagination as paginateList,
+  safeNumber,
+} from '~/utils/query-helpers';
 
 // 创建模块级 logger
 const logger = createModuleLogger('QualityLossService');
