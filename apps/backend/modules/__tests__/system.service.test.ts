@@ -116,14 +116,11 @@ describe('systemService', () => {
         ]) // Global Status
         .mockResolvedValueOnce([{ version: '8.0.28' }]) // Version
         .mockResolvedValueOnce([{ Value: '100000' }]) // Uptime
+        .mockResolvedValueOnce([{ size: '1048576' }]) // Size
         .mockResolvedValueOnce([
           { Variable_name: 'character_set_database', Value: 'utf8mb4' },
           { Variable_name: 'time_zone', Value: '+00:00' },
         ]); // Variables
-
-      (prisma.$queryRawUnsafe as any).mockResolvedValueOnce([
-        { size: '1048576' },
-      ]); // Size
 
       const metrics = await SystemService.getDatabaseMetrics();
 

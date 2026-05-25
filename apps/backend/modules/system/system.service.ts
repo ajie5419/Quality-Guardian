@@ -355,9 +355,9 @@ export const SystemService = {
           prisma.$queryRaw<
             Array<{ Value: string; Variable_name: string }>
           >`SHOW GLOBAL STATUS LIKE "Uptime"`,
-          prisma.$queryRawUnsafe<Array<{ size: string }>>(
-            `SELECT SUM(data_length + index_length) AS size FROM information_schema.TABLES WHERE table_schema = "${dbName}"`,
-          ),
+          prisma.$queryRaw<
+            Array<{ size: string }>
+          >`SELECT SUM(data_length + index_length) AS size FROM information_schema.TABLES WHERE table_schema = ${dbName}`,
           prisma.$queryRaw<
             Array<{ Value: string; Variable_name: string }>
           >`SHOW VARIABLES WHERE Variable_name IN ("character_set_database", "time_zone")`,
