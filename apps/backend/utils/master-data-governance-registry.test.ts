@@ -73,6 +73,14 @@ describe('master-data-governance-registry', () => {
       'bomPartNumber',
       'bomRequiredProcesses',
       'partName',
+      'weldersName',
+      'rolesName',
+      'sequencesName',
+      'standardDocumentName',
+      'userUsername',
+      'userRealName',
+      'userDepartment',
+      'knowledgeCategoryName',
     ]);
   });
 
@@ -123,7 +131,7 @@ describe('master-data-governance-registry', () => {
   });
 
   it('returns sorted rollout waves', () => {
-    expect(listMasterDataGovernanceWaves()).toEqual([0, 1, 2, 3, 7]);
+    expect(listMasterDataGovernanceWaves()).toEqual([0, 1, 2, 3, 7, 8]);
   });
 
   it('processName is canonical field and dual-write', () => {

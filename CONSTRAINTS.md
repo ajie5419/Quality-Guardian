@@ -75,15 +75,18 @@
 `pnpm run check:qms-arch` 在提交前自动执行，检测以下规则：
 
 **目录结构：**
+
 - 不得存在 services/、core/module-registry/、core/master-data/ 目录
 - utils/ 只允许白名单内的基础设施文件
 
 **路由层：**
+
 - api/ 文件不得 import prisma
 - api/ 文件不超过 50 行
 - api/ 文件不得出现 `as Record<string, unknown>` 或 `as any`
 
 **Service 层：**
+
 - modules/ 单文件不超过 500 行
 - 不得出现 `(prisma.xxx as any)`
 - 不得出现 `execSync`
@@ -91,10 +94,12 @@
 - 不得出现 console.log、console.warn、console.error
 
 **模块边界：**
+
 - modules/A/ 不得 import modules/B/ 的非 index.ts 文件
 - 不得出现中文字符串字面量做条件判断
 
 **安全：**
+
 - 不得出现 `$queryRawUnsafe` + 模板字符串组合
 
 违反任一条即阻断提交。

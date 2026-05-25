@@ -1,4 +1,4 @@
-import type { MasterDataGovernanceField } from '../utils/master-data-governance-registry';
+import type { MasterDataGovernanceField } from '../core/master-data/governance-registry';
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -9,7 +9,7 @@ import {
   getMasterDataGovernanceFieldKeys,
   listMasterDataGovernanceFieldsByWave,
   listMasterDataGovernanceWaves,
-} from '../utils/master-data-governance-registry';
+} from '../core/master-data/governance-registry';
 
 function normalizeArgs(argv: string[]) {
   const args = new Map<string, string>();

@@ -23,6 +23,12 @@ vi.mock('../../utils/prisma', () => ({
   },
 }));
 
+vi.mock('../../core/master-data/governance-kernel', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalIdsByNames: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
 function supplier(name: string, status = 'Qualified') {
   const now = new Date('2026-02-14T00:00:00.000Z');
   return {

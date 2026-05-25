@@ -21,7 +21,7 @@ import { nanoid } from 'nanoid';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
+} from '~/core/master-data/governance-write';
 import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 
@@ -87,6 +87,8 @@ export async function getNextInspectionIssueSerialNumber(): Promise<number> {
 }
 
 interface InspectionIssueImportItem {
+  defectSubtype?: unknown;
+  defectType?: unknown;
   description?: unknown;
   division?: unknown;
   ncNumber?: unknown;
@@ -94,10 +96,12 @@ interface InspectionIssueImportItem {
   partName?: unknown;
   projectName?: unknown;
   quantity?: unknown;
+  rootCause?: unknown;
   processName?: unknown;
   responsibleDepartment?: unknown;
   responsibleWelder?: unknown;
   status?: unknown;
+  supplierName?: unknown;
   workOrderNumber?: unknown;
 }
 

@@ -1,4 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/core/master-data/governance-write';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { awaitMockDelay } from '~/utils/index';
@@ -7,10 +11,6 @@ import {
   stringifyItpQuantitativeItems,
 } from '~/utils/itp';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {

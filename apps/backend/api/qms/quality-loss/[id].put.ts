@@ -1,11 +1,11 @@
 import { defineEventHandler, readBody } from 'h3';
-import { SystemLogService } from '~/services/system-log.service';
-import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
+} from '~/core/master-data/governance-write';
+import { SystemLogService } from '~/services/system-log.service';
+import { logApiError } from '~/utils/api-logger';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {

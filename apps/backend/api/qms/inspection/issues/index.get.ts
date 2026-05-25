@@ -1,4 +1,5 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { z } from 'zod';
+import { defineValidatedHandler } from '~/core/validation/define-validated-handler';
 import { InspectionService } from '~/services/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { parseInspectionIssueListQuery } from '~/utils/inspection-issue';
@@ -9,30 +10,34 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
-export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+const inspectionIssuesQuerySchema = z.object({}).passthrough();
 
-  const query = getQuery(event) as Record<string, unknown>;
-  const params = parseInspectionIssueListQuery(query);
+export default defineValidatedHandler(
+  inspectionIssuesQuerySchema,
+  async (event, query) => {
+    const userinfo = await verifyAccessToken(event);
+    if (!userinfo) {
+      return unAuthorizedResponse(event);
+    }
 
-  try {
-    const result = await InspectionService.getIssues({
-      ...params,
-      userContext: {
-        userId: String(userinfo.id || userinfo.userId || ''),
-        username: userinfo.username,
-      },
-    });
+    const params = parseInspectionIssueListQuery(query);
 
-    return useResponseSuccess(result);
-  } catch (error) {
-    logApiError('issues', error, undefined, event);
-    return internalServerErrorResponse(
-      event,
-      'Failed to fetch inspection issues',
-    );
-  }
-});
+    try {
+      const result = await InspectionService.getIssues({
+        ...params,
+        userContext: {
+          userId: String(userinfo.id || userinfo.userId || ''),
+          username: userinfo.username,
+        },
+      });
+
+      return useResponseSuccess(result);
+    } catch (error) {
+      logApiError('issues', error, undefined, event);
+      return internalServerErrorResponse(
+        event,
+        'Failed to fetch inspection issues',
+      );
+    }
+  },
+);

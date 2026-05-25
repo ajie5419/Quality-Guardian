@@ -1,4 +1,4 @@
-import type { SupplierQueryParams } from '~/services/supplier.service';
+import type { SupplierQueryParams } from '~/modules/supplier/supplier.service';
 
 import {
   buildSupplierCreateData as buildSupplierCreateDataRule,
@@ -9,7 +9,7 @@ import {
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
+} from '~/core/master-data/governance-write';
 
 export {
   createSupplierId,

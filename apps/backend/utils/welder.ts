@@ -3,7 +3,7 @@ import {
   buildWelderUpdateDataCore,
   parseWelderListQuery as parseWelderListQueryCore,
 } from '@qgs/domain';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
+import { buildGovernedWriteFieldsForTable } from '~/core/master-data/governance-write';
 import prisma from '~/utils/prisma';
 import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 

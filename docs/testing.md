@@ -50,7 +50,9 @@ vi.mock('~/utils/prisma', () => ({
 }));
 
 describe('ServiceName', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('should do something specific', async () => {
     vi.mocked(prisma.tableName.findMany).mockResolvedValue([]);

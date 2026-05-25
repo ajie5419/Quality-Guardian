@@ -1,4 +1,5 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { z } from 'zod';
+import { defineValidatedHandler } from '~/core/validation/define-validated-handler';
 import { AfterSalesService } from '~/services/after-sales.service';
 import {
   parseAfterSalesDateMode,
@@ -33,40 +34,47 @@ const ALLOWED_METRICS = new Set([
   'totalLoss',
 ]);
 
-export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
+const afterSalesChartAggregateQuerySchema = z.object({}).passthrough();
 
-  const query = getQuery(event) as Record<string, unknown>;
-  const dimension = String(query.dimension || '').trim();
-  const metric = String(query.metric || '').trim();
-  const top = Number.parseInt(String(query.top || '15'), 10);
-  const yearRaw = String(query.year || '').trim();
-  const year = yearRaw ? Number.parseInt(yearRaw, 10) : undefined;
+export default defineValidatedHandler(
+  afterSalesChartAggregateQuerySchema,
+  async (event, query) => {
+    const userinfo = await verifyAccessToken(event);
+    if (!userinfo) return unAuthorizedResponse(event);
 
-  if (!ALLOWED_DIMENSIONS.has(dimension) || !ALLOWED_METRICS.has(metric)) {
-    return internalServerErrorResponse(event, 'Invalid chart aggregate params');
-  }
+    const dimension = String(query.dimension || '').trim();
+    const metric = String(query.metric || '').trim();
+    const top = Number.parseInt(String(query.top || '15'), 10);
+    const yearRaw = String(query.year || '').trim();
+    const year = yearRaw ? Number.parseInt(yearRaw, 10) : undefined;
 
-  try {
-    const data = await AfterSalesService.getChartAggregation({
-      dateMode: parseAfterSalesDateMode(query.dateMode),
-      dateValue: parseAfterSalesDateValue(query.dateValue),
-      dimension: dimension as any,
-      metric: metric as any,
-      top: Number.isNaN(top) ? 15 : top,
-      year: Number.isNaN(year ?? Number.NaN) ? undefined : year,
-      userContext: {
-        userId: String(userinfo.id || userinfo.userId || ''),
-        username: userinfo.username,
-      },
-    });
-    return useResponseSuccess({ items: data });
-  } catch (error) {
-    logApiError('after-sales-chart-aggregate', error, undefined, event);
-    return internalServerErrorResponse(
-      event,
-      'Failed to fetch after-sales chart aggregate',
-    );
-  }
-});
+    if (!ALLOWED_DIMENSIONS.has(dimension) || !ALLOWED_METRICS.has(metric)) {
+      return internalServerErrorResponse(
+        event,
+        'Invalid chart aggregate params',
+      );
+    }
+
+    try {
+      const data = await AfterSalesService.getChartAggregation({
+        dateMode: parseAfterSalesDateMode(query.dateMode),
+        dateValue: parseAfterSalesDateValue(query.dateValue),
+        dimension: dimension as any,
+        metric: metric as any,
+        top: Number.isNaN(top) ? 15 : top,
+        year: Number.isNaN(year ?? Number.NaN) ? undefined : year,
+        userContext: {
+          userId: String(userinfo.id || userinfo.userId || ''),
+          username: userinfo.username,
+        },
+      });
+      return useResponseSuccess({ items: data });
+    } catch (error) {
+      logApiError('after-sales-chart-aggregate', error, undefined, event);
+      return internalServerErrorResponse(
+        event,
+        'Failed to fetch after-sales chart aggregate',
+      );
+    }
+  },
+);

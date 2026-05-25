@@ -14,10 +14,10 @@ vi.mock('~/utils/process-resolver', () => ({
   resolveProcessIdForWrite: vi.fn(),
 }));
 
-vi.mock('~/utils/master-data-governance-write', async () => {
+vi.mock('~/core/master-data/governance-write', async () => {
   const actual = await vi.importActual<
-    typeof import('~/utils/master-data-governance-write')
-  >('~/utils/master-data-governance-write');
+    typeof import('~/core/master-data/governance-write')
+  >('~/core/master-data/governance-write');
   return {
     ...actual,
     buildGovernedCanonicalWritePairForTable: vi.fn(async () => ({})),
@@ -129,7 +129,7 @@ describe('inspection-issue processId dual write', () => {
         responsibleDepartment: ' 生产 OBU ',
         supplierName: ' 供应商B ',
         ncNumber: 'NC-25KJ-002',
-      } as any,
+      },
       101,
     );
 
@@ -151,7 +151,7 @@ describe('inspection-issue processId dual write', () => {
       '~/utils/process-resolver'
     );
     const { buildGovernedCanonicalWritePairForTable } = await import(
-      '~/utils/master-data-governance-write'
+      '~/core/master-data/governance-write'
     );
     vi.mocked(resolveProcessIdForWrite).mockResolvedValue(null);
     vi.mocked(buildGovernedCanonicalWritePairForTable).mockResolvedValue({
@@ -164,7 +164,7 @@ describe('inspection-issue processId dual write', () => {
         defectType: '焊接缺陷',
         defectSubtype: '气孔',
         ncNumber: 'NC-25KJ-003',
-      } as any,
+      },
       102,
     );
 
@@ -179,7 +179,7 @@ describe('inspection-issue processId dual write', () => {
       '~/utils/process-resolver'
     );
     const { buildGovernedCanonicalWritePairForTable } = await import(
-      '~/utils/master-data-governance-write'
+      '~/core/master-data/governance-write'
     );
     vi.mocked(resolveProcessIdForWrite).mockResolvedValue(null);
     vi.mocked(buildGovernedCanonicalWritePairForTable).mockResolvedValue({
@@ -213,7 +213,7 @@ describe('inspection-issue processId dual write', () => {
       {
         rootCause: '焊缝污染',
         ncNumber: 'NC-25KJ-004',
-      } as any,
+      },
       103,
     );
     expect((payload?.create as Record<string, unknown>)?.rootCauseId).toBe(

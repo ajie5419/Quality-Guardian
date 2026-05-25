@@ -10,8 +10,9 @@ const REGISTRY_PATH = path.resolve(
   ROOT,
   'apps',
   'backend',
-  'utils',
-  'master-data-governance-registry.ts',
+  'core',
+  'master-data',
+  'governance-registry.ts',
 );
 
 function resolveWavesFromRegistry() {
@@ -42,6 +43,10 @@ const steps = [
     cmd: 'pnpm run check:master-data-governance',
   },
   {
+    name: 'master-data-generic-write-entry',
+    cmd: 'pnpm run check:master-data-generic-write-entry',
+  },
+  {
     name: 'master-data-baseline-export',
     cmd: 'pnpm --dir apps/backend run db:export-master-data-baseline',
   },
@@ -60,10 +65,6 @@ const steps = [
   {
     name: 'master-data-excluded-freeze',
     cmd: 'pnpm run check:master-data-excluded-freeze',
-  },
-  {
-    name: 'master-data-quantified-baseline',
-    cmd: 'pnpm run check:master-data-quantified-baseline',
   },
   {
     name: 'master-data-registry-policy',
@@ -112,6 +113,10 @@ const steps = [
   {
     name: 'master-data-objective-audit',
     cmd: 'pnpm run check:master-data-objective-audit',
+  },
+  {
+    name: 'master-data-quantified-baseline',
+    cmd: 'pnpm run check:master-data-quantified-baseline',
   },
   {
     name: 'master-data-write-coverage',

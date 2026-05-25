@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
-import { getMasterDataGovernanceField } from '../utils/master-data-governance-registry';
+import { getMasterDataGovernanceField } from '../core/master-data/governance-registry';
 
 interface DerivedRule {
   fieldKey: string;

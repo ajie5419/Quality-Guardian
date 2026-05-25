@@ -1,8 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
+import { buildGovernedWriteFieldsForTable } from '~/core/master-data/governance-write';
 import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { normalizePlanningProjectName } from '~/utils/planning-project';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';

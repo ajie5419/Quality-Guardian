@@ -1,4 +1,5 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { z } from 'zod';
+import { defineValidatedHandler } from '~/core/validation/define-validated-handler';
 import { WorkOrderService } from '~/services/work-order.service';
 import { logApiDebug, logApiError, logApiWarn } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
@@ -12,15 +13,15 @@ import {
 import { parseWorkOrderListQuery } from '~/utils/work-order';
 
 const MAX_EXPORT_ROWS = 20_000;
+const querySchema = z.object({}).passthrough();
 
-export default defineEventHandler(async (event) => {
+export default defineValidatedHandler(querySchema, async (event, query) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
     return unAuthorizedResponse(event);
   }
 
   const startedAt = Date.now();
-  const query = getQuery(event) as Record<string, unknown>;
   const params = parseWorkOrderListQuery(query);
 
   try {

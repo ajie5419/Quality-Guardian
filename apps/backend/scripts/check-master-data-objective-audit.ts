@@ -5,7 +5,7 @@ import process from 'node:process';
 import {
   listMasterDataGovernanceFields,
   listMasterDataGovernanceWaves,
-} from '../utils/master-data-governance-registry';
+} from '../core/master-data/governance-registry';
 
 type AuditStatus = 'fail' | 'pass' | 'warn';
 
@@ -277,13 +277,15 @@ async function main() {
   );
   const registryPath = path.resolve(
     backendDir,
-    'utils',
-    'master-data-governance-registry.ts',
+    'core',
+    'master-data',
+    'governance-registry.ts',
   );
   const writeHelperPath = path.resolve(
     backendDir,
-    'utils',
-    'master-data-governance-write.ts',
+    'core',
+    'master-data',
+    'governance-write.ts',
   );
   const executionPlanPath = path.resolve(
     repoRoot,

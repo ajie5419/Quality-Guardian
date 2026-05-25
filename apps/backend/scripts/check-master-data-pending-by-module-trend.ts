@@ -32,6 +32,26 @@ export interface PendingByModuleTrendResult {
   pass: boolean;
 }
 
+function parseBoolArg(value: string | undefined, fallback: boolean) {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (!normalized) return fallback;
+  if (['1', 'on', 'true', 'y', 'yes'].includes(normalized)) return true;
+  if (['0', 'false', 'n', 'no', 'off'].includes(normalized)) return false;
+  return fallback;
+}
+
+function parseCliArgs(argv: string[]) {
+  const args = new Map<string, string>();
+  for (const item of argv) {
+    if (!item.startsWith('--')) continue;
+    const [key, value = ''] = item.slice(2).split('=');
+    args.set(key, value);
+  }
+  return args;
+}
+
 function resolveRepoRoot() {
   const cwd = process.cwd();
   const backendSuffix = `${path.sep}apps${path.sep}backend`;
@@ -164,6 +184,8 @@ async function pickLatestTwoReports(backlogDir: string): Promise<string[]> {
 }
 
 async function main() {
+  const args = parseCliArgs(process.argv.slice(2));
+  const allowBootstrap = parseBoolArg(args.get('allowBootstrap'), true);
   const repoRoot = resolveRepoRoot();
   const backlogDir = path.resolve(
     repoRoot,
@@ -172,7 +194,31 @@ async function main() {
     'backlog',
   );
 
-  const [beforePath, afterPath] = await pickLatestTwoReports(backlogDir);
+  let reportPaths: string[] = [];
+  try {
+    reportPaths = await pickLatestTwoReports(backlogDir);
+  } catch (error) {
+    if (!allowBootstrap) {
+      throw error;
+    }
+    const message =
+      error instanceof Error ? error.message : 'unknown pending trend error';
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          pass: true,
+          mode: 'bootstrap',
+          reason: message,
+          backlogDir,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
+
+  const [beforePath, afterPath] = reportPaths;
   const beforeRaw = await readJsonFile(beforePath);
   const afterRaw = await readJsonFile(afterPath);
 

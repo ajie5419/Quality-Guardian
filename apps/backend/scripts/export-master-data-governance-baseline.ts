@@ -1,4 +1,4 @@
-import type { MasterDataGovernanceField } from '../utils/master-data-governance-registry';
+import type { MasterDataGovernanceField } from '../core/master-data/governance-registry';
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -8,7 +8,7 @@ import process from 'node:process';
 import {
   listMasterDataGovernanceFields,
   listMasterDataGovernanceWaves,
-} from '../utils/master-data-governance-registry';
+} from '../core/master-data/governance-registry';
 
 type RiskLevel = 'high' | 'low' | 'medium';
 type PathUsageKind = 'read' | 'unknown' | 'write';
@@ -144,10 +144,11 @@ function collectFieldPathInventory(
 
     const filePath = line.slice(0, firstColon);
     const lineText = line.slice(secondColon + 1);
+    const normalizedPath = filePath.replaceAll('\\', '/');
     if (
-      filePath.endsWith('master-data-governance-registry.ts') ||
-      filePath.endsWith('master-data-governance-write.ts') ||
-      filePath.endsWith('master-data-governance-kernel.ts')
+      /(?:^|\/)(?:master-data-governance-(?:registry|write|kernel)|governance-(?:registry|write|kernel))\.ts$/.test(
+        normalizedPath,
+      )
     ) {
       continue;
     }

@@ -1,10 +1,10 @@
 import { defineEventHandler } from 'h3';
+import { buildGovernedWriteFieldsForTable } from '~/core/master-data/governance-write';
 import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { awaitMockDelay } from '~/utils/index';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {

@@ -1,9 +1,9 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { buildGovernedWriteFieldsForTable } from '~/core/master-data/governance-write';
 import { FileStorageService } from '~/services/file-storage.service';
 import { VehicleCommissioningService } from '~/services/vehicle-commissioning.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import {
   badRequestResponse,

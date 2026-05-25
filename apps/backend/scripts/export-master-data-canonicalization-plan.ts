@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
-import { listMasterDataGovernanceFields } from '../utils/master-data-governance-registry';
+import { listMasterDataGovernanceFields } from '../core/master-data/governance-registry';
 
 function toCamelCase(input: string) {
   return String(input || '')

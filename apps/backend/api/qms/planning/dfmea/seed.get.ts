@@ -1,7 +1,7 @@
 import { defineEventHandler } from 'h3';
+import { buildGovernedWriteFieldsForTable } from '~/core/master-data/governance-write';
 import { logApiError } from '~/utils/api-logger';
 import { calculateDfmeaRpn, createDfmeaProjectId } from '~/utils/dfmea';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,

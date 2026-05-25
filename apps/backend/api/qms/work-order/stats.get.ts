@@ -1,4 +1,5 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { z } from 'zod';
+import { defineValidatedHandler } from '~/core/validation/define-validated-handler';
 import { WorkOrderService } from '~/services/work-order.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -9,29 +10,33 @@ import {
 } from '~/utils/response';
 import { parseWorkOrderListQuery } from '~/utils/work-order';
 
-export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+const workOrderStatsQuerySchema = z.object({}).passthrough();
 
-  const query = getQuery(event) as Record<string, unknown>;
-  const params = parseWorkOrderListQuery(query);
+export default defineValidatedHandler(
+  workOrderStatsQuerySchema,
+  async (event, query) => {
+    const userinfo = await verifyAccessToken(event);
+    if (!userinfo) {
+      return unAuthorizedResponse(event);
+    }
 
-  try {
-    const result = await WorkOrderService.getDashboardStats({
-      ...params,
-      userContext: {
-        userId: String(userinfo.id || userinfo.userId || ''),
-        username: userinfo.username,
-      },
-    });
-    return useResponseSuccess(result);
-  } catch (error) {
-    logApiError('work-order-stats', error, undefined, event);
-    return internalServerErrorResponse(
-      event,
-      'Failed to fetch work order dashboard stats',
-    );
-  }
-});
+    const params = parseWorkOrderListQuery(query);
+
+    try {
+      const result = await WorkOrderService.getDashboardStats({
+        ...params,
+        userContext: {
+          userId: String(userinfo.id || userinfo.userId || ''),
+          username: userinfo.username,
+        },
+      });
+      return useResponseSuccess(result);
+    } catch (error) {
+      logApiError('work-order-stats', error, undefined, event);
+      return internalServerErrorResponse(
+        event,
+        'Failed to fetch work order dashboard stats',
+      );
+    }
+  },
+);

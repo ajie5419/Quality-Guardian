@@ -1,10 +1,10 @@
 import { defineEventHandler, readBody } from 'h3';
+import { buildGovernedWriteFieldsForTable } from '~/core/master-data/governance-write';
 import { FileStorageService } from '~/services/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { buildKnowledgeCreateData } from '~/utils/knowledge';
 import { buildKnowledgeCategoryCreateData } from '~/utils/knowledge-category';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {

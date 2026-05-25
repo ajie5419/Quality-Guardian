@@ -1,4 +1,5 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { z } from 'zod';
+import { defineValidatedHandler } from '~/core/validation/define-validated-handler';
 import { SupplierService } from '~/services/supplier.service';
 import { logApiDebug, logApiError, logApiWarn } from '~/utils/api-logger';
 import {
@@ -9,11 +10,11 @@ import {
 import { parseSupplierListQuery } from '~/utils/supplier';
 
 const MAX_EXPORT_ROWS = 20_000;
+const querySchema = z.object({}).passthrough();
 
-export default defineEventHandler(async (event) => {
+export default defineValidatedHandler(querySchema, async (event, query) => {
   const startedAt = Date.now();
   try {
-    const query = getQuery(event) as Record<string, unknown>;
     const params = parseSupplierListQuery(query);
     const result = await SupplierService.findAll({
       ...params,

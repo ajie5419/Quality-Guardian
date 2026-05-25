@@ -1,4 +1,5 @@
-import { defineEventHandler, getQuery } from 'h3';
+import { z } from 'zod';
+import { defineValidatedHandler } from '~/core/validation/define-validated-handler';
 import { WelderScoreService } from '~/services/welder-score.service';
 import { WelderService } from '~/services/welder.service';
 import { logApiError } from '~/utils/api-logger';
@@ -10,19 +11,23 @@ import {
 } from '~/utils/response';
 import { parseWelderListQuery } from '~/utils/welder';
 
-export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+const welderListQuerySchema = z.object({}).passthrough();
 
-  try {
-    await WelderScoreService.syncFromInspectionIssues();
-    const query = getQuery(event) as Record<string, unknown>;
-    const result = await WelderService.findAll(parseWelderListQuery(query));
-    return useResponseSuccess(result);
-  } catch (error: unknown) {
-    logApiError('welder', error, undefined, event);
-    return internalServerErrorResponse(event, 'Failed to fetch welders');
-  }
-});
+export default defineValidatedHandler(
+  welderListQuerySchema,
+  async (event, query) => {
+    const userinfo = await verifyAccessToken(event);
+    if (!userinfo) {
+      return unAuthorizedResponse(event);
+    }
+
+    try {
+      await WelderScoreService.syncFromInspectionIssues();
+      const result = await WelderService.findAll(parseWelderListQuery(query));
+      return useResponseSuccess(result);
+    } catch (error: unknown) {
+      logApiError('welder', error, undefined, event);
+      return internalServerErrorResponse(event, 'Failed to fetch welders');
+    }
+  },
+);

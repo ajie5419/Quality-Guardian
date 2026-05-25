@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { MasterDataGovernanceKernel } from './master-data-governance-kernel';
+import { MasterDataGovernanceKernel } from '../core/master-data/governance-kernel';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedInspectionWriteFields,
   buildGovernedWriteFieldsForTable,
 } from './master-data-governance-write';
 
-vi.mock('./master-data-governance-kernel', () => ({
+vi.mock('../core/master-data/governance-kernel', () => ({
   MasterDataGovernanceKernel: {
     resolveCanonicalNameById: vi.fn(),
     resolveCanonicalIdForWrite: vi.fn(),

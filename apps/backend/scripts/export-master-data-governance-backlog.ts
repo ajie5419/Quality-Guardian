@@ -3,7 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { listMasterDataGovernanceFields } from '../utils/master-data-governance-registry';
+import { listMasterDataGovernanceFields } from '../core/master-data/governance-registry';
 
 type BacklogStatus = 'deferred' | 'excluded' | 'planned';
 type ExcludedCategory =

@@ -1,8 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
+import { buildGovernedWriteFieldsForTable } from '~/core/master-data/governance-write';
 import { logApiError } from '~/utils/api-logger';
 import { buildDfmeaProjectUpdateData } from '~/utils/dfmea';
 import { awaitMockDelay } from '~/utils/index';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {

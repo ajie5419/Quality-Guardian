@@ -81,13 +81,14 @@ async function main() {
   const backendRoot = resolveBackendRoot();
   const writeHelperPath = path.join(
     backendRoot,
-    'utils',
-    'master-data-governance-write.ts',
+    'core',
+    'master-data',
+    'governance-write.ts',
   );
   const writeHelperSource = fs.readFileSync(writeHelperPath, 'utf8');
   const specializedHelpers = parseSpecializedHelperNames(writeHelperSource);
 
-  const scanRoots = ['api', 'services', 'utils'].map((folder) =>
+  const scanRoots = ['api', 'modules', 'services', 'utils'].map((folder) =>
     path.join(backendRoot, folder),
   );
   const files = scanRoots.flatMap((dir) => walkTsFiles(dir));

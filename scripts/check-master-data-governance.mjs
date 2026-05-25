@@ -12,9 +12,14 @@ const targetFiles = [
   path.join(backendDir, 'api'),
   path.join(backendDir, 'services'),
   path.join(backendDir, 'utils'),
+  path.join(backendDir, 'modules'),
+  path.join(backendDir, 'scripts'),
 ];
 
 const skipFiles = new Set([
+  path.join(backendDir, 'core', 'master-data', 'governance-kernel.ts'),
+  path.join(backendDir, 'core', 'master-data', 'governance-registry.ts'),
+  path.join(backendDir, 'core', 'master-data', 'governance-write.ts'),
   path.join(backendDir, 'services', 'master-data-rename.service.ts'),
   path.join(backendDir, 'utils', 'master-data-governance-kernel.ts'),
   path.join(backendDir, 'utils', 'master-data-governance-registry.ts'),
@@ -28,8 +33,9 @@ function escapeRegex(input) {
 function parseGovernanceTokensFromRegistry() {
   const registryPath = path.join(
     backendDir,
-    'utils',
-    'master-data-governance-registry.ts',
+    'core',
+    'master-data',
+    'governance-registry.ts',
   );
   const text = fs.readFileSync(registryPath, 'utf8');
   const blocks = [...text.matchAll(/targets:\s*\[([\s\S]*?)\],/g)].map(
@@ -136,6 +142,14 @@ function hasGovernanceHelperUsage(line) {
   );
 }
 
+function hasFrozenImportViolation(line) {
+  return (
+    line.includes('master-data-governance-kernel') ||
+    line.includes('master-data-governance-registry') ||
+    line.includes('master-data-governance-write')
+  );
+}
+
 function isGovernanceHelperContext(lines, index) {
   const start = Math.max(0, index - 12);
   const end = Math.min(lines.length - 1, index + 2);
@@ -167,6 +181,12 @@ for (const file of changedFiles) {
   lines.forEach((line, index) => {
     const lineNumber = index + 1;
     if (!addedLines.has(lineNumber)) return;
+    if (hasFrozenImportViolation(line)) {
+      violations.push(
+        `${rel}:${index + 1} forbidden governance import alias; use core/master-data/governance-*`,
+      );
+      return;
+    }
     if (hasGovernanceHelperUsage(line)) return;
     if (isGovernanceHelperContext(lines, index)) return;
     if (isOnlyTypingLine(line)) return;

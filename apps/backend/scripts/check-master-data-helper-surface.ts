@@ -28,16 +28,18 @@ function resolveWriteHelperPath() {
     cwd,
     'apps',
     'backend',
-    'utils',
-    'master-data-governance-write.ts',
+    'core',
+    'master-data',
+    'governance-write.ts',
   );
   if (fs.existsSync(backendFromRoot)) {
     return backendFromRoot;
   }
   const backendFromCwd = path.resolve(
     cwd,
-    'utils',
-    'master-data-governance-write.ts',
+    'core',
+    'master-data',
+    'governance-write.ts',
   );
   if (fs.existsSync(backendFromCwd)) {
     return backendFromCwd;

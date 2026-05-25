@@ -2,8 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
-import { MasterDataGovernanceKernel } from '../utils/master-data-governance-kernel';
-import { listMasterDataGovernanceFields } from '../utils/master-data-governance-registry';
+import { MasterDataGovernanceKernel } from '../core/master-data/governance-kernel';
+import { listMasterDataGovernanceFields } from '../core/master-data/governance-registry';
 import prisma from '../utils/prisma';
 
 function parseArgs(argv: string[]) {

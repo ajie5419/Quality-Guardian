@@ -4,13 +4,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
-import { MasterDataGovernanceKernel } from '../utils/master-data-governance-kernel';
+import { MasterDataGovernanceKernel } from '../core/master-data/governance-kernel';
 import {
   getMasterDataGovernanceField,
   getMasterDataGovernanceFieldKeys,
   listMasterDataGovernanceFieldsByWave,
   listMasterDataGovernanceWaves,
-} from '../utils/master-data-governance-registry';
+} from '../core/master-data/governance-registry';
 import prisma from '../utils/prisma';
 
 function parseArgs(argv: string[]) {

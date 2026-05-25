@@ -7,7 +7,7 @@ Prisma 6.2.1，Schema 文件：`apps/backend/prisma/schema.prisma`
 ## 命名约定
 
 | 对象 | 规则 | 示例 |
-|------|------|------|
+| --- | --- | --- |
 | 表名 | snake_case 复数 | `inspections`、`quality_records`、`after_sales` |
 | 列名 | camelCase | `workOrderNumber`、`processName`、`isDeleted` |
 | 关联 ID 列 | `{entity}Id` | `processId`、`supplierId`、`templateId` |
