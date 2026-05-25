@@ -1029,7 +1029,9 @@ export const InspectionCoreService = {
   },
 
   resolveOverallResult(data: InspectionRecordInput): inspection_result {
-    const computed = InspectionCoreService.calculateOverallResult(data.items || []);
+    const computed = InspectionCoreService.calculateOverallResult(
+      data.items || [],
+    );
     if (computed === 'FAIL') return 'FAIL';
 
     const manual = String(data.result || '')

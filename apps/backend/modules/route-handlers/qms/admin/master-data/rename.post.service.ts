@@ -6,7 +6,6 @@ import {
   conflictResponse,
   internalServerErrorResponse,
   unAuthorizedResponse,
-  useResponseSuccess,
 } from '~/utils/response';
 import { requireSystemAdmin } from '~/utils/system-auth';
 

@@ -1,7 +1,7 @@
 import { LoginStatusEnum } from '@qgs/shared';
 import { defineEventHandler, getHeader, readBody, setResponseStatus } from 'h3';
-import { AuthService } from '~/modules/user/auth.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { AuthService } from '~/modules/user/auth.service';
 import {
   clearRefreshTokenCookie,
   setRefreshTokenCookie,

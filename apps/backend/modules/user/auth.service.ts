@@ -11,7 +11,8 @@ export const AuthService = {
       include: { roles: true },
     });
     if (!user) throw new Error('用户名或密码错误');
-    if (user.status !== 'ACTIVE') throw new Error('账号已被禁用，请联系管理员。');
+    if (user.status !== 'ACTIVE')
+      throw new Error('账号已被禁用，请联系管理员。');
 
     const isValid = await bcrypt.compare(pass, user.password);
     if (!isValid) throw new Error('用户名或密码错误');

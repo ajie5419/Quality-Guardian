@@ -38,7 +38,10 @@ export function parsePagination(params: PaginationParams = {}) {
   return { page, pageSize, skip, take: pageSize };
 }
 
-export function applyPagination<T>(items: T[], params: PaginationParams): PageResult<T> {
+export function applyPagination<T>(
+  items: T[],
+  params: PaginationParams,
+): PageResult<T> {
   const { skip, take } = parsePagination(params);
   return { items: items.slice(skip, skip + take), total: items.length };
 }
@@ -95,7 +98,9 @@ export function buildWhereClause<T extends Record<string, any>>(
   return where;
 }
 
-export function buildYearFilter(year?: null | number | string): Prisma.DateTimeFilter | undefined {
+export function buildYearFilter(
+  year?: null | number | string,
+): Prisma.DateTimeFilter | undefined {
   const y = Number(year);
   if (!y || Number.isNaN(y)) return undefined;
   return {
@@ -104,12 +109,17 @@ export function buildYearFilter(year?: null | number | string): Prisma.DateTimeF
   };
 }
 
-export function formatDateString(date: Date | null | string | undefined): null | string {
+export function formatDateString(
+  date: Date | null | string | undefined,
+): null | string {
   const formatted = formatDate(date);
   return formatted || null;
 }
 
-export function formatNumber(value: null | number | string | undefined, decimals = 2): number {
+export function formatNumber(
+  value: null | number | string | undefined,
+  decimals = 2,
+): number {
   const num = safeNumber(value);
   return Number(num.toFixed(decimals));
 }

@@ -48,9 +48,12 @@ vi.mock('~/modules/inspection/inspection.service', () => ({
 vi.mock('~/modules/quality-loss/quality-loss.service', () => ({
   QualityLossService: { getStatsForDashboard: vi.fn() },
 }));
-vi.mock('~/modules/vehicle-commissioning/vehicle-commissioning.service', () => ({
-  VehicleCommissioningService: { getStatsForDashboard: vi.fn() },
-}));
+vi.mock(
+  '~/modules/vehicle-commissioning/vehicle-commissioning.service',
+  () => ({
+    VehicleCommissioningService: { getStatsForDashboard: vi.fn() },
+  }),
+);
 vi.mock('~/modules/work-order/work-order.service', () => ({
   WorkOrderService: { getStatsForDashboard: vi.fn() },
 }));
@@ -86,14 +89,14 @@ describe('dashboardService', () => {
           { type: 'Major', value: 2 },
         ],
       });
-      (VehicleCommissioningService.getStatsForDashboard as any).mockResolvedValue(
-        {
-          totalCount: 2,
-          totalLoss: 700,
-          weeklyCount: 1,
-          weeklyLoss: 70,
-        },
-      );
+      (
+        VehicleCommissioningService.getStatsForDashboard as any
+      ).mockResolvedValue({
+        totalCount: 2,
+        totalLoss: 700,
+        weeklyCount: 1,
+        weeklyLoss: 70,
+      });
       (WorkOrderService.getStatsForDashboard as any).mockResolvedValue({
         totalCount: 20,
         weeklyCount: 4,
