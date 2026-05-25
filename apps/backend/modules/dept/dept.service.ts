@@ -1,4 +1,7 @@
+import type { DeptTreeNode } from '~/utils/dept-tree';
+
 import { createId } from '@paralleldrive/cuid2';
+import { buildDeptTree } from '~/utils/dept-tree';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
@@ -37,52 +40,16 @@ interface DeptItem {
   sort?: null | number;
 }
 
-interface DeptNode extends DeptItem {
-  children: DeptNode[];
-  createTime: string;
-  remark: string;
-}
-
-// Helper: Build Tree
-function buildDeptTree(items: DeptItem[]) {
-  const result: DeptNode[] = [];
-  const map: Record<string, DeptNode> = {};
-
-  // First pass
-  items.forEach((item) => {
-    map[item.id] = {
-      ...item,
-      children: [],
-      createTime: item.createdAt
-        ? new Date(item.createdAt).toLocaleString('zh-CN')
-        : '',
-      remark: item.description || '',
-    };
-  });
-
-  // Second pass
-  items.forEach((item) => {
-    const node = map[item.id];
-    if (item.parentId && item.parentId !== '0' && map[item.parentId]) {
-      map[item.parentId].children.push(node);
-    } else {
-      result.push(node);
-    }
-  });
-
-  return result;
-}
-
 export const DeptService = {
   /**
    * Get all departments as a tree
    */
-  async findAll() {
+  async findAll(): Promise<Array<DeptTreeNode<DeptItem>>> {
     // Cache key: qms:dept:tree
     const cached = await redis.get('qms:dept:tree');
     if (cached) {
       console.warn('[Dept Cache] HIT - Key: qms:dept:tree');
-      return cached;
+      return cached as Array<DeptTreeNode<DeptItem>>;
     }
 
     const result = await (async () => {
@@ -99,7 +66,7 @@ export const DeptService = {
     return result;
   },
 
-  async findActiveTree() {
+  async findActiveTree(): Promise<Array<DeptTreeNode<DeptItem>>> {
     const departments = await prisma.departments.findMany({
       where: { isDeleted: false, status: 1 },
       orderBy: { sort: 'asc' },

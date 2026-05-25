@@ -15,6 +15,7 @@ import { InspectionService } from '~/modules/inspection/inspection.service';
 import { MONTHS } from '~/modules/quality-loss/locale';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
+import { flattenDeptTree } from '~/utils/dept-tree';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
@@ -383,23 +384,16 @@ async function mergeAndFilter(
 ): Promise<QualityLossItem[]> {
   const { lossSource, workOrderNumber } = params;
 
-  const deptTree = ((await DeptService.findAll().catch((error) => {
-    logger.warn(
-      { err: error },
-      'DeptService.findAll failed, fallback to raw dept id',
-    );
-    return [];
-  })) || []) as any[];
+  const deptTree =
+    (await DeptService.findAll().catch((error) => {
+      logger.warn(
+        { err: error },
+        'DeptService.findAll failed, fallback to raw dept id',
+      );
+      return [];
+    })) || [];
   const deptMap = new Map<string, string>();
-  const processDeptNode = (nodes: any[]) => {
-    nodes.forEach((node) => {
-      deptMap.set(node.id, node.name);
-      if (node.children && node.children.length > 0) {
-        processDeptNode(node.children);
-      }
-    });
-  };
-  processDeptNode(deptTree);
+  for (const node of flattenDeptTree(deptTree)) deptMap.set(node.id, node.name);
   const getDeptName = (id: null | string | undefined) => {
     if (!id) return null;
     return deptMap.get(id) || id;

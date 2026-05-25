@@ -21,6 +21,7 @@ import { DeptService } from '~/modules/dept/dept.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
+import { findDeptSubtree } from '~/utils/dept-tree';
 import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import { buildInspectionIssueDateRange } from '~/utils/inspection-issue';
 import { createModuleLogger } from '~/utils/logger';
@@ -1823,25 +1824,19 @@ export const InspectionCoreService = {
 
       const matchedDeptIds = new Set<string>();
       const matchedDeptNames = new Set<string>();
-      const collectMatchedDeptMeta = (nodes: any[]) => {
-        for (const node of nodes || []) {
-          const nodeId = String(node.id || '');
-          const nodeName = String(node.name || '');
-          if (
-            searchTerms.some(
-              (term) => nodeId === term || nodeName.includes(term),
-            )
-          ) {
-            if (nodeId) matchedDeptIds.add(nodeId);
-            if (nodeName) matchedDeptNames.add(nodeName);
-          }
-          if (Array.isArray(node.children) && node.children.length > 0) {
-            collectMatchedDeptMeta(node.children);
-          }
-        }
-      };
-
-      collectMatchedDeptMeta(deptTree as any[]);
+      const matchedDepts = findDeptSubtree(deptTree, (node) => {
+        const nodeId = String(node.id || '');
+        const nodeName = String(node.name || '');
+        return searchTerms.some(
+          (term) => nodeId === term || nodeName.includes(term),
+        );
+      });
+      for (const node of matchedDepts) {
+        const nodeId = String(node.id || '');
+        const nodeName = String(node.name || '');
+        if (nodeId) matchedDeptIds.add(nodeId);
+        if (nodeName) matchedDeptNames.add(nodeName);
+      }
 
       const exactCandidates = [
         ...new Set([...matchedDeptIds, ...matchedDeptNames, ...searchTerms]),

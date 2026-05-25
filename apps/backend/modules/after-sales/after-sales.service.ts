@@ -19,6 +19,7 @@ import { FileStorageService } from '~/modules/file-storage/file-storage.service'
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { buildGovernedAfterSalesUpdateData } from '~/utils/after-sales-payload';
 import { buildAfterSalesDateRange } from '~/utils/after-sales-query';
+import { flattenDeptTree } from '~/utils/dept-tree';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
@@ -257,17 +258,7 @@ const CHART_DB_FIELD_MAP: Record<
 async function buildDeptNameMap() {
   const deptTree = await DeptService.findAll().catch(() => []);
   const deptMap = new Map<string, string>();
-  const walk = (
-    nodes: Array<{ children?: any[]; id: string; name: string }>,
-  ) => {
-    for (const node of nodes) {
-      deptMap.set(node.id, node.name);
-      if (Array.isArray(node.children) && node.children.length > 0) {
-        walk(node.children as any);
-      }
-    }
-  };
-  walk((deptTree || []) as any);
+  for (const node of flattenDeptTree(deptTree)) deptMap.set(node.id, node.name);
   return deptMap;
 }
 

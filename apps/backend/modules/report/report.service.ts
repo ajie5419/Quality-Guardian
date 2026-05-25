@@ -5,6 +5,7 @@ import {
   normalizeIssueTrackingStatus,
 } from '@qgs/shared';
 import { DeptService } from '~/modules/dept/dept.service';
+import { flattenDeptTree } from '~/utils/dept-tree';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
@@ -46,15 +47,10 @@ async function createDepartmentNameResolver(): Promise<
   (id: null | string) => string
 > {
   try {
-    const deptTree = (await DeptService.findAll()) as any[];
+    const deptTree = await DeptService.findAll();
     const deptMap = new Map<string, string>();
-    const processDeptNode = (nodes: any[]) => {
-      nodes.forEach((node) => {
-        deptMap.set(node.id, node.name);
-        if (node.children?.length) processDeptNode(node.children);
-      });
-    };
-    processDeptNode(deptTree);
+    for (const node of flattenDeptTree(deptTree))
+      deptMap.set(node.id, node.name);
     return (id: null | string) => (id ? deptMap.get(id) || id : '-');
   } catch (error) {
     logger.warn({ err: error }, 'Failed to resolve department map');
