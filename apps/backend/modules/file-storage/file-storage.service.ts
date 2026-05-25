@@ -403,7 +403,7 @@ export const FileStorageService = {
   },
 
   async deleteFile(id: string, userId?: number | string) {
-    const file = await (prisma.file_assets as any).update({
+    const file = await prisma.file_assets.update({
       where: { id },
       data: {
         deletedAt: new Date(),
@@ -411,7 +411,7 @@ export const FileStorageService = {
       },
     });
 
-    await (prisma.file_references as any).deleteMany({
+    await prisma.file_references.deleteMany({
       where: { fileId: id },
     });
 
@@ -422,7 +422,7 @@ export const FileStorageService = {
   },
 
   async getFileBuffer(id: string, preferThumb = false) {
-    const file = await (prisma.file_assets as any).findUnique({
+    const file = await prisma.file_assets.findUnique({
       where: { id },
     });
     if (!file || file.status !== 'ACTIVE') return null;
@@ -613,7 +613,7 @@ export const FileStorageService = {
     fileId: string;
     sortOrder?: number;
   }) {
-    return (prisma.file_references as any).create({
+    return prisma.file_references.create({
       data: {
         bizId: params.bizId,
         bizType: params.bizType,
@@ -815,7 +815,7 @@ export const FileStorageService = {
           )}`
         : saved.thumbUrl || '';
 
-    const asset = await (prisma.file_assets as any).create({
+    const asset = await prisma.file_assets.create({
       data: {
         ...saved,
         thumbUrl: thumbUrl || null,

@@ -2,7 +2,7 @@ import prisma from '~/utils/prisma';
 
 export const PreferenceService = {
   async getUserPreference(userId: string, module: string) {
-    return (prisma as any).user_preferences.findUnique({
+    return prisma.user_preferences.findUnique({
       where: { userId_module: { userId, module } },
     });
   },
@@ -10,7 +10,7 @@ export const PreferenceService = {
   async setUserPreference(userId: string, module: string, data: unknown) {
     const preferenceData =
       typeof data === 'string' ? data : JSON.stringify(data);
-    return (prisma as any).user_preferences.upsert({
+    return prisma.user_preferences.upsert({
       where: { userId_module: { userId, module } },
       update: { preference_data: preferenceData },
       create: { userId, module, preference_data: preferenceData },
@@ -18,13 +18,13 @@ export const PreferenceService = {
   },
 
   async deleteUserPreference(userId: string, module: string) {
-    return (prisma as any).user_preferences
+    return prisma.user_preferences
       .delete({ where: { userId_module: { userId, module } } })
       .catch(() => null);
   },
 
   async clearAllUserPreferences(module: string) {
-    return (prisma as any).user_preferences.deleteMany({ where: { module } });
+    return prisma.user_preferences.deleteMany({ where: { module } });
   },
 
   async getSystemSetting(key: string) {

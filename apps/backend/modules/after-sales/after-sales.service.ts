@@ -585,8 +585,8 @@ export const AfterSalesService = {
     for (const field of conf.sumFields) {
       sumPayload[field] = true;
     }
-    const grouped = await (prisma.after_sales as any).groupBy({
-      by: [byField] as any,
+    const grouped = await prisma.after_sales.groupBy({
+      by: [byField],
       where,
       ...(conf.count ? { _count: { id: true } } : {}),
       ...(conf.sumFields.length > 0 ? { _sum: sumPayload } : {}),

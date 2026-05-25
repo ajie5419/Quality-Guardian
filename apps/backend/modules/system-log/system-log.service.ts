@@ -117,7 +117,7 @@ export const SystemLogService = {
       params.detailsVariables,
     );
 
-    return (prisma.audit_logs as any).create({
+    return prisma.audit_logs.create({
       data: {
         userId: params.userId,
         action: params.action,
@@ -126,7 +126,7 @@ export const SystemLogService = {
         details,
         ipAddress: params.ipAddress || 'Unknown',
         userAgent: params.userAgent || 'Unknown',
-      } as any,
+      },
     });
   },
 
