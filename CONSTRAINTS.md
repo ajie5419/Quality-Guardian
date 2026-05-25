@@ -117,3 +117,53 @@
 - 不得出现 `$queryRawUnsafe` + 模板字符串组合
 
 违反任一条即阻断提交。
+
+## 执行流程规范（防止灾难性偏离）
+
+执行多步骤任务（如重构方案的某个阶段）时必须遵守：
+
+### 强制 commit 节奏
+
+1. **每个 step 完成必须立即 commit** — 不 commit 不算"完成"
+2. **不允许累积 step** — 不能"做完 step 1-3 一起 commit"，必须每步独立
+3. **commit 失败必须立即修复或回滚** — 不允许带着失败的 commit 继续做下一步
+
+### 自检命令（每个 step 完成后必跑）
+
+```bash
+# 1. 验证有新 commit
+git log --oneline -3
+
+# 2. 验证未提交文件数合理（应该 ≤ 20）
+git status --short | wc -l
+
+# 3. 验证模块文件数没有异常膨胀
+find apps/backend/modules -name "*.ts" -not -path "*/node_modules/*" | wc -l
+
+# 4. typecheck 通过
+pnpm -C apps/backend exec tsc --noEmit
+
+# 5. 测试通过
+pnpm -C apps/backend exec vitest run
+```
+
+### 异常停止条件（出现立即停下，不要继续）
+
+- 未提交文件数 > 30
+- 模块文件数比上一阶段开始时多 50% 以上
+- typecheck 报错超过 5 个
+- 测试通过数下降超过 10 个
+
+### 验证规则
+
+- 报告"完成 step N"时，必须包含上述自检命令的输出
+- 不允许只说"已完成"，必须给出新 commit 的 hash
+- 不允许只说"测试通过"，必须给出通过的测试数
+
+### 错误恢复
+
+- 如果改坏了文件，**不要继续机械替换"修复"**
+- 立即停下，报告"工作树损坏"
+- 选项：
+  1. 回滚到最近的 good commit（如果该 step 没 commit）
+  2. 逐文件手修（如果已 commit 过半，回滚代价大）
