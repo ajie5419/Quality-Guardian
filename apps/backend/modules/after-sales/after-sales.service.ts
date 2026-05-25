@@ -263,6 +263,29 @@ async function buildDeptNameMap() {
   return deptMap;
 }
 
+function buildAfterSalesVehicleDivisionWhere(vehicleDeptIds: string[]) {
+  const divisions = vehicleDeptIds.filter(Boolean);
+  if (divisions.length > 0) {
+    return {
+      OR: [
+        { division: { in: divisions } },
+        {
+          AND: [
+            { division: { contains: '车辆' as const } },
+            { division: { contains: 'SOBU' as const } },
+          ],
+        },
+      ],
+    };
+  }
+  return {
+    AND: [
+      { division: { contains: '车辆' as const } },
+      { division: { contains: 'SOBU' as const } },
+    ],
+  };
+}
+
 export const AfterSalesService = {
   async findIdBySerialNumber(serialNumber: number) {
     const row = await prisma.after_sales.findFirst({
@@ -370,6 +393,79 @@ export const AfterSalesService = {
     ]);
 
     return { records, stats, statusStats };
+  },
+
+  async getWeeklyReportIssues(params: { end: Date; start: Date }) {
+    return prisma.after_sales.findMany({
+      where: {
+        isDeleted: false,
+        occurDate: { gte: params.start, lte: params.end },
+      },
+    });
+  },
+
+  async getVehicleFailureRecords(params: {
+    end: Date;
+    productType: string;
+    start: Date;
+    vehicleDeptIds: string[];
+  }) {
+    return prisma.after_sales.findMany({
+      select: { defectType: true, defectTypeId: true, occurDate: true },
+      where: {
+        isDeleted: false,
+        occurDate: { gte: params.start, lte: params.end },
+        OR: [
+          { productType: params.productType },
+          {
+            work_orders: {
+              ...buildAfterSalesVehicleDivisionWhere(params.vehicleDeptIds),
+              isDeleted: false,
+            },
+          },
+        ],
+      },
+    });
+  },
+
+  async findEarliestVehicleFailureDate(params: {
+    end: Date;
+    productType: string;
+    vehicleDeptIds: string[];
+  }) {
+    const row = await prisma.after_sales.findFirst({
+      orderBy: { occurDate: 'asc' },
+      select: { occurDate: true },
+      where: {
+        isDeleted: false,
+        occurDate: { lte: params.end },
+        OR: [
+          { productType: params.productType },
+          {
+            work_orders: {
+              ...buildAfterSalesVehicleDivisionWhere(params.vehicleDeptIds),
+              isDeleted: false,
+            },
+          },
+        ],
+      },
+    });
+    return row?.occurDate || null;
+  },
+
+  async getReportPeriodMetrics(params: { end: Date; start: Date }) {
+    const aggregate = await prisma.after_sales.aggregate({
+      _sum: { materialCost: true, laborTravelCost: true },
+      where: {
+        occurDate: { gte: params.start, lte: params.end },
+        isDeleted: false,
+      },
+    });
+    return {
+      externalLoss:
+        Number(aggregate._sum.materialCost || 0) +
+        Number(aggregate._sum.laborTravelCost || 0),
+    };
   },
 
   async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {

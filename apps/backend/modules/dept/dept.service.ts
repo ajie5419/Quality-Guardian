@@ -75,6 +75,18 @@ export const DeptService = {
     return buildDeptTree(departments as DeptItem[]);
   },
 
+  async findVehicleSobuIds() {
+    const rows = await prisma.departments.findMany({
+      select: { id: true },
+      where: {
+        isDeleted: false,
+        name: { contains: '车辆' },
+        AND: [{ name: { contains: 'SOBU' } }],
+      },
+    });
+    return rows.map((item) => item.id).filter(Boolean);
+  },
+
   /**
    * Create a new department
    */

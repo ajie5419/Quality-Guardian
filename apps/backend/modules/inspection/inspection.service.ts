@@ -17,13 +17,23 @@ export const InspectionService = {
   getStatsForDashboard: InspectionCoreService.getStatsForDashboard,
   generateSerialNumber: InspectionCoreService.generateSerialNumber,
   getArchiveTasks: InspectionArchiveService.getArchiveTasks,
+  getDailyArchiveReportData: InspectionCoreService.getDailyArchiveReportData,
+  getDailyReportInspections: InspectionCoreService.getDailyReportInspections,
+  getDailyReportIssues: InspectionCoreService.getDailyReportIssues,
   getIssueChartAggregation: InspectionIssueService.getIssueChartAggregation,
   getIssues: InspectionIssueService.getIssues,
   getIssueStats: InspectionIssueService.getIssueStats,
   getQualityLossTrendRows: InspectionCoreService.getQualityLossTrendRows,
   getQualityLossDrillDownRecords:
     InspectionCoreService.getQualityLossDrillDownRecords,
+  getReportDefectRows: InspectionCoreService.getReportDefectRows,
+  getReportMajorEvents: InspectionCoreService.getReportMajorEvents,
+  getReportPeriodMetrics: InspectionCoreService.getReportPeriodMetrics,
+  getReportSupplierPerformance:
+    InspectionCoreService.getReportSupplierPerformance,
+  getReportTopRiskProjects: InspectionCoreService.getReportTopRiskProjects,
   getSupplierScoringData: InspectionCoreService.getSupplierScoringData,
+  getWeeklyReportIssues: InspectionCoreService.getWeeklyReportIssues,
   getLossRecordsForAggregation:
     InspectionCoreService.getLossRecordsForAggregation,
   getWorkspaceIssueSummary: InspectionCoreService.getWorkspaceIssueSummary,

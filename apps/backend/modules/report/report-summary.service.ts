@@ -6,6 +6,9 @@ import {
   resolveReportShortLabel,
   shiftReportAnchorDate,
 } from '@qgs/shared';
+import { AfterSalesService } from '~/modules/after-sales';
+import { InspectionService } from '~/modules/inspection';
+import { QualityLossService } from '~/modules/quality-loss';
 import {
   resolveInspectionFormProcess,
   resolveInspectionFormProcessCandidates,
@@ -46,8 +49,8 @@ type DailyInspectionRow = {
 };
 
 type ArchiveTaskRow = Awaited<
-  ReturnType<typeof prisma.inspection_archive_tasks.findMany>
->[number];
+  ReturnType<typeof InspectionService.getDailyArchiveReportData>
+>['tasks'][number];
 
 export const ReportSummaryService = {
   isValidationError(error: unknown): error is ReportQueryValidationError {
@@ -180,39 +183,16 @@ export const ReportSummaryService = {
     const { end: endDate, start: startDate } = getReportDayRange(
       new Date(queryDate),
     );
-    const inspections = await prisma.inspections.findMany({
-      where: {
-        isDeleted: false,
-        inspectionDate: { gte: startDate, lte: endDate },
-        OR: [{ inspector: queryUser }, { inspector: input.realName || '' }],
-      },
-      include: {
-        process: { select: { name: true } },
-        work_order: { select: { projectName: true, customerName: true } },
-      },
+    const inspections = await InspectionService.getDailyReportInspections({
+      end: endDate,
+      realName: input.realName,
+      start: startDate,
+      username: queryUser,
     });
-    const issues = await prisma.quality_records.findMany({
-      where: {
-        isDeleted: false,
-        OR: [
-          {
-            createdAt: { gte: startDate, lte: endDate },
-            OR: [{ inspector: queryUser }, { lastEditor: queryUser }],
-          },
-          {
-            status: { not: 'CLOSED' },
-            OR: [{ inspector: queryUser }, { lastEditor: queryUser }],
-          },
-          {
-            status: 'CLOSED',
-            updatedAt: { gte: startDate, lte: endDate },
-            OR: [{ inspector: queryUser }, { lastEditor: queryUser }],
-          },
-        ],
-      },
-      include: {
-        work_orders: { select: { projectName: true, customerName: true } },
-      },
+    const issues = await InspectionService.getDailyReportIssues({
+      end: endDate,
+      start: startDate,
+      username: queryUser,
     });
     interface ProcessItem {
       partNames: Set<string>;
@@ -339,39 +319,11 @@ async function loadDailyArchiveTasks(inspections: DailyInspectionRow[]) {
           .filter(Boolean),
       ),
     ];
-    const [tasks, templates] = await Promise.all([
-      inspectionIds.length > 0
-        ? prisma.inspection_archive_tasks.findMany({
-            where: { isDeleted: false, inspectionId: { in: inspectionIds } },
-            include: {
-              inspection: {
-                select: {
-                  category: true,
-                  incomingType: true,
-                  process: { select: { name: true } },
-                  processName: true,
-                },
-              },
-            },
-            orderBy: [{ dueAt: 'asc' }, { updatedAt: 'desc' }],
-          })
-        : Promise.resolve([]),
-      workOrderNumbers.length > 0
-        ? prisma.inspection_form_templates.findMany({
-            where: {
-              isDeleted: false,
-              status: 'active',
-              workOrderNumber: { in: workOrderNumbers },
-            },
-            select: {
-              id: true,
-              process: { select: { name: true } },
-              processName: true,
-              workOrderNumber: true,
-            },
-          })
-        : Promise.resolve([]),
-    ]);
+    const { tasks, templates } =
+      await InspectionService.getDailyArchiveReportData({
+        inspectionIds,
+        workOrderNumbers,
+      });
     const planProcessMap = new Map<string, Set<string>>();
     for (const template of templates) {
       const workOrderNumber = String(template.workOrderNumber || '').trim();
@@ -508,44 +460,25 @@ async function loadDailyArchiveTasks(inspections: DailyInspectionRow[]) {
 async function fetchPeriodMetrics(start: Date, end: Date) {
   const [
     passRateSummary,
-    newIssues,
-    closedIssues,
-    internalLossAgg,
-    externalLossAgg,
-    manualLossAgg,
+    inspectionMetrics,
+    afterSalesMetrics,
+    qualityLossMetrics,
   ] = await Promise.all([
     getNetPassRateSummaryByRange(start, end),
-    prisma.quality_records.count({
-      where: { createdAt: { gte: start, lte: end }, isDeleted: false },
-    }),
-    prisma.quality_records.count({
-      where: {
-        createdAt: { gte: start, lte: end },
-        status: 'CLOSED',
-        isDeleted: false,
-      },
-    }),
-    prisma.quality_records.aggregate({
-      _sum: { lossAmount: true },
-      where: { date: { gte: start, lte: end }, isDeleted: false },
-    }),
-    prisma.after_sales.aggregate({
-      _sum: { materialCost: true, laborTravelCost: true },
-      where: { occurDate: { gte: start, lte: end }, isDeleted: false },
-    }),
-    prisma.quality_losses.aggregate({
-      _sum: { amount: true },
-      where: { occurDate: { gte: start, lte: end }, isDeleted: false },
-    }),
+    InspectionService.getReportPeriodMetrics({ start, end }),
+    AfterSalesService.getReportPeriodMetrics({ start, end }),
+    QualityLossService.getReportPeriodMetrics({ start, end }),
   ]);
   const closingRate =
-    newIssues > 0 ? ((closedIssues / newIssues) * 100).toFixed(1) : 100;
+    inspectionMetrics.newIssues > 0
+      ? (
+          (inspectionMetrics.closedIssues / inspectionMetrics.newIssues) *
+          100
+        ).toFixed(1)
+      : 100;
   const internalLoss =
-    Number(internalLossAgg._sum.lossAmount || 0) +
-    Number(manualLossAgg._sum.amount || 0);
-  const externalLoss =
-    Number(externalLossAgg._sum.materialCost || 0) +
-    Number(externalLossAgg._sum.laborTravelCost || 0);
+    inspectionMetrics.internalLoss + qualityLossMetrics.manualLoss;
+  const externalLoss = afterSalesMetrics.externalLoss;
   return {
     passRate: passRateSummary.passRate,
     closingRate: Number(closingRate),
@@ -572,10 +505,7 @@ async function fetchProcessPassRates(start: Date, end: Date) {
 }
 
 async function fetchDefectDistribution(start: Date, end: Date) {
-  const rows = await prisma.quality_records.findMany({
-    where: { date: { gte: start, lte: end }, isDeleted: false },
-    select: { defectType: true, defectTypeId: true },
-  });
+  const rows = await InspectionService.getReportDefectRows({ start, end });
   const defectTypeNameById =
     await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
       configKey: 'defectType',
@@ -601,25 +531,13 @@ async function fetchDefectDistribution(start: Date, end: Date) {
 }
 
 async function fetchTopRiskProjects(start: Date, end: Date) {
-  return prisma.quality_records.groupBy({
-    by: ['projectName'],
-    where: { date: { gte: start, lte: end }, isDeleted: false },
-    _count: true,
-    _sum: { lossAmount: true },
-    orderBy: { _sum: { lossAmount: 'desc' } },
-    take: 5,
-  });
+  return InspectionService.getReportTopRiskProjects({ start, end });
 }
 
 async function fetchSupplierPerformance(start: Date, end: Date) {
-  const stats = await prisma.quality_records.groupBy({
-    by: ['supplierName'],
-    where: {
-      date: { gte: start, lte: end },
-      isDeleted: false,
-      supplierName: { not: null },
-    },
-    _count: true,
+  const stats = await InspectionService.getReportSupplierPerformance({
+    start,
+    end,
   });
   return stats
     .map((s) => ({ name: s.supplierName, issues: s._count }))
@@ -627,11 +545,7 @@ async function fetchSupplierPerformance(start: Date, end: Date) {
 }
 
 async function fetchMajorEvents(start: Date, end: Date) {
-  return prisma.quality_records.findMany({
-    where: { date: { gte: start, lte: end }, isDeleted: false },
-    orderBy: { lossAmount: 'desc' },
-    take: 3,
-  });
+  return InspectionService.getReportMajorEvents({ start, end });
 }
 
 function getReportPeriods(date: Date, type: string) {

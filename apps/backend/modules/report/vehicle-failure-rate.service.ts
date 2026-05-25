@@ -1,5 +1,8 @@
+import { AfterSalesService } from '~/modules/after-sales';
+import { DeptService } from '~/modules/dept/dept.service';
+import { SystemService } from '~/modules/system';
+import { WorkOrderService } from '~/modules/work-order';
 import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
-import prisma from '~/utils/prisma';
 import { addYearsToDate } from '~/utils/work-order';
 
 const VEHICLE_PRODUCT_TYPE = '车辆产品';
@@ -168,37 +171,19 @@ async function saveManualData(
   value: Record<string, number>,
   description: string,
 ) {
-  await prisma.system_settings.upsert({
-    where: { key },
-    update: {
-      description,
-      updatedAt: new Date(),
-      value: JSON.stringify(value),
-    },
-    create: {
-      description,
-      key,
-      value: JSON.stringify(value),
-    },
+  await SystemService.saveSettingValue({
+    description,
+    key,
+    value: JSON.stringify(value),
   });
 }
 
 async function buildRanking(start: Date, end: Date, vehicleDeptIds: string[]) {
-  const records = await prisma.after_sales.findMany({
-    select: { defectType: true, defectTypeId: true },
-    where: {
-      isDeleted: false,
-      occurDate: { gte: start, lte: end },
-      OR: [
-        { productType: VEHICLE_PRODUCT_TYPE },
-        {
-          work_orders: {
-            ...buildVehicleDivisionWhere(vehicleDeptIds),
-            isDeleted: false,
-          },
-        },
-      ],
-    },
+  const records = await AfterSalesService.getVehicleFailureRecords({
+    end,
+    productType: VEHICLE_PRODUCT_TYPE,
+    start,
+    vehicleDeptIds,
   });
   const total = records.length;
   const defectTypeNameById =
@@ -225,12 +210,10 @@ async function buildRanking(start: Date, end: Date, vehicleDeptIds: string[]) {
 }
 
 async function getManualData(): Promise<Record<string, number>> {
-  const setting = await prisma.system_settings.findUnique({
-    where: { key: MANUAL_SETTING_KEY },
-  });
-  if (!setting?.value) return {};
+  const value = await SystemService.getSettingValue(MANUAL_SETTING_KEY);
+  if (!value) return {};
   try {
-    const parsed = JSON.parse(setting.value) as Record<string, unknown>;
+    const parsed = JSON.parse(value) as Record<string, unknown>;
     return Object.fromEntries(
       Object.entries(parsed)
         .map(([month, count]) => [month, Number(count)] as const)
@@ -242,12 +225,12 @@ async function getManualData(): Promise<Record<string, number>> {
 }
 
 async function getManualWarrantyData(): Promise<Record<string, number>> {
-  const setting = await prisma.system_settings.findUnique({
-    where: { key: MANUAL_WARRANTY_SETTING_KEY },
-  });
-  if (!setting?.value) return {};
+  const value = await SystemService.getSettingValue(
+    MANUAL_WARRANTY_SETTING_KEY,
+  );
+  if (!value) return {};
   try {
-    const parsed = JSON.parse(setting.value) as Record<string, unknown>;
+    const parsed = JSON.parse(value) as Record<string, unknown>;
     return Object.fromEntries(
       Object.entries(parsed)
         .map(([year, count]) => [year, Number(count)] as const)
@@ -268,21 +251,11 @@ async function loadMonthlyCounts(
   const endYear = Math.max(...years);
   const start = new Date(startYear, 0, 1);
   const end = new Date(endYear, endMonthIndex + 1, 0, 23, 59, 59, 999);
-  const records = await prisma.after_sales.findMany({
-    select: { occurDate: true },
-    where: {
-      isDeleted: false,
-      occurDate: { gte: start, lte: end },
-      OR: [
-        { productType: VEHICLE_PRODUCT_TYPE },
-        {
-          work_orders: {
-            ...buildVehicleDivisionWhere(vehicleDeptIds),
-            isDeleted: false,
-          },
-        },
-      ],
-    },
+  const records = await AfterSalesService.getVehicleFailureRecords({
+    end,
+    productType: VEHICLE_PRODUCT_TYPE,
+    start,
+    vehicleDeptIds,
   });
   const yearSet = new Set(years);
   const monthlyCounts = new Map<string, number>();
@@ -310,12 +283,9 @@ async function loadMonthlyWarrantyCounts(
   const minYearStart = new Date(startYear, 0, 1);
   const maxYearEnd = new Date(endYear, 11, 31, 23, 59, 59, 999);
   const minDeliveryDate = addYearsToDate(minYearStart, -1);
-  const candidates = await prisma.work_orders.findMany({
-    select: { deliveryDate: true, division: true, quantity: true },
-    where: {
-      isDeleted: false,
-      deliveryDate: { gt: minDeliveryDate, lte: maxYearEnd },
-    },
+  const candidates = await WorkOrderService.getWarrantySeeds({
+    maxDeliveryDate: maxYearEnd,
+    minDeliveryDate,
   });
   const vehicleCandidates = candidates.filter((item) =>
     isVehicleDivision(item.division, vehicleDeptIds),
@@ -454,29 +424,18 @@ async function getDisplayYears(
   manualData: Record<string, number>,
   vehicleDeptIds: string[],
 ) {
-  const earliestAutoRecord = await prisma.after_sales.findFirst({
-    orderBy: { occurDate: 'asc' },
-    select: { occurDate: true },
-    where: {
-      isDeleted: false,
-      occurDate: { lte: endMonth },
-      OR: [
-        { productType: VEHICLE_PRODUCT_TYPE },
-        {
-          work_orders: {
-            ...buildVehicleDivisionWhere(vehicleDeptIds),
-            isDeleted: false,
-          },
-        },
-      ],
-    },
-  });
+  const earliestAutoDate =
+    await AfterSalesService.findEarliestVehicleFailureDate({
+      end: endMonth,
+      productType: VEHICLE_PRODUCT_TYPE,
+      vehicleDeptIds,
+    });
   const manualYears = Object.keys(manualData)
     .map((month) => Number(month.slice(0, 4)))
     .filter((year) => Number.isInteger(year) && year <= selectedYear);
   const manualStartYear =
     manualYears.length > 0 ? Math.min(...manualYears) : undefined;
-  const autoStartYear = earliestAutoRecord?.occurDate?.getFullYear();
+  const autoStartYear = earliestAutoDate?.getFullYear();
   const startYearCandidates = [autoStartYear, manualStartYear, selectedYear]
     .filter((year): year is number => typeof year === 'number')
     .map((year) => Math.min(year, selectedYear));
@@ -526,29 +485,6 @@ function formatMonth(year: number, monthIndex: number) {
   return `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
 }
 
-function buildVehicleDivisionWhere(vehicleDeptIds: string[]) {
-  const divisions = vehicleDeptIds.filter(Boolean);
-  if (divisions.length > 0) {
-    return {
-      OR: [
-        { division: { in: divisions } },
-        {
-          AND: [
-            { division: { contains: '车辆' as const } },
-            { division: { contains: 'SOBU' as const } },
-          ],
-        },
-      ],
-    };
-  }
-  return {
-    AND: [
-      { division: { contains: '车辆' as const } },
-      { division: { contains: 'SOBU' as const } },
-    ],
-  };
-}
-
 function isVehicleDivision(
   value: null | string | undefined,
   vehicleDeptIds: string[],
@@ -560,15 +496,7 @@ function isVehicleDivision(
 }
 
 async function getVehicleDeptIds() {
-  const rows = await prisma.departments.findMany({
-    select: { id: true },
-    where: {
-      isDeleted: false,
-      name: { contains: '车辆' },
-      AND: [{ name: { contains: 'SOBU' } }],
-    },
-  });
-  return rows.map((item) => item.id).filter(Boolean);
+  return DeptService.findVehicleSobuIds();
 }
 
 function parseEndMonth(month: unknown): Date {

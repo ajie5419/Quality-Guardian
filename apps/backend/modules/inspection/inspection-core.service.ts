@@ -889,6 +889,187 @@ export const InspectionCoreService = {
     return { incomingStats, engineeringStats, engineeringStatusStats, records };
   },
 
+  async getWeeklyReportIssues(params: { end: Date; start: Date }) {
+    return prisma.quality_records.findMany({
+      where: {
+        isDeleted: false,
+        date: { gte: params.start, lte: params.end },
+      },
+    });
+  },
+
+  async getDailyReportInspections(params: {
+    end: Date;
+    realName?: string;
+    start: Date;
+    username: string;
+  }) {
+    return prisma.inspections.findMany({
+      where: {
+        isDeleted: false,
+        inspectionDate: { gte: params.start, lte: params.end },
+        OR: [
+          { inspector: params.username },
+          { inspector: params.realName || '' },
+        ],
+      },
+      include: {
+        process: { select: { name: true } },
+        work_order: { select: { projectName: true, customerName: true } },
+      },
+    });
+  },
+
+  async getDailyReportIssues(params: {
+    end: Date;
+    start: Date;
+    username: string;
+  }) {
+    return prisma.quality_records.findMany({
+      where: {
+        isDeleted: false,
+        OR: [
+          {
+            createdAt: { gte: params.start, lte: params.end },
+            OR: [
+              { inspector: params.username },
+              { lastEditor: params.username },
+            ],
+          },
+          {
+            status: { not: 'CLOSED' },
+            OR: [
+              { inspector: params.username },
+              { lastEditor: params.username },
+            ],
+          },
+          {
+            status: 'CLOSED',
+            updatedAt: { gte: params.start, lte: params.end },
+            OR: [
+              { inspector: params.username },
+              { lastEditor: params.username },
+            ],
+          },
+        ],
+      },
+      include: {
+        work_orders: { select: { projectName: true, customerName: true } },
+      },
+    });
+  },
+
+  async getDailyArchiveReportData(params: {
+    inspectionIds: string[];
+    workOrderNumbers: string[];
+  }) {
+    const [tasks, templates] = await Promise.all([
+      params.inspectionIds.length > 0
+        ? prisma.inspection_archive_tasks.findMany({
+            where: {
+              isDeleted: false,
+              inspectionId: { in: params.inspectionIds },
+            },
+            include: {
+              inspection: {
+                select: {
+                  category: true,
+                  incomingType: true,
+                  process: { select: { name: true } },
+                  processName: true,
+                },
+              },
+            },
+            orderBy: [{ dueAt: 'asc' }, { updatedAt: 'desc' }],
+          })
+        : Promise.resolve([]),
+      params.workOrderNumbers.length > 0
+        ? prisma.inspection_form_templates.findMany({
+            where: {
+              isDeleted: false,
+              status: 'active',
+              workOrderNumber: { in: params.workOrderNumbers },
+            },
+            select: {
+              id: true,
+              process: { select: { name: true } },
+              processName: true,
+              workOrderNumber: true,
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+    return { tasks, templates };
+  },
+
+  async getReportPeriodMetrics(params: { end: Date; start: Date }) {
+    const [newIssues, closedIssues, internalLossAgg] = await Promise.all([
+      prisma.quality_records.count({
+        where: {
+          createdAt: { gte: params.start, lte: params.end },
+          isDeleted: false,
+        },
+      }),
+      prisma.quality_records.count({
+        where: {
+          createdAt: { gte: params.start, lte: params.end },
+          status: 'CLOSED',
+          isDeleted: false,
+        },
+      }),
+      prisma.quality_records.aggregate({
+        _sum: { lossAmount: true },
+        where: {
+          date: { gte: params.start, lte: params.end },
+          isDeleted: false,
+        },
+      }),
+    ]);
+    return {
+      closedIssues,
+      internalLoss: Number(internalLossAgg._sum.lossAmount || 0),
+      newIssues,
+    };
+  },
+
+  async getReportDefectRows(params: { end: Date; start: Date }) {
+    return prisma.quality_records.findMany({
+      where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
+      select: { defectType: true, defectTypeId: true },
+    });
+  },
+
+  async getReportTopRiskProjects(params: { end: Date; start: Date }) {
+    return prisma.quality_records.groupBy({
+      by: ['projectName'],
+      where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
+      _count: true,
+      _sum: { lossAmount: true },
+      orderBy: { _sum: { lossAmount: 'desc' } },
+      take: 5,
+    });
+  },
+
+  async getReportSupplierPerformance(params: { end: Date; start: Date }) {
+    return prisma.quality_records.groupBy({
+      by: ['supplierName'],
+      where: {
+        date: { gte: params.start, lte: params.end },
+        isDeleted: false,
+        supplierName: { not: null },
+      },
+      _count: true,
+    });
+  },
+
+  async getReportMajorEvents(params: { end: Date; start: Date }) {
+    return prisma.quality_records.findMany({
+      where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
+      orderBy: { lossAmount: 'desc' },
+      take: 3,
+    });
+  },
+
   async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
     const baseWhere: Prisma.quality_recordsWhereInput = {
       isDeleted: false,

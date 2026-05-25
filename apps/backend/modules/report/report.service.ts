@@ -4,10 +4,12 @@ import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
 } from '@qgs/shared';
+import { AfterSalesService } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept/dept.service';
+import { InspectionService } from '~/modules/inspection';
+import { QualityLossService } from '~/modules/quality-loss';
 import { flattenDeptTree } from '~/utils/dept-tree';
 import { createModuleLogger } from '~/utils/logger';
-import prisma from '~/utils/prisma';
 
 const logger = createModuleLogger('ReportService');
 const CLOSED_TRACKING_STATUSES = [
@@ -77,40 +79,24 @@ export const ReportService = {
       // Modifying scope to match user request: "Last Week Problem Tracking"
       // Detailed implementation might require specific business logic on what constitutes "tracking".
       // Here we fetch issues created before start date but still open, or closed within range.
-      const trackingIssuesRaw = await prisma.quality_losses.findMany({
-        where: {
-          isDeleted: false,
-          OR: [
-            // Created before start, still open
-            {
-              occurDate: { lt: start },
-              status: { notIn: CLOSED_TRACKING_STATUSES },
-            },
-            // Closed within range
-            {
-              updatedAt: { gte: start, lte: end },
-              status: { in: CLOSED_TRACKING_STATUSES },
-            },
-          ],
-        },
-        take: 20, // Limit for safety
-      });
+      const trackingIssuesRaw =
+        await QualityLossService.getWeeklyTrackingIssues({
+          closedStatuses: CLOSED_TRACKING_STATUSES,
+          end,
+          start,
+          take: 20,
+        });
 
       // 2. Fetch Internal Issues (This Week)
-      const internalIssuesRaw = await prisma.quality_records.findMany({
-        where: {
-          isDeleted: false,
-          date: { gte: start, lte: end },
-          // Removed lossAmount > 0 filter to show ALL issues as requested
-        },
+      const internalIssuesRaw = await InspectionService.getWeeklyReportIssues({
+        end,
+        start,
       });
 
       // 3. Fetch External Issues (This Week)
-      const externalIssuesRaw = await prisma.after_sales.findMany({
-        where: {
-          isDeleted: false,
-          occurDate: { gte: start, lte: end },
-        },
+      const externalIssuesRaw = await AfterSalesService.getWeeklyReportIssues({
+        end,
+        start,
       });
 
       const getDeptName = await createDepartmentNameResolver();

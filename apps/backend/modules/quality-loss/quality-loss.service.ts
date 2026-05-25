@@ -602,6 +602,43 @@ export const QualityLossService = {
     };
   },
 
+  async getWeeklyTrackingIssues(params: {
+    closedStatuses: string[];
+    end: Date;
+    start: Date;
+    take?: number;
+  }) {
+    return prisma.quality_losses.findMany({
+      where: {
+        isDeleted: false,
+        OR: [
+          {
+            occurDate: { lt: params.start },
+            status: { notIn: params.closedStatuses },
+          },
+          {
+            updatedAt: { gte: params.start, lte: params.end },
+            status: { in: params.closedStatuses },
+          },
+        ],
+      },
+      take: params.take || 20,
+    });
+  },
+
+  async getReportPeriodMetrics(params: { end: Date; start: Date }) {
+    const aggregate = await prisma.quality_losses.aggregate({
+      _sum: { amount: true },
+      where: {
+        occurDate: { gte: params.start, lte: params.end },
+        isDeleted: false,
+      },
+    });
+    return {
+      manualLoss: Number(aggregate._sum.amount || 0),
+    };
+  },
+
   async updateByRouteId(params: {
     body: Record<string, unknown>;
     id: string;

@@ -212,6 +212,22 @@ export const WorkOrderService = {
     });
   },
 
+  async getWarrantySeeds(params: {
+    maxDeliveryDate: Date;
+    minDeliveryDate: Date;
+  }) {
+    return prisma.work_orders.findMany({
+      select: { deliveryDate: true, division: true, quantity: true },
+      where: {
+        isDeleted: false,
+        deliveryDate: {
+          gt: params.minDeliveryDate,
+          lte: params.maxDeliveryDate,
+        },
+      },
+    });
+  },
+
   async getAvailableYears() {
     interface YearRow {
       year: bigint | number;
