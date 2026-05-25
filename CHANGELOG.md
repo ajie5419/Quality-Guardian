@@ -28,6 +28,7 @@
 ### 2026-05-25 阶段一：死代码清理与依赖收敛
 
 **执行内容：**
+
 - 完成阶段一 1-8：移除 backend `core/`、`services/`、`scripts/` 兼容层与治理脚本，删除 `packages/qgs-domain`，将 `qg-enums` 并入 `qgs-shared`，并完成 constants/schemas 并入 modules 与 check 链路精简。
 - 修复 backend build 阻塞：将 `apps/backend/modules/supervision/index.ts` 从 `export *` 改为显式命名导出，消除 Nitro 模块加载时 `setup` 导出冲突。
 - 修复阶段一后测试回归：
@@ -35,10 +36,12 @@
   - `apps/backend/modules/__tests__/report.service.test.ts` 修正 `DeptService` mock 路径为真实 import 源。
 
 **验证结果：**
+
 - `pnpm -C apps/backend run build`: 通过
 - `pnpm -C apps/backend exec vitest run`: 212/212 通过
 
-**commit:** `pending` refactor/fix commits for phase-1 wrap-up
+**commit:** `5f63bd3` fix: resolve backend build and test regressions after phase1 cleanup
 
 **遗留问题：**
+
 - 无阻塞；构建与测试均通过。运行日志中仍有 `REDIS_URL not found` 警告，不影响本阶段门禁。
