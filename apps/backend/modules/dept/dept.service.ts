@@ -1,3 +1,4 @@
+import { createId } from '@paralleldrive/cuid2';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
@@ -114,7 +115,7 @@ export const DeptService = {
     await redis.del('qms:dept:tree');
     const newDept = await prisma.departments.create({
       data: {
-        id: `dept-${Date.now()}`,
+        id: `dept-${createId()}`,
         name: data.name,
         parentId: data.parentId || data.pid || '0',
         businessUnit: data.businessUnit || null,

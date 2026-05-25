@@ -1,3 +1,4 @@
+import { createId } from '@paralleldrive/cuid2';
 import {
   ensureFileCenterMenu,
   ensureInspectionRequestMenu,
@@ -200,7 +201,7 @@ export const RbacService = {
     const orderNo = Number(data.orderNo || meta.orderNo || 0);
     const newMenu = await prisma.menus.create({
       data: {
-        id: `menu-${Date.now()}`,
+        id: `menu-${createId()}`,
         parentId:
           data.pid && data.pid !== '0' && data.pid !== 'null' ? data.pid : '0',
         name: data.name,
@@ -364,7 +365,7 @@ export const RbacService = {
     await redis.delByPattern('qms:menu:*');
     const newRole = await prisma.roles.create({
       data: {
-        id: `role-${Date.now()}`,
+        id: `role-${createId()}`,
         name: String(data.value || data.name || ''),
         description: data.remark || data.description || data.name,
         status: data.status ?? 1,
@@ -502,7 +503,7 @@ export const RbacService = {
     if (missingCodes.length > 0) {
       await prisma.rbac_permissions.createMany({
         data: missingCodes.map((code) => ({
-          id: `rbac-perm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          id: `rbac-perm-${createId()}`,
           code,
           name: code,
           module: code.split(':')[0] || 'QMS',
@@ -524,7 +525,7 @@ export const RbacService = {
         ? [
             prisma.rbac_role_permissions.createMany({
               data: permissionIds.map((permissionId) => ({
-                id: `rbac-rp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                id: `rbac-rp-${createId()}`,
                 roleId,
                 permissionId,
               })),
@@ -552,7 +553,7 @@ export const RbacService = {
       prisma.rbac_user_roles.deleteMany({ where: { userId } }),
       prisma.rbac_user_roles.createMany({
         data: uniqueRoleIds.map((roleId) => ({
-          id: `rbac-ur-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          id: `rbac-ur-${createId()}`,
           userId,
           roleId,
         })),
@@ -587,7 +588,7 @@ export const RbacService = {
         scopeType,
       },
       create: {
-        id: `rbac-ds-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: `rbac-ds-${createId()}`,
         roleId,
         module,
         scopeType,

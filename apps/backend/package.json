@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@fastify/busboy": "^3.2.0",
+    "@paralleldrive/cuid2": "^3.3.0",
     "@prisma/client": "6.2.1",
     "@qgs/shared": "workspace:*",
     "ali-oss": "^6.23.0",

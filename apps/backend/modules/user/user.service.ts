@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
+import { createId } from '@paralleldrive/cuid2';
 import bcrypt from 'bcrypt';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
@@ -120,7 +121,7 @@ export const UserService = {
 
     const newUser = await prisma.users.create({
       data: {
-        id: `user-${Date.now()}`,
+        id: `user-${createId()}`,
         username: String(governedFields.username || ''),
         password: hashedPassword,
         realName:

@@ -1,5 +1,6 @@
 import type { UserSession } from '~/utils/jwt-utils';
 
+import { createId } from '@paralleldrive/cuid2';
 import bcrypt from 'bcrypt';
 import { generateAccessToken, generateRefreshToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -81,7 +82,7 @@ export const AuthService = {
     const hashedPassword = await bcrypt.hash(password, 12);
     const newUser = await prisma.users.create({
       data: {
-        id: `USR-${Date.now()}`,
+        id: `USR-${createId()}`,
         username,
         password: hashedPassword,
         realName: username,
