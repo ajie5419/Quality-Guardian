@@ -1,7 +1,7 @@
 import type { StatusUIConfig } from '../types/workOrder';
 
-import { mapWorkOrderStatus } from '@qgs/domain';
-import { WorkOrderStatusEnum } from '@qgs/enums';
+import { mapWorkOrderStatus } from '@qgs/shared';
+import { WorkOrderStatusEnum } from '@qgs/shared';
 
 import { WORK_ORDER_STATUS_UI_MAP } from '../constants';
 

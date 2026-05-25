@@ -18,13 +18,13 @@ import {
   parseSupervisionList,
   stringifySupervisionList,
   SUPERVISION_PROJECT_STATUS,
+  SUPERVISION_PROJECT_STATUS_SET,
   SUPERVISION_PROJECT_TYPE,
-} from '@qgs/domain';
+  SUPERVISION_PROJECT_TYPE_SET,
+} from '@qgs/shared';
 
-export const PROJECT_STATUSES = new Set(
-  Object.values(SUPERVISION_PROJECT_STATUS),
-);
-export const PROJECT_TYPES = new Set(Object.values(SUPERVISION_PROJECT_TYPE));
+export const PROJECT_STATUSES = SUPERVISION_PROJECT_STATUS_SET;
+export const PROJECT_TYPES = SUPERVISION_PROJECT_TYPE_SET;
 export const EXCEL_EXTENSIONS = new Set(['.xls', '.xlsx']);
 
 export function normalizeText(value: unknown) {

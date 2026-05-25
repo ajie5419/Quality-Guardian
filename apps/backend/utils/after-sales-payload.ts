@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 
-import * as qgsDomain from '@qgs/domain';
+import * as qgsDomain from '@qgs/shared';
 
 import {
   buildGovernedCanonicalWritePairForTable,
@@ -16,7 +16,7 @@ function assertAfterSalesPayloadBuilders(): void {
     typeof buildAfterSalesUpdateData !== 'function'
   ) {
     throw new TypeError(
-      'After-sales payload builders are not available from @qgs/domain runtime exports.',
+      'After-sales payload builders are not available from @qgs/shared runtime exports.',
     );
   }
 }

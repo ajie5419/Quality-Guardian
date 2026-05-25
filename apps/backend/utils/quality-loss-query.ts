@@ -1,4 +1,4 @@
 export {
   parseQualityLossCommonQuery,
   parseQualityLossListQuery,
-} from '@qgs/domain';
+} from '@qgs/shared';

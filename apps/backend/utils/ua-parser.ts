@@ -1,1 +1,1 @@
-export { parseUA, type UAInfo } from '@qgs/domain';
+export { parseUA, type UAInfo } from '@qgs/shared';

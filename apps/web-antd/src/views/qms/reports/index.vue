@@ -11,7 +11,7 @@ import { useUserStore } from '@vben/stores';
 import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
-} from '@qgs/domain';
+} from '@qgs/shared';
 import { Button, DatePicker, Input, message, Tag } from 'ant-design-vue';
 
 import { getDailySummary, saveDailySummary } from '#/api/qms/reports';

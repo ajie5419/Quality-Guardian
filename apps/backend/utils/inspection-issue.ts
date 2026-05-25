@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import type { InspectionIssueDateMode } from '@qgs/domain';
+import type { InspectionIssueDateMode } from '@qgs/shared';
 
 import {
   buildInspectionIssueCreateDataCore,
@@ -16,7 +16,7 @@ import {
   parseInspectionIssueDateValue as parseInspectionIssueDateValueRule,
   parseInspectionIssueListQuery as parseInspectionIssueListQueryRule,
   parseOptionalIssueYear as parseOptionalIssueYearRule,
-} from '@qgs/domain';
+} from '@qgs/shared';
 import { nanoid } from 'nanoid';
 import {
   buildGovernedCanonicalWritePairForTable,
@@ -310,4 +310,4 @@ export async function buildInspectionIssueUpsertPayload(
   } as Prisma.quality_recordsUpsertArgs;
 }
 
-export { type InspectionIssueDateMode } from '@qgs/domain';
+export { type InspectionIssueDateMode } from '@qgs/shared';

@@ -4,7 +4,7 @@ import {
   PUBLIC_METROLOGY_BORROW_OPERATOR,
   readPublicMetrologyBorrowExpectedToken,
   verifyPublicMetrologyBorrowToken,
-} from '@qgs/domain';
+} from '@qgs/shared';
 import { getHeader } from 'h3';
 import { forbiddenResponse } from '~/utils/response';
 

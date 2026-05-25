@@ -129,14 +129,6 @@
       "path": "packages/preferences",
     },
     {
-      "name": "@qgs/enums",
-      "path": "packages/qg-enums",
-    },
-    {
-      "name": "@qgs/domain",
-      "path": "packages/qgs-domain",
-    },
-    {
       "name": "@qgs/shared",
       "path": "packages/qgs-shared",
     },

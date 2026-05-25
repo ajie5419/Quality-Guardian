@@ -6,4 +6,4 @@ export {
   parseWorkOrderListQuery,
   parseWorkOrderNumber,
   parseWorkOrderQuantity,
-} from '@qgs/domain';
+} from '@qgs/shared';

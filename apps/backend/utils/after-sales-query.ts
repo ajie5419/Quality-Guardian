@@ -4,4 +4,4 @@ export {
   parseAfterSalesDateMode,
   parseAfterSalesDateValue,
   parseAfterSalesListQuery,
-} from '@qgs/domain';
+} from '@qgs/shared';

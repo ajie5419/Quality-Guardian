@@ -1,1 +1,1 @@
-export { normalizeIdList, parseNonEmptyIdList } from '@qgs/domain';
+export { normalizeIdList, parseNonEmptyIdList } from '@qgs/shared';

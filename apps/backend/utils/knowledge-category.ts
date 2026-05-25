@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 import {
   buildKnowledgeCategoryCreateData as buildKnowledgeCategoryCreateDataRule,
   buildKnowledgeCategoryUpdateData as buildKnowledgeCategoryUpdateDataRule,
-} from '@qgs/domain';
+} from '@qgs/shared';
 import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 
 function buildGovernedKnowledgeCategoryNameFields(

@@ -7,4 +7,4 @@ export async function getNextAfterSalesSerialNumber(): Promise<number> {
   return (result._max.serialNumber || 0) + 1;
 }
 
-export { createAfterSalesId } from '@qgs/domain';
+export { createAfterSalesId } from '@qgs/shared';

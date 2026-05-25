@@ -1,13 +1,13 @@
 import type { Prisma } from '@prisma/client';
 
-import { resolveInspectionFormProcessCandidates } from '@qgs/domain';
+import { resolveInspectionFormProcessCandidates } from '@qgs/shared';
 import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 
 export {
   parseInspectionFormFields,
   resolveInspectionFormProcess,
   resolveInspectionFormProcessCandidates,
-} from '@qgs/domain';
+} from '@qgs/shared';
 
 export async function buildInspectionFormProcessFilter(params: {
   category?: string;

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildInspectionFormProcessFilter } from './inspection-form';
 
-vi.mock('@qgs/domain', () => ({
+vi.mock('@qgs/shared', () => ({
   resolveInspectionFormProcessCandidates: vi.fn(),
 }));
 
@@ -34,7 +34,7 @@ describe('inspection-form helpers', () => {
 
   it('returns OR filter when process id resolved', async () => {
     const { resolveInspectionFormProcessCandidates } = await import(
-      '@qgs/domain'
+      '@qgs/shared'
     );
     const { resolveProcessIdForWrite } = await import(
       '~/utils/process-resolver'
@@ -55,7 +55,7 @@ describe('inspection-form helpers', () => {
 
   it('returns processName in filter when process id not resolved', async () => {
     const { resolveInspectionFormProcessCandidates } = await import(
-      '@qgs/domain'
+      '@qgs/shared'
     );
     const { resolveProcessIdForWrite } = await import(
       '~/utils/process-resolver'
@@ -77,7 +77,7 @@ describe('inspection-form helpers', () => {
 
   it('returns OR filter with fallback process id when resolver misses process id', async () => {
     const { resolveInspectionFormProcessCandidates } = await import(
-      '@qgs/domain'
+      '@qgs/shared'
     );
     const { resolveProcessIdForWrite } = await import(
       '~/utils/process-resolver'

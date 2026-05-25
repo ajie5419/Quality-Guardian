@@ -11,7 +11,7 @@ import {
   AFTER_SALES_STATUS_COLOR_MAP,
   isKnownAfterSalesStatusInput,
   mapAfterSalesStatus,
-} from '@qgs/domain';
+} from '@qgs/shared';
 
 // ==================== 产品选项 ====================
 

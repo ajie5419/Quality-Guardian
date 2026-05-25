@@ -584,7 +584,7 @@ api/qms/
 规则：
 
 - 单个 API 文件不超过 200 行，超过则按子资源拆分
-- 每个 API 函数必须有返回类型标注（从 `@qgs/domain` 导入）
+- 每个 API 函数必须有返回类型标注（从 `@qgs/shared` 导入）
 - 统一使用 `useRequest` 封装，禁止裸写 axios/fetch
 
 ```typescript
@@ -592,7 +592,7 @@ api/qms/
 import type {
   InspectionRecord,
   InspectionRecordListQuery,
-} from '@qgs/domain/inspection';
+} from '@qgs/shared/inspection';
 import { useRequest } from '~/utils/request';
 
 export function getInspectionRecords(params: InspectionRecordListQuery) {
@@ -614,7 +614,7 @@ import type { VbenFormSchema } from '@vben/common-ui';
 import {
   NonconformanceSeverity,
   NonconformanceStatus,
-} from '@qgs/domain/nonconformance';
+} from '@qgs/shared/nonconformance';
 
 export const gridColumns: VxeGridProps['columns'] = [
   { field: 'title', title: '标题', minWidth: 200 },
@@ -649,7 +649,7 @@ export const workflowActions = NonconformanceStatus.availableActions;
 
 规则：
 
-- 枚举、类型从 `@qgs/domain` 导入，前后端共享一份定义
+- 枚举、类型从 `@qgs/shared` 导入，前后端共享一份定义
 - 表格列和表单 schema 集中在 config.ts，不散落在 template 里
 - 主数据选择器统一用 `MasterDataSelect` 组件，自动走治理流程
 
@@ -669,7 +669,7 @@ export const workflowActions = NonconformanceStatus.availableActions;
 | --- | --- |
 | API 文件按子资源拆分（超过 200 行时） | 可维护性 |
 | 新模块统一用标准结构（config.ts + composable + components） | 一致性 |
-| 从 `@qgs/domain` 导入类型和枚举 | 前后端类型一致 |
+| 从 `@qgs/shared` 导入类型和枚举 | 前后端类型一致 |
 | 通用业务组件沉淀到 `components/Qms/` | 复用性 |
 | config.ts 加单测 | 列定义和表单 schema 是高频改动点 |
 

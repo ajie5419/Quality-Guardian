@@ -1,11 +1,11 @@
 import type { after_sales_claimStatus } from '@prisma/client';
-import type { AfterSalesStatus } from '@qgs/domain';
+import type { AfterSalesStatus } from '@qgs/shared';
 
 import {
   AFTER_SALES_STATUS,
   AFTER_SALES_STATUS_COLOR_MAP,
   mapAfterSalesStatus as mapAfterSalesStatusRule,
-} from '@qgs/domain';
+} from '@qgs/shared';
 
 export { AFTER_SALES_STATUS };
 

@@ -1,4 +1,4 @@
 export {
   getDefaultResetPassword,
   USER_RESET_PASSWORD_ENV_KEY,
-} from '@qgs/domain';
+} from '@qgs/shared';

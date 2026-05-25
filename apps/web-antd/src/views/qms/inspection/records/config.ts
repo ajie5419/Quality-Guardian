@@ -1,7 +1,7 @@
 import type { VxeGridPropTypes } from '#/adapter/vxe-table';
 import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
-import { INSPECTION_RECORD_TYPE } from '@qgs/enums';
+import { INSPECTION_RECORD_TYPE } from '@qgs/shared';
 
 import { cloneInspectionProcessFallbackOptions } from '../../shared/constants/inspection-process-fallback';
 

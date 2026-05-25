@@ -1,1 +1,1 @@
-export { getMissingRequiredFields, parseNonEmptyArray } from '@qgs/domain';
+export { getMissingRequiredFields, parseNonEmptyArray } from '@qgs/shared';

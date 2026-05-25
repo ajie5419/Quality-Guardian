@@ -11,7 +11,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { useI18n } from '@vben/locales';
 
-import { WorkOrderStatusEnum } from '@qgs/enums';
+import { WorkOrderStatusEnum } from '@qgs/shared';
 import { Button, message } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';

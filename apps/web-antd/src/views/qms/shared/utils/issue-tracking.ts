@@ -1,7 +1,7 @@
 import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
-} from '@qgs/domain';
+} from '@qgs/shared';
 
 type AntTagColor = 'default' | 'error' | 'processing' | 'success' | 'warning';
 

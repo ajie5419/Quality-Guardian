@@ -16,7 +16,7 @@ import { downloadFileFromBlob } from '@vben/utils';
 import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
-} from '@qgs/domain';
+} from '@qgs/shared';
 import { message } from 'ant-design-vue';
 import dayjs from 'dayjs';
 

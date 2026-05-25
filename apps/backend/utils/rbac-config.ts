@@ -2,4 +2,4 @@ export {
   isDataScopeV2Enabled,
   isRbacReadV2Enabled,
   isRbacSuperMergeAllCodesEnabled,
-} from '@qgs/domain';
+} from '@qgs/shared';

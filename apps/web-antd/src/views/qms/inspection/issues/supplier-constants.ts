@@ -1,1 +1,1 @@
-export { SUPPLIER_CATEGORY } from '@qgs/enums';
+export { SUPPLIER_CATEGORY } from '@qgs/shared';

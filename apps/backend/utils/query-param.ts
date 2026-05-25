@@ -1,6 +1,6 @@
 import type { EventHandlerRequest, H3Event } from 'h3';
 
-import { parseRequiredParamValue } from '@qgs/domain';
+import { parseRequiredParamValue } from '@qgs/shared';
 import { getQuery, setResponseStatus } from 'h3';
 import { useResponseError } from '~/utils/response';
 

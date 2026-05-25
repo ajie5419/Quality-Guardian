@@ -8,4 +8,4 @@ export {
   parseDfmeaOrder,
   parseDfmeaScore,
   toDfmeaProjectVersionText,
-} from '@qgs/domain';
+} from '@qgs/shared';

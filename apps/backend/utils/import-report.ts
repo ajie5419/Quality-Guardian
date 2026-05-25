@@ -3,5 +3,5 @@ export {
   buildImportSummary,
   inferImportErrorField,
   toImportErrorMessage,
-} from '@qgs/domain';
-export type { ImportRowError } from '@qgs/domain';
+} from '@qgs/shared';
+export type { ImportRowError } from '@qgs/shared';

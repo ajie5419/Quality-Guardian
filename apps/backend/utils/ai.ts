@@ -1,4 +1,4 @@
-import { extractAiJson } from '@qgs/domain';
+import { extractAiJson } from '@qgs/shared';
 
 import prisma from './prisma';
 import { AI_SETTINGS } from './system-data';

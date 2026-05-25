@@ -1,4 +1,4 @@
-import type { ProjectStatusEnum } from '@qgs/enums';
+import type { ProjectStatusEnum } from '@qgs/shared';
 
 /**
  * 统一种类树节点基础接口

@@ -8,4 +8,4 @@ export {
   isPrismaSchemaMismatchError,
   isPrismaUniqueConflictError,
   isPrismaUniqueConstraintError,
-} from '@qgs/domain';
+} from '@qgs/shared';

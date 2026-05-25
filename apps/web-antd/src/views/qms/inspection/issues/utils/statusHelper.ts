@@ -1,6 +1,6 @@
 import type { InspectionIssue } from '../types';
 
-import { INSPECTION_ISSUE_STATUS, mapInspectionIssueStatus } from '@qgs/domain';
+import { INSPECTION_ISSUE_STATUS, mapInspectionIssueStatus } from '@qgs/shared';
 
 import { ISSUE_STATUS_UI_MAP, SEVERITY_OPTIONS } from '../constants';
 import { IssueStatus, Severity } from '../types';

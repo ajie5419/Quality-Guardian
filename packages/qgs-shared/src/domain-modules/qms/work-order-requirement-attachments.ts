@@ -16,7 +16,7 @@ export function parseRequirementAttachments(
     if (!Array.isArray(parsed)) return [];
     return parsed
       .map((item) => normalizeRequirementAttachment(item))
-      .filter(Boolean);
+      .filter((item): item is RequirementAttachment => item !== null);
   } catch {
     return normalizeLegacyAttachment(raw);
   }
@@ -26,7 +26,7 @@ export function stringifyRequirementAttachments(value: unknown) {
   if (!Array.isArray(value)) return null;
   const normalized = value
     .map((item) => normalizeRequirementAttachment(item))
-    .filter(Boolean);
+    .filter((item): item is RequirementAttachment => item !== null);
   return normalized.length > 0 ? JSON.stringify(normalized) : null;
 }
 

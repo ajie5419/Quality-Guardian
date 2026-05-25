@@ -11,8 +11,8 @@ const BORROW_STATUS_LABELS = {
   RETURN_PENDING: '待确认归还',
 } as const;
 
-export type MetrologyInspectionStatus = keyof typeof INSPECTION_STATUS_LABELS;
-export type MetrologyBorrowStatus = keyof typeof BORROW_STATUS_LABELS;
+type MetrologyInspectionStatus = keyof typeof INSPECTION_STATUS_LABELS;
+type MetrologyBorrowStatus = keyof typeof BORROW_STATUS_LABELS;
 
 export function formatMetrologyDate(value: Date | null | string | undefined) {
   if (!value) return null;

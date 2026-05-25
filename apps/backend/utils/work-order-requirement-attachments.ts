@@ -1,5 +1,5 @@
 export {
   parseRequirementAttachments,
   stringifyRequirementAttachments,
-} from '@qgs/domain';
-export type { RequirementAttachment } from '@qgs/domain';
+} from '@qgs/shared';
+export type { RequirementAttachment } from '@qgs/shared';

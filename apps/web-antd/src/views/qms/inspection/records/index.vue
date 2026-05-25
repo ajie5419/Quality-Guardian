@@ -9,7 +9,7 @@ import { Page } from '@vben/common-ui';
 import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
-} from '@qgs/domain';
+} from '@qgs/shared';
 import {
   Descriptions,
   Drawer,

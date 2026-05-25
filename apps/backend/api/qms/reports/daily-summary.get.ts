@@ -1,7 +1,7 @@
 import {
   mapInspectionArchiveStatusLabel,
   parseDailySummaryContent,
-} from '@qgs/domain';
+} from '@qgs/shared';
 import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
 import {

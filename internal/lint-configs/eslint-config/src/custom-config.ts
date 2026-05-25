@@ -253,7 +253,7 @@ const customConfig: Linter.Config[] = [
     },
   },
   {
-    // 已迁移 QMS 枚举强制：禁止在迁移入口继续声明本地 enum，统一使用 @qgs/enums
+    // 已迁移 QMS 枚举强制：禁止在迁移入口继续声明本地 enum，统一使用 @qgs/shared
     files: [
       'apps/web-antd/src/views/qms/quality-loss/types.ts',
       'apps/web-antd/src/views/qms/inspection/issues/types/index.ts',
@@ -263,32 +263,32 @@ const customConfig: Linter.Config[] = [
         'error',
         {
           message:
-            'Do not define local `LossSource` enum. Use `LOSS_SOURCE` from @qgs/enums.',
+            'Do not define local `LossSource` enum. Use `LOSS_SOURCE` from @qgs/shared.',
           selector: "TSEnumDeclaration[id.name='LossSource']",
         },
         {
           message:
-            'Do not define local `LossType` enum. Use `LOSS_TYPE` from @qgs/enums.',
+            'Do not define local `LossType` enum. Use `LOSS_TYPE` from @qgs/shared.',
           selector: "TSEnumDeclaration[id.name='LossType']",
         },
         {
           message:
-            'Do not define local `ClaimStatus` enum. Use `CLAIM_STATUS` from @qgs/enums.',
+            'Do not define local `ClaimStatus` enum. Use `CLAIM_STATUS` from @qgs/shared.',
           selector: "TSEnumDeclaration[id.name='ClaimStatus']",
         },
         {
           message:
-            'Do not define local `Severity` enum. Use `ISSUE_SEVERITY` from @qgs/enums.',
+            'Do not define local `Severity` enum. Use `ISSUE_SEVERITY` from @qgs/shared.',
           selector: "TSEnumDeclaration[id.name='Severity']",
         },
         {
           message:
-            'Do not define local `DeptType` enum. Use `ISSUE_DEPT_TYPE` from @qgs/enums.',
+            'Do not define local `DeptType` enum. Use `ISSUE_DEPT_TYPE` from @qgs/shared.',
           selector: "TSEnumDeclaration[id.name='DeptType']",
         },
         {
           message:
-            'Do not define local `DefectType` enum. Use `ISSUE_DEFECT_TYPE` from @qgs/enums.',
+            'Do not define local `DefectType` enum. Use `ISSUE_DEFECT_TYPE` from @qgs/shared.',
           selector: "TSEnumDeclaration[id.name='DefectType']",
         },
       ],
@@ -305,7 +305,7 @@ const customConfig: Linter.Config[] = [
             {
               group: ['#/api/qms/enums'],
               message:
-                'Use @qgs/enums directly in QMS view modules instead of #/api/qms/enums.',
+                'Use @qgs/shared directly in QMS view modules instead of #/api/qms/enums.',
             },
           ],
         },
@@ -327,31 +327,31 @@ const customConfig: Linter.Config[] = [
         'error',
         {
           message:
-            'Do not redefine local `LOSS_TYPE_OPTIONS`; use `QUALITY_LOSS_TYPE_OPTIONS` from @qgs/enums.',
+            'Do not redefine local `LOSS_TYPE_OPTIONS`; use `QUALITY_LOSS_TYPE_OPTIONS` from @qgs/shared.',
           selector:
             "VariableDeclarator[id.name='LOSS_TYPE_OPTIONS'] > ArrayExpression.init",
         },
         {
           message:
-            'Do not redefine local `QUALITY_LOSS_STATUS_FALLBACK_VALUES`; use `@qgs/enums` constants.',
+            'Do not redefine local `QUALITY_LOSS_STATUS_FALLBACK_VALUES`; use `@qgs/shared` constants.',
           selector:
             "VariableDeclarator[id.name='QUALITY_LOSS_STATUS_FALLBACK_VALUES'] > ArrayExpression.init",
         },
         {
           message:
-            'Do not redefine local `QUALITY_LOSS_STATUS_COLOR_MAP`; use `@qgs/enums` constants.',
+            'Do not redefine local `QUALITY_LOSS_STATUS_COLOR_MAP`; use `@qgs/shared` constants.',
           selector:
             "VariableDeclarator[id.name='QUALITY_LOSS_STATUS_COLOR_MAP'] > ObjectExpression.init",
         },
         {
           message:
-            'Do not redefine local `SOURCE_STYLE_MAP`; use `QUALITY_LOSS_SOURCE_STYLE_MAP` from @qgs/enums.',
+            'Do not redefine local `SOURCE_STYLE_MAP`; use `QUALITY_LOSS_SOURCE_STYLE_MAP` from @qgs/shared.',
           selector:
             "VariableDeclarator[id.name='SOURCE_STYLE_MAP'] > ObjectExpression.init",
         },
         {
           message:
-            'Do not define local `IMPORT_STATUS_MAP` in work-order constants. Use `mapWorkOrderStatus` from @qgs/domain as single source of truth.',
+            'Do not define local `IMPORT_STATUS_MAP` in work-order constants. Use `mapWorkOrderStatus` from @qgs/shared as single source of truth.',
           selector:
             "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator[id.name='IMPORT_STATUS_MAP']",
         },

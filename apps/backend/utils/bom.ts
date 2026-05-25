@@ -14,8 +14,8 @@ export {
   parseBomQuantity,
   parseBomRequiredProcesses,
   serializeBomRequiredProcesses,
-} from '@qgs/domain';
-export type { BomInspectionProgress } from '@qgs/domain';
+} from '@qgs/shared';
+export type { BomInspectionProgress } from '@qgs/shared';
 
 export const projectBomItemSelect = {
   id: true,

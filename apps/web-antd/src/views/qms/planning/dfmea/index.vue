@@ -11,7 +11,7 @@ import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
-import { ProjectStatusEnum } from '@qgs/enums';
+import { ProjectStatusEnum } from '@qgs/shared';
 import { Button, Empty, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';

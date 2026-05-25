@@ -12,7 +12,7 @@ import {
   INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS,
   INSPECTION_ISSUE_SEVERITY_OPTIONS,
   INSPECTION_ISSUE_STATUS_UI_MAP,
-} from '@qgs/enums';
+} from '@qgs/shared';
 
 import { ClaimStatus, IssueStatus, Severity } from './types';
 

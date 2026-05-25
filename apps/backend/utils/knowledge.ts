@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 import {
   buildKnowledgeCreateDataCore,
   buildKnowledgeUpdateDataCore,
-} from '@qgs/domain';
+} from '@qgs/shared';
 
 type KnowledgeAuthorContext = {
   realName?: string;

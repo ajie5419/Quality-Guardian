@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import type { QualityLossSource } from '~/utils/quality-loss-status';
 
-import { resolveQualityLossTargetLocator } from '@qgs/domain';
+import { resolveQualityLossTargetLocator } from '@qgs/shared';
 import { QUALITY_LOSS_SOURCE } from '~/utils/quality-loss-status';
 
 type SourceLookupClient = {
@@ -54,9 +54,9 @@ type ResolveTargetResult =
 export {
   normalizeQualityLossUpdateText,
   parseQualityLossUpdateBody,
-} from '@qgs/domain';
-export { parseOptionalFiniteNumber } from '@qgs/domain';
-export { parseQualityLossOptionalDate as parseQualityLossUpdateDate } from '@qgs/domain';
+} from '@qgs/shared';
+export { parseOptionalFiniteNumber } from '@qgs/shared';
+export { parseQualityLossOptionalDate as parseQualityLossUpdateDate } from '@qgs/shared';
 
 export async function resolveQualityLossUpdateTarget(params: {
   client: SourceLookupClient;

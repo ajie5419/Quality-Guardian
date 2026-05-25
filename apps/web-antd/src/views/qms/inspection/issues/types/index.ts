@@ -10,7 +10,7 @@ import {
   ISSUE_DEFECT_TYPE,
   ISSUE_DEPT_TYPE,
   ISSUE_SEVERITY,
-} from '@qgs/enums';
+} from '@qgs/shared';
 
 /**
  * 问题状态枚举 (重命名导出以保持一致性)

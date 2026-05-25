@@ -3,7 +3,7 @@ import type {
   IssuePassRateBucketInput,
 } from '~/utils/pass-rate-process';
 
-import { getTargetPassRate as getTargetPassRateByStd } from '~/constants/quality-standards';
+import { getTargetPassRate as getTargetPassRateByStd } from '~/modules/inspection/quality-standards';
 import {
   buildCanonicalProcessPassRateTargets,
   getIssueQuantity,

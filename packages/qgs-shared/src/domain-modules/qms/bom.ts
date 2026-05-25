@@ -58,7 +58,7 @@ interface ProjectBomInput {
   unit?: unknown;
 }
 
-export interface BomInspectionProgress {
+interface BomInspectionProgress {
   completed: boolean;
   completedQuantity: number;
   processName: string;
@@ -77,7 +77,11 @@ function normalizeBomProcessList(value: unknown): string[] {
   }
 
   return [
-    ...new Set(values.map((item) => normalizeBomText(item)).filter(Boolean)),
+    ...new Set(
+      values
+        .map((item) => normalizeBomText(item))
+        .filter((item): item is string => Boolean(item)),
+    ),
   ];
 }
 

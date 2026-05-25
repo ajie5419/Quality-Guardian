@@ -14,7 +14,7 @@ import {
   resolveTaskDispatchUserId,
   resolveTaskDispatchUsername,
   TASK_DISPATCH_STATUS,
-} from '@qgs/domain';
+} from '@qgs/shared';
 
 export { TASK_DISPATCH_STATUS };
 
@@ -88,7 +88,7 @@ export {
   resolveTaskDispatchItpProjectIdForValidation,
   resolveTaskDispatchParentIdForPromotion,
 };
-export { resolveTaskDispatchLevel } from '@qgs/domain';
+export { resolveTaskDispatchLevel } from '@qgs/shared';
 
 export function buildTaskDispatchCreateData(
   body: Record<string, unknown>,

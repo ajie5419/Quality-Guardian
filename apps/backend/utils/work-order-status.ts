@@ -3,6 +3,6 @@ export {
   mapToDisplayStatus,
   mapWorkOrderStatus,
   WORK_ORDER_STATUS,
-} from '@qgs/domain';
+} from '@qgs/shared';
 
-export type { WorkOrderStatus } from '@qgs/domain';
+export type { WorkOrderStatus } from '@qgs/shared';

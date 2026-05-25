@@ -5,7 +5,7 @@ import {
   QUALITY_LOSS_STATUS_COLOR_MAP,
   QUALITY_LOSS_STATUS_FALLBACK_VALUES,
   QUALITY_LOSS_TYPE_OPTIONS,
-} from '@qgs/enums';
+} from '@qgs/shared';
 
 /**
  * 损失类型选项

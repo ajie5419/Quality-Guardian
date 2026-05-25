@@ -11,4 +11,4 @@ export {
   stringifyItpQuantitativeItems,
   toItpPlanStatusText,
   toItpProjectVersionText,
-} from '@qgs/domain';
+} from '@qgs/shared';

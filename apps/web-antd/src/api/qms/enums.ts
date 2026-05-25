@@ -4,4 +4,4 @@ export {
   QualityLossStatusEnum,
   SupplierStatusEnum,
   WorkOrderStatusEnum,
-} from '@qgs/enums';
+} from '@qgs/shared';

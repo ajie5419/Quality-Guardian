@@ -2,7 +2,7 @@ import type {
   after_sales_claimStatus,
   quality_records_status,
 } from '@prisma/client';
-import type { QualityLossSource, UnifiedQualityLossStatus } from '@qgs/domain';
+import type { QualityLossSource, UnifiedQualityLossStatus } from '@qgs/shared';
 
 import {
   normalizeQualityLossSource as normalizeQualityLossSourceRule,
@@ -11,7 +11,7 @@ import {
   toAfterSalesClaimStatus as toAfterSalesClaimStatusRule,
   toQualityLossTargetType as toQualityLossTargetTypeRule,
   toQualityRecordStatus as toQualityRecordStatusRule,
-} from '@qgs/domain';
+} from '@qgs/shared';
 
 export type { QualityLossSource, UnifiedQualityLossStatus };
 

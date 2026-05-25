@@ -1,8 +1,8 @@
-export type { ProjectDocumentLedgerItem } from '@qgs/domain';
+export type { ProjectDocumentLedgerItem } from '@qgs/shared';
 export {
   normalizeProjectDocuments,
   parseProjectDocuments,
   shouldSyncInspectionProjectDocument,
   stringifyProjectDocuments,
   upsertInspectionProjectDocuments,
-} from '@qgs/domain';
+} from '@qgs/shared';

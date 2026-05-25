@@ -1,4 +1,4 @@
-import { WorkOrderStatusEnum as Status } from '@qgs/enums';
+import { WorkOrderStatusEnum as Status } from '@qgs/shared';
 
 // ============================================
 // 1. Work Order Status Configuration

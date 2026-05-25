@@ -3,7 +3,7 @@ import type { StatusOption } from './constants';
 import type { VbenFormSchema } from '#/adapter/form';
 import type { VxeGridProps } from '#/adapter/vxe-table';
 
-import { InspectionIssueStatusEnum } from '@qgs/enums';
+import { InspectionIssueStatusEnum } from '@qgs/shared';
 
 import { $t } from '#/locales';
 

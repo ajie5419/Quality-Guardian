@@ -10,7 +10,7 @@ export const SUPERVISION_PROJECT_STATUS = {
   PLANNED: 'PLANNED',
 } as const;
 
-export type SupervisionProjectStatus =
+type SupervisionProjectStatus =
   (typeof SUPERVISION_PROJECT_STATUS)[keyof typeof SUPERVISION_PROJECT_STATUS];
 
 export const SUPERVISION_PROJECT_TYPE = {
@@ -19,13 +19,13 @@ export const SUPERVISION_PROJECT_TYPE = {
   VEHICLE: 'VEHICLE',
 } as const;
 
-export type SupervisionProjectType =
+type SupervisionProjectType =
   (typeof SUPERVISION_PROJECT_TYPE)[keyof typeof SUPERVISION_PROJECT_TYPE];
 
-const SUPERVISION_PROJECT_STATUS_SET = new Set<string>(
+export const SUPERVISION_PROJECT_STATUS_SET = new Set<string>(
   Object.values(SUPERVISION_PROJECT_STATUS),
 );
-const SUPERVISION_PROJECT_TYPE_SET = new Set<string>(
+export const SUPERVISION_PROJECT_TYPE_SET = new Set<string>(
   Object.values(SUPERVISION_PROJECT_TYPE),
 );
 
@@ -127,7 +127,7 @@ export function normalizeSupervisionIssueStatus(value: unknown) {
   });
 }
 
-export type SupervisionPlanTaskStatus =
+type SupervisionPlanTaskStatus =
   | 'DELAYED'
   | 'DONE'
   | 'DUE_SOON'

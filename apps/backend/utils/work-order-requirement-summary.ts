@@ -1,1 +1,1 @@
-export { buildRequirementSummaryMap } from '@qgs/domain';
+export { buildRequirementSummaryMap } from '@qgs/shared';

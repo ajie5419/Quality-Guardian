@@ -1,1 +1,1 @@
-export { parseInspectionRecordListQuery } from '@qgs/domain';
+export { parseInspectionRecordListQuery } from '@qgs/shared';

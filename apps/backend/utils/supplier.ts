@@ -5,7 +5,7 @@ import {
   buildSupplierUpdateData as buildSupplierUpdateDataRule,
   buildSupplierUpsertPayload as buildSupplierUpsertPayloadRule,
   parseSupplierListQuery as parseSupplierListQueryRule,
-} from '@qgs/domain';
+} from '@qgs/shared';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
@@ -23,7 +23,7 @@ export {
   normalizeSupplierString,
   OUTSOURCING_CATEGORY,
   OUTSOURCING_MODES,
-} from '@qgs/domain';
+} from '@qgs/shared';
 
 interface SupplierImportItem {
   address?: unknown;

@@ -1,7 +1,7 @@
 import type { EventHandlerRequest, H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
-import { isSystemAdmin } from '@qgs/domain';
+import { isSystemAdmin } from '@qgs/shared';
 import { forbiddenResponse } from '~/utils/response';
 
 export { isSystemAdmin };

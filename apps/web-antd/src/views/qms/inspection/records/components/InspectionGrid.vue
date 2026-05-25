@@ -11,7 +11,7 @@ import { useI18n } from '@vben/locales';
 import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
-} from '@qgs/domain';
+} from '@qgs/shared';
 import { Button, message, Modal, Space, Tag } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';

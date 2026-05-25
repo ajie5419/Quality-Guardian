@@ -50,7 +50,7 @@ export function parseInspectionRequestQuantity(value: unknown, fallback = 1) {
   return Math.max(1, Math.trunc(parsed));
 }
 
-export type InspectionRequestAttachment = {
+type InspectionRequestAttachment = {
   fileId?: string;
   name: string;
   size: number;

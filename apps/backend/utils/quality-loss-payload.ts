@@ -4,7 +4,7 @@ import {
   buildQualityLossCreateData as buildQualityLossCreateDataRule,
   buildQualityLossCreateResponse as buildQualityLossCreateResponseRule,
   createQualityLossId as createQualityLossIdRule,
-} from '@qgs/domain';
+} from '@qgs/shared';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,

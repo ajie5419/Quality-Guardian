@@ -9,4 +9,4 @@ export {
   type ReportPeriodType,
   resolveReportDateRangeQuery,
   resolveReportQueryDate,
-} from '@qgs/domain';
+} from '@qgs/shared';

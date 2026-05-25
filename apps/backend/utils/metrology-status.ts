@@ -6,8 +6,8 @@ export {
   getMetrologyInspectionStatusLabel,
   normalizeMetrologyBorrowStatus,
   startOfToday,
-} from '@qgs/domain';
+} from '@qgs/shared';
 export type {
   MetrologyBorrowStatus,
   MetrologyInspectionStatus,
-} from '@qgs/domain';
+} from '@qgs/shared';

@@ -79,4 +79,4 @@ export {
   buildPlanningProjectUpdateData,
   normalizePlanningProjectName,
   normalizePlanningWorkOrderNumber,
-} from '@qgs/domain';
+} from '@qgs/shared';
