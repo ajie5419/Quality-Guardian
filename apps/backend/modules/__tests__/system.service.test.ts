@@ -1,5 +1,4 @@
-import { Buffer } from 'node:buffer';
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
 import os from 'node:os';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,12 +26,23 @@ vi.mock('os', () => {
   };
 });
 
-vi.mock('child_process', () => {
-  const execSync = vi.fn();
+vi.mock('node:child_process', () => {
+  const exec = vi.fn();
+  const promisifyCustom = Symbol.for('nodejs.util.promisify.custom');
+  (exec as any)[promisifyCustom] = (cmd: string) =>
+    new Promise((resolve, reject) => {
+      exec(cmd, (error: Error | null, stdout: string, stderr: string) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve({ stderr, stdout });
+      });
+    });
   return {
-    execSync,
+    exec,
     default: {
-      execSync,
+      exec,
     },
   };
 });
@@ -63,30 +73,38 @@ describe('systemService', () => {
 
   describe('getServerMetrics', () => {
     it('should correctly aggregate server metrics on Darwin', async () => {
-      (execSync as any).mockReturnValue(Buffer.from('')); // Default empty for commands
-
-      // Mock vm_stat and df
-      (execSync as any).mockImplementation((cmd: string) => {
-        if (cmd === 'vm_stat')
-          return Buffer.from(
-            'Pages active: 100\nPages inactive: 50\nPages purgeable: 10\nPages wired down: 20\nMach system calls: 1000\nMach traps: 500\ndevice interrupts: 200',
-          );
-        if (cmd === 'df -kP')
-          return Buffer.from(
-            'Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/disk3s1 488245288 245288 488000000 1% /',
-          );
-        if (cmd === 'netstat -ib')
-          return Buffer.from(
-            'Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll\nen0 1500 <Link#4> 00:00:00:00:00:01 100 0 1000 50 0 500 0',
-          );
-        if (cmd.startsWith('ps'))
-          return Buffer.from(
-            'PID %CPU %MEM STAT COMM\n1 0.1 0.2 S launchd\n100 5.0 1.5 R node',
-          );
-        if (cmd === 'sysctl -n hw.cpufrequency')
-          return Buffer.from('3200000000');
-        return Buffer.from('');
-      });
+      (exec as any).mockImplementation(
+        (cmd: string, optionsOrCallback: any, maybeCallback?: any) => {
+          const callback =
+            typeof optionsOrCallback === 'function'
+              ? optionsOrCallback
+              : maybeCallback;
+          let stdout = '';
+          if (cmd === 'vm_stat') {
+            stdout =
+              'Pages active: 100\nPages inactive: 50\nPages purgeable: 10\nPages wired down: 20\nMach system calls: 1000\nMach traps: 500\ndevice interrupts: 200';
+          }
+          if (cmd === 'df -kP') {
+            stdout =
+              'Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/disk3s1 488245288 245288 488000000 1% /';
+          }
+          if (cmd === 'netstat -ib') {
+            stdout =
+              'Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll\nen0 1500 <Link#4> 00:00:00:00:00:01 100 0 1000 50 0 500 0';
+          }
+          if (cmd.startsWith('ps')) {
+            stdout =
+              'PID %CPU %MEM STAT COMM\n1 0.1 0.2 S launchd\n100 5.0 1.5 R node';
+          }
+          if (cmd === 'sysctl -n hw.cpufrequency') {
+            stdout = '3200000000';
+          }
+          queueMicrotask(() => {
+            callback(null, stdout, '');
+          });
+          return {};
+        },
+      );
 
       const metrics = await SystemService.getServerMetrics();
 

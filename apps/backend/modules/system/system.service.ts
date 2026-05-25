@@ -1,10 +1,22 @@
 import type { DatabaseMetrics, ServerMetrics } from '@qgs/shared';
 
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
 import os from 'node:os';
 import process from 'node:process';
+import { promisify } from 'node:util';
 
 import prisma from '~/utils/prisma';
+
+const execAsync = promisify(exec);
+
+async function runSystemCommand(command: string) {
+  try {
+    const { stdout } = await execAsync(command);
+    return stdout.toString();
+  } catch {
+    return '';
+  }
+}
 
 export const SystemService = {
   getDefaultAiConfig() {
@@ -118,20 +130,22 @@ export const SystemService = {
       return Number(((1 - times.idle / total) * 100).toFixed(1));
     });
 
+    const isDarwin = os.platform() === 'darwin';
+    const [clockVal, vmStat, dfRaw, netStatRaw, psRaw] = await Promise.all([
+      isDarwin ? runSystemCommand('sysctl -n hw.cpufrequency') : '',
+      isDarwin ? runSystemCommand('vm_stat') : '',
+      runSystemCommand('df -kP'),
+      isDarwin ? runSystemCommand('netstat -ib') : '',
+      runSystemCommand('ps -ax -o pid,pcpu,pmem,state,comm'),
+    ]);
+
     // CPU frequency (Darwin)
     const freq = { current: '0 MHz', max: '0 MHz', min: '0 MHz' };
-    try {
-      if (os.platform() === 'darwin') {
-        const clockVal = execSync('sysctl -n hw.cpufrequency')
-          .toString()
-          .trim();
-        const clockGhz = (
-          Number.parseInt(clockVal, 10) / 1_000_000_000
-        ).toFixed(2);
-        freq.current = `${clockGhz} GHz`;
-      }
-    } catch {
-      /* fall through */
+    if (isDarwin && clockVal.trim()) {
+      const clockGhz = (
+        Number.parseInt(clockVal.trim(), 10) / 1_000_000_000
+      ).toFixed(2);
+      freq.current = `${clockGhz} GHz`;
     }
 
     // CPU Stats (Darwin/BSD specific estimation via top/vm_stat)
@@ -141,18 +155,13 @@ export const SystemService = {
       soft_interrupts: 0,
       syscalls: 0,
     };
-    try {
-      if (os.platform() === 'darwin') {
-        const vmStat = execSync('vm_stat').toString();
-        const getVal = (key: string) => {
-          const match = vmStat.match(new RegExp(`${key}:\\s+(\\d+)`));
-          return match ? Number.parseInt(match[1], 10) : 0;
-        };
-        stats.ctx_switches = getVal('Mach system calls') + getVal('Mach traps'); // Rough
-        stats.interrupts = getVal('device interrupts');
-      }
-    } catch {
-      /* fall through */
+    if (isDarwin && vmStat) {
+      const getVal = (key: string) => {
+        const match = vmStat.match(new RegExp(`${key}:\\s+(\\d+)`));
+        return match ? Number.parseInt(match[1], 10) : 0;
+      };
+      stats.ctx_switches = getVal('Mach system calls') + getVal('Mach traps'); // Rough
+      stats.interrupts = getVal('device interrupts');
     }
 
     // Memory Advanced (Darwin via vm_stat)
@@ -164,27 +173,22 @@ export const SystemService = {
       cached: 0,
       shared: 0,
     };
-    try {
-      if (os.platform() === 'darwin') {
-        const vmStat = execSync('vm_stat').toString();
-        const pageSize = 4096; // Standard
-        const getPages = (key: string) => {
-          const match = vmStat.match(new RegExp(`Pages ${key}:\\s+(\\d+)`));
-          return match ? Number.parseInt(match[1], 10) * pageSize : 0;
-        };
-        memDist.active = getPages('active');
-        memDist.inactive = getPages('inactive');
-        memDist.cached = getPages('purgeable');
-        memDist.buffers = getPages('wired down');
-      }
-    } catch {
-      /* fall through */
+    if (isDarwin && vmStat) {
+      const pageSize = 4096; // Standard
+      const getPages = (key: string) => {
+        const match = vmStat.match(new RegExp(`Pages ${key}:\\s+(\\d+)`));
+        return match ? Number.parseInt(match[1], 10) * pageSize : 0;
+      };
+      memDist.active = getPages('active');
+      memDist.inactive = getPages('inactive');
+      memDist.cached = getPages('purgeable');
+      memDist.buffers = getPages('wired down');
     }
 
     // Disk Mounts (df)
     let mounts: ServerMetrics['disk']['mounts'] = [];
-    try {
-      const dfOut = execSync('df -kP').toString().split('\n').slice(1);
+    if (dfRaw) {
+      const dfOut = dfRaw.split('\n').slice(1);
       mounts = dfOut
         .filter((l) => l.trim())
         .map((line) => {
@@ -204,55 +208,46 @@ export const SystemService = {
           };
         })
         .slice(0, 5); // Limit to top 5
-    } catch {
-      /* fall through */
     }
 
     // Network Interfaces (netstat)
     let netInterfaces: ServerMetrics['network']['interfaces'] = [];
-    try {
-      if (os.platform() === 'darwin') {
-        const netStat = execSync('netstat -ib').toString().split('\n');
-        const uniqueIfs = new Map<
-          string,
-          ServerMetrics['network']['interfaces'][0]
-        >();
-        netStat.slice(1).forEach((line) => {
-          const parts = line.split(/\s+/);
-          if (parts[0] && !uniqueIfs.has(parts[0])) {
-            uniqueIfs.set(parts[0], {
-              name: parts[0],
-              status: 'online',
-              mtu: Number.parseInt(parts[1], 10),
-              speed: parts[0]?.startsWith('en') ? 1000 : 0,
-              rx_packets: Number.parseInt(parts[4], 10) || 0,
-              rx_errors: Number.parseInt(parts[5], 10) || 0,
-              rx_bytes: Number.parseInt(parts[6], 10) || 0,
-              tx_packets: Number.parseInt(parts[7], 10) || 0,
-              tx_errors: Number.parseInt(parts[8], 10) || 0,
-              tx_bytes: Number.parseInt(parts[9], 10) || 0,
-              rx_drop: 0,
-              tx_drop: 0,
-            });
-          }
-        });
-        netInterfaces = [...uniqueIfs.values()].filter((iface) => {
-          const isLoopback = iface.name.startsWith('lo');
-          const hasTraffic = iface.rx_bytes > 0 || iface.tx_bytes > 0;
-          return !isLoopback && hasTraffic;
-        });
-      }
-    } catch {
-      /* fall through */
+    if (isDarwin && netStatRaw) {
+      const netStat = netStatRaw.split('\n');
+      const uniqueIfs = new Map<
+        string,
+        ServerMetrics['network']['interfaces'][0]
+      >();
+      netStat.slice(1).forEach((line) => {
+        const parts = line.split(/\s+/);
+        if (parts[0] && !uniqueIfs.has(parts[0])) {
+          uniqueIfs.set(parts[0], {
+            name: parts[0],
+            status: 'online',
+            mtu: Number.parseInt(parts[1], 10),
+            speed: parts[0]?.startsWith('en') ? 1000 : 0,
+            rx_packets: Number.parseInt(parts[4], 10) || 0,
+            rx_errors: Number.parseInt(parts[5], 10) || 0,
+            rx_bytes: Number.parseInt(parts[6], 10) || 0,
+            tx_packets: Number.parseInt(parts[7], 10) || 0,
+            tx_errors: Number.parseInt(parts[8], 10) || 0,
+            tx_bytes: Number.parseInt(parts[9], 10) || 0,
+            rx_drop: 0,
+            tx_drop: 0,
+          });
+        }
+      });
+      netInterfaces = [...uniqueIfs.values()].filter((iface) => {
+        const isLoopback = iface.name.startsWith('lo');
+        const hasTraffic = iface.rx_bytes > 0 || iface.tx_bytes > 0;
+        return !isLoopback && hasTraffic;
+      });
     }
 
     // Process List (ps)
     let processList: ServerMetrics['processes']['list'] = [];
-    try {
-      const psOut = execSync('ps -ax -o pid,pcpu,pmem,state,comm')
-        .toString()
-        .split('\n')
-        .slice(1);
+    if (psRaw) {
+      const psOut = psRaw.split('\n').slice(1);
       processList = psOut
         .filter((l) => l.trim())
         .map((line) => {
@@ -268,8 +263,6 @@ export const SystemService = {
         })
         .sort((a, b) => b.cpu - a.cpu)
         .slice(0, 20);
-    } catch {
-      /* fall through */
     }
 
     const running = processList.filter((p) => p.status === 'running').length;
