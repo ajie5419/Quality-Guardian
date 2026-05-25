@@ -2,6 +2,7 @@ import type { H3Event } from 'h3';
 import type { ImportRowError } from '~/utils/import-report';
 import type { UserSession } from '~/utils/jwt-utils';
 
+import { InspectionService } from '~/modules/inspection';
 import { WorkOrderRequirementService } from '~/modules/work-order-requirement/work-order-requirement.service';
 import { WorkOrderService } from '~/modules/work-order/work-order.service';
 import { logApiError } from '~/utils/api-logger';
@@ -577,17 +578,7 @@ export const WorkOrderRouteService = {
         },
       }),
       WorkOrderRequirementService.findActiveForAggregate(workOrderNumber),
-      prisma.inspections.findMany({
-        where: { isDeleted: false, workOrderNumber },
-        orderBy: [{ inspectionDate: 'desc' }],
-        include: {
-          items: {
-            orderBy: [{ order: 'asc' }],
-            select: { checkItem: true, result: true },
-          },
-          process: { select: { name: true } },
-        },
-      }),
+      InspectionService.getWorkOrderAggregateInspections(workOrderNumber),
     ]);
     const byGroup = new Map<string, GroupStats>();
     const requirementList = requirements.map((item) => {

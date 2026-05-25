@@ -39,6 +39,31 @@ export const ReportRouteService = {
       summary: input.summary,
     };
   },
+  async createDailyReport(input: {
+    date: Date;
+    reporter: string;
+    summary: string;
+  }) {
+    return prisma.daily_reports.create({
+      data: input,
+    });
+  },
+  async findDailyReportById(id: string) {
+    return prisma.daily_reports.findUnique({ where: { id } });
+  },
+  async findDailyReports(params: { projectName?: string }) {
+    const where = params.projectName
+      ? {
+          summary: {
+            contains: String(params.projectName).trim(),
+          },
+        }
+      : {};
+    return prisma.daily_reports.findMany({
+      where,
+      orderBy: { date: 'desc' },
+    });
+  },
   async updateById(id: string, body: Record<string, unknown>) {
     const dataUpdate: Record<string, unknown> = {};
     if (body.status !== undefined)

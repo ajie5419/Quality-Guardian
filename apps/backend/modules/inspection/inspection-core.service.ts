@@ -1077,6 +1077,20 @@ export const InspectionCoreService = {
     });
   },
 
+  async getWorkOrderAggregateInspections(workOrderNumber: string) {
+    return prisma.inspections.findMany({
+      where: { isDeleted: false, workOrderNumber },
+      orderBy: [{ inspectionDate: 'desc' }],
+      include: {
+        items: {
+          orderBy: [{ order: 'asc' }],
+          select: { checkItem: true, result: true },
+        },
+        process: { select: { name: true } },
+      },
+    });
+  },
+
   async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
     const baseWhere: Prisma.quality_recordsWhereInput = {
       isDeleted: false,

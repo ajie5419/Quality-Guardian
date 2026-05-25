@@ -20,6 +20,7 @@ import {
 import { nanoid } from 'nanoid';
 import sharp from 'sharp';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { ReportRouteService } from '~/modules/report';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { UPLOAD_DIR } from '~/utils/paths';
@@ -625,12 +626,10 @@ export const VehicleCommissioningService = {
       reportText,
     });
 
-    const row = await prisma.daily_reports.create({
-      data: {
-        date: new Date(payload.date),
-        reporter: payload.reporters.join(' '),
-        summary,
-      },
+    const row = await ReportRouteService.createDailyReport({
+      date: new Date(payload.date),
+      reporter: payload.reporters.join(' '),
+      summary,
     });
 
     return {
@@ -708,17 +707,8 @@ export const VehicleCommissioningService = {
     const page = Math.max(1, Number(params.page || 1));
     const pageSize = Math.max(1, Number(params.pageSize || 20));
     const skip = (page - 1) * pageSize;
-    const where = params.projectName
-      ? {
-          summary: {
-            contains: String(params.projectName).trim(),
-          },
-        }
-      : {};
-
-    const allItems = await prisma.daily_reports.findMany({
-      where,
-      orderBy: { date: 'desc' },
+    const allItems = await ReportRouteService.findDailyReports({
+      projectName: params.projectName,
     });
     const vehicleReportRows = allItems.filter((row) =>
       parseReportSummary(row.summary),
@@ -732,7 +722,7 @@ export const VehicleCommissioningService = {
   },
 
   async getDailyReportPreview(id: string) {
-    const row = await prisma.daily_reports.findUnique({ where: { id } });
+    const row = await ReportRouteService.findDailyReportById(id);
     if (!row) return null;
     return buildRealtimeReportData(row);
   },

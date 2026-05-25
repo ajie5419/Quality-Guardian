@@ -35,6 +35,8 @@ export const InspectionService = {
   getSupplierScoringData: InspectionCoreService.getSupplierScoringData,
   getWelderScoreIssues: InspectionCoreService.getWelderScoreIssues,
   getWeeklyReportIssues: InspectionCoreService.getWeeklyReportIssues,
+  getWorkOrderAggregateInspections:
+    InspectionCoreService.getWorkOrderAggregateInspections,
   getLossRecordsForAggregation:
     InspectionCoreService.getLossRecordsForAggregation,
   getWorkspaceIssueSummary: InspectionCoreService.getWorkspaceIssueSummary,
