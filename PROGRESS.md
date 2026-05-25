@@ -118,6 +118,23 @@
 51. system-log 审计日志改为软删除
 52. dept 字段别名统一（remark/description、orderNo/sort）
 
+### 阶段十一：错误处理与中间件
+
+53. 定义统一业务异常类（BusinessError），替代抛字符串/返回 null
+54. 认证从路由手动调用改为中间件统一处理（非 public 路由自动鉴权）
+55. 数据权限从 service 手动调用改为中间件注入 where 条件
+
+### 阶段十二：数据库 schema 优化
+
+56. 补充缺失索引（workOrderNumber、processName、supplierName 等高频查询字段）
+57. daily_reports.summary JSON blob → 结构化字段 + 索引
+58. 删除 roles.permissions JSON 冗余列（已有 rbac_role_permissions 关系表）
+
+### 阶段十三：前后端类型契约
+
+59. 在 packages/qgs-shared/ 中定义所有 API 响应类型
+60. 后端 service 返回值标注类型，前端 import 共享类型（消除前端 as any）
+
 ## 已知问题
 
 - services/ 兼容壳被 158 个 API 文件引用，删除前需批量替换
