@@ -68,7 +68,6 @@ vite.config.ts.*
 # Personal/Temporary files
 tea.yaml
 findings.md
-progress.md
 task_plan.md
 **/*_output.txt
 typecheck_errors.txt

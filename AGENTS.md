@@ -1,11 +1,77 @@
-# AGENTS.md
+# AGENTS.md — Quality Guardian
 
-This project inherits the global agent rules from:
+## 会话启动必读
 
-- `/Users/zhaoxiaojie/AGENTS.md`
+开始任何任务前，先读以下文件获取上下文：
+1. `CONSTRAINTS.md` — 硬约束（禁止/必须）
+2. `PROGRESS.md` — 当前工作状态与下一步
 
-Project-specific addendum:
+改动某个模块时，先读该模块的 `ARCHITECTURE.md`（如果存在）。
 
-1. Use `pnpm` as the package manager.
-2. Follow the Quality-Guardian gate baseline in the global AGENTS file.
-3. Treat `/Users/zhaoxiaojie/vault` as the long-term memory store and update only on substantive progress.
+## 项目概览
+
+Quality Guardian 是一套面向制造业的质量管理系统（QMS），覆盖检验策划、报检任务、检验记录、不合格品处理、供应商管理、计量器具、监督检查等核心质量业务流程。
+
+## 技术栈
+
+| 层 | 技术 | 版本 |
+|---|---|---|
+| 运行时 | Node.js | >=20.10.0 |
+| 包管理 | pnpm | 10.12.4 |
+| 后端框架 | Nitro (H3) | nitropack 2.11.13, h3 1.15.3 |
+| ORM | Prisma | 6.2.1 |
+| 数据库 | MySQL | 8.x |
+| 前端框架 | Vue 3 | 3.5.17 |
+| UI 组件库 | Ant Design Vue | 4.2.6 |
+| 构建工具 | Vite | 6.3.5 |
+| 类型检查 | TypeScript | 5.8.3 |
+| 测试 | Vitest | 3.2.4 |
+| 语言 | TypeScript (全栈) | — |
+
+## 项目结构
+
+```
+apps/
+├── backend/          # Nitro 后端（文件路由）
+│   ├── api/          # 路由入口
+│   ├── core/         # 横切能力（master-data 治理内核、路由校验）
+│   ├── modules/      # 业务模块（按域自包含）
+│   ├── utils/        # 通用基础设施（prisma、logger、response）
+│   ├── middleware/   # H3 中间件
+│   └── prisma/       # Schema + Migrations
+└── web-antd/         # Vue 3 前端
+
+packages/
+├── qgs-shared/       # 前后端共享类型与常量
+├── qgs-domain/       # 领域逻辑（纯函数）
+└── qg-enums/         # 枚举定义
+```
+
+## 首次运行
+
+```bash
+pnpm install
+cp apps/backend/.env.example apps/backend/.env   # 配置 DATABASE_URL
+pnpm --dir apps/backend exec prisma migrate deploy
+pnpm --dir apps/backend exec prisma generate
+pnpm dev
+```
+
+## 硬约束（不可违反）
+
+1. **包管理器**：只用 pnpm，禁止 npm/yarn
+2. **数据库变更**：必须通过 Prisma migration，禁止手动改表
+3. **密钥安全**：禁止读取/输出/硬编码 `.env`、私钥、token
+4. **提交前门禁**：`pnpm lint && pnpm run check:type && pnpm run check:qms-arch` 必须通过
+5. **utils/ 职责**：只放通用基础设施（prisma、logger、response、auth），业务逻辑放 modules/
+6. **modules/ 自包含**：每个模块目录包含自己的 service、工具函数、类型，不依赖其他模块的内部文件
+7. **语言规范**：代码、注释、commit message 用英文；对话和文档用中文
+
+## 详细文档
+
+- [架构设计](docs/architecture.md) — 后端目标架构与模块化方案
+- [API 设计规范](docs/api-conventions.md) — 添加新端点时必读
+- [数据库文档](docs/database.md) — Schema 设计、Migration 规范、命名约定
+- [测试标准](docs/testing.md) — 测试分层、覆盖要求、编写规范
+- [硬约束](CONSTRAINTS.md) — 禁止/必须的明确规则
+- [项目进度](PROGRESS.md) — 当前工作状态与下一步
