@@ -1,5 +1,4 @@
 import { MasterDataGovernanceKernel } from '~/core/master-data/governance-kernel';
-import { createModuleService } from '~/core/module-registry';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import prisma from '~/utils/prisma';
 import {
@@ -8,8 +7,6 @@ import {
   isOutsourcingCategory,
   normalizeOutsourcingMode,
 } from '~/utils/supplier';
-
-import { supplierModule } from './supplier.definition';
 
 // --- Scoring Constants (Configurable) ---
 const THRESHOLD_CLASS_A_AMOUNT = 5000; // Class A: Loss > 5000
@@ -175,10 +172,7 @@ export interface SupplierQueryParams {
   userContext?: { userId: string; username?: string };
 }
 
-const baseService = createModuleService(supplierModule);
-
 export const SupplierService = {
-  ...baseService,
   /**
    * Find all suppliers with advanced filtering, scoring, and aggregation
    */
