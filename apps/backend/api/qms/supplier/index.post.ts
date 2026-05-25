@@ -1,8 +1,9 @@
 import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
+import { SupplierService } from '~/modules/supplier/supplier.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   badRequestResponse,
@@ -11,7 +12,8 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import { buildSupplierCreateDataWithCanonical } from '~/utils/supplier';
+
+const createSupplierBodySchema = z.object({}).passthrough();
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -20,17 +22,11 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
-    const createData = await buildSupplierCreateDataWithCanonical(
-      body as Record<string, unknown>,
-    );
-    if (!createData) {
+    const body = createSupplierBodySchema.parse(await readBody(event));
+    const newSupplier = await SupplierService.createSupplier(body);
+    if (!newSupplier) {
       return badRequestResponse(event, '缺少必填字段: name');
     }
-
-    const newSupplier = await prisma.suppliers.create({
-      data: createData,
-    });
 
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,

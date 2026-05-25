@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { z } from 'zod';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -9,6 +10,8 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+const updateProjectBodySchema = z.object({}).passthrough();
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
@@ -17,7 +20,7 @@ export default defineEventHandler(async (event) => {
   if (!id) return badRequestResponse(event, '无效监造项目ID');
 
   try {
-    const body = (await readBody(event)) as Record<string, unknown>;
+    const body = updateProjectBodySchema.parse(await readBody(event));
     const data = await SupervisionService.updateProject(id, body);
     return useResponseSuccess(data);
   } catch (error) {

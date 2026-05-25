@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { z } from 'zod';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
@@ -11,6 +12,10 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+const importPlanTasksBodySchema = z
+  .object({ fileUrl: z.unknown().optional() })
+  .passthrough();
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
@@ -19,7 +24,7 @@ export default defineEventHandler(async (event) => {
   if (!projectId) return badRequestResponse(event, '监造项目不能为空');
 
   try {
-    const body = (await readBody(event)) as Record<string, unknown>;
+    const body = importPlanTasksBodySchema.parse(await readBody(event));
     if (!String(body.fileUrl || '').trim()) {
       return badRequestResponse(event, '计划文件不能为空');
     }
@@ -37,11 +42,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(data);
   } catch (error) {
     logApiError('supervision-plan-tasks-import', error, undefined, event);
-    return internalServerErrorResponse(
-      event,
-      error instanceof Error
-        ? error.message
-        : 'Failed to import supervision plan tasks',
-    );
+    return internalServerErrorResponse(event, error instanceof Error ? error.message : 'Failed to import supervision plan tasks');
   }
 });

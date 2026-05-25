@@ -1,6 +1,13 @@
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
+import { buildGovernedCanonicalWritePairForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
+import {
+  buildSupplierCreateDataWithCanonical,
+  buildSupplierUpdateDataWithCanonical,
+  buildSupplierUpsertPayload,
+  normalizeSupplierString,
+} from '~/utils/supplier';
 import {
   DEFAULT_OUTSOURCING_MODE,
   IN_HOUSE_OUTSOURCING_MODE,
@@ -173,6 +180,104 @@ export interface SupplierQueryParams {
 }
 
 export const SupplierService = {
+  async createSupplier(payload: Record<string, unknown>) {
+    const createData = await buildSupplierCreateDataWithCanonical(payload);
+    if (!createData) return null;
+    return prisma.suppliers.create({ data: createData });
+  },
+
+  async updateSupplier(id: string, payload: Record<string, unknown>) {
+    return prisma.suppliers.update({
+      where: { id },
+      data: await buildSupplierUpdateDataWithCanonical(payload),
+    });
+  },
+
+  async deleteSupplier(id: string) {
+    return prisma.suppliers.update({
+      where: { id },
+      data: { isDeleted: true, updatedAt: new Date() },
+    });
+  },
+
+  async batchDeleteSuppliers(ids: string[]) {
+    return prisma.suppliers.updateMany({
+      where: { id: { in: ids } },
+      data: { isDeleted: true, updatedAt: new Date() },
+    });
+  },
+
+  async batchUpsertSuppliers(items: Array<Record<string, unknown>>) {
+    const results = { errors: 0, skipped: 0, success: 0 };
+    const chunkSize = 20;
+    for (let i = 0; i < items.length; i += chunkSize) {
+      const chunk = items.slice(i, i + chunkSize);
+      await Promise.all(
+        chunk.map(async (item) => {
+          const payload = buildSupplierUpsertPayload(item);
+          if (!payload) {
+            results.skipped++;
+            return;
+          }
+          try {
+            const createCanonicalIds =
+              await buildGovernedCanonicalWritePairForTable(
+                'suppliers',
+                payload.create,
+              );
+            const updateCanonicalIds =
+              await buildGovernedCanonicalWritePairForTable(
+                'suppliers',
+                payload.update,
+              );
+            await prisma.suppliers.upsert({
+              ...payload,
+              create: { ...payload.create, ...createCanonicalIds },
+              update: { ...payload.update, ...updateCanonicalIds },
+            });
+            results.success++;
+          } catch {
+            results.errors++;
+          }
+        }),
+      );
+    }
+    return results;
+  },
+
+  async importSuppliers(
+    items: Array<Record<string, unknown>>,
+    category?: unknown,
+  ) {
+    const normalizedCategory = normalizeSupplierString(category);
+    let successCount = 0;
+    for (const item of items) {
+      const payload = buildSupplierUpsertPayload(item, {
+        category: normalizedCategory,
+      });
+      if (!payload) continue;
+      try {
+        const createCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+          'suppliers',
+          payload.create,
+        );
+        const updateCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+          'suppliers',
+          payload.update,
+        );
+        await prisma.suppliers.upsert({
+          ...payload,
+          create: { ...payload.create, ...createCanonicalIds },
+          update: { ...payload.update, ...updateCanonicalIds },
+        });
+        successCount++;
+      } catch {
+        // keep import behavior: ignore row-level failures
+      }
+    }
+    return { successCount, totalCount: items.length };
+  },
+
   /**
    * Find all suppliers with advanced filtering, scoring, and aggregation
    */

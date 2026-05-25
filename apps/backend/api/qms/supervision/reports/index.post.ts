@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
@@ -11,12 +12,19 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+const createReportBodySchema = z
+  .object({
+    attachments: z.array(z.any()).optional(),
+    projectId: z.unknown().optional(),
+    reporter: z.unknown().optional(),
+  })
+  .passthrough();
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
-
   try {
-    const body = (await readBody(event)) as Record<string, unknown>;
+    const body = createReportBodySchema.parse(await readBody(event));
     if (!String(body.projectId || '').trim()) {
       return badRequestResponse(event, '监造项目不能为空');
     }
@@ -37,9 +45,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(data);
   } catch (error) {
     logApiError('supervision-reports-create', error, undefined, event);
-    return internalServerErrorResponse(
-      event,
-      'Failed to create supervision report',
-    );
+    return internalServerErrorResponse(event, 'Failed to create supervision report');
   }
 });
