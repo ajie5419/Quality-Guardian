@@ -1,11 +1,9 @@
 import { defineEventHandler } from 'h3';
+import { WelderService } from '~/modules/welder/welder.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
-import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
-  notFoundResponse,
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
@@ -23,19 +21,10 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    await prisma.welders.update({
-      where: { id },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-      },
-    });
+    await WelderService.softDelete(id);
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('welder', error, undefined, event);
-    if (isPrismaNotFoundError(error)) {
-      return notFoundResponse(event, '焊工不存在');
-    }
     return internalServerErrorResponse(event, '删除焊工失败');
   }
 });

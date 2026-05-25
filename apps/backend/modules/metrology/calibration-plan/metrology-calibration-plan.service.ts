@@ -412,6 +412,24 @@ function mapImportRow(row: CalibrationPlanImportRow) {
 }
 
 export const MetrologyCalibrationPlanService = {
+  async create(body: CalibrationPlanMutationPayload, username?: string) {
+    const data = this.buildMutationPayload(body);
+    return prisma.metrology_calibration_plans.create({
+      data: {
+        ...data,
+        createdBy: username || null,
+        updatedBy: username || null,
+      },
+    });
+  },
+
+  async deleteById(id: string, username?: string) {
+    return prisma.metrology_calibration_plans.update({
+      where: { id },
+      data: { isDeleted: true, updatedBy: username || null },
+    });
+  },
+
   async getList(params: CalibrationPlanListParams) {
     const page = Math.max(Number(params.page || 1), 1);
     const pageSize = Math.min(
@@ -720,6 +738,18 @@ export const MetrologyCalibrationPlanService = {
       successCount,
       totalCount: rows.length,
     };
+  },
+
+  async updateById(
+    id: string,
+    body: CalibrationPlanMutationPayload,
+    username?: string,
+  ) {
+    const data = this.buildMutationPayload(body);
+    return prisma.metrology_calibration_plans.update({
+      where: { id },
+      data: { ...data, updatedBy: username || null },
+    });
   },
 
   getTemplateRows() {

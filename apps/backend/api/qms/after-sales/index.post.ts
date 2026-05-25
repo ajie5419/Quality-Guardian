@@ -1,15 +1,8 @@
-import { QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import { SystemLogService } from '~/modules/system-log/system-log.service';
-import {
-  createAfterSalesId,
-  getNextAfterSalesSerialNumber,
-} from '~/utils/after-sales-id';
-import { buildGovernedAfterSalesCreateData } from '~/utils/after-sales-payload';
+import { z } from 'zod';
+import { AfterSalesRouteService } from '~/modules/after-sales/after-sales-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
@@ -18,6 +11,10 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+const createAfterSalesSchema = z
+  .object({ workOrderNumber: z.unknown() })
+  .passthrough();
+
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
   if (!userinfo) {
@@ -25,44 +22,12 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
+    const body = createAfterSalesSchema.parse(await readBody(event));
     const missingFields = getMissingRequiredFields(body, ['workOrderNumber']);
     if (missingFields.length > 0) {
       return badRequestResponse(event, `缺少必填字段: ${missingFields[0]}`);
     }
-
-    const serialNumber = await getNextAfterSalesSerialNumber();
-
-    const newItem = await prisma.after_sales.create({
-      data: await buildGovernedAfterSalesCreateData(
-        body as Record<string, unknown>,
-        {
-          defaultWorkOrderNumber: QMS_DEFAULT_VALUES.UNKNOWN_WORK_ORDER,
-          id: createAfterSalesId(),
-          serialNumber,
-        },
-      ),
-    });
-
-    await FileStorageService.registerReferencesFromAttachments({
-      attachments: body.photos,
-      bizId: String(newItem.id),
-      bizType: 'after_sales',
-      fieldName: 'photos',
-    });
-
-    await SystemLogService.recordAuditLog({
-      userId: String(userinfo.id),
-      action: 'CREATE',
-      targetType: 'after_sales',
-      targetId: String(newItem.id),
-      detailsTemplate: '新增售后记录: {{projectName}} ({{id}})',
-      detailsVariables: {
-        id: newItem.id,
-        projectName: newItem.projectName,
-      },
-    });
-
+    const newItem = await AfterSalesRouteService.create(body, userinfo);
     return useResponseSuccess(newItem);
   } catch (error: unknown) {
     logApiError('after-sales-create', error, undefined, event);

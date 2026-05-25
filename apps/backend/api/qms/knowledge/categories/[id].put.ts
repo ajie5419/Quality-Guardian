@@ -1,8 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
+import { KnowledgeRouteService } from '~/modules/knowledge/knowledge-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { buildKnowledgeCategoryUpdateData } from '~/utils/knowledge-category';
-import prisma from '~/utils/prisma';
 import {
   isPrismaNotFoundError,
   isPrismaUniqueConstraintError,
@@ -16,6 +16,8 @@ import {
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 
+const updateKnowledgeCategorySchema = z.record(z.string(), z.unknown());
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
@@ -28,12 +30,8 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
-    await prisma.knowledge_categories.update({
-      where: { id },
-      data: buildKnowledgeCategoryUpdateData(body as Record<string, unknown>),
-    });
-
+    const body = updateKnowledgeCategorySchema.parse(await readBody(event));
+    await KnowledgeRouteService.updateCategoryById(id, body);
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('categories', error, undefined, event);

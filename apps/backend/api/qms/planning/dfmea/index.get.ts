@@ -1,30 +1,4 @@
-import { defineEventHandler, getQuery } from 'h3';
-import { logApiError } from '~/utils/api-logger';
-import { normalizeDfmeaText } from '~/utils/dfmea';
-import { awaitMockDelay } from '~/utils/index';
-import prisma from '~/utils/prisma';
-import {
-  internalServerErrorResponse,
-  useListResponseSuccess,
-} from '~/utils/response';
+import { defineEventHandler } from 'h3';
+import { dfmea_index_get } from '~/modules/planning/routes/dfmea/index.get.service';
 
-export default defineEventHandler(async (event) => {
-  await awaitMockDelay();
-  const query = getQuery(event);
-  const projectId = normalizeDfmeaText(query.projectId);
-
-  try {
-    const where = {
-      isDeleted: false,
-      ...(projectId ? { projectId } : {}),
-    };
-    const items = await prisma.dfmea.findMany({
-      where,
-      orderBy: { order: 'asc' },
-    });
-    return useListResponseSuccess(items);
-  } catch (error) {
-    logApiError('dfmea', error, undefined, event);
-    return internalServerErrorResponse(event, '获取 DFMEA 条目失败');
-  }
-});
+export default defineEventHandler(async (event) => dfmea_index_get(event));

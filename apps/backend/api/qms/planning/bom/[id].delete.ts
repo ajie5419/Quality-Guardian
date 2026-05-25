@@ -1,34 +1,4 @@
 import { defineEventHandler } from 'h3';
-import { logApiError } from '~/utils/api-logger';
-import { awaitMockDelay } from '~/utils/index';
-import prisma from '~/utils/prisma';
-import { isPrismaNotFoundError } from '~/utils/prisma-error';
-import {
-  internalServerErrorResponse,
-  notFoundResponse,
-  useResponseSuccess,
-} from '~/utils/response';
-import { getRequiredRouterParam } from '~/utils/route-param';
+import { bom_id_delete } from '~/modules/planning/routes/bom/[id].delete.service';
 
-export default defineEventHandler(async (event) => {
-  await awaitMockDelay();
-  const id = getRequiredRouterParam(event, 'id', 'ID required');
-  if (typeof id !== 'string') {
-    return id;
-  }
-
-  try {
-    // 物理删除，因为 BOM 通常不需要软删除，或者可以加 isDeleted 字段
-    await prisma.project_boms.delete({
-      where: { id },
-    });
-
-    return useResponseSuccess(null);
-  } catch (error) {
-    logApiError('bom', error, undefined, event);
-    if (isPrismaNotFoundError(error)) {
-      return notFoundResponse(event, 'BOM item not found');
-    }
-    return internalServerErrorResponse(event, 'Failed to delete BOM item');
-  }
-});
+export default defineEventHandler(async (event) => bom_id_delete(event));

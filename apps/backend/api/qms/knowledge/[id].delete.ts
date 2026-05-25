@@ -1,8 +1,7 @@
 import { defineEventHandler } from 'h3';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { KnowledgeRouteService } from '~/modules/knowledge/knowledge-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
@@ -24,15 +23,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    await prisma.knowledge_base.update({
-      where: { id },
-      data: { isDeleted: true },
-    });
-    await FileStorageService.softDeleteReferences({
-      bizId: String(id),
-      bizType: 'knowledge_base',
-    });
-
+    await KnowledgeRouteService.deleteById(id);
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('knowledge', error, undefined, event);

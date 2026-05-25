@@ -1,8 +1,8 @@
 import { defineEventHandler } from 'h3';
+import { MetrologyService } from '~/modules/metrology/metrology.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
@@ -24,14 +24,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const deleted = await prisma.measuring_instruments.update({
-      where: { id },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-        updatedBy: userinfo.username,
-      },
-    });
+    const deleted = await MetrologyService.deleteById(id, userinfo.username);
 
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,

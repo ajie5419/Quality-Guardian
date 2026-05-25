@@ -97,7 +97,9 @@ export const InspectionApiService = {
     } else if (status) {
       statusWhere = { status };
     } else if (currentOnly) {
-      statusWhere = { status: { in: ['SUBMITTED', 'DISPATCHED', 'INSPECTING'] } };
+      statusWhere = {
+        status: { in: ['SUBMITTED', 'DISPATCHED', 'INSPECTING'] },
+      };
     }
     const where: Record<string, unknown> = {
       isDeleted: false,

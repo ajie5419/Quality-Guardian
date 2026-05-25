@@ -6,13 +6,11 @@ import {
   buildSupplierCreateDataWithCanonical,
   buildSupplierUpdateDataWithCanonical,
   buildSupplierUpsertPayload,
-  normalizeSupplierString,
-} from '~/utils/supplier';
-import {
   DEFAULT_OUTSOURCING_MODE,
   IN_HOUSE_OUTSOURCING_MODE,
   isOutsourcingCategory,
   normalizeOutsourcingMode,
+  normalizeSupplierString,
 } from '~/utils/supplier';
 
 // --- Scoring Constants (Configurable) ---
@@ -257,14 +255,16 @@ export const SupplierService = {
       });
       if (!payload) continue;
       try {
-        const createCanonicalIds = await buildGovernedCanonicalWritePairForTable(
-          'suppliers',
-          payload.create,
-        );
-        const updateCanonicalIds = await buildGovernedCanonicalWritePairForTable(
-          'suppliers',
-          payload.update,
-        );
+        const createCanonicalIds =
+          await buildGovernedCanonicalWritePairForTable(
+            'suppliers',
+            payload.create,
+          );
+        const updateCanonicalIds =
+          await buildGovernedCanonicalWritePairForTable(
+            'suppliers',
+            payload.update,
+          );
         await prisma.suppliers.upsert({
           ...payload,
           create: { ...payload.create, ...createCanonicalIds },

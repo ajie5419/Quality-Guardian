@@ -1,9 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { z } from 'zod';
+import { KnowledgeRouteService } from '~/modules/knowledge/knowledge-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { buildKnowledgeUpdateData } from '~/utils/knowledge';
-import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
@@ -12,6 +11,8 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
+
+const updateKnowledgeSchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -25,21 +26,8 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
-
-    await prisma.knowledge_base.update({
-      where: { id },
-      data: buildKnowledgeUpdateData(body as Record<string, unknown>),
-    });
-
-    if ((body as Record<string, unknown>).attachments !== undefined) {
-      await FileStorageService.registerReferencesFromAttachments({
-        attachments: (body as Record<string, unknown>).attachments,
-        bizId: id,
-        bizType: 'knowledge_base',
-      });
-    }
-
+    const body = updateKnowledgeSchema.parse(await readBody(event));
+    await KnowledgeRouteService.updateById(id, body);
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('knowledge', error, undefined, event);

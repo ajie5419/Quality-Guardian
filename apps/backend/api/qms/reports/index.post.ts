@@ -1,21 +1,16 @@
 import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
+import { ReportRouteService } from '~/modules/report/report-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
-import {
-  formatReportDate,
-  normalizeReportAuthor,
-  normalizeReportStatus,
-  parseReportDate,
-  parseReportNumber,
-} from '~/utils/report';
-import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
   internalServerErrorResponse,
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
+
+const bodySchema = z.object({ date: z.unknown() }).passthrough();
 
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
@@ -24,33 +19,16 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
-    const missingFields = getMissingRequiredFields(body, ['date']);
-    const reportDate =
-      missingFields.length > 0 ? null : parseReportDate(body.date);
-    if (!reportDate) {
+    const body = bodySchema.parse(await readBody(event));
+    if (body.date === undefined || body.date === null || body.date === '') {
       return badRequestResponse(event, '缺少或无效字段: date');
     }
-
-    const created = await prisma.reports.create({
-      data: {
-        author:
-          normalizeReportAuthor(body.author) ||
-          userinfo.realName ||
-          userinfo.username,
-        date: reportDate,
-        majorDefects: parseReportNumber(body.majorDefects, 0),
-        minorDefects: parseReportNumber(body.minorDefects, 0),
-        passRate: parseReportNumber(body.passRate, 0),
-        status: normalizeReportStatus(body.status),
-        totalInspections: parseReportNumber(body.totalInspections, 0),
-      },
-    });
-
-    return useResponseSuccess({
-      ...created,
-      date: formatReportDate(created.date),
-    });
+    return useResponseSuccess(
+      await ReportRouteService.create({
+        body,
+        fallbackAuthor: userinfo.realName || userinfo.username || '',
+      }),
+    );
   } catch (error) {
     logApiError('reports', error, undefined, event);
     return internalServerErrorResponse(event, '创建报告失败');

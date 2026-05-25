@@ -1,6 +1,10 @@
 import prisma from '~/utils/prisma';
 import { buildTeamContainsWhere } from '~/utils/team-resolver';
-import { hasWelderCodeField } from '~/utils/welder';
+import {
+  buildWelderCreateData,
+  buildWelderUpdateData,
+  hasWelderCodeField,
+} from '~/utils/welder';
 
 export interface WelderQueryParams {
   keyword?: string;
@@ -26,6 +30,23 @@ interface WelderListResponse {
 }
 
 export const WelderService = {
+  async create(body: Record<string, unknown>) {
+    const createData = await buildWelderCreateData(body);
+    if (!createData) throw new Error('MISSING_REQUIRED');
+    return prisma.welders.create({ data: createData });
+  },
+  async update(id: string, body: Record<string, unknown>) {
+    await prisma.welders.update({
+      where: { id },
+      data: await buildWelderUpdateData(body),
+    });
+  },
+  async softDelete(id: string) {
+    await prisma.welders.update({
+      where: { id },
+      data: { isDeleted: true, updatedAt: new Date() },
+    });
+  },
   async findAll(params: WelderQueryParams): Promise<WelderListResponse> {
     const supportsWelderCode = hasWelderCodeField();
     const {
@@ -108,5 +129,46 @@ export const WelderService = {
       stats,
       total,
     };
+  },
+  async importRows(items: Array<Record<string, unknown>>) {
+    const rowErrors: Array<Record<string, unknown>> = [];
+    let successCount = 0;
+    const supportsWelderCode = hasWelderCodeField();
+    for (const [index, item] of items.entries()) {
+      try {
+        const createData = await buildWelderCreateData(item);
+        if (!createData) {
+          rowErrors.push({
+            key: String(item.name || ''),
+            reason: '缺少必填字段: name/team',
+            row: index + 1,
+          });
+          continue;
+        }
+        const welderCode = String(createData.welderCode || '').trim();
+        if (supportsWelderCode && welderCode) {
+          const { id: _id, ...baseUpdateData } = createData;
+          await prisma.welders.upsert({
+            where: { welderCode },
+            update: {
+              ...baseUpdateData,
+              isDeleted: false,
+              updatedAt: new Date(),
+            },
+            create: createData,
+          });
+        } else {
+          await prisma.welders.create({ data: createData });
+        }
+        successCount++;
+      } catch (error: unknown) {
+        rowErrors.push({
+          key: String(item.name || ''),
+          reason: error instanceof Error ? error.message : '导入失败',
+          row: index + 1,
+        });
+      }
+    }
+    return { rowErrors, successCount, totalCount: items.length };
   },
 };

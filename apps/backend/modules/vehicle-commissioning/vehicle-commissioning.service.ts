@@ -24,6 +24,7 @@ import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { UPLOAD_DIR } from '~/utils/paths';
 import prisma from '~/utils/prisma';
+import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 
 const ISSUE_SEVERITY_RANK: Record<string, number> = {
   critical: 3,
@@ -364,6 +365,64 @@ async function buildRealtimeReportData(row: {
 }
 
 export const VehicleCommissioningService = {
+  async createIssueFromBody(
+    body: Record<string, unknown>,
+    operatorUserId?: string,
+  ) {
+    const photos = Array.isArray(body.photos)
+      ? body.photos.map(String).filter(Boolean)
+      : [];
+    const toNumber = (value: unknown) => {
+      if (value === undefined || value === null || value === '')
+        return undefined;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    };
+    const created = await this.createIssue(
+      {
+        assignee: body.assignee ? String(body.assignee) : undefined,
+        date: body.date ? String(body.date) : undefined,
+        description: body.description ? String(body.description) : undefined,
+        isClaim:
+          body.isClaim === undefined
+            ? undefined
+            : ['1', 'true', 'yes', '是'].includes(
+                String(body.isClaim).toLowerCase(),
+              ),
+        lossAmount: toNumber(body.lossAmount),
+        partName: body.partName ? String(body.partName) : undefined,
+        photos,
+        projectName: body.projectName ? String(body.projectName) : undefined,
+        recoveredAmount: toNumber(body.recoveredAmount),
+        ...buildGovernedWriteFieldsForTable('vehicle_commissioning_issues', {
+          responsibleDepartment: body.responsibleDepartment
+            ? String(body.responsibleDepartment)
+            : undefined,
+        }),
+        claimNotes: body.claimNotes ? String(body.claimNotes) : undefined,
+        claimStatus: body.claimStatus ? String(body.claimStatus) : undefined,
+        severity: body.severity ? String(body.severity) : undefined,
+        solution: body.solution ? String(body.solution) : undefined,
+        status: body.status ? parseIssueStatus(body.status) : undefined,
+        title: body.title ? String(body.title) : undefined,
+        workOrderNumber: body.workOrderNumber
+          ? String(body.workOrderNumber)
+          : undefined,
+      },
+      operatorUserId,
+    );
+    try {
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: photos,
+        bizId: String(created.id),
+        bizType: 'vehicle_commissioning_issue',
+        fieldName: 'photos',
+      });
+    } catch (error) {
+      if (!isPrismaSchemaMismatchError(error)) throw error;
+    }
+    return created;
+  },
   async exportIssuesWorkbook(params: VehicleCommissioningIssueParams) {
     const data = await this.getIssues(params);
     const ExcelJS = await import('exceljs');
@@ -723,5 +782,72 @@ export const VehicleCommissioningService = {
     }
 
     return mapIssueToDto(row);
+  },
+  async updateIssueFromBody(
+    id: string,
+    body: Record<string, unknown>,
+    operatorUserId?: string,
+  ) {
+    const hasPhotos = body.photos !== undefined;
+    let photos: string[] | undefined;
+    if (!hasPhotos) {
+      photos = undefined;
+    } else if (Array.isArray(body.photos)) {
+      photos = body.photos.map(String).filter(Boolean);
+    } else {
+      photos = [];
+    }
+    const toNumber = (value: unknown) => {
+      if (value === undefined || value === null || value === '')
+        return undefined;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    };
+    const updated = await this.updateIssue(
+      id,
+      {
+        assignee: body.assignee ? String(body.assignee) : undefined,
+        date: body.date ? String(body.date) : undefined,
+        description: body.description ? String(body.description) : undefined,
+        isClaim:
+          body.isClaim === undefined
+            ? undefined
+            : ['1', 'true', 'yes', '是'].includes(
+                String(body.isClaim).toLowerCase(),
+              ),
+        lossAmount: toNumber(body.lossAmount),
+        partName: body.partName ? String(body.partName) : undefined,
+        photos,
+        projectName: body.projectName ? String(body.projectName) : undefined,
+        recoveredAmount: toNumber(body.recoveredAmount),
+        ...buildGovernedWriteFieldsForTable('vehicle_commissioning_issues', {
+          responsibleDepartment: body.responsibleDepartment
+            ? String(body.responsibleDepartment)
+            : undefined,
+        }),
+        claimNotes: body.claimNotes ? String(body.claimNotes) : undefined,
+        claimStatus: body.claimStatus ? String(body.claimStatus) : undefined,
+        severity: body.severity ? String(body.severity) : undefined,
+        solution: body.solution ? String(body.solution) : undefined,
+        status: body.status ? parseIssueStatus(body.status) : undefined,
+        workOrderNumber: body.workOrderNumber
+          ? String(body.workOrderNumber)
+          : undefined,
+      },
+      operatorUserId,
+    );
+    if (photos !== undefined) {
+      try {
+        await FileStorageService.registerReferencesFromAttachments({
+          attachments: photos,
+          bizId: String(updated.id),
+          bizType: 'vehicle_commissioning_issue',
+          fieldName: 'photos',
+        });
+      } catch (error) {
+        if (!isPrismaSchemaMismatchError(error)) throw error;
+      }
+    }
+    return updated;
   },
 };

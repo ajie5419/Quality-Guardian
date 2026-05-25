@@ -1,11 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { z } from 'zod';
+import { KnowledgeRouteService } from '~/modules/knowledge/knowledge-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { buildKnowledgeCreateData } from '~/utils/knowledge';
-import { buildKnowledgeCategoryCreateData } from '~/utils/knowledge-category';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
-import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   conflictResponse,
@@ -14,6 +11,8 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+const createKnowledgeSchema = z.record(z.string(), z.unknown());
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
@@ -21,52 +20,8 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
-
-    // 1. Determine Category (Fallback to default if not provided)
-    let targetCategoryId = body.categoryId;
-    if (!targetCategoryId || targetCategoryId === '') {
-      const defaultCat = await prisma.knowledge_categories.findFirst({
-        where: { id: 'CAT-DEFAULT' },
-      });
-      if (!defaultCat) {
-        const defaultCategorySeedInput = {
-          id: 'CAT-DEFAULT',
-          name: '通用知识',
-          sort: 0,
-        };
-        // Create it if it doesn't exist
-        await prisma.knowledge_categories.create({
-          data: {
-            ...buildKnowledgeCategoryCreateData(defaultCategorySeedInput),
-            ...buildGovernedWriteFieldsForTable(
-              'knowledge_categories',
-              defaultCategorySeedInput,
-            ),
-          },
-        });
-      }
-      targetCategoryId = 'CAT-DEFAULT';
-    }
-
-    // 2. Create Knowledge Item
-    const newItem = await prisma.knowledge_base.create({
-      data: buildKnowledgeCreateData(
-        body as Record<string, unknown>,
-        String(targetCategoryId),
-        {
-          realName: userinfo.realName,
-          username: userinfo.username,
-        },
-      ),
-    });
-
-    await FileStorageService.registerReferencesFromAttachments({
-      attachments: body.attachments,
-      bizId: newItem.id,
-      bizType: 'knowledge_base',
-    });
-
+    const body = createKnowledgeSchema.parse(await readBody(event));
+    const newItem = await KnowledgeRouteService.create(body, userinfo);
     return useResponseSuccess(newItem);
   } catch (error) {
     logApiError('knowledge', error, undefined, event);

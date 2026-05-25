@@ -118,7 +118,70 @@ export const VehicleFailureRateService = {
 
     return { ranking, trend, yearIntensity, yearSeries, yearWarrantySeries };
   },
+
+  async saveManualPayload(params: {
+    count?: number;
+    month: string;
+    updatedBy?: string;
+    warrantyVehicleCount?: number;
+  }) {
+    const responsePayload: Record<string, unknown> = {
+      month: params.month,
+      success: true,
+      updatedBy: params.updatedBy,
+    };
+
+    if (params.count !== undefined) {
+      const current = await getManualData();
+      const next = {
+        ...current,
+        [params.month]: params.count,
+      };
+      await saveManualData(
+        MANUAL_SETTING_KEY,
+        next,
+        `车辆产品售后反馈去年手动数据，最近更新人：${params.updatedBy}`,
+      );
+      responsePayload.count = params.count;
+    }
+
+    if (params.warrantyVehicleCount !== undefined) {
+      const current = await getManualWarrantyData();
+      const next = {
+        ...current,
+        [params.month]: params.warrantyVehicleCount,
+      };
+      await saveManualData(
+        MANUAL_WARRANTY_SETTING_KEY,
+        next,
+        `车辆产品售后反馈去年手动再保数量，最近更新人：${params.updatedBy}`,
+      );
+      responsePayload.warrantyVehicleCount = params.warrantyVehicleCount;
+    }
+
+    return responsePayload;
+  },
 };
+
+async function saveManualData(
+  key: string,
+  value: Record<string, number>,
+  description: string,
+) {
+  await prisma.system_settings.upsert({
+    where: { key },
+    update: {
+      description,
+      updatedAt: new Date(),
+      value: JSON.stringify(value),
+    },
+    create: {
+      description,
+      key,
+      value: JSON.stringify(value),
+    },
+  });
+}
 
 async function buildRanking(start: Date, end: Date, vehicleDeptIds: string[]) {
   const records = await prisma.after_sales.findMany({

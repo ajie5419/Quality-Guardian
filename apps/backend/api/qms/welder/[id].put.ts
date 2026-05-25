@@ -1,16 +1,16 @@
 import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
+import { WelderService } from '~/modules/welder/welder.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
-import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
-  notFoundResponse,
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
-import { buildWelderUpdateData } from '~/utils/welder';
+
+const bodySchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
@@ -24,17 +24,10 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = (await readBody(event)) as Record<string, unknown>;
-    await prisma.welders.update({
-      where: { id },
-      data: await buildWelderUpdateData(body),
-    });
+    await WelderService.update(id, bodySchema.parse(await readBody(event)));
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('welder', error, undefined, event);
-    if (isPrismaNotFoundError(error)) {
-      return notFoundResponse(event, '焊工不存在');
-    }
     return internalServerErrorResponse(event, '更新焊工失败');
   }
 });

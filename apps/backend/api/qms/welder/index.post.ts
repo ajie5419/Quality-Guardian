@@ -1,16 +1,16 @@
 import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
+import { WelderService } from '~/modules/welder/welder.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
-import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   badRequestResponse,
-  conflictResponse,
   internalServerErrorResponse,
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import { buildWelderCreateData } from '~/utils/welder';
+
+const bodySchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
@@ -19,21 +19,13 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = (await readBody(event)) as Record<string, unknown>;
-    const createData = await buildWelderCreateData(body);
-    if (!createData) {
-      return badRequestResponse(event, '缺少必填字段: name/team');
-    }
-
-    const record = await prisma.welders.create({
-      data: createData,
-    });
-    return useResponseSuccess(record);
+    return useResponseSuccess(
+      await WelderService.create(bodySchema.parse(await readBody(event))),
+    );
   } catch (error: unknown) {
     logApiError('welder', error, undefined, event);
-    if (isPrismaUniqueConstraintError(error)) {
-      return conflictResponse(event, '焊工数据已存在');
-    }
+    if (error instanceof Error && error.message === 'MISSING_REQUIRED')
+      return badRequestResponse(event, '缺少必填字段: name/team');
     return internalServerErrorResponse(event, '创建焊工失败');
   }
 });

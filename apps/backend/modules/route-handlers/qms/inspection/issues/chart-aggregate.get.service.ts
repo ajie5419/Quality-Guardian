@@ -1,0 +1,72 @@
+import { z } from 'zod';
+import { InspectionService } from '~/modules/inspection/inspection.service';
+import { logApiError } from '~/utils/api-logger';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
+import {
+  parseInspectionIssueDateMode,
+  parseInspectionIssueDateValue,
+  parseOptionalIssueYear,
+} from '~/utils/inspection-issue';
+import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  internalServerErrorResponse,
+  unAuthorizedResponse,
+  useResponseSuccess,
+} from '~/utils/response';
+
+const ALLOWED_DIMENSIONS = new Set([
+  'claim',
+  'defectSubtype',
+  'defectType',
+  'division',
+  'projectName',
+  'reportMonth',
+  'responsibleDepartment',
+  'severity',
+  'status',
+  'supplierName',
+]);
+const ALLOWED_METRICS = new Set(['count', 'lossAmount', 'quantity']);
+const schema = z.object({}).passthrough();
+
+export default defineValidatedHandler(schema, async (event, query) => {
+  const userinfo = await verifyAccessToken(event);
+  if (!userinfo) return unAuthorizedResponse(event);
+  const dimension = String(query.dimension || '').trim();
+  const metric = String(query.metric || '').trim();
+  const top = Number.parseInt(String(query.top || '15'), 10);
+  if (!ALLOWED_DIMENSIONS.has(dimension) || !ALLOWED_METRICS.has(metric))
+    return internalServerErrorResponse(event, 'Invalid chart aggregate params');
+
+  try {
+    const result = await InspectionService.getIssueChartAggregation({
+      dateMode: parseInspectionIssueDateMode(query.dateMode),
+      dateValue: parseInspectionIssueDateValue(query.dateValue),
+      dimension: dimension as
+        | 'claim'
+        | 'defectSubtype'
+        | 'defectType'
+        | 'division'
+        | 'projectName'
+        | 'reportMonth'
+        | 'responsibleDepartment'
+        | 'severity'
+        | 'status'
+        | 'supplierName',
+      metric: metric as 'count' | 'lossAmount' | 'quantity',
+      top: Number.isNaN(top) ? 15 : top,
+      year: parseOptionalIssueYear(query.year),
+      userContext: {
+        userId: String(userinfo.id || userinfo.userId || ''),
+        username: userinfo.username,
+      },
+    });
+    return useResponseSuccess({ items: result });
+  } catch (error) {
+    logApiError('inspection-issue-chart-aggregate', error, undefined, event);
+    return internalServerErrorResponse(
+      event,
+      'Failed to fetch inspection issue chart aggregate',
+    );
+  }
+});

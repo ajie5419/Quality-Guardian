@@ -1,35 +1,4 @@
 import { defineEventHandler } from 'h3';
-import { logApiError } from '~/utils/api-logger';
-import { awaitMockDelay } from '~/utils/index';
-import prisma from '~/utils/prisma';
-import { isPrismaNotFoundError } from '~/utils/prisma-error';
-import {
-  internalServerErrorResponse,
-  notFoundResponse,
-  useResponseSuccess,
-} from '~/utils/response';
-import { getRequiredRouterParam } from '~/utils/route-param';
+import { dfmea_id_delete } from '~/modules/planning/routes/dfmea/[id].delete.service';
 
-export default defineEventHandler(async (event) => {
-  await awaitMockDelay();
-  const id = getRequiredRouterParam(event, 'id', 'ID required');
-  if (typeof id !== 'string') {
-    return id;
-  }
-
-  try {
-    // 软删除
-    await prisma.dfmea.update({
-      where: { id },
-      data: { isDeleted: true },
-    });
-
-    return useResponseSuccess(null);
-  } catch (error) {
-    logApiError('dfmea', error, undefined, event);
-    if (isPrismaNotFoundError(error)) {
-      return notFoundResponse(event, 'DFMEA 条目不存在');
-    }
-    return internalServerErrorResponse(event, '删除 DFMEA 条目失败');
-  }
-});
+export default defineEventHandler(async (event) => dfmea_id_delete(event));

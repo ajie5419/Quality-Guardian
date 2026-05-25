@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
@@ -9,15 +10,20 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+const bodySchema = z.object({
+  limit: z.number().int().positive().max(1000).optional(),
+  markMissing: z.boolean().optional(),
+});
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
 
   try {
-    const body = (await readBody(event)) as Record<string, unknown>;
+    const body = bodySchema.parse(await readBody(event));
     const result = await FileStorageService.scanMissingFiles({
-      limit: Number(body.limit || 100),
-      markMissing: Boolean(body.markMissing),
+      limit: body.limit ?? 100,
+      markMissing: body.markMissing ?? false,
     });
     await recordBusinessAuditLog(event, {
       action: 'UPDATE',

@@ -1,7 +1,7 @@
 import { defineEventHandler } from 'h3';
+import { KnowledgeRouteService } from '~/modules/knowledge/knowledge-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
@@ -23,12 +23,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // 软删除分类
-    await prisma.knowledge_categories.update({
-      where: { id },
-      data: { isDeleted: true },
-    });
-
+    await KnowledgeRouteService.deleteCategoryById(id);
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('categories', error, undefined, event);

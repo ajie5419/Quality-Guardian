@@ -3,6 +3,10 @@ import type { DashboardChartItem, DashboardOverview } from '@qgs/shared';
 import { safeNumber } from '@qgs/shared';
 import { createModuleLogger } from '~/utils/logger';
 import { getNetPassRateSummaryByRange } from '~/utils/pass-rate';
+import {
+  buildCanonicalProcessPassRateTargets,
+  PROCESS_PASS_RATE_TARGET_ORDER,
+} from '~/utils/pass-rate-process';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
@@ -36,6 +40,30 @@ const getStartOfWeek = (date: Date = new Date()): Date => {
 };
 
 export const DashboardService = {
+  async getPassRateTargets() {
+    const setting = await prisma.system_settings.findUnique({
+      where: { key: 'QMS_PASS_RATE_TARGETS' },
+    });
+    const savedTargets = setting?.value ? JSON.parse(setting.value) : {};
+    const canonicalTargets = buildCanonicalProcessPassRateTargets(savedTargets);
+    return Object.fromEntries(
+      PROCESS_PASS_RATE_TARGET_ORDER.map((key) => [key, canonicalTargets[key]]),
+    );
+  },
+
+  async savePassRateTargets(targets: Record<string, number>) {
+    const value = JSON.stringify(targets);
+    await prisma.system_settings.upsert({
+      where: { key: 'QMS_PASS_RATE_TARGETS' },
+      update: { value, updatedAt: new Date() },
+      create: {
+        key: 'QMS_PASS_RATE_TARGETS',
+        value,
+        description: 'QMS各工序目标合格率配置 (Quality Pass Rate Targets)',
+      },
+    });
+  },
+
   /**
    * 获取仪表盘核心统计数据 (包含年度总计和本周新增)
    */

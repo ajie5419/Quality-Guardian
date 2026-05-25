@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
 import { MetrologyBorrowService } from '~/modules/metrology/borrow/metrology-borrow.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -9,6 +10,8 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+const borrowSchema = z.record(z.string(), z.unknown());
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
@@ -16,11 +19,8 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
-    await MetrologyBorrowService.borrow(
-      body as Record<string, unknown>,
-      userinfo.username,
-    );
+    const body = borrowSchema.parse(await readBody(event));
+    await MetrologyBorrowService.borrow(body, userinfo.username);
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('metrology-borrow-create', error, undefined, event);

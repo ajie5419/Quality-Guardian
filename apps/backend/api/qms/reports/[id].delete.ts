@@ -1,11 +1,9 @@
 import { defineEventHandler } from 'h3';
+import { ReportRouteService } from '~/modules/report/report-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
-import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
-  notFoundResponse,
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
@@ -23,19 +21,9 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    await prisma.reports.delete({
-      where: { id },
-    });
-    return useResponseSuccess({ message: 'Deleted' });
+    return useResponseSuccess(await ReportRouteService.deleteById(id));
   } catch (error: unknown) {
     logApiError('reports', error, undefined, event);
-    const typedError = error as { code?: string; message?: string };
-    if (isPrismaNotFoundError(error)) {
-      return notFoundResponse(event, 'Report not found');
-    }
-    return internalServerErrorResponse(
-      event,
-      `Delete failed: ${typedError.message}`,
-    );
+    return internalServerErrorResponse(event, 'Delete failed');
   }
 });

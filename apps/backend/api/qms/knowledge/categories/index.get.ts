@@ -1,9 +1,7 @@
 import { defineEventHandler } from 'h3';
+import { KnowledgeRouteService } from '~/modules/knowledge/knowledge-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { buildKnowledgeCategoryCreateData } from '~/utils/knowledge-category';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
-import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,
   unAuthorizedResponse,
@@ -17,50 +15,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    let categories = await prisma.knowledge_categories.findMany({
-      where: { isDeleted: false },
-      orderBy: { sort: 'asc' },
-    });
-
-    // 如果数据库中完全没有分类，则自动创建一个默认分类
-    if (categories.length === 0) {
-      const defaultCategorySeedInput = {
-        id: 'CAT-DEFAULT',
-        name: '通用知识',
-        description: '系统自动创建的默认知识分类',
-        sort: 0,
-      };
-      const defaultCat = await prisma.knowledge_categories.create({
-        data: {
-          ...buildKnowledgeCategoryCreateData(defaultCategorySeedInput),
-          ...buildGovernedWriteFieldsForTable(
-            'knowledge_categories',
-            defaultCategorySeedInput,
-          ),
-        },
-      });
-      categories = [defaultCat];
-    }
-
-    interface CategoryNode {
-      children: CategoryNode[];
-      id: string;
-      name: string;
-      parentId?: null | string;
-      [key: string]: unknown;
-    }
-
-    // 将扁平数组转换为树形结构
-    const buildTree = (parentId: null | string = null): CategoryNode[] => {
-      return categories
-        .filter((cat) => cat.parentId === parentId)
-        .map((cat) => ({
-          ...cat,
-          children: buildTree(cat.id),
-        }));
-    };
-
-    const tree = buildTree(null);
+    const tree = await KnowledgeRouteService.getCategoryTree();
     return useResponseSuccess(tree);
   } catch (error) {
     logApiError('categories', error, undefined, event);

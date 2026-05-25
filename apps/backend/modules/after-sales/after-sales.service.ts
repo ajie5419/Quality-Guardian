@@ -17,6 +17,7 @@ import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept/dept.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { buildGovernedAfterSalesUpdateData } from '~/utils/after-sales-payload';
 import { buildAfterSalesDateRange } from '~/utils/after-sales-query';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -147,6 +148,37 @@ async function buildDeptNameMap() {
 }
 
 export const AfterSalesService = {
+  async updateByRoute(
+    id: string,
+    bodyRecord: Record<string, unknown>,
+  ): Promise<void> {
+    const { costsChanged, data: updateData } =
+      await buildGovernedAfterSalesUpdateData(bodyRecord);
+
+    if (costsChanged) {
+      const current = await prisma.after_sales.findUnique({
+        where: { id },
+        select: { laborTravelCost: true, materialCost: true },
+      });
+      if (!current) {
+        throw new Error('AFTER_SALES_NOT_FOUND');
+      }
+
+      const materialCost = Number(
+        updateData.materialCost ?? current.materialCost ?? 0,
+      );
+      const laborTravelCost = Number(
+        updateData.laborTravelCost ?? current.laborTravelCost ?? 0,
+      );
+      updateData.qualityLoss = materialCost + laborTravelCost;
+    }
+
+    await prisma.after_sales.update({
+      where: { id },
+      data: updateData,
+    });
+  },
+
   /**
    * Calculate After-Sales KPI and Statistics
    */

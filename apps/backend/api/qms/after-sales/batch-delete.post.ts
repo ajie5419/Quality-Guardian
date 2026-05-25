@@ -1,15 +1,16 @@
 import { defineEventHandler, readBody } from 'h3';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { z } from 'zod';
+import { AfterSalesRouteService } from '~/modules/after-sales/after-sales-route.service';
 import { logApiError } from '~/utils/api-logger';
-import { parseNonEmptyIdList } from '~/utils/id-list';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
   internalServerErrorResponse,
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
+
+const batchDeleteSchema = z.object({ ids: z.array(z.string()).min(1) });
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -18,32 +19,13 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = (await readBody(event)) as { ids?: unknown };
-    const ids = parseNonEmptyIdList(body.ids);
-
-    if (!ids) {
+    const parsed = batchDeleteSchema.safeParse(await readBody(event));
+    if (!parsed.success)
       return badRequestResponse(event, '请提供有效的 ID 列表');
-    }
-
-    const result = await prisma.after_sales.updateMany({
-      where: {
-        id: { in: ids },
-      },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-      },
-    });
-    await Promise.all(
-      ids.map((id) =>
-        FileStorageService.softDeleteReferences({
-          bizId: id,
-          bizType: 'after_sales',
-        }),
-      ),
+    const successCount = await AfterSalesRouteService.batchDelete(
+      parsed.data.ids,
     );
-
-    return useResponseSuccess({ successCount: result.count });
+    return useResponseSuccess({ successCount });
   } catch (error) {
     logApiError('batch-delete', error, undefined, event);
     return internalServerErrorResponse(event, '批量删除失败');

@@ -1,8 +1,7 @@
 import { defineEventHandler } from 'h3';
+import { ReportRouteService } from '~/modules/report/report-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
-import { formatReportDate } from '~/utils/report';
 import {
   internalServerErrorResponse,
   unAuthorizedResponse,
@@ -16,16 +15,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const reports = await prisma.reports.findMany({
-      orderBy: { date: 'desc' },
-    });
-
-    const items = reports.map((r) => ({
-      ...r,
-      date: formatReportDate(r.date),
-    }));
-
-    return useListResponseSuccess(items);
+    return useListResponseSuccess(await ReportRouteService.getList());
   } catch (error) {
     logApiError('reports', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch reports');

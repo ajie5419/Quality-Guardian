@@ -377,6 +377,39 @@ function sortList(
 }
 
 export const MetrologyService = {
+  async batchDelete(ids: string[], username?: string) {
+    return prisma.measuring_instruments.updateMany({
+      where: { id: { in: ids }, isDeleted: false },
+      data: {
+        isDeleted: true,
+        updatedAt: new Date(),
+        updatedBy: username || null,
+      },
+    });
+  },
+
+  async create(body: MetrologyMutationPayload, username?: string) {
+    const data = this.buildMutationPayload(body);
+    return prisma.measuring_instruments.create({
+      data: {
+        ...data,
+        createdBy: username || null,
+        updatedBy: username || null,
+      },
+    });
+  },
+
+  async deleteById(id: string, username?: string) {
+    return prisma.measuring_instruments.update({
+      where: { id },
+      data: {
+        isDeleted: true,
+        updatedAt: new Date(),
+        updatedBy: username || null,
+      },
+    });
+  },
+
   async getList(params: MetrologyListParams) {
     const page = Math.max(Number(params.page || 1), 1);
     const pageSize = Math.min(
@@ -559,6 +592,18 @@ export const MetrologyService = {
       successCount,
       totalCount: rows.length,
     };
+  },
+
+  async updateById(
+    id: string,
+    body: MetrologyMutationPayload,
+    username?: string,
+  ) {
+    const data = this.buildMutationPayload(body);
+    return prisma.measuring_instruments.update({
+      where: { id },
+      data: { ...data, updatedBy: username || null },
+    });
   },
 
   getTemplateRows() {

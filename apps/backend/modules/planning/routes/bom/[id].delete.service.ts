@@ -1,0 +1,30 @@
+import type { H3Event } from 'h3';
+
+import { logApiError } from '~/utils/api-logger';
+import { awaitMockDelay } from '~/utils/index';
+import prisma from '~/utils/prisma';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
+import { getRequiredRouterParam } from '~/utils/route-param';
+
+export async function bom_id_delete(event: H3Event) {
+  await awaitMockDelay();
+  const id = getRequiredRouterParam(event, 'id', 'ID required');
+  if (typeof id !== 'string') {
+    return id;
+  }
+
+  try {
+    // 物理删除，因为 BOM 通常不需要软删除，或者可以加 isDeleted 字段
+    await prisma.project_boms.delete({
+      where: { id },
+    });
+
+    return useResponseSuccess(null);
+  } catch (error) {
+    logApiError('bom', error, undefined, event);
+    if (isPrismaNotFoundError(error)) {
+      return notFoundResponse(event, 'BOM item not found');
+    }
+    return internalServerErrorResponse(event, 'Failed to delete BOM item');
+  }
+}

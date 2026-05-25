@@ -45,3 +45,25 @@
 **遗留问题：**
 
 - 无阻塞；构建与测试均通过。运行日志中仍有 `REDIS_URL not found` 警告，不影响本阶段门禁。
+
+### 2026-05-25 阶段二：路由瘦身（批次1-3）
+
+**执行内容：**
+
+- 完成 11 个超大路由（批次1）业务下沉，路由改为薄层转发。
+- 按域推进批次2与批次3：将 API 里的数据库访问迁移到 modules service，并补全 zod 校验，清理 `as any` / `as Record<string, unknown>`。
+- 对剩余超长路由进行统一瘦身，确保路由行数满足规范（`menu/all.ts` 例外保留在 80 行以内）。
+
+**验证结果：**
+
+- `api/` 中 `import prisma from '~/utils/prisma'`: 0
+- `api/` 中超过 50 行路由（`menu/all.ts` 例外）: 0
+- `api/` 中 `as any` / `as Record<string, unknown>`: 0
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/backend exec vitest run`: 212/212 通过
+
+**commit:** `pending` phase2 route-thinning commits
+
+**遗留问题：**
+
+- 无阻塞；全部门禁通过。

@@ -190,6 +190,26 @@ export async function buildWorkOrderWhereCondition(
 }
 
 export const WorkOrderService = {
+  async getAvailableYears() {
+    interface YearRow {
+      year: bigint | number;
+    }
+
+    const result = (await prisma.$queryRaw`
+      SELECT DISTINCT YEAR(deliveryDate) as year
+      FROM work_orders
+      WHERE isDeleted = false
+      ORDER BY year DESC
+    `) as YearRow[];
+
+    const currentYear = new Date().getFullYear();
+    const years =
+      result.length > 0
+        ? result.map((r) => Number(r.year)).filter((y) => y > 0)
+        : [currentYear];
+    return [...new Set(years)].sort((a, b) => b - a);
+  },
+
   /**
    * 获取工单列表（分页）
    */

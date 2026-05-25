@@ -1,7 +1,7 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { KnowledgeRouteService } from '~/modules/knowledge/knowledge-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,
   unAuthorizedResponse,
@@ -15,48 +15,15 @@ export default defineEventHandler(async (event) => {
   }
 
   const { categoryId, keyword, page = 1, pageSize = 10 } = getQuery(event);
-  const skip = (Number(page) - 1) * Number(pageSize);
-  const take = Number(pageSize);
 
   try {
-    const where = {
-      isDeleted: false,
-      ...(categoryId ? { categoryId: String(categoryId) } : {}),
-      ...(keyword
-        ? {
-            OR: [
-              { title: { contains: String(keyword) } },
-              { summary: { contains: String(keyword) } },
-            ],
-          }
-        : {}),
-    };
-
-    const [list, total] = await Promise.all([
-      prisma.knowledge_base.findMany({
-        where,
-        include: {
-          category: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take,
-      }),
-      prisma.knowledge_base.count({ where }),
-    ]);
-
-    const items = list.map((item) => ({
-      ...item,
-      categoryName: item.category?.name || '未分类',
-      publishDate: item.publishDate
-        ? item.publishDate.toISOString().split('T')[0]
-        : item.createdAt.toISOString().split('T')[0],
-      tags: item.tags ? item.tags.split(',') : [],
-      attachments: item.attachment ? JSON.parse(item.attachment) : [],
-      updatedAt: item.updatedAt.toLocaleString(),
-    }));
-
-    return useResponseSuccess({ items, total });
+    const result = await KnowledgeRouteService.getList({
+      categoryId,
+      keyword,
+      page,
+      pageSize,
+    });
+    return useResponseSuccess(result);
   } catch (error) {
     logApiError('knowledge', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to fetch knowledge list');
