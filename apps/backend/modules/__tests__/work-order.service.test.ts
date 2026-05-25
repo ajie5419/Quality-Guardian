@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { WorkOrderService } from '~/modules/work-order/work-order.service';
 
 import prisma from '../../utils/prisma';
-import { WorkOrderService } from '~/modules/work-order/work-order.service';
 
 // Mock prisma and logger
 vi.mock('../../utils/prisma', () => ({

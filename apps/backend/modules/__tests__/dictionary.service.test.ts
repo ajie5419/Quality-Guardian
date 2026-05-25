@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DictionaryService } from '~/modules/dictionary/dictionary.service';
 
 import prisma from '../../utils/prisma';
 import { redis } from '../../utils/redis';
-import { DictionaryService } from '~/modules/dictionary/dictionary.service';
 
 vi.mock('../../utils/prisma', () => ({
   default: {

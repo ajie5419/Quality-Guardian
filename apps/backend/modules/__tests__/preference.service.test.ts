@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PreferenceService } from '~/modules/preference/preference.service';
 
 import prisma from '../../utils/prisma';
-import { PreferenceService } from '~/modules/preference/preference.service';
 
 vi.mock('../../utils/prisma', () => ({
   default: {

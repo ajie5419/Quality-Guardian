@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { RbacService } from '~/modules/rbac/rbac.service';
 
 import prisma from '../../utils/prisma';
-import { RbacService } from '~/modules/rbac/rbac.service';
 
 vi.mock('../../utils/rbac-config', () => ({
   isDataScopeV2Enabled: () => false,

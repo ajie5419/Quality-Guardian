@@ -1,8 +1,8 @@
 import { LoginStatusEnum } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { SystemLogService } from '~/modules/system-log/system-log.service';
 
 import prisma from '../../utils/prisma';
-import { SystemLogService } from '~/modules/system-log/system-log.service';
 
 vi.mock('../../utils/prisma', () => ({
   default: {

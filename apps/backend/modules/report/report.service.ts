@@ -4,10 +4,9 @@ import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
 } from '@qgs/domain';
+import { DeptService } from '~/modules/dept/dept.service';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-
-import { DeptService } from '~/modules/dept/dept.service';
 
 const logger = createModuleLogger('ReportService');
 const CLOSED_TRACKING_STATUSES = [

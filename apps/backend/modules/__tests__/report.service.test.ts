@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import prisma from '../../utils/prisma';
 import { DeptService } from '~/modules/dept/dept.service';
 import { ReportService } from '~/modules/report/report.service';
+
+import prisma from '../../utils/prisma';
 
 vi.mock('../../utils/prisma', () => ({
   default: {

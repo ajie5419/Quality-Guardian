@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 
 import prisma from '../../utils/prisma';
-import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 
 // Mock prisma
 vi.mock('../../utils/prisma', () => ({
