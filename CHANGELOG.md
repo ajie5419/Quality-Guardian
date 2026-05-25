@@ -73,20 +73,28 @@
 
 - 无阻塞；全部门禁通过。
 
-### 2026-05-25 阶段三：模块逻辑优化（步骤11-13）
+### 2026-05-25 阶段三：模块逻辑优化（步骤11-16）
 
 **执行内容：**
 
 - 步骤11：`inspection` 拆分为聚合入口 + 子服务，新增 `inspection-core/template/archive/issue` 四层分工，`inspection.service.ts` 缩减到 500 行以内。
 - 步骤12：`supplier` 评分逻辑提取到 `supplier-scoring.ts`，`supplier.service.ts` 查询与评分解耦。
 - 步骤13：`after-sales` 将 `getStats` 分解为 `buildKpiSummary/buildTrendData/formatStatsResponse`，`getChartAggregation` 改为映射表驱动聚合。
+- 步骤14：`dashboard` 改为聚合调用 `after-sales/inspection/vehicle-commissioning/work-order/quality-loss` 的 `getStatsForDashboard()`，移除跨模块直接查表。
+- 步骤15：`quality-loss` 改为通过模块接口聚合外部损失数据，`getAllLossesUnpaginated` 拆分为 `fetchFromAllSources/mergeAndFilter/applyPagination`。
+- 步骤16：合并薄模块：`auth`、`preference` 并入 `modules/user`，`welder-score` 并入 `modules/welder`，删除 `master-data-rename` 模块，`base` 公共分页/日期工具迁移到 `utils/query-helpers.ts`。
 
 **验证结果：**
 
 - `pnpm -C apps/backend exec tsc --noEmit`: 通过
 
-**commit:** `pending` phase3 step11-13 commits
+**验证结果：**
+
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/backend exec vitest run`: 通过
+
+**commit:** `dd0314d` / `55ed3f6` / `f7e1167` / `5858097` / `35afd82` / `pending(step16)`
 
 **遗留问题：**
 
-- 待继续执行步骤14-16与全量验证。
+- 无阻塞，进入下一阶段前建议执行一次全仓 `pnpm build`。

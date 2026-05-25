@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3';
-import { AuthService } from '~/modules/auth/auth.service';
+import { AuthService } from '~/modules/user/auth.service';
 import {
   clearRefreshTokenCookie,
   getRefreshTokenFromCookie,

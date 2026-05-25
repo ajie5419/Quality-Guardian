@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import * as BaseService from '~/modules/base/base.service';
+import * as BaseService from '~/utils/query-helpers';
 
 describe('baseService', () => {
   describe('parsePagination', () => {

@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { DashboardService } from '~/modules/dashboard/dashboard.service';
+import { InspectionService } from '~/modules/inspection/inspection.service';
+import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
+import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
+import { WorkOrderService } from '~/modules/work-order/work-order.service';
 
 import prisma from '../../utils/prisma';
 
@@ -34,6 +39,22 @@ vi.mock('../../utils/prisma', () => ({
   },
 }));
 
+vi.mock('~/modules/after-sales/after-sales.service', () => ({
+  AfterSalesService: { getStatsForDashboard: vi.fn() },
+}));
+vi.mock('~/modules/inspection/inspection.service', () => ({
+  InspectionService: { getStatsForDashboard: vi.fn() },
+}));
+vi.mock('~/modules/quality-loss/quality-loss.service', () => ({
+  QualityLossService: { getStatsForDashboard: vi.fn() },
+}));
+vi.mock('~/modules/vehicle-commissioning/vehicle-commissioning.service', () => ({
+  VehicleCommissioningService: { getStatsForDashboard: vi.fn() },
+}));
+vi.mock('~/modules/work-order/work-order.service', () => ({
+  WorkOrderService: { getStatsForDashboard: vi.fn() },
+}));
+
 vi.mock('~/utils/logger', () => ({
   createModuleLogger: () => ({
     error: vi.fn(),
@@ -49,59 +70,46 @@ describe('dashboardService', () => {
 
   describe('getStats', () => {
     it('should aggregate statistics correctly', async () => {
-      // Mock year data
-      (prisma.after_sales.aggregate as any).mockResolvedValueOnce({
-        _count: { id: 10 },
-        _sum: { materialCost: 1000, laborTravelCost: 500 },
+      (AfterSalesService.getStatsForDashboard as any).mockResolvedValue({
+        totalCount: 10,
+        totalLoss: 1500,
+        weeklyCount: 2,
+        weeklyLoss: 150,
       });
-      (prisma.quality_records.aggregate as any).mockResolvedValueOnce({
-        _count: { id: 5 },
-        _sum: { lossAmount: 2000 },
+      (InspectionService.getStatsForDashboard as any).mockResolvedValue({
+        totalCount: 5,
+        totalLoss: 2000,
+        weeklyCount: 3,
+        weeklyLoss: 200,
+        issueDistribution: [
+          { type: 'Minor', value: 10 },
+          { type: 'Major', value: 2 },
+        ],
       });
-      (
-        prisma.vehicle_commissioning_issues.aggregate as any
-      ).mockResolvedValueOnce({
-        _count: { id: 2 },
-        _sum: { lossAmount: 700 },
-      });
-      (prisma.work_orders.aggregate as any).mockResolvedValueOnce({
-        _count: { workOrderNumber: 20 },
-      });
-      (prisma.quality_losses.aggregate as any).mockResolvedValueOnce({
-        _sum: { amount: 3000 },
-      });
-
-      // Mock week data counts
-      (prisma.after_sales.count as any).mockResolvedValue(2);
-      (prisma.quality_records.count as any).mockResolvedValue(3);
-      (prisma.vehicle_commissioning_issues.count as any).mockResolvedValue(1);
-      (prisma.work_orders.count as any).mockResolvedValue(4);
-
-      // Mock week loss aggregate (Promise.all)
-      (prisma.after_sales.aggregate as any).mockResolvedValueOnce({
-        _sum: { materialCost: 100, laborTravelCost: 50 },
-      });
-      (prisma.quality_records.aggregate as any).mockResolvedValueOnce({
-        _sum: { lossAmount: 200 },
-      });
-      (prisma.quality_losses.aggregate as any).mockResolvedValueOnce({
-        _sum: { amount: 300 },
-      });
-      (
-        prisma.vehicle_commissioning_issues.aggregate as any
-      ).mockResolvedValueOnce({
-        _sum: { lossAmount: 70 },
-      });
-
-      // Mock recent work orders
-      (prisma.work_orders.findMany as any).mockResolvedValue([
+      (VehicleCommissioningService.getStatsForDashboard as any).mockResolvedValue(
         {
-          workOrderNumber: 'WO-1',
-          projectName: 'P1',
-          status: 'In Progress',
-          customerName: 'C1',
+          totalCount: 2,
+          totalLoss: 700,
+          weeklyCount: 1,
+          weeklyLoss: 70,
         },
-      ]);
+      );
+      (WorkOrderService.getStatsForDashboard as any).mockResolvedValue({
+        totalCount: 20,
+        weeklyCount: 4,
+        recentWorkOrders: [
+          {
+            workOrderNumber: 'WO-1',
+            projectName: 'P1',
+            status: 'In Progress',
+            customerName: 'C1',
+          },
+        ],
+      });
+      (QualityLossService.getStatsForDashboard as any).mockResolvedValue({
+        totalLoss: 3000,
+        weeklyLoss: 300,
+      });
 
       const stats = await DashboardService.getStats();
       const ql = stats.overview.qualityLoss as {
@@ -120,7 +128,7 @@ describe('dashboardService', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      (prisma.after_sales.aggregate as any).mockRejectedValue(
+      (AfterSalesService.getStatsForDashboard as any).mockRejectedValue(
         new Error('DB Error'),
       );
 
@@ -160,10 +168,12 @@ describe('dashboardService', () => {
 
   describe('getIssueDistribution', () => {
     it('should return defect type distribution', async () => {
-      (prisma.quality_records.groupBy as any).mockResolvedValue([
-        { defectType: 'Minor', _count: 10 },
-        { defectType: 'Major', _count: 2 },
-      ]);
+      (InspectionService.getStatsForDashboard as any).mockResolvedValue({
+        issueDistribution: [
+          { type: 'Minor', value: 10 },
+          { type: 'Major', value: 2 },
+        ],
+      });
 
       const dist = await DashboardService.getIssueDistribution();
       expect(dist).toHaveLength(2);

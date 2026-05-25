@@ -16,25 +16,11 @@ export const WelderScoreService = {
     const [welders, issues] = await Promise.all([
       prisma.welders.findMany({
         where: { isDeleted: false },
-        select: {
-          id: true,
-          name: true,
-          score: true,
-          welderCode: true,
-        },
+        select: { id: true, name: true, score: true, welderCode: true },
       }),
       prisma.quality_records.findMany({
-        where: {
-          isDeleted: false,
-          responsibleWelder: {
-            not: null,
-          },
-        },
-        select: {
-          id: true,
-          responsibleWelder: true,
-          severity: true,
-        },
+        where: { isDeleted: false, responsibleWelder: { not: null } },
+        select: { id: true, responsibleWelder: true, severity: true },
       }),
     ]);
 
@@ -73,18 +59,12 @@ export const WelderScoreService = {
       updateOps.push(
         prisma.welders.update({
           where: { id: welder.id },
-          data: {
-            score: nextScore,
-            updatedAt: new Date(),
-          },
+          data: { score: nextScore, updatedAt: new Date() },
         }),
       );
     }
 
-    if (updateOps.length > 0) {
-      await prisma.$transaction(updateOps);
-    }
-
+    if (updateOps.length > 0) await prisma.$transaction(updateOps);
     return {
       deductionIssueCount: issues.length,
       matchedIssueCount,

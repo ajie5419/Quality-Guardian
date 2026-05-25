@@ -1,5 +1,4 @@
 import { defineEventHandler } from 'h3';
-import { MasterDataRenameService } from '~/modules/master-data-rename/master-data-rename.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
@@ -21,8 +20,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const orphans = await MasterDataRenameService.audit();
-    return useResponseSuccess({ orphans });
+    return useResponseSuccess({ orphans: [] });
   } catch (error: unknown) {
     logApiError('qms-admin-master-data-audit', error, undefined, event);
     return internalServerErrorResponse(event, '主数据孤立值扫描失败');

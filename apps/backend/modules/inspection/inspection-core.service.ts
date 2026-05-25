@@ -1029,7 +1029,7 @@ export const InspectionCoreService = {
   },
 
   resolveOverallResult(data: InspectionRecordInput): inspection_result {
-    const computed = this.calculateOverallResult(data.items || []);
+    const computed = InspectionCoreService.calculateOverallResult(data.items || []);
     if (computed === 'FAIL') return 'FAIL';
 
     const manual = String(data.result || '')
@@ -1160,18 +1160,21 @@ export const InspectionCoreService = {
   },
 
   async create(data: InspectionRecordInput) {
-    const overallResult = this.resolveOverallResult(data);
-    const quantitySummary = this.normalizeQuantitySummary({
+    const overallResult = InspectionCoreService.resolveOverallResult(data);
+    const quantitySummary = InspectionCoreService.normalizeQuantitySummary({
       quantity: data.quantity,
       qualifiedQuantity: data.qualifiedQuantity,
       unqualifiedQuantity: data.unqualifiedQuantity,
       result: overallResult,
     });
-    this.assertResultQuantityConsistency(overallResult, quantitySummary);
+    InspectionCoreService.assertResultQuantityConsistency(
+      overallResult,
+      quantitySummary,
+    );
     const maxRetry = 5;
     for (let attempt = 1; attempt <= maxRetry; attempt++) {
       try {
-        const serialNumber = await this.generateSerialNumber();
+        const serialNumber = await InspectionCoreService.generateSerialNumber();
         const inputTeam = data.team;
         const resolvedProcessId = await resolveProcessIdForWrite({
           explicitProcessId: data.processId,
@@ -1298,14 +1301,17 @@ export const InspectionCoreService = {
   },
 
   async update(id: string, data: InspectionRecordInput) {
-    const overallResult = this.resolveOverallResult(data);
-    const quantitySummary = this.normalizeQuantitySummary({
+    const overallResult = InspectionCoreService.resolveOverallResult(data);
+    const quantitySummary = InspectionCoreService.normalizeQuantitySummary({
       quantity: data.quantity,
       qualifiedQuantity: data.qualifiedQuantity,
       unqualifiedQuantity: data.unqualifiedQuantity,
       result: overallResult,
     });
-    this.assertResultQuantityConsistency(overallResult, quantitySummary);
+    InspectionCoreService.assertResultQuantityConsistency(
+      overallResult,
+      quantitySummary,
+    );
 
     return prisma.$transaction(async (tx) => {
       const inputTeam = data.team;
@@ -2016,7 +2022,7 @@ export const InspectionCoreService = {
       });
 
       // 3. Monthly Trend (Using Raw Query for efficiency)
-      const trendData = await this.buildIssueTrendData({
+      const trendData = await InspectionCoreService.buildIssueTrendData({
         currentYear,
         dateMode: params.dateMode,
         end,

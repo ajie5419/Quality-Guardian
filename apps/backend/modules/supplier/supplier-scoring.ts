@@ -206,10 +206,17 @@ export function applyRecordsToStats(
 }
 
 export function scoreSupplierListItem(
-  item: Record<string, unknown> & { category?: string; name?: string; outsourcingMode?: string; qualityScore?: number; status?: string },
+  item: Record<string, unknown> & {
+    category?: string;
+    name?: string;
+    outsourcingMode?: string;
+    qualityScore?: number;
+    status?: string;
+  },
   stat: SupplierStats,
 ) {
-  const incomingPassRate = stat.count > 0 ? stat.qualifiedCount / stat.count : 1;
+  const incomingPassRate =
+    stat.count > 0 ? stat.qualifiedCount / stat.count : 1;
   const incomingQualifiedRate = Math.round(incomingPassRate * 100);
   const totalIssueCount = stat.engineeringCount + stat.afterSalesCount;
   const outsourcingMode = normalizeOutsourcingMode(
@@ -235,7 +242,9 @@ export function scoreSupplierListItem(
       finalStatus = 'Observation';
       score = Math.min(score, usesInHouseOutsourcingScore ? 85 : 70);
       warningReasons.push(
-        usesInHouseOutsourcingScore ? '未关闭/严重问题触发观察' : '累计问题触发C级降级',
+        usesInHouseOutsourcingScore
+          ? '未关闭/严重问题触发观察'
+          : '累计问题触发C级降级',
       );
     } else if (score < THRESHOLD_SCORE_WARNING) {
       finalStatus = 'Observation';

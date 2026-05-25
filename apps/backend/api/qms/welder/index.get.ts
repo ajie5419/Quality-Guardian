@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WelderScoreService } from '~/modules/welder-score/welder-score.service';
+import { WelderScoreService } from '~/modules/welder/welder-score.service';
 import { WelderService } from '~/modules/welder/welder.service';
 import { logApiError } from '~/utils/api-logger';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';

@@ -1,6 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
-import { AuthService } from '~/modules/auth/auth.service';
+import { AuthService } from '~/modules/user/auth.service';
 import {
   badRequestResponse,
   conflictResponse,

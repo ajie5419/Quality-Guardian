@@ -1,24 +1,24 @@
+import type { SupplierStats } from './supplier-scoring';
+
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {
-  applyRecordsToStats,
-  classifyDefect,
-  createEmptyStats,
-  scoreSupplierListItem,
-  type SupplierStats,
-} from './supplier-scoring';
-import {
   buildSupplierCreateDataWithCanonical,
   buildSupplierUpdateDataWithCanonical,
   buildSupplierUpsertPayload,
   DEFAULT_OUTSOURCING_MODE,
-  IN_HOUSE_OUTSOURCING_MODE,
-  isOutsourcingCategory,
   normalizeOutsourcingMode,
   normalizeSupplierString,
 } from '~/utils/supplier';
+
+import {
+  applyRecordsToStats,
+  classifyDefect,
+  createEmptyStats,
+  scoreSupplierListItem,
+} from './supplier-scoring';
 
 export interface SupplierQueryParams {
   page?: number;
@@ -451,7 +451,10 @@ export const SupplierService = {
 
     // 5. [Process FULL List for Global Stats]
     const processedFullList = listData.map((item) =>
-      scoreSupplierListItem(item, statsMap.get(item.name) || createEmptyStats()),
+      scoreSupplierListItem(
+        item,
+        statsMap.get(item.name) || createEmptyStats(),
+      ),
     );
 
     interface SupplierListItem extends Record<string, unknown> {

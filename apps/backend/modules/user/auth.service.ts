@@ -6,26 +6,16 @@ import prisma from '~/utils/prisma';
 
 export const AuthService = {
   async login(username: string, pass: string) {
-    // 1. Try to find user
     const user = await prisma.users.findUnique({
       where: { username },
       include: { roles: true },
     });
-
-    if (!user) {
-      throw new Error('用户名或密码错误');
-    }
-
-    if (user.status !== 'ACTIVE') {
-      throw new Error('账号已被禁用，请联系管理员。');
-    }
+    if (!user) throw new Error('用户名或密码错误');
+    if (user.status !== 'ACTIVE') throw new Error('账号已被禁用，请联系管理员。');
 
     const isValid = await bcrypt.compare(pass, user.password);
-    if (!isValid) {
-      throw new Error('用户名或密码错误');
-    }
+    if (!isValid) throw new Error('用户名或密码错误');
 
-    // 2. Fetch Department
     let deptName = '';
     if (user.department) {
       const dept = await prisma.departments.findUnique({
@@ -34,7 +24,6 @@ export const AuthService = {
       if (dept) deptName = dept.name;
     }
 
-    // 3. Payload
     const userPayload: UserSession = {
       avatar: '/uploads/avatar-v1.svg',
       id: user.id,
@@ -45,10 +34,11 @@ export const AuthService = {
       deptName,
     };
 
-    const accessToken = generateAccessToken(userPayload);
-    const refreshToken = generateRefreshToken(userPayload);
-
-    return { userPayload, accessToken, refreshToken };
+    return {
+      userPayload,
+      accessToken: generateAccessToken(userPayload),
+      refreshToken: generateRefreshToken(userPayload),
+    };
   },
 
   async refreshAccessToken(username: string) {
@@ -56,9 +46,7 @@ export const AuthService = {
       where: { username },
       include: { roles: true },
     });
-    if (!dbUser || dbUser.status !== 'ACTIVE') {
-      return null;
-    }
+    if (!dbUser || dbUser.status !== 'ACTIVE') return null;
     return generateAccessToken({
       id: dbUser.id,
       realName: dbUser.realName,

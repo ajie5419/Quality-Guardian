@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PreferenceService } from '~/modules/preference/preference.service';
+import { PreferenceService } from '~/modules/user/preference.service';
 
 import prisma from '../../utils/prisma';
 

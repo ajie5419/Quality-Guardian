@@ -1,5 +1,4 @@
 import { defineEventHandler, readBody } from 'h3';
-import { MasterDataRenameService } from '~/modules/master-data-rename/master-data-rename.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
@@ -13,7 +12,6 @@ import { requireSystemAdmin } from '~/utils/system-auth';
 
 interface RenameRequestBody {
   configKey?: string;
-  dryRun?: boolean;
   newValue?: string;
   oldValue?: string;
 }
@@ -35,17 +33,8 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = (await readBody(event)) as RenameRequestBody;
-    const configKey = normalizeStringValue(body?.configKey);
     const oldValue = normalizeStringValue(body?.oldValue);
     const newValue = normalizeStringValue(body?.newValue);
-    const dryRun = Boolean(body?.dryRun);
-
-    if (!configKey) {
-      return badRequestResponse(event, '缺少参数: configKey');
-    }
-    if (!MasterDataRenameService.isConfigKey(configKey)) {
-      return badRequestResponse(event, '不支持的 configKey');
-    }
     if (!oldValue) {
       return badRequestResponse(event, '缺少参数: oldValue');
     }
@@ -53,22 +42,16 @@ export default defineEventHandler(async (event) => {
       return badRequestResponse(event, '缺少参数: newValue');
     }
 
-    const results = await MasterDataRenameService.rename({
-      configKey,
-      oldValue,
-      newValue,
-      dryRun,
-    });
-
-    return useResponseSuccess({ results });
+    return badRequestResponse(
+      event,
+      '主数据改名功能已下线',
+      'MasterDataRenameDisabled',
+    );
   } catch (error: unknown) {
     logApiError('qms-admin-master-data-rename', error, undefined, event);
     const message = error instanceof Error ? error.message : '主数据改名失败';
     if (message.startsWith('VALIDATION:')) {
       return badRequestResponse(event, message.replace('VALIDATION:', ''));
-    }
-    if (message === 'INVALID_CONFIG_KEY') {
-      return badRequestResponse(event, '不支持的 configKey');
     }
     if (
       message.includes('Duplicate entry') ||

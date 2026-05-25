@@ -512,7 +512,7 @@ export const InspectionRouteService = {
           '~/modules/system-log/system-log.service'
         );
         const { WelderScoreService } = await import(
-          '~/modules/welder-score/welder-score.service'
+          '~/modules/welder/welder-score.service'
         );
         if (issue) {
           await runClosePostCommitTask('issue-audit-log', () =>
