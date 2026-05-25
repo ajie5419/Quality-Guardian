@@ -162,6 +162,256 @@ export const RbacService = {
     return result;
   },
 
+  async getAllMenuTree() {
+    const menus = (await prisma.menus.findMany({
+      where: { isDeleted: false },
+      orderBy: { order: 'asc' },
+    })) as unknown as Menu[];
+    return buildMenuTree(menus);
+  },
+
+  async checkMenuNameExists(name: string) {
+    return prisma.menus.findFirst({
+      where: { name, isDeleted: false },
+      select: { id: true },
+    });
+  },
+
+  async checkMenuPathExists(path: string) {
+    return prisma.menus.findFirst({
+      where: { path, isDeleted: false },
+      select: { id: true },
+    });
+  },
+
+  async createMenu(data: {
+    component?: string;
+    icon?: string;
+    meta?: Record<string, unknown>;
+    name: string;
+    orderNo?: number;
+    path?: string;
+    pid?: string;
+    status?: number;
+    title?: string;
+    type?: string;
+  }) {
+    const meta = data.meta || {};
+    const orderNo = Number(data.orderNo || meta.orderNo || 0);
+    const newMenu = await prisma.menus.create({
+      data: {
+        id: `menu-${Date.now()}`,
+        parentId:
+          data.pid && data.pid !== '0' && data.pid !== 'null' ? data.pid : '0',
+        name: data.name,
+        path: data.path || '',
+        component: data.component || '',
+        type: data.type || 'menu',
+        order: orderNo,
+        status: data.status ?? 1,
+        meta: JSON.stringify({
+          title: data.title || meta.title,
+          icon: data.icon || meta.icon,
+          orderNo,
+          ...meta,
+        }),
+        isDeleted: false,
+      },
+    });
+    await redis.delByPattern('qms:menu:*');
+    return newMenu;
+  },
+
+  async updateMenu(
+    id: string,
+    data: {
+      component?: string;
+      icon?: string;
+      meta?: Record<string, unknown>;
+      name?: string;
+      orderNo?: number;
+      path?: string;
+      status?: number;
+      title?: string;
+    },
+  ) {
+    const meta = data.meta || {};
+    const orderNo = Number(data.orderNo || meta.orderNo || 0);
+    const updateData: Record<string, unknown> = {
+      component: data.component,
+      name: data.name,
+      path: data.path,
+      updatedAt: new Date(),
+    };
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.orderNo !== undefined || meta.orderNo !== undefined) {
+      updateData.order = orderNo;
+    }
+    if (data.meta || data.title || data.icon) {
+      updateData.meta = JSON.stringify({
+        ...meta,
+        icon: data.icon || meta.icon,
+        orderNo,
+        title: data.title || meta.title,
+      });
+    }
+    await redis.delByPattern('qms:menu:*');
+    await prisma.menus.update({ where: { id }, data: updateData });
+  },
+
+  async softDeleteMenu(id: string) {
+    await redis.delByPattern('qms:menu:*');
+    await prisma.menus.update({
+      where: { id },
+      data: { isDeleted: true, updatedAt: new Date() },
+    });
+  },
+
+  async getRolePermissionTree() {
+    await ensureFileCenterMenu();
+    await ensureVehicleCommissioningMenu();
+    await ensureSupervisionMenu();
+    await ensureInspectionRequestMenu();
+    await ensureMetrologyMenu();
+    const allMenus = await prisma.menus.findMany({
+      where: { isDeleted: false, status: 1 },
+      orderBy: { order: 'asc' },
+    });
+    const getTitle = (metaStr: null | string): string => {
+      if (!metaStr) return '未命名';
+      try {
+        const meta = JSON.parse(metaStr);
+        return meta.title || '未命名';
+      } catch {
+        return '未命名';
+      }
+    };
+    const getTypeLabel = (type: string): string => {
+      if (type === 'button') return '[按钮]';
+      if (type === 'catalog') return '[目录]';
+      if (type === 'menu') return '[页面]';
+      return '';
+    };
+    const buildTree = (
+      parentId = '0',
+    ): Array<{
+      children?: any[];
+      key: string;
+      menuId: string;
+      title: string;
+      type: string;
+    }> =>
+      allMenus
+        .filter((menu) => menu.parentId === parentId)
+        .map((menu) => {
+          const node = {
+            title: `${getTypeLabel(menu.type)} ${getTitle(menu.meta)}`,
+            key: menu.authCode || `MENU_${menu.id}`,
+            menuId: menu.id,
+            type: menu.type,
+          } as any;
+          const children = buildTree(menu.id);
+          if (children.length > 0) node.children = children;
+          return node;
+        });
+    return buildTree('0');
+  },
+
+  async listRoles(page: number, pageSize: number) {
+    const [total, roles] = await Promise.all([
+      prisma.roles.count({ where: { isDeleted: false } }),
+      prisma.roles.findMany({
+        where: { isDeleted: false },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+    return {
+      total,
+      items: roles.map((role) => {
+        let permissions: string[] = [];
+        try {
+          if (role.permissions && typeof role.permissions === 'string') {
+            permissions = JSON.parse(role.permissions);
+          }
+        } catch {
+          permissions = [];
+        }
+        return {
+          ...role,
+          permissions,
+          createTime: role.createdAt
+            ? new Date(role.createdAt).toLocaleString('zh-CN')
+            : '',
+          name: role.description || role.name,
+          value: role.name,
+          remark: role.description || '',
+        };
+      }),
+    };
+  },
+
+  async createRole(data: {
+    description?: string;
+    name?: string;
+    permissions?: string[];
+    remark?: string;
+    status?: number;
+    value?: string;
+  }) {
+    const permissions = Array.isArray(data.permissions) ? data.permissions : [];
+    await redis.delByPattern('qms:menu:*');
+    const newRole = await prisma.roles.create({
+      data: {
+        id: `role-${Date.now()}`,
+        name: String(data.value || data.name || ''),
+        description: data.remark || data.description || data.name,
+        status: data.status ?? 1,
+        permissions: JSON.stringify(permissions),
+        isSystem: false,
+        isDeleted: false,
+      },
+    });
+    await this.saveRolePermissions(newRole.id, permissions);
+    return { ...newRole, permissions };
+  },
+
+  async updateRole(
+    id: string,
+    data: {
+      description?: string;
+      name?: string;
+      permissions?: string[];
+      remark?: string;
+      status?: number;
+      value?: string;
+    },
+  ) {
+    const updateData: Record<string, unknown> = {
+      description: data.name || data.remark || data.description,
+      updatedAt: new Date(),
+    };
+    if (data.value) updateData.name = data.value;
+    if (data.status !== undefined) updateData.status = data.status;
+    await redis.delByPattern('qms:menu:*');
+    const role = await prisma.roles.update({ where: { id }, data: updateData });
+    if (data.permissions !== undefined) {
+      await this.saveRolePermissions(
+        role.id,
+        Array.isArray(data.permissions) ? data.permissions : [],
+      );
+    }
+  },
+
+  async softDeleteRole(id: string) {
+    await redis.delByPattern('qms:menu:*');
+    await prisma.roles.update({
+      where: { id },
+      data: { isDeleted: true, updatedAt: new Date() },
+    });
+  },
+
   async getUserRoles(userId: string) {
     const dbUser = await prisma.users.findFirst({
       where: { id: String(userId), isDeleted: false },

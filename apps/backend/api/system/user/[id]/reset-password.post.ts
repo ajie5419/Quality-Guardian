@@ -1,8 +1,7 @@
-import bcrypt from 'bcrypt';
 import { defineEventHandler } from 'h3';
+import { UserService } from '~/modules/user/user.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
@@ -12,7 +11,6 @@ import {
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 import { requireSystemAdmin } from '~/utils/system-auth';
-import { getDefaultResetPassword } from '~/utils/user-security';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -30,16 +28,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const hashedPassword = await bcrypt.hash(getDefaultResetPassword(), 12);
-
-    await prisma.users.update({
-      where: { id },
-      data: {
-        password: hashedPassword,
-        updatedAt: new Date(),
-      },
-    });
-
+    await UserService.resetPassword(id);
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('user-reset-password', error, undefined, event);

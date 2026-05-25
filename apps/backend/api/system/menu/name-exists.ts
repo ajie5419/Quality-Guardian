@@ -1,12 +1,15 @@
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
+import { z } from 'zod';
+import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import {
   unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
+
+const schema = z.object({ name: z.string().trim().min(1) });
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -15,22 +18,14 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
-    const name = body.name; // Expecting { name: 'xxx' }
-
-    if (!name) {
+    const parsed = schema.safeParse(await readBody(event));
+    if (!parsed.success) {
       setResponseStatus(event, 400);
       return useResponseError('name is required');
     }
-
-    const exists = await prisma.menus.findFirst({
-      where: {
-        name,
-        isDeleted: false,
-      },
-    });
-
-    return useResponseSuccess(!!exists);
+    return useResponseSuccess(
+      !!(await RbacService.checkMenuNameExists(parsed.data.name)),
+    );
   } catch (error) {
     logApiError('menu-name-exists', error, undefined, event);
     setResponseStatus(event, 500);

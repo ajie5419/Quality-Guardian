@@ -1,6 +1,8 @@
+import bcrypt from 'bcrypt';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
+import { getDefaultResetPassword } from '~/utils/user-security';
 
 export interface UserQueryParams {
   page?: number;
@@ -196,6 +198,45 @@ export const UserService = {
         isDeleted: true,
         updatedAt: new Date(),
       },
+    });
+  },
+
+  async getInfoByTokenPayload(userinfo: {
+    avatar?: string;
+    id?: number | string;
+    realName?: string;
+    roles?: string[];
+    username?: string;
+  }) {
+    const dbUser = await prisma.users.findFirst({
+      where: {
+        OR: [{ id: String(userinfo.id) }, { username: userinfo.username }],
+      },
+    });
+    if (!dbUser) return null;
+    const roleRows = await RbacService.getUserRoles(dbUser.id);
+    const permissions = await RbacService.getUserPermissionCodes(dbUser.id);
+    const dept = dbUser.department
+      ? await prisma.departments.findUnique({
+          where: { id: dbUser.department },
+        })
+      : null;
+    return {
+      ...userinfo,
+      id: dbUser.id,
+      realName: dbUser.realName || userinfo.realName,
+      roles: roleRows.map((role) => role.name),
+      permissions,
+      deptName: dept?.name || '',
+      avatar: dbUser.avatar || userinfo.avatar,
+    };
+  },
+
+  async resetPassword(id: string) {
+    const hashedPassword = await bcrypt.hash(getDefaultResetPassword(), 12);
+    await prisma.users.update({
+      where: { id },
+      data: { password: hashedPassword, updatedAt: new Date() },
     });
   },
 };

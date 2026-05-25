@@ -1,7 +1,7 @@
 import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
+import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import {
   unAuthorizedResponse,
   usePageResponseSuccess,
@@ -18,47 +18,13 @@ export default defineEventHandler(async (event) => {
     const { page = 1, pageSize = 20 } = getQuery(event);
     const currentPage = Number(page);
     const currentPageSize = Number(pageSize);
-
-    // Get total count
-    const total = await prisma.roles.count({
-      where: { isDeleted: false },
-    });
-
-    const roles = await prisma.roles.findMany({
-      where: { isDeleted: false },
-      skip: (currentPage - 1) * currentPageSize,
-      take: currentPageSize,
-      orderBy: { createdAt: 'desc' },
-    });
-
-    // Parse permissions (stored as string in DB)
-    const processedRoles = roles.map((role) => {
-      let permissions = [];
-      try {
-        if (role.permissions && typeof role.permissions === 'string') {
-          permissions = JSON.parse(role.permissions);
-        }
-      } catch (error) {
-        console.warn(`Failed to parse permissions for role ${role.id}:`, error);
-      }
-      return {
-        ...role,
-        permissions,
-        createTime: role.createdAt
-          ? new Date(role.createdAt).toLocaleString('zh-CN')
-          : '',
-        name: role.description || role.name, // Map description back to name for display
-        value: role.name, // Internal identifier
-        remark: role.description || '',
-      };
-    });
-
-    return usePageResponseSuccess(
-      page as string,
-      pageSize as string,
-      processedRoles,
-      { total },
+    const { items, total } = await RbacService.listRoles(
+      currentPage,
+      currentPageSize,
     );
+    return usePageResponseSuccess(page as string, pageSize as string, items, {
+      total,
+    });
   } catch (error) {
     logApiError('list', error, undefined, event);
     setResponseStatus(event, 500);

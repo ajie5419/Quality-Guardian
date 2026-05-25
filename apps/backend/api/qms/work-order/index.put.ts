@@ -1,10 +1,8 @@
-import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
+import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
-import { recordBusinessAuditLog } from '~/utils/audit-log';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
-import prisma from '~/utils/prisma';
-import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import { getRequiredQueryParam } from '~/utils/query-param';
 import {
   internalServerErrorResponse,
@@ -12,91 +10,25 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import {
-  parseOptionalDate,
-  parseRequiredDate,
-  parseWorkOrderQuantity,
-} from '~/utils/work-order';
-import { mapWorkOrderStatus } from '~/utils/work-order-status';
 
-export default defineEventHandler(async (event) => {
+const bodySchema = z.object({}).passthrough();
+
+export default defineValidatedHandler(bodySchema, async (event, body) => {
   const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  if (!userinfo) return unAuthorizedResponse(event);
 
   const id = getRequiredQueryParam(event, 'id', '缺少工单号');
-  if (typeof id !== 'string') {
-    return id;
-  }
+  if (typeof id !== 'string') return id;
 
   try {
-    const body = await readBody(event);
-
-    // 局部更新逻辑
-    const updateData: Record<string, unknown> = {
-      updatedAt: new Date(),
-    };
-
-    if (body.customerName !== undefined) {
-      const governedFields = buildGovernedWriteFieldsForTable('work_orders', {
-        customerName: body.customerName,
-      });
-      Object.assign(updateData, governedFields);
-    }
-    if (body.division !== undefined) {
-      const governedFields = buildGovernedWriteFieldsForTable('work_orders', {
-        division: body.division,
-      });
-      Object.assign(updateData, governedFields);
-    }
-    if (body.projectName !== undefined)
-      updateData.projectName = body.projectName;
-    if (body.quantity !== undefined && body.quantity !== null) {
-      updateData.quantity = parseWorkOrderQuantity(body.quantity, 1);
-    }
-    if (body.deliveryDate !== undefined && body.deliveryDate !== null) {
-      updateData.deliveryDate = parseRequiredDate(body.deliveryDate);
-    }
-    if (body.effectiveTime !== undefined) {
-      updateData.effectiveTime = parseOptionalDate(body.effectiveTime);
-    }
-
-    if (body.workOrderNumber && body.workOrderNumber !== id) {
-      updateData.workOrderNumber = body.workOrderNumber;
-    }
-
-    if (body.status) {
-      // 使用统一的状态映射工具
-      updateData.status = mapWorkOrderStatus(body.status);
-    }
-
-    const updated = await prisma.work_orders.update({
-      where: { workOrderNumber: id },
-      data: updateData,
-    });
-
-    await recordBusinessAuditLog(event, {
-      userId: userinfo.id,
-      action: 'UPDATE',
-      targetType: 'work_order',
-      targetId: String(id),
-      detailsTemplate: '修改工单: {{workOrderNumber}} ({{customerName}})',
-      detailsVariables: {
-        customerName: updated.customerName,
-        workOrderNumber: updated.workOrderNumber,
-      },
-    });
-
+    await WorkOrderRouteService.update(event, id, body, userinfo);
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('work-order', error, undefined, event);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    // Check for "Record to update not found"
-    if (isPrismaNotFoundError(error)) {
-      return notFoundResponse(event, `工单不存在: ${id}`);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    if (message.startsWith('NOT_FOUND:')) {
+      return notFoundResponse(event, message.replace('NOT_FOUND:', ''));
     }
-    return internalServerErrorResponse(event, `更新工单失败: ${errorMessage}`);
+    return internalServerErrorResponse(event, `更新工单失败: ${message}`);
   }
 });

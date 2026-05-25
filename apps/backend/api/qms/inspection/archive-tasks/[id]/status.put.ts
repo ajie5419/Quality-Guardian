@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -10,32 +11,27 @@ import {
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 
+const schema = z.object({
+  status: z.string(),
+  workContent: z.unknown().optional(),
+});
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
+  if (!userinfo) return unAuthorizedResponse(event);
   const id = getRequiredRouterParam(event, 'id', 'ID required');
-  if (typeof id !== 'string') {
-    return id;
-  }
-
+  if (typeof id !== 'string') return id;
   try {
-    const body = await readBody(event);
-    const status = String(body?.status || '')
-      .trim()
-      .toUpperCase();
-    const workContent = body?.workContent;
-    if (!status) {
-      return badRequestResponse(event, '缺少归档状态');
-    }
-
+    const body = schema.parse(await readBody(event));
+    const status = body.status.trim().toUpperCase();
+    if (!status) return badRequestResponse(event, '缺少归档状态');
     const updated = await InspectionService.updateArchiveTaskStatus({
       id,
-      status: status as any,
+      status: status as 'ARCHIVED' | 'IN_PROGRESS' | 'PENDING' | 'REJECTED',
       workContent:
-        workContent === undefined ? undefined : String(workContent || ''),
+        body.workContent === undefined
+          ? undefined
+          : String(body.workContent || ''),
     });
     return useResponseSuccess(updated);
   } catch (error: unknown) {

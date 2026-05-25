@@ -1,103 +1,37 @@
-import bcrypt from 'bcrypt';
 import { defineEventHandler, readBody } from 'h3';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
-import prisma from '~/utils/prisma';
+import { z } from 'zod';
+import { AuthService } from '~/modules/auth/auth.service';
 import {
   badRequestResponse,
   conflictResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
-export default defineEventHandler(async (event) => {
-  const { deptId, password, username } = await readBody(event);
-  const governedFields = buildGovernedWriteFieldsForTable('users', {
-    department: deptId,
-    realName: username,
-    username,
-  });
+const registerSchema = z.object({
+  username: z.string().trim().min(1),
+  password: z.string().min(1),
+  deptId: z.string().trim().min(1),
+});
 
-  if (!governedFields.username || !password || !governedFields.department) {
+export default defineEventHandler(async (event) => {
+  const parsed = registerSchema.safeParse(await readBody(event));
+  if (!parsed.success) {
     return badRequestResponse(
       event,
       '用户名、密码和部门均为必填项',
       'BadRequest',
     );
   }
-
-  // 检查部门是否存在
-  const dept = await prisma.departments.findUnique({
-    where: { id: deptId },
+  const result = await AuthService.registerUser({
+    deptId: parsed.data.deptId,
+    password: parsed.data.password,
+    username: parsed.data.username,
   });
-
-  if (!dept) {
+  if ('error' in result && result.error === 'DEPT_NOT_FOUND') {
     return badRequestResponse(event, '所选部门不存在', 'BadRequest');
   }
-
-  // 检查用户名是否已存在
-  const existingUser = await prisma.users.findUnique({
-    where: { username: String(governedFields.username) },
-  });
-
-  if (existingUser) {
+  if ('error' in result && result.error === 'USER_EXISTS') {
     return conflictResponse(event, '用户名已存在', 'Conflict');
   }
-
-  // 获取默认角色 (user)
-  let defaultRole = await prisma.roles.findFirst({
-    where: { name: 'user' },
-  });
-
-  if (!defaultRole) {
-    // 如果没有 user 角色，创建一个
-    defaultRole = await prisma.roles.create({
-      data: {
-        id: 'user-role',
-        name: 'user',
-        description: '普通用户',
-        permissions: '[]',
-        status: 1,
-      },
-    });
-  }
-
-  // 获取默认部门
-  let defaultDept = await prisma.departments.findFirst({
-    where: { parentId: '0' },
-  });
-
-  if (!defaultDept) {
-    defaultDept = await prisma.departments.create({
-      data: {
-        id: 'default-dept',
-        name: '默认部门',
-        parentId: '0',
-        status: 1,
-        updatedAt: new Date(),
-      },
-    });
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 12);
-
-  // 创建用户
-  const newUser = await prisma.users.create({
-    data: {
-      id: `USR-${Date.now()}`,
-      username: String(governedFields.username),
-      password: hashedPassword,
-      realName:
-        governedFields.realName === undefined
-          ? null
-          : String(governedFields.realName),
-      roleId: defaultRole.id,
-      department: String(governedFields.department),
-      status: 'INACTIVE', // 默认禁用，需审核
-    },
-  });
-
-  return useResponseSuccess({
-    id: newUser.id,
-    username: newUser.username,
-    message: '注册成功，请等待管理员审核开通账号',
-  });
+  return useResponseSuccess(result);
 });

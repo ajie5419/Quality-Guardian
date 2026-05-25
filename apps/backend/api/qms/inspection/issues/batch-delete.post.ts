@@ -1,11 +1,9 @@
 import { defineEventHandler, readBody } from 'h3';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import { WelderScoreService } from '~/modules/welder-score/welder-score.service';
+import { z } from 'zod';
+import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
 import { logApiError } from '~/utils/api-logger';
-import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { parseNonEmptyIdList } from '~/utils/id-list';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -13,52 +11,23 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+const schema = z.object({ ids: z.unknown().optional() });
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  if (!userinfo) return unAuthorizedResponse(event);
 
   try {
-    const body = (await readBody(event)) as { ids?: unknown };
+    const body = schema.parse(await readBody(event));
     const ids = parseNonEmptyIdList(body.ids);
-
-    if (!ids) {
-      return badRequestResponse(event, '请提供有效的 ID 列表');
-    }
-
-    const result = await prisma.quality_records.updateMany({
-      where: {
-        id: { in: ids },
-      },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-      },
-    });
-    if (result.count > 0) {
-      await WelderScoreService.syncFromInspectionIssues();
-    }
-    await Promise.all(
-      ids.map((id) =>
-        FileStorageService.softDeleteReferences({
-          bizId: id,
-          bizType: 'inspection_issue',
-        }),
+    if (!ids) return badRequestResponse(event, '请提供有效的 ID 列表');
+    return useResponseSuccess({
+      successCount: await InspectionApiService.batchDeleteIssues(
+        event,
+        userinfo,
+        ids,
       ),
-    );
-    await recordBusinessAuditLog(event, {
-      userId: userinfo.id,
-      action: 'DELETE',
-      targetType: 'inspection_issue',
-      targetId: ids.join(','),
-      detailsTemplate: '批量删除不合格品项: {{count}} 条',
-      detailsVariables: {
-        count: result.count,
-      },
     });
-
-    return useResponseSuccess({ successCount: result.count });
   } catch (error) {
     logApiError('batch-delete', error, undefined, event);
     return internalServerErrorResponse(event, '批量删除失败');

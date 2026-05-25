@@ -1,9 +1,8 @@
 import { defineEventHandler } from 'h3';
+import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
-import { redis } from '~/utils/redis';
 import {
   internalServerErrorResponse,
   notFoundResponse,
@@ -29,15 +28,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    await redis.delByPattern('qms:menu:*');
-    await prisma.menus.update({
-      where: { id },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-      },
-    });
-
+    await RbacService.softDeleteMenu(id);
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('menu', error, undefined, event);

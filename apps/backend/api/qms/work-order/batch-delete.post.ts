@@ -1,9 +1,9 @@
-import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
+import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
-import { recordBusinessAuditLog } from '~/utils/audit-log';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { parseNonEmptyIdList } from '~/utils/id-list';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -11,44 +11,18 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
-export default defineEventHandler(async (event) => {
+const bodySchema = z.object({ ids: z.unknown().optional() }).passthrough();
+
+export default defineValidatedHandler(bodySchema, async (event, body) => {
   const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  if (!userinfo) return unAuthorizedResponse(event);
 
   try {
-    const body = (await readBody(event)) as { ids?: unknown };
     const ids = parseNonEmptyIdList(body.ids);
-
-    if (!ids) {
-      return badRequestResponse(event, '请提供有效的 ID 列表');
-    }
-
-    // work_orders 表的主键是 workOrderNumber
-    const result = await prisma.work_orders.updateMany({
-      where: {
-        workOrderNumber: { in: ids },
-        isDeleted: false, // 只删除未删除的记录
-      },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-      },
-    });
-
-    await recordBusinessAuditLog(event, {
-      userId: userinfo.id,
-      action: 'DELETE',
-      targetType: 'work_order',
-      targetId: ids.join(','),
-      detailsTemplate: '批量删除工单: {{count}} 条',
-      detailsVariables: {
-        count: result.count,
-      },
-    });
-
-    return useResponseSuccess({ successCount: result.count });
+    if (!ids) return badRequestResponse(event, '请提供有效的 ID 列表');
+    return useResponseSuccess(
+      await WorkOrderRouteService.batchDelete(event, ids, userinfo),
+    );
   } catch (error) {
     logApiError('batch-delete', error, undefined, event);
     return internalServerErrorResponse(event, '批量删除失败');

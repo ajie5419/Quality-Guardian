@@ -1,14 +1,8 @@
-import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
+import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
-import { recordBusinessAuditLog } from '~/utils/audit-log';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
-import prisma from '~/utils/prisma';
-import {
-  isPrismaRequiredValueError,
-  isPrismaUniqueConflictError,
-} from '~/utils/prisma-error';
-import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
   conflictResponse,
@@ -16,127 +10,26 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import {
-  parseOptionalDate,
-  parseRequiredDate,
-  parseRequiredWorkOrderNumber,
-  parseWorkOrderQuantity,
-} from '~/utils/work-order';
-import { mapWorkOrderStatus } from '~/utils/work-order-status';
 
-export default defineEventHandler(async (event) => {
+const bodySchema = z.object({}).passthrough();
+
+export default defineValidatedHandler(bodySchema, async (event, body) => {
   const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  if (!userinfo) return unAuthorizedResponse(event);
 
   try {
-    const body = await readBody(event);
-
-    const woNum = parseRequiredWorkOrderNumber(body.workOrderNumber);
-    const missingFields = getMissingRequiredFields(
-      {
-        customerName: body.customerName,
-        workOrderNumber: woNum,
-      },
-      ['workOrderNumber', 'customerName'],
+    return useResponseSuccess(
+      await WorkOrderRouteService.create(event, body, userinfo),
     );
-    if (missingFields.length > 0) {
-      return badRequestResponse(event, `缺少必填字段: ${missingFields[0]}`);
-    }
-
-    // Check for duplicate ID
-    const existing = await prisma.work_orders.findUnique({
-      where: { workOrderNumber: woNum },
-    });
-
-    if (existing) {
-      return conflictResponse(event, `工单号 ${woNum} 已存在，请使用其他编号`);
-    }
-
-    // 使用统一的状态映射工具
-    const statusValue = mapWorkOrderStatus(body.status);
-    const governedFields = buildGovernedWriteFieldsForTable('work_orders', {
-      customerName: body.customerName,
-      division: body.division,
-    });
-
-    const newWO = await prisma.work_orders.create({
-      data: {
-        workOrderNumber: woNum,
-        customerName: body.customerName,
-        projectName: body.projectName,
-        ...governedFields,
-        quantity: parseWorkOrderQuantity(body.quantity, 1),
-        deliveryDate: parseRequiredDate(body.deliveryDate),
-        effectiveTime: parseOptionalDate(body.effectiveTime),
-        status: statusValue,
-        isDeleted: false,
-        updatedAt: new Date(),
-      },
-    });
-
-    // 格式化返回数据，将 UTC 时间转换为本地时间
-    const formattedWO = {
-      ...newWO,
-      id: newWO.workOrderNumber,
-      createTime: newWO.createdAt
-        .toLocaleString('zh-CN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false,
-        })
-        .replaceAll('/', '-'),
-    };
-
-    await recordBusinessAuditLog(event, {
-      userId: userinfo.id,
-      action: 'CREATE',
-      targetType: 'work_order',
-      targetId: String(newWO.workOrderNumber),
-      detailsTemplate: '新增工单: {{workOrderNumber}} ({{customerName}})',
-      detailsVariables: {
-        customerName: newWO.customerName,
-        workOrderNumber: newWO.workOrderNumber,
-      },
-    });
-
-    return useResponseSuccess(formattedWO);
   } catch (error: unknown) {
     logApiError('work-order-create', error, undefined, event);
-    const err = error as { code?: string; message?: string; meta?: unknown };
-    const errorMessage = err.message || String(error);
-
-    const isUniqueError = isPrismaUniqueConflictError(error);
-
-    if (isUniqueError) {
-      return conflictResponse(event, '工单号已存在，请使用其他编号');
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith('BAD_REQUEST:')) {
+      return badRequestResponse(event, message.replace('BAD_REQUEST:', ''));
     }
-
-    // Handle Prisma Validation Errors (Missing Arguments etc.)
-    if (
-      isPrismaRequiredValueError(error) ||
-      errorMessage.includes('Argument')
-    ) {
-      // Try to extract the missing argument name if possible, or just give a generic validation error
-      // Example msg: "Argument `customerName` is missing."
-      const match = errorMessage.match(/Argument `(\w+)` is missing/);
-      if (match && match[1]) {
-        return badRequestResponse(
-          event,
-          `请求参数错误: 缺少必填字段 ${match[1]}`,
-        );
-      }
-      return badRequestResponse(
-        event,
-        '请求参数错误: 数据格式不正确或缺少必填字段',
-      );
+    if (message.startsWith('CONFLICT:')) {
+      return conflictResponse(event, message.replace('CONFLICT:', ''));
     }
-
-    return internalServerErrorResponse(event, `创建工单失败: ${errorMessage}`);
+    return internalServerErrorResponse(event, `创建工单失败: ${message}`);
   }
 });

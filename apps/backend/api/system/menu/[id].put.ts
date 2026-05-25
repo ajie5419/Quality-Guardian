@@ -1,9 +1,9 @@
 import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
+import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
-import { redis } from '~/utils/redis';
 import {
   internalServerErrorResponse,
   notFoundResponse,
@@ -12,6 +12,17 @@ import {
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 import { requireSystemAdmin } from '~/utils/system-auth';
+
+const schema = z.object({
+  component: z.string().optional(),
+  icon: z.string().optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
+  name: z.string().optional(),
+  orderNo: z.number().optional(),
+  path: z.string().optional(),
+  status: z.number().optional(),
+  title: z.string().optional(),
+});
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -29,51 +40,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
-    const bodyRecord = body as {
-      component?: string;
-      icon?: string;
-      meta?: Record<string, unknown>;
-      name?: string;
-      orderNo?: number | string;
-      path?: string;
-      status?: number;
-      title?: string;
-    };
-
-    const updateData: Record<string, unknown> = {
-      component: bodyRecord.component,
-      name: bodyRecord.name,
-      path: bodyRecord.path,
-      updatedAt: new Date(),
-    };
-
-    if (bodyRecord.status !== undefined) updateData.status = bodyRecord.status;
-
-    // Resolve order and meta
-    const meta = (bodyRecord.meta || {}) as Record<string, unknown>;
-    const orderNo = Number(bodyRecord.orderNo || meta.orderNo || 0);
-
-    if (bodyRecord.orderNo !== undefined || meta.orderNo !== undefined) {
-      updateData.order = orderNo;
-    }
-
-    // Update meta stringified
-    if (bodyRecord.meta || bodyRecord.title || bodyRecord.icon) {
-      updateData.meta = JSON.stringify({
-        ...meta,
-        icon: bodyRecord.icon || meta.icon,
-        orderNo,
-        title: bodyRecord.title || meta.title,
-      });
-    }
-
-    await redis.delByPattern('qms:menu:*');
-    await prisma.menus.update({
-      where: { id },
-      data: updateData,
-    });
-
+    await RbacService.updateMenu(id, schema.parse(await readBody(event)));
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('menu-update', error, undefined, event);

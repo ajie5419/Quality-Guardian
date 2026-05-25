@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { z } from 'zod';
 import { DictionaryService } from '~/modules/dictionary/dictionary.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -13,6 +14,14 @@ import {
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 import { requireSystemAdmin } from '~/utils/system-auth';
+
+const schema = z.object({
+  dictKey: z.string().optional(),
+  dictValue: z.string().optional(),
+  status: z.number().optional(),
+  sort: z.number().optional(),
+  remark: z.string().optional(),
+});
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -31,10 +40,9 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
     const updated = await DictionaryService.update(
       id,
-      body as Record<string, unknown>,
+      schema.parse(await readBody(event)),
       String(userinfo.username || userinfo.id),
     );
     return useResponseSuccess(updated);

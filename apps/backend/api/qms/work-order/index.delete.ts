@@ -1,9 +1,7 @@
 import { defineEventHandler } from 'h3';
+import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
-import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
-import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import { getRequiredQueryParam } from '~/utils/query-param';
 import {
   internalServerErrorResponse,
@@ -24,31 +22,11 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // work_orders 表的主键是 workOrderNumber，不是 id
-    const deleted = await prisma.work_orders.update({
-      where: { workOrderNumber: id },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-      },
-    });
-
-    await recordBusinessAuditLog(event, {
-      userId: userinfo.id,
-      action: 'DELETE',
-      targetType: 'work_order',
-      targetId: String(id),
-      detailsTemplate: '删除工单: {{workOrderNumber}} ({{customerName}})',
-      detailsVariables: {
-        customerName: deleted.customerName,
-        workOrderNumber: deleted.workOrderNumber,
-      },
-    });
-
+    await WorkOrderRouteService.deleteById(event, id, userinfo);
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('work-order', error, undefined, event);
-    if (isPrismaNotFoundError(error)) {
+    if (error instanceof Error && error.message === 'NOT_FOUND') {
       return notFoundResponse(event, '删除工单失败：记录不存在');
     }
     return internalServerErrorResponse(event, '删除工单失败');

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WorkOrderRequirementService } from '~/modules/work-order-requirement/work-order-requirement.service';
+import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -8,8 +8,6 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import { parseWorkOrderListQuery } from '~/utils/work-order';
-import { parseRequirementAttachments } from '~/utils/work-order-requirement-attachments';
 
 const workOrderRequirementBoardQuerySchema = z.object({}).passthrough();
 
@@ -17,44 +15,12 @@ export default defineValidatedHandler(
   workOrderRequirementBoardQuerySchema,
   async (event, query) => {
     const userinfo = await verifyAccessToken(event);
-    if (!userinfo) {
-      return unAuthorizedResponse(event);
-    }
-
-    const params = parseWorkOrderListQuery(query);
-    const filter = normalizeFilter(query.filter);
+    if (!userinfo) return unAuthorizedResponse(event);
 
     try {
-      const result = await WorkOrderRequirementService.getRequirementBoard({
-        ...params,
-        filter,
-        userContext: {
-          userId: String(userinfo.id || userinfo.userId || ''),
-          username: userinfo.username,
-        },
-      });
-
-      return useResponseSuccess({
-        items: result.items.map((item) => ({
-          attachments: parseRequirementAttachments(item.attachment),
-          confirmedAt: item.confirmedAt,
-          confirmer: item.confirmer || '',
-          confirmStatus: String(item.confirmStatus || 'PENDING').toUpperCase(),
-          createdAt: item.createdAt,
-          customerName: item.work_order?.customerName || '',
-          division: item.work_order?.division || '',
-          id: item.id,
-          partName: item.partName || '',
-          processName: item.processName || '',
-          projectName: item.work_order?.projectName || '',
-          requirementName: item.requirementName || '',
-          responsiblePerson: item.responsiblePerson || '',
-          responsibleTeam: item.responsibleTeam || '',
-          workOrderNumber: item.workOrderNumber,
-          workOrderStatus: item.work_order?.status || '',
-        })),
-        total: result.total,
-      });
+      return useResponseSuccess(
+        await WorkOrderRouteService.getRequirementBoard(query, userinfo),
+      );
     } catch (error) {
       logApiError('work-order-requirement-board', error, undefined, event);
       return internalServerErrorResponse(
@@ -64,13 +30,3 @@ export default defineValidatedHandler(
     }
   },
 );
-
-function normalizeFilter(value: unknown) {
-  const normalized = String(value || 'all')
-    .trim()
-    .toLowerCase();
-  if (normalized === 'confirmed') return 'confirmed' as const;
-  if (normalized === 'pending') return 'pending' as const;
-  if (normalized === 'overdue') return 'overdue' as const;
-  return 'all' as const;
-}

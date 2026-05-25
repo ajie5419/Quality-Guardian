@@ -1,16 +1,13 @@
 import { defineEventHandler, readBody } from 'h3';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { WelderScoreService } from '~/modules/welder-score/welder-score.service';
+import { z } from 'zod';
+import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
 import { logApiError } from '~/utils/api-logger';
+import { isPrismaNotFoundError } from '~/utils/db-error';
 import {
-  buildInspectionIssueUpdateData,
   findInspectionIssueAccessRecord,
   hasInspectionIssueWriteAccess,
 } from '~/utils/inspection-issue';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
-import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   forbiddenResponse,
   internalServerErrorResponse,
@@ -20,84 +17,45 @@ import {
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 
+const schema = z.object({}).passthrough();
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  if (!userinfo) return unAuthorizedResponse(event);
 
   const id = getRequiredRouterParam(event, 'id', '缺少ID');
-  if (typeof id !== 'string') {
-    return id;
-  }
-
-  // Data Ownership Check
+  if (typeof id !== 'string') return id;
   let existingNcNumber: null | string = null;
   try {
     const existingRecord = await findInspectionIssueAccessRecord(id);
-
-    if (!existingRecord) {
-      return notFoundResponse(event, '记录不存在');
-    }
-
+    if (!existingRecord) return notFoundResponse(event, '记录不存在');
     existingNcNumber = existingRecord.nonConformanceNumber;
-
     if (
       !hasInspectionIssueWriteAccess({
         inspector: existingRecord.inspector,
         roles: userinfo.roles,
         username: userinfo.username,
       })
-    ) {
+    )
       return forbiddenResponse(event, '无权修改：您只能修改自己创建的数据');
-    }
   } catch (error) {
     logApiError('issues', error, undefined, event);
     return internalServerErrorResponse(event, '权限校验失败');
   }
 
   try {
-    const body = await readBody(event);
-    const bodyRecord = body as Record<string, unknown>;
-    const updateData = await buildInspectionIssueUpdateData(
-      bodyRecord,
+    const body = schema.parse(await readBody(event));
+    await InspectionApiService.updateIssue(
+      userinfo,
+      id,
+      body,
       existingNcNumber,
     );
-
-    await prisma.quality_records.update({
-      where: { id },
-      data: updateData,
-    });
-
-    if (bodyRecord.photos !== undefined) {
-      await FileStorageService.registerReferencesFromAttachments({
-        attachments: bodyRecord.photos,
-        bizId: String(id),
-        bizType: 'inspection_issue',
-        fieldName: 'photos',
-      });
-    }
-
-    await SystemLogService.recordAuditLog({
-      userId: String(userinfo.id),
-      action: 'UPDATE',
-      targetType: 'inspection_issue',
-      targetId: String(id),
-      detailsTemplate: '修改检验问题: {{partName}} ({{nonConformanceNumber}})',
-      detailsVariables: {
-        nonConformanceNumber:
-          updateData.nonConformanceNumber || existingNcNumber || '无编号',
-        partName: updateData.partName || '未修改名称',
-      },
-    });
-    await WelderScoreService.syncFromInspectionIssues();
-
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('issues', error, undefined, event);
-    if (isPrismaNotFoundError(error)) {
+    if (isPrismaNotFoundError(error))
       return notFoundResponse(event, '记录不存在');
-    }
     return internalServerErrorResponse(event, '更新问题失败');
   }
 });

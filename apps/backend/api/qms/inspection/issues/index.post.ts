@@ -1,16 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { WelderScoreService } from '~/modules/welder-score/welder-score.service';
+import { z } from 'zod';
+import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
 import { logApiError } from '~/utils/api-logger';
-import {
-  buildInspectionIssueCreateData,
-  createInspectionIssueId,
-  findInspectionForIssue,
-  getNextInspectionIssueSerialNumber,
-} from '~/utils/inspection-issue';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   badRequestResponse,
@@ -20,68 +12,36 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+const schema = z.object({}).passthrough();
+
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  if (!userinfo) return unAuthorizedResponse(event);
 
   try {
-    const body = await readBody(event);
-    const bodyRecord = body as Record<string, unknown>;
-    const sourceType = String(bodyRecord.sourceType || '')
+    const body = schema.parse(await readBody(event));
+    const sourceType = String(body.sourceType || '')
       .trim()
       .toUpperCase();
     if (
       (sourceType === 'INSPECTION' || sourceType === 'INSPECTION_RECORD') &&
-      !String(bodyRecord.inspectionId || '').trim()
+      !String(body.inspectionId || '').trim()
     ) {
       return badRequestResponse(
         event,
         '检验记录来源创建不合格项时必须携带 inspectionId',
       );
     }
-    const linkedInspection = await findInspectionForIssue(
-      bodyRecord.inspectionId as string | undefined,
+    return useResponseSuccess(
+      await InspectionApiService.createIssue(userinfo, body),
     );
-    const newId = createInspectionIssueId();
-    const serialNumber = await getNextInspectionIssueSerialNumber();
-
-    const newRecord = await prisma.quality_records.create({
-      data: await buildInspectionIssueCreateData(bodyRecord, {
-        id: newId,
-        inspection: linkedInspection,
-        inspectorUsername: userinfo.username,
-        serialNumber,
-      }),
-    });
-
-    await FileStorageService.registerReferencesFromAttachments({
-      attachments: bodyRecord.photos,
-      bizId: String(newRecord.id),
-      bizType: 'inspection_issue',
-      fieldName: 'photos',
-    });
-
-    await SystemLogService.recordAuditLog({
-      userId: String(userinfo.id),
-      action: 'CREATE',
-      targetType: 'inspection_issue',
-      targetId: String(newRecord.id),
-      detailsTemplate: '新增检验问题: {{partName}} ({{nonConformanceNumber}})',
-      detailsVariables: {
-        nonConformanceNumber: newRecord.nonConformanceNumber || '无编号',
-        partName: newRecord.partName,
-      },
-    });
-    await WelderScoreService.syncFromInspectionIssues();
-
-    return useResponseSuccess({
-      ...newRecord,
-      ncNumber: newRecord.nonConformanceNumber,
-    });
   } catch (error) {
     logApiError('issues', error, undefined, event);
+    if (error instanceof Error && error.message.startsWith('BAD_REQUEST:'))
+      return badRequestResponse(
+        event,
+        error.message.replace('BAD_REQUEST:', ''),
+      );
     if (isPrismaUniqueConstraintError(error)) {
       return conflictResponse(event, 'NC number already exists');
     }

@@ -1,55 +1,41 @@
 import { readBody } from 'h3';
+import { z } from 'zod';
 import { logApiError, logClientReport } from '~/utils/api-logger';
 import { bindRequestLogger } from '~/utils/logger';
 import { useResponseSuccess } from '~/utils/response';
 
-const CLIENT_REPORT_ALLOWED_FIELDS = new Set([
-  'colno',
-  'error',
-  'errorCode',
-  'lineno',
-  'message',
-  'requestMethod',
-  'requestTimeout',
-  'requestUrl',
-  'responseStatus',
-  'responseStatusText',
-  'source',
-  'stack',
-  'type',
-  'url',
-  'userAgent',
-]);
-
-function pickClientReportPayload(body: unknown) {
-  if (!body || typeof body !== 'object') return {};
-  const source = body as Record<string, unknown>;
-  const picked: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(source)) {
-    if (!CLIENT_REPORT_ALLOWED_FIELDS.has(key)) continue;
-    picked[key] = value;
-  }
-
-  return picked;
-}
+const schema = z
+  .object({
+    type: z.unknown().optional(),
+    message: z.unknown().optional(),
+    stack: z.unknown().optional(),
+    url: z.unknown().optional(),
+    userAgent: z.unknown().optional(),
+    source: z.unknown().optional(),
+    error: z.unknown().optional(),
+    errorCode: z.unknown().optional(),
+    lineno: z.unknown().optional(),
+    colno: z.unknown().optional(),
+    requestUrl: z.unknown().optional(),
+    requestMethod: z.unknown().optional(),
+    requestTimeout: z.unknown().optional(),
+    responseStatus: z.unknown().optional(),
+    responseStatusText: z.unknown().optional(),
+  })
+  .passthrough();
 
 export default defineEventHandler(async (event) => {
   bindRequestLogger(event);
   try {
-    const body = await readBody(event);
-    const payload = pickClientReportPayload(body);
-
+    const payload = schema.parse(await readBody(event));
     logClientReport(event, {
       endpoint: 'client-log',
       ...payload,
       recordedAt: new Date().toISOString(),
     });
-
     return useResponseSuccess({ message: 'Log recorded' });
   } catch (error) {
     logApiError('client-log', error, undefined, event);
-    // 即使记录日志本身出错，也不要抛出异常给前端
     return useResponseSuccess({ message: 'Log processing attempted' });
   }
 });

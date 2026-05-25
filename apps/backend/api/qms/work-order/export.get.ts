@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { WorkOrderService } from '~/modules/work-order/work-order.service';
-import { logApiDebug, logApiError, logApiWarn } from '~/utils/api-logger';
-import { recordBusinessAuditLog } from '~/utils/audit-log';
+import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
+import { logApiError } from '~/utils/api-logger';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
@@ -10,75 +9,22 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import { parseWorkOrderListQuery } from '~/utils/work-order';
 
-const MAX_EXPORT_ROWS = 20_000;
 const querySchema = z.object({}).passthrough();
 
 export default defineValidatedHandler(querySchema, async (event, query) => {
   const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
-  const startedAt = Date.now();
-  const params = parseWorkOrderListQuery(query);
+  if (!userinfo) return unAuthorizedResponse(event);
 
   try {
-    const result = await WorkOrderService.getList({
-      ...params,
-      page: 1,
-      pageSize: MAX_EXPORT_ROWS + 1,
-    });
-
-    if ((result.total || 0) > MAX_EXPORT_ROWS) {
-      logApiWarn('work-order-export', 'export rows exceed limit', {
-        count: result.total,
-        filters: params,
-        latencyMs: Date.now() - startedAt,
-        module: 'work-order',
-        userId: userinfo.userId,
-      });
-      return badRequestResponse(
-        event,
-        `导出数据量超过上限（${MAX_EXPORT_ROWS} 条），请缩小筛选范围后重试`,
-      );
-    }
-
-    logApiDebug('work-order-export', 'export success', {
-      count: result.total || 0,
-      filters: params,
-      latencyMs: Date.now() - startedAt,
-      module: 'work-order',
-      userId: userinfo.userId,
-    });
-
-    await recordBusinessAuditLog(event, {
-      userId: userinfo.id,
-      action: 'EXPORT',
-      targetType: 'work_order',
-      targetId: 'export',
-      detailsTemplate: '导出工单: {{count}} 条',
-      detailsVariables: {
-        count: result.total || 0,
-      },
-    });
-
-    return useResponseSuccess({
-      items: result.items || [],
-      total: result.total || 0,
-    });
-  } catch (error) {
-    logApiError(
-      'work-order-export',
-      error,
-      {
-        latencyMs: Date.now() - startedAt,
-        module: 'work-order',
-        userId: userinfo.userId,
-      },
-      event,
+    return useResponseSuccess(
+      await WorkOrderRouteService.exportList(event, query, userinfo),
     );
+  } catch (error) {
+    logApiError('work-order-export', error, undefined, event);
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith('BAD_REQUEST:'))
+      return badRequestResponse(event, message.replace('BAD_REQUEST:', ''));
     return internalServerErrorResponse(
       event,
       'Failed to export work order list',

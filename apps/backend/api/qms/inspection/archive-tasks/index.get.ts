@@ -1,4 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { z } from 'zod';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -8,6 +9,8 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+const schema = z.object({}).passthrough();
+
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
   if (!userinfo) {
@@ -15,19 +18,18 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const query = getQuery(event);
-    const date = String(query.date || '').trim() || undefined;
-    const status = String(query.status || '').trim() || undefined;
-    const page = Number(query.page || 1);
-    const pageSize = Number(query.pageSize || 20);
-    const inspector = String(query.inspector || userinfo.username || '').trim();
-
+    const query = schema.parse(getQuery(event));
     const result = await InspectionService.getArchiveTasks({
-      date,
-      inspector,
-      page,
-      pageSize,
-      status: status as any,
+      date: String(query.date || '').trim() || undefined,
+      inspector: String(query.inspector || userinfo.username || '').trim(),
+      page: Number(query.page || 1),
+      pageSize: Number(query.pageSize || 20),
+      status: (String(query.status || '').trim() || undefined) as
+        | 'ARCHIVED'
+        | 'IN_PROGRESS'
+        | 'PENDING'
+        | 'REJECTED'
+        | undefined,
     });
     return useResponseSuccess(result);
   } catch (error) {

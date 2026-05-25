@@ -98,6 +98,15 @@ export const DeptService = {
     return result;
   },
 
+  async findActiveTree() {
+    const departments = await prisma.departments.findMany({
+      where: { isDeleted: false, status: 1 },
+      orderBy: { sort: 'asc' },
+      select: { id: true, name: true, parentId: true },
+    });
+    return buildDeptTree(departments as DeptItem[]);
+  },
+
   /**
    * Create a new department
    */

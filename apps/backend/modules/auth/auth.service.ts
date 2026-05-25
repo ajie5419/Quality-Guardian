@@ -50,4 +50,61 @@ export const AuthService = {
 
     return { userPayload, accessToken, refreshToken };
   },
+
+  async refreshAccessToken(username: string) {
+    const dbUser = await prisma.users.findUnique({
+      where: { username },
+      include: { roles: true },
+    });
+    if (!dbUser || dbUser.status !== 'ACTIVE') {
+      return null;
+    }
+    return generateAccessToken({
+      id: dbUser.id,
+      realName: dbUser.realName,
+      roles: [dbUser.roles?.name || 'user'],
+      username: dbUser.username,
+    });
+  },
+
+  async registerUser(params: {
+    deptId: string;
+    password: string;
+    username: string;
+  }) {
+    const { deptId, password, username } = params;
+    const dept = await prisma.departments.findUnique({ where: { id: deptId } });
+    if (!dept) return { error: 'DEPT_NOT_FOUND' as const };
+    const existingUser = await prisma.users.findUnique({ where: { username } });
+    if (existingUser) return { error: 'USER_EXISTS' as const };
+
+    const defaultRole =
+      (await prisma.roles.findFirst({ where: { name: 'user' } })) ||
+      (await prisma.roles.create({
+        data: {
+          id: 'user-role',
+          name: 'user',
+          description: '普通用户',
+          permissions: '[]',
+          status: 1,
+        },
+      }));
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const newUser = await prisma.users.create({
+      data: {
+        id: `USR-${Date.now()}`,
+        username,
+        password: hashedPassword,
+        realName: username,
+        roleId: defaultRole.id,
+        department: deptId,
+        status: 'INACTIVE',
+      },
+    });
+    return {
+      id: newUser.id,
+      username: newUser.username,
+      message: '注册成功，请等待管理员审核开通账号',
+    };
+  },
 };

@@ -2,13 +2,10 @@ import { defineEventHandler, readBody } from 'h3';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
-import prisma from '~/utils/prisma';
 import {
   isPrismaNotFoundError,
   isPrismaUniqueConstraintError,
 } from '~/utils/prisma-error';
-import { redis } from '~/utils/redis';
 import {
   conflictResponse,
   internalServerErrorResponse,
@@ -35,40 +32,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
-    const governedFields = buildGovernedWriteFieldsForTable('roles', {
-      name: body.value,
-    });
-
-    const updateData: Record<string, unknown> = {
-      description: body.name || body.remark || body.description, // Use 'name' from FE as description
-      updatedAt: new Date(),
-    };
-
-    // Only update name (identifier) if provided and we really want to allow it
-    // But usually identifier shouldn't change.
-    // In our DB mapping, name = role value.
-    if (governedFields.name) {
-      updateData.name = governedFields.name;
-    }
-
-    if (body.status !== undefined) {
-      updateData.status = body.status;
-    }
-
-    await redis.delByPattern('qms:menu:*');
-    const role = await prisma.roles.update({
-      where: { id },
-      data: updateData,
-    });
-
-    if (body.permissions !== undefined) {
-      const permissions = Array.isArray(body.permissions)
-        ? body.permissions
-        : [];
-      await RbacService.saveRolePermissions(role.id, permissions);
-    }
-
+    await RbacService.updateRole(id, await readBody(event));
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('role', error, undefined, event);

@@ -1,41 +1,22 @@
 import { defineEventHandler, readBody } from 'h3';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { z } from 'zod';
+import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
 import { logApiError } from '~/utils/api-logger';
 import {
-  generateInspectionRequestNo,
   isInspectionRequestAssemblyProcess,
-  mapInspectionRequest,
   normalizeInspectionRequestAttachments,
-  normalizeInspectionRequestCheckResult,
   normalizeInspectionRequestText,
-  parseInspectionRequestQuantity,
 } from '~/utils/inspection-request';
-import { publishInspectionRequestCreated } from '~/utils/inspection-request-events';
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
-import prisma from '~/utils/prisma';
-import { resolveProcessIdForWrite } from '~/utils/process-resolver';
-import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import { resolveTeamIdForWrite } from '~/utils/team-resolver';
+
+const schema = z.object({}).passthrough();
 
 export default defineEventHandler(async (event) => {
-  const body = (await readBody(event)) as Record<string, unknown>;
-  const required = getMissingRequiredFields(body, [
-    'workOrderNumber',
-    'partName',
-    'processName',
-    'reporter',
-  ]);
-  if (required.length > 0) {
-    return badRequestResponse(event, `缺少必填字段: ${required.join('/')}`);
-  }
+  const body = schema.parse(await readBody(event));
 
   const workOrderNumber = normalizeInspectionRequestText(body.workOrderNumber);
   const partName = normalizeInspectionRequestText(body.partName);
@@ -45,7 +26,7 @@ export default defineEventHandler(async (event) => {
     : normalizeInspectionRequestText(body.componentName);
   const reporter = normalizeInspectionRequestText(body.reporter);
   const team = normalizeInspectionRequestText(body.team);
-  const quantity = parseInspectionRequestQuantity(body.quantity);
+  parseInspectionRequestQuantity(body.quantity);
   const attachments = normalizeInspectionRequestAttachments(body.attachments);
   if (
     !workOrderNumber ||
@@ -63,72 +44,13 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const governedFields = buildGovernedWriteFieldsForTable(
-      'qms_inspection_requests',
-      {
-        componentName: componentName || null,
-        team,
-      },
+    return useResponseSuccess(
+      await InspectionApiService.createRequest(event, null, body, true),
     );
-    const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
-      'qms_inspection_requests',
-      governedFields as Record<string, unknown>,
-    );
-    const processId = await resolveProcessIdForWrite({
-      processName,
-    });
-    const teamId = await resolveTeamIdForWrite({
-      team,
-    });
-    const workOrder = await prisma.work_orders.findUnique({
-      select: { workOrderNumber: true },
-      where: { workOrderNumber },
-    });
-    if (!workOrder) {
-      return badRequestResponse(event, '工单不存在');
-    }
-
-    const created = await prisma.qms_inspection_requests.create({
-      data: {
-        attachments: JSON.stringify(attachments),
-        componentName: componentName || null,
-        mutualCheckResult: normalizeInspectionRequestCheckResult(
-          body.mutualCheckResult,
-        ),
-        partName,
-        processId,
-        teamId,
-        processName,
-        quantity,
-        reporter,
-        requestInfo: normalizeInspectionRequestText(body.requestInfo) || null,
-        requestNo: await generateInspectionRequestNo(prisma),
-        selfCheckResult: normalizeInspectionRequestCheckResult(
-          body.selfCheckResult,
-        ),
-        ...governedFields,
-        ...governedCanonicalIds,
-        workOrderNumber,
-      },
-      include: {
-        dispatcher: { select: { realName: true, username: true } },
-        inspector: { select: { realName: true, username: true } },
-        process: { select: { name: true } },
-      },
-    });
-
-    await FileStorageService.registerReferencesFromAttachments({
-      attachments,
-      bizId: created.id,
-      bizType: 'inspection_request',
-    });
-
-    const mapped = mapInspectionRequest(created);
-    publishInspectionRequestCreated(mapped);
-
-    return useResponseSuccess(mapped);
   } catch (error) {
     logApiError('public-inspection-request-create', error, undefined, event);
+    if (error instanceof Error && error.message.startsWith('BAD_REQUEST:'))
+      return badRequestResponse(event, error.message.replace('BAD_REQUEST:', ''));
     return internalServerErrorResponse(event, '创建报检任务失败');
   }
 });
