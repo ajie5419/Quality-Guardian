@@ -4,10 +4,10 @@ import type {
   QualityLossServiceTrendItem,
 } from '@qgs/shared';
 import type { PaginationParams } from '~/modules/base/base.service';
+import type { QualityLossSource } from '~/utils/quality-loss-status';
 
 import { Prisma } from '@prisma/client';
 import { AUDIT_TEMPLATES } from '@qgs/shared';
-import { MONTHS } from '~/modules/quality-loss/locale';
 import {
   applyPagination,
   formatDateString,
@@ -16,10 +16,23 @@ import {
 } from '~/modules/base/base.service';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept/dept.service';
+import { MONTHS } from '~/modules/quality-loss/locale';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import { normalizeQualityLossStatus } from '~/utils/quality-loss-status';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
+import {
+  normalizeQualityLossSource,
+  normalizeQualityLossStatus,
+  QUALITY_LOSS_SOURCE,
+  toAfterSalesClaimStatus,
+  toQualityLossTargetType,
+  toQualityRecordStatus,
+} from '~/utils/quality-loss-status';
+import {
+  parseQualityLossUpdateBody,
+  resolveQualityLossUpdateTarget,
+} from '~/utils/quality-loss-update';
 
 // 创建模块级 logger
 const logger = createModuleLogger('QualityLossService');
@@ -529,6 +542,136 @@ function formatTrendItem(
 // ============ 主服务导出 ============
 
 export const QualityLossService = {
+  async updateByRouteId(params: {
+    body: Record<string, unknown>;
+    id: string;
+    userId: string;
+  }) {
+    const source = normalizeQualityLossSource(
+      params.body.lossSource as string | undefined,
+    );
+    const parsedBody = parseQualityLossUpdateBody(params.body);
+    if ('message' in parsedBody) {
+      return {
+        ok: false as const,
+        code: 'BAD_REQUEST' as const,
+        message: parsedBody.message,
+      };
+    }
+
+    const target = await resolveQualityLossUpdateTarget({
+      client: prisma,
+      pathId: params.id,
+      pk: params.body.pk,
+      source,
+    });
+    if ('message' in target) {
+      return {
+        ok: false as const,
+        code: 'BAD_REQUEST' as const,
+        message: target.message,
+      };
+    }
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        if (target.source === QUALITY_LOSS_SOURCE.INTERNAL) {
+          await tx.quality_records.update({
+            where: target.where,
+            data: {
+              recoveredAmount: parsedBody.actualClaim,
+              ...(parsedBody.status
+                ? { status: toQualityRecordStatus(parsedBody.status) }
+                : {}),
+              updatedAt: new Date(),
+            },
+          });
+          return;
+        }
+        if (target.source === QUALITY_LOSS_SOURCE.EXTERNAL) {
+          await tx.after_sales.update({
+            where: target.where,
+            data: {
+              actualClaim: parsedBody.actualClaim,
+              ...(parsedBody.status
+                ? { claimStatus: toAfterSalesClaimStatus(parsedBody.status) }
+                : {}),
+              updatedAt: new Date(),
+            },
+          });
+          return;
+        }
+        if (target.source === QUALITY_LOSS_SOURCE.COMMISSIONING) {
+          await tx.vehicle_commissioning_issues.update({
+            where: target.where,
+            data: {
+              ...(parsedBody.amount === undefined
+                ? {}
+                : { lossAmount: parsedBody.amount }),
+              ...(parsedBody.actualClaim === undefined
+                ? {}
+                : { recoveredAmount: parsedBody.actualClaim }),
+              ...(parsedBody.status ? { claimStatus: parsedBody.status } : {}),
+              updatedAt: new Date(),
+            },
+          });
+          return;
+        }
+        await tx.quality_losses.update({
+          where: target.where,
+          data: {
+            ...(parsedBody.occurDate
+              ? { occurDate: parsedBody.occurDate }
+              : {}),
+            ...(parsedBody.type ? { type: parsedBody.type } : {}),
+            ...(parsedBody.amount === undefined
+              ? {}
+              : { amount: parsedBody.amount }),
+            ...(parsedBody.actualClaim === undefined
+              ? {}
+              : { actualClaim: parsedBody.actualClaim }),
+            ...(parsedBody.respDept === undefined
+              ? {}
+              : { respDept: parsedBody.respDept }),
+            ...(params.body.description === undefined
+              ? {}
+              : { description: params.body.description }),
+            ...(parsedBody.status ? { status: parsedBody.status } : {}),
+            updatedAt: new Date(),
+          },
+        });
+      });
+    } catch (error) {
+      if (isPrismaNotFoundError(error)) {
+        return {
+          ok: false as const,
+          code: 'NOT_FOUND' as const,
+          message: '目标记录不存在',
+        };
+      }
+      const err = error as { message?: string };
+      return {
+        ok: false as const,
+        code: 'INTERNAL' as const,
+        message: `数据更新失败：${err.message || '数据库操作异常'}`,
+      };
+    }
+
+    await SystemLogService.recordAuditLog({
+      userId: params.userId,
+      action: 'UPDATE',
+      targetType: toQualityLossTargetType(source as QualityLossSource),
+      targetId: String(params.id),
+      detailsTemplate: '修改质量损失相关记录: {{id}}{{sourcePart}}',
+      detailsVariables: {
+        id: params.id,
+        sourcePart:
+          source === QUALITY_LOSS_SOURCE.MANUAL ? '' : ` (${source} 来源)`,
+      },
+    });
+    return { ok: true as const };
+  },
+
   /**
    * 获取趋势数据（按月或按周）
    */

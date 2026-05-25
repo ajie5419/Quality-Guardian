@@ -1,23 +1,8 @@
-import {
-  resolveReportPeriodRange,
-  resolveReportShortLabel,
-  shiftReportAnchorDate,
-} from '@qgs/shared';
 import { defineEventHandler, getQuery } from 'h3';
+import { z } from 'zod';
+import { ReportSummaryService } from '~/modules/report/report-summary.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
-import {
-  createPassRateTargetResolver,
-  getNetPassRateSummaryByRange,
-  getPassRateDrillDownByRange,
-} from '~/utils/pass-rate';
-import prisma from '~/utils/prisma';
-import {
-  formatReportDate,
-  parseReportPeriodType,
-  resolveReportQueryDate,
-} from '~/utils/report';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -25,297 +10,26 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+const summaryQuerySchema = z.object({
+  date: z.string().optional(),
+  type: z.string().optional(),
+});
+
 export default defineEventHandler(async (event) => {
   const userinfo = await verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
-
-  const query = getQuery(event);
-  const type = parseReportPeriodType(query.type);
-  if (!type) {
-    return badRequestResponse(event, 'Invalid type parameter');
-  }
-  const { date: targetDate, valid: isDateValid } = resolveReportQueryDate(
-    query.date,
-  );
-  if (!isDateValid) {
-    return badRequestResponse(event, 'Invalid date parameter');
-  }
-
+  const query = summaryQuerySchema.parse(getQuery(event));
   try {
-    const historyCount = 6;
-    const periods = Array.from({ length: historyCount })
-      .map(
-        (_, i) =>
-          getReportPeriods(shiftDate(targetDate, type, -i), type).current,
-      )
-      .reverse();
-
-    const currentPeriod = periods[historyCount - 1];
-    const _previousPeriod = periods[historyCount - 2];
-
-    // Parallel data fetching for the entire history and current details
-    const [
-      historyMetrics,
-      defects,
-      topRiskProjects,
-      supplierRanking,
-      majorEvents,
-      processPassRates,
-    ] = await Promise.all([
-      Promise.all(periods.map((p) => fetchPeriodMetrics(p.start, p.end))),
-      fetchDefectDistribution(currentPeriod.start, currentPeriod.end),
-      fetchTopRiskProjects(currentPeriod.start, currentPeriod.end),
-      fetchSupplierPerformance(currentPeriod.start, currentPeriod.end),
-      fetchMajorEvents(currentPeriod.start, currentPeriod.end),
-      fetchProcessPassRates(currentPeriod.start, currentPeriod.end),
-    ]);
-
-    const currData = historyMetrics[historyCount - 1];
-    const prevData = historyMetrics[historyCount - 2];
-
-    const reportData = {
-      title: `${type === 'weekly' ? '周' : '月'}度质量分析报告`,
-      period: `${formatReportDate(currentPeriod.start)} ~ ${formatReportDate(currentPeriod.end)}`,
-      metrics: [
-        {
-          label: '综合合格率',
-          value: currData.passRate,
-          unit: '%',
-          trend: calculateTrend(currData.passRate, prevData.passRate),
-          desc: '检验合格数量扣减不合格项后的净合格率',
-          history: historyMetrics.map((h) => h.passRate),
-        },
-        {
-          label: '制造损失',
-          value: currData.internalLoss,
-          unit: '¥',
-          trend: calculateTrend(
-            currData.internalLoss,
-            prevData.internalLoss,
-            true,
-          ),
-          desc: 'NCR 产生的报废与工时损失',
-          history: historyMetrics.map((h) => h.internalLoss),
-        },
-        {
-          label: '售后损失',
-          value: currData.externalLoss,
-          unit: '¥',
-          trend: calculateTrend(
-            currData.externalLoss,
-            prevData.externalLoss,
-            true,
-          ),
-          desc: '售后赔偿及维修成本',
-          history: historyMetrics.map((h) => h.externalLoss),
-        },
-        {
-          label: '问题结案率',
-          value: currData.closingRate,
-          unit: '%',
-          trend: calculateTrend(currData.closingRate, prevData.closingRate),
-          desc: '本期已关闭问题 / 本期新增问题',
-          history: historyMetrics.map((h) => h.closingRate),
-        },
-      ],
-      historyLabels: periods.map((p) => formatDateShort(p.start, type)),
-      defects: defects.map((d) => ({
-        name: d.defectType || '未分类',
-        value: d._count,
-      })),
-      processPassRates,
-      topProjects: topRiskProjects.map((p) => ({
-        name: p.projectName || '未知项目',
-        issues: p._count,
-        loss: Number(p._sum.lossAmount || 0),
-      })),
-      suppliers: {
-        best: supplierRanking.slice(0, 3),
-        worst: supplierRanking.reverse().slice(0, 3),
-      },
-      majorEvents: majorEvents.map((e) => ({
-        id: e.id,
-        title: e.partName || '未知部件',
-        project: e.projectName,
-        loss: Number(e.lossAmount),
-        status: e.status,
-        date: formatReportDate(e.date),
-        desc: e.description,
-      })),
-    };
-
-    return useResponseSuccess(reportData);
+    const data = await ReportSummaryService.getSummaryFromQuery(
+      query.type,
+      query.date,
+    );
+    return useResponseSuccess(data);
   } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
+    if (ReportSummaryService.isValidationError(error)) {
+      return badRequestResponse(event, error.message);
+    }
     logApiError('summary', error, undefined, event);
-    return internalServerErrorResponse(event, `报告生成失败: ${errorMessage}`);
+    return internalServerErrorResponse(event, '报告生成失败');
   }
 });
-
-async function fetchPeriodMetrics(start: Date, end: Date) {
-  const [
-    passRateSummary,
-    newIssues,
-    closedIssues,
-    internalLossAgg,
-    externalLossAgg,
-    manualLossAgg,
-  ] = await Promise.all([
-    getNetPassRateSummaryByRange(start, end),
-    prisma.quality_records.count({
-      where: { createdAt: { gte: start, lte: end }, isDeleted: false },
-    }),
-    prisma.quality_records.count({
-      where: {
-        createdAt: { gte: start, lte: end },
-        status: 'CLOSED',
-        isDeleted: false,
-      },
-    }),
-    prisma.quality_records.aggregate({
-      _sum: { lossAmount: true },
-      where: { date: { gte: start, lte: end }, isDeleted: false },
-    }),
-    prisma.after_sales.aggregate({
-      _sum: { materialCost: true, laborTravelCost: true },
-      where: { occurDate: { gte: start, lte: end }, isDeleted: false },
-    }),
-    prisma.quality_losses.aggregate({
-      _sum: { amount: true },
-      where: { occurDate: { gte: start, lte: end }, isDeleted: false },
-    }),
-  ]);
-
-  const closingRate =
-    newIssues > 0 ? ((closedIssues / newIssues) * 100).toFixed(1) : 100;
-  const internalLoss =
-    Number(internalLossAgg._sum.lossAmount || 0) +
-    Number(manualLossAgg._sum.amount || 0);
-  const externalLoss =
-    Number(externalLossAgg._sum.materialCost || 0) +
-    Number(externalLossAgg._sum.laborTravelCost || 0);
-
-  return {
-    passRate: passRateSummary.passRate,
-    closingRate: Number(closingRate),
-    internalLoss,
-    externalLoss,
-  };
-}
-
-async function fetchProcessPassRates(start: Date, end: Date) {
-  const getTargetPassRate = await createPassRateTargetResolver();
-  const drillDown = await getPassRateDrillDownByRange(
-    start,
-    end,
-    getTargetPassRate,
-  );
-
-  return drillDown.map((row) => ({
-    processName: row.process,
-    category: row.category,
-    total: row.totalCount,
-    passed: row.passCount,
-    passRate: row.passRate,
-    targetPassRate: row.targetPassRate,
-  }));
-}
-
-async function fetchDefectDistribution(start: Date, end: Date) {
-  const rows = await prisma.quality_records.findMany({
-    where: { date: { gte: start, lte: end }, isDeleted: false },
-    select: {
-      defectType: true,
-      defectTypeId: true,
-    },
-  });
-  const defectTypeNameById =
-    await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-      configKey: 'defectType',
-      canonicalIds: rows.map((item) => item.defectTypeId),
-    });
-  const countByDefectType = new Map<string, number>();
-  for (const row of rows) {
-    const key =
-      defectTypeNameById.get(String(row.defectTypeId || '')) ||
-      String(row.defectType || '').trim() ||
-      '未分类';
-    countByDefectType.set(key, (countByDefectType.get(key) || 0) + 1);
-  }
-  return [...countByDefectType.entries()]
-    .map(([defectType, count]) => ({
-      defectType,
-      _count: {
-        defectType: count,
-      },
-    }))
-    .sort((a, b) => b._count.defectType - a._count.defectType)
-    .slice(0, 5);
-}
-
-async function fetchTopRiskProjects(start: Date, end: Date) {
-  return prisma.quality_records.groupBy({
-    by: ['projectName'],
-    where: { date: { gte: start, lte: end }, isDeleted: false },
-    _count: true,
-    _sum: { lossAmount: true },
-    orderBy: { _sum: { lossAmount: 'desc' } },
-    take: 5,
-  });
-}
-
-async function fetchSupplierPerformance(start: Date, end: Date) {
-  // 简化逻辑：通过 NCR 数量反向评估
-  const stats = await prisma.quality_records.groupBy({
-    by: ['supplierName'],
-    where: {
-      date: { gte: start, lte: end },
-      isDeleted: false,
-      supplierName: { not: null },
-    },
-    _count: true,
-  });
-  return stats
-    .map((s) => ({ name: s.supplierName, issues: s._count }))
-    .sort((a, b) => a.issues - b.issues); // 问题越少排名越前
-}
-
-async function fetchMajorEvents(start: Date, end: Date) {
-  return prisma.quality_records.findMany({
-    where: { date: { gte: start, lte: end }, isDeleted: false },
-    orderBy: { lossAmount: 'desc' },
-    take: 3,
-  });
-}
-
-function getReportPeriods(date: Date, type: string) {
-  const granularity = type === 'weekly' ? 'week' : 'month';
-  const current = resolveReportPeriodRange({
-    anchorDate: date,
-    granularity,
-  });
-  return { current };
-}
-
-function shiftDate(date: Date, type: string, amount: number) {
-  return shiftReportAnchorDate({
-    amount,
-    anchorDate: date,
-    granularity: type === 'weekly' ? 'week' : 'month',
-  });
-}
-
-function calculateTrend(curr: number, prev: number, lowerIsBetter = false) {
-  if (!prev) return 0;
-  const diff = (((curr - prev) / prev) * 100).toFixed(1);
-  const val = Number(diff);
-  return lowerIsBetter ? -val : val;
-}
-
-function formatDateShort(date: Date, type: string) {
-  return resolveReportShortLabel({
-    date,
-    granularity: type === 'weekly' ? 'week' : 'month',
-  });
-}

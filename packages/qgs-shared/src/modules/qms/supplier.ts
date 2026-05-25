@@ -5,7 +5,7 @@
 /**
  * Supplier Category
  */
-export type SupplierCategory = 'Outsourcing' | 'Supplier' | string;
+type SupplierCategory = 'Outsourcing' | 'Supplier' | string;
 export type OutsourcingMode =
   | 'EXTERNAL_PROCESSOR'
   | 'EXTERNAL_SERVICE'

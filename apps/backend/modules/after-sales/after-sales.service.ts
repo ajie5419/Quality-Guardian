@@ -6,8 +6,8 @@ import type {
 import type { AfterSalesDateMode } from '~/utils/after-sales-query';
 
 import { Prisma } from '@prisma/client';
-import { AUDIT_TEMPLATES } from '@qgs/shared';
 import {
+  AUDIT_TEMPLATES,
   formatDate,
   QMS_DEFAULT_VALUES,
   QMS_STATUS_OPEN_SET,

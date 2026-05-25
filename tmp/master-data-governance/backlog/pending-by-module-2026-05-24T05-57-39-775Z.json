@@ -1,0 +1,137 @@
+{
+  "generatedAt": "2026-05-24T05:57:39.774Z",
+  "summary": {
+    "moduleCount": 4,
+    "totalExcluded": 17,
+    "totalPending": 17,
+    "totalUndecided": 0
+  },
+  "modules": [
+    {
+      "moduleKey": "supervision",
+      "moduleNameZh": "监督",
+      "pendingCount": 9,
+      "excludedCount": 9,
+      "fields": [
+        {
+          "fieldKey": "supervision_milestones.delayReason",
+          "fieldNameZh": "监督里程碑延期原因",
+          "reason": "Business-excluded by product decision; not governed by master-data canonicalization scope.",
+          "status": "excluded"
+        },
+        {
+          "fieldKey": "supervision_milestones.name",
+          "fieldNameZh": "监督里程碑名称",
+          "reason": "Business-excluded by product decision; not governed by master-data canonicalization scope.",
+          "status": "excluded"
+        },
+        {
+          "fieldKey": "supervision_plan_steps.stepName",
+          "fieldNameZh": "监督计划步骤名",
+          "reason": "Business-excluded by product decision; not governed by master-data canonicalization scope.",
+          "status": "excluded"
+        },
+        {
+          "fieldKey": "supervision_plan_tasks.resourceName",
+          "fieldNameZh": "监督计划任务资源名",
+          "reason": "Business-excluded by product decision; not governed by master-data canonicalization scope.",
+          "status": "excluded"
+        },
+        {
+          "fieldKey": "supervision_plan_tasks.riskReason",
+          "fieldNameZh": "监督风险原因",
+          "reason": "Business-excluded by product decision; not governed by master-data canonicalization scope.",
+          "status": "excluded"
+        },
+        {
+          "fieldKey": "supervision_plan_tasks.taskName",
+          "fieldNameZh": "监督计划任务名",
+          "reason": "Business-excluded by product decision; not governed by master-data canonicalization scope.",
+          "status": "excluded"
+        },
+        {
+          "fieldKey": "supervision_projects.participants",
+          "fieldNameZh": "监督参与方",
+          "reason": "Business-excluded by product decision; not governed by master-data canonicalization scope.",
+          "status": "excluded"
+        },
+        {
+          "fieldKey": "supervision_report_task_updates.riskReason",
+          "fieldNameZh": "监督风险原因",
+          "reason": "Business-excluded by product decision; not governed by master-data canonicalization scope.",
+          "status": "excluded"
+        },
+        {
+          "fieldKey": "supervision_report_task_updates.taskName",
+          "fieldNameZh": "监督计划任务名",
+          "reason": "Business-excluded by product decision; not governed by master-data canonicalization scope.",
+          "status": "excluded"
+        }
+      ]
+    },
+    {
+      "moduleKey": "system",
+      "moduleNameZh": "系统元数据",
+      "pendingCount": 6,
+      "excludedCount": 6,
+      "fields": [
+        {
+          "fieldKey": "data_permission_policies.deptIds",
+          "reason": "Authorization policy field, not business master-data naming field.",
+          "status": "excluded"
+        },
+        {
+          "fieldKey": "login_logs.username",
+          "reason": "Audit/login identity field, out of master-data naming governance scope.",
+          "status": "excluded"
+        },
+        {
+          "fieldKey": "menus.name",
+          "reason": "System menu metadata, not business master-data field.",
+          "status": "excluded"
+        },
+        {
+          "fieldKey": "menus.type",
+          "reason": "System menu metadata, not business master-data field.",
+          "status": "excluded"
+        },
+        {
+          "fieldKey": "permissions.name",
+          "reason": "RBAC metadata field, out of business master-data governance scope.",
+          "status": "excluded"
+        },
+        {
+          "fieldKey": "rbac_permissions.name",
+          "reason": "RBAC metadata field, out of business master-data governance scope.",
+          "status": "excluded"
+        }
+      ]
+    },
+    {
+      "moduleKey": "dictionary",
+      "moduleNameZh": "字典与主数据",
+      "pendingCount": 1,
+      "excludedCount": 1,
+      "fields": [
+        {
+          "fieldKey": "dictionaries.dictType",
+          "reason": "Dictionary metadata key, not target business field.",
+          "status": "excluded"
+        }
+      ]
+    },
+    {
+      "moduleKey": "inspection",
+      "moduleNameZh": "检验",
+      "pendingCount": 1,
+      "excludedCount": 1,
+      "fields": [
+        {
+          "fieldKey": "inspections.templateName",
+          "reason": "Display/derived template label; governance target should be canonical template id relation.",
+          "status": "excluded"
+        }
+      ]
+    }
+  ]
+}
