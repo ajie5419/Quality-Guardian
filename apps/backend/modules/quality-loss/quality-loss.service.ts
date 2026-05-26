@@ -3,65 +3,50 @@ import type {
   QualityLossCharts,
   QualityLossDashboardSummary,
   QualityLossItem,
-  QualityLossParams,
   QualityLossServiceTrendItem,
 } from '@qgs/shared';
-import type { QualityLossSource } from '~/modules/quality-loss/quality-loss-status';
-import type { PaginationParams } from '~/utils/query-helpers';
+
+import type {
+  QualityLossQueryParams,
+  SingleQualityLossSource,
+  TrendRow,
+} from './quality-loss-format';
 
 import { Prisma } from '@prisma/client';
-import { resolveQualityLossTargetLocator } from '@qgs/shared';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
-import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { flattenDeptTree } from '~/modules/dept/dept-tree';
 import { DeptService } from '~/modules/dept/dept.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
-import { MONTHS } from '~/modules/quality-loss/locale';
-import {
-  normalizeQualityLossSource,
-  normalizeQualityLossStatus,
-  QUALITY_LOSS_SOURCE,
-  toQualityLossTargetType,
-} from '~/modules/quality-loss/quality-loss-status';
-import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { normalizeQualityLossStatus } from '~/modules/quality-loss/quality-loss-status';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
-  formatDateString,
-  formatNumber,
   applyPagination as paginateList,
   parsePagination,
   safeNumber,
 } from '~/utils/query-helpers';
 
-import { parseQualityLossUpdateBody } from './quality-loss-update';
+import { QualityLossDataScopeService } from './quality-loss-data-scope.service';
+import {
+  buildManualLossesWhere,
+  formatCommissioningIssueItem,
+  formatExternalSalesItem,
+  formatInternalRecordItem,
+  formatManualLossItem,
+  formatTrendItem,
+  mergeTrendData,
+  normalizeLossSourceFilter,
+  QL_CONSTANTS,
+  sortByDateDesc,
+} from './quality-loss-format';
+import { QualityLossRecordMaintenanceService } from './quality-loss-record-maintenance.service';
+import { QualityLossReportingService } from './quality-loss-reporting.service';
+import { QualityLossRouteUpdateService } from './quality-loss-route-update.service';
+import { QualityLossSummaryService } from './quality-loss-summary.service';
 
 // 创建模块级 logger
 const logger = createModuleLogger('QualityLossService');
-
-// ============ 类型定义 ============
-
-interface TrendRow {
-  a: bigint | null | number | Prisma.Decimal;
-  p: bigint | number;
-}
-
-interface TrendItem {
-  commissioning: number;
-  external: number;
-  internal: number;
-  manual: number;
-}
-
-type QualityLossQueryParams = PaginationParams & QualityLossParams;
-
-type SingleQualityLossSource =
-  | typeof QL_CONSTANTS.SOURCE.COMMISSIONING
-  | typeof QL_CONSTANTS.SOURCE.EXTERNAL
-  | typeof QL_CONSTANTS.SOURCE.INTERNAL
-  | typeof QL_CONSTANTS.SOURCE.MANUAL;
 
 type AggregationSourceRecords = {
   commissioningIssues: Awaited<
@@ -75,295 +60,6 @@ type AggregationSourceRecords = {
   >;
   manualRecords: Awaited<ReturnType<typeof prisma.quality_losses.findMany>>;
 };
-
-type QualityLossUpdateTarget =
-  | { id: string; source: 'Commissioning'; valid: true }
-  | { id: string; source: 'External'; valid: true }
-  | { id: string; source: 'Internal'; valid: true }
-  | { message: string; valid: false }
-  | {
-      source: 'Manual';
-      valid: true;
-      where: Prisma.quality_lossesWhereUniqueInput;
-    };
-
-async function resolveQualityLossUpdateTarget(params: {
-  pathId: string;
-  pk: unknown;
-  source: QualityLossSource;
-}): Promise<QualityLossUpdateTarget> {
-  const target = resolveQualityLossTargetLocator(params);
-  if ('message' in target) return { valid: false, message: target.message };
-
-  if (target.lookup === 'manualLossId') {
-    return {
-      source: QUALITY_LOSS_SOURCE.MANUAL,
-      valid: true,
-      where: { lossId: target.identifier },
-    };
-  }
-  if (target.lookup === 'manualId') {
-    return {
-      source: QUALITY_LOSS_SOURCE.MANUAL,
-      valid: true,
-      where: { id: target.identifier },
-    };
-  }
-  if (target.lookup === 'internal') {
-    if (target.serial === null) {
-      return {
-        source: QUALITY_LOSS_SOURCE.INTERNAL,
-        valid: true,
-        id: target.identifier,
-      };
-    }
-    const id = await InspectionService.findIssueIdBySerialNumber(target.serial);
-    return id
-      ? { source: QUALITY_LOSS_SOURCE.INTERNAL, valid: true, id }
-      : { valid: false, message: '内部质量记录不存在' };
-  }
-  if (target.lookup === 'commissioning') {
-    const id = await VehicleCommissioningService.findIssueId(target.identifier);
-    return id
-      ? { source: QUALITY_LOSS_SOURCE.COMMISSIONING, valid: true, id }
-      : { valid: false, message: '调试验收问题不存在' };
-  }
-  if (target.serial === null) {
-    return {
-      source: QUALITY_LOSS_SOURCE.EXTERNAL,
-      valid: true,
-      id: target.identifier,
-    };
-  }
-  const id = await AfterSalesService.findIdBySerialNumber(target.serial);
-  return id
-    ? { source: QUALITY_LOSS_SOURCE.EXTERNAL, valid: true, id }
-    : { valid: false, message: '外部售后记录不存在' };
-}
-
-function getWeekOfYear(date: Date): number {
-  const start = new Date(date.getFullYear(), 0, 1);
-  const dayOffset = (start.getDay() + 6) % 7;
-  const dayOfYear =
-    Math.floor((date.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-  return Math.ceil((dayOfYear + dayOffset) / 7);
-}
-
-// ============ 常量定义 ============
-
-const QL_CONSTANTS = {
-  MONTHS,
-  STATUS: {
-    CLOSED: 'CLOSED',
-    CONFIRMED: 'Confirmed',
-    PENDING: 'Pending',
-  },
-  SOURCE: {
-    COMMISSIONING: 'Commissioning',
-    MANUAL: 'Manual',
-    INTERNAL: 'Internal',
-    EXTERNAL: 'External',
-  },
-} as const;
-
-// ============ 辅助函数：Where 条件构建 ============
-
-/**
- * 构建 quality_losses 表的 where 条件
- */
-function buildManualLossesWhere(
-  params: Omit<QualityLossQueryParams, 'page' | 'pageSize'>,
-): Prisma.quality_lossesWhereInput {
-  const where: Prisma.quality_lossesWhereInput = {
-    isDeleted: false,
-  };
-  if (params.status) {
-    where.status = normalizeQualityLossStatus(params.status);
-  }
-  if (params.year) {
-    where.occurDate = {
-      gte: new Date(`${params.year}-01-01T00:00:00.000Z`),
-      lte: new Date(`${params.year}-12-31T23:59:59.999Z`),
-    };
-  }
-  return where;
-}
-
-/**
- * 构建 quality_records 表的 where 条件
- */
-// ============ 辅助函数：响应格式化 ============
-
-/**
- * 格式化手工录入的损失记录
- */
-function formatManualLossItem(item: {
-  actualClaim: unknown;
-  amount: unknown;
-  id: string;
-  lossId: string;
-  occurDate: Date;
-  projectName?: null | string;
-  respDept: null | string;
-  status?: string;
-  type: string;
-  workOrderNumber?: null | string;
-}): QualityLossItem {
-  return {
-    id: item.lossId || item.id,
-    pk: item.id,
-    date: formatDateString(item.occurDate),
-    responsibleDepartment: item.respDept,
-    lossSource: QL_CONSTANTS.SOURCE.MANUAL,
-    workOrderNumber: item.workOrderNumber || '-',
-    projectName: item.projectName || '-',
-    partName: item.type,
-    amount: safeNumber(item.amount),
-    actualClaim: safeNumber(item.actualClaim),
-    status: normalizeQualityLossStatus(
-      item.status || QL_CONSTANTS.STATUS.PENDING,
-    ),
-  };
-}
-
-/**
- * 格式化内部质量记录
- */
-function formatInternalRecordItem(item: {
-  createdAt: Date;
-  date: Date;
-  description: null | string;
-  id: string;
-  lossAmount: null | number | Prisma.Decimal;
-  partName: null | string;
-  projectName: null | string;
-  recoveredAmount: null | number | Prisma.Decimal;
-  responsibleDepartment: null | string;
-  serialNumber: number;
-  status: string;
-  workOrderNumber: null | string;
-}): QualityLossItem {
-  return {
-    id: `INT-${item.serialNumber}`,
-    pk: item.id,
-    date: formatDateString(item.date),
-    amount: safeNumber(item.lossAmount),
-    responsibleDepartment: item.responsibleDepartment,
-    description: item.description || undefined,
-    status: normalizeQualityLossStatus(item.status),
-    type: QL_CONSTANTS.SOURCE.INTERNAL,
-    lossSource: QL_CONSTANTS.SOURCE.INTERNAL,
-    workOrderNumber: item.workOrderNumber || '-',
-    projectName: item.projectName || '-',
-    partName: item.partName || '-',
-    actualClaim: safeNumber(item.recoveredAmount),
-    createdAt: item.createdAt.toISOString(),
-  };
-}
-
-/**
- * 格式化售后记录
- */
-function formatExternalSalesItem(item: {
-  actualClaim: null | number | Prisma.Decimal;
-  claimStatus: string;
-  createdAt: Date;
-  id: string;
-  issueDescription: null | string;
-  laborTravelCost: null | number | Prisma.Decimal;
-  materialCost: null | number | Prisma.Decimal;
-  occurDate: Date;
-  partName: null | string;
-  productSubtype: null | string;
-  productType: null | string;
-  projectName: null | string;
-  respDept: null | string;
-  serialNumber: number;
-  workOrderNumber: null | string;
-}): null | QualityLossItem {
-  const amount =
-    safeNumber(item.materialCost) + safeNumber(item.laborTravelCost);
-  if (amount <= 0) return null;
-
-  return {
-    id: `EXT-${item.serialNumber}`,
-    pk: item.id,
-    date: formatDateString(item.occurDate),
-    amount,
-    responsibleDepartment: item.respDept,
-    description: item.issueDescription || undefined,
-    status: normalizeQualityLossStatus(item.claimStatus),
-    type: QL_CONSTANTS.SOURCE.EXTERNAL,
-    lossSource: QL_CONSTANTS.SOURCE.EXTERNAL,
-    workOrderNumber: item.workOrderNumber || '-',
-    projectName: item.projectName || '-',
-    partName: item.partName || item.productSubtype || item.productType || '-',
-    actualClaim: safeNumber(item.actualClaim),
-    createdAt: item.createdAt.toISOString(),
-  };
-}
-
-/**
- * 格式化调试验收问题产生的质量损失。
- */
-function formatCommissioningIssueItem(item: {
-  claimNotes: null | string;
-  claimStatus: string;
-  createdAt: Date;
-  date: Date;
-  description: null | string;
-  id: string;
-  lossAmount: null | number | Prisma.Decimal;
-  partName: null | string;
-  projectName: null | string;
-  recoveredAmount: null | number | Prisma.Decimal;
-  responsibleDepartment: null | string;
-  workOrderNumber: null | string;
-}): QualityLossItem {
-  return {
-    id: item.id,
-    pk: item.id,
-    date: formatDateString(item.date),
-    amount: safeNumber(item.lossAmount),
-    responsibleDepartment: item.responsibleDepartment,
-    description: item.claimNotes || item.description || undefined,
-    status: normalizeQualityLossStatus(item.claimStatus),
-    type: QL_CONSTANTS.SOURCE.COMMISSIONING,
-    lossSource: QL_CONSTANTS.SOURCE.COMMISSIONING,
-    workOrderNumber: item.workOrderNumber || '-',
-    projectName: item.projectName || '-',
-    partName: item.partName || '-',
-    actualClaim: safeNumber(item.recoveredAmount),
-    createdAt: item.createdAt.toISOString(),
-  };
-}
-
-// ============ 辅助函数：排序 ============
-
-/**
- * 按日期降序排序
- */
-function sortByDateDesc(items: QualityLossItem[]): QualityLossItem[] {
-  return items.sort(
-    (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
-  );
-}
-
-function normalizeLossSourceFilter(
-  source: string | undefined,
-): null | SingleQualityLossSource {
-  if (!source) return null;
-  const normalized = normalizeQualityLossSource(source);
-  if (
-    normalized === QL_CONSTANTS.SOURCE.MANUAL ||
-    normalized === QL_CONSTANTS.SOURCE.INTERNAL ||
-    normalized === QL_CONSTANTS.SOURCE.EXTERNAL ||
-    normalized === QL_CONSTANTS.SOURCE.COMMISSIONING
-  ) {
-    return normalized;
-  }
-  return null;
-}
 
 async function getDeptNameMapper() {
   const deptTree =
@@ -386,27 +82,7 @@ async function applyQualityLossDataScope(
   items: QualityLossItem[],
   userContext?: { userId: string; username?: string },
 ) {
-  if (!userContext?.userId) return items;
-
-  const scope = await DataScopeService.getScopeForModule(
-    userContext.userId,
-    'quality-loss',
-  );
-  if (scope.scopeType === 'ALL') return items;
-
-  const deptSource =
-    scope.scopeType === 'DEPT'
-      ? scope
-      : await DataScopeService.getScopeForModule(
-          userContext.userId,
-          'supplier',
-        );
-  const deptCandidates = await DataScopeService.getDeptCandidates(
-    deptSource.deptIds,
-  );
-  return items.filter((item) =>
-    deptCandidates.includes(String(item.responsibleDepartment || '')),
-  );
+  return QualityLossDataScopeService.apply(items, userContext);
 }
 
 function filterQualityLossItemsByStatus(
@@ -538,41 +214,10 @@ async function getAllLossesUnpaginated(
       )
     : merged;
 
-  if (!userContext?.userId) {
-    return sortByDateDesc(statusFiltered);
-  }
-
-  const scope = await DataScopeService.getScopeForModule(
-    userContext.userId,
-    'quality-loss',
-  );
-  if (scope.scopeType === 'ALL') {
-    return sortByDateDesc(statusFiltered);
-  }
-
-  if (scope.scopeType === 'DEPT') {
-    const deptCandidates = await DataScopeService.getDeptCandidates(
-      scope.deptIds,
-    );
-    return sortByDateDesc(
-      statusFiltered.filter((item) =>
-        deptCandidates.includes(String(item.responsibleDepartment || '')),
-      ),
-    );
-  }
-
-  // 质量损失聚合记录缺少稳定“责任人账号”字段，SELF 先按用户部门口径兜底。
-  const deptFallback = await DataScopeService.getScopeForModule(
-    userContext.userId,
-    'supplier',
-  );
-  const deptCandidates = await DataScopeService.getDeptCandidates(
-    deptFallback.deptIds,
-  );
-  return sortByDateDesc(
-    statusFiltered.filter((item) =>
-      deptCandidates.includes(String(item.responsibleDepartment || '')),
-    ),
+  return QualityLossDataScopeService.sortFilteredByScope(
+    statusFiltered,
+    sortByDateDesc,
+    userContext,
   );
 }
 
@@ -673,79 +318,11 @@ function applyPagination(
   return paginateList(items, params);
 }
 
-// ============ 辅助函数：趋势数据处理 ============
-
-/**
- * 合并多个来源的趋势数据
- */
-function mergeTrendData(
-  manual: TrendRow[],
-  internal: TrendRow[],
-  external: TrendRow[],
-  commissioning: TrendRow[],
-  granularity: 'month' | 'week',
-): Map<number, TrendItem> {
-  const merged = new Map<number, TrendItem>();
-
-  const process = (rows: TrendRow[], key: keyof TrendItem) => {
-    rows.forEach((r) => {
-      const p = Number(r.p);
-      if (p === 0 && granularity !== 'week') return; // WEEK() can be 0, MONTH() is 1-12
-      let item = merged.get(p);
-      if (!item) {
-        item = { commissioning: 0, external: 0, internal: 0, manual: 0 };
-        merged.set(p, item);
-      }
-      item[key] += safeNumber(r.a);
-    });
-  };
-
-  process(manual, 'manual');
-  process(internal, 'internal');
-  process(external, 'external');
-  process(commissioning, 'commissioning');
-
-  return merged;
-}
-
-/**
- * 格式化趋势数据项
- */
-function formatTrendItem(
-  period: string,
-  item: TrendItem,
-): QualityLossServiceTrendItem {
-  const total =
-    item.manual + item.internal + item.external + item.commissioning;
-  return {
-    period,
-    totalAmount: formatNumber(total),
-    manualAmount: formatNumber(item.manual),
-    internalAmount: formatNumber(item.internal),
-    externalAmount: formatNumber(item.external),
-    commissioningAmount: formatNumber(item.commissioning),
-  };
-}
-
 // ============ 主服务导出 ============
 
 export const QualityLossService = {
   async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
-    const baseWhere = { isDeleted: false };
-    const [yearAggregate, weekAggregate] = await Promise.all([
-      prisma.quality_losses.aggregate({
-        where: { ...baseWhere, occurDate: { gte: params.yearStart } },
-        _sum: { amount: true },
-      }),
-      prisma.quality_losses.aggregate({
-        where: { ...baseWhere, occurDate: { gte: params.weekStart } },
-        _sum: { amount: true },
-      }),
-    ]);
-    return {
-      totalLoss: Number(yearAggregate._sum.amount || 0),
-      weeklyLoss: Number(weekAggregate._sum.amount || 0),
-    };
+    return QualityLossReportingService.getStatsForDashboard(params);
   },
 
   async getWeeklyTrackingIssues(params: {
@@ -754,35 +331,11 @@ export const QualityLossService = {
     start: Date;
     take?: number;
   }) {
-    return prisma.quality_losses.findMany({
-      where: {
-        isDeleted: false,
-        OR: [
-          {
-            occurDate: { lt: params.start },
-            status: { notIn: params.closedStatuses },
-          },
-          {
-            updatedAt: { gte: params.start, lte: params.end },
-            status: { in: params.closedStatuses },
-          },
-        ],
-      },
-      take: params.take || 20,
-    });
+    return QualityLossReportingService.getWeeklyTrackingIssues(params);
   },
 
   async getReportPeriodMetrics(params: { end: Date; start: Date }) {
-    const aggregate = await prisma.quality_losses.aggregate({
-      _sum: { amount: true },
-      where: {
-        occurDate: { gte: params.start, lte: params.end },
-        isDeleted: false,
-      },
-    });
-    return {
-      manualLoss: Number(aggregate._sum.amount || 0),
-    };
+    return QualityLossReportingService.getReportPeriodMetrics(params);
   },
 
   async updateByRouteId(params: {
@@ -790,116 +343,7 @@ export const QualityLossService = {
     id: string;
     userId: string;
   }) {
-    const source = normalizeQualityLossSource(
-      params.body.lossSource as string | undefined,
-    );
-    const parsedBody = parseQualityLossUpdateBody(params.body);
-    if ('message' in parsedBody) {
-      return {
-        ok: false as const,
-        code: 'BAD_REQUEST' as const,
-        message: parsedBody.message,
-      };
-    }
-
-    const target = await resolveQualityLossUpdateTarget({
-      pathId: params.id,
-      pk: params.body.pk,
-      source,
-    });
-    if ('message' in target) {
-      return {
-        ok: false as const,
-        code: 'BAD_REQUEST' as const,
-        message: target.message,
-      };
-    }
-
-    try {
-      switch (target.source) {
-        case QUALITY_LOSS_SOURCE.COMMISSIONING: {
-          await VehicleCommissioningService.updateQualityLossFields({
-            id: target.id,
-            amount: parsedBody.amount,
-            actualClaim: parsedBody.actualClaim,
-            status: parsedBody.status,
-          });
-
-          break;
-        }
-        case QUALITY_LOSS_SOURCE.EXTERNAL: {
-          await AfterSalesService.updateQualityLossFields({
-            id: target.id,
-            actualClaim: parsedBody.actualClaim,
-            status: parsedBody.status,
-          });
-
-          break;
-        }
-        case QUALITY_LOSS_SOURCE.INTERNAL: {
-          await InspectionService.updateQualityLossFields({
-            id: target.id,
-            actualClaim: parsedBody.actualClaim,
-            status: parsedBody.status,
-          });
-
-          break;
-        }
-        default: {
-          await prisma.$transaction(async (tx) => {
-            await tx.quality_losses.update({
-              where: target.where,
-              data: {
-                ...(parsedBody.occurDate
-                  ? { occurDate: parsedBody.occurDate }
-                  : {}),
-                ...(parsedBody.type ? { type: parsedBody.type } : {}),
-                ...(parsedBody.amount === undefined
-                  ? {}
-                  : { amount: parsedBody.amount }),
-                ...(parsedBody.actualClaim === undefined
-                  ? {}
-                  : { actualClaim: parsedBody.actualClaim }),
-                ...(parsedBody.respDept === undefined
-                  ? {}
-                  : { respDept: parsedBody.respDept }),
-                ...(params.body.description === undefined
-                  ? {}
-                  : { description: params.body.description }),
-                ...(parsedBody.status ? { status: parsedBody.status } : {}),
-                updatedAt: new Date(),
-              },
-            });
-          });
-        }
-      }
-    } catch (error) {
-      if (isPrismaNotFoundError(error)) {
-        return {
-          ok: false as const,
-          code: 'NOT_FOUND' as const,
-          message: '目标记录不存在',
-        };
-      }
-      const err = error as { message?: string };
-      return {
-        ok: false as const,
-        code: 'INTERNAL' as const,
-        message: `数据更新失败：${err.message || '数据库操作异常'}`,
-      };
-    }
-
-    await SystemLogService.auditLog('quality-loss', 'relatedUpdate', {
-      userId: params.userId,
-      targetType: toQualityLossTargetType(source as QualityLossSource),
-      targetId: String(params.id),
-      detailsVariables: {
-        id: params.id,
-        sourcePart:
-          source === QUALITY_LOSS_SOURCE.MANUAL ? '' : ` (${source} 来源)`,
-      },
-    });
-    return { ok: true as const };
+    return QualityLossRouteUpdateService.updateByRouteId(params);
   },
 
   /**
@@ -997,182 +441,21 @@ export const QualityLossService = {
     filters: Omit<QualityLossQueryParams, 'page' | 'pageSize' | 'year'> = {},
   ): Promise<QualityLossDashboardSummary> {
     const list = await getAllLossesUnpaginated(filters);
-    const totalAmount = list.reduce(
-      (sum, item) => sum + (Number(item.amount) || 0),
-      0,
-    );
-    const totalClaim = list.reduce(
-      (sum, item) => sum + (Number(item.actualClaim) || 0),
-      0,
-    );
-    const recoveryRate =
-      totalAmount > 0 ? Math.round((totalClaim / totalAmount) * 1000) / 10 : 0;
-    let pendingAmount = 0;
-    for (const item of list) {
-      const status = normalizeQualityLossStatus(item.status);
-      if (
-        status === 'Pending' ||
-        status === 'Processing' ||
-        status === 'Resolved'
-      ) {
-        pendingAmount +=
-          (Number(item.amount) || 0) - (Number(item.actualClaim) || 0);
-      }
-    }
-
-    const years = [
-      ...new Set(
-        list
-          .map((item) => {
-            const time = new Date(item.date || '').getTime();
-            if (Number.isNaN(time)) return null;
-            return new Date(time).getFullYear();
-          })
-          .filter((year): year is number => year !== null),
-      ),
-    ].sort((a, b) => b - a);
-
-    return {
-      kpi: {
-        totalAmount: Number(totalAmount.toFixed(2)),
-        totalClaim: Number(totalClaim.toFixed(2)),
-        recoveryRate,
-        displayRate: `${recoveryRate}%`,
-        pendingAmount: Number(pendingAmount.toFixed(2)),
-      },
-      years: years.length > 0 ? years : [new Date().getFullYear()],
-    };
+    return QualityLossSummaryService.getDashboardSummary(list);
   },
 
   async getYearlyCharts(
     filters: Omit<QualityLossQueryParams, 'page' | 'pageSize'> = {},
   ): Promise<QualityLossCharts> {
-    const targetYear = Number(filters.year) || new Date().getFullYear();
-    const granularity = filters.granularity || 'month';
     const list = await getAllLossesUnpaginated(filters);
-    const filteredByYear = list.filter((item) => {
-      const time = new Date(item.date || '').getTime();
-      if (Number.isNaN(time)) return false;
-      return new Date(time).getFullYear() === targetYear;
-    });
-
-    const deptMap = new Map<string, number>();
-    for (const item of filteredByYear) {
-      const name = String(item.responsibleDepartment || '未指定部门');
-      const amount = Number(item.amount) || 0;
-      deptMap.set(name, (deptMap.get(name) || 0) + amount);
-    }
-    const deptDistribution = [...deptMap.entries()]
-      .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
-      .sort((a, b) => b.value - a.value);
-
-    const trendMap = new Map<
-      number,
-      { claimAmount: number; totalAmount: number }
-    >();
-    const upsertTrend = (key: number, amount: number, claimAmount: number) => {
-      const current = trendMap.get(key) || { totalAmount: 0, claimAmount: 0 };
-      current.totalAmount += amount;
-      current.claimAmount += claimAmount;
-      trendMap.set(key, current);
-    };
-
-    for (const item of list) {
-      const date = new Date(item.date || '');
-      if (Number.isNaN(date.getTime())) continue;
-      const amount = Number(item.amount) || 0;
-      const claimAmount = Number(item.actualClaim) || 0;
-      if (granularity === 'year') {
-        upsertTrend(date.getFullYear(), amount, claimAmount);
-        continue;
-      }
-      if (date.getFullYear() !== targetYear) continue;
-      if (granularity === 'week') {
-        upsertTrend(getWeekOfYear(date), amount, claimAmount);
-      } else {
-        upsertTrend(date.getMonth() + 1, amount, claimAmount);
-      }
-    }
-
-    let trend: QualityLossCharts['trend'] = [];
-    if (granularity === 'year') {
-      trend = [...trendMap.entries()]
-        .sort((a, b) => a[0] - b[0])
-        .map(([period, value]) => ({
-          period,
-          periodLabel: `${period}年`,
-          totalAmount: Number(value.totalAmount.toFixed(2)),
-          claimAmount: Number(value.claimAmount.toFixed(2)),
-        }));
-    } else if (granularity === 'week') {
-      const maxWeek = 53;
-      trend = Array.from({ length: maxWeek }).map((_, index) => {
-        const period = index + 1;
-        const value = trendMap.get(period) || {
-          totalAmount: 0,
-          claimAmount: 0,
-        };
-        return {
-          period,
-          periodLabel: `W${period}`,
-          totalAmount: Number(value.totalAmount.toFixed(2)),
-          claimAmount: Number(value.claimAmount.toFixed(2)),
-        };
-      });
-    } else {
-      trend = Array.from({ length: 12 }).map((_, index) => {
-        const period = index + 1;
-        const value = trendMap.get(period) || {
-          totalAmount: 0,
-          claimAmount: 0,
-        };
-        return {
-          period,
-          periodLabel: `${period}月`,
-          totalAmount: Number(value.totalAmount.toFixed(2)),
-          claimAmount: Number(value.claimAmount.toFixed(2)),
-        };
-      });
-    }
-
-    return {
-      deptDistribution,
-      trend,
-    };
+    return QualityLossSummaryService.getYearlyCharts(list, filters);
   },
 
   /**
    * Delete a single record with audit logging
    */
   async deleteRecord(id: string, userId: string): Promise<void> {
-    const target = await prisma.quality_losses.findFirst({
-      where: {
-        isDeleted: false,
-        OR: [{ id }, { lossId: id }],
-      },
-      select: { id: true },
-    });
-
-    if (!target) {
-      const notFoundError = new Error(
-        'Quality loss record not found',
-      ) as Error & {
-        code?: string;
-      };
-      notFoundError.code = 'NOT_FOUND';
-      throw notFoundError;
-    }
-
-    await prisma.quality_losses.update({
-      where: { id: target.id },
-      data: { isDeleted: true },
-    });
-
-    await SystemLogService.auditLog('quality-loss', 'delete', {
-      userId,
-      targetId: target.id,
-      detailsVariables: {},
-    });
+    return QualityLossRecordMaintenanceService.deleteRecord(id, userId);
   },
 
   /**
@@ -1182,73 +465,13 @@ export const QualityLossService = {
     ids: string[],
     userId: string,
   ): Promise<Prisma.BatchPayload> {
-    const normalizedIds = [
-      ...new Set(ids.map((item) => String(item).trim()).filter(Boolean)),
-    ];
-    if (normalizedIds.length === 0) return { count: 0 };
-
-    const targets = await prisma.quality_losses.findMany({
-      where: {
-        isDeleted: false,
-        OR: [{ id: { in: normalizedIds } }, { lossId: { in: normalizedIds } }],
-      },
-      select: { id: true },
-    });
-
-    if (targets.length === 0) return { count: 0 };
-
-    const result = await prisma.quality_losses.updateMany({
-      where: { id: { in: targets.map((target) => target.id) } },
-      data: { isDeleted: true },
-    });
-
-    await SystemLogService.auditLog('quality-loss', 'batchDelete', {
-      userId,
-      targetId: normalizedIds.join(','),
-      detailsVariables: {
-        count: result.count,
-      },
-    });
-
-    return result;
+    return QualityLossRecordMaintenanceService.batchDelete(ids, userId);
   },
 
   /**
    * 获取钻取明细数据
    */
   async getDrillDown(start: Date, end: Date) {
-    const [manualLosses, internalLosses, externalLosses, commissioningLosses] =
-      await Promise.all([
-        prisma.quality_losses.findMany({
-          where: {
-            isDeleted: false,
-            occurDate: { gte: start, lte: end },
-          },
-          orderBy: { occurDate: 'desc' },
-          take: 500,
-        }),
-        InspectionService.getQualityLossDrillDownRecords({
-          start,
-          end,
-          take: 500,
-        }),
-        AfterSalesService.getQualityLossDrillDownRecords({
-          start,
-          end,
-          take: 500,
-        }),
-        VehicleCommissioningService.getQualityLossDrillDownRecords({
-          start,
-          end,
-          take: 500,
-        }),
-      ]);
-
-    return {
-      manualLosses,
-      internalLosses,
-      externalLosses,
-      commissioningLosses,
-    };
+    return QualityLossRecordMaintenanceService.getDrillDown(start, end);
   },
 };

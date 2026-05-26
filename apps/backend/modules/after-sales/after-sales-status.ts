@@ -1,21 +1,27 @@
 import type { after_sales_claimStatus } from '@prisma/client';
-import type { AfterSalesStatus } from '@qgs/shared';
 
-import {
-  AFTER_SALES_STATUS,
-  AFTER_SALES_STATUS_COLOR_MAP,
-  mapAfterSalesStatus as mapAfterSalesStatusRule,
-} from '@qgs/shared';
+const AFTER_SALES_CLAIM_STATUS_VALUES = new Set<string>([
+  'CANCELLED',
+  'CLOSED',
+  'COMPLETED',
+  'IN_PROGRESS',
+  'NEGOTIATING',
+  'OPEN',
+  'RESOLVED',
+  'SUBMITTED',
+]);
 
-export { AFTER_SALES_STATUS };
-
-export type { AfterSalesStatus };
-
-export function mapAfterSalesStatus(
-  frontendStatus?: null | string,
-): after_sales_claimStatus {
-  return mapAfterSalesStatusRule(frontendStatus) as after_sales_claimStatus;
+export function isAfterSalesClaimStatus(
+  value: string,
+): value is after_sales_claimStatus {
+  return AFTER_SALES_CLAIM_STATUS_VALUES.has(value);
 }
 
-export const STATUS_COLOR_MAP: Record<AfterSalesStatus, string> =
-  AFTER_SALES_STATUS_COLOR_MAP;
+export function normalizeAfterSalesClaimStatus(
+  value: unknown,
+): after_sales_claimStatus | undefined {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase();
+  return isAfterSalesClaimStatus(normalized) ? normalized : undefined;
+}
