@@ -1,3 +1,4 @@
+import type { after_sales_claimStatus } from '@prisma/client';
 import type {
   AfterSalesItem,
   AfterSalesParams,
@@ -66,6 +67,32 @@ type TrendResultDay = {
   issues: bigint;
   period: Date;
 };
+
+const AFTER_SALES_CLAIM_STATUS_VALUES = new Set<string>([
+  'CANCELLED',
+  'CLOSED',
+  'COMPLETED',
+  'IN_PROGRESS',
+  'NEGOTIATING',
+  'OPEN',
+  'RESOLVED',
+  'SUBMITTED',
+]);
+
+function isAfterSalesClaimStatus(
+  value: string,
+): value is after_sales_claimStatus {
+  return AFTER_SALES_CLAIM_STATUS_VALUES.has(value);
+}
+
+function normalizeAfterSalesClaimStatus(
+  value: unknown,
+): after_sales_claimStatus | undefined {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase();
+  return isAfterSalesClaimStatus(normalized) ? normalized : undefined;
+}
 
 function getMetricValueFromRow(
   metric: AfterSalesChartMetric,
@@ -593,7 +620,9 @@ export const AfterSalesService = {
     };
 
     try {
-      const openStatus = [...QMS_STATUS_OPEN_SET];
+      const openStatus = [...QMS_STATUS_OPEN_SET]
+        .map((status) => normalizeAfterSalesClaimStatus(status))
+        .filter(Boolean);
 
       // 1. KPI & Basic Aggregations
       const [kpiAggregate, openCount, resolvedStats] = await Promise.all([
@@ -603,7 +632,7 @@ export const AfterSalesService = {
           _sum: { materialCost: true, laborTravelCost: true },
         }),
         prisma.after_sales.count({
-          where: { ...baseWhere, claimStatus: { in: openStatus as any } },
+          where: { ...baseWhere, claimStatus: { in: openStatus } },
         }),
         // Average Resolution Time using Raw Query
         prisma.$queryRaw<Array<{ avgDays: number }>>`
@@ -876,7 +905,10 @@ export const AfterSalesService = {
       where.projectName = { contains: String(projectName).trim() };
     }
     if (status && String(status).trim() !== '') {
-      where.claimStatus = String(status).trim() as any;
+      const claimStatus = normalizeAfterSalesClaimStatus(status);
+      if (claimStatus) {
+        where.claimStatus = claimStatus;
+      }
     }
     if (supplierBrand && String(supplierBrand).trim() !== '') {
       where.OR = [

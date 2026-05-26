@@ -36,6 +36,14 @@ interface Menu {
   [key: string]: unknown;
 }
 
+type RolePermissionTreeNode = {
+  children?: RolePermissionTreeNode[];
+  key: string;
+  menuId: string;
+  title: string;
+  type: string;
+};
+
 function parseMenuMeta(meta: Menu['meta']) {
   if (!meta) return {};
   if (typeof meta === 'string') {
@@ -279,24 +287,16 @@ export const RbacService = {
       if (type === 'menu') return '[页面]';
       return '';
     };
-    const buildTree = (
-      parentId = '0',
-    ): Array<{
-      children?: any[];
-      key: string;
-      menuId: string;
-      title: string;
-      type: string;
-    }> =>
+    const buildTree = (parentId = '0'): RolePermissionTreeNode[] =>
       allMenus
         .filter((menu) => menu.parentId === parentId)
         .map((menu) => {
-          const node = {
+          const node: RolePermissionTreeNode = {
             title: `${getTypeLabel(menu.type)} ${getTitle(menu.meta)}`,
             key: menu.authCode || `MENU_${menu.id}`,
             menuId: menu.id,
             type: menu.type,
-          } as any;
+          };
           const children = buildTree(menu.id);
           if (children.length > 0) node.children = children;
           return node;

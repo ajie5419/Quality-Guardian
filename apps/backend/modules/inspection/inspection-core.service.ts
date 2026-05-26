@@ -1,4 +1,9 @@
-import type { archive_task_status, inspection_result } from '@prisma/client';
+import type {
+  archive_task_status,
+  inspection_category,
+  inspection_result,
+  quality_records_status,
+} from '@prisma/client';
 import type { InspectionIssue } from '@qgs/shared';
 import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
@@ -59,6 +64,86 @@ import { buildInspectionIssueDateRange } from './inspection-issue';
 const logger = createModuleLogger('InspectionService');
 const inspectionTemplateAutoBindEnabled =
   process.env.INSPECTION_TEMPLATE_AUTO_BIND_ENABLED !== 'false';
+
+const INSPECTION_CATEGORY_VALUES = new Set<string>([
+  'INCOMING',
+  'PROCESS',
+  'SHIPMENT',
+]);
+
+function isInspectionCategory(value: string): value is inspection_category {
+  return INSPECTION_CATEGORY_VALUES.has(value);
+}
+
+function normalizeInspectionCategory(
+  value: unknown,
+): inspection_category | undefined {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase();
+  return isInspectionCategory(normalized) ? normalized : undefined;
+}
+
+type QualityRecordOrderField = keyof Pick<
+  Prisma.quality_recordsOrderByWithRelationInput,
+  | 'createdAt'
+  | 'date'
+  | 'inspector'
+  | 'lossAmount'
+  | 'nonConformanceNumber'
+  | 'partName'
+  | 'projectName'
+  | 'quantity'
+  | 'responsibleDepartment'
+  | 'severity'
+  | 'status'
+  | 'updatedAt'
+  | 'workOrderNumber'
+>;
+
+const QUALITY_RECORD_ORDER_FIELD_MAP: Record<string, QualityRecordOrderField> =
+  {
+    createdAt: 'createdAt',
+    date: 'date',
+    inspector: 'inspector',
+    lossAmount: 'lossAmount',
+    ncNumber: 'nonConformanceNumber',
+    partName: 'partName',
+    projectName: 'projectName',
+    quantity: 'quantity',
+    reportDate: 'date',
+    reportedBy: 'inspector',
+    responsibleDepartment: 'responsibleDepartment',
+    severity: 'severity',
+    status: 'status',
+    title: 'partName',
+    updatedAt: 'updatedAt',
+    workOrderNumber: 'workOrderNumber',
+  };
+
+function buildQualityRecordOrderBy(
+  sortBy: string,
+  sortOrder: 'asc' | 'desc',
+): Prisma.quality_recordsOrderByWithRelationInput {
+  const field =
+    QUALITY_RECORD_ORDER_FIELD_MAP[sortBy] ||
+    QUALITY_RECORD_ORDER_FIELD_MAP.createdAt;
+  return { [field]: sortOrder };
+}
+
+function normalizeQualityRecordStatusFilter(
+  value: string | string[],
+):
+  | Prisma.Enumquality_records_statusFilter<'quality_records'>
+  | quality_records_status
+  | undefined {
+  const values = (Array.isArray(value) ? value : [value])
+    .map((item) => toQualityRecordStatus(item))
+    .filter(Boolean);
+
+  if (values.length === 0) return undefined;
+  return Array.isArray(value) ? { in: values } : values[0];
+}
 
 function isInspectionSerialNumberConflict(error: unknown): boolean {
   if (!isPrismaUniqueConstraintError(error)) {
@@ -1257,7 +1342,10 @@ export const InspectionCoreService = {
 
     // Category Filter
     if (type !== 'ALL') {
-      where.category = type as any;
+      const category = normalizeInspectionCategory(type);
+      if (category) {
+        where.category = category;
+      }
     }
 
     // Specific Filters
@@ -1418,7 +1506,7 @@ export const InspectionCoreService = {
     }
 
     if (hasFail) return 'FAIL';
-    if (hasConditional) return 'CONDITIONAL' as any; // Prisma enum might not have CONDITIONAL? Let's check schema.
+    if (hasConditional) return 'CONDITIONAL';
     return 'PASS';
   },
 
@@ -2207,9 +2295,10 @@ export const InspectionCoreService = {
     }
 
     if (params.status) {
-      where.status = Array.isArray(params.status)
-        ? { in: params.status as any }
-        : (params.status as any);
+      const statusFilter = normalizeQualityRecordStatusFilter(params.status);
+      if (statusFilter) {
+        where.status = statusFilter;
+      }
     }
 
     if (params.responsibleDepartment) {
@@ -2285,28 +2374,7 @@ export const InspectionCoreService = {
     const skip = pageSize && pageSize > 0 ? (page - 1) * pageSize : undefined;
     const take = pageSize && pageSize > 0 ? pageSize : undefined;
 
-    const orderBy: Prisma.quality_recordsOrderByWithRelationInput = {};
-    switch (sortBy) {
-      case 'ncNumber': {
-        orderBy.nonConformanceNumber = sortOrder;
-        break;
-      }
-      case 'reportDate': {
-        orderBy.date = sortOrder;
-        break;
-      }
-      case 'reportedBy': {
-        orderBy.inspector = sortOrder;
-        break;
-      }
-      case 'title': {
-        orderBy.partName = sortOrder;
-        break;
-      }
-      default: {
-        (orderBy as any)[sortBy] = sortOrder;
-      }
-    }
+    const orderBy = buildQualityRecordOrderBy(sortBy, sortOrder);
 
     const [total, issues] = await Promise.all([
       prisma.quality_records.count({ where }),
