@@ -148,3 +148,30 @@
 **遗留问题：**
 
 - 无阻塞；`pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
+
+### 2026-05-26 阶段六：性能问题修复（步骤30-36）
+
+**执行内容：**
+
+- 步骤30：`supplier.findAll` 改为 DB 层 `skip/take/count/orderBy`，供应商评分聚合只针对当前页供应商执行，全局统计改用 DB count/aggregate。
+- 步骤31：`metrology` 台账、借用、检定计划列表全部改为 DB 层分页，`pageSize` 上限收敛为 100；动态状态过滤下推为 Prisma where。
+- 步骤32：`welder.findAll` 全表统计改为 DB `count` 与 `_avg(score)` 聚合，不再加载全表到内存计算。
+- 步骤33：`quality-loss` 单来源列表查询改为来源 service 支持 `skip/take/count`，手工损失表使用 DB 过滤/分页，钻取路径增加 DB 排序和上限。
+- 步骤34：`dashboard.getStats` 改为 service 内进程级 Map + TTL 缓存，缓存 key 包含 `userId/scope/granularity`，并提供显式 `invalidateStatsCache` 入口。
+- 步骤35：`vehicle-commissioning.getDailyReports` 改为通过 `daily_reports.date/summary` where 条件和 `skip/take/count` 读取候选页，读取时解析 `summary` 为结构化 DTO；未改 Prisma schema。
+- 步骤36：`file-storage.registerReferencesFromAttachments` 将附件文件解析从逐项 `findFirst` 改为批量 `findMany` + 内存映射，引用写入继续使用 `deleteMany/createMany`。
+
+**验证结果：**
+
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec vitest run`: 32 文件 / 212-213 测试全部通过
+- 阶段结束 `git status --short | wc -l`: 0
+- 阶段结束模块 TS 文件数：176
+
+**commit:** `81b13d13` / `7b9b68be` / `48cf187f` / `e9439945` / `9547b8be` / `3d809882` / `1e4e6a5f`
+
+**遗留问题：**
+
+- `daily_reports.summary` 仍是 JSON blob；本阶段仅优化读取路径，结构化字段和索引拆分按阶段十二 Step 57 处理。
+- `quality_losses` 当前 schema 没有 `workOrderNumber` 字段，手工损失按工单号过滤无法真正下推到 DB；如需支持，应在阶段十二 schema 优化中补字段与索引。
+- `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
