@@ -275,3 +275,27 @@
 
 - Step 51 的 `prisma migrate dev --name add_soft_delete_to_logs` 因既有历史迁移 `20250521000000_add_processes_table_and_processId` 在 shadow database 中引用不存在的 `inspections` 表而失败；本阶段已按 Prisma migration 规范新增 `20260526000100_add_soft_delete_to_logs/migration.sql`，未手动改数据库。
 - `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
+
+### 2026-05-26 阶段十一：错误处理与中间件（步骤53-55）
+
+**执行内容：**
+
+- 步骤53：新增 `BusinessError` 统一业务异常类型与 legacy error 映射工具；全局 error handler 支持标准业务错误响应；优先替换 dictionary、inspection、work-order 中明确的 `VALIDATION`、`NOT_FOUND`、`DUPLICATE`、`FORBIDDEN` 错误码路径。
+- 步骤54：新增 `middleware/3.auth.ts` 集中处理非 public API 鉴权，将用户会话注入 `event.context.user/userId`；批量移除 API 与 route-handler 中手动 `verifyAccessToken(event)` 和重复未授权响应逻辑，改用 `getCurrentUser(event)` 读取上下文。
+- 步骤55：新增 `middleware/4.data-scope.ts`，按 QMS 路径预解析 after-sales、inspection、supplier、work-order 的数据权限 scope 并注入 `event.context.dataScope`；`DataScopeService` 支持传入预解析 scope，相关 service 优先复用 context scope，未传时保留原有 fallback 查询。
+
+**验证结果：**
+
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec vitest run`: 32 文件 / 218-219 测试全部通过
+- 每个步骤提交前均执行 `pnpm run check:qms-arch`: 通过
+- 步骤54 后 `rg "verifyAccessToken\\(" apps/backend/api apps/backend/modules/route-handlers apps/backend/middleware` 仅剩认证中间件调用
+- 阶段结束 `git status --short | wc -l`: 0
+
+**commit:** `7a0c26c6` / `40f5cfa5` / `aadcde09`
+
+**遗留问题：**
+
+- BusinessError 本阶段只替换明确错误码路径，纯消息类 `throw new Error(...)` 后续阶段继续收敛。
+- 数据权限注入采用渐进式方案：中间件预解析 scope，service 可选接收；未接入 context 的调用仍按旧逻辑自行解析，行为保持兼容。
+- `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
