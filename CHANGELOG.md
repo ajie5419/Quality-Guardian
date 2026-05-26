@@ -353,6 +353,34 @@
 - `@qgs/shared` 中仍有部分历史类型命名与模块文件拆分不完全一致，未做无关重命名。
 - `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
 
+### 2026-05-26 架构偏离修复：执行流程规范补救
+
+**执行内容：**
+
+- 偏离1：拆分 `apps/backend/modules` 中剩余超 500 行生产文件；最终将 `inspection-core.service.ts` 收缩为门面，并按职责拆出 inspection 记录查询、创建、更新、删除、归档任务、问题列表/统计/编号、报告聚合、模板绑定与文档同步服务。
+- 偏离2：确认生产模块中 `$queryRawUnsafe` 无残留；原始 SQL 均保持参数化 `$queryRaw`。
+- 偏离3：清理生产模块最后一处 `as any`，将 AI JSON 解析改为泛型返回，并在 4 个 AI 调用点声明响应形状。
+- 偏离4：确认 report 模块不再直接访问 `prisma.daily_reports`，日报数据通过 vehicle-commissioning 模块服务访问。
+- 偏离5：确认业务 utils 已迁入 modules，对应文件名检查为空，`apps/backend/utils/*.ts` 数量为 25。
+
+**验证结果：**
+
+- `find apps/backend/modules -name "*.ts" -not -path "*/__tests__/*" -not -name "*.test.*" -exec wc -l {} + | awk '$1 > 500 && !/total/' | sort -rn`: 无输出
+- `rg "\$queryRawUnsafe" apps/backend/modules/ -g "*.ts"`: 无输出
+- `rg "as any" apps/backend/modules/ -g "*.ts" | grep -v __tests__ | grep -v "\.test\."`: 无输出
+- `rg "prisma\.daily_reports" apps/backend/modules/report/ -g "*.ts"`: 无输出
+- `ls apps/backend/utils/ | grep -E "ai|audit-log|inspection|project-documents|quality-loss|supplier|system-auth|system-data|task-dispatch|user-security|work-order"`: 无输出
+- `ls apps/backend/utils/*.ts | wc -l`: 25
+- `pnpm -C apps/backend exec tsc --noEmit --pretty false`: 通过
+- `pnpm -C apps/backend exec vitest run`: 32 文件 / 219 测试全部通过
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+
+**commit:** `85d8577c` / `0f2f8d65` / `f840d26e` / `b41ae6ea` / `cd409964` / `3f1bc665` / `a52cf7c2`
+
+**遗留问题：**
+
+- `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
+
 全部完成
 
 13 阶段后端精简重构全部执行完毕。
