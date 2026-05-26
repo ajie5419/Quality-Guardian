@@ -200,3 +200,25 @@
 - `utils/` 仍包含部分未列入阶段七输入白名单但实际为通用基础设施或跨模块共享的文件，例如 `response`、`route-param`、`request-validation`、`redis`、`team-resolver`、`task-dispatch`、`work-order` 等；本阶段按调用方审计后保留。
 - vehicle-commissioning 当前命中的是 Excel 导出逻辑，不属于“文件 → 二维数据/对象数组”的读取解析路径，未强行接入 `excel-parser`。
 - `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
+
+### 2026-05-26 阶段八：CI + 架构守护（步骤39-40）
+
+**执行内容：**
+
+- 步骤39：精简 `.github/workflows/ci-gate.yml`，删除 12 个已失效治理 job，保留 `lint`、`typecheck`、`qms-arch`、`unit-tests`、`secret-scan` 5 个 job；文件行数从 348 行降至 108 行。
+- 步骤40：重写 `scripts/check-qms-architecture.sh`，保留前端 R1/R3，并新增后端架构规则段；脚本行数从 246 行增至 343 行。
+- 步骤40：立即启用 7 条当前零违规后端规则：B-D1、B-R1、B-R2、B-R3、B-S2、B-S3、B-SEC1。
+- 步骤40：将暂不启用规则写为纯注释 TODO，不扫描、不豁免、不 baseline：B-S1（16 violations）、B-S4（需要重新定义 Date.now ID 生成匹配器）、B-S5（3 violations）、B-T1（约 12 violations）、B-T2（约 7 violations，utils 第三方桥接另行处理）、B-M1（many violations）、B-T3（scan-only initially）、B-M2（needs pre-scan）。
+
+**验证结果：**
+
+- `pnpm run check:qms-arch`: 通过，输出 `QMS architecture check passed.`
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/backend exec vitest run`: 32 文件 / 213 测试全部通过
+- 阶段结束 `git status --short | wc -l`: 0
+
+**commit:** `d6242a23` ci: prune obsolete gate jobs / current commit: chore: rewrite qms architecture check
+
+**遗留问题：**
+
+- B-S1、B-S4、B-S5、B-T1、B-T2、B-M1、B-T3、B-M2 按脚本 TODO 后续清理；本阶段未写入豁免或新增 baseline。
