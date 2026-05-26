@@ -1,1 +1,1 @@
-export { default } from '~/modules/route-handlers/qms/ai/generate-itp.post.service';
+export { default } from '~/route-handlers/qms/ai/generate-itp.post.service';

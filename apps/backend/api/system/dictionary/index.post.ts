@@ -1,1 +1,1 @@
-export { default } from '~/modules/route-handlers/system/dictionary/index.post.service';
+export { default } from '~/route-handlers/system/dictionary/index.post.service';

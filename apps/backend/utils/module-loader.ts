@@ -22,7 +22,7 @@ import { planningModule } from '~/modules/planning/planning.module';
 import { qualityLossModule } from '~/modules/quality-loss/quality-loss.module';
 import { rbacModule } from '~/modules/rbac/rbac.module';
 import { reportModule } from '~/modules/report/report.module';
-import { routeHandlersModule } from '~/modules/route-handlers/route-handlers.module';
+import { routeHandlersModule } from '~/route-handlers/route-handlers.module';
 import { supervisionModule } from '~/modules/supervision/supervision.module';
 import { supplierModule } from '~/modules/supplier/supplier.module';
 import { systemLogModule } from '~/modules/system-log/system-log.module';

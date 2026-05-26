@@ -1,1 +1,1 @@
-export { default } from '~/modules/route-handlers/qms/pass-rate-trend.get.service';
+export { default } from '~/route-handlers/qms/pass-rate-trend.get.service';

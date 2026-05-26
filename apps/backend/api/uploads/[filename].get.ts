@@ -1,1 +1,1 @@
-export { default } from '~/modules/route-handlers/uploads/[filename].get.service';
+export { default } from '~/route-handlers/uploads/[filename].get.service';

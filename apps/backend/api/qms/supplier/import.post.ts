@@ -1,1 +1,1 @@
-export { default } from '~/modules/route-handlers/qms/supplier/import.post.service';
+export { default } from '~/route-handlers/qms/supplier/import.post.service';

@@ -1,1 +1,1 @@
-export { default } from '~/modules/route-handlers/qms/inspection/issues/[id].delete.service';
+export { default } from '~/route-handlers/qms/inspection/issues/[id].delete.service';

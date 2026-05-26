@@ -1,1 +1,1 @@
-export { default } from '~/modules/route-handlers/qms/dashboard/targets.post.service';
+export { default } from '~/route-handlers/qms/dashboard/targets.post.service';

@@ -1,1 +1,1 @@
-export { default } from '~/modules/route-handlers/auth/login.post.service';
+export { default } from '~/route-handlers/auth/login.post.service';
