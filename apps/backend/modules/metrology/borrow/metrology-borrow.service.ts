@@ -4,6 +4,8 @@ import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
 } from '~/utils/master-data-governance-write';
+import prisma from '~/utils/prisma';
+
 import {
   deriveMetrologyInspectionStatus,
   formatMetrologyDate,
@@ -11,8 +13,7 @@ import {
   getMetrologyInspectionStatusLabel,
   normalizeMetrologyBorrowStatus,
   startOfToday,
-} from '~/utils/metrology-status';
-import prisma from '~/utils/prisma';
+} from '../metrology-status';
 
 const BORROW_RECORD_STATUS_LABELS = {
   BORROWED: '已借出',

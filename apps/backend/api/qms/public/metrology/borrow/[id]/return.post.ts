@@ -1,11 +1,11 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { MetrologyBorrowService } from '~/modules/metrology/borrow/metrology-borrow.service';
-import { logApiError } from '~/utils/api-logger';
 import {
   PUBLIC_METROLOGY_BORROW_OPERATOR,
   verifyPublicMetrologyBorrowAccess,
-} from '~/utils/public-metrology-borrow';
+} from '~/modules/metrology/public-metrology-borrow';
+import { logApiError } from '~/utils/api-logger';
 import {
   badRequestResponse,
   internalServerErrorResponse,

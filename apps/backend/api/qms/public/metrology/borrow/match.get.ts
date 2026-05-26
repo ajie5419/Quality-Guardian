@@ -1,7 +1,7 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { MetrologyBorrowService } from '~/modules/metrology/borrow/metrology-borrow.service';
+import { verifyPublicMetrologyBorrowAccess } from '~/modules/metrology/public-metrology-borrow';
 import { logApiError } from '~/utils/api-logger';
-import { verifyPublicMetrologyBorrowAccess } from '~/utils/public-metrology-borrow';
 import {
   internalServerErrorResponse,
   useResponseSuccess,
