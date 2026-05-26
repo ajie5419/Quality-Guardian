@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
-import { DeptService } from '~/modules/dept/dept.service';
+import { DeptService } from '~/modules/dept';
 import { logApiError } from '~/utils/api-logger';
 import { isPrismaNotFoundError } from '~/utils/db-error';
 import { verifyAccessToken } from '~/utils/jwt-utils';
@@ -11,6 +11,8 @@ import {
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 import { requireSystemAdmin } from '~/utils/system-auth';
+
+import { normalizeUpdateDeptBody } from './dept-body';
 
 export default defineEventHandler(async (event) => {
   const userinfo = verifyAccessToken(event);
@@ -28,7 +30,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const body = await readBody(event);
+    const body = normalizeUpdateDeptBody(await readBody(event));
     await DeptService.update(id, body);
     return useResponseSuccess(null);
   } catch (error) {

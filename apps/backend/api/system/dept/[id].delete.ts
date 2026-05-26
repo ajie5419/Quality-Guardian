@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3';
-import { DeptService } from '~/modules/dept/dept.service';
+import { DeptService } from '~/modules/dept';
 import { logApiError } from '~/utils/api-logger';
 import { isPrismaNotFoundError } from '~/utils/db-error';
 import { verifyAccessToken } from '~/utils/jwt-utils';

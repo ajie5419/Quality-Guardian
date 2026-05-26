@@ -1,5 +1,5 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
-import { DeptService } from '~/modules/dept/dept.service';
+import { DeptService } from '~/modules/dept';
 import { logApiError } from '~/utils/api-logger';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 

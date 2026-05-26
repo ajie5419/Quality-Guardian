@@ -6,26 +6,20 @@ import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
 export interface CreateDeptDto {
+  businessUnit?: string;
+  description?: string;
   name: string;
   parentId?: string;
-  pid?: string;
-  businessUnit?: string;
-  remark?: string;
-  description?: string;
   status?: number;
-  orderNo?: number;
   sort?: number;
 }
 
 export interface UpdateDeptDto {
+  businessUnit?: string;
+  description?: string;
   name?: string;
   parentId?: string;
-  pid?: string;
-  businessUnit?: string;
-  remark?: string;
-  description?: string;
   status?: number;
-  orderNo?: number;
   sort?: number;
 }
 
@@ -96,11 +90,11 @@ export const DeptService = {
       data: {
         id: `dept-${createId()}`,
         name: data.name,
-        parentId: data.parentId || data.pid || '0',
+        parentId: data.parentId || '0',
         businessUnit: data.businessUnit || null,
-        description: data.remark || data.description || null,
+        description: data.description || null,
         status: data.status ?? 1,
-        sort: Number(data.orderNo || data.sort || 0),
+        sort: Number(data.sort || 0),
         isDeleted: false,
         updatedAt: new Date(),
       },
@@ -113,22 +107,19 @@ export const DeptService = {
    */
   async update(id: string, data: UpdateDeptDto) {
     await redis.del('qms:dept:tree');
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
     };
 
     if (data.businessUnit !== undefined)
       updateData.businessUnit = data.businessUnit;
-    if (data.remark !== undefined) updateData.description = data.remark;
     if (data.description !== undefined)
       updateData.description = data.description;
     if (data.name !== undefined) updateData.name = data.name;
 
     if (data.status !== undefined) updateData.status = data.status;
-    if (data.parentId || data.pid)
-      updateData.parentId = data.parentId || data.pid;
-    if (data.orderNo || data.sort)
-      updateData.sort = Number(data.orderNo || data.sort);
+    if (data.parentId !== undefined) updateData.parentId = data.parentId;
+    if (data.sort !== undefined) updateData.sort = Number(data.sort);
 
     await prisma.departments.update({
       where: { id },
