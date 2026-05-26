@@ -5,7 +5,7 @@ import {
   normalizeIssueTrackingStatus,
 } from '@qgs/shared';
 import { AfterSalesService } from '~/modules/after-sales';
-import { DeptService } from '~/modules/dept/dept.service';
+import { DeptService } from '~/modules/dept';
 import { InspectionService } from '~/modules/inspection';
 import { QualityLossService } from '~/modules/quality-loss';
 import { flattenDeptTree } from '~/utils/dept-tree';
