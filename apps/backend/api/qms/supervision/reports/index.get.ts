@@ -2,10 +2,8 @@ import { z } from 'zod';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -14,9 +12,6 @@ const supervisionReportsQuerySchema = z.object({}).passthrough();
 export default defineValidatedHandler(
   supervisionReportsQuerySchema,
   async (event, query) => {
-    const userinfo = verifyAccessToken(event);
-    if (!userinfo) return unAuthorizedResponse(event);
-
     try {
       const data = await SupervisionService.listReports({
         page: query.page ? Number(query.page) : undefined,

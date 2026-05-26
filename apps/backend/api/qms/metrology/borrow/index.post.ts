@@ -2,21 +2,17 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { MetrologyBorrowService } from '~/modules/metrology/borrow/metrology-borrow.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 const borrowSchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
 
   try {
     const body = borrowSchema.parse(await readBody(event));

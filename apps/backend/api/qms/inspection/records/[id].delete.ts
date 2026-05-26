@@ -2,8 +2,8 @@ import { defineEventHandler } from 'h3';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
+import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaNotFoundError } from '~/utils/db-error';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
   notFoundResponse,
@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const userinfo = verifyAccessToken(event);
+    const userinfo = getCurrentUser(event);
     await InspectionService.delete(id);
     await recordBusinessAuditLog(event, {
       userId: userinfo?.id,

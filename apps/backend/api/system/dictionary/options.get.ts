@@ -5,20 +5,13 @@ import {
   businessErrorResponse,
   legacyErrorToBusinessError,
 } from '~/utils/business-error';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,
-  unAuthorizedResponse,
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
   const query = getQuery(event);
   const dictType = String(query.dictType || '').trim();
   if (!dictType) {

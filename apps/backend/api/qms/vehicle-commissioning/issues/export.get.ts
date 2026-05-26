@@ -4,8 +4,7 @@ import { z } from 'zod';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { logApiError } from '~/utils/api-logger';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { verifyAccessToken } from '~/utils/jwt-utils';
-import { internalServerErrorResponse, unAuthorizedResponse } from '~/utils/response';
+import { internalServerErrorResponse } from '~/utils/response';
 
 const querySchema = z.object({
   date: z.string().optional(),
@@ -22,9 +21,6 @@ const querySchema = z.object({
 });
 
 export default defineValidatedHandler(querySchema, async (event, query) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
-
   try {
     const buffer = await VehicleCommissioningService.exportIssuesWorkbook({
       date: query.date,
@@ -34,8 +30,16 @@ export default defineValidatedHandler(querySchema, async (event, query) => {
       status: query.status,
       workOrderNumber: query.workOrderNumber,
     });
-    setHeader(event, 'Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    setHeader(event, 'Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent('调试验收问题台账.xlsx')}`);
+    setHeader(
+      event,
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    setHeader(
+      event,
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent('调试验收问题台账.xlsx')}`,
+    );
     return buffer;
   } catch (error) {
     logApiError('vehicle-commissioning-issues-export', error, undefined, event);

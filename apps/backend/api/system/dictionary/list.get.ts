@@ -1,19 +1,9 @@
 import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { DictionaryService } from '~/modules/dictionary/dictionary.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
-import {
-  unAuthorizedResponse,
-  usePageResponseSuccess,
-  useResponseError,
-} from '~/utils/response';
+import { usePageResponseSuccess, useResponseError } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
   try {
     const query = getQuery(event);
     const page = Number(query.page || 1);

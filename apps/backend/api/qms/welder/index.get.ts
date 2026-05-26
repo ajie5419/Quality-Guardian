@@ -4,10 +4,8 @@ import { WelderScoreService } from '~/modules/welder/welder-score.service';
 import { WelderService } from '~/modules/welder/welder.service';
 import { logApiError } from '~/utils/api-logger';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -16,11 +14,6 @@ const welderListQuerySchema = z.object({}).passthrough();
 export default defineValidatedHandler(
   welderListQuerySchema,
   async (event, query) => {
-    const userinfo = await verifyAccessToken(event);
-    if (!userinfo) {
-      return unAuthorizedResponse(event);
-    }
-
     try {
       await WelderScoreService.syncFromInspectionIssues();
       const result = await WelderService.findAll(parseWelderListQuery(query));

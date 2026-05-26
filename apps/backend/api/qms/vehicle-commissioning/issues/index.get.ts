@@ -3,10 +3,8 @@ import { z } from 'zod';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { logApiError } from '~/utils/api-logger';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -29,11 +27,6 @@ const vehicleCommissioningIssuesQuerySchema = z.object({
 export default defineValidatedHandler(
   vehicleCommissioningIssuesQuerySchema,
   async (event, query) => {
-    const userinfo = verifyAccessToken(event);
-    if (!userinfo) {
-      return unAuthorizedResponse(event);
-    }
-
     try {
       return useResponseSuccess(
         await VehicleCommissioningService.getIssues(query),

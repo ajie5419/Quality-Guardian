@@ -2,21 +2,11 @@ import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { z } from 'zod';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
-import {
-  unAuthorizedResponse,
-  useResponseError,
-  useResponseSuccess,
-} from '~/utils/response';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 const schema = z.object({ path: z.string().trim().min(1) });
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
   try {
     const parsed = schema.safeParse(await readBody(event));
     if (!parsed.success) {

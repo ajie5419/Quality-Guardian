@@ -1,21 +1,17 @@
 import { defineEventHandler, readBody } from 'h3';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 import { requireSystemAdmin } from '~/utils/system-auth';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
   const adminCheck = requireSystemAdmin(event, userinfo);
   if (adminCheck) {
     return adminCheck;

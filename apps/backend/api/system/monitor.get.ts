@@ -1,17 +1,12 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
 import { SystemService } from '~/modules/system/system.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
-import {
-  unAuthorizedResponse,
-  useResponseError,
-  useResponseSuccess,
-} from '~/utils/response';
+import { getCurrentUser } from '~/utils/current-user';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 import { requireSystemAdmin } from '~/utils/system-auth';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
+  const userinfo = getCurrentUser(event);
 
   const adminCheck = requireSystemAdmin(event, userinfo);
   if (adminCheck) {

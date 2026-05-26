@@ -2,11 +2,10 @@ import { z } from 'zod';
 import { parseAfterSalesListQuery } from '~/modules/after-sales/after-sales-query';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useListResponseSuccess,
 } from '~/utils/response';
 
@@ -15,10 +14,7 @@ const afterSalesListQuerySchema = z.object({}).passthrough();
 export default defineValidatedHandler(
   afterSalesListQuerySchema,
   async (event, query) => {
-    const userinfo = await verifyAccessToken(event);
-    if (!userinfo) {
-      return unAuthorizedResponse(event);
-    }
+    const userinfo = getCurrentUser(event);
 
     const params = parseAfterSalesListQuery(query);
 

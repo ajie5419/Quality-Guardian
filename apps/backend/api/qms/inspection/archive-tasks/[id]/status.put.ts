@@ -2,11 +2,9 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -17,8 +15,6 @@ const schema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
   const id = getRequiredRouterParam(event, 'id', 'ID required');
   if (typeof id !== 'string') return id;
   try {

@@ -1,12 +1,11 @@
 import { defineEventHandler, readBody } from 'h3';
 import { DeptService } from '~/modules/dept';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaNotFoundError } from '~/utils/db-error';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
   notFoundResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -15,10 +14,7 @@ import { requireSystemAdmin } from '~/utils/system-auth';
 import { normalizeUpdateDeptBody } from './dept-body';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
   const adminCheck = requireSystemAdmin(event, userinfo);
   if (adminCheck) {
     return adminCheck;

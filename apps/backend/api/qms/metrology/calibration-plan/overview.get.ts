@@ -3,19 +3,12 @@ import type { MetrologyCalibrationPlanStatus } from '@qgs/shared';
 import { defineEventHandler, getQuery } from 'h3';
 import { MetrologyCalibrationPlanService } from '~/modules/metrology/calibration-plan/metrology-calibration-plan.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
   try {
     const query = getQuery(event);
     const result = await MetrologyCalibrationPlanService.getOverview({

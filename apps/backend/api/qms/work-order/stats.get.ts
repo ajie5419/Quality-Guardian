@@ -1,11 +1,10 @@
 import { z } from 'zod';
 import { WorkOrderService } from '~/modules/work-order/work-order.service';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { parseWorkOrderListQuery } from '~/utils/work-order';
@@ -15,10 +14,7 @@ const workOrderStatsQuerySchema = z.object({}).passthrough();
 export default defineValidatedHandler(
   workOrderStatsQuerySchema,
   async (event, query) => {
-    const userinfo = await verifyAccessToken(event);
-    if (!userinfo) {
-      return unAuthorizedResponse(event);
-    }
+    const userinfo = getCurrentUser(event);
 
     const params = parseWorkOrderListQuery(query);
 

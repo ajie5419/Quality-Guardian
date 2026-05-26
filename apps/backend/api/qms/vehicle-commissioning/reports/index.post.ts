@@ -2,10 +2,8 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -20,11 +18,6 @@ const bodySchema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
   try {
     const body = bodySchema.parse(await readBody(event));
     return useResponseSuccess(

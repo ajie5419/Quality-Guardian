@@ -1,19 +1,12 @@
 import { eventHandler, setResponseStatus } from 'h3';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import { ensureModuleMenus } from '~/utils/module-loader';
-import {
-  unAuthorizedResponse,
-  useResponseError,
-  useResponseSuccess,
-} from '~/utils/response';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default eventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
 
   const userId = userinfo.userId || userinfo.id;
   if (!userId) {

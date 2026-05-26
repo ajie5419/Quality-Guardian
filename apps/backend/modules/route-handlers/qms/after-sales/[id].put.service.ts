@@ -4,13 +4,12 @@ import { buildGovernedAfterSalesUpdateData } from '~/modules/after-sales/after-s
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
   notFoundResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -18,10 +17,7 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 const updateAfterSalesSchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
 
   const id = getRequiredRouterParam(event, 'id', '缺少ID');
   if (typeof id !== 'string') {

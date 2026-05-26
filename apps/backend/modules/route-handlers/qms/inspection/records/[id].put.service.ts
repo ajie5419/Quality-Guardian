@@ -7,8 +7,8 @@ import {
   businessErrorResponse,
   legacyErrorToBusinessError,
 } from '~/utils/business-error';
+import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaNotFoundError } from '~/utils/db-error';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
   notFoundResponse,
@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
   if (typeof id !== 'string') return id;
 
   try {
-    const userinfo = verifyAccessToken(event);
+    const userinfo = getCurrentUser(event);
     const body = schema.parse(await readBody(event));
     const result = await InspectionService.update(
       id,

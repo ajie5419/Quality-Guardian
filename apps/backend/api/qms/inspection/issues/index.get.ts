@@ -2,11 +2,10 @@ import { z } from 'zod';
 import { parseInspectionIssueListQuery } from '~/modules/inspection/inspection-issue';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -15,10 +14,7 @@ const inspectionIssuesQuerySchema = z.object({}).passthrough();
 export default defineValidatedHandler(
   inspectionIssuesQuerySchema,
   async (event, query) => {
-    const userinfo = await verifyAccessToken(event);
-    if (!userinfo) {
-      return unAuthorizedResponse(event);
-    }
+    const userinfo = getCurrentUser(event);
 
     const params = parseInspectionIssueListQuery(query);
 

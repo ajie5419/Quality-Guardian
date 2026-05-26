@@ -3,17 +3,10 @@ import {
   sendInspectionRequestHeartbeat,
   subscribeInspectionRequestEvents,
 } from '~/modules/inspection/inspection-request-events';
-import { verifyAccessToken } from '~/utils/jwt-utils';
-import { unAuthorizedResponse } from '~/utils/response';
 
 const HEARTBEAT_INTERVAL_MS = 25_000;
 
 export default defineEventHandler((event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
   setHeader(event, 'Content-Type', 'text/event-stream; charset=utf-8');
   setHeader(event, 'Cache-Control', 'no-cache, no-transform');
   setHeader(event, 'Connection', 'keep-alive');

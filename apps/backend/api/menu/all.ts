@@ -1,14 +1,10 @@
 import { eventHandler } from 'h3';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
-import { unAuthorizedResponse } from '~/utils/response';
+import { getCurrentUser } from '~/utils/current-user';
 
 export default eventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
 
   try {
     return await RbacService.getMenuTreeForUser(userinfo);

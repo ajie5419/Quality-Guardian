@@ -1,11 +1,10 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -14,10 +13,7 @@ const MANUAL_WARRANTY_SETTING_KEY =
   'QMS_VEHICLE_FAILURE_LAST_YEAR_WARRANTY_MONTHLY_MANUAL';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
 
   try {
     const body = (await readBody(event)) as Record<string, unknown>;

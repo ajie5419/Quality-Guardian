@@ -5,20 +5,16 @@ import {
   businessErrorResponse,
   legacyErrorToBusinessError,
 } from '~/utils/business-error';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 import { requireSystemAdmin } from '~/utils/system-auth';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
 
   const adminCheck = requireSystemAdmin(event, userinfo);
   if (adminCheck) {

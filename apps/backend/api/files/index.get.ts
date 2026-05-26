@@ -1,17 +1,12 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
-
   try {
     const query = getQuery(event);
     const result = await FileStorageService.listFiles({

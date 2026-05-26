@@ -2,17 +2,15 @@ import { defineEventHandler, getQuery } from 'h3';
 import { resolveReportDateRangeQuery } from '~/modules/report/report-utils';
 import { ReportService } from '~/modules/report/report.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
+  const userinfo = getCurrentUser(event);
 
   const query = getQuery(event);
   const dateRange = resolveReportDateRangeQuery(query.startDate, query.endDate);

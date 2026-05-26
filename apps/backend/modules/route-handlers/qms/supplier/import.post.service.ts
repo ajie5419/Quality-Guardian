@@ -3,12 +3,11 @@ import { z } from 'zod';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import { parseNonEmptyArray } from '~/utils/request-validation';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -18,8 +17,7 @@ const importSupplierBodySchema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
+  const userinfo = getCurrentUser(event);
 
   try {
     const body = importSupplierBodySchema.parse(await readBody(event));

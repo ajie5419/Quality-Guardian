@@ -1,11 +1,10 @@
 import { z } from 'zod';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { parseSupplierListQuery } from '~/utils/supplier';
@@ -15,10 +14,7 @@ const supplierListQuerySchema = z.object({}).passthrough();
 export default defineValidatedHandler(
   supplierListQuerySchema,
   async (event, query) => {
-    const userinfo = await verifyAccessToken(event);
-    if (!userinfo) {
-      return unAuthorizedResponse(event);
-    }
+    const userinfo = getCurrentUser(event);
 
     try {
       const result = await SupplierService.findAll({

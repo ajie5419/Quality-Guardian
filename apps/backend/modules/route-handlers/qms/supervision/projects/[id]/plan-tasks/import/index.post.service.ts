@@ -3,12 +3,10 @@ import { z } from 'zod';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -17,9 +15,6 @@ const importPlanTasksBodySchema = z
   .passthrough();
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
-
   const projectId = getRouterParam(event, 'id');
   if (!projectId) return badRequestResponse(event, '监造项目不能为空');
 

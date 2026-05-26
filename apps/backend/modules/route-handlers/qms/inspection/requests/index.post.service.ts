@@ -7,19 +7,17 @@ import {
   normalizeInspectionRequestText,
 } from '~/modules/inspection/inspection-request';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 const schema = z.object({}).passthrough();
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
+  const userinfo = getCurrentUser(event);
   const body = schema.parse(await readBody(event));
 
   const workOrderNumber = normalizeInspectionRequestText(body.workOrderNumber);

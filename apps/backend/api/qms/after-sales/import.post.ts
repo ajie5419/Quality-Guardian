@@ -2,11 +2,9 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { AfterSalesRouteService } from '~/modules/after-sales/after-sales-route.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -15,9 +13,6 @@ const importSchema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
-
   try {
     const body = importSchema.safeParse(await readBody(event));
     if (!body.success) return badRequestResponse(event, '未选择数据');

@@ -5,20 +5,18 @@ import {
   businessErrorResponse,
   legacyErrorToBusinessError,
 } from '~/utils/business-error';
+import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import { getRequiredQueryParam } from '~/utils/query-param';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 const bodySchema = z.object({}).passthrough();
 
 export default defineValidatedHandler(bodySchema, async (event, body) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
+  const userinfo = getCurrentUser(event);
 
   const id = getRequiredQueryParam(event, 'id', '缺少工单号');
   if (typeof id !== 'string') return id;

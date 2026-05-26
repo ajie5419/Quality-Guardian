@@ -3,21 +3,17 @@ import { z } from 'zod';
 import { MetrologyService } from '~/modules/metrology/metrology.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 const batchDeleteSchema = z.object({ ids: z.array(z.string()).min(1) });
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
 
   try {
     const parsed = batchDeleteSchema.safeParse(await readBody(event));

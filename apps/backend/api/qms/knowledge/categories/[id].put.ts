@@ -6,12 +6,10 @@ import {
   isPrismaNotFoundError,
   isPrismaUniqueConstraintError,
 } from '~/utils/db-error';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   conflictResponse,
   internalServerErrorResponse,
   notFoundResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -19,11 +17,6 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 const updateKnowledgeCategorySchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
   const id = getRequiredRouterParam(event, 'id', '缺少分类ID');
   if (typeof id !== 'string') {
     return id;

@@ -6,7 +6,7 @@ import {
   businessErrorResponse,
   legacyErrorToBusinessError,
 } from '~/utils/business-error';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   internalServerErrorResponse,
   useResponseSuccess,
@@ -14,7 +14,7 @@ import {
 
 export default defineEventHandler(async (event) => {
   try {
-    const userinfo = verifyAccessToken(event);
+    const userinfo = getCurrentUser(event);
     const body = await readBody(event);
     const result = await InspectionService.create(body);
     await recordBusinessAuditLog(event, {

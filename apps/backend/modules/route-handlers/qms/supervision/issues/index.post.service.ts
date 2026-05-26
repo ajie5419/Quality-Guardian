@@ -3,12 +3,11 @@ import { z } from 'zod';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -21,8 +20,7 @@ const createIssueBodySchema = z
   .passthrough();
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
+  const userinfo = getCurrentUser(event);
   try {
     const body = createIssueBodySchema.parse(await readBody(event));
     if (!String(body.projectId || '').trim()) {

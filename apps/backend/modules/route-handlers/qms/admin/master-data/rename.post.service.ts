@@ -1,11 +1,10 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
   conflictResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
 } from '~/utils/response';
 import { requireSystemAdmin } from '~/utils/system-auth';
 
@@ -20,10 +19,7 @@ function normalizeStringValue(value: unknown) {
 }
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
 
   const adminCheck = requireSystemAdmin(event, userinfo);
   if (adminCheck) {

@@ -1,19 +1,14 @@
 import { defineEventHandler, readBody } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isProcessPassRateTargetKey } from '~/utils/pass-rate-process';
 import prisma from '~/utils/prisma';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
-
   try {
     const body = await readBody(event);
 

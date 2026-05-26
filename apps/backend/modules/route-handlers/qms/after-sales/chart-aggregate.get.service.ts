@@ -5,11 +5,10 @@ import {
 } from '~/modules/after-sales/after-sales-query';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -44,8 +43,7 @@ const afterSalesChartAggregateQuerySchema = z
 export default defineValidatedHandler(
   afterSalesChartAggregateQuerySchema,
   async (event, query) => {
-    const userinfo = await verifyAccessToken(event);
-    if (!userinfo) return unAuthorizedResponse(event);
+    const userinfo = getCurrentUser(event);
 
     const dimension = query.dimension;
     const metric = query.metric;

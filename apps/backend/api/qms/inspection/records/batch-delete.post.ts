@@ -2,8 +2,8 @@ import { defineEventHandler, readBody } from 'h3';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
+import { getCurrentUser } from '~/utils/current-user';
 import { parseNonEmptyIdList } from '~/utils/id-list';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -12,7 +12,7 @@ import {
 
 export default defineEventHandler(async (event) => {
   try {
-    const userinfo = verifyAccessToken(event);
+    const userinfo = getCurrentUser(event);
     const body = (await readBody(event)) as { ids?: unknown };
     const ids = parseNonEmptyIdList(body.ids);
     if (!ids) {

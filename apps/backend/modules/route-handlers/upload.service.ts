@@ -5,12 +5,12 @@ import { eventHandler, setResponseStatus } from 'h3';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default eventHandler(async (event) => {
   try {
-    const userinfo = verifyAccessToken(event);
+    const userinfo = getCurrentUser(event);
     const rawContentType = event.node.req.headers['content-type'];
     const contentType = Array.isArray(rawContentType)
       ? rawContentType[0]

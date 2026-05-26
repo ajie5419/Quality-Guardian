@@ -1,14 +1,11 @@
 import { eventHandler } from 'h3';
 import { UserService } from '~/modules/user/user.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
-import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
+import { getCurrentUser } from '~/utils/current-user';
+import { useResponseSuccess } from '~/utils/response';
 
 export default eventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
 
   try {
     const freshUserInfo = await UserService.getInfoByTokenPayload(userinfo);

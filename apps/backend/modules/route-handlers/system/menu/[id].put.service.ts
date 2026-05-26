@@ -2,12 +2,11 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
   notFoundResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -25,10 +24,7 @@ const schema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
   const adminCheck = requireSystemAdmin(event, userinfo);
   if (adminCheck) {
     return adminCheck;

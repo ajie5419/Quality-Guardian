@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { MetrologyService } from '~/modules/metrology/metrology.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   isPrismaNotFoundError,
   isPrismaUniqueConstraintError,
@@ -13,7 +13,6 @@ import {
   conflictResponse,
   internalServerErrorResponse,
   notFoundResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -21,10 +20,7 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 const updateMetrologySchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
 
   const id = getRequiredRouterParam(event, 'id', '缺少计量器具ID');
   if (typeof id !== 'string') {

@@ -1,19 +1,9 @@
 import { eventHandler, getRouterParam, setResponseStatus } from 'h3';
 import { PreferenceService } from '~/modules/user/preference.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
-import {
-  unAuthorizedResponse,
-  useResponseError,
-  useResponseSuccess,
-} from '~/utils/response';
+import { useResponseError, useResponseSuccess } from '~/utils/response';
 
 export default eventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
   const key = getRouterParam(event, 'key');
   if (!key) {
     setResponseStatus(event, 400);

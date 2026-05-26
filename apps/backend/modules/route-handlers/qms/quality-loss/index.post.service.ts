@@ -6,21 +6,17 @@ import {
 } from '~/modules/quality-loss/quality-loss-payload';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
 
   try {
     const body = await readBody(event);

@@ -3,12 +3,11 @@ import { z } from 'zod';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaSchemaMismatchError } from '~/utils/db-error';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -17,8 +16,7 @@ const createIssueActionBodySchema = z
   .passthrough();
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
+  const userinfo = getCurrentUser(event);
 
   const id = getRouterParam(event, 'id');
   if (!id) return badRequestResponse(event, '无效监造问题ID');

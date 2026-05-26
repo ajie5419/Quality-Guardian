@@ -1,19 +1,9 @@
 import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { UserService } from '~/modules/user/user.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
-import {
-  unAuthorizedResponse,
-  usePageResponseSuccess,
-  useResponseError,
-} from '~/utils/response';
+import { usePageResponseSuccess, useResponseError } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
   try {
     const { page = 1, pageSize = 20 } = getQuery(event);
     const result = await UserService.findAll({

@@ -5,11 +5,10 @@ import {
   TaskDispatchService,
 } from '~/modules/task-dispatch/task-dispatch.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -22,8 +21,7 @@ const bodySchema = z
   .passthrough();
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
+  const userinfo = getCurrentUser(event);
 
   const body = bodySchema.parse(await readBody(event));
   if (!body.type || !body.title || !body.assigneeId)

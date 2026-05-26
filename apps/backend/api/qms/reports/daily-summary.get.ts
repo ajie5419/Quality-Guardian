@@ -2,11 +2,10 @@ import { defineEventHandler, getQuery } from 'h3';
 import { z } from 'zod';
 import { ReportSummaryService } from '~/modules/report/report-summary.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -16,8 +15,7 @@ const dailySummaryQuerySchema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
+  const userinfo = getCurrentUser(event);
   const query = dailySummaryQuerySchema.parse(getQuery(event));
   try {
     const data = await ReportSummaryService.getDailySummaryFromQuery({

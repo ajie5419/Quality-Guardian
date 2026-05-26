@@ -2,10 +2,8 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { ReportRouteService } from '~/modules/report/report-route.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -13,11 +11,6 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 const bodySchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
   const id = getRequiredRouterParam(event, 'id', 'id required');
   if (typeof id !== 'string') {
     return id;

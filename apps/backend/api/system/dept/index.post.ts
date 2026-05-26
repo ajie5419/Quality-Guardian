@@ -1,12 +1,11 @@
 import { defineEventHandler, readBody } from 'h3';
 import { DeptService } from '~/modules/dept';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaUniqueConstraintError } from '~/utils/db-error';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   conflictResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { requireSystemAdmin } from '~/utils/system-auth';
@@ -14,10 +13,7 @@ import { requireSystemAdmin } from '~/utils/system-auth';
 import { normalizeCreateDeptBody } from './dept-body';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
   const adminCheck = requireSystemAdmin(event, userinfo);
   if (adminCheck) {
     return adminCheck;

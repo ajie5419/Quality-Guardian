@@ -2,11 +2,10 @@ import { defineEventHandler, getQuery } from 'h3';
 import { z } from 'zod';
 import { TaskDispatchService } from '~/modules/task-dispatch/task-dispatch.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useListResponseSuccess,
 } from '~/utils/response';
 
@@ -18,10 +17,7 @@ const querySchema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
 
   const query = querySchema.parse(getQuery(event));
 

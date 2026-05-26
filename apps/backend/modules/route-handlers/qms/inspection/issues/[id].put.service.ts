@@ -6,13 +6,12 @@ import {
   hasInspectionIssueWriteAccess,
 } from '~/modules/inspection/inspection-issue';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaNotFoundError } from '~/utils/db-error';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   forbiddenResponse,
   internalServerErrorResponse,
   notFoundResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -20,8 +19,7 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 const schema = z.object({}).passthrough();
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
+  const userinfo = getCurrentUser(event);
 
   const id = getRequiredRouterParam(event, 'id', '缺少ID');
   if (typeof id !== 'string') return id;

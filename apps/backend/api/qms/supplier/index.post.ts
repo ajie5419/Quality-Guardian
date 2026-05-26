@@ -3,23 +3,19 @@ import { z } from 'zod';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
+import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaUniqueConstraintError } from '~/utils/db-error';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,
   conflictResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 const createSupplierBodySchema = z.object({}).passthrough();
 
 export default defineEventHandler(async (event) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
+  const userinfo = getCurrentUser(event);
 
   try {
     const body = createSupplierBodySchema.parse(await readBody(event));

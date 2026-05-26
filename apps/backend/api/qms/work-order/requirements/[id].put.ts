@@ -2,12 +2,11 @@ import { getRouterParam } from 'h3';
 import { z } from 'zod';
 import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -21,8 +20,7 @@ const bodySchema = z
   .passthrough();
 
 export default defineValidatedHandler(bodySchema, async (event, body) => {
-  const userinfo = verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
+  const userinfo = getCurrentUser(event);
 
   const id = String(getRouterParam(event, 'id') || '').trim();
   if (!id) return badRequestResponse(event, '无效要求ID');

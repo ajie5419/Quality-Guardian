@@ -5,19 +5,12 @@ import {
 } from '~/modules/after-sales/after-sales-query';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
   const {
     dateMode: rawDateMode,
     dateValue: rawDateValue,

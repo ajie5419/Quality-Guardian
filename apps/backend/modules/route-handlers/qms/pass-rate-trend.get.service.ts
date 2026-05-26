@@ -6,7 +6,6 @@ import {
 } from '@qgs/shared';
 import { defineEventHandler, getQuery } from 'h3';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   createPassRateTargetResolver,
   getNetPassRateSummaryByRange,
@@ -14,14 +13,10 @@ import {
 } from '~/utils/pass-rate';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) return unAuthorizedResponse(event);
-
   const query = getQuery(event);
   const granularity = (query.granularity as unknown as string) || 'week';
   const period = query.period as unknown as string;

@@ -1,18 +1,9 @@
 import { defineEventHandler, setHeader } from 'h3';
 import { MetrologyCalibrationPlanService } from '~/modules/metrology/calibration-plan/metrology-calibration-plan.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
-import {
-  internalServerErrorResponse,
-  unAuthorizedResponse,
-} from '~/utils/response';
+import { internalServerErrorResponse } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
   try {
     const XLSX = await import('xlsx');
     const workbook = XLSX.utils.book_new();

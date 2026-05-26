@@ -2,12 +2,10 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { WelderService } from '~/modules/welder/welder.service';
 import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import { parseNonEmptyArray } from '~/utils/request-validation';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -16,11 +14,6 @@ const bodySchema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await verifyAccessToken(event);
-  if (!userinfo) {
-    return unAuthorizedResponse(event);
-  }
-
   try {
     const body = bodySchema.parse(await readBody(event));
     const items = parseNonEmptyArray<Record<string, unknown>>(body.items);

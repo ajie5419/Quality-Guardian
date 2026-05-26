@@ -2,11 +2,10 @@ import { z } from 'zod';
 import { parseQualityLossListQuery } from '~/modules/quality-loss/quality-loss-query';
 import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
-import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   internalServerErrorResponse,
-  unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -15,10 +14,7 @@ const qualityLossListQuerySchema = z.object({}).passthrough();
 export default defineValidatedHandler(
   qualityLossListQuerySchema,
   async (event, query) => {
-    const userinfo = await verifyAccessToken(event);
-    if (!userinfo) {
-      return unAuthorizedResponse(event);
-    }
+    const userinfo = getCurrentUser(event);
 
     const params = parseQualityLossListQuery(query);
 
