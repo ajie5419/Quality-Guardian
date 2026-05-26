@@ -55,7 +55,7 @@ export const SystemLogService = {
     const pageSize = Number(params.pageSize) || 20;
     const skip = (page - 1) * pageSize;
 
-    const where: Prisma.login_logsWhereInput = {};
+    const where: Prisma.login_logsWhereInput = { isDeleted: false };
     if (params.username?.trim()) {
       where.username = { contains: params.username.trim() };
     }
@@ -88,15 +88,19 @@ export const SystemLogService = {
    * Delete a log
    */
   async deleteLog(id: string): Promise<LoginLog> {
-    return prisma.login_logs.delete({ where: { id } });
+    return prisma.login_logs.update({
+      where: { id },
+      data: { isDeleted: true },
+    });
   },
 
   /**
    * Batch delete logs
    */
   async batchDeleteLogs(ids: string[]): Promise<Prisma.BatchPayload> {
-    return prisma.login_logs.deleteMany({
+    return prisma.login_logs.updateMany({
       where: { id: { in: ids } },
+      data: { isDeleted: true },
     });
   },
 
@@ -173,7 +177,7 @@ export const SystemLogService = {
     const pageSize = Number(params.pageSize) || 20;
     const skip = (page - 1) * pageSize;
 
-    const where: Prisma.audit_logsWhereInput = {};
+    const where: Prisma.audit_logsWhereInput = { isDeleted: false };
     if (params.userId) {
       where.userId = params.userId;
     }
@@ -220,6 +224,7 @@ export const SystemLogService = {
   async getAuditLogsByTarget(params: { targetId: string; targetType: string }) {
     return prisma.audit_logs.findMany({
       where: {
+        isDeleted: false,
         targetId: params.targetId,
         targetType: params.targetType,
       },
@@ -239,15 +244,19 @@ export const SystemLogService = {
    * Delete an audit log
    */
   async deleteAuditLog(id: string): Promise<any> {
-    return prisma.audit_logs.delete({ where: { id } });
+    return prisma.audit_logs.update({
+      where: { id },
+      data: { isDeleted: true },
+    });
   },
 
   /**
    * Batch delete audit logs
    */
   async batchDeleteAuditLogs(ids: string[]): Promise<Prisma.BatchPayload> {
-    return prisma.audit_logs.deleteMany({
+    return prisma.audit_logs.updateMany({
       where: { id: { in: ids } },
+      data: { isDeleted: true },
     });
   },
 };

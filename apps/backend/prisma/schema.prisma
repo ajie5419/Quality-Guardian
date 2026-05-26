@@ -202,6 +202,7 @@ model audit_logs {
   ipAddress  String?
   userAgent  String?           @db.Text
   timestamp  BigInt            @default(autoincrement())
+  isDeleted  Boolean           @default(false)
   createdAt  DateTime          @default(now())
   users      users             @relation(fields: [userId], references: [id])
 
@@ -219,6 +220,7 @@ model login_logs {
   method    String?  @default("密码登录")
   status    String?  @default("成功") // 成功 / 失败
   message   String?  @db.Text
+  isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
 }
 

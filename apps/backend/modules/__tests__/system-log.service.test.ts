@@ -10,8 +10,8 @@ vi.mock('../../utils/prisma', () => ({
       create: vi.fn(),
       findMany: vi.fn(),
       count: vi.fn(),
-      delete: vi.fn(),
-      deleteMany: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -89,6 +89,7 @@ describe('systemLogService', () => {
 
       expect(prisma.login_logs.findMany).toHaveBeenCalledWith({
         where: {
+          isDeleted: false,
           username: { contains: 'test' },
           status: '成功',
           createdAt: {
@@ -106,17 +107,19 @@ describe('systemLogService', () => {
   });
 
   describe('delete operations', () => {
-    it('should delete a single log', async () => {
+    it('should soft delete a single log', async () => {
       await SystemLogService.deleteLog('123');
-      expect(prisma.login_logs.delete).toHaveBeenCalledWith({
+      expect(prisma.login_logs.update).toHaveBeenCalledWith({
         where: { id: '123' },
+        data: { isDeleted: true },
       });
     });
 
-    it('should batch delete logs', async () => {
+    it('should batch soft delete logs', async () => {
       await SystemLogService.batchDeleteLogs(['1', '2']);
-      expect(prisma.login_logs.deleteMany).toHaveBeenCalledWith({
+      expect(prisma.login_logs.updateMany).toHaveBeenCalledWith({
         where: { id: { in: ['1', '2'] } },
+        data: { isDeleted: true },
       });
     });
   });

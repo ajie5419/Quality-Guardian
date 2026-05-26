@@ -8,8 +8,8 @@ vi.mock('~/utils/prisma', () => ({
       create: vi.fn(),
       findMany: vi.fn(),
       count: vi.fn(),
-      delete: vi.fn(),
-      deleteMany: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -49,21 +49,23 @@ describe('systemLogService - Audit Logs', () => {
     );
   });
 
-  it('should delete a single audit log', async () => {
+  it('should soft delete a single audit log', async () => {
     await SystemLogService.deleteAuditLog('1');
-    expect(prisma.audit_logs.delete).toHaveBeenCalledWith({
+    expect(prisma.audit_logs.update).toHaveBeenCalledWith({
       where: { id: '1' },
+      data: { isDeleted: true },
     });
   });
 
-  it('should batch delete audit logs', async () => {
+  it('should batch soft delete audit logs', async () => {
     const ids = ['1', '2'];
-    (prisma.audit_logs.deleteMany as any).mockResolvedValue({ count: 2 });
+    (prisma.audit_logs.updateMany as any).mockResolvedValue({ count: 2 });
 
     const result = await SystemLogService.batchDeleteAuditLogs(ids);
     expect(result.count).toBe(2);
-    expect(prisma.audit_logs.deleteMany).toHaveBeenCalledWith({
+    expect(prisma.audit_logs.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ids } },
+      data: { isDeleted: true },
     });
   });
 });
