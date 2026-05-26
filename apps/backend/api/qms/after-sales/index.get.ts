@@ -25,6 +25,7 @@ export default defineValidatedHandler(
           userId: String(userinfo.id || userinfo.userId || ''),
           username: userinfo.username,
         },
+        dataScope: event.context.dataScope,
       });
       return useListResponseSuccess(list);
     } catch (error: unknown) {

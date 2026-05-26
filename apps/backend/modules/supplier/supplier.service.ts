@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
 import type { SupplierStats } from './supplier-scoring';
 
@@ -35,6 +36,7 @@ export interface SupplierQueryParams {
   name?: string;
   outsourcingMode?: string;
   userContext?: { userId: string; username?: string };
+  dataScope?: ResolvedDataScope;
 }
 
 type SupplierWhereInput = Prisma.suppliersWhereInput;
@@ -415,10 +417,14 @@ export const SupplierService = {
     }
 
     const scopedWhere = params.userContext?.userId
-      ? await DataScopeService.buildSupplierWhere(where, {
-          userId: params.userContext.userId,
-          username: params.userContext.username,
-        })
+      ? await DataScopeService.buildSupplierWhere(
+          where,
+          {
+            userId: params.userContext.userId,
+            username: params.userContext.username,
+          },
+          params.dataScope,
+        )
       : where;
 
     // 2. 执行核心查询

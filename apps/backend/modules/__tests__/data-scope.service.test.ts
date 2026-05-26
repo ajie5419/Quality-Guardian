@@ -64,6 +64,33 @@ describe('dataScopeService', () => {
     );
   });
 
+  it('should use pre-resolved scope without querying role policies', async () => {
+    (prisma.departments.findMany as any).mockResolvedValue([
+      { name: 'Quality Dept' },
+    ]);
+
+    const where = await DataScopeService.buildInspectionWhere(
+      { isDeleted: false },
+      { userId: 'u1', username: 'vben' },
+      { scopeType: 'DEPT', deptIds: ['dept-a'] },
+    );
+
+    expect(prisma.users.findFirst).not.toHaveBeenCalled();
+    expect(prisma.rbac_user_roles.findMany).not.toHaveBeenCalled();
+    expect(prisma.data_permission_policies.findMany).not.toHaveBeenCalled();
+    expect(where).toEqual({
+      AND: [
+        { isDeleted: false },
+        {
+          OR: [
+            { responsibleDepartment: { in: ['dept-a', 'Quality Dept'] } },
+            { responsibleBU: { in: ['dept-a', 'Quality Dept'] } },
+          ],
+        },
+      ],
+    });
+  });
+
   it('should fallback to SELF with username condition', async () => {
     (prisma.data_permission_policies.findMany as any).mockResolvedValue([]);
 

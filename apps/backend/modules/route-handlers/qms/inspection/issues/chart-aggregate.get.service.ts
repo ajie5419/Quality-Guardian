@@ -58,6 +58,7 @@ export default defineValidatedHandler(schema, async (event, query) => {
         userId: String(userinfo.id || userinfo.userId || ''),
         username: userinfo.username,
       },
+      dataScope: event.context.dataScope,
     });
     return useResponseSuccess({ items: result });
   } catch (error) {

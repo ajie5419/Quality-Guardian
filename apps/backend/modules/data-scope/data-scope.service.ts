@@ -3,7 +3,13 @@ import { getDataScopeConfig } from '~/utils/module-loader';
 import prisma from '~/utils/prisma';
 import { isDataScopeV2Enabled } from '~/utils/rbac-config';
 
-type DataScopeType = 'ALL' | 'DEPT' | 'SELF';
+export type DataScopeType = 'ALL' | 'DEPT' | 'SELF';
+
+export interface ResolvedDataScope {
+  deptIds: string[];
+  module: string;
+  scopeType: DataScopeType;
+}
 
 interface UserContext {
   userId: string;
@@ -128,13 +134,15 @@ export const DataScopeService = {
     module: string,
     baseWhere: T,
     user: UserContext,
+    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
   ): Promise<T> {
     const config = getDataScopeConfig(module);
     if (!config) {
       return baseWhere;
     }
 
-    const { scopeType, deptIds } = await resolveScope(user.userId, module);
+    const { scopeType, deptIds } =
+      resolvedScope ?? (await resolveScope(user.userId, module));
 
     if (scopeType === 'ALL') {
       return baseWhere;
@@ -170,28 +178,32 @@ export const DataScopeService = {
   async buildInspectionWhere(
     baseWhere: Prisma.quality_recordsWhereInput,
     user: UserContext,
+    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
   ): Promise<Prisma.quality_recordsWhereInput> {
-    return this.buildScopedWhere('inspection', baseWhere, user);
+    return this.buildScopedWhere('inspection', baseWhere, user, resolvedScope);
   },
 
   async buildSupplierWhere(
     baseWhere: Prisma.suppliersWhereInput,
     user: UserContext,
+    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
   ): Promise<Prisma.suppliersWhereInput> {
-    return this.buildScopedWhere('supplier', baseWhere, user);
+    return this.buildScopedWhere('supplier', baseWhere, user, resolvedScope);
   },
 
   async buildAfterSalesWhere(
     baseWhere: Prisma.after_salesWhereInput,
     user: UserContext,
+    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
   ): Promise<Prisma.after_salesWhereInput> {
-    return this.buildScopedWhere('after-sales', baseWhere, user);
+    return this.buildScopedWhere('after-sales', baseWhere, user, resolvedScope);
   },
 
   async buildWorkOrderWhere(
     baseWhere: Prisma.work_ordersWhereInput,
     user: UserContext,
+    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
   ): Promise<Prisma.work_ordersWhereInput> {
-    return this.buildScopedWhere('work-order', baseWhere, user);
+    return this.buildScopedWhere('work-order', baseWhere, user, resolvedScope);
   },
 };

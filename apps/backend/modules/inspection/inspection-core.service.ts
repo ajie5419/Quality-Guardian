@@ -1,5 +1,6 @@
 import type { archive_task_status, inspection_result } from '@prisma/client';
 import type { InspectionIssue } from '@qgs/shared';
+import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
 import type { InspectionIssueDateMode } from './inspection-issue';
 
@@ -2138,6 +2139,7 @@ export const InspectionCoreService = {
   },
 
   async getIssues(params: {
+    dataScope?: ResolvedDataScope;
     dateMode?: InspectionIssueDateMode;
     dateValue?: string;
     defectType?: string | string[];
@@ -2264,10 +2266,14 @@ export const InspectionCoreService = {
     }
 
     if (params.userContext?.userId) {
-      where = await DataScopeService.buildInspectionWhere(where, {
-        userId: params.userContext.userId,
-        username: params.userContext.username,
-      });
+      where = await DataScopeService.buildInspectionWhere(
+        where,
+        {
+          userId: params.userContext.userId,
+          username: params.userContext.username,
+        },
+        params.dataScope,
+      );
     }
 
     const {
@@ -2441,6 +2447,7 @@ export const InspectionCoreService = {
   },
 
   async getIssueChartAggregation(params: {
+    dataScope?: ResolvedDataScope;
     dateMode?: InspectionIssueDateMode;
     dateValue?: string;
     dimension: InspectionIssueChartDimension;
@@ -2460,10 +2467,14 @@ export const InspectionCoreService = {
       date: { gte: start, lt: end },
     };
     if (params.userContext?.userId) {
-      where = await DataScopeService.buildInspectionWhere(where, {
-        userId: params.userContext.userId,
-        username: params.userContext.username,
-      });
+      where = await DataScopeService.buildInspectionWhere(
+        where,
+        {
+          userId: params.userContext.userId,
+          username: params.userContext.username,
+        },
+        params.dataScope,
+      );
     }
 
     const rows = await prisma.quality_records.findMany({

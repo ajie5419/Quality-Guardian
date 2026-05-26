@@ -3,6 +3,7 @@ import type {
   WorkOrderListResult,
   WorkOrderSummaryItem,
 } from '@qgs/shared';
+import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
 import { Prisma } from '@prisma/client';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
@@ -64,6 +65,7 @@ interface WorkOrderListParams {
   keyword?: string;
   ids?: string[];
   userContext?: { userId: string; username?: string };
+  dataScope?: ResolvedDataScope;
 }
 
 type WorkOrderDashboardStats = {
@@ -182,6 +184,7 @@ export async function buildWorkOrderWhereCondition(
         userId: userContext.userId,
         username: userContext.username,
       },
+      params.dataScope,
     );
   }
   return whereCondition;

@@ -3,6 +3,7 @@ import type {
   AfterSalesParams,
   AfterSalesStats,
 } from '@qgs/shared';
+import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
 import type { AfterSalesDateMode } from './after-sales-query';
 
@@ -717,6 +718,7 @@ export const AfterSalesService = {
   },
 
   async getChartAggregation(params: {
+    dataScope?: ResolvedDataScope;
     dateMode?: AfterSalesDateMode;
     dateValue?: string;
     dimension: AfterSalesChartDimension;
@@ -737,10 +739,14 @@ export const AfterSalesService = {
     };
 
     if (params.userContext?.userId) {
-      where = await DataScopeService.buildAfterSalesWhere(where, {
-        userId: params.userContext.userId,
-        username: params.userContext.username,
-      });
+      where = await DataScopeService.buildAfterSalesWhere(
+        where,
+        {
+          userId: params.userContext.userId,
+          username: params.userContext.username,
+        },
+        params.dataScope,
+      );
     }
 
     const limit = Math.min(Math.max(Number(params.top) || 15, 1), 50);
@@ -827,6 +833,7 @@ export const AfterSalesService = {
    */
   async getList(
     params: AfterSalesParams & {
+      dataScope?: ResolvedDataScope;
       dateMode?: AfterSalesDateMode;
       dateValue?: string;
       userContext?: { userId: string; username?: string };
@@ -879,10 +886,14 @@ export const AfterSalesService = {
     }
 
     if (params.userContext?.userId) {
-      where = await DataScopeService.buildAfterSalesWhere(where, {
-        userId: params.userContext.userId,
-        username: params.userContext.username,
-      });
+      where = await DataScopeService.buildAfterSalesWhere(
+        where,
+        {
+          userId: params.userContext.userId,
+          username: params.userContext.username,
+        },
+        params.dataScope,
+      );
     }
 
     const list = await prisma.after_sales.findMany({
