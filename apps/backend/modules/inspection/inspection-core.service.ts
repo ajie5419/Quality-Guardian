@@ -21,6 +21,7 @@ import { DeptService } from '~/modules/dept/dept.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
+import { BusinessError } from '~/utils/business-error';
 import { findDeptSubtree } from '~/utils/dept-tree';
 import { parseWorkbookSheets } from '~/utils/excel-parser';
 import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
@@ -1514,11 +1515,17 @@ export const InspectionCoreService = {
     );
 
     if (normalizedResult === 'PASS' && unqualified > 0) {
-      throw new Error('VALIDATION:检验结论为合格时，不合格数量必须为 0');
+      throw new BusinessError(
+        'VALIDATION',
+        '检验结论为合格时，不合格数量必须为 0',
+      );
     }
 
     if (normalizedResult === 'FAIL' && unqualified <= 0) {
-      throw new Error('VALIDATION:检验结论为不合格时，不合格数量必须大于 0');
+      throw new BusinessError(
+        'VALIDATION',
+        '检验结论为不合格时，不合格数量必须大于 0',
+      );
     }
   },
 

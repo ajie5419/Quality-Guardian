@@ -1,4 +1,5 @@
 import { QMS_DICTIONARY_TYPES } from '@qgs/shared';
+import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
@@ -51,7 +52,7 @@ function normalizeStatus(value: unknown, defaultValue: number) {
 
 function ensureSupportedDictType(dictType: string) {
   if (!SUPPORTED_DICT_TYPES.has(dictType)) {
-    throw new Error('VALIDATION:不支持的字典类型');
+    throw new BusinessError('VALIDATION', '不支持的字典类型');
   }
 }
 
@@ -74,13 +75,13 @@ export const DictionaryService = {
     const dictValue = normalizeDictText(data.dictValue);
 
     if (!dictType) {
-      throw new Error('VALIDATION:字典类型不能为空');
+      throw new BusinessError('VALIDATION', '字典类型不能为空');
     }
     if (!dictKey) {
-      throw new Error('VALIDATION:字典键不能为空');
+      throw new BusinessError('VALIDATION', '字典键不能为空');
     }
     if (!dictValue) {
-      throw new Error('VALIDATION:字典值不能为空');
+      throw new BusinessError('VALIDATION', '字典值不能为空');
     }
     ensureSupportedDictType(dictType);
 
@@ -93,7 +94,7 @@ export const DictionaryService = {
       select: { id: true },
     });
     if (duplicate) {
-      throw new Error('DUPLICATE_DICT_KEY');
+      throw new BusinessError('DUPLICATE_DICT_KEY', '字典键已存在', 409);
     }
 
     const created = await prisma.dictionaries.create({
@@ -120,10 +121,13 @@ export const DictionaryService = {
       where: { id, isDeleted: false },
     });
     if (!existing) {
-      throw new Error('NOT_FOUND');
+      throw new BusinessError('NOT_FOUND', '字典项不存在', 404);
     }
     if (existing.isSystem) {
-      throw new Error('FORBIDDEN_SYSTEM_DICT');
+      throw new BusinessError(
+        'FORBIDDEN_SYSTEM_DICT',
+        '系统内置字典项不允许删除',
+      );
     }
 
     await prisma.dictionaries.update({
@@ -140,7 +144,7 @@ export const DictionaryService = {
   async getOptions(dictType: string) {
     const normalizedType = normalizeDictText(dictType);
     if (!normalizedType) {
-      throw new Error('VALIDATION:字典类型不能为空');
+      throw new BusinessError('VALIDATION', '字典类型不能为空');
     }
     ensureSupportedDictType(normalizedType);
 
@@ -218,7 +222,7 @@ export const DictionaryService = {
       where: { id, isDeleted: false },
     });
     if (!existing) {
-      throw new Error('NOT_FOUND');
+      throw new BusinessError('NOT_FOUND', '字典项不存在', 404);
     }
     ensureSupportedDictType(existing.dictType);
 
@@ -230,14 +234,17 @@ export const DictionaryService = {
         : normalizeDictText(data.dictValue);
 
     if (dictKey !== undefined && !dictKey) {
-      throw new Error('VALIDATION:字典键不能为空');
+      throw new BusinessError('VALIDATION', '字典键不能为空');
     }
     if (dictValue !== undefined && !dictValue) {
-      throw new Error('VALIDATION:字典值不能为空');
+      throw new BusinessError('VALIDATION', '字典值不能为空');
     }
 
     if (existing.isSystem && data.status === 0) {
-      throw new Error('FORBIDDEN_SYSTEM_DICT');
+      throw new BusinessError(
+        'FORBIDDEN_SYSTEM_DICT',
+        '系统内置字典项不允许禁用',
+      );
     }
 
     if (dictKey !== undefined && dictKey !== existing.dictKey) {
@@ -251,7 +258,7 @@ export const DictionaryService = {
         select: { id: true },
       });
       if (duplicate) {
-        throw new Error('DUPLICATE_DICT_KEY');
+        throw new BusinessError('DUPLICATE_DICT_KEY', '字典键已存在', 409);
       }
     }
 

@@ -1,6 +1,10 @@
 import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
 import { DictionaryService } from '~/modules/dictionary/dictionary.service';
 import { logApiError } from '~/utils/api-logger';
+import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,
@@ -26,9 +30,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(items);
   } catch (error: unknown) {
     logApiError('dictionary-options', error, undefined, event);
-    const message = error instanceof Error ? error.message : '获取字典选项失败';
-    if (message.startsWith('VALIDATION:')) {
-      return badRequestResponse(event, message.replace('VALIDATION:', ''));
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) {
+      return businessErrorResponse(event, businessError);
     }
     setResponseStatus(event, 500);
     return useResponseError('Failed to fetch dictionary options');

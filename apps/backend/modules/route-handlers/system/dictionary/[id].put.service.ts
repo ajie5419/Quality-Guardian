@@ -2,13 +2,15 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { DictionaryService } from '~/modules/dictionary/dictionary.service';
 import { logApiError } from '~/utils/api-logger';
+import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaUniqueConflictError } from '~/utils/prisma-error';
 import {
-  badRequestResponse,
   conflictResponse,
   internalServerErrorResponse,
-  notFoundResponse,
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
@@ -48,18 +50,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(updated);
   } catch (error: unknown) {
     logApiError('dictionary-update', error, undefined, event);
-    const message = error instanceof Error ? error.message : '更新字典项失败';
-    if (message === 'NOT_FOUND') {
-      return notFoundResponse(event, '字典项不存在');
-    }
-    if (message === 'FORBIDDEN_SYSTEM_DICT') {
-      return badRequestResponse(event, '系统内置字典项不允许禁用');
-    }
-    if (message.startsWith('VALIDATION:')) {
-      return badRequestResponse(event, message.replace('VALIDATION:', ''));
-    }
-    if (message === 'DUPLICATE_DICT_KEY') {
-      return conflictResponse(event, '字典键已存在');
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) {
+      return businessErrorResponse(event, businessError);
     }
     if (isPrismaUniqueConflictError(error)) {
       return conflictResponse(event, '字典键已存在');

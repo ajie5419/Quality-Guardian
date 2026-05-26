@@ -3,11 +3,14 @@ import { z } from 'zod';
 import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
 import { normalizeInspectionRequestText } from '~/modules/inspection/inspection-request';
 import { logApiError } from '~/utils/api-logger';
+import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,
   internalServerErrorResponse,
-  notFoundResponse,
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
@@ -36,13 +39,10 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(updated);
   } catch (error) {
     logApiError('inspection-request-dispatch', error, undefined, event);
-    if (error instanceof Error && error.message.startsWith('NOT_FOUND:'))
-      return notFoundResponse(event, error.message.replace('NOT_FOUND:', ''));
-    if (error instanceof Error && error.message.startsWith('BAD_REQUEST:'))
-      return badRequestResponse(
-        event,
-        error.message.replace('BAD_REQUEST:', ''),
-      );
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) {
+      return businessErrorResponse(event, businessError);
+    }
     return internalServerErrorResponse(event, '报检派单失败');
   }
 });

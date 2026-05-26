@@ -1,11 +1,13 @@
 import { defineEventHandler } from 'h3';
 import { DictionaryService } from '~/modules/dictionary/dictionary.service';
 import { logApiError } from '~/utils/api-logger';
+import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
-  badRequestResponse,
   internalServerErrorResponse,
-  notFoundResponse,
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
@@ -36,12 +38,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('dictionary-delete', error, undefined, event);
-    const message = error instanceof Error ? error.message : '删除字典项失败';
-    if (message === 'NOT_FOUND') {
-      return notFoundResponse(event, '字典项不存在');
-    }
-    if (message === 'FORBIDDEN_SYSTEM_DICT') {
-      return badRequestResponse(event, '系统内置字典项不允许删除');
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) {
+      return businessErrorResponse(event, businessError);
     }
     return internalServerErrorResponse(event, '删除字典项失败');
   }

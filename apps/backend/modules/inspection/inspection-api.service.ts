@@ -4,6 +4,7 @@ import { FileStorageService } from '~/modules/file-storage/file-storage.service'
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
+import { BusinessError } from '~/utils/business-error';
 import {
   buildImportRowError,
   buildImportSummary,
@@ -307,7 +308,7 @@ export const InspectionApiService = {
         where: { OR: [{ id: inspectorId }, { username: inspectorId }] },
       }),
     ]);
-    if (!request) throw new Error('NOT_FOUND:报检任务不存在');
+    if (!request) throw new BusinessError('NOT_FOUND', '报检任务不存在', 404);
     if (request.status === INSPECTION_REQUEST_STATUS.CLOSED)
       throw new Error('BAD_REQUEST:检验完成的报检任务不能重复派单');
     if (!inspector) throw new Error('BAD_REQUEST:检验员不存在');
@@ -372,7 +373,7 @@ export const InspectionApiService = {
       select: { dispatchTaskId: true, id: true, requestNo: true },
       where: { id, isDeleted: false },
     });
-    if (!existing) throw new Error('NOT_FOUND:报检任务不存在');
+    if (!existing) throw new BusinessError('NOT_FOUND', '报检任务不存在', 404);
     await prisma.$transaction(async (tx) => {
       await tx.qms_inspection_requests.update({
         data: { isDeleted: true, updatedAt: new Date() },

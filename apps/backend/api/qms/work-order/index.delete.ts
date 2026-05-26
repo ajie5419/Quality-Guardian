@@ -1,11 +1,14 @@
 import { defineEventHandler } from 'h3';
 import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
+import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { getRequiredQueryParam } from '~/utils/query-param';
 import {
   internalServerErrorResponse,
-  notFoundResponse,
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
@@ -26,8 +29,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('work-order', error, undefined, event);
-    if (error instanceof Error && error.message === 'NOT_FOUND') {
-      return notFoundResponse(event, '删除工单失败：记录不存在');
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) {
+      return businessErrorResponse(event, businessError);
     }
     return internalServerErrorResponse(event, '删除工单失败');
   }

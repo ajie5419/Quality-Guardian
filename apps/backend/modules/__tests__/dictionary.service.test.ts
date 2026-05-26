@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DictionaryService } from '~/modules/dictionary/dictionary.service';
+import { BusinessError } from '~/utils/business-error';
 
 import prisma from '../../utils/prisma';
 import { redis } from '../../utils/redis';
@@ -40,7 +41,10 @@ describe('dictionaryService', () => {
         },
         'tester',
       ),
-    ).rejects.toThrow('VALIDATION:不支持的字典类型');
+    ).rejects.toMatchObject({
+      code: 'VALIDATION',
+      message: '不支持的字典类型',
+    } satisfies Partial<BusinessError>);
 
     expect(prisma.dictionaries.findFirst).not.toHaveBeenCalled();
     expect(prisma.dictionaries.create).not.toHaveBeenCalled();
@@ -60,7 +64,11 @@ describe('dictionaryService', () => {
         },
         'tester',
       ),
-    ).rejects.toThrow('DUPLICATE_DICT_KEY');
+    ).rejects.toMatchObject({
+      code: 'DUPLICATE_DICT_KEY',
+      httpStatus: 409,
+      message: '字典键已存在',
+    } satisfies Partial<BusinessError>);
 
     expect(prisma.dictionaries.create).not.toHaveBeenCalled();
     expect(redis.del).not.toHaveBeenCalled();
@@ -87,7 +95,11 @@ describe('dictionaryService', () => {
         },
         'tester',
       ),
-    ).rejects.toThrow('DUPLICATE_DICT_KEY');
+    ).rejects.toMatchObject({
+      code: 'DUPLICATE_DICT_KEY',
+      httpStatus: 409,
+      message: '字典键已存在',
+    } satisfies Partial<BusinessError>);
 
     expect(prisma.dictionaries.update).not.toHaveBeenCalled();
   });

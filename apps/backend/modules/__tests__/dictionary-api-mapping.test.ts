@@ -115,11 +115,11 @@ describe('dictionary api mapping', () => {
 
     const res = await mod.default({} as any);
 
-    expect(mockConflictResponse).toHaveBeenCalledWith(
-      expect.anything(),
-      '字典键已存在',
-    );
-    expect(res).toEqual({ msg: '字典键已存在', type: 'conflict' });
+    expect(mockSetResponseStatus).toHaveBeenCalledWith(expect.anything(), 409);
+    expect(mockUseResponseError).toHaveBeenCalledWith('DUPLICATE_DICT_KEY', {
+      code: 'DUPLICATE_DICT_KEY',
+    });
+    expect(res).toEqual({ msg: 'DUPLICATE_DICT_KEY', type: 'error' });
   });
 
   it('maps validation update error to bad request response', async () => {
@@ -131,11 +131,11 @@ describe('dictionary api mapping', () => {
 
     const res = await mod.default({} as any);
 
-    expect(mockBadRequestResponse).toHaveBeenCalledWith(
-      expect.anything(),
-      '字典键不能为空',
-    );
-    expect(res).toEqual({ msg: '字典键不能为空', type: 'bad' });
+    expect(mockSetResponseStatus).toHaveBeenCalledWith(expect.anything(), 400);
+    expect(mockUseResponseError).toHaveBeenCalledWith('字典键不能为空', {
+      code: 'VALIDATION',
+    });
+    expect(res).toEqual({ msg: '字典键不能为空', type: 'error' });
   });
 
   it('maps options validation error to bad request response', async () => {
@@ -147,11 +147,11 @@ describe('dictionary api mapping', () => {
 
     const res = await mod.default({} as any);
 
-    expect(mockBadRequestResponse).toHaveBeenCalledWith(
-      expect.anything(),
-      '不支持的字典类型',
-    );
-    expect(res).toEqual({ msg: '不支持的字典类型', type: 'bad' });
+    expect(mockSetResponseStatus).toHaveBeenCalledWith(expect.anything(), 400);
+    expect(mockUseResponseError).toHaveBeenCalledWith('不支持的字典类型', {
+      code: 'VALIDATION',
+    });
+    expect(res).toEqual({ msg: '不支持的字典类型', type: 'error' });
   });
 
   it('maps list success response with paging data', async () => {

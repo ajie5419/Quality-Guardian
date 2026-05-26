@@ -7,6 +7,7 @@ import { WorkOrderRequirementService } from '~/modules/work-order-requirement/wo
 import { WorkOrderService } from '~/modules/work-order/work-order.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
+import { BusinessError } from '~/utils/business-error';
 import {
   buildImportRowError,
   buildImportSummary,
@@ -144,7 +145,9 @@ export const WorkOrderRouteService = {
       });
       return null;
     } catch (error) {
-      if (isPrismaNotFoundError(error)) throw new Error('NOT_FOUND');
+      if (isPrismaNotFoundError(error)) {
+        throw new BusinessError('NOT_FOUND', '工单不存在', 404);
+      }
       throw error;
     }
   },
@@ -265,7 +268,7 @@ export const WorkOrderRouteService = {
       return null;
     } catch (error) {
       if (isPrismaNotFoundError(error))
-        throw new Error(`NOT_FOUND:工单不存在: ${id}`);
+        throw new BusinessError('NOT_FOUND', `工单不存在: ${id}`, 404);
       throw error;
     }
   },

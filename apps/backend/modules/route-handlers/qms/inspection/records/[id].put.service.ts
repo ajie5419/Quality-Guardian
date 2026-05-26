@@ -3,10 +3,13 @@ import { z } from 'zod';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
+import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
 import { isPrismaNotFoundError } from '~/utils/db-error';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
-  badRequestResponse,
   internalServerErrorResponse,
   notFoundResponse,
   useResponseSuccess,
@@ -39,14 +42,10 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error: unknown) {
     logApiError('inspection-update', error, undefined, event);
-    if (
-      error instanceof Error &&
-      String(error.message || '').startsWith('VALIDATION:')
-    )
-      return badRequestResponse(
-        event,
-        String(error.message || '').replace('VALIDATION:', ''),
-      );
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) {
+      return businessErrorResponse(event, businessError);
+    }
     if (isPrismaNotFoundError(error))
       return notFoundResponse(event, 'Inspection record not found');
     return internalServerErrorResponse(

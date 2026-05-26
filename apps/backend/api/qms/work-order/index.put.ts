@@ -1,12 +1,15 @@
 import { z } from 'zod';
 import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
+import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { getRequiredQueryParam } from '~/utils/query-param';
 import {
   internalServerErrorResponse,
-  notFoundResponse,
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
@@ -25,10 +28,11 @@ export default defineValidatedHandler(bodySchema, async (event, body) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('work-order', error, undefined, event);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    if (message.startsWith('NOT_FOUND:')) {
-      return notFoundResponse(event, message.replace('NOT_FOUND:', ''));
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) {
+      return businessErrorResponse(event, businessError);
     }
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return internalServerErrorResponse(event, `更新工单失败: ${message}`);
   }
 });

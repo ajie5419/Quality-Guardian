@@ -2,9 +2,12 @@ import { defineEventHandler, readBody } from 'h3';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
+import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
-  badRequestResponse,
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
@@ -27,14 +30,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error: unknown) {
     logApiError('inspection-create', error, undefined, event);
-    if (
-      error instanceof Error &&
-      String(error.message || '').startsWith('VALIDATION:')
-    ) {
-      return badRequestResponse(
-        event,
-        String(error.message || '').replace('VALIDATION:', ''),
-      );
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) {
+      return businessErrorResponse(event, businessError);
     }
     return internalServerErrorResponse(
       event,

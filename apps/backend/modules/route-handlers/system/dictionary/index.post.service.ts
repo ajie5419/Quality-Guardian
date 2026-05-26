@@ -2,10 +2,13 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { DictionaryService } from '~/modules/dictionary/dictionary.service';
 import { logApiError } from '~/utils/api-logger';
+import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { isPrismaUniqueConflictError } from '~/utils/prisma-error';
 import {
-  badRequestResponse,
   conflictResponse,
   internalServerErrorResponse,
   unAuthorizedResponse,
@@ -42,12 +45,9 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(created);
   } catch (error: unknown) {
     logApiError('dictionary-create', error, undefined, event);
-    const message = error instanceof Error ? error.message : '创建字典项失败';
-    if (message.startsWith('VALIDATION:')) {
-      return badRequestResponse(event, message.replace('VALIDATION:', ''));
-    }
-    if (message === 'DUPLICATE_DICT_KEY') {
-      return conflictResponse(event, '字典键已存在');
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) {
+      return businessErrorResponse(event, businessError);
     }
     if (isPrismaUniqueConflictError(error)) {
       return conflictResponse(event, '字典键已存在');
