@@ -61,7 +61,8 @@ export default defineEventHandler(async (event) => {
   const method = String(event.method || '').toUpperCase();
   if (!WRITE_METHODS.has(method)) return;
 
-  const pathname = getRequestURL(event).pathname;
+  const requestUrl = getRequestURL(event);
+  const pathname = requestUrl.pathname;
   if (!pathname.startsWith('/api/')) return;
 
   const contentType = String(getHeader(event, 'content-type') || '');
@@ -77,7 +78,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const dedupeKey = sha256(
-    `${resolveRequestIdentity(event)}|${method}|${pathname}|${bodyHash}`,
+    `${resolveRequestIdentity(event)}|${method}|${pathname}${requestUrl.search}|${bodyHash}`,
   );
   if (dedupeTimers.has(dedupeKey)) {
     return conflictResponse(event, '请求重复，请勿重复提交');
