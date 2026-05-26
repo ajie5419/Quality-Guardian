@@ -1,8 +1,11 @@
 import type { H3Event } from 'h3';
 
+import {
+  toItpPlanStatusText,
+  toItpProjectVersionText,
+} from '~/modules/planning/itp';
 import { logApiError } from '~/utils/api-logger';
 import { awaitMockDelay } from '~/utils/index';
-import { toItpPlanStatusText, toItpProjectVersionText } from '~/utils/itp';
 import prisma from '~/utils/prisma';
 
 export async function itp_projects_index_get(event: H3Event) {
