@@ -1,5 +1,6 @@
 import type { ReportItem, SaveDailySummaryResult } from '@qgs/shared';
 
+import { VehicleCommissioningDailyReportStorageService } from '~/modules/vehicle-commissioning/daily-report-storage.service';
 import prisma from '~/utils/prisma';
 
 import {
@@ -9,14 +10,6 @@ import {
   parseReportDate,
   parseReportNumber,
 } from './report-utils';
-
-type DailyReportQueryParams = {
-  dateFrom?: Date;
-  dateTo?: Date;
-  projectName?: string;
-  skip?: number;
-  take?: number;
-};
 
 export const ReportRouteService = {
   async deleteById(id: string) {
@@ -35,19 +28,13 @@ export const ReportRouteService = {
     const reportDate = parseReportDate(input.date);
     if (!reportDate) throw new Error('INVALID_DATE');
     const reportText = String(input.summary || '');
-    const saved = await prisma.daily_reports.upsert({
-      where: { date_reporter: { date: reportDate, reporter: input.reporter } },
-      update: {
-        reportText,
-        summary: JSON.stringify({ summary: input.summary }),
-      },
-      create: {
+    const saved =
+      await VehicleCommissioningDailyReportStorageService.upsertDailySummary({
         date: reportDate,
         reporter: input.reporter,
         reportText,
         summary: JSON.stringify({ summary: input.summary }),
-      },
-    });
+      });
     return {
       date: formatReportDate(saved.date),
       documentItems: [],
@@ -63,24 +50,33 @@ export const ReportRouteService = {
     summary: string;
     workOrderNumber?: null | string;
   }) {
-    return prisma.daily_reports.create({
-      data: input,
-    });
+    return VehicleCommissioningDailyReportStorageService.createDailyReport(
+      input,
+    );
   },
   async findDailyReportById(id: string) {
-    return prisma.daily_reports.findUnique({ where: { id } });
+    return VehicleCommissioningDailyReportStorageService.findDailyReportById(
+      id,
+    );
   },
-  async countDailyReports(params: DailyReportQueryParams) {
-    return prisma.daily_reports.count({
-      where: buildDailyReportWhere(params),
-    });
+  async countDailyReports(params: {
+    dateFrom?: Date;
+    dateTo?: Date;
+    projectName?: string;
+  }) {
+    return VehicleCommissioningDailyReportStorageService.countDailyReports(
+      params,
+    );
   },
-  async findDailyReports(params: DailyReportQueryParams) {
-    return prisma.daily_reports.findMany({
-      where: buildDailyReportWhere(params),
-      orderBy: { date: 'desc' },
-      ...(params.skip === undefined ? {} : { skip: params.skip }),
-      ...(params.take === undefined ? {} : { take: params.take }),
+  async findDailyReports(params: {
+    dateFrom?: Date;
+    dateTo?: Date;
+    projectName?: string;
+    skip?: number;
+    take?: number;
+  }) {
+    return VehicleCommissioningDailyReportStorageService.findDailyReports({
+      ...params,
     });
   },
   async updateById(id: string, body: Record<string, unknown>) {
@@ -129,25 +125,3 @@ export const ReportRouteService = {
     return { ...created, date: formatReportDate(created.date) };
   },
 };
-
-function buildDailyReportWhere(params: DailyReportQueryParams) {
-  const projectName = String(params.projectName || '').trim();
-  return {
-    ...(projectName
-      ? {
-          OR: [
-            { projectName: { contains: projectName } },
-            { summary: { contains: projectName } },
-          ],
-        }
-      : {}),
-    ...(params.dateFrom || params.dateTo
-      ? {
-          date: {
-            ...(params.dateFrom ? { gte: params.dateFrom } : {}),
-            ...(params.dateTo ? { lte: params.dateTo } : {}),
-          },
-        }
-      : {}),
-  };
-}

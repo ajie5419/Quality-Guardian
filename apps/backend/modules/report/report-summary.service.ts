@@ -9,6 +9,7 @@ import {
 import { AfterSalesService } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
 import { QualityLossService } from '~/modules/quality-loss';
+import { VehicleCommissioningDailyReportStorageService } from '~/modules/vehicle-commissioning/daily-report-storage.service';
 import {
   resolveInspectionFormProcess,
   resolveInspectionFormProcessCandidates,
@@ -19,7 +20,6 @@ import {
   getNetPassRateSummaryByRange,
   getPassRateDrillDownByRange,
 } from '~/utils/pass-rate';
-import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
@@ -291,11 +291,13 @@ export const ReportSummaryService = {
       };
     });
     const dailyArchive = await loadDailyArchiveTasks(inspections);
-    const existingReport = await prisma.daily_reports.findUnique({
-      where: {
-        date_reporter: { date: new Date(queryDate), reporter: queryUser },
-      },
-    });
+    const existingReport =
+      await VehicleCommissioningDailyReportStorageService.findDailyReportByDateReporter(
+        {
+          date: new Date(queryDate),
+          reporter: queryUser,
+        },
+      );
     const storedContent = parseDailySummaryContent(existingReport?.summary);
     return {
       archiveStats: dailyArchive.stats,
