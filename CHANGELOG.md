@@ -175,3 +175,28 @@
 - `daily_reports.summary` 仍是 JSON blob；本阶段仅优化读取路径，结构化字段和索引拆分按阶段十二 Step 57 处理。
 - `quality_losses` 当前 schema 没有 `workOrderNumber` 字段，手工损失按工单号过滤无法真正下推到 DB；如需支持，应在阶段十二 schema 优化中补字段与索引。
 - `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
+
+### 2026-05-26 阶段七：utils/ 归位（步骤37-38）
+
+**执行内容：**
+
+- 步骤37：按模块归位业务 utils，使用 `git mv` 迁移 after-sales、inspection、quality-loss、metrology、work-order、knowledge、planning、report、welder 等单模块工具。
+- 步骤37：保留跨模块共享或基础设施工具在 `utils/`，包括 `inspection-form`、`quality-loss-status`、`supplier`、`import-report`、`audit-log`、`rbac-config`、`pass-rate`、`process-resolver`、`project-documents`、`ai`、`master-data-governance-*` 等。
+- 步骤37h：审计 `utils/` 剩余文件，确认剩余项为白名单基础设施或跨模块共享工具；非测试 TS 文件数从 66 降至 43。
+- 步骤38：新增 `apps/backend/utils/excel-parser.ts`，提取 `xlsx` 纯解析能力，并替换 inspection 模板元数据读取与 supervision 计划任务导入中的 inline Excel 解析。
+
+**验证结果：**
+
+- 每个 sub-step 提交前均执行 `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- 每个 sub-step 提交前均执行 `pnpm -C apps/backend exec vitest run`: 32 文件 / 213 测试全部通过
+- 阶段收尾执行 `pnpm -C apps/backend run check:qms-arch`: apps/backend 无该脚本
+- 阶段收尾执行 `pnpm run check:qms-arch`: 通过
+- 阶段结束 `git status --short | wc -l`: 0
+
+**commit:** `922232bf` / `f9422087` / `668d82a6` / `aa7e3e8f` / `ea46aecd` / `c887d93e` / `f87c9f6e` / `84c9e463` / `d3d959b3`
+
+**遗留问题：**
+
+- `utils/` 仍包含部分未列入阶段七输入白名单但实际为通用基础设施或跨模块共享的文件，例如 `response`、`route-param`、`request-validation`、`redis`、`team-resolver`、`task-dispatch`、`work-order` 等；本阶段按调用方审计后保留。
+- vehicle-commissioning 当前命中的是 Excel 导出逻辑，不属于“文件 → 二维数据/对象数组”的读取解析路径，未强行接入 `excel-parser`。
+- `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
