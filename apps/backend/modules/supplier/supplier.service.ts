@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 import type { SupplierStats } from './supplier-scoring';
 
 import { AfterSalesService } from '~/modules/after-sales';
@@ -33,6 +35,220 @@ export interface SupplierQueryParams {
   name?: string;
   outsourcingMode?: string;
   userContext?: { userId: string; username?: string };
+}
+
+type SupplierWhereInput = Prisma.suppliersWhereInput;
+
+interface SupplierListItem extends Record<string, unknown> {
+  name: string;
+  status: string;
+  qualityScore: number;
+  [key: string]: unknown;
+}
+
+const SUPPLIER_SORT_FIELDS: Record<
+  string,
+  Prisma.suppliersOrderByWithRelationInput
+> = {
+  category: { category: 'asc' },
+  createdAt: { createdAt: 'asc' },
+  email: { email: 'asc' },
+  name: { name: 'asc' },
+  phone: { phone: 'asc' },
+  qualityScore: { qualityScore: 'asc' },
+  rating: { rating: 'asc' },
+  status: { status: 'asc' },
+  updatedAt: { updatedAt: 'asc' },
+};
+
+function buildSupplierOrderBy(
+  sortBy?: string,
+  sortOrder?: 'asc' | 'desc',
+): Prisma.suppliersOrderByWithRelationInput {
+  const configured = sortBy ? SUPPLIER_SORT_FIELDS[sortBy] : undefined;
+  if (!configured) return { createdAt: 'desc' };
+  const [field] = Object.keys(configured);
+  return { [field]: sortOrder || 'asc' };
+}
+
+async function buildSupplierStatsMap(supplierNames: string[]) {
+  const statsMap = new Map<string, SupplierStats>();
+  if (supplierNames.length === 0) return statsMap;
+
+  const now = new Date();
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(now.getFullYear() - 1);
+
+  const supplierNameToId =
+    await MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
+      configKey: 'supplierName',
+      names: supplierNames,
+    });
+  const supplierIds = [...supplierNameToId.values()].filter(
+    Boolean,
+  ) as string[];
+  const [inspectionScoring, afterSalesScoring] = await Promise.all([
+    InspectionService.getSupplierScoringData({
+      since: oneYearAgo,
+      supplierIds,
+      supplierNames,
+    }),
+    AfterSalesService.getSupplierScoringData({
+      since: oneYearAgo,
+      supplierNames,
+    }),
+  ]);
+  const {
+    incomingStats,
+    engineeringStats,
+    engineeringStatusStats,
+    records: recentQualityRecords,
+  } = inspectionScoring;
+  const {
+    stats: afterSalesStats,
+    statusStats: afterSalesStatusStats,
+    records: recentAfterSales,
+  } = afterSalesScoring;
+
+  incomingStats.forEach((s) => {
+    if (s.supplierName) {
+      const current = statsMap.get(s.supplierName) || createEmptyStats();
+      current.count += s._count.id;
+      current.quantity += s._sum.quantity || 0;
+      if (s.result === 'PASS') {
+        current.qualifiedCount += s._count.id;
+      } else if (s.result === 'FAIL') {
+        current.failures += s._count.id;
+        current.failuresQuantity += s._sum.quantity || 0;
+      }
+      statsMap.set(s.supplierName, current);
+    }
+  });
+
+  afterSalesStats.forEach((s) => {
+    if (s.supplierBrand) {
+      const current = statsMap.get(s.supplierBrand) || createEmptyStats();
+      current.afterSalesLoss +=
+        Number(s._sum.materialCost || 0) + Number(s._sum.laborTravelCost || 0);
+      current.afterSalesCount += s._count.id;
+      statsMap.set(s.supplierBrand, current);
+    }
+  });
+
+  engineeringStats.forEach((s) => {
+    if (s.supplierName) {
+      const current = statsMap.get(s.supplierName) || createEmptyStats();
+      current.engineeringLoss += Number(s._sum.lossAmount || 0);
+      current.engineeringCount += s._count.id;
+      current.engineeringDefectQuantity += s._sum.quantity || 0;
+      statsMap.set(s.supplierName, current);
+    }
+  });
+
+  engineeringStatusStats.forEach((s) => {
+    if (!s.supplierName) return;
+    if (s.status === 'CLOSED') return;
+    const current = statsMap.get(s.supplierName) || createEmptyStats();
+    current.openEngineeringCount += s._count.id;
+    statsMap.set(s.supplierName, current);
+  });
+
+  afterSalesStatusStats.forEach((s) => {
+    if (!s.supplierBrand) return;
+    if (
+      ['CANCELLED', 'CLOSED', 'COMPLETED', 'RESOLVED'].includes(s.claimStatus)
+    ) {
+      return;
+    }
+    const current = statsMap.get(s.supplierBrand) || createEmptyStats();
+    current.openAfterSalesCount += s._count.id;
+    statsMap.set(s.supplierBrand, current);
+  });
+
+  const supplierRecords: Record<
+    string,
+    Array<{
+      date: Date;
+      loss: number;
+      origin: 'afterSales' | 'qualityRecords';
+      type: 'A' | 'B' | 'C' | null;
+    }>
+  > = {};
+
+  const combinedRecords = [
+    ...recentAfterSales.map((r) => ({
+      ...r,
+      origin: 'afterSales' as const,
+    })),
+    ...recentQualityRecords.map((r) => ({
+      ...r,
+      origin: 'qualityRecords' as const,
+    })),
+  ];
+
+  combinedRecords.forEach((r) => {
+    const name = r.origin === 'afterSales' ? r.supplierBrand : r.supplierName;
+    if (!name) return;
+
+    let loss = 0;
+    let date = new Date();
+    if (r.origin === 'afterSales') {
+      loss = Number(r.materialCost || 0) + Number(r.laborTravelCost || 0);
+      date = new Date(r.occurDate);
+    } else {
+      loss = Number(r.lossAmount || 0);
+      date = new Date(r.date);
+    }
+
+    const classification = classifyDefect(loss, r.severity || undefined);
+    if (!supplierRecords[name]) supplierRecords[name] = [];
+    supplierRecords[name].push({
+      type: classification,
+      loss,
+      date,
+      origin: r.origin,
+    });
+  });
+
+  Object.entries(supplierRecords).forEach(([name, records]) => {
+    const current = statsMap.get(name) || createEmptyStats();
+    records.sort((a, b) => b.date.getTime() - a.date.getTime());
+    statsMap.set(name, applyRecordsToStats(current, records));
+  });
+
+  return statsMap;
+}
+
+async function buildSupplierGlobalStats(
+  scopedWhere: SupplierWhereInput,
+  totalCount: number,
+) {
+  const [qualifiedCount, warningCount, averageScore] = await Promise.all([
+    prisma.suppliers.count({
+      where: { AND: [scopedWhere, { status: 'Qualified' }] },
+    }),
+    prisma.suppliers.count({
+      where: {
+        AND: [
+          scopedWhere,
+          {
+            OR: [{ status: 'Observation' }, { qualityScore: { lt: 80 } }],
+          },
+        ],
+      },
+    }),
+    prisma.suppliers.aggregate({
+      where: scopedWhere,
+      _avg: { qualityScore: true },
+    }),
+  ]);
+
+  return {
+    total: totalCount,
+    qualified: qualifiedCount,
+    warning: warningCount,
+    avgScore: (averageScore._avg.qualityScore ?? 0).toFixed(1),
+  };
 }
 
 export const SupplierService = {
@@ -151,8 +367,12 @@ export const SupplierService = {
       outsourcingMode,
     } = params;
 
+    const safePage = Math.max(Number(page) || 1, 1);
+    const safePageSize = Math.min(Math.max(Number(pageSize) || 20, 1), 100);
+    const skip = (safePage - 1) * safePageSize;
+
     // 1. 构造极其稳健的过滤条件
-    const where: Record<string, unknown> = { isDeleted: false };
+    const where: SupplierWhereInput = { isDeleted: false };
     if (category) {
       const cat = category.toLowerCase();
       if (cat === 'supplier' || cat === 'productionunit') {
@@ -179,7 +399,9 @@ export const SupplierService = {
     if (normalizedOutsourcingMode && outsourcingMode) {
       if (normalizedOutsourcingMode === DEFAULT_OUTSOURCING_MODE) {
         where.AND = [
-          ...((where.AND as unknown[]) || []),
+          ...((Array.isArray(where.AND)
+            ? where.AND
+            : []) as SupplierWhereInput[]),
           {
             OR: [
               { outsourcingMode: normalizedOutsourcingMode },
@@ -203,7 +425,9 @@ export const SupplierService = {
     const [rawItems, totalCount] = await Promise.all([
       prisma.suppliers.findMany({
         where: scopedWhere,
-        orderBy: { createdAt: 'desc' },
+        orderBy: buildSupplierOrderBy(sortBy, sortOrder),
+        skip,
+        take: safePageSize,
       }),
       prisma.suppliers.count({ where: scopedWhere }),
     ]);
@@ -221,175 +445,23 @@ export const SupplierService = {
     }));
 
     // 4. Statistics Aggregation
-    // Get ALL supplier names to calculate global stats
     const supplierNames = listData.map((i) => i.name).filter(Boolean);
-    const statsMap = new Map<string, SupplierStats>();
+    const [statsMap, globalStats] = await Promise.all([
+      buildSupplierStatsMap(supplierNames),
+      buildSupplierGlobalStats(scopedWhere, totalCount),
+    ]);
 
-    const now = new Date();
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(now.getFullYear() - 1);
-
-    if (supplierNames.length > 0) {
-      const supplierNameToId =
-        await MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
-          configKey: 'supplierName',
-          names: supplierNames,
-        });
-      const supplierIds = [...supplierNameToId.values()].filter(
-        Boolean,
-      ) as string[];
-      const [inspectionScoring, afterSalesScoring] = await Promise.all([
-        InspectionService.getSupplierScoringData({
-          since: oneYearAgo,
-          supplierIds,
-          supplierNames,
-        }),
-        AfterSalesService.getSupplierScoringData({
-          since: oneYearAgo,
-          supplierNames,
-        }),
-      ]);
-      const {
-        incomingStats,
-        engineeringStats,
-        engineeringStatusStats,
-        records: recentQualityRecords,
-      } = inspectionScoring;
-      const {
-        stats: afterSalesStats,
-        statusStats: afterSalesStatusStats,
-        records: recentAfterSales,
-      } = afterSalesScoring;
-
-      incomingStats.forEach((s) => {
-        if (s.supplierName) {
-          const current = statsMap.get(s.supplierName) || createEmptyStats();
-          current.count += s._count.id;
-          current.quantity += s._sum.quantity || 0;
-          if (s.result === 'PASS') {
-            current.qualifiedCount += s._count.id;
-          } else if (s.result === 'FAIL') {
-            current.failures += s._count.id;
-            current.failuresQuantity += s._sum.quantity || 0;
-          }
-          statsMap.set(s.supplierName, current);
-        }
-      });
-
-      afterSalesStats.forEach((s) => {
-        if (s.supplierBrand) {
-          const current = statsMap.get(s.supplierBrand) || createEmptyStats();
-          current.afterSalesLoss +=
-            Number(s._sum.materialCost || 0) +
-            Number(s._sum.laborTravelCost || 0);
-          current.afterSalesCount += s._count.id;
-          statsMap.set(s.supplierBrand, current);
-        }
-      });
-
-      engineeringStats.forEach((s) => {
-        if (s.supplierName) {
-          const current = statsMap.get(s.supplierName) || createEmptyStats();
-          current.engineeringLoss += Number(s._sum.lossAmount || 0);
-          current.engineeringCount += s._count.id;
-          current.engineeringDefectQuantity += s._sum.quantity || 0;
-          statsMap.set(s.supplierName, current);
-        }
-      });
-
-      engineeringStatusStats.forEach((s) => {
-        if (!s.supplierName) return;
-        if (s.status === 'CLOSED') return;
-        const current = statsMap.get(s.supplierName) || createEmptyStats();
-        current.openEngineeringCount += s._count.id;
-        statsMap.set(s.supplierName, current);
-      });
-
-      afterSalesStatusStats.forEach((s) => {
-        if (!s.supplierBrand) return;
-        if (
-          ['CANCELLED', 'CLOSED', 'COMPLETED', 'RESOLVED'].includes(
-            s.claimStatus,
-          )
-        ) {
-          return;
-        }
-        const current = statsMap.get(s.supplierBrand) || createEmptyStats();
-        current.openAfterSalesCount += s._count.id;
-        statsMap.set(s.supplierBrand, current);
-      });
-
-      const supplierRecords: Record<
-        string,
-        Array<{
-          date: Date;
-          loss: number;
-          origin: 'afterSales' | 'qualityRecords';
-          type: 'A' | 'B' | 'C' | null;
-        }>
-      > = {};
-
-      const combinedRecords = [
-        ...recentAfterSales.map((r) => ({
-          ...r,
-          origin: 'afterSales' as const,
-        })),
-        ...recentQualityRecords.map((r) => ({
-          ...r,
-          origin: 'qualityRecords' as const,
-        })),
-      ];
-
-      combinedRecords.forEach((r) => {
-        const name =
-          r.origin === 'afterSales' ? r.supplierBrand : r.supplierName;
-        if (!name) return;
-
-        let loss = 0;
-        let date = new Date();
-        if (r.origin === 'afterSales') {
-          loss = Number(r.materialCost || 0) + Number(r.laborTravelCost || 0);
-          date = new Date(r.occurDate);
-        } else {
-          loss = Number(r.lossAmount || 0);
-          date = new Date(r.date);
-        }
-
-        const classification = classifyDefect(loss, r.severity || undefined);
-        if (!supplierRecords[name]) supplierRecords[name] = [];
-        supplierRecords[name].push({
-          type: classification,
-          loss,
-          date,
-          origin: r.origin,
-        });
-      });
-
-      Object.entries(supplierRecords).forEach(([name, records]) => {
-        const current = statsMap.get(name) || createEmptyStats();
-        records.sort((a, b) => b.date.getTime() - a.date.getTime());
-        statsMap.set(name, applyRecordsToStats(current, records));
-      });
-    }
-
-    // 5. [Process FULL List for Global Stats]
-    const processedFullList = listData.map((item) =>
+    // 5. [Process Current Page]
+    const processedPageList = listData.map((item) =>
       scoreSupplierListItem(
         item,
         statsMap.get(item.name) || createEmptyStats(),
       ),
     );
 
-    interface SupplierListItem extends Record<string, unknown> {
-      name: string;
-      status: string;
-      qualityScore: number;
-      [key: string]: unknown;
-    }
-
     // 6. [Dynamic Sorting]
-    if (sortBy && sortOrder) {
-      (processedFullList as SupplierListItem[]).sort((a, b) => {
+    if (sortBy && sortOrder && !SUPPLIER_SORT_FIELDS[sortBy]) {
+      (processedPageList as SupplierListItem[]).sort((a, b) => {
         const valA = a[sortBy];
         const valB = b[sortBy];
 
@@ -409,28 +481,8 @@ export const SupplierService = {
       });
     }
 
-    // 7. Global Aggregation
-    const globalStats = {
-      total: totalCount,
-      qualified: processedFullList.filter((s) => s.status === 'Qualified')
-        .length,
-      warning: processedFullList.filter(
-        (s) => s.qualityScore < 80 || s.status === 'Observation',
-      ).length,
-      avgScore: (
-        processedFullList.reduce((sum, i) => sum + i.qualityScore, 0) /
-        (processedFullList.length || 1)
-      ).toFixed(1),
-    };
-
-    // 8. Final Pagination
-    const finalItems = processedFullList.slice(
-      (page - 1) * pageSize,
-      page * pageSize,
-    );
-
     return {
-      items: finalItems,
+      items: processedPageList,
       total: totalCount,
       stats: globalStats,
     };

@@ -6,6 +6,7 @@ import prisma from '../../utils/prisma';
 vi.mock('../../utils/prisma', () => ({
   default: {
     suppliers: {
+      aggregate: vi.fn(),
       count: vi.fn(),
       findMany: vi.fn(),
     },
@@ -65,6 +66,15 @@ function setupScenario(input: {
 
   (prisma.suppliers.findMany as any).mockResolvedValue(suppliers);
   (prisma.suppliers.count as any).mockResolvedValue(suppliers.length);
+  (prisma.suppliers.aggregate as any).mockResolvedValue({
+    _avg: {
+      qualityScore:
+        suppliers.reduce(
+          (sum, item) => sum + Number(item.qualityScore || 0),
+          0,
+        ) / (suppliers.length || 1),
+    },
+  });
   (prisma.inspections.groupBy as any).mockResolvedValue(incomingStats);
   (prisma.after_sales.groupBy as any)
     .mockResolvedValueOnce(afterSalesStats)
@@ -364,9 +374,13 @@ describe('supplierService standard scoring samples', () => {
     expect(row.qualityScore).toBeGreaterThanOrEqual(80);
   });
 
-  it('sample 10: sorting by qualityScore desc should order suppliers correctly', async () => {
+  it('sample 10: sorting by qualityScore desc should use database ordering', async () => {
     setupScenario({
-      suppliers: [supplier('S1'), supplier('S2'), supplier('S3')],
+      suppliers: [
+        { ...supplier('S1'), qualityScore: 100 },
+        { ...supplier('S2'), qualityScore: 80 },
+        { ...supplier('S3'), qualityScore: 90 },
+      ],
       engineeringStats: [
         {
           supplierName: 'S2',
@@ -401,7 +415,14 @@ describe('supplierService standard scoring samples', () => {
       sortOrder: 'desc',
     });
     const names = result.items.map((item: any) => item.name);
-    expect(names).toEqual(['S1', 'S3', 'S2']);
+    expect(names).toEqual(['S1', 'S2', 'S3']);
+    expect(prisma.suppliers.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { qualityScore: 'desc' },
+        skip: 0,
+        take: 20,
+      }),
+    );
   });
 
   it('sample 11: external outsourcing should use supplier risk rules', async () => {
