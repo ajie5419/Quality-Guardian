@@ -1,5 +1,11 @@
 import type { H3Event } from 'h3';
 
+import {
+  createDfmeaProjectId,
+  normalizeDfmeaProjectStatus,
+  normalizeDfmeaText,
+  toDfmeaProjectVersionText,
+} from '~/modules/planning/dfmea';
 import { logApiError } from '~/utils/api-logger';
 import { awaitMockDelay } from '~/utils/index';
 import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';

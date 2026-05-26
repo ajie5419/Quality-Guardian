@@ -1,5 +1,12 @@
 import type { H3Event } from 'h3';
 
+import {
+  calculateDfmeaRpn,
+  normalizeDfmeaEffect,
+  normalizeDfmeaText,
+  parseDfmeaOrder,
+  parseDfmeaScore,
+} from '~/modules/planning/dfmea';
 import { logApiError } from '~/utils/api-logger';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';

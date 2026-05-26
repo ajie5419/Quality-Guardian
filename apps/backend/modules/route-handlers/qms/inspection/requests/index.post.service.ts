@@ -5,6 +5,7 @@ import {
   isInspectionRequestAssemblyProcess,
   normalizeInspectionRequestAttachments,
   normalizeInspectionRequestText,
+  parseInspectionRequestQuantity,
 } from '~/modules/inspection/inspection-request';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';

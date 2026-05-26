@@ -1,5 +1,9 @@
 import type { H3Event } from 'h3';
 
+import {
+  normalizeBomProjectStatus,
+  normalizeBomProjectVersion,
+} from '~/modules/planning/bom';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { getMetadata } from '~/utils/metadata';
