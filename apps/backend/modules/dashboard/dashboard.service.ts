@@ -12,10 +12,31 @@ import {
   buildCanonicalProcessPassRateTargets,
   PROCESS_PASS_RATE_TARGET_ORDER,
 } from '~/utils/pass-rate-process';
-import { redis } from '~/utils/redis';
 
 // 创建模块级 logger
 const logger = createModuleLogger('DashboardService');
+const DASHBOARD_STATS_CACHE_TTL_MS = 60_000;
+const DASHBOARD_TREND_CACHE_TTL_MS = 3_600_000;
+
+type DashboardStatsResult = {
+  overview: DashboardOverview;
+  recentWorkOrders: any[];
+};
+
+type DashboardStatsParams = {
+  granularity?: string;
+  scope?: string;
+  userId?: string;
+};
+
+const dashboardStatsCache = new Map<
+  string,
+  { expiresAt: number; value: DashboardStatsResult }
+>();
+const dashboardTrendCache = new Map<
+  string,
+  { expiresAt: number; value: DashboardChartItem[] }
+>();
 
 /**
  * 获取当前年份的起始时间 (YYYY-01-01 00:00:00)
@@ -38,7 +59,65 @@ const getStartOfWeek = (date: Date = new Date()): Date => {
   return start;
 };
 
+function buildDashboardStatsCacheKey(params: DashboardStatsParams = {}) {
+  return [
+    'qms:dashboard:stats',
+    params.userId || 'anonymous',
+    params.scope || 'default',
+    params.granularity || 'default',
+  ].join(':');
+}
+
+function getCachedDashboardStats(cacheKey: string) {
+  const cached = dashboardStatsCache.get(cacheKey);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    dashboardStatsCache.delete(cacheKey);
+    return null;
+  }
+  return cached.value;
+}
+
+function setCachedDashboardStats(
+  cacheKey: string,
+  value: DashboardStatsResult,
+) {
+  dashboardStatsCache.set(cacheKey, {
+    expiresAt: Date.now() + DASHBOARD_STATS_CACHE_TTL_MS,
+    value,
+  });
+}
+
+function getCachedDashboardTrend(cacheKey: string) {
+  const cached = dashboardTrendCache.get(cacheKey);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    dashboardTrendCache.delete(cacheKey);
+    return null;
+  }
+  return cached.value;
+}
+
+function setCachedDashboardTrend(
+  cacheKey: string,
+  value: DashboardChartItem[],
+) {
+  dashboardTrendCache.set(cacheKey, {
+    expiresAt: Date.now() + DASHBOARD_TREND_CACHE_TTL_MS,
+    value,
+  });
+}
+
 export const DashboardService = {
+  invalidateStatsCache(params?: DashboardStatsParams) {
+    if (!params) {
+      dashboardStatsCache.clear();
+      dashboardTrendCache.clear();
+      return;
+    }
+    dashboardStatsCache.delete(buildDashboardStatsCacheKey(params));
+  },
+
   async getPassRateTargets() {
     const value = await SystemService.getSettingValue('QMS_PASS_RATE_TARGETS');
     const savedTargets = value ? JSON.parse(value) : {};
@@ -60,17 +139,12 @@ export const DashboardService = {
   /**
    * 获取仪表盘核心统计数据 (包含年度总计和本周新增)
    */
-  async getStats(): Promise<{
-    overview: DashboardOverview;
-    recentWorkOrders: any[];
-  }> {
-    const cacheKey = 'qms:dashboard:stats';
-    const cached = await redis.get<{
-      overview: DashboardOverview;
-      recentWorkOrders: any[];
-    }>(cacheKey);
+  async getStats(
+    params: DashboardStatsParams = {},
+  ): Promise<DashboardStatsResult> {
+    const cacheKey = buildDashboardStatsCacheKey(params);
+    const cached = getCachedDashboardStats(cacheKey);
     if (cached) {
-      console.warn(`[Dashboard Cache] HIT - Key: ${cacheKey}`);
       return cached;
     }
 
@@ -142,8 +216,7 @@ export const DashboardService = {
       }
     })();
 
-    console.warn(`[Dashboard Cache] MISS - Key: ${cacheKey}`);
-    await redis.set(cacheKey, result, 60 * 5); // 5 minutes
+    setCachedDashboardStats(cacheKey, result);
     return result;
   },
 
@@ -152,9 +225,8 @@ export const DashboardService = {
    */
   async getMonthlyTrend(): Promise<DashboardChartItem[]> {
     const cacheKey = 'qms:dashboard:trend';
-    const cached = await redis.get<DashboardChartItem[]>(cacheKey);
+    const cached = getCachedDashboardTrend(cacheKey);
     if (cached) {
-      console.warn(`[Dashboard Cache] HIT - Key: ${cacheKey}`);
       return cached;
     }
 
@@ -202,8 +274,7 @@ export const DashboardService = {
       }
     })();
 
-    console.warn(`[Dashboard Cache] MISS - Key: ${cacheKey}`);
-    await redis.set(cacheKey, result, 3600); // 1 hour cache
+    setCachedDashboardTrend(cacheKey, result);
     return result;
   },
 

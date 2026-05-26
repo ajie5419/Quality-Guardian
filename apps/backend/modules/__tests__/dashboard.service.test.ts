@@ -69,6 +69,7 @@ vi.mock('~/utils/logger', () => ({
 describe('dashboardService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    DashboardService.invalidateStatsCache();
   });
 
   describe('getStats', () => {
@@ -143,6 +144,48 @@ describe('dashboardService', () => {
 
       expect(ql.total).toBe(0);
       expect(stats.recentWorkOrders).toEqual([]);
+    });
+
+    it('should return cached stats without querying downstream services', async () => {
+      (AfterSalesService.getStatsForDashboard as any).mockResolvedValue({
+        totalCount: 1,
+        totalLoss: 10,
+        weeklyCount: 1,
+        weeklyLoss: 10,
+      });
+      (InspectionService.getStatsForDashboard as any).mockResolvedValue({
+        totalCount: 0,
+        totalLoss: 0,
+        weeklyCount: 0,
+        weeklyLoss: 0,
+      });
+      (
+        VehicleCommissioningService.getStatsForDashboard as any
+      ).mockResolvedValue({
+        totalCount: 0,
+        totalLoss: 0,
+        weeklyCount: 0,
+        weeklyLoss: 0,
+      });
+      (WorkOrderService.getStatsForDashboard as any).mockResolvedValue({
+        totalCount: 0,
+        weeklyCount: 0,
+        recentWorkOrders: [],
+      });
+      (QualityLossService.getStatsForDashboard as any).mockResolvedValue({
+        totalLoss: 0,
+        weeklyLoss: 0,
+      });
+
+      await DashboardService.getStats({ userId: 'u1', scope: 'all' });
+      await DashboardService.getStats({ userId: 'u1', scope: 'all' });
+
+      expect(AfterSalesService.getStatsForDashboard).toHaveBeenCalledTimes(1);
+
+      DashboardService.invalidateStatsCache({ userId: 'u1', scope: 'all' });
+      await DashboardService.getStats({ userId: 'u1', scope: 'all' });
+
+      expect(AfterSalesService.getStatsForDashboard).toHaveBeenCalledTimes(2);
     });
   });
 
