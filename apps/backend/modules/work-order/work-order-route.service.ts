@@ -31,8 +31,9 @@ import {
   parseWorkOrderListQuery,
   parseWorkOrderQuantity,
 } from '~/utils/work-order';
-import { parseRequirementAttachments } from '~/utils/work-order-requirement-attachments';
-import { mapWorkOrderStatus } from '~/utils/work-order-status';
+
+import { parseRequirementAttachments } from './work-order-requirement-attachments';
+import { mapWorkOrderStatus } from './work-order-status';
 
 type GroupStats = {
   inspectedPoints: number;

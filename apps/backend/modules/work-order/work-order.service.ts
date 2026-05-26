@@ -11,10 +11,8 @@ import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { formatDateString } from '~/utils/query-helpers';
 import { addYearsToDate } from '~/utils/work-order';
-import {
-  mapToDisplayStatus,
-  WORK_ORDER_STATUS,
-} from '~/utils/work-order-status';
+
+import { mapToDisplayStatus, WORK_ORDER_STATUS } from './work-order-status';
 
 // 创建模块级 logger
 const logger = createModuleLogger('WorkOrderService');
