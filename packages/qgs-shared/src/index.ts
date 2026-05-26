@@ -56,6 +56,7 @@ export * from './modules/qms/constants';
 export * from './modules/qms/dashboard';
 export * from './modules/qms/dictionary';
 export * from './modules/qms/enums';
+export * from './modules/qms/file-storage';
 export * from './modules/qms/inspection';
 export * from './modules/qms/inspection-request';
 export * from './modules/qms/knowledge';

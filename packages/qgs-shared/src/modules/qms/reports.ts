@@ -9,6 +9,13 @@ export interface ReportItem {
   totalInspections: number;
 }
 
+export type ReportDetail = ReportItem;
+
+export interface ReportPageResult {
+  items: ReportItem[];
+  total: number;
+}
+
 export interface DailySummaryData {
   archiveStats?: {
     archivedCount: number;
@@ -52,6 +59,13 @@ export interface DailySummaryData {
     status: string;
     workOrder: string;
   }>;
+  reporter: string;
+  summary: string;
+}
+
+export interface SaveDailySummaryResult {
+  date: string;
+  documentItems: DailySummaryData['documentItems'];
   reporter: string;
   summary: string;
 }

@@ -15,6 +15,45 @@ export interface QualityLossItem {
   workOrderNumber: string;
 }
 
+export type QualityLossDetail = QualityLossItem;
+
+export interface QualityLossParams {
+  granularity?: 'month' | 'week' | 'year';
+  lossSource?: string;
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  userContext?: { userId: string; username?: string };
+  workOrderNumber?: string;
+  year?: number;
+}
+
+export interface QualityLossPageResult {
+  items: QualityLossItem[];
+  total: number;
+}
+
+export interface QualityLossDashboardSummary {
+  kpi: {
+    displayRate: string;
+    pendingAmount: number;
+    recoveryRate: number;
+    totalAmount: number;
+    totalClaim: number;
+  };
+  years: number[];
+}
+
+export interface QualityLossCharts {
+  deptDistribution: Array<{ name: string; value: number }>;
+  trend: Array<{
+    claimAmount: number;
+    period: number;
+    periodLabel: string;
+    totalAmount: number;
+  }>;
+}
+
 export interface QualityLossServiceTrendItem {
   commissioningAmount?: number;
   externalAmount: number;
