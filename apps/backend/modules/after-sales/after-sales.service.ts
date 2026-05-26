@@ -331,8 +331,26 @@ export const AfterSalesService = {
         >`SELECT MONTH(occurDate) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${params.year} AND isDeleted = 0 GROUP BY p`;
   },
 
-  async getLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
+  async getLossRecordsForAggregation(params?: {
+    skip?: number;
+    take?: number;
+    workOrderNumber?: string;
+  }) {
     return prisma.after_sales.findMany({
+      where: {
+        isDeleted: false,
+        ...(params?.workOrderNumber
+          ? { workOrderNumber: { contains: params.workOrderNumber } }
+          : {}),
+      },
+      orderBy: { occurDate: 'desc' },
+      ...(params?.skip === undefined ? {} : { skip: params.skip }),
+      ...(params?.take === undefined ? {} : { take: params.take }),
+    });
+  },
+
+  async countLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
+    return prisma.after_sales.count({
       where: {
         isDeleted: false,
         ...(params?.workOrderNumber
@@ -342,12 +360,18 @@ export const AfterSalesService = {
     });
   },
 
-  async getQualityLossDrillDownRecords(params: { end: Date; start: Date }) {
+  async getQualityLossDrillDownRecords(params: {
+    end: Date;
+    start: Date;
+    take?: number;
+  }) {
     return prisma.after_sales.findMany({
       where: {
         isDeleted: false,
         occurDate: { gte: params.start, lte: params.end },
       },
+      orderBy: { occurDate: 'desc' },
+      take: params.take || 500,
     });
   },
 

@@ -804,8 +804,27 @@ export const InspectionCoreService = {
     };
   },
 
-  async getLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
+  async getLossRecordsForAggregation(params?: {
+    skip?: number;
+    take?: number;
+    workOrderNumber?: string;
+  }) {
     return prisma.quality_records.findMany({
+      where: {
+        isDeleted: false,
+        lossAmount: { gt: 0 },
+        ...(params?.workOrderNumber
+          ? { workOrderNumber: { contains: params.workOrderNumber } }
+          : {}),
+      },
+      orderBy: { date: 'desc' },
+      ...(params?.skip === undefined ? {} : { skip: params.skip }),
+      ...(params?.take === undefined ? {} : { take: params.take }),
+    });
+  },
+
+  async countLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
+    return prisma.quality_records.count({
       where: {
         isDeleted: false,
         lossAmount: { gt: 0 },
@@ -816,13 +835,19 @@ export const InspectionCoreService = {
     });
   },
 
-  async getQualityLossDrillDownRecords(params: { end: Date; start: Date }) {
+  async getQualityLossDrillDownRecords(params: {
+    end: Date;
+    start: Date;
+    take?: number;
+  }) {
     return prisma.quality_records.findMany({
       where: {
         isDeleted: false,
         date: { gte: params.start, lte: params.end },
         lossAmount: { gt: 0 },
       },
+      orderBy: { date: 'desc' },
+      take: params.take || 500,
     });
   },
 

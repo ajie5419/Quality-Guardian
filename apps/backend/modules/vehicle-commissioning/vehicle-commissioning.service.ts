@@ -406,8 +406,27 @@ export const VehicleCommissioningService = {
         >`SELECT MONTH(date) as p, SUM(IFNULL(lossAmount, 0)) as a FROM vehicle_commissioning_issues WHERE YEAR(date) = ${params.year} AND isDeleted = 0 AND (isClaim = 1 OR IFNULL(lossAmount, 0) > 0) GROUP BY p`;
   },
 
-  async getLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
+  async getLossRecordsForAggregation(params?: {
+    skip?: number;
+    take?: number;
+    workOrderNumber?: string;
+  }) {
     return prisma.vehicle_commissioning_issues.findMany({
+      where: {
+        isDeleted: false,
+        OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
+        ...(params?.workOrderNumber
+          ? { workOrderNumber: { contains: params.workOrderNumber } }
+          : {}),
+      },
+      orderBy: { date: 'desc' },
+      ...(params?.skip === undefined ? {} : { skip: params.skip }),
+      ...(params?.take === undefined ? {} : { take: params.take }),
+    });
+  },
+
+  async countLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
+    return prisma.vehicle_commissioning_issues.count({
       where: {
         isDeleted: false,
         OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
@@ -418,13 +437,19 @@ export const VehicleCommissioningService = {
     });
   },
 
-  async getQualityLossDrillDownRecords(params: { end: Date; start: Date }) {
+  async getQualityLossDrillDownRecords(params: {
+    end: Date;
+    start: Date;
+    take?: number;
+  }) {
     return prisma.vehicle_commissioning_issues.findMany({
       where: {
         isDeleted: false,
         date: { gte: params.start, lte: params.end },
         OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
       },
+      orderBy: { date: 'desc' },
+      take: params.take || 500,
     });
   },
 

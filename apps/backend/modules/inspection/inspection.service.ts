@@ -39,6 +39,8 @@ export const InspectionService = {
     InspectionCoreService.getWorkOrderAggregateInspections,
   getLossRecordsForAggregation:
     InspectionCoreService.getLossRecordsForAggregation,
+  countLossRecordsForAggregation:
+    InspectionCoreService.countLossRecordsForAggregation,
   getWorkspaceIssueSummary: InspectionCoreService.getWorkspaceIssueSummary,
   normalizeQuantitySummary: InspectionCoreService.normalizeQuantitySummary,
   resolveOverallResult: InspectionCoreService.resolveOverallResult,

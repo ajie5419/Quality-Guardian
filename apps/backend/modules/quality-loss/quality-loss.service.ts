@@ -30,6 +30,7 @@ import {
   formatDateString,
   formatNumber,
   applyPagination as paginateList,
+  parsePagination,
   safeNumber,
 } from '~/utils/query-helpers';
 
@@ -58,6 +59,12 @@ interface QualityLossQueryParams extends PaginationParams {
   workOrderNumber?: string;
   year?: number;
 }
+
+type SingleQualityLossSource =
+  | typeof QL_CONSTANTS.SOURCE.COMMISSIONING
+  | typeof QL_CONSTANTS.SOURCE.EXTERNAL
+  | typeof QL_CONSTANTS.SOURCE.INTERNAL
+  | typeof QL_CONSTANTS.SOURCE.MANUAL;
 
 type AggregationSourceRecords = {
   commissioningIssues: Awaited<
@@ -189,11 +196,21 @@ const QL_CONSTANTS = {
  * 构建 quality_losses 表的 where 条件
  */
 function buildManualLossesWhere(
-  _params: QualityLossQueryParams,
+  params: Omit<QualityLossQueryParams, 'page' | 'pageSize'>,
 ): Prisma.quality_lossesWhereInput {
-  return {
+  const where: Prisma.quality_lossesWhereInput = {
     isDeleted: false,
   };
+  if (params.status) {
+    where.status = normalizeQualityLossStatus(params.status);
+  }
+  if (params.year) {
+    where.occurDate = {
+      gte: new Date(`${params.year}-01-01T00:00:00.000Z`),
+      lte: new Date(`${params.year}-12-31T23:59:59.999Z`),
+    };
+  }
+  return where;
 }
 
 /**
@@ -356,6 +373,181 @@ function sortByDateDesc(items: QualityLossItem[]): QualityLossItem[] {
   );
 }
 
+function normalizeLossSourceFilter(
+  source: string | undefined,
+): null | SingleQualityLossSource {
+  if (!source) return null;
+  const normalized = normalizeQualityLossSource(source);
+  if (
+    normalized === QL_CONSTANTS.SOURCE.MANUAL ||
+    normalized === QL_CONSTANTS.SOURCE.INTERNAL ||
+    normalized === QL_CONSTANTS.SOURCE.EXTERNAL ||
+    normalized === QL_CONSTANTS.SOURCE.COMMISSIONING
+  ) {
+    return normalized;
+  }
+  return null;
+}
+
+async function getDeptNameMapper() {
+  const deptTree =
+    (await DeptService.findAll().catch((error) => {
+      logger.warn(
+        { err: error },
+        'DeptService.findAll failed, fallback to raw dept id',
+      );
+      return [];
+    })) || [];
+  const deptMap = new Map<string, string>();
+  for (const node of flattenDeptTree(deptTree)) deptMap.set(node.id, node.name);
+  return (id: null | string | undefined) => {
+    if (!id) return null;
+    return deptMap.get(id) || id;
+  };
+}
+
+async function applyQualityLossDataScope(
+  items: QualityLossItem[],
+  userContext?: { userId: string; username?: string },
+) {
+  if (!userContext?.userId) return items;
+
+  const scope = await DataScopeService.getScopeForModule(
+    userContext.userId,
+    'quality-loss',
+  );
+  if (scope.scopeType === 'ALL') return items;
+
+  const deptSource =
+    scope.scopeType === 'DEPT'
+      ? scope
+      : await DataScopeService.getScopeForModule(
+          userContext.userId,
+          'supplier',
+        );
+  const deptCandidates = await DataScopeService.getDeptCandidates(
+    deptSource.deptIds,
+  );
+  return items.filter((item) =>
+    deptCandidates.includes(String(item.responsibleDepartment || '')),
+  );
+}
+
+function filterQualityLossItemsByStatus(
+  items: QualityLossItem[],
+  status?: string,
+) {
+  if (!status) return items;
+  const normalizedStatus = normalizeQualityLossStatus(status);
+  return items.filter(
+    (item) => normalizeQualityLossStatus(item.status) === normalizedStatus,
+  );
+}
+
+async function getSingleSourceLossPage(
+  source: SingleQualityLossSource,
+  params: QualityLossQueryParams,
+): Promise<PageResult<QualityLossItem>> {
+  const { skip, take } = parsePagination(params);
+  const getDeptName = await getDeptNameMapper();
+  const workOrderNumber = params.workOrderNumber;
+
+  if (source === QL_CONSTANTS.SOURCE.MANUAL) {
+    const where = buildManualLossesWhere(params);
+    const [rows, total] = await Promise.all([
+      prisma.quality_losses.findMany({
+        where,
+        orderBy: { occurDate: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.quality_losses.count({ where }),
+    ]);
+    const items = rows
+      .filter((item) => safeNumber(item.amount) > 0)
+      .map((item) => {
+        const formatted = formatManualLossItem(item);
+        formatted.responsibleDepartment = getDeptName(
+          formatted.responsibleDepartment,
+        );
+        return formatted;
+      });
+    return {
+      items: await applyQualityLossDataScope(items, params.userContext),
+      total,
+    };
+  }
+
+  let sourceRecords:
+    | Awaited<ReturnType<typeof AfterSalesService.getLossRecordsForAggregation>>
+    | Awaited<ReturnType<typeof InspectionService.getLossRecordsForAggregation>>
+    | Awaited<
+        ReturnType<
+          typeof VehicleCommissioningService.getLossRecordsForAggregation
+        >
+      >;
+  let total = 0;
+  if (source === QL_CONSTANTS.SOURCE.INTERNAL) {
+    [sourceRecords, total] = await Promise.all([
+      InspectionService.getLossRecordsForAggregation({
+        skip,
+        take,
+        workOrderNumber,
+      }),
+      InspectionService.countLossRecordsForAggregation({ workOrderNumber }),
+    ]);
+  } else if (source === QL_CONSTANTS.SOURCE.EXTERNAL) {
+    [sourceRecords, total] = await Promise.all([
+      AfterSalesService.getLossRecordsForAggregation({
+        skip,
+        take,
+        workOrderNumber,
+      }),
+      AfterSalesService.countLossRecordsForAggregation({
+        workOrderNumber,
+      }),
+    ]);
+  } else {
+    [sourceRecords, total] = await Promise.all([
+      VehicleCommissioningService.getLossRecordsForAggregation({
+        skip,
+        take,
+        workOrderNumber,
+      }),
+      VehicleCommissioningService.countLossRecordsForAggregation({
+        workOrderNumber,
+      }),
+    ]);
+  }
+
+  const formatted = sourceRecords
+    .map((item) => {
+      if (source === QL_CONSTANTS.SOURCE.INTERNAL) {
+        return formatInternalRecordItem(
+          item as Parameters<typeof formatInternalRecordItem>[0],
+        );
+      }
+      if (source === QL_CONSTANTS.SOURCE.EXTERNAL) {
+        return formatExternalSalesItem(
+          item as Parameters<typeof formatExternalSalesItem>[0],
+        );
+      }
+      return formatCommissioningIssueItem(
+        item as Parameters<typeof formatCommissioningIssueItem>[0],
+      );
+    })
+    .filter(Boolean);
+  const scoped = await applyQualityLossDataScope(
+    filterQualityLossItemsByStatus(formatted, params.status).map((item) => ({
+      ...item,
+      responsibleDepartment: getDeptName(item.responsibleDepartment),
+    })),
+    params.userContext,
+  );
+
+  return { items: scoped, total };
+}
+
 async function getAllLossesUnpaginated(
   params: Omit<QualityLossQueryParams, 'page' | 'pageSize'> = {},
 ): Promise<QualityLossItem[]> {
@@ -442,35 +634,13 @@ async function mergeAndFilter(
   sourceRecords: AggregationSourceRecords,
   params: Omit<QualityLossQueryParams, 'page' | 'pageSize'> = {},
 ): Promise<QualityLossItem[]> {
-  const { lossSource, workOrderNumber } = params;
-
-  const deptTree =
-    (await DeptService.findAll().catch((error) => {
-      logger.warn(
-        { err: error },
-        'DeptService.findAll failed, fallback to raw dept id',
-      );
-      return [];
-    })) || [];
-  const deptMap = new Map<string, string>();
-  for (const node of flattenDeptTree(deptTree)) deptMap.set(node.id, node.name);
-  const getDeptName = (id: null | string | undefined) => {
-    if (!id) return null;
-    return deptMap.get(id) || id;
-  };
+  const { lossSource } = params;
+  const getDeptName = await getDeptNameMapper();
 
   const result: QualityLossItem[] = [];
 
   if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.MANUAL) {
-    const filteredManual = workOrderNumber
-      ? sourceRecords.manualRecords.filter((r) => {
-          const record = r as typeof r & {
-            workOrderNumber?: null | string;
-          };
-          return record.workOrderNumber?.includes(workOrderNumber);
-        })
-      : sourceRecords.manualRecords;
-    filteredManual.forEach((item) => {
+    sourceRecords.manualRecords.forEach((item) => {
       const itemRecord = item as typeof item & {
         projectName?: null | string;
         workOrderNumber?: null | string;
@@ -828,6 +998,10 @@ export const QualityLossService = {
     params: QualityLossQueryParams = {},
   ): Promise<PageResult<QualityLossItem>> {
     try {
+      const source = normalizeLossSourceFilter(params.lossSource);
+      if (source) {
+        return getSingleSourceLossPage(source, params);
+      }
       const sorted = await getAllLossesUnpaginated(params);
       return applyPagination(sorted, params);
     } catch (error) {
@@ -1082,12 +1256,23 @@ export const QualityLossService = {
             isDeleted: false,
             occurDate: { gte: start, lte: end },
           },
+          orderBy: { occurDate: 'desc' },
+          take: 500,
         }),
-        InspectionService.getQualityLossDrillDownRecords({ start, end }),
-        AfterSalesService.getQualityLossDrillDownRecords({ start, end }),
+        InspectionService.getQualityLossDrillDownRecords({
+          start,
+          end,
+          take: 500,
+        }),
+        AfterSalesService.getQualityLossDrillDownRecords({
+          start,
+          end,
+          take: 500,
+        }),
         VehicleCommissioningService.getQualityLossDrillDownRecords({
           start,
           end,
+          take: 500,
         }),
       ]);
 
