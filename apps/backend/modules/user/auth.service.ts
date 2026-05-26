@@ -75,7 +75,6 @@ export const AuthService = {
           id: 'user-role',
           name: 'user',
           description: '普通用户',
-          permissions: '[]',
           status: 1,
         },
       }));

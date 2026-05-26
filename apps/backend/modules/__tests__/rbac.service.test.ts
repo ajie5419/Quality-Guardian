@@ -65,7 +65,6 @@ describe('rbacService', () => {
     (prisma.roles.create as any).mockResolvedValue({
       id: 'role-1',
       name: 'operator',
-      permissions: '',
     });
     (prisma.rbac_permissions.findMany as any)
       .mockResolvedValueOnce([])
@@ -78,7 +77,7 @@ describe('rbacService', () => {
 
     expect(prisma.roles.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ permissions: '' }),
+        data: expect.not.objectContaining({ permissions: expect.anything() }),
       }),
     );
   });
@@ -109,7 +108,7 @@ describe('rbacService', () => {
   it('should merge all menu auth codes for super role', async () => {
     (prisma.users.findFirst as any).mockResolvedValue({
       id: 'u1',
-      roles: { id: 'r1', name: 'super', permissions: '["A:Legacy"]' },
+      roles: { id: 'r1', name: 'super' },
     });
     (prisma.rbac_user_roles.findMany as any).mockResolvedValue([]);
     (prisma.rbac_role_permissions.findMany as any).mockResolvedValue([
@@ -129,7 +128,7 @@ describe('rbacService', () => {
   it('should not fallback to legacy JSON permissions', async () => {
     (prisma.users.findFirst as any).mockResolvedValue({
       id: 'u1',
-      roles: { id: 'r1', name: 'operator', permissions: '["A:Legacy"]' },
+      roles: { id: 'r1', name: 'operator' },
     });
     (prisma.rbac_user_roles.findMany as any).mockResolvedValue([]);
     (prisma.rbac_role_permissions.findMany as any).mockResolvedValue([]);

@@ -123,18 +123,6 @@ async function runClosePostCommitTask(
   }
 }
 
-function parsePermissionCodes(raw?: null | string) {
-  if (!raw) return [] as string[];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed)
-      ? parsed.filter((item): item is string => typeof item === 'string')
-      : [];
-  } catch {
-    return [] as string[];
-  }
-}
-
 function getShanghaiTodayRange(now = new Date()) {
   const shanghaiDate = new Intl.DateTimeFormat('en-CA', {
     day: '2-digit',
@@ -625,7 +613,6 @@ export const InspectionRouteService = {
           roles: {
             select: {
               name: true,
-              permissions: true,
               rbac_role_permissions: {
                 select: { permission: { select: { code: true } } },
               },
@@ -636,7 +623,6 @@ export const InspectionRouteService = {
               role: {
                 select: {
                   name: true,
-                  permissions: true,
                   rbac_role_permissions: {
                     select: { permission: { select: { code: true } } },
                   },
@@ -670,18 +656,14 @@ export const InspectionRouteService = {
       totalTaskMinutes: 0,
     });
     const collectRolePermissionCodes = (role?: {
-      permissions?: null | string;
       rbac_role_permissions?: Array<{
         permission?: null | { code?: null | string };
       }>;
     }) =>
       role
-        ? [
-            ...parsePermissionCodes(role.permissions),
-            ...(role.rbac_role_permissions || [])
-              .map((item) => item.permission?.code || '')
-              .filter(Boolean),
-          ]
+        ? (role.rbac_role_permissions || [])
+            .map((item) => item.permission?.code || '')
+            .filter(Boolean)
         : [];
     const isInspectorUser = (user: (typeof activeUsers)[number]) =>
       [

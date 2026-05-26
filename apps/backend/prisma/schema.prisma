@@ -924,7 +924,6 @@ model roles {
   id                       String                     @id
   name                     String                     @unique
   description              String?
-  permissions              String                     @db.LongText
   status                   Int                        @default(1)
   isSystem                 Boolean                    @default(false)
   isDeleted                Boolean                    @default(false)

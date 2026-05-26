@@ -355,7 +355,6 @@ export const RbacService = {
         name: String(data.value || data.name || ''),
         description: data.remark || data.description || data.name,
         status: data.status ?? 1,
-        permissions: '',
         isSystem: false,
         isDeleted: false,
       },
