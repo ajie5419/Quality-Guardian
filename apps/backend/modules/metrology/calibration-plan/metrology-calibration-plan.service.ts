@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 import prisma from '~/utils/prisma';
 
 const STATUS_LABELS = {
@@ -36,6 +38,45 @@ interface CalibrationPlanMutationPayload {
 
 interface CalibrationPlanImportRow {
   [key: string]: unknown;
+}
+
+type CalibrationPlanWhereInput = Prisma.metrology_calibration_plansWhereInput;
+type CalibrationPlanOrderByInput =
+  Prisma.metrology_calibration_plansOrderByWithRelationInput;
+
+const CALIBRATION_PLAN_SORT_FIELDS: Record<
+  string,
+  CalibrationPlanOrderByInput
+> = {
+  actualDate: { actualDate: 'asc' },
+  instrumentCode: { instrument: { instrumentCode: 'asc' } },
+  instrumentName: { instrument: { instrumentName: 'asc' } },
+  model: { instrument: { model: 'asc' } },
+  orderNo: { instrument: { orderNo: 'asc' } },
+  planDay: { planDay: 'asc' },
+  planMonth: { planMonth: 'asc' },
+  plannedDate: { plannedDate: 'asc' },
+  planYear: { planYear: 'asc' },
+  statusLabel: { status: 'asc' },
+  usingUnit: { instrument: { usingUnit: 'asc' } },
+};
+
+function buildCalibrationPlanOrderBy(
+  sortBy?: string,
+  sortOrder: 'asc' | 'desc' = 'asc',
+): CalibrationPlanOrderByInput[] {
+  const configured = sortBy ? CALIBRATION_PLAN_SORT_FIELDS[sortBy] : undefined;
+  if (!configured) return [{ plannedDate: 'asc' }, { createdAt: 'desc' }];
+  const [field] = Object.keys(configured);
+  if (field === 'instrument') {
+    const instrumentOrder = configured.instrument || {};
+    const [instrumentField] = Object.keys(instrumentOrder);
+    return [
+      { instrument: { [instrumentField]: sortOrder } },
+      { createdAt: 'desc' },
+    ];
+  }
+  return [{ [field]: sortOrder }, { createdAt: 'desc' }];
 }
 
 function normalizeKey(value: unknown) {
@@ -231,44 +272,8 @@ function compareValues(
   return direction === 'asc' ? compareResult : -compareResult;
 }
 
-function sortList(
-  items: ReturnType<typeof buildListItem>[],
-  sortBy?: string,
-  sortOrder: 'asc' | 'desc' = 'asc',
-) {
-  if (!sortBy) {
-    return items;
-  }
-
-  const sortableFields = new Set([
-    'actualDate',
-    'instrumentCode',
-    'instrumentName',
-    'model',
-    'orderNo',
-    'planDay',
-    'planMonth',
-    'plannedDate',
-    'planYear',
-    'statusLabel',
-    'usingUnit',
-  ]);
-
-  if (!sortableFields.has(sortBy)) {
-    return items;
-  }
-
-  return [...items].sort((left, right) =>
-    compareValues(
-      left[sortBy as keyof typeof left] as null | number | string | undefined,
-      right[sortBy as keyof typeof right] as null | number | string | undefined,
-      sortOrder,
-    ),
-  );
-}
-
 function buildWhere(params: CalibrationPlanListParams) {
-  const where: Record<string, unknown> = {
+  const where: CalibrationPlanWhereInput = {
     isDeleted: false,
   };
 
@@ -302,12 +307,33 @@ function buildWhere(params: CalibrationPlanListParams) {
 
   if (params.usingUnit?.trim()) {
     where.instrument = {
-      ...(typeof where.instrument === 'object' ? where.instrument : {}),
+      ...(typeof where.instrument === 'object'
+        ? where.instrument
+        : { isDeleted: false }),
       usingUnit: { contains: params.usingUnit.trim() },
     };
   }
 
+  const statusWhere = buildCalibrationStatusWhere(params.status);
+  if (statusWhere) {
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : []), statusWhere];
+  }
+
   return where;
+}
+
+function buildCalibrationStatusWhere(
+  status: string | undefined,
+): CalibrationPlanWhereInput | null {
+  if (!status) return null;
+  if (status === 'COMPLETED') return { actualDate: { not: null } };
+  if (status === 'OVERDUE') {
+    return { actualDate: null, plannedDate: { lt: startOfToday() } };
+  }
+  if (status === 'PLANNED') {
+    return { actualDate: null, plannedDate: { gte: startOfToday() } };
+  }
+  return null;
 }
 
 function buildOverviewWhere(params: CalibrationPlanOverviewParams) {
@@ -432,39 +458,33 @@ export const MetrologyCalibrationPlanService = {
 
   async getList(params: CalibrationPlanListParams) {
     const page = Math.max(Number(params.page || 1), 1);
-    const pageSize = Math.min(
-      Math.max(Number(params.pageSize || 20), 1),
-      100_000,
-    );
+    const pageSize = Math.min(Math.max(Number(params.pageSize || 20), 1), 100);
     const where = buildWhere(params);
+    const skip = (page - 1) * pageSize;
 
-    const rows = await prisma.metrology_calibration_plans.findMany({
-      where,
-      include: {
-        instrument: {
-          select: {
-            id: true,
-            instrumentCode: true,
-            instrumentName: true,
-            model: true,
-            orderNo: true,
-            usingUnit: true,
+    const [rows, total] = await Promise.all([
+      prisma.metrology_calibration_plans.findMany({
+        where,
+        include: {
+          instrument: {
+            select: {
+              id: true,
+              instrumentCode: true,
+              instrumentName: true,
+              model: true,
+              orderNo: true,
+              usingUnit: true,
+            },
           },
         },
-      },
-    });
+        orderBy: buildCalibrationPlanOrderBy(params.sortBy, params.sortOrder),
+        skip,
+        take: pageSize,
+      }),
+      prisma.metrology_calibration_plans.count({ where }),
+    ]);
 
-    let items = rows.map((item) => buildListItem(item));
-    if (params.status) {
-      items = items.filter((item) => item.status === params.status);
-    }
-    items = sortList(items, params.sortBy, params.sortOrder);
-
-    const total = items.length;
-    const start = (page - 1) * pageSize;
-    items = items.slice(start, start + pageSize);
-
-    return { items, total };
+    return { items: rows.map((item) => buildListItem(item)), total };
   },
 
   async getAnnualGrid(

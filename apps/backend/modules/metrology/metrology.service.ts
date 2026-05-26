@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
@@ -9,6 +11,7 @@ import {
   getMetrologyBorrowStatusLabel,
   getMetrologyInspectionStatusLabel,
   normalizeMetrologyBorrowStatus,
+  startOfToday,
 } from '~/utils/metrology-status';
 import prisma from '~/utils/prisma';
 
@@ -40,6 +43,21 @@ interface MetrologyMutationPayload {
   usingUnit?: unknown;
   validUntil?: unknown;
 }
+
+type MeasuringInstrumentWhereInput = Prisma.measuring_instrumentsWhereInput;
+type MeasuringInstrumentOrderByInput =
+  Prisma.measuring_instrumentsOrderByWithRelationInput;
+
+const METROLOGY_SORT_FIELDS: Record<string, MeasuringInstrumentOrderByInput> = {
+  instrumentCode: { instrumentCode: 'asc' },
+  instrumentName: { instrumentName: 'asc' },
+  inspectionStatusLabel: { inspectionStatus: 'asc' },
+  model: { model: 'asc' },
+  orderNo: { orderNo: 'asc' },
+  remainingDays: { validUntil: 'asc' },
+  usingUnit: { usingUnit: 'asc' },
+  validUntil: { validUntil: 'asc' },
+};
 
 function normalizeKey(value: unknown) {
   return String(value ?? '')
@@ -208,7 +226,17 @@ function buildQueryWhere(
   const where = buildWhere(params);
 
   if (options?.ignoreInspectionStatus) {
-    delete where.inspectionStatus;
+    return where;
+  }
+
+  const inspectionStatusWhere = buildInspectionStatusWhere(
+    params.inspectionStatus,
+  );
+  if (inspectionStatusWhere) {
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : []),
+      inspectionStatusWhere,
+    ];
   }
 
   return where;
@@ -257,7 +285,7 @@ function mapImportRow(row: MetrologyImportRow) {
 }
 
 function buildWhere(params: MetrologyListParams) {
-  const where: Record<string, unknown> = {
+  const where: MeasuringInstrumentWhereInput = {
     isDeleted: false,
   };
 
@@ -295,6 +323,53 @@ function buildWhere(params: MetrologyListParams) {
   return where;
 }
 
+function buildInspectionStatusWhere(
+  rawStatus: string | undefined,
+): MeasuringInstrumentWhereInput | null {
+  if (!rawStatus) return null;
+  const status = deriveMetrologyInspectionStatus(rawStatus, null);
+  const today = startOfToday();
+  const pendingUntil = new Date(today);
+  pendingUntil.setDate(pendingUntil.getDate() + 30);
+  const disabledWhere: MeasuringInstrumentWhereInput = {
+    OR: [
+      { inspectionStatus: { equals: 'DISABLED' } },
+      { inspectionStatus: { equals: '停用' } },
+      { inspectionStatus: { equals: '禁用' } },
+    ],
+  };
+  const activeWhere: MeasuringInstrumentWhereInput = { NOT: disabledWhere };
+
+  if (status === 'DISABLED') return disabledWhere;
+  if (status === 'EXPIRED') {
+    return { AND: [activeWhere, { validUntil: { lt: today } }] };
+  }
+  if (status === 'PENDING') {
+    return {
+      AND: [
+        activeWhere,
+        {
+          OR: [
+            { validUntil: null },
+            { validUntil: { gte: today, lte: pendingUntil } },
+          ],
+        },
+      ],
+    };
+  }
+  return { AND: [activeWhere, { validUntil: { gt: pendingUntil } }] };
+}
+
+function buildMetrologyOrderBy(
+  sortBy?: string,
+  sortOrder: 'asc' | 'desc' = 'asc',
+): MeasuringInstrumentOrderByInput[] {
+  const configured = sortBy ? METROLOGY_SORT_FIELDS[sortBy] : undefined;
+  if (!configured) return [{ orderNo: 'asc' }, { createdAt: 'desc' }];
+  const [field] = Object.keys(configured);
+  return [{ [field]: sortOrder }, { createdAt: 'desc' }];
+}
+
 function normalizeMutationPayload(body: MetrologyMutationPayload) {
   const instrumentName = String(body.instrumentName || '').trim();
   const instrumentCode = String(body.instrumentCode || '').trim();
@@ -316,64 +391,6 @@ function normalizeMutationPayload(body: MetrologyMutationPayload) {
     parsedDate,
     usingUnit,
   };
-}
-
-function compareValues(
-  left: null | number | string | undefined,
-  right: null | number | string | undefined,
-  direction: 'asc' | 'desc',
-) {
-  const leftValue = left ?? '';
-  const rightValue = right ?? '';
-
-  if (typeof leftValue === 'number' && typeof rightValue === 'number') {
-    return direction === 'asc'
-      ? leftValue - rightValue
-      : rightValue - leftValue;
-  }
-
-  const compareResult = String(leftValue).localeCompare(
-    String(rightValue),
-    'zh-CN',
-    {
-      numeric: true,
-      sensitivity: 'base',
-    },
-  );
-  return direction === 'asc' ? compareResult : -compareResult;
-}
-
-function sortList(
-  items: ReturnType<typeof buildListItem>[],
-  sortBy?: string,
-  sortOrder: 'asc' | 'desc' = 'asc',
-) {
-  if (!sortBy) {
-    return items;
-  }
-
-  const sortableFields = new Set([
-    'inspectionStatusLabel',
-    'instrumentCode',
-    'instrumentName',
-    'model',
-    'orderNo',
-    'remainingDays',
-    'usingUnit',
-    'validUntil',
-  ]);
-
-  if (!sortableFields.has(sortBy)) {
-    return items;
-  }
-
-  return [...items].sort((left, right) =>
-    compareValues(
-      left[sortBy as keyof typeof left] as null | number | string | undefined,
-      right[sortBy as keyof typeof right] as null | number | string | undefined,
-      sortOrder,
-    ),
-  );
 }
 
 export const MetrologyService = {
@@ -412,27 +429,21 @@ export const MetrologyService = {
 
   async getList(params: MetrologyListParams) {
     const page = Math.max(Number(params.page || 1), 1);
-    const pageSize = Math.min(
-      Math.max(Number(params.pageSize || 20), 1),
-      100_000,
-    );
+    const pageSize = Math.min(Math.max(Number(params.pageSize || 20), 1), 100);
     const where = buildQueryWhere(params);
+    const skip = (page - 1) * pageSize;
 
-    const items = await prisma.measuring_instruments.findMany({ where });
+    const [items, total] = await Promise.all([
+      prisma.measuring_instruments.findMany({
+        where,
+        orderBy: buildMetrologyOrderBy(params.sortBy, params.sortOrder),
+        skip,
+        take: pageSize,
+      }),
+      prisma.measuring_instruments.count({ where }),
+    ]);
 
-    let list = items.map((item) => buildListItem(item));
-    if (params.inspectionStatus) {
-      const normalizedStatus = deriveMetrologyInspectionStatus(
-        params.inspectionStatus,
-        null,
-      );
-      list = list.filter((item) => item.inspectionStatus === normalizedStatus);
-    }
-    list = sortList(list, params.sortBy, params.sortOrder);
-
-    const total = list.length;
-    const start = (page - 1) * pageSize;
-    list = list.slice(start, start + pageSize);
+    const list = items.map((item) => buildListItem(item));
 
     return {
       items: list,
@@ -441,11 +452,15 @@ export const MetrologyService = {
   },
 
   async getExportList(params: Omit<MetrologyListParams, 'page' | 'pageSize'>) {
-    return this.getList({
-      ...params,
-      page: 1,
-      pageSize: 100_000,
+    const where = buildQueryWhere(params);
+    const items = await prisma.measuring_instruments.findMany({
+      where,
+      orderBy: buildMetrologyOrderBy(params.sortBy, params.sortOrder),
     });
+    return {
+      items: items.map((item) => buildListItem(item)),
+      total: items.length,
+    };
   },
 
   async getOverview(params: Omit<MetrologyListParams, 'page' | 'pageSize'>) {

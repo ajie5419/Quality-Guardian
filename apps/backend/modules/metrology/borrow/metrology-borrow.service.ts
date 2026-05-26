@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
@@ -62,6 +64,41 @@ interface BorrowOverviewParams {
   keyword?: string;
 }
 
+type BorrowRecordOrderByInput =
+  Prisma.metrology_borrow_recordsOrderByWithRelationInput;
+
+const BORROW_SORT_FIELDS: Record<string, BorrowRecordOrderByInput> = {
+  borrowedAt: { borrowedAt: 'asc' },
+  borrowerDepartment: { borrowerDepartment: 'asc' },
+  borrowerName: { borrowerName: 'asc' },
+  expectedReturnAt: { expectedReturnAt: 'asc' },
+  instrumentCode: { instrument: { instrumentCode: 'asc' } },
+  instrumentName: { instrument: { instrumentName: 'asc' } },
+  model: { instrument: { model: 'asc' } },
+  orderNo: { instrument: { orderNo: 'asc' } },
+  returnedAt: { returnedAt: 'asc' },
+  statusLabel: { status: 'asc' },
+  usingUnit: { instrument: { usingUnit: 'asc' } },
+};
+
+function buildBorrowOrderBy(
+  sortBy?: string,
+  sortOrder: 'asc' | 'desc' = 'asc',
+): BorrowRecordOrderByInput[] {
+  const configured = sortBy ? BORROW_SORT_FIELDS[sortBy] : undefined;
+  if (!configured) return [{ borrowedAt: 'desc' }, { createdAt: 'desc' }];
+  const [field] = Object.keys(configured);
+  if (field === 'instrument') {
+    const instrumentOrder = configured.instrument || {};
+    const [instrumentField] = Object.keys(instrumentOrder);
+    return [
+      { instrument: { [instrumentField]: sortOrder } },
+      { createdAt: 'desc' },
+    ];
+  }
+  return [{ [field]: sortOrder }, { createdAt: 'desc' }];
+}
+
 function parseDateValue(value: unknown, fieldName: string) {
   const text = String(value ?? '').trim();
   if (!text) {
@@ -108,42 +145,6 @@ function compareValues(
     },
   );
   return direction === 'asc' ? compareResult : -compareResult;
-}
-
-function sortList(
-  items: ReturnType<typeof buildBorrowRecordItem>[],
-  sortBy?: string,
-  sortOrder: 'asc' | 'desc' = 'asc',
-) {
-  if (!sortBy) {
-    return items;
-  }
-
-  const sortableFields = new Set([
-    'borrowedAt',
-    'borrowerDepartment',
-    'borrowerName',
-    'expectedReturnAt',
-    'instrumentCode',
-    'instrumentName',
-    'model',
-    'orderNo',
-    'returnedAt',
-    'statusLabel',
-    'usingUnit',
-  ]);
-
-  if (!sortableFields.has(sortBy)) {
-    return items;
-  }
-
-  return [...items].sort((left, right) =>
-    compareValues(
-      left[sortBy as keyof typeof left] as null | number | string | undefined,
-      right[sortBy as keyof typeof right] as null | number | string | undefined,
-      sortOrder,
-    ),
-  );
 }
 
 function normalizeListFilters(params: MetrologyBorrowListParams) {
@@ -352,40 +353,37 @@ export const MetrologyBorrowService = {
     await refreshOverdueStatuses();
 
     const page = Math.max(Number(params.page || 1), 1);
-    const pageSize = Math.min(
-      Math.max(Number(params.pageSize || 20), 1),
-      100_000,
-    );
+    const pageSize = Math.min(Math.max(Number(params.pageSize || 20), 1), 100);
+    const where = buildBorrowRecordWhere(params);
+    const skip = (page - 1) * pageSize;
 
-    const rows = await prisma.metrology_borrow_records.findMany({
-      where: buildBorrowRecordWhere(params),
-      include: {
-        instrument: {
-          select: {
-            borrowStatus: true,
-            id: true,
-            inspectionStatus: true,
-            instrumentCode: true,
-            instrumentName: true,
-            model: true,
-            orderNo: true,
-            usingUnit: true,
-            validUntil: true,
+    const [rows, total] = await Promise.all([
+      prisma.metrology_borrow_records.findMany({
+        where,
+        include: {
+          instrument: {
+            select: {
+              borrowStatus: true,
+              id: true,
+              inspectionStatus: true,
+              instrumentCode: true,
+              instrumentName: true,
+              model: true,
+              orderNo: true,
+              usingUnit: true,
+              validUntil: true,
+            },
           },
         },
-      },
-      orderBy: [{ borrowedAt: 'desc' }, { createdAt: 'desc' }],
-    });
-
-    let list = rows.map((item) => buildBorrowRecordItem(item));
-    list = sortList(list, params.sortBy, params.sortOrder);
-
-    const total = list.length;
-    const start = (page - 1) * pageSize;
-    list = list.slice(start, start + pageSize);
+        orderBy: buildBorrowOrderBy(params.sortBy, params.sortOrder),
+        skip,
+        take: pageSize,
+      }),
+      prisma.metrology_borrow_records.count({ where }),
+    ]);
 
     return {
-      items: list,
+      items: rows.map((item) => buildBorrowRecordItem(item)),
       total,
     };
   },
