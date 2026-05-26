@@ -10,6 +10,14 @@ const bodySchema = z.object({
   partName: z.string().optional(),
 });
 
+interface AiMatchResult {
+  id: string;
+  matchReason?: string;
+  similarityScore?: number;
+}
+
+type MatchAiResult = AiMatchResult[] | { matches?: AiMatchResult[] };
+
 export default defineEventHandler(async (event) => {
   const body = bodySchema.parse(await readBody(event));
   const { description, partName } = body;
@@ -50,7 +58,7 @@ ${historyIssues.map((h) => `ID: ${h.id}, 部件: ${h.partName}, 描述: ${h.desc
       { temperature: 0 },
     );
 
-    let matches = extractJson(aiResponse);
+    let matches = extractJson<MatchAiResult>(aiResponse);
 
     // 确保 matches 是数组
     if (!Array.isArray(matches)) {
@@ -62,14 +70,8 @@ ${historyIssues.map((h) => `ID: ${h.id}, 部件: ${h.partName}, 描述: ${h.desc
       }
     }
 
-    interface AiMatchResult {
-      id: string;
-      matchReason?: string;
-      similarityScore?: number;
-    }
-
     // 3. 将匹配信息与原始数据合并
-    const result = (matches as AiMatchResult[])
+    const result = matches
       .map((match) => {
         if (!match || !match.id) return null;
         const original = historyIssues.find((h) => h.id === match.id);

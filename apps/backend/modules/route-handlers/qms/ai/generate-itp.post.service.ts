@@ -13,6 +13,40 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+interface ItpRawItem {
+  acceptanceCriteria?: string;
+  activity?: string;
+  controlPoint?: string;
+  frequency?: string;
+  isQuantitative?: boolean;
+  lowerTolerance?: number | string;
+  processStep?: string;
+  referenceDoc?: string;
+  standardValue?: number | string;
+  unit?: string;
+  upperTolerance?: number | string;
+  verifyingDocument?: string;
+  [key: string]: unknown;
+}
+
+type ItpAiResult =
+  | ItpRawItem
+  | ItpRawItem[]
+  | {
+      data?: ItpRawItem | ItpRawItem[];
+      items?: ItpRawItem[];
+    };
+
+function normalizeItpItems(result: ItpAiResult): ItpRawItem[] {
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result.items)) return result.items;
+  if (Array.isArray(result.data)) return result.data;
+  if (result.data && typeof result.data === 'object') {
+    return [Object.fromEntries(Object.entries(result.data))];
+  }
+  return [result];
+}
+
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
   const { fileList, fileContent, prompt: userPrompt } = body;
@@ -74,28 +108,7 @@ export default defineEventHandler(async (event) => {
       },
     );
 
-    const result = extractJson(aiResponse);
-
-    interface ItpRawItem {
-      acceptanceCriteria?: string;
-      activity?: string;
-      controlPoint?: string;
-      frequency?: string;
-      isQuantitative?: boolean;
-      lowerTolerance?: number | string;
-      processStep?: string;
-      referenceDoc?: string;
-      standardValue?: number | string;
-      unit?: string;
-      upperTolerance?: number | string;
-      verifyingDocument?: string;
-      [key: string]: unknown;
-    }
-
-    const rawItems: ItpRawItem[] =
-      result.items ||
-      result.data ||
-      (Array.isArray(result) ? result : [result]);
+    const rawItems = normalizeItpItems(extractJson<ItpAiResult>(aiResponse));
 
     const normalizedItems = rawItems
       .filter((i) => i && typeof i === 'object')

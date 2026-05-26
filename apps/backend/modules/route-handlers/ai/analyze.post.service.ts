@@ -6,6 +6,11 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+type AnalyzeAiResult = Record<string, unknown> & {
+  rootCause?: string;
+  solution?: string;
+};
+
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
   const { description, defectType, partName } = body;
@@ -37,7 +42,7 @@ export default defineEventHandler(async (event) => {
       { temperature: 0.3 },
     );
 
-    const result = extractJson(aiResponse);
+    const result = extractJson<AnalyzeAiResult>(aiResponse);
 
     // --- 语义聚合逻辑：处理 AI 不按套路出牌返回自定义 Key 的情况 ---
     let finalRootCause = '';
@@ -45,7 +50,10 @@ export default defineEventHandler(async (event) => {
 
     if (result.rootCause && typeof result.rootCause === 'string') {
       finalRootCause = result.rootCause;
-      finalSolution = result.solution || '建议制定专项预防措施并加强过程检验。';
+      finalSolution =
+        typeof result.solution === 'string'
+          ? result.solution
+          : '建议制定专项预防措施并加强过程检验。';
     } else {
       // 如果 AI 返回了像 {"materialIssue": "..."} 这样的自定义结构
       // 我们将其遍历并聚合为一段可读的文本

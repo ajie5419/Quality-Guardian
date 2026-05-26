@@ -7,6 +7,8 @@ export interface AiMessage {
   content: string;
 }
 
+export type AiJsonValue = Record<string, unknown> | unknown[];
+
 export async function getAiConfig() {
   const settings = await prisma.system_settings.findUnique({
     where: { key: 'AI_CONFIGURATION' },
@@ -137,9 +139,11 @@ export async function callAi(
 /**
  * 提取 JSON 块（增强版）
  */
-export function extractJson(content: string) {
+export function extractJson<T extends AiJsonValue = Record<string, unknown>>(
+  content: string,
+): T {
   try {
-    return extractAiJson(content) as any;
+    return extractAiJson(content) as T;
   } catch (error) {
     console.error('[AI-JSON-Parse-Error] Raw Content:', content);
     throw error;

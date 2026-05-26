@@ -6,6 +6,8 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+type TagAiResult = string[] | { tags?: unknown };
+
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
   const { content } = body;
@@ -38,7 +40,7 @@ export default defineEventHandler(async (event) => {
       },
     );
 
-    const result = extractJson(aiResponse);
+    const result = extractJson<TagAiResult>(aiResponse);
     const tags = Array.isArray(result) ? result : result.tags || [];
 
     // 确保结果是数组且过滤掉非字符串
