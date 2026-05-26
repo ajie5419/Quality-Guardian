@@ -1,0 +1,444 @@
+import { Prisma } from '@prisma/client';
+import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
+import prisma from '~/utils/prisma';
+
+export const InspectionReportingService = {
+  async findIssueIdBySerialNumber(serialNumber: number) {
+    const row = await prisma.quality_records.findFirst({
+      where: { serialNumber },
+      select: { id: true },
+    });
+    return row?.id || null;
+  },
+
+  async updateQualityLossFields(params: {
+    actualClaim?: number;
+    id: string;
+    status?: string;
+  }) {
+    await prisma.quality_records.update({
+      where: { id: params.id },
+      data: {
+        recoveredAmount: params.actualClaim,
+        ...(params.status
+          ? { status: toQualityRecordStatus(params.status) }
+          : {}),
+        updatedAt: new Date(),
+      },
+    });
+  },
+
+  async getQualityLossTrendRows(params: {
+    granularity: 'month' | 'week';
+    year: number;
+  }) {
+    return params.granularity === 'week'
+      ? prisma.$queryRaw<
+          Array<{
+            a: bigint | null | number | Prisma.Decimal;
+            p: bigint | number;
+          }>
+        >`SELECT WEEK(date, 3) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${params.year} AND isDeleted = 0 GROUP BY p`
+      : prisma.$queryRaw<
+          Array<{
+            a: bigint | null | number | Prisma.Decimal;
+            p: bigint | number;
+          }>
+        >`SELECT MONTH(date) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${params.year} AND isDeleted = 0 GROUP BY p`;
+  },
+
+  async getWorkspaceIssueSummary(params: { today: Date }) {
+    const [
+      openIssues,
+      todayInspections,
+      todayIssues,
+      openIssuesCount,
+      recentIssues,
+    ] = await Promise.all([
+      prisma.quality_records.findMany({
+        where: { status: 'OPEN', isDeleted: false },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.inspections.count({
+        where: { createdAt: { gte: params.today }, isDeleted: false },
+      }),
+      prisma.quality_records.count({
+        where: { createdAt: { gte: params.today }, isDeleted: false },
+      }),
+      prisma.quality_records.count({
+        where: { status: 'OPEN', isDeleted: false },
+      }),
+      prisma.quality_records.findMany({
+        take: 8,
+        orderBy: { createdAt: 'desc' },
+        where: { isDeleted: false },
+        select: {
+          id: true,
+          partName: true,
+          description: true,
+          createdAt: true,
+          status: true,
+          inspector: true,
+        },
+      }),
+    ]);
+
+    return {
+      openIssues,
+      openIssuesCount,
+      recentIssues,
+      todayInspections,
+      todayIssues,
+    };
+  },
+
+  async getLossRecordsForAggregation(params?: {
+    skip?: number;
+    take?: number;
+    workOrderNumber?: string;
+  }) {
+    return prisma.quality_records.findMany({
+      where: {
+        isDeleted: false,
+        lossAmount: { gt: 0 },
+        ...(params?.workOrderNumber
+          ? { workOrderNumber: { contains: params.workOrderNumber } }
+          : {}),
+      },
+      orderBy: { date: 'desc' },
+      ...(params?.skip === undefined ? {} : { skip: params.skip }),
+      ...(params?.take === undefined ? {} : { take: params.take }),
+    });
+  },
+
+  async countLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
+    return prisma.quality_records.count({
+      where: {
+        isDeleted: false,
+        lossAmount: { gt: 0 },
+        ...(params?.workOrderNumber
+          ? { workOrderNumber: { contains: params.workOrderNumber } }
+          : {}),
+      },
+    });
+  },
+
+  async getQualityLossDrillDownRecords(params: {
+    end: Date;
+    start: Date;
+    take?: number;
+  }) {
+    return prisma.quality_records.findMany({
+      where: {
+        isDeleted: false,
+        date: { gte: params.start, lte: params.end },
+        lossAmount: { gt: 0 },
+      },
+      orderBy: { date: 'desc' },
+      take: params.take || 500,
+    });
+  },
+
+  async getSupplierScoringData(params: {
+    since: Date;
+    supplierIds: string[];
+    supplierNames: string[];
+  }) {
+    const supplierWhereOr =
+      params.supplierIds.length > 0
+        ? [
+            { supplierName: { in: params.supplierNames } },
+            { supplierId: { in: params.supplierIds } },
+          ]
+        : [{ supplierName: { in: params.supplierNames } }];
+    const [incomingStats, engineeringStats, engineeringStatusStats, records] =
+      await Promise.all([
+        prisma.inspections.groupBy({
+          by: ['supplierName', 'result'],
+          where: {
+            OR: supplierWhereOr,
+            category: 'INCOMING',
+            isDeleted: false,
+            inspectionDate: { gte: params.since },
+          },
+          _count: { id: true },
+          _sum: { quantity: true },
+        }),
+        prisma.quality_records.groupBy({
+          by: ['supplierName'],
+          where: {
+            OR: supplierWhereOr,
+            isDeleted: false,
+            date: { gte: params.since },
+          },
+          _sum: { lossAmount: true, quantity: true },
+          _count: { id: true },
+        }),
+        prisma.quality_records.groupBy({
+          by: ['supplierName', 'status'],
+          where: {
+            OR: supplierWhereOr,
+            isDeleted: false,
+            date: { gte: params.since },
+          },
+          _count: { id: true },
+        }),
+        prisma.quality_records.findMany({
+          where: {
+            OR: supplierWhereOr,
+            isDeleted: false,
+            date: { gte: params.since },
+          },
+          select: {
+            supplierName: true,
+            lossAmount: true,
+            severity: true,
+            date: true,
+          },
+          orderBy: { date: 'desc' },
+        }),
+      ]);
+
+    return { incomingStats, engineeringStats, engineeringStatusStats, records };
+  },
+
+  async getWeeklyReportIssues(params: { end: Date; start: Date }) {
+    return prisma.quality_records.findMany({
+      where: {
+        isDeleted: false,
+        date: { gte: params.start, lte: params.end },
+      },
+    });
+  },
+
+  async getDailyReportInspections(params: {
+    end: Date;
+    realName?: string;
+    start: Date;
+    username: string;
+  }) {
+    return prisma.inspections.findMany({
+      where: {
+        isDeleted: false,
+        inspectionDate: { gte: params.start, lte: params.end },
+        OR: [
+          { inspector: params.username },
+          { inspector: params.realName || '' },
+        ],
+      },
+      include: {
+        process: { select: { name: true } },
+        work_order: { select: { projectName: true, customerName: true } },
+      },
+    });
+  },
+
+  async getDailyReportIssues(params: {
+    end: Date;
+    start: Date;
+    username: string;
+  }) {
+    return prisma.quality_records.findMany({
+      where: {
+        isDeleted: false,
+        OR: [
+          {
+            createdAt: { gte: params.start, lte: params.end },
+            OR: [
+              { inspector: params.username },
+              { lastEditor: params.username },
+            ],
+          },
+          {
+            status: { not: 'CLOSED' },
+            OR: [
+              { inspector: params.username },
+              { lastEditor: params.username },
+            ],
+          },
+          {
+            status: 'CLOSED',
+            updatedAt: { gte: params.start, lte: params.end },
+            OR: [
+              { inspector: params.username },
+              { lastEditor: params.username },
+            ],
+          },
+        ],
+      },
+      include: {
+        work_orders: { select: { projectName: true, customerName: true } },
+      },
+    });
+  },
+
+  async getDailyArchiveReportData(params: {
+    inspectionIds: string[];
+    workOrderNumbers: string[];
+  }) {
+    const [tasks, templates] = await Promise.all([
+      params.inspectionIds.length > 0
+        ? prisma.inspection_archive_tasks.findMany({
+            where: {
+              isDeleted: false,
+              inspectionId: { in: params.inspectionIds },
+            },
+            include: {
+              inspection: {
+                select: {
+                  category: true,
+                  incomingType: true,
+                  process: { select: { name: true } },
+                  processName: true,
+                },
+              },
+            },
+            orderBy: [{ dueAt: 'asc' }, { updatedAt: 'desc' }],
+          })
+        : Promise.resolve([]),
+      params.workOrderNumbers.length > 0
+        ? prisma.inspection_form_templates.findMany({
+            where: {
+              isDeleted: false,
+              status: 'active',
+              workOrderNumber: { in: params.workOrderNumbers },
+            },
+            select: {
+              id: true,
+              process: { select: { name: true } },
+              processName: true,
+              workOrderNumber: true,
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+    return { tasks, templates };
+  },
+
+  async getReportPeriodMetrics(params: { end: Date; start: Date }) {
+    const [newIssues, closedIssues, internalLossAgg] = await Promise.all([
+      prisma.quality_records.count({
+        where: {
+          createdAt: { gte: params.start, lte: params.end },
+          isDeleted: false,
+        },
+      }),
+      prisma.quality_records.count({
+        where: {
+          createdAt: { gte: params.start, lte: params.end },
+          status: 'CLOSED',
+          isDeleted: false,
+        },
+      }),
+      prisma.quality_records.aggregate({
+        _sum: { lossAmount: true },
+        where: {
+          date: { gte: params.start, lte: params.end },
+          isDeleted: false,
+        },
+      }),
+    ]);
+    return {
+      closedIssues,
+      internalLoss: Number(internalLossAgg._sum.lossAmount || 0),
+      newIssues,
+    };
+  },
+
+  async getReportDefectRows(params: { end: Date; start: Date }) {
+    return prisma.quality_records.findMany({
+      where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
+      select: { defectType: true, defectTypeId: true },
+    });
+  },
+
+  async getReportTopRiskProjects(params: { end: Date; start: Date }) {
+    return prisma.quality_records.groupBy({
+      by: ['projectName'],
+      where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
+      _count: true,
+      _sum: { lossAmount: true },
+      orderBy: { _sum: { lossAmount: 'desc' } },
+      take: 5,
+    });
+  },
+
+  async getReportSupplierPerformance(params: { end: Date; start: Date }) {
+    return prisma.quality_records.groupBy({
+      by: ['supplierName'],
+      where: {
+        date: { gte: params.start, lte: params.end },
+        isDeleted: false,
+        supplierName: { not: null },
+      },
+      _count: true,
+    });
+  },
+
+  async getReportMajorEvents(params: { end: Date; start: Date }) {
+    return prisma.quality_records.findMany({
+      where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
+      orderBy: { lossAmount: 'desc' },
+      take: 3,
+    });
+  },
+
+  async getWelderScoreIssues() {
+    return prisma.quality_records.findMany({
+      where: { isDeleted: false, responsibleWelder: { not: null } },
+      select: { id: true, responsibleWelder: true, severity: true },
+    });
+  },
+
+  async getWorkOrderAggregateInspections(workOrderNumber: string) {
+    return prisma.inspections.findMany({
+      where: { isDeleted: false, workOrderNumber },
+      orderBy: [{ inspectionDate: 'desc' }],
+      include: {
+        items: {
+          orderBy: [{ order: 'asc' }],
+          select: { checkItem: true, result: true },
+        },
+        process: { select: { name: true } },
+      },
+    });
+  },
+
+  async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
+    const baseWhere: Prisma.quality_recordsWhereInput = {
+      isDeleted: false,
+    };
+    const [yearAggregate, weekAggregate, weekCount, yearTypeStats] =
+      await Promise.all([
+        prisma.quality_records.aggregate({
+          where: { ...baseWhere, date: { gte: params.yearStart } },
+          _count: { id: true },
+          _sum: { lossAmount: true },
+        }),
+        prisma.quality_records.aggregate({
+          where: { ...baseWhere, date: { gte: params.weekStart } },
+          _sum: { lossAmount: true },
+        }),
+        prisma.quality_records.count({
+          where: { ...baseWhere, date: { gte: params.weekStart } },
+        }),
+        prisma.quality_records.groupBy({
+          by: ['defectType'],
+          where: { ...baseWhere, date: { gte: params.yearStart } },
+          _count: { id: true },
+        }),
+      ]);
+
+    return {
+      totalCount: yearAggregate._count.id || 0,
+      weeklyCount: weekCount || 0,
+      totalLoss: Number(yearAggregate._sum.lossAmount || 0),
+      weeklyLoss: Number(weekAggregate._sum.lossAmount || 0),
+      issueDistribution: yearTypeStats.map((item) => ({
+        type: item.defectType || 'Unknown',
+        value: item._count.id,
+      })),
+    };
+  },
+};
