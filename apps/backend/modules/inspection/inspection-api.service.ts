@@ -11,28 +11,6 @@ import {
   toImportErrorMessage,
 } from '~/utils/import-report';
 import {
-  buildInspectionIssueCreateData,
-  buildInspectionIssueUpdateData,
-  buildInspectionIssueUpsertPayload,
-  createInspectionIssueId,
-  findInspectionForIssue,
-  getNextInspectionIssueSerialNumber,
-} from '~/utils/inspection-issue';
-import {
-  generateInspectionRequestNo,
-  INSPECTION_REQUEST_STATUS,
-  isInspectionRequestAssemblyProcess,
-  mapInspectionRequest,
-  normalizeInspectionRequestAttachments,
-  normalizeInspectionRequestCheckResult,
-  normalizeInspectionRequestStatus,
-  normalizeInspectionRequestText,
-  parseInspectionRequestPriority,
-  parseInspectionRequestQuantity,
-  resolveInspectionRequestCurrentUserId,
-} from '~/utils/inspection-request';
-import { publishInspectionRequestCreated } from '~/utils/inspection-request-events';
-import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
 } from '~/utils/master-data-governance-write';
@@ -47,6 +25,29 @@ import {
   resolveTeamIdForWrite,
 } from '~/utils/team-resolver';
 import { parseWorkOrderListQuery } from '~/utils/work-order';
+
+import {
+  buildInspectionIssueCreateData,
+  buildInspectionIssueUpdateData,
+  buildInspectionIssueUpsertPayload,
+  createInspectionIssueId,
+  findInspectionForIssue,
+  getNextInspectionIssueSerialNumber,
+} from './inspection-issue';
+import {
+  generateInspectionRequestNo,
+  INSPECTION_REQUEST_STATUS,
+  isInspectionRequestAssemblyProcess,
+  mapInspectionRequest,
+  normalizeInspectionRequestAttachments,
+  normalizeInspectionRequestCheckResult,
+  normalizeInspectionRequestStatus,
+  normalizeInspectionRequestText,
+  parseInspectionRequestPriority,
+  parseInspectionRequestQuantity,
+  resolveInspectionRequestCurrentUserId,
+} from './inspection-request';
+import { publishInspectionRequestCreated } from './inspection-request-events';
 
 type RequestBody = Record<string, unknown>;
 

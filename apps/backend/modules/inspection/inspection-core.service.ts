@@ -1,6 +1,7 @@
 import type { archive_task_status, inspection_result } from '@prisma/client';
 import type { InspectionIssue } from '@qgs/shared';
-import type { InspectionIssueDateMode } from '~/utils/inspection-issue';
+
+import type { InspectionIssueDateMode } from './inspection-issue';
 
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -23,7 +24,6 @@ import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
 import { findDeptSubtree } from '~/utils/dept-tree';
 import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
-import { buildInspectionIssueDateRange } from '~/utils/inspection-issue';
 import { createModuleLogger } from '~/utils/logger';
 import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 import {
@@ -51,6 +51,8 @@ import {
 import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 import { buildYearFilter, parsePagination } from '~/utils/query-helpers';
 import { resolveTeamIdForWrite } from '~/utils/team-resolver';
+
+import { buildInspectionIssueDateRange } from './inspection-issue';
 
 const logger = createModuleLogger('InspectionService');
 const inspectionTemplateAutoBindEnabled =

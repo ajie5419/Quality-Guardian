@@ -1,12 +1,12 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
-import { logApiError } from '~/utils/api-logger';
-import { isPrismaNotFoundError } from '~/utils/db-error';
 import {
   findInspectionIssueAccessRecord,
   hasInspectionIssueWriteAccess,
-} from '~/utils/inspection-issue';
+} from '~/modules/inspection/inspection-issue';
+import { logApiError } from '~/utils/api-logger';
+import { isPrismaNotFoundError } from '~/utils/db-error';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   forbiddenResponse,

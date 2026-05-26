@@ -1,10 +1,10 @@
 import { defineEventHandler } from 'h3';
-import { InspectionService } from '~/modules/inspection/inspection.service';
-import { logApiError } from '~/utils/api-logger';
 import {
   findInspectionIssueAccessRecord,
   hasInspectionIssueWriteAccess,
-} from '~/utils/inspection-issue';
+} from '~/modules/inspection/inspection-issue';
+import { InspectionService } from '~/modules/inspection/inspection.service';
+import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   forbiddenResponse,

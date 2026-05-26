@@ -1,8 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
+import { normalizeInspectionRequestText } from '~/modules/inspection/inspection-request';
 import { logApiError } from '~/utils/api-logger';
-import { normalizeInspectionRequestText } from '~/utils/inspection-request';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,

@@ -22,10 +22,9 @@ import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
 } from '~/utils/master-data-governance-write';
+import prisma from '~/utils/prisma';
 import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 import { toQualityRecordStatus } from '~/utils/quality-loss-status';
-
-import prisma from './prisma';
 
 export function buildInspectionIssueDateRange(params: {
   dateMode?: InspectionIssueDateMode;

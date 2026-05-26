@@ -2,7 +2,7 @@ import { defineEventHandler, setHeader } from 'h3';
 import {
   sendInspectionRequestHeartbeat,
   subscribeInspectionRequestEvents,
-} from '~/utils/inspection-request-events';
+} from '~/modules/inspection/inspection-request-events';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { unAuthorizedResponse } from '~/utils/response';
 

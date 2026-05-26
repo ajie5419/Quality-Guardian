@@ -9,16 +9,6 @@ import { logApiError } from '~/utils/api-logger';
 import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import {
-  buildInspectionRecordFromRequest,
-  INSPECTION_REQUEST_STATUS,
-  mapInspectionRequest,
-  mergeInspectionRequestAttachments,
-  normalizeInspectionRequestAttachments,
-  normalizeInspectionRequestText,
-  parseInspectionRequestQuantity,
-  resolveInspectionRequestCurrentUserId,
-} from '~/utils/inspection-request';
-import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
 } from '~/utils/master-data-governance-write';
@@ -27,6 +17,17 @@ import {
   resolveCanonicalProcessName,
   resolveProcessIdForWrite,
 } from '~/utils/process-resolver';
+
+import {
+  buildInspectionRecordFromRequest,
+  INSPECTION_REQUEST_STATUS,
+  mapInspectionRequest,
+  mergeInspectionRequestAttachments,
+  normalizeInspectionRequestAttachments,
+  normalizeInspectionRequestText,
+  parseInspectionRequestQuantity,
+  resolveInspectionRequestCurrentUserId,
+} from './inspection-request';
 
 const INSPECTION_EXECUTION_CODES = new Set(['QMS:Inspection:Requests:Close']);
 
@@ -293,7 +294,7 @@ export const InspectionRouteService = {
         (await resolveInspectionRequestCurrentUserId(userinfo, prisma));
 
       if (result === 'FAIL' && linkedIssue && inspectionId) {
-        const issueUtils = await import('~/utils/inspection-issue');
+        const issueUtils = await import('./inspection-issue');
         const linkedInspection =
           await issueUtils.findInspectionForIssue(inspectionId);
         const newId = issueUtils.createInspectionIssueId();
