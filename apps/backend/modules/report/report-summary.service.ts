@@ -305,7 +305,7 @@ export const ReportSummaryService = {
       inspections: formattedInspections,
       issues: formattedIssues,
       reporter,
-      summary: storedContent.summary,
+      summary: existingReport?.reportText || storedContent.summary,
     };
   },
 };

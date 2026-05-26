@@ -32,12 +32,17 @@ export const ReportRouteService = {
   }) {
     const reportDate = parseReportDate(input.date);
     if (!reportDate) throw new Error('INVALID_DATE');
+    const reportText = String(input.summary || '');
     const saved = await prisma.daily_reports.upsert({
       where: { date_reporter: { date: reportDate, reporter: input.reporter } },
-      update: { summary: JSON.stringify({ summary: input.summary }) },
+      update: {
+        reportText,
+        summary: JSON.stringify({ summary: input.summary }),
+      },
       create: {
         date: reportDate,
         reporter: input.reporter,
+        reportText,
         summary: JSON.stringify({ summary: input.summary }),
       },
     });
@@ -50,8 +55,11 @@ export const ReportRouteService = {
   },
   async createDailyReport(input: {
     date: Date;
+    projectName?: null | string;
     reporter: string;
+    reportText?: null | string;
     summary: string;
+    workOrderNumber?: null | string;
   }) {
     return prisma.daily_reports.create({
       data: input,
@@ -121,12 +129,14 @@ export const ReportRouteService = {
 };
 
 function buildDailyReportWhere(params: DailyReportQueryParams) {
+  const projectName = String(params.projectName || '').trim();
   return {
-    ...(params.projectName
+    ...(projectName
       ? {
-          summary: {
-            contains: String(params.projectName).trim(),
-          },
+          OR: [
+            { projectName: { contains: projectName } },
+            { summary: { contains: projectName } },
+          ],
         }
       : {}),
     ...(params.dateFrom || params.dateTo

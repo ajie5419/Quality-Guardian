@@ -317,33 +317,40 @@ async function buildRealtimeReportData(row: {
   createdAt: Date;
   date: Date;
   id: string;
+  projectName?: null | string;
   reporter: string;
+  reportText?: null | string;
   summary: null | string;
   updatedAt: Date;
+  workOrderNumber?: null | string;
 }) {
   const parsed = parseReportSummary(row.summary);
   if (!parsed) {
     return {
       id: row.id,
       date: formatDate(row.date),
-      projectName: '',
+      projectName: row.projectName || '',
       reporters: row.reporter ? row.reporter.split(/\s+/).filter(Boolean) : [],
       mainWorks: [],
       notes: '',
       issueIds: [],
-      reportText: row.summary || '',
+      reportText: row.reportText || row.summary || '',
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
-      workOrderNumber: '',
+      workOrderNumber: row.workOrderNumber || '',
     } as VehicleCommissioningDailyReport;
   }
 
+  const projectName = row.projectName || parsed.projectName;
+  const workOrderNumber = row.workOrderNumber || parsed.workOrderNumber || '';
   const normalizedMainWorks = parsed.mainWorks.map((item) =>
     normalizeMainWorkItem(item),
   );
   const reportPayload: VehicleCommissioningDailyReportPayload = {
     ...parsed,
+    projectName,
     mainWorks: normalizedMainWorks,
+    workOrderNumber,
   };
   const reportIssues = await resolveReportIssues(reportPayload);
   const mappedIssues = reportIssues.map((issue) => mapIssueToDto(issue));
@@ -358,15 +365,19 @@ async function buildRealtimeReportData(row: {
     ...parsed,
     id: row.id,
     date: formatDate(row.date),
+    projectName,
     mainWorks: normalizedMainWorks,
     issueIds: mappedIssues.map((item) => item.id),
-    reportText: buildReportText({
-      payload: reportPayload,
-      openIssues,
-      closedIssues,
-    }),
+    reportText:
+      row.reportText ||
+      buildReportText({
+        payload: reportPayload,
+        openIssues,
+        closedIssues,
+      }),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    workOrderNumber,
   } as VehicleCommissioningDailyReport;
 }
 
@@ -658,8 +669,11 @@ export const VehicleCommissioningService = {
 
     const row = await ReportRouteService.createDailyReport({
       date: new Date(payload.date),
+      projectName: payload.projectName,
       reporter: payload.reporters.join(' '),
+      reportText,
       summary,
+      workOrderNumber: payload.workOrderNumber || null,
     });
 
     return {

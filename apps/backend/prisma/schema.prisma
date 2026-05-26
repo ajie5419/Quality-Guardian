@@ -1383,14 +1383,19 @@ model knowledge_base {
 }
 
 model daily_reports {
-  id        String   @id @default(cuid())
-  date      DateTime
-  reporter  String
-  summary   String?  @db.LongText
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  date            DateTime
+  reporter        String
+  summary         String?  @db.LongText
+  projectName     String?
+  workOrderNumber String?
+  reportText      String?  @db.LongText
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@unique([date, reporter], name: "date_reporter")
+  @@index([projectName])
+  @@index([workOrderNumber])
 }
 
 model inspection_archive_tasks {
