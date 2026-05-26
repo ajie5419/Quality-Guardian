@@ -202,7 +202,7 @@ async function ensureMenu(declaration: ModuleMenuDeclaration) {
   }
 
   let changed = false;
-  const existing = await prisma.menus.findFirst({
+  const candidates = await prisma.menus.findMany({
     where: buildMenuLookupWhere(declaration),
     select: {
       authCode: true,
@@ -218,6 +218,11 @@ async function ensureMenu(declaration: ModuleMenuDeclaration) {
       type: true,
     },
   });
+  const existing =
+    candidates.find(
+      (item) =>
+        item.name === declaration.name || item.path === declaration.path,
+    ) ?? candidates[0];
   const meta = JSON.stringify(declaration.meta);
   let menuId = existing?.id ? String(existing.id) : '';
 
