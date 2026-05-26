@@ -89,7 +89,15 @@ export const WelderService = {
       where.OR = searchOr;
     }
 
-    const [total, items] = await Promise.all([
+    const [
+      total,
+      items,
+      allWelderCount,
+      certifiedCount,
+      examPassedCount,
+      warningCount,
+      averageScore,
+    ] = await Promise.all([
       prisma.welders.count({ where }),
       prisma.welders.findMany({
         where,
@@ -97,28 +105,24 @@ export const WelderService = {
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
+      prisma.welders.count({ where: { isDeleted: false } }),
+      prisma.welders.count({
+        where: { isDeleted: false, certificationNo: { not: null } },
+      }),
+      prisma.welders.count({ where: { isDeleted: false, examPassed: true } }),
+      prisma.welders.count({ where: { isDeleted: false, score: { lte: 6 } } }),
+      prisma.welders.aggregate({
+        where: { isDeleted: false },
+        _avg: { score: true },
+      }),
     ]);
 
-    const allRows = await prisma.welders.findMany({
-      where: { isDeleted: false },
-      select: {
-        certificationNo: true,
-        examPassed: true,
-        score: true,
-      },
-    });
-
-    let totalScore = 0;
-    for (const row of allRows) {
-      totalScore += row.score || 0;
-    }
-
     const stats = {
-      averageScore: (totalScore / (allRows.length || 1)).toFixed(1),
-      certifiedCount: allRows.filter((row) => !!row.certificationNo).length,
-      examPassedCount: allRows.filter((row) => row.examPassed).length,
-      total: allRows.length,
-      warningCount: allRows.filter((row) => (row.score || 0) <= 6).length,
+      averageScore: (averageScore._avg.score ?? 0).toFixed(1),
+      certifiedCount,
+      examPassedCount,
+      total: allWelderCount,
+      warningCount,
     };
 
     return {
