@@ -1,6 +1,9 @@
 import type {
   PageResult,
+  QualityLossCharts,
+  QualityLossDashboardSummary,
   QualityLossItem,
+  QualityLossParams,
   QualityLossServiceTrendItem,
 } from '@qgs/shared';
 import type { QualityLossSource } from '~/utils/quality-loss-status';
@@ -52,14 +55,7 @@ interface TrendItem {
   manual: number;
 }
 
-interface QualityLossQueryParams extends PaginationParams {
-  granularity?: 'month' | 'week' | 'year';
-  lossSource?: string;
-  status?: string;
-  userContext?: { userId: string; username?: string };
-  workOrderNumber?: string;
-  year?: number;
-}
+type QualityLossQueryParams = PaginationParams & QualityLossParams;
 
 type SingleQualityLossSource =
   | typeof QL_CONSTANTS.SOURCE.COMMISSIONING
@@ -78,27 +74,6 @@ type AggregationSourceRecords = {
     ReturnType<typeof InspectionService.getLossRecordsForAggregation>
   >;
   manualRecords: Awaited<ReturnType<typeof prisma.quality_losses.findMany>>;
-};
-
-type QualityLossDashboardSummary = {
-  kpi: {
-    displayRate: string;
-    pendingAmount: number;
-    recoveryRate: number;
-    totalAmount: number;
-    totalClaim: number;
-  };
-  years: number[];
-};
-
-type QualityLossYearlyCharts = {
-  deptDistribution: Array<{ name: string; value: number }>;
-  trend: Array<{
-    claimAmount: number;
-    period: number;
-    periodLabel: string;
-    totalAmount: number;
-  }>;
 };
 
 type QualityLossUpdateTarget =
@@ -1071,7 +1046,7 @@ export const QualityLossService = {
 
   async getYearlyCharts(
     filters: Omit<QualityLossQueryParams, 'page' | 'pageSize'> = {},
-  ): Promise<QualityLossYearlyCharts> {
+  ): Promise<QualityLossCharts> {
     const targetYear = Number(filters.year) || new Date().getFullYear();
     const granularity = filters.granularity || 'month';
     const list = await getAllLossesUnpaginated(filters);
@@ -1119,7 +1094,7 @@ export const QualityLossService = {
       }
     }
 
-    let trend: QualityLossYearlyCharts['trend'] = [];
+    let trend: QualityLossCharts['trend'] = [];
     if (granularity === 'year') {
       trend = [...trendMap.entries()]
         .sort((a, b) => a[0] - b[0])

@@ -1,3 +1,10 @@
+import type {
+  FileListParams,
+  FilePageResult,
+  FileStorageStats,
+  ScanMissingResult,
+} from '@qgs/shared';
+
 import prisma from '~/utils/prisma';
 
 import {
@@ -5,18 +12,9 @@ import {
   normalizeStorageProvider,
 } from './storage-strategy';
 
-export async function listFileAssets(params: {
-  bizId?: string;
-  bizType?: string;
-  fieldName?: string;
-  keyword?: string;
-  mimeType?: string;
-  page?: number;
-  pageSize?: number;
-  status?: string;
-  storageProvider?: string;
-  uploadedBy?: string;
-}) {
+export async function listFileAssets(
+  params: FileListParams,
+): Promise<FilePageResult> {
   const page = Math.max(1, Number(params.page || 1));
   const pageSize = Math.max(1, Math.min(200, Number(params.pageSize || 20)));
   const where: any = {};
@@ -61,7 +59,7 @@ export async function listFileAssets(params: {
   return { items, total };
 }
 
-export async function getFileStorageStats() {
+export async function getFileStorageStats(): Promise<FileStorageStats> {
   const [
     totalAgg,
     activeAgg,
@@ -121,7 +119,7 @@ export async function getFileStorageStats() {
 export async function listOrphanFileAssets(params: {
   page?: number;
   pageSize?: number;
-}) {
+}): Promise<FilePageResult> {
   const page = Math.max(1, Number(params.page || 1));
   const pageSize = Math.max(1, Math.min(200, Number(params.pageSize || 20)));
   const where = {
@@ -144,7 +142,7 @@ export async function listOrphanFileAssets(params: {
 export async function scanMissingFileAssets(params: {
   limit?: number;
   markMissing?: boolean;
-}) {
+}): Promise<ScanMissingResult> {
   const limit = Math.max(1, Math.min(500, Number(params.limit || 100)));
   const files = await prisma.file_assets.findMany({
     orderBy: { createdAt: 'asc' },

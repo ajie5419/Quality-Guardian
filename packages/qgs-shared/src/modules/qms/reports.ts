@@ -1,11 +1,11 @@
 export interface ReportItem {
-  author: string;
+  author: null | string;
   date: string;
   id: string;
   majorDefects: number;
   minorDefects: number;
   passRate: number;
-  status: 'Draft' | 'Published';
+  status: string;
   totalInspections: number;
 }
 

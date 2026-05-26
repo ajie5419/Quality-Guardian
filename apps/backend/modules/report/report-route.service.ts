@@ -1,3 +1,5 @@
+import type { ReportItem, SaveDailySummaryResult } from '@qgs/shared';
+
 import prisma from '~/utils/prisma';
 
 import {
@@ -21,7 +23,7 @@ export const ReportRouteService = {
     await prisma.reports.delete({ where: { id } });
     return { message: 'Deleted' };
   },
-  async getList() {
+  async getList(): Promise<ReportItem[]> {
     const rows = await prisma.reports.findMany({ orderBy: { date: 'desc' } });
     return rows.map((r) => ({ ...r, date: formatReportDate(r.date) }));
   },
@@ -29,7 +31,7 @@ export const ReportRouteService = {
     date: string;
     reporter: string;
     summary: string;
-  }) {
+  }): Promise<SaveDailySummaryResult> {
     const reportDate = parseReportDate(input.date);
     if (!reportDate) throw new Error('INVALID_DATE');
     const reportText = String(input.summary || '');

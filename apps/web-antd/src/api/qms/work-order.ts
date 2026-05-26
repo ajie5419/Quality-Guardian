@@ -1,4 +1,10 @@
-import type { WorkOrderItem } from '@qgs/shared';
+import type {
+  WorkOrderDashboardStats,
+  WorkOrderItem,
+  WorkOrderListResult,
+  WorkOrderParams,
+  WorkOrderSummaryItem,
+} from '@qgs/shared';
 
 import type { WorkOrderRequirementAttachment } from './workspace';
 
@@ -33,11 +39,9 @@ export async function getWorkOrderList(params?: {
   workOrderNumber?: string;
   year?: number;
 }) {
-  return requestClient.get<{
-    items: WorkOrderItem[];
-    summary: Array<{ division: string; quantity: number; status: string }>;
-    total: number;
-  }>(QMS_API.WORK_ORDER, { params });
+  return requestClient.get<WorkOrderListResult>(QMS_API.WORK_ORDER, {
+    params,
+  });
 }
 
 export async function getWorkOrderListPage(params?: {
@@ -63,33 +67,12 @@ export async function getWorkOrderListPage(params?: {
   };
 }
 
-export type WorkOrderDashboardStats = {
-  completed: number;
-  inProgress: number;
-  pieData: Array<{ name: string; value: number }>;
-  progressPercent: number;
-  rankings: Array<{
-    division: string;
-    productName: string;
-    productNames?: string[];
-    warrantyCount: number;
-  }>;
-  total: number;
-};
-
-export async function getWorkOrderDashboardStats(params?: {
-  endDate?: string;
-  granularity?: 'month' | 'week' | 'year';
-  ids?: string;
-  ignoreYearFilter?: boolean;
-  keyword?: string;
-  productName?: string;
-  projectName?: string;
-  startDate?: string;
-  status?: string;
-  workOrderNumber?: string;
-  year?: number;
-}) {
+export async function getWorkOrderDashboardStats(
+  params?: Omit<WorkOrderParams, 'dataScope' | 'ids' | 'page' | 'pageSize'> & {
+    granularity?: 'month' | 'week' | 'year';
+    ids?: string;
+  },
+) {
   return requestClient.get<WorkOrderDashboardStats>(QMS_API.WORK_ORDER_STATS, {
     params,
   });
@@ -110,7 +93,7 @@ export async function getWorkOrderExportList(params?: {
 }) {
   const raw = await requestClient.get<{
     items: WorkOrderItem[];
-    summary?: Array<{ division: string; quantity: number; status: string }>;
+    summary?: WorkOrderSummaryItem[];
     total: number;
   }>(`${QMS_API.WORK_ORDER}/export`, { params });
   return normalizeListResponse<WorkOrderItem>(raw);

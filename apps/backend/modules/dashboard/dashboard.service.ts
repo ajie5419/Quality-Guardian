@@ -1,4 +1,4 @@
-import type { DashboardChartItem, DashboardOverview } from '@qgs/shared';
+import type { DashboardChartItem, DashboardStats } from '@qgs/shared';
 
 import { AfterSalesService } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
@@ -18,10 +18,7 @@ const logger = createModuleLogger('DashboardService');
 const DASHBOARD_STATS_CACHE_TTL_MS = 60_000;
 const DASHBOARD_TREND_CACHE_TTL_MS = 3_600_000;
 
-type DashboardStatsResult = {
-  overview: DashboardOverview;
-  recentWorkOrders: any[];
-};
+type DashboardStatsResult = DashboardStats;
 
 type DashboardStatsParams = {
   granularity?: string;

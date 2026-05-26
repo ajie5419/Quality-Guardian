@@ -1,6 +1,9 @@
 import type {
+  WorkOrderDashboardStats,
+  WorkOrderDashboardSummary,
   WorkOrderItem,
   WorkOrderListResult,
+  WorkOrderParams,
   WorkOrderSummaryItem,
 } from '@qgs/shared';
 import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
@@ -50,36 +53,8 @@ const getYearDateRange = (year?: number) => {
   return { start, end, isCurrentYear: targetYear === now.getFullYear() };
 };
 
-interface WorkOrderListParams {
-  page?: number;
-  pageSize?: number;
-  granularity?: string;
-  startDate?: string;
-  endDate?: string;
-  productName?: string;
-  year?: number;
-  projectName?: string;
-  status?: string;
-  workOrderNumber?: string;
-  ignoreYearFilter?: boolean;
-  keyword?: string;
-  ids?: string[];
-  userContext?: { userId: string; username?: string };
+type WorkOrderListParams = WorkOrderParams & {
   dataScope?: ResolvedDataScope;
-}
-
-type WorkOrderDashboardStats = {
-  completed: number;
-  inProgress: number;
-  pieData: Array<{ name: string; value: number }>;
-  progressPercent: number;
-  rankings: Array<{
-    division: string;
-    productName: string;
-    productNames: string[];
-    warrantyCount: number;
-  }>;
-  total: number;
 };
 
 const isValidDate = (value?: string) => {
@@ -249,7 +224,10 @@ export const WorkOrderService = {
     return [...new Set(years)].sort((a, b) => b - a);
   },
 
-  async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
+  async getStatsForDashboard(params: {
+    weekStart: Date;
+    yearStart: Date;
+  }): Promise<WorkOrderDashboardSummary> {
     const baseWhere = { isDeleted: false };
     const [yearAggregate, weekCount, recentWorkOrders] = await Promise.all([
       prisma.work_orders.aggregate({

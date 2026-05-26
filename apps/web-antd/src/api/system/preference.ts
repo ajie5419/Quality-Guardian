@@ -1,5 +1,7 @@
 import { requestClient } from '../request';
 
+export type PreferenceValue = Record<string, unknown>;
+
 /**
  * 获取模块的合并偏好设置 (用户偏好 -> 系统默认)
  * @param module 模块名称
@@ -9,7 +11,7 @@ export async function getMergedPreferenceApi(
   module: string,
   systemKey?: string,
 ) {
-  return requestClient.get<any>(`/user/preferences/${module}`, {
+  return requestClient.get<PreferenceValue>(`/user/preferences/${module}`, {
     params: { systemKey },
   });
 }
@@ -19,7 +21,10 @@ export async function getMergedPreferenceApi(
  * @param module 模块名称
  * @param data 偏好数据
  */
-export async function saveUserPreferenceApi(module: string, data: any) {
+export async function saveUserPreferenceApi(
+  module: string,
+  data: PreferenceValue,
+) {
   return requestClient.post(`/user/preferences/${module}`, { data });
 }
 
@@ -28,7 +33,7 @@ export async function saveUserPreferenceApi(module: string, data: any) {
  * @param key 设置的 key
  */
 export async function getSystemSettingApi(key: string) {
-  return requestClient.get<any>(`/system/settings/${key}`);
+  return requestClient.get<PreferenceValue | string>(`/system/settings/${key}`);
 }
 
 /**
@@ -39,7 +44,7 @@ export async function getSystemSettingApi(key: string) {
  */
 export async function saveSystemSettingApi(
   key: string,
-  value: any,
+  value: unknown,
   description?: string,
 ) {
   return requestClient.post(`/system/settings/${key}`, { value, description });

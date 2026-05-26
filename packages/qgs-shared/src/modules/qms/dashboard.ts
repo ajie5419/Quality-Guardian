@@ -18,11 +18,11 @@ export interface DashboardChartItem {
 export interface DashboardWorkOrder {
   content?: null | string;
   customerName?: null | string;
-  id: string;
-  priority: string;
+  id?: string;
+  priority?: string;
   projectName?: null | string;
   status: string;
-  title: string;
+  title?: string;
   workOrderNumber?: string;
 }
 

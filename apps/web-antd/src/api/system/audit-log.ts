@@ -1,32 +1,9 @@
+import type { AuditLog, AuditLogPageResult, AuditLogParams } from '@qgs/shared';
+
 import { requestClient } from '#/api/request';
 
-export interface AuditLogItem {
-  id: string;
-  userId: string;
-  username: string;
-  action: string;
-  targetType: string;
-  targetId: string;
-  details: string;
-  ipAddress: string;
-  userAgent: string;
-  createdAt: string;
-}
-
-export interface AuditLogQueryParams {
-  page?: number;
-  pageSize?: number;
-  userId?: string;
-  action?: string;
-  targetType?: string;
-  startDate?: string;
-  endDate?: string;
-}
-
-export interface AuditLogPageResult {
-  items: AuditLogItem[];
-  total: number;
-}
+export type AuditLogItem = AuditLog;
+export type AuditLogQueryParams = AuditLogParams;
 
 /**
  * Get Audit Log list (paginated)

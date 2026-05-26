@@ -2,6 +2,11 @@ import { baseRequestClient, requestClient } from '#/api/request';
 
 import { CORE_API } from './constants';
 
+export interface PublicDepartment {
+  id: string;
+  name: string;
+}
+
 export namespace AuthApi {
   /** 登录接口参数 */
   export interface LoginParams {
@@ -59,5 +64,5 @@ export async function getAccessCodesApi() {
  * 获取公开部门列表（注册使用）
  */
 export async function getPublicDepartmentsApi() {
-  return requestClient.get<any[]>('/auth/departments');
+  return requestClient.get<PublicDepartment[]>('/auth/departments');
 }

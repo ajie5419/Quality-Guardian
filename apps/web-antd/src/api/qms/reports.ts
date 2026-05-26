@@ -1,10 +1,10 @@
 import type {
   QualityReportSummary,
   ReportItem,
+  ReportPageResult,
+  SaveDailySummaryResult,
   DailySummaryData as SharedDailySummaryData,
 } from '@qgs/shared';
-
-import type { QmsListResponse } from '#/api/qms/types';
 
 import { normalizeMutationResponse } from '#/api/qms/adapters';
 import { requestClient } from '#/api/request';
@@ -52,12 +52,7 @@ export function saveDailySummary(data: {
   summary: string;
   user?: string;
 }) {
-  return requestClient.put<{
-    date: string;
-    documentItems: DailySummaryData['documentItems'];
-    reporter: string;
-    summary: string;
-  }>(QMS_API.REPORTS_DAILY, data);
+  return requestClient.put<SaveDailySummaryResult>(QMS_API.REPORTS_DAILY, data);
 }
 
 /**
@@ -69,7 +64,7 @@ export async function getReportsList() {
 }
 
 export async function getReportsListPage() {
-  return requestClient.get<QmsListResponse<ReportItem>>(QMS_API.REPORTS);
+  return requestClient.get<ReportPageResult>(QMS_API.REPORTS);
 }
 
 /**

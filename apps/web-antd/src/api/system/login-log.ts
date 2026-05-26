@@ -1,31 +1,9 @@
+import type { LoginLog, LoginLogPageResult, LoginLogParams } from '@qgs/shared';
+
 import { requestClient } from '#/api/request';
 
-export interface LoginLogItem {
-  id: string;
-  username: string;
-  ip: string;
-  browser: string;
-  os: string;
-  device: string;
-  method: string;
-  status: string;
-  message: string;
-  createdAt: string;
-}
-
-export interface LoginLogQueryParams {
-  page?: number;
-  pageSize?: number;
-  username?: string;
-  status?: string;
-  startDate?: string;
-  endDate?: string;
-}
-
-export interface LoginLogPageResult {
-  items: LoginLogItem[];
-  total: number;
-}
+export type LoginLogItem = LoginLog;
+export type LoginLogQueryParams = LoginLogParams;
 
 /**
  * Get Login Log list (paginated)

@@ -1,3 +1,12 @@
+import type {
+  FileAssetItem,
+  FileListParams,
+  FilePageResult,
+  FileStorageStats,
+  ScanMissingResult,
+  UploadFileResult,
+} from '@qgs/shared';
+
 import { Buffer } from 'node:buffer';
 import { basename, extname } from 'node:path';
 import process from 'node:process';
@@ -201,7 +210,7 @@ export const FileStorageService = {
     return this.getFileBuffer(file.id, preferThumb);
   },
 
-  async getFileDetail(id: string) {
+  async getFileDetail(id: string): Promise<FileAssetItem | null> {
     return prisma.file_assets.findUnique({
       include: {
         references: {
@@ -216,22 +225,11 @@ export const FileStorageService = {
     });
   },
 
-  async listFiles(params: {
-    bizId?: string;
-    bizType?: string;
-    fieldName?: string;
-    keyword?: string;
-    mimeType?: string;
-    page?: number;
-    pageSize?: number;
-    status?: string;
-    storageProvider?: string;
-    uploadedBy?: string;
-  }) {
+  async listFiles(params: FileListParams): Promise<FilePageResult> {
     return listFileAssets(params);
   },
 
-  async getStorageStats() {
+  async getStorageStats(): Promise<FileStorageStats> {
     return getFileStorageStats();
   },
 
@@ -387,17 +385,25 @@ export const FileStorageService = {
     }
   },
 
-  async listOrphanFiles(params: { page?: number; pageSize?: number }) {
+  async listOrphanFiles(params: {
+    page?: number;
+    pageSize?: number;
+  }): Promise<FilePageResult> {
     return listOrphanFileAssets(params);
   },
 
-  async scanMissingFiles(params: { limit?: number; markMissing?: boolean }) {
+  async scanMissingFiles(params: {
+    limit?: number;
+    markMissing?: boolean;
+  }): Promise<ScanMissingResult> {
     return scanMissingFileAssets(params);
   },
 
   getMaxUploadBytes,
 
-  async uploadFileStream(params: UploadFileStreamParams) {
+  async uploadFileStream(
+    params: UploadFileStreamParams,
+  ): Promise<UploadFileResult> {
     const originalName = basename(params.filename || 'upload');
     const mimeType = getMimeType(originalName, params.mimeType);
     const storedName = createStoredName(originalName, mimeType);
@@ -446,7 +452,7 @@ export const FileStorageService = {
     };
   },
 
-  async uploadFile(params: UploadFileParams) {
+  async uploadFile(params: UploadFileParams): Promise<UploadFileResult> {
     if (!params.data || params.data.length === 0) {
       throw new Error('upload file payload is empty');
     }

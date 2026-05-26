@@ -1,3 +1,4 @@
+import type { audit_logs_action } from '@prisma/client';
 import type {
   AuditLog,
   AuditLogPageResult,
@@ -78,10 +79,7 @@ export const SystemLogService = {
       prisma.login_logs.count({ where }),
     ]);
 
-    return {
-      items: items as any as LoginLog[],
-      total,
-    };
+    return { items, total };
   },
 
   /**
@@ -108,7 +106,7 @@ export const SystemLogService = {
    * Record an audit log for business operations
    */
   async recordAuditLog(params: {
-    action: any;
+    action: audit_logs_action;
     detailsTemplate: string;
     detailsVariables: Record<string, unknown>;
     ipAddress?: string;
@@ -116,7 +114,7 @@ export const SystemLogService = {
     targetType: string;
     userAgent?: string;
     userId: string;
-  }): Promise<any> {
+  }): Promise<AuditLog> {
     const details = renderAuditTemplateText(
       params.detailsTemplate,
       params.detailsVariables,
@@ -149,7 +147,7 @@ export const SystemLogService = {
       userAgent?: string;
       userId: string;
     },
-  ): Promise<any> {
+  ): Promise<AuditLog> {
     const config = getAuditActionConfig(moduleName, actionKey);
     if (!config) {
       throw new Error(
@@ -158,7 +156,7 @@ export const SystemLogService = {
     }
 
     return this.recordAuditLog({
-      action: config.action,
+      action: config.action as audit_logs_action,
       detailsTemplate: config.detailsTemplate,
       detailsVariables: params.detailsVariables,
       ipAddress: params.ipAddress,
@@ -182,7 +180,7 @@ export const SystemLogService = {
       where.userId = params.userId;
     }
     if (params.action) {
-      where.action = params.action as any;
+      where.action = params.action as audit_logs_action;
     }
     if (params.targetType) {
       where.targetType = { contains: params.targetType };
@@ -211,14 +209,13 @@ export const SystemLogService = {
       prisma.audit_logs.count({ where }),
     ]);
 
-    return {
-      items: items.map((item) => ({
-        ...item,
-        timestamp: String(item.timestamp),
-        username: item.users?.realName || item.users?.username || 'Unknown',
-      })) as any as AuditLog[],
-      total,
-    };
+    const mappedItems: AuditLog[] = items.map((item) => ({
+      ...item,
+      timestamp: String(item.timestamp),
+      username: item.users?.realName || item.users?.username || 'Unknown',
+    }));
+
+    return { items: mappedItems, total };
   },
 
   async getAuditLogsByTarget(params: { targetId: string; targetType: string }) {
@@ -243,7 +240,7 @@ export const SystemLogService = {
   /**
    * Delete an audit log
    */
-  async deleteAuditLog(id: string): Promise<any> {
+  async deleteAuditLog(id: string): Promise<AuditLog> {
     return prisma.audit_logs.update({
       where: { id },
       data: { isDeleted: true },

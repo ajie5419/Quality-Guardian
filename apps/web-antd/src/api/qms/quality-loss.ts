@@ -1,45 +1,17 @@
-import type { QualityLossItem } from '@qgs/shared';
+import type {
+  QualityLossCharts,
+  QualityLossDashboardSummary,
+  QualityLossItem,
+  QualityLossPageResult,
+  QualityLossParams,
+} from '@qgs/shared';
 
 import { requestClient } from '#/api/request';
 
 // Re-export types
 export * from '@qgs/shared';
 
-export interface QualityLossQueryParams {
-  granularity?: 'month' | 'week' | 'year';
-  lossSource?: string;
-  page?: number;
-  pageSize?: number;
-  status?: string;
-  workOrderNumber?: string;
-  year?: number;
-}
-
-export interface QualityLossPageResult {
-  items: QualityLossItem[];
-  total: number;
-}
-
-export interface QualityLossDashboardSummary {
-  kpi: {
-    displayRate: string;
-    pendingAmount: number;
-    recoveryRate: number;
-    totalAmount: number;
-    totalClaim: number;
-  };
-  years: number[];
-}
-
-export interface QualityLossCharts {
-  deptDistribution: Array<{ name: string; value: number }>;
-  trend: Array<{
-    claimAmount: number;
-    period: number;
-    periodLabel: string;
-    totalAmount: number;
-  }>;
-}
+export type QualityLossQueryParams = QualityLossParams;
 
 /**
  * Get Quality Loss list (paginated)
