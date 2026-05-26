@@ -631,31 +631,69 @@ export const FileStorageService = {
     fieldName?: string;
   }) {
     const attachments = parseAttachmentItems(params.attachments);
-    const fileIds = [];
+    const requestedFileIds: string[] = [];
+    const requestedStoredNames: string[] = [];
     for (const item of attachments) {
       const lookup = resolveAttachmentLookup(item);
       if ('fileId' in lookup && lookup.fileId) {
-        const file = await prisma.file_assets.findFirst({
-          select: { id: true },
-          where: { id: lookup.fileId, status: 'ACTIVE' },
-        });
-        if (file) fileIds.push(file.id);
+        requestedFileIds.push(lookup.fileId);
         continue;
       }
-      if (!lookup.storedName) continue;
-      const file = await prisma.file_assets.findFirst({
-        select: { id: true },
-        where: {
-          OR: [
-            { storedName: lookup.storedName },
-            { objectKey: { endsWith: lookup.storedName } },
-            { thumbObjectKey: { endsWith: lookup.storedName } },
-          ],
-          status: 'ACTIVE',
-        },
-      });
-      if (file) fileIds.push(file.id);
+      if (lookup.storedName) requestedStoredNames.push(lookup.storedName);
     }
+
+    const [filesById, filesByStoredName] = await Promise.all([
+      requestedFileIds.length > 0
+        ? prisma.file_assets.findMany({
+            select: { id: true },
+            where: {
+              id: { in: [...new Set(requestedFileIds)] },
+              status: 'ACTIVE',
+            },
+          })
+        : Promise.resolve([]),
+      requestedStoredNames.length > 0
+        ? prisma.file_assets.findMany({
+            select: {
+              id: true,
+              objectKey: true,
+              storedName: true,
+              thumbObjectKey: true,
+            },
+            where: {
+              OR: [
+                { storedName: { in: [...new Set(requestedStoredNames)] } },
+                ...requestedStoredNames.map((storedName) => ({
+                  objectKey: { endsWith: storedName },
+                })),
+                ...requestedStoredNames.map((storedName) => ({
+                  thumbObjectKey: { endsWith: storedName },
+                })),
+              ],
+              status: 'ACTIVE',
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const activeIds = new Set(filesById.map((file) => file.id));
+    const storedNameToFileId = new Map<string, string>();
+    for (const file of filesByStoredName) {
+      storedNameToFileId.set(file.storedName, file.id);
+      storedNameToFileId.set(extractStoredName(file.objectKey), file.id);
+      storedNameToFileId.set(extractStoredName(file.thumbObjectKey), file.id);
+    }
+    const fileIds = attachments
+      .map((item) => {
+        const lookup = resolveAttachmentLookup(item);
+        if ('fileId' in lookup && lookup.fileId) {
+          return activeIds.has(lookup.fileId) ? lookup.fileId : null;
+        }
+        return lookup.storedName
+          ? storedNameToFileId.get(lookup.storedName) || null
+          : null;
+      })
+      .filter(Boolean);
     const uniqueFileIds = [...new Set(fileIds)];
 
     await prisma.file_references.deleteMany({
