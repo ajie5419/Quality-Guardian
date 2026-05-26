@@ -7,6 +7,7 @@ import type {
 import { extname } from 'node:path';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { parseSheet, parseWorkbook } from '~/utils/excel-parser';
 import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
 
 import {
@@ -51,12 +52,10 @@ async function readUploadedWorkbook(
   if (!managedFile) {
     throw new Error('未找到上传的计划文件');
   }
-  const XLSX = await import('xlsx');
-  const workbook = XLSX.read(managedFile.buffer, {
+  const workbook = await parseWorkbook(managedFile.buffer, {
     cellDates: true,
-    type: 'buffer',
   });
-  return { sourceFileName, utils: XLSX.utils, workbook };
+  return { sourceFileName, workbook };
 }
 function resolveHeaderValue(row: Record<string, unknown>, names: string[]) {
   for (const name of names) {
@@ -92,19 +91,17 @@ function inferLevelFromCode(code: string): number {
   return parts.length;
 }
 
-function parseWorkbookTasks(
-  workbook: any,
-  utils: { sheet_to_json: (...args: any[]) => unknown[] },
+async function parseWorkbookTasks(
+  workbook: Awaited<ReturnType<typeof parseWorkbook>>,
   sourceFileName: string,
   fileUrl: string,
 ) {
   const sheetName = workbook.SheetNames?.[0];
   if (!sheetName) throw new Error('计划文件没有工作表');
-  const sheet = workbook.Sheets[sheetName];
-  const rows = utils.sheet_to_json(sheet, {
+  const rows = await parseSheet<Record<string, unknown>>(workbook, sheetName, {
     defval: '',
     raw: false,
-  }) as Array<Record<string, unknown>>;
+  });
   const tasks = rows
     .map((row, index) => {
       const taskNo = normalizeText(
@@ -428,12 +425,12 @@ export const SupervisionPlanTaskService = {
   ): Promise<SupervisionPlanTaskImportResult> {
     const fileUrl = normalizeText(payload.fileUrl);
     if (!fileUrl) throw new Error('计划文件不能为空');
-    const { sourceFileName, utils, workbook } = await readUploadedWorkbook(
+    const { sourceFileName, workbook } = await readUploadedWorkbook(
       fileUrl,
       normalizeText(payload.fileName),
       normalizeText(payload.storedName),
     );
-    const tasks = parseWorkbookTasks(workbook, utils, sourceFileName, fileUrl);
+    const tasks = await parseWorkbookTasks(workbook, sourceFileName, fileUrl);
 
     await prisma.$transaction(async (tx) => {
       await tx.supervision_plan_tasks.updateMany({

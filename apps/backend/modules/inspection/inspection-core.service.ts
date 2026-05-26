@@ -23,6 +23,7 @@ import { FileStorageService } from '~/modules/file-storage/file-storage.service'
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
 import { findDeptSubtree } from '~/utils/dept-tree';
+import { parseWorkbookSheets } from '~/utils/excel-parser';
 import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import { createModuleLogger } from '~/utils/logger';
 import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
@@ -280,17 +281,15 @@ async function resolveTemplateMetaFromAttachment(
       };
     }
 
-    const fileBuffer = await readFile(filePath);
-    const XLSX = await import('xlsx');
-    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-    for (const sheetName of workbook.SheetNames || []) {
-      const sheet = workbook.Sheets[sheetName];
-      if (!sheet) continue;
-      const rows = XLSX.utils.sheet_to_json(sheet, {
+    const sheets = await parseWorkbookSheets<unknown[]>(
+      await readFile(filePath),
+      {
         defval: '',
         header: 1,
         raw: false,
-      }) as unknown[][];
+      },
+    );
+    for (const { rows } of sheets) {
       if (!Array.isArray(rows) || rows.length === 0) continue;
       const meta = resolveMetaFromSheetRows(rows);
       if (meta.formNo || meta.drawingNo) {
