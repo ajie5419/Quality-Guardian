@@ -51,6 +51,8 @@ USAGE
 
 for arg in "$@"; do
   case "$arg" in
+    --)
+      ;;
     --all)
       SCOPE="all"
       ;;
@@ -106,9 +108,11 @@ mark_rule_violation() {
   local rule="$1"
   local existing=''
 
-  for existing in "${violated_rules[@]}"; do
-    [[ "$existing" == "$rule" ]] && return 0
-  done
+  if (( ${#violated_rules[@]} > 0 )); then
+    for existing in "${violated_rules[@]}"; do
+      [[ "$existing" == "$rule" ]] && return 0
+    done
+  fi
 
   violated_rules+=("$rule")
 }

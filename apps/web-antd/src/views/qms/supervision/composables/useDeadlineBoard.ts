@@ -4,7 +4,7 @@ import { ref } from 'vue';
 
 import { message } from 'ant-design-vue';
 
-import { requestClient } from '#/api/request';
+import { getSupervisionDeadlineBoard } from '#/api/qms/supervision';
 
 export function useDeadlineBoard() {
   const loading = ref(false);
@@ -28,10 +28,7 @@ export function useDeadlineBoard() {
   }) {
     loading.value = true;
     try {
-      const data = await requestClient.get<DeadlineBoardResult>(
-        '/qms/supervision/deadline-board',
-        { params },
-      );
+      const data = await getSupervisionDeadlineBoard(params);
       board.value = data;
     } catch {
       message.error('加载纳期看板失败');

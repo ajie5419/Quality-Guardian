@@ -1,4 +1,5 @@
 import type {
+  DeadlineBoardResult,
   SupervisionDailyReport,
   SupervisionDashboard,
   SupervisionIssue,
@@ -34,6 +35,16 @@ type SupervisionPlanRowPayload = {
 
 export async function getSupervisionOverview() {
   return requestClient.get<SupervisionDashboard>(QMS_API.SUPERVISION_OVERVIEW);
+}
+
+export async function getSupervisionDeadlineBoard(params?: {
+  dueSoonDays?: number;
+  projectId?: string;
+}) {
+  return requestClient.get<DeadlineBoardResult>(
+    QMS_API.SUPERVISION_DEADLINE_BOARD,
+    { params },
+  );
 }
 
 export async function getSupervisionProjects(
