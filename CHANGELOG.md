@@ -325,3 +325,34 @@
 - `daily_reports.summary` 按兼容策略保留旧 JSON blob，复杂数组字段如 `mainWorks/issueIds` 仍留在 JSON 中；本阶段仅抽取过滤和展示最常用的顶层字段。
 - 本阶段沿用手写 migration SQL，原因同 Step 51：既有历史 migration 在 shadow database 中存在顺序问题；未手动修改数据库。
 - `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
+
+### 2026-05-26 阶段十三：前后端类型契约（步骤59-60）
+
+**执行内容：**
+
+- 步骤59：补齐 `@qgs/shared` 中缺失的 API 响应类型，新增/完善 dashboard、work-order、quality-loss、report、file-storage 类型；确认 system-log 的 `AuditLog/LoginLog` 分页类型已存在并复用。
+- 步骤60：后端主要公开 service 方法改为引用共享返回类型，包括 dashboard stats、work-order list/dashboard、quality-loss page/dashboard/charts、file-storage list/detail/upload、report list/daily summary、system-log 分页日志。
+- 步骤60：前端 `apps/web-antd/src/api/` 改为消费共享类型，移除 API 层本地重复定义与 API 响应相关 `any/unknown` 泛型；未改组件逻辑，未处理第三方库兼容型 `as any`。
+- 步骤60：清理 system-log 中旧的双重断言映射，改为结构化 `AuditLog/LoginLog` 返回。
+
+**验证结果：**
+
+- 每个步骤提交前均执行 `pnpm -C packages/qgs-shared run build`: 通过
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec vitest run`: 32 文件 / 219 测试全部通过
+- 每个步骤提交前均执行 `pnpm run check:qms-arch`: 通过
+- 步骤60 后执行 `rg "requestClient\\.(get|post|put|delete)<(any|unknown)|get<any|post<any|put<any|delete<any|as any" apps/web-antd/src/api -g '*.ts'`: 无命中
+- 阶段结束模块 TS 文件数：232
+- 阶段结束 `git status --short | wc -l`: 0
+
+**commit:** `520e3e41` / `e1493793`
+
+**遗留问题：**
+
+- 前端组件与第三方库类型兼容中的 `as any` 不属于 API 响应契约，本阶段按要求未处理。
+- `@qgs/shared` 中仍有部分历史类型命名与模块文件拆分不完全一致，未做无关重命名。
+- `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
+
+全部完成
+
+13 阶段后端精简重构全部执行完毕。
