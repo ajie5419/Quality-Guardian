@@ -222,3 +222,29 @@
 **遗留问题：**
 
 - B-S1、B-S4、B-S5、B-T1、B-T2、B-M1、B-T3、B-M2 按脚本 TODO 后续清理；本阶段未写入豁免或新增 baseline。
+
+### 2026-05-26 阶段九：模块自治（步骤41-46）
+
+**执行内容：**
+
+- 步骤41：新增 `ModuleDeclaration` 类型与 25 个业务模块 `.module.ts` 声明文件，将菜单、DataScope、审计日志声明下沉到模块目录。
+- 步骤42：新增 `utils/module-loader.ts`，集中加载模块声明，并提供菜单、DataScope、审计配置查询函数。
+- 步骤43：将菜单初始化改为读取模块菜单声明，替换 `auth/codes.ts` 与 `rbac.service.ts` 调用，删除 `utils/menu-bootstrap.ts`（1144 行）。
+- 步骤44：`DataScopeService` 去掉 QMS 模块名硬编码，新增通用 `buildScopedWhere()`，旧 `buildInspectionWhere/buildSupplierWhere/buildAfterSalesWhere/buildWorkOrderWhere` 保留为兼容包装。
+- 步骤45：新增 `SystemLogService.auditLog(moduleName, actionKey, params)`，业务模块审计调用改为通过模块声明解析模板、动作和 targetType，底层写入逻辑不变。
+- 步骤46：扫描 `api/` 与 `route-handlers/`，未发现 API 层直接做主数据 ID → 名称解析；现有 after-sales/quality-loss 解析均经模块 payload/service 函数处理，无需迁移。
+
+**验证结果：**
+
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec vitest run`: 32 文件 / 213 测试全部通过
+- 每个步骤提交前均执行 `pnpm run check:qms-arch`: 通过
+- 阶段结束模块 TS 文件数：227
+- 阶段结束 `git status --short | wc -l`: 0
+
+**commit:** `5fff5c25` / `92c731a4` / `41eaa19e` / `1aa93ca9` / `0ec8573d` / current commit: step46 verify master data resolution
+
+**遗留问题：**
+
+- `module-loader.ts` 当前采用显式模块注册，避免 Nitro/tsc 环境下运行时 glob 差异；新增业务模块时需要在 loader 中注册对应声明。
+- 仍保留 `recordBusinessAuditLog(event, params)` 作为带请求上下文的审计适配器；阶段十一做中间件自动审计时再统一收敛。
