@@ -1,14 +1,16 @@
 import { MasterDataGovernanceKernel } from '~/governance/master-data/master-data-governance-kernel';
 import { AfterSalesService } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept/dept.service';
-import { SystemService } from '~/modules/system';
 import { WorkOrderService } from '~/modules/work-order';
 import { addYearsToDate } from '~/modules/work-order/work-order-query';
 
+import {
+  getVehicleFailureManualData,
+  getVehicleFailureManualWarrantyData,
+  saveVehicleFailureManualPayload,
+} from './vehicle-failure-rate-manual.service';
+
 const VEHICLE_PRODUCT_TYPE = '车辆产品';
-const MANUAL_SETTING_KEY = 'QMS_VEHICLE_FAILURE_LAST_YEAR_MANUAL';
-const MANUAL_WARRANTY_SETTING_KEY =
-  'QMS_VEHICLE_FAILURE_LAST_YEAR_WARRANTY_MONTHLY_MANUAL';
 
 interface MonthWindow {
   currentEnd: Date;
@@ -50,8 +52,8 @@ export const VehicleFailureRateService = {
     const endMonth = parseEndMonth(month);
     const vehicleDeptIds = await getVehicleDeptIds();
     const windows = getMonthWindows(endMonth);
-    const manualData = await getManualData();
-    const manualWarrantyData = await getManualWarrantyData();
+    const manualData = await getVehicleFailureManualData();
+    const manualWarrantyData = await getVehicleFailureManualWarrantyData();
     const selectedYear = endMonth.getFullYear();
     const years = await getDisplayYears(
       selectedYear,
@@ -128,55 +130,9 @@ export const VehicleFailureRateService = {
     updatedBy?: string;
     warrantyVehicleCount?: number;
   }) {
-    const responsePayload: Record<string, unknown> = {
-      month: params.month,
-      success: true,
-      updatedBy: params.updatedBy,
-    };
-
-    if (params.count !== undefined) {
-      const current = await getManualData();
-      const next = {
-        ...current,
-        [params.month]: params.count,
-      };
-      await saveManualData(
-        MANUAL_SETTING_KEY,
-        next,
-        `车辆产品售后反馈去年手动数据，最近更新人：${params.updatedBy}`,
-      );
-      responsePayload.count = params.count;
-    }
-
-    if (params.warrantyVehicleCount !== undefined) {
-      const current = await getManualWarrantyData();
-      const next = {
-        ...current,
-        [params.month]: params.warrantyVehicleCount,
-      };
-      await saveManualData(
-        MANUAL_WARRANTY_SETTING_KEY,
-        next,
-        `车辆产品售后反馈去年手动再保数量，最近更新人：${params.updatedBy}`,
-      );
-      responsePayload.warrantyVehicleCount = params.warrantyVehicleCount;
-    }
-
-    return responsePayload;
+    return saveVehicleFailureManualPayload(params);
   },
 };
-
-async function saveManualData(
-  key: string,
-  value: Record<string, number>,
-  description: string,
-) {
-  await SystemService.saveSettingValue({
-    description,
-    key,
-    value: JSON.stringify(value),
-  });
-}
 
 async function buildRanking(start: Date, end: Date, vehicleDeptIds: string[]) {
   const records = await AfterSalesService.getVehicleFailureRecords({
@@ -207,38 +163,6 @@ async function buildRanking(start: Date, end: Date, vehicleDeptIds: string[]) {
     }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
-}
-
-async function getManualData(): Promise<Record<string, number>> {
-  const value = await SystemService.getSettingValue(MANUAL_SETTING_KEY);
-  if (!value) return {};
-  try {
-    const parsed = JSON.parse(value) as Record<string, unknown>;
-    return Object.fromEntries(
-      Object.entries(parsed)
-        .map(([month, count]) => [month, Number(count)] as const)
-        .filter(([, count]) => Number.isFinite(count)),
-    );
-  } catch {
-    return {};
-  }
-}
-
-async function getManualWarrantyData(): Promise<Record<string, number>> {
-  const value = await SystemService.getSettingValue(
-    MANUAL_WARRANTY_SETTING_KEY,
-  );
-  if (!value) return {};
-  try {
-    const parsed = JSON.parse(value) as Record<string, unknown>;
-    return Object.fromEntries(
-      Object.entries(parsed)
-        .map(([year, count]) => [year, Number(count)] as const)
-        .filter(([, count]) => Number.isFinite(count)),
-    );
-  } catch {
-    return {};
-  }
 }
 
 async function loadMonthlyCounts(

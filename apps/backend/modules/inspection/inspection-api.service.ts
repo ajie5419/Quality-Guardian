@@ -13,28 +13,12 @@ import {
   resolveTeamIdForWrite,
 } from '~/governance/master-data/team-resolver';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import {
-  buildImportRowError,
-  buildImportSummary,
-  inferImportErrorField,
-  toImportErrorMessage,
-} from '~/modules/file-storage/import-report';
-import { OUTSOURCING_CATEGORY } from '~/modules/supplier/supplier-query';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
-import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { WelderScoreService } from '~/modules/welder/welder-score.service';
-import { parseWorkOrderListQuery } from '~/modules/work-order/work-order-query';
 import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 
-import {
-  buildInspectionIssueCreateData,
-  buildInspectionIssueUpdateData,
-  buildInspectionIssueUpsertPayload,
-  createInspectionIssueId,
-  findInspectionForIssue,
-  getNextInspectionIssueSerialNumber,
-} from './inspection-issue';
+import { InspectionIssueMutationService } from './inspection-issue-mutation.service';
+import { InspectionPublicQueryService } from './inspection-public-query.service';
 import {
   generateInspectionRequestNo,
   INSPECTION_REQUEST_STATUS,
@@ -51,31 +35,6 @@ import {
 import { publishInspectionRequestCreated } from './inspection-request-events';
 
 type RequestBody = Record<string, unknown>;
-
-type DeptRow = { id: string; name: string; parentId: string };
-
-function collectLeafDepartments(rows: DeptRow[]) {
-  const childrenMap = new Map<string, DeptRow[]>();
-  for (const row of rows)
-    childrenMap.set(row.parentId, [
-      ...(childrenMap.get(row.parentId) || []),
-      row,
-    ]);
-  const result: DeptRow[] = [];
-  const walk = (row: DeptRow) => {
-    const children = childrenMap.get(row.id) || [];
-    if (children.length === 0) return void result.push(row);
-    for (const child of children) walk(child);
-  };
-  const productionRoots = rows.filter(
-    (row) => row.name.includes('生产') || row.name.includes('制造'),
-  );
-  if (productionRoots.length > 0) {
-    for (const root of productionRoots) walk(root);
-    return result;
-  }
-  return rows.filter((row) => (childrenMap.get(row.id) || []).length === 0);
-}
 
 export const InspectionApiService = {
   async getRequestList(userinfo: UserSession, query: Record<string, unknown>) {
@@ -399,46 +358,7 @@ export const InspectionApiService = {
     });
   },
   async createIssue(userinfo: UserSession, body: RequestBody) {
-    const sourceType = String(body.sourceType || '')
-      .trim()
-      .toUpperCase();
-    if (
-      (sourceType === 'INSPECTION' || sourceType === 'INSPECTION_RECORD') &&
-      !String(body.inspectionId || '').trim()
-    ) {
-      throw new Error(
-        'BAD_REQUEST:检验记录来源创建不合格项时必须携带 inspectionId',
-      );
-    }
-    const linkedInspection = await findInspectionForIssue(
-      body.inspectionId as string | undefined,
-    );
-    const newId = createInspectionIssueId();
-    const serialNumber = await getNextInspectionIssueSerialNumber();
-    const newRecord = await prisma.quality_records.create({
-      data: await buildInspectionIssueCreateData(body, {
-        id: newId,
-        inspection: linkedInspection,
-        inspectorUsername: userinfo.username,
-        serialNumber,
-      }),
-    });
-    await FileStorageService.registerReferencesFromAttachments({
-      attachments: body.photos,
-      bizId: String(newRecord.id),
-      bizType: 'inspection_issue',
-      fieldName: 'photos',
-    });
-    await SystemLogService.auditLog('inspection', 'issueCreate', {
-      userId: String(userinfo.id),
-      targetId: String(newRecord.id),
-      detailsVariables: {
-        nonConformanceNumber: newRecord.nonConformanceNumber || '无编号',
-        partName: newRecord.partName,
-      },
-    });
-    await WelderScoreService.syncFromInspectionIssues();
-    return { ...newRecord, ncNumber: newRecord.nonConformanceNumber };
+    return InspectionIssueMutationService.createIssue(userinfo, body);
   },
   async updateIssue(
     userinfo: UserSession,
@@ -446,202 +366,38 @@ export const InspectionApiService = {
     body: RequestBody,
     existingNcNumber: null | string,
   ) {
-    const updateData = await buildInspectionIssueUpdateData(
+    return InspectionIssueMutationService.updateIssue(
+      userinfo,
+      id,
       body,
       existingNcNumber,
     );
-    await prisma.quality_records.update({ where: { id }, data: updateData });
-    if (body.photos !== undefined) {
-      await FileStorageService.registerReferencesFromAttachments({
-        attachments: body.photos,
-        bizId: String(id),
-        bizType: 'inspection_issue',
-        fieldName: 'photos',
-      });
-    }
-    await SystemLogService.auditLog('inspection', 'issueUpdate', {
-      userId: String(userinfo.id),
-      targetId: String(id),
-      detailsVariables: {
-        nonConformanceNumber:
-          updateData.nonConformanceNumber || existingNcNumber || '无编号',
-        partName: updateData.partName || '未修改名称',
-      },
-    });
-    await WelderScoreService.syncFromInspectionIssues();
   },
   async batchDeleteIssues(
     event: Parameters<typeof recordBusinessAuditLog>[0],
     userinfo: UserSession,
     ids: string[],
   ) {
-    const result = await prisma.quality_records.updateMany({
-      where: { id: { in: ids } },
-      data: { isDeleted: true, updatedAt: new Date() },
-    });
-    if (result.count > 0) await WelderScoreService.syncFromInspectionIssues();
-    await Promise.all(
-      ids.map((id) =>
-        FileStorageService.softDeleteReferences({
-          bizId: id,
-          bizType: 'inspection_issue',
-        }),
-      ),
+    return InspectionIssueMutationService.batchDeleteIssues(
+      event,
+      userinfo,
+      ids,
     );
-    await recordBusinessAuditLog(event, {
-      userId: userinfo.id,
-      action: 'DELETE',
-      targetType: 'inspection_issue',
-      targetId: ids.join(','),
-      detailsTemplate: '批量删除不合格品项: {{count}} 条',
-      detailsVariables: { count: result.count },
-    });
-    return result.count;
   },
   async importIssues(
     event: Parameters<typeof recordBusinessAuditLog>[0],
     userinfo: UserSession,
     items: Array<Record<string, unknown>>,
   ) {
-    let successCount = 0;
-    const rowErrors = [];
-    let serialSeed = await getNextInspectionIssueSerialNumber();
-    for (const [index, item] of items.entries()) {
-      try {
-        const payload = await buildInspectionIssueUpsertPayload(
-          item,
-          serialSeed,
-        );
-        if (!payload) {
-          rowErrors.push(
-            buildImportRowError({
-              field: 'workOrderNumber',
-              item,
-              keyField: 'ncNumber',
-              reason: '缺少有效的工单号',
-              row: index + 1,
-              suggestion: '请填写可关联的工单号',
-            }),
-          );
-          continue;
-        }
-        serialSeed++;
-        await prisma.quality_records.upsert(payload);
-        successCount++;
-      } catch (error) {
-        const message = toImportErrorMessage(error);
-        rowErrors.push(
-          buildImportRowError({
-            field: inferImportErrorField(message),
-            item,
-            keyField: 'ncNumber',
-            reason: message,
-            row: index + 1,
-          }),
-        );
-      }
-    }
-    if (successCount > 0) await WelderScoreService.syncFromInspectionIssues();
-    await recordBusinessAuditLog(event, {
-      userId: userinfo.id,
-      action: 'CREATE',
-      targetType: 'inspection_issue',
-      targetId: 'batch-import',
-      detailsTemplate: '导入不合格品项: {{successCount}}/{{totalCount}} 条',
-      detailsVariables: { successCount, totalCount: items.length },
-    });
-    return buildImportSummary({
-      rowErrors,
-      successCount,
-      totalCount: items.length,
-    });
+    return InspectionIssueMutationService.importIssues(event, userinfo, items);
   },
   async getPublicProcesses(workOrderNumber: string) {
-    const list = await prisma.work_order_requirements.findMany({
-      where: { isDeleted: false, status: 'active', workOrderNumber },
-      orderBy: [{ updatedAt: 'desc' }],
-      select: { process: { select: { name: true } }, processName: true },
-    });
-    return [
-      ...new Set(
-        list.map((item) => resolveCanonicalProcessName(item)).filter(Boolean),
-      ),
-    ].map((processName) => ({ processName }));
+    return InspectionPublicQueryService.getPublicProcesses(workOrderNumber);
   },
   async getPublicTeams(keyword: string) {
-    const [departments, suppliers] = await Promise.all([
-      prisma.departments.findMany({
-        where: { isDeleted: false, status: 1 },
-        orderBy: { sort: 'asc' },
-        select: { id: true, name: true, parentId: true },
-      }),
-      prisma.suppliers.findMany({
-        where: {
-          category: OUTSOURCING_CATEGORY,
-          isDeleted: false,
-          ...(keyword ? { name: { contains: keyword } } : {}),
-        },
-        orderBy: { name: 'asc' },
-        take: 100,
-        select: { name: true },
-      }),
-    ]);
-    const internalTeams = collectLeafDepartments(departments)
-      .filter((item) => !keyword || item.name.includes(keyword))
-      .map((item) => ({
-        group: 'internal' as const,
-        label: item.name,
-        value: item.name,
-      }));
-    const externalTeams = suppliers.map((item) => ({
-      group: 'external' as const,
-      label: item.name,
-      value: item.name,
-    }));
-    return [...internalTeams, ...externalTeams];
+    return InspectionPublicQueryService.getPublicTeams(keyword);
   },
   async getPublicWorkOrders(query: Record<string, unknown>) {
-    const params = parseWorkOrderListQuery({
-      ...query,
-      ignoreYearFilter: true,
-      pageSize: query.pageSize || 20,
-    });
-    const where: Record<string, unknown> = { isDeleted: false };
-    if (params.keyword) {
-      where.OR = [
-        { workOrderNumber: { contains: params.keyword } },
-        { projectName: { contains: params.keyword } },
-      ];
-    } else if (params.workOrderNumber) {
-      where.workOrderNumber = { contains: params.workOrderNumber };
-    }
-    const [items, total] = await Promise.all([
-      prisma.work_orders.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (params.page - 1) * params.pageSize,
-        take: params.pageSize,
-        select: {
-          projectName: true,
-          quantity: true,
-          status: true,
-          workOrderNumber: true,
-        },
-      }),
-      prisma.work_orders.count({ where }),
-    ]);
-    return {
-      items: items.map((item) => ({
-        createTime: null,
-        customerName: null,
-        deliveryDate: null,
-        id: item.workOrderNumber,
-        projectName: item.projectName || null,
-        quantity: item.quantity || 0,
-        status: item.status,
-        workOrderNumber: item.workOrderNumber,
-      })),
-      total,
-    };
+    return InspectionPublicQueryService.getPublicWorkOrders(query);
   },
 };

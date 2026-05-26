@@ -1,11 +1,9 @@
 import type { Prisma } from '@prisma/client';
 
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/governance/master-data/master-data-governance-write';
+import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import prisma from '~/utils/prisma';
 
+import { MetrologyImportService } from './metrology-import.service';
 import {
   calculateRemainingDays,
   deriveMetrologyInspectionStatus,
@@ -15,6 +13,7 @@ import {
   normalizeMetrologyBorrowStatus,
   startOfToday,
 } from './metrology-status';
+import { getMetrologyTemplateRows } from './metrology-template';
 
 interface MetrologyListParams {
   inspectionStatus?: string;
@@ -29,10 +28,6 @@ interface MetrologyListParams {
   usingUnit?: string;
   validFrom?: string;
   validTo?: string;
-}
-
-interface MetrologyImportRow {
-  [key: string]: unknown;
 }
 
 interface MetrologyMutationPayload {
@@ -60,26 +55,6 @@ const METROLOGY_SORT_FIELDS: Record<string, MeasuringInstrumentOrderByInput> = {
   validUntil: { validUntil: 'asc' },
 };
 
-function normalizeKey(value: unknown) {
-  return String(value ?? '')
-    .replaceAll(/\s+/g, '')
-    .trim()
-    .toLowerCase();
-}
-
-function pickRowValue(row: MetrologyImportRow, candidates: string[]) {
-  const entries = Object.entries(row || {});
-  for (const candidate of candidates) {
-    const matched = entries.find(
-      ([key]) => normalizeKey(key) === normalizeKey(candidate),
-    );
-    if (matched) {
-      return matched[1];
-    }
-  }
-  return undefined;
-}
-
 function parseOrderNo(value: unknown) {
   const text = String(value ?? '').trim();
   if (!text) return null;
@@ -87,11 +62,6 @@ function parseOrderNo(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/**
- * Excel stores date cells as serial numbers in many export files.
- * We must accept both human-readable strings and Excel serial values here,
- * otherwise batch import rejects valid rows as malformed dates.
- */
 function parseExcelSerialDate(value: number) {
   if (!Number.isFinite(value) || value <= 0) {
     return null;
@@ -241,48 +211,6 @@ function buildQueryWhere(
   }
 
   return where;
-}
-
-function mapImportRow(row: MetrologyImportRow) {
-  const values = Object.values(row || {});
-  const instrumentName = String(
-    pickRowValue(row, ['量具名称', 'instrumentName']) ?? values[1] ?? '',
-  ).trim();
-  const instrumentCode = String(
-    pickRowValue(row, ['编号', 'instrumentCode']) ?? values[2] ?? '',
-  ).trim();
-  const model = String(
-    pickRowValue(row, ['型号', 'model']) ?? values[3] ?? '',
-  ).trim();
-  const usingUnit = String(
-    pickRowValue(row, ['使用单位', 'usingUnit']) ?? values[4] ?? '',
-  ).trim();
-  const validUntilValue =
-    pickRowValue(row, ['有效期', 'validUntil']) ?? values[5] ?? '';
-  const inspectionStatusValue =
-    pickRowValue(row, ['检验状态', 'inspectionStatus']) ?? values[6] ?? '';
-  const orderNoValue =
-    pickRowValue(row, ['序号', 'orderNo']) ?? values[0] ?? '';
-
-  if (!instrumentName && !instrumentCode && !model && !usingUnit) {
-    return null;
-  }
-
-  if (instrumentName === '量具名称' && instrumentCode === '编号') {
-    return null;
-  }
-
-  const parsedDate = parseDateValue(validUntilValue);
-
-  return {
-    instrumentCode,
-    instrumentName,
-    inspectionStatusValue,
-    model,
-    orderNo: parseOrderNo(orderNoValue),
-    parsedDate,
-    usingUnit,
-  };
 }
 
 function buildWhere(params: MetrologyListParams) {
@@ -522,92 +450,7 @@ export const MetrologyService = {
   },
 
   async importItems(items: unknown[], username?: string, fileName?: string) {
-    const rows = Array.isArray(items) ? items : [];
-    const seenCodes = new Set<string>();
-    const errors: Array<{ reason: string; row: number }> = [];
-    let successCount = 0;
-
-    for (const [index, rawRow] of rows.entries()) {
-      const rowNumber = index + 2;
-      const mapped = mapImportRow((rawRow || {}) as MetrologyImportRow);
-      if (!mapped) {
-        continue;
-      }
-
-      if (!mapped.instrumentName) {
-        errors.push({ row: rowNumber, reason: '量具名称不能为空' });
-        continue;
-      }
-      if (!mapped.instrumentCode) {
-        errors.push({ row: rowNumber, reason: '编号不能为空' });
-        continue;
-      }
-      if (seenCodes.has(mapped.instrumentCode)) {
-        errors.push({ row: rowNumber, reason: '同一文件中编号重复' });
-        continue;
-      }
-      seenCodes.add(mapped.instrumentCode);
-
-      if (mapped.parsedDate.error) {
-        errors.push({ row: rowNumber, reason: mapped.parsedDate.error });
-        continue;
-      }
-
-      const normalizedStatus = deriveMetrologyInspectionStatus(
-        undefined,
-        mapped.parsedDate.date,
-      );
-      const governedFields = buildGovernedWriteFieldsForTable(
-        'measuring_instruments',
-        {
-          instrumentName: mapped.instrumentName,
-        },
-      );
-      const governedInstrumentName =
-        governedFields.instrumentName || mapped.instrumentName;
-      const governedCanonicalIds =
-        await buildGovernedCanonicalWritePairForTable('measuring_instruments', {
-          instrumentName: governedInstrumentName,
-        });
-
-      await prisma.measuring_instruments.upsert({
-        where: { instrumentCode: mapped.instrumentCode },
-        update: {
-          isDeleted: false,
-          inspectionStatus: normalizedStatus,
-          instrumentName: governedInstrumentName, // governance-allow-direct-name-id
-          ...governedCanonicalIds,
-          model: mapped.model || null,
-          orderNo: mapped.orderNo,
-          sourceFileName: fileName || null,
-          updatedBy: username || null,
-          usingUnit: mapped.usingUnit || null,
-          validUntil: mapped.parsedDate.date,
-        },
-        create: {
-          inspectionStatus: normalizedStatus,
-          instrumentCode: mapped.instrumentCode,
-          instrumentName: governedInstrumentName, // governance-allow-direct-name-id
-          ...governedCanonicalIds,
-          model: mapped.model || null,
-          orderNo: mapped.orderNo,
-          sourceFileName: fileName || null,
-          createdBy: username || null,
-          updatedBy: username || null,
-          usingUnit: mapped.usingUnit || null,
-          validUntil: mapped.parsedDate.date,
-        },
-      });
-      successCount += 1;
-    }
-
-    return {
-      errorCount: errors.length,
-      errors,
-      failedCount: errors.length,
-      successCount,
-      totalCount: rows.length,
-    };
+    return MetrologyImportService.importItems(items, username, fileName);
   },
 
   async updateById(
@@ -623,17 +466,7 @@ export const MetrologyService = {
   },
 
   getTemplateRows() {
-    return [
-      {
-        序号: 1,
-        量具名称: '游标卡尺',
-        编号: 'JL-001',
-        型号: '0-150mm',
-        使用单位: '结构BU1',
-        有效期: '2026-12-31',
-        检验状态: '在检',
-      },
-    ];
+    return getMetrologyTemplateRows();
   },
 
   buildMutationPayload(body: MetrologyMutationPayload) {
