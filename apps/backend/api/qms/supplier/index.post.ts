@@ -1,8 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { SupplierService } from '~/modules/supplier/supplier.service';
+import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
-import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaUniqueConstraintError } from '~/utils/db-error';
 import {

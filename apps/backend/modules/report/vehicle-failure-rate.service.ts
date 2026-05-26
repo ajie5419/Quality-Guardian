@@ -1,9 +1,9 @@
+import { MasterDataGovernanceKernel } from '~/governance/master-data/master-data-governance-kernel';
 import { AfterSalesService } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept/dept.service';
 import { SystemService } from '~/modules/system';
 import { WorkOrderService } from '~/modules/work-order';
-import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
-import { addYearsToDate } from '~/utils/work-order';
+import { addYearsToDate } from '~/modules/work-order/work-order-query';
 
 const VEHICLE_PRODUCT_TYPE = '车辆产品';
 const MANUAL_SETTING_KEY = 'QMS_VEHICLE_FAILURE_LAST_YEAR_MANUAL';

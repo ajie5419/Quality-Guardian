@@ -24,7 +24,7 @@ vi.mock('../../utils/prisma', () => ({
   },
 }));
 
-vi.mock('../../utils/master-data-governance-kernel', () => ({
+vi.mock('../../governance/master-data/master-data-governance-kernel', () => ({
   MasterDataGovernanceKernel: {
     resolveCanonicalIdsByNames: vi.fn().mockResolvedValue(new Map()),
   },

@@ -16,13 +16,13 @@ import {
   tryParsePhotos,
 } from '@qgs/shared';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import { flattenDeptTree } from '~/modules/dept/dept-tree';
 import { DeptService } from '~/modules/dept/dept.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { toAfterSalesClaimStatus } from '~/modules/quality-loss/quality-loss-status';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { flattenDeptTree } from '~/utils/dept-tree';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import { toAfterSalesClaimStatus } from '~/utils/quality-loss-status';
 
 import { buildGovernedAfterSalesUpdateData } from './after-sales-payload';
 import { buildAfterSalesDateRange } from './after-sales-query';

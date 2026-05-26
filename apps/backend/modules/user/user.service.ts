@@ -2,10 +2,10 @@ import { randomBytes } from 'node:crypto';
 
 import { createId } from '@paralleldrive/cuid2';
 import bcrypt from 'bcrypt';
+import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import { RbacService } from '~/modules/rbac/rbac.service';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
+import { getDefaultResetPassword } from '~/modules/user/user-security';
 import prisma from '~/utils/prisma';
-import { getDefaultResetPassword } from '~/utils/user-security';
 
 export interface UserQueryParams {
   page?: number;

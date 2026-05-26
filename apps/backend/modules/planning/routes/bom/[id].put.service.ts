@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3';
 
+import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import {
   buildProjectBomMutableData,
   mapProjectBomItem,
@@ -7,7 +8,6 @@ import {
 } from '~/modules/planning/bom';
 import { logApiError } from '~/utils/api-logger';
 import { awaitMockDelay } from '~/utils/index';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import { getRequiredRouterParam } from '~/utils/route-param';

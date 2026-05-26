@@ -1,16 +1,16 @@
-import type { PassRateSource } from '~/utils/pass-rate';
+import type { PassRateSource } from '~/modules/report/pass-rate';
 
 import {
   resolveReportPeriodRangeFromLabel,
   resolveReportWeekNumber,
 } from '@qgs/shared';
 import { defineEventHandler, getQuery } from 'h3';
-import { logApiError } from '~/utils/api-logger';
 import {
   createPassRateTargetResolver,
   getNetPassRateSummaryByRange,
   getPassRateDrillDownByRange,
-} from '~/utils/pass-rate';
+} from '~/modules/report/pass-rate';
+import { logApiError } from '~/utils/api-logger';
 import {
   internalServerErrorResponse,
   useResponseSuccess,

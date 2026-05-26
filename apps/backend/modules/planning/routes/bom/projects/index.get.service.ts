@@ -4,9 +4,9 @@ import {
   normalizeBomProjectStatus,
   normalizeBomProjectVersion,
 } from '~/modules/planning/bom';
+import { getMetadata } from '~/modules/system/metadata';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { getMetadata } from '~/utils/metadata';
 import prisma from '~/utils/prisma';
 
 export async function bom_projects_index_get(event: H3Event) {

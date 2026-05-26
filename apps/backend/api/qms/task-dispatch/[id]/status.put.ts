@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { normalizeTaskDispatchStatus } from '~/modules/task-dispatch/task-dispatch-rules';
 import { TaskDispatchService } from '~/modules/task-dispatch/task-dispatch.service';
 import { logApiError } from '~/utils/api-logger';
 import {
@@ -8,7 +9,6 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
-import { normalizeTaskDispatchStatus } from '~/utils/task-dispatch';
 
 const bodySchema = z.object({ status: z.unknown().optional() });
 

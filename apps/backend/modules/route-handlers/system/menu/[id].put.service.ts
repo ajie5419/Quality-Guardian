@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { RbacService } from '~/modules/rbac/rbac.service';
+import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
@@ -10,7 +11,6 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
-import { requireSystemAdmin } from '~/utils/system-auth';
 
 const schema = z.object({
   component: z.string().optional(),

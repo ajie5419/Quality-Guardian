@@ -1,8 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { MetrologyService } from '~/modules/metrology/metrology.service';
+import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
-import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {

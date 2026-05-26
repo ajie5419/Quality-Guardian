@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { defineEventHandler, readBody, setResponseStatus } from 'h3';
 import { nanoid } from 'nanoid';
-import { callAi, extractJson } from '~/utils/ai';
+import { callAi, extractJson } from '~/modules/ai/ai';
 import { logApiError } from '~/utils/api-logger';
 import { UPLOAD_DIR } from '~/utils/paths';
 import {

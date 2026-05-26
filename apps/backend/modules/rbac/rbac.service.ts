@@ -1,10 +1,10 @@
 import { createId } from '@paralleldrive/cuid2';
-import { ensureModuleMenus } from '~/utils/module-loader';
-import prisma from '~/utils/prisma';
 import {
   isRbacReadV2Enabled,
   isRbacSuperMergeAllCodesEnabled,
-} from '~/utils/rbac-config';
+} from '~/modules/rbac/rbac-config';
+import { ensureModuleMenus } from '~/utils/module-loader';
+import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 import { useResponseSuccess } from '~/utils/response';
 

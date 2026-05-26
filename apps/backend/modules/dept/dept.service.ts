@@ -1,7 +1,7 @@
-import type { DeptTreeNode } from '~/utils/dept-tree';
+import type { DeptTreeNode } from '~/modules/dept/dept-tree';
 
 import { createId } from '@paralleldrive/cuid2';
-import { buildDeptTree } from '~/utils/dept-tree';
+import { buildDeptTree } from '~/modules/dept/dept-tree';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 

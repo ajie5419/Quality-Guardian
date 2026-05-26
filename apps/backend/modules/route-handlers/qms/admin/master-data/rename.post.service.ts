@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import {
@@ -6,7 +7,6 @@ import {
   conflictResponse,
   internalServerErrorResponse,
 } from '~/utils/response';
-import { requireSystemAdmin } from '~/utils/system-auth';
 
 interface RenameRequestBody {
   configKey?: string;

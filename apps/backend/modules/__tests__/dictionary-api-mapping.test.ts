@@ -72,7 +72,7 @@ vi.mock('~/modules/dictionary/dictionary.service', () => ({
   },
 }));
 
-vi.mock('~/utils/system-auth', () => ({
+vi.mock('~/modules/user/system-auth', () => ({
   requireSystemAdmin: mockRequireSystemAdmin,
 }));
 

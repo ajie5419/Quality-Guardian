@@ -1,6 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
+import { isProcessPassRateTargetKey } from '~/modules/report/pass-rate-process';
 import { logApiError } from '~/utils/api-logger';
-import { isProcessPassRateTargetKey } from '~/utils/pass-rate-process';
 import prisma from '~/utils/prisma';
 import {
   badRequestResponse,

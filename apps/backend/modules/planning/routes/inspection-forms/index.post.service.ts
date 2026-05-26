@@ -1,12 +1,12 @@
 import type { H3Event } from 'h3';
 
+import { resolveProcessIdForWrite } from '~/governance/master-data/process-resolver';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { buildInspectionFormProcessFilter } from '~/modules/inspection/inspection-form';
 import { logApiError } from '~/utils/api-logger';
-import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
-import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 
 export async function inspection_forms_index_post(event: H3Event) {

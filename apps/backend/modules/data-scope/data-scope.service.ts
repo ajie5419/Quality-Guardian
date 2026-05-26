@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
+import { isDataScopeV2Enabled } from '~/modules/rbac/rbac-config';
 import { getDataScopeConfig } from '~/utils/module-loader';
 import prisma from '~/utils/prisma';
-import { isDataScopeV2Enabled } from '~/utils/rbac-config';
 
 export type DataScopeType = 'ALL' | 'DEPT' | 'SELF';
 

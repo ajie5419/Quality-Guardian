@@ -1,31 +1,31 @@
 import type { UserSession } from '~/utils/jwt-utils';
 
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/governance/master-data/master-data-governance-write';
+import {
+  resolveCanonicalProcessName,
+  resolveProcessIdForWrite,
+} from '~/governance/master-data/process-resolver';
+import {
+  buildTeamContainsWhere,
+  resolveTeamIdForWrite,
+} from '~/governance/master-data/team-resolver';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { WelderScoreService } from '~/modules/welder/welder-score.service';
-import { recordBusinessAuditLog } from '~/utils/audit-log';
-import { BusinessError } from '~/utils/business-error';
 import {
   buildImportRowError,
   buildImportSummary,
   inferImportErrorField,
   toImportErrorMessage,
-} from '~/utils/import-report';
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
+} from '~/modules/file-storage/import-report';
+import { OUTSOURCING_CATEGORY } from '~/modules/supplier/supplier-query';
+import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
+import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { WelderScoreService } from '~/modules/welder/welder-score.service';
+import { parseWorkOrderListQuery } from '~/modules/work-order/work-order-query';
+import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
-import {
-  resolveCanonicalProcessName,
-  resolveProcessIdForWrite,
-} from '~/utils/process-resolver';
-import { OUTSOURCING_CATEGORY } from '~/utils/supplier';
-import {
-  buildTeamContainsWhere,
-  resolveTeamIdForWrite,
-} from '~/utils/team-resolver';
-import { parseWorkOrderListQuery } from '~/utils/work-order';
 
 import {
   buildInspectionIssueCreateData,

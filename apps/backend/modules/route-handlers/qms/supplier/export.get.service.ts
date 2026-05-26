@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseSupplierListQuery } from '~/modules/supplier/supplier-query';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { logApiDebug, logApiError, logApiWarn } from '~/utils/api-logger';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
@@ -7,7 +8,6 @@ import {
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import { parseSupplierListQuery } from '~/utils/supplier';
 
 const MAX_EXPORT_ROWS = 20_000;
 const querySchema = z.object({}).passthrough();

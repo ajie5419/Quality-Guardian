@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
-import { callAi, extractJson } from '~/utils/ai';
+import { callAi, extractJson } from '~/modules/ai/ai';
 import { logApiError } from '~/utils/api-logger';
 import {
   internalServerErrorResponse,

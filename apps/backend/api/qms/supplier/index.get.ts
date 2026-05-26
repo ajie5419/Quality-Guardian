@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseSupplierListQuery } from '~/modules/supplier/supplier-query';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
@@ -7,7 +8,6 @@ import {
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import { parseSupplierListQuery } from '~/utils/supplier';
 
 const supplierListQuerySchema = z.object({}).passthrough();
 

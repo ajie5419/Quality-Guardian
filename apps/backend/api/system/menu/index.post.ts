@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { RbacService } from '~/modules/rbac/rbac.service';
+import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaUniqueConstraintError } from '~/utils/db-error';
@@ -9,7 +10,6 @@ import {
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import { requireSystemAdmin } from '~/utils/system-auth';
 
 const schema = z.object({
   name: z.string().trim().min(1),

@@ -1,7 +1,6 @@
 import { extractAiJson } from '@qgs/shared';
-
-import prisma from './prisma';
-import { AI_SETTINGS } from './system-data';
+import { AI_SETTINGS } from '~/modules/system/system-data';
+import prisma from '~/utils/prisma';
 
 export interface AiMessage {
   role: 'assistant' | 'system' | 'user';

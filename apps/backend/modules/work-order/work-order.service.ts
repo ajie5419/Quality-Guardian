@@ -11,10 +11,10 @@ import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service'
 import { Prisma } from '@prisma/client';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { WorkOrderRequirementService } from '~/modules/work-order-requirement';
+import { addYearsToDate } from '~/modules/work-order/work-order-query';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { formatDateString } from '~/utils/query-helpers';
-import { addYearsToDate } from '~/utils/work-order';
 
 import { mapToDisplayStatus, WORK_ORDER_STATUS } from './work-order-status';
 

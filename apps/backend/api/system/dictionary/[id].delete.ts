@@ -1,5 +1,6 @@
 import { defineEventHandler } from 'h3';
 import { DictionaryService } from '~/modules/dictionary/dictionary.service';
+import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
 import {
   businessErrorResponse,
@@ -11,7 +12,6 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
-import { requireSystemAdmin } from '~/utils/system-auth';
 
 export default defineEventHandler(async (event) => {
   const userinfo = getCurrentUser(event);

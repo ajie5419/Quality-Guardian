@@ -15,9 +15,9 @@ import {
   parseInspectionRequestPriority as parseInspectionRequestPriorityRule,
   parseInspectionRequestQuantity as parseInspectionRequestQuantityRule,
 } from '@qgs/shared';
+import { resolveCanonicalProcessName } from '~/governance/master-data/process-resolver';
 import { InspectionService } from '~/modules/inspection/inspection.service';
-import { resolveCanonicalProcessName } from '~/utils/process-resolver';
-import { resolveTaskDispatchCurrentUserId } from '~/utils/task-dispatch';
+import { resolveTaskDispatchCurrentUserId } from '~/modules/task-dispatch/task-dispatch-rules';
 
 export { INSPECTION_REQUEST_STATUS, isInspectionRequestAssemblyProcess };
 

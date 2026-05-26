@@ -6,22 +6,22 @@ import {
   resolveReportShortLabel,
   shiftReportAnchorDate,
 } from '@qgs/shared';
+import { MasterDataGovernanceKernel } from '~/governance/master-data/master-data-governance-kernel';
+import { resolveCanonicalProcessName } from '~/governance/master-data/process-resolver';
 import { AfterSalesService } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
-import { QualityLossService } from '~/modules/quality-loss';
-import { VehicleCommissioningDailyReportStorageService } from '~/modules/vehicle-commissioning/daily-report-storage.service';
 import {
   resolveInspectionFormProcess,
   resolveInspectionFormProcessCandidates,
-} from '~/utils/inspection-form';
-import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
+} from '~/modules/inspection/inspection-form';
+import { QualityLossService } from '~/modules/quality-loss';
 import {
   createPassRateTargetResolver,
   getNetPassRateSummaryByRange,
   getPassRateDrillDownByRange,
-} from '~/utils/pass-rate';
+} from '~/modules/report/pass-rate';
+import { VehicleCommissioningDailyReportStorageService } from '~/modules/vehicle-commissioning/daily-report-storage.service';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
-import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import {
   formatReportDate,

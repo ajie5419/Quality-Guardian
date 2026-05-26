@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
+} from '~/governance/master-data/master-data-governance-write';
 import prisma from '~/utils/prisma';
 
 import {

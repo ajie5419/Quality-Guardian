@@ -1,14 +1,14 @@
 import { QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import { SystemLogService } from '~/modules/system-log/system-log.service';
 import {
   buildImportRowError,
   buildImportSummary,
   inferImportErrorField,
   toImportErrorMessage,
-} from '~/utils/import-report';
+} from '~/modules/file-storage/import-report';
+import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { parseRequiredWorkOrderNumber } from '~/modules/work-order/work-order-query';
 import prisma from '~/utils/prisma';
-import { parseRequiredWorkOrderNumber } from '~/utils/work-order';
 
 import {
   createAfterSalesId,

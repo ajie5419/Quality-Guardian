@@ -2,7 +2,7 @@ import {
   IN_HOUSE_OUTSOURCING_MODE,
   isOutsourcingCategory,
   normalizeOutsourcingMode,
-} from '~/utils/supplier';
+} from '~/modules/supplier/supplier-query';
 
 const THRESHOLD_CLASS_A_AMOUNT = 5000;
 const THRESHOLD_CRITICAL_AMOUNT = 80_000;

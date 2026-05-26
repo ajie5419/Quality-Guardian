@@ -6,28 +6,28 @@ import type {
   QualityLossParams,
   QualityLossServiceTrendItem,
 } from '@qgs/shared';
-import type { QualityLossSource } from '~/utils/quality-loss-status';
+import type { QualityLossSource } from '~/modules/quality-loss/quality-loss-status';
 import type { PaginationParams } from '~/utils/query-helpers';
 
 import { Prisma } from '@prisma/client';
 import { resolveQualityLossTargetLocator } from '@qgs/shared';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import { flattenDeptTree } from '~/modules/dept/dept-tree';
 import { DeptService } from '~/modules/dept/dept.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { MONTHS } from '~/modules/quality-loss/locale';
-import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
-import { flattenDeptTree } from '~/utils/dept-tree';
-import { createModuleLogger } from '~/utils/logger';
-import prisma from '~/utils/prisma';
-import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   normalizeQualityLossSource,
   normalizeQualityLossStatus,
   QUALITY_LOSS_SOURCE,
   toQualityLossTargetType,
-} from '~/utils/quality-loss-status';
+} from '~/modules/quality-loss/quality-loss-status';
+import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
+import { createModuleLogger } from '~/utils/logger';
+import prisma from '~/utils/prisma';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   formatDateString,
   formatNumber,

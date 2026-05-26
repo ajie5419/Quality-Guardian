@@ -1,8 +1,8 @@
 import type { Prisma } from '@prisma/client';
-import type { QualityLossSource } from '~/utils/quality-loss-status';
+import type { QualityLossSource } from '~/modules/quality-loss/quality-loss-status';
 
 import { resolveQualityLossTargetLocator } from '@qgs/shared';
-import { QUALITY_LOSS_SOURCE } from '~/utils/quality-loss-status';
+import { QUALITY_LOSS_SOURCE } from '~/modules/quality-loss/quality-loss-status';
 
 type SourceLookupClient = {
   after_sales: {

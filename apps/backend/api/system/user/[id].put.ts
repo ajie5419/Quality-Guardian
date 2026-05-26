@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { UserService } from '~/modules/user/user.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
@@ -13,7 +14,6 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
-import { requireSystemAdmin } from '~/utils/system-auth';
 
 export default defineEventHandler(async (event) => {
   const userinfo = getCurrentUser(event);

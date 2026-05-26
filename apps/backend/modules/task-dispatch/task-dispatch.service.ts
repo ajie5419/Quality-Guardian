@@ -1,5 +1,4 @@
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
-import prisma from '~/utils/prisma';
+import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import {
   buildTaskDispatchCreateData,
   getTaskDispatchArchiveFilter,
@@ -9,7 +8,8 @@ import {
   resolveTaskDispatchParentIdForPromotion,
   resolveTaskDispatchStatusFilter,
   TASK_DISPATCH_STATUS,
-} from '~/utils/task-dispatch';
+} from '~/modules/task-dispatch/task-dispatch-rules';
+import prisma from '~/utils/prisma';
 
 export function getTaskDispatchErrorMessage(message: string) {
   if (message === 'CURRENT_USER_NOT_FOUND') return '无法识别当前操作人身份';

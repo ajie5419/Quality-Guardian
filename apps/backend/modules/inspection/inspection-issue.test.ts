@@ -10,14 +10,14 @@ vi.mock('~/utils/prisma', () => ({
   default: {},
 }));
 
-vi.mock('~/utils/process-resolver', () => ({
+vi.mock('~/governance/master-data/process-resolver', () => ({
   resolveProcessIdForWrite: vi.fn(),
 }));
 
-vi.mock('~/utils/master-data-governance-write', async () => {
+vi.mock('~/governance/master-data/master-data-governance-write', async () => {
   const actual = await vi.importActual<
-    typeof import('~/utils/master-data-governance-write')
-  >('~/utils/master-data-governance-write');
+    typeof import('~/governance/master-data/master-data-governance-write')
+  >('~/governance/master-data/master-data-governance-write');
   return {
     ...actual,
     buildGovernedCanonicalWritePairForTable: vi.fn(async () => ({})),
@@ -31,7 +31,7 @@ describe('inspection-issue processId dual write', () => {
 
   it('injects processId into create payload from processName', async () => {
     const { resolveProcessIdForWrite } = await import(
-      '~/utils/process-resolver'
+      '~/governance/master-data/process-resolver'
     );
     vi.mocked(resolveProcessIdForWrite).mockResolvedValue('process-weld');
 
@@ -62,7 +62,7 @@ describe('inspection-issue processId dual write', () => {
 
   it('injects processId into update payload when processName is provided', async () => {
     const { resolveProcessIdForWrite } = await import(
-      '~/utils/process-resolver'
+      '~/governance/master-data/process-resolver'
     );
     vi.mocked(resolveProcessIdForWrite).mockResolvedValue('process-paint');
 
@@ -85,7 +85,7 @@ describe('inspection-issue processId dual write', () => {
 
   it('injects processId into upsert payload when processName is provided', async () => {
     const { resolveProcessIdForWrite } = await import(
-      '~/utils/process-resolver'
+      '~/governance/master-data/process-resolver'
     );
     vi.mocked(resolveProcessIdForWrite).mockResolvedValue('process-assemble');
 
@@ -117,7 +117,7 @@ describe('inspection-issue processId dual write', () => {
 
   it('normalizes wave1 governed fields in upsert payload', async () => {
     const { resolveProcessIdForWrite } = await import(
-      '~/utils/process-resolver'
+      '~/governance/master-data/process-resolver'
     );
     vi.mocked(resolveProcessIdForWrite).mockResolvedValue(null);
 
@@ -148,10 +148,10 @@ describe('inspection-issue processId dual write', () => {
 
   it('writes canonical ids for defect fields when governance kernel resolves', async () => {
     const { resolveProcessIdForWrite } = await import(
-      '~/utils/process-resolver'
+      '~/governance/master-data/process-resolver'
     );
     const { buildGovernedCanonicalWritePairForTable } = await import(
-      '~/utils/master-data-governance-write'
+      '~/governance/master-data/master-data-governance-write'
     );
     vi.mocked(resolveProcessIdForWrite).mockResolvedValue(null);
     vi.mocked(buildGovernedCanonicalWritePairForTable).mockResolvedValue({
@@ -176,10 +176,10 @@ describe('inspection-issue processId dual write', () => {
 
   it('writes rootCauseId into quality record payloads when governance helper resolves', async () => {
     const { resolveProcessIdForWrite } = await import(
-      '~/utils/process-resolver'
+      '~/governance/master-data/process-resolver'
     );
     const { buildGovernedCanonicalWritePairForTable } = await import(
-      '~/utils/master-data-governance-write'
+      '~/governance/master-data/master-data-governance-write'
     );
     vi.mocked(resolveProcessIdForWrite).mockResolvedValue(null);
     vi.mocked(buildGovernedCanonicalWritePairForTable).mockResolvedValue({

@@ -6,9 +6,9 @@ import {
 } from '@qgs/shared';
 import { AfterSalesService } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept';
+import { flattenDeptTree } from '~/modules/dept/dept-tree';
 import { InspectionService } from '~/modules/inspection';
 import { QualityLossService } from '~/modules/quality-loss';
-import { flattenDeptTree } from '~/utils/dept-tree';
 import { createModuleLogger } from '~/utils/logger';
 
 const logger = createModuleLogger('ReportService');

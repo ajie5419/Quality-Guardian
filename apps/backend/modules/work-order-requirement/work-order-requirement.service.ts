@@ -1,8 +1,8 @@
 import { Prisma } from '@prisma/client';
+import { resolveCanonicalProcessName } from '~/governance/master-data/process-resolver';
 import { FileStorageService } from '~/modules/file-storage';
 import { buildWorkOrderWhereCondition } from '~/modules/work-order/work-order.service';
 import prisma from '~/utils/prisma';
-import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import { buildRequirementSummaryMap } from './work-order-requirement-summary';
 

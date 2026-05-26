@@ -1,4 +1,4 @@
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
+import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import prisma from '~/utils/prisma';
 
 interface PlanningProjectRecord {

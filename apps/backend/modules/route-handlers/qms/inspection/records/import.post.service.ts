@@ -1,12 +1,12 @@
 import { defineEventHandler, readBody } from 'h3';
-import { InspectionService } from '~/modules/inspection/inspection.service';
-import { logApiError } from '~/utils/api-logger';
 import {
   buildImportRowError,
   buildImportSummary,
   inferImportErrorField,
   toImportErrorMessage,
-} from '~/utils/import-report';
+} from '~/modules/file-storage/import-report';
+import { InspectionService } from '~/modules/inspection/inspection.service';
+import { logApiError } from '~/utils/api-logger';
 import { parseNonEmptyArray } from '~/utils/request-validation';
 import {
   badRequestResponse,

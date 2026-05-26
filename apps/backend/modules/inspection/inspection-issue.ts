@@ -21,10 +21,10 @@ import { nanoid } from 'nanoid';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
+} from '~/governance/master-data/master-data-governance-write';
+import { resolveProcessIdForWrite } from '~/governance/master-data/process-resolver';
+import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
 import prisma from '~/utils/prisma';
-import { resolveProcessIdForWrite } from '~/utils/process-resolver';
-import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 
 export function buildInspectionIssueDateRange(params: {
   dateMode?: InspectionIssueDateMode;

@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { DictionaryService } from '~/modules/dictionary/dictionary.service';
+import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
 import {
   businessErrorResponse,
@@ -14,7 +15,6 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
-import { requireSystemAdmin } from '~/utils/system-auth';
 
 const schema = z.object({
   dictKey: z.string().optional(),

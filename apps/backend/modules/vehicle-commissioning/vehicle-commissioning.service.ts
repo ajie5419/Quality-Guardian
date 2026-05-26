@@ -18,10 +18,10 @@ import {
 } from '@qgs/shared';
 import { nanoid } from 'nanoid';
 import sharp from 'sharp';
+import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { ReportRouteService } from '~/modules/report';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import { UPLOAD_DIR } from '~/utils/paths';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';

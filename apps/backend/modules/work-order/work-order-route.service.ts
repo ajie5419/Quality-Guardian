@@ -1,37 +1,37 @@
 import type { H3Event } from 'h3';
-import type { ImportRowError } from '~/utils/import-report';
+import type { ImportRowError } from '~/modules/file-storage/import-report';
 import type { UserSession } from '~/utils/jwt-utils';
 
-import { InspectionService } from '~/modules/inspection';
-import { WorkOrderRequirementService } from '~/modules/work-order-requirement/work-order-requirement.service';
-import { WorkOrderService } from '~/modules/work-order/work-order.service';
-import { logApiError } from '~/utils/api-logger';
-import { recordBusinessAuditLog } from '~/utils/audit-log';
-import { BusinessError } from '~/utils/business-error';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/governance/master-data/master-data-governance-write';
+import { resolveCanonicalProcessName } from '~/governance/master-data/process-resolver';
 import {
   buildImportRowError,
   buildImportSummary,
   inferImportErrorField,
   toImportErrorMessage,
-} from '~/utils/import-report';
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
-import prisma from '~/utils/prisma';
-import {
-  isPrismaNotFoundError,
-  isPrismaRequiredValueError,
-  isPrismaUniqueConflictError,
-} from '~/utils/prisma-error';
-import { resolveCanonicalProcessName } from '~/utils/process-resolver';
+} from '~/modules/file-storage/import-report';
+import { InspectionService } from '~/modules/inspection';
+import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
+import { WorkOrderRequirementService } from '~/modules/work-order-requirement/work-order-requirement.service';
 import {
   parseOptionalDate,
   parseRequiredDate,
   parseRequiredWorkOrderNumber,
   parseWorkOrderListQuery,
   parseWorkOrderQuantity,
-} from '~/utils/work-order';
+} from '~/modules/work-order/work-order-query';
+import { WorkOrderService } from '~/modules/work-order/work-order.service';
+import { logApiError } from '~/utils/api-logger';
+import { BusinessError } from '~/utils/business-error';
+import prisma from '~/utils/prisma';
+import {
+  isPrismaNotFoundError,
+  isPrismaRequiredValueError,
+  isPrismaUniqueConflictError,
+} from '~/utils/prisma-error';
 
 import { parseRequirementAttachments } from './work-order-requirement-attachments';
 import { mapWorkOrderStatus } from './work-order-status';

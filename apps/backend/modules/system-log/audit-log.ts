@@ -2,8 +2,7 @@ import type { EventHandlerRequest, H3Event } from 'h3';
 
 import { getHeader } from 'h3';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
-
-import { logApiError } from './api-logger';
+import { logApiError } from '~/utils/api-logger';
 
 type AuditAction = 'CREATE' | 'DELETE' | 'EXPORT' | 'READ' | 'UPDATE';
 

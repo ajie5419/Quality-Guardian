@@ -1,7 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { callAi, extractJson } from '~/modules/ai/ai';
 import { AiRouteService } from '~/modules/ai/ai-route.service';
-import { callAi, extractJson } from '~/utils/ai';
 import { logApiError } from '~/utils/api-logger';
 import { useResponseSuccess } from '~/utils/response';
 

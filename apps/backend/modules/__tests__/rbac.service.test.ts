@@ -3,7 +3,7 @@ import { RbacService } from '~/modules/rbac/rbac.service';
 
 import prisma from '../../utils/prisma';
 
-vi.mock('../../utils/rbac-config', () => ({
+vi.mock('../rbac/rbac-config', () => ({
   isDataScopeV2Enabled: () => false,
   isRbacReadV2Enabled: () => true,
   isRbacSuperMergeAllCodesEnabled: () => true,

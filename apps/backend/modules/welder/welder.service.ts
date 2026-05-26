@@ -1,5 +1,5 @@
+import { buildTeamContainsWhere } from '~/governance/master-data/team-resolver';
 import prisma from '~/utils/prisma';
-import { buildTeamContainsWhere } from '~/utils/team-resolver';
 
 import {
   buildWelderCreateData,

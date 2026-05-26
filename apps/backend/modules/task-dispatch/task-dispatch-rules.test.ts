@@ -7,7 +7,7 @@ import {
   resolveTaskDispatchItpProjectIdForValidation,
   resolveTaskDispatchLevel,
   resolveTaskDispatchParentIdForPromotion,
-} from './task-dispatch';
+} from './task-dispatch-rules';
 
 describe('task-dispatch payload utils', () => {
   it('resolves assignee candidates from one input value', () => {

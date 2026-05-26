@@ -1,7 +1,7 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
-import { recordBusinessAuditLog } from '~/utils/audit-log';
 import { getCurrentUser } from '~/utils/current-user';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';

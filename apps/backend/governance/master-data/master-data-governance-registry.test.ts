@@ -528,6 +528,7 @@ describe('master-data-governance-registry', () => {
     const configPath = path.resolve(
       CURRENT_DIR,
       '..',
+      '..',
       'config',
       'master-data-governance-backlog.json',
     );

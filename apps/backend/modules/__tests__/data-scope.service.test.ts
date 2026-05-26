@@ -3,7 +3,7 @@ import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 
 import prisma from '../../utils/prisma';
 
-vi.mock('../../utils/rbac-config', () => ({
+vi.mock('../rbac/rbac-config', () => ({
   isDataScopeV2Enabled: () => true,
 }));
 

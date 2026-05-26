@@ -1,8 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { InspectionService } from '~/modules/inspection/inspection.service';
+import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
-import { recordBusinessAuditLog } from '~/utils/audit-log';
 import {
   businessErrorResponse,
   legacyErrorToBusinessError,

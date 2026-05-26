@@ -22,21 +22,34 @@ import {
   ISSUE_TRACKING_STATUS,
   tryParsePhotos,
 } from '@qgs/shared';
-import { DataScopeService } from '~/modules/data-scope/data-scope.service';
-import { DeptService } from '~/modules/dept/dept.service';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { WelderScoreService } from '~/modules/welder/welder-score.service';
-import { BusinessError } from '~/utils/business-error';
-import { findDeptSubtree } from '~/utils/dept-tree';
-import { parseWorkbookSheets } from '~/utils/excel-parser';
-import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
-import { createModuleLogger } from '~/utils/logger';
-import { MasterDataGovernanceKernel } from '~/utils/master-data-governance-kernel';
+import { MasterDataGovernanceKernel } from '~/governance/master-data/master-data-governance-kernel';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
+} from '~/governance/master-data/master-data-governance-write';
+import {
+  buildProcessNameWhere,
+  resolveCanonicalProcessNameById,
+  resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation,
+  resolveProcessIdForWrite,
+} from '~/governance/master-data/process-resolver';
+import { resolveTeamIdForWrite } from '~/governance/master-data/team-resolver';
+import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import { findDeptSubtree } from '~/modules/dept/dept-tree';
+import { DeptService } from '~/modules/dept/dept.service';
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { buildInspectionFormProcessFilter } from '~/modules/inspection/inspection-form';
+import {
+  parseProjectDocuments,
+  stringifyProjectDocuments,
+  upsertInspectionProjectDocuments,
+} from '~/modules/inspection/project-documents';
+import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
+import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { WelderScoreService } from '~/modules/welder/welder-score.service';
+import { BusinessError } from '~/utils/business-error';
+import { parseWorkbookSheets } from '~/utils/excel-parser';
+import { createModuleLogger } from '~/utils/logger';
 import { UPLOAD_DIR } from '~/utils/paths';
 import prisma from '~/utils/prisma';
 import {
@@ -44,20 +57,7 @@ import {
   isPrismaSchemaMismatchError,
   isPrismaUniqueConstraintError,
 } from '~/utils/prisma-error';
-import {
-  buildProcessNameWhere,
-  resolveCanonicalProcessNameById,
-  resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation,
-  resolveProcessIdForWrite,
-} from '~/utils/process-resolver';
-import {
-  parseProjectDocuments,
-  stringifyProjectDocuments,
-  upsertInspectionProjectDocuments,
-} from '~/utils/project-documents';
-import { toQualityRecordStatus } from '~/utils/quality-loss-status';
 import { buildYearFilter, parsePagination } from '~/utils/query-helpers';
-import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 import { buildInspectionIssueDateRange } from './inspection-issue';
 

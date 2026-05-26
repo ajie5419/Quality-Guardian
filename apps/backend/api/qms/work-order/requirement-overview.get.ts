@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { WorkOrderRequirementService } from '~/modules/work-order-requirement/work-order-requirement.service';
+import { parseWorkOrderListQuery } from '~/modules/work-order/work-order-query';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
@@ -7,7 +8,6 @@ import {
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import { parseWorkOrderListQuery } from '~/utils/work-order';
 
 const workOrderRequirementOverviewQuerySchema = z.object({}).passthrough();
 

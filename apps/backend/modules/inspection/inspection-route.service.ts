@@ -4,19 +4,19 @@ import type { UserSession } from '~/utils/jwt-utils';
 
 import process from 'node:process';
 
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import { logApiError } from '~/utils/api-logger';
-import { recordBusinessAuditLog } from '~/utils/audit-log';
-import { buildInspectionFormProcessFilter } from '~/utils/inspection-form';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/utils/master-data-governance-write';
-import prisma from '~/utils/prisma';
+} from '~/governance/master-data/master-data-governance-write';
 import {
   resolveCanonicalProcessName,
   resolveProcessIdForWrite,
-} from '~/utils/process-resolver';
+} from '~/governance/master-data/process-resolver';
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { buildInspectionFormProcessFilter } from '~/modules/inspection/inspection-form';
+import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
+import { logApiError } from '~/utils/api-logger';
+import prisma from '~/utils/prisma';
 
 import {
   buildInspectionRecordFromRequest,

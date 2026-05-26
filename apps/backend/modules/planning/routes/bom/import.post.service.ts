@@ -1,12 +1,12 @@
 import type { H3Event } from 'h3';
 
+import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import {
   buildProjectBomCreateData,
   normalizeBomText,
 } from '~/modules/planning/bom';
 import { logApiError } from '~/utils/api-logger';
 import { awaitMockDelay } from '~/utils/index';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 
 export async function bom_import_post(event: H3Event) {

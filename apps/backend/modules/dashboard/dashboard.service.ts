@@ -3,15 +3,15 @@ import type { DashboardChartItem, DashboardStats } from '@qgs/shared';
 import { AfterSalesService } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
 import { QualityLossService } from '~/modules/quality-loss';
+import { getNetPassRateSummaryByRange } from '~/modules/report/pass-rate';
+import {
+  buildCanonicalProcessPassRateTargets,
+  PROCESS_PASS_RATE_TARGET_ORDER,
+} from '~/modules/report/pass-rate-process';
 import { SystemService } from '~/modules/system';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning';
 import { WorkOrderService } from '~/modules/work-order';
 import { createModuleLogger } from '~/utils/logger';
-import { getNetPassRateSummaryByRange } from '~/utils/pass-rate';
-import {
-  buildCanonicalProcessPassRateTargets,
-  PROCESS_PASS_RATE_TARGET_ORDER,
-} from '~/utils/pass-rate-process';
 
 // 创建模块级 logger
 const logger = createModuleLogger('DashboardService');

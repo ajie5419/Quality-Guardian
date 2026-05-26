@@ -1,9 +1,9 @@
 import { eventHandler, getRouterParam, readBody, setResponseStatus } from 'h3';
 import { PreferenceService } from '~/modules/user/preference.service';
+import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
-import { requireSystemAdmin } from '~/utils/system-auth';
 
 export default eventHandler(async (event) => {
   const userinfo = getCurrentUser(event);

@@ -1,10 +1,10 @@
 import type { H3Event } from 'h3';
 
+import { parseProjectDocuments } from '~/modules/inspection/project-documents';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaMissingColumnError } from '~/utils/prisma-error';
-import { parseProjectDocuments } from '~/utils/project-documents';
 
 export async function project_docs_projects_index_get(event: H3Event) {
   const userinfo = await verifyAccessToken(event);

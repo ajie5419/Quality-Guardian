@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { RbacService } from '~/modules/rbac/rbac.service';
+import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaUniqueConflictError } from '~/utils/db-error';
@@ -8,7 +9,6 @@ import {
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import { requireSystemAdmin } from '~/utils/system-auth';
 
 export default defineEventHandler(async (event) => {
   const userinfo = getCurrentUser(event);

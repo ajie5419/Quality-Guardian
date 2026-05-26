@@ -1,8 +1,8 @@
 import type { H3Event } from 'h3';
 
+import { getMetadata, setMetadata } from '~/modules/system/metadata';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { getMetadata, setMetadata } from '~/utils/metadata';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import { getRequiredRouterParam } from '~/utils/route-param';
