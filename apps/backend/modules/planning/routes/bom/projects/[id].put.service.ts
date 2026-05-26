@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3';
 
+import { normalizeBomProjectStatus } from '~/modules/planning/bom';
 import { logApiError } from '~/utils/api-logger';
-import { normalizeBomProjectStatus } from '~/utils/bom';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';

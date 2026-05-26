@@ -1,10 +1,11 @@
 import prisma from '~/utils/prisma';
 import { buildTeamContainsWhere } from '~/utils/team-resolver';
+
 import {
   buildWelderCreateData,
   buildWelderUpdateData,
   hasWelderCodeField,
-} from '~/utils/welder';
+} from './welder';
 
 export interface WelderQueryParams {
   keyword?: string;

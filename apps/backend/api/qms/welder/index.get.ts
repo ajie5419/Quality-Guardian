@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseWelderListQuery } from '~/modules/welder/welder';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
 import { WelderService } from '~/modules/welder/welder.service';
 import { logApiError } from '~/utils/api-logger';
@@ -9,7 +10,6 @@ import {
   unAuthorizedResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import { parseWelderListQuery } from '~/utils/welder';
 
 const welderListQuerySchema = z.object({}).passthrough();
 

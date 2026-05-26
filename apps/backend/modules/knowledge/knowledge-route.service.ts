@@ -1,14 +1,15 @@
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
+import prisma from '~/utils/prisma';
+
 import {
   buildKnowledgeCreateData,
   buildKnowledgeUpdateData,
-} from '~/utils/knowledge';
+} from './knowledge';
 import {
   buildKnowledgeCategoryCreateData,
   buildKnowledgeCategoryUpdateData,
-} from '~/utils/knowledge-category';
-import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
-import prisma from '~/utils/prisma';
+} from './knowledge-category';
 
 function formatKnowledgeItem(item: any) {
   return {

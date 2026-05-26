@@ -1,8 +1,8 @@
 import { defineEventHandler, getQuery } from 'h3';
+import { resolveReportDateRangeQuery } from '~/modules/report/report-utils';
 import { ReportService } from '~/modules/report/report.service';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
-import { resolveReportDateRangeQuery } from '~/utils/report';
 import {
   badRequestResponse,
   internalServerErrorResponse,

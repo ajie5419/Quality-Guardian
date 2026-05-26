@@ -1,7 +1,10 @@
 import type { H3Event } from 'h3';
 
+import {
+  normalizeBomProjectStatus,
+  normalizeBomText,
+} from '~/modules/planning/bom';
 import { logApiError } from '~/utils/api-logger';
-import { normalizeBomProjectStatus, normalizeBomText } from '~/utils/bom';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';

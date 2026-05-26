@@ -1,11 +1,12 @@
 import prisma from '~/utils/prisma';
+
 import {
   formatReportDate,
   normalizeReportAuthor,
   normalizeReportStatus,
   parseReportDate,
   parseReportNumber,
-} from '~/utils/report';
+} from './report-utils';
 
 type DailyReportQueryParams = {
   dateFrom?: Date;

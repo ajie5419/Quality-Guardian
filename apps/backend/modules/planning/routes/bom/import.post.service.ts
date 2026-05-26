@@ -1,7 +1,10 @@
 import type { H3Event } from 'h3';
 
+import {
+  buildProjectBomCreateData,
+  normalizeBomText,
+} from '~/modules/planning/bom';
 import { logApiError } from '~/utils/api-logger';
-import { buildProjectBomCreateData, normalizeBomText } from '~/utils/bom';
 import { awaitMockDelay } from '~/utils/index';
 import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';

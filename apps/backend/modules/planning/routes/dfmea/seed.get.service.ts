@@ -1,7 +1,10 @@
 import type { H3Event } from 'h3';
 
+import {
+  calculateDfmeaRpn,
+  createDfmeaProjectId,
+} from '~/modules/planning/dfmea';
 import { logApiError } from '~/utils/api-logger';
-import { calculateDfmeaRpn, createDfmeaProjectId } from '~/utils/dfmea';
 import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';
 import {

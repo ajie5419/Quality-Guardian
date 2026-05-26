@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3';
 
+import { buildDfmeaProjectUpdateData } from '~/modules/planning/dfmea';
 import { logApiError } from '~/utils/api-logger';
-import { buildDfmeaProjectUpdateData } from '~/utils/dfmea';
 import { awaitMockDelay } from '~/utils/index';
 import { buildGovernedWriteFieldsForTable } from '~/utils/master-data-governance-write';
 import prisma from '~/utils/prisma';

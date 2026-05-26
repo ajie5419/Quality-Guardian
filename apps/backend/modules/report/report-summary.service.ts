@@ -22,11 +22,12 @@ import {
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
+
 import {
   formatReportDate,
   getReportDayRange,
   resolveReportQueryDate,
-} from '~/utils/report';
+} from './report-utils';
 
 class ReportQueryValidationError extends Error {
   constructor(message: string) {

@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3';
 
+import { normalizeDfmeaText } from '~/modules/planning/dfmea';
 import { logApiError } from '~/utils/api-logger';
-import { normalizeDfmeaText } from '~/utils/dfmea';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 
