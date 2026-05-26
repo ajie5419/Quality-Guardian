@@ -157,6 +157,46 @@ describe('dictionaryService', () => {
     );
   });
 
+  it('invalidates scoped cache after successful update', async () => {
+    (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
+      dictKey: 'OPEN',
+      dictType: 'inspection_issue_status',
+      id: 'dict-1',
+      isDeleted: false,
+      isSystem: false,
+      sort: 0,
+      status: 1,
+    });
+    (prisma.dictionaries.update as any).mockResolvedValueOnce({
+      id: 'dict-1',
+    });
+
+    await DictionaryService.update(
+      'dict-1',
+      { dictValue: 'Open', sort: 1 },
+      'tester',
+    );
+
+    expect(redis.del).toHaveBeenCalledWith(
+      'qms:dict:options:inspection_issue_status',
+    );
+  });
+
+  it('invalidates scoped cache after successful delete', async () => {
+    (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
+      dictType: 'supplier_status',
+      id: 'dict-1',
+      isSystem: false,
+    });
+    (prisma.dictionaries.update as any).mockResolvedValueOnce({
+      id: 'dict-1',
+    });
+
+    await DictionaryService.delete('dict-1', 'tester');
+
+    expect(redis.del).toHaveBeenCalledWith('qms:dict:options:supplier_status');
+  });
+
   it('accepts newly supported supervision/planning dict types', async () => {
     (prisma.dictionaries.findFirst as any).mockResolvedValueOnce(null);
     (prisma.dictionaries.create as any).mockResolvedValueOnce({ id: 'new-id' });
