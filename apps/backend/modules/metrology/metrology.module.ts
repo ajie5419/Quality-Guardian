@@ -1,0 +1,153 @@
+import type { ModuleDeclaration } from '~/utils/module-types';
+
+export const metrologyModule: ModuleDeclaration = {
+  name: 'metrology',
+  menus: [
+    {
+      key: 'metrology-management',
+      parentPath: '/qms',
+      path: '/qms/metrology',
+      name: 'QMSMetrologyManagement',
+      redirect: '/qms/metrology/ledger',
+      order: 96,
+      type: 'catalog',
+      meta: {
+        icon: 'carbon:ruler-alt',
+        orderNo: 96,
+        title: '计量器具管理',
+      },
+    },
+    {
+      key: 'metrology-ledger',
+      parentPath: '/qms/metrology',
+      path: '/qms/metrology/ledger',
+      legacyPaths: ['/qms/metrology'],
+      legacyNames: ['QMSMetrology'],
+      name: 'QMSMetrologyLedger',
+      component: 'qms/metrology/index',
+      authCode: 'QMS:Metrology:List',
+      order: 1,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:notebook',
+        title: '计量器具台账',
+      },
+      buttons: [
+        {
+          authCode: 'QMS:Metrology:Create',
+          name: 'QMSMetrologyCreate',
+          order: 1,
+          title: '新建',
+        },
+        {
+          authCode: 'QMS:Metrology:Edit',
+          name: 'QMSMetrologyEdit',
+          order: 2,
+          title: '编辑',
+        },
+        {
+          authCode: 'QMS:Metrology:Delete',
+          name: 'QMSMetrologyDelete',
+          order: 3,
+          title: '删除',
+        },
+        {
+          authCode: 'QMS:Metrology:Import',
+          name: 'QMSMetrologyImport',
+          order: 4,
+          title: '导入',
+        },
+        {
+          authCode: 'QMS:Metrology:Export',
+          name: 'QMSMetrologyExport',
+          order: 5,
+          title: '导出',
+        },
+      ],
+    },
+    {
+      key: 'metrology-calibration-plan',
+      parentPath: '/qms/metrology',
+      path: '/qms/metrology/calibration-plan',
+      name: 'QMSMetrologyCalibrationPlan',
+      component: 'qms/metrology/calibration-plan/index',
+      authCode: 'QMS:Metrology:CalibrationPlan:List',
+      order: 2,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:calendar',
+        title: '计量器具校准计划',
+      },
+      buttons: [
+        {
+          authCode: 'QMS:Metrology:CalibrationPlan:Create',
+          name: 'QMSMetrologyCalibrationPlanCreate',
+          order: 1,
+          title: '新建',
+        },
+        {
+          authCode: 'QMS:Metrology:CalibrationPlan:Edit',
+          name: 'QMSMetrologyCalibrationPlanEdit',
+          order: 2,
+          title: '编辑',
+        },
+        {
+          authCode: 'QMS:Metrology:CalibrationPlan:Delete',
+          name: 'QMSMetrologyCalibrationPlanDelete',
+          order: 3,
+          title: '删除',
+        },
+        {
+          authCode: 'QMS:Metrology:CalibrationPlan:Import',
+          name: 'QMSMetrologyCalibrationPlanImport',
+          order: 4,
+          title: '导入',
+        },
+      ],
+    },
+    {
+      key: 'metrology-borrow',
+      parentPath: '/qms/metrology',
+      path: '/qms/metrology/borrow',
+      name: 'QMSMetrologyBorrow',
+      component: 'qms/metrology/borrow/index',
+      authCode: 'QMS:Metrology:Borrow:List',
+      order: 3,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:qr-code',
+        title: '量具借用管理',
+      },
+      buttons: [
+        {
+          authCode: 'QMS:Metrology:Borrow:Create',
+          name: 'QMSMetrologyBorrowCreate',
+          order: 1,
+          title: '借用',
+        },
+        {
+          authCode: 'QMS:Metrology:Borrow:Return',
+          name: 'QMSMetrologyBorrowReturn',
+          order: 2,
+          title: '归还',
+        },
+      ],
+    },
+    {
+      key: 'metrology-borrow-entry',
+      parentPath: '/qms/metrology',
+      path: '/qms/metrology/borrow/entry',
+      name: 'QMSMetrologyBorrowEntry',
+      component: 'qms/metrology/borrow/entry/index',
+      authCode: null,
+      order: 99,
+      type: 'menu',
+      meta: {
+        activePath: '/qms/metrology/borrow',
+        hideInMenu: true,
+        publicAccess: true,
+        title: '扫码借还入口',
+      },
+    },
+  ],
+};
