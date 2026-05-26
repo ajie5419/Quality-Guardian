@@ -248,3 +248,30 @@
 
 - `module-loader.ts` 当前采用显式模块注册，避免 Nitro/tsc 环境下运行时 glob 差异；新增业务模块时需要在 loader 中注册对应声明。
 - 仍保留 `recordBusinessAuditLog(event, params)` 作为带请求上下文的审计适配器；阶段十一做中间件自动审计时再统一收敛。
+
+### 2026-05-26 阶段十：遗留清理（步骤47-52）
+
+**执行内容：**
+
+- 步骤47：`rbac` 停止读写 `roles.permissions` legacy JSON；角色权限统一写入并读取 `rbac_role_permissions`，`listRoles` 从关系表返回权限码，并补充关系表读取单测。
+- 步骤48：修正 `report.service.ts` 对 `dept` 模块的直接 service import，统一通过模块 `index.ts` 导出访问。
+- 步骤49：审计 `dictionary` 缓存一致性；确认无批量写入和 service 外写表路径，补充 `update/delete` 后按 `dictType` 失效缓存的单测。
+- 步骤50：将 `file-storage` 拆为策略模式，新增 `StorageStrategy`、local/OSS 实现、附件解析与文件资产查询辅助模块；`file-storage.service.ts` 从 888 行降至 460 行。
+- 步骤51：`login_logs` 与 `audit_logs` 增加 `isDeleted` 字段和 migration，查询统一过滤未删除记录，删除接口改为软删除。
+- 步骤52：`dept` service DTO 统一为 schema 字段 `description/sort/parentId`，`remark/orderNo/pid` 兼容映射下沉到 API 入口。
+
+**验证结果：**
+
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec vitest run`: 32 文件 / 216-218 测试全部通过
+- 每个步骤提交前均执行 `pnpm run check:qms-arch`: 通过
+- 步骤51 执行 `pnpm -C apps/backend exec prisma generate --schema=./prisma/schema.prisma`: 通过
+- 阶段结束模块 TS 文件数：232
+- 阶段结束 `git status --short | wc -l`: 0
+
+**commit:** `2c136b33` / `85bbe782` / `59e96595` / `a17e1071` / `2a757e69` / `bcc5bc24`
+
+**遗留问题：**
+
+- Step 51 的 `prisma migrate dev --name add_soft_delete_to_logs` 因既有历史迁移 `20250521000000_add_processes_table_and_processId` 在 shadow database 中引用不存在的 `inspections` 表而失败；本阶段已按 Prisma migration 规范新增 `20260526000100_add_soft_delete_to_logs/migration.sql`，未手动改数据库。
+- `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
