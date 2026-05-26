@@ -1,6 +1,16 @@
 import type { H3Event } from 'h3';
 
 import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/governance/master-data/master-data-governance-write';
+import {
+  buildImportRowError,
+  buildImportSummary,
+  inferImportErrorField,
+  toImportErrorMessage,
+} from '~/modules/file-storage/import-report';
+import {
   buildItpItemCreateData,
   getMaxItpItemOrder,
   normalizeItpText,

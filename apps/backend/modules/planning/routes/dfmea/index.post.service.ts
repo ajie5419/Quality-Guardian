@@ -1,6 +1,10 @@
 import type { H3Event } from 'h3';
 
 import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/governance/master-data/master-data-governance-write';
+import {
   calculateDfmeaRpn,
   normalizeDfmeaEffect,
   normalizeDfmeaText,

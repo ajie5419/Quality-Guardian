@@ -1,5 +1,9 @@
 import type { H3Event } from 'h3';
 
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/governance/master-data/master-data-governance-write';
 import { resolveProcessIdForWrite } from '~/governance/master-data/process-resolver';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { buildInspectionFormProcessFilter } from '~/modules/inspection/inspection-form';

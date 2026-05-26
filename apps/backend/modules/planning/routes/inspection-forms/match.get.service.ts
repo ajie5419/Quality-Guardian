@@ -1,6 +1,11 @@
 import type { H3Event } from 'h3';
 
 import { resolveCanonicalProcessName } from '~/governance/master-data/process-resolver';
+import {
+  buildInspectionFormProcessFilter,
+  parseInspectionFormFields,
+  resolveInspectionFormProcess,
+} from '~/modules/inspection/inspection-form';
 import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
