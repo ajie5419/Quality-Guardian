@@ -259,6 +259,12 @@ function parseReportSummary(summary?: null | string) {
   return null;
 }
 
+function parseReportDateBoundary(value: string | undefined, endOfDay: boolean) {
+  if (!value) return undefined;
+  const date = new Date(`${value}T${endOfDay ? '23:59:59.999' : '00:00:00'}`);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
 async function resolveReportIssues(
   payload: Partial<VehicleCommissioningDailyReportPayload>,
 ) {
@@ -725,25 +731,40 @@ export const VehicleCommissioningService = {
   },
 
   async getDailyReports(params: {
+    dateFrom?: string;
+    dateTo?: string;
     page?: number;
     pageSize?: number;
     projectName?: string;
   }) {
     const page = Math.max(1, Number(params.page || 1));
-    const pageSize = Math.max(1, Number(params.pageSize || 20));
+    const pageSize = Math.min(100, Math.max(1, Number(params.pageSize || 20)));
     const skip = (page - 1) * pageSize;
-    const allItems = await ReportRouteService.findDailyReports({
+    const dateFrom = parseReportDateBoundary(params.dateFrom, false);
+    const dateTo = parseReportDateBoundary(params.dateTo, true);
+    const query = {
+      dateFrom,
+      dateTo,
       projectName: params.projectName,
-    });
-    const vehicleReportRows = allItems.filter((row) =>
-      parseReportSummary(row.summary),
-    );
-    const pageRows = vehicleReportRows.slice(skip, skip + pageSize);
+    };
+    const [pageRows, total] = await Promise.all([
+      ReportRouteService.findDailyReports({
+        ...query,
+        skip,
+        take: pageSize,
+      }),
+      ReportRouteService.countDailyReports(query),
+    ]);
     const mapped = await Promise.all(
       pageRows.map((row) => buildRealtimeReportData(row)),
     );
 
-    return { items: mapped, total: vehicleReportRows.length };
+    return {
+      items: mapped.filter(
+        (item) => item.projectName || item.mainWorks.length > 0,
+      ),
+      total,
+    };
   },
 
   async getDailyReportPreview(id: string) {

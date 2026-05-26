@@ -7,6 +7,14 @@ import {
   parseReportNumber,
 } from '~/utils/report';
 
+type DailyReportQueryParams = {
+  dateFrom?: Date;
+  dateTo?: Date;
+  projectName?: string;
+  skip?: number;
+  take?: number;
+};
+
 export const ReportRouteService = {
   async deleteById(id: string) {
     await prisma.reports.delete({ where: { id } });
@@ -51,17 +59,17 @@ export const ReportRouteService = {
   async findDailyReportById(id: string) {
     return prisma.daily_reports.findUnique({ where: { id } });
   },
-  async findDailyReports(params: { projectName?: string }) {
-    const where = params.projectName
-      ? {
-          summary: {
-            contains: String(params.projectName).trim(),
-          },
-        }
-      : {};
+  async countDailyReports(params: DailyReportQueryParams) {
+    return prisma.daily_reports.count({
+      where: buildDailyReportWhere(params),
+    });
+  },
+  async findDailyReports(params: DailyReportQueryParams) {
     return prisma.daily_reports.findMany({
-      where,
+      where: buildDailyReportWhere(params),
       orderBy: { date: 'desc' },
+      ...(params.skip === undefined ? {} : { skip: params.skip }),
+      ...(params.take === undefined ? {} : { take: params.take }),
     });
   },
   async updateById(id: string, body: Record<string, unknown>) {
@@ -110,3 +118,23 @@ export const ReportRouteService = {
     return { ...created, date: formatReportDate(created.date) };
   },
 };
+
+function buildDailyReportWhere(params: DailyReportQueryParams) {
+  return {
+    ...(params.projectName
+      ? {
+          summary: {
+            contains: String(params.projectName).trim(),
+          },
+        }
+      : {}),
+    ...(params.dateFrom || params.dateTo
+      ? {
+          date: {
+            ...(params.dateFrom ? { gte: params.dateFrom } : {}),
+            ...(params.dateTo ? { lte: params.dateTo } : {}),
+          },
+        }
+      : {}),
+  };
+}

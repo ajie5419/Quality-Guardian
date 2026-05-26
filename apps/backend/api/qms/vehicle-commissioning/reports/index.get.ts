@@ -19,6 +19,8 @@ export default defineValidatedHandler(
 
     try {
       const data = await VehicleCommissioningService.getDailyReports({
+        dateFrom: query.dateFrom ? String(query.dateFrom) : undefined,
+        dateTo: query.dateTo ? String(query.dateTo) : undefined,
         page: query.page ? Number(query.page) : undefined,
         pageSize: query.pageSize ? Number(query.pageSize) : undefined,
         projectName: query.projectName ? String(query.projectName) : undefined,
