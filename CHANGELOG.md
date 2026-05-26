@@ -299,3 +299,29 @@
 - BusinessError 本阶段只替换明确错误码路径，纯消息类 `throw new Error(...)` 后续阶段继续收敛。
 - 数据权限注入采用渐进式方案：中间件预解析 scope，service 可选接收；未接入 context 的调用仍按旧逻辑自行解析，行为保持兼容。
 - `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
+
+### 2026-05-26 阶段十二：数据库 schema 优化（步骤56-58）
+
+**执行内容：**
+
+- 步骤56：补充确认缺失的 DataScope 与软删除查询索引，新增 `after_sales.feedbackDept/handler/division`、`audit_logs.isDeleted`、`login_logs.isDeleted`、`quality_records.responsibleBU`、`suppliers.buyer`、`work_orders.division` 索引；确认 `quality_records.inspector/lastEditor/responsibleDepartment` 与 `daily_reports(date, reporter)` 已有索引或唯一约束，未重复添加。
+- 步骤57：将 `daily_reports.summary` 的高频顶层字段结构化为 `projectName`、`workOrderNumber`、`reportText`，保留 `summary` JSON blob；通用日报和车辆调试日报改为双写结构化字段与旧 JSON，读取优先结构化字段并 fallback 到解析 `summary`。
+- 步骤58：删除 `roles.permissions` legacy JSON 列；RBAC 创建角色、默认用户角色创建、检验员权限识别路径均改为只读 `rbac_role_permissions` 关系表，并更新相关单测。
+
+**验证结果：**
+
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec prisma generate --schema=./prisma/schema.prisma`: 通过
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- 每个步骤提交前均执行 `pnpm -C apps/backend exec vitest run`: 32 文件 / 219 测试全部通过
+- 每个步骤提交前均执行 `pnpm run check:qms-arch`: 通过
+- 步骤58 后执行 `rg "roles\\.permissions|role\\.permissions|permissions: true|permissions: ''|permissions: '\\[\\]'" apps/backend/modules apps/backend/api apps/backend/prisma/schema.prisma`: 无命中
+- 阶段结束模块 TS 文件数：232
+- 阶段结束 `git status --short | wc -l`: 0
+
+**commit:** `338b970f` / `f7c509c1` / `cbc9a58d`
+
+**遗留问题：**
+
+- `daily_reports.summary` 按兼容策略保留旧 JSON blob，复杂数组字段如 `mainWorks/issueIds` 仍留在 JSON 中；本阶段仅抽取过滤和展示最常用的顶层字段。
+- 本阶段沿用手写 migration SQL，原因同 Step 51：既有历史 migration 在 shadow database 中存在顺序问题；未手动修改数据库。
+- `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
