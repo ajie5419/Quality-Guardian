@@ -1,7 +1,7 @@
 import { resolveQualityLossTargetLocator } from '@qgs/shared';
 import { describe, expect, it, vi } from 'vitest';
+import { QUALITY_LOSS_SOURCE } from '~/utils/quality-loss-status';
 
-import { QUALITY_LOSS_SOURCE } from './quality-loss-status';
 import {
   parseQualityLossUpdateBody,
   resolveQualityLossUpdateTarget,

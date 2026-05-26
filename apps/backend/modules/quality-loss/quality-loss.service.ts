@@ -25,7 +25,6 @@ import {
   QUALITY_LOSS_SOURCE,
   toQualityLossTargetType,
 } from '~/utils/quality-loss-status';
-import { parseQualityLossUpdateBody } from '~/utils/quality-loss-update';
 import {
   formatDateString,
   formatNumber,
@@ -33,6 +32,8 @@ import {
   parsePagination,
   safeNumber,
 } from '~/utils/query-helpers';
+
+import { parseQualityLossUpdateBody } from './quality-loss-update';
 
 // 创建模块级 logger
 const logger = createModuleLogger('QualityLossService');

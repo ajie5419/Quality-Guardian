@@ -1,13 +1,13 @@
 import { defineEventHandler, readBody } from 'h3';
-import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { logApiError } from '~/utils/api-logger';
-import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
 import {
   buildQualityLossCreateDataWithCanonical,
   buildQualityLossCreateResponse,
   createQualityLossId,
-} from '~/utils/quality-loss-payload';
+} from '~/modules/quality-loss/quality-loss-payload';
+import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { logApiError } from '~/utils/api-logger';
+import { verifyAccessToken } from '~/utils/jwt-utils';
+import prisma from '~/utils/prisma';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
   badRequestResponse,
