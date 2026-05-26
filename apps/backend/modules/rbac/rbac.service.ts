@@ -12,7 +12,7 @@ function uniqueNonEmpty(values: string[]) {
   return [...new Set(values.filter((value) => value && value.trim() !== ''))];
 }
 
-function parseLegacyPermissions(raw: null | string) {
+function parseStringArrayJson(raw: null | string) {
   if (!raw) return [] as string[];
   try {
     const parsed = JSON.parse(raw);
@@ -309,6 +309,11 @@ export const RbacService = {
       prisma.roles.count({ where: { isDeleted: false } }),
       prisma.roles.findMany({
         where: { isDeleted: false },
+        include: {
+          rbac_role_permissions: {
+            include: { permission: true },
+          },
+        },
         skip: (page - 1) * pageSize,
         take: pageSize,
         orderBy: { createdAt: 'desc' },
@@ -317,14 +322,9 @@ export const RbacService = {
     return {
       total,
       items: roles.map((role) => {
-        let permissions: string[] = [];
-        try {
-          if (role.permissions && typeof role.permissions === 'string') {
-            permissions = JSON.parse(role.permissions);
-          }
-        } catch {
-          permissions = [];
-        }
+        const permissions = uniqueNonEmpty(
+          role.rbac_role_permissions.map((link) => link.permission?.code || ''),
+        );
         return {
           ...role,
           permissions,
@@ -355,7 +355,7 @@ export const RbacService = {
         name: String(data.value || data.name || ''),
         description: data.remark || data.description || data.name,
         status: data.status ?? 1,
-        permissions: JSON.stringify(permissions),
+        permissions: '',
         isSystem: false,
         isDeleted: false,
       },
@@ -434,25 +434,13 @@ export const RbacService = {
       (name) => name.includes('super') || name.includes('admin'),
     );
 
-    let codes: string[] = [];
-
-    if (isRbacReadV2Enabled()) {
-      const rolePermissions = await prisma.rbac_role_permissions.findMany({
-        where: { roleId: { in: roleIds } },
-        include: { permission: true },
-      });
-      codes = uniqueNonEmpty(
-        rolePermissions.map((row) => row.permission?.code || ''),
-      );
-    }
-
-    // Fallback or compatibility merge with legacy JSON codes.
-    if (codes.length === 0 || !isRbacReadV2Enabled()) {
-      const legacyCodes = uniqueNonEmpty(
-        roles.flatMap((role) => parseLegacyPermissions(role.permissions)),
-      );
-      codes = uniqueNonEmpty([...codes, ...legacyCodes]);
-    }
+    const rolePermissions = await prisma.rbac_role_permissions.findMany({
+      where: { roleId: { in: roleIds } },
+      include: { permission: true },
+    });
+    let codes = uniqueNonEmpty(
+      rolePermissions.map((row) => row.permission?.code || ''),
+    );
 
     if (isSuper && isRbacSuperMergeAllCodesEnabled()) {
       const menuCodes = await prisma.menus.findMany({
@@ -470,15 +458,7 @@ export const RbacService = {
 
   async saveRolePermissions(roleId: string, codes: string[]) {
     const uniqueCodes = uniqueNonEmpty(codes);
-    const permissionsJson = JSON.stringify(uniqueCodes);
 
-    // 双写第一份：旧字段（兼容）
-    await prisma.roles.update({
-      where: { id: roleId },
-      data: { permissions: permissionsJson },
-    });
-
-    // 双写第二份：新关系表
     const existingPermissions = await prisma.rbac_permissions.findMany({
       where: { code: { in: uniqueCodes } },
       select: { code: true, id: true },
@@ -553,7 +533,7 @@ export const RbacService = {
       where: { roleId, module, isDeleted: false },
     });
     return {
-      deptIds: policy?.deptIds ? parseLegacyPermissions(policy.deptIds) : [],
+      deptIds: policy?.deptIds ? parseStringArrayJson(policy.deptIds) : [],
       module,
       roleId,
       scopeType: policy?.scopeType || 'SELF',

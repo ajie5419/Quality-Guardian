@@ -29,6 +29,9 @@ vi.mock('../../utils/prisma', () => ({
       findMany: vi.fn(),
     },
     roles: {
+      count: vi.fn(),
+      create: vi.fn(),
+      findMany: vi.fn(),
       update: vi.fn(),
     },
     users: {
@@ -44,23 +47,63 @@ describe('rbacService', () => {
     vi.clearAllMocks();
   });
 
-  it('should dual-write role permissions to legacy JSON and v2 relations', async () => {
+  it('should write role permissions only to v2 relations', async () => {
     (prisma.rbac_permissions.findMany as any)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ id: 'perm-1' }, { id: 'perm-2' }]);
 
     await RbacService.saveRolePermissions('role-1', ['A:List', 'B:List']);
 
-    expect(prisma.roles.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: { permissions: JSON.stringify(['A:List', 'B:List']) },
-        where: { id: 'role-1' },
-      }),
-    );
+    expect(prisma.roles.update).not.toHaveBeenCalled();
     expect(prisma.rbac_role_permissions.deleteMany).toHaveBeenCalledWith({
       where: { roleId: 'role-1' },
     });
     expect(prisma.rbac_role_permissions.createMany).toHaveBeenCalled();
+  });
+
+  it('should create roles without legacy JSON permissions', async () => {
+    (prisma.roles.create as any).mockResolvedValue({
+      id: 'role-1',
+      name: 'operator',
+      permissions: '',
+    });
+    (prisma.rbac_permissions.findMany as any)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    await RbacService.createRole({
+      name: 'operator',
+      permissions: ['QMS:Inspection:List'],
+    });
+
+    expect(prisma.roles.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ permissions: '' }),
+      }),
+    );
+  });
+
+  it('should list role permissions from v2 relations', async () => {
+    (prisma.roles.findMany as any).mockResolvedValue([
+      {
+        id: 'role-1',
+        name: 'operator',
+        description: 'Operator',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        rbac_role_permissions: [
+          { permission: { code: 'QMS:Inspection:List' } },
+          { permission: { code: 'QMS:Inspection:Create' } },
+        ],
+      },
+    ]);
+    (prisma.roles.count as any).mockResolvedValue(1);
+
+    const result = await RbacService.listRoles(1, 10);
+
+    expect(result.items[0].permissions).toEqual([
+      'QMS:Inspection:List',
+      'QMS:Inspection:Create',
+    ]);
   });
 
   it('should merge all menu auth codes for super role', async () => {
@@ -81,6 +124,19 @@ describe('rbacService', () => {
     expect(codes).toContain('A:Legacy');
     expect(codes).toContain('QMS:VehicleCommissioning:List');
     expect(codes).toContain('QMS:Inspection:List');
+  });
+
+  it('should not fallback to legacy JSON permissions', async () => {
+    (prisma.users.findFirst as any).mockResolvedValue({
+      id: 'u1',
+      roles: { id: 'r1', name: 'operator', permissions: '["A:Legacy"]' },
+    });
+    (prisma.rbac_user_roles.findMany as any).mockResolvedValue([]);
+    (prisma.rbac_role_permissions.findMany as any).mockResolvedValue([]);
+
+    const codes = await RbacService.getUserPermissionCodes('u1');
+
+    expect(codes).toEqual([]);
   });
 
   it('should dual-write user roles to both legacy and v2', async () => {
