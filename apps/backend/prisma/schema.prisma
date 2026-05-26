@@ -179,10 +179,13 @@ model after_sales {
   @@index([isDeleted])
   @@index([respDept])
   @@index([respDeptId])
+  @@index([feedbackDept])
   @@index([feedbackDeptId])
+  @@index([handler])
   @@index([defectType])
   @@index([defectTypeId])
   @@index([defectSubtypeId])
+  @@index([division])
   @@index([divisionId])
   @@index([customerNameId])
   @@index([partId])
@@ -208,6 +211,7 @@ model audit_logs {
 
   @@index([timestamp])
   @@index([userId])
+  @@index([isDeleted])
 }
 
 model login_logs {
@@ -222,6 +226,8 @@ model login_logs {
   message   String?  @db.Text
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([isDeleted])
 }
 
 model departments {
@@ -570,6 +576,7 @@ model quality_records {
   @@index([workOrderNumber])
   @@index([responsibleDepartment])
   @@index([responsibleDepartmentId])
+  @@index([responsibleBU])
   @@index([supplierId])
   @@index([projectId])
   @@index([divisionId])
@@ -1030,6 +1037,7 @@ model suppliers {
   @@index([categoryId])
   @@index([productNameId])
   @@index([projectId])
+  @@index([buyer])
 }
 
 model measuring_instruments {
@@ -1191,6 +1199,7 @@ model work_orders {
 
   @@index([customerName])
   @@index([customerNameId])
+  @@index([division])
   @@index([divisionId])
   @@index([deliveryDate])
   @@index([status])
