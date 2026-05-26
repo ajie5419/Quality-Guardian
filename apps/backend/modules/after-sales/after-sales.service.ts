@@ -3,7 +3,8 @@ import type {
   AfterSalesParams,
   AfterSalesStats,
 } from '@qgs/shared';
-import type { AfterSalesDateMode } from '~/utils/after-sales-query';
+
+import type { AfterSalesDateMode } from './after-sales-query';
 
 import { Prisma } from '@prisma/client';
 import {
@@ -17,12 +18,13 @@ import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept/dept.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { buildGovernedAfterSalesUpdateData } from '~/utils/after-sales-payload';
-import { buildAfterSalesDateRange } from '~/utils/after-sales-query';
 import { flattenDeptTree } from '~/utils/dept-tree';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { toAfterSalesClaimStatus } from '~/utils/quality-loss-status';
+
+import { buildGovernedAfterSalesUpdateData } from './after-sales-payload';
+import { buildAfterSalesDateRange } from './after-sales-query';
 
 // 创建模块级 logger
 const logger = createModuleLogger('AfterSalesService');

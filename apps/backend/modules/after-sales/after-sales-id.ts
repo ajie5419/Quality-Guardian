@@ -1,4 +1,4 @@
-import prisma from './prisma';
+import prisma from '~/utils/prisma';
 
 export async function getNextAfterSalesSerialNumber(): Promise<number> {
   const result = await prisma.after_sales.aggregate({

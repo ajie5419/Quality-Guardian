@@ -1,6 +1,6 @@
 import { z } from 'zod';
+import { parseAfterSalesListQuery } from '~/modules/after-sales/after-sales-query';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
-import { parseAfterSalesListQuery } from '~/utils/after-sales-query';
 import { logApiError } from '~/utils/api-logger';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { verifyAccessToken } from '~/utils/jwt-utils';

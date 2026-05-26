@@ -2,11 +2,6 @@ import { QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import {
-  createAfterSalesId,
-  getNextAfterSalesSerialNumber,
-} from '~/utils/after-sales-id';
-import { buildGovernedAfterSalesCreateData } from '~/utils/after-sales-payload';
-import {
   buildImportRowError,
   buildImportSummary,
   inferImportErrorField,
@@ -14,6 +9,12 @@ import {
 } from '~/utils/import-report';
 import prisma from '~/utils/prisma';
 import { parseRequiredWorkOrderNumber } from '~/utils/work-order';
+
+import {
+  createAfterSalesId,
+  getNextAfterSalesSerialNumber,
+} from './after-sales-id';
+import { buildGovernedAfterSalesCreateData } from './after-sales-payload';
 
 export const AfterSalesRouteService = {
   async batchDelete(ids: string[]) {
