@@ -2,9 +2,12 @@ import type {
   ModuleAuditActionDeclaration,
   ModuleDataScopeDeclaration,
   ModuleDeclaration,
+  ModuleMenuButtonDeclaration,
   ModuleMenuDeclaration,
 } from '~/utils/module-types';
 
+import { createId } from '@paralleldrive/cuid2';
+import { Prisma } from '@prisma/client';
 import { afterSalesModule } from '~/modules/after-sales/after-sales.module';
 import { aiModule } from '~/modules/ai/ai.module';
 import { dashboardModule } from '~/modules/dashboard/dashboard.module';
@@ -30,6 +33,8 @@ import { vehicleCommissioningModule } from '~/modules/vehicle-commissioning/vehi
 import { welderModule } from '~/modules/welder/welder.module';
 import { workOrderRequirementModule } from '~/modules/work-order-requirement/work-order-requirement.module';
 import { workOrderModule } from '~/modules/work-order/work-order.module';
+import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 
 const MODULE_DECLARATIONS: ModuleDeclaration[] = [
   afterSalesModule,
@@ -107,4 +112,186 @@ export function getAuditActionConfig(
   actionKey: string,
 ): ModuleAuditActionDeclaration | undefined {
   return getAuditConfig(moduleName)?.[actionKey];
+}
+
+function buildMenuLookupWhere(
+  declaration: ModuleMenuDeclaration,
+): Prisma.menusWhereInput {
+  return {
+    OR: [
+      { name: declaration.name },
+      ...(declaration.legacyNames ?? []).map((name) => ({ name })),
+      { path: declaration.path },
+      ...(declaration.legacyPaths ?? []).map((path) => ({ path })),
+    ],
+  };
+}
+
+async function findMenuByPath(path: string) {
+  return prisma.menus.findFirst({
+    where: {
+      isDeleted: false,
+      path,
+      status: 1,
+    },
+    select: { id: true },
+  });
+}
+
+async function ensureButton(
+  button: ModuleMenuButtonDeclaration,
+  parentId: string,
+) {
+  const existing = await prisma.menus.findFirst({
+    where: {
+      OR: [{ authCode: button.authCode }, { name: button.name }],
+    },
+    select: {
+      authCode: true,
+      id: true,
+      isDeleted: true,
+      meta: true,
+      parentId: true,
+      status: true,
+      type: true,
+    },
+  });
+  const meta = JSON.stringify({ title: button.title });
+
+  if (!existing) {
+    await prisma.menus.create({
+      data: {
+        id: `menu-${createId()}-${button.name}`,
+        authCode: button.authCode,
+        isDeleted: false,
+        meta,
+        name: button.name,
+        order: button.order,
+        parentId,
+        status: 1,
+        type: 'button',
+      },
+    });
+    return true;
+  }
+
+  const nextData: Prisma.menusUpdateInput = {};
+  if (existing.isDeleted) nextData.isDeleted = false;
+  if (existing.status !== 1) nextData.status = 1;
+  if (existing.parentId !== parentId) nextData.parentId = parentId;
+  if (existing.type !== 'button') nextData.type = 'button';
+  if (!existing.authCode) nextData.authCode = button.authCode;
+  if (!existing.meta) nextData.meta = meta;
+
+  if (Object.keys(nextData).length === 0) {
+    return false;
+  }
+
+  await prisma.menus.update({
+    where: { id: existing.id },
+    data: nextData,
+  });
+  return true;
+}
+
+async function ensureMenu(declaration: ModuleMenuDeclaration) {
+  const parent = declaration.parentPath
+    ? await findMenuByPath(declaration.parentPath)
+    : null;
+  const parentId = parent?.id ?? null;
+  if (declaration.parentPath && !parentId) {
+    return false;
+  }
+
+  let changed = false;
+  const existing = await prisma.menus.findFirst({
+    where: buildMenuLookupWhere(declaration),
+    select: {
+      authCode: true,
+      component: true,
+      id: true,
+      isDeleted: true,
+      meta: true,
+      name: true,
+      parentId: true,
+      path: true,
+      redirect: true,
+      status: true,
+      type: true,
+    },
+  });
+  const meta = JSON.stringify(declaration.meta);
+  let menuId = existing?.id ? String(existing.id) : '';
+
+  if (existing) {
+    const nextData: Prisma.menusUpdateInput = {};
+    if (existing.isDeleted) nextData.isDeleted = false;
+    if (existing.status !== 1) nextData.status = 1;
+    if (existing.type !== declaration.type) nextData.type = declaration.type;
+    if (existing.name !== declaration.name) nextData.name = declaration.name;
+    if (existing.path !== declaration.path) nextData.path = declaration.path;
+    if (parentId && existing.parentId !== parentId)
+      nextData.parentId = parentId;
+    if (existing.component !== declaration.component) {
+      nextData.component = declaration.component;
+    }
+    if (declaration.authCode !== undefined) {
+      if (existing.authCode !== declaration.authCode) {
+        nextData.authCode = declaration.authCode;
+      }
+    } else if (!existing.authCode) {
+      nextData.authCode = declaration.authCode;
+    }
+    if (existing.redirect !== declaration.redirect) {
+      nextData.redirect = declaration.redirect;
+    }
+    if (!existing.meta || existing.meta !== meta) {
+      nextData.meta = meta;
+    }
+
+    if (Object.keys(nextData).length > 0) {
+      await prisma.menus.update({
+        where: { id: existing.id },
+        data: nextData,
+      });
+      changed = true;
+    }
+  } else {
+    const created = await prisma.menus.create({
+      data: {
+        id: `menu-${createId()}-${declaration.key}`,
+        authCode: declaration.authCode,
+        component: declaration.component,
+        isDeleted: false,
+        meta,
+        name: declaration.name,
+        order: declaration.order,
+        parentId,
+        path: declaration.path,
+        redirect: declaration.redirect,
+        status: 1,
+        type: declaration.type,
+      },
+    });
+    changed = true;
+    menuId = String(created.id);
+  }
+
+  for (const button of declaration.buttons ?? []) {
+    changed = (await ensureButton(button, menuId)) || changed;
+  }
+
+  return changed;
+}
+
+export async function ensureModuleMenus() {
+  const changed = [];
+
+  for (const declaration of getMenuDeclarations()) {
+    changed.push(await ensureMenu(declaration));
+  }
+
+  if (changed.some(Boolean)) {
+    await redis.delByPattern('qms:menu:*');
+  }
 }

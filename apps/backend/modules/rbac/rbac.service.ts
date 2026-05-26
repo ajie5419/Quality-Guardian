@@ -1,11 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import {
-  ensureFileCenterMenu,
-  ensureInspectionRequestMenu,
-  ensureMetrologyMenu,
-  ensureSupervisionMenu,
-  ensureVehicleCommissioningMenu,
-} from '~/utils/menu-bootstrap';
+import { ensureModuleMenus } from '~/utils/module-loader';
 import prisma from '~/utils/prisma';
 import {
   isRbacReadV2Enabled,
@@ -132,11 +126,7 @@ export const RbacService = {
     const cached = await redis.get(cacheKey);
     if (cached) return cached;
 
-    await ensureFileCenterMenu();
-    await ensureVehicleCommissioningMenu();
-    await ensureSupervisionMenu();
-    await ensureInspectionRequestMenu();
-    await ensureMetrologyMenu();
+    await ensureModuleMenus();
 
     const allDbMenus = (await prisma.menus.findMany({
       where: { isDeleted: false, status: 1 },
@@ -269,11 +259,7 @@ export const RbacService = {
   },
 
   async getRolePermissionTree() {
-    await ensureFileCenterMenu();
-    await ensureVehicleCommissioningMenu();
-    await ensureSupervisionMenu();
-    await ensureInspectionRequestMenu();
-    await ensureMetrologyMenu();
+    await ensureModuleMenus();
     const allMenus = await prisma.menus.findMany({
       where: { isDeleted: false, status: 1 },
       orderBy: { order: 'asc' },
