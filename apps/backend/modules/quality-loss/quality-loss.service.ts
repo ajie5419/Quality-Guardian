@@ -7,7 +7,7 @@ import type { QualityLossSource } from '~/utils/quality-loss-status';
 import type { PaginationParams } from '~/utils/query-helpers';
 
 import { Prisma } from '@prisma/client';
-import { AUDIT_TEMPLATES, resolveQualityLossTargetLocator } from '@qgs/shared';
+import { resolveQualityLossTargetLocator } from '@qgs/shared';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept/dept.service';
@@ -914,12 +914,10 @@ export const QualityLossService = {
       };
     }
 
-    await SystemLogService.recordAuditLog({
+    await SystemLogService.auditLog('quality-loss', 'relatedUpdate', {
       userId: params.userId,
-      action: 'UPDATE',
       targetType: toQualityLossTargetType(source as QualityLossSource),
       targetId: String(params.id),
-      detailsTemplate: '修改质量损失相关记录: {{id}}{{sourcePart}}',
       detailsVariables: {
         id: params.id,
         sourcePart:
@@ -1195,12 +1193,9 @@ export const QualityLossService = {
       data: { isDeleted: true },
     });
 
-    await SystemLogService.recordAuditLog({
+    await SystemLogService.auditLog('quality-loss', 'delete', {
       userId,
-      action: 'DELETE',
-      targetType: 'quality_loss',
       targetId: target.id,
-      detailsTemplate: AUDIT_TEMPLATES.QUALITY_LOSS_SOFT_DELETE,
       detailsVariables: {},
     });
   },
@@ -1232,12 +1227,9 @@ export const QualityLossService = {
       data: { isDeleted: true },
     });
 
-    await SystemLogService.recordAuditLog({
+    await SystemLogService.auditLog('quality-loss', 'batchDelete', {
       userId,
-      action: 'DELETE',
-      targetType: 'quality_loss',
       targetId: normalizedIds.join(','),
-      detailsTemplate: AUDIT_TEMPLATES.QUALITY_LOSS_BATCH_SOFT_DELETE,
       detailsVariables: {
         count: result.count,
       },

@@ -13,6 +13,7 @@ import {
   LoginStatusEnum,
   renderAuditTemplateText,
 } from '@qgs/shared';
+import { getAuditActionConfig } from '~/utils/module-loader';
 import prisma from '~/utils/prisma';
 import { parseUA } from '~/utils/ua-parser';
 
@@ -127,6 +128,40 @@ export const SystemLogService = {
         ipAddress: params.ipAddress || 'Unknown',
         userAgent: params.userAgent || 'Unknown',
       },
+    });
+  },
+
+  /**
+   * Record an audit log from a module declaration.
+   */
+  async auditLog(
+    moduleName: string,
+    actionKey: string,
+    params: {
+      detailsVariables: Record<string, unknown>;
+      ipAddress?: string;
+      targetId: string;
+      targetType?: string;
+      userAgent?: string;
+      userId: string;
+    },
+  ): Promise<any> {
+    const config = getAuditActionConfig(moduleName, actionKey);
+    if (!config) {
+      throw new Error(
+        `Audit action is not declared: ${moduleName}.${actionKey}`,
+      );
+    }
+
+    return this.recordAuditLog({
+      action: config.action,
+      detailsTemplate: config.detailsTemplate,
+      detailsVariables: params.detailsVariables,
+      ipAddress: params.ipAddress,
+      targetId: params.targetId,
+      targetType: params.targetType || config.targetType || moduleName,
+      userAgent: params.userAgent,
+      userId: params.userId,
     });
   },
 

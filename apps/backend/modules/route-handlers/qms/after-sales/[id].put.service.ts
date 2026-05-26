@@ -63,12 +63,9 @@ export default defineEventHandler(async (event) => {
         fieldName: 'photos',
       });
     }
-    await SystemLogService.recordAuditLog({
+    await SystemLogService.auditLog('after-sales', 'update', {
       userId: String(userinfo.id),
-      action: 'UPDATE',
-      targetType: 'after_sales',
       targetId: String(id),
-      detailsTemplate: '修改售后记录: {{id}}',
       detailsVariables: { id },
     });
 

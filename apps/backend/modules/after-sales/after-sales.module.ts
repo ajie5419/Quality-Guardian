@@ -22,7 +22,7 @@ export const afterSalesModule: ModuleDeclaration = {
     update: {
       action: 'UPDATE',
       targetType: 'after_sales',
-      detailsTemplate: '修改售后记录: {{projectName}} ({{id}})',
+      detailsTemplate: '修改售后记录: {{id}}',
     },
   },
 };

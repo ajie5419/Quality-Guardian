@@ -428,12 +428,9 @@ export const InspectionApiService = {
       bizType: 'inspection_issue',
       fieldName: 'photos',
     });
-    await SystemLogService.recordAuditLog({
+    await SystemLogService.auditLog('inspection', 'issueCreate', {
       userId: String(userinfo.id),
-      action: 'CREATE',
-      targetType: 'inspection_issue',
       targetId: String(newRecord.id),
-      detailsTemplate: '新增检验问题: {{partName}} ({{nonConformanceNumber}})',
       detailsVariables: {
         nonConformanceNumber: newRecord.nonConformanceNumber || '无编号',
         partName: newRecord.partName,
@@ -461,12 +458,9 @@ export const InspectionApiService = {
         fieldName: 'photos',
       });
     }
-    await SystemLogService.recordAuditLog({
+    await SystemLogService.auditLog('inspection', 'issueUpdate', {
       userId: String(userinfo.id),
-      action: 'UPDATE',
-      targetType: 'inspection_issue',
       targetId: String(id),
-      detailsTemplate: '修改检验问题: {{partName}} ({{nonConformanceNumber}})',
       detailsVariables: {
         nonConformanceNumber:
           updateData.nonConformanceNumber || existingNcNumber || '无编号',

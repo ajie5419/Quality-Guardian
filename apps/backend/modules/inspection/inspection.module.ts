@@ -80,15 +80,31 @@ export const inspectionModule: ModuleDeclaration = {
       targetType: 'inspection_request',
       detailsTemplate: '删除报检任务: {{requestNo}}',
     },
+    requestClose: {
+      action: 'UPDATE',
+      targetType: 'inspection_request',
+      detailsTemplate:
+        '关闭报检任务: {{requestNo}}，关联检验记录: {{inspectionId}}',
+    },
     issueCreate: {
       action: 'CREATE',
       targetType: 'inspection_issue',
       detailsTemplate: '新增检验问题: {{partName}} ({{nonConformanceNumber}})',
     },
+    issueCreateFromClose: {
+      action: 'CREATE',
+      targetType: 'inspection_issue',
+      detailsTemplate: '新增检验问题: {{issue}} ({{nonConformanceNumber}})',
+    },
     issueUpdate: {
       action: 'UPDATE',
       targetType: 'inspection_issue',
       detailsTemplate: '修改检验问题: {{partName}} ({{nonConformanceNumber}})',
+    },
+    issueCloseLinked: {
+      action: 'UPDATE',
+      targetType: 'inspection_issue',
+      detailsTemplate: '复检合格关闭关联检验问题: {{linkedIssue}}',
     },
     issueDelete: {
       action: 'DELETE',

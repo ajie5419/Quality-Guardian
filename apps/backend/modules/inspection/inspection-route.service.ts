@@ -517,13 +517,9 @@ export const InspectionRouteService = {
         );
         if (issue) {
           await runClosePostCommitTask('issue-audit-log', () =>
-            SystemLogService.recordAuditLog({
+            SystemLogService.auditLog('inspection', 'issueCreateFromClose', {
               userId: String(userinfo.id),
-              action: 'CREATE',
-              targetType: 'inspection_issue',
               targetId: String(issue.id),
-              detailsTemplate:
-                '新增检验问题: {{issue}} ({{nonConformanceNumber}})',
               detailsVariables: {
                 issue: issueAuditVariables?.issue || issue.partName,
                 nonConformanceNumber:
@@ -536,12 +532,9 @@ export const InspectionRouteService = {
         }
         if (closedLinkedIssueCount > 0 && updated.linkedIssueId) {
           await runClosePostCommitTask('linked-issue-close-audit-log', () =>
-            SystemLogService.recordAuditLog({
+            SystemLogService.auditLog('inspection', 'issueCloseLinked', {
               userId: String(userinfo.id),
-              action: 'UPDATE',
-              targetType: 'inspection_issue',
               targetId: String(updated.linkedIssueId),
-              detailsTemplate: '复检合格关闭关联检验问题: {{linkedIssue}}',
               detailsVariables: {
                 linkedIssue: updated.linkedIssueNo || updated.linkedIssueId,
               },

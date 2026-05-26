@@ -8,7 +8,6 @@ import type { AfterSalesDateMode } from './after-sales-query';
 
 import { Prisma } from '@prisma/client';
 import {
-  AUDIT_TEMPLATES,
   formatDate,
   QMS_DEFAULT_VALUES,
   QMS_STATUS_OPEN_SET,
@@ -940,12 +939,9 @@ export const AfterSalesService = {
     });
 
     // Record audit log
-    await SystemLogService.recordAuditLog({
+    await SystemLogService.auditLog('after-sales', 'delete', {
       userId,
-      action: 'DELETE',
-      targetType: 'after_sales',
       targetId: id,
-      detailsTemplate: AUDIT_TEMPLATES.AFTER_SALES_SOFT_DELETE,
       detailsVariables: {},
     });
   },

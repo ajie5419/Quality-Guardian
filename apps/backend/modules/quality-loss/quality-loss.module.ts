@@ -9,6 +9,11 @@ export const qualityLossModule: ModuleDeclaration = {
     selfFields: [],
   },
   audit: {
+    create: {
+      action: 'CREATE',
+      targetType: 'quality_loss',
+      detailsTemplate: '新增质量损失记录: {{type}} ({{amount}})',
+    },
     relatedUpdate: {
       action: 'UPDATE',
       detailsTemplate: '修改质量损失相关记录: {{id}}{{sourcePart}}',

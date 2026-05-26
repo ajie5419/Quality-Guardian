@@ -10,7 +10,6 @@ import process from 'node:process';
 
 import { Prisma } from '@prisma/client';
 import {
-  AUDIT_TEMPLATES,
   deriveIssueTrackingStatus,
   formatDate,
   InspectionIssueStatusEnum,
@@ -2687,12 +2686,9 @@ export const InspectionCoreService = {
     await WelderScoreService.syncFromInspectionIssues();
 
     // Record audit log
-    await SystemLogService.recordAuditLog({
+    await SystemLogService.auditLog('inspection', 'issueDelete', {
       userId,
-      action: 'DELETE',
-      targetType: 'inspection_issue',
       targetId: id,
-      detailsTemplate: AUDIT_TEMPLATES.INSPECTION_ISSUE_SOFT_DELETE,
       detailsVariables: {},
     });
   },

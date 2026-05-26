@@ -10,7 +10,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { extname, relative, resolve } from 'node:path';
 
 import {
-  AUDIT_TEMPLATES,
   formatDate,
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
@@ -715,14 +714,11 @@ export const VehicleCommissioningService = {
     });
 
     if (operatorUserId) {
-      await SystemLogService.recordAuditLog({
-        action: 'CREATE',
-        detailsTemplate: AUDIT_TEMPLATES.VEHICLE_COMMISSIONING_ISSUE_CREATE,
+      await SystemLogService.auditLog('vehicle-commissioning', 'issueCreate', {
         detailsVariables: {
           issue: row.description || row.id,
         },
         targetId: row.id,
-        targetType: 'vehicle_commissioning_issue',
         userId: operatorUserId,
       });
     }
@@ -883,15 +879,12 @@ export const VehicleCommissioningService = {
     });
 
     if (operatorUserId) {
-      await SystemLogService.recordAuditLog({
-        action: 'UPDATE',
-        detailsTemplate: AUDIT_TEMPLATES.VEHICLE_COMMISSIONING_ISSUE_UPDATE,
+      await SystemLogService.auditLog('vehicle-commissioning', 'issueUpdate', {
         detailsVariables: {
           issue: row.description || row.id,
           status: String(row.status || ''),
         },
         targetId: row.id,
-        targetType: 'vehicle_commissioning_issue',
         userId: operatorUserId,
       });
     }

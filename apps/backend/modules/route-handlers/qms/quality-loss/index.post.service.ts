@@ -38,12 +38,9 @@ export default defineEventHandler(async (event) => {
       ),
     });
 
-    await SystemLogService.recordAuditLog({
+    await SystemLogService.auditLog('quality-loss', 'create', {
       userId: String(userinfo.id),
-      action: 'CREATE',
-      targetType: 'quality_loss',
       targetId: String(newItem.id),
-      detailsTemplate: '新增质量损失记录: {{type}} ({{amount}})',
       detailsVariables: {
         amount: newItem.amount,
         type: newItem.type,

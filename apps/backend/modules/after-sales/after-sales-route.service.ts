@@ -51,12 +51,9 @@ export const AfterSalesRouteService = {
       bizType: 'after_sales',
       fieldName: 'photos',
     });
-    await SystemLogService.recordAuditLog({
+    await SystemLogService.auditLog('after-sales', 'create', {
       userId: String(userinfo.id || ''),
-      action: 'CREATE',
-      targetType: 'after_sales',
       targetId: String(created.id),
-      detailsTemplate: '新增售后记录: {{projectName}} ({{id}})',
       detailsVariables: { id: created.id, projectName: created.projectName },
     });
     return created;
