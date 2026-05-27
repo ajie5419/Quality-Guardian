@@ -97,6 +97,23 @@ function flattenDeptFilters(
   return result;
 }
 
+function formatDepartmentList(
+  deptRawData: BaseTreeNode[],
+  departments?: string[],
+  fallback?: string,
+): string {
+  let values: string[] = [];
+  if (Array.isArray(departments) && departments.length > 0) {
+    values = departments;
+  } else if (fallback) {
+    values = [fallback];
+  }
+  return values
+    .map((value) => findNameById(deptRawData, value) || value)
+    .filter(Boolean)
+    .join(', ');
+}
+
 export function useIssueGridOptions({
   currentDateMode,
   currentDateValue,
@@ -244,10 +261,18 @@ export function useIssueGridOptions({
           return {
             ...col,
             filters: deptFilters.value,
-            formatter: ({ cellValue }: { cellValue: string | unknown }) => {
-              if (!cellValue) return '';
-              const name = findNameById(deptRawData.value, cellValue as string);
-              return name || (cellValue as string);
+            formatter: ({
+              cellValue,
+              row,
+            }: {
+              cellValue: string | unknown;
+              row: InspectionIssue;
+            }) => {
+              return formatDepartmentList(
+                deptRawData.value,
+                row.responsibleDepartments,
+                cellValue as string | undefined,
+              );
             },
           };
         }
