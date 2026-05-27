@@ -28,12 +28,14 @@ const { t } = useI18n();
       <FormItem
         :label="t('qms.afterSales.form.responsibleDept')"
         class="mb-0"
-        name="responsibleDept"
+        name="responsibleDepartments"
       >
         <TreeSelect
-          v-model:value="formState.responsibleDept"
+          v-model:value="formState.responsibleDepartments"
           :tree-data="deptTreeData"
+          max-tag-count="responsive"
           placeholder="请选择责任部门"
+          tree-checkable
           tree-default-expand-all
           class="w-full"
         />

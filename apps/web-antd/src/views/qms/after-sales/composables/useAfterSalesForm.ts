@@ -41,6 +41,22 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
   // 缺陷子类型
   const currentDefectSubtypes = ref<string[]>([]);
 
+  function normalizeResponsibleDepartments(values: {
+    responsibleDept?: string;
+    responsibleDepartments?: string[];
+  }): string[] {
+    if (Array.isArray(values.responsibleDepartments)) {
+      return values.responsibleDepartments
+        .map((item) => String(item || '').trim())
+        .filter(Boolean);
+    }
+    return values.responsibleDept ? [String(values.responsibleDept)] : [];
+  }
+
+  function firstResponsibleDepartment(): string {
+    return normalizeResponsibleDepartments(formState)[0] || '';
+  }
+
   /**
    * 更新产品子类型选项
    */
@@ -128,6 +144,7 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
     );
 
     const { photos, ...rest } = row;
+    const responsibleDepartments = normalizeResponsibleDepartments(rest);
 
     // 处理照片数据转换
     let photoArray: string[] = [];
@@ -139,6 +156,7 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
 
     Object.assign(formState, {
       ...rest,
+      responsibleDepartments,
       photos: photoArray.map((url, index) => ({
         uid: String(index),
         name: `Photo ${index + 1}`,
@@ -172,9 +190,12 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
           })
           .filter((url): url is string => !!url) || [];
 
+      const responsibleDepartments = normalizeResponsibleDepartments(rawData);
       const data = {
         ...rawData,
         photos,
+        responsibleDept: responsibleDepartments[0] || '',
+        responsibleDepartments,
       };
 
       if (isEditMode.value && currentId.value) {
@@ -197,13 +218,14 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
    * 检查是否为采购部门
    */
   function checkIsPurchasingDept(deptTreeData: TreeSelectNode[]): boolean {
-    if (!formState.responsibleDept) return false;
+    const responsibleDept = firstResponsibleDepartment();
+    if (!responsibleDept) return false;
     const KEYWORD = '采购';
-    if (String(formState.responsibleDept).includes(KEYWORD)) return true;
+    if (String(responsibleDept).includes(KEYWORD)) return true;
 
     const findDept = (nodes: TreeSelectNode[]): boolean => {
       for (const node of nodes) {
-        if (node.value === formState.responsibleDept) {
+        if (node.value === responsibleDept) {
           return (
             (node.title as string)?.includes(KEYWORD) ||
             (node.label as string)?.includes(KEYWORD)
@@ -282,7 +304,7 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
         ]),
       },
     ],
-    responsibleDept: [
+    responsibleDepartments: [
       {
         required: true,
         message: t('ui.formRules.selectRequired', [
