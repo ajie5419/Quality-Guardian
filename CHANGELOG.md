@@ -25,6 +25,29 @@
 
 ## 执行记录
 
+### 2026-05-27 需求：责任部门多选
+
+**执行内容：**
+
+- 为 `quality_records` 和 `after_sales` 增加 `responsibleDepartments` JSON array 文本列，保留旧单值字段兼容旧数据。
+- 新增共享工具 `department-multi.ts`，统一解析和序列化责任部门数组。
+- 后端 inspection / after-sales 写入数组时同步旧字段首项，列表返回兼容新数组与旧单值。
+- 前端不合格品和售后问题表单改为多选，并修复列表与详情展示多个责任部门。
+- 新增 `scripts/qms-architecture-baseline.txt`，记录本次触碰的既有超长 QMS 页面基线，确保架构检查聚焦新增违规。
+- 创建需求文档 `docs/requirements/2026-05-27-responsible-department-multi-select.md`。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/backend exec vitest run`: 通过
+- `pnpm -C apps/web-antd exec vue-tsc --noEmit`: 通过
+
+**commit:** `8af125a9` / `a8d95555` / `0bb59cdf` / `55c4e7c1` / `98b4d263` / `86c40f60` / `7b230893` / `be278afb` / `d10a6422` / `f869176d` / `53cd3307` / `0f28cd84`
+
+**遗留问题：**
+
+- 本机 `prisma migrate dev --name add_responsible_departments_multi` 连接 `127.0.0.1:3306` 后返回 schema engine 空错误；已创建 Prisma migration SQL，并通过 `prisma validate` / `prisma generate` / typecheck 验证。
+
 ### 2026-05-25 阶段一：死代码清理与依赖收敛
 
 **执行内容：**
