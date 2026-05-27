@@ -52,7 +52,7 @@ const teamOptions = ref<SelectProps['options']>([]);
 const workOrderLoading = ref(false);
 const workOrderOptions = ref<Array<{ label: string; value: string }>>([]);
 const workOrderProcessesLoading = ref(false);
-const { compressImage, isImage } = useImageCompress();
+const { compressImage } = useImageCompress();
 const workOrderProcessOptions = ref<Array<{ label: string; value: string }>>(
   [],
 );
@@ -199,8 +199,7 @@ function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
   syncAttachmentsFromFiles(attachmentFileList.value);
 }
 
-async function handlePhotoBeforeUpload(file: File) {
-  if (!isImage(file)) return true;
+async function handleBeforeUpload(file: File) {
   return compressImage(file);
 }
 
@@ -472,7 +471,7 @@ watch(
       <Form.Item label="自检记录" required>
         <InspectionRequestEntryUploadActions
           v-model:file-list="attachmentFileList"
-          :before-photo-upload="handlePhotoBeforeUpload"
+          :before-upload="handleBeforeUpload"
           :disabled="submitting"
           @change="handleAttachmentUploadChange"
         />

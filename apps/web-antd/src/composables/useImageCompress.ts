@@ -47,12 +47,14 @@ export function useImageCompress() {
       return Promise.resolve(file);
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const compressor = new Compressor(file, {
         maxHeight: opts.maxHeight,
         maxWidth: opts.maxWidth,
         quality: opts.quality,
-        error: reject,
+        error() {
+          resolve(file);
+        },
         success(result) {
           resolve(
             new File([result], file.name, {

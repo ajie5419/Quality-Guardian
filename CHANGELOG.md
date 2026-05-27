@@ -25,6 +25,24 @@
 
 ## 执行记录
 
+### 2026-05-27 修复：报检入口上传照片失败
+
+**执行内容：**
+
+- 修复图片压缩失败时阻断 Ant Design Vue Upload 上传的问题，压缩异常时自动回退原文件上传。
+- 报检入口“拍照上传”和“选择文件”统一使用同一上传前压缩处理，图片按 lossy 策略压缩，非图片保持原文件上传。
+
+**验证结果：**
+
+- `pnpm -C apps/web-antd exec vue-tsc --noEmit`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `3348eb11` fix(@qgs/web-antd): keep inspection entry uploads resilient
+
+**遗留问题：**
+
+- 未启动前端 dev server，按项目规则仅做类型检查和架构守护验证。
+
 ### 2026-05-27 需求：责任部门多选
 
 **执行内容：**

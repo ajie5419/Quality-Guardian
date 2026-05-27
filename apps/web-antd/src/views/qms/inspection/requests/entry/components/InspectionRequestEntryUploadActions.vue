@@ -6,7 +6,7 @@ import { IconifyIcon } from '@vben/icons';
 import { Button, Upload } from 'ant-design-vue';
 
 interface Props {
-  beforePhotoUpload: (file: File) => Promise<File | true>;
+  beforeUpload: (file: File) => Promise<File>;
   disabled: boolean;
 }
 
@@ -28,7 +28,7 @@ const files = defineModel<UploadFile[]>('fileList', {
       accept="image/*"
       action="/api/upload"
       capture="environment"
-      :before-upload="props.beforePhotoUpload"
+      :before-upload="props.beforeUpload"
       :disabled="props.disabled"
       :show-upload-list="false"
       @change="(info) => emit('change', info)"
@@ -43,6 +43,7 @@ const files = defineModel<UploadFile[]>('fileList', {
     <Upload
       v-model:file-list="files"
       action="/api/upload"
+      :before-upload="props.beforeUpload"
       :disabled="props.disabled"
       multiple
       @change="(info) => emit('change', info)"
