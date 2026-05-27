@@ -4,7 +4,7 @@ import { RbacService } from '~/modules/rbac/rbac.service';
 import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
-import { isPrismaUniqueConstraintError } from '~/utils/db-error';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   conflictResponse,
   internalServerErrorResponse,

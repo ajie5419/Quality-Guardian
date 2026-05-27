@@ -6,7 +6,7 @@ import { getCurrentUser } from '~/utils/current-user';
 import {
   isPrismaNotFoundError,
   isPrismaUniqueConstraintError,
-} from '~/utils/db-error';
+} from '~/utils/prisma-error';
 import {
   conflictResponse,
   internalServerErrorResponse,

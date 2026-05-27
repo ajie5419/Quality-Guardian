@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
-import { isPrismaUniqueConstraintError } from '~/utils/db-error';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   badRequestResponse,
   conflictResponse,

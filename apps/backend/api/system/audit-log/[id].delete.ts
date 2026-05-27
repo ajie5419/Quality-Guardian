@@ -3,7 +3,7 @@ import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
-import { isPrismaNotFoundError } from '~/utils/db-error';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
   notFoundResponse,

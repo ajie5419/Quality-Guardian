@@ -7,7 +7,7 @@ import {
 } from '~/modules/inspection/inspection-issue';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
-import { isPrismaNotFoundError } from '~/utils/db-error';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   forbiddenResponse,
   internalServerErrorResponse,

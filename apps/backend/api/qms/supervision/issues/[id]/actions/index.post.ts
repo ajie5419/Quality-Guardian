@@ -4,7 +4,7 @@ import { FileStorageService } from '~/modules/file-storage/file-storage.service'
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
-import { isPrismaSchemaMismatchError } from '~/utils/db-error';
+import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import {
   badRequestResponse,
   internalServerErrorResponse,

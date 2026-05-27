@@ -3,7 +3,7 @@ import { MetrologyService } from '~/modules/metrology/metrology.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
-import { isPrismaNotFoundError } from '~/utils/db-error';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
   notFoundResponse,

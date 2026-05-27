@@ -5,7 +5,7 @@ import { logApiError } from '~/utils/api-logger';
 import {
   isPrismaNotFoundError,
   isPrismaUniqueConstraintError,
-} from '~/utils/db-error';
+} from '~/utils/prisma-error';
 import {
   conflictResponse,
   internalServerErrorResponse,

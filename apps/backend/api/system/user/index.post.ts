@@ -3,7 +3,7 @@ import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { UserService } from '~/modules/user/user.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
-import { isPrismaUniqueConflictError } from '~/utils/db-error';
+import { isPrismaUniqueConflictError } from '~/utils/prisma-error';
 import {
   conflictResponse,
   internalServerErrorResponse,

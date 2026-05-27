@@ -8,7 +8,7 @@ import {
   legacyErrorToBusinessError,
 } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
-import { isPrismaNotFoundError } from '~/utils/db-error';
+import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
   notFoundResponse,

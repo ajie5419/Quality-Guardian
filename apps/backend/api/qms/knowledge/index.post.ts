@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { KnowledgeRouteService } from '~/modules/knowledge/knowledge-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
-import { isPrismaUniqueConstraintError } from '~/utils/db-error';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   conflictResponse,
   internalServerErrorResponse,
