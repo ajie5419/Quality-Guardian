@@ -10,9 +10,7 @@ import {
   findInspectionForIssue,
   getNextInspectionIssueSerialNumber,
 } from './inspection-issue';
-import {
-  normalizeInspectionRequestText,
-} from './inspection-request';
+import { normalizeInspectionRequestText } from './inspection-request';
 import { parseCloseRequestNumber } from './inspection-request-close.schema';
 
 export interface CloseLinkedIssueCreateResult {
@@ -114,10 +112,13 @@ function buildCloseLinkedIssueBody(options: {
       options.request.partName,
     processName:
       normalizeInspectionRequestText(options.linkedIssue.processName) ||
-      normalizeInspectionRequestText(resolveCanonicalProcessName(options.request)) ||
+      normalizeInspectionRequestText(
+        resolveCanonicalProcessName(options.request),
+      ) ||
       options.request.processName,
     projectName:
-      options.request.work_order?.projectName || options.request.workOrderNumber,
+      options.request.work_order?.projectName ||
+      options.request.workOrderNumber,
     quantity: issueQuantity,
     reportDate: normalizeInspectionRequestText(options.linkedIssue.reportDate),
     reportedBy:
@@ -134,7 +135,8 @@ function buildCloseLinkedIssueBody(options: {
     severity:
       normalizeInspectionRequestText(options.linkedIssue.severity) || 'Minor',
     solution: normalizeInspectionRequestText(options.linkedIssue.solution),
-    status: normalizeInspectionRequestText(options.linkedIssue.status) || 'OPEN',
+    status:
+      normalizeInspectionRequestText(options.linkedIssue.status) || 'OPEN',
     supplierName: normalizeInspectionRequestText(
       options.linkedIssue.supplierName,
     ),

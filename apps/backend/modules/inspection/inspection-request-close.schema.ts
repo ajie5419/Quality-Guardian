@@ -35,10 +35,7 @@ export function validateCloseRequestBody(body: Record<string, unknown>) {
     failCloseRequest('VALIDATION', '检验结果为合格时，不合格数量必须为 0');
   if (result !== 'FAIL') return;
   if (unqualifiedQuantity <= 0)
-    failCloseRequest(
-      'VALIDATION',
-      '检验结果为不合格时，不合格数量必须大于 0',
-    );
+    failCloseRequest('VALIDATION', '检验结果为不合格时，不合格数量必须大于 0');
   if (!body.linkedIssue || typeof body.linkedIssue !== 'object')
     failCloseRequest('VALIDATION', '检验结果为不合格时必须填写不合格项信息');
   const linkedIssue = body.linkedIssue as Record<string, unknown>;

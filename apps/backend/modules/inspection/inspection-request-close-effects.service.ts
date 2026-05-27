@@ -64,13 +64,11 @@ export async function syncCloseAttachments(options: {
 
 export async function syncCloseIssueEffects(options: {
   closedLinkedIssueCount: number;
-  issue:
-    | {
-        id: string;
-        nonConformanceNumber: null | string;
-        partName: string;
-      }
-    | null;
+  issue: null | {
+    id: string;
+    nonConformanceNumber: null | string;
+    partName: string;
+  };
   issueAuditVariables?: { issue: string; nonConformanceNumber: string };
   linkedIssue?: Record<string, unknown>;
   updated: {
