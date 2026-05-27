@@ -50,12 +50,13 @@ packages/
 ## 生产环境
 
 | 资源 | 配置 |
-|------|------|
+| --- | --- |
 | 应用服务器 | 2 核 4 GB |
 | 文件存储 | 阿里云 OSS（环境变量 `OSS_PROVIDER=aliyun` + `OSS_BUCKET` + `OSS_ENDPOINT` + `OSS_ACCESS_KEY_ID` + `OSS_ACCESS_KEY_SECRET`） |
 | 数据库 | 阿里云 RDS for MySQL 8.x（环境变量 `DATABASE_URL`） |
 
 部署注意：
+
 - OSS 环境变量缺失时，文件会落到容器本地 `uploads/` 目录，重启数据丢失
 - RDS 连接串必须通过环境变量注入，禁止写入代码或提交到 git
 - 服务器内存有限（4 GB），慎用全量加载到内存的查询（见 CONSTRAINTS.md 性能规范）
