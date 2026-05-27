@@ -81,6 +81,23 @@ function normalizeAfterSalesRows(
   });
 }
 
+function formatDepartmentList(
+  deptRawData: BaseTreeNode[],
+  departments?: string[],
+  fallback?: string,
+): string {
+  let values: string[] = [];
+  if (Array.isArray(departments) && departments.length > 0) {
+    values = departments;
+  } else if (fallback) {
+    values = [fallback];
+  }
+  return values
+    .map((value) => findNameById(deptRawData, value) || value)
+    .filter(Boolean)
+    .join(', ');
+}
+
 export function useAfterSalesGrid({
   canDelete,
   canEdit,
@@ -279,10 +296,18 @@ export function useAfterSalesGrid({
         field: 'responsibleDept',
         title: t('qms.afterSales.form.responsibleDept'),
         width: 120,
-        formatter: ({ cellValue }: { cellValue: string }) => {
-          if (!cellValue) return '';
-          const name = findNameById(deptRawData.value, cellValue);
-          return name || cellValue;
+        formatter: ({
+          cellValue,
+          row,
+        }: {
+          cellValue: string;
+          row: QmsAfterSalesApi.AfterSalesItem;
+        }) => {
+          return formatDepartmentList(
+            deptRawData.value,
+            row.responsibleDepartments,
+            cellValue,
+          );
         },
       },
       {
