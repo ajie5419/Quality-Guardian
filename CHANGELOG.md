@@ -480,3 +480,34 @@
 **遗留问题：**
 
 - `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
+
+### 2026-05-27 报检任务模块重构
+
+**执行内容：**
+
+- 更新 inspection 模块架构文档，补充报检任务状态机、public 报检入口边界和后续拆分约束。
+- 新增报检任务创建 schema，后台创建和 public 创建共用字段白名单与必填校验，移除创建入口的 `z.object({}).passthrough()`。
+- 将报检任务列表查询拆到 `InspectionRequestQueryService`，保留 DB 分页上限、软删除过滤和关联不合格品批量查询。
+- 将报检任务创建拆到 `InspectionRequestCreateService`，保留工单校验、主数据双写、附件引用、审计和 SSE 事件发布。
+- 将派工和删除拆到 `InspectionRequestDispatchService`、`InspectionRequestDeleteService`，保留事务边界和审计行为。
+- 将关闭工作流拆出关闭校验、失败关联不合格品构造、关闭后附件/审计/焊工评分副作用，关闭主 service 从 474 行降到 265 行。
+- 报检任务 API 主路径直接调用专用 service，不再经由 `InspectionApiService` facade；`mapInspectionRequest` 去掉生产代码中的 `any`。
+- 新增 `inspection-request-create.schema.test.ts`，覆盖当前创建 payload、非组装工序组件必填、组装工序允许空组件。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/backend exec vitest run modules/inspection/inspection-request-create.schema.test.ts`: 1 文件 / 3 测试全部通过
+- `pnpm -C apps/backend exec vitest run`: 30 文件 / 160 测试全部通过
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+- `rg "await import|modules/welder/welder-score|modules/system-log/system-log" apps/backend/modules/inspection/inspection-request-close.service.ts apps/backend/modules/inspection/inspection-request-close-effects.service.ts apps/backend/modules/inspection/inspection-request-close-issue.service.ts`: 无输出
+- `wc -l apps/backend/modules/inspection/inspection-request-close.service.ts`: 265 行
+- 阶段结束模块 TS 文件数：316
+
+**commit:** `1f24ea63` / `a5bd2928` / `f9adcada` / `3b40cbb8` / `6237e67f` / `3ebb657e` / `fe2ff921` / `6418afd1` / `8da0c637` / `df52c4f6`
+
+**遗留问题：**
+
+- `InspectionApiService` 仍保留不合格品 issue 相关兼容入口，本轮只清理报检任务主路径，未扩大到 issue API。
+- 报检任务派工、关闭 PASS/FAIL、public 创建仍建议继续补带数据库 mock 的流程测试。
+- `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。

@@ -7,7 +7,9 @@ import {
 
 function buildValidPayload() {
   return {
-    attachments: [{ name: 'self-check.jpg', url: 'https://example.test/a.jpg' }],
+    attachments: [
+      { name: 'self-check.jpg', url: 'https://example.test/a.jpg' },
+    ],
     componentName: '组件A',
     mutualCheckResult: 'PASS',
     partName: '一级部件',
