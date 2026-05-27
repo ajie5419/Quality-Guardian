@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/system/menu/[id].put.service';
+export { default } from '~/modules/system/menu-id.put.service';

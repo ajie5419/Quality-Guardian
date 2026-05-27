@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/system/settings/[key].post.service';
+export { default } from '~/modules/system/settings-key.post.service';

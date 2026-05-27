@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/qms/quality-loss/index.post.service';
+export { default } from '~/modules/quality-loss/quality-loss-create.post.service';

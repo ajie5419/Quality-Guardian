@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/system/role/[id]/data-scope.post.service';
+export { default } from '~/modules/rbac/role-data-scope.post.service';

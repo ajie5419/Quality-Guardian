@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/qms/vehicle-failure-rate-manual.post.service';
+export { default } from '~/modules/report/vehicle-failure-rate-manual.post.service';

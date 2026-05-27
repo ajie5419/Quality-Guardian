@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/qms/supplier/[id].put.service';
+export { default } from '~/modules/supplier/supplier-id.put.service';

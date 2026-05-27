@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/ai/analyze.post.service';
+export { default } from '~/modules/ai/analyze.post.service';

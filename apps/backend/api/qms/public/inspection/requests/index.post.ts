@@ -2,4 +2,4 @@
 
 
 
-export {default} from '~/route-handlers/qms/public/inspection/requests/index.post.service';
+export {default} from '~/modules/inspection/public-inspection-request-create.post.service';

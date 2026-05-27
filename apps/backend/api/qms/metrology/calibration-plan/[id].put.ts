@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/qms/metrology/calibration-plan/[id].put.service';
+export { default } from '~/modules/metrology/calibration-plan-id.put.service';

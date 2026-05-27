@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/qms/ai/extract-tags.post.service';
+export { default } from '~/modules/ai/extract-tags.post.service';

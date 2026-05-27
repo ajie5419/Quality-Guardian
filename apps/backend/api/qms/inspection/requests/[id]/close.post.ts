@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/qms/inspection/requests/[id]/close.post.service';
+export { default } from '~/modules/inspection/inspection-request-close.post.service';

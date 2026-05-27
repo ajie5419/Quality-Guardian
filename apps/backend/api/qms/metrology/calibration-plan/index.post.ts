@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/qms/metrology/calibration-plan/index.post.service';
+export { default } from '~/modules/metrology/calibration-plan-create.post.service';

@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/qms/supervision/issues/index.post.service';
+export { default } from '~/modules/supervision/supervision-issue-create.post.service';

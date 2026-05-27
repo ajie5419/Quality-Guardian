@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/system/dictionary/index.post.service';
+export { default } from '~/modules/dictionary/dictionary-create.post.service';

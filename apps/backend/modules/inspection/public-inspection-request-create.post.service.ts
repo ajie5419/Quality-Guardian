@@ -51,7 +51,10 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     logApiError('public-inspection-request-create', error, undefined, event);
     if (error instanceof Error && error.message.startsWith('BAD_REQUEST:'))
-      return badRequestResponse(event, error.message.replace('BAD_REQUEST:', ''));
+      return badRequestResponse(
+        event,
+        error.message.replace('BAD_REQUEST:', ''),
+      );
     return internalServerErrorResponse(event, '创建报检任务失败');
   }
 });

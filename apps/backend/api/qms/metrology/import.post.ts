@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/qms/metrology/import.post.service';
+export { default } from '~/modules/metrology/metrology-import.post.service';

@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/qms/inspection/records/export.get.service';
+export { default } from '~/modules/inspection/inspection-record-export.get.service';

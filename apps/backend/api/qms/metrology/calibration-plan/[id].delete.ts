@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/qms/metrology/calibration-plan/[id].delete.service';
+export { default } from '~/modules/metrology/calibration-plan-id.delete.service';

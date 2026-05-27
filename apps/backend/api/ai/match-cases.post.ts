@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/ai/match-cases.post.service';
+export { default } from '~/modules/ai/match-cases.post.service';

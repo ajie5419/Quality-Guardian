@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/system/dictionary/[id].put.service';
+export { default } from '~/modules/dictionary/dictionary-id.put.service';

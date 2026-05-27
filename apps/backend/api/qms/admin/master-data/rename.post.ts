@@ -1,1 +1,1 @@
-export { default } from '~/route-handlers/qms/admin/master-data/rename.post.service';
+export { default } from '~/modules/system/admin-master-data-rename.post.service';
