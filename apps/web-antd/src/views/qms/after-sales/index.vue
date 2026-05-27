@@ -229,6 +229,20 @@ function formatDept(value: string | undefined) {
   return findNameById(deptRawData.value, value) || value;
 }
 
+function formatDepartments(record: QmsAfterSalesApi.AfterSalesItem) {
+  let values: string[] = [];
+  if (
+    Array.isArray(record.responsibleDepartments) &&
+    record.responsibleDepartments.length > 0
+  ) {
+    values = record.responsibleDepartments;
+  } else if (record.responsibleDept) {
+    values = [record.responsibleDept];
+  }
+  if (values.length === 0) return '-';
+  return values.map((value) => formatDept(value)).join(', ');
+}
+
 function onCheckChange(
   params: VxeCheckboxChangeParams<QmsAfterSalesApi.AfterSalesItem>,
 ) {
@@ -559,7 +573,7 @@ function handleModalSuccess() {
             {{ formatDept(detailRecord.division) }}
           </Descriptions.Item>
           <Descriptions.Item :label="t('qms.afterSales.form.responsibleDept')">
-            {{ formatDept(detailRecord.responsibleDept) }}
+            {{ formatDepartments(detailRecord) }}
           </Descriptions.Item>
 
           <Descriptions.Item :label="t('qms.afterSales.form.customerName')">
