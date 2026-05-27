@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
+import type { CompressPreset } from '#/composables/useImageCompress';
 
 import { computed } from 'vue';
 
@@ -7,6 +8,7 @@ import { useAccessStore } from '@vben/stores';
 
 import { message, Upload } from 'ant-design-vue';
 
+import { useImageCompress } from '#/composables/useImageCompress';
 import { applyUploadResponse } from '#/views/qms/shared/utils/upload-file';
 
 const props = withDefaults(
@@ -17,6 +19,7 @@ const props = withDefaults(
     listType?: 'picture' | 'picture-card' | 'text';
     maxCount?: number;
     multiple?: boolean;
+    photoCompressPreset?: CompressPreset;
   }>(),
   {
     accept: undefined,
@@ -25,6 +28,7 @@ const props = withDefaults(
     listType: 'text',
     maxCount: undefined,
     multiple: false,
+    photoCompressPreset: 'lossy',
   },
 );
 
@@ -38,6 +42,7 @@ const files = defineModel<UploadFile[]>('fileList', {
 });
 
 const accessStore = useAccessStore();
+const { compressImage, isImage } = useImageCompress();
 
 const uploadHeaders = computed(() => ({
   Authorization: `Bearer ${accessStore.accessToken}`,
@@ -59,6 +64,11 @@ function handleChange(info: UploadChangeParam<UploadFile>) {
   }
   emit('change', files.value);
 }
+
+async function handleBeforeUpload(file: File) {
+  if (!isImage(file)) return true;
+  return compressImage(file, props.photoCompressPreset);
+}
 </script>
 
 <template>
@@ -66,6 +76,7 @@ function handleChange(info: UploadChangeParam<UploadFile>) {
     v-model:file-list="files"
     action="/api/upload"
     :accept="accept"
+    :before-upload="handleBeforeUpload"
     :disabled="disabled"
     :headers="uploadHeaders"
     :list-type="listType"
