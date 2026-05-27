@@ -1,12 +1,9 @@
 import { defineEventHandler, readBody } from 'h3';
-import { z } from 'zod';
 import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
 import {
-  isInspectionRequestAssemblyProcess,
-  normalizeInspectionRequestAttachments,
-  normalizeInspectionRequestText,
-  parseInspectionRequestQuantity,
-} from '~/modules/inspection/inspection-request';
+  inspectionRequestCreateBodySchema,
+  validateInspectionRequestCreateBody,
+} from '~/modules/inspection/inspection-request-create.schema';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import {
@@ -15,31 +12,12 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
-const schema = z.object({}).passthrough();
-
 export default defineEventHandler(async (event) => {
   const userinfo = getCurrentUser(event);
-  const body = schema.parse(await readBody(event));
+  const body = inspectionRequestCreateBodySchema.parse(await readBody(event));
+  const validation = validateInspectionRequestCreateBody(body);
 
-  const workOrderNumber = normalizeInspectionRequestText(body.workOrderNumber);
-  const partName = normalizeInspectionRequestText(body.partName);
-  const processName = normalizeInspectionRequestText(body.processName);
-  const componentName = isInspectionRequestAssemblyProcess(processName)
-    ? ''
-    : normalizeInspectionRequestText(body.componentName);
-  const reporter = normalizeInspectionRequestText(body.reporter);
-  const team = normalizeInspectionRequestText(body.team);
-  parseInspectionRequestQuantity(body.quantity);
-  const attachments = normalizeInspectionRequestAttachments(body.attachments);
-  if (
-    !workOrderNumber ||
-    !partName ||
-    !processName ||
-    (!isInspectionRequestAssemblyProcess(processName) && !componentName) ||
-    !team ||
-    !reporter ||
-    attachments.length === 0
-  ) {
+  if (!validation.isValid) {
     return badRequestResponse(
       event,
       '工单号、工序、一级部件名称、组件名称、班组、报检人、自检记录不能为空',
