@@ -98,6 +98,7 @@ const {
   detailPhotos,
   openDetail,
   formatDept,
+  formatDepartments,
   formatDisplayDate,
 } = useIssueDetail(deptRawData);
 const { statusOptions: fallbackIssueStatusOptions } = useStatusOptions();
@@ -548,7 +549,7 @@ async function handleGenerateInsight() {
         <Descriptions.Item
           :label="t('qms.inspection.issues.responsibleDepartment')"
         >
-          {{ formatDept(detailRecord.responsibleDepartment) }}
+          {{ formatDepartments(detailRecord) }}
         </Descriptions.Item>
         <Descriptions.Item
           :label="t('qms.inspection.issues.responsibleWelder')"

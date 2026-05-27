@@ -42,6 +42,20 @@ export function useIssueDetail(deptRawData: Ref<any[]>) {
     return findNameById(deptRawData.value, value) || value;
   }
 
+  function formatDepartments(record: InspectionIssue) {
+    let values: string[] = [];
+    if (
+      Array.isArray(record.responsibleDepartments) &&
+      record.responsibleDepartments.length > 0
+    ) {
+      values = record.responsibleDepartments;
+    } else if (record.responsibleDepartment) {
+      values = [record.responsibleDepartment];
+    }
+    if (values.length === 0) return '-';
+    return values.map((value) => formatDept(value)).join(', ');
+  }
+
   function formatDisplayDate(value: string | undefined) {
     if (!value) return '-';
     return value.includes('T') ? value.slice(0, 10) : value;
@@ -53,6 +67,7 @@ export function useIssueDetail(deptRawData: Ref<any[]>) {
     detailPhotos,
     openDetail,
     formatDept,
+    formatDepartments,
     formatDisplayDate,
   };
 }

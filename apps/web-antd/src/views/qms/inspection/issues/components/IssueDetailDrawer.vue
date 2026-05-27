@@ -56,6 +56,20 @@ function formatDept(value: string | undefined) {
   return findNameById(props.deptData, value) || value;
 }
 
+function formatDepartments(record: InspectionIssue) {
+  let values: string[] = [];
+  if (
+    Array.isArray(record.responsibleDepartments) &&
+    record.responsibleDepartments.length > 0
+  ) {
+    values = record.responsibleDepartments;
+  } else if (record.responsibleDepartment) {
+    values = [record.responsibleDepartment];
+  }
+  if (values.length === 0) return '-';
+  return values.map((value) => formatDept(value)).join(', ');
+}
+
 function formatDisplayDate(value: string | undefined) {
   if (!value) return '-';
   return value.includes('T') ? value.slice(0, 10) : value;
@@ -101,7 +115,7 @@ function formatDisplayDate(value: string | undefined) {
       <Descriptions.Item
         :label="t('qms.inspection.issues.responsibleDepartment')"
       >
-        {{ formatDept(record.responsibleDepartment) }}
+        {{ formatDepartments(record) }}
       </Descriptions.Item>
       <Descriptions.Item :label="t('qms.inspection.issues.responsibleWelder')">
         {{ record.responsibleWelder || '-' }}
