@@ -167,3 +167,35 @@ pnpm -C apps/backend exec vitest run
 - 选项：
   1. 回滚到最近的 good commit（如果该 step 没 commit）
   2. 逐文件手修（如果已 commit 过半，回滚代价大）
+
+## 新增模块规范
+
+新增一个业务模块时，必须完成以下步骤：
+
+### 目录结构（最小骨架）
+
+```
+modules/new-module/
+├── index.ts                    # 对外导出（只导出 service 和类型）
+├── new-module.service.ts       # 业务逻辑
+├── new-module.module.ts        # 模块声明（menus、dataScope、audit、idResolution）
+└── new-module.service.test.ts  # 单元测试
+```
+
+### 必须完成的注册
+
+1. 在 `utils/module-loader.ts` 的 `MODULE_DECLARATIONS` 数组中注册
+2. 在 `prisma/schema.prisma` 中新增表时，加注释标注归属模块：`// @module new-module`
+3. 在 `api/` 下创建对应路由目录
+
+### index.ts 导出规则
+
+- 只导出 service 对象和公共类型
+- 不导出内部工具函数、常量、prisma 实例
+- 其他模块只能 `import from '~/modules/new-module'`（即 index.ts）
+
+### 测试要求
+
+- 测试文件放在模块目录内（`xxx.service.test.ts`）
+- 不允许放在集中的 `__tests__/` 目录
+- 不允许存在 `modules/__tests__/` 目录
