@@ -37,6 +37,9 @@ import {
   scanMissingFiles,
 } from '#/api/qms/file-center';
 
+type FileStatusStat = FileStorageStats['byStatus'][number];
+type FileStorageProviderStat = FileStorageStats['byStorageProvider'][number];
+
 defineOptions({ name: 'QMSFileCenter' });
 
 const loading = ref(false);
@@ -102,7 +105,7 @@ function formatBytes(bytes: number) {
   return `${Number.parseFloat((bytes / 1024 ** index).toFixed(2))} ${units[index]}`;
 }
 
-function formatDate(value?: string) {
+function formatDate(value?: Date | string) {
   return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-';
 }
 
@@ -111,12 +114,14 @@ function getReferenceCount(file: FileAssetItem) {
 }
 
 function getStatusStat(status: string) {
-  return storageStats.value.byStatus.find((item) => item.status === status);
+  return storageStats.value.byStatus.find(
+    (item: FileStatusStat) => item.status === status,
+  );
 }
 
 function getStorageProviderStat(storageProvider: string) {
   return storageStats.value.byStorageProvider.find(
-    (item) => item.storageProvider === storageProvider,
+    (item: FileStorageProviderStat) => item.storageProvider === storageProvider,
   );
 }
 

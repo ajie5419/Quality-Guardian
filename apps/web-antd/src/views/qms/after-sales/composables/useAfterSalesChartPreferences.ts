@@ -11,6 +11,10 @@ import {
 } from '#/api/system/preference';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
+function normalizeChartConfigs(value: unknown): ChartConfig[] {
+  return Array.isArray(value) ? (value as ChartConfig[]) : [];
+}
+
 export function useAfterSalesChartPreferences() {
   const { handleApiError } = useErrorHandler();
   const showCharts = ref(false);
@@ -25,7 +29,7 @@ export function useAfterSalesChartPreferences() {
       );
       if (pref) {
         showCharts.value = !!pref.showCharts;
-        customChartsData.value = pref.customCharts || [];
+        customChartsData.value = normalizeChartConfigs(pref.customCharts);
       }
     } catch (error) {
       handleApiError(error, 'Load After Sales Chart Preferences');

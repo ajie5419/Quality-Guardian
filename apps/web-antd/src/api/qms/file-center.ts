@@ -8,6 +8,12 @@ import type {
 
 import { requestClient } from '#/api/request';
 
+export type {
+  FileAssetItem,
+  FileListParams,
+  FileReferenceItem,
+  FileStorageStats,
+} from '@qgs/shared';
 export type FileListResponse = FilePageResult;
 
 export function getFileList(params?: FileListParams) {

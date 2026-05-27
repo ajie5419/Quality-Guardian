@@ -42,8 +42,8 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
   const currentDefectSubtypes = ref<string[]>([]);
 
   function normalizeResponsibleDepartments(values: {
-    responsibleDept?: string;
     responsibleDepartments?: string[];
+    responsibleDept?: string;
   }): string[] {
     if (Array.isArray(values.responsibleDepartments)) {
       return values.responsibleDepartments
