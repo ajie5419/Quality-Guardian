@@ -110,9 +110,6 @@ function buildDispatchTaskCreateData(options: {
   };
   return {
     ...taskCreateData,
-    ...buildGovernedWriteFieldsForTable(
-      'qms_task_dispatches',
-      taskCreateData,
-    ),
+    ...buildGovernedWriteFieldsForTable('qms_task_dispatches', taskCreateData),
   };
 }

@@ -4,89 +4,28 @@ import type { UserSession } from '~/utils/jwt-utils';
 
 import process from 'node:process';
 
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
-import { logApiError } from '~/utils/api-logger';
-import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
-import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import {
   buildInspectionRecordFromRequest,
   INSPECTION_REQUEST_STATUS,
   mapInspectionRequest,
-  mergeInspectionRequestAttachments,
   normalizeInspectionRequestAttachments,
   normalizeInspectionRequestText,
   parseInspectionRequestQuantity,
   resolveInspectionRequestCurrentUserId,
 } from './inspection-request';
-
-function fail(prefix: string, message: string): never {
-  throw new Error(`${prefix}:${message}`);
-}
-
-function parseCloseRequestNumber(value: unknown, fallback = 0) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function requireLinkedIssueText(
-  linkedIssue: Record<string, unknown>,
-  key: string,
-  label: string,
-) {
-  if (!normalizeInspectionRequestText(linkedIssue[key])) {
-    fail('VALIDATION', `不合格项${label}不能为空`);
-  }
-}
-
-function validateCloseRequestBody(body: Record<string, unknown>) {
-  const result = normalizeInspectionRequestText(body.result).toUpperCase();
-  if (result !== 'PASS' && result !== 'FAIL')
-    fail('VALIDATION', '检验结果必须为合格或不合格');
-  const closeAttachments = normalizeInspectionRequestAttachments(
-    body.attachments,
-  );
-  if (closeAttachments.length === 0) fail('VALIDATION', '检验记录不能为空');
-  const quantity = parseInspectionRequestQuantity(body.quantity);
-  const rawUnqualifiedQuantity = parseCloseRequestNumber(
-    body.unqualifiedQuantity,
-    result === 'FAIL' ? quantity : 0,
-  );
-  const unqualifiedQuantity = Math.max(
-    0,
-    Math.min(quantity, rawUnqualifiedQuantity),
-  );
-  if (result === 'PASS' && unqualifiedQuantity > 0)
-    fail('VALIDATION', '检验结果为合格时，不合格数量必须为 0');
-  if (result !== 'FAIL') return;
-  if (unqualifiedQuantity <= 0)
-    fail('VALIDATION', '检验结果为不合格时，不合格数量必须大于 0');
-  if (!body.linkedIssue || typeof body.linkedIssue !== 'object')
-    fail('VALIDATION', '检验结果为不合格时必须填写不合格项信息');
-  const linkedIssue = body.linkedIssue as Record<string, unknown>;
-  for (const [key, label] of [
-    ['partName', '组件名称'],
-    ['processName', '工序'],
-    ['responsibleDepartment', '责任部门'],
-    ['defectType', '缺陷分类'],
-    ['defectSubtype', '二级分类'],
-    ['severity', '严重程度'],
-    ['status', '状态'],
-    ['description', '不合格描述'],
-    ['rootCause', '原因分析'],
-    ['solution', '解决方案'],
-  ] as const) {
-    requireLinkedIssueText(linkedIssue, key, label);
-  }
-}
-
-function stringifyCloseInspectionDocuments(
-  attachments: ReturnType<typeof normalizeInspectionRequestAttachments>,
-) {
-  return attachments.length > 0 ? JSON.stringify(attachments) : null;
-}
+import {
+  syncCloseAttachments,
+  syncCloseIssueEffects,
+} from './inspection-request-close-effects.service';
+import { buildCloseLinkedIssueCreateResult } from './inspection-request-close-issue.service';
+import {
+  failCloseRequest,
+  parseCloseRequestNumber,
+  validateCloseRequestBody,
+} from './inspection-request-close.schema';
 
 function buildLinkedIssueWhere(
   request: { linkedIssueId?: null | string; linkedIssueNo?: null | string },
@@ -101,17 +40,6 @@ function buildLinkedIssueWhere(
   if (ids.length > 0) OR.push({ id: { in: [...new Set(ids)] } });
   if (issueNo) OR.push({ nonConformanceNumber: issueNo });
   return OR.length > 0 ? { isDeleted: false, OR } : null;
-}
-
-async function runClosePostCommitTask(
-  label: string,
-  task: () => Promise<unknown>,
-) {
-  try {
-    await task();
-  } catch (error) {
-    logApiError(`inspection-request-close-${label}`, error);
-  }
 }
 
 export const InspectionRequestCloseService = {
@@ -133,9 +61,9 @@ export const InspectionRequestCloseService = {
         },
         where: { id, isDeleted: false },
       });
-      if (!request) fail('NOT_FOUND', '报检任务不存在');
+      if (!request) failCloseRequest('NOT_FOUND', '报检任务不存在');
       if (request.status === INSPECTION_REQUEST_STATUS.CLOSED)
-        fail('BAD_REQUEST', '报检任务已检验完成');
+        failCloseRequest('BAD_REQUEST', '报检任务已检验完成');
 
       let inspectionId = explicitInspectionId;
       if (inspectionId) {
@@ -148,7 +76,10 @@ export const InspectionRequestCloseService = {
           },
         });
         if (!inspection)
-          fail('BAD_REQUEST', '关联的检验记录不存在，或工单号与报检任务不一致');
+          failCloseRequest(
+            'BAD_REQUEST',
+            '关联的检验记录不存在，或工单号与报检任务不一致',
+          );
       } else {
         const inspection = await buildInspectionRecordFromRequest(
           request,
@@ -194,90 +125,15 @@ export const InspectionRequestCloseService = {
         (await resolveInspectionRequestCurrentUserId(userinfo, prisma));
 
       if (result === 'FAIL' && linkedIssue && inspectionId) {
-        const issueUtils = await import('./inspection-issue');
-        const linkedInspection =
-          await issueUtils.findInspectionForIssue(inspectionId);
-        const newId = issueUtils.createInspectionIssueId();
-        const serialNumber =
-          await issueUtils.getNextInspectionIssueSerialNumber();
-        const issueQuantity = Math.max(
-          1,
-          Math.trunc(
-            parseCloseRequestNumber(
-              linkedIssue.quantity,
-              parseCloseRequestNumber(body.unqualifiedQuantity, 1),
-            ),
-          ),
-        );
-        const governedIssueFields = buildGovernedWriteFieldsForTable(
-          'quality_records',
-          {
-            defectSubtype: normalizeInspectionRequestText(
-              linkedIssue.defectSubtype,
-            ),
-            defectType:
-              normalizeInspectionRequestText(linkedIssue.defectType) ||
-              '制造缺陷',
-            division:
-              normalizeInspectionRequestText(linkedIssue.division) ||
-              linkedInspection?.work_order?.division ||
-              undefined,
-          },
-        );
-        const issueBody = {
-          claim: normalizeInspectionRequestText(linkedIssue.claim) || 'No',
-          ...governedIssueFields,
-          description: normalizeInspectionRequestText(linkedIssue.description),
+        const result = await buildCloseLinkedIssueCreateResult({
+          body,
           inspectionId,
-          lossAmount: Number(linkedIssue.lossAmount || 0),
-          partName:
-            normalizeInspectionRequestText(linkedIssue.partName) ||
-            normalizeInspectionRequestText(request.componentName) ||
-            request.partName,
-          processName:
-            normalizeInspectionRequestText(linkedIssue.processName) ||
-            normalizeInspectionRequestText(
-              resolveCanonicalProcessName(request),
-            ) ||
-            request.processName,
-          projectName:
-            request.work_order?.projectName || request.workOrderNumber,
-          quantity: issueQuantity,
-          reportDate: normalizeInspectionRequestText(linkedIssue.reportDate),
-          reportedBy:
-            normalizeInspectionRequestText(linkedIssue.reportedBy) ||
-            request.reporter,
-          responsibleDepartment:
-            normalizeInspectionRequestText(linkedIssue.responsibleDepartment) ||
-            '生产 OBU',
-          responsibleWelder:
-            normalizeInspectionRequestText(linkedIssue.responsibleWelder) ||
-            undefined,
-          rootCause: normalizeInspectionRequestText(linkedIssue.rootCause),
-          severity:
-            normalizeInspectionRequestText(linkedIssue.severity) || 'Minor',
-          solution: normalizeInspectionRequestText(linkedIssue.solution),
-          status: normalizeInspectionRequestText(linkedIssue.status) || 'OPEN',
-          supplierName: normalizeInspectionRequestText(
-            linkedIssue.supplierName,
-          ),
-          sourceType: 'INSPECTION_REQUEST',
-          photos: Array.isArray(linkedIssue.photos) ? linkedIssue.photos : [],
-          workOrderNumber: request.workOrderNumber,
-        };
-        issueCreateData = await issueUtils.buildInspectionIssueCreateData(
-          issueBody,
-          {
-            id: newId,
-            inspection: linkedInspection,
-            inspectorUsername: userinfo.username,
-            serialNumber,
-          },
-        );
-        issueAuditVariables = {
-          issue: issueBody.partName,
-          nonConformanceNumber: newId,
-        };
+          linkedIssue,
+          request,
+          userinfo,
+        });
+        issueCreateData = result.createData;
+        issueAuditVariables = result.auditVariables;
       }
 
       const {
@@ -367,84 +223,19 @@ export const InspectionRequestCloseService = {
         return { closedLinkedIssueCount, issue: issueRecord, record };
       });
 
-      await runClosePostCommitTask('request-file-references', () =>
-        FileStorageService.registerReferencesFromAttachments({
-          attachments: closeAttachments,
-          bizId: String(updated.id),
-          bizType: 'inspection_request',
-          fieldName: 'closeAttachments',
-        }),
-      );
-      const currentInspection = await prisma.inspections.findUnique({
-        select: { documents: true },
-        where: { id: inspectionId },
-      });
-      const inspectionDocuments = mergeInspectionRequestAttachments(
-        currentInspection?.documents,
+      await syncCloseAttachments({
         closeAttachments,
-      );
-      await runClosePostCommitTask('inspection-documents', async () => {
-        await prisma.inspections.update({
-          data: {
-            documents: stringifyCloseInspectionDocuments(inspectionDocuments),
-            hasDocuments: inspectionDocuments.length > 0,
-          },
-          where: { id: inspectionId },
-        });
-        await FileStorageService.registerReferencesFromAttachments({
-          attachments: inspectionDocuments,
-          bizId: String(inspectionId),
-          bizType: 'inspection_record',
-          fieldName: 'documents',
-        });
+        inspectionId,
+        requestId: String(updated.id),
       });
-      if (issue && linkedIssue?.photos !== undefined) {
-        await runClosePostCommitTask('issue-file-references', () =>
-          FileStorageService.registerReferencesFromAttachments({
-            attachments: linkedIssue.photos,
-            bizId: String(issue.id),
-            bizType: 'inspection_issue',
-            fieldName: 'photos',
-          }),
-        );
-      }
-      if (issue || closedLinkedIssueCount > 0) {
-        const { SystemLogService } = await import(
-          '~/modules/system-log/system-log.service'
-        );
-        const { WelderScoreService } = await import(
-          '~/modules/welder/welder-score.service'
-        );
-        if (issue) {
-          await runClosePostCommitTask('issue-audit-log', () =>
-            SystemLogService.auditLog('inspection', 'issueCreateFromClose', {
-              userId: String(userinfo.id),
-              targetId: String(issue.id),
-              detailsVariables: {
-                issue: issueAuditVariables?.issue || issue.partName,
-                nonConformanceNumber:
-                  issueAuditVariables?.nonConformanceNumber ||
-                  issue.nonConformanceNumber ||
-                  '无编号',
-              },
-            }),
-          );
-        }
-        if (closedLinkedIssueCount > 0 && updated.linkedIssueId) {
-          await runClosePostCommitTask('linked-issue-close-audit-log', () =>
-            SystemLogService.auditLog('inspection', 'issueCloseLinked', {
-              userId: String(userinfo.id),
-              targetId: String(updated.linkedIssueId),
-              detailsVariables: {
-                linkedIssue: updated.linkedIssueNo || updated.linkedIssueId,
-              },
-            }),
-          );
-        }
-        await runClosePostCommitTask('welder-score-sync', () =>
-          WelderScoreService.syncFromInspectionIssues(),
-        );
-      }
+      await syncCloseIssueEffects({
+        closedLinkedIssueCount,
+        issue,
+        issueAuditVariables,
+        linkedIssue,
+        updated,
+        userinfo,
+      });
 
       await recordBusinessAuditLog(event, {
         action: 'UPDATE',
@@ -466,7 +257,7 @@ export const InspectionRequestCloseService = {
         message &&
         !message.includes(':')
       ) {
-        fail('INTERNAL', `关闭报检任务失败：${message}`);
+        failCloseRequest('INTERNAL', `关闭报检任务失败：${message}`);
       }
       throw error;
     }
