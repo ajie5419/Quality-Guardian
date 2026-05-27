@@ -37,7 +37,7 @@
 - `pnpm -C apps/web-antd exec vue-tsc --noEmit`: 通过
 - `pnpm run check:qms-arch`: 通过
 
-**commit:** `3348eb11` fix(@qgs/web-antd): keep inspection entry uploads resilient
+**commit:** `787fb8d0` fix(@qgs/web-antd): keep inspection entry uploads resilient
 
 **遗留问题：**
 
