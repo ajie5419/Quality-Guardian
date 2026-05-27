@@ -1,7 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
-import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
 import { normalizeInspectionRequestText } from '~/modules/inspection/inspection-request';
+import { InspectionRequestDispatchService } from '~/modules/inspection/inspection-request-dispatch.service';
 import { logApiError } from '~/utils/api-logger';
 import {
   businessErrorResponse,
@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
   if (!inspectorId) return badRequestResponse(event, '检验员不能为空');
 
   try {
-    const updated = await InspectionApiService.dispatchRequest(
+    const updated = await InspectionRequestDispatchService.dispatchRequest(
       event,
       id,
       body,

@@ -1,8 +1,11 @@
-import type { InspectionRequest } from '@qgs/shared';
 import type { ServerResponse } from 'node:http';
 
+import type { mapInspectionRequest } from './inspection-request';
+
+type InspectionRequestEventPayload = ReturnType<typeof mapInspectionRequest>;
+
 type InspectionRequestEvent = {
-  request: InspectionRequest;
+  request: InspectionRequestEventPayload;
   type: 'inspection-request-created';
 };
 
@@ -26,7 +29,9 @@ export function sendInspectionRequestHeartbeat(response: ServerResponse) {
   response.write(': heartbeat\n\n');
 }
 
-export function publishInspectionRequestCreated(request: InspectionRequest) {
+export function publishInspectionRequestCreated(
+  request: InspectionRequestEventPayload,
+) {
   const payload: InspectionRequestEvent = {
     request,
     type: 'inspection-request-created',

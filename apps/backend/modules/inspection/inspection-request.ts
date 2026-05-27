@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import type { InspectionRequestRecordLike } from '@qgs/shared';
 
 import {
   buildInspectionRecordPayloadCore as buildInspectionRecordPayloadCoreRule,
@@ -104,7 +105,14 @@ export async function generateInspectionRequestNo(
   return buildInspectionRequestNo({ count, now });
 }
 
-export function mapInspectionRequest(record: any) {
+type InspectionRequestMappableRecord = InspectionRequestRecordLike & {
+  process?: null | { name?: null | string };
+  processName?: null | string;
+};
+
+export function mapInspectionRequest<T extends InspectionRequestMappableRecord>(
+  record: T,
+) {
   return mapInspectionRequestRecordRule({
     ...record,
     processName: resolveCanonicalProcessName(record) || '',

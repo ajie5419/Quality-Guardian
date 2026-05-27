@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3';
-import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
+import { InspectionRequestDeleteService } from '~/modules/inspection/inspection-request-delete.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import {
@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   if (typeof id !== 'string') return id;
 
   try {
-    await InspectionApiService.deleteRequest(event, id, userinfo);
+    await InspectionRequestDeleteService.deleteRequest(event, id, userinfo);
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('inspection-request-delete', error, { id }, event);

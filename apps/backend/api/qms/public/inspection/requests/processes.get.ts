@@ -1,6 +1,6 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { z } from 'zod';
-import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
+import { InspectionPublicQueryService } from '~/modules/inspection/inspection-public-query.service';
 import { logApiError } from '~/utils/api-logger';
 import {
   badRequestResponse,
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     return useResponseSuccess(
-      await InspectionApiService.getPublicProcesses(workOrderNumber),
+      await InspectionPublicQueryService.getPublicProcesses(workOrderNumber),
     );
   } catch (error) {
     logApiError('public-inspection-request-process-list', error, undefined, event);

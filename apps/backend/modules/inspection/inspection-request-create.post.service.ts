@@ -1,9 +1,9 @@
 import { defineEventHandler, readBody } from 'h3';
-import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
 import {
   inspectionRequestCreateBodySchema,
   validateInspectionRequestCreateBody,
 } from '~/modules/inspection/inspection-request-create.schema';
+import { InspectionRequestCreateService } from '~/modules/inspection/inspection-request-create.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import {
@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const created = await InspectionApiService.createRequest(
+    const created = await InspectionRequestCreateService.createRequest(
       event,
       userinfo,
       body,

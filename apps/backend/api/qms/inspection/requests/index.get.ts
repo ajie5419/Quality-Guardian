@@ -1,6 +1,6 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { z } from 'zod';
-import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
+import { InspectionRequestQueryService } from '~/modules/inspection/inspection-request-query.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import {
@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   const userinfo = getCurrentUser(event);
 
   try {
-    const result = await InspectionApiService.getRequestList(
+    const result = await InspectionRequestQueryService.getRequestList(
       userinfo,
       schema.parse(getQuery(event)),
     );

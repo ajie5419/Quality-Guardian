@@ -1,9 +1,9 @@
 import { defineEventHandler, readBody } from 'h3';
-import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
 import {
   inspectionRequestCreateBodySchema,
   validateInspectionRequestCreateBody,
 } from '~/modules/inspection/inspection-request-create.schema';
+import { InspectionRequestCreateService } from '~/modules/inspection/inspection-request-create.service';
 import { logApiError } from '~/utils/api-logger';
 import {
   badRequestResponse,
@@ -24,7 +24,12 @@ export default defineEventHandler(async (event) => {
 
   try {
     return useResponseSuccess(
-      await InspectionApiService.createRequest(event, null, body, true),
+      await InspectionRequestCreateService.createRequest(
+        event,
+        null,
+        body,
+        true,
+      ),
     );
   } catch (error) {
     logApiError('public-inspection-request-create', error, undefined, event);
