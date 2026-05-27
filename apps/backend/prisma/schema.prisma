@@ -130,6 +130,7 @@ model after_sales {
   qualityLoss         Decimal                 @default(0.00) @db.Decimal(10, 2)
   actualClaim         Decimal                 @default(0.00) @db.Decimal(10, 2)
   respDept            String?
+  responsibleDepartments String?              @db.Text // @module after-sales - JSON array
   respDeptId          String?
   supplierBrand       String?
   supplierBrandId     String?
@@ -522,6 +523,7 @@ model quality_records {
   division                                String?
   divisionId                              String?
   responsibleDepartment                   String
+  responsibleDepartments                  String?                     @db.Text // @module inspection - JSON array
   responsibleDepartmentId                 String?
   responsibleBU                           String?
   inspector                               String?
