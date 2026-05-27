@@ -413,3 +413,25 @@
 - `modules/master-data/` 是空目录，Git 无可跟踪删除内容；`cef1c453` 为空提交，仅用于记录偏离3已验证完成。
 - 测试数量从 169 降至 153 是按要求删除废弃 `base.service.test.ts` 导致；其余测试已归位并通过。
 - `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
+
+### 2026-05-27 Prisma 一次性脚本清理
+
+**执行内容：**
+
+- 偏离6：删除 `apps/backend/prisma/` 下 14 个已执行过的一次性数据迁移、回填与检查脚本。
+- 清理 `apps/backend/package.json` 中对应的 `db:*` 脚本入口，并同步移除已指向不存在文件的 legacy ITP 清理命令。
+- 保留 `apps/backend/prisma/schema.prisma`、`apps/backend/prisma/seed.js` 与完整 `apps/backend/prisma/migrations/` 目录。
+
+**验证结果：**
+
+- `ls apps/backend/prisma/*.mjs apps/backend/prisma/*.js apps/backend/prisma/*.ts 2>/dev/null`: 仅剩 `apps/backend/prisma/seed.js`
+- `ls apps/backend/prisma/schema.prisma`: 存在
+- `ls apps/backend/prisma/migrations/`: 存在且非空
+- `pnpm -C apps/backend exec tsc --noEmit --pretty false`: 通过
+- `pnpm -C apps/backend exec vitest run`: 29 文件 / 153 测试全部通过
+
+**commit:** 本次提交
+
+**遗留问题：**
+
+- `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
