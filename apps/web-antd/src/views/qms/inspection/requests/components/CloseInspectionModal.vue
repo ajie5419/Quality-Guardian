@@ -22,6 +22,7 @@ import {
   Upload,
 } from 'ant-design-vue';
 
+import { useImageCompress } from '#/composables/useImageCompress';
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 
 import IssuePhotoUpload from '../../issues/components/IssuePhotoUpload.vue';
@@ -82,6 +83,7 @@ const emit = defineEmits<{
   'update:open': [value: boolean];
 }>();
 const { isMobile, modalWidth, modalWrapClassName } = useAdaptivePopup();
+const { compressImage, isImage } = useImageCompress();
 
 function cloneCloseForm(source: Props['closeForm']): Props['closeForm'] {
   return {
@@ -183,6 +185,11 @@ function handleSubmit() {
 function handleUpdateOpen(value: boolean) {
   emit('update:open', value);
 }
+
+async function handleBeforeUpload(file: File) {
+  if (!isImage(file)) return true;
+  return compressImage(file);
+}
 </script>
 
 <template>
@@ -235,6 +242,7 @@ function handleUpdateOpen(value: boolean) {
           :file-list="props.closeAttachmentFileList"
           action="/api/upload"
           :headers="props.uploadHeaders"
+          :before-upload="handleBeforeUpload"
           :disabled="props.submitting"
           multiple
           @change="props.handleCloseAttachmentUploadChange"

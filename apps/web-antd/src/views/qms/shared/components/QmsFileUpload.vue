@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
+
 import type { CompressPreset } from '#/composables/useImageCompress';
 
 import { computed } from 'vue';

@@ -15,18 +15,7 @@ import type { WorkOrderItem } from '#/api/qms/work-order';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import { IconifyIcon } from '@vben/icons';
-
-import {
-  Alert,
-  Button,
-  Form,
-  Input,
-  InputNumber,
-  message,
-  Select,
-  Upload,
-} from 'ant-design-vue';
+import { Form, Input, InputNumber, message, Select } from 'ant-design-vue';
 
 import {
   createPublicInspectionRequest,
@@ -36,6 +25,7 @@ import {
   getPublicInspectionRequestWorkOrders,
 } from '#/api/qms/inspection-request';
 import { getBomList } from '#/api/qms/planning';
+import { useImageCompress } from '#/composables/useImageCompress';
 import {
   applyUploadResponse,
   normalizeUploadFileList,
@@ -43,6 +33,9 @@ import {
 
 import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
 import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
+import InspectionRequestEntryShell from './components/InspectionRequestEntryShell.vue';
+import InspectionRequestEntrySubmitBar from './components/InspectionRequestEntrySubmitBar.vue';
+import InspectionRequestEntryUploadActions from './components/InspectionRequestEntryUploadActions.vue';
 
 import './index.css';
 
@@ -59,6 +52,7 @@ const teamOptions = ref<SelectProps['options']>([]);
 const workOrderLoading = ref(false);
 const workOrderOptions = ref<Array<{ label: string; value: string }>>([]);
 const workOrderProcessesLoading = ref(false);
+const { compressImage, isImage } = useImageCompress();
 const workOrderProcessOptions = ref<Array<{ label: string; value: string }>>(
   [],
 );
@@ -203,6 +197,11 @@ function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
 
   attachmentFileList.value = [...info.fileList];
   syncAttachmentsFromFiles(attachmentFileList.value);
+}
+
+async function handlePhotoBeforeUpload(file: File) {
+  if (!isImage(file)) return true;
+  return compressImage(file);
 }
 
 async function loadBomPartOptions(workOrderNumber: string) {
@@ -369,182 +368,119 @@ watch(
 </script>
 
 <template>
-  <div
-    class="inspection-entry-page min-h-[100dvh] overflow-x-hidden bg-gray-100 px-2 pb-[calc(env(safe-area-inset-bottom)+88px)] pt-3 sm:px-6 sm:py-8"
-  >
-    <div class="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-3 sm:gap-4">
-      <header
-        class="rounded-lg bg-white px-4 py-3 shadow-sm sm:rounded-xl sm:px-6 sm:py-4"
-      >
-        <h1 class="text-lg font-semibold text-gray-900 sm:text-xl">扫码报检</h1>
-        <p class="mt-1 text-sm text-gray-500">
-          填写车间报检信息后，调度可在报检任务中派单。
-        </p>
-      </header>
-
-      <main
-        class="min-w-0 rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:rounded-xl sm:p-6"
-      >
-        <Alert
-          class="mb-4"
-          message="该入口无需登录账号，适合车间扫码填报。"
-          type="info"
-          show-icon
+  <InspectionRequestEntryShell>
+    <Form class="inspection-entry-form" layout="vertical">
+      <Form.Item label="工单号" required>
+        <Select
+          v-model:value="requestForm.workOrderNumber"
+          :filter-option="false"
+          :loading="workOrderLoading"
+          :options="workOrderOptions"
+          class="w-full"
+          placeholder="请选择或搜索工单号"
+          show-search
+          allow-clear
+          @search="loadWorkOrderOptions"
         />
-
-        <Form class="inspection-entry-form" layout="vertical">
-          <Form.Item label="工单号" required>
-            <Select
-              v-model:value="requestForm.workOrderNumber"
-              :filter-option="false"
-              :loading="workOrderLoading"
-              :options="workOrderOptions"
-              class="w-full"
-              placeholder="请选择或搜索工单号"
-              show-search
-              allow-clear
-              @search="loadWorkOrderOptions"
-            />
-          </Form.Item>
-          <Form.Item label="工序" required>
-            <Select
-              v-model:value="requestForm.processName"
-              :options="processOptions"
-              :loading="workOrderProcessesLoading"
-              class="w-full"
-              placeholder="请选择工序"
-              show-search
-              allow-clear
-            />
-          </Form.Item>
-          <Form.Item label="一级部件名称" required>
-            <Select
-              v-model:value="requestForm.partName"
-              :options="bomPartOptions"
-              :loading="bomPartsLoading"
-              :disabled="!requestForm.workOrderNumber"
-              class="w-full"
-              placeholder="请选择BOM一级部件"
-              show-search
-              allow-clear
-            />
-          </Form.Item>
-          <Form.Item v-if="!isAssemblyProcess" label="组件名称" required>
-            <Input
-              v-model:value="requestForm.componentName"
-              class="w-full"
-              placeholder="请输入组件名称"
-              allow-clear
-            />
-          </Form.Item>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Form.Item label="数量" required>
-              <InputNumber
-                v-model:value="requestForm.quantity"
-                :min="1"
-                :precision="0"
-                class="w-full min-w-0"
-              />
-            </Form.Item>
-            <Form.Item label="班组" required>
-              <Select
-                v-model:value="requestForm.team"
-                :filter-option="false"
-                :loading="teamLoading"
-                :options="teamOptions"
-                class="w-full"
-                placeholder="请选择或搜索班组/外协单位"
-                show-search
-                allow-clear
-                @search="loadTeamOptions"
-              />
-            </Form.Item>
-          </div>
-          <Form.Item label="报检人" required>
-            <Input
-              v-model:value="requestForm.reporter"
-              class="w-full"
-              placeholder="请输入报检人"
-              allow-clear
-            />
-          </Form.Item>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Form.Item label="自检结果">
-              <Select
-                v-model:value="requestForm.selfCheckResult"
-                :options="checkResultOptions"
-                class="w-full"
-              />
-            </Form.Item>
-            <Form.Item label="互检结果">
-              <Select
-                v-model:value="requestForm.mutualCheckResult"
-                :options="checkResultOptions"
-                class="w-full"
-              />
-            </Form.Item>
-          </div>
-          <Form.Item label="报检信息">
-            <Input.TextArea
-              v-model:value="requestForm.requestInfo"
-              :rows="4"
-              class="w-full"
-              placeholder="请输入补充说明"
-            />
-          </Form.Item>
-          <Form.Item label="自检记录" required>
-            <div class="flex flex-col gap-2 sm:flex-row">
-              <Upload
-                v-model:file-list="attachmentFileList"
-                accept="image/*"
-                action="/api/upload"
-                capture="environment"
-                :disabled="submitting"
-                :show-upload-list="false"
-                @change="handleAttachmentUploadChange"
-              >
-                <Button class="w-full sm:w-auto">
-                  <template #icon>
-                    <IconifyIcon icon="lucide:camera" />
-                  </template>
-                  拍照上传
-                </Button>
-              </Upload>
-              <Upload
-                v-model:file-list="attachmentFileList"
-                action="/api/upload"
-                :disabled="submitting"
-                multiple
-                @change="handleAttachmentUploadChange"
-              >
-                <Button class="w-full sm:w-auto">
-                  <template #icon>
-                    <IconifyIcon icon="lucide:upload" />
-                  </template>
-                  选择文件
-                </Button>
-              </Upload>
-            </div>
-          </Form.Item>
-          <div
-            class="inspection-entry-submit fixed inset-x-0 bottom-0 z-20 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur sm:static sm:inset-auto sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none"
-          >
-            <Button
-              type="primary"
-              block
-              size="large"
-              :loading="submitting"
-              :disabled="submitting"
-              @click="submitRequest"
-            >
-              <template v-if="!submitting" #icon>
-                <IconifyIcon icon="lucide:plus" />
-              </template>
-              {{ submitting ? '提交中，请勿重复点击' : '提交报检' }}
-            </Button>
-          </div>
-        </Form>
-      </main>
-    </div>
-  </div>
+      </Form.Item>
+      <Form.Item label="工序" required>
+        <Select
+          v-model:value="requestForm.processName"
+          :options="processOptions"
+          :loading="workOrderProcessesLoading"
+          class="w-full"
+          placeholder="请选择工序"
+          show-search
+          allow-clear
+        />
+      </Form.Item>
+      <Form.Item label="一级部件名称" required>
+        <Select
+          v-model:value="requestForm.partName"
+          :options="bomPartOptions"
+          :loading="bomPartsLoading"
+          :disabled="!requestForm.workOrderNumber"
+          class="w-full"
+          placeholder="请选择BOM一级部件"
+          show-search
+          allow-clear
+        />
+      </Form.Item>
+      <Form.Item v-if="!isAssemblyProcess" label="组件名称" required>
+        <Input
+          v-model:value="requestForm.componentName"
+          class="w-full"
+          placeholder="请输入组件名称"
+          allow-clear
+        />
+      </Form.Item>
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Form.Item label="数量" required>
+          <InputNumber
+            v-model:value="requestForm.quantity"
+            :min="1"
+            :precision="0"
+            class="w-full min-w-0"
+          />
+        </Form.Item>
+        <Form.Item label="班组" required>
+          <Select
+            v-model:value="requestForm.team"
+            :filter-option="false"
+            :loading="teamLoading"
+            :options="teamOptions"
+            class="w-full"
+            placeholder="请选择或搜索班组/外协单位"
+            show-search
+            allow-clear
+            @search="loadTeamOptions"
+          />
+        </Form.Item>
+      </div>
+      <Form.Item label="报检人" required>
+        <Input
+          v-model:value="requestForm.reporter"
+          class="w-full"
+          placeholder="请输入报检人"
+          allow-clear
+        />
+      </Form.Item>
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Form.Item label="自检结果">
+          <Select
+            v-model:value="requestForm.selfCheckResult"
+            :options="checkResultOptions"
+            class="w-full"
+          />
+        </Form.Item>
+        <Form.Item label="互检结果">
+          <Select
+            v-model:value="requestForm.mutualCheckResult"
+            :options="checkResultOptions"
+            class="w-full"
+          />
+        </Form.Item>
+      </div>
+      <Form.Item label="报检信息">
+        <Input.TextArea
+          v-model:value="requestForm.requestInfo"
+          :rows="4"
+          class="w-full"
+          placeholder="请输入补充说明"
+        />
+      </Form.Item>
+      <Form.Item label="自检记录" required>
+        <InspectionRequestEntryUploadActions
+          v-model:file-list="attachmentFileList"
+          :before-photo-upload="handlePhotoBeforeUpload"
+          :disabled="submitting"
+          @change="handleAttachmentUploadChange"
+        />
+      </Form.Item>
+      <InspectionRequestEntrySubmitBar
+        :submitting="submitting"
+        @submit="submitRequest"
+      />
+    </Form>
+  </InspectionRequestEntryShell>
 </template>
