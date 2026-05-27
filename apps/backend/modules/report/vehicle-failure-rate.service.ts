@@ -1,8 +1,8 @@
-import { MasterDataGovernanceKernel } from '~/governance/master-data/master-data-governance-kernel';
 import { AfterSalesService } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept/dept.service';
 import { WorkOrderService } from '~/modules/work-order';
 import { addYearsToDate } from '~/modules/work-order/work-order-query';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 
 import {
   getVehicleFailureManualData,

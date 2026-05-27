@@ -1,6 +1,5 @@
 import type { H3Event } from 'h3';
 
-import { resolveCanonicalProcessName } from '~/governance/master-data/process-resolver';
 import {
   buildInspectionFormProcessFilter,
   resolveInspectionFormProcess,
@@ -9,6 +8,7 @@ import { logApiError } from '~/utils/api-logger';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 export async function inspection_forms_index_get(event: H3Event) {
   const userinfo = await verifyAccessToken(event);

@@ -6,9 +6,9 @@ import type {
 
 import { ISSUE_TRACKING_STATUS, safeNumber } from '@qgs/shared';
 import { nanoid } from 'nanoid';
-import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 

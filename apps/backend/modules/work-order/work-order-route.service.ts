@@ -2,7 +2,6 @@ import type { H3Event } from 'h3';
 import type { ImportRowError } from '~/modules/file-storage/import-report';
 import type { UserSession } from '~/utils/jwt-utils';
 
-import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import {
   buildImportRowError,
   buildImportSummary,
@@ -20,6 +19,7 @@ import {
 import { WorkOrderService } from '~/modules/work-order/work-order.service';
 import { logApiError } from '~/utils/api-logger';
 import { BusinessError } from '~/utils/business-error';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 import {
   isPrismaNotFoundError,

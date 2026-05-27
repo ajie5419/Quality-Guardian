@@ -1,17 +1,17 @@
 import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { buildInspectionFormProcessFilter } from '~/modules/inspection/inspection-form';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/governance/master-data/master-data-governance-write';
+} from '~/utils/governed-write';
+import prisma from '~/utils/prisma';
 import {
   resolveCanonicalProcessName,
   resolveProcessIdForWrite,
-} from '~/governance/master-data/process-resolver';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import { buildInspectionFormProcessFilter } from '~/modules/inspection/inspection-form';
-import prisma from '~/utils/prisma';
+} from '~/utils/process-resolver';
 
 import { InspectionRequestCloseService } from './inspection-request-close.service';
 import { InspectionRequestStatsService } from './inspection-request-stats.service';

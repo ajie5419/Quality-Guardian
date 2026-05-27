@@ -4,12 +4,12 @@ import type { UserSession } from '~/utils/jwt-utils';
 
 import process from 'node:process';
 
-import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
-import { resolveCanonicalProcessName } from '~/governance/master-data/process-resolver';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import {
   buildInspectionRecordFromRequest,

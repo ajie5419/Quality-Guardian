@@ -1,9 +1,9 @@
 import type { H3Event } from 'h3';
 
-import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import { awaitMockDelay } from '~/utils/index';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';

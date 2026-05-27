@@ -5,7 +5,6 @@ import type {
 } from '~/modules/planning/bom';
 
 import { getQuery } from 'h3';
-import { resolveCanonicalProcessName } from '~/governance/master-data/process-resolver';
 import {
   mapProjectBomItem,
   normalizeBomText,
@@ -15,6 +14,7 @@ import {
 import { logApiError } from '~/utils/api-logger';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import {
   internalServerErrorResponse,
   useListResponseSuccess,

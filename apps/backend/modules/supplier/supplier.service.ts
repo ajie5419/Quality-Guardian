@@ -3,8 +3,6 @@ import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service'
 
 import type { SupplierStats } from './supplier-scoring';
 
-import { MasterDataGovernanceKernel } from '~/governance/master-data/master-data-governance-kernel';
-import { buildGovernedCanonicalWritePairForTable } from '~/governance/master-data/master-data-governance-write';
 import { AfterSalesService } from '~/modules/after-sales';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { InspectionService } from '~/modules/inspection';
@@ -16,6 +14,8 @@ import {
   normalizeOutsourcingMode,
   normalizeSupplierString,
 } from '~/modules/supplier/supplier-query';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
+import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 
 import {

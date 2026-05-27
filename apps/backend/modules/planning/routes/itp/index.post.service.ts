@@ -1,10 +1,6 @@
 import type { H3Event } from 'h3';
 
 import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/governance/master-data/master-data-governance-write';
-import {
   buildItpItemCreateData,
   getMaxItpItemOrder,
   normalizeItpText,
@@ -12,6 +8,10 @@ import {
 } from '~/modules/planning/itp';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/governed-write';
 import { awaitMockDelay } from '~/utils/index';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';

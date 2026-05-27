@@ -3,9 +3,9 @@ import {
   buildWelderUpdateDataCore,
   parseWelderListQuery as parseWelderListQueryCore,
 } from '@qgs/shared';
-import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
-import { resolveTeamIdForWrite } from '~/governance/master-data/team-resolver';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
+import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 function hasWelderField(fieldName: string) {
   const fields = (

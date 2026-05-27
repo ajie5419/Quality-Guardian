@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 
-import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 
 import { MetrologyImportService } from './metrology-import.service';

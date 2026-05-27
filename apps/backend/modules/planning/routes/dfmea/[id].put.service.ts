@@ -1,10 +1,6 @@
 import type { H3Event } from 'h3';
 
 import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/governance/master-data/master-data-governance-write';
-import {
   calculateDfmeaRpn,
   normalizeDfmeaEffect,
   normalizeDfmeaText,
@@ -12,6 +8,10 @@ import {
   parseDfmeaScore,
 } from '~/modules/planning/dfmea';
 import { logApiError } from '~/utils/api-logger';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/governed-write';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';

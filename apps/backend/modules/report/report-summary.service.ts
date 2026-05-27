@@ -4,7 +4,6 @@ import {
   resolveReportShortLabel,
   shiftReportAnchorDate,
 } from '@qgs/shared';
-import { MasterDataGovernanceKernel } from '~/governance/master-data/master-data-governance-kernel';
 import { AfterSalesService } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
 import { QualityLossService } from '~/modules/quality-loss';
@@ -13,6 +12,7 @@ import {
   getNetPassRateSummaryByRange,
   getPassRateDrillDownByRange,
 } from '~/modules/report/pass-rate';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 
 import { ReportDailySummaryService } from './report-daily-summary.service';
 import { ReportQueryValidationError } from './report-query-validation-error';

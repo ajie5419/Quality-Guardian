@@ -2,7 +2,7 @@ import type {
   MasterDataCanonicalRelation,
   MasterDataGovernanceField,
   MasterDataTarget,
-} from './master-data-governance-registry';
+} from './master-data-fields';
 
 import { randomUUID } from 'node:crypto';
 
@@ -11,7 +11,7 @@ import prisma from '~/utils/prisma';
 import {
   getMasterDataGovernanceField,
   listMasterDataGovernanceFields,
-} from './master-data-governance-registry';
+} from './master-data-fields';
 
 type CountRow = { count: bigint | number | string };
 type DistinctValueRow = { value: null | string };

@@ -1,11 +1,11 @@
 import type { H3Event } from 'h3';
 
-import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import {
   calculateDfmeaRpn,
   createDfmeaProjectId,
 } from '~/modules/planning/dfmea';
 import { logApiError } from '~/utils/api-logger';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,

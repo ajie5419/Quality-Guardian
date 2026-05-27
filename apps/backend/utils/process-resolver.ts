@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 
 import process from 'node:process';
 
-import { MasterDataGovernanceKernel } from '~/governance/master-data/master-data-governance-kernel';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
 
 type CacheEntry = {

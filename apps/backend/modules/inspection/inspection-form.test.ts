@@ -6,7 +6,7 @@ vi.mock('@qgs/shared', () => ({
   resolveInspectionFormProcessCandidates: vi.fn(),
 }));
 
-vi.mock('~/governance/master-data/process-resolver', () => ({
+vi.mock('~/utils/process-resolver', () => ({
   resolveProcessIdForWrite: vi.fn(),
 }));
 
@@ -37,7 +37,7 @@ describe('inspection-form helpers', () => {
       '@qgs/shared'
     );
     const { resolveProcessIdForWrite } = await import(
-      '~/governance/master-data/process-resolver'
+      '~/utils/process-resolver'
     );
 
     vi.mocked(resolveInspectionFormProcessCandidates).mockReturnValue(['焊接']);
@@ -58,7 +58,7 @@ describe('inspection-form helpers', () => {
       '@qgs/shared'
     );
     const { resolveProcessIdForWrite } = await import(
-      '~/governance/master-data/process-resolver'
+      '~/utils/process-resolver'
     );
 
     vi.mocked(resolveInspectionFormProcessCandidates).mockReturnValue([]);
@@ -80,7 +80,7 @@ describe('inspection-form helpers', () => {
       '@qgs/shared'
     );
     const { resolveProcessIdForWrite } = await import(
-      '~/governance/master-data/process-resolver'
+      '~/utils/process-resolver'
     );
 
     vi.mocked(resolveInspectionFormProcessCandidates).mockReturnValue(['打磨']);

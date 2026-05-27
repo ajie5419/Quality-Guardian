@@ -1,4 +1,3 @@
-import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import {
   buildTaskDispatchCreateData,
   getTaskDispatchArchiveFilter,
@@ -9,6 +8,7 @@ import {
   resolveTaskDispatchStatusFilter,
   TASK_DISPATCH_STATUS,
 } from '~/modules/task-dispatch/task-dispatch-rules';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 
 export function getTaskDispatchErrorMessage(message: string) {

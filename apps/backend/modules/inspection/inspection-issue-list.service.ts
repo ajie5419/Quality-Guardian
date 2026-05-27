@@ -10,15 +10,15 @@ import {
   InspectionIssueStatusEnum,
   tryParsePhotos,
 } from '@qgs/shared';
-import {
-  buildProcessNameWhere,
-  resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation,
-} from '~/governance/master-data/process-resolver';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { findDeptSubtree } from '~/modules/dept/dept-tree';
 import { DeptService } from '~/modules/dept/dept.service';
 import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
 import prisma from '~/utils/prisma';
+import {
+  buildProcessNameWhere,
+  resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation,
+} from '~/utils/process-resolver';
 
 import { buildInspectionIssueDateRange } from './inspection-issue';
 

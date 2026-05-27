@@ -1,7 +1,7 @@
-import { resolveCanonicalProcessName } from '~/governance/master-data/process-resolver';
 import { OUTSOURCING_CATEGORY } from '~/modules/supplier/supplier-query';
 import { parseWorkOrderListQuery } from '~/modules/work-order/work-order-query';
 import prisma from '~/utils/prisma';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 type DeptRow = { id: string; name: string; parentId: string };
 

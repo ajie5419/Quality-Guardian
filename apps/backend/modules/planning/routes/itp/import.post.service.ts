@@ -1,10 +1,6 @@
 import type { H3Event } from 'h3';
 
 import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/governance/master-data/master-data-governance-write';
-import {
   buildImportRowError,
   buildImportSummary,
   inferImportErrorField,
@@ -16,6 +12,10 @@ import {
   normalizeItpText,
 } from '~/modules/planning/itp';
 import { logApiError } from '~/utils/api-logger';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 
 export async function itp_import_post(event: H3Event) {

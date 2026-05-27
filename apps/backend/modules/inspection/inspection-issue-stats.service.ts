@@ -4,8 +4,8 @@ import type { InspectionIssueDateMode } from './inspection-issue';
 
 import { Prisma } from '@prisma/client';
 import { formatDate } from '@qgs/shared';
-import { MasterDataGovernanceKernel } from '~/governance/master-data/master-data-governance-kernel';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 

@@ -1,6 +1,5 @@
 import type { H3Event } from 'h3';
 
-import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import {
   createDfmeaProjectId,
   normalizeDfmeaProjectStatus,
@@ -8,6 +7,7 @@ import {
   toDfmeaProjectVersionText,
 } from '~/modules/planning/dfmea';
 import { logApiError } from '~/utils/api-logger';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 import { isPrismaForeignKeyError } from '~/utils/prisma-error';

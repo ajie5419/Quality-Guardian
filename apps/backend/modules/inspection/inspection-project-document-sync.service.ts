@@ -1,11 +1,11 @@
 import { Prisma } from '@prisma/client';
-import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import {
   parseProjectDocuments,
   stringifyProjectDocuments,
   upsertInspectionProjectDocuments,
 } from '~/modules/inspection/project-documents';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import { createModuleLogger } from '~/utils/logger';
 import { isPrismaMissingColumnError } from '~/utils/prisma-error';
 

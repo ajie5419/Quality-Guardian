@@ -1,8 +1,8 @@
 import type { archive_task_status } from '@prisma/client';
 
 import { Prisma } from '@prisma/client';
-import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import { createModuleLogger } from '~/utils/logger';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 

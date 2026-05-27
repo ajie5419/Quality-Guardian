@@ -1,6 +1,5 @@
 import type { H3Event } from 'h3';
 
-import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import {
   normalizeProjectDocuments,
@@ -8,6 +7,7 @@ import {
 } from '~/modules/inspection/project-documents';
 import { normalizePlanningProjectName } from '~/modules/planning/planning-project';
 import { logApiError } from '~/utils/api-logger';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';

@@ -8,7 +8,7 @@ import { safeNumber, tryParsePhotos } from '@qgs/shared';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/governance/master-data/master-data-governance-write';
+} from '~/utils/governed-write';
 
 import {
   normalizeDate,

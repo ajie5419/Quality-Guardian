@@ -5,10 +5,10 @@ import type {
 
 import { Prisma } from '@prisma/client';
 import { formatDate } from '@qgs/shared';
-import { resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation } from '~/governance/master-data/process-resolver';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
+import { resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation } from '~/utils/process-resolver';
 import { buildYearFilter, parsePagination } from '~/utils/query-helpers';
 
 import {

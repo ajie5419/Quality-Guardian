@@ -1,14 +1,14 @@
 import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/governance/master-data/master-data-governance-write';
-import { resolveCanonicalProcessName } from '~/governance/master-data/process-resolver';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { WorkOrderRequirementService } from '~/modules/work-order-requirement/work-order-requirement.service';
 import { parseWorkOrderListQuery } from '~/modules/work-order/work-order-query';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/governed-write';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import { WorkOrderAggregateService } from './work-order-aggregate.service';
 import { parseRequirementAttachments } from './work-order-requirement-attachments';

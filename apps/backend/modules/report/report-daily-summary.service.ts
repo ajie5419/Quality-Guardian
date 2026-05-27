@@ -2,7 +2,6 @@ import {
   mapInspectionArchiveStatusLabel,
   parseDailySummaryContent,
 } from '@qgs/shared';
-import { resolveCanonicalProcessName } from '~/governance/master-data/process-resolver';
 import { InspectionService } from '~/modules/inspection';
 import {
   resolveInspectionFormProcess,
@@ -10,6 +9,7 @@ import {
 } from '~/modules/inspection/inspection-form';
 import { VehicleCommissioningDailyReportStorageService } from '~/modules/vehicle-commissioning/daily-report-storage.service';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import { ReportQueryValidationError } from './report-query-validation-error';
 import {

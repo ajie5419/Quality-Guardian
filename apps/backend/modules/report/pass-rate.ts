@@ -3,7 +3,6 @@ import type {
   IssuePassRateBucketInput,
 } from '~/modules/report/pass-rate-process';
 
-import { resolveCanonicalProcessName } from '~/governance/master-data/process-resolver';
 import { getTargetPassRate as getTargetPassRateByStd } from '~/modules/inspection/quality-standards';
 import {
   buildCanonicalProcessPassRateTargets,
@@ -17,6 +16,7 @@ import {
   roundPercent,
 } from '~/modules/report/pass-rate-process';
 import prisma from '~/utils/prisma';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 interface DrillDownItem {
   category: string;

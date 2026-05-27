@@ -1,7 +1,7 @@
-import { resolveCanonicalProcessName } from '~/governance/master-data/process-resolver';
 import { InspectionService } from '~/modules/inspection';
 import { WorkOrderRequirementService } from '~/modules/work-order-requirement/work-order-requirement.service';
 import prisma from '~/utils/prisma';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import { parseRequirementAttachments } from './work-order-requirement-attachments';
 

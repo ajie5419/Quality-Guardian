@@ -9,7 +9,7 @@ import {
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/governance/master-data/master-data-governance-write';
+} from '~/utils/governed-write';
 
 export {
   createSupplierId,

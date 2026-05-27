@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client';
 
 import { resolveInspectionFormProcessCandidates } from '@qgs/shared';
-import { resolveProcessIdForWrite } from '~/governance/master-data/process-resolver';
+import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 
 export {
   parseInspectionFormFields,

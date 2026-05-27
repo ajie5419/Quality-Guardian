@@ -1,6 +1,6 @@
-import { resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation } from '~/governance/master-data/process-resolver';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import prisma from '~/utils/prisma';
+import { resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation } from '~/utils/process-resolver';
 
 import { syncInspectionProjectDocuments } from './inspection-project-document-sync.service';
 

@@ -4,7 +4,7 @@ import {
   buildKnowledgeCategoryCreateData as buildKnowledgeCategoryCreateDataRule,
   buildKnowledgeCategoryUpdateData as buildKnowledgeCategoryUpdateDataRule,
 } from '@qgs/shared';
-import { buildGovernedWriteFieldsForTable } from '~/governance/master-data/master-data-governance-write';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 
 function buildGovernedKnowledgeCategoryNameFields(
   input: Record<string, unknown>,

@@ -4,7 +4,7 @@ import type {
   SupervisionPlanTaskImportResult,
 } from '@qgs/shared';
 
-import { MasterDataGovernanceKernel } from '~/governance/master-data/master-data-governance-kernel';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 
 import { SupervisionPlanTaskImportService } from './supervision-plan-task-import.service';
 import { syncSupervisionProjectProgress } from './supervision-plan-task-progress';

@@ -18,13 +18,13 @@ import {
   parseOptionalIssueYear as parseOptionalIssueYearRule,
 } from '@qgs/shared';
 import { nanoid } from 'nanoid';
+import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/governance/master-data/master-data-governance-write';
-import { resolveProcessIdForWrite } from '~/governance/master-data/process-resolver';
-import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
+} from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
+import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 
 export function buildInspectionIssueDateRange(params: {
   dateMode?: InspectionIssueDateMode;

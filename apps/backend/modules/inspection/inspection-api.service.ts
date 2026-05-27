@@ -1,21 +1,21 @@
 import type { UserSession } from '~/utils/jwt-utils';
 
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/governance/master-data/master-data-governance-write';
-import {
-  resolveCanonicalProcessName,
-  resolveProcessIdForWrite,
-} from '~/governance/master-data/process-resolver';
-import {
-  buildTeamContainsWhere,
-  resolveTeamIdForWrite,
-} from '~/governance/master-data/team-resolver';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { BusinessError } from '~/utils/business-error';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
+import {
+  resolveCanonicalProcessName,
+  resolveProcessIdForWrite,
+} from '~/utils/process-resolver';
+import {
+  buildTeamContainsWhere,
+  resolveTeamIdForWrite,
+} from '~/utils/team-resolver';
 
 import { InspectionIssueMutationService } from './inspection-issue-mutation.service';
 import { InspectionPublicQueryService } from './inspection-public-query.service';

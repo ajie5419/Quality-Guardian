@@ -2,17 +2,17 @@ import type { inspection_result } from '@prisma/client';
 
 import type { InspectionRecordInput } from './inspection-record-types';
 
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/governance/master-data/master-data-governance-write';
+} from '~/utils/governed-write';
+import prisma from '~/utils/prisma';
 import {
   resolveCanonicalProcessNameById,
   resolveProcessIdForWrite,
-} from '~/governance/master-data/process-resolver';
-import { resolveTeamIdForWrite } from '~/governance/master-data/team-resolver';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import prisma from '~/utils/prisma';
+} from '~/utils/process-resolver';
+import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 import { syncInspectionArchiveTask } from './inspection-archive-sync.service';
 import { syncInspectionProjectDocuments } from './inspection-project-document-sync.service';

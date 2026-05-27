@@ -5,19 +5,19 @@ import type {
   InspectionRecordInput,
 } from './inspection-record-types';
 
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
-} from '~/governance/master-data/master-data-governance-write';
-import {
-  resolveCanonicalProcessNameById,
-  resolveProcessIdForWrite,
-} from '~/governance/master-data/process-resolver';
-import { resolveTeamIdForWrite } from '~/governance/master-data/team-resolver';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+} from '~/utils/governed-write';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
+import {
+  resolveCanonicalProcessNameById,
+  resolveProcessIdForWrite,
+} from '~/utils/process-resolver';
+import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 import { syncInspectionArchiveTask } from './inspection-archive-sync.service';
 import { syncInspectionProjectDocuments } from './inspection-project-document-sync.service';

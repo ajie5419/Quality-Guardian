@@ -1,8 +1,8 @@
-import { MasterDataGovernanceKernel } from './master-data-governance-kernel';
+import { MasterDataGovernanceKernel } from './canonical-master-data';
 import {
   getMasterDataGovernanceField,
   listMasterDataGovernanceFields,
-} from './master-data-governance-registry';
+} from './master-data-fields';
 
 type GovernedWriteInput = Record<string, unknown>;
 type GovernedFieldMapping = Record<string, string>;
