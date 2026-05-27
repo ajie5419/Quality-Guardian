@@ -33,6 +33,7 @@ const maxImages = computed(
       v-model:file-list="photos"
       list-type="picture-card"
       :max-count="props?.maxCount ?? MAX_UPLOAD_LIMIT"
+      photo-compress-preset="evidence"
     >
       <div v-if="maxImages">
         <span class="i-lucide-plus text-xl"></span>
