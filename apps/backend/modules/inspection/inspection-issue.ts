@@ -20,6 +20,10 @@ import {
 import { nanoid } from 'nanoid';
 import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
 import {
+  parseResponsibleDepartments,
+  serializeResponsibleDepartments,
+} from '~/utils/department-multi';
+import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
 } from '~/utils/governed-write';
@@ -98,6 +102,7 @@ interface InspectionIssueImportItem {
   rootCause?: unknown;
   processName?: unknown;
   responsibleDepartment?: unknown;
+  responsibleDepartments?: unknown;
   responsibleWelder?: unknown;
   status?: unknown;
   supplierName?: unknown;
@@ -146,7 +151,58 @@ export async function buildInspectionIssueCreateData(
     serialNumber: options.serialNumber,
     uuid: options.id,
   }) as Prisma.quality_recordsCreateInput;
-  return attachProcessIdToIssueCreateData(createData);
+  return attachProcessIdToIssueCreateData(
+    attachResponsibleDepartmentsToIssueCreateData(body, createData),
+  );
+}
+
+function normalizeResponsibleDepartments(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return parseResponsibleDepartments(value)
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function attachResponsibleDepartmentsToIssueCreateData(
+  body: Record<string, unknown>,
+  createData: Prisma.quality_recordsCreateInput,
+) {
+  const departments = normalizeResponsibleDepartments(
+    body.responsibleDepartments,
+  );
+  if (departments.length === 0) {
+    return createData;
+  }
+  return {
+    ...createData,
+    responsibleDepartment: departments[0],
+    responsibleDepartments: serializeResponsibleDepartments(departments),
+  } as Prisma.quality_recordsCreateInput;
+}
+
+function attachResponsibleDepartmentsToIssueUpdateData(
+  body: Record<string, unknown>,
+  updateData: Prisma.quality_recordsUpdateInput,
+) {
+  if (body.responsibleDepartments === undefined) {
+    return updateData;
+  }
+  const departments = normalizeResponsibleDepartments(
+    body.responsibleDepartments,
+  );
+  return {
+    ...updateData,
+    responsibleDepartment:
+      departments[0] ??
+      normalizeOptionalInspectionIssueString(body.responsibleDepartment) ??
+      '',
+    responsibleDepartments: serializeResponsibleDepartments(departments),
+  } as Prisma.quality_recordsUpdateInput;
 }
 
 async function attachProcessIdToIssueCreateData(
@@ -235,7 +291,10 @@ export async function buildInspectionIssueUpdateData(
     existingNcNumber,
     (value) => toQualityRecordStatus(value),
   ) as Prisma.quality_recordsUpdateInput;
-  return attachProcessIdToIssueUpdateData(body, updateData);
+  return attachProcessIdToIssueUpdateData(
+    body,
+    attachResponsibleDepartmentsToIssueUpdateData(body, updateData),
+  );
 }
 
 export async function buildInspectionIssueUpsertPayload(

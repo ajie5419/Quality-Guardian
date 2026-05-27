@@ -60,6 +60,24 @@ describe('inspection-issue processId dual write', () => {
     expect(data.supplierName).toBe('供应商A');
   });
 
+  it('serializes responsibleDepartments and keeps legacy field on create', async () => {
+    const data = await buildInspectionIssueCreateData(
+      {
+        responsibleDepartment: '质量部',
+        responsibleDepartments: ['生产部', '工艺部'],
+      },
+      {
+        id: 'ISS-2026-DEPT',
+        serialNumber: 2,
+      },
+    );
+
+    expect(data.responsibleDepartment).toBe('生产部');
+    expect(data.responsibleDepartments).toBe(
+      JSON.stringify(['生产部', '工艺部']),
+    );
+  });
+
   it('injects processId into update payload when processName is provided', async () => {
     const { resolveProcessIdForWrite } = await import(
       '~/utils/process-resolver'
@@ -81,6 +99,21 @@ describe('inspection-issue processId dual write', () => {
         id: 'process-paint',
       },
     });
+  });
+
+  it('serializes responsibleDepartments and keeps legacy field on update', async () => {
+    const updateData = await buildInspectionIssueUpdateData(
+      {
+        responsibleDepartment: '质量部',
+        responsibleDepartments: ['售后部', '技术部'],
+      },
+      null,
+    );
+
+    expect(updateData.responsibleDepartment).toBe('售后部');
+    expect(updateData.responsibleDepartments).toBe(
+      JSON.stringify(['售后部', '技术部']),
+    );
   });
 
   it('injects processId into upsert payload when processName is provided', async () => {

@@ -21,6 +21,7 @@ export interface InspectionIssue {
   reportDate: string;
   reportedBy: string; // 检验员 (Legacy?)
   responsibleDepartment: string; // 责任部门
+  responsibleDepartments?: string[]; // 责任部门多选
   responsibleWelder?: string; // 责任焊工
   rootCause: string; // 原因分析
   severity: 'Critical' | 'Major' | 'Minor';

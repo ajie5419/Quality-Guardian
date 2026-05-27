@@ -14,6 +14,7 @@ import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { findDeptSubtree } from '~/modules/dept/dept-tree';
 import { DeptService } from '~/modules/dept/dept.service';
 import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
+import { parseResponsibleDepartments } from '~/utils/department-multi';
 import prisma from '~/utils/prisma';
 import {
   buildProcessNameWhere,
@@ -81,6 +82,19 @@ function normalizeQualityRecordStatusFilter(
 
   if (values.length === 0) return undefined;
   return Array.isArray(value) ? { in: values } : values[0];
+}
+
+function getResponsibleDepartmentsForResponse(issue: {
+  responsibleDepartment: null | string;
+  responsibleDepartments: null | string;
+}): string[] {
+  const responsibleDepartments = parseResponsibleDepartments(
+    issue.responsibleDepartments,
+  );
+  if (responsibleDepartments.length > 0) {
+    return responsibleDepartments;
+  }
+  return issue.responsibleDepartment ? [issue.responsibleDepartment] : [];
 }
 
 export const InspectionIssueListService = {
@@ -254,6 +268,8 @@ export const InspectionIssueListService = {
     const items: InspectionIssue[] = issues.map((issue) => {
       const photos = tryParsePhotos(issue.issuePhoto as string);
       const canonicalProcessName = resolveCanonicalProcessNameByRelation(issue);
+      const responsibleDepartments =
+        getResponsibleDepartmentsForResponse(issue);
 
       return {
         ...issue,
@@ -268,6 +284,7 @@ export const InspectionIssueListService = {
         status: issue.status as InspectionIssueStatusEnum,
         lossAmount: Number(issue.lossAmount) || 0,
         responsibleDepartment: issue.responsibleDepartment || '',
+        responsibleDepartments,
         responsibleWelder: issue.responsibleWelder || '',
         reportedBy: issue.inspector || '', // Use inspector for reportedBy
         rootCause: issue.rootCause || '',
