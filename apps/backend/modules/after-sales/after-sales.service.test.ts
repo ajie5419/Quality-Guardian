@@ -80,6 +80,7 @@ describe('afterSalesService', () => {
           materialCost: 100,
           laborTravelCost: 50,
           respDept: 'Quality',
+          responsibleDepartments: JSON.stringify(['Quality', 'Engineering']),
           solution: 'Repair',
           isClaim: true,
           photos: JSON.stringify(['photo1.jpg']),
@@ -102,6 +103,7 @@ describe('afterSalesService', () => {
       const item = result[0];
       expect(item.id).toBe('AS-1');
       expect(item.qualityLoss).toBe(150);
+      expect(item.responsibleDepartments).toEqual(['Quality', 'Engineering']);
     });
   });
 });

@@ -24,6 +24,7 @@ export interface AfterSalesItem {
   qualityLoss?: number; // 质量损失金
   quantity: number; // 数量
   resolutionPlan: string; // 处理意见及方案
+  responsibleDepartments?: string[]; // 责任部门多选
   responsibleDept: string; // 责任部门
   runningHours?: number; // 运行小时数
   severity: string; // 严重程度

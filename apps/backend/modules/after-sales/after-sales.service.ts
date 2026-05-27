@@ -17,6 +17,7 @@ import { formatDate, tryParsePhotos } from '@qgs/shared';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { parseResponsibleDepartments } from '~/utils/department-multi';
 import prisma from '~/utils/prisma';
 
 import { AfterSalesAnalyticsService } from './after-sales-analytics.service';
@@ -24,6 +25,19 @@ import { AfterSalesIntegrationService } from './after-sales-integration.service'
 import { buildGovernedAfterSalesUpdateData } from './after-sales-payload';
 import { buildAfterSalesDateRange } from './after-sales-query';
 import { normalizeAfterSalesClaimStatus } from './after-sales-status';
+
+function getResponsibleDepartmentsForResponse(item: {
+  respDept: null | string;
+  responsibleDepartments: null | string;
+}): string[] {
+  const responsibleDepartments = parseResponsibleDepartments(
+    item.responsibleDepartments,
+  );
+  if (responsibleDepartments.length > 0) {
+    return responsibleDepartments;
+  }
+  return item.respDept ? [item.respDept] : [];
+}
 
 export const AfterSalesService = {
   async findIdBySerialNumber(serialNumber: number) {
@@ -236,6 +250,7 @@ export const AfterSalesService = {
     return list.map((item) => {
       const materialCost = Number(item.materialCost) || 0;
       const laborTravelCost = Number(item.laborTravelCost) || 0;
+      const responsibleDepartments = getResponsibleDepartmentsForResponse(item);
 
       return {
         ...item,
@@ -246,6 +261,7 @@ export const AfterSalesService = {
         shipDate: formatDate(item.shipDate),
         createdAt: formatDate(item.createdAt),
         responsibleDept: item.respDept || '',
+        responsibleDepartments,
         resolutionPlan: item.solution || '',
         status: item.claimStatus,
         isClaim: item.isClaim || false,
