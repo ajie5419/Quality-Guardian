@@ -458,3 +458,25 @@
 **遗留问题：**
 
 - `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
+
+### 2026-05-27 报检任务模块重构基线
+
+**执行内容：**
+
+- 建立报检任务模块重构前基线，确认当前工作树干净。
+- 记录当前 inspection 模块文件数量，用于后续阶段异常检测。
+- 确认后端类型检查、后端测试与 QMS 架构守护均在重构前通过。
+
+**验证结果：**
+
+- `git status --short`: 无输出
+- `rg --files apps/backend/modules/inspection | wc -l`: 50
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/backend exec vitest run`: 29 文件 / 157 测试全部通过
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+
+**commit:** 本次提交
+
+**遗留问题：**
+
+- `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
