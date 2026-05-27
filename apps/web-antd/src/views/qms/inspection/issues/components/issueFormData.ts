@@ -123,13 +123,16 @@ export function getIssueFormSchema(
       component: 'Input',
     },
     {
-      fieldName: 'responsibleDepartment',
+      fieldName: 'responsibleDepartments',
       label: t('qms.inspection.issues.responsibleDepartment'),
       component: 'TreeSelect',
       rules: 'selectRequired',
       componentProps: {
         dropdownStyle: { maxHeight: '400px', overflow: 'auto' },
+        maxTagCount: 'responsive',
         treeDefaultExpandAll: true,
+        treeCheckable: true,
+        treeCheckStrictly: false,
       },
     },
     {
@@ -154,9 +157,11 @@ export function getIssueFormSchema(
       component: 'Input',
       rules: 'required',
       dependencies: {
-        triggerFields: ['responsibleDepartment'],
+        triggerFields: ['responsibleDepartments'],
         show: (values: Record<string, unknown>) =>
-          !!values.responsibleDepartment,
+          Array.isArray(values.responsibleDepartments)
+            ? values.responsibleDepartments.length > 0
+            : !!values.responsibleDepartments,
       },
     },
     {

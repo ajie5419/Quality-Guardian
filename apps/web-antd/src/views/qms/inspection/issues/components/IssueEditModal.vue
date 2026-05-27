@@ -48,6 +48,7 @@ type IssueFormValues = {
   partName?: string;
   projectName?: string;
   responsibleDepartment?: string;
+  responsibleDepartments?: string[];
   responsibleWelder?: string;
   rootCause?: string;
   solution?: string;
@@ -112,6 +113,14 @@ const [Form, formApi] = useVbenForm({
   showDefaultActions: false, // Handle submit via Modal OK button
 });
 
+function firstResponsibleDepartment(): string {
+  const departments = formValues.value.responsibleDepartments;
+  if (Array.isArray(departments) && departments.length > 0) {
+    return departments[0] || '';
+  }
+  return formValues.value.responsibleDepartment || '';
+}
+
 // Composable integration
 const openRef = toRef(props, 'open');
 const isEditModeRef = toRef(props, 'isEditMode');
@@ -158,7 +167,7 @@ function findDeptTitle(tree: DeptNode[], value?: string): string | undefined {
 
 // Supplier category calculation
 const targetUnitCategory = computed(() => {
-  const deptId = formValues.value.responsibleDepartment as string;
+  const deptId = firstResponsibleDepartment();
   const name = findDeptTitle(props.deptTreeData, deptId) || '';
   if (name.includes(DEPT_TYPE_KEYWORDS.PURCHASE)) return 'Supplier';
   if (
@@ -172,7 +181,7 @@ const targetUnitCategory = computed(() => {
 
 // Determine if supplier field should be visible
 const shouldShowSupplier = computed(() => {
-  const deptId = formValues.value.responsibleDepartment as string;
+  const deptId = firstResponsibleDepartment();
   if (!deptId) return false;
   const name = findDeptTitle(props.deptTreeData, deptId) || '';
   return (
@@ -189,7 +198,7 @@ watch(
   (data) => {
     formApi.updateSchema([
       {
-        fieldName: 'responsibleDepartment',
+        fieldName: 'responsibleDepartments',
         componentProps: { treeData: data },
       },
     ]);
@@ -205,7 +214,7 @@ watch(
       {
         fieldName: 'supplierName',
         dependencies: {
-          triggerFields: ['responsibleDepartment'],
+          triggerFields: ['responsibleDepartments'],
           show: () => show,
         },
       },

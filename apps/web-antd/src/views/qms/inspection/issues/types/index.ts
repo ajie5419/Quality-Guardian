@@ -62,6 +62,7 @@ export interface InspectionIssue {
   solution?: string;
   lossAmount: number;
   responsibleDepartment: string;
+  responsibleDepartments?: string[];
   responsibleWelder?: string;
   supplierName?: string;
   status: 'Closed' | 'Open' | 'Resolved' | IssueStatus;

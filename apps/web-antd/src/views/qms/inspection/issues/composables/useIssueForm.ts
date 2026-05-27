@@ -31,6 +31,20 @@ type IssueSubmitValues = Omit<Partial<InspectionIssue>, 'photos'> & {
   photos?: UploadPhotoItem[];
 };
 
+function normalizeResponsibleDepartments(values: {
+  responsibleDepartment?: string;
+  responsibleDepartments?: string[];
+}): string[] {
+  if (Array.isArray(values.responsibleDepartments)) {
+    return values.responsibleDepartments
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+  }
+  return values.responsibleDepartment
+    ? [String(values.responsibleDepartment)]
+    : [];
+}
+
 /**
  * 创建初始数据
  */
@@ -84,6 +98,7 @@ export function useIssueForm(options: UseIssueFormOptions) {
    */
   async function initFromData(data: Partial<InspectionIssue>) {
     const { photos, ...rest } = data;
+    const responsibleDepartments = normalizeResponsibleDepartments(rest);
 
     let photoArray: string[] = [];
     if (Array.isArray(photos)) {
@@ -94,6 +109,7 @@ export function useIssueForm(options: UseIssueFormOptions) {
 
     const values: Record<string, unknown> = {
       ...rest,
+      responsibleDepartments,
       photos: photoArray.map((url, index) => ({
         uid: `photo-${encodeURIComponent(url)}-${index}`,
         name: `Photo ${index + 1}`,
@@ -128,9 +144,12 @@ export function useIssueForm(options: UseIssueFormOptions) {
           })
           .filter((url): url is string => !!url) || [];
 
+      const responsibleDepartments = normalizeResponsibleDepartments(rawData);
       const data = {
         ...rawData,
         photos,
+        responsibleDepartment: responsibleDepartments[0] || '',
+        responsibleDepartments,
         severity: rawData.severity || DEFAULT_VALUES.DEFAULT_SEVERITY,
       };
 
