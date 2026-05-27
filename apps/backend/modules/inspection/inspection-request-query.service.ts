@@ -37,8 +37,12 @@ async function buildRequestListWhere(
     isDeleted: false,
     ...(query.mine && currentUserId ? { inspectorId: currentUserId } : {}),
     ...statusWhere,
-    ...(query.workOrderNumber ? { workOrderNumber: query.workOrderNumber } : {}),
-    ...(query.team ? await buildTeamContainsWhere({ keyword: query.team }) : {}),
+    ...(query.workOrderNumber
+      ? { workOrderNumber: query.workOrderNumber }
+      : {}),
+    ...(query.team
+      ? await buildTeamContainsWhere({ keyword: query.team })
+      : {}),
     ...(query.keyword
       ? {
           OR: [
@@ -80,10 +84,8 @@ async function findLinkedIssues(
 ) {
   const linkedIssueIds = items
     .map((item) => item.linkedIssueId)
-    .filter((item): item is string => Boolean(item));
-  const inspectionIds = items
-    .map((item) => item.inspectionId)
-    .filter((item): item is string => Boolean(item));
+    .filter(Boolean);
+  const inspectionIds = items.map((item) => item.inspectionId).filter(Boolean);
 
   if (linkedIssueIds.length === 0 && inspectionIds.length === 0) {
     return [];
@@ -114,7 +116,10 @@ async function findLinkedIssues(
 }
 
 export const InspectionRequestQueryService = {
-  async getRequestList(userinfo: UserSession, rawQuery: Record<string, unknown>) {
+  async getRequestList(
+    userinfo: UserSession,
+    rawQuery: Record<string, unknown>,
+  ) {
     const query = normalizeRequestListQuery(rawQuery);
     const where = await buildRequestListWhere(userinfo, query);
     const [items, total] = await Promise.all([

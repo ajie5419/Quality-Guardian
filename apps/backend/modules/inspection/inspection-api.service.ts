@@ -3,34 +3,19 @@ import type { UserSession } from '~/utils/jwt-utils';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { BusinessError } from '~/utils/business-error';
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/utils/governed-write';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
-import {
-  resolveCanonicalProcessName,
-  resolveProcessIdForWrite,
-} from '~/utils/process-resolver';
-import {
-  resolveTeamIdForWrite,
-} from '~/utils/team-resolver';
 
 import { InspectionIssueMutationService } from './inspection-issue-mutation.service';
 import { InspectionPublicQueryService } from './inspection-public-query.service';
 import {
-  generateInspectionRequestNo,
   INSPECTION_REQUEST_STATUS,
-  isInspectionRequestAssemblyProcess,
   mapInspectionRequest,
-  normalizeInspectionRequestAttachments,
-  normalizeInspectionRequestCheckResult,
   normalizeInspectionRequestText,
   parseInspectionRequestPriority,
-  parseInspectionRequestQuantity,
   resolveInspectionRequestCurrentUserId,
 } from './inspection-request';
-import { publishInspectionRequestCreated } from './inspection-request-events';
+import { InspectionRequestCreateService } from './inspection-request-create.service';
 import { InspectionRequestQueryService } from './inspection-request-query.service';
 
 type RequestBody = Record<string, unknown>;
@@ -45,86 +30,12 @@ export const InspectionApiService = {
     body: RequestBody,
     isPublic = false,
   ) {
-    const workOrderNumber = normalizeInspectionRequestText(
-      body.workOrderNumber,
+    return InspectionRequestCreateService.createRequest(
+      event,
+      userinfo,
+      body,
+      isPublic,
     );
-    const partName = normalizeInspectionRequestText(body.partName);
-    const processName = normalizeInspectionRequestText(body.processName);
-    const componentName = isInspectionRequestAssemblyProcess(processName)
-      ? ''
-      : normalizeInspectionRequestText(body.componentName);
-    const reporter = normalizeInspectionRequestText(body.reporter);
-    const team = normalizeInspectionRequestText(body.team);
-    const quantity = parseInspectionRequestQuantity(body.quantity);
-    const attachments = normalizeInspectionRequestAttachments(body.attachments);
-    const governedFields = buildGovernedWriteFieldsForTable(
-      'qms_inspection_requests',
-      { componentName: componentName || null, team },
-    );
-    const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
-      'qms_inspection_requests',
-      governedFields as Record<string, unknown>,
-    );
-    const processId = await resolveProcessIdForWrite({ processName });
-    const teamId = await resolveTeamIdForWrite({ team });
-    const workOrder = await prisma.work_orders.findUnique({
-      select: { workOrderNumber: true },
-      where: { workOrderNumber },
-    });
-    if (!workOrder) throw new Error('BAD_REQUEST:工单不存在');
-    const created = await prisma.qms_inspection_requests.create({
-      data: {
-        attachments:
-          attachments.length > 0 ? JSON.stringify(attachments) : null,
-        componentName: componentName || null,
-        mutualCheckResult: normalizeInspectionRequestCheckResult(
-          body.mutualCheckResult,
-        ),
-        partName,
-        processId,
-        teamId,
-        processName,
-        quantity,
-        reporter,
-        requestInfo: normalizeInspectionRequestText(body.requestInfo) || null,
-        requestNo: await generateInspectionRequestNo(prisma),
-        selfCheckResult: normalizeInspectionRequestCheckResult(
-          body.selfCheckResult,
-        ),
-        ...governedFields,
-        ...governedCanonicalIds,
-        workOrderNumber,
-      },
-      include: {
-        dispatcher: { select: { realName: true, username: true } },
-        inspector: { select: { realName: true, username: true } },
-        process: { select: { name: true } },
-      },
-    });
-    await FileStorageService.registerReferencesFromAttachments({
-      attachments,
-      bizId: created.id,
-      bizType: 'inspection_request',
-    });
-    const mapped = mapInspectionRequest(created);
-    if (!isPublic && userinfo) {
-      await recordBusinessAuditLog(event, {
-        action: 'CREATE',
-        detailsTemplate:
-          '新增报检任务: {{requestNo}} ({{workOrderNumber}}/{{processName}}/{{partName}})',
-        detailsVariables: {
-          partName: created.partName,
-          processName: resolveCanonicalProcessName(created) || '',
-          requestNo: created.requestNo,
-          workOrderNumber: created.workOrderNumber,
-        },
-        targetId: String(created.id),
-        targetType: 'inspection_request',
-        userId: userinfo.id,
-      });
-    }
-    publishInspectionRequestCreated(mapped);
-    return mapped;
   },
   async dispatchRequest(
     event: Parameters<typeof recordBusinessAuditLog>[0],
