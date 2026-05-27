@@ -384,3 +384,32 @@
 全部完成
 
 13 阶段后端精简重构全部执行完毕。
+
+### 2026-05-27 目录结构偏离修复
+
+**执行内容：**
+
+- 偏离1：删除 `apps/backend/governance/` 顶层目录；将 process/team resolver 迁入 `utils/`；将仍被业务写入依赖的主数据字段定义、canonical 查询与写入规范化 helper 迁入 `utils/master-data-fields.ts`、`utils/canonical-master-data.ts`、`utils/governed-write.ts`，并更新所有引用路径。
+- 偏离2：将 `route-handlers/` 下路由处理服务按业务域合并到已有 `modules/` 目录，API 层 re-export 改为指向对应 module 文件，并删除 `route-handlers/` 目录。
+- 偏离3：确认 `modules/master-data/` 为空目录且无引用，删除本地空目录；因 Git 不跟踪空目录，使用空提交记录该偏离项处理结果。
+- 偏离4：将 `modules/__tests__/` 下测试文件归位到对应模块目录，删除已废弃的 `base.service.test.ts`，并删除 `modules/__tests__/` 目录。
+
+**验证结果：**
+
+- `find apps/backend -maxdepth 1 -type d | grep -v node_modules | grep -v .output | grep -v .nitro | grep -v .turbo | grep -v tmp | grep -v uploads | sort`: 仅剩 `apps/backend`、`api`、`config`、`middleware`、`modules`、`prisma`、`routes`、`utils`
+- `ls apps/backend/governance/ 2>/dev/null && echo "FAIL" || echo "OK"`: OK
+- `ls apps/backend/route-handlers/ 2>/dev/null && echo "FAIL" || echo "OK"`: OK
+- `ls apps/backend/modules/master-data/ 2>/dev/null && echo "FAIL" || echo "OK"`: OK
+- `ls apps/backend/modules/__tests__/ 2>/dev/null && echo "FAIL" || echo "OK"`: OK
+- `pnpm -C apps/backend exec tsc --noEmit --pretty false`: 通过
+- `pnpm -C apps/backend exec vitest run`: 29 文件 / 153 测试全部通过
+- 阶段结束模块 TS 文件数：302
+- 阶段结束 `git status --short | wc -l`: 0
+
+**commit:** `2c74709b` / `86841108` / `cef1c453` / `ebc08d05`
+
+**遗留问题：**
+
+- `modules/master-data/` 是空目录，Git 无可跟踪删除内容；`cef1c453` 为空提交，仅用于记录偏离3已验证完成。
+- 测试数量从 169 降至 153 是按要求删除废弃 `base.service.test.ts` 导致；其余测试已归位并通过。
+- `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
