@@ -7,7 +7,7 @@ import { Button, Drawer, Tag } from 'ant-design-vue';
 
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 
-interface Props {
+export interface DispatchDetailDrawerProps {
   open: boolean;
   request?: InspectionRequest;
   statusColor: (status: InspectionRequest['status']) => string;
@@ -29,7 +29,7 @@ interface Props {
   issueStatusLabel: (status?: null | string) => string;
 }
 
-const props = defineProps<Props>();
+const props = defineProps<DispatchDetailDrawerProps>();
 
 const emit = defineEmits<{
   openClose: [];
@@ -50,7 +50,7 @@ const drawerWidth = computed(() =>
 <template>
   <Drawer
     :open="props.open"
-    title="派单详情"
+    title="报检任务详情"
     :width="drawerWidth"
     placement="right"
     :body-style="{ padding: 0 }"

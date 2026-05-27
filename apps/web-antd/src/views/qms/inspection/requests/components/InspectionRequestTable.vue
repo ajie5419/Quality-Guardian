@@ -13,7 +13,7 @@ import {
   Tooltip,
 } from 'ant-design-vue';
 
-interface Props {
+export interface InspectionRequestTableProps {
   canDelete: boolean;
   loading: boolean;
   page: number;
@@ -43,7 +43,7 @@ interface Props {
   hasActionMenu: (record: InspectionRequest) => boolean;
 }
 
-const props = defineProps<Props>();
+const props = defineProps<InspectionRequestTableProps>();
 
 const emit = defineEmits<{
   close: [record: InspectionRequest];

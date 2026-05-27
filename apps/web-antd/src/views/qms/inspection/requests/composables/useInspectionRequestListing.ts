@@ -3,7 +3,7 @@ import type {
   InspectionRequestStatus,
 } from '#/api/qms/inspection-request';
 
-import { computed, reactive, ref } from 'vue';
+import { reactive, ref } from 'vue';
 
 import {
   getInspectionRequests,
@@ -66,8 +66,6 @@ export function useInspectionRequestListing(
     status: undefined as InspectionRequestStatus | undefined,
   });
 
-  const isEntryView = computed(() => activeView.value === 'entry');
-
   function applyViewStatus(value: string) {
     switch (value) {
       case 'dispatched': {
@@ -117,7 +115,6 @@ export function useInspectionRequestListing(
   }
 
   async function refreshInspectionRequestPage() {
-    if (isEntryView.value) return;
     page.value = 1;
     await Promise.all([loadRequests(), loadRequestStats()]);
   }
@@ -130,7 +127,6 @@ export function useInspectionRequestListing(
     beforeReload?.();
     applyViewStatus(activeView.value);
     page.value = 1;
-    if (isEntryView.value) return;
     await loadRequests();
   }
 
@@ -154,7 +150,6 @@ export function useInspectionRequestListing(
 
   return {
     activeView,
-    isEntryView,
     loading,
     page,
     pageSize,
