@@ -34,19 +34,31 @@ Quality Guardian 是一套面向制造业的质量管理系统（QMS），覆盖
 ```
 apps/
 ├── backend/          # Nitro 后端（文件路由）
-│   ├── api/          # 路由入口
-│   ├── core/         # 横切能力（master-data 治理内核、路由校验）
-│   ├── modules/      # 业务模块（按域自包含）
-│   ├── utils/        # 通用基础设施（prisma、logger、response）
-│   ├── middleware/   # H3 中间件
-│   └── prisma/       # Schema + Migrations
+│   ├── api/          # 路由入口（薄层：认证 + 解析 + 调 service）
+│   ├── modules/      # 业务模块（按域自包含，所有业务逻辑在这里）
+│   ├── utils/        # 通用基础设施（prisma、logger、response、auth）
+│   ├── middleware/   # H3 中间件（认证、数据权限、日志）
+│   ├── prisma/       # Schema + Migrations
+│   ├── routes/       # catch-all 兜底路由
+│   └── config/       # 运行时配置
 └── web-antd/         # Vue 3 前端
 
 packages/
-├── qgs-shared/       # 前后端共享类型与常量
-├── qgs-domain/       # 领域逻辑（纯函数）
-└── qg-enums/         # 枚举定义
+└── qgs-shared/       # 前后端共享类型、枚举、领域纯函数
 ```
+
+## 生产环境
+
+| 资源 | 配置 |
+|------|------|
+| 应用服务器 | 2 核 4 GB |
+| 文件存储 | 阿里云 OSS（环境变量 `OSS_PROVIDER=aliyun` + `OSS_BUCKET` + `OSS_ENDPOINT` + `OSS_ACCESS_KEY_ID` + `OSS_ACCESS_KEY_SECRET`） |
+| 数据库 | 阿里云 RDS for MySQL 8.x（环境变量 `DATABASE_URL`） |
+
+部署注意：
+- OSS 环境变量缺失时，文件会落到容器本地 `uploads/` 目录，重启数据丢失
+- RDS 连接串必须通过环境变量注入，禁止写入代码或提交到 git
+- 服务器内存有限（4 GB），慎用全量加载到内存的查询（见 CONSTRAINTS.md 性能规范）
 
 ## 首次运行
 
