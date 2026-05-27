@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupplierService } from '~/modules/supplier/supplier.service';
+import prisma from '~/utils/prisma';
 
-import prisma from '../../utils/prisma';
-
-vi.mock('../../utils/prisma', () => ({
+vi.mock('~/utils/prisma', () => ({
   default: {
     suppliers: {
       aggregate: vi.fn(),
@@ -24,7 +23,7 @@ vi.mock('../../utils/prisma', () => ({
   },
 }));
 
-vi.mock('../../utils/canonical-master-data', () => ({
+vi.mock('~/utils/canonical-master-data', () => ({
   MasterDataGovernanceKernel: {
     resolveCanonicalIdsByNames: vi.fn().mockResolvedValue(new Map()),
   },

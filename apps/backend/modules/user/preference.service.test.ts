@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PreferenceService } from '~/modules/user/preference.service';
+import prisma from '~/utils/prisma';
 
-import prisma from '../../utils/prisma';
-
-vi.mock('../../utils/prisma', () => ({
+vi.mock('~/utils/prisma', () => ({
   default: {
     user_preferences: {
       findUnique: vi.fn(),

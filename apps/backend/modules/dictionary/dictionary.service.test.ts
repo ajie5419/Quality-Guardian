@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DictionaryService } from '~/modules/dictionary/dictionary.service';
 import { BusinessError } from '~/utils/business-error';
+import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 
-import prisma from '../../utils/prisma';
-import { redis } from '../../utils/redis';
-
-vi.mock('../../utils/prisma', () => ({
+vi.mock('~/utils/prisma', () => ({
   default: {
     dictionaries: {
       count: vi.fn(),
@@ -17,7 +16,7 @@ vi.mock('../../utils/prisma', () => ({
   },
 }));
 
-vi.mock('../../utils/redis', () => ({
+vi.mock('~/utils/redis', () => ({
   redis: {
     del: vi.fn(),
     delByPattern: vi.fn(),

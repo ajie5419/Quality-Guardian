@@ -5,11 +5,10 @@ import { InspectionService } from '~/modules/inspection/inspection.service';
 import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { WorkOrderService } from '~/modules/work-order/work-order.service';
-
-import prisma from '../../utils/prisma';
+import prisma from '~/utils/prisma';
 
 // Mock prisma and logger
-vi.mock('../../utils/prisma', () => ({
+vi.mock('~/utils/prisma', () => ({
   default: {
     $queryRaw: vi.fn(),
     inspections: {

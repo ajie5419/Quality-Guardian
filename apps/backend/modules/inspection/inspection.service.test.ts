@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionService } from '~/modules/inspection/inspection.service';
-
-import prisma from '../../utils/prisma';
+import prisma from '~/utils/prisma';
 
 // Mock prisma
-vi.mock('../../utils/prisma', () => ({
+vi.mock('~/utils/prisma', () => ({
   default: {
     inspections: {
       findFirst: vi.fn(),

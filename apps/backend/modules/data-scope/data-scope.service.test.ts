@@ -1,13 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import prisma from '~/utils/prisma';
 
-import prisma from '../../utils/prisma';
-
-vi.mock('../rbac/rbac-config', () => ({
+vi.mock('~/modules/rbac/rbac-config', () => ({
   isDataScopeV2Enabled: () => true,
 }));
 
-vi.mock('../../utils/prisma', () => ({
+vi.mock('~/utils/prisma', () => ({
   default: {
     data_permission_policies: {
       findMany: vi.fn(),

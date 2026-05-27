@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkOrderService } from '~/modules/work-order/work-order.service';
-
-import prisma from '../../utils/prisma';
+import prisma from '~/utils/prisma';
 
 // Mock prisma and logger
-vi.mock('../../utils/prisma', () => ({
+vi.mock('~/utils/prisma', () => ({
   default: {
     work_orders: {
       findMany: vi.fn(),

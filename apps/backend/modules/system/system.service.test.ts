@@ -3,8 +3,7 @@ import os from 'node:os';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SystemService } from '~/modules/system/system.service';
-
-import prisma from '../../utils/prisma';
+import prisma from '~/utils/prisma';
 
 // Mock os, child_process and prisma
 vi.mock('os', () => {
@@ -47,7 +46,7 @@ vi.mock('node:child_process', () => {
   };
 });
 
-vi.mock('../../utils/prisma', () => ({
+vi.mock('~/utils/prisma', () => ({
   default: {
     $queryRaw: vi.fn(),
     $queryRawUnsafe: vi.fn(),

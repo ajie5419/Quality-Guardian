@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
-
-import prisma from '../../utils/prisma';
+import prisma from '~/utils/prisma';
 
 // Mock prisma
-vi.mock('../../utils/prisma', () => ({
+vi.mock('~/utils/prisma', () => ({
   default: {
     after_sales: {
       findMany: vi.fn(),

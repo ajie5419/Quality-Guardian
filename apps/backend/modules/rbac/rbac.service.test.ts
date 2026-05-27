@@ -1,15 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RbacService } from '~/modules/rbac/rbac.service';
+import prisma from '~/utils/prisma';
 
-import prisma from '../../utils/prisma';
-
-vi.mock('../rbac/rbac-config', () => ({
+vi.mock('~/modules/rbac/rbac-config', () => ({
   isDataScopeV2Enabled: () => false,
   isRbacReadV2Enabled: () => true,
   isRbacSuperMergeAllCodesEnabled: () => true,
 }));
 
-vi.mock('../../utils/prisma', () => ({
+vi.mock('~/utils/prisma', () => ({
   default: {
     menus: {
       findMany: vi.fn(),
