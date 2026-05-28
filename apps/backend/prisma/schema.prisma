@@ -926,6 +926,7 @@ model roles {
   id                       String                     @id
   name                     String                     @unique
   description              String?
+  permissions              String?                    @db.Text
   status                   Int                        @default(1)
   isSystem                 Boolean                    @default(false)
   isDeleted                Boolean                    @default(false)
@@ -1147,7 +1148,7 @@ model users {
   password                                          String
   email                                             String?
   realName                                          String?
-  wechatWorkId                                      String?                   @unique
+  wechatWorkId                                      String?
   phone                                             String?
   roleId                                            String
   department                                        String
