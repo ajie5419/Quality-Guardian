@@ -244,20 +244,35 @@ async function attachProcessIdToIssueUpdateData(
   body: Record<string, unknown>,
   updateData: Prisma.quality_recordsUpdateInput,
 ) {
+  const { updateData: workOrderUpdateData, workOrderNumber } =
+    normalizeWorkOrderRelationForIssueUpdate(updateData);
   const governedCanonicalIdsRaw = await buildGovernedCanonicalWritePairForTable(
     'quality_records',
-    updateData as Record<string, unknown>,
+    workOrderUpdateData as Record<string, unknown>,
   );
   const { processId: _ignoredProcessId, ...governedCanonicalIds } =
     governedCanonicalIdsRaw;
   const governedFields = buildGovernedWriteFieldsForTable(
     'quality_records',
-    updateData as Record<string, unknown>,
+    workOrderUpdateData as Record<string, unknown>,
   );
   const normalizedUpdateData = {
-    ...updateData,
+    ...workOrderUpdateData,
     ...governedFields,
     ...governedCanonicalIds,
+    ...(workOrderNumber === undefined
+      ? {}
+      : {
+          work_orders: workOrderNumber
+            ? {
+                connect: {
+                  workOrderNumber,
+                },
+              }
+            : {
+                disconnect: true,
+              },
+        }),
   } as Prisma.quality_recordsUpdateInput;
   if (body.processName === undefined) {
     return normalizedUpdateData;
@@ -280,6 +295,27 @@ async function attachProcessIdToIssueUpdateData(
       },
     },
   } as Prisma.quality_recordsUpdateInput;
+}
+
+function normalizeWorkOrderRelationForIssueUpdate(
+  updateData: Prisma.quality_recordsUpdateInput,
+): {
+  updateData: Prisma.quality_recordsUpdateInput;
+  workOrderNumber?: string;
+} {
+  const rawWorkOrderNumber = (updateData as Record<string, unknown>)
+    .workOrderNumber;
+  if (rawWorkOrderNumber === undefined) {
+    return { updateData };
+  }
+
+  const { workOrderNumber: _ignoredWorkOrderNumber, ...rest } =
+    updateData as Record<string, unknown>;
+  return {
+    updateData: rest as Prisma.quality_recordsUpdateInput,
+    workOrderNumber:
+      normalizeOptionalInspectionIssueString(rawWorkOrderNumber) ?? '',
+  };
 }
 
 export async function buildInspectionIssueUpdateData(

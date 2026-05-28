@@ -25,6 +25,33 @@
 
 ## 执行记录
 
+### 2026-05-28 修复：前端错误上报日志分级
+
+**执行内容：**
+
+- 后端客户端日志接收器按 `severity` / `type` 将浏览器上报分为 `error`、`warn`、`info`，避免真实前端错误落成普通 info 日志。
+- 前端错误上报统一补齐浏览器上下文，包含 `source=browser`、`recordedAt`、当前页面 URL、User-Agent、源文件、堆栈和请求响应状态等字段。
+- 请求入口的 `request received` 访问流水从 `debug` 降到 `trace`，避免开发默认日志被每个 API 请求刷屏。
+- 断开 task-dispatch 后端规则文件对 shared 中两个转发函数的运行时导入，消除 Nitro/Rollup 的 unused import 构建噪声。
+- 修复不合格品更新时将 `workOrderNumber` 作为 Prisma checked update scalar 写入的问题，改为 `work_orders.connect/disconnect` 关系写法。
+- Prisma Client 默认关闭自身 `error` 日志输出，仅保留应用侧结构化错误日志；Prisma validation 错误默认压缩为摘要，避免终端打印完整 invocation 和 stack。
+- 保持生产环境 JSON 日志输出不变，未新增仓库内运维脚本，避免把服务器侧工具打进应用代码。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/backend exec vitest run modules/inspection/inspection-issue.test.ts utils/logger.test.ts`: 2 文件 / 10 测试通过
+- `pnpm -C apps/backend exec vitest run modules/task-dispatch/task-dispatch-rules.test.ts`: 1 文件 / 6 测试通过
+- `pnpm -C apps/backend run build`: 通过
+- `pnpm -C apps/web-antd exec vue-tsc --noEmit`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `pending`
+
+**遗留问题：**
+
+- 服务器侧 `docker logs` 过滤脚本应部署在运维目录，不纳入本次仓库改动。
+
 ### 2026-05-28 优化：报检看板完整排行明细
 
 **执行内容：**

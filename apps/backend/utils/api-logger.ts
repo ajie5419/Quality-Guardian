@@ -9,11 +9,20 @@ import {
   createModuleLogger,
   getRequestLogger,
   sanitizeContext,
+  sanitizeError,
 } from './logger';
 
 // 创建 API 专用 logger
 const apiLogger = createModuleLogger('API');
 const clientLogger = createModuleLogger('ClientReport');
+const ERROR_CLIENT_LOG_TYPES = new Set([
+  'component',
+  'onerror',
+  'unhandledrejection',
+]);
+const WARN_CLIENT_LOG_TYPES = new Set(['manual']);
+
+type ClientLogLevel = 'error' | 'info' | 'warn';
 
 function getBaseApiContext(
   event?: H3Event<EventHandlerRequest>,
@@ -51,11 +60,7 @@ export function logApiError(
     targetLogger.error(
       {
         ...mergedContext,
-        err: {
-          message: error.message,
-          name: error.name,
-          stack: error.stack,
-        },
+        err: sanitizeError(error),
       },
       `${endpoint} exception`,
     );
@@ -118,13 +123,30 @@ export function logClientReport(
   payload: Record<string, unknown>,
 ) {
   const requestLogger = getRequestLogger(event);
+  const level = resolveClientLogLevel(payload);
   const context = sanitizeContext({
     ...getBaseApiContext(event),
     ...payload,
+    level,
   });
 
-  requestLogger.info(context, 'client-report received');
-  clientLogger.info(context, 'client-report received');
+  requestLogger[level](context, 'client-report received');
+  clientLogger[level](context, 'client-report received');
 }
 
 export { apiLogger, clientLogger };
+
+function resolveClientLogLevel(
+  payload: Record<string, unknown>,
+): ClientLogLevel {
+  const severity = payload.severity;
+  if (severity === 'error' || severity === 'warn' || severity === 'info') {
+    return severity;
+  }
+
+  const type = typeof payload.type === 'string' ? payload.type : '';
+  if (ERROR_CLIENT_LOG_TYPES.has(type)) return 'error';
+  if (WARN_CLIENT_LOG_TYPES.has(type)) return 'warn';
+
+  return 'info';
+}

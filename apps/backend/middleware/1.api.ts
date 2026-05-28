@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
     'Access-Control-Allow-Origin',
     event.headers.get('Origin') ?? '*',
   );
-  requestLogger.debug(
+  requestLogger.trace(
     {
       method: event.method,
       path: event.path,
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
     'request received',
   );
   if (event.method === 'OPTIONS') {
-    requestLogger.debug('OPTIONS preflight request');
+    requestLogger.trace('OPTIONS preflight request');
     event.node.res.statusCode = 204;
     event.node.res.statusMessage = 'No Content.';
     return 'OK';

@@ -17,6 +17,7 @@ import pino from 'pino';
 
 const isDev = process.env.NODE_ENV !== 'production';
 const LOG_LEVEL = process.env.LOG_LEVEL || (isDev ? 'debug' : 'info');
+const SHOULD_LOG_ERROR_STACK = process.env.LOG_ERROR_STACK === '1';
 const REDACTED_VALUE = '[REDACTED]';
 const SENSITIVE_KEY_PATTERN =
   /pass(?:word)?|token|secret|authorization|cookie|api[-_]?key|session/i;
@@ -75,12 +76,37 @@ function normalizeLogInput(
   };
 }
 
-function sanitizeError(error: Error) {
+export function sanitizeError(error: Error) {
+  const message = summarizeErrorMessage(error.message);
   return {
-    message: error.message,
+    message,
     name: error.name,
-    stack: error.stack,
+    ...(SHOULD_LOG_ERROR_STACK ? { stack: error.stack } : {}),
   };
+}
+
+function summarizeErrorMessage(message: string) {
+  const firstLine = message
+    .split('\n')
+    .map((line) => line.trim())
+    .find(Boolean);
+
+  if (!firstLine) {
+    return message;
+  }
+
+  if (message.includes('Unknown argument `')) {
+    const unknownArgument = message.match(/Unknown argument `([^`]+)`/);
+    return unknownArgument
+      ? `Prisma validation failed: unknown argument "${unknownArgument[1]}"`
+      : 'Prisma validation failed: unknown argument';
+  }
+
+  if (message.includes('Invalid `prisma.')) {
+    return firstLine;
+  }
+
+  return message;
 }
 
 function sanitizeValue(value: unknown, state: SanitizerState): unknown {

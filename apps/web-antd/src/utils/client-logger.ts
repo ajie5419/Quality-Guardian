@@ -1,5 +1,16 @@
 import { sendClientLog } from '#/api/system/log';
 
+type ClientLogSeverity = 'error' | 'info' | 'warn';
+
+function getBrowserLogContext() {
+  return {
+    recordedAt: new Date().toISOString(),
+    source: 'browser',
+    url: window.location.href,
+    userAgent: navigator.userAgent,
+  };
+}
+
 function serializeUnknownError(error: unknown) {
   if (!error) {
     return { error: 'Unknown error' };
@@ -50,6 +61,15 @@ function serializeUnknownError(error: unknown) {
   return { error: String(error) };
 }
 
+function reportClientLog(
+  payload: Record<string, unknown> & { severity: ClientLogSeverity },
+) {
+  sendClientLog({
+    ...getBrowserLogContext(),
+    ...payload,
+  });
+}
+
 /**
  * 设置全局错误处理器，捕获未处理的运行时错误和 Promise 拒绝
  */
@@ -73,15 +93,14 @@ export function setupClientLogger() {
       return;
     }
 
-    sendClientLog({
+    reportClientLog({
       colno,
       lineno,
       message: String(message),
-      source: filename,
+      severity: 'error',
+      sourceFile: filename,
       stack: error?.stack,
       type: 'onerror',
-      url: window.location.href,
-      userAgent: navigator.userAgent,
     });
   });
 
@@ -106,12 +125,11 @@ export function setupClientLogger() {
       return;
     }
 
-    sendClientLog({
+    reportClientLog({
       ...serializeUnknownError(reason),
       message,
+      severity: 'error',
       type: 'unhandledrejection',
-      url: window.location.href,
-      userAgent: navigator.userAgent,
     });
   });
 }
@@ -119,14 +137,16 @@ export function setupClientLogger() {
 /**
  * 手动记录远程错误
  */
-export const logRemoteError = (message: string, context?: any) => {
+export const logRemoteError = (
+  message: string,
+  context?: Record<string, unknown>,
+) => {
   const { originalError, ...restContext } = context || {};
-  sendClientLog({
+  reportClientLog({
     type: 'manual',
     message,
+    severity: 'warn',
     ...serializeUnknownError(originalError),
     ...restContext,
-    url: window.location.href,
-    userAgent: navigator.userAgent,
   });
 };

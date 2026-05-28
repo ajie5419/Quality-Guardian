@@ -101,6 +101,24 @@ describe('inspection-issue processId dual write', () => {
     });
   });
 
+  it('writes work order relation on update instead of scalar foreign key', async () => {
+    const updateData = await buildInspectionIssueUpdateData(
+      {
+        workOrderNumber: ' WO-1001 ',
+      },
+      null,
+    );
+
+    expect((updateData as Record<string, unknown>).workOrderNumber).toBe(
+      undefined,
+    );
+    expect(updateData.work_orders).toEqual({
+      connect: {
+        workOrderNumber: 'WO-1001',
+      },
+    });
+  });
+
   it('serializes responsibleDepartments and keeps legacy field on update', async () => {
     const updateData = await buildInspectionIssueUpdateData(
       {

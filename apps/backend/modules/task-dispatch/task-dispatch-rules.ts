@@ -4,11 +4,10 @@ import {
   buildTaskDispatchCurrentUserLookupConditions,
   buildTaskDispatchPayloadCore,
   getTaskDispatchArchiveFilterRule,
-  isTaskDispatchLevelTwo,
   normalizeTaskDispatchStatus,
-  resolveTaskDispatchAssigneeCandidates,
   resolveTaskDispatchAssigneeFilterRule,
   resolveTaskDispatchItpProjectIdForValidation,
+  resolveTaskDispatchLevel,
   resolveTaskDispatchParentIdForPromotion,
   resolveTaskDispatchStatusFilterRule,
   resolveTaskDispatchUserId,
@@ -83,12 +82,25 @@ export async function resolveTaskDispatchCurrentUserId(
 }
 
 export {
-  isTaskDispatchLevelTwo,
-  resolveTaskDispatchAssigneeCandidates,
   resolveTaskDispatchItpProjectIdForValidation,
+  resolveTaskDispatchLevel,
   resolveTaskDispatchParentIdForPromotion,
 };
-export { resolveTaskDispatchLevel } from '@qgs/shared';
+
+export function isTaskDispatchLevelTwo(body: Record<string, unknown>): boolean {
+  return resolveTaskDispatchLevel(body.level, 1) === 2;
+}
+
+export function resolveTaskDispatchAssigneeCandidates(
+  assigneeId: unknown,
+): null | { id: string; username: string } {
+  const normalized = String(assigneeId ?? '').trim();
+  if (!normalized) {
+    return null;
+  }
+
+  return { id: normalized, username: normalized };
+}
 
 export function buildTaskDispatchCreateData(
   body: Record<string, unknown>,
