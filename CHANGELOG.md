@@ -38,7 +38,7 @@
 - `pnpm -C apps/backend exec vitest run`: 30 文件 / 160 测试通过
 - `pnpm run check:qms-arch`: 通过
 
-**commit:** `pending`
+**commit:** `7675bd19` fix(@qgs/backend): allow anonymous public uploads
 
 **遗留问题：**
 
