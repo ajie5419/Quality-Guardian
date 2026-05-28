@@ -72,6 +72,7 @@ const formState = reactive({
   roles: [] as string[],
   status: 1,
   username: '',
+  wechatWorkId: '',
 });
 
 // Load department tree data
@@ -126,6 +127,7 @@ const gridOptions = computed<VxeGridProps>(() => ({
     },
     { field: 'email', title: t('sys.user.email'), width: 180 },
     { field: 'phone', title: t('sys.user.phone'), width: 130 },
+    { field: 'wechatWorkId', title: t('sys.user.wechatWorkId'), width: 180 },
     { field: 'deptName', title: t('sys.user.deptName'), width: 120 },
     {
       field: 'status',
@@ -221,6 +223,7 @@ function handleOpenModal() {
     status: 1,
     remark: '',
     roles: [],
+    wechatWorkId: '',
   });
   // We load roles in onMounted, but ensure it's fresh if needed or rely on mounted
   isModalVisible.value = true;
@@ -239,6 +242,7 @@ function handleEdit(row: SystemUserApi.User) {
     status: row.status,
     remark: row.remark || '',
     roles: row.roles || [], // Populate roles
+    wechatWorkId: row.wechatWorkId || '',
   });
   isModalVisible.value = true;
 }
@@ -354,6 +358,12 @@ async function handleSubmit() {
             <Input
               v-model:value="formState.phone"
               :placeholder="`${t('common.pleaseInput')}${t('sys.user.phone')}`"
+            />
+          </FormItem>
+          <FormItem :label="t('sys.user.wechatWorkId')">
+            <Input
+              v-model:value="formState.wechatWorkId"
+              :placeholder="t('sys.user.wechatWorkIdPlaceholder')"
             />
           </FormItem>
           <FormItem :label="t('sys.user.deptName')">

@@ -1,4 +1,4 @@
-import type { PageResult, User } from '@qgs/shared';
+import type { PageResult, User as SharedUser } from '@qgs/shared';
 
 import { requestClient } from '#/api/request';
 
@@ -7,18 +7,22 @@ import { SYSTEM_API } from './constants';
 // Re-export for compatibility
 export * from '@qgs/shared';
 
+export interface SystemUser extends SharedUser {
+  wechatWorkId?: null | string;
+}
+
 export const getUserList = (params?: { page?: number; pageSize?: number }) => {
   const { page = 1, pageSize = 20 } = params || {};
-  return requestClient.get<PageResult<User>>(SYSTEM_API.USER_LIST, {
+  return requestClient.get<PageResult<SystemUser>>(SYSTEM_API.USER_LIST, {
     params: { page, pageSize },
   });
 };
 
-export const createUser = (data: Partial<User>) => {
-  return requestClient.post<User>(SYSTEM_API.USER, data);
+export const createUser = (data: Partial<SystemUser>) => {
+  return requestClient.post<SystemUser>(SYSTEM_API.USER, data);
 };
 
-export const updateUser = (id: string, data: Partial<User>) => {
+export const updateUser = (id: string, data: Partial<SystemUser>) => {
   return requestClient.put(`${SYSTEM_API.USER}/${id}`, data);
 };
 
@@ -31,6 +35,6 @@ export const resetPassword = (id: string) => {
 };
 
 export namespace SystemUserApi {
-  export type User = import('@qgs/shared').User;
+  export type User = SystemUser;
   export type PageResult<T> = import('@qgs/shared').PageResult<T>;
 }

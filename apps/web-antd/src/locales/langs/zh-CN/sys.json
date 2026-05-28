@@ -40,6 +40,8 @@
     "realName": "姓名",
     "email": "邮箱",
     "phone": "手机号",
+    "wechatWorkId": "企微账号",
+    "wechatWorkIdPlaceholder": "请输入企业微信通讯录中的账号",
     "deptName": "所属部门",
     "createTime": "创建时间",
     "remark": "备注",

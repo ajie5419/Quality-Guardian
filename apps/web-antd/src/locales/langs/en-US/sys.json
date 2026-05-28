@@ -40,6 +40,8 @@
     "realName": "Real Name",
     "email": "Email",
     "phone": "Phone",
+    "wechatWorkId": "Wechat Work ID",
+    "wechatWorkIdPlaceholder": "Enter the account from Wechat Work contacts",
     "deptName": "Department",
     "createTime": "Created At",
     "remark": "Remark",
