@@ -39,7 +39,7 @@
 - `pnpm -C apps/backend exec vitest run`: 30 文件 / 160 测试通过
 - `pnpm run check:qms-arch`: 通过
 
-**commit:** `pending`
+**commit:** `68bd72f0` feat(@qgs/web-antd): add full inspection dashboard rankings
 
 **遗留问题：**
 
