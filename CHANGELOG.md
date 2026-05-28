@@ -25,6 +25,25 @@
 
 ## 执行记录
 
+### 2026-05-28 修复：public 上传匿名 auth context
+
+**执行内容：**
+
+- 修复 public 上传路由复用上传 service 时强制读取登录用户导致 `AUTH_CONTEXT_MISSING` 的问题。
+- 上传 service 改为读取可选用户；登录上传继续记录 `uploadedBy` 和审计，匿名 public 上传跳过用户审计。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/backend exec vitest run`: 30 文件 / 160 测试通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `pending`
+
+**遗留问题：**
+
+- 定向执行 `pnpm -C apps/backend exec vitest run apps/backend/modules/file-storage` 时该目录没有测试文件，已改跑 backend 全量测试并通过。
+
 ### 2026-05-28 修复：public 上传 action 缺少 API 前缀
 
 **执行内容：**
