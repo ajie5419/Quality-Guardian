@@ -1,35 +1,3 @@
-<template>
-  <div class="task-list">
-    <a-spin :spinning="loading">
-      <div
-        v-for="task in tasks"
-        :key="task.id"
-        class="task-card"
-        @click="goDetail(task)"
-      >
-        <div class="task-header">
-          <span class="task-no">{{ task.requestNo }}</span>
-          <a-tag :color="priorityColor(task.priority)">
-            {{ priorityLabel(task.priority) }}
-          </a-tag>
-        </div>
-        <div class="task-info">
-          <div>Work order: {{ task.workOrderNumber }}</div>
-          <div>Part: {{ task.partName }}</div>
-          <div>Process: {{ task.processName }}</div>
-          <div>Reporter: {{ task.reporter }}</div>
-          <div>Submitted: {{ formatDate(task.submittedAt || task.createdAt) }}</div>
-        </div>
-      </div>
-      <a-empty
-        v-if="tasks.length === 0 && !loading"
-        class="task-empty"
-        description="No pending tasks"
-      />
-    </a-spin>
-  </div>
-</template>
-
 <script setup lang="ts">
 import type { InspectionRequest } from '#/api/qms/inspection-request';
 
@@ -97,6 +65,40 @@ onMounted(() => {
 });
 </script>
 
+<template>
+  <div class="task-list">
+    <a-spin :spinning="loading">
+      <div
+        v-for="task in tasks"
+        :key="task.id"
+        class="task-card"
+        @click="goDetail(task)"
+      >
+        <div class="task-header">
+          <span class="task-no">{{ task.requestNo }}</span>
+          <a-tag :color="priorityColor(task.priority)">
+            {{ priorityLabel(task.priority) }}
+          </a-tag>
+        </div>
+        <div class="task-info">
+          <div>Work order: {{ task.workOrderNumber }}</div>
+          <div>Part: {{ task.partName }}</div>
+          <div>Process: {{ task.processName }}</div>
+          <div>Reporter: {{ task.reporter }}</div>
+          <div>
+            Submitted: {{ formatDate(task.submittedAt || task.createdAt) }}
+          </div>
+        </div>
+      </div>
+      <a-empty
+        v-if="tasks.length === 0 && !loading"
+        class="task-empty"
+        description="No pending tasks"
+      />
+    </a-spin>
+  </div>
+</template>
+
 <style scoped>
 .task-list {
   min-height: calc(100vh - 64px);
@@ -120,19 +122,19 @@ onMounted(() => {
 
 .task-no {
   overflow: hidden;
-  color: #111827;
-  font-weight: 600;
-  font-size: 15px;
   text-overflow: ellipsis;
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
   white-space: nowrap;
 }
 
 .task-info {
   display: grid;
   gap: 6px;
-  color: #4b5563;
   font-size: 13px;
   line-height: 1.5;
+  color: #4b5563;
 }
 
 .task-empty {

@@ -1,18 +1,3 @@
-<template>
-  <div class="mobile-layout">
-    <div v-if="loading" class="mobile-loading">Loading...</div>
-    <template v-else-if="isAuthed">
-      <div class="mobile-header">
-        <h3>{{ route.meta.title || 'Quality Guardian' }}</h3>
-      </div>
-      <div class="mobile-content">
-        <router-view />
-      </div>
-    </template>
-    <div v-else class="mobile-error">Authentication failed</div>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { useRoute } from 'vue-router';
@@ -28,6 +13,21 @@ onMounted(() => {
   }
 });
 </script>
+
+<template>
+  <div class="mobile-layout">
+    <div v-if="loading" class="mobile-loading">Loading...</div>
+    <template v-else-if="isAuthed">
+      <div class="mobile-header">
+        <h3>{{ route.meta.title || 'Quality Guardian' }}</h3>
+      </div>
+      <div class="mobile-content">
+        <router-view />
+      </div>
+    </template>
+    <div v-else class="mobile-error">Authentication failed</div>
+  </div>
+</template>
 
 <style scoped>
 .mobile-layout {
@@ -60,7 +60,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  color: #666;
   font-size: 16px;
+  color: #666;
 }
 </style>

@@ -1,64 +1,3 @@
-<template>
-  <div class="mobile-dispatch">
-    <a-spin :spinning="loading">
-      <a-descriptions
-        v-if="task"
-        class="task-detail"
-        :column="1"
-        bordered
-        size="small"
-      >
-        <a-descriptions-item label="Request no">
-          {{ task.requestNo }}
-        </a-descriptions-item>
-        <a-descriptions-item label="Work order">
-          {{ task.workOrderNumber }}
-        </a-descriptions-item>
-        <a-descriptions-item label="Part">
-          {{ task.partName }}
-        </a-descriptions-item>
-        <a-descriptions-item label="Process">
-          {{ task.processName }}
-        </a-descriptions-item>
-        <a-descriptions-item label="Reporter">
-          {{ task.reporter }}
-        </a-descriptions-item>
-      </a-descriptions>
-
-      <a-form class="dispatch-form" layout="vertical">
-        <a-form-item label="Inspector" required>
-          <a-select
-            v-model:value="form.inspectorId"
-            :options="inspectorOptions"
-            placeholder="Select inspector"
-            show-search
-          />
-        </a-form-item>
-        <a-form-item label="Priority">
-          <a-input-number v-model:value="form.priority" :max="5" :min="1" />
-        </a-form-item>
-        <a-form-item label="Remark">
-          <a-textarea
-            v-model:value="form.dispatchRemark"
-            :maxlength="200"
-            placeholder="Optional dispatch remark"
-            :rows="3"
-          />
-        </a-form-item>
-        <a-button
-          block
-          type="primary"
-          :disabled="!form.inspectorId"
-          :loading="submitting"
-          @click="submitDispatch"
-        >
-          Dispatch
-        </a-button>
-      </a-form>
-    </a-spin>
-  </div>
-</template>
-
 <script setup lang="ts">
 import type { InspectionRequest } from '#/api/qms/inspection-request';
 
@@ -127,6 +66,67 @@ onMounted(() => {
   void loadDetail();
 });
 </script>
+
+<template>
+  <div class="mobile-dispatch">
+    <a-spin :spinning="loading">
+      <a-descriptions
+        v-if="task"
+        class="task-detail"
+        :column="1"
+        bordered
+        size="small"
+      >
+        <a-descriptions-item label="Request no">
+          {{ task.requestNo }}
+        </a-descriptions-item>
+        <a-descriptions-item label="Work order">
+          {{ task.workOrderNumber }}
+        </a-descriptions-item>
+        <a-descriptions-item label="Part">
+          {{ task.partName }}
+        </a-descriptions-item>
+        <a-descriptions-item label="Process">
+          {{ task.processName }}
+        </a-descriptions-item>
+        <a-descriptions-item label="Reporter">
+          {{ task.reporter }}
+        </a-descriptions-item>
+      </a-descriptions>
+
+      <a-form class="dispatch-form" layout="vertical">
+        <a-form-item label="Inspector" required>
+          <a-select
+            v-model:value="form.inspectorId"
+            :options="inspectorOptions"
+            placeholder="Select inspector"
+            show-search
+          />
+        </a-form-item>
+        <a-form-item label="Priority">
+          <a-input-number v-model:value="form.priority" :max="5" :min="1" />
+        </a-form-item>
+        <a-form-item label="Remark">
+          <a-textarea
+            v-model:value="form.dispatchRemark"
+            :maxlength="200"
+            placeholder="Optional dispatch remark"
+            :rows="3"
+          />
+        </a-form-item>
+        <a-button
+          block
+          type="primary"
+          :disabled="!form.inspectorId"
+          :loading="submitting"
+          @click="submitDispatch"
+        >
+          Dispatch
+        </a-button>
+      </a-form>
+    </a-spin>
+  </div>
+</template>
 
 <style scoped>
 .mobile-dispatch {
