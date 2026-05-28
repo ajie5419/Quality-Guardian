@@ -25,6 +25,25 @@
 
 ## 执行记录
 
+### 2026-05-28 修复：public 报检入口上传 401
+
+**执行内容：**
+
+- 新增 `/api/qms/public/upload` 公开上传路由，复用文件上传 service，避免匿名报检入口调用受保护的 `/api/upload`。
+- 报检入口上传组件支持传入上传地址，public 报检页改用 `QMS_API.PUBLIC_UPLOAD`，后台上传入口不受影响。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/web-antd exec vue-tsc --noEmit`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `pending`
+
+**遗留问题：**
+
+- 未启动前端 dev server，按项目规则仅做类型检查和架构守护验证。
+
 ### 2026-05-27 修复：报检入口上传照片失败
 
 **执行内容：**

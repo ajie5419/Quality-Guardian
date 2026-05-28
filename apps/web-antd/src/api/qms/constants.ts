@@ -36,6 +36,7 @@ export const QMS_API = {
   PUBLIC_INSPECTION_REQUEST_TEAMS: '/qms/public/inspection/requests/teams',
   PUBLIC_INSPECTION_REQUEST_WORK_ORDERS:
     '/qms/public/inspection/requests/work-orders',
+  PUBLIC_UPLOAD: '/qms/public/upload',
   INSPECTION_ARCHIVE_TASKS: '/qms/inspection/archive-tasks',
   QUALITY_LOSS: '/qms/quality-loss',
   METROLOGY: '/qms/metrology',
