@@ -267,6 +267,38 @@ export const UserService = {
     });
   },
 
+  async findWechatWorkDispatchRecipients() {
+    const users = await prisma.users.findMany({
+      include: { roles: true },
+      where: {
+        isDeleted: false,
+        status: 'ACTIVE',
+        wechatWorkId: { not: null },
+      },
+    });
+    return users.filter((user) => {
+      const roleName = user.roles?.name?.toLowerCase() || '';
+      return (
+        roleName.includes('admin') ||
+        roleName.includes('dispatch') ||
+        roleName.includes('manager') ||
+        roleName.includes('schedule')
+      );
+    });
+  },
+
+  async findWechatWorkUserById(id: string) {
+    return prisma.users.findFirst({
+      select: { realName: true, username: true, wechatWorkId: true },
+      where: {
+        id,
+        isDeleted: false,
+        status: 'ACTIVE',
+        wechatWorkId: { not: null },
+      },
+    });
+  },
+
   async getWechatWorkUserId(code: string) {
     const corpId = process.env.WECHAT_WORK_CORP_ID;
     const secret = process.env.WECHAT_WORK_SECRET;

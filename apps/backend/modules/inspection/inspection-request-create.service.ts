@@ -3,11 +3,13 @@ import type { UserSession } from '~/utils/jwt-utils';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
+import { UserService } from '~/modules/user';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
 } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
+import { notifyWechatWork } from '~/utils/wechat-work-notify';
 import {
   resolveCanonicalProcessName,
   resolveProcessIdForWrite,
@@ -80,9 +82,33 @@ export const InspectionRequestCreateService = {
       await auditRequestCreate(event, userinfo, created);
     }
     publishInspectionRequestCreated(mapped);
+    void notifyDispatchers(mapped);
     return mapped;
   },
 };
+
+async function notifyDispatchers(request: {
+  id: string;
+  partName: string;
+  processName: string;
+  requestNo: string;
+  workOrderNumber: string;
+}) {
+  const recipients = await UserService.findWechatWorkDispatchRecipients();
+  const url = `https://www.tlqms.com/mobile/dispatch/${request.id}`;
+  await Promise.all(
+    recipients.map((user) =>
+      user.wechatWorkId
+        ? notifyWechatWork(
+            user.wechatWorkId,
+            'New inspection request',
+            `${request.requestNo} ${request.workOrderNumber} ${request.processName} ${request.partName}`,
+            url,
+          )
+        : Promise.resolve(),
+    ),
+  );
+}
 
 async function assertWorkOrderExists(workOrderNumber: string) {
   const workOrder = await prisma.work_orders.findUnique({

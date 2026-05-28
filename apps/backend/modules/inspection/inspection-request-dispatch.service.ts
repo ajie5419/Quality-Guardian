@@ -2,9 +2,11 @@ import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
+import { UserService } from '~/modules/user';
 import { BusinessError } from '~/utils/business-error';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
+import { notifyWechatWork } from '~/utils/wechat-work-notify';
 
 import {
   INSPECTION_REQUEST_STATUS,
@@ -85,9 +87,32 @@ export const InspectionRequestDispatchService = {
       targetType: 'inspection_request',
       userId: userinfo.id,
     });
-    return mapInspectionRequest(updated);
+    const mapped = mapInspectionRequest(updated);
+    void notifyInspector(inspector.id, mapped);
+    return mapped;
   },
 };
+
+async function notifyInspector(
+  inspectorId: string,
+  request: {
+    id: string;
+    partName: string;
+    processName: string;
+    requestNo: string;
+    workOrderNumber: string;
+  },
+) {
+  const inspector = await UserService.findWechatWorkUserById(inspectorId);
+  if (!inspector?.wechatWorkId) return;
+
+  await notifyWechatWork(
+    inspector.wechatWorkId,
+    'Inspection task assigned',
+    `${request.requestNo} ${request.workOrderNumber} ${request.processName} ${request.partName}`,
+    `https://www.tlqms.com/mobile/inspect/${request.id}`,
+  );
+}
 
 function buildDispatchTaskCreateData(options: {
   assignorId: string;
