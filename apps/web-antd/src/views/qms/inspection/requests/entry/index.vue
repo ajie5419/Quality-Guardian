@@ -17,7 +17,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { Form, Input, InputNumber, message, Select } from 'ant-design-vue';
 
-import { QMS_API } from '#/api/qms/constants';
+import { QMS_UPLOAD_ACTIONS } from '#/api/qms/constants';
 import {
   createPublicInspectionRequest,
   getPublicInspectionRequestProcessDictionaryOptions,
@@ -472,7 +472,7 @@ watch(
       <Form.Item label="自检记录" required>
         <InspectionRequestEntryUploadActions
           v-model:file-list="attachmentFileList"
-          :action="QMS_API.PUBLIC_UPLOAD"
+          :action="QMS_UPLOAD_ACTIONS.PUBLIC_UPLOAD"
           :before-upload="handleBeforeUpload"
           :disabled="submitting"
           @change="handleAttachmentUploadChange"

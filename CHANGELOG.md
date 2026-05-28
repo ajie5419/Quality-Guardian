@@ -25,6 +25,24 @@
 
 ## 执行记录
 
+### 2026-05-28 修复：public 上传 action 缺少 API 前缀
+
+**执行内容：**
+
+- 将 public 报检入口上传 action 从 requestClient 相对路径常量切换为浏览器直连上传常量 `/api/qms/public/upload`。
+- 保留普通 QMS API 常量不带 `/api` 的约定，避免请求客户端路径和 Upload action 路径混用。
+
+**验证结果：**
+
+- `pnpm -C apps/web-antd exec vue-tsc --noEmit`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `pending`
+
+**遗留问题：**
+
+- 未启动前端 dev server，按项目规则仅做类型检查和架构守护验证。
+
 ### 2026-05-28 修复：public 报检入口上传 401
 
 **执行内容：**
