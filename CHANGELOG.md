@@ -39,7 +39,7 @@
 - `pnpm -C apps/backend exec vitest run`: 30 文件 / 160 测试通过
 - `pnpm run check:qms-arch`: 通过
 
-**commit:** `pending`
+**commit:** `dbbd1581` fix(@qgs/web-antd): keep inspection entry bom lookup public
 
 **遗留问题：**
 
