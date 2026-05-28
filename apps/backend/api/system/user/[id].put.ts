@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     logApiError('user', error, undefined, event);
     if (isPrismaUniqueConstraintError(error)) {
-      return conflictResponse(event, '用户名已存在');
+      return conflictResponse(event, '用户名或企微账号已存在');
     }
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '用户不存在');

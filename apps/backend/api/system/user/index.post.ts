@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     logApiError('user', error, undefined, event);
     if (isPrismaUniqueConflictError(error)) {
-      return conflictResponse(event, '用户名已存在');
+      return conflictResponse(event, '用户名或企微账号已存在');
     }
     return internalServerErrorResponse(event, '创建用户失败');
   }

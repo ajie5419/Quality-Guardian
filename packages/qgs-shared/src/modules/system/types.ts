@@ -16,6 +16,7 @@ export interface User {
   roles?: string[];
   status: number;
   username: string;
+  wechatWorkId?: null | string;
 }
 
 export interface Role {

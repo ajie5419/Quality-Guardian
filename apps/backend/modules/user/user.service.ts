@@ -23,6 +23,7 @@ export interface CreateUserDto {
   status?: number; // 1: ACTIVE, 0: INACTIVE
   roles?: string[];
   roleIds?: string[];
+  wechatWorkId?: string;
 }
 
 export interface UpdateUserDto {
@@ -35,6 +36,7 @@ export interface UpdateUserDto {
   status?: number;
   roles?: string[];
   roleIds?: string[];
+  wechatWorkId?: string;
 }
 
 interface WechatWorkTokenResponse {
@@ -51,6 +53,11 @@ interface WechatWorkUserInfoResponse {
 
 function generateTemporaryPassword() {
   return randomBytes(18).toString('base64url');
+}
+
+function normalizeOptionalText(value: string | undefined) {
+  const normalized = String(value ?? '').trim();
+  return normalized || null;
 }
 
 export const UserService = {
@@ -142,6 +149,7 @@ export const UserService = {
           governedFields.realName === undefined
             ? null
             : String(governedFields.realName),
+        wechatWorkId: normalizeOptionalText(data.wechatWorkId),
         email: data.email || '',
         phone: data.phone || '',
         department: String(governedFields.department || 'Unknown'), // governance-allow-direct-name-id
@@ -179,6 +187,9 @@ export const UserService = {
       updateData.department = governedFields.department;
     if (data.email !== undefined) updateData.email = data.email;
     if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.wechatWorkId !== undefined) {
+      updateData.wechatWorkId = normalizeOptionalText(data.wechatWorkId);
+    }
     if (governedFields.realName !== undefined)
       updateData.realName = governedFields.realName;
     if (governedFields.username !== undefined)
