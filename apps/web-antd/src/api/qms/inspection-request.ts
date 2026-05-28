@@ -84,6 +84,12 @@ export async function getInspectionRequestStatsWithParams(params?: {
   );
 }
 
+export async function getInspectionRequest(id: string) {
+  return requestClient.get<InspectionRequest>(
+    `${QMS_API.INSPECTION_REQUESTS}/${id}`,
+  );
+}
+
 export async function createInspectionRequest(
   data: CreateInspectionRequestParams,
 ) {

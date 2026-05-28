@@ -116,6 +116,43 @@ async function findLinkedIssues(
 }
 
 export const InspectionRequestQueryService = {
+  async getRequestDetail(id: string) {
+    const request = await prisma.qms_inspection_requests.findFirst({
+      include: {
+        dispatcher: { select: { realName: true, username: true } },
+        inspection: {
+          select: {
+            qualifiedQuantity: true,
+            result: true,
+            unqualifiedQuantity: true,
+          },
+        },
+        inspector: { select: { realName: true, username: true } },
+        process: { select: { name: true } },
+      },
+      where: { id, isDeleted: false },
+    });
+    if (!request) return null;
+
+    const issues = await findLinkedIssues([request]);
+    const issueById = new Map(issues.map((issue) => [issue.id, issue]));
+    const issueByInspectionId = new Map(
+      issues
+        .filter((issue) => issue.inspectionId)
+        .map((issue) => [issue.inspectionId, issue]),
+    );
+
+    return mapInspectionRequest({
+      ...request,
+      qualityRecords: [
+        request.linkedIssueId ? issueById.get(request.linkedIssueId) : null,
+        request.inspectionId
+          ? issueByInspectionId.get(request.inspectionId)
+          : null,
+      ].filter(Boolean),
+    });
+  },
+
   async getRequestList(
     userinfo: UserSession,
     rawQuery: Record<string, unknown>,
