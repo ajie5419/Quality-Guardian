@@ -38,7 +38,7 @@
 - `pnpm -C apps/web-antd exec vue-tsc --noEmit`: 通过
 - `pnpm run check:qms-arch`: 通过
 
-**commit:** `pending`
+**commit:** `0e1b1e98` fix(@qgs/web-antd): use public upload endpoint for inspection entry
 
 **遗留问题：**
 
