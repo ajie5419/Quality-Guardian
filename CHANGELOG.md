@@ -37,7 +37,7 @@
 - `pnpm -C apps/web-antd exec vue-tsc --noEmit`: 通过
 - `pnpm run check:qms-arch`: 通过
 
-**commit:** `pending`
+**commit:** `5ac64e84` fix(@qgs/web-antd): include api prefix for public upload action
 
 **遗留问题：**
 
