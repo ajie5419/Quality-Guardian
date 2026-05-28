@@ -10,16 +10,32 @@ import { IconifyIcon } from '@vben/icons';
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
 
 import { tryOnUnmounted } from '@vueuse/core';
-import { Button, Card, DatePicker, Segmented } from 'ant-design-vue';
+import { Button, DatePicker, Segmented } from 'ant-design-vue';
 import dayjs from 'dayjs';
 
 import { getInspectionRequestStatsWithParams } from '#/api/qms/inspection-request';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
+import {
+  buildDailyTrendChartOptions,
+  buildHistoryInspectorChartOptions,
+  buildHistoryReinspectionChartOptions,
+  buildHistoryTeamChartOptions,
+} from './chart-options';
+import InspectionDashboardDetailDrawer from './components/InspectionDashboardDetailDrawer.vue';
+import InspectionDashboardHistoryCard from './components/InspectionDashboardHistoryCard.vue';
+import InspectionDashboardHistoryList from './components/InspectionDashboardHistoryList.vue';
+import InspectionDashboardRankCards from './components/InspectionDashboardRankCards.vue';
+import InspectionDashboardStatsCards from './components/InspectionDashboardStatsCards.vue';
+import InspectionDashboardTrendCard from './components/InspectionDashboardTrendCard.vue';
+
 defineOptions({ name: 'QMSInspectionDashboard' });
 
 const { handleApiError } = useErrorHandler();
 const loading = ref(false);
+const detailDrawerOpen = ref(false);
+const detailDrawerTeamSource = ref<'current' | 'history'>('current');
+const detailDrawerType = ref<'inspector' | 'reinspection' | 'team'>('team');
 const rangeMode = ref<'custom' | 'halfYear' | 'month' | 'quarter' | 'year'>(
   'month',
 );
@@ -44,7 +60,10 @@ const rangeModeOptions = [
   { label: '自定义', value: 'custom' },
 ];
 
-const historyStatsOptions = [
+const historyStatsOptions: Array<{
+  label: string;
+  value: 'inspector' | 'reinspection' | 'team';
+}> = [
   { label: '班组报检', value: 'team' },
   { label: '班组复检率', value: 'reinspection' },
   { label: '检验效率', value: 'inspector' },
@@ -188,6 +207,15 @@ function minutesText(value?: number) {
   return `${minutes}分钟`;
 }
 
+function openDetailDrawer(
+  type: 'inspector' | 'reinspection' | 'team',
+  teamSource: 'current' | 'history' = 'current',
+) {
+  detailDrawerType.value = type;
+  detailDrawerTeamSource.value = teamSource;
+  detailDrawerOpen.value = true;
+}
+
 function renderHistoryStatsChart() {
   if (!historyChartRef.value || !hasHistoryStatsData.value) {
     getHistoryChartInstance()?.clear();
@@ -195,107 +223,22 @@ function renderHistoryStatsChart() {
   }
 
   if (historyStatsView.value === 'team') {
-    const rows = historyTeamChartRows.value;
-    renderHistoryEcharts({
-      grid: { bottom: 16, left: 16, right: 18, top: 12, containLabel: true },
-      series: [
-        {
-          barMaxWidth: 20,
-          data: rows.map((item) => item.count),
-          itemStyle: {
-            borderRadius: [0, 4, 4, 0],
-            color: '#1677ff',
-          },
-          type: 'bar',
-        },
-      ],
-      tooltip: { trigger: 'axis' },
-      xAxis: { axisLabel: { color: '#6b7280' }, type: 'value' },
-      yAxis: {
-        axisLabel: { color: '#374151' },
-        data: rows.map((item) => item.team || '未填写'),
-        type: 'category',
-      },
-    });
+    renderHistoryEcharts(
+      buildHistoryTeamChartOptions(historyTeamChartRows.value),
+    );
     return;
   }
 
   if (historyStatsView.value === 'reinspection') {
-    const rows = reinspectionChartRows.value;
-    renderHistoryEcharts({
-      grid: { bottom: 16, left: 16, right: 24, top: 12, containLabel: true },
-      series: [
-        {
-          barMaxWidth: 20,
-          data: rows.map((item) => item.reinspectionRate),
-          itemStyle: {
-            borderRadius: [0, 4, 4, 0],
-            color: '#fa8c16',
-          },
-          type: 'bar',
-        },
-      ],
-      tooltip: {
-        trigger: 'axis',
-      },
-      xAxis: {
-        axisLabel: {
-          color: '#6b7280',
-          formatter: (value: number) => `${value}%`,
-        },
-        type: 'value',
-      },
-      yAxis: {
-        axisLabel: { color: '#374151' },
-        data: rows.map((item) => item.team || '未填写'),
-        type: 'category',
-      },
-    });
+    renderHistoryEcharts(
+      buildHistoryReinspectionChartOptions(reinspectionChartRows.value),
+    );
     return;
   }
 
-  const rows = historyInspectorChartRows.value;
-  renderHistoryEcharts({
-    grid: { bottom: 22, left: 16, right: 18, top: 36, containLabel: true },
-    legend: { top: 0 },
-    series: [
-      {
-        barMaxWidth: 20,
-        data: rows.map((item) => item.completedTaskCount),
-        itemStyle: { borderRadius: [4, 4, 0, 0], color: '#13c2c2' },
-        name: '完成数量',
-        type: 'bar',
-      },
-      {
-        data: rows.map((item) => item.averageTaskMinutes),
-        name: '平均时长',
-        smooth: true,
-        type: 'line',
-        yAxisIndex: 1,
-      },
-    ],
-    tooltip: { trigger: 'axis' },
-    xAxis: {
-      axisLabel: { color: '#374151' },
-      data: rows.map((item) => item.inspector || '未记录'),
-      type: 'category',
-    },
-    yAxis: [
-      {
-        axisLabel: { color: '#6b7280' },
-        name: '完成',
-        type: 'value',
-      },
-      {
-        axisLabel: {
-          color: '#6b7280',
-          formatter: (value: number) => `${value}分`,
-        },
-        name: '均时长',
-        type: 'value',
-      },
-    ],
-  });
+  renderHistoryEcharts(
+    buildHistoryInspectorChartOptions(historyInspectorChartRows.value),
+  );
 }
 
 function renderDailyTrendChart() {
@@ -304,42 +247,9 @@ function renderDailyTrendChart() {
     return;
   }
 
-  const rows = requestStats.value.dailyTrend;
-  renderDailyTrendEcharts({
-    grid: { bottom: 22, left: 12, right: 18, top: 36, containLabel: true },
-    legend: { top: 0 },
-    series: [
-      {
-        barMaxWidth: 18,
-        data: rows.map((item) => item.submittedCount),
-        itemStyle: { borderRadius: [4, 4, 0, 0], color: '#1677ff' },
-        name: '报检数量',
-        type: 'bar',
-      },
-      {
-        data: rows.map((item) => item.closedCount),
-        itemStyle: { color: '#52c41a' },
-        name: '完成数量',
-        smooth: true,
-        symbolSize: 6,
-        type: 'line',
-      },
-    ],
-    tooltip: { trigger: 'axis' },
-    xAxis: {
-      axisLabel: {
-        color: '#6b7280',
-        formatter: (value: string) => dayjs(value).format('MM-DD'),
-      },
-      data: rows.map((item) => item.date),
-      type: 'category',
-    },
-    yAxis: {
-      axisLabel: { color: '#6b7280' },
-      minInterval: 1,
-      type: 'value',
-    },
-  });
+  renderDailyTrendEcharts(
+    buildDailyTrendChartOptions(requestStats.value.dailyTrend),
+  );
 }
 
 function scheduleRenderDailyTrendChart() {
@@ -442,264 +352,78 @@ tryOnUnmounted(() => {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <div class="rounded border bg-white p-4">
-          <div class="text-sm font-medium text-gray-600">报检数量</div>
-          <div class="mt-3 text-3xl font-semibold text-blue-900">
-            {{ requestStats.todaySubmittedCount }}
-          </div>
-          <div class="mt-2 flex items-center justify-between text-xs">
-            <span class="text-gray-500">{{ dashboardRangeLabel }}</span>
-            <span class="text-blue-700">
-              待派单 {{ requestStats.pendingDispatchCount }}
-            </span>
-          </div>
-        </div>
-        <div class="rounded border bg-white p-4">
-          <div class="text-sm font-medium text-gray-600">完成数量</div>
-          <div class="mt-3 text-3xl font-semibold text-green-900">
-            {{ requestStats.todayClosedCount }}
-          </div>
-          <div class="mt-2 flex items-center justify-between text-xs">
-            <span class="text-gray-500">待检验任务</span>
-            <span class="text-green-700">
-              {{ requestStats.pendingInspectionCount }}
-            </span>
-          </div>
-        </div>
-        <div class="rounded border bg-white p-4">
-          <div class="text-sm font-medium text-gray-600">平均每日报检</div>
-          <div class="mt-3 text-3xl font-semibold text-cyan-900">
-            {{ averageDailySubmittedCount }}
-          </div>
-          <div class="mt-2 text-xs text-gray-500">
-            统计 {{ requestStats.dailyTrend.length }} 天
-          </div>
-        </div>
-        <div class="rounded border bg-white p-4">
-          <div class="text-sm font-medium text-gray-600">最高日峰值</div>
-          <div class="mt-3 text-3xl font-semibold text-orange-900">
-            {{ busiestDailyTrend?.submittedCount || 0 }}
-          </div>
-          <div class="mt-2 text-xs text-gray-500">
-            {{ busiestDailyTrend?.date || dashboardRangeLabel }}
-          </div>
-        </div>
-      </div>
+      <InspectionDashboardStatsCards
+        :average-daily-submitted-count="averageDailySubmittedCount"
+        :busiest-daily-trend="busiestDailyTrend"
+        :range-label="dashboardRangeLabel"
+        :stats="requestStats"
+      />
 
-      <Card :body-style="{ padding: '16px' }">
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div class="font-medium text-gray-900">每日报检数量</div>
-            <div class="mt-1 text-xs text-gray-500">
-              按报检日期汇总，完成数量作为对比线
-            </div>
-          </div>
-          <span class="text-xs text-gray-500">{{ dashboardRangeLabel }}</span>
-        </div>
-        <div class="min-h-[320px] rounded bg-gray-50 p-3">
+      <InspectionDashboardTrendCard
+        :has-data="hasDailyTrendData"
+        :range-label="dashboardRangeLabel"
+      >
+        <EchartsUI ref="dailyTrendChartRef" class="h-[300px] w-full" />
+      </InspectionDashboardTrendCard>
+
+      <InspectionDashboardRankCards
+        :max-team-count="maxTeamCount"
+        :reinspection-stats-total="requestStats.reinspectionRateByTeam.length"
+        :team-stats-total="requestStats.byTeam.length"
+        :top-reinspection-stats="topReinspectionStats"
+        :top-team-stats="topTeamStats"
+        @open-detail="openDetailDrawer"
+      />
+
+      <InspectionDashboardHistoryCard
+        v-model:view="historyStatsView"
+        :has-data="hasHistoryStatsData"
+        :options="historyStatsOptions"
+        :range-label="dashboardRangeLabel"
+        @open-detail="
+          openDetailDrawer(
+            historyStatsView,
+            historyStatsView === 'team' ? 'history' : 'current',
+          )
+        "
+      >
+        <template #chart>
           <EchartsUI
-            v-if="hasDailyTrendData"
-            ref="dailyTrendChartRef"
+            v-if="hasHistoryStatsData"
+            ref="historyChartRef"
             class="h-[300px] w-full"
           />
           <div
             v-else
             class="flex h-[300px] items-center justify-center text-sm text-gray-400"
           >
-            当前范围暂无报检趋势数据
+            暂无历史统计数据
           </div>
-        </div>
-      </Card>
+        </template>
 
-      <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
-        <Card :body-style="{ padding: '16px' }">
-          <div class="mb-4 flex items-center justify-between">
-            <div>
-              <div class="font-medium text-gray-900">班组报检排行</div>
-              <div class="mt-1 text-xs text-gray-500">
-                共 {{ requestStats.byTeam.length }} 个班组
-              </div>
-            </div>
-            <span class="text-xs text-gray-500">前 12 项</span>
-          </div>
-          <div v-if="topTeamStats.length > 0" class="space-y-3">
-            <div
-              v-for="item in topTeamStats"
-              :key="item.team"
-              class="space-y-1"
-            >
-              <div class="flex items-start justify-between gap-3 text-sm">
-                <span class="break-words text-gray-800">
-                  {{ item.team || '未填写' }}
-                </span>
-                <span class="shrink-0 font-semibold text-gray-900">
-                  {{ item.count }}
-                </span>
-              </div>
-              <div class="h-1.5 overflow-hidden rounded bg-gray-100">
-                <div
-                  class="h-full rounded bg-blue-500"
-                  :style="{ width: `${(item.count / maxTeamCount) * 100}%` }"
-                ></div>
-              </div>
-            </div>
-          </div>
-          <div v-else class="py-10 text-center text-sm text-gray-400">
-            当前范围暂无班组报检
-          </div>
-        </Card>
-
-        <Card :body-style="{ padding: '16px' }">
-          <div class="mb-4 flex items-center justify-between">
-            <div>
-              <div class="font-medium text-gray-900">班组复检率</div>
-              <div class="mt-1 text-xs text-gray-500">
-                只按已完成检验或已产生不合格项的任务计算
-              </div>
-            </div>
-            <span class="text-xs text-gray-500">
-              {{ requestStats.reinspectionRateByTeam.length }} 个班组
-            </span>
-          </div>
-          <div v-if="topReinspectionStats.length > 0" class="space-y-2">
-            <div
-              v-for="(item, index) in topReinspectionStats"
-              :key="item.team"
-              class="rounded bg-gray-50 px-3 py-2"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <div class="text-sm text-gray-800">
-                    <span class="mr-2 text-xs text-gray-400">
-                      {{ index + 1 }}
-                    </span>
-                    <span class="break-words">{{ item.team || '未填写' }}</span>
-                  </div>
-                  <div class="mt-1 text-xs text-gray-500">
-                    复检 {{ item.reinspectionCount }} / 已检
-                    {{ item.inspectedCount }}
-                    <span class="text-gray-400">
-                      · 报检 {{ item.submittedCount }}
-                    </span>
-                  </div>
-                </div>
-                <span class="shrink-0 text-base font-semibold text-orange-600">
-                  {{ item.reinspectionRate }}%
-                </span>
-              </div>
-            </div>
-          </div>
-          <div v-else class="py-10 text-center text-sm text-gray-400">
-            当前范围暂无复检率数据
-          </div>
-        </Card>
-      </div>
-
-      <Card :body-style="{ padding: '16px' }">
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div class="font-medium text-gray-900">历史统计</div>
-            <div class="mt-1 text-xs text-gray-500">
-              {{
-                dashboardRangeLabel
-              }}班组报检、复检率、检验员完成数量与平均任务时长
-            </div>
-          </div>
-          <Segmented
-            v-model:value="historyStatsView"
-            :options="historyStatsOptions"
+        <template #list>
+          <InspectionDashboardHistoryList
+            :inspector-stats="topHistoryInspectorStats"
+            :minutes-text="minutesText"
+            :reinspection-stats="topReinspectionStats"
+            :team-stats="topHistoryTeamStats"
+            :view="historyStatsView"
           />
-        </div>
-
-        <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div class="min-h-[320px] rounded bg-gray-50 p-3">
-            <EchartsUI
-              v-if="hasHistoryStatsData"
-              ref="historyChartRef"
-              class="h-[300px] w-full"
-            />
-            <div
-              v-else
-              class="flex h-[300px] items-center justify-center text-sm text-gray-400"
-            >
-              暂无历史统计数据
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <template v-if="historyStatsView === 'team'">
-              <div
-                v-for="(item, index) in topHistoryTeamStats"
-                :key="item.team"
-                class="flex items-center justify-between rounded bg-gray-50 px-3 py-2"
-              >
-                <div class="flex min-w-0 items-center gap-2">
-                  <span class="w-5 text-xs text-gray-400">{{ index + 1 }}</span>
-                  <span class="truncate text-sm text-gray-800">
-                    {{ item.team || '未填写' }}
-                  </span>
-                </div>
-                <span class="text-sm font-semibold text-gray-900">
-                  {{ item.count }}
-                </span>
-              </div>
-            </template>
-            <template v-else-if="historyStatsView === 'reinspection'">
-              <div
-                v-for="(item, index) in topReinspectionStats"
-                :key="item.team"
-                class="rounded bg-gray-50 px-3 py-2"
-              >
-                <div class="flex items-center justify-between gap-2">
-                  <div class="flex min-w-0 items-center gap-2">
-                    <span class="w-5 text-xs text-gray-400">
-                      {{ index + 1 }}
-                    </span>
-                    <span class="truncate text-sm text-gray-800">
-                      {{ item.team || '未填写' }}
-                    </span>
-                  </div>
-                  <span class="text-sm font-semibold text-orange-600">
-                    {{ item.reinspectionRate }}%
-                  </span>
-                </div>
-                <div class="mt-1 text-xs text-gray-500">
-                  复检 {{ item.reinspectionCount }} / 已检
-                  {{ item.inspectedCount }}
-                  <span class="text-gray-400">
-                    · 报检 {{ item.submittedCount }}
-                  </span>
-                </div>
-              </div>
-            </template>
-            <template v-else>
-              <div
-                v-for="(item, index) in topHistoryInspectorStats"
-                :key="item.inspector"
-                class="rounded bg-gray-50 px-3 py-2"
-              >
-                <div class="flex items-center justify-between gap-2">
-                  <div class="flex min-w-0 items-center gap-2">
-                    <span class="w-5 text-xs text-gray-400">
-                      {{ index + 1 }}
-                    </span>
-                    <span class="truncate text-sm text-gray-800">
-                      {{ item.inspector || '未记录' }}
-                    </span>
-                  </div>
-                  <span class="text-sm font-semibold text-gray-900">
-                    {{ item.completedTaskCount }}
-                  </span>
-                </div>
-                <div class="mt-1 text-xs text-gray-500">
-                  平均任务时长 {{ minutesText(item.averageTaskMinutes) }}
-                </div>
-              </div>
-            </template>
-          </div>
-        </div>
-      </Card>
+        </template>
+      </InspectionDashboardHistoryCard>
     </div>
+
+    <InspectionDashboardDetailDrawer
+      v-model:open="detailDrawerOpen"
+      :inspector-stats="requestStats.historyByInspector"
+      :range-label="dashboardRangeLabel"
+      :reinspection-stats="requestStats.reinspectionRateByTeam"
+      :team-stats="
+        detailDrawerTeamSource === 'history'
+          ? requestStats.historyByTeam
+          : requestStats.byTeam
+      "
+      :type="detailDrawerType"
+    />
   </Page>
 </template>
