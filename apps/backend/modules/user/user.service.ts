@@ -1,10 +1,12 @@
 import { randomBytes } from 'node:crypto';
+import process from 'node:process';
 
 import { createId } from '@paralleldrive/cuid2';
 import bcrypt from 'bcrypt';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { getDefaultResetPassword } from '~/modules/user/user-security';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
+import { generateAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 
 export interface UserQueryParams {
@@ -33,6 +35,18 @@ export interface UpdateUserDto {
   status?: number;
   roles?: string[];
   roleIds?: string[];
+}
+
+interface WechatWorkTokenResponse {
+  access_token?: string;
+  errcode?: number;
+  errmsg?: string;
+}
+
+interface WechatWorkUserInfoResponse {
+  errcode?: number;
+  errmsg?: string;
+  userid?: string;
 }
 
 function generateTemporaryPassword() {
@@ -240,6 +254,64 @@ export const UserService = {
       deptName: dept?.name || '',
       avatar: dbUser.avatar || userinfo.avatar,
     };
+  },
+
+  async findByWechatWorkId(wechatWorkId: string) {
+    return prisma.users.findFirst({
+      where: {
+        isDeleted: false,
+        status: 'ACTIVE',
+        wechatWorkId,
+      },
+      include: { roles: true },
+    });
+  },
+
+  async getWechatWorkUserId(code: string) {
+    const corpId = process.env.WECHAT_WORK_CORP_ID;
+    const secret = process.env.WECHAT_WORK_SECRET;
+    if (!corpId || !secret) {
+      throw new Error('Wechat Work OAuth is not configured');
+    }
+
+    const tokenRes = await fetch(
+      `https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=${encodeURIComponent(
+        corpId,
+      )}&corpsecret=${encodeURIComponent(secret)}`,
+    );
+    const tokenData = (await tokenRes.json()) as WechatWorkTokenResponse;
+    if (!tokenData.access_token) {
+      throw new Error(tokenData.errmsg || 'Failed to get Wechat Work token');
+    }
+
+    const userRes = await fetch(
+      `https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?access_token=${encodeURIComponent(
+        tokenData.access_token,
+      )}&code=${encodeURIComponent(code)}`,
+    );
+    const userData = (await userRes.json()) as WechatWorkUserInfoResponse;
+    if (!userData.userid) {
+      throw new Error(userData.errmsg || 'Failed to get Wechat Work user');
+    }
+
+    return userData.userid;
+  },
+
+  generateToken(user: {
+    avatar?: null | string;
+    id: string;
+    realName?: null | string;
+    roles?: null | { name?: null | string };
+    username: string;
+  }) {
+    return generateAccessToken({
+      avatar: user.avatar || '/uploads/avatar-v1.svg',
+      id: user.id,
+      realName: user.realName || user.username,
+      roles: [user.roles?.name || 'user'],
+      userId: user.id,
+      username: user.username,
+    });
   },
 
   async resetPassword(id: string) {

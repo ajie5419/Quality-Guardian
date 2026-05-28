@@ -7,6 +7,7 @@ const PUBLIC_PATH_PREFIXES = [
   '/api/auth/logout',
   '/api/auth/refresh',
   '/api/auth/register',
+  '/api/auth/wechat-work',
   '/api/auth/departments',
   '/api/index',
   '/api/qms/public/',

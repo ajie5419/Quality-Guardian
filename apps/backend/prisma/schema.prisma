@@ -1147,6 +1147,7 @@ model users {
   password                                          String
   email                                             String?
   realName                                          String?
+  wechatWorkId                                      String?                   @unique
   phone                                             String?
   roleId                                            String
   department                                        String
@@ -1168,6 +1169,7 @@ model users {
   roles                                             roles                     @relation(fields: [roleId], references: [id])
 
   @@index([roleId], map: "users_roleId_fkey")
+  @@index([wechatWorkId])
 }
 
 model work_orders {
