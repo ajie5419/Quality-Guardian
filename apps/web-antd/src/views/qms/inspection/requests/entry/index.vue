@@ -9,7 +9,6 @@ import type {
   InspectionRequestAttachment,
   InspectionRequestCheckResult,
 } from '#/api/qms/inspection-request';
-import type { BomItem } from '#/api/qms/planning';
 import type { WorkOrderItem } from '#/api/qms/work-order';
 
 import { computed, onMounted, reactive, ref, watch } from 'vue';
@@ -20,12 +19,12 @@ import { Form, Input, InputNumber, message, Select } from 'ant-design-vue';
 import { QMS_UPLOAD_ACTIONS } from '#/api/qms/constants';
 import {
   createPublicInspectionRequest,
+  getPublicInspectionRequestBomParts,
   getPublicInspectionRequestProcessDictionaryOptions,
   getPublicInspectionRequestProcesses,
   getPublicInspectionRequestTeams,
   getPublicInspectionRequestWorkOrders,
 } from '#/api/qms/inspection-request';
-import { getBomList } from '#/api/qms/planning';
 import { useImageCompress } from '#/composables/useImageCompress';
 import {
   applyUploadResponse,
@@ -214,10 +213,12 @@ async function loadBomPartOptions(workOrderNumber: string) {
 
   bomPartsLoading.value = true;
   try {
-    const list = await getBomList({ projectId: normalized });
+    const list = await getPublicInspectionRequestBomParts({
+      workOrderNumber: normalized,
+    });
     if (requestForm.workOrderNumber.trim() !== normalized) return;
 
-    const parts = new Map<string, BomItem>();
+    const parts = new Map<string, (typeof list)[number]>();
     for (const item of list || []) {
       const partName = String(item.partName || '').trim();
       if (partName) parts.set(partName, item);

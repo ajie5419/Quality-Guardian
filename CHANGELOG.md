@@ -25,6 +25,26 @@
 
 ## 执行记录
 
+### 2026-05-28 修复：public 报检工单选择跳登录
+
+**执行内容：**
+
+- 新增 public 报检 BOM 部件查询接口 `/api/qms/public/inspection/requests/bom-parts`，只返回报检入口需要的部件名称、部件号和工单号。
+- 报检入口选择工单后改用 public BOM 查询接口，不再调用受保护的 `/qms/planning/bom` 后台接口。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/web-antd exec vue-tsc --noEmit`: 通过
+- `pnpm -C apps/backend exec vitest run`: 30 文件 / 160 测试通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `pending`
+
+**遗留问题：**
+
+- 未启动前端 dev server，按项目规则仅做类型检查、测试和架构守护验证。
+
 ### 2026-05-28 修复：public 上传匿名 auth context
 
 **执行内容：**

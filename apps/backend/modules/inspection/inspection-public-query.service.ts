@@ -42,6 +42,25 @@ export const InspectionPublicQueryService = {
     ].map((processName) => ({ processName }));
   },
 
+  async getPublicBomParts(workOrderNumber: string) {
+    const list = await prisma.project_boms.findMany({
+      where: { work_order_number: workOrderNumber },
+      orderBy: [{ part_number: 'asc' }, { created_at: 'desc' }],
+      select: {
+        id: true,
+        part_name: true,
+        part_number: true,
+        work_order_number: true,
+      },
+    });
+    return list.map((item) => ({
+      id: item.id,
+      partName: item.part_name,
+      partNumber: item.part_number,
+      workOrderNumber: item.work_order_number,
+    }));
+  },
+
   async getPublicTeams(keyword: string) {
     const [departments, suppliers] = await Promise.all([
       prisma.departments.findMany({

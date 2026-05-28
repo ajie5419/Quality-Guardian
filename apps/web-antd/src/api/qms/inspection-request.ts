@@ -117,6 +117,22 @@ export async function getPublicInspectionRequestProcessDictionaryOptions() {
   );
 }
 
+export interface PublicInspectionRequestBomPart {
+  id: string;
+  partName: string;
+  partNumber?: null | string;
+  workOrderNumber: string;
+}
+
+export async function getPublicInspectionRequestBomParts(params: {
+  workOrderNumber: string;
+}) {
+  return requestClient.get<PublicInspectionRequestBomPart[]>(
+    QMS_API.PUBLIC_INSPECTION_REQUEST_BOM_PARTS,
+    { params },
+  );
+}
+
 export async function getPublicInspectionRequestTeams(params?: {
   keyword?: string;
 }) {
