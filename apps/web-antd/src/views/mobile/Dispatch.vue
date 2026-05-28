@@ -4,7 +4,18 @@ import type { InspectionRequest } from '#/api/qms/inspection-request';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import { message } from 'ant-design-vue';
+import {
+  Button,
+  Descriptions,
+  DescriptionsItem,
+  Form,
+  FormItem,
+  InputNumber,
+  message,
+  Select,
+  Spin,
+  Textarea,
+} from 'ant-design-vue';
 
 import {
   dispatchInspectionRequest,
@@ -69,62 +80,62 @@ onMounted(() => {
 
 <template>
   <div class="mobile-dispatch">
-    <a-spin :spinning="loading">
-      <a-descriptions
+    <Spin :spinning="loading">
+      <Descriptions
         v-if="task"
         class="task-detail"
         :column="1"
         bordered
         size="small"
       >
-        <a-descriptions-item label="Request no">
+        <DescriptionsItem label="编号">
           {{ task.requestNo }}
-        </a-descriptions-item>
-        <a-descriptions-item label="Work order">
+        </DescriptionsItem>
+        <DescriptionsItem label="工单号">
           {{ task.workOrderNumber }}
-        </a-descriptions-item>
-        <a-descriptions-item label="Part">
+        </DescriptionsItem>
+        <DescriptionsItem label="零件">
           {{ task.partName }}
-        </a-descriptions-item>
-        <a-descriptions-item label="Process">
+        </DescriptionsItem>
+        <DescriptionsItem label="工序">
           {{ task.processName }}
-        </a-descriptions-item>
-        <a-descriptions-item label="Reporter">
+        </DescriptionsItem>
+        <DescriptionsItem label="报检人">
           {{ task.reporter }}
-        </a-descriptions-item>
-      </a-descriptions>
+        </DescriptionsItem>
+      </Descriptions>
 
-      <a-form class="dispatch-form" layout="vertical">
-        <a-form-item label="Inspector" required>
-          <a-select
+      <Form class="dispatch-form" layout="vertical">
+        <FormItem label="检验员" required>
+          <Select
             v-model:value="form.inspectorId"
             :options="inspectorOptions"
-            placeholder="Select inspector"
+            placeholder="请选择检验员"
             show-search
           />
-        </a-form-item>
-        <a-form-item label="Priority">
-          <a-input-number v-model:value="form.priority" :max="5" :min="1" />
-        </a-form-item>
-        <a-form-item label="Remark">
-          <a-textarea
+        </FormItem>
+        <FormItem label="优先级">
+          <InputNumber v-model:value="form.priority" :max="5" :min="1" />
+        </FormItem>
+        <FormItem label="备注">
+          <Textarea
             v-model:value="form.dispatchRemark"
             :maxlength="200"
-            placeholder="Optional dispatch remark"
+            placeholder="派单备注（选填）"
             :rows="3"
           />
-        </a-form-item>
-        <a-button
+        </FormItem>
+        <Button
           block
           type="primary"
           :disabled="!form.inspectorId"
           :loading="submitting"
           @click="submitDispatch"
         >
-          Dispatch
-        </a-button>
-      </a-form>
-    </a-spin>
+          确认派单
+        </Button>
+      </Form>
+    </Spin>
   </div>
 </template>
 

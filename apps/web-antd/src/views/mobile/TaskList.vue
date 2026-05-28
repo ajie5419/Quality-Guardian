@@ -4,6 +4,8 @@ import type { InspectionRequest } from '#/api/qms/inspection-request';
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { Empty, Spin, Tag } from 'ant-design-vue';
+
 import { getInspectionRequests } from '#/api/qms/inspection-request';
 
 import { useWechatAuth } from './composables/useWechatAuth';
@@ -67,7 +69,7 @@ onMounted(() => {
 
 <template>
   <div class="task-list">
-    <a-spin :spinning="loading">
+    <Spin :spinning="loading">
       <div
         v-for="task in tasks"
         :key="task.id"
@@ -76,26 +78,26 @@ onMounted(() => {
       >
         <div class="task-header">
           <span class="task-no">{{ task.requestNo }}</span>
-          <a-tag :color="priorityColor(task.priority)">
+          <Tag :color="priorityColor(task.priority)">
             {{ priorityLabel(task.priority) }}
-          </a-tag>
+          </Tag>
         </div>
         <div class="task-info">
-          <div>Work order: {{ task.workOrderNumber }}</div>
-          <div>Part: {{ task.partName }}</div>
-          <div>Process: {{ task.processName }}</div>
-          <div>Reporter: {{ task.reporter }}</div>
+          <div>工单号: {{ task.workOrderNumber }}</div>
+          <div>零件: {{ task.partName }}</div>
+          <div>工序: {{ task.processName }}</div>
+          <div>报检人: {{ task.reporter }}</div>
           <div>
-            Submitted: {{ formatDate(task.submittedAt || task.createdAt) }}
+            提交时间: {{ formatDate(task.submittedAt || task.createdAt) }}
           </div>
         </div>
       </div>
-      <a-empty
+      <Empty
         v-if="tasks.length === 0 && !loading"
         class="task-empty"
-        description="No pending tasks"
+        description="暂无待办任务"
       />
-    </a-spin>
+    </Spin>
   </div>
 </template>
 

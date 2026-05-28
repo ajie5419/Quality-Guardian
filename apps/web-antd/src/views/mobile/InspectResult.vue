@@ -9,7 +9,18 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { useAccessStore } from '@vben/stores';
 
-import { message } from 'ant-design-vue';
+import {
+  Button,
+  Descriptions,
+  DescriptionsItem,
+  Form,
+  FormItem,
+  message,
+  Segmented,
+  Spin,
+  Textarea,
+  Upload,
+} from 'ant-design-vue';
 
 import {
   closeInspectionRequest,
@@ -92,49 +103,49 @@ onMounted(() => {
 
 <template>
   <div class="mobile-inspect">
-    <a-spin :spinning="loading">
-      <a-descriptions
+    <Spin :spinning="loading">
+      <Descriptions
         v-if="task"
         class="task-detail"
         :column="1"
         bordered
         size="small"
       >
-        <a-descriptions-item label="Request no">
+        <DescriptionsItem label="编号">
           {{ task.requestNo }}
-        </a-descriptions-item>
-        <a-descriptions-item label="Work order">
+        </DescriptionsItem>
+        <DescriptionsItem label="工单号">
           {{ task.workOrderNumber }}
-        </a-descriptions-item>
-        <a-descriptions-item label="Part">
+        </DescriptionsItem>
+        <DescriptionsItem label="零件">
           {{ task.partName }}
-        </a-descriptions-item>
-        <a-descriptions-item label="Process">
+        </DescriptionsItem>
+        <DescriptionsItem label="工序">
           {{ task.processName }}
-        </a-descriptions-item>
-        <a-descriptions-item label="Quantity">
+        </DescriptionsItem>
+        <DescriptionsItem label="数量">
           {{ task.quantity }}
-        </a-descriptions-item>
-      </a-descriptions>
+        </DescriptionsItem>
+      </Descriptions>
 
-      <a-form class="inspect-form" layout="vertical">
-        <a-form-item label="Result" required>
-          <a-segmented
+      <Form class="inspect-form" layout="vertical">
+        <FormItem label="检验结果" required>
+          <Segmented
             v-model:value="form.result"
             block
             :options="resultOptions"
           />
-        </a-form-item>
-        <a-form-item label="Remark">
-          <a-textarea
+        </FormItem>
+        <FormItem label="备注">
+          <Textarea
             v-model:value="form.closeRemark"
             :maxlength="300"
-            placeholder="Optional inspection remark"
+            placeholder="检验备注（选填）"
             :rows="4"
           />
-        </a-form-item>
-        <a-form-item v-if="form.result === 'FAIL'" label="Photos">
-          <a-upload
+        </FormItem>
+        <FormItem v-if="form.result === 'FAIL'" label="照片">
+          <Upload
             v-model:file-list="fileList"
             accept="image/*"
             action="/api/upload"
@@ -146,19 +157,19 @@ onMounted(() => {
             :before-upload="beforeUpload"
             @change="handleUploadChange"
           >
-            <div v-if="fileList.length < 3">Photo</div>
-          </a-upload>
-        </a-form-item>
-        <a-button
+            <div v-if="fileList.length < 3">拍照</div>
+          </Upload>
+        </FormItem>
+        <Button
           block
           type="primary"
           :loading="submitting"
           @click="submitResult"
         >
-          Submit
-        </a-button>
-      </a-form>
-    </a-spin>
+          提交结果
+        </Button>
+      </Form>
+    </Spin>
   </div>
 </template>
 

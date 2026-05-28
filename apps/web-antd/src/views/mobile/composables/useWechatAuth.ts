@@ -43,6 +43,13 @@ function restoreMobileUser() {
 
 export function useWechatAuth() {
   async function auth() {
+    if (import.meta.env.DEV) {
+      user.value = { id: '1', realName: '开发测试', role: 'DISPATCHER' };
+      isAuthed.value = true;
+      loading.value = false;
+      return;
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
 
