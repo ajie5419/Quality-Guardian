@@ -20,6 +20,10 @@ interface MobileAuthResult {
   user: MobileAuthUser;
 }
 
+const isAuthed = ref(false);
+const loading = ref(true);
+const user = ref<MobileAuthUser | null>(null);
+
 function saveMobileSession(token: string, nextUser: MobileAuthUser) {
   localStorage.setItem(MOBILE_TOKEN_KEY, token);
   localStorage.setItem(MOBILE_USER_KEY, JSON.stringify(nextUser));
@@ -38,10 +42,6 @@ function restoreMobileUser() {
 }
 
 export function useWechatAuth() {
-  const isAuthed = ref(false);
-  const user = ref<MobileAuthUser | null>(null);
-  const loading = ref(true);
-
   async function auth() {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
