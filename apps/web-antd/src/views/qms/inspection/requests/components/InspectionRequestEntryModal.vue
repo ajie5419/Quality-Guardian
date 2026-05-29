@@ -58,7 +58,8 @@ const emit = defineEmits<{
           @update:value="(value) => emit('update:baseUrl', value ?? '')"
         />
         <div class="text-[11px] leading-relaxed text-gray-400">
-          配置后所有二维码都指向此地址，不受打开后台时用域名还是 IP 影响。修改后立即生效，无需重新部署。
+          配置后所有二维码都指向此地址，不受打开后台时用域名还是 IP
+          影响。修改后立即生效，无需重新部署。
         </div>
         <div class="flex justify-end">
           <Button

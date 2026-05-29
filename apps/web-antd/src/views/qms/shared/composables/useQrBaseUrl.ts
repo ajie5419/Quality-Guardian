@@ -1,13 +1,18 @@
 import { ref } from 'vue';
 
-import { getSystemSettingApi, saveSystemSettingApi } from '#/api/system/preference';
+import {
+  getSystemSettingApi,
+  saveSystemSettingApi,
+} from '#/api/system/preference';
 
 export const QR_BASE_URL_SETTING_KEY = 'qms:qrcode:base_url';
 
 const FALLBACK_ORIGIN = 'http://localhost:5666';
 
 function currentOrigin() {
-  return typeof window === 'undefined' ? FALLBACK_ORIGIN : window.location.origin;
+  return typeof window === 'undefined'
+    ? FALLBACK_ORIGIN
+    : window.location.origin;
 }
 
 function normalizeBase(value: unknown): string {

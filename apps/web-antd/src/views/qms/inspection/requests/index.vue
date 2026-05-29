@@ -51,8 +51,12 @@ const requestEntryOpen = ref(false);
 const requestEntryQr = ref('');
 
 const canConfigQrBase = computed(() => hasAccessByRoles(['super', 'admin']));
-const { baseUrl: qrBaseUrl, loadBaseUrl, saveBaseUrl, buildEntryUrl } =
-  useQrBaseUrl();
+const {
+  baseUrl: qrBaseUrl,
+  loadBaseUrl,
+  saveBaseUrl,
+  buildEntryUrl,
+} = useQrBaseUrl();
 const qrBaseInput = ref('');
 const qrBaseSaving = ref(false);
 const deptRawData = ref<SystemDeptApi.Dept[]>([]);
