@@ -77,7 +77,8 @@ resolve_base_ref() {
     return 0
   fi
 
-  if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
+  if [[ -n "${GITHUB_BASE_REF:-}" ]] &&
+    git -C "$ROOT_DIR" rev-parse --verify "origin/$GITHUB_BASE_REF" >/dev/null 2>&1; then
     printf 'origin/%s' "$GITHUB_BASE_REF"
     return 0
   fi
@@ -230,6 +231,7 @@ count_lines_violation() {
 }
 
 check_r1() {
+  (( ${#QMS_VIEW_TARGETS[@]} == 0 )) && return 0
   grep_rule "R1" "Do not call requestClient directly from qms views." '\brequestClient[[:space:]]*\.' "${QMS_VIEW_TARGETS[@]}"
 }
 
@@ -239,6 +241,7 @@ check_r3() {
   local repo_path=''
   local baseline_limit=''
 
+  (( ${#QMS_VIEW_TARGETS[@]} == 0 )) && return 0
   for index_file in "${QMS_VIEW_TARGETS[@]}"; do
     [[ -f "$index_file" ]] || continue
     [[ "$index_file" == */index.vue ]] || continue
@@ -275,6 +278,7 @@ check_b_d1() {
 }
 
 check_b_r1() {
+  (( ${#API_TS_TARGETS[@]} == 0 )) && return 0
   grep_rule "B-R1" "API files must not import Prisma directly." "import[[:space:]].*from[[:space:]]+['\"](~/?|/)?utils/prisma['\"]|from[[:space:]]+['\"]prisma['\"]|import[[:space:]]+prisma" "${API_TS_TARGETS[@]}"
 }
 
@@ -283,6 +287,7 @@ check_b_r2() {
   local repo_path=''
   local max_lines=50
 
+  (( ${#API_TS_TARGETS[@]} == 0 )) && return 0
   for file in "${API_TS_TARGETS[@]}"; do
     repo_path="$(to_repo_path "$file")"
     max_lines=50
@@ -292,18 +297,22 @@ check_b_r2() {
 }
 
 check_b_r3() {
+  (( ${#API_TS_TARGETS[@]} == 0 )) && return 0
   grep_rule "B-R3" "API files must use validated request types instead of unsafe casts." 'as Record<string, unknown>| as any' "${API_TS_TARGETS[@]}"
 }
 
 check_b_s2() {
+  (( ${#MODULE_TS_TARGETS[@]} == 0 )) && return 0
   grep_rule "B-S2" "Prisma delegate casts to any are not allowed in modules." '\(prisma\.[a-zA-Z_]+ as any\)' "${MODULE_TS_TARGETS[@]}"
 }
 
 check_b_s3() {
+  (( ${#MODULE_TS_TARGETS[@]} == 0 )) && return 0
   grep_rule "B-S3" "Use async process execution instead of execSync." 'execSync' "${MODULE_TS_TARGETS[@]}"
 }
 
 check_b_sec1() {
+  (( ${#REPO_TS_TARGETS[@]} == 0 )) && return 0
   grep_rule "B-SEC1" "Do not combine queryRawUnsafe with template strings." '\$queryRawUnsafe.*`' "${REPO_TS_TARGETS[@]}"
 }
 
