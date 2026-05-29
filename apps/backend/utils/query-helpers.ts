@@ -57,6 +57,20 @@ export function buildDateRangeFilter(
   return filter;
 }
 
+export function buildKeywordOr<F extends string>(
+  keyword: null | string | undefined,
+  fields: readonly F[],
+): undefined | { OR: Array<Record<F, { contains: string }>> } {
+  const kw = String(keyword ?? '').trim();
+  if (!kw || fields.length === 0) return undefined;
+  return {
+    OR: fields.map(
+      (field) =>
+        ({ [field]: { contains: kw } }) as Record<F, { contains: string }>,
+    ),
+  };
+}
+
 export function withSoftDelete<T extends Record<string, any>>(
   where: T,
   includeDeleted = false,
