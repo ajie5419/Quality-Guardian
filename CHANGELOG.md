@@ -25,6 +25,31 @@
 
 ## 执行记录
 
+### 2026-05-29 重构：列表关键词搜索共享 helper
+
+**执行内容：**
+
+- 在 `apps/backend/utils/query-helpers.ts` 新增通用 `buildKeywordOr` helper，并新增 `apps/backend/utils/query-helpers.test.ts` 覆盖空关键词、空字段、单字段、多字段、trim 与字段顺序。
+- 将 inspection 记录查询、public 工单查询、work-order、supplier、metrology、supervision、file-storage、dictionary 共 8 个简单 keyword OR 调用点改为复用 `buildKeywordOr`。
+- 保留 welder 的 `searchOr` 和 inspection-issue-list 的复杂部门解析逻辑不变；未触碰 schema、migration、索引或 FULLTEXT。
+- supplier / supervision 关键词现在由 helper 统一 trim，这是本次允许的归一化差异。
+
+**验证结果：**
+
+- `pnpm --dir apps/backend exec vitest run`: 32 文件 / 169 测试通过
+- `pnpm lint`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:**
+
+- `439676eb` refactor(@qgs/backend): add keyword OR query helper
+- `7c26830e` refactor(@qgs/backend): share keyword OR filters
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-05-28 修复：前端错误上报日志分级
 
 **执行内容：**
