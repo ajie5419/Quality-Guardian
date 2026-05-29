@@ -106,3 +106,14 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  prisma-migration:
+    name: Prisma Migration Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check schema/migration in sync
+        run: bash ./scripts/check-prisma-migration.sh "origin/${{ github.base_ref || 'main' }}"

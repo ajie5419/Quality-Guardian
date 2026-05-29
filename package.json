@@ -29,6 +29,7 @@
     "check:cspell": "cspell lint **/*.ts **/README.md .changeset/*.md --no-progress",
     "check:qms-arch": "bash ./scripts/check-qms-architecture.sh",
     "check:qms-arch:all": "bash ./scripts/check-qms-architecture.sh --all",
+    "check:prisma-migration": "bash ./scripts/check-prisma-migration.sh",
     "check:dep": "vsh check-dep",
     "check:type": "turbo run typecheck",
     "local:rbac": "bash ./scripts/local/rbac-local-one-click.sh",
