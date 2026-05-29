@@ -20,6 +20,7 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { convertToTreeSelectData } from '#/types';
 import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
+import { useQrBaseUrl } from '#/views/qms/shared/composables/useQrBaseUrl';
 
 import {
   useClaimOptions,
@@ -41,13 +42,19 @@ const route = useRoute();
 const router = useRouter();
 const accessStore = useAccessStore();
 const userStore = useUserStore();
-const { hasAccessByCodes } = useAccess();
+const { hasAccessByCodes, hasAccessByRoles } = useAccess();
 const { handleApiError } = useErrorHandler();
 const { isMobile } = useMobileViewport();
 const users = ref<SystemUserApi.User[]>([]);
 const inspectorStatusOpen = ref(false);
 const requestEntryOpen = ref(false);
 const requestEntryQr = ref('');
+
+const canConfigQrBase = computed(() => hasAccessByRoles(['super', 'admin']));
+const { baseUrl: qrBaseUrl, loadBaseUrl, saveBaseUrl, buildEntryUrl } =
+  useQrBaseUrl();
+const qrBaseInput = ref('');
+const qrBaseSaving = ref(false);
 const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const deptTreeData = ref<TreeSelectNode[]>([]);
 
@@ -223,21 +230,9 @@ function buildRequestUrl(
   params: Record<string, string>,
   path = '/qms/inspection/requests',
 ) {
-  const origin =
-    typeof window === 'undefined'
-      ? 'http://localhost:5666'
-      : window.location.origin;
-  const routePath = path.startsWith('/') ? path : `/${path}`;
-  const routeUrl = new URL(routePath, origin);
-  for (const [key, value] of Object.entries(params)) {
-    if (value) routeUrl.searchParams.set(key, value);
-  }
-
-  if (import.meta.env.VITE_ROUTER_HISTORY === 'hash') {
-    return `${origin}/#${routeUrl.pathname}${routeUrl.search}`;
-  }
-
-  return routeUrl.toString();
+  // 依赖 qrBaseUrl 以便配置变化时重新计算入口链接
+  void qrBaseUrl.value;
+  return buildEntryUrl(path, params);
 }
 
 async function makeQr(url: string) {
@@ -275,6 +270,20 @@ function openPublicEntryPage() {
 async function copyRequestEntryUrl() {
   await navigator.clipboard.writeText(requestEntryUrl.value);
   message.success('报检入口链接已复制');
+}
+
+async function saveQrBaseUrl(value: string) {
+  qrBaseSaving.value = true;
+  try {
+    await saveBaseUrl(value);
+    qrBaseInput.value = qrBaseUrl.value;
+    requestEntryQr.value = await makeQr(requestEntryUrl.value);
+    message.success('二维码地址已保存');
+  } catch (error) {
+    handleApiError(error, '保存二维码地址');
+  } finally {
+    qrBaseSaving.value = false;
+  }
 }
 
 const {
@@ -365,6 +374,8 @@ function handleDispatchFormUpdate(nextValue: typeof dispatchForm) {
 
 onMounted(async () => {
   applyRouteDispatchDetail();
+  await loadBaseUrl();
+  qrBaseInput.value = qrBaseUrl.value;
   requestEntryQr.value = await makeQr(requestEntryUrl.value);
   await Promise.all([
     loadDeptData(),
@@ -451,10 +462,14 @@ watch(
 
     <InspectionRequestEntryModal
       v-model:open="requestEntryOpen"
+      v-model:base-url="qrBaseInput"
       :qr-code="requestEntryQr"
       :url="requestEntryUrl"
+      :can-config="canConfigQrBase"
+      :saving="qrBaseSaving"
       @copy="copyRequestEntryUrl"
       @open-page="openPublicEntryPage"
+      @save-base-url="saveQrBaseUrl"
     />
 
     <InspectionRequestWorkflows

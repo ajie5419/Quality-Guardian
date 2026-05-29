@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { useI18n } from '@vben/locales';
@@ -7,20 +7,23 @@ import { useI18n } from '@vben/locales';
 import { Alert, Button, Input, message, Space } from 'ant-design-vue';
 import QRCode from 'qrcode';
 
+import { useQrBaseUrl } from '#/views/qms/shared/composables/useQrBaseUrl';
+
 const { t } = useI18n();
 const router = useRouter();
 const qrcode = ref('');
 const entryPath = '/qms/metrology/borrow/entry';
 
+const { baseUrl, loadBaseUrl, buildEntryUrl } = useQrBaseUrl();
+
 const entryUrl = computed(() => {
-  if (typeof window === 'undefined') {
-    return entryPath;
-  }
-  const routePath =
-    import.meta.env.VITE_ROUTER_HISTORY === 'hash'
-      ? `/#${entryPath}`
-      : entryPath;
-  return `${window.location.origin}${routePath}`;
+  // 依赖 baseUrl 以便配置变化时重新计算
+  void baseUrl.value;
+  return buildEntryUrl(entryPath);
+});
+
+onMounted(() => {
+  void loadBaseUrl();
 });
 
 watch(
