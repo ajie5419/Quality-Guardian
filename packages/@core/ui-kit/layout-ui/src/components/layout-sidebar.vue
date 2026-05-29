@@ -290,7 +290,7 @@ function handleMouseleave() {
       v-if="!collapse"
       class="text-muted-foreground flex-center mb-1 p-2 text-[10px] opacity-40 transition-all"
     >
-      v{{ displayVersion }}
+      {{ displayVersion }}
     </div>
 
     <div :style="collapseStyle"></div>

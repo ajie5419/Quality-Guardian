@@ -47,15 +47,21 @@ jobs:
             exit 1
           fi
 
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+
           if [ -n "$INPUT_VERSION" ]; then
             VERSION="$INPUT_VERSION"
+            DISPLAY_VERSION="$INPUT_VERSION"
           elif [[ "$REF_NAME" == v* ]]; then
             VERSION="$REF_NAME"
+            DISPLAY_VERSION="$REF_NAME"
           else
-            VERSION="v$(node -p "require('./package.json').version")-${GITHUB_SHA::7}"
+            VERSION="v${PKG_VERSION}-${GITHUB_SHA::7}"
+            DISPLAY_VERSION="v${PKG_VERSION}"
           fi
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "display_version=$DISPLAY_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Login ACR
         if: ${{ github.event.inputs.deploy_only != 'true' }}
@@ -75,7 +81,7 @@ jobs:
         run: |
           docker build --platform linux/amd64 \
             -f infra/docker/Dockerfile.frontend \
-            --build-arg VITE_APP_VERSION="${{ steps.version.outputs.version }}" \
+            --build-arg VITE_APP_VERSION="${{ steps.version.outputs.display_version }}" \
             -t "$IMAGE_REPO:frontend-${{ steps.version.outputs.version }}" .
 
       - name: Push images

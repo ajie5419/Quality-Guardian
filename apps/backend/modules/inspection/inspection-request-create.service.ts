@@ -9,12 +9,12 @@ import {
   buildGovernedWriteFieldsForTable,
 } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
-import { notifyWechatWork } from '~/utils/wechat-work-notify';
 import {
   resolveCanonicalProcessName,
   resolveProcessIdForWrite,
 } from '~/utils/process-resolver';
 import { resolveTeamIdForWrite } from '~/utils/team-resolver';
+import { notifyWechatWork } from '~/utils/wechat-work-notify';
 
 import {
   generateInspectionRequestNo,
