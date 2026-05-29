@@ -14,7 +14,7 @@ import { WorkOrderRequirementService } from '~/modules/work-order-requirement';
 import { addYearsToDate } from '~/modules/work-order/work-order-query';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import { formatDateString } from '~/utils/query-helpers';
+import { buildKeywordOr, formatDateString } from '~/utils/query-helpers';
 
 import { mapToDisplayStatus, WORK_ORDER_STATUS } from './work-order-status';
 
@@ -104,12 +104,11 @@ export async function buildWorkOrderWhereCondition(
         | any
         | Prisma.Enumwork_orders_statusFilter<'work_orders'>;
     }
-    if (keyword?.trim()) {
-      whereCondition.OR = [
-        { workOrderNumber: { contains: keyword.trim() } },
-        { projectName: { contains: keyword.trim() } },
-      ];
-    }
+    const keywordOr = buildKeywordOr(keyword, [
+      'workOrderNumber',
+      'projectName',
+    ] as const);
+    if (keywordOr) Object.assign(whereCondition, keywordOr);
 
     if (!ignoreYearFilter) {
       if (isValidDate(startDate) && isValidDate(endDate)) {

@@ -9,7 +9,11 @@ import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import { resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation } from '~/utils/process-resolver';
-import { buildYearFilter, parsePagination } from '~/utils/query-helpers';
+import {
+  buildKeywordOr,
+  buildYearFilter,
+  parsePagination,
+} from '~/utils/query-helpers';
 
 import {
   deriveInspectionIssueStatus,
@@ -131,14 +135,13 @@ export const InspectionRecordQueryService = {
     if (projectName) where.projectName = { contains: projectName };
 
     // Keyword Search
-    if (keyword) {
-      where.OR = [
-        { workOrderNumber: { contains: keyword } },
-        { projectName: { contains: keyword } },
-        { supplierName: { contains: keyword } },
-        { inspector: { contains: keyword } },
-      ];
-    }
+    const keywordOr = buildKeywordOr(keyword, [
+      'workOrderNumber',
+      'projectName',
+      'supplierName',
+      'inspector',
+    ] as const);
+    if (keywordOr) Object.assign(where, keywordOr);
 
     // Date Range (Year)
     if (year) {

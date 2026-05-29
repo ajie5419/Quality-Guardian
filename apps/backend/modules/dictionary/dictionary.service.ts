@@ -1,6 +1,7 @@
 import { QMS_DICTIONARY_TYPES } from '@qgs/shared';
 import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
+import { buildKeywordOr } from '~/utils/query-helpers';
 import { redis } from '~/utils/redis';
 
 const DICT_CACHE_KEY_PREFIX = 'qms:dict';
@@ -187,12 +188,11 @@ export const DictionaryService = {
       ensureSupportedDictType(dictType);
       where.dictType = dictType;
     }
-    if (keyword) {
-      where.OR = [
-        { dictKey: { contains: keyword } },
-        { dictValue: { contains: keyword } },
-      ];
-    }
+    const keywordOr = buildKeywordOr(keyword, [
+      'dictKey',
+      'dictValue',
+    ] as const);
+    if (keywordOr) Object.assign(where, keywordOr);
     if (
       params.status !== undefined &&
       params.status !== null &&

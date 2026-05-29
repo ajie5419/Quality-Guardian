@@ -9,6 +9,7 @@ import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
 } from '~/utils/governed-write';
+import { buildKeywordOr } from '~/utils/query-helpers';
 
 import {
   normalizeDate,
@@ -98,14 +99,13 @@ export const SupervisionProjectService = {
       where.supplierName = { contains: params.supplierName };
     if (params.projectType)
       where.projectType = normalizeProjectType(params.projectType);
-    if (params.keyword) {
-      where.OR = [
-        { projectName: { contains: params.keyword } },
-        { projectType: { contains: params.keyword } },
-        { workOrderNumber: { contains: params.keyword } },
-        { supplierName: { contains: params.keyword } },
-      ];
-    }
+    const keywordOr = buildKeywordOr(params.keyword, [
+      'projectName',
+      'projectType',
+      'workOrderNumber',
+      'supplierName',
+    ] as const);
+    if (keywordOr) Object.assign(where, keywordOr);
 
     const [rows, total] = await Promise.all([
       prisma.supervision_projects.findMany({

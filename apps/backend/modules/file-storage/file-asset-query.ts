@@ -6,6 +6,7 @@ import type {
 } from '@qgs/shared';
 
 import prisma from '~/utils/prisma';
+import { buildKeywordOr } from '~/utils/query-helpers';
 
 import {
   getStorageStrategyForProvider,
@@ -19,14 +20,13 @@ export async function listFileAssets(
   const pageSize = Math.max(1, Math.min(200, Number(params.pageSize || 20)));
   const where: any = {};
   const keyword = String(params.keyword || '').trim();
-  if (keyword) {
-    where.OR = [
-      { originalName: { contains: keyword } },
-      { storedName: { contains: keyword } },
-      { objectKey: { contains: keyword } },
-      { sha256: { contains: keyword } },
-    ];
-  }
+  const keywordOr = buildKeywordOr(keyword, [
+    'originalName',
+    'storedName',
+    'objectKey',
+    'sha256',
+  ] as const);
+  if (keywordOr) Object.assign(where, keywordOr);
   if (params.status) where.status = String(params.status).toUpperCase();
   if (params.storageProvider) {
     where.storageProvider = String(params.storageProvider).toUpperCase();

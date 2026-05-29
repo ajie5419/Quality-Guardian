@@ -2,6 +2,7 @@ import { OUTSOURCING_CATEGORY } from '~/modules/supplier/supplier-query';
 import { parseWorkOrderListQuery } from '~/modules/work-order/work-order-query';
 import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
+import { buildKeywordOr } from '~/utils/query-helpers';
 
 type DeptRow = { id: string; name: string; parentId: string };
 
@@ -101,11 +102,12 @@ export const InspectionPublicQueryService = {
       pageSize: query.pageSize || 20,
     });
     const where: Record<string, unknown> = { isDeleted: false };
-    if (params.keyword) {
-      where.OR = [
-        { workOrderNumber: { contains: params.keyword } },
-        { projectName: { contains: params.keyword } },
-      ];
+    const keywordOr = buildKeywordOr(params.keyword, [
+      'workOrderNumber',
+      'projectName',
+    ] as const);
+    if (keywordOr) {
+      Object.assign(where, keywordOr);
     } else if (params.workOrderNumber) {
       where.workOrderNumber = { contains: params.workOrderNumber };
     }

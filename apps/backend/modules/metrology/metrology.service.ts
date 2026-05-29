@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
+import { buildKeywordOr } from '~/utils/query-helpers';
 
 import { MetrologyImportService } from './metrology-import.service';
 import {
@@ -230,14 +231,13 @@ function buildWhere(params: MetrologyListParams) {
   if (params.usingUnit?.trim()) {
     where.usingUnit = { contains: params.usingUnit.trim() };
   }
-  if (params.keyword?.trim()) {
-    where.OR = [
-      { instrumentName: { contains: params.keyword.trim() } },
-      { instrumentCode: { contains: params.keyword.trim() } },
-      { model: { contains: params.keyword.trim() } },
-      { usingUnit: { contains: params.keyword.trim() } },
-    ];
-  }
+  const keywordOr = buildKeywordOr(params.keyword, [
+    'instrumentName',
+    'instrumentCode',
+    'model',
+    'usingUnit',
+  ] as const);
+  if (keywordOr) Object.assign(where, keywordOr);
   if (params.validFrom || params.validTo) {
     where.validUntil = {
       ...(params.validFrom

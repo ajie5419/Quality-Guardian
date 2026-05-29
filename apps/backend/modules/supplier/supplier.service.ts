@@ -17,6 +17,7 @@ import {
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
+import { buildKeywordOr } from '~/utils/query-helpers';
 
 import {
   applyRecordsToStats,
@@ -386,14 +387,13 @@ export const SupplierService = {
       }
     }
     if (status) where.status = status;
-    if (keyword) {
-      where.OR = [
-        { name: { contains: keyword } },
-        { contact: { contains: keyword } },
-        { email: { contains: keyword } },
-        { phone: { contains: keyword } },
-      ];
-    }
+    const keywordOr = buildKeywordOr(keyword, [
+      'name',
+      'contact',
+      'email',
+      'phone',
+    ] as const);
+    if (keywordOr) Object.assign(where, keywordOr);
     const normalizedOutsourcingMode = normalizeOutsourcingMode(
       outsourcingMode,
       category,
