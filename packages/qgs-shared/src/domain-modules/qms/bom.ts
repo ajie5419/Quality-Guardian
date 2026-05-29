@@ -76,13 +76,11 @@ function normalizeBomProcessList(value: unknown): string[] {
       : value.split(/[、,，;；\n]/);
   }
 
-  return [
-    ...new Set(
-      values
-        .map((item) => normalizeBomText(item))
-        .filter((v): v is string => Boolean(v)),
-    ),
-  ];
+  const normalized = values.flatMap((item) => {
+    const text = normalizeBomText(item);
+    return text ? [text] : [];
+  });
+  return [...new Set(normalized)];
 }
 
 function tryParseJsonArray(value: string): unknown[] {
