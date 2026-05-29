@@ -77,7 +77,11 @@ function normalizeBomProcessList(value: unknown): string[] {
   }
 
   return [
-    ...new Set(values.map((item) => normalizeBomText(item)).filter(Boolean)),
+    ...new Set(
+      values
+        .map((item) => normalizeBomText(item))
+        .filter((v): v is string => Boolean(v)),
+    ),
   ];
 }
 
