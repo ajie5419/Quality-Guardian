@@ -59,7 +59,7 @@ async function handleShowInspectors(
   messageId: number | undefined,
   queryId: string,
 ) {
-  await answerCallbackQuery(queryId);
+  void answerCallbackQuery(queryId);
   const requestId = data.replace('dispatch:', '');
 
   const inspectors = await UserService.findInspectors();
