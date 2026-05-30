@@ -25,6 +25,14 @@
 
 ## 执行记录
 
+## [0.4.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.4.0...qgs-v0.4.1) (2026-05-30)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** point dispatch QR at reachable frontend host ([79056b9](https://github.com/ajie5419/Quality-Guardian/commit/79056b9be611928fd4336816354f7fff8b3c25e0))
+* **@qgs/backend:** resolve dept by id and reuse frontend QR base url ([8ca2c37](https://github.com/ajie5419/Quality-Guardian/commit/8ca2c3796c6c1f11a83d5bf7117d29868d24fdf4))
+
 ## [0.4.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.3.0...qgs-v0.4.0) (2026-05-30)
 
 
