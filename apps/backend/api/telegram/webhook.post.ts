@@ -109,7 +109,9 @@ async function handleDispatch(
       {} as any,
       requestId,
       { inspectorId, priority: 3 },
-      { id: 'telegram-bot', roles: ['admin'] } as any,
+      {
+        username: process.env.TELEGRAM_DISPATCHER_USERNAME || 'vben',
+      } as any,
     );
 
     const inspectorName = result.inspectorName || inspectorId;
