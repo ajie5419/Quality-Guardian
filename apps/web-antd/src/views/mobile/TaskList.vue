@@ -4,19 +4,20 @@ import type { InspectionRequest } from '#/api/qms/inspection-request';
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useUserStore } from '@vben/stores';
+
 import { Empty, Spin, Tag } from 'ant-design-vue';
 
 import { getInspectionRequests } from '#/api/qms/inspection-request';
 
-import { useWechatAuth } from './composables/useWechatAuth';
-
 const router = useRouter();
-const { user } = useWechatAuth();
+const userStore = useUserStore();
 const loading = ref(false);
 const tasks = ref<InspectionRequest[]>([]);
 
 const isDispatcher = computed(() => {
-  const role = user.value?.role.toLowerCase() || '';
+  const roles = userStore.userRoles || [];
+  const role = roles.join(',').toLowerCase();
   return (
     role.includes('admin') ||
     role.includes('dispatch') ||

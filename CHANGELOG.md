@@ -25,6 +25,33 @@
 
 ## 执行记录
 
+### 2026-05-30 重构：报检通知从企业微信迁移到 Telegram Bot
+
+**执行内容：**
+
+- 删除企业微信全部代码：`wechat-work-notify.ts`、`wechat-work.post.ts`、`useWechatAuth.ts`、UserService 中 4 个企微方法 + 2 个 interface
+- 删除报检创建/派单服务中的微信通知调用（`notifyDispatchers`、`notifyInspector`）
+- 新增 `apps/backend/utils/telegram-bot.ts`：sendMessage、sendPhoto、editMessageText、answerCallbackQuery、notifyTelegramNewRequest
+- 新增 `apps/backend/utils/telegram-qr.ts`：generateCloseQrImage（QR 码 + sharp 合成检验员名标签）
+- 新增 `apps/backend/api/telegram/webhook.post.ts`：处理 Inline Button 回调（展示检验员忙碌状态、执行派单、发送关闭二维码）
+- 新增 `UserService.findInspectors()` 方法
+- 修改 `MobileLayout.vue`、`TaskList.vue` 移除企微认证依赖
+- 修改 auth 中间件：`/api/telegram/` 加入公开路径
+- 环境变量：移除 `WX_PUSH_*`/`WECHAT_WORK_*`，新增 `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`/`TELEGRAM_WEBHOOK_SECRET`
+- 新增依赖：`qrcode ^1.5.4`
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/web-antd exec vue-tsc --noEmit`: 通过
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 部署后需注册 Telegram Webhook：`curl "https://api.telegram.org/bot${TOKEN}/setWebhook?url=https://www.tlqms.com/api/telegram/webhook&secret_token=${SECRET}"`
+- 需安装 `qrcode` 依赖（`pnpm install`）
+
 ### 2026-05-29 重构：列表关键词搜索共享 helper
 
 **执行内容：**

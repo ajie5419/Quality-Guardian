@@ -39,18 +39,6 @@ export interface UpdateUserDto {
   wechatWorkId?: string;
 }
 
-interface WechatWorkTokenResponse {
-  access_token?: string;
-  errcode?: number;
-  errmsg?: string;
-}
-
-interface WechatWorkUserInfoResponse {
-  errcode?: number;
-  errmsg?: string;
-  userid?: string;
-}
-
 function generateTemporaryPassword() {
   return randomBytes(18).toString('base64url');
 }
@@ -267,77 +255,15 @@ export const UserService = {
     };
   },
 
-  async findByWechatWorkId(wechatWorkId: string) {
-    return prisma.users.findFirst({
+  async findInspectors() {
+    return prisma.users.findMany({
       where: {
         isDeleted: false,
         status: 'ACTIVE',
-        wechatWorkId,
+        roles: { name: { contains: 'inspect' } },
       },
-      include: { roles: true },
+      select: { id: true, realName: true, username: true },
     });
-  },
-
-  async findWechatWorkDispatchRecipients() {
-    const users = await prisma.users.findMany({
-      include: { roles: true },
-      where: {
-        isDeleted: false,
-        status: 'ACTIVE',
-        wechatWorkId: { not: null },
-      },
-    });
-    return users.filter((user) => {
-      const roleName = user.roles?.name?.toLowerCase() || '';
-      return (
-        roleName.includes('admin') ||
-        roleName.includes('dispatch') ||
-        roleName.includes('manager') ||
-        roleName.includes('schedule')
-      );
-    });
-  },
-
-  async findWechatWorkUserById(id: string) {
-    return prisma.users.findFirst({
-      select: { realName: true, username: true, wechatWorkId: true },
-      where: {
-        id,
-        isDeleted: false,
-        status: 'ACTIVE',
-        wechatWorkId: { not: null },
-      },
-    });
-  },
-
-  async getWechatWorkUserId(code: string) {
-    const corpId = process.env.WECHAT_WORK_CORP_ID;
-    const secret = process.env.WECHAT_WORK_SECRET;
-    if (!corpId || !secret) {
-      throw new Error('Wechat Work OAuth is not configured');
-    }
-
-    const tokenRes = await fetch(
-      `https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=${encodeURIComponent(
-        corpId,
-      )}&corpsecret=${encodeURIComponent(secret)}`,
-    );
-    const tokenData = (await tokenRes.json()) as WechatWorkTokenResponse;
-    if (!tokenData.access_token) {
-      throw new Error(tokenData.errmsg || 'Failed to get Wechat Work token');
-    }
-
-    const userRes = await fetch(
-      `https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?access_token=${encodeURIComponent(
-        tokenData.access_token,
-      )}&code=${encodeURIComponent(code)}`,
-    );
-    const userData = (await userRes.json()) as WechatWorkUserInfoResponse;
-    if (!userData.userid) {
-      throw new Error(userData.errmsg || 'Failed to get Wechat Work user');
-    }
-
-    return userData.userid;
   },
 
   generateToken(user: {

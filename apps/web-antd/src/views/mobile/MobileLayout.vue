@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
-import { useWechatAuth } from './composables/useWechatAuth';
+import { useAccessStore } from '@vben/stores';
 
 const route = useRoute();
-const { auth, checkExistingToken, isAuthed, loading } = useWechatAuth();
+const accessStore = useAccessStore();
+const loading = ref(true);
+const isAuthed = ref(false);
 
 onMounted(() => {
-  if (!checkExistingToken()) {
-    void auth();
+  const token = accessStore.accessToken || localStorage.getItem('mobile-token');
+  if (token) {
+    accessStore.setAccessToken(token);
+    isAuthed.value = true;
   }
+  loading.value = false;
 });
 </script>
 

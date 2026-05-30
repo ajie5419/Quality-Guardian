@@ -667,6 +667,9 @@ importers:
       prisma:
         specifier: 6.2.1
         version: 6.2.1
+      qrcode:
+        specifier: ^1.5.4
+        version: 1.5.4
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -686,6 +689,9 @@ importers:
       '@types/jsonwebtoken':
         specifier: 'catalog:'
         version: 9.0.10
+      '@types/qrcode':
+        specifier: ^1.5.5
+        version: 1.5.5
       h3:
         specifier: 'catalog:'
         version: 1.15.3

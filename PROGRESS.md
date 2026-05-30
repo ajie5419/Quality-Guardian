@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 最新 commit: `df52c4f6` (test(@qgs/backend): cover inspection request creation schema)
+- 最新变更: 报检通知从企业微信迁移到 Telegram Bot
 - 测试状态: 30 文件 / 160 测试全部通过
 - Lint: 通过
 - Typecheck: 0 error
