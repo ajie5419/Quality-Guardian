@@ -3,7 +3,7 @@ name: deploy
 on:
   push:
     tags:
-      - 'v*'
+      - 'qgs-v*'
   workflow_dispatch:
     inputs:
       version:
