@@ -20,19 +20,25 @@ function isEnabled(): boolean {
 
 async function callApi(method: string, body: Record<string, unknown>) {
   const { apiBase, botToken } = getConfig();
-  const res = await fetch(`${apiBase}/bot${botToken}/${method}`, {
-    body: JSON.stringify(body),
-    headers: { 'Content-Type': 'application/json' },
-    method: 'POST',
-  });
-  const data = (await res.json()) as { description?: string; ok: boolean };
-  if (!data.ok) {
-    logger.warn(
-      { method, description: data.description },
-      'Telegram API error',
-    );
+  try {
+    const res = await fetch(`${apiBase}/bot${botToken}/${method}`, {
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = (await res.json()) as { description?: string; ok: boolean };
+    if (!data.ok) {
+      logger.warn(
+        { method, description: data.description },
+        'Telegram API error',
+      );
+    }
+    return data;
+  } catch (error) {
+    logger.warn({ method, err: error }, 'Telegram API request failed');
+    return null;
   }
-  return data;
 }
 
 export interface InlineButton {
@@ -96,15 +102,21 @@ export async function sendPhoto(photo: Buffer, caption?: string) {
     form.append('caption', caption);
     form.append('parse_mode', 'Markdown');
   }
-  const res = await fetch(`${apiBase}/bot${botToken}/sendPhoto`, {
-    body: form,
-    method: 'POST',
-  });
-  const data = (await res.json()) as { description?: string; ok: boolean };
-  if (!data.ok) {
-    logger.warn({ description: data.description }, 'sendPhoto failed');
+  try {
+    const res = await fetch(`${apiBase}/bot${botToken}/sendPhoto`, {
+      body: form,
+      method: 'POST',
+      signal: AbortSignal.timeout(15_000),
+    });
+    const data = (await res.json()) as { description?: string; ok: boolean };
+    if (!data.ok) {
+      logger.warn({ description: data.description }, 'sendPhoto failed');
+    }
+    return data;
+  } catch (error) {
+    logger.warn({ err: error }, 'sendPhoto request failed');
+    return null;
   }
-  return data;
 }
 
 export async function answerCallbackQuery(
