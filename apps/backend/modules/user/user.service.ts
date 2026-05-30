@@ -256,11 +256,16 @@ export const UserService = {
   },
 
   async findInspectors() {
+    const deptName = process.env.TELEGRAM_INSPECTOR_DEPT || '品质部';
+    const dept = await prisma.departments.findFirst({
+      where: { name: deptName, isDeleted: false },
+      select: { id: true },
+    });
     return prisma.users.findMany({
       where: {
         isDeleted: false,
         status: 'ACTIVE',
-        department: process.env.TELEGRAM_INSPECTOR_DEPT || '品质部',
+        ...(dept ? { department: dept.id } : {}),
       },
       select: { id: true, realName: true, username: true },
       orderBy: { createdAt: 'desc' },

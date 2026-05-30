@@ -1,16 +1,15 @@
 import { Buffer } from 'node:buffer';
-import process from 'node:process';
 
 import QRCode from 'qrcode';
 import sharp from 'sharp';
 
-const QR_BASE_URL = process.env.QR_BASE_URL || 'http://8.141.123.254';
-
 export async function generateCloseQrImage(
   requestId: string,
   inspectorName: string,
+  baseUrl: string,
 ): Promise<Buffer> {
-  const url = `${QR_BASE_URL}/#/qms/inspection/requests?dispatchRequestId=${requestId}`;
+  const origin = baseUrl.replace(/\/+$/, '');
+  const url = `${origin}/#/qms/inspection/requests?dispatchRequestId=${requestId}`;
   const qrBuffer = await QRCode.toBuffer(url, {
     errorCorrectionLevel: 'M',
     margin: 2,

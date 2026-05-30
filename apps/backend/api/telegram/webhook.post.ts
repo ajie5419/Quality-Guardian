@@ -2,6 +2,7 @@ import process from 'node:process';
 
 import { defineEventHandler, getHeader, readBody } from 'h3';
 import { InspectionRequestDispatchService } from '~/modules/inspection/inspection-request-dispatch.service';
+import { SystemService } from '~/modules/system/system.service';
 import { UserService } from '~/modules/user';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -124,7 +125,15 @@ async function handleDispatch(
       );
     }
 
-    const qrImage = await generateCloseQrImage(requestId, inspectorName);
+    const qrBaseUrl =
+      (await SystemService.getSettingValue('qms:qrcode:base_url')) ||
+      process.env.QR_BASE_URL ||
+      'http://8.141.123.254';
+    const qrImage = await generateCloseQrImage(
+      requestId,
+      inspectorName,
+      qrBaseUrl,
+    );
     await sendPhoto(
       qrImage,
       `检验员: ${inspectorName}\n单号: ${result.requestNo}`,
