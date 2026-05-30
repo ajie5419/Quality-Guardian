@@ -26,7 +26,9 @@ interface TelegramUpdate {
 }
 
 export default defineEventHandler(async (event) => {
-  const secret = getHeader(event, 'x-telegram-bot-api-secret-token');
+  const secret =
+    getHeader(event, 'x-tg-secret') ||
+    getHeader(event, 'x-telegram-bot-api-secret-token');
   if (secret !== process.env.TELEGRAM_WEBHOOK_SECRET) {
     return { ok: false };
   }
