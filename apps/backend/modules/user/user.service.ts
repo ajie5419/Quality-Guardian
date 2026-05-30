@@ -1,5 +1,4 @@
 import { randomBytes } from 'node:crypto';
-import process from 'node:process';
 
 import { createId } from '@paralleldrive/cuid2';
 import bcrypt from 'bcrypt';
@@ -260,9 +259,10 @@ export const UserService = {
       where: {
         isDeleted: false,
         status: 'ACTIVE',
-        roles: { name: { contains: 'inspect' } },
       },
       select: { id: true, realName: true, username: true },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
     });
   },
 
