@@ -25,6 +25,18 @@
 
 ## 执行记录
 
+## [0.4.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.3.0...qgs-v0.4.0) (2026-05-30)
+
+
+### Features
+
+* **@qgs/backend:** filter Telegram inspector list by department ([dc653fa](https://github.com/ajie5419/Quality-Guardian/commit/dc653faa5a5997a43c3c918f28b973f6995c83fe))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** use real user as dispatcher for Telegram dispatch ([20578eb](https://github.com/ajie5419/Quality-Guardian/commit/20578ebf40a17f7f7e712b590a47e72273d0cddd))
+
 ## [0.3.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.2.3...qgs-v0.3.0) (2026-05-30)
 
 
