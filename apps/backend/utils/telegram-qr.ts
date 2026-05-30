@@ -4,7 +4,7 @@ import process from 'node:process';
 import QRCode from 'qrcode';
 import sharp from 'sharp';
 
-const QR_BASE_URL = process.env.QR_BASE_URL || 'https://www.tlqms.com';
+const QR_BASE_URL = process.env.QR_BASE_URL || 'http://8.141.123.254';
 
 export async function generateCloseQrImage(
   requestId: string,
