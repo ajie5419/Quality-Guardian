@@ -7,6 +7,7 @@ const logger = createModuleLogger('TelegramBot');
 
 function getConfig() {
   return {
+    apiBase: process.env.TELEGRAM_API_BASE || 'https://api.telegram.org',
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
     chatId: process.env.TELEGRAM_CHAT_ID || '',
   };
@@ -18,8 +19,8 @@ function isEnabled(): boolean {
 }
 
 async function callApi(method: string, body: Record<string, unknown>) {
-  const { botToken } = getConfig();
-  const res = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
+  const { apiBase, botToken } = getConfig();
+  const res = await fetch(`${apiBase}/bot${botToken}/${method}`, {
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
     method: 'POST',
@@ -87,7 +88,7 @@ export async function editMessageText(
 
 export async function sendPhoto(photo: Buffer, caption?: string) {
   if (!isEnabled()) return null;
-  const { botToken, chatId } = getConfig();
+  const { apiBase, botToken, chatId } = getConfig();
   const form = new FormData();
   form.append('chat_id', chatId);
   form.append('photo', new Blob([photo], { type: 'image/png' }), 'qr.png');
@@ -95,7 +96,7 @@ export async function sendPhoto(photo: Buffer, caption?: string) {
     form.append('caption', caption);
     form.append('parse_mode', 'Markdown');
   }
-  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+  const res = await fetch(`${apiBase}/bot${botToken}/sendPhoto`, {
     body: form,
     method: 'POST',
   });
