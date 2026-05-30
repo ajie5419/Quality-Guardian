@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import process from 'node:process';
 
 import { createId } from '@paralleldrive/cuid2';
 import bcrypt from 'bcrypt';
@@ -259,6 +260,7 @@ export const UserService = {
       where: {
         isDeleted: false,
         status: 'ACTIVE',
+        department: process.env.TELEGRAM_INSPECTOR_DEPT || '品质部',
       },
       select: { id: true, realName: true, username: true },
       orderBy: { createdAt: 'desc' },
