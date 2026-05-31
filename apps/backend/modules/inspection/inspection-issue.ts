@@ -318,6 +318,23 @@ function normalizeWorkOrderRelationForIssueUpdate(
   };
 }
 
+function normalizeInspectorRelationForIssueUpdate(
+  updateData: Prisma.quality_recordsUpdateInput,
+): Prisma.quality_recordsUpdateInput {
+  const raw = updateData as Record<string, unknown>;
+  if (!('inspector' in raw)) {
+    return updateData;
+  }
+  const { inspector, ...rest } = raw;
+  const username = normalizeOptionalInspectionIssueString(inspector);
+  return {
+    ...rest,
+    users_quality_records_inspectorTousers: username
+      ? { connect: { username } }
+      : { disconnect: true },
+  } as Prisma.quality_recordsUpdateInput;
+}
+
 export async function buildInspectionIssueUpdateData(
   body: Record<string, unknown>,
   existingNcNumber: null | string,
@@ -327,10 +344,11 @@ export async function buildInspectionIssueUpdateData(
     existingNcNumber,
     (value) => toQualityRecordStatus(value),
   ) as Prisma.quality_recordsUpdateInput;
-  return attachProcessIdToIssueUpdateData(
+  const withRelations = await attachProcessIdToIssueUpdateData(
     body,
     attachResponsibleDepartmentsToIssueUpdateData(body, updateData),
   );
+  return normalizeInspectorRelationForIssueUpdate(withRelations);
 }
 
 export async function buildInspectionIssueUpsertPayload(
