@@ -40,7 +40,7 @@
 - `pnpm run check:type`: 通过
 - `pnpm run check:qms-arch`: 通过
 
-**commit:** 待提交
+**commit:** `51cfbd33` fix(@qgs/web-antd): remove duplicate report work order field
 
 **遗留问题：**
 
