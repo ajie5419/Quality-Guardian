@@ -28,6 +28,7 @@ import {
   reorderSupervisionPlanTasks,
   updateSupervisionPlanTask,
 } from '#/api/qms/supervision';
+import { useMobileViewport } from '#/hooks/useMobileViewport';
 
 import { formatPlanTaskDate, planTaskColor, planTaskLabel } from '../constants';
 
@@ -40,6 +41,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   refresh: [];
 }>();
+
+const { isMobile } = useMobileViewport();
 
 const drawerOpen = ref(false);
 const editingTask = ref<null | SupervisionPlanTask>(null);
@@ -483,7 +486,8 @@ async function submitIssue() {
     <Drawer
       :open="drawerOpen"
       :title="editingTask ? '编辑甘特任务' : '新增甘特任务'"
-      width="480"
+      :width="isMobile ? '100vw' : 480"
+      :body-style="{ overflowX: 'hidden' }"
       @close="drawerOpen = false"
     >
       <Form layout="vertical">
@@ -503,7 +507,7 @@ async function submitIssue() {
             placeholder="选择父任务（留空为顶级）"
           />
         </Form.Item>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Form.Item label="计划开始">
             <DatePicker v-model:value="form.plannedStartAt" class="w-full" />
           </Form.Item>
@@ -511,7 +515,7 @@ async function submitIssue() {
             <DatePicker v-model:value="form.plannedEndAt" class="w-full" />
           </Form.Item>
         </div>
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Form.Item label="计划数量">
             <InputNumber
               v-model:value="form.plannedQuantity"

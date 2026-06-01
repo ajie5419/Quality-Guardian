@@ -13,6 +13,7 @@ import {
   Space,
 } from 'ant-design-vue';
 
+import { useMobileViewport } from '#/hooks/useMobileViewport';
 import SupplierSelect from '#/views/qms/shared/components/SupplierSelect.vue';
 
 type ProjectFormState = {
@@ -31,12 +32,12 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
 const emit = defineEmits<{
   submit: [];
   'update:form': [value: ProjectFormState];
   'update:open': [value: boolean];
 }>();
+const { isMobile } = useMobileViewport();
 
 const localForm = reactive<ProjectFormState>({
   plannedEndAt: undefined,
@@ -92,7 +93,8 @@ function handleSubmit() {
   <Drawer
     :open="props.open"
     :title="props.editingProjectId ? '编辑监造项目' : '新建监造项目'"
-    width="480"
+    :width="isMobile ? '100vw' : 480"
+    :body-style="{ overflowX: 'hidden' }"
     @update:open="handleUpdateOpen"
   >
     <Form layout="vertical">
@@ -117,7 +119,7 @@ function handleSubmit() {
           placeholder="选择监造员"
         />
       </Form.Item>
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Form.Item label="计划开始">
           <DatePicker v-model:value="localForm.plannedStartAt" class="w-full" />
         </Form.Item>

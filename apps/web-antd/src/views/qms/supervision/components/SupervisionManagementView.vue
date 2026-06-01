@@ -50,6 +50,7 @@ import {
   updateSupervisionProject,
 } from '#/api/qms/supervision';
 import { getUserList } from '#/api/system/user';
+import { useMobileViewport } from '#/hooks/useMobileViewport';
 import QmsFileUpload from '#/views/qms/shared/components/QmsFileUpload.vue';
 import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
 import { getUploadResponse } from '#/views/qms/shared/utils/upload-file';
@@ -62,6 +63,8 @@ import DeadlineBoard from './DeadlineBoard.vue';
 import GanttTaskEditor from './GanttTaskEditor.vue';
 import SupervisionProjectDetailDrawer from './SupervisionProjectDetailDrawer.vue';
 import SupervisionProjectFormDrawer from './SupervisionProjectFormDrawer.vue';
+
+const { isMobile } = useMobileViewport();
 
 type ProjectFormState = {
   plannedEndAt?: dayjs.Dayjs;
@@ -1785,7 +1788,12 @@ onMounted(async () => {
     @submit="submitProject"
   />
 
-  <Drawer v-model:open="reportDrawerOpen" title="提交节点推进日报" width="860">
+  <Drawer
+    v-model:open="reportDrawerOpen"
+    title="提交节点推进日报"
+    :width="isMobile ? '100vw' : 860"
+    :body-style="{ overflowX: 'hidden' }"
+  >
     <Form layout="vertical">
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
         <Form.Item label="监造项目" required>
@@ -1991,7 +1999,8 @@ onMounted(async () => {
   <Drawer
     v-model:open="issueDrawerOpen"
     :title="editingIssueId ? '编辑监造问题' : '新建监造问题'"
-    width="640"
+    :width="isMobile ? '100vw' : 640"
+    :body-style="{ overflowX: 'hidden' }"
   >
     <Form layout="vertical">
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -2085,7 +2094,12 @@ onMounted(async () => {
     </template>
   </Drawer>
 
-  <Drawer v-model:open="actionDrawerOpen" title="问题处理记录" width="620">
+  <Drawer
+    v-model:open="actionDrawerOpen"
+    title="问题处理记录"
+    :width="isMobile ? '100vw' : 620"
+    :body-style="{ overflowX: 'hidden' }"
+  >
     <div class="mb-4 space-y-2">
       <div
         v-for="item in issueActions"

@@ -3,6 +3,8 @@ import type { SupervisionProject } from '@qgs/shared';
 
 import { Button, Drawer, Progress, Space, Tag } from 'ant-design-vue';
 
+import { useMobileViewport } from '#/hooks/useMobileViewport';
+
 interface Props {
   open: boolean;
   project?: SupervisionProject;
@@ -11,12 +13,12 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
 const emit = defineEmits<{
   edit: [project: SupervisionProject];
   'update:open': [value: boolean];
   viewPlan: [project: SupervisionProject];
 }>();
+const { isMobile } = useMobileViewport();
 
 function handleUpdateOpen(value: boolean) {
   emit('update:open', value);
@@ -39,7 +41,8 @@ function handleEdit() {
   <Drawer
     :open="props.open"
     title="监造项目详情"
-    width="640"
+    :width="isMobile ? '100vw' : 640"
+    :body-style="{ overflowX: 'hidden' }"
     @update:open="handleUpdateOpen"
   >
     <div v-if="props.project" class="space-y-4">
@@ -58,7 +61,7 @@ function handleEdit() {
 
       <Progress :percent="props.project.progressPercent" />
 
-      <div class="grid grid-cols-2 gap-3 text-sm md:grid-cols-2">
+      <div class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
         <div class="rounded bg-blue-50 px-3 py-2 text-blue-700">
           <div class="text-xs">未闭环问题</div>
           <div class="font-semibold">
