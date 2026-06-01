@@ -25,6 +25,26 @@
 
 ## 执行记录
 
+### 2026-06-01 重构：迁移文件中心到 QMS 壳层
+
+**执行内容：**
+
+- 抽出 `FileStorageStatsCards`，将文件中心存储统计卡从入口页移出。
+- 将文件中心页面迁移到 `QmsPageShell`，入口文件从 512 行降到 436 行。
+
+**验证结果：**
+
+- `pnpm lint`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `5e34f181` refactor(@qgs/web-antd): migrate qms file center shell
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-01 优化：迁移 QMS 总览和 ITP 跳转页壳层
 
 **执行内容：**
