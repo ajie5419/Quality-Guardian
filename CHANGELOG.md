@@ -42,7 +42,7 @@
 - `pnpm run check:qms-arch`: 通过
 - `pnpm --dir apps/backend exec vitest run`: 33 文件 / 173 测试通过
 
-**commit:** `pending`
+**commit:** `ee86776c` feat(@qgs/backend): broadcast inspection request events
 
 **遗留问题：**
 
