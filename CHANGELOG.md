@@ -45,7 +45,7 @@
 - `pnpm run check:qms-arch`: 通过
 - `pnpm --dir apps/backend exec vitest run`: 34 文件 / 176 测试通过
 
-**commit:** `c3ca73a4` fix(@qgs/web-antd): align incoming request entry fields
+**commit:** `95415e1a` fix(@qgs/web-antd): align incoming request entry fields
 
 **遗留问题：**
 
