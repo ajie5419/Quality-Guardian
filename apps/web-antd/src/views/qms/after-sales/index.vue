@@ -18,8 +18,6 @@ import {
 import {
   Button,
   DatePicker,
-  Descriptions,
-  Drawer,
   Image,
   message,
   Modal,
@@ -43,10 +41,11 @@ import { useGridImport } from '#/hooks/useGridImport';
 import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
-import { findNameById } from '#/types';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
 import AfterSalesCharts from './components/AfterSalesCharts.vue';
+import AfterSalesDetailDrawer from './components/AfterSalesDetailDrawer.vue';
 import AfterSalesModal from './components/AfterSalesModal.vue';
 import { buildAfterSalesKnowledgePayload } from './composables/knowledge-settlement';
 import { useAfterSalesChartPreferences } from './composables/useAfterSalesChartPreferences';
@@ -203,46 +202,6 @@ function openDetail(row: QmsAfterSalesApi.AfterSalesItem) {
   detailVisible.value = true;
 }
 
-function parsePhotos(photos: unknown): string[] {
-  if (Array.isArray(photos)) {
-    return photos.filter((item): item is string => typeof item === 'string');
-  }
-  if (typeof photos === 'string') {
-    try {
-      const parsed = JSON.parse(photos) as unknown;
-      if (Array.isArray(parsed)) {
-        return parsed.filter(
-          (item): item is string => typeof item === 'string',
-        );
-      }
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
-
-const detailPhotos = computed(() => parsePhotos(detailRecord.value?.photos));
-
-function formatDept(value: string | undefined) {
-  if (!value) return '-';
-  return findNameById(deptRawData.value, value) || value;
-}
-
-function formatDepartments(record: QmsAfterSalesApi.AfterSalesItem) {
-  let values: string[] = [];
-  if (
-    Array.isArray(record.responsibleDepartments) &&
-    record.responsibleDepartments.length > 0
-  ) {
-    values = record.responsibleDepartments;
-  } else if (record.responsibleDept) {
-    values = [record.responsibleDept];
-  }
-  if (values.length === 0) return '-';
-  return values.map((value) => formatDept(value)).join(', ');
-}
-
 function onCheckChange(
   params: VxeCheckboxChangeParams<QmsAfterSalesApi.AfterSalesItem>,
 ) {
@@ -394,9 +353,9 @@ function handleModalSuccess() {
 </script>
 
 <template>
-  <Page>
+  <Page content-class="p-0">
     <ErrorBoundary>
-      <div class="p-4">
+      <QmsPageShell>
         <div v-if="showCharts" class="mb-4">
           <AfterSalesCharts
             ref="chartsRef"
@@ -537,7 +496,7 @@ function handleModalSuccess() {
             </template>
           </Grid>
         </div>
-      </div>
+      </QmsPageShell>
 
       <AfterSalesModal
         v-model:open="isModalVisible"
@@ -548,133 +507,11 @@ function handleModalSuccess() {
         @success="handleModalSuccess"
       />
 
-      <Drawer
+      <AfterSalesDetailDrawer
         v-model:open="detailVisible"
-        :title="`售后问题详情 - ${detailRecord?.workOrderNumber || ''}`"
-        :width="900"
-        placement="right"
-      >
-        <Descriptions v-if="detailRecord" bordered :column="2" size="small">
-          <Descriptions.Item :label="t('qms.afterSales.form.workOrderNumber')">
-            {{ detailRecord.workOrderNumber || '-' }}
-          </Descriptions.Item>
-          <Descriptions.Item :label="t('qms.afterSales.form.status')">
-            <QmsStatusTag :status="detailRecord.status" type="after-sales" />
-          </Descriptions.Item>
-
-          <Descriptions.Item :label="t('qms.afterSales.form.projectName')">
-            {{ detailRecord.projectName || '-' }}
-          </Descriptions.Item>
-          <Descriptions.Item :label="t('qms.afterSales.form.partName')">
-            {{ detailRecord.partName || '-' }}
-          </Descriptions.Item>
-
-          <Descriptions.Item :label="t('qms.afterSales.form.division')">
-            {{ formatDept(detailRecord.division) }}
-          </Descriptions.Item>
-          <Descriptions.Item :label="t('qms.afterSales.form.responsibleDept')">
-            {{ formatDepartments(detailRecord) }}
-          </Descriptions.Item>
-
-          <Descriptions.Item :label="t('qms.afterSales.form.customerName')">
-            {{ detailRecord.customerName || '-' }}
-          </Descriptions.Item>
-          <Descriptions.Item :label="t('qms.afterSales.form.location')">
-            {{ detailRecord.location || '-' }}
-          </Descriptions.Item>
-
-          <Descriptions.Item :label="t('qms.afterSales.form.productType')">
-            {{ detailRecord.productType || '-' }}
-          </Descriptions.Item>
-          <Descriptions.Item :label="t('qms.afterSales.form.productSubtype')">
-            {{ detailRecord.productSubtype || '-' }}
-          </Descriptions.Item>
-
-          <Descriptions.Item :label="t('qms.afterSales.form.defectType')">
-            {{ detailRecord.defectType || '-' }}
-          </Descriptions.Item>
-          <Descriptions.Item :label="t('qms.afterSales.form.defectSubtype')">
-            {{ detailRecord.defectSubtype || '-' }}
-          </Descriptions.Item>
-
-          <Descriptions.Item :label="t('qms.afterSales.form.severity')">
-            {{ detailRecord.severity || '-' }}
-          </Descriptions.Item>
-          <Descriptions.Item :label="t('qms.afterSales.columns.isClaim')">
-            <Tag :color="detailRecord.isClaim ? 'red' : 'green'">
-              {{ detailRecord.isClaim ? t('common.yes') : t('common.no') }}
-            </Tag>
-          </Descriptions.Item>
-
-          <Descriptions.Item :label="t('qms.afterSales.form.quantity')">
-            {{ detailRecord.quantity ?? '-' }}
-          </Descriptions.Item>
-          <Descriptions.Item :label="t('qms.afterSales.form.runningHours')">
-            {{ detailRecord.runningHours ?? '-' }}
-          </Descriptions.Item>
-
-          <Descriptions.Item :label="t('qms.afterSales.form.warrantyStatus')">
-            {{ detailRecord.warrantyStatus || '-' }}
-          </Descriptions.Item>
-          <Descriptions.Item :label="t('qms.afterSales.form.supplierBrand')">
-            {{ detailRecord.supplierBrand || '-' }}
-          </Descriptions.Item>
-
-          <Descriptions.Item :label="t('qms.afterSales.form.materialCost')">
-            ¥{{ detailRecord.materialCost ?? 0 }}
-          </Descriptions.Item>
-          <Descriptions.Item :label="t('qms.afterSales.form.laborTravelCost')">
-            ¥{{ detailRecord.laborTravelCost ?? 0 }}
-          </Descriptions.Item>
-
-          <Descriptions.Item :label="t('qms.afterSales.form.handler')">
-            {{ detailRecord.handler || '-' }}
-          </Descriptions.Item>
-          <Descriptions.Item :label="t('qms.afterSales.form.factoryDate')">
-            {{ detailRecord.factoryDate || '-' }}
-          </Descriptions.Item>
-
-          <Descriptions.Item :label="t('qms.afterSales.form.issueDate')">
-            {{ detailRecord.issueDate || '-' }}
-          </Descriptions.Item>
-          <Descriptions.Item :label="t('qms.afterSales.form.closeDate')">
-            {{ detailRecord.closeDate || '-' }}
-          </Descriptions.Item>
-
-          <Descriptions.Item label="发生日期">
-            {{ detailRecord.occurDate || '-' }}
-          </Descriptions.Item>
-          <Descriptions.Item label="发货日期">
-            {{ detailRecord.shipDate || '-' }}
-          </Descriptions.Item>
-
-          <Descriptions.Item
-            :label="t('qms.afterSales.form.issueDescription')"
-            :span="2"
-          >
-            {{ detailRecord.issueDescription || '-' }}
-          </Descriptions.Item>
-          <Descriptions.Item
-            :label="t('qms.afterSales.form.resolutionPlan')"
-            :span="2"
-          >
-            {{ detailRecord.resolutionPlan || '-' }}
-          </Descriptions.Item>
-          <Descriptions.Item :label="t('qms.afterSales.form.photos')" :span="2">
-            <div v-if="detailPhotos.length > 0" class="flex flex-wrap gap-2">
-              <Image
-                v-for="(photo, index) in detailPhotos"
-                :key="`${photo}-${index}`"
-                :width="96"
-                :height="96"
-                :src="photo"
-                class="rounded border border-gray-200"
-              />
-            </div>
-            <span v-else>-</span>
-          </Descriptions.Item>
-        </Descriptions>
-      </Drawer>
+        :dept-data="deptRawData"
+        :record="detailRecord"
+      />
     </ErrorBoundary>
   </Page>
 </template>
