@@ -25,6 +25,29 @@
 
 ## 执行记录
 
+### 2026-06-01 优化：补迁移 QMS 普通后台页壳层
+
+**执行内容：**
+
+- 将供应商管理、报检看板、计量借用、计量校准计划、检验表模板、DFMEA、项目资料、工作台补迁移到 `QmsPageShell`。
+- 修复不合格项新建/编辑弹窗在移动端表单内容横向溢出的问题。
+- 重新审计 QMS 页面壳层覆盖范围，标记需要拆组件后迁移的大入口页面。
+
+**验证结果：**
+
+- `pnpm lint`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `07fb59e3` refactor(@qgs/web-antd): migrate remaining qms standard pages
+
+**遗留问题：**
+
+- 焊工、质量知识库、监造、文件中心、售后、BOM、质量总览仍需拆组件后迁移。
+- 报检公开填报和计量借用扫码入口是独立公开移动页，不套后台 `QmsPageShell`。
+- ITP/ITP 生成器是跳转页，待下一批轻量统一。
+
 ### 2026-06-01 修复：报检看板历史统计移动端溢出
 
 **执行内容：**
