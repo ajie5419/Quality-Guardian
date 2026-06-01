@@ -338,7 +338,7 @@ function handleCancel() {
         : t('qms.inspection.issues.createIssue')
     "
     :width="isMobile ? modalWidth : '900px'"
-    :wrap-class-name="modalWrapClassName"
+    :wrap-class-name="`${modalWrapClassName} issue-edit-modal-wrap`"
     @cancel="handleCancel"
     @ok="handleOk"
   >
@@ -468,7 +468,20 @@ function handleCancel() {
 </template>
 
 <style scoped>
+:global(.issue-edit-modal-wrap .ant-modal) {
+  max-width: calc(100vw - 16px);
+}
+
+:global(.issue-edit-modal-wrap .ant-modal-content) {
+  overflow-x: hidden;
+}
+
+:global(.issue-edit-modal-wrap .ant-modal-body) {
+  overflow-x: hidden;
+}
+
 :deep(.ant-form-item) {
+  min-width: 0;
   margin-bottom: 16px;
 }
 
@@ -476,12 +489,31 @@ function handleCancel() {
   min-width: 0;
 }
 
+:deep(.ant-form-item-label),
+:deep(.ant-form-item-control) {
+  min-width: 0;
+}
+
 :deep(.ant-form-item-control-input-content),
 :deep(.ant-select),
+:deep(.ant-select-selector),
 :deep(.ant-input),
 :deep(.ant-picker),
 :deep(.ant-input-number),
-:deep(.ant-tree-select) {
+:deep(.ant-tree-select),
+:deep(.ant-upload-list),
+:deep(.ant-upload-list-item),
+:deep(.ant-upload-wrapper) {
+  min-width: 0;
   max-width: 100%;
+}
+
+:deep(.ant-select-selection-overflow) {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+:deep(textarea.ant-input) {
+  resize: vertical;
 }
 </style>
