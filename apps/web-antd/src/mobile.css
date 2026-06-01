@@ -39,6 +39,46 @@ body {
   backdrop-filter: blur(8px);
 }
 
+.qms-page-shell {
+  min-height: 100dvh;
+  padding-bottom: var(--qms-safe-bottom);
+}
+
+.qms-page-shell__content {
+  min-width: 0;
+  padding-right: max(12px, var(--qms-safe-right));
+  padding-left: max(12px, var(--qms-safe-left));
+  overflow-x: hidden;
+}
+
+.qms-page-shell--standard .qms-page-shell__content {
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.qms-page-shell--compact .qms-page-shell__content {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.qms-page-shell--contained .qms-page-shell__content {
+  max-width: 1280px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.qms-page-shell__footer {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  padding: 10px max(12px, var(--qms-safe-right))
+    calc(10px + var(--qms-safe-bottom)) max(12px, var(--qms-safe-left));
+  background: rgb(255 255 255 / 95%);
+  border-top: 1px solid rgb(229 231 235);
+  backdrop-filter: blur(8px);
+}
+
 .qms-mobile-modal .ant-modal {
   top: 0;
   max-width: 100vw;

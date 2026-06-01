@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+### 2026-06-01 优化：统一 QMS 页面响应式壳层
+
+**执行内容：**
+
+- 新增 `QmsPageShell`，提供 QMS 页面统一的 fluid / contained 布局、密度、移动端安全区和页脚能力。
+- 为 QMS 全局移动样式补充 `qms-page-shell` 样式，避免后续页面继续依赖仅面向移动端命名的 shell。
+- 将调试验收页面迁移到 `QmsPageShell`，移除桌面端 `mx-auto max-w-7xl` 窄容器，恢复和其他后台页面一致的 full-width 布局。
+- 抽出 `VehicleCommissioningIssueModal`，降低调试验收入口文件行数并满足 QMS 架构门禁。
+
+**验证结果：**
+
+- `pnpm lint`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `pending`
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-01 优化：报检任务实时通知跨实例广播
 
 **执行内容：**

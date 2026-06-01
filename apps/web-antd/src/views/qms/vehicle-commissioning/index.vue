@@ -7,23 +7,19 @@ import {
   DatePicker,
   Form,
   Input,
-  InputNumber,
   Modal,
-  Select,
   Space,
-  Switch,
   Table,
   Tabs,
   Tag,
-  TreeSelect,
 } from 'ant-design-vue';
 
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
-import IssuePhotoUpload from '#/views/qms/inspection/issues/components/IssuePhotoUpload.vue';
-import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
 
+import VehicleCommissioningIssueModal from './components/VehicleCommissioningIssueModal.vue';
 import VehicleCommissioningOverviewCard from './components/VehicleCommissioningOverviewCard.vue';
 import { useVehicleCommissioningPage } from './composables/useVehicleCommissioningPage';
 import { issueStatusColor, issueStatusLabel } from './utils/issue-status';
@@ -74,8 +70,8 @@ const {
 
 <template>
   <Page content-class="p-0">
-    <MobilePageShell content-class="py-3 sm:py-4">
-      <div class="mx-auto max-w-7xl space-y-3 sm:space-y-4">
+    <QmsPageShell content-class="bg-gray-50">
+      <div class="space-y-4">
         <VehicleCommissioningOverviewCard :issues-by-status="issuesByStatus" />
 
         <Tabs :tab-bar-gutter="isMobile ? 8 : 16">
@@ -410,109 +406,35 @@ const {
           </Tabs.TabPane>
         </Tabs>
       </div>
-    </MobilePageShell>
+    </QmsPageShell>
 
-    <Modal
+    <VehicleCommissioningIssueModal
       v-model:open="issueModalOpen"
-      :title="issueEditId ? '编辑调试验收问题' : '新建调试验收问题'"
-      :width="modalWidth"
-      :wrap-class-name="modalWrapClassName"
-      ok-text="保存"
-      cancel-text="取消"
-      @ok="submitIssue"
-    >
-      <Form layout="vertical">
-        <Form.Item label="日期">
-          <DatePicker
-            v-model:value="issueForm.date"
-            value-format="YYYY-MM-DD"
-            class="w-full"
-          />
-        </Form.Item>
-        <Form.Item label="工单号">
-          <WorkOrderSelect
-            v-model:value="selectedWorkOrderValue"
-            @change="onWorkOrderChange"
-          />
-        </Form.Item>
-        <Form.Item label="项目名称" required>
-          <Input v-model:value="issueForm.projectName" />
-        </Form.Item>
-        <Form.Item label="部件名称">
-          <Input v-model:value="issueForm.partName" />
-        </Form.Item>
-        <Form.Item label="问题描述" required>
-          <Input.TextArea v-model:value="issueForm.description" :rows="4" />
-        </Form.Item>
-        <Form.Item label="责任部门">
-          <TreeSelect
-            v-model:value="issueForm.responsibleDepartment"
-            :tree-data="deptTreeData"
-            placeholder="请选择责任部门"
-            tree-default-expand-all
-          />
-        </Form.Item>
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Form.Item label="严重程度">
-            <Select
-              v-model:value="issueForm.severity"
-              :options="severityOptions"
-            />
-          </Form.Item>
-          <Form.Item label="状态">
-            <Select
-              v-model:value="issueForm.status"
-              :options="issueStatusOptions"
-            />
-          </Form.Item>
-        </div>
-        <Form.Item label="是否索赔">
-          <Switch
-            v-model:checked="issueForm.isClaim"
-            checked-children="是"
-            un-checked-children="否"
-          />
-        </Form.Item>
-        <div
-          v-if="issueForm.isClaim"
-          class="grid grid-cols-1 gap-3 md:grid-cols-2"
-        >
-          <Form.Item label="预计损失金额">
-            <InputNumber
-              v-model:value="issueForm.lossAmount"
-              :min="0"
-              :precision="2"
-              class="w-full"
-              prefix="¥"
-            />
-          </Form.Item>
-          <Form.Item label="已索赔金额">
-            <InputNumber
-              v-model:value="issueForm.recoveredAmount"
-              :min="0"
-              :precision="2"
-              class="w-full"
-              prefix="¥"
-            />
-          </Form.Item>
-          <Form.Item label="索赔状态">
-            <Select
-              v-model:value="issueForm.claimStatus"
-              :options="claimStatusOptions"
-            />
-          </Form.Item>
-          <Form.Item label="索赔备注">
-            <Input.TextArea v-model:value="issueForm.claimNotes" :rows="2" />
-          </Form.Item>
-        </div>
-        <Form.Item label="问题照片">
-          <IssuePhotoUpload v-model:value="issueForm.photos" />
-        </Form.Item>
-        <Form.Item label="处理建议">
-          <Input.TextArea v-model:value="issueForm.solution" :rows="3" />
-        </Form.Item>
-      </Form>
-    </Modal>
+      v-model:claim-notes="issueForm.claimNotes"
+      v-model:claim-status="issueForm.claimStatus"
+      v-model:date="issueForm.date"
+      v-model:description="issueForm.description"
+      v-model:is-claim="issueForm.isClaim"
+      v-model:loss-amount="issueForm.lossAmount"
+      v-model:part-name="issueForm.partName"
+      v-model:photos="issueForm.photos"
+      v-model:project-name="issueForm.projectName"
+      v-model:recovered-amount="issueForm.recoveredAmount"
+      v-model:responsible-department="issueForm.responsibleDepartment"
+      v-model:selected-work-order-value="selectedWorkOrderValue"
+      v-model:severity="issueForm.severity"
+      v-model:solution="issueForm.solution"
+      v-model:status="issueForm.status"
+      :claim-status-options="claimStatusOptions"
+      :dept-tree-data="deptTreeData"
+      :issue-edit-id="issueEditId"
+      :issue-status-options="issueStatusOptions"
+      :modal-width="modalWidth"
+      :modal-wrap-class-name="modalWrapClassName"
+      :on-work-order-change="onWorkOrderChange"
+      :severity-options="severityOptions"
+      @submit="submitIssue"
+    />
 
     <Modal
       v-model:open="issueLogModalOpen"
