@@ -40,7 +40,7 @@
 - `pnpm run check:type`: 通过
 - `pnpm run check:qms-arch`: 通过
 
-**commit:** `pending`
+**commit:** `cb16e74c` refactor(@qgs/web-antd): migrate qms pages to responsive shell
 
 **遗留问题：**
 
