@@ -902,13 +902,13 @@ const [Grid, gridApi] = useVbenVxeGrid({
 
 <template>
   <div class="space-y-4">
-    <Row :gutter="16">
-      <Col :span="6">
+    <Row :gutter="[12, 12]">
+      <Col :lg="6" :sm="12" :xs="12">
         <Card size="small">
           <Statistic :title="t('qms.welder.total')" :value="stats.total || 0" />
         </Card>
       </Col>
-      <Col :span="6">
+      <Col :lg="6" :sm="12" :xs="12">
         <Card size="small">
           <Statistic
             :title="t('qms.welder.examPassedCount')"
@@ -916,7 +916,7 @@ const [Grid, gridApi] = useVbenVxeGrid({
           />
         </Card>
       </Col>
-      <Col :span="6">
+      <Col :lg="6" :sm="12" :xs="12">
         <Card size="small">
           <Statistic
             :title="t('qms.welder.certifiedCount')"
@@ -924,7 +924,7 @@ const [Grid, gridApi] = useVbenVxeGrid({
           />
         </Card>
       </Col>
-      <Col :span="6">
+      <Col :lg="6" :sm="12" :xs="12">
         <Card size="small">
           <Statistic
             :title="t('qms.welder.averageScore')"
