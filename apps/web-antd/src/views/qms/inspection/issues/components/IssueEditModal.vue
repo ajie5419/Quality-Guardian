@@ -95,12 +95,12 @@ function isTestWelderRecord(params: { code?: string; name?: string }) {
 
 const [Form, formApi] = useVbenForm({
   commonConfig: {
-    labelClass: 'issue-edit-form-label',
     labelWidth: 100,
     componentProps: {
       class: 'w-full',
     },
   },
+  layout: 'vertical',
   wrapperClass:
     'issue-edit-form-grid grid min-w-0 grid-cols-1 gap-x-4 gap-y-0 sm:grid-cols-2',
   handleSubmit: () => submit(),
@@ -528,14 +528,6 @@ function handleCancel() {
 
   :deep(.issue-edit-form-grid > *) {
     grid-column: 1 / -1;
-  }
-
-  :deep(.issue-edit-form-label) {
-    justify-content: flex-start;
-    width: 100% !important;
-    margin-right: 0;
-    margin-bottom: 6px;
-    text-align: left;
   }
 
   :deep(.ant-form-item-control),
