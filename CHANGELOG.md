@@ -44,7 +44,7 @@
 - `pnpm run check:type`: 通过
 - `pnpm run check:qms-arch`: 通过
 
-**commit:** 待提交
+**commit:** `bc80c5e5` feat(@qgs/web-antd): add incoming inspection request entry
 
 **遗留问题：**
 
