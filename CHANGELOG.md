@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+### 2026-06-01 重构：完成 QMS 响应式壳层迁移
+
+**执行内容：**
+
+- 将检验记录、工单要求、外协管理、报告日报、报告汇总、检验问题页面迁移到 `QmsPageShell`。
+- 移除 QMS 页面下剩余 `MobilePageShell` 使用点，统一页面级响应式壳层。
+- 检验问题页复用 `IssueDetailDrawer` 和 `IssueStatisticsCard`，降低入口文件行数并保持原统计卡展示。
+- 检验问题详情抽屉改为移动端 `100vw` / 单列、桌面端 `min(100vw, 960px)` / 双列，避免移动端横向溢出。
+
+**验证结果：**
+
+- `pnpm lint`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `e79bfa84` refactor(@qgs/web-antd): finish qms responsive shell migration
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-01 修复：报检任务移动端列表右侧溢出
 
 **执行内容：**
