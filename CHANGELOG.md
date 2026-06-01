@@ -41,7 +41,7 @@
 - `pnpm run check:type`: 通过
 - `pnpm run check:qms-arch`: 通过
 
-**commit:** `49a00155` fix(@qgs/web-antd): require commissioning issue fields
+**commit:** `96b1e41d` fix(@qgs/web-antd): require commissioning issue fields
 
 **遗留问题：**
 
