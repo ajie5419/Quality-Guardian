@@ -22,7 +22,6 @@ import {
   Modal,
   Select,
   Space,
-  Spin,
   Table,
   Tag,
 } from 'ant-design-vue';
@@ -36,9 +35,9 @@ import {
   getOrphanFileList,
   scanMissingFiles,
 } from '#/api/qms/file-center';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
-type FileStatusStat = FileStorageStats['byStatus'][number];
-type FileStorageProviderStat = FileStorageStats['byStorageProvider'][number];
+import FileStorageStatsCards from './components/FileStorageStatsCards.vue';
 
 defineOptions({ name: 'QMSFileCenter' });
 
@@ -111,18 +110,6 @@ function formatDate(value?: Date | string) {
 
 function getReferenceCount(file: FileAssetItem) {
   return file._count?.references ?? file.references?.length ?? 0;
-}
-
-function getStatusStat(status: string) {
-  return storageStats.value.byStatus.find(
-    (item: FileStatusStat) => item.status === status,
-  );
-}
-
-function getStorageProviderStat(storageProvider: string) {
-  return storageStats.value.byStorageProvider.find(
-    (item: FileStorageProviderStat) => item.storageProvider === storageProvider,
-  );
 }
 
 function asFileAsset(record: Record<string, unknown>) {
@@ -239,214 +226,155 @@ onMounted(() => {
 </script>
 
 <template>
-  <Page content-class="p-4">
-    <div class="space-y-4">
-      <Spin :spinning="statsLoading">
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div class="rounded border border-blue-100 bg-blue-50 px-4 py-3">
-            <div class="text-xs text-blue-700">总存储占用</div>
-            <div class="mt-1 text-2xl font-semibold text-blue-950">
-              {{ formatBytes(storageStats.totalSize) }}
-            </div>
-            <div class="mt-1 text-xs text-blue-700">
-              共 {{ storageStats.totalCount }} 个文件
-            </div>
-          </div>
-          <div
-            class="rounded border border-emerald-100 bg-emerald-50 px-4 py-3"
-          >
-            <div class="text-xs text-emerald-700">有效文件占用</div>
-            <div class="mt-1 text-2xl font-semibold text-emerald-950">
-              {{ formatBytes(storageStats.activeSize) }}
-            </div>
-            <div class="mt-1 text-xs text-emerald-700">
-              ACTIVE {{ storageStats.activeCount }} 个
-            </div>
-          </div>
-          <div class="rounded border border-violet-100 bg-violet-50 px-4 py-3">
-            <div class="text-xs text-violet-700">存储位置</div>
-            <div class="mt-2 space-y-1 text-xs text-violet-900">
-              <div class="flex items-center justify-between gap-2">
-                <span>OSS</span>
-                <span class="font-semibold">
-                  {{ formatBytes(getStorageProviderStat('OSS')?.size || 0) }}
-                  / {{ getStorageProviderStat('OSS')?.count || 0 }} 个
-                </span>
-              </div>
-              <div class="flex items-center justify-between gap-2">
-                <span>LOCAL</span>
-                <span class="font-semibold">
-                  {{ formatBytes(getStorageProviderStat('LOCAL')?.size || 0) }}
-                  / {{ getStorageProviderStat('LOCAL')?.count || 0 }} 个
-                </span>
-              </div>
-            </div>
-          </div>
-          <div class="rounded border border-amber-100 bg-amber-50 px-4 py-3">
-            <div class="text-xs text-amber-700">文件使用情况</div>
-            <div class="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
-              <div>
-                <div class="text-lg font-semibold text-amber-950">
-                  {{ storageStats.referencedCount }}
-                </div>
-                <div class="text-amber-700">已引用</div>
-              </div>
-              <div>
-                <div class="text-lg font-semibold text-amber-950">
-                  {{ storageStats.orphanCount }}
-                </div>
-                <div class="text-amber-700">孤儿</div>
-              </div>
-              <div>
-                <div class="text-lg font-semibold text-amber-950">
-                  {{ getStatusStat('MISSING')?.count || 0 }}
-                </div>
-                <div class="text-amber-700">缺失</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Spin>
+  <Page content-class="p-0">
+    <QmsPageShell>
+      <div class="space-y-4">
+        <FileStorageStatsCards :loading="statsLoading" :stats="storageStats" />
 
-      <Form layout="inline" @submit.prevent="search">
-        <Form.Item label="关键词">
-          <Input
-            v-model:value="query.keyword"
-            allow-clear
-            placeholder="文件名 / 对象键 / SHA256"
-            style="width: 260px"
-            @press-enter="search"
-          />
-        </Form.Item>
-        <Form.Item label="状态">
-          <Select
-            v-model:value="query.status"
-            allow-clear
-            style="width: 130px"
-            :options="[
-              { label: 'ACTIVE', value: 'ACTIVE' },
-              { label: 'MISSING', value: 'MISSING' },
-              { label: 'DELETED', value: 'DELETED' },
-            ]"
-          />
-        </Form.Item>
-        <Form.Item label="存储">
-          <Select
-            v-model:value="query.storageProvider"
-            allow-clear
-            style="width: 120px"
-            :options="[
-              { label: 'LOCAL', value: 'LOCAL' },
-              { label: 'OSS', value: 'OSS' },
-            ]"
-          />
-        </Form.Item>
-        <Form.Item label="业务模块">
-          <Input
-            v-model:value="query.bizType"
-            allow-clear
-            placeholder="bizType"
-            style="width: 180px"
-          />
-        </Form.Item>
-        <Form.Item>
-          <Space>
-            <Button type="primary" @click="search">查询</Button>
-            <Button
-              :type="orphanMode ? 'primary' : 'default'"
-              @click="toggleOrphans"
-            >
-              孤儿文件
-            </Button>
-            <Button :loading="scanLoading" @click="handleScan(false)">
-              扫描缺失
-            </Button>
-            <Button danger :loading="scanLoading" @click="handleScan(true)">
-              扫描并标记
-            </Button>
-          </Space>
-        </Form.Item>
-      </Form>
-
-      <Table
-        row-key="id"
-        :columns="columns"
-        :data-source="files"
-        :loading="loading"
-        :pagination="pagination"
-        size="middle"
-        @change="handleTableChange"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.dataIndex === 'originalName'">
-            <div class="min-w-0">
-              <div class="truncate font-medium">{{ record.originalName }}</div>
-              <div class="truncate text-xs text-gray-500">
-                {{ record.objectKey }}
-              </div>
-            </div>
-          </template>
-          <template v-else-if="column.dataIndex === 'storageProvider'">
-            <Tag :color="record.storageProvider === 'OSS' ? 'blue' : 'default'">
-              {{ record.storageProvider }}
-            </Tag>
-          </template>
-          <template v-else-if="column.dataIndex === 'size'">
-            {{ formatBytes(record.size) }}
-          </template>
-          <template v-else-if="column.dataIndex === 'status'">
-            <Tag
-              :color="
-                record.status === 'ACTIVE'
-                  ? 'green'
-                  : record.status === 'MISSING'
-                    ? 'orange'
-                    : 'red'
-              "
-            >
-              {{ record.status }}
-            </Tag>
-          </template>
-          <template v-else-if="column.dataIndex === 'referenceCount'">
-            {{ getReferenceCount(asFileAsset(record)) }}
-          </template>
-          <template v-else-if="column.dataIndex === 'createdAt'">
-            {{ formatDate(record.createdAt) }}
-          </template>
-          <template v-else-if="column.dataIndex === 'action'">
+        <Form layout="inline" @submit.prevent="search">
+          <Form.Item label="关键词">
+            <Input
+              v-model:value="query.keyword"
+              allow-clear
+              placeholder="文件名 / 对象键 / SHA256"
+              style="width: 260px"
+              @press-enter="search"
+            />
+          </Form.Item>
+          <Form.Item label="状态">
+            <Select
+              v-model:value="query.status"
+              allow-clear
+              style="width: 130px"
+              :options="[
+                { label: 'ACTIVE', value: 'ACTIVE' },
+                { label: 'MISSING', value: 'MISSING' },
+                { label: 'DELETED', value: 'DELETED' },
+              ]"
+            />
+          </Form.Item>
+          <Form.Item label="存储">
+            <Select
+              v-model:value="query.storageProvider"
+              allow-clear
+              style="width: 120px"
+              :options="[
+                { label: 'LOCAL', value: 'LOCAL' },
+                { label: 'OSS', value: 'OSS' },
+              ]"
+            />
+          </Form.Item>
+          <Form.Item label="业务模块">
+            <Input
+              v-model:value="query.bizType"
+              allow-clear
+              placeholder="bizType"
+              style="width: 180px"
+            />
+          </Form.Item>
+          <Form.Item>
             <Space>
+              <Button type="primary" @click="search">查询</Button>
               <Button
-                size="small"
-                type="link"
-                @click="openDetail(asFileAsset(record))"
-                >详情</Button
+                :type="orphanMode ? 'primary' : 'default'"
+                @click="toggleOrphans"
               >
-              <Button
-                size="small"
-                type="link"
-                @click="previewFile(asFileAsset(record))"
-                >预览</Button
-              >
-              <Button
-                size="small"
-                type="link"
-                @click="downloadFile(asFileAsset(record))"
-              >
-                下载
+                孤儿文件
               </Button>
-              <Button
-                danger
-                size="small"
-                type="link"
-                @click="confirmDelete(asFileAsset(record))"
-              >
-                删除
+              <Button :loading="scanLoading" @click="handleScan(false)">
+                扫描缺失
+              </Button>
+              <Button danger :loading="scanLoading" @click="handleScan(true)">
+                扫描并标记
               </Button>
             </Space>
+          </Form.Item>
+        </Form>
+
+        <Table
+          row-key="id"
+          :columns="columns"
+          :data-source="files"
+          :loading="loading"
+          :pagination="pagination"
+          size="middle"
+          @change="handleTableChange"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.dataIndex === 'originalName'">
+              <div class="min-w-0">
+                <div class="truncate font-medium">
+                  {{ record.originalName }}
+                </div>
+                <div class="truncate text-xs text-gray-500">
+                  {{ record.objectKey }}
+                </div>
+              </div>
+            </template>
+            <template v-else-if="column.dataIndex === 'storageProvider'">
+              <Tag
+                :color="record.storageProvider === 'OSS' ? 'blue' : 'default'"
+              >
+                {{ record.storageProvider }}
+              </Tag>
+            </template>
+            <template v-else-if="column.dataIndex === 'size'">
+              {{ formatBytes(record.size) }}
+            </template>
+            <template v-else-if="column.dataIndex === 'status'">
+              <Tag
+                :color="
+                  record.status === 'ACTIVE'
+                    ? 'green'
+                    : record.status === 'MISSING'
+                      ? 'orange'
+                      : 'red'
+                "
+              >
+                {{ record.status }}
+              </Tag>
+            </template>
+            <template v-else-if="column.dataIndex === 'referenceCount'">
+              {{ getReferenceCount(asFileAsset(record)) }}
+            </template>
+            <template v-else-if="column.dataIndex === 'createdAt'">
+              {{ formatDate(record.createdAt) }}
+            </template>
+            <template v-else-if="column.dataIndex === 'action'">
+              <Space>
+                <Button
+                  size="small"
+                  type="link"
+                  @click="openDetail(asFileAsset(record))"
+                  >详情</Button
+                >
+                <Button
+                  size="small"
+                  type="link"
+                  @click="previewFile(asFileAsset(record))"
+                  >预览</Button
+                >
+                <Button
+                  size="small"
+                  type="link"
+                  @click="downloadFile(asFileAsset(record))"
+                >
+                  下载
+                </Button>
+                <Button
+                  danger
+                  size="small"
+                  type="link"
+                  @click="confirmDelete(asFileAsset(record))"
+                >
+                  删除
+                </Button>
+              </Space>
+            </template>
           </template>
-        </template>
-      </Table>
-    </div>
+        </Table>
+      </div>
+    </QmsPageShell>
 
     <Drawer
       v-model:open="drawerOpen"
