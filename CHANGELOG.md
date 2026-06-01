@@ -25,6 +25,27 @@
 
 ## 执行记录
 
+### 2026-06-01 重构：迁移售后问题到 QMS 壳层
+
+**执行内容：**
+
+- 抽出 `AfterSalesDetailDrawer`，将售后问题详情抽屉从入口页移出。
+- 将售后问题页面迁移到 `QmsPageShell`，入口文件从 680 行降到 517 行。
+- 售后详情抽屉改为移动端 `100vw` / 单列、桌面端 `min(100vw, 900px)` / 双列。
+
+**验证结果：**
+
+- `pnpm lint`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `233888e5` refactor(@qgs/web-antd): migrate qms after sales shell
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-01 重构：迁移文件中心到 QMS 壳层
 
 **执行内容：**
