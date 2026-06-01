@@ -32,6 +32,7 @@ import { getDeptList } from '#/api/system/dept';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useDashboardQuery } from '#/hooks/useQmsQueries';
 import { findNameById } from '#/types';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import PassRateTargetModal from './components/PassRateTargetModal.vue';
 import PassRateTrendChart from './components/PassRateTrendChart.vue';
@@ -45,7 +46,6 @@ const { handleApiError } = useErrorHandler();
 const { data: dashboardData, isLoading: dashboardLoading } =
   useDashboardQuery();
 
-// ===================== 常量集中管理 =====================
 const CONSTANTS = {
   CHART_RENDER_DELAY: 200,
   DEFAULT_PAGE_SIZE: 10,
@@ -59,21 +59,16 @@ function formatPercent(value: null | number | undefined) {
   return Number(value ?? 0).toFixed(2);
 }
 
-// 合格率/质量损失粒度控制
 const granularity = ref<'month' | 'week'>('week');
 const qualityLossGranularity = ref<'month' | 'week'>('week');
 const passRateSource = ref<'inspection' | 'issue'>('inspection');
 
-// ===================== 数据获取 =====================
 const targetModalRef = ref();
 
 function handleTargetSuccess() {
   loadPassRateTrend();
-  // Optionally refetch dashboard query if overview cards depend on these targets
-  // queryClient.invalidateQueries({ queryKey: ['dashboard'] });
 }
 
-/** 1. 部门数据 */
 const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const deptLoading = ref(false);
 
@@ -89,7 +84,6 @@ const loadDeptList = async () => {
   }
 };
 
-/** 2. 合格率趋势数据（基于useRequest的自定义Hook） */
 const {
   data: trendData,
   isLoading: passRateLoading,
@@ -104,7 +98,6 @@ const {
   () => passRateSource.value,
 );
 
-/** 3. 质量损失趋势数据（基于useRequest的自定义Hook） */
 const {
   data: qualityLossData,
   isLoading: qualityLossLoading,
@@ -116,7 +109,6 @@ const {
   [],
 );
 
-// 缓存部门ID-名称映射（优化性能）
 const deptNameMap = computed(() => {
   const map = new Map<string, string>();
   const traverse = (items: SystemDeptApi.Dept[]) => {
@@ -131,10 +123,8 @@ const deptNameMap = computed(() => {
   return map;
 });
 
-// ===================== 下钻逻辑 =====================
 const currentDrillDownType = ref<'passRate' | 'qualityLoss'>('passRate');
 
-// 合格率下钻
 const passRateDrillDown = useDrillDown<QmsDashboardApi.PassRateDrillDownItem>(
   'passRate',
   (period) =>
@@ -143,7 +133,6 @@ const passRateDrillDown = useDrillDown<QmsDashboardApi.PassRateDrillDownItem>(
     ),
 );
 
-// 质量损失下钻
 const qualityLossDrillDown =
   useDrillDown<QmsDashboardApi.QualityLossDrillDownItem>(
     'qualityLoss',
@@ -153,7 +142,6 @@ const qualityLossDrillDown =
       ),
   );
 
-// 下钻弹窗可见性（计算属性）
 const drillDownVisible = computed({
   get: () =>
     passRateDrillDown.visible.value || qualityLossDrillDown.visible.value,
@@ -165,7 +153,6 @@ const drillDownVisible = computed({
   },
 });
 
-// 下钻弹窗标题
 const modalTitle = computed(() => {
   const period =
     currentDrillDownType.value === 'passRate'
@@ -178,30 +165,20 @@ const modalTitle = computed(() => {
   return `${period} ${suffix}`;
 });
 
-// ===================== 事件处理 =====================
-
-/** 合格率图表点击事件 */
 function handleChartClick(params: EChartsClickParams) {
   currentDrillDownType.value = 'passRate';
   passRateDrillDown.open(params.name);
 }
 
-/** 质量损失图表点击事件 */
 function handleQualityLossClick(params: EChartsClickParams) {
   currentDrillDownType.value = 'qualityLoss';
   qualityLossDrillDown.open(params.name);
 }
 
-// ===================== 生命周期 =====================
 onMounted(async () => {
   try {
-    // 启动部门加载
     loadDeptList();
-
-    // 等待DOM就绪
     await nextTick();
-    // 仅当核心数据加载完成后，加载图表数据
-    // 注意：由于是异步加载，这里主要是一个保险延迟
     setTimeout(() => {
       loadPassRateTrend();
       loadQualityLossTrend();
@@ -212,7 +189,6 @@ onMounted(async () => {
   }
 });
 
-// 监听粒度变化，重置下钻状态
 watch(granularity, () => {
   passRateDrillDown.close();
 });
@@ -266,7 +242,6 @@ const overviewItems = computed<AnalysisOverviewItem[]>(() => {
   ];
 });
 
-// 下钻表格列配置
 const drillDownColumns = shallowRef([
   {
     title: t('qms.planning.itp.processStep'),
@@ -296,7 +271,6 @@ const drillDownColumns = shallowRef([
   },
 ]);
 
-// 质量损失下钻表格列配置
 const qualityLossDrillDownColumns = shallowRef([
   {
     title: t('qms.inspection.issues.reportDate'),
@@ -333,13 +307,11 @@ const qualityLossDrillDownColumns = shallowRef([
   },
 ]);
 
-// ... (removed redundant logic handled above)
-
 const activeTab = ref('trends');
 </script>
 
 <template>
-  <div class="p-5">
+  <QmsPageShell>
     <div
       v-if="dashboardLoading || deptLoading"
       class="flex justify-center p-12"
@@ -347,10 +319,8 @@ const activeTab = ref('trends');
       <Spin size="large" :tip="t('common.loadingText')" />
     </div>
     <div v-else>
-      <!-- 统计卡片 -->
       <AnalysisOverview :items="overviewItems" />
 
-      <!-- 图表区域 -->
       <div
         class="card-box bg-card mt-5 w-full rounded-md border px-4 pb-5 pt-3"
       >
@@ -369,7 +339,6 @@ const activeTab = ref('trends');
           </template>
           <TabPane key="trends" :tab="t('qms.dashboard.passRateTrend')">
             <div class="pt-2">
-              <!-- 粒度切换 -->
               <div class="mb-4">
                 <div class="flex flex-wrap gap-3">
                   <Segmented
@@ -403,7 +372,6 @@ const activeTab = ref('trends');
 
           <TabPane key="qualityLoss" :tab="t('qms.dashboard.qualityLossStats')">
             <div class="pt-2">
-              <!-- 粒度切换 -->
               <div class="mb-4">
                 <Segmented
                   v-model:value="qualityLossGranularity"
@@ -413,7 +381,6 @@ const activeTab = ref('trends');
                   ]"
                 />
               </div>
-              <!-- 质量损失图表 -->
               <div v-show="activeTab === 'qualityLoss'">
                 <Spin
                   v-if="qualityLossLoading"
@@ -442,7 +409,6 @@ const activeTab = ref('trends');
       </div>
     </div>
 
-    <!-- 下钻弹窗 -->
     <Modal
       v-model:open="drillDownVisible"
       :title="modalTitle"
@@ -515,7 +481,6 @@ const activeTab = ref('trends');
       </Table>
     </Modal>
 
-    <!-- 指标配置弹窗 -->
     <PassRateTargetModal ref="targetModalRef" @success="handleTargetSuccess" />
-  </div>
+  </QmsPageShell>
 </template>
