@@ -25,6 +25,7 @@ import { getWorkOrderListPage } from '#/api/qms/work-order';
 import { getUserList } from '#/api/system/user';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 // Shared
 import PlanningSidebar from '../components/PlanningSidebar.vue';
@@ -345,104 +346,110 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Page>
+  <Page content-class="p-0">
     <ErrorBoundary>
-      <div class="flex gap-4 p-4">
-        <PlanningSidebar
-          class="flex-shrink-0"
-          :title="t('qms.planning.dfmea.projectList')"
-          :projects="filteredProjects"
-          v-model:selected-id="selectedProjectId"
-          v-model:active-tab="activeTab"
-          v-model:search-text="searchText"
-          auth-prefix="QMS:Planning:DFMEA"
-          @change="handleTabChange"
-          @create="openProjectModal('create')"
-        >
-          <template #actions="{ project }">
-            <ProjectActionButtons
-              :project="project"
-              mode="dropdown"
-              auth-prefix="QMS:Planning:DFMEA"
-              :can-dispatch="true"
-              @archive="handleArchiveProject"
-              @delete="handleDeleteProject"
-              @edit="handleEditProject"
-              @dispatch="handleDispatch"
-            />
-          </template>
-        </PlanningSidebar>
+      <QmsPageShell>
+        <div class="flex gap-4">
+          <PlanningSidebar
+            class="flex-shrink-0"
+            :title="t('qms.planning.dfmea.projectList')"
+            :projects="filteredProjects"
+            v-model:selected-id="selectedProjectId"
+            v-model:active-tab="activeTab"
+            v-model:search-text="searchText"
+            auth-prefix="QMS:Planning:DFMEA"
+            @change="handleTabChange"
+            @create="openProjectModal('create')"
+          >
+            <template #actions="{ project }">
+              <ProjectActionButtons
+                :project="project"
+                mode="dropdown"
+                auth-prefix="QMS:Planning:DFMEA"
+                :can-dispatch="true"
+                @archive="handleArchiveProject"
+                @delete="handleDeleteProject"
+                @edit="handleEditProject"
+                @dispatch="handleDispatch"
+              />
+            </template>
+          </PlanningSidebar>
 
-        <div
-          class="flex-1 rounded-lg border border-gray-200 bg-white shadow-sm"
-        >
-          <div v-if="currentProject">
-            <div
-              class="flex items-center justify-between border-b border-gray-100 bg-gray-50/30 p-4"
-            >
-              <div>
-                <h2 class="text-xl font-bold text-gray-800">
-                  {{ currentProject.name }}
-                </h2>
-                <div class="mt-1 flex items-center gap-3 text-xs text-gray-500">
-                  <span>
-                    {{ t('qms.planning.bom.workOrderNo') }}:
-                    <b class="text-gray-700">{{
-                      currentProject.workOrderNumber || '-'
-                    }}</b>
-                  </span>
-                  <span>
-                    {{ t('qms.planning.dfmea.itemCount') }}:
-                    <b class="text-blue-600">{{
-                      currentProject.children?.length || 0
-                    }}</b>
-                  </span>
-                  <span>
-                    {{ t('qms.planning.bom.version') }}:
-                    <b class="text-orange-600">{{
-                      currentProject.version || 'V1.0'
-                    }}</b>
-                  </span>
+          <div
+            class="flex-1 rounded-lg border border-gray-200 bg-white shadow-sm"
+          >
+            <div v-if="currentProject">
+              <div
+                class="flex items-center justify-between border-b border-gray-100 bg-gray-50/30 p-4"
+              >
+                <div>
+                  <h2 class="text-xl font-bold text-gray-800">
+                    {{ currentProject.name }}
+                  </h2>
+                  <div
+                    class="mt-1 flex items-center gap-3 text-xs text-gray-500"
+                  >
+                    <span>
+                      {{ t('qms.planning.bom.workOrderNo') }}:
+                      <b class="text-gray-700">{{
+                        currentProject.workOrderNumber || '-'
+                      }}</b>
+                    </span>
+                    <span>
+                      {{ t('qms.planning.dfmea.itemCount') }}:
+                      <b class="text-blue-600">{{
+                        currentProject.children?.length || 0
+                      }}</b>
+                    </span>
+                    <span>
+                      {{ t('qms.planning.bom.version') }}:
+                      <b class="text-orange-600">{{
+                        currentProject.version || 'V1.0'
+                      }}</b>
+                    </span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <Button
+                    v-if="canCreate"
+                    type="primary"
+                    @click="openItemModal('create')"
+                  >
+                    + {{ t('common.add') }}
+                  </Button>
                 </div>
               </div>
-              <div class="flex items-center gap-2">
-                <Button
-                  v-if="canCreate"
-                  type="primary"
-                  @click="openItemModal('create')"
-                >
-                  + {{ t('common.add') }}
-                </Button>
+              <div class="p-4">
+                <Grid>
+                  <template #rpn="{ row }">
+                    <Tag :color="(row.rpn || 0) > 100 ? 'red' : 'green'">
+                      {{ row.rpn || 0 }}
+                    </Tag>
+                  </template>
+                  <template #action="{ row }">
+                    <ProjectActionButtons
+                      :project="toPlanningNode(row)"
+                      mode="table"
+                      auth-prefix="QMS:Planning:DFMEA"
+                      :can-archive="false"
+                      @delete="handleDeleteDfmeaItem(row)"
+                      @edit="handleEditItem(row)"
+                    />
+                  </template>
+                </Grid>
               </div>
             </div>
-            <div class="p-4">
-              <Grid>
-                <template #rpn="{ row }">
-                  <Tag :color="(row.rpn || 0) > 100 ? 'red' : 'green'">
-                    {{ row.rpn || 0 }}
-                  </Tag>
-                </template>
-                <template #action="{ row }">
-                  <ProjectActionButtons
-                    :project="toPlanningNode(row)"
-                    mode="table"
-                    auth-prefix="QMS:Planning:DFMEA"
-                    :can-archive="false"
-                    @delete="handleDeleteDfmeaItem(row)"
-                    @edit="handleEditItem(row)"
-                  />
-                </template>
-              </Grid>
+            <div
+              v-else
+              class="flex flex-col items-center justify-center bg-gray-50/20 py-20 text-gray-400"
+            >
+              <Empty
+                :description="t('qms.planning.common.selectProjectHint')"
+              />
             </div>
           </div>
-          <div
-            v-else
-            class="flex flex-col items-center justify-center bg-gray-50/20 py-20 text-gray-400"
-          >
-            <Empty :description="t('qms.planning.common.selectProjectHint')" />
-          </div>
         </div>
-      </div>
+      </QmsPageShell>
 
       <DfmeaProjectModal
         v-model:open="projectModalVisible"

@@ -15,6 +15,7 @@ import dayjs from 'dayjs';
 
 import { getInspectionRequestStatsWithParams } from '#/api/qms/inspection-request';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import {
   buildDailyTrendChartOptions,
@@ -326,92 +327,94 @@ tryOnUnmounted(() => {
 </script>
 
 <template>
-  <Page content-class="p-4">
-    <div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 class="m-0 text-lg font-semibold text-gray-900">报检看板</h2>
-          <p class="m-0 mt-1 text-sm text-gray-500">
-            {{ dashboardRangeLabel }}报检、复检和检验效率统计
-          </p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <Segmented v-model:value="rangeMode" :options="rangeModeOptions" />
-          <DatePicker.RangePicker
-            v-if="rangeMode === 'custom'"
-            v-model:value="customRange"
-            :allow-clear="false"
-            class="w-[260px]"
-          />
-          <Button :loading="loading" @click="loadStats">
-            <template #icon>
-              <IconifyIcon icon="ant-design:reload-outlined" />
-            </template>
-            刷新
-          </Button>
-        </div>
-      </div>
-
-      <InspectionDashboardStatsCards
-        :average-daily-submitted-count="averageDailySubmittedCount"
-        :busiest-daily-trend="busiestDailyTrend"
-        :range-label="dashboardRangeLabel"
-        :stats="requestStats"
-      />
-
-      <InspectionDashboardTrendCard
-        :has-data="hasDailyTrendData"
-        :range-label="dashboardRangeLabel"
-      >
-        <EchartsUI ref="dailyTrendChartRef" class="h-[300px] w-full" />
-      </InspectionDashboardTrendCard>
-
-      <InspectionDashboardRankCards
-        :max-team-count="maxTeamCount"
-        :reinspection-stats-total="requestStats.reinspectionRateByTeam.length"
-        :team-stats-total="requestStats.byTeam.length"
-        :top-reinspection-stats="topReinspectionStats"
-        :top-team-stats="topTeamStats"
-        @open-detail="openDetailDrawer"
-      />
-
-      <InspectionDashboardHistoryCard
-        v-model:view="historyStatsView"
-        :has-data="hasHistoryStatsData"
-        :options="historyStatsOptions"
-        :range-label="dashboardRangeLabel"
-        @open-detail="
-          openDetailDrawer(
-            historyStatsView,
-            historyStatsView === 'team' ? 'history' : 'current',
-          )
-        "
-      >
-        <template #chart>
-          <EchartsUI
-            v-if="hasHistoryStatsData"
-            ref="historyChartRef"
-            class="h-[300px] w-full"
-          />
-          <div
-            v-else
-            class="flex h-[300px] items-center justify-center text-sm text-gray-400"
-          >
-            暂无历史统计数据
+  <Page content-class="p-0">
+    <QmsPageShell>
+      <div class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="m-0 text-lg font-semibold text-gray-900">报检看板</h2>
+            <p class="m-0 mt-1 text-sm text-gray-500">
+              {{ dashboardRangeLabel }}报检、复检和检验效率统计
+            </p>
           </div>
-        </template>
+          <div class="flex flex-wrap items-center gap-2">
+            <Segmented v-model:value="rangeMode" :options="rangeModeOptions" />
+            <DatePicker.RangePicker
+              v-if="rangeMode === 'custom'"
+              v-model:value="customRange"
+              :allow-clear="false"
+              class="w-[260px]"
+            />
+            <Button :loading="loading" @click="loadStats">
+              <template #icon>
+                <IconifyIcon icon="ant-design:reload-outlined" />
+              </template>
+              刷新
+            </Button>
+          </div>
+        </div>
 
-        <template #list>
-          <InspectionDashboardHistoryList
-            :inspector-stats="topHistoryInspectorStats"
-            :minutes-text="minutesText"
-            :reinspection-stats="topReinspectionStats"
-            :team-stats="topHistoryTeamStats"
-            :view="historyStatsView"
-          />
-        </template>
-      </InspectionDashboardHistoryCard>
-    </div>
+        <InspectionDashboardStatsCards
+          :average-daily-submitted-count="averageDailySubmittedCount"
+          :busiest-daily-trend="busiestDailyTrend"
+          :range-label="dashboardRangeLabel"
+          :stats="requestStats"
+        />
+
+        <InspectionDashboardTrendCard
+          :has-data="hasDailyTrendData"
+          :range-label="dashboardRangeLabel"
+        >
+          <EchartsUI ref="dailyTrendChartRef" class="h-[300px] w-full" />
+        </InspectionDashboardTrendCard>
+
+        <InspectionDashboardRankCards
+          :max-team-count="maxTeamCount"
+          :reinspection-stats-total="requestStats.reinspectionRateByTeam.length"
+          :team-stats-total="requestStats.byTeam.length"
+          :top-reinspection-stats="topReinspectionStats"
+          :top-team-stats="topTeamStats"
+          @open-detail="openDetailDrawer"
+        />
+
+        <InspectionDashboardHistoryCard
+          v-model:view="historyStatsView"
+          :has-data="hasHistoryStatsData"
+          :options="historyStatsOptions"
+          :range-label="dashboardRangeLabel"
+          @open-detail="
+            openDetailDrawer(
+              historyStatsView,
+              historyStatsView === 'team' ? 'history' : 'current',
+            )
+          "
+        >
+          <template #chart>
+            <EchartsUI
+              v-if="hasHistoryStatsData"
+              ref="historyChartRef"
+              class="h-[300px] w-full"
+            />
+            <div
+              v-else
+              class="flex h-[300px] items-center justify-center text-sm text-gray-400"
+            >
+              暂无历史统计数据
+            </div>
+          </template>
+
+          <template #list>
+            <InspectionDashboardHistoryList
+              :inspector-stats="topHistoryInspectorStats"
+              :minutes-text="minutesText"
+              :reinspection-stats="topReinspectionStats"
+              :team-stats="topHistoryTeamStats"
+              :view="historyStatsView"
+            />
+          </template>
+        </InspectionDashboardHistoryCard>
+      </div>
+    </QmsPageShell>
 
     <InspectionDashboardDetailDrawer
       v-model:open="detailDrawerOpen"

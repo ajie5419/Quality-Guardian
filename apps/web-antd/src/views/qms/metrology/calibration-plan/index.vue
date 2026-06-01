@@ -36,6 +36,7 @@ import {
   buildImportWarningMessage,
   resolveImportErrorCount,
 } from '#/utils/import-summary';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import CalibrationPlanAnnualGrid from './components/CalibrationPlanAnnualGrid.vue';
 import CalibrationPlanEditModal from './components/CalibrationPlanEditModal.vue';
@@ -379,86 +380,92 @@ function handleMonthClick(month: number) {
 </script>
 
 <template>
-  <Page :title="t('qms.metrology.calibrationPlan.title')">
-    <div class="m-4 flex flex-col gap-5">
-      <CalibrationPlanOverviewCards
-        :loading="overviewLoading"
-        :summary="overview.summary"
-        @open="handleOverviewOpen"
-      />
+  <Page :title="t('qms.metrology.calibrationPlan.title')" content-class="p-0">
+    <QmsPageShell>
+      <div class="flex flex-col gap-4 sm:gap-5">
+        <CalibrationPlanOverviewCards
+          :loading="overviewLoading"
+          :summary="overview.summary"
+          @open="handleOverviewOpen"
+        />
 
-      <div class="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,2fr)_420px]">
-        <div class="min-w-0">
-          <CalibrationPlanMonthlyDistributionChart
-            :data="overview.monthlyDistribution"
-            @month-click="handleMonthClick"
-          />
+        <div class="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,2fr)_420px]">
+          <div class="min-w-0">
+            <CalibrationPlanMonthlyDistributionChart
+              :data="overview.monthlyDistribution"
+              @month-click="handleMonthClick"
+            />
+          </div>
+          <div class="min-w-0">
+            <CalibrationPlanUpcomingTable
+              :items="overview.upcomingItems"
+              :loading="overviewLoading"
+            />
+          </div>
         </div>
-        <div class="min-w-0">
-          <CalibrationPlanUpcomingTable
-            :items="overview.upcomingItems"
-            :loading="overviewLoading"
-          />
-        </div>
-      </div>
 
-      <Card :bordered="false" class="shadow-sm">
-        <div
-          class="mb-4 flex flex-col gap-3 border-b border-gray-100 pb-4 lg:flex-row lg:items-center lg:justify-between"
-        >
-          <div class="flex flex-wrap items-center gap-3">
-            <Button v-if="canCreateAction" type="primary" @click="handleAdd">
-              <template #icon>
-                <IconifyIcon icon="lucide:plus" />
-              </template>
-              {{ t('common.create') }}
-            </Button>
-            <Upload
-              v-if="canImportAction"
-              :before-upload="handleImportUpload"
-              :show-upload-list="false"
-              accept=".xlsx,.xls"
-            >
-              <Button type="primary">
-                {{ t('qms.metrology.importExcel') }}
+        <Card :bordered="false" class="shadow-sm">
+          <div
+            class="mb-4 flex flex-col gap-3 border-b border-gray-100 pb-4 lg:flex-row lg:items-center lg:justify-between"
+          >
+            <div class="flex flex-wrap items-center gap-3">
+              <Button v-if="canCreateAction" type="primary" @click="handleAdd">
+                <template #icon>
+                  <IconifyIcon icon="lucide:plus" />
+                </template>
+                {{ t('common.create') }}
               </Button>
-            </Upload>
+              <Upload
+                v-if="canImportAction"
+                :before-upload="handleImportUpload"
+                :show-upload-list="false"
+                accept=".xlsx,.xls"
+              >
+                <Button type="primary">
+                  {{ t('qms.metrology.importExcel') }}
+                </Button>
+              </Upload>
+            </div>
+
+            <Segmented v-model:value="viewMode" :options="getViewOptions()" />
           </div>
 
-          <Segmented v-model:value="viewMode" :options="getViewOptions()" />
-        </div>
+          <Grid v-show="viewMode === 'list'">
+            <template #status="{ row }">
+              <Tag :color="getStatusColor(row.status)">
+                {{ row.statusLabel }}
+              </Tag>
+            </template>
 
-        <Grid v-show="viewMode === 'list'">
-          <template #status="{ row }">
-            <Tag :color="getStatusColor(row.status)">
-              {{ row.statusLabel }}
-            </Tag>
-          </template>
+            <template #action="{ row }">
+              <Space>
+                <Button
+                  v-if="canEditAction"
+                  type="link"
+                  @click="handleEdit(row)"
+                >
+                  {{ t('common.edit') }}
+                </Button>
+                <Button
+                  v-if="canDeleteAction"
+                  danger
+                  type="link"
+                  @click="handleDelete(row)"
+                >
+                  {{ t('common.delete') }}
+                </Button>
+              </Space>
+            </template>
+          </Grid>
 
-          <template #action="{ row }">
-            <Space>
-              <Button v-if="canEditAction" type="link" @click="handleEdit(row)">
-                {{ t('common.edit') }}
-              </Button>
-              <Button
-                v-if="canDeleteAction"
-                danger
-                type="link"
-                @click="handleDelete(row)"
-              >
-                {{ t('common.delete') }}
-              </Button>
-            </Space>
-          </template>
-        </Grid>
-
-        <CalibrationPlanAnnualGrid
-          v-show="viewMode === 'grid'"
-          :items="annualGridItems"
-          :loading="annualGridLoading"
-        />
-      </Card>
-    </div>
+          <CalibrationPlanAnnualGrid
+            v-show="viewMode === 'grid'"
+            :items="annualGridItems"
+            :loading="annualGridLoading"
+          />
+        </Card>
+      </div>
+    </QmsPageShell>
 
     <CalibrationPlanEditModal
       v-model:open="modalVisible"

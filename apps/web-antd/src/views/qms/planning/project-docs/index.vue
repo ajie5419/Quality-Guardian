@@ -25,6 +25,7 @@ import {
   updateProjectDocProject,
 } from '#/api/qms/planning';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import PlanningSidebar from '../components/PlanningSidebar.vue';
 import ProjectActionButtons from '../components/ProjectActionButtons.vue';
@@ -377,110 +378,114 @@ onMounted(() => {
 </script>
 
 <template>
-  <Page content-class="h-full p-4">
-    <div class="flex h-[calc(100vh-130px)] min-h-0 gap-4 overflow-hidden">
-      <PlanningSidebar
-        :title="t('qms.planning.bom.projectList')"
-        :projects="sidebarProjects"
-        v-model:selected-id="selectedProjectId"
-        v-model:active-tab="activeTab"
-        v-model:search-text="searchTerm"
-        auth-prefix="QMS:Planning:ProjectDocs"
-        @archive="handleArchiveProject"
-        @create="handleCreateProject"
-      >
-        <template #actions="{ project }">
-          <ProjectActionButtons
-            :project="project"
-            mode="dropdown"
-            auth-prefix="QMS:Planning:ProjectDocs"
-            @archive="handleArchiveProject"
-            @delete="handleDeleteProject"
-          />
-        </template>
-      </PlanningSidebar>
+  <Page content-class="h-full p-0">
+    <QmsPageShell content-class="h-full">
+      <div class="flex h-[calc(100vh-130px)] min-h-0 gap-4 overflow-hidden">
+        <PlanningSidebar
+          :title="t('qms.planning.bom.projectList')"
+          :projects="sidebarProjects"
+          v-model:selected-id="selectedProjectId"
+          v-model:active-tab="activeTab"
+          v-model:search-text="searchTerm"
+          auth-prefix="QMS:Planning:ProjectDocs"
+          @archive="handleArchiveProject"
+          @create="handleCreateProject"
+        >
+          <template #actions="{ project }">
+            <ProjectActionButtons
+              :project="project"
+              mode="dropdown"
+              auth-prefix="QMS:Planning:ProjectDocs"
+              @archive="handleArchiveProject"
+              @delete="handleDeleteProject"
+            />
+          </template>
+        </PlanningSidebar>
 
-      <div
-        class="flex flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
-      >
         <div
-          v-show="selectedProject"
-          class="flex h-full flex-col overflow-hidden"
+          class="flex flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
         >
           <div
-            class="flex items-center justify-between border-b border-gray-100 bg-gray-50/30 p-4"
+            v-show="selectedProject"
+            class="flex h-full flex-col overflow-hidden"
           >
-            <div>
-              <h2 class="text-xl font-bold text-gray-800">
-                {{ selectedProject?.projectName }}
-              </h2>
-              <div class="mt-1 flex items-center gap-3 text-xs text-gray-500">
-                <span>
-                  {{ t('qms.planning.bom.workOrderNo') }}:
-                  <b class="text-gray-700">{{
-                    selectedProject?.workOrderNumber
-                  }}</b>
-                </span>
-                <span>
-                  {{ t('qms.planning.projectDocs.recordCount') }}:
-                  <b class="text-blue-600">{{ inspectionRecords.length }}</b>
-                </span>
+            <div
+              class="flex items-center justify-between border-b border-gray-100 bg-gray-50/30 p-4"
+            >
+              <div>
+                <h2 class="text-xl font-bold text-gray-800">
+                  {{ selectedProject?.projectName }}
+                </h2>
+                <div class="mt-1 flex items-center gap-3 text-xs text-gray-500">
+                  <span>
+                    {{ t('qms.planning.bom.workOrderNo') }}:
+                    <b class="text-gray-700">{{
+                      selectedProject?.workOrderNumber
+                    }}</b>
+                  </span>
+                  <span>
+                    {{ t('qms.planning.projectDocs.recordCount') }}:
+                    <b class="text-blue-600">{{ inspectionRecords.length }}</b>
+                  </span>
+                </div>
               </div>
+              <div class="flex items-center gap-2"></div>
             </div>
-            <div class="flex items-center gap-2"></div>
-          </div>
 
-          <div class="flex-1 overflow-hidden p-4">
-            <div class="flex h-full flex-col gap-4 overflow-hidden">
-              <div
-                class="min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-200"
-              >
-                <div class="border-b border-gray-100 bg-gray-50 px-4 py-3">
-                  <h3 class="text-sm font-semibold text-gray-700">
-                    检验资料记录
-                  </h3>
-                </div>
-                <div class="h-[calc(100%-49px)] p-4">
-                  <Grid>
-                    <template #status="{ row }">
-                      <Tag
-                        color="green"
-                        v-if="
-                          [
-                            'Completed',
-                            'COMPLETED',
-                            '已归档',
-                            'Pass',
-                            'PASS',
-                          ].includes(row.status as string)
-                        "
-                      >
-                        {{ t('common.completed') }}
-                      </Tag>
-                      <Tag color="orange" v-else>{{
-                        t('task.status.pending')
-                      }}</Tag>
-                    </template>
-                    <template #actions="{ row }">
-                      <div class="flex items-center gap-2">
-                        <a @click="handleViewDoc(row)">查看资料</a>
-                        <a @click="handleOpenInspectionRecord(row)">查看记录</a>
-                      </div>
-                    </template>
-                  </Grid>
+            <div class="flex-1 overflow-hidden p-4">
+              <div class="flex h-full flex-col gap-4 overflow-hidden">
+                <div
+                  class="min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-200"
+                >
+                  <div class="border-b border-gray-100 bg-gray-50 px-4 py-3">
+                    <h3 class="text-sm font-semibold text-gray-700">
+                      检验资料记录
+                    </h3>
+                  </div>
+                  <div class="h-[calc(100%-49px)] p-4">
+                    <Grid>
+                      <template #status="{ row }">
+                        <Tag
+                          color="green"
+                          v-if="
+                            [
+                              'Completed',
+                              'COMPLETED',
+                              '已归档',
+                              'Pass',
+                              'PASS',
+                            ].includes(row.status as string)
+                          "
+                        >
+                          {{ t('common.completed') }}
+                        </Tag>
+                        <Tag color="orange" v-else>{{
+                          t('task.status.pending')
+                        }}</Tag>
+                      </template>
+                      <template #actions="{ row }">
+                        <div class="flex items-center gap-2">
+                          <a @click="handleViewDoc(row)">查看资料</a>
+                          <a @click="handleOpenInspectionRecord(row)"
+                            >查看记录</a
+                          >
+                        </div>
+                      </template>
+                    </Grid>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-        <div
-          v-show="!selectedProject"
-          class="flex flex-1 flex-col items-center justify-center bg-gray-50/20 text-gray-400"
-        >
-          <Empty :description="t('qms.planning.common.selectProjectHint')" />
+          <div
+            v-show="!selectedProject"
+            class="flex flex-1 flex-col items-center justify-center bg-gray-50/20 text-gray-400"
+          >
+            <Empty :description="t('qms.planning.common.selectProjectHint')" />
+          </div>
         </div>
       </div>
-    </div>
+    </QmsPageShell>
     <WorkOrderSelectModal
       v-model:open="workOrderSelectVisible"
       @success="handleWorkOrderSelected"

@@ -15,6 +15,7 @@ import { getSupplierExportList, getSupplierListPage } from '#/api/qms/supplier';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
 import {
@@ -299,133 +300,135 @@ function getRatingColor(level?: string, rating?: string) {
 </script>
 
 <template>
-  <Page>
-    <div class="flex flex-col gap-4 p-4">
-      <!-- 统计卡片 -->
-      <SupplierStats :stats="stats" type="Supplier" />
+  <Page content-class="p-0">
+    <QmsPageShell>
+      <div class="flex flex-col gap-3 sm:gap-4">
+        <!-- 统计卡片 -->
+        <SupplierStats :stats="stats" type="Supplier" />
 
-      <!-- 表格 -->
-      <Card :bordered="false" class="shadow-sm">
-        <Grid>
-          <template #toolbar-actions>
-            <Space>
-              <Button @click="() => rulesModalRef?.openModal()">
-                <template #icon>
-                  <IconifyIcon icon="lucide:book-open" />
-                </template>
-                {{ t('qms.supplier.scoringRules') }}
-              </Button>
-              <Button
-                v-access:code="'QMS:Supplier:Create'"
-                type="primary"
-                @click="handleOpenModal"
-              >
-                <template #icon>
-                  <IconifyIcon icon="lucide:plus" />
-                </template>
-                {{ t('qms.supplier.addSupplier') }}
-              </Button>
-              <Button
-                v-if="checkedRows.length > 0"
-                v-access:code="'QMS:Supplier:Delete'"
-                danger
-                type="primary"
-                @click="handleBatchDelete"
-              >
-                <template #icon>
-                  <IconifyIcon icon="lucide:trash-2" />
-                </template>
-                {{ t('common.batchDelete') }}
-              </Button>
-            </Space>
-          </template>
+        <!-- 表格 -->
+        <Card :bordered="false" class="shadow-sm">
+          <Grid>
+            <template #toolbar-actions>
+              <Space>
+                <Button @click="() => rulesModalRef?.openModal()">
+                  <template #icon>
+                    <IconifyIcon icon="lucide:book-open" />
+                  </template>
+                  {{ t('qms.supplier.scoringRules') }}
+                </Button>
+                <Button
+                  v-access:code="'QMS:Supplier:Create'"
+                  type="primary"
+                  @click="handleOpenModal"
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:plus" />
+                  </template>
+                  {{ t('qms.supplier.addSupplier') }}
+                </Button>
+                <Button
+                  v-if="checkedRows.length > 0"
+                  v-access:code="'QMS:Supplier:Delete'"
+                  danger
+                  type="primary"
+                  @click="handleBatchDelete"
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:trash-2" />
+                  </template>
+                  {{ t('common.batchDelete') }}
+                </Button>
+              </Space>
+            </template>
 
-          <template #name_link="{ row }">
-            <div class="flex items-center gap-2">
-              <a class="font-bold text-blue-600" @click="showDetail(row)">{{
-                row.name
-              }}</a>
-              <Tooltip
-                v-if="row.isWarning"
-                :title="
-                  row.warningReasons?.join('、') ||
-                  t('qms.supplier.warningPrompt')
-                "
-              >
-                <span
-                  class="i-lucide-alert-triangle animate-pulse cursor-help text-red-500"
-                ></span>
-              </Tooltip>
-            </div>
-          </template>
-
-          <template #status_badge="{ row }">
-            <div class="flex items-center">
-              <Badge
-                :status="getStatusConfig(row.status).status"
-                :text="
-                  getStatusConfig(row.status).textKey
-                    ? t(getStatusConfig(row.status).textKey)
-                    : '-'
-                "
-              />
-            </div>
-          </template>
-
-          <template #level_tag="{ row }">
-            <div class="flex items-center">
-              <Tag :color="getRatingColor(row.level, row.rating)">
-                {{ row.level || row.rating || '-' }} {{ t('common.level') }}
-              </Tag>
-            </div>
-          </template>
-
-          <template #score_tag="{ row }">
-            <Tooltip
-              :title="`来料:${row.incomingScore ?? '-'} | 工程:${row.engineeringScore ?? '-'} | 售后:${row.afterSalesScore ?? '-'} | 稳定:${row.stabilityScore ?? '-'}`"
-            >
-              <div
-                :class="{
-                  'text-green-600': (row.qualityScore ?? 0) >= 90,
-                  'text-blue-600':
-                    (row.qualityScore ?? 0) >= 80 &&
-                    (row.qualityScore ?? 0) < 90,
-                  'text-red-600': (row.qualityScore ?? 0) < 80,
-                }"
-                class="flex items-center font-mono font-bold"
-              >
-                {{ row.qualityScore ?? '-' }}
+            <template #name_link="{ row }">
+              <div class="flex items-center gap-2">
+                <a class="font-bold text-blue-600" @click="showDetail(row)">{{
+                  row.name
+                }}</a>
+                <Tooltip
+                  v-if="row.isWarning"
+                  :title="
+                    row.warningReasons?.join('、') ||
+                    t('qms.supplier.warningPrompt')
+                  "
+                >
+                  <span
+                    class="i-lucide-alert-triangle animate-pulse cursor-help text-red-500"
+                  ></span>
+                </Tooltip>
               </div>
-            </Tooltip>
-          </template>
+            </template>
 
-          <template #eng_issue="{ row }">
-            <div
-              class="flex items-center"
-              :class="{
-                'font-bold text-orange-500':
-                  (row.engineeringIssueCount ?? 0) > 0,
-                'text-gray-400': (row.engineeringIssueCount ?? 0) <= 0,
-              }"
-            >
-              {{ row.engineeringIssueCount ?? 0 }} {{ t('common.unit.item') }}
-            </div>
-          </template>
+            <template #status_badge="{ row }">
+              <div class="flex items-center">
+                <Badge
+                  :status="getStatusConfig(row.status).status"
+                  :text="
+                    getStatusConfig(row.status).textKey
+                      ? t(getStatusConfig(row.status).textKey)
+                      : '-'
+                  "
+                />
+              </div>
+            </template>
 
-          <template #issue_count="{ row }">
-            <div
-              class="flex items-center"
-              :class="{
-                'font-bold text-red-500': (row.afterSalesIssueCount ?? 0) > 0,
-                'text-gray-400': (row.afterSalesIssueCount ?? 0) <= 0,
-              }"
-            >
-              {{ row.afterSalesIssueCount ?? 0 }} {{ t('common.unit.item') }}
-            </div>
-          </template>
-        </Grid>
-      </Card>
-    </div>
+            <template #level_tag="{ row }">
+              <div class="flex items-center">
+                <Tag :color="getRatingColor(row.level, row.rating)">
+                  {{ row.level || row.rating || '-' }} {{ t('common.level') }}
+                </Tag>
+              </div>
+            </template>
+
+            <template #score_tag="{ row }">
+              <Tooltip
+                :title="`来料:${row.incomingScore ?? '-'} | 工程:${row.engineeringScore ?? '-'} | 售后:${row.afterSalesScore ?? '-'} | 稳定:${row.stabilityScore ?? '-'}`"
+              >
+                <div
+                  :class="{
+                    'text-green-600': (row.qualityScore ?? 0) >= 90,
+                    'text-blue-600':
+                      (row.qualityScore ?? 0) >= 80 &&
+                      (row.qualityScore ?? 0) < 90,
+                    'text-red-600': (row.qualityScore ?? 0) < 80,
+                  }"
+                  class="flex items-center font-mono font-bold"
+                >
+                  {{ row.qualityScore ?? '-' }}
+                </div>
+              </Tooltip>
+            </template>
+
+            <template #eng_issue="{ row }">
+              <div
+                class="flex items-center"
+                :class="{
+                  'font-bold text-orange-500':
+                    (row.engineeringIssueCount ?? 0) > 0,
+                  'text-gray-400': (row.engineeringIssueCount ?? 0) <= 0,
+                }"
+              >
+                {{ row.engineeringIssueCount ?? 0 }} {{ t('common.unit.item') }}
+              </div>
+            </template>
+
+            <template #issue_count="{ row }">
+              <div
+                class="flex items-center"
+                :class="{
+                  'font-bold text-red-500': (row.afterSalesIssueCount ?? 0) > 0,
+                  'text-gray-400': (row.afterSalesIssueCount ?? 0) <= 0,
+                }"
+              >
+                {{ row.afterSalesIssueCount ?? 0 }} {{ t('common.unit.item') }}
+              </div>
+            </template>
+          </Grid>
+        </Card>
+      </div>
+    </QmsPageShell>
 
     <SupplierEditModal ref="editModalRef" @success="handleSuccess" />
     <SupplierDetailDrawer ref="detailDrawerRef" />

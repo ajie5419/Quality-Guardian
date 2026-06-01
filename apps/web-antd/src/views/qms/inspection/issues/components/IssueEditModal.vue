@@ -101,7 +101,8 @@ const [Form, formApi] = useVbenForm({
       class: 'w-full',
     },
   },
-  wrapperClass: 'grid grid-cols-1 gap-x-4 gap-y-0 sm:grid-cols-2',
+  wrapperClass:
+    'issue-edit-form-grid grid min-w-0 grid-cols-1 gap-x-4 gap-y-0 sm:grid-cols-2',
   handleSubmit: () => submit(),
   handleValuesChange: (vals) => {
     formValues.value = vals as IssueFormValues;
@@ -341,12 +342,14 @@ function handleCancel() {
     @cancel="handleCancel"
     @ok="handleOk"
   >
-    <div class="max-h-[70vh] overflow-y-auto p-1 sm:max-h-[700px] sm:p-2">
+    <div
+      class="max-h-[70vh] min-w-0 overflow-y-auto overflow-x-hidden p-1 sm:max-h-[700px] sm:p-2"
+    >
       <Form>
         <!-- NC Number Slot: Add Auto Switch -->
         <template #ncNumber="{ modelValue }">
-          <div class="flex items-center gap-2">
-            <div class="relative flex-1">
+          <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+            <div class="relative min-w-0 flex-1">
               <span
                 class="ant-input ant-input-disabled inline-block w-full rounded border bg-gray-50 px-2 py-1"
               >
@@ -418,10 +421,10 @@ function handleCancel() {
         <!-- Description Slot: AI Buttons in Label/Top -->
         <template #description-label>
           <div
-            class="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+            class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
           >
             <span>{{ t('qms.inspection.issues.description') }}</span>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
               <Tooltip :title="t('qms.inspection.issues.aiAnalyzeTooltip')">
                 <Button
                   :loading="isAiAnalyzing"
@@ -467,5 +470,18 @@ function handleCancel() {
 <style scoped>
 :deep(.ant-form-item) {
   margin-bottom: 16px;
+}
+
+:deep(.issue-edit-form-grid > *) {
+  min-width: 0;
+}
+
+:deep(.ant-form-item-control-input-content),
+:deep(.ant-select),
+:deep(.ant-input),
+:deep(.ant-picker),
+:deep(.ant-input-number),
+:deep(.ant-tree-select) {
+  max-width: 100%;
 }
 </style>

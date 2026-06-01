@@ -26,6 +26,7 @@ import {
 } from '#/api/qms/metrology';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import MetrologyBorrowEntryAccessCard from './components/MetrologyBorrowEntryAccessCard.vue';
 import MetrologyBorrowMonthlyDistributionChart from './components/MetrologyBorrowMonthlyDistributionChart.vue';
@@ -220,88 +221,90 @@ function confirmReturn(row: QmsMetrologyApi.MetrologyBorrowRecordItem) {
 </script>
 
 <template>
-  <Page :title="t('qms.metrology.borrow.title')">
-    <div class="m-4 flex flex-col gap-5">
-      <MetrologyBorrowOverviewCards
-        :loading="overviewLoading"
-        :summary="overview.summary"
-        @open="handleOverviewOpen"
-      />
+  <Page :title="t('qms.metrology.borrow.title')" content-class="p-0">
+    <QmsPageShell>
+      <div class="flex flex-col gap-4 sm:gap-5">
+        <MetrologyBorrowOverviewCards
+          :loading="overviewLoading"
+          :summary="overview.summary"
+          @open="handleOverviewOpen"
+        />
 
-      <Alert
-        v-if="Number(overview.summary.overdueCount || 0) > 0"
-        :message="
-          t('qms.metrology.borrow.overdueReminder', {
-            count: overview.summary.overdueCount,
-          })
-        "
-        show-icon
-        type="warning"
-      >
-        <template #action>
-          <Button size="small" type="primary" @click="handleOpenOverdue">
-            {{ t('qms.metrology.borrow.viewOverdue') }}
-          </Button>
-        </template>
-      </Alert>
-
-      <div class="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,2fr)_420px]">
-        <div class="min-w-0">
-          <MetrologyBorrowMonthlyDistributionChart
-            :data="overview.monthlyDistribution"
-          />
-        </div>
-        <div class="flex min-w-0 flex-col gap-4">
-          <MetrologyBorrowEntryAccessCard />
-          <MetrologyBorrowUpcomingTable
-            :items="overview.upcomingItems"
-            :loading="overviewLoading"
-            @open="handleUpcomingOpen"
-          />
-        </div>
-      </div>
-
-      <Card :body-style="{ padding: '16px' }" class="rounded-2xl shadow-sm">
-        <Grid>
-          <template #toolbar-actions>
-            <Space>
-              <Button
-                v-if="canCreateAction"
-                type="primary"
-                @click="handleToolbarScan"
-              >
-                <template #icon>
-                  <IconifyIcon icon="lucide:scan-line" />
-                </template>
-                {{ t('qms.metrology.borrow.actions.scan') }}
-              </Button>
-              <Button v-if="canCreateAction" @click="handleToolbarManual">
-                {{ t('qms.metrology.borrow.actions.manual') }}
-              </Button>
-            </Space>
-          </template>
-
-          <template #status="{ row }">
-            <Tag :color="getStatusColor(row.status)">
-              {{ row.statusLabel }}
-            </Tag>
-          </template>
-
-          <template #action="{ row }">
-            <Button
-              v-if="canReturnAction && row.status !== 'RETURNED'"
-              type="link"
-              @click="confirmReturn(row)"
-            >
-              {{
-                row.status === 'RETURN_PENDING'
-                  ? t('qms.metrology.borrow.actions.confirmReceived')
-                  : t('qms.metrology.borrow.actions.return')
-              }}
+        <Alert
+          v-if="Number(overview.summary.overdueCount || 0) > 0"
+          :message="
+            t('qms.metrology.borrow.overdueReminder', {
+              count: overview.summary.overdueCount,
+            })
+          "
+          show-icon
+          type="warning"
+        >
+          <template #action>
+            <Button size="small" type="primary" @click="handleOpenOverdue">
+              {{ t('qms.metrology.borrow.viewOverdue') }}
             </Button>
           </template>
-        </Grid>
-      </Card>
-    </div>
+        </Alert>
+
+        <div class="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,2fr)_420px]">
+          <div class="min-w-0">
+            <MetrologyBorrowMonthlyDistributionChart
+              :data="overview.monthlyDistribution"
+            />
+          </div>
+          <div class="flex min-w-0 flex-col gap-4">
+            <MetrologyBorrowEntryAccessCard />
+            <MetrologyBorrowUpcomingTable
+              :items="overview.upcomingItems"
+              :loading="overviewLoading"
+              @open="handleUpcomingOpen"
+            />
+          </div>
+        </div>
+
+        <Card :body-style="{ padding: '16px' }" class="rounded-2xl shadow-sm">
+          <Grid>
+            <template #toolbar-actions>
+              <Space>
+                <Button
+                  v-if="canCreateAction"
+                  type="primary"
+                  @click="handleToolbarScan"
+                >
+                  <template #icon>
+                    <IconifyIcon icon="lucide:scan-line" />
+                  </template>
+                  {{ t('qms.metrology.borrow.actions.scan') }}
+                </Button>
+                <Button v-if="canCreateAction" @click="handleToolbarManual">
+                  {{ t('qms.metrology.borrow.actions.manual') }}
+                </Button>
+              </Space>
+            </template>
+
+            <template #status="{ row }">
+              <Tag :color="getStatusColor(row.status)">
+                {{ row.statusLabel }}
+              </Tag>
+            </template>
+
+            <template #action="{ row }">
+              <Button
+                v-if="canReturnAction && row.status !== 'RETURNED'"
+                type="link"
+                @click="confirmReturn(row)"
+              >
+                {{
+                  row.status === 'RETURN_PENDING'
+                    ? t('qms.metrology.borrow.actions.confirmReceived')
+                    : t('qms.metrology.borrow.actions.return')
+                }}
+              </Button>
+            </template>
+          </Grid>
+        </Card>
+      </div>
+    </QmsPageShell>
   </Page>
 </template>

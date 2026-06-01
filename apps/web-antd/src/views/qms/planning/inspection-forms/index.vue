@@ -24,6 +24,7 @@ import {
   updateInspectionFormTemplate,
 } from '#/api/qms/planning';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import TemplateModal from './components/TemplateModal.vue';
 
@@ -204,8 +205,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Page auto-content-height>
-    <div class="p-3">
+  <Page auto-content-height content-class="p-0">
+    <QmsPageShell>
       <div class="mb-3 flex items-center justify-between">
         <Space>
           <Input
@@ -297,7 +298,7 @@ onMounted(async () => {
           </template>
         </template>
       </Table>
-    </div>
+    </QmsPageShell>
 
     <TemplateModal
       :open="modalOpen"

@@ -25,6 +25,7 @@ import { Spin } from 'ant-design-vue';
 
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useWorkspaceQuery } from '#/hooks/useQmsQueries';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import { useWorkOrderAggregateDrawer } from '../work-order/composables/useWorkOrderAggregateDrawer';
 import WorkOrderAggregateDrawer from './components/WorkOrderAggregateDrawer.vue';
@@ -127,7 +128,7 @@ function getGreeting(): string {
 </script>
 
 <template>
-  <div class="p-5">
+  <QmsPageShell>
     <WorkbenchHeader
       :avatar="userStore.userInfo?.avatar || preferences.app.defaultAvatar"
     >
@@ -222,5 +223,5 @@ function getGreeting(): string {
         @refresh="refreshAggregate"
       />
     </Spin>
-  </div>
+  </QmsPageShell>
 </template>
