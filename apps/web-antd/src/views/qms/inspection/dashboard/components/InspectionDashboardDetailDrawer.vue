@@ -3,7 +3,10 @@ import { computed, ref, watch } from 'vue';
 
 import { Drawer, Input, Table } from 'ant-design-vue';
 
+import { useMobileViewport } from '#/hooks/useMobileViewport';
+
 type DetailType = 'inspector' | 'reinspection' | 'team';
+type TableScroll = { x: number | true };
 
 interface InspectorStat {
   averageTaskMinutes: number;
@@ -37,7 +40,12 @@ const emit = defineEmits<{
   'update:open': [value: boolean];
 }>();
 
+const { isMobile } = useMobileViewport();
 const keyword = ref('');
+
+const drawerWidth = computed(() =>
+  isMobile.value ? '100vw' : 'min(100vw, 760px)',
+);
 
 const drawerTitle = computed(() => {
   if (props.type === 'reinspection') return '班组复检率完整排行';
@@ -121,6 +129,16 @@ const pagination = computed(() => ({
   showSizeChanger: false,
 }));
 
+const teamTableScroll = computed<TableScroll>(() => ({
+  x: isMobile.value ? 420 : true,
+}));
+const reinspectionTableScroll = computed<TableScroll>(() => ({
+  x: isMobile.value ? 560 : true,
+}));
+const inspectorTableScroll = computed<TableScroll>(() => ({
+  x: isMobile.value ? 460 : true,
+}));
+
 function minutesText(value?: number) {
   const totalMinutes = Math.max(0, Math.floor(Number(value || 0)));
   const hours = Math.floor(totalMinutes / 60);
@@ -145,7 +163,7 @@ watch(
   <Drawer
     :open="props.open"
     :title="drawerTitle"
-    :width="760"
+    :width="drawerWidth"
     destroy-on-close
     @update:open="handleOpenChange"
   >
@@ -162,6 +180,7 @@ watch(
       :data-source="teamRows"
       :pagination="pagination"
       row-key="rank"
+      :scroll="teamTableScroll"
       size="small"
     >
       <Table.Column title="排名" data-index="rank" :width="72" />
@@ -175,6 +194,7 @@ watch(
       :data-source="reinspectionRows"
       :pagination="pagination"
       row-key="rank"
+      :scroll="reinspectionTableScroll"
       size="small"
     >
       <Table.Column title="排名" data-index="rank" :width="72" />
@@ -190,6 +210,7 @@ watch(
       :data-source="inspectorRows"
       :pagination="pagination"
       row-key="rank"
+      :scroll="inspectorTableScroll"
       size="small"
     >
       <Table.Column title="排名" data-index="rank" :width="72" />
