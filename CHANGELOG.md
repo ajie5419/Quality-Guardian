@@ -41,7 +41,7 @@
 - `pnpm run check:type`: 通过
 - `pnpm run check:qms-arch`: 通过
 
-**commit:** `pending`
+**commit:** `248abae2` feat(@qgs/web-antd): add qms responsive page shell
 
 **遗留问题：**
 
