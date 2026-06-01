@@ -367,7 +367,7 @@ function handleModalSuccess() {
           />
         </div>
 
-        <div class="rounded-lg bg-white">
+        <div class="after-sales-grid-card rounded-lg bg-white">
           <Grid>
             <template #status="{ row }">
               <QmsStatusTag :status="row.status" type="after-sales" />

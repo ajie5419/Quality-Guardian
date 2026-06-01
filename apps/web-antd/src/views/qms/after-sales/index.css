@@ -24,3 +24,43 @@
   height: 100%;
   object-fit: cover;
 }
+
+.after-sales-grid-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.after-sales-grid-card .vxe-grid {
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .after-sales-grid-card {
+    margin-right: -4px;
+    margin-left: -4px;
+  }
+
+  .after-sales-grid-card .vxe-grid {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .after-sales-grid-card .vxe-toolbar {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .after-sales-grid-card .vxe-table--main-wrapper,
+  .after-sales-grid-card .vxe-table--body-wrapper {
+    min-width: 0;
+  }
+
+  .after-sales-grid-card .vxe-table--fixed-left-wrapper,
+  .after-sales-grid-card .vxe-table--fixed-right-wrapper {
+    box-shadow: none !important;
+  }
+
+  .after-sales-grid-card .vxe-table--body-wrapper {
+    overflow-x: auto !important;
+  }
+}
