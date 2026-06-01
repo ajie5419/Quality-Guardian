@@ -22,6 +22,8 @@ import {
   SelectOption,
 } from 'ant-design-vue';
 
+import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
+
 import { renderCustomChart } from '../composables/useChartAggregation';
 import { CHART_DIMENSIONS, CHART_METRICS } from '../constants';
 
@@ -40,6 +42,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { isMobile, modalWidth, modalWrapClassName } = useAdaptivePopup();
 
 const formState = reactive<Omit<ChartConfig, 'id'>>({
   title: t('qms.afterSales.chart.defaultTitle'),
@@ -149,20 +152,27 @@ function handleCancel() {
         ? t('qms.afterSales.chart.editTitle')
         : t('qms.afterSales.chart.addTitle')
     "
-    width="900px"
+    :width="isMobile ? modalWidth : '900px'"
+    :wrap-class-name="`${modalWrapClassName} after-sales-chart-builder-modal`"
     @cancel="handleCancel"
     @ok="handleSave"
   >
-    <div class="flex h-[400px] gap-4">
+    <div
+      class="flex min-w-0 flex-col gap-4 sm:h-[400px] sm:flex-row"
+      :class="isMobile ? 'max-h-[calc(100dvh-150px)] overflow-y-auto' : ''"
+    >
       <!-- 左侧：预览区域 -->
-      <div class="flex-1 rounded border border-gray-200 bg-gray-50 p-2">
-        <div class="h-full w-full">
+      <div
+        class="min-w-0 rounded border border-gray-200 bg-gray-50 p-2 sm:flex-1"
+        :class="isMobile ? 'h-[260px]' : 'h-full'"
+      >
+        <div class="h-full min-w-0">
           <EchartsUI ref="previewChartRef" height="100%" width="100%" />
         </div>
       </div>
 
       <!-- 右侧：配置区域 -->
-      <div class="w-[300px] flex-shrink-0 space-y-4 pt-2">
+      <div class="min-w-0 space-y-4 pt-2 sm:w-[300px] sm:flex-shrink-0">
         <Form layout="vertical">
           <FormItem :label="t('qms.afterSales.chart.form.title')">
             <Input v-model:value="formState.title" />
@@ -201,6 +211,7 @@ function handleCancel() {
           <FormItem :label="t('qms.afterSales.chart.form.chartType')">
             <RadioGroup
               v-model:value="formState.chartType"
+              class="chart-type-radio-group"
               button-style="solid"
             >
               <RadioButton value="bar">{{
@@ -222,3 +233,30 @@ function handleCancel() {
     </div>
   </Modal>
 </template>
+
+<style scoped>
+:global(.after-sales-chart-builder-modal .ant-modal) {
+  max-width: calc(100vw - 16px);
+}
+
+:global(.after-sales-chart-builder-modal .ant-modal-content),
+:global(.after-sales-chart-builder-modal .ant-modal-body) {
+  overflow-x: hidden;
+}
+
+.chart-type-radio-group {
+  display: flex;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.chart-type-radio-group :deep(.ant-radio-button-wrapper) {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 767px) {
+  .chart-type-radio-group {
+    padding-bottom: 2px;
+  }
+}
+</style>
