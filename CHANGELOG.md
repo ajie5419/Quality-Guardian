@@ -41,7 +41,7 @@
 - `pnpm run check:qms-arch`: 通过
 - `pnpm --dir apps/backend exec vitest run`: 32 文件 / 171 测试通过
 
-**commit:** `39af10b4` fix(@qgs/backend): split inspection dashboard permission
+**commit:** `737ef424` fix(@qgs/backend): split inspection dashboard permission
 
 **遗留问题：**
 
