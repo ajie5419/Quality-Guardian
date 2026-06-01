@@ -230,6 +230,12 @@ async function handleBeforeUpload(file: File) {
 }
 
 async function loadBomPartOptions(workOrderNumber: string) {
+  if (isIncomingEntry.value) {
+    bomPartOptions.value = [];
+    bomPartsLoading.value = false;
+    return;
+  }
+
   const normalized = (workOrderNumber || '').trim();
   if (!normalized) {
     bomPartOptions.value = [];
@@ -394,6 +400,10 @@ watch(
 watch(
   () => requestForm.workOrderNumber,
   (workOrderNumber) => {
+    if (isIncomingEntry.value) {
+      void loadWorkOrderProcessOptions(workOrderNumber);
+      return;
+    }
     void Promise.all([
       loadBomPartOptions(workOrderNumber),
       loadWorkOrderProcessOptions(workOrderNumber),

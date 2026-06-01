@@ -78,16 +78,19 @@ const attachmentFileList = defineModel<UploadFile[]>('attachmentFileList', {
       @search="(value) => emit('workOrderSearch', value)"
     />
   </Form.Item>
-  <Form.Item :label="props.entryCopy.processLabel" required>
+  <Form.Item
+    v-if="!props.isIncomingEntry"
+    :label="props.entryCopy.processLabel"
+    required
+  >
     <Select
       v-model:value="form.processName"
       :options="props.processOptions"
       :loading="props.workOrderProcessesLoading"
-      :disabled="props.isIncomingEntry"
-      :allow-clear="!props.isIncomingEntry"
       class="w-full"
-      :placeholder="props.isIncomingEntry ? '进货检验' : '请选择工序'"
+      placeholder="请选择工序"
       show-search
+      allow-clear
     />
   </Form.Item>
   <Form.Item v-if="props.isIncomingEntry" label="进货类型" required>
@@ -100,7 +103,15 @@ const attachmentFileList = defineModel<UploadFile[]>('attachmentFileList', {
     />
   </Form.Item>
   <Form.Item :label="props.entryCopy.partLabel" required>
+    <Input
+      v-if="props.isIncomingEntry"
+      v-model:value="form.partName"
+      class="w-full"
+      :placeholder="props.entryCopy.partPlaceholder"
+      allow-clear
+    />
     <Select
+      v-else
       v-model:value="form.partName"
       :options="props.bomPartOptions"
       :loading="props.bomPartsLoading"

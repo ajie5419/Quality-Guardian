@@ -25,6 +25,31 @@
 
 ## 执行记录
 
+### 2026-06-01 修复：进货检验记录分类与扫码入口物料录入
+
+**执行内容：**
+
+- 修复报检任务关闭生成检验记录时，进货检验任务因工序主数据关系缺失被落为 `PROCESS` 的问题；后端保留原始“进货检验”流程名并增加 `INCOMING` payload 兜底。
+- 进货检验扫码入口隐藏“检验类型”字段，仍在提交 payload 中固定写入 `processName = 进货检验`。
+- 进货检验扫码入口的“物料名称”改为自由填写，不再强制从 BOM 物料列表选择，也不再为进货入口拉取 BOM 物料选项。
+- 新增 `buildInspectionRecordFromRequest` 回归测试，覆盖进货任务在 process relation 缺失时仍生成 `INCOMING` 记录。
+
+**验证结果：**
+
+- `pnpm --dir apps/backend exec vitest run modules/inspection/inspection-request.test.ts`: 1 文件 / 1 测试通过
+- `pnpm --dir apps/backend exec tsc --noEmit`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm lint`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+- `pnpm --dir apps/backend exec vitest run`: 35 文件 / 177 测试通过
+
+**commit:** `待提交`
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-01 修复：进货检验扫码入口复用进货类型与供应商选择
 
 **执行内容：**

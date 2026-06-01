@@ -95,7 +95,60 @@ export function buildInspectionRecordPayloadCore(input: {
     workOrderNumber: string;
   };
 }) {
-  return buildInspectionRecordPayloadCoreRule(input);
+  const payload = buildInspectionRecordPayloadCoreRule(input);
+  if (!isIncomingInspectionRequestProcess(input.request.processName)) {
+    return payload;
+  }
+  if (payload.category === 'INCOMING') {
+    return payload;
+  }
+
+  const requestInfo = parseIncomingInspectionRequestInfo(
+    input.request.requestInfo,
+  );
+  return {
+    category: 'INCOMING' as const,
+    documents: payload.documents,
+    hasDocuments: payload.hasDocuments,
+    inspectionDate: payload.inspectionDate,
+    inspector: payload.inspector,
+    incomingType: requestInfo.incomingType || INCOMING_INSPECTION_PROCESS_NAME,
+    items: Array.isArray(input.body.inspectionItems)
+      ? input.body.inspectionItems
+      : [
+          {
+            acceptanceCriteria: '来料外观、数量和资料符合进货检验要求。',
+            checkItem: `${INCOMING_INSPECTION_PROCESS_NAME} ${input.request.partName}`,
+            measuredValue: payload.result === 'FAIL' ? 'FAIL' : 'PASS',
+            remarks: requestInfo.notes,
+            result: payload.result,
+            standardValue: 'PASS',
+          },
+        ],
+    materialName: input.request.partName,
+    projectName: payload.projectName,
+    qualifiedQuantity: payload.qualifiedQuantity,
+    quantity: payload.quantity,
+    remarks: requestInfo.notes || payload.remarks,
+    result: payload.result,
+    supplierName: normalizeInspectionRequestText(input.request.team),
+    unqualifiedQuantity: payload.unqualifiedQuantity,
+    workOrderNumber: payload.workOrderNumber,
+  };
+}
+
+function parseIncomingInspectionRequestInfo(value?: null | string) {
+  const raw = normalizeInspectionRequestText(value);
+  if (!raw) return { incomingType: '', notes: '' };
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      incomingType: normalizeInspectionRequestText(parsed.incomingType),
+      notes: normalizeInspectionRequestText(parsed.notes),
+    };
+  } catch {
+    return { incomingType: '', notes: raw };
+  }
 }
 
 export async function generateInspectionRequestNo(
@@ -161,7 +214,9 @@ export async function buildInspectionRecordFromRequest(
       body,
       request: {
         ...request,
-        processName: resolveCanonicalProcessName(request) || '',
+        processName:
+          resolveCanonicalProcessName(request) ||
+          normalizeInspectionRequestText(request.processName),
       },
     }),
   );
