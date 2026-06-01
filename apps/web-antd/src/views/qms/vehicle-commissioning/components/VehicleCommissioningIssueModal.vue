@@ -75,15 +75,15 @@ const status = defineModel<VehicleCommissioningIssueStatus>('status', {
     cancel-text="取消"
     @ok="emit('submit')"
   >
-    <Form layout="vertical">
-      <Form.Item label="日期">
+    <Form layout="vertical" class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
+      <Form.Item label="日期" required>
         <DatePicker
           v-model:value="date"
           value-format="YYYY-MM-DD"
           class="w-full"
         />
       </Form.Item>
-      <Form.Item label="工单号">
+      <Form.Item label="工单号" required>
         <WorkOrderSelect
           v-model:value="selectedWorkOrderValueModel"
           @change="onWorkOrderChange"
@@ -92,13 +92,13 @@ const status = defineModel<VehicleCommissioningIssueStatus>('status', {
       <Form.Item label="项目名称" required>
         <Input v-model:value="projectName" />
       </Form.Item>
-      <Form.Item label="部件名称">
+      <Form.Item label="部件名称" required>
         <Input v-model:value="partName" />
       </Form.Item>
-      <Form.Item label="问题描述" required>
+      <Form.Item label="问题描述" required class="md:col-span-2">
         <Input.TextArea v-model:value="description" :rows="4" />
       </Form.Item>
-      <Form.Item label="责任部门">
+      <Form.Item label="责任部门" required>
         <TreeSelect
           v-model:value="responsibleDepartment"
           :tree-data="deptTreeData"
@@ -106,23 +106,21 @@ const status = defineModel<VehicleCommissioningIssueStatus>('status', {
           tree-default-expand-all
         />
       </Form.Item>
-      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Form.Item label="严重程度">
-          <Select v-model:value="severity" :options="severityOptions" />
-        </Form.Item>
-        <Form.Item label="状态">
-          <Select v-model:value="status" :options="issueStatusOptions" />
-        </Form.Item>
-      </div>
-      <Form.Item label="是否索赔">
+      <Form.Item label="严重程度" required>
+        <Select v-model:value="severity" :options="severityOptions" />
+      </Form.Item>
+      <Form.Item label="状态" required>
+        <Select v-model:value="status" :options="issueStatusOptions" />
+      </Form.Item>
+      <Form.Item label="是否索赔" required>
         <Switch
           v-model:checked="isClaim"
           checked-children="是"
           un-checked-children="否"
         />
       </Form.Item>
-      <div v-if="isClaim" class="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Form.Item label="预计损失金额">
+      <template v-if="isClaim">
+        <Form.Item label="预计损失金额" required>
           <InputNumber
             v-model:value="lossAmount"
             :min="0"
@@ -131,7 +129,7 @@ const status = defineModel<VehicleCommissioningIssueStatus>('status', {
             prefix="¥"
           />
         </Form.Item>
-        <Form.Item label="已索赔金额">
+        <Form.Item label="已索赔金额" required>
           <InputNumber
             v-model:value="recoveredAmount"
             :min="0"
@@ -140,17 +138,17 @@ const status = defineModel<VehicleCommissioningIssueStatus>('status', {
             prefix="¥"
           />
         </Form.Item>
-        <Form.Item label="索赔状态">
+        <Form.Item label="索赔状态" required>
           <Select v-model:value="claimStatus" :options="claimStatusOptions" />
         </Form.Item>
-        <Form.Item label="索赔备注">
+        <Form.Item label="索赔备注" required>
           <Input.TextArea v-model:value="claimNotes" :rows="2" />
         </Form.Item>
-      </div>
-      <Form.Item label="问题照片">
+      </template>
+      <Form.Item label="问题照片" required class="md:col-span-2">
         <IssuePhotoUpload v-model:value="photos" />
       </Form.Item>
-      <Form.Item label="处理建议">
+      <Form.Item label="处理建议" required class="md:col-span-2">
         <Input.TextArea v-model:value="solution" :rows="3" />
       </Form.Item>
     </Form>

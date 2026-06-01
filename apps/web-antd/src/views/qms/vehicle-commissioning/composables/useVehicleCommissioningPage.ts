@@ -53,6 +53,11 @@ type VehicleCommissioningReportGroup = {
   workOrderNumber: string;
 };
 
+type RequiredIssueField = {
+  label: string;
+  value: unknown;
+};
+
 export function useVehicleCommissioningPage() {
   const deptRawData = ref<Dept[]>([]);
   const deptTreeData = ref<TreeSelectNode[]>([]);
@@ -115,7 +120,7 @@ export function useVehicleCommissioningPage() {
     photos: [],
     projectName: '',
     recoveredAmount: 0,
-    responsibleDepartment: '调试组',
+    responsibleDepartment: '',
     severity: 'minor',
     solution: '',
     status: 'OPEN',
@@ -191,7 +196,7 @@ export function useVehicleCommissioningPage() {
 
   function resolveDepartmentValue(value?: string) {
     const raw = String(value || '').trim();
-    if (!raw) return '调试组';
+    if (!raw) return '';
     const match = findDeptNameById(raw);
     return match || raw;
   }
@@ -222,6 +227,47 @@ export function useVehicleCommissioningPage() {
 
   function normalizePhotoUrls(files: UploadFileWithResponse[]) {
     return files.map((file) => resolveUploadedPhotoUrl(file)).filter(Boolean);
+  }
+
+  function getMissingIssueField() {
+    const requiredFields: RequiredIssueField[] = [
+      { label: '日期', value: issueForm.date },
+      { label: '工单号', value: issueForm.workOrderNumber },
+      { label: '项目名称', value: issueForm.projectName },
+      { label: '部件名称', value: issueForm.partName },
+      { label: '问题描述', value: issueForm.description },
+      { label: '责任部门', value: issueForm.responsibleDepartment },
+      { label: '严重程度', value: issueForm.severity },
+      { label: '状态', value: issueForm.status },
+      { label: '处理建议', value: issueForm.solution },
+    ];
+
+    if (issueForm.isClaim) {
+      requiredFields.push(
+        { label: '预计损失金额', value: issueForm.lossAmount },
+        { label: '已索赔金额', value: issueForm.recoveredAmount },
+        { label: '索赔状态', value: issueForm.claimStatus },
+        { label: '索赔备注', value: issueForm.claimNotes },
+      );
+    }
+
+    const missingTextField = requiredFields.find(
+      (field) => typeof field.value === 'string' && !field.value.trim(),
+    );
+    if (missingTextField) return missingTextField.label;
+
+    const missingNumberField = requiredFields.find(
+      (field) =>
+        typeof field.value === 'number' &&
+        (!Number.isFinite(field.value) || field.value < 0),
+    );
+    if (missingNumberField) return missingNumberField.label;
+
+    if (normalizePhotoUrls(issueForm.photos).length === 0) {
+      return '问题照片';
+    }
+
+    return '';
   }
 
   const groupedIssues = computed<VehicleCommissioningIssueGroup[]>(() => {
@@ -379,7 +425,7 @@ export function useVehicleCommissioningPage() {
       photos: [],
       projectName: reportForm.projectName || '',
       recoveredAmount: 0,
-      responsibleDepartment: '调试组',
+      responsibleDepartment: '',
       severity: 'minor',
       solution: '',
       status: 'OPEN',
@@ -402,7 +448,7 @@ export function useVehicleCommissioningPage() {
       photos: normalizeUploadPhotos(row.photos),
       projectName: row.projectName || '',
       recoveredAmount: Number(row.recoveredAmount || 0),
-      responsibleDepartment: row.responsibleDepartment || '调试组',
+      responsibleDepartment: row.responsibleDepartment || '',
       severity: row.severity || 'minor',
       solution: row.solution || '',
       status: row.status || 'OPEN',
@@ -440,32 +486,30 @@ export function useVehicleCommissioningPage() {
   }
 
   async function submitIssue() {
-    if (!issueForm.description.trim()) {
-      message.warning('请填写问题描述');
-      return;
-    }
-    if (!issueForm.projectName.trim()) {
-      message.warning('请填写项目名称');
+    const missingField = getMissingIssueField();
+    if (missingField) {
+      message.warning(`请填写${missingField}`);
       return;
     }
     try {
+      const payload = {
+        ...issueForm,
+        claimNotes: issueForm.claimNotes.trim(),
+        description: issueForm.description.trim(),
+        partName: issueForm.partName.trim(),
+        photos: normalizePhotoUrls(issueForm.photos),
+        projectName: issueForm.projectName.trim(),
+        responsibleDepartment: resolveDepartmentValue(
+          issueForm.responsibleDepartment,
+        ),
+        solution: issueForm.solution.trim(),
+        workOrderNumber: issueForm.workOrderNumber.trim(),
+      };
       if (issueEditId.value) {
-        await updateVehicleCommissioningIssue(issueEditId.value, {
-          ...issueForm,
-          photos: normalizePhotoUrls(issueForm.photos),
-          responsibleDepartment: resolveDepartmentValue(
-            issueForm.responsibleDepartment,
-          ),
-        });
+        await updateVehicleCommissioningIssue(issueEditId.value, payload);
         message.success('问题更新成功');
       } else {
-        await createVehicleCommissioningIssue({
-          ...issueForm,
-          photos: normalizePhotoUrls(issueForm.photos),
-          responsibleDepartment: resolveDepartmentValue(
-            issueForm.responsibleDepartment,
-          ),
-        });
+        await createVehicleCommissioningIssue(payload);
         message.success('问题创建成功');
       }
       issueModalOpen.value = false;

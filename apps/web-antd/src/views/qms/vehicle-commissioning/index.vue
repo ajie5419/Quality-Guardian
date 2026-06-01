@@ -429,7 +429,7 @@ const {
       :dept-tree-data="deptTreeData"
       :issue-edit-id="issueEditId"
       :issue-status-options="issueStatusOptions"
-      :modal-width="modalWidth"
+      :modal-width="isMobile ? modalWidth : '900px'"
       :modal-wrap-class-name="modalWrapClassName"
       :on-work-order-change="onWorkOrderChange"
       :severity-options="severityOptions"
