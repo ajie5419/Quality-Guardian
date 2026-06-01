@@ -6,6 +6,8 @@ export const INSPECTION_REQUEST_STATUS = {
   SUBMITTED: 'SUBMITTED',
 } as const;
 
+export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
+
 const CHECK_RESULT_SET = new Set(['FAIL', 'NA', 'PASS']);
 const REQUEST_STATUS_SET = new Set<string>(
   Object.values(INSPECTION_REQUEST_STATUS),
@@ -30,6 +32,12 @@ export function normalizeInspectionRequestStatus(value: unknown) {
 
 export function isInspectionRequestAssemblyProcess(value: unknown) {
   return normalizeInspectionRequestText(value).includes('组装');
+}
+
+export function isIncomingInspectionRequestProcess(value: unknown) {
+  return (
+    normalizeInspectionRequestText(value) === INCOMING_INSPECTION_PROCESS_NAME
+  );
 }
 
 export function parseInspectionRequestPriority(value: unknown, fallback = 3) {
@@ -244,9 +252,18 @@ export function buildInspectionRecordPayloadCore(
   const componentName = normalizeInspectionRequestText(
     input.request.componentName,
   );
-
-  return {
-    category: 'PROCESS' as const,
+  const isIncoming = isIncomingInspectionRequestProcess(
+    input.request.processName,
+  );
+  const quantity = parseInspectionRequestQuantity(
+    input.body.quantity,
+    input.request.quantity || 1,
+  );
+  let defaultMeasuredValue = `${input.request.selfCheckResult}/${input.request.mutualCheckResult}`;
+  if (isIncoming) {
+    defaultMeasuredValue = result === 'FAIL' ? 'FAIL' : 'PASS';
+  }
+  const basePayload = {
     documents:
       closeAttachments.length > 0 ? JSON.stringify(closeAttachments) : null,
     hasDocuments: closeAttachments.length > 0,
@@ -260,23 +277,21 @@ export function buildInspectionRecordPayloadCore(
         ? inspectionItems
         : [
             {
-              acceptanceCriteria: '报检前已完成自检和互检。',
-              checkItem: `${input.request.processName} ${input.request.partName}${componentName ? ` ${componentName}` : ''}`,
-              measuredValue: `${input.request.selfCheckResult}/${input.request.mutualCheckResult}`,
+              acceptanceCriteria: isIncoming
+                ? '来料外观、数量和资料符合进货检验要求。'
+                : '报检前已完成自检和互检。',
+              checkItem: isIncoming
+                ? `${INCOMING_INSPECTION_PROCESS_NAME} ${input.request.partName}`
+                : `${input.request.processName} ${input.request.partName}${componentName ? ` ${componentName}` : ''}`,
+              measuredValue: defaultMeasuredValue,
               remarks: input.request.requestInfo || '',
               result: result === 'FAIL' ? 'FAIL' : 'PASS',
-              standardValue: 'PASS/PASS',
+              standardValue: isIncoming ? 'PASS' : 'PASS/PASS',
             },
           ],
-    level1Component: input.request.partName,
-    level2Component: componentName || undefined,
-    processName: input.request.processName,
     projectName:
       input.request.work_order?.projectName || input.request.workOrderNumber,
-    quantity: parseInspectionRequestQuantity(
-      input.body.quantity,
-      input.request.quantity || 1,
-    ),
+    quantity,
     qualifiedQuantity:
       typeof input.body.qualifiedQuantity === 'string' ||
       typeof input.body.qualifiedQuantity === 'number'
@@ -286,12 +301,30 @@ export function buildInspectionRecordPayloadCore(
       normalizeInspectionRequestText(input.body.closeRemark) ||
       normalizeInspectionRequestText(input.request.requestInfo),
     result: result === 'FAIL' ? 'FAIL' : 'PASS',
-    team: normalizeInspectionRequestText(input.request.team),
     unqualifiedQuantity:
       typeof input.body.unqualifiedQuantity === 'string' ||
       typeof input.body.unqualifiedQuantity === 'number'
         ? input.body.unqualifiedQuantity
         : undefined,
     workOrderNumber: input.request.workOrderNumber,
+  };
+
+  if (isIncoming) {
+    return {
+      ...basePayload,
+      category: 'INCOMING' as const,
+      incomingType: INCOMING_INSPECTION_PROCESS_NAME,
+      materialName: input.request.partName,
+      supplierName: normalizeInspectionRequestText(input.request.team),
+    };
+  }
+
+  return {
+    ...basePayload,
+    category: 'PROCESS' as const,
+    level1Component: input.request.partName,
+    level2Component: componentName || undefined,
+    processName: input.request.processName,
+    team: normalizeInspectionRequestText(input.request.team),
   };
 }

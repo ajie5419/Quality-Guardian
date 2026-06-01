@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  INCOMING_INSPECTION_PROCESS_NAME,
   inspectionRequestCreateBodySchema,
   validateInspectionRequestCreateBody,
 } from './inspection-request-create.schema';
@@ -56,5 +57,20 @@ describe('inspection request create schema', () => {
     });
 
     expect(validateInspectionRequestCreateBody(parsed).isValid).toBe(true);
+  });
+
+  it('allows empty componentName for incoming inspection process', () => {
+    const parsed = inspectionRequestCreateBodySchema.parse({
+      ...buildValidPayload(),
+      componentName: '',
+      processName: INCOMING_INSPECTION_PROCESS_NAME,
+      team: '供应商A',
+    });
+
+    const validation = validateInspectionRequestCreateBody(parsed);
+
+    expect(validation.isValid).toBe(true);
+    expect(validation.componentName).toBe('');
+    expect(validation.processName).toBe(INCOMING_INSPECTION_PROCESS_NAME);
   });
 });

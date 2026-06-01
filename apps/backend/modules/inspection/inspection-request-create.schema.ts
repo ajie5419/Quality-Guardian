@@ -1,11 +1,15 @@
 import { z } from 'zod';
 
 import {
+  INCOMING_INSPECTION_PROCESS_NAME,
+  isIncomingInspectionRequestProcess,
   isInspectionRequestAssemblyProcess,
   normalizeInspectionRequestAttachments,
   normalizeInspectionRequestText,
   parseInspectionRequestQuantity,
 } from './inspection-request';
+
+export { INCOMING_INSPECTION_PROCESS_NAME };
 
 const inspectionRequestAttachmentSchema = z.object({
   fileId: z.string().optional(),
@@ -40,7 +44,10 @@ export function validateInspectionRequestCreateBody(
   const workOrderNumber = normalizeInspectionRequestText(body.workOrderNumber);
   const partName = normalizeInspectionRequestText(body.partName);
   const processName = normalizeInspectionRequestText(body.processName);
-  const componentName = isInspectionRequestAssemblyProcess(processName)
+  const skipsComponentName =
+    isInspectionRequestAssemblyProcess(processName) ||
+    isIncomingInspectionRequestProcess(processName);
+  const componentName = skipsComponentName
     ? ''
     : normalizeInspectionRequestText(body.componentName);
   const reporter = normalizeInspectionRequestText(body.reporter);
@@ -55,8 +62,7 @@ export function validateInspectionRequestCreateBody(
       Boolean(workOrderNumber) &&
       Boolean(partName) &&
       Boolean(processName) &&
-      (isInspectionRequestAssemblyProcess(processName) ||
-        Boolean(componentName)) &&
+      (skipsComponentName || Boolean(componentName)) &&
       Boolean(team) &&
       Boolean(reporter) &&
       attachments.length > 0,

@@ -25,6 +25,31 @@
 
 ## 执行记录
 
+### 2026-06-01 功能：报检任务增加进货检验扫码入口
+
+**执行内容：**
+
+- 新增 `/qms/inspection/requests/incoming-entry` 进货检验扫码入口，复用 public 报检提交链路，提交时固定 `processName = 进货检验`。
+- 报检任务扫码入口弹窗同时展示过程报检和进货检验两个二维码、链接、打开入口和复制入口。
+- 报检任务列表增加“进货检验任务”视图，后端列表接口支持按 `processName` 精确过滤，列表任务列增加进货检验标识。
+- 进货检验任务关闭时直接生成 `INCOMING` 检验记录，`materialName` 取报检部件，`supplierName` 取任务 `team`；不合格项仍复用现有表单和校验。
+- 进货检验创建跳过组件名称必填，保持派单和关闭状态机复用现有报检任务流程。
+
+**验证结果：**
+
+- `pnpm exec vitest run packages/qgs-shared/src/domain-modules/qms/inspection-request.test.ts apps/backend/modules/inspection/inspection-request-create.schema.test.ts`: 2 文件 / 5 测试通过
+- `pnpm --dir apps/backend exec vitest run`: 33 文件 / 174 测试通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm lint`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-01 修复：调试验收日报工单字段去重
 
 **执行内容：**

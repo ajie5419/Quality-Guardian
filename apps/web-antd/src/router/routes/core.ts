@@ -120,6 +120,18 @@ const coreRoutes: RouteRecordRaw[] = [
       title: '扫码报检',
     },
   },
+  {
+    name: 'PublicIncomingInspectionRequestEntry',
+    path: '/qms/inspection/requests/incoming-entry',
+    component: InspectionRequestEntryPage,
+    meta: {
+      hideInBreadcrumb: true,
+      hideInMenu: true,
+      hideInTab: true,
+      ignoreAccess: true,
+      title: '进货检验扫码入口',
+    },
+  },
 ];
 
 export { coreRoutes, fallbackNotFoundRoute };

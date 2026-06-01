@@ -1,5 +1,16 @@
 <script setup lang="ts">
 import { Alert } from 'ant-design-vue';
+
+withDefaults(
+  defineProps<{
+    description?: string;
+    title?: string;
+  }>(),
+  {
+    description: '填写车间报检信息后，调度可在报检任务中派单。',
+    title: '扫码报检',
+  },
+);
 </script>
 
 <template>
@@ -10,9 +21,11 @@ import { Alert } from 'ant-design-vue';
       <header
         class="rounded-lg bg-white px-4 py-3 shadow-sm sm:rounded-xl sm:px-6 sm:py-4"
       >
-        <h1 class="text-lg font-semibold text-gray-900 sm:text-xl">扫码报检</h1>
+        <h1 class="text-lg font-semibold text-gray-900 sm:text-xl">
+          {{ title }}
+        </h1>
         <p class="mt-1 text-sm text-gray-500">
-          填写车间报检信息后，调度可在报检任务中派单。
+          {{ description }}
         </p>
       </header>
 

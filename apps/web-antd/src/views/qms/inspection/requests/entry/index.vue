@@ -9,7 +9,6 @@ import type {
   InspectionRequestAttachment,
   InspectionRequestCheckResult,
 } from '#/api/qms/inspection-request';
-import type { WorkOrderItem } from '#/api/qms/work-order';
 
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -31,11 +30,21 @@ import {
   normalizeUploadFileList,
 } from '#/views/qms/shared/utils/upload-file';
 
-import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
 import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
 import InspectionRequestEntryShell from './components/InspectionRequestEntryShell.vue';
 import InspectionRequestEntrySubmitBar from './components/InspectionRequestEntrySubmitBar.vue';
 import InspectionRequestEntryUploadActions from './components/InspectionRequestEntryUploadActions.vue';
+import {
+  buildInspectionRequestEntryProcessOptions,
+  buildInspectionRequestEntryRequiredMessage,
+  getInspectionRequestEntryCopy,
+  INCOMING_INSPECTION_PROCESS_NAME,
+  inspectionRequestEntryCheckResultOptions,
+  isIncomingInspectionEntryPath,
+  mapInspectionRequestEntryBomPartOptions,
+  mapInspectionRequestEntryTeamOptions,
+  mapInspectionRequestEntryWorkOrderOptions,
+} from './entry-mode';
 
 import './index.css';
 
@@ -57,7 +66,7 @@ const workOrderProcessOptions = ref<Array<{ label: string; value: string }>>(
   [],
 );
 const dictionaryProcessOptions = ref<Array<{ label: string; value: string }>>(
-  cloneInspectionProcessFallbackOptions(),
+  [],
 );
 
 const requestForm = reactive({
@@ -74,39 +83,36 @@ const requestForm = reactive({
   workOrderNumber: '',
 });
 
-const checkResultOptions = [
-  { label: '合格', value: 'PASS' },
-  { label: '不合格', value: 'FAIL' },
-  { label: '不适用', value: 'NA' },
-];
+const isIncomingEntry = computed(() =>
+  isIncomingInspectionEntryPath(String(route.path || '')),
+);
 
-const processOptions = computed(() => {
-  const fallbackOptions = cloneInspectionProcessFallbackOptions();
-  const map = new Map<string, { label: string; value: string }>();
-  for (const option of mapDictionaryOptionsToInspectionProcess(
-    undefined,
-    fallbackOptions,
-  )) {
-    map.set(option.value, option);
-  }
-  for (const option of dictionaryProcessOptions.value) {
-    map.set(option.value, option);
-  }
-  for (const option of workOrderProcessOptions.value) {
-    map.set(option.value, option);
-  }
-  return [...map.values()];
-});
+const processOptions = computed(() =>
+  buildInspectionRequestEntryProcessOptions(
+    dictionaryProcessOptions.value,
+    workOrderProcessOptions.value,
+  ),
+);
 
 const isAssemblyProcess = computed(() =>
   String(requestForm.processName || '').includes('组装'),
+);
+
+const requiresComponentName = computed(
+  () => !isIncomingEntry.value && !isAssemblyProcess.value,
+);
+
+const entryCopy = computed(() =>
+  getInspectionRequestEntryCopy(isIncomingEntry.value),
 );
 
 function applyRoutePrefill() {
   requestForm.workOrderNumber = String(route.query.workOrderNumber || '');
   requestForm.partName = String(route.query.partName || '');
   requestForm.componentName = String(route.query.componentName || '');
-  requestForm.processName = String(route.query.processName || '');
+  requestForm.processName = isIncomingEntry.value
+    ? INCOMING_INSPECTION_PROCESS_NAME
+    : String(route.query.processName || '');
   requestForm.reporter = String(route.query.reporter || '');
   requestForm.team = String(route.query.team || '');
 }
@@ -116,22 +122,15 @@ function resetRequestForm() {
   requestForm.attachments = [];
   requestForm.componentName = '';
   requestForm.partName = '';
-  requestForm.processName = '';
+  requestForm.processName = isIncomingEntry.value
+    ? INCOMING_INSPECTION_PROCESS_NAME
+    : '';
   requestForm.quantity = 1;
   requestForm.reporter = '';
   requestForm.requestInfo = '';
   requestForm.selfCheckResult = 'PASS';
   requestForm.mutualCheckResult = 'PASS';
   requestForm.team = '';
-}
-
-function mapWorkOrderOptions(items: WorkOrderItem[]) {
-  return items.map((item) => ({
-    label: item.projectName
-      ? `${item.workOrderNumber} - ${item.projectName}`
-      : item.workOrderNumber,
-    value: item.workOrderNumber,
-  }));
 }
 
 async function loadWorkOrderOptions(keyword = '') {
@@ -142,7 +141,9 @@ async function loadWorkOrderOptions(keyword = '') {
       page: 1,
       pageSize: 30,
     });
-    workOrderOptions.value = mapWorkOrderOptions(res.items || []);
+    workOrderOptions.value = mapInspectionRequestEntryWorkOrderOptions(
+      res.items || [],
+    );
   } catch {
     workOrderOptions.value = [];
   } finally {
@@ -156,16 +157,7 @@ async function loadTeamOptions(keyword = '') {
     const list = await getPublicInspectionRequestTeams({
       keyword: keyword.trim() || undefined,
     });
-    const internalOptions = list
-      .filter((item) => item.group === 'internal')
-      .map((item) => ({ label: item.label, value: item.value }));
-    const externalOptions = list
-      .filter((item) => item.group === 'external')
-      .map((item) => ({ label: item.label, value: item.value }));
-    teamOptions.value = [
-      { label: '内部生产车间', options: internalOptions },
-      { label: '外协加工单位', options: externalOptions },
-    ].filter((group) => group.options.length > 0);
+    teamOptions.value = mapInspectionRequestEntryTeamOptions(list);
   } catch {
     teamOptions.value = [];
   } finally {
@@ -175,7 +167,10 @@ async function loadTeamOptions(keyword = '') {
 
 function syncAttachmentsFromFiles(files: UploadFile[]) {
   requestForm.attachments =
-    normalizeUploadFileList<InspectionRequestAttachment>(files, '自检记录');
+    normalizeUploadFileList<InspectionRequestAttachment>(
+      files,
+      entryCopy.value.attachmentUploadName,
+    );
 }
 
 function hasBlockingAttachmentState() {
@@ -218,17 +213,7 @@ async function loadBomPartOptions(workOrderNumber: string) {
     });
     if (requestForm.workOrderNumber.trim() !== normalized) return;
 
-    const parts = new Map<string, (typeof list)[number]>();
-    for (const item of list || []) {
-      const partName = String(item.partName || '').trim();
-      if (partName) parts.set(partName, item);
-    }
-    bomPartOptions.value = [...parts.values()].map((item) => ({
-      label: item.partNumber
-        ? `${item.partName} (${item.partNumber})`
-        : item.partName,
-      value: item.partName,
-    }));
+    bomPartOptions.value = mapInspectionRequestEntryBomPartOptions(list || []);
 
     if (
       requestForm.partName &&
@@ -246,6 +231,16 @@ async function loadBomPartOptions(workOrderNumber: string) {
 }
 
 async function loadWorkOrderProcessOptions(workOrderNumber: string) {
+  if (isIncomingEntry.value) {
+    workOrderProcessOptions.value = [
+      {
+        label: INCOMING_INSPECTION_PROCESS_NAME,
+        value: INCOMING_INSPECTION_PROCESS_NAME,
+      },
+    ];
+    return;
+  }
+
   const normalized = workOrderNumber.trim();
   if (!normalized) {
     workOrderProcessOptions.value = [];
@@ -282,10 +277,10 @@ async function loadPublicInspectionProcessDictionaryOptions() {
     const options = await getPublicInspectionRequestProcessDictionaryOptions();
     dictionaryProcessOptions.value = mapDictionaryOptionsToInspectionProcess(
       options,
-      cloneInspectionProcessFallbackOptions(),
+      [],
     );
   } catch {
-    dictionaryProcessOptions.value = cloneInspectionProcessFallbackOptions();
+    dictionaryProcessOptions.value = [];
   }
 }
 
@@ -296,14 +291,17 @@ async function submitRequest() {
     !requestForm.workOrderNumber ||
     !requestForm.partName ||
     !requestForm.processName ||
-    (!isAssemblyProcess.value && !requestForm.componentName) ||
+    (requiresComponentName.value && !requestForm.componentName) ||
     !requestForm.quantity ||
     !requestForm.team ||
     !requestForm.reporter ||
     requestForm.attachments.length === 0
   ) {
     message.warning(
-      '工单号、工序、一级部件名称、组件名称、数量、班组、报检人、自检记录不能为空',
+      buildInspectionRequestEntryRequiredMessage(
+        entryCopy.value,
+        requiresComponentName.value,
+      ),
     );
     return;
   }
@@ -317,9 +315,16 @@ async function submitRequest() {
   try {
     const created = await createPublicInspectionRequest({
       ...requestForm,
-      componentName: isAssemblyProcess.value ? '' : requestForm.componentName,
+      componentName: requiresComponentName.value
+        ? requestForm.componentName
+        : '',
+      processName: isIncomingEntry.value
+        ? INCOMING_INSPECTION_PROCESS_NAME
+        : requestForm.processName,
     });
-    message.success(`报检任务已提交：${created.requestNo}`);
+    message.success(
+      `${entryCopy.value.submitSuccessPrefix}：${created.requestNo}`,
+    );
     resetRequestForm();
     const nextQuery = { ...route.query };
     delete nextQuery.partName;
@@ -369,7 +374,7 @@ watch(
 </script>
 
 <template>
-  <InspectionRequestEntryShell>
+  <InspectionRequestEntryShell :title="entryCopy.shellTitle">
     <Form class="inspection-entry-form" layout="vertical">
       <Form.Item label="工单号" required>
         <Select
@@ -384,30 +389,35 @@ watch(
           @search="loadWorkOrderOptions"
         />
       </Form.Item>
-      <Form.Item label="工序" required>
+      <Form.Item :label="entryCopy.processLabel" required>
         <Select
           v-model:value="requestForm.processName"
           :options="processOptions"
           :loading="workOrderProcessesLoading"
+          :disabled="isIncomingEntry"
+          :allow-clear="!isIncomingEntry"
           class="w-full"
-          placeholder="请选择工序"
+          :placeholder="isIncomingEntry ? '进货检验' : '请选择工序'"
           show-search
-          allow-clear
         />
       </Form.Item>
-      <Form.Item label="一级部件名称" required>
+      <Form.Item :label="entryCopy.partLabel" required>
         <Select
           v-model:value="requestForm.partName"
           :options="bomPartOptions"
           :loading="bomPartsLoading"
           :disabled="!requestForm.workOrderNumber"
           class="w-full"
-          placeholder="请选择BOM一级部件"
+          :placeholder="entryCopy.partPlaceholder"
           show-search
           allow-clear
         />
       </Form.Item>
-      <Form.Item v-if="!isAssemblyProcess" label="组件名称" required>
+      <Form.Item
+        v-if="requiresComponentName"
+        :label="entryCopy.componentLabel"
+        required
+      >
         <Input
           v-model:value="requestForm.componentName"
           class="w-full"
@@ -424,14 +434,14 @@ watch(
             class="w-full min-w-0"
           />
         </Form.Item>
-        <Form.Item label="班组" required>
+        <Form.Item :label="entryCopy.teamLabel" required>
           <Select
             v-model:value="requestForm.team"
             :filter-option="false"
             :loading="teamLoading"
             :options="teamOptions"
             class="w-full"
-            placeholder="请选择或搜索班组/外协单位"
+            :placeholder="entryCopy.teamPlaceholder"
             show-search
             allow-clear
             @search="loadTeamOptions"
@@ -450,14 +460,14 @@ watch(
         <Form.Item label="自检结果">
           <Select
             v-model:value="requestForm.selfCheckResult"
-            :options="checkResultOptions"
+            :options="inspectionRequestEntryCheckResultOptions"
             class="w-full"
           />
         </Form.Item>
         <Form.Item label="互检结果">
           <Select
             v-model:value="requestForm.mutualCheckResult"
-            :options="checkResultOptions"
+            :options="inspectionRequestEntryCheckResultOptions"
             class="w-full"
           />
         </Form.Item>
@@ -470,7 +480,7 @@ watch(
           placeholder="请输入补充说明"
         />
       </Form.Item>
-      <Form.Item label="自检记录" required>
+      <Form.Item :label="entryCopy.attachmentLabel" required>
         <InspectionRequestEntryUploadActions
           v-model:file-list="attachmentFileList"
           :action="QMS_UPLOAD_ACTIONS.PUBLIC_UPLOAD"

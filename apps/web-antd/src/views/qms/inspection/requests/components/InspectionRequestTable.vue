@@ -14,6 +14,8 @@ import {
   Tooltip,
 } from 'ant-design-vue';
 
+import { INCOMING_INSPECTION_PROCESS_NAME } from '../constants';
+
 export interface InspectionRequestTableProps {
   canDelete: boolean;
   canDispatch: boolean;
@@ -57,6 +59,10 @@ const emit = defineEmits<{
   qr: [record: InspectionRequest];
   record: [record: InspectionRequest];
 }>();
+
+function isIncomingInspectionRequest(record: InspectionRequest) {
+  return record.processName === INCOMING_INSPECTION_PROCESS_NAME;
+}
 
 function handleActionMenuClick(record: InspectionRequest, key: unknown) {
   const action = String(key);
@@ -102,7 +108,11 @@ function handleActionMenuClick(record: InspectionRequest, key: unknown) {
             </span>
           </div>
           <div class="truncate text-xs text-gray-500">
-            {{ record.processName }} · {{ record.quantity || 1 }}
+            <Tag v-if="isIncomingInspectionRequest(record)" color="blue">
+              进货检验
+            </Tag>
+            <span v-else>{{ record.processName }}</span>
+            <span> · {{ record.quantity || 1 }}</span>
           </div>
           <div class="truncate text-xs text-gray-400">
             {{ record.requestNo }} / {{ record.workOrderNumber }}

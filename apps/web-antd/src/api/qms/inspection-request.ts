@@ -57,6 +57,7 @@ export async function getInspectionRequests(params?: {
   mine?: boolean;
   page?: number;
   pageSize?: number;
+  processName?: string;
   status?: string;
   workOrderNumber?: string;
 }) {

@@ -18,6 +18,7 @@ function normalizeRequestListQuery(query: Record<string, unknown>) {
     mine: String(query.mine || '') === 'true',
     page: Math.max(Number(query.page || 1), 1),
     pageSize: Math.min(Math.max(Number(query.pageSize || 20), 1), 100),
+    processName: normalizeInspectionRequestText(query.processName),
     status: normalizeInspectionRequestStatus(query.status),
     team: normalizeInspectionRequestText(query.team),
     workOrderNumber: normalizeInspectionRequestText(query.workOrderNumber),
@@ -40,6 +41,7 @@ async function buildRequestListWhere(
     ...(query.workOrderNumber
       ? { workOrderNumber: query.workOrderNumber }
       : {}),
+    ...(query.processName ? { processName: query.processName } : {}),
     ...(query.team
       ? await buildTeamContainsWhere({ keyword: query.team })
       : {}),

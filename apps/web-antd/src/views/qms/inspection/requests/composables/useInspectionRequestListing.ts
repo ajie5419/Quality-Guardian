@@ -10,6 +10,8 @@ import {
   getInspectionRequestStats,
 } from '#/api/qms/inspection-request';
 
+import { INCOMING_INSPECTION_PROCESS_NAME } from '../constants';
+
 interface InspectionRequestStatsState {
   byInspector: Array<{ count: number; inspector: string }>;
   byTeam: Array<{ count: number; team: string }>;
@@ -90,6 +92,12 @@ export function useInspectionRequestListing(
     return activeView.value === 'inspecting';
   }
 
+  function requestProcessNameFilter() {
+    return activeView.value === 'incoming'
+      ? INCOMING_INSPECTION_PROCESS_NAME
+      : undefined;
+  }
+
   async function loadRequests() {
     loading.value = true;
     try {
@@ -100,6 +108,7 @@ export function useInspectionRequestListing(
         mine: shouldUseMineFilter(),
         page: page.value,
         pageSize: pageSize.value,
+        processName: requestProcessNameFilter(),
         status: query.status,
       });
       requests.value = res.items || [];

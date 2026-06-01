@@ -19,6 +19,7 @@ export function useInspectionRequestEntryActions({
     buildEntryUrl,
   } = useQrBaseUrl();
   const requestEntryOpen = ref(false);
+  const incomingRequestEntryQr = ref('');
   const requestEntryQr = ref('');
   const qrBaseInput = ref('');
   const qrBaseSaving = ref(false);
@@ -42,6 +43,12 @@ export function useInspectionRequestEntryActions({
   const requestEntryUrl = computed(() =>
     buildRequestUrl({ entry: 'submit' }, '/qms/inspection/requests/entry'),
   );
+  const incomingRequestEntryUrl = computed(() =>
+    buildRequestUrl(
+      { entry: 'incoming' },
+      '/qms/inspection/requests/incoming-entry',
+    ),
+  );
 
   function openRequestEntry() {
     requestEntryOpen.value = true;
@@ -61,7 +68,12 @@ export function useInspectionRequestEntryActions({
     try {
       await saveBaseUrl(value);
       qrBaseInput.value = qrBaseUrl.value;
-      requestEntryQr.value = await makeQr(requestEntryUrl.value);
+      const [requestQr, incomingQr] = await Promise.all([
+        makeQr(requestEntryUrl.value),
+        makeQr(incomingRequestEntryUrl.value),
+      ]);
+      requestEntryQr.value = requestQr;
+      incomingRequestEntryQr.value = incomingQr;
       message.success('二维码地址已保存');
     } catch (error) {
       handleApiError(error, '保存二维码地址');
@@ -73,12 +85,19 @@ export function useInspectionRequestEntryActions({
   async function loadRequestEntryConfig() {
     await loadBaseUrl();
     qrBaseInput.value = qrBaseUrl.value;
-    requestEntryQr.value = await makeQr(requestEntryUrl.value);
+    const [requestQr, incomingQr] = await Promise.all([
+      makeQr(requestEntryUrl.value),
+      makeQr(incomingRequestEntryUrl.value),
+    ]);
+    requestEntryQr.value = requestQr;
+    incomingRequestEntryQr.value = incomingQr;
   }
 
   return {
     buildRequestUrl,
     copyRequestEntryUrl,
+    incomingRequestEntryQr,
+    incomingRequestEntryUrl,
     loadRequestEntryConfig,
     makeQr,
     openPublicEntryPage,

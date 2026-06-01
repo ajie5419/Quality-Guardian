@@ -17,6 +17,7 @@ import { notifyTelegramNewRequest } from '~/utils/telegram-bot';
 
 import {
   generateInspectionRequestNo,
+  isIncomingInspectionRequestProcess,
   isInspectionRequestAssemblyProcess,
   mapInspectionRequest,
   normalizeInspectionRequestAttachments,
@@ -98,7 +99,10 @@ async function buildCreateRequestPayload(body: RequestBody) {
   const workOrderNumber = normalizeInspectionRequestText(body.workOrderNumber);
   const partName = normalizeInspectionRequestText(body.partName);
   const processName = normalizeInspectionRequestText(body.processName);
-  const componentName = isInspectionRequestAssemblyProcess(processName)
+  const skipsComponentName =
+    isInspectionRequestAssemblyProcess(processName) ||
+    isIncomingInspectionRequestProcess(processName);
+  const componentName = skipsComponentName
     ? ''
     : normalizeInspectionRequestText(body.componentName);
   const reporter = normalizeInspectionRequestText(body.reporter);

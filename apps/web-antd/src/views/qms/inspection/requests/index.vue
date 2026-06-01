@@ -11,7 +11,7 @@ import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useAccessStore, useUserStore } from '@vben/stores';
 
-import { Card } from 'ant-design-vue';
+import { Card, message } from 'ant-design-vue';
 
 import { getDeptList } from '#/api/system/dept';
 import { getUserList } from '#/api/system/user';
@@ -36,6 +36,7 @@ import { useInspectionRequestEntryActions } from './composables/useInspectionReq
 import { useInspectionRequestListing } from './composables/useInspectionRequestListing';
 import { useInspectionRequestPresentation } from './composables/useInspectionRequestPresentation';
 import { useInspectionRequestTaskActions } from './composables/useInspectionRequestTaskActions';
+import { INCOMING_INSPECTION_PROCESS_NAME } from './constants';
 import {
   inspectionRequestCheckResultOptions,
   inspectionRequestViewOptions,
@@ -55,6 +56,8 @@ const canConfigQrBase = computed(() => hasAccessByRoles(['super', 'admin']));
 const {
   buildRequestUrl,
   copyRequestEntryUrl,
+  incomingRequestEntryQr,
+  incomingRequestEntryUrl,
   loadRequestEntryConfig,
   makeQr,
   openPublicEntryPage,
@@ -304,9 +307,21 @@ function openInspectionRecord(record: InspectionRequest) {
     path: '/qms/inspection/records',
     query: {
       sourceInspectionId: record.inspectionId,
-      type: 'process',
+      type:
+        record.processName === INCOMING_INSPECTION_PROCESS_NAME
+          ? 'incoming'
+          : 'process',
     },
   });
+}
+
+async function copyIncomingRequestEntryUrl() {
+  await navigator.clipboard.writeText(incomingRequestEntryUrl.value);
+  message.success('进货检验入口链接已复制');
+}
+
+function openIncomingPublicEntryPage() {
+  window.open(incomingRequestEntryUrl.value, '_blank', 'noopener,noreferrer');
 }
 
 function handleInspectionRequestCreated() {
@@ -421,10 +436,14 @@ watch(
       v-model:base-url="qrBaseInput"
       :qr-code="requestEntryQr"
       :url="requestEntryUrl"
+      :incoming-qr-code="incomingRequestEntryQr"
+      :incoming-url="incomingRequestEntryUrl"
       :can-config="canConfigQrBase"
       :saving="qrBaseSaving"
       @copy="copyRequestEntryUrl"
+      @copy-incoming="copyIncomingRequestEntryUrl"
       @open-page="openPublicEntryPage"
+      @open-incoming-page="openIncomingPublicEntryPage"
       @save-base-url="saveQrBaseUrl"
     />
 

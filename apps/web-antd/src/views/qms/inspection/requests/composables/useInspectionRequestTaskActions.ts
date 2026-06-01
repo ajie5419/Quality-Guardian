@@ -27,6 +27,7 @@ import {
 } from '#/views/qms/shared/utils/upload-file';
 
 import { DEFAULT_VALUES } from '../../issues/constants';
+import { INCOMING_INSPECTION_PROCESS_NAME } from '../constants';
 
 type LinkedIssueDraftState = {
   claim: string;
@@ -360,6 +361,10 @@ export function useInspectionRequestTaskActions(
     return findDeptIdByName(deptRawData.value, '生产 OBU') || '生产 OBU';
   }
 
+  function isIncomingInspectionRequest(record: InspectionRequest) {
+    return record.processName === INCOMING_INSPECTION_PROCESS_NAME;
+  }
+
   function openClose(record: InspectionRequest) {
     currentRequest.value = record;
     closeAttachmentFileList.value = [];
@@ -385,7 +390,9 @@ export function useInspectionRequestTaskActions(
       rootCause: '',
       solution: '',
       status: 'OPEN',
-      supplierName: '',
+      supplierName: isIncomingInspectionRequest(record)
+        ? record.team || ''
+        : '',
       photos: [] as UploadFileWithResponse[],
       unqualifiedQuantity: record.quantity || 1,
       responsibleDepartment: defaultIssueResponsibleDepartment(),

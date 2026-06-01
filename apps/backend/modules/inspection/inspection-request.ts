@@ -20,7 +20,15 @@ import { InspectionService } from '~/modules/inspection/inspection.service';
 import { resolveTaskDispatchCurrentUserId } from '~/modules/task-dispatch/task-dispatch-rules';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
+export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
+
 export { INSPECTION_REQUEST_STATUS, isInspectionRequestAssemblyProcess };
+
+export function isIncomingInspectionRequestProcess(value: unknown) {
+  return (
+    normalizeInspectionRequestText(value) === INCOMING_INSPECTION_PROCESS_NAME
+  );
+}
 
 export function normalizeInspectionRequestText(value: unknown): string {
   return normalizeInspectionRequestTextRule(value);

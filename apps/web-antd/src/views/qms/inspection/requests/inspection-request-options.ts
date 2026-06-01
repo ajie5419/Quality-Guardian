@@ -8,4 +8,5 @@ export const inspectionRequestViewOptions = [
   { label: '待派单', value: 'submitted' },
   { label: '已派单', value: 'dispatched' },
   { label: '我的检验', value: 'inspecting' },
+  { label: '进货检验任务', value: 'incoming' },
 ];
