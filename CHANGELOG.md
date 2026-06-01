@@ -25,6 +25,29 @@
 
 ## 执行记录
 
+### 2026-06-01 重构：完成 QMS 后台页面壳层迁移复查
+
+**执行内容：**
+
+- 全量复查 `apps/web-antd/src/views/qms/**/index.vue` 的 `QmsPageShell` 接入状态。
+- 将质量知识库迁移到 `QmsPageShell`，抽出 `KnowledgeWorkspace`，入口页从 767 行降到 442 行，并收紧三栏布局的移动端宽度约束。
+- 将焊工管理、BOM 策划、监督管理入口迁移到 `QmsPageShell`，将大块业务视图移入对应组件，入口页均降到 15 行。
+- 加强不合格项新建/编辑弹窗的移动端防横向溢出样式。
+- 保留 `inspection/requests/entry` 与 `metrology/borrow/entry` 两个公开移动入口不接后台壳层。
+
+**验证结果：**
+
+- `pnpm lint`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `a87146be` refactor(@qgs/web-antd): complete qms shell migration
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-01 重构：迁移售后问题到 QMS 壳层
 
 **执行内容：**
