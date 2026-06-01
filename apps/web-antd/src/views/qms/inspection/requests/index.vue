@@ -11,8 +11,7 @@ import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useAccessStore, useUserStore } from '@vben/stores';
 
-import { Card, message } from 'ant-design-vue';
-import QRCode from 'qrcode';
+import { Card } from 'ant-design-vue';
 
 import { getDeptList } from '#/api/system/dept';
 import { getUserList } from '#/api/system/user';
@@ -20,7 +19,6 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { convertToTreeSelectData } from '#/types';
 import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
-import { useQrBaseUrl } from '#/views/qms/shared/composables/useQrBaseUrl';
 
 import {
   useClaimOptions,
@@ -34,9 +32,14 @@ import InspectionRequestListCard from './components/InspectionRequestListCard.vu
 import InspectionRequestPageHeader from './components/InspectionRequestPageHeader.vue';
 import InspectionRequestStatsCards from './components/InspectionRequestStatsCards.vue';
 import InspectionRequestWorkflows from './components/InspectionRequestWorkflows.vue';
+import { useInspectionRequestEntryActions } from './composables/useInspectionRequestEntryActions';
 import { useInspectionRequestListing } from './composables/useInspectionRequestListing';
 import { useInspectionRequestPresentation } from './composables/useInspectionRequestPresentation';
 import { useInspectionRequestTaskActions } from './composables/useInspectionRequestTaskActions';
+import {
+  inspectionRequestCheckResultOptions,
+  inspectionRequestViewOptions,
+} from './inspection-request-options';
 
 const route = useRoute();
 const router = useRouter();
@@ -47,18 +50,22 @@ const { handleApiError } = useErrorHandler();
 const { isMobile } = useMobileViewport();
 const users = ref<SystemUserApi.User[]>([]);
 const inspectorStatusOpen = ref(false);
-const requestEntryOpen = ref(false);
-const requestEntryQr = ref('');
 
 const canConfigQrBase = computed(() => hasAccessByRoles(['super', 'admin']));
 const {
-  baseUrl: qrBaseUrl,
-  loadBaseUrl,
-  saveBaseUrl,
-  buildEntryUrl,
-} = useQrBaseUrl();
-const qrBaseInput = ref('');
-const qrBaseSaving = ref(false);
+  buildRequestUrl,
+  copyRequestEntryUrl,
+  loadRequestEntryConfig,
+  makeQr,
+  openPublicEntryPage,
+  openRequestEntry,
+  qrBaseInput,
+  qrBaseSaving,
+  requestEntryOpen,
+  requestEntryQr,
+  requestEntryUrl,
+  saveQrBaseUrl,
+} = useInspectionRequestEntryActions({ handleApiError });
 const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const deptTreeData = ref<TreeSelectNode[]>([]);
 
@@ -89,17 +96,9 @@ const {
 const canDelete = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Requests:Delete']),
 );
-const checkResultOptions = [
-  { label: '合格', value: 'PASS' as const },
-  { label: '不合格', value: 'FAIL' as const },
-];
-
-const viewOptions = [
-  { label: '当前任务', value: 'current' },
-  { label: '待派单', value: 'submitted' },
-  { label: '已派单', value: 'dispatched' },
-  { label: '我的检验', value: 'inspecting' },
-];
+const canDispatch = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Requests:Dispatch']),
+);
 
 const userOptions = computed(() =>
   users.value.map((user) => ({
@@ -111,10 +110,6 @@ const userOptions = computed(() =>
 const uploadHeaders = computed(() => ({
   Authorization: `Bearer ${accessStore.accessToken}`,
 }));
-
-const requestEntryUrl = computed(() =>
-  buildRequestUrl({ entry: 'submit' }, '/qms/inspection/requests/entry'),
-);
 
 const exceptionTaskCount = computed(
   () =>
@@ -154,12 +149,13 @@ const {
   waitDuration,
 } = useInspectionRequestPresentation({
   canDelete,
-  checkResultOptions,
+  checkResultOptions: inspectionRequestCheckResultOptions,
   requestStats,
 });
 
 const listCardProps = computed(() => ({
   canDelete: canDelete.value,
+  canDispatch: canDispatch.value,
   checkResultLabel,
   directClosedClass,
   displayDispatchTime,
@@ -230,23 +226,6 @@ function currentUserName() {
   );
 }
 
-function buildRequestUrl(
-  params: Record<string, string>,
-  path = '/qms/inspection/requests',
-) {
-  // 依赖 qrBaseUrl 以便配置变化时重新计算入口链接
-  void qrBaseUrl.value;
-  return buildEntryUrl(path, params);
-}
-
-async function makeQr(url: string) {
-  return QRCode.toDataURL(url, {
-    errorCorrectionLevel: 'M',
-    margin: 1,
-    width: 180,
-  });
-}
-
 async function handleViewChange(value: number | string) {
   await handleListingViewChange(value, closeRouteDispatchDetail);
 }
@@ -261,33 +240,6 @@ function handleKeywordUpdate(value: string) {
 
 function handleStatusUpdate(value?: InspectionRequest['status']) {
   query.status = value;
-}
-
-function openRequestEntry() {
-  requestEntryOpen.value = true;
-}
-
-function openPublicEntryPage() {
-  window.open(requestEntryUrl.value, '_blank', 'noopener,noreferrer');
-}
-
-async function copyRequestEntryUrl() {
-  await navigator.clipboard.writeText(requestEntryUrl.value);
-  message.success('报检入口链接已复制');
-}
-
-async function saveQrBaseUrl(value: string) {
-  qrBaseSaving.value = true;
-  try {
-    await saveBaseUrl(value);
-    qrBaseInput.value = qrBaseUrl.value;
-    requestEntryQr.value = await makeQr(requestEntryUrl.value);
-    message.success('二维码地址已保存');
-  } catch (error) {
-    handleApiError(error, '保存二维码地址');
-  } finally {
-    qrBaseSaving.value = false;
-  }
 }
 
 const {
@@ -318,6 +270,7 @@ const {
   submitDispatch,
 } = useInspectionRequestTaskActions({
   canDelete,
+  canDispatch,
   defectSubtypes,
   deptRawData,
   async onAfterMutation() {
@@ -378,9 +331,7 @@ function handleDispatchFormUpdate(nextValue: typeof dispatchForm) {
 
 onMounted(async () => {
   applyRouteDispatchDetail();
-  await loadBaseUrl();
-  qrBaseInput.value = qrBaseUrl.value;
-  requestEntryQr.value = await makeQr(requestEntryUrl.value);
+  await loadRequestEntryConfig();
   await Promise.all([
     loadDeptData(),
     loadUsers(),
@@ -430,7 +381,7 @@ watch(
             :keyword="query.keyword"
             :status="query.status"
             :status-options="statusOptions"
-            :view-options="viewOptions"
+            :view-options="inspectionRequestViewOptions"
             @search="loadRequests"
             @status-change="handleStatusFilterChange"
             @update-active-view="handleActiveViewUpdate"

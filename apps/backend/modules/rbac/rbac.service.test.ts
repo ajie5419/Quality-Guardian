@@ -11,7 +11,10 @@ vi.mock('~/modules/rbac/rbac-config', () => ({
 vi.mock('~/utils/prisma', () => ({
   default: {
     menus: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
+      update: vi.fn(),
     },
     rbac_permissions: {
       createMany: vi.fn(),
@@ -44,6 +47,8 @@ vi.mock('~/utils/prisma', () => ({
 describe('rbacService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma.menus.findFirst as any).mockResolvedValue(null);
+    (prisma.menus.create as any).mockResolvedValue({ id: 'created-menu' });
   });
 
   it('should write role permissions only to v2 relations', async () => {
@@ -122,6 +127,51 @@ describe('rbacService', () => {
     expect(codes).toContain('A:Legacy');
     expect(codes).toContain('QMS:VehicleCommissioning:List');
     expect(codes).toContain('QMS:Inspection:List');
+  });
+
+  it('should keep button permissions under parent menu when ids are mixed types', async () => {
+    (prisma.menus.findMany as any).mockResolvedValue([
+      {
+        id: 40,
+        parentId: '0',
+        type: 'catalog',
+        authCode: null,
+        meta: JSON.stringify({ title: '检验管理' }),
+      },
+      {
+        id: '43',
+        parentId: 40,
+        type: 'menu',
+        authCode: 'QMS:Inspection:Requests:List',
+        meta: JSON.stringify({ title: '报检任务' }),
+      },
+      {
+        id: 4301,
+        parentId: '43',
+        type: 'button',
+        authCode: 'QMS:Inspection:Requests:Dispatch',
+        meta: JSON.stringify({ title: '派单' }),
+      },
+    ]);
+
+    const tree = await RbacService.getRolePermissionTree();
+
+    expect(tree).toEqual([
+      expect.objectContaining({
+        children: [
+          expect.objectContaining({
+            key: 'QMS:Inspection:Requests:List',
+            children: [
+              expect.objectContaining({
+                key: 'QMS:Inspection:Requests:Dispatch',
+                title: '[按钮] 派单',
+                type: 'button',
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
   });
 
   it('should not fallback to legacy JSON permissions', async () => {

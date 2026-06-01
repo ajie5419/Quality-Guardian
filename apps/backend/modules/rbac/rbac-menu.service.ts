@@ -62,6 +62,16 @@ function buildMenuTree(menus: Menu[], parentId: string = '0'): Menu[] {
     });
 }
 
+function menuParentId(menu: { parentId?: null | number | string }) {
+  return !menu.parentId ||
+    menu.parentId === null ||
+    menu.parentId === undefined ||
+    menu.parentId === '0' ||
+    menu.parentId === 0
+    ? '0'
+    : String(menu.parentId);
+}
+
 function collectMenuAuthCodes(menu: Menu): string[] {
   const codes: string[] = [];
   if (menu.authCode) codes.push(menu.authCode);
@@ -273,15 +283,15 @@ export const RbacMenuService = {
     };
     const buildTree = (parentId = '0'): RolePermissionTreeNode[] =>
       allMenus
-        .filter((menu) => menu.parentId === parentId)
+        .filter((menu) => menuParentId(menu) === String(parentId))
         .map((menu) => {
           const node: RolePermissionTreeNode = {
             title: `${getTypeLabel(menu.type)} ${getTitle(menu.meta)}`,
-            key: menu.authCode || `MENU_${menu.id}`,
-            menuId: menu.id,
+            key: menu.authCode || `MENU_${String(menu.id)}`,
+            menuId: String(menu.id),
             type: menu.type,
           };
-          const children = buildTree(menu.id);
+          const children = buildTree(String(menu.id));
           if (children.length > 0) node.children = children;
           return node;
         });

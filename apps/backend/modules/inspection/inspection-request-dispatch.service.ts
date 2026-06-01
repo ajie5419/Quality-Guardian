@@ -1,6 +1,7 @@
 import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
+import { RbacService } from '~/modules/rbac/rbac.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { BusinessError } from '~/utils/business-error';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
@@ -16,13 +17,30 @@ import {
 
 type RequestBody = Record<string, unknown>;
 
+const DISPATCH_PERMISSION_CODE = 'QMS:Inspection:Requests:Dispatch';
+
 export const InspectionRequestDispatchService = {
+  async ensureDispatchPermission(userinfo: UserSession) {
+    const userId =
+      userinfo.userId ||
+      userinfo.id ||
+      (await resolveInspectionRequestCurrentUserId(userinfo, prisma));
+    const codes = userId
+      ? await RbacService.getUserPermissionCodes(String(userId))
+      : [];
+    if (!codes.includes(DISPATCH_PERMISSION_CODE)) {
+      throw new BusinessError('FORBIDDEN', '无派单权限', 403);
+    }
+  },
+
   async dispatchRequest(
     event: H3Event,
     id: string,
     body: RequestBody,
     userinfo: UserSession,
   ) {
+    await this.ensureDispatchPermission(userinfo);
+
     const inspectorId = normalizeInspectionRequestText(body.inspectorId);
     const dispatcherId = await resolveInspectionRequestCurrentUserId(
       userinfo,

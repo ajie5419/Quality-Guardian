@@ -1,6 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
-import { normalizeInspectionRequestText } from '~/modules/inspection/inspection-request';
 import { InspectionRequestDispatchService } from '~/modules/inspection/inspection-request-dispatch.service';
 import { logApiError } from '~/utils/api-logger';
 import {
@@ -9,7 +8,6 @@ import {
 } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import {
-  badRequestResponse,
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
@@ -24,8 +22,6 @@ export default defineEventHandler(async (event) => {
   if (typeof id !== 'string') return id;
 
   const body = schema.parse(await readBody(event));
-  const inspectorId = normalizeInspectionRequestText(body.inspectorId);
-  if (!inspectorId) return badRequestResponse(event, '检验员不能为空');
 
   try {
     const updated = await InspectionRequestDispatchService.dispatchRequest(

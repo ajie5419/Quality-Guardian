@@ -25,6 +25,30 @@
 
 ## 执行记录
 
+### 2026-06-01 修复：报检任务派单权限闭环
+
+**执行内容：**
+
+- 报检任务列表“派单”按钮改为同时检查任务状态和 `QMS:Inspection:Requests:Dispatch` 权限。
+- 派单弹窗打开和提交前增加无权限提示，避免外部事件或组件调用绕过按钮隐藏。
+- 后端派单 service 增加 `QMS:Inspection:Requests:Dispatch` 权限校验，接口层保持瘦身；Telegram 派单会先解析真实用户再校验权限。
+- 修复角色权限树父子菜单 ID 类型混用时按钮节点掉树的问题，确保报检任务下显示新增、派单、关闭、删除按钮权限。
+- 为权限树混合 ID 类型场景补充 RBAC 回归测试。
+- 将报检任务入口二维码逻辑和静态选项拆出 composable / options 文件，保持 QMS 页面与路由文件行数符合架构守护规则。
+
+**验证结果：**
+
+- `pnpm lint`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+- `pnpm --dir apps/backend exec vitest run`: 32 文件 / 170 测试通过
+
+**commit:** `pending`
+
+**遗留问题：**
+
+- 工作树存在既有未跟踪诊断脚本 `apps/backend/diagnose-menu.mts`；本次仅为通过全仓 lint 对其做了格式与 lint 规则整理，未纳入权限改动范围。
+
 ## [0.4.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.4.0...qgs-v0.4.1) (2026-05-30)
 
 

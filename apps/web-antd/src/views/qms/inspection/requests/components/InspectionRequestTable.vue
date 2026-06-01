@@ -15,6 +15,7 @@ import {
 
 export interface InspectionRequestTableProps {
   canDelete: boolean;
+  canDispatch: boolean;
   loading: boolean;
   page: number;
   pageSize: number;
@@ -194,7 +195,7 @@ function handleActionMenuClick(record: InspectionRequest, key: unknown) {
             详情
           </Button>
           <Button
-            v-if="props.isDispatchable(record)"
+            v-if="props.canDispatch && props.isDispatchable(record)"
             size="small"
             @click="emit('dispatch', record)"
           >

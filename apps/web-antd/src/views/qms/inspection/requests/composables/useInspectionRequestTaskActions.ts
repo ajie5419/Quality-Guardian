@@ -52,6 +52,7 @@ type LinkedIssueDraftState = {
 
 interface UseInspectionRequestTaskActionsOptions {
   canDelete: Ref<boolean>;
+  canDispatch: Ref<boolean>;
   defectSubtypes: Ref<Record<string, Array<{ label: string; value: string }>>>;
   deptRawData: Ref<SystemDeptApi.Dept[]>;
   onAfterMutation: () => Promise<void>;
@@ -70,6 +71,7 @@ export function useInspectionRequestTaskActions(
 ) {
   const {
     canDelete,
+    canDispatch,
     defectSubtypes,
     deptRawData,
     onAfterMutation,
@@ -246,6 +248,10 @@ export function useInspectionRequestTaskActions(
   }
 
   function openDispatch(record: InspectionRequest) {
+    if (!canDispatch.value) {
+      message.warning('无派单权限');
+      return;
+    }
     currentRequest.value = record;
     dispatchForm.dispatchRemark = '';
     dispatchForm.inspectorId = record.inspectorId || '';
@@ -278,6 +284,10 @@ export function useInspectionRequestTaskActions(
   }
 
   async function submitDispatch() {
+    if (!canDispatch.value) {
+      message.warning('无派单权限');
+      return;
+    }
     if (!currentRequest.value || !dispatchForm.inspectorId) {
       message.warning('请选择检验员');
       return;

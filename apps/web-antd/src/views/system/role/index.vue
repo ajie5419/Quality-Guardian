@@ -257,7 +257,8 @@ function handleEdit(row: SystemRoleApi.Role) {
   isModalVisible.value = true;
 }
 
-function handlePermissions(row: SystemRoleApi.Role) {
+async function handlePermissions(row: SystemRoleApi.Role) {
+  await fetchPermissionTree();
   currentId.value = row.id;
   currentRoleName.value = row.name;
   // Load current permissions for this role
