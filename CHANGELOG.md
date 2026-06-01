@@ -25,6 +25,27 @@
 
 ## 执行记录
 
+### 2026-06-01 修复：报检看板历史统计移动端溢出
+
+**执行内容：**
+
+- 修复报检看板历史统计「查看全部」详情抽屉在移动端固定 760px 宽度导致页面横向溢出的问题。
+- 详情抽屉改为移动端 `100vw`、桌面端 `min(100vw, 760px)`。
+- 为班组报检、班组复检率、检验效率三张详情表设置移动端横向滚动宽度，避免表格列撑开页面。
+
+**验证结果：**
+
+- `pnpm lint`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `ddb8192f` fix(@qgs/web-antd): prevent inspection dashboard drawer overflow
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-01 重构：完成 QMS 响应式壳层迁移
 
 **执行内容：**
