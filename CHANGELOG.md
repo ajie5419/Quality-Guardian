@@ -25,6 +25,27 @@
 
 ## 执行记录
 
+### 2026-06-01 优化：迁移 QMS 总览和 ITP 跳转页壳层
+
+**执行内容：**
+
+- 将 QMS 总览页迁移到 `QmsPageShell`，同时移除无信息增量注释，把入口文件压到 QMS 架构行数限制内。
+- 将 ITP 和 ITP Generator 跳转页迁移到 `QmsPageShell`，统一后台页面边距。
+
+**验证结果：**
+
+- `pnpm lint`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `473783c7` refactor(@qgs/web-antd): migrate qms dashboard shell
+
+**遗留问题：**
+
+- 焊工、质量知识库、监造、文件中心、售后、BOM 仍需拆组件后迁移。
+- 报检公开填报和计量借用扫码入口保持独立公开移动页。
+
 ### 2026-06-01 优化：补迁移 QMS 普通后台页壳层
 
 **执行内容：**
