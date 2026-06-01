@@ -44,7 +44,7 @@
 - `pnpm run check:qms-arch`: 通过
 - `pnpm --dir apps/backend exec vitest run`: 35 文件 / 177 测试通过
 
-**commit:** `待提交`
+**commit:** `23478718` fix(@qgs/web-antd): keep incoming request records classified
 
 **遗留问题：**
 
