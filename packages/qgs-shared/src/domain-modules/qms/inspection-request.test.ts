@@ -25,7 +25,10 @@ describe('buildInspectionRecordPayloadCore', () => {
         processName: INCOMING_INSPECTION_PROCESS_NAME,
         quantity: 10,
         reporter: 'Reporter A',
-        requestInfo: 'Incoming batch',
+        requestInfo: JSON.stringify({
+          incomingType: '外购件',
+          notes: 'Incoming batch',
+        }),
         selfCheckResult: 'PASS',
         team: 'Supplier A',
         work_order: { projectName: 'Project A' },
@@ -35,7 +38,7 @@ describe('buildInspectionRecordPayloadCore', () => {
 
     expect(payload).toMatchObject({
       category: 'INCOMING',
-      incomingType: INCOMING_INSPECTION_PROCESS_NAME,
+      incomingType: '外购件',
       materialName: 'Bearing',
       projectName: 'Project A',
       qualifiedQuantity: 8,

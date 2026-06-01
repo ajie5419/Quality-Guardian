@@ -152,6 +152,16 @@ export async function getPublicInspectionRequestTeams(params?: {
   >(QMS_API.PUBLIC_INSPECTION_REQUEST_TEAMS, { params });
 }
 
+export async function getPublicInspectionRequestSuppliers(params?: {
+  category?: string;
+  keyword?: string;
+}) {
+  return requestClient.get<Array<{ label: string; value: string }>>(
+    QMS_API.PUBLIC_INSPECTION_REQUEST_SUPPLIERS,
+    { params },
+  );
+}
+
 export async function getPublicInspectionRequestWorkOrders(params?: {
   keyword?: string;
   page?: number;

@@ -219,6 +219,20 @@ export function buildInspectionRequestNo(params: {
   return `IR-${datePart}-${String(params.count + 1).padStart(4, '0')}`;
 }
 
+function parseIncomingRequestInfo(value?: null | string) {
+  const raw = normalizeInspectionRequestText(value);
+  if (!raw) return { incomingType: '', notes: '' };
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      incomingType: normalizeInspectionRequestText(parsed.incomingType),
+      notes: normalizeInspectionRequestText(parsed.notes),
+    };
+  } catch {
+    return { incomingType: '', notes: raw };
+  }
+}
+
 export interface InspectionRecordPayloadInput {
   body: Record<string, unknown>;
   request: {
@@ -255,6 +269,12 @@ export function buildInspectionRecordPayloadCore(
   const isIncoming = isIncomingInspectionRequestProcess(
     input.request.processName,
   );
+  const requestInfo = isIncoming
+    ? parseIncomingRequestInfo(input.request.requestInfo)
+    : {
+        incomingType: '',
+        notes: normalizeInspectionRequestText(input.request.requestInfo),
+      };
   const quantity = parseInspectionRequestQuantity(
     input.body.quantity,
     input.request.quantity || 1,
@@ -284,7 +304,7 @@ export function buildInspectionRecordPayloadCore(
                 ? `${INCOMING_INSPECTION_PROCESS_NAME} ${input.request.partName}`
                 : `${input.request.processName} ${input.request.partName}${componentName ? ` ${componentName}` : ''}`,
               measuredValue: defaultMeasuredValue,
-              remarks: input.request.requestInfo || '',
+              remarks: requestInfo.notes,
               result: result === 'FAIL' ? 'FAIL' : 'PASS',
               standardValue: isIncoming ? 'PASS' : 'PASS/PASS',
             },
@@ -299,7 +319,7 @@ export function buildInspectionRecordPayloadCore(
         : undefined,
     remarks:
       normalizeInspectionRequestText(input.body.closeRemark) ||
-      normalizeInspectionRequestText(input.request.requestInfo),
+      requestInfo.notes,
     result: result === 'FAIL' ? 'FAIL' : 'PASS',
     unqualifiedQuantity:
       typeof input.body.unqualifiedQuantity === 'string' ||
@@ -313,7 +333,8 @@ export function buildInspectionRecordPayloadCore(
     return {
       ...basePayload,
       category: 'INCOMING' as const,
-      incomingType: INCOMING_INSPECTION_PROCESS_NAME,
+      incomingType:
+        requestInfo.incomingType || INCOMING_INSPECTION_PROCESS_NAME,
       materialName: input.request.partName,
       supplierName: normalizeInspectionRequestText(input.request.team),
     };

@@ -35,6 +35,8 @@ export const QMS_API = {
     '/qms/public/inspection/requests/process-dictionary-options',
   PUBLIC_INSPECTION_REQUEST_BOM_PARTS:
     '/qms/public/inspection/requests/bom-parts',
+  PUBLIC_INSPECTION_REQUEST_SUPPLIERS:
+    '/qms/public/inspection/requests/suppliers',
   PUBLIC_INSPECTION_REQUEST_TEAMS: '/qms/public/inspection/requests/teams',
   PUBLIC_INSPECTION_REQUEST_WORK_ORDERS:
     '/qms/public/inspection/requests/work-orders',

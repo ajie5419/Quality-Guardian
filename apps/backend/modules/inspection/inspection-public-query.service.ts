@@ -1,4 +1,4 @@
-import { OUTSOURCING_CATEGORY } from '~/modules/supplier/supplier-query';
+import { SUPPLIER_CATEGORY } from '@qgs/shared';
 import { parseWorkOrderListQuery } from '~/modules/work-order/work-order-query';
 import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
@@ -71,7 +71,7 @@ export const InspectionPublicQueryService = {
       }),
       prisma.suppliers.findMany({
         where: {
-          category: OUTSOURCING_CATEGORY,
+          category: SUPPLIER_CATEGORY.OUTSOURCING,
           isDeleted: false,
           ...(keyword ? { name: { contains: keyword } } : {}),
         },
@@ -93,6 +93,25 @@ export const InspectionPublicQueryService = {
       value: item.name,
     }));
     return [...internalTeams, ...externalTeams];
+  },
+
+  async getPublicSuppliers(keyword: string, category: string) {
+    const normalizedKeyword = keyword.trim();
+    const normalizedCategory = category.trim() || SUPPLIER_CATEGORY.SUPPLIER;
+    const suppliers = await prisma.suppliers.findMany({
+      where: {
+        category: normalizedCategory,
+        isDeleted: false,
+        ...(normalizedKeyword ? { name: { contains: normalizedKeyword } } : {}),
+      },
+      orderBy: { name: 'asc' },
+      take: 100,
+      select: { name: true },
+    });
+    return suppliers.map((item) => ({
+      label: item.name,
+      value: item.name,
+    }));
   },
 
   async getPublicWorkOrders(query: Record<string, unknown>) {

@@ -13,7 +13,8 @@ import type {
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import { Form, Input, InputNumber, message, Select } from 'ant-design-vue';
+import { SUPPLIER_CATEGORY } from '@qgs/shared';
+import { Form, message } from 'ant-design-vue';
 
 import { QMS_UPLOAD_ACTIONS } from '#/api/qms/constants';
 import {
@@ -21,6 +22,7 @@ import {
   getPublicInspectionRequestBomParts,
   getPublicInspectionRequestProcessDictionaryOptions,
   getPublicInspectionRequestProcesses,
+  getPublicInspectionRequestSuppliers,
   getPublicInspectionRequestTeams,
   getPublicInspectionRequestWorkOrders,
 } from '#/api/qms/inspection-request';
@@ -31,16 +33,18 @@ import {
 } from '#/views/qms/shared/utils/upload-file';
 
 import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
+import InspectionRequestEntryFormFields from './components/InspectionRequestEntryFormFields.vue';
 import InspectionRequestEntryShell from './components/InspectionRequestEntryShell.vue';
 import InspectionRequestEntrySubmitBar from './components/InspectionRequestEntrySubmitBar.vue';
-import InspectionRequestEntryUploadActions from './components/InspectionRequestEntryUploadActions.vue';
 import {
+  buildIncomingInspectionRequestInfo,
   buildInspectionRequestEntryProcessOptions,
   buildInspectionRequestEntryRequiredMessage,
   getInspectionRequestEntryCopy,
   INCOMING_INSPECTION_PROCESS_NAME,
   inspectionRequestEntryCheckResultOptions,
   isIncomingInspectionEntryPath,
+  MACHINED_INCOMING_INSPECTION_TYPE,
   mapInspectionRequestEntryBomPartOptions,
   mapInspectionRequestEntryTeamOptions,
   mapInspectionRequestEntryWorkOrderOptions,
@@ -72,6 +76,7 @@ const dictionaryProcessOptions = ref<Array<{ label: string; value: string }>>(
 const requestForm = reactive({
   attachments: [] as InspectionRequestAttachment[],
   componentName: '',
+  incomingType: '',
   mutualCheckResult: 'PASS' as InspectionRequestCheckResult,
   partName: '',
   processName: '',
@@ -121,6 +126,7 @@ function resetRequestForm() {
   attachmentFileList.value = [];
   requestForm.attachments = [];
   requestForm.componentName = '';
+  requestForm.incomingType = '';
   requestForm.partName = '';
   requestForm.processName = isIncomingEntry.value
     ? INCOMING_INSPECTION_PROCESS_NAME
@@ -163,6 +169,31 @@ async function loadTeamOptions(keyword = '') {
   } finally {
     teamLoading.value = false;
   }
+}
+
+async function loadSupplierOptions(keyword = '') {
+  teamLoading.value = true;
+  try {
+    teamOptions.value = await getPublicInspectionRequestSuppliers({
+      category:
+        requestForm.incomingType === MACHINED_INCOMING_INSPECTION_TYPE
+          ? SUPPLIER_CATEGORY.OUTSOURCING
+          : SUPPLIER_CATEGORY.SUPPLIER,
+      keyword: keyword.trim() || undefined,
+    });
+  } catch {
+    teamOptions.value = [];
+  } finally {
+    teamLoading.value = false;
+  }
+}
+
+async function loadResponsibleUnitOptions(keyword = '') {
+  if (isIncomingEntry.value) {
+    await loadSupplierOptions(keyword);
+    return;
+  }
+  await loadTeamOptions(keyword);
 }
 
 function syncAttachmentsFromFiles(files: UploadFile[]) {
@@ -289,6 +320,7 @@ async function submitRequest() {
 
   if (
     !requestForm.workOrderNumber ||
+    (isIncomingEntry.value && !requestForm.incomingType) ||
     !requestForm.partName ||
     !requestForm.processName ||
     (requiresComponentName.value && !requestForm.componentName) ||
@@ -301,6 +333,7 @@ async function submitRequest() {
       buildInspectionRequestEntryRequiredMessage(
         entryCopy.value,
         requiresComponentName.value,
+        isIncomingEntry.value,
       ),
     );
     return;
@@ -321,6 +354,12 @@ async function submitRequest() {
       processName: isIncomingEntry.value
         ? INCOMING_INSPECTION_PROCESS_NAME
         : requestForm.processName,
+      requestInfo: isIncomingEntry.value
+        ? buildIncomingInspectionRequestInfo({
+            incomingType: requestForm.incomingType,
+            notes: requestForm.requestInfo,
+          })
+        : requestForm.requestInfo,
     });
     message.success(
       `${entryCopy.value.submitSuccessPrefix}：${created.requestNo}`,
@@ -342,7 +381,7 @@ onMounted(() => {
   applyRoutePrefill();
   void loadPublicInspectionProcessDictionaryOptions();
   void loadWorkOrderOptions(requestForm.workOrderNumber);
-  void loadTeamOptions(requestForm.team);
+  void loadResponsibleUnitOptions(requestForm.team);
 });
 
 watch(
@@ -371,124 +410,44 @@ watch(
     }
   },
 );
+
+watch(
+  () => requestForm.incomingType,
+  (nextValue, previousValue) => {
+    if (!isIncomingEntry.value) return;
+    if (nextValue !== previousValue && previousValue !== undefined) {
+      requestForm.team = '';
+    }
+    void loadSupplierOptions(requestForm.team);
+  },
+);
 </script>
 
 <template>
   <InspectionRequestEntryShell :title="entryCopy.shellTitle">
     <Form class="inspection-entry-form" layout="vertical">
-      <Form.Item label="工单号" required>
-        <Select
-          v-model:value="requestForm.workOrderNumber"
-          :filter-option="false"
-          :loading="workOrderLoading"
-          :options="workOrderOptions"
-          class="w-full"
-          placeholder="请选择或搜索工单号"
-          show-search
-          allow-clear
-          @search="loadWorkOrderOptions"
-        />
-      </Form.Item>
-      <Form.Item :label="entryCopy.processLabel" required>
-        <Select
-          v-model:value="requestForm.processName"
-          :options="processOptions"
-          :loading="workOrderProcessesLoading"
-          :disabled="isIncomingEntry"
-          :allow-clear="!isIncomingEntry"
-          class="w-full"
-          :placeholder="isIncomingEntry ? '进货检验' : '请选择工序'"
-          show-search
-        />
-      </Form.Item>
-      <Form.Item :label="entryCopy.partLabel" required>
-        <Select
-          v-model:value="requestForm.partName"
-          :options="bomPartOptions"
-          :loading="bomPartsLoading"
-          :disabled="!requestForm.workOrderNumber"
-          class="w-full"
-          :placeholder="entryCopy.partPlaceholder"
-          show-search
-          allow-clear
-        />
-      </Form.Item>
-      <Form.Item
-        v-if="requiresComponentName"
-        :label="entryCopy.componentLabel"
-        required
-      >
-        <Input
-          v-model:value="requestForm.componentName"
-          class="w-full"
-          placeholder="请输入组件名称"
-          allow-clear
-        />
-      </Form.Item>
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Form.Item label="数量" required>
-          <InputNumber
-            v-model:value="requestForm.quantity"
-            :min="1"
-            :precision="0"
-            class="w-full min-w-0"
-          />
-        </Form.Item>
-        <Form.Item :label="entryCopy.teamLabel" required>
-          <Select
-            v-model:value="requestForm.team"
-            :filter-option="false"
-            :loading="teamLoading"
-            :options="teamOptions"
-            class="w-full"
-            :placeholder="entryCopy.teamPlaceholder"
-            show-search
-            allow-clear
-            @search="loadTeamOptions"
-          />
-        </Form.Item>
-      </div>
-      <Form.Item label="报检人" required>
-        <Input
-          v-model:value="requestForm.reporter"
-          class="w-full"
-          placeholder="请输入报检人"
-          allow-clear
-        />
-      </Form.Item>
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Form.Item label="自检结果">
-          <Select
-            v-model:value="requestForm.selfCheckResult"
-            :options="inspectionRequestEntryCheckResultOptions"
-            class="w-full"
-          />
-        </Form.Item>
-        <Form.Item label="互检结果">
-          <Select
-            v-model:value="requestForm.mutualCheckResult"
-            :options="inspectionRequestEntryCheckResultOptions"
-            class="w-full"
-          />
-        </Form.Item>
-      </div>
-      <Form.Item label="报检信息">
-        <Input.TextArea
-          v-model:value="requestForm.requestInfo"
-          :rows="4"
-          class="w-full"
-          placeholder="请输入补充说明"
-        />
-      </Form.Item>
-      <Form.Item :label="entryCopy.attachmentLabel" required>
-        <InspectionRequestEntryUploadActions
-          v-model:file-list="attachmentFileList"
-          :action="QMS_UPLOAD_ACTIONS.PUBLIC_UPLOAD"
-          :before-upload="handleBeforeUpload"
-          :disabled="submitting"
-          @change="handleAttachmentUploadChange"
-        />
-      </Form.Item>
+      <InspectionRequestEntryFormFields
+        v-model:form="requestForm"
+        v-model:attachment-file-list="attachmentFileList"
+        :upload-action="QMS_UPLOAD_ACTIONS.PUBLIC_UPLOAD"
+        :before-upload="handleBeforeUpload"
+        :bom-part-options="bomPartOptions"
+        :bom-parts-loading="bomPartsLoading"
+        :check-result-options="inspectionRequestEntryCheckResultOptions"
+        :entry-copy="entryCopy"
+        :is-incoming-entry="isIncomingEntry"
+        :process-options="processOptions"
+        :requires-component-name="requiresComponentName"
+        :submitting="submitting"
+        :team-loading="teamLoading"
+        :team-options="teamOptions"
+        :work-order-loading="workOrderLoading"
+        :work-order-options="workOrderOptions"
+        :work-order-processes-loading="workOrderProcessesLoading"
+        @attachment-change="handleAttachmentUploadChange"
+        @responsible-unit-search="loadResponsibleUnitOptions"
+        @work-order-search="loadWorkOrderOptions"
+      />
       <InspectionRequestEntrySubmitBar
         :submitting="submitting"
         @submit="submitRequest"

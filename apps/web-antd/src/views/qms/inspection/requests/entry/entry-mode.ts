@@ -9,6 +9,15 @@ export const inspectionRequestEntryCheckResultOptions = [
   { label: '不适用', value: 'NA' },
 ];
 
+export const incomingInspectionTypeOptions = [
+  { label: '原材料', value: '原材料' },
+  { label: '外购件', value: '外购件' },
+  { label: '辅材', value: '辅材' },
+  { label: '机加成品件', value: '机加成品件' },
+];
+
+export const MACHINED_INCOMING_INSPECTION_TYPE = '机加成品件';
+
 type WorkOrderOptionSource = {
   projectName?: null | string;
   workOrderNumber: string;
@@ -121,7 +130,19 @@ export function getInspectionRequestEntryCopy(isIncoming: boolean) {
 export function buildInspectionRequestEntryRequiredMessage(
   copy: ReturnType<typeof getInspectionRequestEntryCopy>,
   requiresComponentName: boolean,
+  isIncoming: boolean,
 ) {
   const componentText = requiresComponentName ? `${copy.componentLabel}、` : '';
-  return `工单号、${copy.processLabel}、${copy.partLabel}、${componentText}数量、${copy.teamLabel}、报检人、${copy.attachmentRequiredMessage}`;
+  const incomingTypeText = isIncoming ? '进货类型、' : '';
+  return `工单号、${copy.processLabel}、${incomingTypeText}${copy.partLabel}、${componentText}数量、${copy.teamLabel}、报检人、${copy.attachmentRequiredMessage}`;
+}
+
+export function buildIncomingInspectionRequestInfo(input: {
+  incomingType: string;
+  notes: string;
+}) {
+  return JSON.stringify({
+    incomingType: input.incomingType,
+    notes: input.notes,
+  });
 }

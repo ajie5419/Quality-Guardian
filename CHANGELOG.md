@@ -25,6 +25,32 @@
 
 ## 执行记录
 
+### 2026-06-01 修复：进货检验扫码入口复用进货类型与供应商选择
+
+**执行内容：**
+
+- 进货检验扫码入口新增可选择的“进货类型”，复用新建进货检验表单的选项。
+- 新增 public supplier list endpoint，扫码入口的“供应商/来料单位”改为查询供应商列表；进货类型为“机加成品件”时查询外协单位，其余查询供应商。
+- 进货检验扫码提交时结构化保存进货类型与补充说明，关闭任务落库为进货检验记录时回填 `incomingType`、`materialName`、`supplierName`。
+- 抽出扫码入口字段组件，保持 public entry 入口文件低于 QMS 架构行数限制。
+- 新增 `InspectionPublicQueryService.getPublicSuppliers` 单元测试，覆盖默认供应商分类、外协分类与搜索词 trim。
+
+**验证结果：**
+
+- `pnpm exec vitest run packages/qgs-shared/src/domain-modules/qms/inspection-request.test.ts`: 1 文件 / 1 测试通过
+- `pnpm --dir apps/backend exec vitest run modules/inspection/inspection-public-query.service.test.ts modules/inspection/inspection-request-create.schema.test.ts modules/inspection/inspection-request-events.test.ts modules/inspection/inspection.service.test.ts`: 4 文件 / 22 测试通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm lint`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+- `pnpm --dir apps/backend exec vitest run`: 34 文件 / 176 测试通过
+
+**commit:** `c3ca73a4` fix(@qgs/web-antd): align incoming request entry fields
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-01 功能：报检任务增加进货检验扫码入口
 
 **执行内容：**
