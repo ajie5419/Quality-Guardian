@@ -225,17 +225,11 @@ const {
           <Tabs.TabPane key="report" tab="日报生成与发布">
             <Card title="生成调试验收日报" size="small">
               <Form layout="vertical">
-                <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
                   <Form.Item label="关联工单">
                     <WorkOrderSelect
                       v-model:value="selectedReportWorkOrderValue"
                       @change="onReportWorkOrderChange"
-                    />
-                  </Form.Item>
-                  <Form.Item label="工单号">
-                    <Input
-                      v-model:value="reportForm.workOrderNumber"
-                      placeholder="选择工单后自动带出"
                     />
                   </Form.Item>
                   <Form.Item label="项目名称" required>
