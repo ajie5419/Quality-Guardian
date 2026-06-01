@@ -10,17 +10,7 @@ import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
 import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
-import {
-  Button,
-  Card,
-  DatePicker,
-  Descriptions,
-  Drawer,
-  Image,
-  Select,
-  Statistic,
-  Tag,
-} from 'ant-design-vue';
+import { Button, DatePicker, Image, Select, Tag } from 'ant-design-vue';
 import dayjs from 'dayjs';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
@@ -30,13 +20,15 @@ import { useGridImport } from '#/hooks/useGridImport';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
-import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import { useDictionaryOptions } from '../../shared/composables/useDictionaryOptions';
 import { cloneInspectionProcessFallbackOptions } from '../../shared/constants/inspection-process-fallback';
 import { mapDictionaryOptionsToInspectionProcess } from '../records/config';
 import IssueChartDashboard from './components/IssueChartDashboard.vue';
+import IssueDetailDrawer from './components/IssueDetailDrawer.vue';
 import IssueEditModal from './components/IssueEditModal.vue';
+import IssueStatisticsCard from './components/IssueStatisticsCard.vue';
 import { useAiReport } from './composables/useAiReport';
 import { useIssueActions } from './composables/useIssueActions';
 import { useIssueChartPreferences } from './composables/useIssueChartPreferences';
@@ -86,21 +78,10 @@ const isAdmin = computed(() => {
 
 const checkedRows = ref<InspectionIssue[]>([]);
 const { isMobile } = useMobileViewport();
-const detailDrawerWidth = computed(() =>
-  isMobile.value ? '100vw' : 'min(100vw, 960px)',
-);
 
 const { invalidateInspectionIssues } = useInvalidateQmsQueries();
 const { deptTreeData, deptRawData, loadInitialData } = useIssueData();
-const {
-  detailVisible,
-  detailRecord,
-  detailPhotos,
-  openDetail,
-  formatDept,
-  formatDepartments,
-  formatDisplayDate,
-} = useIssueDetail(deptRawData);
+const { detailVisible, detailRecord, openDetail } = useIssueDetail(deptRawData);
 const { statusOptions: fallbackIssueStatusOptions } = useStatusOptions();
 const {
   options: issueStatusOptions,
@@ -324,7 +305,7 @@ async function handleGenerateInsight() {
 
 <template>
   <Page class="h-full" content-class="p-0">
-    <MobilePageShell>
+    <QmsPageShell>
       <div v-if="showCharts" class="mb-4">
         <IssueChartDashboard
           ref="chartDashboardRef"
@@ -334,42 +315,11 @@ async function handleGenerateInsight() {
         />
       </div>
 
-      <Card size="small" class="mb-4 border-none bg-gray-50 shadow-sm">
-        <div
-          class="grid grid-cols-1 gap-3 text-center sm:grid-cols-2 lg:grid-cols-5"
-        >
-          <Statistic
-            :title="t('qms.inspection.issues.totalCount')"
-            :value="statistics.totalCount"
-          />
-          <Statistic
-            :title="t('qms.inspection.issues.status.open')"
-            :value="statistics.openCount"
-            :value-style="{ color: '#cf1322' }"
-          />
-          <Statistic
-            :title="t('qms.inspection.issues.status.closed')"
-            :value="statistics.closedCount"
-            :value-style="{ color: '#3f8600' }"
-          />
-          <Statistic
-            :title="`${t('qms.inspection.issues.lossAmount')} (RMB)`"
-            :value="statistics.totalLoss"
-            prefix="¥"
-            :precision="2"
-          />
-          <Button
-            type="primary"
-            shape="round"
-            block
-            :loading="isGeneratingInsight"
-            @click="handleGenerateInsight"
-          >
-            <span class="i-lucide-scroll-text mr-1"></span>
-            {{ t('qms.inspection.issues.aiInsightReport') }}
-          </Button>
-        </div>
-      </Card>
+      <IssueStatisticsCard
+        :statistics="statistics"
+        :loading="isGeneratingInsight"
+        @generate-insight="handleGenerateInsight"
+      />
 
       <Grid class="h-full" :grid-api="gridApi" :grid-events="gridEvents">
         <template #status="{ row }">
@@ -499,131 +449,13 @@ async function handleGenerateInsight() {
           </div>
         </template>
       </Grid>
-    </MobilePageShell>
+    </QmsPageShell>
 
-    <Drawer
+    <IssueDetailDrawer
       v-model:open="detailVisible"
-      :title="`不合格项详情 - ${detailRecord?.ncNumber || ''}`"
-      :width="detailDrawerWidth"
-      placement="right"
-    >
-      <Descriptions
-        v-if="detailRecord"
-        bordered
-        :column="isMobile ? 1 : 2"
-        size="small"
-      >
-        <Descriptions.Item :label="t('qms.inspection.issues.ncNumber')">
-          {{ detailRecord.ncNumber || '-' }}
-        </Descriptions.Item>
-        <Descriptions.Item :label="t('qms.inspection.issues.statusLabel')">
-          <Tag :color="getStatusColor(detailRecord.status)">
-            {{ getStatusLabel(detailRecord.status) }}
-          </Tag>
-        </Descriptions.Item>
-
-        <Descriptions.Item :label="t('qms.inspection.issues.workOrderNumber')">
-          {{ detailRecord.workOrderNumber || '-' }}
-        </Descriptions.Item>
-        <Descriptions.Item :label="t('qms.inspection.issues.projectName')">
-          {{ detailRecord.projectName || '-' }}
-        </Descriptions.Item>
-
-        <Descriptions.Item :label="t('qms.inspection.issues.partName')">
-          {{ detailRecord.partName || '-' }}
-        </Descriptions.Item>
-        <Descriptions.Item :label="t('qms.inspection.issues.processName')">
-          {{ detailRecord.processName || '-' }}
-        </Descriptions.Item>
-
-        <Descriptions.Item :label="t('qms.inspection.issues.reportDate')">
-          {{ formatDisplayDate(detailRecord.reportDate) }}
-        </Descriptions.Item>
-        <Descriptions.Item :label="t('qms.inspection.issues.reportedBy')">
-          {{ detailRecord.inspector || '-' }}
-        </Descriptions.Item>
-
-        <Descriptions.Item label="事业部">
-          {{ formatDept(detailRecord.division) }}
-        </Descriptions.Item>
-        <Descriptions.Item
-          :label="t('qms.inspection.issues.responsibleDepartment')"
-        >
-          {{ formatDepartments(detailRecord) }}
-        </Descriptions.Item>
-        <Descriptions.Item
-          :label="t('qms.inspection.issues.responsibleWelder')"
-        >
-          {{ detailRecord.responsibleWelder || '-' }}
-        </Descriptions.Item>
-
-        <Descriptions.Item :label="t('qms.inspection.issues.defectType')">
-          {{ detailRecord.defectType || '-' }}
-        </Descriptions.Item>
-        <Descriptions.Item :label="t('qms.inspection.issues.defectSubtype')">
-          {{ detailRecord.defectSubtype || '-' }}
-        </Descriptions.Item>
-
-        <Descriptions.Item :label="t('qms.inspection.issues.severity')">
-          <Tag :color="getSeverityColor(detailRecord.severity)">
-            {{ getSeverityLabel(detailRecord.severity) }}
-          </Tag>
-        </Descriptions.Item>
-        <Descriptions.Item :label="t('qms.inspection.issues.claim')">
-          <Tag :color="detailRecord.claim === 'Yes' ? 'red' : 'green'">
-            {{
-              detailRecord.claim === 'Yes' ? t('common.yes') : t('common.no')
-            }}
-          </Tag>
-        </Descriptions.Item>
-
-        <Descriptions.Item :label="t('qms.inspection.issues.quantity')">
-          {{ detailRecord.quantity ?? '-' }}
-        </Descriptions.Item>
-        <Descriptions.Item :label="t('qms.inspection.issues.lossAmount')">
-          ¥{{ detailRecord.lossAmount ?? 0 }}
-        </Descriptions.Item>
-
-        <Descriptions.Item label="供应商">
-          {{ detailRecord.supplierName || '-' }}
-        </Descriptions.Item>
-        <Descriptions.Item label="更新时间">
-          {{ formatDisplayDate(detailRecord.updatedAt) }}
-        </Descriptions.Item>
-
-        <Descriptions.Item
-          :label="t('qms.inspection.issues.description')"
-          :span="2"
-        >
-          {{ detailRecord.description || '-' }}
-        </Descriptions.Item>
-        <Descriptions.Item
-          :label="t('qms.inspection.issues.rootCause')"
-          :span="2"
-        >
-          {{ detailRecord.rootCause || '-' }}
-        </Descriptions.Item>
-        <Descriptions.Item
-          :label="t('qms.inspection.issues.solution')"
-          :span="2"
-        >
-          {{ detailRecord.solution || '-' }}
-        </Descriptions.Item>
-        <Descriptions.Item :label="t('qms.inspection.issues.photos')" :span="2">
-          <div v-if="detailPhotos.length > 0" class="flex flex-wrap gap-2">
-            <Image
-              v-for="(photo, index) in detailPhotos"
-              :key="`${photo}-${index}`"
-              :width="96"
-              :height="96"
-              :src="photo"
-              class="rounded border border-gray-200"
-            />
-          </div>
-          <span v-else>-</span>
-        </Descriptions.Item>
-      </Descriptions>
-    </Drawer>
+      :dept-data="deptRawData"
+      :record="detailRecord"
+    />
 
     <IssueEditModal
       v-model:open="modalVisible"

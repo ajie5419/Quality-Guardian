@@ -18,7 +18,7 @@ import { getDailySummary, saveDailySummary } from '#/api/qms/reports';
 import { getDeptList } from '#/api/system/dept';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
-import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 import {
   getIssueTrackingLabel,
   getIssueTrackingTagColor,
@@ -271,7 +271,7 @@ onMounted(() => {
 
 <template>
   <Page content-class="p-0">
-    <MobilePageShell>
+    <QmsPageShell layout="contained">
       <div
         ref="reportRef"
         class="space-y-4 rounded-lg bg-white p-3 text-base sm:space-y-6 sm:p-8 sm:text-lg"
@@ -352,7 +352,7 @@ onMounted(() => {
           />
         </div>
       </div>
-    </MobilePageShell>
+    </QmsPageShell>
 
     <!-- Footer Actions -->
     <div

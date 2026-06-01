@@ -9,6 +9,7 @@ import { useI18n } from '@vben/locales';
 
 import { Descriptions, Drawer, Image, Tag } from 'ant-design-vue';
 
+import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { findNameById } from '#/types';
 
 import {
@@ -26,8 +27,12 @@ const props = defineProps<{
 const open = defineModel<boolean>('open', { default: false });
 
 const { t } = useI18n();
+const { isMobile } = useMobileViewport();
 
 const title = computed(() => `不合格项详情 - ${props.record?.ncNumber || ''}`);
+const drawerWidth = computed(() =>
+  isMobile.value ? '100vw' : 'min(100vw, 960px)',
+);
 
 const photos = computed(() => parsePhotos(props.record?.photos));
 
@@ -77,8 +82,18 @@ function formatDisplayDate(value: string | undefined) {
 </script>
 
 <template>
-  <Drawer v-model:open="open" :title="title" :width="960" placement="right">
-    <Descriptions v-if="record" bordered :column="2" size="small">
+  <Drawer
+    v-model:open="open"
+    :title="title"
+    :width="drawerWidth"
+    placement="right"
+  >
+    <Descriptions
+      v-if="record"
+      bordered
+      :column="isMobile ? 1 : 2"
+      size="small"
+    >
       <Descriptions.Item :label="t('qms.inspection.issues.ncNumber')">
         {{ record.ncNumber || '-' }}
       </Descriptions.Item>

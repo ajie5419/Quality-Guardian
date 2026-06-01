@@ -22,7 +22,7 @@ import {
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
-import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 import {
   getIssueTrackingLabel,
   getIssueTrackingTagColor,
@@ -225,7 +225,7 @@ watch(
 <template>
   <Page content-class="p-0">
     <ErrorBoundary>
-      <MobilePageShell>
+      <QmsPageShell>
         <div class="bg-white p-3 sm:p-4">
           <div
             class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
@@ -254,7 +254,7 @@ watch(
             @view="openDetail"
           />
         </div>
-      </MobilePageShell>
+      </QmsPageShell>
 
       <Modal
         v-model:open="modalVisible"

@@ -16,7 +16,7 @@ import { getSupplierExportList, getSupplierListPage } from '#/api/qms/supplier';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
-import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import {
   RATING_COLORS,
@@ -271,7 +271,7 @@ function getStatusConfig(status?: string): {
 
 <template>
   <Page content-class="p-0">
-    <MobilePageShell>
+    <QmsPageShell>
       <div class="flex flex-col gap-3 sm:gap-4">
         <!-- 统计卡片 (复用) -->
         <SupplierStats :stats="stats" type="Outsourcing" />
@@ -419,7 +419,7 @@ function getStatusConfig(status?: string): {
           </Grid>
         </Card>
       </div>
-    </MobilePageShell>
+    </QmsPageShell>
 
     <SupplierEditModal ref="editModalRef" @success="handleSuccess" />
     <SupplierDetailDrawer ref="detailDrawerRef" />

@@ -25,7 +25,7 @@ import dayjs from 'dayjs';
 import { getSummaryReport } from '#/api/qms/reports';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
-import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import MonthlyReportContent from '../MonthlyReportContent.vue';
 import WeeklyReport from '../WeeklyReport.vue';
@@ -128,8 +128,8 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
     :title="t('qms.reports.summary.title')"
     content-class="p-0 bg-gray-100 min-h-screen"
   >
-    <MobilePageShell>
-      <div class="mx-auto max-w-7xl space-y-3 sm:space-y-4">
+    <QmsPageShell layout="contained">
+      <div class="space-y-3 sm:space-y-4">
         <!-- 1. 顶部筛选 (非打印区) -->
         <Card size="small" class="no-print shadow-sm">
           <div
@@ -284,7 +284,7 @@ const renderSparkline = (data: number[], color = '#1890ff') => {
           </div>
         </Spin>
       </div>
-    </MobilePageShell>
+    </QmsPageShell>
   </Page>
 </template>
 

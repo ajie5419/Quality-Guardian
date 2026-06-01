@@ -28,7 +28,7 @@ import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { convertToTreeSelectData, findNameById } from '#/types';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
-import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import WorkOrderAggregateDrawer from '../workspace/components/WorkOrderAggregateDrawer.vue';
 import WorkOrderCharts from './components/WorkOrderCharts.vue';
@@ -386,7 +386,7 @@ const {
 <template>
   <Page content-class="p-0">
     <ErrorBoundary>
-      <MobilePageShell>
+      <QmsPageShell>
         <div class="flex flex-col gap-3 sm:gap-4">
           <WorkOrderCharts
             v-if="showDashboard"
@@ -444,7 +444,7 @@ const {
             </Grid>
           </div>
         </div>
-      </MobilePageShell>
+      </QmsPageShell>
 
       <WorkOrderEditModal ref="editModalRef" @success="handleSuccess" />
       <WorkOrderRequirementBoardDrawer
