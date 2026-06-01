@@ -25,6 +25,27 @@
 
 ## 执行记录
 
+### 2026-06-01 重构：迁移首批 QMS 页面到统一响应式壳层
+
+**执行内容：**
+
+- 将报检任务、计量管理、质量损失三个典型 QMS 页面从 `MobilePageShell` 迁移到 `QmsPageShell`。
+- 保持页面业务逻辑、表格配置、按钮权限和弹窗流程不变，仅统一页面级响应式壳层。
+- 质量损失和报检任务继续使用灰色内容背景，计量管理保持原有内容结构。
+
+**验证结果：**
+
+- `pnpm lint`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `pending`
+
+**遗留问题：**
+
+- 剩余 `MobilePageShell` 页面仍待分批迁移。
+
 ### 2026-06-01 优化：统一 QMS 页面响应式壳层
 
 **执行内容：**

@@ -29,7 +29,7 @@ import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
 import { convertToTreeSelectData } from '#/types';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
-import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
 import LossCharts from './components/LossCharts.vue';
@@ -277,7 +277,7 @@ onMounted(async () => {
 
 <template>
   <Page content-class="p-0">
-    <MobilePageShell>
+    <QmsPageShell content-class="bg-gray-50">
       <div class="flex flex-col gap-3 bg-gray-50/50 sm:gap-4">
         <!-- 1. KPI 核心指标卡片 -->
         <LossKpiCards :stats="stats" />
@@ -379,7 +379,7 @@ onMounted(async () => {
           </Grid>
         </Card>
       </div>
-    </MobilePageShell>
+    </QmsPageShell>
 
     <!-- 录入/编辑弹窗组件 -->
     <LossEditModal

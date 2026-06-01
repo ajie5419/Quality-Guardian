@@ -18,7 +18,7 @@ import { getUserList } from '#/api/system/user';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { convertToTreeSelectData } from '#/types';
-import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import {
   useClaimOptions,
@@ -362,7 +362,7 @@ watch(
 
 <template>
   <Page content-class="p-0">
-    <MobilePageShell content-class="bg-gray-50 py-3 sm:py-4">
+    <QmsPageShell content-class="bg-gray-50">
       <div class="space-y-4">
         <InspectionRequestPageHeader
           @open-entry="openRequestEntry"
@@ -413,7 +413,7 @@ watch(
           @delete="handleTableActionDelete"
         />
       </div>
-    </MobilePageShell>
+    </QmsPageShell>
 
     <InspectionRequestEntryModal
       v-model:open="requestEntryOpen"

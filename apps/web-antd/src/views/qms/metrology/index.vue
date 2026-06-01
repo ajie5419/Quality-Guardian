@@ -41,7 +41,7 @@ import {
   resolveImportErrorCount,
 } from '#/utils/import-summary';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
-import MobilePageShell from '#/views/qms/shared/components/MobilePageShell.vue';
+import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
 import MetrologyEditModal from './components/MetrologyEditModal.vue';
@@ -367,7 +367,7 @@ const handleImportUpload: UploadProps['beforeUpload'] = async (file) => {
 
 <template>
   <Page content-class="p-0">
-    <MobilePageShell>
+    <QmsPageShell>
       <div class="flex flex-col gap-3 sm:gap-4">
         <MetrologyOverviewCards
           :overview="overview"
@@ -457,7 +457,7 @@ const handleImportUpload: UploadProps['beforeUpload'] = async (file) => {
           </Grid>
         </Card>
       </div>
-    </MobilePageShell>
+    </QmsPageShell>
     <MetrologyEditModal
       v-model:open="editModalOpen"
       :record="currentRecord"
