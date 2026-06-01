@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+### 2026-06-01 修复：报检任务按钮权限树唯一化
+
+**执行内容：**
+
+- 将报检看板权限码从 `QMS:Inspection:Requests:List` 拆分为 `QMS:Inspection:Dashboard:List`，避免 Ant Tree 中报检看板和报检任务使用重复 key。
+- 保留授权码兼容补齐：已有 `QMS:Inspection:Requests:List` 的用户仍会获得报检看板访问码。
+- 增加 RBAC 权限树回归测试，确保报检看板和报检任务是两个唯一节点，报检任务下按钮权限稳定挂载。
+
+**验证结果：**
+
+- `pnpm --dir apps/backend exec vitest run modules/rbac/rbac.service.test.ts`: 1 文件 / 8 测试通过
+- `pnpm lint`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+- `pnpm --dir apps/backend exec vitest run`: 32 文件 / 171 测试通过
+
+**commit:** `39af10b4` fix(@qgs/backend): split inspection dashboard permission
+
+**遗留问题：**
+
+- 工作树仍存在未跟踪诊断脚本 `apps/backend/diagnose-menu.mts`，未纳入本次提交。
+
 ### 2026-06-01 修复：报检任务派单权限闭环
 
 **执行内容：**
@@ -43,7 +65,7 @@
 - `pnpm run check:qms-arch`: 通过
 - `pnpm --dir apps/backend exec vitest run`: 32 文件 / 170 测试通过
 
-**commit:** `pending`
+**commit:** `0be1a266` fix(@qgs/backend): enforce inspection dispatch permission
 
 **遗留问题：**
 

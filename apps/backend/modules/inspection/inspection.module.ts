@@ -11,7 +11,7 @@ export const inspectionModule: ModuleDeclaration = {
       path: '/qms/inspection/dashboard',
       name: 'QMSInspectionDashboard',
       component: 'qms/inspection/dashboard/index',
-      authCode: 'QMS:Inspection:Requests:List',
+      authCode: 'QMS:Inspection:Dashboard:List',
       order: 2,
       type: 'menu',
       meta: {

@@ -174,6 +174,58 @@ describe('rbacService', () => {
     ]);
   });
 
+  it('should keep inspection dashboard and request permissions as unique tree keys', async () => {
+    (prisma.menus.findMany as any).mockResolvedValue([
+      {
+        id: 40,
+        parentId: '0',
+        type: 'catalog',
+        authCode: null,
+        meta: JSON.stringify({ title: '检验管理' }),
+      },
+      {
+        id: 'inspection-dashboard',
+        parentId: 40,
+        type: 'menu',
+        authCode: 'QMS:Inspection:Dashboard:List',
+        meta: JSON.stringify({ title: '报检看板' }),
+      },
+      {
+        id: '43',
+        parentId: 40,
+        type: 'menu',
+        authCode: 'QMS:Inspection:Requests:List',
+        meta: JSON.stringify({ title: '报检任务' }),
+      },
+      {
+        id: 4301,
+        parentId: '43',
+        type: 'button',
+        authCode: 'QMS:Inspection:Requests:Dispatch',
+        meta: JSON.stringify({ title: '派单' }),
+      },
+    ]);
+
+    const tree = await RbacService.getRolePermissionTree();
+    const inspectionChildren = tree[0]?.children ?? [];
+    const keys = inspectionChildren.map((node) => node.key);
+
+    expect(keys).toContain('QMS:Inspection:Dashboard:List');
+    expect(keys).toContain('QMS:Inspection:Requests:List');
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(
+      inspectionChildren.find(
+        (node) => node.key === 'QMS:Inspection:Requests:List',
+      )?.children,
+    ).toEqual([
+      expect.objectContaining({
+        key: 'QMS:Inspection:Requests:Dispatch',
+        title: '[按钮] 派单',
+        type: 'button',
+      }),
+    ]);
+  });
+
   it('should not fallback to legacy JSON permissions', async () => {
     (prisma.users.findFirst as any).mockResolvedValue({
       id: 'u1',

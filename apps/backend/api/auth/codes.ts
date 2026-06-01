@@ -17,6 +17,9 @@ export default eventHandler(async (event) => {
     await ensureModuleMenus();
     const codes = await RbacService.getUserPermissionCodes(String(userId));
     const normalizedCodes = new Set(codes);
+    if (normalizedCodes.has('QMS:Inspection:Requests:List')) {
+      normalizedCodes.add('QMS:Inspection:Dashboard:List');
+    }
     if (
       normalizedCodes.has('QMS:Inspection:Requests:Close') ||
       normalizedCodes.has('QMS:Inspection:Requests:Dispatch')
