@@ -25,6 +25,30 @@
 
 ## 执行记录
 
+### 2026-06-01 优化：报检任务实时通知跨实例广播
+
+**执行内容：**
+
+- 将报检任务 SSE 通知从单进程内存广播升级为本地 SSE 广播 + Redis Pub/Sub 跨实例广播。
+- 保留 Redis 不可用时的单进程推送行为，不影响本地开发和无 Redis 部署。
+- Redis 消息带实例来源标识，避免本实例收到自己发布的事件后重复弹通知。
+- 增加报检任务事件测试，覆盖本地 SSE 推送和其他后端实例 Redis 广播转发。
+
+**验证结果：**
+
+- `pnpm --dir apps/backend exec vitest run modules/inspection/inspection-request-events.test.ts`: 1 文件 / 2 测试通过
+- `pnpm lint`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+- `pnpm --dir apps/backend exec vitest run`: 33 文件 / 173 测试通过
+
+**commit:** `pending`
+
+**遗留问题：**
+
+- 前端仍保留 60 秒轮询兜底，用于 SSE 断线或 Redis 不可用时补漏。
+- 工作树仍存在未跟踪诊断脚本 `apps/backend/diagnose-menu.mts`，未纳入本次提交。
+
 ### 2026-06-01 修复：报检任务按钮权限树唯一化
 
 **执行内容：**
