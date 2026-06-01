@@ -4,6 +4,7 @@ import type { InspectionRequest } from '#/api/qms/inspection-request';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useAccess } from '@vben/access';
 import { IconifyIcon } from '@vben/icons';
 import { useAccessStore, useUserStore } from '@vben/stores';
 
@@ -25,6 +26,11 @@ const activeRequest = ref<InspectionRequest>();
 const pendingRequests = ref<InspectionRequest[]>([]);
 let timer: number | undefined;
 let eventSource: EventSource | undefined;
+
+const { hasAccessByCodes } = useAccess();
+const canReceiveAlert = computed(() =>
+  hasAccessByCodes(['QMS:Inspection:Requests:Dispatch']),
+);
 
 const storageKey = computed(
   () =>
@@ -174,9 +180,11 @@ async function handleViewTask() {
 }
 
 onMounted(() => {
+  if (!canReceiveAlert.value) return;
   connectInspectionRequestEvents();
   void pollInspectionRequests();
   timer = window.setInterval(() => {
+    if (!canReceiveAlert.value) return;
     connectInspectionRequestEvents();
     void pollInspectionRequests();
   }, POLL_INTERVAL_MS);
@@ -190,6 +198,7 @@ watch(
       eventSource = undefined;
       return;
     }
+    if (!canReceiveAlert.value) return;
     connectInspectionRequestEvents();
     void pollInspectionRequests();
   },
