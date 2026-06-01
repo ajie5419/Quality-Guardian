@@ -40,7 +40,7 @@
 - `pnpm run check:type`: 通过
 - `pnpm run check:qms-arch`: 通过
 
-**commit:** `pending`
+**commit:** `644e6c5a` fix(@qgs/web-antd): prevent mobile inspection request overflow
 
 **遗留问题：**
 
