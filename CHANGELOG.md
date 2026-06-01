@@ -25,6 +25,27 @@
 
 ## 执行记录
 
+### 2026-06-01 修复：报检任务移动端列表右侧溢出
+
+**执行内容：**
+
+- 报检任务列表在移动端改为卡片列表，不再渲染带 `fixed="right"` 操作列的 Ant Table。
+- 桌面端保留原表格布局和固定操作列。
+- 移动端卡片保留详情、派单、完成、更多操作入口，并使用简洁分页。
+
+**验证结果：**
+
+- `pnpm lint`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+
+**commit:** `pending`
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-01 重构：迁移首批 QMS 页面到统一响应式壳层
 
 **执行内容：**

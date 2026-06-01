@@ -7,6 +7,7 @@ import {
   Button,
   Dropdown,
   Menu,
+  Pagination,
   Space,
   Table,
   Tag,
@@ -42,6 +43,7 @@ export interface InspectionRequestTableProps {
   isCompletable: (record: InspectionRequest) => boolean;
   isClosed: (record: InspectionRequest) => boolean;
   hasActionMenu: (record: InspectionRequest) => boolean;
+  isMobile?: boolean;
 }
 
 const props = defineProps<InspectionRequestTableProps>();
@@ -74,6 +76,7 @@ function handleActionMenuClick(record: InspectionRequest, key: unknown) {
 
 <template>
   <Table
+    v-if="!props.isMobile"
     row-key="id"
     :data-source="props.requests"
     :loading="props.loading"
@@ -248,4 +251,143 @@ function handleActionMenuClick(record: InspectionRequest, key: unknown) {
       </template>
     </Table.Column>
   </Table>
+  <div v-else class="space-y-2">
+    <div
+      v-for="record in props.requests"
+      :key="record.id"
+      class="rounded border border-gray-100 bg-white px-3 py-2"
+      :class="props.isClosed(record) ? 'bg-gray-50' : ''"
+    >
+      <div class="flex min-w-0 items-start justify-between gap-2">
+        <div class="min-w-0">
+          <div class="truncate font-medium text-gray-900">
+            {{ record.partName }}
+            <span v-if="record.componentName">
+              / {{ record.componentName }}
+            </span>
+          </div>
+          <div class="truncate text-xs text-gray-500">
+            {{ record.processName }} · {{ record.quantity || 1 }}
+          </div>
+          <div class="truncate text-xs text-gray-400">
+            {{ record.requestNo }} / {{ record.workOrderNumber }}
+          </div>
+        </div>
+        <div class="shrink-0">
+          <Tag :color="props.statusColor(record.status)">
+            {{ props.statusLabel(record.status) }}
+          </Tag>
+        </div>
+      </div>
+
+      <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-500">
+        <div class="min-w-0">
+          <span class="text-gray-400">报检：</span>
+          <span class="truncate align-bottom">{{
+            record.reporter || '-'
+          }}</span>
+        </div>
+        <div class="min-w-0 text-right">
+          <span class="text-gray-400">等待：</span>
+          {{ props.waitDuration(record) }}
+        </div>
+        <div class="col-span-2 truncate">
+          <span class="text-gray-400">检验：</span>
+          <span :class="props.missingValueClass(record.inspectorName)">
+            {{ props.displayInspector(record) }}
+          </span>
+          <span class="mx-1 text-gray-300">/</span>
+          <span class="text-gray-400">派单：</span>
+          <span :class="props.missingValueClass(record.dispatcherName)">
+            {{ props.displayDispatcher(record) }}
+          </span>
+        </div>
+      </div>
+
+      <div
+        v-if="record.status === 'CLOSED' || record.inspectionResult === 'FAIL'"
+        class="mt-2 flex flex-wrap gap-1"
+      >
+        <Tag :color="props.inspectionResultColor(record)">
+          {{ props.inspectionResultLabel(record) }}
+        </Tag>
+        <Tag v-if="props.hasLinkedIssue(record)" color="red">
+          {{ record.linkedIssueNo || '已生成不合格项' }}
+        </Tag>
+      </div>
+
+      <div
+        class="mt-2 flex w-full min-w-0 items-center justify-end gap-1 overflow-hidden"
+      >
+        <Button size="small" @click="emit('detail', record)">
+          <template #icon>
+            <IconifyIcon icon="lucide:list-checks" />
+          </template>
+          详情
+        </Button>
+        <Button
+          v-if="props.canDispatch && props.isDispatchable(record)"
+          size="small"
+          @click="emit('dispatch', record)"
+        >
+          <template #icon><IconifyIcon icon="lucide:send" /></template>
+          派单
+        </Button>
+        <Button
+          v-if="props.isCompletable(record)"
+          size="small"
+          type="primary"
+          @click="emit('close', record)"
+        >
+          <template #icon>
+            <IconifyIcon icon="lucide:check-circle" />
+          </template>
+          完成
+        </Button>
+        <Dropdown v-if="props.hasActionMenu(record)" trigger="click">
+          <Tooltip title="更多操作">
+            <Button size="small">
+              <template #icon>
+                <IconifyIcon icon="lucide:more-horizontal" />
+              </template>
+            </Button>
+          </Tooltip>
+          <template #overlay>
+            <Menu @click="({ key }) => handleActionMenuClick(record, key)">
+              <Menu.Item v-if="!props.isClosed(record)" key="qr">
+                <template #icon>
+                  <IconifyIcon icon="lucide:qr-code" />
+                </template>
+                二维码
+              </Menu.Item>
+              <Menu.Item v-if="record.inspectionId" key="record">
+                <template #icon>
+                  <IconifyIcon icon="lucide:file-check-2" />
+                </template>
+                查看记录
+              </Menu.Item>
+              <Menu.Item v-if="props.canDelete" key="delete" danger>
+                <template #icon>
+                  <IconifyIcon icon="lucide:trash-2" />
+                </template>
+                删除
+              </Menu.Item>
+            </Menu>
+          </template>
+        </Dropdown>
+      </div>
+    </div>
+    <Pagination
+      size="small"
+      :current="props.page"
+      :page-size="props.pageSize"
+      :total="props.total"
+      simple
+      @change="
+        (nextPage: number, nextPageSize: number) => {
+          emit('pageChange', nextPage, nextPageSize);
+        }
+      "
+    />
+  </div>
 </template>

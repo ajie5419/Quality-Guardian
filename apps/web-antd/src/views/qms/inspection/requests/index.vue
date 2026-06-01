@@ -169,6 +169,7 @@ const listCardProps = computed(() => ({
   inspectionQuantityText,
   inspectionResultColor,
   inspectionResultLabel,
+  isMobile: isMobile.value,
   isClosed,
   isCompletable,
   isDispatchable,
