@@ -95,7 +95,7 @@ function isTestWelderRecord(params: { code?: string; name?: string }) {
 
 const [Form, formApi] = useVbenForm({
   commonConfig: {
-    // 统一布局配置
+    labelClass: 'issue-edit-form-label',
     labelWidth: 100,
     componentProps: {
       class: 'w-full',
@@ -480,6 +480,10 @@ function handleCancel() {
   overflow-x: hidden;
 }
 
+:global(.issue-edit-modal-wrap.qms-mobile-modal .ant-modal-body) {
+  max-height: calc(100dvh - 112px);
+}
+
 :deep(.ant-form-item) {
   min-width: 0;
   margin-bottom: 16px;
@@ -515,5 +519,29 @@ function handleCancel() {
 
 :deep(textarea.ant-input) {
   resize: vertical;
+}
+
+@media (max-width: 767px) {
+  :deep(.ant-form-item) {
+    align-items: stretch;
+  }
+
+  :deep(.issue-edit-form-grid > *) {
+    grid-column: 1 / -1;
+  }
+
+  :deep(.issue-edit-form-label) {
+    justify-content: flex-start;
+    width: 100% !important;
+    margin-right: 0;
+    margin-bottom: 6px;
+    text-align: left;
+  }
+
+  :deep(.ant-form-item-control),
+  :deep(.ant-form-item-control-input),
+  :deep(.ant-form-item-control-input-content) {
+    width: 100%;
+  }
 }
 </style>
