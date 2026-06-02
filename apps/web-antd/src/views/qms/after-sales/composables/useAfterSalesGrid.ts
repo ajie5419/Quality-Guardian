@@ -156,6 +156,11 @@ export function useAfterSalesGrid({
     height: 'auto',
     scrollX: { enabled: true, gt: 0 },
     scrollY: { enabled: true, gt: 0 },
+    rowConfig: {
+      keyField: 'id',
+      isHover: true,
+    },
+    keepSource: true,
     checkboxConfig: {
       reserve: true,
       highlight: true,

@@ -331,6 +331,7 @@ function handleMobilePageChange(nextPage: number, nextPageSize: number) {
   mobilePageSize.value = nextPageSize;
   gridApi.setGridOptions({
     pagerConfig: {
+      ...gridOptions.value?.pagerConfig,
       currentPage: nextPage,
       pageSize: nextPageSize,
     },
@@ -381,6 +382,7 @@ watch([currentYear, currentDateMode, currentDate], () => {
   mobilePage.value = 1;
   gridApi.setGridOptions({
     pagerConfig: {
+      ...gridOptions.value?.pagerConfig,
       currentPage: 1,
       pageSize: mobilePageSize.value,
     },

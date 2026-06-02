@@ -51,7 +51,11 @@
 
 **遗留问题：**
 
-- 无。
+- Local desktop verification on `http://localhost:5666/qms/after-sales` still shows an unresolved pagination-state issue.
+- With the current local dataset, the page has only 2 records under the default `20` rows per page, so a real page-2 interaction cannot be reproduced directly.
+- During local verification, changing the page-size area can still trigger a full blank loading state before the grid recovers.
+- A follow-up frontend fix aligned `pagerConfig` state updates in `apps/web-antd/src/views/qms/after-sales/index.vue` with the stable inspection-issues pattern by preserving the original pager config before updating `currentPage` and `pageSize`.
+- This follow-up passed `pnpm --dir apps/web-antd exec vue-tsc --noEmit`, but the desktop pagination flow still requires a final browser-level verification with multi-page local data before this issue can be considered closed.
 
 ### 2026-06-02 修复：工单管理移动端列表防溢出
 
