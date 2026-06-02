@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+### 2026-06-02 修复：售后质量移动端列表防溢出
+
+**执行内容：**
+
+- 售后质量页面在移动端切换为卡片列表展示，避免宽表格在手机端横向溢出。
+- 抽出 `AfterSalesMobileList` 和 `AfterSalesToolbarActions`，桌面端保留原 VxeGrid、搜索、导入导出和表格操作。
+- 移动端列表复用原 grid 查询结果、分页状态、状态/索赔标签、责任部门名称格式化和现有详情/编辑/删除/案例沉淀操作。
+
+**验证结果：**
+
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm lint`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+- `pnpm --dir apps/backend exec vitest run`: 35 文件 / 177 测试通过
+
+**commit:** `92faac7e` fix(@qgs/web-antd): adapt after sales list for mobile
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-02 修复：公开扫码入口避免过期登录态跳转登录
 
 **执行内容：**
