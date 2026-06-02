@@ -43,7 +43,7 @@
 - `pnpm run check:qms-arch`: 通过
 - `pnpm --dir apps/backend exec vitest run`: 35 文件 / 177 测试通过
 
-**commit:** `56509646` fix(@qgs/web-antd): paginate after sales list response
+**commit:** `00da19f1` fix(@qgs/web-antd): paginate after sales list response
 
 **遗留问题：**
 
