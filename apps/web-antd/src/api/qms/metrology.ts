@@ -24,7 +24,7 @@ import type {
 import type { QmsImportSummary } from '#/api/qms/types';
 
 import { normalizeListResponse } from '#/api/qms/adapters';
-import { requestClient } from '#/api/request';
+import { publicRequestClient, requestClient } from '#/api/request';
 
 import { QMS_API, QMS_IMPORT_TIMEOUT } from './constants';
 
@@ -191,7 +191,7 @@ export async function matchPublicMetrologyBorrowInstruments(
   keyword: string,
   token?: string,
 ) {
-  return requestClient.get<MetrologyBorrowInstrumentMatchItem[]>(
+  return publicRequestClient.get<MetrologyBorrowInstrumentMatchItem[]>(
     QMS_API.PUBLIC_METROLOGY_BORROW_MATCH,
     {
       params: { keyword, token },
@@ -219,7 +219,7 @@ export async function createMetrologyBorrowMutation(
 export async function createPublicMetrologyBorrowMutation(
   data: MetrologyBorrowMutationPayload & { token?: string },
 ) {
-  return requestClient.post(QMS_API.PUBLIC_METROLOGY_BORROW, data);
+  return publicRequestClient.post(QMS_API.PUBLIC_METROLOGY_BORROW, data);
 }
 
 export async function returnMetrologyBorrowMutation(
@@ -233,7 +233,7 @@ export async function returnPublicMetrologyBorrowMutation(
   id: string,
   data: MetrologyBorrowReturnRequestPayload & { token?: string },
 ) {
-  return requestClient.post(
+  return publicRequestClient.post(
     `${QMS_API.PUBLIC_METROLOGY_BORROW}/${id}/return`,
     data,
   );

@@ -9,7 +9,7 @@ import type {
 import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
 import { normalizeListResponse } from '#/api/qms/adapters';
-import { requestClient } from '#/api/request';
+import { publicRequestClient, requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
 
@@ -103,7 +103,7 @@ export async function createInspectionRequest(
 export async function createPublicInspectionRequest(
   data: CreateInspectionRequestParams,
 ) {
-  return requestClient.post<InspectionRequest>(
+  return publicRequestClient.post<InspectionRequest>(
     QMS_API.PUBLIC_INSPECTION_REQUESTS,
     data,
   );
@@ -112,14 +112,14 @@ export async function createPublicInspectionRequest(
 export async function getPublicInspectionRequestProcesses(params: {
   workOrderNumber: string;
 }) {
-  return requestClient.get<Array<{ processName: string }>>(
+  return publicRequestClient.get<Array<{ processName: string }>>(
     QMS_API.PUBLIC_INSPECTION_REQUEST_PROCESSES,
     { params },
   );
 }
 
 export async function getPublicInspectionRequestProcessDictionaryOptions() {
-  return requestClient.get<DictionaryOptionItem[]>(
+  return publicRequestClient.get<DictionaryOptionItem[]>(
     QMS_API.PUBLIC_INSPECTION_REQUEST_PROCESS_DICTIONARY_OPTIONS,
   );
 }
@@ -134,7 +134,7 @@ export interface PublicInspectionRequestBomPart {
 export async function getPublicInspectionRequestBomParts(params: {
   workOrderNumber: string;
 }) {
-  return requestClient.get<PublicInspectionRequestBomPart[]>(
+  return publicRequestClient.get<PublicInspectionRequestBomPart[]>(
     QMS_API.PUBLIC_INSPECTION_REQUEST_BOM_PARTS,
     { params },
   );
@@ -143,7 +143,7 @@ export async function getPublicInspectionRequestBomParts(params: {
 export async function getPublicInspectionRequestTeams(params?: {
   keyword?: string;
 }) {
-  return requestClient.get<
+  return publicRequestClient.get<
     Array<{
       group: 'external' | 'internal';
       label: string;
@@ -156,7 +156,7 @@ export async function getPublicInspectionRequestSuppliers(params?: {
   category?: string;
   keyword?: string;
 }) {
-  return requestClient.get<Array<{ label: string; value: string }>>(
+  return publicRequestClient.get<Array<{ label: string; value: string }>>(
     QMS_API.PUBLIC_INSPECTION_REQUEST_SUPPLIERS,
     { params },
   );
@@ -168,7 +168,7 @@ export async function getPublicInspectionRequestWorkOrders(params?: {
   pageSize?: number;
   workOrderNumber?: string;
 }) {
-  const raw = await requestClient.get<{
+  const raw = await publicRequestClient.get<{
     items: WorkOrderItem[];
     total: number;
   }>(QMS_API.PUBLIC_INSPECTION_REQUEST_WORK_ORDERS, { params });

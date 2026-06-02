@@ -162,4 +162,28 @@ export const requestClient = createRequestClient(apiURL, {
   responseReturn: 'data',
 });
 
+export const publicRequestClient = new RequestClient({
+  baseURL: apiURL,
+  responseReturn: 'data',
+});
+publicRequestClient.addRequestInterceptor({
+  fulfilled: async (config) => {
+    config.headers['Accept-Language'] = preferences.app.locale;
+    if (config.params) {
+      const cleanParams = Object.entries(config.params).filter(
+        ([_, v]) => v !== undefined && v !== null && v !== '',
+      );
+      config.params = Object.fromEntries(cleanParams);
+    }
+    return config;
+  },
+});
+publicRequestClient.addResponseInterceptor(
+  defaultResponseInterceptor({
+    codeField: 'code',
+    dataField: 'data',
+    successCode: 0,
+  }),
+);
+
 export const baseRequestClient = new RequestClient({ baseURL: apiURL });
