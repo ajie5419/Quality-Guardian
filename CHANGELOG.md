@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+### 2026-06-02 修复：公开扫码入口避免过期登录态跳转登录
+
+**执行内容：**
+
+- 确认扫码报检、进货检验扫码入口和计量借用扫码入口路由均为公开入口，但前端 public API 复用了带 token 和 401 登录跳转拦截的 `requestClient`。
+- 新增 `publicRequestClient`，保留响应解包、语言头和空参数清理，但不注入 Authorization，也不挂载 401 重新认证/登出拦截。
+- 报检 public 查询/提交接口和计量借用 public 匹配/借用/归还接口统一切换到 `publicRequestClient`，避免带过期 token 的浏览器扫码后被踢回登录页。
+
+**验证结果：**
+
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm lint`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+- `pnpm --dir apps/backend exec vitest run`: 35 文件 / 177 测试通过
+
+**commit:** `3d40df3c` fix(@qgs/web-antd): keep public entry requests unauthenticated
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-02 修复：不合格项移动端列表防溢出
 
 **执行内容：**
