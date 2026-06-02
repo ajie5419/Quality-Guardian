@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+### 2026-06-02 修复：不合格项移动端列表防溢出
+
+**执行内容：**
+
+- 不合格项页面在移动端切换为卡片列表展示，避免继续渲染宽表格造成横向溢出。
+- 抽出 `IssueMobileList` 和 `IssueToolbarActions`，桌面端保留原 VxeGrid、搜索、导入导出和表格操作。
+- 移动端列表复用原 grid 查询结果、分页状态、状态/严重度标签和责任部门名称格式化，保持与桌面筛选结果一致。
+
+**验证结果：**
+
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm lint`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+- `pnpm --dir apps/backend exec vitest run`: 35 文件 / 177 测试通过
+
+**commit:** `b060cc0a` fix(@qgs/web-antd): adapt inspection issues for mobile
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-01 修复：进货检验记录分类与扫码入口物料录入
 
 **执行内容：**
