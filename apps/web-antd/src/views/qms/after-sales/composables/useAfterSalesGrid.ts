@@ -380,7 +380,17 @@ export function useAfterSalesGrid({
         },
       },
     ],
+    pagerConfig: {
+      enabled: true,
+      pageSize: 20,
+      pageSizes: [10, 20, 30, 50, 100],
+    },
     proxyConfig: {
+      autoLoad: true,
+      props: {
+        result: 'items',
+        total: 'total',
+      },
       ajax: {
         query: async (
           { page }: { page?: { currentPage?: number; pageSize?: number } },
@@ -411,6 +421,8 @@ export function useAfterSalesGrid({
           const data = await getAfterSalesListPage({
             dateMode: currentDateMode.value,
             dateValue: currentDateValue.value,
+            page: 1,
+            pageSize: 100_000,
             year: currentYear.value,
             ...filters,
           } as QmsAfterSalesApi.AfterSalesParams);
