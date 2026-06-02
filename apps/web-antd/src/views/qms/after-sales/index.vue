@@ -1,11 +1,13 @@
 <script lang="ts" setup>
 import type { Ref } from 'vue';
 
+import type { AfterSalesGridRow } from './composables/useAfterSalesGrid';
+
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
 import type { VxeCheckboxChangeParams } from '#/types';
 
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
@@ -15,15 +17,7 @@ import {
   AFTER_SALES_IMPORT_STATUS_MAP,
   QMS_DICTIONARY_TYPE_KEYS,
 } from '@qgs/shared';
-import {
-  Button,
-  DatePicker,
-  Image,
-  message,
-  Modal,
-  Select,
-  Tag,
-} from 'ant-design-vue';
+import { Image, message, Modal, Tag } from 'ant-design-vue';
 import dayjs from 'dayjs';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
@@ -39,14 +33,18 @@ import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useGridImport } from '#/hooks/useGridImport';
 import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
+import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
+import { findNameById } from '#/types';
 import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
 import AfterSalesCharts from './components/AfterSalesCharts.vue';
 import AfterSalesDetailDrawer from './components/AfterSalesDetailDrawer.vue';
+import AfterSalesMobileList from './components/AfterSalesMobileList.vue';
 import AfterSalesModal from './components/AfterSalesModal.vue';
+import AfterSalesToolbarActions from './components/AfterSalesToolbarActions.vue';
 import { buildAfterSalesKnowledgePayload } from './composables/knowledge-settlement';
 import { useAfterSalesChartPreferences } from './composables/useAfterSalesChartPreferences';
 import { useAfterSalesDeptData } from './composables/useAfterSalesDeptData';
@@ -60,6 +58,7 @@ import './index.css';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
+const { isMobile } = useMobileViewport();
 
 const chartRefreshKey = ref(0);
 const chartsRef = ref<null | { handleAddCustomChart: () => void }>(null);
@@ -161,20 +160,22 @@ const currentDateValue = computed(() => {
   }
   return String(currentYear.value);
 });
-const dateModeOptions = computed(() => [
-  {
-    label: t('qms.afterSales.dateMode.year'),
-    value: 'year',
-  },
-  {
-    label: t('qms.afterSales.dateMode.month'),
-    value: 'month',
-  },
-  {
-    label: t('qms.afterSales.dateMode.week'),
-    value: 'week',
-  },
-]);
+const dateModeOptions = computed(
+  (): Array<{ label: string; value: 'month' | 'week' | 'year' }> => [
+    {
+      label: t('qms.afterSales.dateMode.year'),
+      value: 'year',
+    },
+    {
+      label: t('qms.afterSales.dateMode.month'),
+      value: 'month',
+    },
+    {
+      label: t('qms.afterSales.dateMode.week'),
+      value: 'week',
+    },
+  ],
+);
 
 const gridApiProxy =
   ref<ReturnType<typeof useVbenVxeGrid<QmsAfterSalesApi.AfterSalesItem>>[1]>();
@@ -191,6 +192,10 @@ const { handleImport } = useGridImport({
 });
 
 const checkedRows = ref<QmsAfterSalesApi.AfterSalesItem[]>([]);
+const mobileRecords = ref<AfterSalesGridRow[]>([]);
+const mobileTotal = ref(0);
+const mobilePage = ref(1);
+const mobilePageSize = ref(20);
 
 const detailVisible = ref(false);
 const detailRecord = ref<QmsAfterSalesApi.AfterSalesItem | undefined>(
@@ -294,6 +299,45 @@ function handleSettleToKnowledge(row: QmsAfterSalesApi.AfterSalesItem) {
   settleToKnowledge(buildAfterSalesKnowledgePayload(row, t));
 }
 
+function formatMobileDept(row: AfterSalesGridRow) {
+  const values =
+    row.responsibleDepartments && row.responsibleDepartments.length > 0
+      ? row.responsibleDepartments
+      : [row.responsibleDept].filter(Boolean);
+  return values
+    .map((value) => findNameById(deptRawData.value, value) || value)
+    .join(', ');
+}
+
+function syncMobileRows(payload: {
+  items: AfterSalesGridRow[];
+  total: number;
+}) {
+  mobileRecords.value = payload.items.map((item) => ({
+    ...item,
+    responsibleDept: formatMobileDept(item),
+  }));
+  mobileTotal.value = payload.total;
+}
+
+async function addCustomChart() {
+  showCharts.value = true;
+  await Promise.resolve();
+  chartsRef.value?.handleAddCustomChart();
+}
+
+function handleMobilePageChange(nextPage: number, nextPageSize: number) {
+  mobilePage.value = nextPage;
+  mobilePageSize.value = nextPageSize;
+  gridApi.setGridOptions({
+    pagerConfig: {
+      currentPage: nextPage,
+      pageSize: nextPageSize,
+    },
+  });
+  gridApi.reload();
+}
+
 const { gridOptions, formSchema } = useAfterSalesGrid({
   canDelete,
   canEdit,
@@ -310,6 +354,7 @@ const { gridOptions, formSchema } = useAfterSalesGrid({
   handleEdit,
   handleImport,
   handleSettleToKnowledge,
+  onRowsChange: syncMobileRows,
   t,
 });
 
@@ -333,6 +378,7 @@ watch(deptRawData, () => {
 });
 
 watch([currentYear, currentDateMode, currentDate], () => {
+  mobilePage.value = 1;
   gridApi.reload();
   chartRefreshKey.value++;
 });
@@ -367,7 +413,48 @@ function handleModalSuccess() {
           />
         </div>
 
-        <div class="after-sales-grid-card rounded-lg bg-white">
+        <AfterSalesToolbarActions
+          v-if="isMobile"
+          v-model:date-mode="currentDateMode"
+          v-model:date-value="currentDate"
+          v-model:year="currentYear"
+          class="mb-3"
+          :can-add-chart="canAddChart"
+          :can-create="canCreate"
+          :can-delete="canDelete"
+          :checked-count="checkedRows.length"
+          :date-mode-options="dateModeOptions"
+          :is-admin="isAdmin"
+          :is-mobile="isMobile"
+          :show-charts="showCharts"
+          :year-options="yearOptions"
+          @add-chart="addCustomChart"
+          @batch-delete="handleBatchDelete"
+          @create="handleOpenModal"
+          @save-system-default="handleSaveSystemDefault"
+          @toggle-charts="showCharts = !showCharts"
+        />
+
+        <AfterSalesMobileList
+          v-if="isMobile"
+          :can-delete="canDelete"
+          :can-edit="canEdit"
+          :can-settle="canSettle"
+          :page="mobilePage"
+          :page-size="mobilePageSize"
+          :records="mobileRecords"
+          :total="mobileTotal"
+          @delete="handleDelete"
+          @detail="openDetail"
+          @edit="handleEdit"
+          @page-change="handleMobilePageChange"
+          @settle="handleSettleToKnowledge"
+        />
+
+        <div
+          v-show="!isMobile"
+          class="after-sales-grid-card rounded-lg bg-white"
+        >
           <Grid>
             <template #status="{ row }">
               <QmsStatusTag :status="row.status" type="after-sales" />
@@ -397,102 +484,25 @@ function handleModalSuccess() {
               </div>
             </template>
             <template #toolbar-actions>
-              <div class="flex flex-wrap items-center gap-2">
-                <Button
-                  v-if="canCreate"
-                  shape="round"
-                  type="primary"
-                  @click="handleOpenModal"
-                >
-                  <template #icon>
-                    <IconifyIcon icon="lucide:plus" />
-                  </template>
-                  {{ t('qms.inspection.issues.createIssue') }}
-                </Button>
-                <Button
-                  v-if="checkedRows.length > 0 && canDelete"
-                  danger
-                  shape="round"
-                  type="primary"
-                  @click="handleBatchDelete"
-                >
-                  <template #icon>
-                    <IconifyIcon icon="lucide:trash-2" />
-                  </template>
-                  {{ t('common.batchDelete') }}
-                </Button>
-                <Button
-                  v-if="canAddChart"
-                  shape="round"
-                  @click="
-                    async () => {
-                      showCharts = true;
-                      await nextTick();
-                      chartsRef?.handleAddCustomChart();
-                    }
-                  "
-                >
-                  <template #icon>
-                    <IconifyIcon icon="lucide:plus" />
-                  </template>
-                  新增图表
-                </Button>
-                <Button shape="round" @click="showCharts = !showCharts">
-                  <template #icon>
-                    <IconifyIcon
-                      :icon="
-                        showCharts ? 'lucide:bar-chart-3' : 'lucide:bar-chart-3'
-                      "
-                    />
-                  </template>
-                  {{
-                    showCharts ? t('common.hideChart') : t('common.showChart')
-                  }}
-                </Button>
-                <div class="flex items-center gap-2">
-                  <span class="text-xs text-gray-500">
-                    {{ t('qms.afterSales.dateMode.label') }}:
-                  </span>
-                  <Select
-                    v-model:value="currentDateMode"
-                    :options="dateModeOptions"
-                    size="small"
-                    class="w-[100px]"
-                  />
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="text-xs text-gray-500"
-                    >{{ t('qms.inspection.records.statsYear') }}:</span
-                  >
-                  <Select
-                    v-if="currentDateMode === 'year'"
-                    v-model:value="currentYear"
-                    :options="yearOptions"
-                    size="small"
-                    class="w-[100px]"
-                    @change="() => gridApi.reload()"
-                  />
-                  <DatePicker
-                    v-else
-                    v-model:value="currentDate"
-                    :picker="currentDateMode"
-                    :allow-clear="false"
-                    size="small"
-                    class="w-[140px]"
-                  />
-                </div>
-                <Button
-                  v-if="isAdmin"
-                  shape="round"
-                  type="link"
-                  @click="handleSaveSystemDefault"
-                >
-                  <template #icon>
-                    <IconifyIcon icon="lucide:save" />
-                  </template>
-                  存为系统默认
-                </Button>
-              </div>
+              <AfterSalesToolbarActions
+                v-model:date-mode="currentDateMode"
+                v-model:date-value="currentDate"
+                v-model:year="currentYear"
+                :can-add-chart="canAddChart"
+                :can-create="canCreate"
+                :can-delete="canDelete"
+                :checked-count="checkedRows.length"
+                :date-mode-options="dateModeOptions"
+                :is-admin="isAdmin"
+                :is-mobile="isMobile"
+                :show-charts="showCharts"
+                :year-options="yearOptions"
+                @add-chart="addCustomChart"
+                @batch-delete="handleBatchDelete"
+                @create="handleOpenModal"
+                @save-system-default="handleSaveSystemDefault"
+                @toggle-charts="showCharts = !showCharts"
+              />
             </template>
           </Grid>
         </div>

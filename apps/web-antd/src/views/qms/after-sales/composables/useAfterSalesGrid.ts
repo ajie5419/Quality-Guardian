@@ -22,7 +22,7 @@ type GridFormSchema = NonNullable<
 
 type ExtendedGridFormSchema = GridFormSchema & { colProps?: { span?: number } };
 
-type AfterSalesGridRow = QmsAfterSalesApi.AfterSalesItem & {
+export type AfterSalesGridRow = QmsAfterSalesApi.AfterSalesItem & {
   photoExportUrl: string;
   photos: string[];
   photoThumbUrl: string;
@@ -46,6 +46,10 @@ interface UseAfterSalesGridParams {
   handleEdit: (row: QmsAfterSalesApi.AfterSalesItem) => void;
   handleImport: (params: { file: File }) => Promise<void>;
   handleSettleToKnowledge: (row: QmsAfterSalesApi.AfterSalesItem) => void;
+  onRowsChange?: (payload: {
+    items: AfterSalesGridRow[];
+    total: number;
+  }) => void;
   t: (key: string, params?: Record<string, any>) => string;
 }
 
@@ -114,6 +118,7 @@ export function useAfterSalesGrid({
   handleEdit,
   handleImport,
   handleSettleToKnowledge,
+  onRowsChange,
   t,
 }: UseAfterSalesGridParams) {
   const statusOptionsList = computed(() =>
@@ -393,6 +398,7 @@ export function useAfterSalesGrid({
           const start = (currentPage - 1) * pageSize;
           const end = start + pageSize;
           const pageData = items.slice(start, end);
+          onRowsChange?.({ items: pageData, total: items.length });
 
           return { items: pageData, total: items.length };
         },
