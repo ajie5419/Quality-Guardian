@@ -26,7 +26,7 @@ interface GridFilterItem {
   values?: unknown[];
 }
 
-type InspectionGridRow = InspectionIssue & {
+export type InspectionGridRow = InspectionIssue & {
   photoExportUrl: string;
   photos: string[];
   photoThumbUrl: string;
@@ -49,6 +49,10 @@ interface UseIssueGridOptionsParams {
   handleEdit: (row: InspectionIssue) => void;
   handleImport: (params: { file: File }) => Promise<void>;
   handleSettleToKnowledge: (row: InspectionIssue) => void;
+  onRowsChange?: (payload: {
+    items: InspectionGridRow[];
+    total: number;
+  }) => void;
   t: (key: string, params?: Record<string, any>) => string;
 }
 
@@ -131,6 +135,7 @@ export function useIssueGridOptions({
   handleEdit,
   handleImport,
   handleSettleToKnowledge,
+  onRowsChange,
   t,
 }: UseIssueGridOptionsParams) {
   const deptFilters = computed(() => flattenDeptFilters(deptRawData.value));
@@ -394,9 +399,16 @@ export function useIssueGridOptions({
           });
 
           const filteredItems = filterBySourceIssueId(items || []);
+          const nextTotal = defaultSourceIssueId?.value
+            ? filteredItems.length
+            : total;
+          onRowsChange?.({
+            items: normalizeInspectionRows(filteredItems),
+            total: nextTotal,
+          });
           return {
             items: filteredItems,
-            total: defaultSourceIssueId?.value ? filteredItems.length : total,
+            total: nextTotal,
           };
         },
         queryAll: async ({ form }: { form: Record<string, unknown> }) => {

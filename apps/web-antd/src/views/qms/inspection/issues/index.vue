@@ -1,16 +1,16 @@
 <script lang="ts" setup>
+import type { InspectionGridRow } from './composables/useIssueGridOptions';
 import type { InspectionIssue } from './types';
 
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { useAccess } from '@vben/access';
-import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
 import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
-import { Button, DatePicker, Image, Select, Tag } from 'ant-design-vue';
+import { Image, Tag } from 'ant-design-vue';
 import dayjs from 'dayjs';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
@@ -20,6 +20,7 @@ import { useGridImport } from '#/hooks/useGridImport';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
+import { findNameById } from '#/types';
 import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import { useDictionaryOptions } from '../../shared/composables/useDictionaryOptions';
@@ -28,7 +29,9 @@ import { mapDictionaryOptionsToInspectionProcess } from '../records/config';
 import IssueChartDashboard from './components/IssueChartDashboard.vue';
 import IssueDetailDrawer from './components/IssueDetailDrawer.vue';
 import IssueEditModal from './components/IssueEditModal.vue';
+import IssueMobileList from './components/IssueMobileList.vue';
 import IssueStatisticsCard from './components/IssueStatisticsCard.vue';
+import IssueToolbarActions from './components/IssueToolbarActions.vue';
 import { useAiReport } from './composables/useAiReport';
 import { useIssueActions } from './composables/useIssueActions';
 import { useIssueChartPreferences } from './composables/useIssueChartPreferences';
@@ -78,6 +81,10 @@ const isAdmin = computed(() => {
 
 const checkedRows = ref<InspectionIssue[]>([]);
 const { isMobile } = useMobileViewport();
+const mobileIssues = ref<InspectionGridRow[]>([]);
+const mobileTotal = ref(0);
+const mobilePage = ref(1);
+const mobilePageSize = ref(20);
 
 const { invalidateInspectionIssues } = useInvalidateQmsQueries();
 const { deptTreeData, deptRawData, loadInitialData } = useIssueData();
@@ -204,8 +211,45 @@ const dateModeOptions = computed(() => {
     { label: t('qms.inspection.issues.dateMode.year'), value: 'year' },
     { label: t('qms.inspection.issues.dateMode.month'), value: 'month' },
     { label: t('qms.inspection.issues.dateMode.week'), value: 'week' },
-  ];
+  ] as Array<{ label: string; value: 'month' | 'week' | 'year' }>;
 });
+
+function syncMobileRows(payload: {
+  items: InspectionGridRow[];
+  total: number;
+}) {
+  mobileIssues.value = payload.items.map((item) => {
+    const departments =
+      item.responsibleDepartments && item.responsibleDepartments.length > 0
+        ? item.responsibleDepartments
+        : [item.responsibleDepartment].filter(Boolean);
+    return {
+      ...item,
+      responsibleDepartment: departments
+        .map((value) => findNameById(deptRawData.value, value) || value)
+        .join(', '),
+    };
+  });
+  mobileTotal.value = payload.total;
+}
+
+function addCustomChart() {
+  showCharts.value = true;
+  chartDashboardRef.value?.handleAddCustomChart();
+}
+
+function handleMobilePageChange(nextPage: number, nextPageSize: number) {
+  mobilePage.value = nextPage;
+  mobilePageSize.value = nextPageSize;
+  gridApi.setGridOptions({
+    pagerConfig: {
+      ...gridOptions.value?.pagerConfig,
+      currentPage: nextPage,
+      pageSize: nextPageSize,
+    },
+  });
+  gridApi.reload();
+}
 
 const { gridOptions } = useIssueGridOptions({
   currentDateMode,
@@ -224,6 +268,7 @@ const { gridOptions } = useIssueGridOptions({
   handleEdit,
   handleImport,
   handleSettleToKnowledge,
+  onRowsChange: syncMobileRows,
   t,
 });
 
@@ -265,6 +310,7 @@ function refreshStatistics() {
 }
 
 watch([currentYear, currentDateMode, currentDate], () => {
+  mobilePage.value = 1;
   refreshStatistics();
   gridApi.reload();
 });
@@ -321,7 +367,50 @@ async function handleGenerateInsight() {
         @generate-insight="handleGenerateInsight"
       />
 
-      <Grid class="h-full" :grid-api="gridApi" :grid-events="gridEvents">
+      <IssueToolbarActions
+        v-if="isMobile"
+        v-model:date-mode="currentDateMode"
+        v-model:date-value="currentDate"
+        v-model:year="currentYear"
+        class="mb-3"
+        :can-add-chart="canAddChart"
+        :can-delete="canDelete"
+        :checked-count="checkedRows.length"
+        :date-mode-label="t('qms.inspection.issues.dateMode.label')"
+        :date-mode-options="dateModeOptions"
+        :is-admin="isAdmin"
+        :is-mobile="isMobile"
+        :show-charts="showCharts"
+        :year-options="yearOptions"
+        @add-chart="addCustomChart"
+        @batch-delete="handleBatchDelete"
+        @create="handleOpenModal"
+        @save-system-default="handleSaveSystemDefault"
+        @toggle-charts="showCharts = !showCharts"
+      />
+
+      <IssueMobileList
+        v-if="isMobile"
+        :can-delete="canDelete"
+        :can-edit="canEdit"
+        :can-settle="canSettle"
+        :issues="mobileIssues"
+        :page="mobilePage"
+        :page-size="mobilePageSize"
+        :total="mobileTotal"
+        @delete="handleDelete"
+        @detail="openDetail"
+        @edit="handleEdit"
+        @page-change="handleMobilePageChange"
+        @settle="handleSettleToKnowledge"
+      />
+
+      <Grid
+        v-show="!isMobile"
+        class="h-full"
+        :grid-api="gridApi"
+        :grid-events="gridEvents"
+      >
         <template #status="{ row }">
           <Tag :color="getStatusColor(row.status)">
             {{ getStatusLabel(row.status) }}
@@ -361,92 +450,25 @@ async function handleGenerateInsight() {
           </Tag>
         </template>
         <template #toolbar-actions>
-          <div class="flex flex-wrap items-center gap-2">
-            <Button
-              v-access:code="'QMS:Inspection:Issues:Create'"
-              shape="round"
-              type="primary"
-              @click="handleOpenModal"
-            >
-              <template #icon>
-                <IconifyIcon icon="lucide:plus" />
-              </template>
-              {{ t('qms.inspection.issues.createIssue') }}
-            </Button>
-            <Button
-              v-if="checkedRows.length > 0 && canDelete"
-              danger
-              shape="round"
-              type="primary"
-              @click="handleBatchDelete"
-            >
-              <template #icon>
-                <IconifyIcon icon="lucide:trash-2" />
-              </template>
-              {{ t('common.batchDelete') }}
-            </Button>
-            <Button
-              v-if="canAddChart"
-              shape="round"
-              @click="
-                () => {
-                  showCharts = true;
-                  chartDashboardRef?.handleAddCustomChart();
-                }
-              "
-            >
-              <template #icon>
-                <IconifyIcon icon="lucide:plus" />
-              </template>
-              新增图表
-            </Button>
-            <Button shape="round" @click="showCharts = !showCharts">
-              <template #icon>
-                <IconifyIcon
-                  :icon="
-                    showCharts ? 'lucide:bar-chart-3' : 'lucide:bar-chart-3'
-                  "
-                />
-              </template>
-              {{ showCharts ? t('common.hideChart') : t('common.showChart') }}
-            </Button>
-            <div
-              class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center"
-            >
-              <span class="text-gray-500">
-                {{ t('qms.inspection.issues.dateMode.label') }}:
-              </span>
-              <Select
-                v-model:value="currentDateMode"
-                :options="dateModeOptions"
-                :class="isMobile ? 'w-full' : 'w-[100px]'"
-              />
-              <Select
-                v-if="currentDateMode === 'year'"
-                v-model:value="currentYear"
-                :options="yearOptions"
-                :class="isMobile ? 'w-full' : 'w-[120px]'"
-              />
-              <DatePicker
-                v-else
-                v-model:value="currentDate"
-                :allow-clear="false"
-                :picker="currentDateMode"
-                :class="isMobile ? 'w-full' : 'w-[160px]'"
-              />
-            </div>
-            <Button
-              v-if="isAdmin"
-              shape="round"
-              type="link"
-              @click="handleSaveSystemDefault"
-            >
-              <template #icon>
-                <IconifyIcon icon="lucide:save" />
-              </template>
-              存为系统默认
-            </Button>
-          </div>
+          <IssueToolbarActions
+            v-model:date-mode="currentDateMode"
+            v-model:date-value="currentDate"
+            v-model:year="currentYear"
+            :can-add-chart="canAddChart"
+            :can-delete="canDelete"
+            :checked-count="checkedRows.length"
+            :date-mode-label="t('qms.inspection.issues.dateMode.label')"
+            :date-mode-options="dateModeOptions"
+            :is-admin="isAdmin"
+            :is-mobile="isMobile"
+            :show-charts="showCharts"
+            :year-options="yearOptions"
+            @add-chart="addCustomChart"
+            @batch-delete="handleBatchDelete"
+            @create="handleOpenModal"
+            @save-system-default="handleSaveSystemDefault"
+            @toggle-charts="showCharts = !showCharts"
+          />
         </template>
       </Grid>
     </QmsPageShell>
