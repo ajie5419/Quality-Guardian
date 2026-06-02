@@ -1,48 +1,39 @@
 <script lang="ts" setup>
-import type { WorkOrderSearchFormValues } from './composables/useWorkOrderQueryFilters';
-
-import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 import type { SystemDeptApi } from '#/api/system/dept';
 import type { TreeSelectNode, VxeCheckboxChangeParams } from '#/types';
 
-import { computed, onMounted, ref, watch } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useI18n } from '@vben/locales';
 
-import { WorkOrderStatusEnum } from '@qgs/shared';
-import { Button, message } from 'ant-design-vue';
+import { Button } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import {
-  getWorkOrderDashboardStats,
-  getWorkOrderExportList,
-  getWorkOrderListPage,
-} from '#/api/qms/work-order';
 import { getDeptList } from '#/api/system/dept';
 import ErrorBoundary from '#/components/ErrorBoundary.vue';
 import { QmsStatusTag } from '#/components/Qms';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
-import { convertToTreeSelectData, findNameById } from '#/types';
-import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
+import { convertToTreeSelectData } from '#/types';
 import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import WorkOrderAggregateDrawer from '../workspace/components/WorkOrderAggregateDrawer.vue';
 import WorkOrderCharts from './components/WorkOrderCharts.vue';
 import WorkOrderEditModal from './components/WorkOrderEditModal.vue';
+import WorkOrderMobileSection from './components/WorkOrderMobileSection.vue';
 import WorkOrderRequirementBoardDrawer from './components/WorkOrderRequirementBoardDrawer.vue';
 import WorkOrderRequirementSummaryCards from './components/WorkOrderRequirementSummaryCards.vue';
 import WorkOrderToolbarActions from './components/WorkOrderToolbarActions.vue';
 import { useWorkOrderActions } from './composables/useWorkOrderActions';
 import { useWorkOrderAggregateDrawer } from './composables/useWorkOrderAggregateDrawer';
+import { useWorkOrderGridOptions } from './composables/useWorkOrderGridOptions';
 import { useWorkOrderImport } from './composables/useWorkOrderImport';
+import { useWorkOrderMobileList } from './composables/useWorkOrderMobileList';
 import { useWorkOrderQueryFilters } from './composables/useWorkOrderQueryFilters';
 import { useWorkOrderRequirementBoard } from './composables/useWorkOrderRequirementBoard';
-import { getStatusInfo } from './composables/useWorkOrderStatus';
-import { getGridColumns } from './data';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
@@ -118,212 +109,54 @@ const { handleImport, gridApi } = useWorkOrderImport(() => {
   api.reload();
 });
 
-const statusOptions = computed(() =>
-  Object.values(WorkOrderStatusEnum).map((value) => {
-    const info = getStatusInfo(value);
-    return { label: info.defaultText, value };
-  }),
-);
-
-const formSchema = [
-  {
-    fieldName: 'workOrderNumber',
-    label: t('qms.workOrder.workOrderNumber'),
-    component: 'Input',
-    componentProps: {
-      placeholder: t('common.pleaseInput'),
-      allowClear: true,
-    },
-    colProps: { span: 6 },
-  },
-  {
-    fieldName: 'productName',
-    label: t('qms.workOrder.productName'),
-    component: 'Input',
-    componentProps: {
-      placeholder: t('common.pleaseInput'),
-      allowClear: true,
-    },
-    colProps: { span: 6 },
-  },
-  {
-    fieldName: 'status',
-    label: t('qms.workOrder.statusLabel'),
-    component: 'Select',
-    componentProps: {
-      options: statusOptions,
-      placeholder: t('common.pleaseSelect'),
-      allowClear: true,
-    },
-    colProps: { span: 6 },
-  },
-];
-const exportWorkOrderAsXlsx =
-  createVxePhotoXlsxExportMethod<QmsWorkOrderApi.WorkOrderItem>({
-    sheetName: t('qms.workOrder.title'),
-    filename: () => `${t('qms.workOrder.title')}-${Date.now()}.xlsx`,
-    photoField: '__none__',
-    getPhotoUrl: () => '',
-    getRows: async ({ mode, $table, $grid }) => {
-      if (mode === 'selected') {
-        return $table.getCheckboxRecords() || [];
-      }
-      if (mode === 'all') {
-        const proxyInfo = $grid?.getProxyInfo?.();
-        const formValues = (proxyInfo?.form || {}) as WorkOrderSearchFormValues;
-        const response = await getWorkOrderExportList(
-          buildQueryParams(formValues),
-        );
-        return response.items || [];
-      }
-      const tableData = $table.getTableData?.();
-      return tableData?.fullData || [];
-    },
-  });
-const gridOptions = computed<VxeGridProps>(() => ({
-  columns: [
-    { type: 'checkbox', width: 50 },
-    ...(getGridColumns() || []).map((col) => {
-      if (col.field === 'division') {
-        return {
-          ...col,
-          slots: {},
-          formatter: ({
-            cellValue,
-          }: {
-            cellValue: null | string | undefined;
-          }) => {
-            return (
-              findNameById(deptRawData.value, cellValue || '') ||
-              cellValue ||
-              '-'
-            );
-          },
-        };
-      }
-      if (col.slots?.default === 'action') {
-        return {
-          ...col,
-          slots: undefined,
-          cellRender: {
-            name: 'CellOperation',
-            props: {
-              options: [
-                ...(canEdit.value ? ['edit'] : []),
-                ...(canDelete.value ? ['delete'] : []),
-              ],
-              onClick: ({
-                code,
-                row,
-              }: {
-                code: string;
-                row: QmsWorkOrderApi.WorkOrderItem;
-              }) => {
-                if (code === 'edit') handleEdit(row);
-                if (code === 'delete') handleDelete(row);
-              },
-            },
-          },
-        };
-      }
-      return col;
-    }),
-  ],
-  checkboxConfig: {
-    reserve: true,
-    highlight: true,
-  },
-  toolbarConfig: {
-    export: canExport.value,
-    refresh: true,
-    import: canImport.value,
-    search: true,
-    zoom: true,
-    custom: true,
-    slots: {
-      buttons: 'toolbar-actions',
-    },
-  },
-  importConfig: {
-    remote: true,
-    importMethod: handleImport,
-  },
-  exportConfig: {
-    remote: true,
-    exportMethod: exportWorkOrderAsXlsx,
-    types: ['xlsx'],
-    modes: ['current', 'selected', 'all'],
-  },
-  proxyConfig: {
-    ajax: {
-      query: async (
-        {
-          page: pageParams,
-        }: { page?: { currentPage?: number; pageSize?: number } },
-        formValues: WorkOrderSearchFormValues,
-      ) => {
-        try {
-          const { currentPage = 1, pageSize = 20 } = pageParams || {};
-          isStatsLoading.value = true;
-          const queryParams = buildQueryParams(formValues);
-
-          latestRequirementQueryParams.value = queryParams;
-          const [response, stats] = await Promise.all([
-            getWorkOrderListPage({
-              page: currentPage,
-              pageSize,
-              ...queryParams,
-            }),
-            getWorkOrderDashboardStats(queryParams),
-            loadOverview(queryParams),
-          ]);
-          workOrderStats.value = stats;
-
-          const { items, total } = response;
-
-          return {
-            items,
-            total,
-          };
-        } catch (error: unknown) {
-          handleApiError(error, 'Load Work Order List');
-          message.error(
-            t('qms.common.dataLoadFailed') +
-              ((error as { message?: string }).message
-                ? `: ${(error as { message?: string }).message}`
-                : ''),
-          );
-          return { items: [], total: 0 };
-        } finally {
-          isStatsLoading.value = false;
-        }
-      },
-      queryAll: async (params) => {
-        const rawParams = params as {
-          form?: Record<string, unknown>;
-          formValues?: Record<string, unknown>;
-        };
-        const formValues =
-          (rawParams.form as unknown as WorkOrderSearchFormValues) ||
-          (rawParams.formValues as unknown as WorkOrderSearchFormValues);
-        try {
-          const response = await getWorkOrderListPage({
-            page: 1,
-            pageSize: 100_000,
-            ...buildQueryParams(formValues),
-          });
-          return { items: response.items };
-        } catch (error) {
-          handleApiError(error, 'Query All Work Orders');
-          message.error(t('qms.common.dataLoadFailed'));
-          return { items: [] };
-        }
-      },
-    },
-  },
-}));
-
 const checkedRows = ref<QmsWorkOrderApi.WorkOrderItem[]>([]);
+const editModalRef = ref<InstanceType<typeof WorkOrderEditModal> | null>(null);
+const showDashboard = ref(true);
+
+const {
+  handleAdd,
+  handleEdit,
+  handleDelete,
+  handleBatchDelete,
+  handleSuccess,
+} = useWorkOrderActions({
+  gridApi,
+  deptTreeData,
+  editModalRef,
+  checkedRows,
+});
+
+const {
+  handleMobilePageChange,
+  mobilePage,
+  mobilePageSize,
+  mobileRecords,
+  mobileTotal,
+  resetMobilePage,
+  syncMobileRows,
+} = useWorkOrderMobileList({
+  deptRawData,
+  gridApi: () => gridApi.value,
+});
+
+const { formSchema, gridOptions } = useWorkOrderGridOptions({
+  buildQueryParams,
+  canDelete,
+  canEdit,
+  canExport,
+  canImport,
+  deptRawData,
+  handleApiError,
+  handleDelete,
+  handleEdit,
+  handleImport,
+  isStatsLoading,
+  latestRequirementQueryParams,
+  loadOverview,
+  syncMobileRows,
+  t,
+  workOrderStats,
+});
 
 function onCheckChange(
   params: VxeCheckboxChangeParams<QmsWorkOrderApi.WorkOrderItem>,
@@ -366,21 +199,7 @@ watch(
   { immediate: true },
 );
 
-const editModalRef = ref<InstanceType<typeof WorkOrderEditModal> | null>(null);
-const showDashboard = ref(true);
-
-const {
-  handleAdd,
-  handleEdit,
-  handleDelete,
-  handleBatchDelete,
-  handleSuccess,
-} = useWorkOrderActions({
-  gridApi,
-  deptTreeData,
-  editModalRef,
-  checkedRows,
-});
+watch([currentYear, currentDateMode, currentDate], resetMobilePage);
 </script>
 
 <template>
@@ -400,7 +219,41 @@ const {
             @open="openBoard"
           />
 
-          <div class="rounded-lg bg-white shadow-sm">
+          <WorkOrderMobileSection
+            v-if="isMobile"
+            :can-create="canCreate"
+            :can-delete="canDelete"
+            :can-edit="canEdit"
+            :checked-rows-length="checkedRows.length"
+            :current-date="currentDate"
+            :current-date-mode="currentDateMode"
+            :current-year="currentYear"
+            :date-mode-options="dateModeOptions"
+            :page="mobilePage"
+            :page-size="mobilePageSize"
+            :records="mobileRecords"
+            :show-dashboard="showDashboard"
+            :total="mobileTotal"
+            :year-options="yearOptions"
+            @add="handleAdd"
+            @batch-delete="handleBatchDelete"
+            @delete="handleDelete"
+            @detail="
+              (row) =>
+                openWorkOrderAggregate(row.workOrderNumber, {
+                  syncRoute: false,
+                })
+            "
+            @edit="handleEdit"
+            @page-change="handleMobilePageChange"
+            @reload="reloadGrid"
+            @toggle-dashboard="showDashboard = !showDashboard"
+            @update:current-date="currentDate = $event"
+            @update:current-date-mode="currentDateMode = $event"
+            @update:current-year="currentYear = $event"
+          />
+
+          <div v-show="!isMobile" class="rounded-lg bg-white shadow-sm">
             <Grid>
               <template #toolbar-actions>
                 <WorkOrderToolbarActions

@@ -134,6 +134,8 @@
     "completionRate": "交付完成率",
     "excellent": "优秀",
     "createWorkOrder": "新建工单",
+    "requirementTasks": "任务",
+    "overdueOverTenDays": "超10天",
     "showChart": "显示图表",
     "hideChart": "隐藏图表"
   },

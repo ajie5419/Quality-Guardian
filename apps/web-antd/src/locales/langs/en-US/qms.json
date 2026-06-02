@@ -83,7 +83,9 @@
     "effectiveTime": "Effective Time",
     "completionRate": "Completion Rate",
     "excellent": "Excellent",
-    "createWorkOrder": "Create Work Order"
+    "createWorkOrder": "Create Work Order",
+    "requirementTasks": "Tasks",
+    "overdueOverTenDays": "Over 10 Days"
   },
   "qualityLoss": {
     "amountLabel": "Amount",
