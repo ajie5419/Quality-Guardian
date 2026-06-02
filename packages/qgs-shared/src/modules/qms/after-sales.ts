@@ -38,6 +38,8 @@ export interface AfterSalesItem {
 export interface AfterSalesParams {
   dateMode?: 'month' | 'week' | 'year';
   dateValue?: string;
+  page?: number;
+  pageSize?: number;
   projectName?: string;
   status?: string;
   supplierBrand?: string;

@@ -25,6 +25,30 @@
 
 ## 执行记录
 
+### 2026-06-02 修复：售后质量分页重复增长
+
+**执行内容：**
+
+- 修复售后质量列表接口未使用分页响应导致桌面表格和移动端卡片分页状态脱节的问题。
+- 售后质量查询参数补充 `page` / `pageSize`，后端 `/qms/after-sales` 统一按页返回 `items` 和总数。
+- 前端售后质量 grid 查询移除二次 `slice`，每次分页直接替换当前页数据；日期筛选切换时同步重置 grid 和移动端页码。
+
+**验证结果：**
+
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm --dir apps/backend exec tsc --noEmit`: 通过
+- `pnpm --dir apps/backend exec vitest run modules/after-sales/after-sales.service.test.ts modules/after-sales/after-sales-payload.test.ts`: 2 文件 / 6 测试通过
+- `pnpm lint`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过
+- `pnpm --dir apps/backend exec vitest run`: 35 文件 / 177 测试通过
+
+**commit:** `56509646` fix(@qgs/web-antd): paginate after sales list response
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-02 修复：工单管理移动端列表防溢出
 
 **执行内容：**

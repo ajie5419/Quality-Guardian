@@ -379,6 +379,12 @@ watch(deptRawData, () => {
 
 watch([currentYear, currentDateMode, currentDate], () => {
   mobilePage.value = 1;
+  gridApi.setGridOptions({
+    pagerConfig: {
+      currentPage: 1,
+      pageSize: mobilePageSize.value,
+    },
+  });
   gridApi.reload();
   chartRefreshKey.value++;
 });

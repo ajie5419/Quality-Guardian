@@ -6,10 +6,15 @@ import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import {
   internalServerErrorResponse,
-  useListResponseSuccess,
+  usePageResponseSuccess,
 } from '~/utils/response';
 
 const afterSalesListQuerySchema = z.object({}).passthrough();
+
+function normalizePageValue(value: unknown, fallback: number) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 export default defineValidatedHandler(
   afterSalesListQuerySchema,
@@ -17,6 +22,8 @@ export default defineValidatedHandler(
     const userinfo = getCurrentUser(event);
 
     const params = parseAfterSalesListQuery(query);
+    const page = normalizePageValue(query.page, 1);
+    const pageSize = Math.min(normalizePageValue(query.pageSize, 20), 100);
 
     try {
       const list = await AfterSalesService.getList({
@@ -27,7 +34,7 @@ export default defineValidatedHandler(
         },
         dataScope: event.context.dataScope,
       });
-      return useListResponseSuccess(list);
+      return usePageResponseSuccess(page, pageSize, list);
     } catch (error: unknown) {
       logApiError('after-sales', error, undefined, event);
       return internalServerErrorResponse(

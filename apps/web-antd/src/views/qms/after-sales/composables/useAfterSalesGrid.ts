@@ -386,21 +386,19 @@ export function useAfterSalesGrid({
           { page }: { page?: { currentPage?: number; pageSize?: number } },
           formValues: Record<string, unknown> = {},
         ) => {
+          const { currentPage = 1, pageSize = 20 } = page || {};
           const data = await getAfterSalesListPage({
             dateMode: currentDateMode.value,
             dateValue: currentDateValue.value,
+            page: currentPage,
+            pageSize,
             year: currentYear.value,
             ...formValues,
           } as QmsAfterSalesApi.AfterSalesParams);
           const items = normalizeAfterSalesRows(data.items || []);
+          onRowsChange?.({ items, total: data.total });
 
-          const { currentPage = 1, pageSize = 20 } = page || {};
-          const start = (currentPage - 1) * pageSize;
-          const end = start + pageSize;
-          const pageData = items.slice(start, end);
-          onRowsChange?.({ items: pageData, total: items.length });
-
-          return { items: pageData, total: items.length };
+          return { items, total: data.total };
         },
         queryAll: async ({
           form,

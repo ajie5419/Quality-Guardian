@@ -1,3 +1,5 @@
+import type { AfterSalesParams } from '../../modules/qms/after-sales';
+
 import { mapAfterSalesStatus } from './after-sales-status';
 
 export type AfterSalesDateMode = 'month' | 'week' | 'year';
@@ -5,6 +7,11 @@ export type AfterSalesDateMode = 'month' | 'week' | 'year';
 function normalizeQueryText(value: unknown): string | undefined {
   const normalized = String(value ?? '').trim();
   return normalized || undefined;
+}
+
+function normalizePositiveInteger(value: unknown, fallback: number): number {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function parseLocalDate(value: string): Date | undefined {
@@ -88,13 +95,17 @@ export function buildAfterSalesDateRange(params: {
   };
 }
 
-export function parseAfterSalesListQuery(query: Record<string, unknown>) {
+export function parseAfterSalesListQuery(
+  query: Record<string, unknown>,
+): AfterSalesParams {
   const yearRaw = normalizeQueryText(query.year);
   const year = yearRaw ? Number.parseInt(yearRaw, 10) : undefined;
 
   return {
     dateMode: parseAfterSalesDateMode(query.dateMode),
     dateValue: parseAfterSalesDateValue(query.dateValue),
+    page: normalizePositiveInteger(query.page, 1),
+    pageSize: Math.min(normalizePositiveInteger(query.pageSize, 20), 100),
     year: Number.isNaN(year ?? Number.NaN) ? undefined : year,
     workOrderNumber: normalizeQueryText(query.workOrderNumber),
     projectName: normalizeQueryText(query.projectName),
