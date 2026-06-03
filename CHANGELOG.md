@@ -25,6 +25,16 @@
 
 ## 执行记录
 
+## [0.5.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.5.0...qgs-v0.5.1) (2026-06-03)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** lowercase dispatch test describe to satisfy lint ([267c831](https://github.com/ajie5419/Quality-Guardian/commit/267c8310e5f69863530c03bd12ca62542ef7ff8d))
+* **@qgs/backend:** prevent duplicate dispatch on already-dispatched requests ([9dccc3c](https://github.com/ajie5419/Quality-Guardian/commit/9dccc3c1da22863f1f4f42bc19a395aaf36115cd))
+* **@qgs/web-antd:** show backend message instead of [object Object] ([70d67d7](https://github.com/ajie5419/Quality-Guardian/commit/70d67d7da0023fa05a01177d22a6dbbc84a78c75))
+* **@qgs/web-antd:** sort fetch-event-source import to satisfy lint ([160166e](https://github.com/ajie5419/Quality-Guardian/commit/160166e07229cc099a762374849811255b2de632))
+
 ## [0.5.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.4.1...qgs-v0.5.0) (2026-06-03)
 
 
