@@ -121,6 +121,8 @@ function openCreate(parentId?: string) {
   drawerOpen.value = true;
 }
 
+defineExpose({ openCreate });
+
 function openEdit(task: SupervisionPlanTask) {
   editingTask.value = task;
   Object.assign(form, {

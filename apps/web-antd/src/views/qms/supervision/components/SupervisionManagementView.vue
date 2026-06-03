@@ -9,7 +9,7 @@ import type {
 } from '@qgs/shared';
 import type { UploadFile } from 'ant-design-vue';
 
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 
 import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
@@ -150,6 +150,7 @@ const loadingPlanTasks = ref(false);
 const importingPlanTasks = ref(false);
 const activeTab = ref('projects');
 const ganttView = ref('focus');
+const ganttEditorRef = ref<InstanceType<typeof GanttTaskEditor> | null>(null);
 const projectTypeFilter = ref('');
 const selectedPlanProjectId = ref('');
 
@@ -731,6 +732,13 @@ async function loadIssues() {
   }
 }
 
+async function openCreatePlanTask() {
+  if (!selectedPlanProjectId.value) return;
+  ganttView.value = 'edit';
+  await nextTick();
+  ganttEditorRef.value?.openCreate();
+}
+
 async function loadPlanTasks(projectId = selectedPlanProjectId.value) {
   if (!projectId) {
     planTasks.value = [];
@@ -1181,13 +1189,26 @@ onMounted(async () => {
                 :options="projectOptions"
                 @change="() => loadPlanTasks()"
               />
+              <Button
+                type="primary"
+                :disabled="!selectedPlanProjectId"
+                @click="openCreatePlanTask"
+              >
+                新建任务
+              </Button>
               <QmsFileUpload
                 accept=".xls,.xlsx"
-                button-text="导入Excel计划"
                 :disabled="!selectedPlanProjectId || importingPlanTasks"
                 :max-count="1"
                 @uploaded="handlePlanTaskImport"
-              />
+              >
+                <Button
+                  type="primary"
+                  :disabled="!selectedPlanProjectId || importingPlanTasks"
+                >
+                  导入Excel计划
+                </Button>
+              </QmsFileUpload>
               <Button @click="loadPlanTasks()">刷新</Button>
             </Space>
             <div class="text-xs text-gray-500">
@@ -1495,6 +1516,7 @@ onMounted(async () => {
 
             <div v-else-if="ganttView === 'edit'">
               <GanttTaskEditor
+                ref="ganttEditorRef"
                 :project-id="selectedPlanProjectId"
                 :reporter="selectedPlanProject?.supervisor || ''"
                 :tasks="planTasks"
