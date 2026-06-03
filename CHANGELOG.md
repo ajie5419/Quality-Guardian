@@ -25,6 +25,46 @@
 
 ## 执行记录
 
+## [0.5.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.4.1...qgs-v0.5.0) (2026-06-03)
+
+
+### Features
+
+* **@qgs/backend:** broadcast inspection request events ([ee86776](https://github.com/ajie5419/Quality-Guardian/commit/ee86776ce1b04abbb9dd170abac8a2436399bddf))
+* **@qgs/web-antd:** add create entry to supervision gantt plan toolbar ([bdd920a](https://github.com/ajie5419/Quality-Guardian/commit/bdd920aced83e378c39083eaf2ac2f509d5851a9))
+* **@qgs/web-antd:** add incoming inspection request entry ([bc80c5e](https://github.com/ajie5419/Quality-Guardian/commit/bc80c5e5e176d2f82103137ae1755bc5278aea41))
+* **@qgs/web-antd:** add qms responsive page shell ([248abae](https://github.com/ajie5419/Quality-Guardian/commit/248abae2473f029920a92c58ec63dba69a221a9f))
+* **@qgs/web-antd:** gate inspection request alerts by dispatch permission ([bd2e98a](https://github.com/ajie5419/Quality-Guardian/commit/bd2e98acf1a4bb3ea5f66ba56e823f87eb1428a6))
+* **project:** add document-availability choice when closing inspection ([7729195](https://github.com/ajie5419/Quality-Guardian/commit/77291950c75c22c44ba15d3e417b0ec4609b109b))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** enforce inspection dispatch permission ([0be1a26](https://github.com/ajie5419/Quality-Guardian/commit/0be1a266b30d46d91342f923424667dfd7a1d3bf))
+* **@qgs/backend:** split inspection dashboard permission ([737ef42](https://github.com/ajie5419/Quality-Guardian/commit/737ef4241516ac4cc45c7d07787ed9bb6bfd6eb1))
+* **@qgs/backend:** write issue inspector as relation to avoid prisma error ([8c2b634](https://github.com/ajie5419/Quality-Guardian/commit/8c2b6344f913f963fc94a45bf9391bec849b79cf))
+* **@qgs/web-antd:** adapt after sales list for mobile ([92faac7](https://github.com/ajie5419/Quality-Guardian/commit/92faac7e8e73b92e8330b03d2103d998bbaba308))
+* **@qgs/web-antd:** adapt custom chart modal on mobile ([9f64ed8](https://github.com/ajie5419/Quality-Guardian/commit/9f64ed80f888212032b0c7faf51541c225d0f1c3))
+* **@qgs/web-antd:** adapt inspection issues for mobile ([b060cc0](https://github.com/ajie5419/Quality-Guardian/commit/b060cc0a0b327bd9ae93bd9e59f84f4a11fd99bf))
+* **@qgs/web-antd:** adapt qms statistic cards on mobile ([05dbc91](https://github.com/ajie5419/Quality-Guardian/commit/05dbc911524707cb62331804d3eff441578a5043))
+* **@qgs/web-antd:** adapt supervision drawers on mobile ([0357056](https://github.com/ajie5419/Quality-Guardian/commit/03570569ba1f41ab884052f69c8f27e6d2aba3f0))
+* **@qgs/web-antd:** adapt work order list for mobile ([82c6b0d](https://github.com/ajie5419/Quality-Guardian/commit/82c6b0d8bede61ee2e58094f22c2a8ebf9c7aa7f))
+* **@qgs/web-antd:** align incoming request entry fields ([95415e1](https://github.com/ajie5419/Quality-Guardian/commit/95415e1a5f59c24b60903d59e9ccb9921294d16b))
+* **@qgs/web-antd:** authenticate inspection request SSE stream ([3fbe675](https://github.com/ajie5419/Quality-Guardian/commit/3fbe6758ea9ab5e112eb8ca3200fbb8898aff457))
+* **@qgs/web-antd:** improve after sales grid on mobile ([37480cb](https://github.com/ajie5419/Quality-Guardian/commit/37480cbf424fdbe4d4c1dc31ff9af53cc0d1e47d))
+* **@qgs/web-antd:** keep incoming request records classified ([2347871](https://github.com/ajie5419/Quality-Guardian/commit/234787185721e3f6e620c373a59dde9a916781eb))
+* **@qgs/web-antd:** keep public entry requests unauthenticated ([3d40df3](https://github.com/ajie5419/Quality-Guardian/commit/3d40df3c31c3e7bb088b25fda01300ad269f0e20))
+* **@qgs/web-antd:** paginate after sales list response ([00da19f](https://github.com/ajie5419/Quality-Guardian/commit/00da19f1bed99c2a1de124430ca854bc1fc416d3))
+* **@qgs/web-antd:** prevent inspection dashboard drawer overflow ([ddb8192](https://github.com/ajie5419/Quality-Guardian/commit/ddb8192fffb00731394b215e95049f29290642cb))
+* **@qgs/web-antd:** prevent mobile inspection request overflow ([644e6c5](https://github.com/ajie5419/Quality-Guardian/commit/644e6c5ad2060e30f2e747198864d5e2805fb11a))
+* **@qgs/web-antd:** remove duplicate report work order field ([51cfbd3](https://github.com/ajie5419/Quality-Guardian/commit/51cfbd33b638810701da89b531d7ef6cf87c0031))
+* **@qgs/web-antd:** require commissioning issue fields ([96b1e41](https://github.com/ajie5419/Quality-Guardian/commit/96b1e41d15689baea5e77b71414257d13c32f285))
+* **@qgs/web-antd:** stabilize after sales desktop grid state ([a08d448](https://github.com/ajie5419/Quality-Guardian/commit/a08d44891f9a5db16b993e727cf5d4258695f921))
+* **@qgs/web-antd:** stabilize after sales grid pagination ([29d959f](https://github.com/ajie5419/Quality-Guardian/commit/29d959f8574a1cfa67167520c811f1f19904b5f3))
+* **@qgs/web-antd:** stack issue form fields on mobile ([d8d4d1a](https://github.com/ajie5419/Quality-Guardian/commit/d8d4d1acfbd2c5ed1e194d90a3a71820259171b0))
+* **@qgs/web-antd:** stop after sales grid auto-resize loop ([624587b](https://github.com/ajie5419/Quality-Guardian/commit/624587b2a70430f5c36d1a4bf22a5fb9f259771b))
+* **@qgs/web-antd:** use vertical issue form layout ([bbc6a76](https://github.com/ajie5419/Quality-Guardian/commit/bbc6a76f6053e25b7b6efa8baaaf1bfba7f08c5f))
+
 ### 2026-06-03 新增：完成检验时可选择「是否有资料」
 
 **执行内容：**
