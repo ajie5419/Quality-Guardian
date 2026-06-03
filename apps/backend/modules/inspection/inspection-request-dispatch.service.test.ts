@@ -38,7 +38,7 @@ vi.mock('~/utils/governed-write', () => ({
 const userinfo = { id: 'admin-1', userId: 'admin-1', username: 'admin' } as any;
 const event = {} as any;
 
-describe('InspectionRequestDispatchService.dispatchRequest', () => {
+describe('inspectionRequestDispatchService.dispatchRequest', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(prisma.users.findFirst).mockResolvedValue({
