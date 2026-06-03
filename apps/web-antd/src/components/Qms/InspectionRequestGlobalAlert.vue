@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 import type { InspectionRequest } from '#/api/qms/inspection-request';
 
+import { fetchEventSource } from '@microsoft/fetch-event-source';
+
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -25,7 +27,7 @@ const loading = ref(false);
 const activeRequest = ref<InspectionRequest>();
 const pendingRequests = ref<InspectionRequest[]>([]);
 let timer: number | undefined;
-let eventSource: EventSource | undefined;
+let abortController: AbortController | undefined;
 
 const { hasAccessByCodes } = useAccess();
 const canReceiveAlert = computed(() =>
@@ -112,22 +114,30 @@ function showNextRequest() {
 }
 
 function connectInspectionRequestEvents() {
-  if (!accessStore.accessToken || eventSource) return;
-
-  eventSource = new EventSource('/api/qms/inspection/requests/events');
-  eventSource.addEventListener('inspection-request-created', (event) => {
-    try {
-      const payload = JSON.parse((event as MessageEvent).data) as {
-        request?: InspectionRequest;
-      };
-      if (payload.request) enqueueRequest(payload.request);
-    } catch {
-      // Ignore malformed SSE payloads and keep the connection alive.
-    }
-  });
-  eventSource.addEventListener('error', () => {
-    eventSource?.close();
-    eventSource = undefined;
+  if (!accessStore.accessToken || abortController) return;
+  abortController = new AbortController();
+  fetchEventSource('/api/qms/inspection/requests/events', {
+    signal: abortController.signal,
+    openWhenHidden: true,
+    headers: {
+      Authorization: `Bearer ${accessStore.accessToken}`,
+    },
+    onmessage(ev) {
+      if (ev.event !== 'inspection-request-created') return;
+      try {
+        const payload = JSON.parse(ev.data) as { request?: InspectionRequest };
+        if (payload.request) enqueueRequest(payload.request);
+      } catch {
+        // Ignore malformed SSE payloads and keep the connection alive.
+      }
+    },
+    onerror(err) {
+      abortController?.abort();
+      abortController = undefined;
+      throw err;
+    },
+  }).catch(() => {
+    abortController = undefined;
   });
 }
 
@@ -194,8 +204,8 @@ watch(
   () => accessStore.accessToken,
   (token) => {
     if (!token) {
-      eventSource?.close();
-      eventSource = undefined;
+      abortController?.abort();
+      abortController = undefined;
       return;
     }
     if (!canReceiveAlert.value) return;
@@ -206,8 +216,8 @@ watch(
 
 onUnmounted(() => {
   if (timer) window.clearInterval(timer);
-  eventSource?.close();
-  eventSource = undefined;
+  abortController?.abort();
+  abortController = undefined;
 });
 </script>
 

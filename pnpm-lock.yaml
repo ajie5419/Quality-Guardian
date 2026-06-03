@@ -698,6 +698,9 @@ importers:
 
   apps/web-antd:
     dependencies:
+      '@microsoft/fetch-event-source':
+        specifier: ^2.0.1
+        version: 2.0.1
       '@qgs/shared':
         specifier: workspace:*
         version: link:../../packages/qgs-shared
@@ -3723,6 +3726,9 @@ packages:
   '@microsoft/api-extractor@7.52.5':
     resolution: {integrity: sha512-6WWgjjg6FkoDWpF/O3sjB05OkszpI5wtKJqd8fUIR/JJUv8IqNCGr1lJUZJnc1HegcT9gAvyf98KfH0wFncU0w==}
     hasBin: true
+
+  '@microsoft/fetch-event-source@2.0.1':
+    resolution: {integrity: sha512-W6CLUJ2eBMw3Rec70qrsEW0jOm/3twwJv21mrmj2yORiaVmVYGS4sSS5yUwvQc1ZlDLYGPnClVWmUUMagKNsfA==}
 
   '@microsoft/tsdoc-config@0.17.1':
     resolution: {integrity: sha512-UtjIFe0C6oYgTnad4q1QP4qXwLhe6tIpNTRStJ2RZEPIkqQPREAwE5spzVxsdn9UaEMUqhh0AqSx3X4nWAKXWw==}
@@ -14955,6 +14961,8 @@ snapshots:
       typescript: 5.8.2
     transitivePeerDependencies:
       - '@types/node'
+
+  '@microsoft/fetch-event-source@2.0.1': {}
 
   '@microsoft/tsdoc-config@0.17.1':
     dependencies:

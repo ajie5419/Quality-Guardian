@@ -22,6 +22,7 @@
     "#/*": "./src/*"
   },
   "dependencies": {
+    "@microsoft/fetch-event-source": "^2.0.1",
     "@qgs/shared": "workspace:*",
     "@tanstack/vue-query": "catalog:",
     "@univerjs/preset-sheets-core": "0.16.1",
