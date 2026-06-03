@@ -82,6 +82,7 @@ export interface DispatchInspectionRequestParams {
 export interface CloseInspectionRequestParams {
   attachments?: InspectionRequestAttachment[];
   closeRemark?: string;
+  hasDocuments?: boolean;
   inspectionDate?: string;
   inspectionId?: string;
   inspectionItems?: Array<{

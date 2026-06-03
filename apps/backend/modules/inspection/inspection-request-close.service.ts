@@ -225,6 +225,10 @@ export const InspectionRequestCloseService = {
 
       await syncCloseAttachments({
         closeAttachments,
+        hasDocuments:
+          typeof body.hasDocuments === 'boolean'
+            ? body.hasDocuments
+            : undefined,
         inspectionId,
         requestId: String(updated.id),
       });

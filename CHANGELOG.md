@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+### 2026-06-03 新增：完成检验时可选择「是否有资料」
+
+**执行内容：**
+
+- 解决外购件扫码报检完成检验后，落入进货检验记录的「是否有资料」恒为「有」且无法选择的问题。根因：`hasDocuments` 从未作为用户输入，而是后端按检验记录附件数量推导（`qgs-shared` 构造 payload 时 `attachments.length > 0`、create 兜底默认 `true`、close 后又按文档数量二次覆盖），而完成检验时附件必填，导致该值恒为 true。
+- 共享包 `CloseInspectionRequestParams` 新增可选 `hasDocuments` 字段；`buildInspectionRecordPayloadCore` 改为优先采用显式传入的 `hasDocuments`，未传时回退附件数量推导。
+- 后端 `syncCloseAttachments`（close 后置同步）新增 `hasDocuments` 入参，显式传入时尊重用户选择、不再无条件按文档数量覆盖；`inspection-request-close.service` 将 `body.hasDocuments` 透传给该同步任务。
+- PC 端「完成检验」弹窗（`CloseInspectionModal.vue`）与移动端检验页（`InspectResult.vue`）均新增「是否有资料」开关，默认「有」，提交时随完成检验接口上送；对应 `closeForm` 状态与本地 `CloseForm` 类型同步补充该字段。
+- 新增 `buildInspectionRecordFromRequest` 单测：显式 `hasDocuments: false` 时记录落为「无」，未传时按附件数量回退为「有」。
+
+**验证结果：**
+
+- `pnpm --dir packages/qgs-shared run build`: 通过（dts 已含新字段）
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm --dir apps/backend exec tsc --noEmit`: 通过
+- `pnpm --dir apps/backend exec vitest run modules/inspection/`: 7 文件 / 37 测试通过（含 2 条新增 `hasDocuments` 用例）
+- 浏览器层面（PC 完成检验弹窗、移动端检验页选择「无」后进货检验记录是否落为「无」）待人工验证。
+
+**遗留问题：**
+
+- 需在本地走一遍「外购件扫码报检 → 完成检验选择无资料 → 查看进货检验记录」确认落库正确。
+
 ### 2026-06-03 修复：售后质量表格首次加载持续下拉
 
 **执行内容：**

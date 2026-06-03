@@ -18,6 +18,7 @@ import {
   InputNumber,
   Modal,
   Select,
+  Switch,
   TreeSelect,
   Upload,
 } from 'ant-design-vue';
@@ -33,6 +34,7 @@ interface Props {
   closeForm: {
     attachments: InspectionRequestAttachment[];
     closeRemark: string;
+    hasDocuments: boolean;
     inspectionId: string;
     inspector: string;
     quantity: number;
@@ -234,6 +236,13 @@ async function handleBeforeUpload(file: File) {
             v-model:value="localCloseForm.quantity"
             :min="1"
             class="w-full"
+          />
+        </Form.Item>
+        <Form.Item label="是否有资料">
+          <Switch
+            v-model:checked="localCloseForm.hasDocuments"
+            checked-children="有"
+            un-checked-children="无"
           />
         </Form.Item>
       </div>

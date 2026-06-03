@@ -107,6 +107,7 @@ export function useInspectionRequestTaskActions(
   const closeForm = reactive({
     attachments: [] as InspectionRequestAttachment[],
     closeRemark: '',
+    hasDocuments: true,
     inspectionId: '',
     inspector: '',
     quantity: 1,
@@ -370,6 +371,7 @@ export function useInspectionRequestTaskActions(
     closeAttachmentFileList.value = [];
     closeForm.attachments = [];
     closeForm.closeRemark = '';
+    closeForm.hasDocuments = true;
     closeForm.inspectionId = record.inspectionId || '';
     closeForm.inspector = record.inspectorName || getCurrentUserName();
     closeForm.quantity = record.quantity || 1;
@@ -430,6 +432,7 @@ export function useInspectionRequestTaskActions(
       await closeInspectionRequest(currentRequest.value.id, {
         attachments: closeForm.attachments,
         closeRemark: closeForm.closeRemark,
+        hasDocuments: closeForm.hasDocuments,
         inspectionId: closeForm.inspectionId || undefined,
         inspector: closeForm.inspector,
         linkedIssue: payloadLinkedIssue,

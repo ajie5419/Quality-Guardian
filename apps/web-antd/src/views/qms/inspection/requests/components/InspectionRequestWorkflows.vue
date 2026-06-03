@@ -24,6 +24,7 @@ type DispatchForm = {
 type CloseForm = {
   attachments: InspectionRequestAttachment[];
   closeRemark: string;
+  hasDocuments: boolean;
   inspectionId: string;
   inspector: string;
   quantity: number;

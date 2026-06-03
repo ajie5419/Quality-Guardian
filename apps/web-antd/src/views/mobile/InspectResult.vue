@@ -18,6 +18,7 @@ import {
   message,
   Segmented,
   Spin,
+  Switch,
   Textarea,
   Upload,
 } from 'ant-design-vue';
@@ -40,6 +41,7 @@ const task = ref<InspectionRequest | null>(null);
 const fileList = ref<UploadFile[]>([]);
 const form = reactive({
   closeRemark: '',
+  hasDocuments: true,
   result: 'PASS' as 'FAIL' | 'PASS',
 });
 
@@ -84,6 +86,7 @@ async function submitResult() {
     await closeInspectionRequest(requestId.value, {
       attachments: normalizeUploadFileList(fileList.value, 'Inspection photo'),
       closeRemark: form.closeRemark || undefined,
+      hasDocuments: form.hasDocuments,
       qualifiedQuantity: form.result === 'PASS' ? quantity : 0,
       quantity,
       result: form.result,
@@ -134,6 +137,13 @@ onMounted(() => {
             v-model:value="form.result"
             block
             :options="resultOptions"
+          />
+        </FormItem>
+        <FormItem label="是否有资料" required>
+          <Switch
+            v-model:checked="form.hasDocuments"
+            checked-children="有"
+            un-checked-children="无"
           />
         </FormItem>
         <FormItem label="备注">

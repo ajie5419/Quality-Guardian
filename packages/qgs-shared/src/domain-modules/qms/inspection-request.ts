@@ -286,7 +286,10 @@ export function buildInspectionRecordPayloadCore(
   const basePayload = {
     documents:
       closeAttachments.length > 0 ? JSON.stringify(closeAttachments) : null,
-    hasDocuments: closeAttachments.length > 0,
+    hasDocuments:
+      typeof input.body.hasDocuments === 'boolean'
+        ? input.body.hasDocuments
+        : closeAttachments.length > 0,
     inspectionDate:
       normalizeInspectionRequestText(input.body.inspectionDate) || new Date(),
     inspector:

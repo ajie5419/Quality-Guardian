@@ -54,4 +54,67 @@ describe('inspection request helpers', () => {
       }),
     );
   });
+
+  it('honors an explicit hasDocuments choice over attachment count', async () => {
+    await buildInspectionRecordFromRequest(
+      {
+        componentName: '',
+        mutualCheckResult: 'PASS',
+        partName: 'Bearing',
+        process: { name: '' },
+        processName: INCOMING_INSPECTION_PROCESS_NAME,
+        quantity: 10,
+        reporter: 'Reporter A',
+        requestInfo: JSON.stringify({
+          incomingType: '外购件',
+          notes: 'Incoming batch',
+        }),
+        selfCheckResult: 'PASS',
+        team: 'Supplier A',
+        work_order: { projectName: 'Project A' },
+        workOrderNumber: 'WO-001',
+      },
+      {
+        attachments: [{ name: 'record.pdf', url: 'https://example.com/r.pdf' }],
+        hasDocuments: false,
+        inspector: 'Inspector A',
+        result: 'PASS',
+      },
+    );
+
+    expect(InspectionService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ hasDocuments: false }),
+    );
+  });
+
+  it('falls back to attachment count when hasDocuments is not provided', async () => {
+    await buildInspectionRecordFromRequest(
+      {
+        componentName: '',
+        mutualCheckResult: 'PASS',
+        partName: 'Bearing',
+        process: { name: '' },
+        processName: INCOMING_INSPECTION_PROCESS_NAME,
+        quantity: 10,
+        reporter: 'Reporter A',
+        requestInfo: JSON.stringify({
+          incomingType: '外购件',
+          notes: 'Incoming batch',
+        }),
+        selfCheckResult: 'PASS',
+        team: 'Supplier A',
+        work_order: { projectName: 'Project A' },
+        workOrderNumber: 'WO-001',
+      },
+      {
+        attachments: [{ name: 'record.pdf', url: 'https://example.com/r.pdf' }],
+        inspector: 'Inspector A',
+        result: 'PASS',
+      },
+    );
+
+    expect(InspectionService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ hasDocuments: true }),
+    );
+  });
 });

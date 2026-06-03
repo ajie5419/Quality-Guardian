@@ -26,6 +26,7 @@ export async function runClosePostCommitTask(
 
 export async function syncCloseAttachments(options: {
   closeAttachments: CloseAttachment;
+  hasDocuments?: boolean;
   inspectionId: string;
   requestId: string;
 }) {
@@ -45,11 +46,15 @@ export async function syncCloseAttachments(options: {
     currentInspection?.documents,
     options.closeAttachments,
   );
+  const resolvedHasDocuments =
+    typeof options.hasDocuments === 'boolean'
+      ? options.hasDocuments
+      : inspectionDocuments.length > 0;
   await runClosePostCommitTask('inspection-documents', async () => {
     await prisma.inspections.update({
       data: {
         documents: stringifyCloseInspectionDocuments(inspectionDocuments),
-        hasDocuments: inspectionDocuments.length > 0,
+        hasDocuments: resolvedHasDocuments,
       },
       where: { id: options.inspectionId },
     });
