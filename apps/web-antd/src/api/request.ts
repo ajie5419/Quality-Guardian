@@ -117,7 +117,11 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
       const responseData = err?.response?.data ?? {};
       const status = err?.response?.status;
       const code = responseData?.code;
-      const errorMessage = responseData?.error ?? responseData?.message ?? '';
+      const rawError = responseData?.error;
+      const errorMessage =
+        responseData?.message ??
+        (typeof rawError === 'string' ? rawError : '') ??
+        '';
 
       // 情况 A: 业务错误 (Code 1000-4999) -> 使用 message (轻型提示)
       if (code && code >= 1000 && code < 5000) {
