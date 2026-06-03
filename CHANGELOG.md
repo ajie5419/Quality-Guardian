@@ -25,6 +25,24 @@
 
 ## 执行记录
 
+### 2026-06-03 修复：售后质量表格首次加载持续下拉
+
+**执行内容：**
+
+- 定位售后质量桌面端表格首次加载时持续下拉、像一直在分页的问题，确认根因并非分页状态，而是虚拟滚动与布局的反馈循环。
+- 售后质量 grid 配置中 `height: 'auto'` 与 `scrollY`（纵向虚拟滚动）同时启用，但虚拟滚动需要确定的滚动体高度才能计算可见行；父容器 `.after-sales-grid-card` 未约束高度，`Page` 使用 `content-class="p-0"` 而非 `h-full`，导致 vxe-table 的 ResizeObserver 首次渲染时进入「表体高度变化 → 容器增高 → 重算可见行」的死循环。
+- 移除 `apps/web-antd/src/views/qms/after-sales/composables/useAfterSalesGrid.ts` 中的 `height: 'auto'` 覆盖，让 grid 继承适配器默认固定高度 `600`，与 supplier/metrology/outsourcing/inspection-issues 等其它分页表格保持一致，为虚拟滚动提供确定高度。
+- 说明此前三次「stabilize pagination」修复（`00da19f1`、`29d959f8`、`a08d4489`）均针对分页状态与后端分页，未触及该布局循环，因此问题持续存在。
+
+**验证结果：**
+
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- 浏览器层面（`http://localhost:5666/qms/after-sales` 首次加载是否只渲染一次、表格静止）待人工验证。
+
+**遗留问题：**
+
+- 需在本地多页数据下做最终浏览器验证，确认首次加载不再持续下拉。
+
 ### 2026-06-02 修复：售后质量分页重复增长
 
 **执行内容：**

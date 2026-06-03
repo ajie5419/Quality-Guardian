@@ -153,7 +153,6 @@ export function useAfterSalesGrid({
     });
 
   const gridOptions = computed(() => ({
-    height: 'auto',
     scrollX: { enabled: true, gt: 0 },
     scrollY: { enabled: true, gt: 0 },
     rowConfig: {
