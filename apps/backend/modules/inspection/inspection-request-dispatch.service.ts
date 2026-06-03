@@ -60,14 +60,27 @@ export const InspectionRequestDispatchService = {
       }),
     ]);
     if (!request) throw new BusinessError('NOT_FOUND', '报检任务不存在', 404);
-    if (request.status === INSPECTION_REQUEST_STATUS.CLOSED)
-      throw new Error('BAD_REQUEST:检验完成的报检任务不能重复派单');
+    if (request.status !== INSPECTION_REQUEST_STATUS.SUBMITTED)
+      throw new Error('BAD_REQUEST:该报检任务已被派单或不可派单，请刷新后重试');
     if (!inspector) throw new Error('BAD_REQUEST:检验员不存在');
 
     const priority = parseInspectionRequestPriority(body.priority);
     const dispatchRemark =
       normalizeInspectionRequestText(body.dispatchRemark) || null;
     const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.qms_inspection_requests.updateMany({
+        where: { id, status: INSPECTION_REQUEST_STATUS.SUBMITTED },
+        data: {
+          dispatchedAt: new Date(),
+          dispatcherId,
+          dispatchRemark,
+          inspectorId: inspector.id,
+          priority,
+          status: INSPECTION_REQUEST_STATUS.DISPATCHED,
+        },
+      });
+      if (result.count === 0)
+        throw new Error('BAD_REQUEST:该报检任务已被派单，请刷新后重试');
       const task = await tx.qms_task_dispatches.create({
         data: buildDispatchTaskCreateData({
           assignorId: dispatcherId,
@@ -77,15 +90,7 @@ export const InspectionRequestDispatchService = {
         }),
       });
       return tx.qms_inspection_requests.update({
-        data: {
-          dispatchedAt: new Date(),
-          dispatcherId,
-          dispatchRemark,
-          dispatchTaskId: task.id,
-          inspectorId: inspector.id,
-          priority,
-          status: INSPECTION_REQUEST_STATUS.DISPATCHED,
-        },
+        data: { dispatchTaskId: task.id },
         include: {
           dispatcher: { select: { realName: true, username: true } },
           inspector: { select: { realName: true, username: true } },
