@@ -1,8 +1,6 @@
 <script lang="ts" setup>
 import type { InspectionRequest } from '#/api/qms/inspection-request';
 
-import { fetchEventSource } from '@microsoft/fetch-event-source';
-
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -10,6 +8,7 @@ import { useAccess } from '@vben/access';
 import { IconifyIcon } from '@vben/icons';
 import { useAccessStore, useUserStore } from '@vben/stores';
 
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { Button, Modal, Tag } from 'ant-design-vue';
 import dayjs from 'dayjs';
 
