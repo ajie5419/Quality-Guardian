@@ -253,73 +253,79 @@ async function handleShare() {
       </div>
     </div>
 
-    <!-- Work content -->
+    <!-- Work content + completed milestone (two columns) -->
     <div
-      v-if="props.report.workContent"
-      style="
-        padding: 16px;
-        margin-bottom: 16px;
-        background-color: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-      "
+      v-if="props.report.workContent || props.report.completedMilestone"
+      style="display: flex; gap: 14px; margin-bottom: 14px"
     >
       <div
+        v-if="props.report.workContent"
         style="
-          padding-left: 10px;
-          margin-bottom: 12px;
-          font-size: 20px;
-          font-weight: 600;
-          color: #374151;
-          border-left: 4px solid #2563eb;
+          flex: 1;
+          min-width: 0;
+          padding: 16px;
+          background-color: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
         "
       >
-        今日工作内容
+        <div
+          style="
+            padding-left: 10px;
+            margin-bottom: 12px;
+            font-size: 20px;
+            font-weight: 600;
+            color: #374151;
+            border-left: 4px solid #2563eb;
+          "
+        >
+          今日工作内容
+        </div>
+        <div
+          style="
+            font-size: 17px;
+            line-height: 1.7;
+            color: #374151;
+            white-space: pre-wrap;
+          "
+        >
+          {{ props.report.workContent }}
+        </div>
       </div>
-      <div
-        style="
-          font-size: 17px;
-          line-height: 1.7;
-          color: #374151;
-          white-space: pre-wrap;
-        "
-      >
-        {{ props.report.workContent }}
-      </div>
-    </div>
 
-    <!-- Completed milestone -->
-    <div
-      v-if="props.report.completedMilestone"
-      style="
-        padding: 16px;
-        margin-bottom: 16px;
-        background-color: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-      "
-    >
       <div
+        v-if="props.report.completedMilestone"
         style="
-          padding-left: 10px;
-          margin-bottom: 12px;
-          font-size: 20px;
-          font-weight: 600;
-          color: #374151;
-          border-left: 4px solid #2563eb;
+          flex: 1;
+          min-width: 0;
+          padding: 16px;
+          background-color: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
         "
       >
-        完成节点
-      </div>
-      <div
-        style="
-          font-size: 17px;
-          line-height: 1.7;
-          color: #374151;
-          white-space: pre-wrap;
-        "
-      >
-        {{ props.report.completedMilestone }}
+        <div
+          style="
+            padding-left: 10px;
+            margin-bottom: 12px;
+            font-size: 20px;
+            font-weight: 600;
+            color: #374151;
+            border-left: 4px solid #2563eb;
+          "
+        >
+          完成节点
+        </div>
+        <div
+          style="
+            font-size: 17px;
+            line-height: 1.7;
+            color: #374151;
+            white-space: pre-wrap;
+          "
+        >
+          {{ props.report.completedMilestone }}
+        </div>
       </div>
     </div>
 
@@ -444,108 +450,121 @@ async function handleShare() {
       </div>
     </div>
 
-    <!-- Issue summary -->
+    <!-- Issue / tomorrow plan / coordination (three columns) -->
     <div
-      v-if="props.report.issueSummary"
-      style="
-        padding: 16px;
-        margin-bottom: 16px;
-        background-color: #fff7ed;
-        border: 1px solid #fed7aa;
-        border-radius: 6px;
+      v-if="
+        props.report.issueSummary ||
+        props.report.tomorrowPlan ||
+        props.report.coordinationNeeded
       "
+      style="display: flex; gap: 14px; margin-bottom: 14px"
     >
+      <!-- Issue summary -->
       <div
+        v-if="props.report.issueSummary"
         style="
-          padding-left: 10px;
-          margin-bottom: 12px;
-          font-size: 20px;
-          font-weight: 600;
-          color: #374151;
-          border-left: 4px solid #f97316;
+          flex: 1;
+          min-width: 0;
+          padding: 16px;
+          background-color: #fff7ed;
+          border: 1px solid #fed7aa;
+          border-radius: 6px;
         "
       >
-        问题汇总
+        <div
+          style="
+            padding-left: 10px;
+            margin-bottom: 12px;
+            font-size: 20px;
+            font-weight: 600;
+            color: #374151;
+            border-left: 4px solid #f97316;
+          "
+        >
+          问题汇总
+        </div>
+        <div
+          style="
+            font-size: 17px;
+            line-height: 1.7;
+            color: #374151;
+            white-space: pre-wrap;
+          "
+        >
+          {{ props.report.issueSummary }}
+        </div>
       </div>
-      <div
-        style="
-          font-size: 17px;
-          line-height: 1.7;
-          color: #374151;
-          white-space: pre-wrap;
-        "
-      >
-        {{ props.report.issueSummary }}
-      </div>
-    </div>
 
-    <!-- Tomorrow plan -->
-    <div
-      v-if="props.report.tomorrowPlan"
-      style="
-        padding: 16px;
-        margin-bottom: 16px;
-        background-color: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-      "
-    >
+      <!-- Tomorrow plan -->
       <div
+        v-if="props.report.tomorrowPlan"
         style="
-          padding-left: 10px;
-          margin-bottom: 12px;
-          font-size: 20px;
-          font-weight: 600;
-          color: #374151;
-          border-left: 4px solid #2563eb;
+          flex: 1;
+          min-width: 0;
+          padding: 16px;
+          background-color: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
         "
       >
-        明日计划
+        <div
+          style="
+            padding-left: 10px;
+            margin-bottom: 12px;
+            font-size: 20px;
+            font-weight: 600;
+            color: #374151;
+            border-left: 4px solid #2563eb;
+          "
+        >
+          明日计划
+        </div>
+        <div
+          style="
+            font-size: 17px;
+            line-height: 1.7;
+            color: #374151;
+            white-space: pre-wrap;
+          "
+        >
+          {{ props.report.tomorrowPlan }}
+        </div>
       </div>
-      <div
-        style="
-          font-size: 17px;
-          line-height: 1.7;
-          color: #374151;
-          white-space: pre-wrap;
-        "
-      >
-        {{ props.report.tomorrowPlan }}
-      </div>
-    </div>
 
-    <!-- Coordination needed -->
-    <div
-      v-if="props.report.coordinationNeeded"
-      style="
-        padding: 16px;
-        margin-bottom: 16px;
-        background-color: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-      "
-    >
+      <!-- Coordination needed -->
       <div
+        v-if="props.report.coordinationNeeded"
         style="
-          padding-left: 10px;
-          margin-bottom: 12px;
-          font-size: 20px;
-          font-weight: 600;
-          color: #374151;
-          border-left: 4px solid #2563eb;
+          flex: 1;
+          min-width: 0;
+          padding: 16px;
+          background-color: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
         "
       >
-        需要协调事项
-      </div>
-      <div
-        style="
-          font-size: 17px;
-          line-height: 1.7;
-          color: #374151;
-          white-space: pre-wrap;
-        "
-      >
-        {{ props.report.coordinationNeeded }}
+        <div
+          style="
+            padding-left: 10px;
+            margin-bottom: 12px;
+            font-size: 20px;
+            font-weight: 600;
+            color: #374151;
+            border-left: 4px solid #2563eb;
+          "
+        >
+          需要协调事项
+        </div>
+        <div
+          style="
+            font-size: 17px;
+            line-height: 1.7;
+            color: #374151;
+            white-space: pre-wrap;
+          "
+        >
+          {{ props.report.coordinationNeeded }}
+        </div>
       </div>
     </div>
 
@@ -572,7 +591,9 @@ async function handleShare() {
       >
         现场照片
       </div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px">
+      <div
+        style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px"
+      >
         <img
           v-for="url in props.report.attachments"
           :key="url"
@@ -581,7 +602,7 @@ async function handleShare() {
           style="
             display: block;
             width: 100%;
-            height: 200px;
+            height: 150px;
             object-fit: cover;
             border: 1px solid #e5e7eb;
             border-radius: 4px;
