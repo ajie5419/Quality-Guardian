@@ -25,6 +25,33 @@
 
 ## 执行记录
 
+### 2026-06-04 监造日报：任务状态徽章改用项目计划实时状态
+
+**用户反馈：** 截图里"2.3 支腿组对"进度 100% 但徽章显示"进行中"——该显示项目计划里的实时状态（已完成 / 已延期等），不是日报提交时的快照。
+
+**执行内容（3 个文件）：**
+
+- 共享类型 SupervisionReportTaskUpdate 新增 `currentTaskStatus?: SupervisionPlanTaskStatus`，注释说明它来自关联 plan_task 的实时计算，区别于本表的提交快照 status
+- 后端 mapReportTaskUpdate 在查询时调用 calculatePlanTaskStatus 实时计算，输入来自 include 的 plan_task 的 actual/planned 日期 + progressPercent + riskLevel；fallback 链：实时算 → 快照 status → 'IN_PROGRESS'（plan_task 被删时的兜底）
+- 三处 include（createReport / listReports / updateReport）从 `taskUpdates: true` 改为 include task 的 6 个原始字段
+- 前端徽章两处（截图区 + 抽屉正常视图）都改用 `task.currentTaskStatus ?? task.status`
+
+**关键设计选择：** 没有读 plan_tasks.status 字段，而是用 calculatePlanTaskStatus 在查询时实时算。原因：plan_tasks.status 字段只在 createTask/updateTask/进度同步时刷新，长期不动会陈旧（比如某任务过了 plannedEndAt 但没人编辑，字段仍是 IN_PROGRESS）。这与项目已有的 mapPlanTask 范式一致——读出来时实时算，不依赖存储字段。
+
+**验证结果：**
+
+- build (shared): 通过
+- typecheck (backend): 通过
+- typecheck (frontend): 通过
+- lint: 通过
+
+**commit:**
+- `12bc94cd` fix(@qgs/backend): show real-time plan-task status in report details
+
+**遗留问题：**
+
+- 浏览器层面（重新打开历史日报、进度 100% 任务徽章应显示"已完成"、过期任务应显示"已延期"）待人工验证
+
 ### 2026-06-04 监造日报：分享图片改善（多列布局 + 任务状态徽章）
 
 **用户反馈：** 1) 图片太长（所有区块单列纵向堆叠）；2) 任务推进里看不出"组对节点 6 月 2 日，6 月 4 日的日报应显示已逾期"——只有进度数字没状态。
