@@ -25,6 +25,72 @@
 
 ## 执行记录
 
+### 2026-06-04 监造模块：新增工单号选择和删除功能
+
+**执行内容：**
+
+1. 监造项目创建表单新增工单号选择功能（2 个文件，33 行）
+   - 前端表单组件添加 WorkOrderSelect 组件
+   - 添加 workOrderNumber 字段到表单状态和 payload
+   - 实现 watch 监听工单号变化，自动从工单 API 获取项目名称并填充
+   - 选择工单号后项目名称自动填充，简化数据录入
+
+2. 监造项目和问题闭环新增删除功能（6 个文件，122 行）
+   - 后端 Service 层添加软删除方法（deleteProject / deleteIssue）
+   - 后端创建 DELETE 路由（projects/[id].delete.ts 和 issues/[id].delete.ts）
+   - 前端 API 添加删除函数（deleteSupervisionProject / deleteSupervisionIssue）
+   - 前端列表添加删除按钮（danger 样式）和确认对话框
+   - 删除成功后自动刷新列表
+
+**验证结果：**
+
+- typecheck (frontend): 通过
+- typecheck (backend): 通过
+- lint: 通过
+- 未运行 build（存在无关的 jiti 依赖问题）
+- 监造模块无单测文件
+
+**commit:**
+- `f29fdb80` feat(@qgs/web-antd): add work order selection to supervision project form
+- `e4e73d4b` feat(@qgs/backend): add delete functionality for supervision
+
+**遗留问题：**
+
+- 无
+
+### 2026-06-04 项目代码审计（采样）
+
+**执行内容：**
+
+- 用户提供 38 项常见代码风险/坏味道清单（时区、错误码、软删除、状态机、越权、竞态、暴破防护、过时三方依赖等）。
+- 派 4 个 haiku 子代理并行采样扫描，分组：A 安全 / B 数据 / C 接口 / D 卫生。每组挑最严重的 5–10 个证据。
+- 发现 **5 项高危、13 项中等、14 项良好/不存在、2 项不适用**，共覆盖 34/38 项清单条目。
+- 完整结果与修复计划记录于 `docs/AUDIT-2026-06-04.md`（176 行）。
+- 追加 4 条新硬约束到 `CONSTRAINTS.md`：错误码契约、并发写守卫、写路由所有权断言、禁止静默 catch。
+
+**高危项（建议优先修）：**
+
+1. 错误码类型不一致：后端 `BusinessError.code` 是字符串、响应顶层 `code` 永远是 -1，前端按数字范围判断永远不命中（`response.ts:52` + `request.ts:127`）
+2. 登录暴力破解无防护（`auth.service.ts` 无任何 rate-limit/lockout）
+3. 水平越权：`data-scope` 中间件只覆盖 4 个模块，`quality-loss / metrology / knowledge` 等 delete/put 无所有权校验
+4. `inspection-request close` 存在并发竞态（状态检查在事务外）
+5. 异常类型混乱：3 种风格并存，约 15 处 `throw new Error('中文')` 不能被 `legacyErrorToBusinessError` 转换
+
+**审计局限性（必须诚实记录）：**
+
+- 本次为采样而非穷举：`setResponseStatus` 裸调仅上报 5 处，仓库实际 ~30+；IDOR 检查只覆盖 quality-loss/metrology/knowledge，inspection-record/supplier/welder 等模块未逐路由审。
+- 后续修复时需要扩大扫描范围，并在每个高危项修复后做穷举式验证。
+
+**验证结果：**
+
+- 本次为审计阶段，未涉及代码改动，无需 typecheck/lint。
+- 文档与硬约束已落库。
+
+**遗留问题：**
+
+- 5 项高危按 ROI 排序进入"批次 1"修复计划（见 `docs/AUDIT-2026-06-04.md`），尚未启动。
+- 用户已确认这些问题不作为"新约束"（多数已被现有 CONSTRAINTS.md 覆盖），而是作为"违反现有约束"的债务清单分批处理。
+
 ## [0.5.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.5.0...qgs-v0.5.1) (2026-06-03)
 
 
