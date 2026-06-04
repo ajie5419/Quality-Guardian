@@ -6,10 +6,10 @@ import type {
 
 import { formatDate } from '@qgs/shared';
 
+import { syncSupervisionProjectProgress } from './supervision-plan-task-progress';
 import {
   calculatePlanTaskStatus,
   calculateQuantityProgress,
-  mapPlanTask,
   normalizeDate,
   normalizePercent,
   normalizePositiveQuantity,
@@ -18,7 +18,6 @@ import {
   parseList,
   prisma,
   stringifyList,
-  summarizePlanTasks,
 } from './supervision-shared';
 
 /**
@@ -213,19 +212,14 @@ export const SupervisionReportService = {
         });
       }
 
-      const projectTasks = await tx.supervision_plan_tasks.findMany({
-        where: { isDeleted: false, projectId },
-      });
-      const projectProgress = summarizePlanTasks(
-        projectTasks.map((item) => mapPlanTask(item)),
-      ).progressPercent;
-
+      // Sync project progressPercent and status from leaf tasks (isSummary: false).
+      // Uses the shared helper so both code paths stay consistent.
+      await syncSupervisionProjectProgress(projectId, tx);
+      // Update location/stage from the report payload separately.
       await tx.supervision_projects.update({
         data: {
           location: normalizeText(payload.location) || undefined,
-          progressPercent: projectProgress,
           stage: normalizeText(payload.completedMilestone) || undefined,
-          status: projectProgress >= 100 ? 'COMPLETED' : 'IN_PROGRESS',
         },
         where: { id: projectId },
       });
