@@ -25,6 +25,36 @@
 
 ## 执行记录
 
+### 2026-06-04 监造日报：详情增加"分享图片"功能（可发微信）
+
+**需求：** 手机端查看日报时分享成图片发微信，图片布局要适合电脑端查看。
+
+**方案选型（用户确认）：**
+- 分享方式：Web Share API 原生分享（手机弹系统分享面板，含微信），不支持时降级为下载图片。理由：项目未集成微信 JSSDK，网页无法直接塞图给微信；原生分享是最接近"直接发微信"且零额外依赖的路径
+- 图片布局：固定 800px 宽的专用截图布局，不受手机屏宽影响，电脑端清晰
+
+**执行内容（1 个文件，+574 行）：**
+
+- 复用项目已有的 html2canvas（^1.4.1，无新依赖）
+- 新增固定 800px、off-screen（position:fixed; left:-9999px）的截图专用布局：在 DOM 内正常渲染供 html2canvas 截取，但用户不可见、不影响抽屉布局
+- 截图布局全用内联 hex 颜色（非 tailwind class），避开 html2canvas 对 tailwind v4 oklch 动态颜色支持不稳导致的截图变黑/透明
+- 分享降级链：html2canvas 截图 → toBlob → File → navigator.canShare 检测 → navigator.share({ files }) → 不支持则下载 PNG 并提示"打开微信选择图片发送"；share 的 AbortError（用户取消）静默处理
+- 抽屉 footer 加"分享图片"按钮（带 loading）
+- Web Share API 用特性检测守卫，无 as any
+
+**验证结果：**
+
+- typecheck (frontend): 通过
+- lint: 通过
+
+**commit:**
+- `c66d2877` feat(@qgs/web-antd): add share-as-image to supervision report detail
+
+**遗留问题：**
+
+- ⚠️ OSS 图片跨域风险：若 OSS bucket 未对前端域名配置 CORS 响应头，截图里的现场照片会因 canvas taint 变空白（文字和布局不受影响）。彻底解决需在 OSS 配 CORS 允许前端域名，或后端加图片代理接口
+- 浏览器/手机层面（原生分享面板能否弹出微信、截图版式、电脑端查看效果）待人工验证
+
 ### 2026-06-04 监造日报：移动端卡片补回操作入口（查看/编辑/删除）
 
 **执行内容：**
