@@ -25,6 +25,32 @@
 
 ## 执行记录
 
+### 2026-06-04 监造模块：修复项目进度与甘特任务不同步
+
+**执行内容：**
+
+修复"甘特任务全完成但项目进度卡在 40%"的 bug（3 个文件）
+
+- 根因：项目进度有两条回写路径，日报提交路径（supervision-report.service.ts）计算进度时漏了 `isSummary: false` 过滤，把汇总行也算进分母稀释了进度；两条路径的 status 更新逻辑还不一致
+- 采用方案 a（DRY 重构）：
+  - syncSupervisionProjectProgress 增加可选 tx 参数，支持事务内/独立调用
+  - 日报路径改为复用该函数（原内联 15 行逻辑删除），两条路径算法完全统一，只算叶子任务
+  - 抽出 calcProjectStatusFromProgress：100→COMPLETED，1-99→IN_PROGRESS，0→保持原值
+- 新增一次性重算脚本 scripts/resync-supervision-project-progress.ts，修复历史脏数据（如"风领模具"40%），带 before/after 日志
+
+**验证结果：**
+
+- typecheck (backend): 通过
+- lint: 通过
+
+**commit:**
+- `3558b57e` fix(@qgs/backend): sync project progress from leaf tasks consistently
+
+**遗留问题：**
+
+- ⚠️ 历史脏数据需部署后手动跑一次重算脚本：`pnpm --dir apps/backend exec tsx scripts/resync-supervision-project-progress.ts`
+- 小遗留（未处理）：report service 里 stage 仍从 payload.completedMilestone 取值，但该字段已改为后端自动汇总、前端不再传，导致 stage 实际不会更新。不影响本次进度修复，范围外暂记
+
 ### 2026-06-04 监造日报：标题加工单号、人数文本化、节点自动汇总
 
 **执行内容：**
