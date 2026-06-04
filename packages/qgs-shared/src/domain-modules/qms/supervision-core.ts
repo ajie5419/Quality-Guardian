@@ -153,9 +153,9 @@ export function calculateSupervisionPlanTaskStatus(task: {
     normalizeSupervisionText(task.riskLevel).toUpperCase() === 'RISK';
   if (!hasStarted) {
     if (startAt) {
-      const startOfDay = new Date(startAt);
-      startOfDay.setHours(0, 0, 0, 0);
-      if (startOfDay <= now) return 'DELAYED';
+      const endOfStartDay = new Date(startAt);
+      endOfStartDay.setHours(23, 59, 59, 999);
+      if (endOfStartDay < now) return 'DELAYED';
     }
     if (isRisk) return 'RISK';
     return 'NOT_STARTED';
