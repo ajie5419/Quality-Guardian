@@ -36,6 +36,57 @@ function handleUpdateOpen(value: boolean) {
   emit('update:open', value);
 }
 
+// Hex color + label maps for the screenshot region (avoid antd theme keywords
+// which html2canvas may drop). Used only inside the off-screen capture div.
+function shareStatusHex(status?: string): { bg: string; fg: string } {
+  switch (status) {
+    case 'DELAYED': {
+      return { bg: '#fee2e2', fg: '#b91c1c' };
+    }
+    case 'DONE': {
+      return { bg: '#dcfce7', fg: '#15803d' };
+    }
+    case 'DUE_SOON': {
+      return { bg: '#ffedd5', fg: '#c2410c' };
+    }
+    case 'IN_PROGRESS': {
+      return { bg: '#dbeafe', fg: '#1d4ed8' };
+    }
+    case 'RISK': {
+      return { bg: '#f3e8ff', fg: '#7e22ce' };
+    }
+    default: {
+      return { bg: '#f3f4f6', fg: '#4b5563' };
+    }
+  }
+}
+
+function shareStatusLabel(status?: string): string {
+  switch (status) {
+    case 'DELAYED': {
+      return '已延期';
+    }
+    case 'DONE': {
+      return '已完成';
+    }
+    case 'DUE_SOON': {
+      return '临期';
+    }
+    case 'IN_PROGRESS': {
+      return '进行中';
+    }
+    case 'NOT_STARTED': {
+      return '未开始';
+    }
+    case 'RISK': {
+      return '有风险';
+    }
+    default: {
+      return '未开始';
+    }
+  }
+}
+
 function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -372,8 +423,31 @@ async function handleShare() {
           "
         >
           <div style="flex: 1; min-width: 0">
-            <div style="font-size: 18px; font-weight: 600; color: #111827">
-              {{ task.taskNo }} {{ task.taskName }}
+            <div
+              style="
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+                align-items: center;
+              "
+            >
+              <div style="font-size: 18px; font-weight: 600; color: #111827">
+                {{ task.taskNo }} {{ task.taskName }}
+              </div>
+              <span
+                :style="{
+                  display: 'inline-block',
+                  padding: '2px 10px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  lineHeight: '1.5',
+                  borderRadius: '4px',
+                  backgroundColor: shareStatusHex(task.status).bg,
+                  color: shareStatusHex(task.status).fg,
+                }"
+              >
+                {{ shareStatusLabel(task.status) }}
+              </span>
             </div>
             <div style="margin-top: 6px; font-size: 15px; color: #6b7280">
               数量：{{ task.completedQuantity ?? 0 }}/{{
