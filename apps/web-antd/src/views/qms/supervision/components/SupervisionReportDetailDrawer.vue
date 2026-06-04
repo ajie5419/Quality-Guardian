@@ -1,11 +1,14 @@
 <script lang="ts" setup>
 import type { SupervisionDailyReport } from '@qgs/shared';
 
+import { ref } from 'vue';
+
 import {
   Button,
   Card,
   Drawer,
   Image,
+  message,
   Progress,
   Space,
   Tag,
@@ -26,12 +29,575 @@ const emit = defineEmits<{
 }>();
 const { isMobile } = useMobileViewport();
 
+const shareCanvasRef = ref<HTMLElement | null>(null);
+const shareLoading = ref(false);
+
 function handleUpdateOpen(value: boolean) {
   emit('update:open', value);
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error('canvas.toBlob returned null'));
+      }
+    }, 'image/png');
+  });
+}
+
+async function handleShare() {
+  if (!shareCanvasRef.value || !props.report) return;
+  shareLoading.value = true;
+  try {
+    const { default: html2canvas } = await import('html2canvas');
+    const canvas = await html2canvas(shareCanvasRef.value, {
+      useCORS: true,
+      scale: 2,
+      backgroundColor: '#ffffff',
+      ignoreElements: (element) => element.tagName === 'SCRIPT',
+    });
+
+    const projectName = props.report.projectName ?? '监造项目';
+    const reportDate = props.report.reportDate ?? '';
+    const fileName = `监造日报_${projectName}_${reportDate}.png`;
+
+    const blob = await canvasToBlob(canvas);
+    const file = new File([blob], fileName, { type: 'image/png' });
+
+    // Try native share (mobile / supported browsers)
+    if (
+      'canShare' in navigator &&
+      typeof navigator.canShare === 'function' &&
+      navigator.canShare({ files: [file] })
+    ) {
+      try {
+        await navigator.share({ files: [file], title: '监造日报' });
+      } catch (shareError) {
+        if (shareError instanceof Error && shareError.name === 'AbortError') {
+          // User cancelled — not an error, do nothing
+          return;
+        }
+        throw shareError;
+      }
+    } else {
+      // Fallback: download PNG
+      const url = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      message.info('图片已保存，请打开微信选择图片发送');
+    }
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') return;
+    message.error('生成分享图片失败，请重试');
+  } finally {
+    shareLoading.value = false;
+  }
 }
 </script>
 
 <template>
+  <!-- ============================================================
+       Off-screen screenshot canvas — fixed 800px, invisible to user
+       position:fixed + left:-9999px keeps it in DOM for html2canvas
+       but outside viewport so it never affects layout
+  ============================================================ -->
+  <div
+    v-if="props.report"
+    ref="shareCanvasRef"
+    style="
+      position: fixed;
+      left: -9999px;
+      top: 0;
+      width: 800px;
+      background-color: #ffffff;
+      padding: 32px;
+      font-family:
+        -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei',
+        sans-serif;
+      color: #1a1a1a;
+      box-sizing: border-box;
+    "
+  >
+    <!-- Title area -->
+    <div
+      style="
+        text-align: center;
+        border-bottom: 2px solid #2563eb;
+        padding-bottom: 20px;
+        margin-bottom: 24px;
+      "
+    >
+      <div
+        style="
+          font-size: 24px;
+          font-weight: 700;
+          color: #111827;
+          line-height: 1.3;
+        "
+      >
+        {{ props.report.projectName ?? '' }}
+      </div>
+      <div
+        v-if="props.report.workOrderNumber"
+        style="font-size: 13px; color: #6b7280; margin-top: 6px"
+      >
+        工单号：{{ props.report.workOrderNumber }}
+      </div>
+      <div style="font-size: 13px; color: #6b7280; margin-top: 4px">
+        监造现场日报
+      </div>
+      <div
+        style="
+          font-size: 22px;
+          font-weight: 700;
+          color: #2563eb;
+          margin-top: 8px;
+        "
+      >
+        {{ props.report.reportDate }}
+      </div>
+    </div>
+
+    <!-- Basic info grid -->
+    <div
+      style="
+        background-color: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 16px;
+      "
+    >
+      <div
+        style="
+          font-size: 14px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 12px;
+          border-left: 3px solid #2563eb;
+          padding-left: 8px;
+        "
+      >
+        基本信息
+      </div>
+      <div
+        style="
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          font-size: 13px;
+        "
+      >
+        <div>
+          <div style="color: #6b7280; margin-bottom: 2px">监造员</div>
+          <div style="font-weight: 500; color: #111827">
+            {{ props.report.reporter || '-' }}
+          </div>
+        </div>
+        <div>
+          <div style="color: #6b7280; margin-bottom: 2px">现场人数</div>
+          <div style="font-weight: 500; color: #111827">
+            {{ props.report.manpower || '-' }}
+          </div>
+        </div>
+        <div>
+          <div style="color: #6b7280; margin-bottom: 2px">现场地点</div>
+          <div style="font-weight: 500; color: #111827">
+            {{ props.report.location || '-' }}
+          </div>
+        </div>
+        <div>
+          <div style="color: #6b7280; margin-bottom: 2px">天气</div>
+          <div style="font-weight: 500; color: #111827">
+            {{ props.report.weather || '-' }}
+          </div>
+        </div>
+      </div>
+      <div
+        v-if="props.report.progressPercent > 0"
+        style="margin-top: 12px; font-size: 13px"
+      >
+        <div style="color: #6b7280; margin-bottom: 6px">
+          项目进度：{{ props.report.progressPercent }}%
+        </div>
+        <div
+          style="
+            height: 8px;
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+          "
+        >
+          <div
+            :style="{
+              width: `${props.report.progressPercent}%`,
+              height: '100%',
+              backgroundColor: '#2563eb',
+              borderRadius: '4px',
+            }"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Work content -->
+    <div
+      v-if="props.report.workContent"
+      style="
+        background-color: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 16px;
+      "
+    >
+      <div
+        style="
+          font-size: 14px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 8px;
+          border-left: 3px solid #2563eb;
+          padding-left: 8px;
+        "
+      >
+        今日工作内容
+      </div>
+      <div
+        style="
+          font-size: 13px;
+          color: #374151;
+          white-space: pre-wrap;
+          line-height: 1.6;
+        "
+      >
+        {{ props.report.workContent }}
+      </div>
+    </div>
+
+    <!-- Completed milestone -->
+    <div
+      v-if="props.report.completedMilestone"
+      style="
+        background-color: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 16px;
+      "
+    >
+      <div
+        style="
+          font-size: 14px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 8px;
+          border-left: 3px solid #2563eb;
+          padding-left: 8px;
+        "
+      >
+        完成节点
+      </div>
+      <div
+        style="
+          font-size: 13px;
+          color: #374151;
+          white-space: pre-wrap;
+          line-height: 1.6;
+        "
+      >
+        {{ props.report.completedMilestone }}
+      </div>
+    </div>
+
+    <!-- Task updates -->
+    <div
+      v-if="props.report.taskUpdates && props.report.taskUpdates.length > 0"
+      style="
+        background-color: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 16px;
+      "
+    >
+      <div
+        style="
+          font-size: 14px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 12px;
+          border-left: 3px solid #2563eb;
+          padding-left: 8px;
+        "
+      >
+        任务推进情况
+      </div>
+      <div
+        v-for="task in props.report.taskUpdates"
+        :key="task.id ?? task.taskId"
+        style="
+          background-color: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 4px;
+          padding: 12px;
+          margin-bottom: 8px;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+          "
+        >
+          <div style="flex: 1; min-width: 0">
+            <div style="font-size: 13px; font-weight: 600; color: #111827">
+              {{ task.taskNo }} {{ task.taskName }}
+            </div>
+            <div style="font-size: 12px; color: #6b7280; margin-top: 4px">
+              数量：{{ task.completedQuantity ?? 0 }}/{{
+                task.plannedQuantity ?? 0
+              }}{{ task.quantityUnit ?? '' }}
+              <span v-if="task.dailyQuantity" style="color: #16a34a">
+                （本次 +{{ task.dailyQuantity }}{{ task.quantityUnit ?? '' }}）
+              </span>
+            </div>
+          </div>
+          <div style="text-align: right; white-space: nowrap">
+            <div style="font-size: 18px; font-weight: 700; color: #2563eb">
+              {{ task.progressPercent }}%
+            </div>
+          </div>
+        </div>
+        <div
+          style="
+            height: 6px;
+            background-color: #e5e7eb;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+          "
+        >
+          <div
+            :style="{
+              width: `${task.progressPercent}%`,
+              height: '100%',
+              backgroundColor: '#2563eb',
+              borderRadius: '3px',
+            }"
+          ></div>
+        </div>
+        <div v-if="task.workContent" style="margin-top: 8px; font-size: 12px">
+          <div style="color: #6b7280">工作内容</div>
+          <div
+            style="
+              color: #374151;
+              white-space: pre-wrap;
+              margin-top: 2px;
+              line-height: 1.5;
+            "
+          >
+            {{ task.workContent }}
+          </div>
+        </div>
+        <div v-if="task.nextPlan" style="margin-top: 8px; font-size: 12px">
+          <div style="color: #6b7280">下一步计划</div>
+          <div
+            style="
+              color: #374151;
+              white-space: pre-wrap;
+              margin-top: 2px;
+              line-height: 1.5;
+            "
+          >
+            {{ task.nextPlan }}
+          </div>
+        </div>
+        <div v-if="task.riskReason" style="margin-top: 8px; font-size: 12px">
+          <div style="color: #6b7280">风险原因</div>
+          <div
+            style="
+              color: #d97706;
+              white-space: pre-wrap;
+              margin-top: 2px;
+              line-height: 1.5;
+            "
+          >
+            {{ task.riskReason }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Issue summary -->
+    <div
+      v-if="props.report.issueSummary"
+      style="
+        background-color: #fff7ed;
+        border: 1px solid #fed7aa;
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 16px;
+      "
+    >
+      <div
+        style="
+          font-size: 14px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 8px;
+          border-left: 3px solid #f97316;
+          padding-left: 8px;
+        "
+      >
+        问题汇总
+      </div>
+      <div
+        style="
+          font-size: 13px;
+          color: #374151;
+          white-space: pre-wrap;
+          line-height: 1.6;
+        "
+      >
+        {{ props.report.issueSummary }}
+      </div>
+    </div>
+
+    <!-- Tomorrow plan -->
+    <div
+      v-if="props.report.tomorrowPlan"
+      style="
+        background-color: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 16px;
+      "
+    >
+      <div
+        style="
+          font-size: 14px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 8px;
+          border-left: 3px solid #2563eb;
+          padding-left: 8px;
+        "
+      >
+        明日计划
+      </div>
+      <div
+        style="
+          font-size: 13px;
+          color: #374151;
+          white-space: pre-wrap;
+          line-height: 1.6;
+        "
+      >
+        {{ props.report.tomorrowPlan }}
+      </div>
+    </div>
+
+    <!-- Coordination needed -->
+    <div
+      v-if="props.report.coordinationNeeded"
+      style="
+        background-color: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 16px;
+      "
+    >
+      <div
+        style="
+          font-size: 14px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 8px;
+          border-left: 3px solid #2563eb;
+          padding-left: 8px;
+        "
+      >
+        需要协调事项
+      </div>
+      <div
+        style="
+          font-size: 13px;
+          color: #374151;
+          white-space: pre-wrap;
+          line-height: 1.6;
+        "
+      >
+        {{ props.report.coordinationNeeded }}
+      </div>
+    </div>
+
+    <!-- Photos -->
+    <div
+      v-if="props.report.attachments && props.report.attachments.length > 0"
+      style="
+        background-color: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 16px;
+      "
+    >
+      <div
+        style="
+          font-size: 14px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 12px;
+          border-left: 3px solid #2563eb;
+          padding-left: 8px;
+        "
+      >
+        现场照片
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px">
+        <img
+          v-for="url in props.report.attachments"
+          :key="url"
+          :src="url"
+          crossorigin="anonymous"
+          style="
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #e5e7eb;
+            display: block;
+          "
+        />
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div
+      style="
+        text-align: center;
+        font-size: 11px;
+        color: #9ca3af;
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid #e5e7eb;
+      "
+    >
+      由质量管理系统生成 · {{ new Date().toLocaleDateString('zh-CN') }}
+    </div>
+  </div>
+
+  <!-- Main drawer -->
   <Drawer
     :open="props.open"
     title="监造日报详情"
@@ -213,6 +779,14 @@ function handleUpdateOpen(value: boolean) {
     <template #footer>
       <Space>
         <Button @click="emit('update:open', false)">关闭</Button>
+        <Button
+          v-if="props.report"
+          type="primary"
+          :loading="shareLoading"
+          @click="handleShare"
+        >
+          分享图片
+        </Button>
       </Space>
     </template>
   </Drawer>
