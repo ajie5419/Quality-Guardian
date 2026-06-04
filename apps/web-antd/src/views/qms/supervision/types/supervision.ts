@@ -10,7 +10,6 @@ export type ProjectFormState = {
   actualEndAt?: dayjs.Dayjs;
   actualStartAt?: dayjs.Dayjs;
   location: string;
-  milestonesText: string;
   participantsText: string;
   plannedEndAt?: dayjs.Dayjs;
   plannedStartAt?: dayjs.Dayjs;
@@ -78,13 +77,4 @@ export type IssueFormState = {
   severity: string;
   status: SupervisionIssue['status'];
   verifyResult: string;
-};
-
-export type PlanStepFormState = {
-  actualAt?: dayjs.Dayjs;
-  plannedAt?: dayjs.Dayjs;
-  remark: string;
-  sortOrder: number;
-  status: string;
-  stepName: string;
 };

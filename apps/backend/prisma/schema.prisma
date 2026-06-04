@@ -652,10 +652,8 @@ model supervision_projects {
   isDeleted         Boolean                           @default(false)
   createdAt         DateTime                          @default(now())
   updatedAt         DateTime                          @updatedAt
-  milestones        supervision_milestones[]
   dailyReports      supervision_daily_reports[]
   issues            supervision_issues[]
-  planRows          supervision_plan_rows[]
   planTasks         supervision_plan_tasks[]
   reportTaskUpdates supervision_report_task_updates[]
 
@@ -668,65 +666,6 @@ model supervision_projects {
   @@index([projectId])
   @@index([status])
   @@index([riskLevel])
-  @@index([isDeleted])
-}
-
-model supervision_milestones {
-  id               String               @id @default(cuid())
-  projectId        String
-  name             String
-  plannedAt        DateTime?
-  actualAt         DateTime?
-  status           String               @default("PENDING")
-  delayReason      String?              @db.Text
-  acceptanceRecord String?              @db.LongText
-  sortOrder        Int                  @default(0)
-  isDeleted        Boolean              @default(false)
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-  project          supervision_projects @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-  @@index([status])
-  @@index([plannedAt])
-}
-
-model supervision_plan_rows {
-  id          String                   @id @default(cuid())
-  projectId   String
-  segmentCode String
-  quantity    Int                      @default(1)
-  unit        String                   @default("套")
-  remark      String?                  @db.Text
-  isDeleted   Boolean                  @default(false)
-  createdAt   DateTime                 @default(now())
-  updatedAt   DateTime                 @updatedAt
-  project     supervision_projects     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  steps       supervision_plan_steps[]
-
-  @@index([projectId])
-  @@index([segmentCode])
-  @@index([isDeleted])
-}
-
-model supervision_plan_steps {
-  id        String                @id @default(cuid())
-  rowId     String
-  stepName  String
-  plannedAt DateTime?
-  actualAt  DateTime?
-  status    String                @default("PENDING")
-  remark    String?               @db.Text
-  sortOrder Int                   @default(0)
-  isDeleted Boolean               @default(false)
-  createdAt DateTime              @default(now())
-  updatedAt DateTime              @updatedAt
-  row       supervision_plan_rows @relation(fields: [rowId], references: [id], onDelete: Cascade)
-
-  @@index([rowId])
-  @@index([stepName])
-  @@index([plannedAt])
-  @@index([status])
   @@index([isDeleted])
 }
 

@@ -76,7 +76,6 @@ export const QMS_API = {
   AFTER_SALES_BATCH_DELETE: '/qms/after-sales/batch-delete',
   SUPERVISION_ISSUES: '/qms/supervision/issues',
   SUPERVISION_DEADLINE_BOARD: '/qms/supervision/deadline-board',
-  SUPERVISION_OVERVIEW: '/qms/supervision/overview',
   SUPERVISION_PROJECTS: '/qms/supervision/projects',
   SUPERVISION_REPORTS: '/qms/supervision/reports',
   VEHICLE_COMMISSIONING_ISSUES: '/qms/vehicle-commissioning/issues',

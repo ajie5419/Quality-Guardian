@@ -1,12 +1,9 @@
 import type {
   DeadlineBoardResult,
   SupervisionDailyReport,
-  SupervisionDashboard,
   SupervisionIssue,
   SupervisionIssueAction,
   SupervisionIssueParams,
-  SupervisionMilestone,
-  SupervisionPlanRow,
   SupervisionPlanTaskImportResult,
   SupervisionProject,
   SupervisionProjectParams,
@@ -17,25 +14,6 @@ import { normalizeListResponse } from '#/api/qms/adapters';
 import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
-
-type SupervisionPlanRowPayload = {
-  quantity?: number;
-  remark?: string;
-  segmentCode?: string;
-  steps?: Array<{
-    actualAt?: string;
-    plannedAt?: string;
-    remark?: string;
-    sortOrder?: number;
-    status?: string;
-    stepName?: string;
-  }>;
-  unit?: string;
-};
-
-export async function getSupervisionOverview() {
-  return requestClient.get<SupervisionDashboard>(QMS_API.SUPERVISION_OVERVIEW);
-}
 
 export async function getSupervisionDeadlineBoard(params?: {
   dueSoonDays?: number;
@@ -80,38 +58,6 @@ export async function deleteSupervisionProject(id: string) {
   return requestClient.delete(`${QMS_API.SUPERVISION_PROJECTS}/${id}`, {
     params: { id },
   });
-}
-
-export async function getSupervisionMilestones(projectId: string) {
-  return requestClient.get<SupervisionMilestone[]>(
-    `${QMS_API.SUPERVISION_PROJECTS}/${projectId}/milestones`,
-  );
-}
-
-export async function updateSupervisionMilestones(
-  projectId: string,
-  items: Array<Partial<SupervisionMilestone>>,
-) {
-  return requestClient.put<SupervisionMilestone[]>(
-    `${QMS_API.SUPERVISION_PROJECTS}/${projectId}/milestones`,
-    { items },
-  );
-}
-
-export async function getSupervisionPlanRows(projectId: string) {
-  return requestClient.get<SupervisionPlanRow[]>(
-    `${QMS_API.SUPERVISION_PROJECTS}/${projectId}/plan-rows`,
-  );
-}
-
-export async function updateSupervisionPlanRows(
-  projectId: string,
-  rows: SupervisionPlanRowPayload[],
-) {
-  return requestClient.put<SupervisionPlanRow[]>(
-    `${QMS_API.SUPERVISION_PROJECTS}/${projectId}/plan-rows`,
-    { rows },
-  );
 }
 
 export async function getSupervisionPlanTasks(projectId: string) {

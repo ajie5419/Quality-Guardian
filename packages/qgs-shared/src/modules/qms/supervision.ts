@@ -22,12 +22,8 @@ export interface SupervisionProject {
   location?: string;
   openIssueCount?: number;
   participants: string[];
-  planDelayedStepCount?: number;
-  planDoneStepCount?: number;
-  planDueSoonStepCount?: number;
   plannedEndAt?: string;
   plannedStartAt?: string;
-  planStepCount?: number;
   progressPercent: number;
   projectName: string;
   projectType: SupervisionProjectType;
@@ -40,45 +36,6 @@ export interface SupervisionProject {
   totalIssueCount?: number;
   updatedAt?: string;
   workOrderNumber?: string;
-}
-
-export interface SupervisionMilestone {
-  acceptanceRecord?: string[];
-  actualAt?: string;
-  createdAt?: string;
-  delayReason?: string;
-  id: string;
-  name: string;
-  plannedAt?: string;
-  projectId: string;
-  sortOrder: number;
-  status: string;
-  updatedAt?: string;
-}
-
-export interface SupervisionPlanStep {
-  actualAt?: string;
-  createdAt?: string;
-  id: string;
-  plannedAt?: string;
-  remark?: string;
-  rowId: string;
-  sortOrder: number;
-  status: string;
-  stepName: string;
-  updatedAt?: string;
-}
-
-export interface SupervisionPlanRow {
-  createdAt?: string;
-  id: string;
-  projectId: string;
-  quantity: number;
-  remark?: string;
-  segmentCode: string;
-  steps: SupervisionPlanStep[];
-  unit: string;
-  updatedAt?: string;
 }
 
 export type SupervisionPlanTaskStatus =
@@ -247,21 +204,6 @@ export interface SupervisionIssueAction {
   description?: string;
   id: string;
   issueId: string;
-}
-
-export interface SupervisionDashboard {
-  activeProjectCount: number;
-  averageProgress: number;
-  delayedMilestoneCount: number;
-  highRiskProjectCount: number;
-  openIssueCount: number;
-  overdueIssueCount: number;
-  reportsTodayCount: number;
-  supplierStats: Array<{
-    openIssueCount: number;
-    projectCount: number;
-    supplierName: string;
-  }>;
 }
 
 export interface SupervisionProjectParams {
