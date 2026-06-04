@@ -25,6 +25,45 @@
 
 ## 执行记录
 
+### 2026-06-04 监造模块设计审查后整改：修复日报假编辑 + 清理死代码
+
+**背景：** 应用户要求对监造 5 个子模块（项目/甘特计划/现场日报/问题闭环/纳期管控）做设计审查，发现核心数据流设计正确（甘特任务为单一事实源 → 日报汇报 → 回写任务进度 → 汇总项目进度 → 纳期只读聚合），但存在两类问题并整改。
+
+**执行内容：**
+
+1. 修复"现场日报编辑实际是新增"的 bug（2 个文件）
+   - 根因：submitReport 无论新增/编辑都调 createSupervisionReport（POST），从不调 updateSupervisionReport（PUT），editReport 也没记录正在编辑的 ID。后果：编辑日报变成新增重复记录，并重复回写甘特进度
+   - 后端 updateReport 从只接受 3 字段扩展为接受全部描述性字段（location/weather/manpower/issueSummary/coordinationNeeded/attachments/reporter/reportDate/progressPercent/workContent），加 isDeleted 守卫
+   - 前端新增 editingReportId，提交按是否编辑分流 update/create
+   - 用户决策：编辑只改描述性字段，任务汇报（taskUpdates）不可改（避免进度回滚的复杂度）；编辑模式隐藏甘特节点汇报区、跳过节点必填校验
+
+2. 清理三套早期"计划/进度"死代码（6 个文件，净删 174 行）
+   - 这三套设计已被甘特任务（supervision_plan_tasks）完全取代，有表+类型+前端 API 声明，但无后端路由、无组件调用
+   - 删数据库表：supervision_milestones、supervision_plan_rows、supervision_plan_steps（migration 按外键顺序 DROP）
+   - 删共享类型：SupervisionMilestone/PlanRow/PlanStep/Dashboard + SupervisionProject 上 4 个 planStepCount 字段
+   - 删前端孤立 API：getSupervisionOverview/Milestones/PlanRows 等 + SUPERVISION_OVERVIEW 常量 + PlanStepFormState/milestonesText
+   - 每项删除前 grep 确认零引用
+
+**审查发现但本次未改（暂记）：**
+- 问题闭环的 supervision_issues.taskId 字段后端会写但前端不传，问题只能挂项目无法定位到任务（半成品，按业务需要再排期）
+- 项目 PAUSED 状态会被日报提交的进度同步冲掉
+
+**验证结果：**
+
+- build (shared): 通过
+- typecheck (backend): 通过
+- typecheck (frontend): 通过
+- lint: 通过
+
+**commit:**
+- `8e1e3909` fix(@qgs/backend): make supervision report edit actually update
+- `b7a9dd27` refactor(@qgs/backend): remove dead supervision plan tables and types
+
+**遗留问题：**
+
+- ⚠️ 删表 migration 已创建未应用（migrate dev 因 shadow DB 历史 migration 问题失败）。需手动执行 `pnpm --dir apps/backend exec prisma migrate deploy`。注意：上一条 manpower migration（20260604000100）可能也尚未应用，deploy 会一并按顺序执行
+- 浏览器层面（日报编辑只改描述字段、编辑模式隐藏任务区）待人工验证
+
 ### 2026-06-04 监造模块：修复项目进度与甘特任务不同步
 
 **执行内容：**
