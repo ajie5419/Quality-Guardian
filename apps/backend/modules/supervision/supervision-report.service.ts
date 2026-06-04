@@ -264,6 +264,21 @@ export const SupervisionReportService = {
       data.reporter = normalizeText(payload.reporter);
     if (payload.reportDate !== undefined)
       data.reportDate = normalizeDate(payload.reportDate);
+    if (payload.location !== undefined)
+      data.location = normalizeText(payload.location) || null;
+    if (payload.weather !== undefined)
+      data.weather = normalizeText(payload.weather) || null;
+    if (payload.manpower !== undefined)
+      data.manpower = normalizeText(payload.manpower) || null;
+    if (payload.issueSummary !== undefined)
+      data.issueSummary = normalizeText(payload.issueSummary) || null;
+    if (payload.coordinationNeeded !== undefined)
+      data.coordinationNeeded =
+        normalizeText(payload.coordinationNeeded) || null;
+    if (payload.attachments !== undefined)
+      data.attachments = stringifyList(payload.attachments);
+    if (payload.progressPercent !== undefined)
+      data.progressPercent = normalizePercent(payload.progressPercent);
 
     const row = await prisma.supervision_daily_reports.update({
       data,
@@ -271,7 +286,7 @@ export const SupervisionReportService = {
         project: { select: { projectName: true, workOrderNumber: true } },
         taskUpdates: true,
       },
-      where: { id },
+      where: { id, isDeleted: false },
     });
     return mapReport(row);
   },

@@ -50,6 +50,7 @@ import {
   importSupervisionPlanTasks,
   updateSupervisionIssue,
   updateSupervisionProject,
+  updateSupervisionReport,
 } from '#/api/qms/supervision';
 import { getUserList } from '#/api/system/user';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
@@ -166,6 +167,7 @@ const issueDrawerOpen = ref(false);
 const actionDrawerOpen = ref(false);
 const editingProjectId = ref('');
 const editingIssueId = ref('');
+const editingReportId = ref('');
 const detailProject = ref<SupervisionProject>();
 const detailReport = ref<SupervisionDailyReport>();
 
@@ -705,8 +707,9 @@ async function loadReports() {
 }
 
 function editReport(record: SupervisionDailyReport) {
+  editingReportId.value = record.id;
   Object.assign(reportForm, {
-    attachments: [],
+    attachments: toUploadFiles(record.attachments || []),
     completedMilestone: record.completedMilestone || '',
     coordinationNeeded: record.coordinationNeeded || '',
     issueSummary: record.issueSummary || '',
@@ -729,7 +732,6 @@ function editReport(record: SupervisionDailyReport) {
   reportTaskDrafts.value = [];
   if (record.projectId) {
     selectedPlanProjectId.value = record.projectId;
-    loadPlanTasks(record.projectId).then(syncReportTaskDrafts);
   }
   reportDrawerOpen.value = true;
 }
@@ -907,6 +909,7 @@ async function submitProject() {
 }
 
 function openReportDrawer(project?: SupervisionProject) {
+  editingReportId.value = '';
   Object.assign(reportForm, {
     attachments: [],
     completedMilestone: '',
@@ -941,6 +944,28 @@ async function submitReport() {
     message.warning('监造项目和监造人员不能为空');
     return;
   }
+
+  if (editingReportId.value) {
+    // Edit mode: only update descriptive fields, skip taskUpdates
+    await updateSupervisionReport(editingReportId.value, {
+      attachments: uploadUrls(reportForm.attachments),
+      coordinationNeeded: reportForm.coordinationNeeded,
+      issueSummary: reportForm.issueSummary,
+      location: reportForm.location,
+      manpower: reportForm.manpower,
+      progressPercent: reportForm.progressPercent,
+      reportDate: reportForm.reportDate.format('YYYY-MM-DD'),
+      reporter: reportForm.reporter,
+      weather: reportForm.weather,
+      workContent: reportForm.workContent,
+    });
+    reportDrawerOpen.value = false;
+    message.success('监造日报已更新');
+    await loadReports();
+    return;
+  }
+
+  // Create mode: require at least one gantt node
   const selectedDrafts = activeReportTaskDrafts.value;
   if (selectedDrafts.length === 0) {
     message.warning('请选择至少一个甘特节点进行汇报');
@@ -1910,7 +1935,7 @@ onMounted(async () => {
 
   <Drawer
     v-model:open="reportDrawerOpen"
-    title="提交节点推进日报"
+    :title="editingReportId ? '编辑现场日报' : '提交节点推进日报'"
     :width="isMobile ? '100vw' : 860"
     :body-style="{ overflowX: 'hidden' }"
   >
@@ -1920,6 +1945,7 @@ onMounted(async () => {
           <Select
             v-model:value="reportForm.projectId"
             show-search
+            :disabled="!!editingReportId"
             :filter-option="true"
             :options="projectOptions"
             @change="handleReportProjectChange"
@@ -1945,7 +1971,10 @@ onMounted(async () => {
           />
         </Form.Item>
       </div>
-      <div class="mb-4 rounded border border-blue-100 bg-blue-50 p-3">
+      <div
+        v-if="!editingReportId"
+        class="mb-4 rounded border border-blue-100 bg-blue-50 p-3"
+      >
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div>
             <div class="font-medium">今日节点推进</div>
@@ -1957,18 +1986,18 @@ onMounted(async () => {
         </div>
       </div>
       <div
-        v-if="loadingPlanTasks"
+        v-if="!editingReportId && loadingPlanTasks"
         class="mb-4 rounded border border-dashed p-6 text-center text-gray-500"
       >
         正在加载甘特节点
       </div>
       <div
-        v-else-if="reportTaskDrafts.length === 0"
+        v-else-if="!editingReportId && reportTaskDrafts.length === 0"
         class="mb-4 rounded border border-dashed p-6 text-center text-gray-500"
       >
         当前项目暂无可推进的甘特节点
       </div>
-      <div v-else class="mb-4 space-y-4">
+      <div v-else-if="!editingReportId" class="mb-4 space-y-4">
         <div v-for="group in reportTaskGroups" :key="group.title">
           <div class="mb-2 text-sm font-medium text-gray-600">
             {{ group.title }}
