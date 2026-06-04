@@ -25,6 +25,42 @@
 
 ## 执行记录
 
+### 2026-06-04 监造日报：标题加工单号、人数文本化、节点自动汇总
+
+**执行内容：**
+
+按用户需求改进监造日报三项（6 个文件 + 1 个 migration）
+
+1. 详情标题增加工单号
+   - 共享类型 SupervisionDailyReport 新增 workOrderNumber 字段
+   - 后端三处 project include 增加 select workOrderNumber，mapReport 返回该字段
+   - 详情卡片标题区在项目名称下显示「工单号：xxx」（为空不显示）
+
+2. 现场人数从数字改为文本（Int → String）
+   - Prisma migration：manpower 列 INT 改 TEXT（MySQL 自动转换现有数字数据）
+   - 支持「下料2人、组对3人」这类中文描述
+   - 前端输入控件 InputNumber 改为 Input，详情展示去掉"人"后缀
+
+3. 完成节点 + 明日计划改为任务自动汇总（完全只读）
+   - 后端 createReport 新增 summarizeTaskField，根据 taskUpdates 的 workContent/nextPlan 自动生成
+   - 格式：每个任务一行「{任务名}：{内容}」，空内容跳过
+   - 前端删除这两个字段的手动输入框，不再手动录入
+
+**验证结果：**
+
+- build (shared): 通过
+- typecheck (frontend): 通过
+- typecheck (backend): 通过
+- lint: 通过
+
+**commit:**
+- `d670090e` feat(@qgs/backend): improve supervision report fields and auto-summary
+
+**遗留问题：**
+
+- ⚠️ Migration 文件已创建但未应用到数据库（子代理无法连接 DB）。用户需手动执行：`pnpm --dir apps/backend exec prisma migrate deploy`
+- 浏览器层面（人数文本录入、工单号显示、节点自动汇总效果）待人工验证
+
 ### 2026-06-04 监造模块：完善日报表单与新增卡片详情视图
 
 **执行内容：**
