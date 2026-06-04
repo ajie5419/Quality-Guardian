@@ -72,6 +72,7 @@ type ProjectFormState = {
   projectName: string;
   supervisor: string;
   supplierName: string;
+  workOrderNumber: string;
 };
 
 type ReportFormState = {
@@ -167,6 +168,7 @@ const projectForm = reactive<ProjectFormState>({
   projectName: '',
   supplierName: '',
   supervisor: '',
+  workOrderNumber: '',
 });
 
 const reportForm = reactive<ReportFormState>({
@@ -820,6 +822,7 @@ function buildProjectPayload() {
     projectName: projectForm.projectName,
     supplierName: projectForm.supplierName,
     supervisor: projectForm.supervisor,
+    workOrderNumber: projectForm.workOrderNumber,
   };
 }
 

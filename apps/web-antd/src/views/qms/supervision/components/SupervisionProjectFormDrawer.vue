@@ -13,8 +13,10 @@ import {
   Space,
 } from 'ant-design-vue';
 
+import { getWorkOrderList } from '#/api/qms/work-order';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import SupplierSelect from '#/views/qms/shared/components/SupplierSelect.vue';
+import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
 
 type ProjectFormState = {
   plannedEndAt?: dayjs.Dayjs;
@@ -22,6 +24,7 @@ type ProjectFormState = {
   projectName: string;
   supervisor: string;
   supplierName: string;
+  workOrderNumber: string;
 };
 
 interface Props {
@@ -45,6 +48,7 @@ const localForm = reactive<ProjectFormState>({
   projectName: '',
   supervisor: '',
   supplierName: '',
+  workOrderNumber: '',
 });
 
 function copyForm(source: ProjectFormState): ProjectFormState {
@@ -54,6 +58,7 @@ function copyForm(source: ProjectFormState): ProjectFormState {
     projectName: source.projectName,
     supervisor: source.supervisor,
     supplierName: source.supplierName,
+    workOrderNumber: source.workOrderNumber,
   };
 }
 
@@ -87,6 +92,25 @@ function handleSubmit() {
   emit('update:form', copyForm(localForm));
   emit('submit');
 }
+
+watch(
+  () => localForm.workOrderNumber,
+  async (workOrderNumber) => {
+    if (!workOrderNumber) return;
+    try {
+      const { items } = await getWorkOrderList({
+        workOrderNumber,
+        ignoreYearFilter: true,
+      });
+      const firstItem = items?.[0];
+      if (firstItem?.projectName) {
+        localForm.projectName = firstItem.projectName;
+      }
+    } catch (error) {
+      console.error('Failed to fetch work order details:', error);
+    }
+  },
+);
 </script>
 
 <template>
@@ -98,6 +122,12 @@ function handleSubmit() {
     @update:open="handleUpdateOpen"
   >
     <Form layout="vertical">
+      <Form.Item label="工单号">
+        <WorkOrderSelect
+          v-model:value="localForm.workOrderNumber"
+          placeholder="选择工单号"
+        />
+      </Form.Item>
       <Form.Item label="项目名称" required>
         <Input
           v-model:value="localForm.projectName"
