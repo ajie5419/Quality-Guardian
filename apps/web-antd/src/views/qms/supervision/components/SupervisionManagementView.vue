@@ -65,6 +65,7 @@ import DeadlineBoard from './DeadlineBoard.vue';
 import GanttTaskEditor from './GanttTaskEditor.vue';
 import SupervisionProjectDetailDrawer from './SupervisionProjectDetailDrawer.vue';
 import SupervisionProjectFormDrawer from './SupervisionProjectFormDrawer.vue';
+import SupervisionReportDetailDrawer from './SupervisionReportDetailDrawer.vue';
 
 const { isMobile } = useMobileViewport();
 
@@ -160,11 +161,13 @@ const selectedPlanProjectId = ref('');
 const projectDrawerOpen = ref(false);
 const projectDetailDrawerOpen = ref(false);
 const reportDrawerOpen = ref(false);
+const reportDetailDrawerOpen = ref(false);
 const issueDrawerOpen = ref(false);
 const actionDrawerOpen = ref(false);
 const editingProjectId = ref('');
 const editingIssueId = ref('');
 const detailProject = ref<SupervisionProject>();
+const detailReport = ref<SupervisionDailyReport>();
 
 const projectForm = reactive<ProjectFormState>({
   projectName: '',
@@ -702,10 +705,32 @@ async function loadReports() {
 }
 
 function editReport(record: SupervisionDailyReport) {
-  reportForm.projectId = record.projectId;
-  reportForm.reporter = record.reporter;
-  reportForm.workContent = record.workContent || '';
-  reportForm.reportDate = dayjs(record.reportDate);
+  Object.assign(reportForm, {
+    attachments: [],
+    completedMilestone: record.completedMilestone || '',
+    coordinationNeeded: record.coordinationNeeded || '',
+    issueSummary: record.issueSummary || '',
+    location: record.location || '',
+    manpower: record.manpower || 0,
+    progressPercent: record.progressPercent || 0,
+    projectId: record.projectId,
+    reportDate: dayjs(record.reportDate),
+    reporter: record.reporter,
+    taskId: '',
+    taskNextPlan: '',
+    taskProgressPercent: 0,
+    taskRiskReason: '',
+    taskStatus: 'IN_PROGRESS',
+    taskWorkContent: '',
+    tomorrowPlan: record.tomorrowPlan || '',
+    weather: record.weather || '',
+    workContent: record.workContent || '',
+  });
+  reportTaskDrafts.value = [];
+  if (record.projectId) {
+    selectedPlanProjectId.value = record.projectId;
+    loadPlanTasks(record.projectId).then(syncReportTaskDrafts);
+  }
   reportDrawerOpen.value = true;
 }
 
@@ -724,6 +749,11 @@ function deleteReport(record: SupervisionDailyReport) {
       }
     },
   });
+}
+
+function openReportDetail(record: SupervisionDailyReport) {
+  detailReport.value = record;
+  reportDetailDrawerOpen.value = true;
 }
 
 function deleteProject(record: SupervisionProject) {
@@ -1647,6 +1677,13 @@ onMounted(async () => {
               <Table.Column title="操作" width="120" fixed="right">
                 <template #default="{ record }">
                   <Space>
+                    <Button
+                      size="small"
+                      type="link"
+                      @click="openReportDetail(record)"
+                    >
+                      查看
+                    </Button>
                     <Button size="small" type="link" @click="editReport(record)"
                       >编辑</Button
                     >
@@ -1855,6 +1892,14 @@ onMounted(async () => {
     @edit="openProjectDrawer"
   />
 
+  <SupervisionReportDetailDrawer
+    :open="reportDetailDrawerOpen"
+    :report="detailReport"
+    :plan-task-color="planTaskColor"
+    :plan-task-label="planTaskLabel"
+    @update:open="(value) => (reportDetailDrawerOpen = value)"
+  />
+
   <SupervisionProjectFormDrawer
     :open="projectDrawerOpen"
     :editing-project-id="editingProjectId"
@@ -2054,6 +2099,44 @@ onMounted(async () => {
           v-model:value="reportForm.workContent"
           :rows="3"
           placeholder="描述今日现场工作情况"
+        />
+      </Form.Item>
+      <Form.Item label="完成节点">
+        <Input.TextArea
+          v-model:value="reportForm.completedMilestone"
+          :rows="2"
+          placeholder="今日完成的主要节点"
+        />
+      </Form.Item>
+      <Form.Item label="问题汇总">
+        <Input.TextArea
+          v-model:value="reportForm.issueSummary"
+          :rows="3"
+          placeholder="现场发现的问题汇总"
+        />
+      </Form.Item>
+      <Form.Item label="明日计划">
+        <Input.TextArea
+          v-model:value="reportForm.tomorrowPlan"
+          :rows="3"
+          placeholder="明日工作计划"
+        />
+      </Form.Item>
+      <Form.Item label="需要协调事项">
+        <Input.TextArea
+          v-model:value="reportForm.coordinationNeeded"
+          :rows="2"
+          placeholder="需要公司或其他部门协调的事项"
+        />
+      </Form.Item>
+      <Form.Item label="项目进度（可选）">
+        <InputNumber
+          v-model:value="reportForm.progressPercent"
+          class="w-full"
+          :min="0"
+          :max="100"
+          :step="1"
+          addon-after="%"
         />
       </Form.Item>
       <Form.Item label="现场照片">
