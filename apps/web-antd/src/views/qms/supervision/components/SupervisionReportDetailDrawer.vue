@@ -111,52 +111,52 @@ async function handleShare() {
     ref="shareCanvasRef"
     style="
       position: fixed;
-      left: -9999px;
       top: 0;
-      width: 800px;
-      background-color: #ffffff;
-      padding: 32px;
+      left: -9999px;
+      box-sizing: border-box;
+      width: 900px;
+      padding: 40px;
       font-family:
         -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei',
         sans-serif;
       color: #1a1a1a;
-      box-sizing: border-box;
+      background-color: #fff;
     "
   >
     <!-- Title area -->
     <div
       style="
+        padding-bottom: 24px;
+        margin-bottom: 28px;
         text-align: center;
-        border-bottom: 2px solid #2563eb;
-        padding-bottom: 20px;
-        margin-bottom: 24px;
+        border-bottom: 3px solid #2563eb;
       "
     >
       <div
         style="
-          font-size: 24px;
+          font-size: 32px;
           font-weight: 700;
-          color: #111827;
           line-height: 1.3;
+          color: #111827;
         "
       >
         {{ props.report.projectName ?? '' }}
       </div>
       <div
         v-if="props.report.workOrderNumber"
-        style="font-size: 13px; color: #6b7280; margin-top: 6px"
+        style="margin-top: 10px; font-size: 16px; color: #6b7280"
       >
         工单号：{{ props.report.workOrderNumber }}
       </div>
-      <div style="font-size: 13px; color: #6b7280; margin-top: 4px">
+      <div style="margin-top: 6px; font-size: 16px; color: #6b7280">
         监造现场日报
       </div>
       <div
         style="
-          font-size: 22px;
+          margin-top: 12px;
+          font-size: 28px;
           font-weight: 700;
           color: #2563eb;
-          margin-top: 8px;
         "
       >
         {{ props.report.reportDate }}
@@ -166,21 +166,21 @@ async function handleShare() {
     <!-- Basic info grid -->
     <div
       style="
+        padding: 16px;
+        margin-bottom: 16px;
         background-color: #f9fafb;
         border: 1px solid #e5e7eb;
         border-radius: 6px;
-        padding: 16px;
-        margin-bottom: 16px;
       "
     >
       <div
         style="
-          font-size: 14px;
+          padding-left: 10px;
+          margin-bottom: 14px;
+          font-size: 20px;
           font-weight: 600;
           color: #374151;
-          margin-bottom: 12px;
-          border-left: 3px solid #2563eb;
-          padding-left: 8px;
+          border-left: 4px solid #2563eb;
         "
       >
         基本信息
@@ -189,30 +189,38 @@ async function handleShare() {
         style="
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 12px;
-          font-size: 13px;
+          gap: 16px;
+          font-size: 17px;
         "
       >
         <div>
-          <div style="color: #6b7280; margin-bottom: 2px">监造员</div>
+          <div style="margin-bottom: 4px; font-size: 14px; color: #6b7280">
+            监造员
+          </div>
           <div style="font-weight: 500; color: #111827">
             {{ props.report.reporter || '-' }}
           </div>
         </div>
         <div>
-          <div style="color: #6b7280; margin-bottom: 2px">现场人数</div>
+          <div style="margin-bottom: 4px; font-size: 14px; color: #6b7280">
+            现场人数
+          </div>
           <div style="font-weight: 500; color: #111827">
             {{ props.report.manpower || '-' }}
           </div>
         </div>
         <div>
-          <div style="color: #6b7280; margin-bottom: 2px">现场地点</div>
+          <div style="margin-bottom: 4px; font-size: 14px; color: #6b7280">
+            现场地点
+          </div>
           <div style="font-weight: 500; color: #111827">
             {{ props.report.location || '-' }}
           </div>
         </div>
         <div>
-          <div style="color: #6b7280; margin-bottom: 2px">天气</div>
+          <div style="margin-bottom: 4px; font-size: 14px; color: #6b7280">
+            天气
+          </div>
           <div style="font-weight: 500; color: #111827">
             {{ props.report.weather || '-' }}
           </div>
@@ -220,17 +228,17 @@ async function handleShare() {
       </div>
       <div
         v-if="props.report.progressPercent > 0"
-        style="margin-top: 12px; font-size: 13px"
+        style="margin-top: 16px; font-size: 16px"
       >
-        <div style="color: #6b7280; margin-bottom: 6px">
+        <div style="margin-bottom: 8px; color: #6b7280">
           项目进度：{{ props.report.progressPercent }}%
         </div>
         <div
           style="
-            height: 8px;
-            background-color: #e5e7eb;
-            border-radius: 4px;
+            height: 12px;
             overflow: hidden;
+            background-color: #e5e7eb;
+            border-radius: 6px;
           "
         >
           <div
@@ -249,31 +257,31 @@ async function handleShare() {
     <div
       v-if="props.report.workContent"
       style="
+        padding: 16px;
+        margin-bottom: 16px;
         background-color: #f9fafb;
         border: 1px solid #e5e7eb;
         border-radius: 6px;
-        padding: 16px;
-        margin-bottom: 16px;
       "
     >
       <div
         style="
-          font-size: 14px;
+          padding-left: 10px;
+          margin-bottom: 12px;
+          font-size: 20px;
           font-weight: 600;
           color: #374151;
-          margin-bottom: 8px;
-          border-left: 3px solid #2563eb;
-          padding-left: 8px;
+          border-left: 4px solid #2563eb;
         "
       >
         今日工作内容
       </div>
       <div
         style="
-          font-size: 13px;
+          font-size: 17px;
+          line-height: 1.7;
           color: #374151;
           white-space: pre-wrap;
-          line-height: 1.6;
         "
       >
         {{ props.report.workContent }}
@@ -284,31 +292,31 @@ async function handleShare() {
     <div
       v-if="props.report.completedMilestone"
       style="
+        padding: 16px;
+        margin-bottom: 16px;
         background-color: #f9fafb;
         border: 1px solid #e5e7eb;
         border-radius: 6px;
-        padding: 16px;
-        margin-bottom: 16px;
       "
     >
       <div
         style="
-          font-size: 14px;
+          padding-left: 10px;
+          margin-bottom: 12px;
+          font-size: 20px;
           font-weight: 600;
           color: #374151;
-          margin-bottom: 8px;
-          border-left: 3px solid #2563eb;
-          padding-left: 8px;
+          border-left: 4px solid #2563eb;
         "
       >
         完成节点
       </div>
       <div
         style="
-          font-size: 13px;
+          font-size: 17px;
+          line-height: 1.7;
           color: #374151;
           white-space: pre-wrap;
-          line-height: 1.6;
         "
       >
         {{ props.report.completedMilestone }}
@@ -319,21 +327,21 @@ async function handleShare() {
     <div
       v-if="props.report.taskUpdates && props.report.taskUpdates.length > 0"
       style="
+        padding: 16px;
+        margin-bottom: 16px;
         background-color: #f9fafb;
         border: 1px solid #e5e7eb;
         border-radius: 6px;
-        padding: 16px;
-        margin-bottom: 16px;
       "
     >
       <div
         style="
-          font-size: 14px;
+          padding-left: 10px;
+          margin-bottom: 14px;
+          font-size: 20px;
           font-weight: 600;
           color: #374151;
-          margin-bottom: 12px;
-          border-left: 3px solid #2563eb;
-          padding-left: 8px;
+          border-left: 4px solid #2563eb;
         "
       >
         任务推进情况
@@ -342,26 +350,26 @@ async function handleShare() {
         v-for="task in props.report.taskUpdates"
         :key="task.id ?? task.taskId"
         style="
-          background-color: #ffffff;
+          padding: 16px;
+          margin-bottom: 10px;
+          background-color: #fff;
           border: 1px solid #e5e7eb;
-          border-radius: 4px;
-          padding: 12px;
-          margin-bottom: 8px;
+          border-radius: 6px;
         "
       >
         <div
           style="
             display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
             gap: 8px;
+            align-items: flex-start;
+            justify-content: space-between;
           "
         >
           <div style="flex: 1; min-width: 0">
-            <div style="font-size: 13px; font-weight: 600; color: #111827">
+            <div style="font-size: 18px; font-weight: 600; color: #111827">
               {{ task.taskNo }} {{ task.taskName }}
             </div>
-            <div style="font-size: 12px; color: #6b7280; margin-top: 4px">
+            <div style="margin-top: 6px; font-size: 15px; color: #6b7280">
               数量：{{ task.completedQuantity ?? 0 }}/{{
                 task.plannedQuantity ?? 0
               }}{{ task.quantityUnit ?? '' }}
@@ -371,18 +379,18 @@ async function handleShare() {
             </div>
           </div>
           <div style="text-align: right; white-space: nowrap">
-            <div style="font-size: 18px; font-weight: 700; color: #2563eb">
+            <div style="font-size: 26px; font-weight: 700; color: #2563eb">
               {{ task.progressPercent }}%
             </div>
           </div>
         </div>
         <div
           style="
-            height: 6px;
-            background-color: #e5e7eb;
-            border-radius: 3px;
+            height: 8px;
+            margin-top: 10px;
             overflow: hidden;
-            margin-top: 8px;
+            background-color: #e5e7eb;
+            border-radius: 4px;
           "
         >
           <div
@@ -394,40 +402,40 @@ async function handleShare() {
             }"
           ></div>
         </div>
-        <div v-if="task.workContent" style="margin-top: 8px; font-size: 12px">
+        <div v-if="task.workContent" style="margin-top: 10px; font-size: 15px">
           <div style="color: #6b7280">工作内容</div>
           <div
             style="
+              margin-top: 4px;
+              line-height: 1.6;
               color: #374151;
               white-space: pre-wrap;
-              margin-top: 2px;
-              line-height: 1.5;
             "
           >
             {{ task.workContent }}
           </div>
         </div>
-        <div v-if="task.nextPlan" style="margin-top: 8px; font-size: 12px">
+        <div v-if="task.nextPlan" style="margin-top: 10px; font-size: 15px">
           <div style="color: #6b7280">下一步计划</div>
           <div
             style="
+              margin-top: 4px;
+              line-height: 1.6;
               color: #374151;
               white-space: pre-wrap;
-              margin-top: 2px;
-              line-height: 1.5;
             "
           >
             {{ task.nextPlan }}
           </div>
         </div>
-        <div v-if="task.riskReason" style="margin-top: 8px; font-size: 12px">
+        <div v-if="task.riskReason" style="margin-top: 10px; font-size: 15px">
           <div style="color: #6b7280">风险原因</div>
           <div
             style="
+              margin-top: 4px;
+              line-height: 1.6;
               color: #d97706;
               white-space: pre-wrap;
-              margin-top: 2px;
-              line-height: 1.5;
             "
           >
             {{ task.riskReason }}
@@ -440,31 +448,31 @@ async function handleShare() {
     <div
       v-if="props.report.issueSummary"
       style="
+        padding: 16px;
+        margin-bottom: 16px;
         background-color: #fff7ed;
         border: 1px solid #fed7aa;
         border-radius: 6px;
-        padding: 16px;
-        margin-bottom: 16px;
       "
     >
       <div
         style="
-          font-size: 14px;
+          padding-left: 10px;
+          margin-bottom: 12px;
+          font-size: 20px;
           font-weight: 600;
           color: #374151;
-          margin-bottom: 8px;
-          border-left: 3px solid #f97316;
-          padding-left: 8px;
+          border-left: 4px solid #f97316;
         "
       >
         问题汇总
       </div>
       <div
         style="
-          font-size: 13px;
+          font-size: 17px;
+          line-height: 1.7;
           color: #374151;
           white-space: pre-wrap;
-          line-height: 1.6;
         "
       >
         {{ props.report.issueSummary }}
@@ -475,31 +483,31 @@ async function handleShare() {
     <div
       v-if="props.report.tomorrowPlan"
       style="
+        padding: 16px;
+        margin-bottom: 16px;
         background-color: #f9fafb;
         border: 1px solid #e5e7eb;
         border-radius: 6px;
-        padding: 16px;
-        margin-bottom: 16px;
       "
     >
       <div
         style="
-          font-size: 14px;
+          padding-left: 10px;
+          margin-bottom: 12px;
+          font-size: 20px;
           font-weight: 600;
           color: #374151;
-          margin-bottom: 8px;
-          border-left: 3px solid #2563eb;
-          padding-left: 8px;
+          border-left: 4px solid #2563eb;
         "
       >
         明日计划
       </div>
       <div
         style="
-          font-size: 13px;
+          font-size: 17px;
+          line-height: 1.7;
           color: #374151;
           white-space: pre-wrap;
-          line-height: 1.6;
         "
       >
         {{ props.report.tomorrowPlan }}
@@ -510,31 +518,31 @@ async function handleShare() {
     <div
       v-if="props.report.coordinationNeeded"
       style="
+        padding: 16px;
+        margin-bottom: 16px;
         background-color: #f9fafb;
         border: 1px solid #e5e7eb;
         border-radius: 6px;
-        padding: 16px;
-        margin-bottom: 16px;
       "
     >
       <div
         style="
-          font-size: 14px;
+          padding-left: 10px;
+          margin-bottom: 12px;
+          font-size: 20px;
           font-weight: 600;
           color: #374151;
-          margin-bottom: 8px;
-          border-left: 3px solid #2563eb;
-          padding-left: 8px;
+          border-left: 4px solid #2563eb;
         "
       >
         需要协调事项
       </div>
       <div
         style="
-          font-size: 13px;
+          font-size: 17px;
+          line-height: 1.7;
           color: #374151;
           white-space: pre-wrap;
-          line-height: 1.6;
         "
       >
         {{ props.report.coordinationNeeded }}
@@ -545,21 +553,21 @@ async function handleShare() {
     <div
       v-if="props.report.attachments && props.report.attachments.length > 0"
       style="
+        padding: 16px;
+        margin-bottom: 16px;
         background-color: #f9fafb;
         border: 1px solid #e5e7eb;
         border-radius: 6px;
-        padding: 16px;
-        margin-bottom: 16px;
       "
     >
       <div
         style="
-          font-size: 14px;
+          padding-left: 10px;
+          margin-bottom: 14px;
+          font-size: 20px;
           font-weight: 600;
           color: #374151;
-          margin-bottom: 12px;
-          border-left: 3px solid #2563eb;
-          padding-left: 8px;
+          border-left: 4px solid #2563eb;
         "
       >
         现场照片
@@ -571,12 +579,12 @@ async function handleShare() {
           :src="url"
           crossorigin="anonymous"
           style="
-            width: 100%;
-            height: 160px;
-            object-fit: cover;
-            border-radius: 4px;
-            border: 1px solid #e5e7eb;
             display: block;
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
           "
         />
       </div>
@@ -585,11 +593,11 @@ async function handleShare() {
     <!-- Footer -->
     <div
       style="
-        text-align: center;
-        font-size: 11px;
+        padding-top: 20px;
+        margin-top: 28px;
+        font-size: 13px;
         color: #9ca3af;
-        margin-top: 24px;
-        padding-top: 16px;
+        text-align: center;
         border-top: 1px solid #e5e7eb;
       "
     >
