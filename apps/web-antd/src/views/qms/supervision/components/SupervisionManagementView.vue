@@ -1769,6 +1769,26 @@ onMounted(async () => {
               <div v-if="record.workContent" class="mt-2 text-sm text-gray-600">
                 {{ record.workContent }}
               </div>
+              <div class="mt-2 flex justify-end gap-1 border-t pt-2">
+                <Button
+                  size="small"
+                  type="link"
+                  @click="openReportDetail(record)"
+                >
+                  查看
+                </Button>
+                <Button size="small" type="link" @click="editReport(record)">
+                  编辑
+                </Button>
+                <Button
+                  size="small"
+                  type="link"
+                  danger
+                  @click="deleteReport(record)"
+                >
+                  删除
+                </Button>
+              </div>
             </Card>
           </div>
         </Card>
