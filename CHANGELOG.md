@@ -25,6 +25,30 @@
 
 ## 执行记录
 
+### 2026-06-04 监造模块：修复甘特图逾期判断 bug
+
+**执行内容：**
+
+修复监造计划任务逾期判断错误（1 个文件，3 行）
+- 问题：计划 6 月 4 日开始的任务，在 6 月 4 日当天就显示"已逾期"
+- 根因：未开始任务的逾期判断使用了 `startOfDay (00:00:00) <= now`
+- 修复：改为 `endOfStartDay (23:59:59) < now`，与已开始任务逻辑保持一致
+- 文件：`packages/qgs-shared/src/domain-modules/qms/supervision-core.ts`
+
+**验证结果：**
+
+- typecheck (shared): 通过
+- typecheck (frontend): 通过
+- typecheck (backend): 通过
+- build (shared): 通过
+
+**commit:**
+- `e35094ad` fix(@qgs/shared): correct delayed status logic for unstarted tasks
+
+**遗留问题：**
+
+- 无
+
 ### 2026-06-04 监造模块：新增工单号选择和删除功能
 
 **执行内容：**
