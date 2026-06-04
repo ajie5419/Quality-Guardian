@@ -426,8 +426,8 @@ async function handleShare() {
             <div
               style="
                 display: flex;
-                gap: 8px;
                 flex-wrap: wrap;
+                gap: 8px;
                 align-items: center;
               "
             >
@@ -442,11 +442,14 @@ async function handleShare() {
                   fontWeight: 600,
                   lineHeight: '1.5',
                   borderRadius: '4px',
-                  backgroundColor: shareStatusHex(task.status).bg,
-                  color: shareStatusHex(task.status).fg,
+                  backgroundColor: shareStatusHex(
+                    task.currentTaskStatus ?? task.status,
+                  ).bg,
+                  color: shareStatusHex(task.currentTaskStatus ?? task.status)
+                    .fg,
                 }"
               >
-                {{ shareStatusLabel(task.status) }}
+                {{ shareStatusLabel(task.currentTaskStatus ?? task.status) }}
               </span>
             </div>
             <div style="margin-top: 6px; font-size: 15px; color: #6b7280">
@@ -785,8 +788,14 @@ async function handleShare() {
                   <span class="font-medium">
                     {{ task.taskNo }} {{ task.taskName }}
                   </span>
-                  <Tag :color="props.planTaskColor(task.status)">
-                    {{ props.planTaskLabel(task.status) }}
+                  <Tag
+                    :color="
+                      props.planTaskColor(task.currentTaskStatus ?? task.status)
+                    "
+                  >
+                    {{
+                      props.planTaskLabel(task.currentTaskStatus ?? task.status)
+                    }}
                   </Tag>
                 </div>
                 <div class="mt-1 text-xs text-gray-500">

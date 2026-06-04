@@ -68,9 +68,23 @@ function mapReport(row: any) {
 }
 
 function mapReportTaskUpdate(row: any) {
+  const computedStatus = row.task
+    ? calculatePlanTaskStatus({
+        actualEndAt: row.task.actualEndAt ?? null,
+        actualStartAt: row.task.actualStartAt ?? null,
+        plannedEndAt: row.task.plannedEndAt ?? null,
+        plannedStartAt: row.task.plannedStartAt ?? null,
+        progressPercent: row.task.progressPercent ?? 0,
+        riskLevel: row.task.riskLevel ?? null,
+      })
+    : null;
   return {
     completedQuantity: normalizeQuantity(row.completedQuantity, 0),
     createdAt: row.createdAt?.toISOString(),
+    // currentTaskStatus: real-time status computed from the linked plan task's
+    // current fields, not from the stale status column. Falls back to the
+    // snapshot status on this record when the task has been deleted.
+    currentTaskStatus: computedStatus ?? row.status ?? 'IN_PROGRESS',
     dailyQuantity: normalizeQuantity(row.dailyQuantity, 0),
     id: row.id,
     nextPlan: row.nextPlan || '',
@@ -227,7 +241,20 @@ export const SupervisionReportService = {
       return tx.supervision_daily_reports.findUniqueOrThrow({
         include: {
           project: { select: { projectName: true, workOrderNumber: true } },
-          taskUpdates: true,
+          taskUpdates: {
+            include: {
+              task: {
+                select: {
+                  actualEndAt: true,
+                  actualStartAt: true,
+                  plannedEndAt: true,
+                  plannedStartAt: true,
+                  progressPercent: true,
+                  riskLevel: true,
+                },
+              },
+            },
+          },
         },
         where: { id: report.id },
       });
@@ -244,7 +271,20 @@ export const SupervisionReportService = {
       prisma.supervision_daily_reports.findMany({
         include: {
           project: { select: { projectName: true, workOrderNumber: true } },
-          taskUpdates: true,
+          taskUpdates: {
+            include: {
+              task: {
+                select: {
+                  actualEndAt: true,
+                  actualStartAt: true,
+                  plannedEndAt: true,
+                  plannedStartAt: true,
+                  progressPercent: true,
+                  riskLevel: true,
+                },
+              },
+            },
+          },
         },
         orderBy: { reportDate: 'desc' },
         skip: (page - 1) * pageSize,
@@ -284,7 +324,20 @@ export const SupervisionReportService = {
       data,
       include: {
         project: { select: { projectName: true, workOrderNumber: true } },
-        taskUpdates: true,
+        taskUpdates: {
+          include: {
+            task: {
+              select: {
+                actualEndAt: true,
+                actualStartAt: true,
+                plannedEndAt: true,
+                plannedStartAt: true,
+                progressPercent: true,
+                riskLevel: true,
+              },
+            },
+          },
+        },
       },
       where: { id, isDeleted: false },
     });

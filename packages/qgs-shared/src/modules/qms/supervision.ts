@@ -154,6 +154,13 @@ export interface SupervisionDailyReport {
 export interface SupervisionReportTaskUpdate {
   completedQuantity?: number;
   createdAt?: string;
+  /**
+   * Real-time status from the linked supervision_plan_tasks record,
+   * calculated by calculatePlanTaskStatus at the time the report is fetched.
+   * Distinct from `status`, which is the snapshot saved at submission time.
+   * Falls back to `status` when the linked plan task has been deleted.
+   */
+  currentTaskStatus?: SupervisionPlanTaskStatus;
   dailyQuantity?: number;
   id?: string;
   nextPlan?: string;
