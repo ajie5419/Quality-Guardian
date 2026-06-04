@@ -21,6 +21,27 @@ import {
   summarizePlanTasks,
 } from './supervision-shared';
 
+/**
+ * Summarize a task field (workContent or nextPlan) into a multi-line string.
+ * Each line is formatted as "{taskName}：{value}".
+ * Tasks with an empty value for the given field are skipped.
+ */
+function summarizeTaskField(
+  taskUpdates: Array<Record<string, unknown>>,
+  field: 'nextPlan' | 'workContent',
+): string {
+  return taskUpdates
+    .map((item) => {
+      const value = normalizeText(item[field]);
+      if (!value) return '';
+      const taskName =
+        normalizeText(item.taskName) || normalizeText(item.taskNo) || '';
+      return taskName ? `${taskName}：${value}` : value;
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
 function mapReport(row: any) {
   return {
     attachments: parseList(row.attachments),
@@ -30,7 +51,7 @@ function mapReport(row: any) {
     id: row.id,
     issueSummary: row.issueSummary || '',
     location: row.location || '',
-    manpower: row.manpower || 0,
+    manpower: row.manpower || '',
     progressPercent: row.progressPercent || 0,
     projectId: row.projectId,
     projectName: row.project?.projectName || '',
@@ -43,6 +64,7 @@ function mapReport(row: any) {
     updatedAt: row.updatedAt?.toISOString(),
     weather: row.weather || '',
     workContent: row.workContent || '',
+    workOrderNumber: row.project?.workOrderNumber || '',
   } satisfies SupervisionDailyReport;
 }
 
@@ -76,20 +98,25 @@ export const SupervisionReportService = {
       ? (payload.taskUpdates as Array<Record<string, unknown>>)
       : [];
     const reportDate = normalizeDate(payload.reportDate) || new Date();
+
+    // Auto-summarize completedMilestone and tomorrowPlan from task updates
+    const completedMilestone = summarizeTaskField(taskUpdates, 'workContent');
+    const tomorrowPlan = summarizeTaskField(taskUpdates, 'nextPlan');
+
     const row = await prisma.$transaction(async (tx) => {
       const report = await tx.supervision_daily_reports.create({
         data: {
           attachments: stringifyList(payload.attachments),
-          completedMilestone: normalizeText(payload.completedMilestone) || null,
+          completedMilestone: completedMilestone || null,
           coordinationNeeded: normalizeText(payload.coordinationNeeded) || null,
           issueSummary: normalizeText(payload.issueSummary) || null,
           location: normalizeText(payload.location) || null,
-          manpower: Math.max(0, Math.trunc(Number(payload.manpower || 0))),
+          manpower: normalizeText(payload.manpower) || null,
           progressPercent,
           projectId,
           reportDate,
           reporter: normalizeText(payload.reporter),
-          tomorrowPlan: normalizeText(payload.tomorrowPlan) || null,
+          tomorrowPlan: tomorrowPlan || null,
           weather: normalizeText(payload.weather) || null,
           workContent: normalizeText(payload.workContent) || null,
         },
@@ -205,7 +232,7 @@ export const SupervisionReportService = {
 
       return tx.supervision_daily_reports.findUniqueOrThrow({
         include: {
-          project: { select: { projectName: true } },
+          project: { select: { projectName: true, workOrderNumber: true } },
           taskUpdates: true,
         },
         where: { id: report.id },
@@ -222,7 +249,7 @@ export const SupervisionReportService = {
     const [items, total] = await Promise.all([
       prisma.supervision_daily_reports.findMany({
         include: {
-          project: { select: { projectName: true } },
+          project: { select: { projectName: true, workOrderNumber: true } },
           taskUpdates: true,
         },
         orderBy: { reportDate: 'desc' },
@@ -247,7 +274,7 @@ export const SupervisionReportService = {
     const row = await prisma.supervision_daily_reports.update({
       data,
       include: {
-        project: { select: { projectName: true } },
+        project: { select: { projectName: true, workOrderNumber: true } },
         taskUpdates: true,
       },
       where: { id },

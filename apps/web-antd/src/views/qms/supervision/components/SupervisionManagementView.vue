@@ -84,7 +84,7 @@ type ReportFormState = {
   coordinationNeeded: string;
   issueSummary: string;
   location: string;
-  manpower: number;
+  manpower: string;
   progressPercent: number;
   projectId: string;
   reportDate: dayjs.Dayjs;
@@ -182,7 +182,7 @@ const reportForm = reactive<ReportFormState>({
   coordinationNeeded: '',
   issueSummary: '',
   location: '',
-  manpower: 0,
+  manpower: '',
   progressPercent: 0,
   projectId: '',
   reportDate: dayjs(),
@@ -711,7 +711,7 @@ function editReport(record: SupervisionDailyReport) {
     coordinationNeeded: record.coordinationNeeded || '',
     issueSummary: record.issueSummary || '',
     location: record.location || '',
-    manpower: record.manpower || 0,
+    manpower: record.manpower || '',
     progressPercent: record.progressPercent || 0,
     projectId: record.projectId,
     reportDate: dayjs(record.reportDate),
@@ -909,11 +909,11 @@ async function submitProject() {
 function openReportDrawer(project?: SupervisionProject) {
   Object.assign(reportForm, {
     attachments: [],
-    completedMilestone: project?.stage || '',
+    completedMilestone: '',
     coordinationNeeded: '',
     issueSummary: '',
     location: project?.location || '',
-    manpower: 0,
+    manpower: '',
     progressPercent: project?.progressPercent || 0,
     projectId: project?.id || '',
     reportDate: dayjs(),
@@ -948,7 +948,6 @@ async function submitReport() {
   }
   await createSupervisionReport({
     attachments: uploadUrls(reportForm.attachments),
-    completedMilestone: reportForm.completedMilestone,
     coordinationNeeded: reportForm.coordinationNeeded,
     issueSummary: reportForm.issueSummary,
     location: reportForm.location,
@@ -972,7 +971,6 @@ async function submitReport() {
       taskNo: draft.task.taskNo,
       workContent: draft.workContent,
     })),
-    tomorrowPlan: reportForm.tomorrowPlan,
     weather: reportForm.weather,
     workContent: reportForm.workContent,
   });
@@ -1940,10 +1938,10 @@ onMounted(async () => {
           <Input v-model:value="reportForm.weather" />
         </Form.Item>
         <Form.Item label="现场人数">
-          <InputNumber
+          <Input
             v-model:value="reportForm.manpower"
             class="w-full"
-            :min="0"
+            placeholder="如：下料2人、组对3人"
           />
         </Form.Item>
       </div>
@@ -2101,25 +2099,11 @@ onMounted(async () => {
           placeholder="描述今日现场工作情况"
         />
       </Form.Item>
-      <Form.Item label="完成节点">
-        <Input.TextArea
-          v-model:value="reportForm.completedMilestone"
-          :rows="2"
-          placeholder="今日完成的主要节点"
-        />
-      </Form.Item>
       <Form.Item label="问题汇总">
         <Input.TextArea
           v-model:value="reportForm.issueSummary"
           :rows="3"
           placeholder="现场发现的问题汇总"
-        />
-      </Form.Item>
-      <Form.Item label="明日计划">
-        <Input.TextArea
-          v-model:value="reportForm.tomorrowPlan"
-          :rows="3"
-          placeholder="明日工作计划"
         />
       </Form.Item>
       <Form.Item label="需要协调事项">

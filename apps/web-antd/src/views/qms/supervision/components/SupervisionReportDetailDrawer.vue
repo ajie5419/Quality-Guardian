@@ -45,6 +45,12 @@ function handleUpdateOpen(value: boolean) {
           <div class="text-lg font-semibold">
             {{ props.report.projectName }}
           </div>
+          <div
+            v-if="props.report.workOrderNumber"
+            class="mt-1 text-sm text-gray-500"
+          >
+            工单号：{{ props.report.workOrderNumber }}
+          </div>
           <div class="mt-1 text-sm text-gray-500">监造现场日报</div>
           <div class="mt-2 text-xl font-bold text-blue-600">
             {{ props.report.reportDate }}
@@ -60,7 +66,7 @@ function handleUpdateOpen(value: boolean) {
           </div>
           <div>
             <div class="text-xs text-gray-500">现场人数</div>
-            <div class="font-medium">{{ props.report.manpower || 0 }} 人</div>
+            <div class="font-medium">{{ props.report.manpower || '—' }}</div>
           </div>
           <div>
             <div class="text-xs text-gray-500">现场地点</div>

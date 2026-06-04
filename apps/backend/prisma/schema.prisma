@@ -793,7 +793,7 @@ model supervision_daily_reports {
   issueSummary       String?                           @db.Text
   tomorrowPlan       String?                           @db.Text
   coordinationNeeded String?                           @db.Text
-  manpower           Int                               @default(0)
+  manpower           String?                           @db.Text
   weather            String?
   attachments        String?                           @db.LongText
   isDeleted          Boolean                           @default(false)

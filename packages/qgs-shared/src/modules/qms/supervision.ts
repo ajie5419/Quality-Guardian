@@ -180,7 +180,7 @@ export interface SupervisionDailyReport {
   id: string;
   issueSummary?: string;
   location?: string;
-  manpower: number;
+  manpower?: string;
   progressPercent: number;
   projectId: string;
   projectName?: string;
@@ -191,6 +191,7 @@ export interface SupervisionDailyReport {
   updatedAt?: string;
   weather?: string;
   workContent?: string;
+  workOrderNumber?: string;
 }
 
 export interface SupervisionReportTaskUpdate {
