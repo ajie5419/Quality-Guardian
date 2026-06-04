@@ -25,6 +25,41 @@
 
 ## 执行记录
 
+### 2026-06-04 监造日报：分享图片改善（多列布局 + 任务状态徽章）
+
+**用户反馈：** 1) 图片太长（所有区块单列纵向堆叠）；2) 任务推进里看不出"组对节点 6 月 2 日，6 月 4 日的日报应显示已逾期"——只有进度数字没状态。
+
+**执行内容（单文件）：**
+
+1. 多列布局缩短图片高度
+   - 今日工作 + 完成节点 → 两列并排
+   - 问题汇总 + 明日计划 + 需协调事项 → 三列并排
+   - 现场照片网格 3 列 200px → 4 列 150px
+   - 总高度大约砍掉一半
+
+2. 任务推进卡新增状态徽章
+   - 之前截图区只渲染任务号+名/数量/进度，没渲染 task.status
+   - 在任务名旁加内联徽章：DELAYED 红 / DONE 绿 / DUE_SOON 橙 / RISK 紫 / IN_PROGRESS 蓝 / NOT_STARTED 灰
+   - 徽章用内联 hex 颜色，避开 ant-design 主题关键字（html2canvas 会丢色）
+
+**业务语义说明：** 任务状态显示的是**日报提交时的快照**，不是查看时的实时状态——日报是当天现场记录，事后任务变化不应回写到历史日报。如果用户当时提交日报时该任务已经超过计划开始日，提交逻辑应该写入 DELAYED；如果实际显示成"未开始"，说明前端提交时传的 status 错了。
+
+**审查发现但本次未改（暂记）：**
+- 后端 `supervision-report.service.ts:156` 的 `updateStatus` 直接信任前端传入的 status，没有用 `calculatePlanTaskStatus` 兜底重算。如果前端表单初始化 status 时机不对（比如打开抽屉时任务还没逾期，提交时已逾期），存进去的状态会偏。建议改成在写入 taskUpdates 前用 plannedStartAt/plannedEndAt 实时算一次
+
+**验证结果：**
+
+- typecheck (frontend): 通过
+- lint: 通过
+
+**commit:**
+- `928e3f98` style(@qgs/web-antd): use multi-column layout in report share image
+- `a58e915c` feat(@qgs/web-antd): show task status badge in report share image
+
+**遗留问题：**
+
+- 浏览器/手机层面（多列布局是否在内容多时换行错乱、状态徽章颜色和文案）待人工验证
+
 ### 2026-06-04 监造日报：放大分享图片字号，改善可读性
 
 **执行内容：**
