@@ -25,6 +25,35 @@
 
 ## 执行记录
 
+### 2026-06-04 监造模块：完善日报表单与新增卡片详情视图
+
+**执行内容：**
+
+修复日报字段缺失并新增卡片式详情视图（2 个文件，300 行）
+
+1. 表单修复（SupervisionManagementView.vue）
+   - 根因：日报表单缺少完成节点、问题汇总、明日计划、需协调事项、项目进度的输入控件——这些字段在提交逻辑里已包含，但用户无法录入，导致填了表格却"不显示"
+   - 补齐上述 5 个字段的 Form.Item 输入控件
+   - 修复 editReport：原本只回填 4 个字段（projectId/reporter/workContent/reportDate），现改为回填全部字段并加载任务草稿
+
+2. 新增日报卡片详情（SupervisionReportDetailDrawer.vue）
+   - 卡片分区展示：基本信息、今日工作、完成节点、任务推进、问题汇总、明日计划、需协调事项、现场照片
+   - 白色背景、清晰分区，适合手机截图发日报群
+   - 日报表格操作列新增"查看"按钮
+   - 移动端/桌面端适配
+
+**验证结果：**
+
+- typecheck (frontend): 通过
+- lint: 通过
+
+**commit:**
+- `e26bec3c` feat(@qgs/web-antd): complete supervision report form and add card detail view
+
+**遗留问题：**
+
+- 浏览器层面（表单录入回显、详情卡片样式、截图效果）待人工验证
+
 ### 2026-06-04 监造模块：修复甘特图逾期判断 bug
 
 **执行内容：**
