@@ -280,4 +280,11 @@ export const SupervisionIssueService = {
     });
     return mapIssue(row);
   },
+
+  async deleteIssue(id: string) {
+    await prisma.supervision_issues.update({
+      data: { isDeleted: true },
+      where: { id },
+    });
+  },
 };

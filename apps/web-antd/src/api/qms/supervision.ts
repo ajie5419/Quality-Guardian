@@ -76,6 +76,12 @@ export async function updateSupervisionProject(
   );
 }
 
+export async function deleteSupervisionProject(id: string) {
+  return requestClient.delete(`${QMS_API.SUPERVISION_PROJECTS}/${id}`, {
+    params: { id },
+  });
+}
+
 export async function getSupervisionMilestones(projectId: string) {
   return requestClient.get<SupervisionMilestone[]>(
     `${QMS_API.SUPERVISION_PROJECTS}/${projectId}/milestones`,
@@ -178,6 +184,12 @@ export async function updateSupervisionIssue(
     `${QMS_API.SUPERVISION_ISSUES}/${id}`,
     data,
   );
+}
+
+export async function deleteSupervisionIssue(id: string) {
+  return requestClient.delete(`${QMS_API.SUPERVISION_ISSUES}/${id}`, {
+    params: { id },
+  });
 }
 
 export async function getSupervisionIssueActions(issueId: string) {

@@ -257,4 +257,11 @@ export const SupervisionProjectService = {
     });
     return mapProject(row);
   },
+
+  async deleteProject(id: string) {
+    await prisma.supervision_projects.update({
+      data: { isDeleted: true },
+      where: { id },
+    });
+  },
 };

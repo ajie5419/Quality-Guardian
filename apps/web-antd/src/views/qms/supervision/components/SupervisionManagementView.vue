@@ -39,6 +39,8 @@ import {
   createSupervisionIssueAction,
   createSupervisionProject,
   createSupervisionReport,
+  deleteSupervisionIssue,
+  deleteSupervisionProject,
   deleteSupervisionReport,
   getSupervisionIssueActions,
   getSupervisionIssues,
@@ -724,6 +726,40 @@ function deleteReport(record: SupervisionDailyReport) {
   });
 }
 
+function deleteProject(record: SupervisionProject) {
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定删除项目「${record.projectName}」？`,
+    okType: 'danger',
+    async onOk() {
+      try {
+        await deleteSupervisionProject(record.id);
+        message.success('项目已删除');
+        await loadProjects();
+      } catch (error: any) {
+        message.error(error?.message || '删除失败');
+      }
+    },
+  });
+}
+
+function deleteIssue(record: SupervisionIssue) {
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定删除问题「${record.issueNo}」？`,
+    okType: 'danger',
+    async onOk() {
+      try {
+        await deleteSupervisionIssue(record.id);
+        message.success('问题已删除');
+        await loadIssues();
+      } catch (error: any) {
+        message.error(error?.message || '删除失败');
+      }
+    },
+  });
+}
+
 async function loadIssues() {
   loadingIssues.value = true;
   try {
@@ -1113,6 +1149,14 @@ onMounted(async () => {
                       @click="openProjectDrawer(record)"
                     >
                       编辑
+                    </Button>
+                    <Button
+                      size="small"
+                      type="link"
+                      danger
+                      @click="deleteProject(record)"
+                    >
+                      删除
                     </Button>
                   </Space>
                 </template>
@@ -1737,6 +1781,14 @@ onMounted(async () => {
                       @click="openActionDrawer(record)"
                     >
                       处理
+                    </Button>
+                    <Button
+                      size="small"
+                      type="link"
+                      danger
+                      @click="deleteIssue(record)"
+                    >
+                      删除
                     </Button>
                   </Space>
                 </template>
