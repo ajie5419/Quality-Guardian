@@ -7,7 +7,7 @@ import type {
 } from '#/api/qms/inspection-request';
 import type { TreeSelectNode } from '#/types';
 
-import { computed, reactive, watch } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 
@@ -16,17 +16,19 @@ import {
   Form,
   Input,
   InputNumber,
+  message,
   Modal,
   Select,
   Switch,
-  TreeSelect,
   Upload,
 } from 'ant-design-vue';
 
+import { getWorkOrderListPage } from '#/api/qms/work-order';
 import { useImageCompress } from '#/composables/useImageCompress';
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 
-import IssuePhotoUpload from '../../issues/components/IssuePhotoUpload.vue';
+import IssueFormFields from '../../issues/components/IssueFormFields.vue';
+import { useStatusOptions } from '../../issues/constants';
 
 interface Props {
   open: boolean;
@@ -65,10 +67,6 @@ interface Props {
   uploadHeaders: Record<string, string>;
   currentRequest?: InspectionRequest;
   deptTreeData: TreeSelectNode[];
-  defectOptions: Array<{ label: string; value: string }>;
-  linkedDefectSubtypeOptions: Array<{ label: string; value: string }>;
-  severityOptions: Array<{ label: string; value: string }>;
-  claimOptions: Array<{ label: string; value: string }>;
   displayCloseReadonlyValue: (value?: null | string) => string;
   handleCloseAttachmentUploadChange: (info: {
     file: UploadFile;
@@ -84,8 +82,10 @@ const emit = defineEmits<{
   'update:linkedIssueDraft': [value: Props['linkedIssueDraft']];
   'update:open': [value: boolean];
 }>();
+
 const { isMobile, modalWidth, modalWrapClassName } = useAdaptivePopup();
 const { compressImage, isImage } = useImageCompress();
+const { statusOptions } = useStatusOptions();
 
 function cloneCloseForm(source: Props['closeForm']): Props['closeForm'] {
   return {
@@ -116,6 +116,7 @@ const localLinkedIssueDraft = reactive(
 const shouldCreateLinkedIssue = computed(
   () => localCloseForm.result === 'FAIL',
 );
+const formFieldsRef = ref<InstanceType<typeof IssueFormFields> | null>(null);
 
 function syncLocalLinkedIssueQuantities(unqualifiedValue?: unknown) {
   const totalQuantity = normalizeQuantity(localCloseForm.quantity);
@@ -139,21 +140,97 @@ function syncFromProps() {
   );
 }
 
+function buildEmbeddedIssueValues() {
+  const total = normalizeQuantity(localCloseForm.quantity);
+  return {
+    workOrderNumber: props.currentRequest?.workOrderNumber || '',
+    projectName: '',
+    division: '',
+    partName: localLinkedIssueDraft.partName,
+    processName: localLinkedIssueDraft.processName,
+    quantity: total,
+    inspector: localLinkedIssueDraft.reportedBy,
+    reportDate: localLinkedIssueDraft.reportDate,
+    responsibleDepartments: localLinkedIssueDraft.responsibleDepartment
+      ? [localLinkedIssueDraft.responsibleDepartment]
+      : [],
+    responsibleDepartment: localLinkedIssueDraft.responsibleDepartment,
+    responsibleWelder: localLinkedIssueDraft.responsibleWelder,
+    supplierName: localLinkedIssueDraft.supplierName,
+    status: localLinkedIssueDraft.status,
+    severity: localLinkedIssueDraft.severity,
+    defectType: localLinkedIssueDraft.defectType,
+    defectSubtype: localLinkedIssueDraft.defectSubtype,
+    lossAmount: localLinkedIssueDraft.lossAmount,
+    claim: localLinkedIssueDraft.claim,
+    description: localLinkedIssueDraft.description,
+    rootCause: localLinkedIssueDraft.rootCause,
+    solution: localLinkedIssueDraft.solution,
+    photos: localLinkedIssueDraft.photos,
+  };
+}
+
+async function applyEmbeddedValues() {
+  await nextTick();
+  const fields = formFieldsRef.value;
+  if (!fields) return;
+  fields.resetAutoNc();
+  await fields.setValues(buildEmbeddedIssueValues());
+  await fillWorkOrderInfo();
+}
+
+async function fillWorkOrderInfo() {
+  const workOrderNumber = props.currentRequest?.workOrderNumber;
+  const fields = formFieldsRef.value;
+  if (!workOrderNumber || !fields) return;
+  try {
+    const result = await getWorkOrderListPage({
+      workOrderNumber,
+      pageSize: 1,
+    });
+    const matched = result.items.find(
+      (item) => item.workOrderNumber === workOrderNumber,
+    );
+    if (!matched) return;
+    await fields.setValues({
+      projectName: matched.projectName || '',
+      division: matched.division || '',
+    });
+  } catch (error) {
+    console.warn('[close-inspection] failed to load work order info', error);
+  }
+}
+
 watch(
   () => props.open,
-  (open) => {
+  async (open) => {
     if (open) {
       syncFromProps();
+      if (shouldCreateLinkedIssue.value) {
+        await applyEmbeddedValues();
+      }
     }
   },
   { immediate: true },
 );
+
+watch(shouldCreateLinkedIssue, async (val) => {
+  if (val) {
+    await applyEmbeddedValues();
+  }
+});
 
 watch(
   () => localCloseForm.quantity,
   () => {
     if (shouldCreateLinkedIssue.value) {
       syncLocalLinkedIssueQuantities();
+      const fields = formFieldsRef.value;
+      if (fields) {
+        void fields.setValues({
+          quantity: normalizeQuantity(localCloseForm.quantity),
+        });
+      }
     }
   },
 );
@@ -174,10 +251,46 @@ watch(
   { deep: true },
 );
 
-function handleSubmit() {
+async function collectIssueFromForm() {
+  const fields = formFieldsRef.value;
+  if (!fields) return false;
+  const { valid } = await fields.validate();
+  if (!valid) return false;
+  const values = (await fields.getValues()) as Record<string, unknown>;
+  const responsibleDepartments = Array.isArray(values.responsibleDepartments)
+    ? (values.responsibleDepartments as string[])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean)
+    : [];
+  Object.assign(localLinkedIssueDraft, {
+    partName: String(values.partName || ''),
+    processName: String(values.processName || ''),
+    responsibleDepartment: responsibleDepartments[0] || '',
+    responsibleWelder: String(values.responsibleWelder || ''),
+    supplierName: String(values.supplierName || ''),
+    status: String(values.status || 'OPEN'),
+    severity: String(values.severity || ''),
+    defectType: String(values.defectType || ''),
+    defectSubtype: String(values.defectSubtype || ''),
+    lossAmount: Number(values.lossAmount) || 0,
+    claim: String(values.claim || ''),
+    description: String(values.description || ''),
+    rootCause: String(values.rootCause || ''),
+    solution: String(values.solution || ''),
+    photos: Array.isArray(values.photos) ? (values.photos as UploadFile[]) : [],
+  });
+  return true;
+}
+
+async function handleSubmit() {
   if (props.submitting) return;
-  // Upload component updates attachments in parent state directly.
-  // Ensure local draft keeps the latest uploaded attachments before submit.
+  if (shouldCreateLinkedIssue.value) {
+    const ok = await collectIssueFromForm();
+    if (!ok) {
+      message.error('请补全不合格项必填信息');
+      return;
+    }
+  }
   localCloseForm.attachments = [...props.closeForm.attachments];
   emit('update:closeForm', cloneCloseForm(localCloseForm));
   emit('update:linkedIssueDraft', cloneLinkedIssueDraft(localLinkedIssueDraft));
@@ -199,7 +312,7 @@ async function handleBeforeUpload(file: File) {
     :open="props.open"
     title="完成检验"
     :confirm-loading="props.submitting"
-    :width="isMobile ? modalWidth : shouldCreateLinkedIssue ? 800 : 520"
+    :width="isMobile ? modalWidth : shouldCreateLinkedIssue ? 900 : 520"
     :wrap-class-name="modalWrapClassName"
     @ok="handleSubmit"
     @update:open="handleUpdateOpen"
@@ -275,171 +388,13 @@ async function handleBeforeUpload(file: File) {
         <div class="mb-3 font-medium text-orange-700">
           当前判定为“不合格”，请补充不合格项信息（保存时自动建立关联）
         </div>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <div class="mb-1 text-gray-600">部件名称</div>
-            <Input
-              v-model:value="localLinkedIssueDraft.partName"
-              :disabled="
-                Boolean(
-                  props.currentRequest?.componentName ||
-                    props.currentRequest?.partName,
-                )
-              "
-              placeholder="自动沿用组件名称，可手动补充"
-            />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">工序</div>
-            <Input
-              v-model:value="localLinkedIssueDraft.processName"
-              :disabled="Boolean(props.currentRequest?.processName)"
-              placeholder="自动沿用，可手动补充"
-            />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">责任部门</div>
-            <TreeSelect
-              v-model:value="localLinkedIssueDraft.responsibleDepartment"
-              :tree-data="props.deptTreeData"
-              tree-default-expand-all
-              show-search
-              allow-clear
-              class="w-full"
-              placeholder="请选择责任部门"
-            />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">责任焊工</div>
-            <Input
-              v-model:value="localLinkedIssueDraft.responsibleWelder"
-              placeholder="请填写责任焊工"
-            />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">责任单位（供应商）</div>
-            <Input
-              v-model:value="localLinkedIssueDraft.supplierName"
-              placeholder="自动沿用供应商，可手动补充"
-            />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">报告日期</div>
-            <Input :value="localLinkedIssueDraft.reportDate" disabled />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">检验员</div>
-            <Input :value="localLinkedIssueDraft.reportedBy" disabled />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">缺陷分类</div>
-            <Select
-              v-model:value="localLinkedIssueDraft.defectType"
-              :options="props.defectOptions"
-              class="w-full"
-              @change="
-                () => {
-                  localLinkedIssueDraft.defectSubtype =
-                    props.linkedDefectSubtypeOptions[0]?.value || '';
-                }
-              "
-            />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">二级分类</div>
-            <Select
-              v-model:value="localLinkedIssueDraft.defectSubtype"
-              :options="props.linkedDefectSubtypeOptions"
-              class="w-full"
-            />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">合格数量</div>
-            <InputNumber
-              :value="localLinkedIssueDraft.qualifiedQuantity"
-              :min="0"
-              class="w-full"
-              disabled
-            />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">不合格数量</div>
-            <InputNumber
-              v-model:value="localLinkedIssueDraft.unqualifiedQuantity"
-              :min="0"
-              :max="Math.max(1, Number(localCloseForm.quantity) || 1)"
-              class="w-full"
-              @change="syncLocalLinkedIssueQuantities"
-            />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">严重程度</div>
-            <Select
-              v-model:value="localLinkedIssueDraft.severity"
-              :options="props.severityOptions"
-              class="w-full"
-            />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">状态</div>
-            <Select
-              v-model:value="localLinkedIssueDraft.status"
-              :options="[
-                { label: '待处理', value: 'OPEN' },
-                { label: '处理中', value: 'IN_PROGRESS' },
-                { label: '已关闭', value: 'CLOSED' },
-              ]"
-              class="w-full"
-            />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">是否索赔</div>
-            <Select
-              v-model:value="localLinkedIssueDraft.claim"
-              :options="props.claimOptions"
-              class="w-full"
-            />
-          </div>
-          <div>
-            <div class="mb-1 text-gray-600">损失金额</div>
-            <InputNumber
-              v-model:value="localLinkedIssueDraft.lossAmount"
-              :min="0"
-              :step="0.01"
-              class="w-full"
-            />
-          </div>
-          <div class="sm:col-span-2 lg:col-span-3">
-            <div class="mb-1 text-gray-600">不合格描述</div>
-            <Input.TextArea
-              v-model:value="localLinkedIssueDraft.description"
-              :rows="3"
-              placeholder="请填写不合格描述"
-            />
-          </div>
-          <div class="sm:col-span-2 lg:col-span-3">
-            <div class="mb-1 text-gray-600">原因分析</div>
-            <Input.TextArea
-              v-model:value="localLinkedIssueDraft.rootCause"
-              :rows="2"
-              placeholder="请填写原因分析"
-            />
-          </div>
-          <div class="sm:col-span-2 lg:col-span-3">
-            <div class="mb-1 text-gray-600">解决方案</div>
-            <Input.TextArea
-              v-model:value="localLinkedIssueDraft.solution"
-              :rows="2"
-              placeholder="请填写解决方案"
-            />
-          </div>
-          <div class="sm:col-span-2 lg:col-span-3">
-            <IssuePhotoUpload
-              v-model:value="localLinkedIssueDraft.photos"
-              :max-count="8"
-            />
-          </div>
-        </div>
+        <IssueFormFields
+          ref="formFieldsRef"
+          mode="embedded"
+          :is-edit-mode="false"
+          :dept-tree-data="props.deptTreeData"
+          :status-options="statusOptions"
+        />
       </div>
     </Form>
   </Modal>

@@ -2,25 +2,24 @@
 import type { StatusOption } from '../constants';
 import type { DeptNode, InspectionIssue } from '../types';
 
-import { computed, onMounted, ref, toRef, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
+import { useUserStore } from '@vben/stores';
 
-import { Button, Modal, Select, Switch, Tooltip } from 'ant-design-vue';
+import { message, Modal } from 'ant-design-vue';
 
-import { useVbenForm } from '#/adapter/form';
-import { getWelderListPage } from '#/api/qms/welder';
+import {
+  createInspectionIssue,
+  updateInspectionIssue,
+} from '#/api/qms/inspection';
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
+import { buildThumbUrlFromOriginal } from '#/views/qms/shared/utils/photo-url';
+import { getUploadResponse } from '#/views/qms/shared/utils/upload-file';
 
-import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
-import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
-import { useAiAnalysis } from '../composables/useAiAnalysis';
-import { useIssueForm } from '../composables/useIssueForm';
-import { useNcNumber } from '../composables/useNcNumber';
-import { DEPT_TYPE_KEYWORDS } from '../constants';
-import { getIssueFormSchemaWithStatusOptions } from './issueFormData';
-import IssuePhotoUpload from './IssuePhotoUpload.vue';
-import IssueSimilarCases from './IssueSimilarCases.vue';
+import { DEFAULT_VALUES } from '../constants';
+import IssueFormFields from './IssueFormFields.vue';
 
 const props = defineProps<{
   deptTreeData: DeptNode[];
@@ -36,291 +35,150 @@ const emit = defineEmits<{
   success: [];
   'update:open': [boolean];
 }>();
+
 const { isMobile, modalWidth, modalWrapClassName } = useAdaptivePopup();
-
 const { t } = useI18n();
+const { handleApiError } = useErrorHandler();
+const userStore = useUserStore();
+const submitting = ref(false);
+const formFieldsRef = ref<InstanceType<typeof IssueFormFields> | null>(null);
 
-// Local reactive state for form values to ensure reactivity in slots and composables
-type IssueFormValues = {
-  defectType?: string;
-  description?: string;
-  division?: string;
-  partName?: string;
-  projectName?: string;
+type UploadPhotoItem = {
+  response?: unknown;
+  status?: string;
+  url?: string;
+};
+type IssueSubmitValues = Omit<Partial<InspectionIssue>, 'photos'> & {
+  id?: string;
+  photos?: UploadPhotoItem[];
+};
+
+function normalizeResponsibleDepartments(values: {
   responsibleDepartment?: string;
   responsibleDepartments?: string[];
-  responsibleWelder?: string;
-  rootCause?: string;
-  solution?: string;
-};
-const formValues = ref<IssueFormValues>({});
-type WelderOption = { label: string; searchText: string; value: string };
-const welderOptions = ref<WelderOption[]>([]);
-const welderLoading = ref(false);
-
-function isHeaderLikeWelderRecord(params: { code?: string; name?: string }) {
-  const name = String(params.name || '')
-    .trim()
-    .toLowerCase();
-  const code = String(params.code || '')
-    .trim()
-    .toLowerCase();
-  const combined = `${name} ${code}`;
-  return (
-    combined.includes('焊工编号') ||
-    combined.includes('焊工姓名') ||
-    combined.includes('姓名') ||
-    combined.includes('最新') ||
-    combined.includes('(姓名)') ||
-    combined.includes('（姓名）') ||
-    combined.includes('weldercode') ||
-    combined.includes('weldername')
-  );
-}
-
-function isTestWelderRecord(params: { code?: string; name?: string }) {
-  const name = String(params.name || '')
-    .trim()
-    .toLowerCase();
-  const code = String(params.code || '')
-    .trim()
-    .toLowerCase();
-  return (
-    name.includes('测试') ||
-    name.includes('test') ||
-    code.includes('test') ||
-    code.startsWith('t-test')
-  );
-}
-
-const [Form, formApi] = useVbenForm({
-  commonConfig: {
-    labelWidth: 100,
-    componentProps: {
-      class: 'w-full',
-    },
-  },
-  layout: 'vertical',
-  wrapperClass:
-    'issue-edit-form-grid grid min-w-0 grid-cols-1 gap-x-4 gap-y-0 sm:grid-cols-2',
-  handleSubmit: () => submit(),
-  handleValuesChange: (vals) => {
-    formValues.value = vals as IssueFormValues;
-  },
-  schema: getIssueFormSchemaWithStatusOptions(
-    props.statusOptions,
-    props.processOptions,
-  ),
-  showDefaultActions: false, // Handle submit via Modal OK button
-});
-
-function firstResponsibleDepartment(): string {
-  const departments = formValues.value.responsibleDepartments;
-  if (Array.isArray(departments) && departments.length > 0) {
-    return departments[0] || '';
+}): string[] {
+  if (Array.isArray(values.responsibleDepartments)) {
+    return values.responsibleDepartments
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
   }
-  return formValues.value.responsibleDepartment || '';
+  return values.responsibleDepartment
+    ? [String(values.responsibleDepartment)]
+    : [];
 }
 
-// Composable integration
-const openRef = toRef(props, 'open');
-const isEditModeRef = toRef(props, 'isEditMode');
-const initialDataRef = computed(() => props.initialData);
-
-const { submit } = useIssueForm({
-  formApi,
-  initialData: initialDataRef,
-  isEditMode: isEditModeRef,
-  open: openRef,
-  onSuccess: () => emit('success'),
-  onClose: () => emit('update:open', false),
-});
-
-// Composable integration using the synced formValues
-const { isAutoNc, resetAutoNc } = useNcNumber({
-  formApi,
-  isEditMode: isEditModeRef,
-});
-
-const {
-  isAiAnalyzing,
-  isMatchingCases,
-  matchedCases,
-  analyzeIssue,
-  matchHistory,
-  applyCaseSolution,
-  clearMatchedCases,
-} = useAiAnalysis({ formState: formValues });
-
-// Department finding logic
-function findDeptTitle(tree: DeptNode[], value?: string): string | undefined {
-  if (!value) return undefined;
-  for (const node of tree) {
-    const nodeTitle = node.label;
-    if (node.value === value) return nodeTitle;
-    if (node.children) {
-      const found = findDeptTitle(node.children, value);
-      if (found) return found;
-    }
-  }
-  return undefined;
+function buildInitialData() {
+  const inspector =
+    userStore.userInfo?.realName || userStore.userInfo?.username || '';
+  return {
+    ncNumber: '',
+    reportDate: new Date().toISOString().split('T')[0],
+    status: DEFAULT_VALUES.DEFAULT_STATUS,
+    quantity: DEFAULT_VALUES.DEFAULT_QUANTITY,
+    lossAmount: 0,
+    inspector,
+    claim: DEFAULT_VALUES.DEFAULT_CLAIM,
+    photos: [],
+    defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE,
+    defectSubtype: DEFAULT_VALUES.DEFAULT_DEFECT_SUBTYPE,
+    severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
+  };
 }
 
-// Supplier category calculation
-const targetUnitCategory = computed(() => {
-  const deptId = firstResponsibleDepartment();
-  const name = findDeptTitle(props.deptTreeData, deptId) || '';
-  if (name.includes(DEPT_TYPE_KEYWORDS.PURCHASE)) return 'Supplier';
-  if (
-    name.includes(DEPT_TYPE_KEYWORDS.PRODUCTION) ||
-    name.includes('生产') ||
-    name.includes(DEPT_TYPE_KEYWORDS.OUTSOURCED)
-  )
-    return 'Outsourcing';
-  return 'Supplier';
-});
-
-// Determine if supplier field should be visible
-const shouldShowSupplier = computed(() => {
-  const deptId = firstResponsibleDepartment();
-  if (!deptId) return false;
-  const name = findDeptTitle(props.deptTreeData, deptId) || '';
-  return (
-    name.includes(DEPT_TYPE_KEYWORDS.PURCHASE) ||
-    name.includes(DEPT_TYPE_KEYWORDS.PRODUCTION) ||
-    name.includes(DEPT_TYPE_KEYWORDS.OUTSOURCED) ||
-    name.includes('生产')
-  );
-});
-
-// Watchers for initialization
-watch(
-  () => props.deptTreeData,
-  (data) => {
-    formApi.updateSchema([
-      {
-        fieldName: 'responsibleDepartments',
-        componentProps: { treeData: data },
-      },
-    ]);
-  },
-  { immediate: true },
-);
-
-// Watcher to update supplier field visibility based on department selection
-watch(
-  shouldShowSupplier,
-  (show) => {
-    formApi.updateSchema([
-      {
-        fieldName: 'supplierName',
-        dependencies: {
-          triggerFields: ['responsibleDepartments'],
-          show: () => show,
-        },
-      },
-    ]);
-  },
-  { immediate: true },
-);
-
-watch(openRef, (val) => {
-  if (val && !props.isEditMode) {
-    resetAutoNc();
-    clearMatchedCases();
+async function applyEditData(data: Partial<InspectionIssue>) {
+  const fields = formFieldsRef.value;
+  if (!fields) return;
+  const { photos, ...rest } = data;
+  const responsibleDepartments = normalizeResponsibleDepartments(rest);
+  let photoArray: string[] = [];
+  if (Array.isArray(photos)) {
+    photoArray = photos;
+  } else if (photos) {
+    photoArray = [photos as unknown as string];
   }
-});
+  await fields.setValues({
+    ...rest,
+    responsibleDepartments,
+    photos: photoArray.map((url, index) => ({
+      uid: `photo-${encodeURIComponent(url)}-${index}`,
+      name: `Photo ${index + 1}`,
+      status: 'done' as const,
+      thumbUrl: buildThumbUrlFromOriginal(url),
+      url,
+    })),
+  });
+}
+
+async function resetToCreate() {
+  const fields = formFieldsRef.value;
+  if (!fields) return;
+  await fields.resetForm();
+  await fields.setValues(buildInitialData());
+  fields.resetAutoNc();
+  fields.clearMatchedCases();
+}
 
 watch(
-  () => props.statusOptions,
-  (options) => {
-    if (!options) return;
-    formApi.updateSchema([
-      {
-        fieldName: 'status',
-        componentProps: {
-          options,
-        },
-      },
-    ]);
+  () => props.open,
+  async (val) => {
+    if (!val) return;
+    await nextTick();
+    await (props.isEditMode && props.initialData
+      ? applyEditData(props.initialData)
+      : resetToCreate());
   },
-  { immediate: true },
 );
 
-watch(
-  () => props.processOptions,
-  (options) => {
-    if (!options) return;
-    formApi.updateSchema([
-      {
-        fieldName: 'processName',
-        componentProps: {
-          options,
-          allowClear: true,
-          showSearch: true,
-        },
-      },
-    ]);
-  },
-  { immediate: true },
+const modalTitle = computed(() =>
+  props.isEditMode
+    ? t('qms.inspection.issues.editIssue')
+    : t('qms.inspection.issues.createIssue'),
 );
-
-onMounted(async () => {
-  try {
-    welderLoading.value = true;
-    const result = await getWelderListPage({
-      employmentStatus: 'ON_DUTY',
-      page: 1,
-      pageSize: 500,
-    });
-    welderOptions.value = (result.items || [])
-      .map((item) => {
-        const name = String(item.name || '').trim();
-        if (!name) return null;
-        const code = String(item.welderCode || '').trim();
-        if (
-          isHeaderLikeWelderRecord({ code, name }) ||
-          isTestWelderRecord({ code, name })
-        ) {
-          return null;
-        }
-        return {
-          label: code ? `${name}（${code}）` : name,
-          searchText: `${name} ${code}`.trim().toLowerCase(),
-          value: code || name,
-        };
-      })
-      .filter(Boolean) as WelderOption[];
-  } finally {
-    welderLoading.value = false;
-  }
-});
-
-// Event Handlers
-function handleWorkOrderChange(
-  val: unknown,
-  option?: {
-    item?: {
-      division?: string;
-      projectName?: string;
-      workOrderNumber?: string;
-    };
-  },
-) {
-  const wo = option?.item;
-  if (wo) {
-    formApi.setValues({
-      projectName: wo.projectName || '',
-      division: wo.division || '',
-    });
-    emit('searchWorkOrder', wo.workOrderNumber || '');
-  } else {
-    emit('searchWorkOrder', String(val));
-  }
-}
 
 async function handleOk() {
-  await submit();
+  const fields = formFieldsRef.value;
+  if (!fields || submitting.value) return;
+  try {
+    submitting.value = true;
+    const { valid } = await fields.validate();
+    if (!valid) return;
+    const rawData = (await fields.getValues()) as IssueSubmitValues;
+    const photos =
+      rawData.photos
+        ?.map((file) => {
+          if (file.url) return file.url;
+          const response = getUploadResponse(file);
+          if (file.status === 'done' && response?.data?.url) {
+            return response.data.url;
+          }
+          return null;
+        })
+        .filter((url): url is string => !!url) || [];
+    const responsibleDepartments = normalizeResponsibleDepartments(rawData);
+    const data = {
+      ...rawData,
+      photos,
+      responsibleDepartment: responsibleDepartments[0] || '',
+      responsibleDepartments,
+      severity: rawData.severity || DEFAULT_VALUES.DEFAULT_SEVERITY,
+    };
+    if (props.isEditMode && data.id) {
+      await updateInspectionIssue(data.id, data as InspectionIssue);
+      message.success(t('common.saveSuccess'));
+    } else {
+      await createInspectionIssue(data as InspectionIssue);
+      message.success(t('common.createSuccess'));
+    }
+    emit('update:open', false);
+    emit('success');
+  } catch (error) {
+    handleApiError(error, 'Save Inspection Issue');
+    const errorMessage =
+      error instanceof Error ? error.message : t('common.saveFailed');
+    message.error(errorMessage);
+  } finally {
+    submitting.value = false;
+  }
 }
 
 function handleCancel() {
@@ -330,13 +188,9 @@ function handleCancel() {
 
 <template>
   <Modal
-    :confirm-loading="false"
+    :confirm-loading="submitting"
     :open="open"
-    :title="
-      isEditMode
-        ? t('qms.inspection.issues.editIssue')
-        : t('qms.inspection.issues.createIssue')
-    "
+    :title="modalTitle"
     :width="isMobile ? modalWidth : '900px'"
     :wrap-class-name="`${modalWrapClassName} issue-edit-modal-wrap`"
     @cancel="handleCancel"
@@ -345,123 +199,14 @@ function handleCancel() {
     <div
       class="max-h-[70vh] min-w-0 overflow-y-auto overflow-x-hidden p-1 sm:max-h-[700px] sm:p-2"
     >
-      <Form>
-        <!-- NC Number Slot: Add Auto Switch -->
-        <template #ncNumber="{ modelValue }">
-          <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-            <div class="relative min-w-0 flex-1">
-              <span
-                class="ant-input ant-input-disabled inline-block w-full rounded border bg-gray-50 px-2 py-1"
-              >
-                {{
-                  modelValue ||
-                  t('qms.inspection.issues.generateNumberPlaceholder')
-                }}
-              </span>
-            </div>
-            <div
-              v-if="!isEditMode"
-              class="flex flex-shrink-0 items-center gap-2"
-            >
-              <span class="text-xs text-gray-400">自动生成</span>
-              <Switch v-model:checked="isAutoNc" size="small" />
-            </div>
-          </div>
-        </template>
-
-        <!-- Work Order Slot -->
-        <template #workOrderNumber="slotProps">
-          <WorkOrderSelect v-bind="slotProps" @change="handleWorkOrderChange" />
-        </template>
-
-        <!-- Supplier Slot -->
-        <template #supplierName="slotProps">
-          <SupplierSelect
-            v-bind="slotProps"
-            :key="targetUnitCategory"
-            :category="targetUnitCategory"
-          />
-        </template>
-
-        <template #responsibleWelder="slotProps">
-          <Select
-            v-bind="slotProps"
-            :loading="welderLoading"
-            :options="welderOptions"
-            allow-clear
-            show-search
-            :filter-option="
-              (input, option) =>
-                String(option?.searchText || '')
-                  .toLowerCase()
-                  .includes(
-                    String(input || '')
-                      .trim()
-                      .toLowerCase(),
-                  ) ||
-                String(option?.label || '')
-                  .toLowerCase()
-                  .includes(
-                    String(input || '')
-                      .trim()
-                      .toLowerCase(),
-                  ) ||
-                String(option?.value || '')
-                  .toLowerCase()
-                  .includes(
-                    String(input || '')
-                      .trim()
-                      .toLowerCase(),
-                  )
-            "
-            placeholder="请选择责任焊工"
-          />
-        </template>
-
-        <!-- Description Slot: AI Buttons in Label/Top -->
-        <template #description-label>
-          <div
-            class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <span>{{ t('qms.inspection.issues.description') }}</span>
-            <div class="flex flex-wrap gap-2">
-              <Tooltip :title="t('qms.inspection.issues.aiAnalyzeTooltip')">
-                <Button
-                  :loading="isAiAnalyzing"
-                  size="small"
-                  type="link"
-                  @click="analyzeIssue"
-                >
-                  <span class="i-lucide-sparkles mr-1"></span>
-                  {{ t('qms.inspection.issues.aiAnalyze') }}
-                </Button>
-              </Tooltip>
-              <Tooltip :title="t('qms.inspection.issues.matchHistoryTooltip')">
-                <Button
-                  :loading="isMatchingCases"
-                  size="small"
-                  type="link"
-                  @click="matchHistory"
-                >
-                  <span class="i-lucide-history mr-1"></span>
-                  {{ t('qms.inspection.issues.matchCases') }}
-                </Button>
-              </Tooltip>
-            </div>
-          </div>
-        </template>
-
-        <!-- Photos Slot -->
-        <template #photos="slotProps">
-          <IssuePhotoUpload v-bind="slotProps" />
-        </template>
-      </Form>
-
-      <!-- Similar Cases: Outside the Form grid but inside the modal scroll -->
-      <IssueSimilarCases
-        v-if="matchedCases.length > 0"
-        :cases="matchedCases"
-        @apply="(solution) => applyCaseSolution(solution)"
+      <IssueFormFields
+        ref="formFieldsRef"
+        mode="standalone"
+        :is-edit-mode="isEditMode"
+        :dept-tree-data="deptTreeData"
+        :process-options="processOptions"
+        :status-options="statusOptions"
+        @search-work-order="(value) => emit('searchWorkOrder', value)"
       />
     </div>
   </Modal>
@@ -482,58 +227,5 @@ function handleCancel() {
 
 :global(.issue-edit-modal-wrap.qms-mobile-modal .ant-modal-body) {
   max-height: calc(100dvh - 112px);
-}
-
-:deep(.ant-form-item) {
-  min-width: 0;
-  margin-bottom: 16px;
-}
-
-:deep(.issue-edit-form-grid > *) {
-  min-width: 0;
-}
-
-:deep(.ant-form-item-label),
-:deep(.ant-form-item-control) {
-  min-width: 0;
-}
-
-:deep(.ant-form-item-control-input-content),
-:deep(.ant-select),
-:deep(.ant-select-selector),
-:deep(.ant-input),
-:deep(.ant-picker),
-:deep(.ant-input-number),
-:deep(.ant-tree-select),
-:deep(.ant-upload-list),
-:deep(.ant-upload-list-item),
-:deep(.ant-upload-wrapper) {
-  min-width: 0;
-  max-width: 100%;
-}
-
-:deep(.ant-select-selection-overflow) {
-  max-width: 100%;
-  overflow: hidden;
-}
-
-:deep(textarea.ant-input) {
-  resize: vertical;
-}
-
-@media (max-width: 767px) {
-  :deep(.ant-form-item) {
-    align-items: stretch;
-  }
-
-  :deep(.issue-edit-form-grid > *) {
-    grid-column: 1 / -1;
-  }
-
-  :deep(.ant-form-item-control),
-  :deep(.ant-form-item-control-input),
-  :deep(.ant-form-item-control-input-content) {
-    width: 100%;
-  }
 }
 </style>

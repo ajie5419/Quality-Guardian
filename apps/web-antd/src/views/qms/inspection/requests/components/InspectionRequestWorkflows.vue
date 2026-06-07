@@ -152,10 +152,6 @@ const emit = defineEmits<{
     :upload-headers="props.uploadHeaders"
     :current-request="props.currentRequest"
     :dept-tree-data="props.deptTreeData"
-    :defect-options="props.defectOptions"
-    :linked-defect-subtype-options="props.linkedDefectSubtypeOptions"
-    :severity-options="props.severityOptions"
-    :claim-options="props.claimOptions"
     :display-close-readonly-value="props.displayCloseReadonlyValue"
     :handle-close-attachment-upload-change="
       props.handleCloseAttachmentUploadChange
