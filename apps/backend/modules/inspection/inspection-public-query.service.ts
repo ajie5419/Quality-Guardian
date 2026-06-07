@@ -1,8 +1,12 @@
-import { SUPPLIER_CATEGORY } from '@qgs/shared';
+import { INSPECTION_REQUEST_STATUS, SUPPLIER_CATEGORY } from '@qgs/shared';
+import { INCOMING_INSPECTION_PROCESS_NAME } from '~/modules/inspection/inspection-request';
 import { parseWorkOrderListQuery } from '~/modules/work-order/work-order-query';
+import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import { buildKeywordOr } from '~/utils/query-helpers';
+
+const logger = createModuleLogger('inspection-public-query');
 
 type DeptRow = { id: string; name: string; parentId: string };
 
@@ -27,6 +31,64 @@ function collectLeafDepartments(rows: DeptRow[]) {
     return result;
   }
   return rows.filter((row) => (childrenMap.get(row.id) || []).length === 0);
+}
+
+function maskReporter(value: null | string | undefined): string {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  const first = text[0] ?? '';
+  return text.length === 1 ? first : `${first}*`;
+}
+
+function parseIncomingRequestInfo(value: null | string | undefined): {
+  incomingType: string;
+  notes: string;
+} {
+  if (!value) return { incomingType: '', notes: '' };
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    return {
+      incomingType: String(parsed.incomingType ?? '').trim(),
+      notes: String(parsed.notes ?? '').trim(),
+    };
+  } catch (error) {
+    logger.warn({ err: error }, 'failed to parse requestInfo json');
+    return { incomingType: '', notes: '' };
+  }
+}
+
+function toItem(record: {
+  closedAt: Date | null;
+  inspectionResult: string;
+  partName: string;
+  qualifiedQuantity: null | number;
+  quantity: number;
+  reporter: string;
+  requestInfo: null | string;
+  requestNo: string;
+  status: string;
+  submittedAt: Date;
+  team: null | string;
+  unqualifiedQuantity: null | number;
+  workOrderNumber: string;
+}) {
+  const info = parseIncomingRequestInfo(record.requestInfo);
+  return {
+    requestNo: record.requestNo,
+    partName: record.partName,
+    supplierName: record.team ?? '',
+    workOrderNumber: record.workOrderNumber,
+    quantity: record.quantity,
+    qualifiedQuantity: record.qualifiedQuantity,
+    unqualifiedQuantity: record.unqualifiedQuantity,
+    reporter: maskReporter(record.reporter),
+    status: record.status,
+    inspectionResult: record.inspectionResult,
+    incomingType: info.incomingType,
+    notes: info.notes,
+    submittedAt: record.submittedAt.toISOString(),
+    closedAt: record.closedAt ? record.closedAt.toISOString() : null,
+  };
 }
 
 export const InspectionPublicQueryService = {
@@ -157,6 +219,83 @@ export const InspectionPublicQueryService = {
         workOrderNumber: item.workOrderNumber,
       })),
       total,
+    };
+  },
+
+  async getTodayIncomingInspections() {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+
+    const TAKE_LIMIT = 200;
+    const records = await prisma.qms_inspection_requests.findMany({
+      where: {
+        isDeleted: false,
+        processName: INCOMING_INSPECTION_PROCESS_NAME,
+        submittedAt: { gte: start, lt: end },
+      },
+      orderBy: { submittedAt: 'desc' },
+      take: TAKE_LIMIT,
+      select: {
+        requestNo: true,
+        partName: true,
+        team: true,
+        workOrderNumber: true,
+        quantity: true,
+        qualifiedQuantity: true,
+        unqualifiedQuantity: true,
+        reporter: true,
+        status: true,
+        inspectionResult: true,
+        requestInfo: true,
+        submittedAt: true,
+        closedAt: true,
+      },
+    });
+
+    const pendingItems: Array<ReturnType<typeof toItem>> = [];
+    const passItems: Array<ReturnType<typeof toItem>> = [];
+    const failItems: Array<ReturnType<typeof toItem>> = [];
+    const conditionalItems: Array<ReturnType<typeof toItem>> = [];
+
+    for (const record of records) {
+      const status = String(record.status);
+      const result = String(record.inspectionResult);
+      const item = toItem({
+        ...record,
+        status,
+        inspectionResult: result,
+      });
+      if (result === 'FAIL') {
+        failItems.push(item);
+      } else if (status === INSPECTION_REQUEST_STATUS.CLOSED) {
+        if (result === 'CONDITIONAL') conditionalItems.push(item);
+        else passItems.push(item);
+      } else if (
+        status === INSPECTION_REQUEST_STATUS.SUBMITTED ||
+        status === INSPECTION_REQUEST_STATUS.DISPATCHED ||
+        status === INSPECTION_REQUEST_STATUS.INSPECTING
+      ) {
+        pendingItems.push(item);
+      }
+    }
+
+    return {
+      summary: {
+        pending: pendingItems.length,
+        pass: passItems.length,
+        fail: failItems.length,
+        conditional: conditionalItems.length,
+        total: records.length,
+      },
+      pendingItems,
+      passItems,
+      failItems,
+      conditionalItems,
+      generatedAt: new Date().toISOString(),
+      dateLabel: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`,
+      truncated: records.length === TAKE_LIMIT,
     };
   },
 };

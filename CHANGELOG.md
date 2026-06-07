@@ -25,6 +25,32 @@
 
 ## 执行记录
 
+### 2026-06-07 新增公开端点：今日外购件检验情况
+
+**执行内容：**
+
+- 后端：在 `apps/backend/modules/inspection/inspection-public-query.service.ts` 新增 `getTodayIncomingInspections()`，按服务器本地时区今日窗口、`processName === 进货检验`（用 `INCOMING_INSPECTION_PROCESS_NAME` 常量）查询 `qms_inspection_requests`，按 `INSPECTION_REQUEST_STATUS` 枚举与 `inspectionResult` 分桶为 pending/pass/fail/conditional 四类；字段白名单输出（reporter 自动姓+*脱敏，`requestInfo` 解析为 incomingType/notes），take 上限 200，超过返回 `truncated=true`
+- 后端路由：新增 `apps/backend/api/qms/public/inspection/today-incoming.get.ts`（22 行），无参数，标准 `try/logApiError/internalServerErrorResponse` 形态；`/api/qms/public/` 已在 auth 中间件白名单
+- 后端测试：扩展 `inspection-public-query.service.test.ts` 增加 7 个用例（基本分桶 / CONDITIONAL 单独桶 / reporter 脱敏 / requestInfo 解析 / truncated 标记 / where 子句包含进货检验+今日窗口+isDeleted 过滤 / ISO 时间序列化）
+- 前端：新增 `views/qms/inspection/today-incoming/index.vue` 与 `components/BucketCard.vue`，独立全屏布局（无侧栏），头部 4 卡片汇总 + 4 个分桶卡片（待检验/合格/让步合格/不合格），自动 60s 刷新；新增 `getPublicTodayIncomingInspections` API 与 `PUBLIC_TODAY_INCOMING_INSPECTION` 路径常量，使用 `publicRequestClient`（不带 token、不触发 401 重定向）
+- 前端路由：在 `apps/web-antd/src/router/routes/core.ts` 注册公开路由 `PublicTodayIncomingInspection` → `/qms/inspection/today-incoming`，`meta.ignoreAccess=true` 不触发权限校验
+
+**验证结果：**
+
+- lint: 通过（pnpm lint）
+- typecheck: 通过（@qgs/backend tsc --noEmit、@qgs/web-antd vue-tsc --noEmit）
+- check:qms-arch: 0 violations
+- vitest: 9/9 通过（inspection-public-query.service.test.ts）
+
+**commit:** 未提交，待用户决定
+
+**遗留问题：**
+
+- 该端点是公开 URL，已对 reporter 做姓+*脱敏；如要进一步收紧（隐藏 reporter / 加 token / 加访问频率限制），可后续按需扩展
+- 前端 60s 自动刷新对未开启的浏览器无影响；如有大屏长时间停留场景，后续可考虑改为 SSE/WebSocket
+
+---
+
 ### 2026-06-06 后端测试：补齐零测试模块覆盖并推进逐功能覆盖
 
 **执行内容：**

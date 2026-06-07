@@ -8,6 +8,9 @@ vi.mock('~/utils/prisma', () => ({
     suppliers: {
       findMany: vi.fn(),
     },
+    qms_inspection_requests: {
+      findMany: vi.fn(),
+    },
   },
 }));
 
@@ -61,5 +64,209 @@ describe('inspection public query service', () => {
     expect(result).toEqual([
       { label: 'Outsourcing A', value: 'Outsourcing A' },
     ]);
+  });
+});
+
+describe('getTodayIncomingInspections', () => {
+  const submittedAt = new Date('2026-06-07T01:00:00Z');
+  const closedAt = new Date('2026-06-07T03:00:00Z');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function makeRecord(overrides: Record<string, unknown> = {}) {
+    return {
+      requestNo: 'IR-20260607-0001',
+      partName: '零件A',
+      team: '供应商X',
+      workOrderNumber: 'WO-001',
+      quantity: 10,
+      qualifiedQuantity: 10,
+      unqualifiedQuantity: 0,
+      reporter: '张三',
+      status: 'SUBMITTED',
+      inspectionResult: 'PASS',
+      requestInfo: null,
+      submittedAt,
+      closedAt: null,
+      ...overrides,
+    };
+  }
+
+  it('correctly buckets pending, pass, fail, and conditional items', async () => {
+    const records = [
+      makeRecord({ status: 'SUBMITTED' }),
+      makeRecord({ requestNo: 'IR-20260607-0002', status: 'DISPATCHED' }),
+      makeRecord({ requestNo: 'IR-20260607-0003', status: 'INSPECTING' }),
+      makeRecord({
+        requestNo: 'IR-20260607-0004',
+        status: 'CLOSED',
+        inspectionResult: 'PASS',
+        closedAt,
+      }),
+      makeRecord({
+        requestNo: 'IR-20260607-0005',
+        status: 'CLOSED',
+        inspectionResult: 'FAIL',
+        closedAt,
+      }),
+      makeRecord({
+        requestNo: 'IR-20260607-0006',
+        status: 'CLOSED',
+        inspectionResult: 'CONDITIONAL',
+        closedAt,
+      }),
+    ];
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(records);
+
+    const result =
+      await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(result.summary).toEqual({
+      pending: 3,
+      pass: 1,
+      fail: 1,
+      conditional: 1,
+      total: 6,
+    });
+    expect(result.pendingItems).toHaveLength(3);
+    expect(result.passItems).toHaveLength(1);
+    expect(result.failItems).toHaveLength(1);
+    expect(result.conditionalItems).toHaveLength(1);
+    expect(result.truncated).toBe(false);
+  });
+
+  it('masks reporter name to first char + asterisk', async () => {
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      makeRecord({ reporter: '张三', status: 'SUBMITTED' }),
+    ]);
+
+    const result =
+      await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(result.pendingItems[0]?.reporter).toBe('张*');
+  });
+
+  it('masks single-char reporter without asterisk', async () => {
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([makeRecord({ reporter: '张', status: 'SUBMITTED' })]);
+
+    const result =
+      await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(result.pendingItems[0]?.reporter).toBe('张');
+  });
+
+  it('parses requestInfo JSON into incomingType and notes', async () => {
+    const requestInfo = JSON.stringify({
+      incomingType: '首批',
+      notes: '外观检验',
+    });
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([makeRecord({ status: 'SUBMITTED', requestInfo })]);
+
+    const result =
+      await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(result.pendingItems[0]?.incomingType).toBe('首批');
+    expect(result.pendingItems[0]?.notes).toBe('外观检验');
+  });
+
+  it('sets truncated=true when records hit the 200 limit', async () => {
+    const records = Array.from({ length: 200 }, (_, i) =>
+      makeRecord({ requestNo: `IR-20260607-${String(i).padStart(4, '0')}` }),
+    );
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(records);
+
+    const result =
+      await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(result.truncated).toBe(true);
+  });
+
+  it('calls findMany with correct where clause including processName and isDeleted', async () => {
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+
+    await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(prisma.qms_inspection_requests.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          isDeleted: false,
+          processName: '进货检验',
+          submittedAt: expect.objectContaining({
+            gte: expect.any(Date),
+            lt: expect.any(Date),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('buckets FAIL records into fail regardless of status (e.g. re-inspection)', async () => {
+    const records = [
+      makeRecord({
+        requestNo: 'IR-20260607-A1',
+        status: 'INSPECTING',
+        inspectionResult: 'FAIL',
+        qualifiedQuantity: 0,
+        unqualifiedQuantity: 1,
+      }),
+      makeRecord({
+        requestNo: 'IR-20260607-A2',
+        status: 'DISPATCHED',
+        inspectionResult: 'FAIL',
+      }),
+      makeRecord({
+        requestNo: 'IR-20260607-A3',
+        status: 'CLOSED',
+        inspectionResult: 'FAIL',
+        closedAt,
+      }),
+    ];
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(records);
+
+    const result =
+      await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(result.summary.fail).toBe(3);
+    expect(result.summary.pending).toBe(0);
+    expect(result.failItems.map((item) => item.status)).toEqual([
+      'INSPECTING',
+      'DISPATCHED',
+      'CLOSED',
+    ]);
+  });
+
+  it('serializes submittedAt and closedAt as ISO strings', async () => {
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      makeRecord({
+        status: 'CLOSED',
+        inspectionResult: 'PASS',
+        submittedAt,
+        closedAt,
+      }),
+    ]);
+
+    const result =
+      await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(result.passItems[0]?.submittedAt).toBe(submittedAt.toISOString());
+    expect(result.passItems[0]?.closedAt).toBe(closedAt.toISOString());
   });
 });

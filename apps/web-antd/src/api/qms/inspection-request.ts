@@ -175,6 +175,46 @@ export async function getPublicInspectionRequestWorkOrders(params?: {
   return normalizeListResponse<WorkOrderItem>(raw);
 }
 
+export interface PublicTodayIncomingInspectionItem {
+  requestNo: string;
+  partName: string;
+  supplierName: string;
+  workOrderNumber: string;
+  quantity: number;
+  qualifiedQuantity: null | number;
+  unqualifiedQuantity: null | number;
+  reporter: string;
+  status: string;
+  inspectionResult: string;
+  incomingType: string;
+  notes: string;
+  submittedAt: string;
+  closedAt: null | string;
+}
+
+export interface PublicTodayIncomingInspectionResponse {
+  summary: {
+    conditional: number;
+    fail: number;
+    pass: number;
+    pending: number;
+    total: number;
+  };
+  pendingItems: PublicTodayIncomingInspectionItem[];
+  passItems: PublicTodayIncomingInspectionItem[];
+  failItems: PublicTodayIncomingInspectionItem[];
+  conditionalItems: PublicTodayIncomingInspectionItem[];
+  generatedAt: string;
+  dateLabel: string;
+  truncated: boolean;
+}
+
+export async function getPublicTodayIncomingInspections() {
+  return publicRequestClient.get<PublicTodayIncomingInspectionResponse>(
+    QMS_API.PUBLIC_TODAY_INCOMING_INSPECTION,
+  );
+}
+
 export async function dispatchInspectionRequest(
   id: string,
   data: DispatchInspectionRequestParams,
