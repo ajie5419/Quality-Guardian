@@ -177,8 +177,9 @@ describe('quality-loss format helpers', () => {
     expect([...merged.keys()].sort()).toEqual([1, 2]);
     const monthOne = merged.get(1);
     expect(monthOne).toBeDefined();
-    expect(formatTrendItem('Jan', monthOne as NonNullable<typeof monthOne>))
-      .toEqual({
+    expect(
+      formatTrendItem('Jan', monthOne as NonNullable<typeof monthOne>),
+    ).toEqual({
       commissioningAmount: 40,
       externalAmount: 0,
       internalAmount: 20,

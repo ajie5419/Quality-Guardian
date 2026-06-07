@@ -69,9 +69,7 @@ describe('menu id put service', () => {
   async function loadHandler() {
     vi.resetModules();
     const mod = await import('~/modules/system/menu-id.put.service');
-    return mod.default as (
-      event: unknown,
-    ) => Promise<unknown>;
+    return mod.default as (event: unknown) => Promise<unknown>;
   }
 
   it('updates menu with parsed payload and returns success', async () => {

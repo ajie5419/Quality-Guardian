@@ -123,7 +123,9 @@ describe('metrology route service handlers', () => {
   });
 
   it('creates metrology instrument, records audit, and returns created data', async () => {
-    const mod = await import('~/modules/metrology/metrology-create.post.service');
+    const mod = await import(
+      '~/modules/metrology/metrology-create.post.service'
+    );
     const handler = mod.default;
     readBody.mockResolvedValue({ instrumentCode: 'M-001' });
     createMetrology.mockResolvedValue({
@@ -153,7 +155,9 @@ describe('metrology route service handlers', () => {
   });
 
   it('maps metrology create validation and duplicate errors', async () => {
-    const mod = await import('~/modules/metrology/metrology-create.post.service');
+    const mod = await import(
+      '~/modules/metrology/metrology-create.post.service'
+    );
     const handler = mod.default;
     readBody.mockResolvedValue({});
     createMetrology.mockRejectedValueOnce(new Error('编号不能为空'));
@@ -201,7 +205,9 @@ describe('metrology route service handlers', () => {
   });
 
   it('imports metrology rows and rejects empty imports', async () => {
-    const mod = await import('~/modules/metrology/metrology-import.post.service');
+    const mod = await import(
+      '~/modules/metrology/metrology-import.post.service'
+    );
     const handler = mod.default;
     readBody.mockResolvedValueOnce({ items: [] });
     expect(await handler(event())).toEqual({

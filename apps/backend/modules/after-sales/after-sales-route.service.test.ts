@@ -222,7 +222,9 @@ describe('after-sales route services', () => {
   });
 
   it('updates after-sales route records with quality-loss recalculation and photo references', async () => {
-    const mod = await import('~/modules/after-sales/after-sales-id.put.service');
+    const mod = await import(
+      '~/modules/after-sales/after-sales-id.put.service'
+    );
     const handler = mod.default;
     readBody.mockResolvedValue({
       laborTravelCost: 20,
@@ -249,7 +251,9 @@ describe('after-sales route services', () => {
   });
 
   it('maps after-sales update missing id, missing current record, prisma not-found, and generic failures', async () => {
-    const mod = await import('~/modules/after-sales/after-sales-id.put.service');
+    const mod = await import(
+      '~/modules/after-sales/after-sales-id.put.service'
+    );
     const handler = mod.default;
     getRequiredRouterParam.mockReturnValueOnce({ message: 'missing id' });
     expect(await handler(event())).toEqual({ message: 'missing id' });
