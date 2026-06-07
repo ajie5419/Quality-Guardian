@@ -26,6 +26,7 @@ declare -a QMS_VIEW_TARGETS=()
 declare -a API_TS_TARGETS=()
 declare -a MODULE_TS_TARGETS=()
 declare -a REPO_TS_TARGETS=()
+declare -a BACKEND_TEST_TARGETS=()
 
 usage() {
   cat <<'USAGE'
@@ -41,6 +42,10 @@ Rules:
   B-S2: modules/ files must not cast Prisma delegates to any
   B-S3: modules/ files must not use execSync
   B-SEC1: raw SQL must not combine $queryRawUnsafe with template strings
+  B-MAP1: new module/route/view directories must update code_map.md (changed mode only)
+  B-TEST1: backend tests must not live in centralized __tests__/tests/test directories
+  B-TEST2: backend test files must have a sibling source file (orphan tests forbidden)
+  B-TEST3: tests importing ~/utils/prisma must also vi.mock it
 
 Modes:
   --changed  Check changed files only, including committed diff, staged changes,
@@ -171,6 +176,7 @@ load_targets() {
   collect_targets "$TMP_DIR/api-ts-targets.txt" '^apps/backend/api/.*\.ts$'
   collect_targets "$TMP_DIR/module-ts-targets.txt" '^apps/backend/modules/.*\.ts$'
   collect_targets "$TMP_DIR/repo-ts-targets.txt" '.*\.ts$'
+  collect_targets "$TMP_DIR/backend-test-targets.txt" '^apps/backend/.*\.test\.ts$'
 
   while IFS= read -r file; do
     [[ -n "$file" && -f "$file" ]] && QMS_VIEW_TARGETS+=("$file")
@@ -187,12 +193,22 @@ load_targets() {
   while IFS= read -r file; do
     [[ -n "$file" && -f "$file" ]] && REPO_TS_TARGETS+=("$file")
   done <"$TMP_DIR/repo-ts-targets.txt"
+
+  while IFS= read -r file; do
+    [[ -n "$file" && -f "$file" ]] && BACKEND_TEST_TARGETS+=("$file")
+  done <"$TMP_DIR/backend-test-targets.txt"
 }
 
 baseline_r3_limit() {
   local repo_path="$1"
   [[ -f "$BASELINE_FILE" ]] || return 1
   awk -F'|' -v path="$repo_path" '$1 == "R3" && $2 == path { print $3; found = 1 } END { if (!found) exit 1 }' "$BASELINE_FILE"
+}
+
+baseline_has_test2() {
+  local repo_path="$1"
+  [[ -f "$BASELINE_FILE" ]] || return 1
+  awk -F'|' -v path="$repo_path" '$1 == "B-TEST2" && $2 == path { found = 1 } END { exit !found }' "$BASELINE_FILE"
 }
 
 grep_rule() {
@@ -316,6 +332,93 @@ check_b_sec1() {
   grep_rule "B-SEC1" "Do not combine queryRawUnsafe with template strings." '\$queryRawUnsafe.*`' "${REPO_TS_TARGETS[@]}"
 }
 
+# B-MAP1: new business module / top-level route / view directories require code_map.md update.
+# Only meaningful in --changed mode (need a base ref to compare directory listings).
+check_b_map1() {
+  [[ "$SCOPE" == "all" ]] && return 0
+
+  local changed_file="$TMP_DIR/changed-files.txt"
+  [[ -f "$changed_file" ]] || collect_changed_files "$changed_file"
+
+  # If code_map.md itself was touched, the rule is satisfied.
+  if grep -qx 'code_map.md' "$changed_file"; then
+    return 0
+  fi
+
+  local pattern='^(apps/backend/modules/[^/]+/|apps/backend/api/[^/]+/|apps/backend/api/qms/[^/]+/|apps/web-antd/src/views/[^/]+/|apps/web-antd/src/views/qms/[^/]+/)'
+  local repo_path=''
+  local seen_dirs=' '
+
+  while IFS= read -r repo_path; do
+    [[ -n "$repo_path" ]] || continue
+    [[ "$repo_path" =~ $pattern ]] || continue
+    local dir="${BASH_REMATCH[1]}"
+
+    # Skip directories that already exist on the base ref (only flag *new* dirs).
+    local base_ref=''
+    if base_ref="$(resolve_base_ref)"; then
+      if git -C "$ROOT_DIR" cat-file -e "$base_ref:$dir" 2>/dev/null; then
+        continue
+      fi
+    fi
+
+    [[ "$seen_dirs" == *" $dir "* ]] && continue
+    seen_dirs="$seen_dirs$dir "
+
+    report_violation "B-MAP1" "${dir}1" "New module/route/view directory must be reflected in code_map.md."
+  done <"$changed_file"
+}
+
+# B-TEST1: backend test files must not live in centralized __tests__/tests/test directories.
+check_b_test1() {
+  (( ${#BACKEND_TEST_TARGETS[@]} == 0 )) && return 0
+  local file=''
+  local repo_path=''
+  for file in "${BACKEND_TEST_TARGETS[@]}"; do
+    repo_path="$(to_repo_path "$file")"
+    if [[ "$repo_path" == */__tests__/* || "$repo_path" == */tests/* || "$repo_path" == */test/* ]]; then
+      report_violation "B-TEST1" "$repo_path:1" "Tests must live next to source files, not in centralized test directories."
+    fi
+  done
+}
+
+# B-TEST2: foo.<suffix>.test.ts must have a sibling foo.<suffix>.ts.
+# Existing legitimate orphan tests are baselined.
+check_b_test2() {
+  (( ${#BACKEND_TEST_TARGETS[@]} == 0 )) && return 0
+  local file=''
+  local repo_path=''
+  local sibling=''
+  for file in "${BACKEND_TEST_TARGETS[@]}"; do
+    repo_path="$(to_repo_path "$file")"
+    sibling="${file%.test.ts}.ts"
+    if [[ ! -f "$sibling" ]]; then
+      if baseline_has_test2 "$repo_path"; then
+        echo -e "${YELLOW}Baseline B-TEST2:${NC} $repo_path (orphan test grandfathered)"
+        baseline_hits=$((baseline_hits + 1))
+      else
+        report_violation "B-TEST2" "$repo_path:1" "Test file has no sibling source ($(to_repo_path "$sibling") missing)."
+      fi
+    fi
+  done
+}
+
+# B-TEST3: a test importing ~/utils/prisma must also vi.mock it.
+check_b_test3() {
+  (( ${#BACKEND_TEST_TARGETS[@]} == 0 )) && return 0
+  local file=''
+  local repo_path=''
+  for file in "${BACKEND_TEST_TARGETS[@]}"; do
+    [[ -f "$file" ]] || continue
+    if grep -qE "from[[:space:]]+['\"]~/utils/prisma['\"]" "$file"; then
+      if ! grep -qE "vi\.mock\([[:space:]]*['\"]~/utils/prisma['\"]" "$file"; then
+        repo_path="$(to_repo_path "$file")"
+        report_violation "B-TEST3" "$repo_path:1" "Test imports ~/utils/prisma without vi.mock — would hit a real DB."
+      fi
+    fi
+  done
+}
+
 echo "QMS architecture check"
 echo "scope: $SCOPE"
 echo "views dir: $QMS_VIEWS_DIR"
@@ -323,7 +426,7 @@ echo "baseline: $BASELINE_FILE"
 echo
 
 load_targets
-echo "target files: qms=${#QMS_VIEW_TARGETS[@]} api=${#API_TS_TARGETS[@]} modules=${#MODULE_TS_TARGETS[@]} repo-ts=${#REPO_TS_TARGETS[@]}"
+echo "target files: qms=${#QMS_VIEW_TARGETS[@]} api=${#API_TS_TARGETS[@]} modules=${#MODULE_TS_TARGETS[@]} repo-ts=${#REPO_TS_TARGETS[@]} backend-tests=${#BACKEND_TEST_TARGETS[@]}"
 echo
 
 check_r1
@@ -335,6 +438,10 @@ check_b_r3
 check_b_s2
 check_b_s3
 check_b_sec1
+check_b_map1
+check_b_test1
+check_b_test2
+check_b_test3
 
 echo
 if (( violations > 0 )); then

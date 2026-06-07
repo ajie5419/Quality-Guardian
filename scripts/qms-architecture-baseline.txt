@@ -1,3 +1,12 @@
 R3|apps/web-antd/src/views/qms/after-sales/index.vue|680
 R3|apps/web-antd/src/views/qms/file-center/index.vue|512
 R3|apps/web-antd/src/views/qms/inspection/issues/index.vue|643
+B-TEST2|apps/backend/modules/after-sales/after-sales-core.test.ts
+B-TEST2|apps/backend/modules/after-sales/after-sales-list-route.test.ts
+B-TEST2|apps/backend/modules/after-sales/after-sales-route-services.test.ts
+B-TEST2|apps/backend/modules/ai/ai-post-services.test.ts
+B-TEST2|apps/backend/modules/dictionary/dictionary-api-mapping.test.ts
+B-TEST2|apps/backend/modules/metrology/metrology-route-services.test.ts
+B-TEST2|apps/backend/modules/metrology/metrology-template-public.test.ts
+B-TEST2|apps/backend/modules/supervision/supervision-project-issue.service.test.ts
+B-TEST2|apps/backend/modules/system-log/audit-log.service.test.ts

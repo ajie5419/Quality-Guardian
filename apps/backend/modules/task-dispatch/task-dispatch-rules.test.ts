@@ -1,15 +1,104 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildTaskDispatchCreateData,
+  getTaskDispatchArchiveFilter,
   isTaskDispatchLevelTwo,
+  normalizeTaskDispatchStatus,
   resolveTaskDispatchAssigneeCandidates,
+  resolveTaskDispatchAssigneeFilter,
+  resolveTaskDispatchCurrentUserId,
   resolveTaskDispatchItpProjectIdForValidation,
   resolveTaskDispatchLevel,
   resolveTaskDispatchParentIdForPromotion,
+  resolveTaskDispatchStatusFilter,
+  resolveTaskDispatchUserId,
 } from './task-dispatch-rules';
 
 describe('task-dispatch payload utils', () => {
+  it('returns archive filter that excludes archived task statuses', () => {
+    expect(getTaskDispatchArchiveFilter()).toEqual({
+      AND: [
+        {
+          OR: [
+            { itpProjectId: null },
+            { itp_project: { planStatus: { not: 'ARCHIVED' } } },
+          ],
+        },
+        {
+          OR: [
+            { dfmeaId: null },
+            { dfmea_project: { status: { not: 'archived' } } },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('resolves assignee filter by admin all flag, parent id, and current user', () => {
+    expect(
+      resolveTaskDispatchAssigneeFilter({
+        all: 'true',
+        currentUserId: 'u1',
+        isAdmin: true,
+        parentId: '',
+      }),
+    ).toEqual({});
+    expect(
+      resolveTaskDispatchAssigneeFilter({
+        all: '1',
+        currentUserId: 'u1',
+        isAdmin: false,
+        parentId: '',
+      }),
+    ).toEqual({ assigneeId: 'u1' });
+    expect(
+      resolveTaskDispatchAssigneeFilter({
+        all: '',
+        currentUserId: 'u1',
+        isAdmin: true,
+        parentId: 'parent-1',
+      }),
+    ).toEqual({ parentId: 'parent-1' });
+  });
+
+  it('normalizes and resolves status filter values', () => {
+    expect(normalizeTaskDispatchStatus('pending')).toBe('PENDING');
+    expect(resolveTaskDispatchStatusFilter('processing')).toBe('processing');
+    expect(resolveTaskDispatchStatusFilter('pending,processing')).toEqual({
+      in: ['pending', 'processing'],
+    });
+    expect(resolveTaskDispatchStatusFilter('')).toBeUndefined();
+  });
+
+  it('resolves user id from token fields and database lookup', async () => {
+    expect(resolveTaskDispatchUserId({ id: 12 })).toBe('12');
+    expect(resolveTaskDispatchUserId({ userId: '  u1  ' })).toBe('u1');
+
+    const userLookupClient = {
+      users: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'db-user' }),
+      },
+    };
+
+    await expect(
+      resolveTaskDispatchCurrentUserId(
+        { id: 'token-user', username: 'tom' },
+        userLookupClient,
+      ),
+    ).resolves.toBe('db-user');
+    expect(userLookupClient.users.findFirst).toHaveBeenCalledWith({
+      where: {
+        OR: [{ id: 'token-user' }, { username: 'tom' }],
+      },
+      select: { id: true },
+    });
+
+    await expect(
+      resolveTaskDispatchCurrentUserId({}, userLookupClient),
+    ).resolves.toBeNull();
+  });
+
   it('resolves assignee candidates from one input value', () => {
     expect(resolveTaskDispatchAssigneeCandidates('  user01  ')).toEqual({
       id: 'user01',

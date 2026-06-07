@@ -25,6 +25,33 @@
 
 ## 执行记录
 
+### 2026-06-06 后端测试：补齐零测试模块覆盖并推进逐功能覆盖
+
+**执行内容：**
+
+- 为此前没有测试文件的 8 个业务模块补充同目录功能测试：ai、dept、file-storage、metrology、supervision、vehicle-commissioning、welder、work-order-requirement
+- 覆盖重点包括：部门树缓存与创建默认值、计量器具分页/状态汇总/写入校验、监督计划任务看板与事务删除、文件附件引用解析与上传、AI 历史问题查询与 JSON 提取、车辆调试问题创建/筛选与跨模块文件引用、焊工查询统计与导入、工单需求看板与跨模块工单条件构建
+- 用户明确要求逐功能覆盖后，重新建立导出入口基线；修正静态脚本误抓对象内部 `if/for` 后，当前基线约 610 个，已完成 343 个，剩余 267 个
+- 扩展 supervision 全子域功能测试：项目、问题、计划任务、计划导入、日报、进度同步、shared helper、facade
+- 扩展 planning 共享逻辑测试：工单引导创建、冲突、软删恢复、治理字段写入
+- 扩展 quality-loss 基础功能测试：四类损失来源格式化、状态/source 映射、趋势合并、排序与筛选
+- 扩展 metrology 全子域功能测试：台账 service、导入、模板、公用扫码借用校验、借用/归还、校准计划 CRUD、query、mapping、导入、route service
+- 扩展 after-sales 全子域功能测试：状态/id、payload、service façade、integration、analytics/chart aggregation、route service、更新路由、批删、导入、文件引用和审计日志
+- 扩展 quality-loss 全子域功能测试：summary、data-scope、record maintenance、reporting、route update、create/export/trend route、dashboard façade、drill-down、跨 after-sales / inspection / vehicle-commissioning 更新委派
+- 扩展 dashboard / dictionary / data-scope / system / system-log / knowledge / task-dispatch 全功能测试：目标配置、workspace 聚合、字典 CRUD/cache/list、数据权限解析与 wrapper、系统设置/AI 连接测试/菜单更新/metadata、登录与审计日志、知识库分类/列表/文件引用、任务派工创建/列表/统计/状态规则
+
+**验证结果：**
+
+- typecheck (backend): 通过
+- qms-arch: 通过
+- vitest: 78/78 文件通过，429/429 测试通过
+
+**commit:** 未提交
+
+**遗留问题：**
+
+- 当前已补齐原零测试模块，并推进 after-sales / supervision / metrology / quality-loss / dashboard / dictionary / data-scope / system / system-log / knowledge / task-dispatch / planning 的逐功能覆盖；全量约 610 个导出入口仍剩 267 个需继续逐项核对，未标记完成
+
 ### 2026-06-04 监造日报：任务状态徽章改用项目计划实时状态
 
 **用户反馈：** 截图里"2.3 支腿组对"进度 100% 但徽章显示"进行中"——该显示项目计划里的实时状态（已完成 / 已延期等），不是日报提交时的快照。

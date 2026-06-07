@@ -27,10 +27,84 @@ describe('dataScopeService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (prisma.departments.findMany as any).mockResolvedValue([]);
-    (prisma.users.findFirst as any).mockResolvedValue({ roleId: 'role-1' });
+    (prisma.users.findFirst as any).mockResolvedValue({
+      department: 'dept-a',
+      roleId: 'role-1',
+    });
     (prisma.rbac_user_roles.findMany as any).mockResolvedValue([
       { roleId: 'role-1' },
     ]);
+  });
+
+  it('resolves scope from v2 role policies and deduplicates department ids', async () => {
+    (prisma.data_permission_policies.findMany as any).mockResolvedValue([
+      { scopeType: 'DEPT', deptIds: '["dept-a","dept-b"]' },
+      { scopeType: 'DEPT', deptIds: '["dept-a","dept-c",3]' },
+    ]);
+
+    const scope = await DataScopeService.getScopeForModule('u1', 'inspection');
+
+    expect(scope).toEqual({
+      deptIds: ['dept-a', 'dept-b', 'dept-c'],
+      scopeType: 'DEPT',
+    });
+  });
+
+  it('falls back to the legacy user role id when no v2 role links exist', async () => {
+    (prisma.rbac_user_roles.findMany as any).mockResolvedValueOnce([]);
+    (prisma.data_permission_policies.findMany as any).mockResolvedValueOnce([
+      { scopeType: 'ALL', deptIds: null },
+    ]);
+
+    const scope = await DataScopeService.getScopeForModule('u1', 'supplier');
+
+    expect(prisma.data_permission_policies.findMany).toHaveBeenCalledWith({
+      where: {
+        roleId: { in: ['role-1'] },
+        module: 'supplier',
+        isDeleted: false,
+      },
+      select: { scopeType: true, deptIds: true },
+    });
+    expect(scope).toEqual({ deptIds: [], scopeType: 'ALL' });
+  });
+
+  it('falls back to user department or self scope when policies are unavailable', async () => {
+    (prisma.data_permission_policies.findMany as any).mockResolvedValueOnce([]);
+
+    await expect(
+      DataScopeService.getScopeForModule('u1', 'inspection'),
+    ).resolves.toEqual({ deptIds: ['dept-a'], scopeType: 'DEPT' });
+
+    (prisma.users.findFirst as any).mockResolvedValueOnce({
+      department: '',
+      roleId: 'role-1',
+    });
+    (prisma.data_permission_policies.findMany as any).mockResolvedValueOnce([]);
+
+    await expect(
+      DataScopeService.getScopeForModule('u1', 'inspection'),
+    ).resolves.toEqual({ deptIds: [], scopeType: 'SELF' });
+  });
+
+  it('returns department ids and names as unique data-scope candidates', async () => {
+    (prisma.departments.findMany as any).mockResolvedValueOnce([
+      { name: 'Quality' },
+      { name: 'Quality' },
+      { name: ' ' },
+      { name: null },
+    ]);
+
+    const candidates = await DataScopeService.getDeptCandidates([
+      'dept-a',
+      'dept-b',
+    ]);
+
+    expect(candidates).toEqual(['dept-a', 'dept-b', 'Quality']);
+    expect(prisma.departments.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['dept-a', 'dept-b'] }, isDeleted: false },
+      select: { name: true },
+    });
   });
 
   it('should keep query unchanged for ALL', async () => {
@@ -91,6 +165,10 @@ describe('dataScopeService', () => {
   });
 
   it('should fallback to SELF with username condition', async () => {
+    (prisma.users.findFirst as any).mockResolvedValueOnce({
+      department: '',
+      roleId: 'role-1',
+    });
     (prisma.data_permission_policies.findMany as any).mockResolvedValue([]);
 
     const where = await DataScopeService.buildSupplierWhere(
@@ -100,6 +178,71 @@ describe('dataScopeService', () => {
 
     expect(where).toEqual({
       AND: [{ isDeleted: false }, { buyer: 'vben' }],
+    });
+  });
+
+  it('falls back self scope to department fields when module config requires it', async () => {
+    (prisma.departments.findMany as any).mockResolvedValueOnce([
+      { name: 'Machining' },
+    ]);
+
+    const where = await DataScopeService.buildWorkOrderWhere(
+      { isDeleted: false },
+      { userId: 'u1', username: 'vben' },
+      { scopeType: 'SELF', deptIds: ['dept-machining'] },
+    );
+
+    expect(where).toEqual({
+      AND: [
+        { isDeleted: false },
+        { division: { in: ['dept-machining', 'Machining'] } },
+      ],
+    });
+  });
+
+  it('keeps base query when self fallback has no department candidates', async () => {
+    const where = await DataScopeService.buildWorkOrderWhere(
+      { isDeleted: false },
+      { userId: 'u1', username: 'vben' },
+      { scopeType: 'SELF', deptIds: [] },
+    );
+
+    expect(where).toEqual({ isDeleted: false });
+  });
+
+  it('keeps base query for modules without data-scope config', async () => {
+    const where = await DataScopeService.buildScopedWhere(
+      'unknown-module',
+      { isDeleted: false },
+      { userId: 'u1', username: 'vben' },
+      { scopeType: 'SELF', deptIds: [] },
+    );
+
+    expect(where).toEqual({ isDeleted: false });
+  });
+
+  it('delegates after-sales wrapper to its configured department fields', async () => {
+    (prisma.departments.findMany as any).mockResolvedValueOnce([
+      { name: 'Service' },
+    ]);
+
+    const where = await DataScopeService.buildAfterSalesWhere(
+      { isDeleted: false },
+      { userId: 'u1', username: 'vben' },
+      { scopeType: 'DEPT', deptIds: ['dept-service'] },
+    );
+
+    expect(where).toEqual({
+      AND: [
+        { isDeleted: false },
+        {
+          OR: [
+            { division: { in: ['dept-service', 'Service'] } },
+            { feedbackDept: { in: ['dept-service', 'Service'] } },
+            { respDept: { in: ['dept-service', 'Service'] } },
+          ],
+        },
+      ],
     });
   });
 });

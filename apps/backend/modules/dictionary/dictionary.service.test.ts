@@ -30,6 +30,53 @@ describe('dictionaryService', () => {
     vi.clearAllMocks();
   });
 
+  it('returns supported dictionary types from shared constants', () => {
+    const types = DictionaryService.getSupportedTypes();
+
+    expect(types).toContain('inspection_issue_status');
+    expect(types).toContain('supplier_status');
+  });
+
+  it('rejects blank required fields before creating entries', async () => {
+    await expect(
+      DictionaryService.create(
+        {
+          dictKey: 'OPEN',
+          dictType: ' ',
+          dictValue: 'Open',
+        },
+        'tester',
+      ),
+    ).rejects.toMatchObject({
+      code: 'VALIDATION',
+      message: '字典类型不能为空',
+    });
+
+    await expect(
+      DictionaryService.create(
+        {
+          dictKey: ' ',
+          dictType: 'inspection_issue_status',
+          dictValue: 'Open',
+        },
+        'tester',
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION', message: '字典键不能为空' });
+
+    await expect(
+      DictionaryService.create(
+        {
+          dictKey: 'OPEN',
+          dictType: 'inspection_issue_status',
+          dictValue: ' ',
+        },
+        'tester',
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION', message: '字典值不能为空' });
+
+    expect(prisma.dictionaries.findFirst).not.toHaveBeenCalled();
+  });
+
   it('rejects unsupported dictType when creating entries', async () => {
     await expect(
       DictionaryService.create(
@@ -150,6 +197,76 @@ describe('dictionaryService', () => {
     );
   });
 
+  it('rejects blank and unsupported option dictType', async () => {
+    await expect(DictionaryService.getOptions(' ')).rejects.toMatchObject({
+      code: 'VALIDATION',
+      message: '字典类型不能为空',
+    });
+
+    await expect(DictionaryService.getOptions('legacy')).rejects.toMatchObject({
+      code: 'VALIDATION',
+      message: '不支持的字典类型',
+    });
+
+    expect(redis.get).not.toHaveBeenCalled();
+  });
+
+  it('lists dictionary entries with paging, filters, and keyword search', async () => {
+    (prisma.dictionaries.findMany as any).mockResolvedValueOnce([
+      { dictKey: 'OPEN', id: 'dict-1' },
+    ]);
+    (prisma.dictionaries.count as any).mockResolvedValueOnce(1);
+
+    const result = await DictionaryService.list({
+      dictType: 'inspection_issue_status',
+      keyword: 'open',
+      page: 2,
+      pageSize: 5,
+      status: 1,
+    });
+
+    expect(result).toEqual({
+      items: [{ dictKey: 'OPEN', id: 'dict-1' }],
+      total: 1,
+    });
+    expect(prisma.dictionaries.findMany).toHaveBeenCalledWith({
+      where: {
+        isDeleted: false,
+        dictType: 'inspection_issue_status',
+        OR: [
+          { dictKey: { contains: 'open' } },
+          { dictValue: { contains: 'open' } },
+        ],
+        status: 1,
+      },
+      orderBy: [{ dictType: 'asc' }, { sort: 'asc' }, { createdAt: 'desc' }],
+      skip: 5,
+      take: 5,
+    });
+    expect(prisma.dictionaries.count).toHaveBeenCalledWith({
+      where: {
+        isDeleted: false,
+        dictType: 'inspection_issue_status',
+        OR: [
+          { dictKey: { contains: 'open' } },
+          { dictValue: { contains: 'open' } },
+        ],
+        status: 1,
+      },
+    });
+  });
+
+  it('rejects unsupported dictType when listing entries', async () => {
+    await expect(
+      DictionaryService.list({ dictType: 'unsupported_type' }),
+    ).rejects.toMatchObject({
+      code: 'VALIDATION',
+      message: '不支持的字典类型',
+    });
+
+    expect(prisma.dictionaries.findMany).not.toHaveBeenCalled();
+  });
+
   it('invalidates scoped cache after successful create', async () => {
     (prisma.dictionaries.findFirst as any).mockResolvedValueOnce(null);
     (prisma.dictionaries.create as any).mockResolvedValueOnce({ id: 'new-id' });
@@ -206,6 +323,136 @@ describe('dictionaryService', () => {
     await DictionaryService.delete('dict-1', 'tester');
 
     expect(redis.del).toHaveBeenCalledWith('qms:dict:options:supplier_status');
+  });
+
+  it('rejects delete when dictionary item is missing or system-owned', async () => {
+    (prisma.dictionaries.findFirst as any).mockResolvedValueOnce(null);
+
+    await expect(
+      DictionaryService.delete('missing', 'tester'),
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      httpStatus: 404,
+      message: '字典项不存在',
+    });
+
+    (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
+      dictType: 'supplier_status',
+      id: 'system-id',
+      isSystem: true,
+    });
+
+    await expect(
+      DictionaryService.delete('system-id', 'tester'),
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN_SYSTEM_DICT',
+      message: '系统内置字典项不允许删除',
+    });
+
+    expect(prisma.dictionaries.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing item, blank fields, and disabling system item when updating', async () => {
+    (prisma.dictionaries.findFirst as any).mockResolvedValueOnce(null);
+
+    await expect(
+      DictionaryService.update('missing', { dictValue: 'Open' }, 'tester'),
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      httpStatus: 404,
+      message: '字典项不存在',
+    });
+
+    (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
+      dictKey: 'OPEN',
+      dictType: 'inspection_issue_status',
+      id: 'dict-1',
+      isSystem: false,
+      sort: 0,
+      status: 1,
+    });
+
+    await expect(
+      DictionaryService.update('dict-1', { dictKey: ' ' }, 'tester'),
+    ).rejects.toMatchObject({
+      code: 'VALIDATION',
+      message: '字典键不能为空',
+    });
+
+    (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
+      dictKey: 'OPEN',
+      dictType: 'inspection_issue_status',
+      id: 'dict-1',
+      isSystem: false,
+      sort: 0,
+      status: 1,
+    });
+
+    await expect(
+      DictionaryService.update('dict-1', { dictValue: ' ' }, 'tester'),
+    ).rejects.toMatchObject({
+      code: 'VALIDATION',
+      message: '字典值不能为空',
+    });
+
+    (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
+      dictKey: 'OPEN',
+      dictType: 'inspection_issue_status',
+      id: 'dict-1',
+      isSystem: true,
+      sort: 0,
+      status: 1,
+    });
+
+    await expect(
+      DictionaryService.update('dict-1', { status: 0 }, 'tester'),
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN_SYSTEM_DICT',
+      message: '系统内置字典项不允许禁用',
+    });
+  });
+
+  it('normalizes mutable fields and keeps existing fallback values when updating', async () => {
+    (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
+      dictKey: 'OPEN',
+      dictType: 'inspection_issue_status',
+      id: 'dict-1',
+      isSystem: false,
+      sort: 9,
+      status: 1,
+    });
+    (prisma.dictionaries.update as any).mockResolvedValueOnce({
+      id: 'dict-1',
+      sort: 9,
+      status: 1,
+    });
+
+    await DictionaryService.update(
+      'dict-1',
+      {
+        dictKey: ' OPEN ',
+        dictValue: ' Open ',
+        remark: ' ',
+        sort: 'bad' as any,
+        status: '' as any,
+      },
+      'tester',
+    );
+
+    expect(prisma.dictionaries.update).toHaveBeenCalledWith({
+      where: { id: 'dict-1' },
+      data: {
+        dictKey: 'OPEN',
+        dictValue: 'Open',
+        remark: null,
+        sort: 9,
+        status: 1,
+        updatedBy: 'tester',
+      },
+    });
+    expect(redis.del).toHaveBeenCalledWith(
+      'qms:dict:options:inspection_issue_status',
+    );
   });
 
   it('accepts newly supported supervision/planning dict types', async () => {

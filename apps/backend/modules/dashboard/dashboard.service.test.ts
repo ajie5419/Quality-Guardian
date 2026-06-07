@@ -3,6 +3,7 @@ import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { DashboardService } from '~/modules/dashboard/dashboard.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
+import { SystemService } from '~/modules/system';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { WorkOrderService } from '~/modules/work-order/work-order.service';
 import prisma from '~/utils/prisma';
@@ -47,6 +48,12 @@ vi.mock('~/modules/inspection/inspection.service', () => ({
 vi.mock('~/modules/quality-loss/quality-loss.service', () => ({
   QualityLossService: { getStatsForDashboard: vi.fn() },
 }));
+vi.mock('~/modules/system', () => ({
+  SystemService: {
+    getSettingValue: vi.fn(),
+    saveSettingValue: vi.fn(),
+  },
+}));
 vi.mock(
   '~/modules/vehicle-commissioning/vehicle-commissioning.service',
   () => ({
@@ -69,6 +76,53 @@ describe('dashboardService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     DashboardService.invalidateStatsCache();
+  });
+
+  describe('pass rate targets', () => {
+    it('returns canonical pass-rate targets in configured order', async () => {
+      (SystemService.getSettingValue as any).mockResolvedValue(
+        JSON.stringify({
+          外协: 98,
+          外协结构: 99.7,
+          机加: 99.5,
+        }),
+      );
+
+      const targets = await DashboardService.getPassRateTargets();
+
+      expect(Object.keys(targets)).toEqual([
+        '外协结构',
+        '外协机加',
+        '外协涂装',
+        '下料BU',
+        '结构BU1',
+        '结构BU2',
+        '组装BU',
+        '机加BU',
+        '模具 BU',
+      ]);
+      expect(targets).toMatchObject({
+        外协结构: 99.7,
+        外协机加: 98,
+        外协涂装: 98,
+        机加BU: 99.5,
+      });
+    });
+
+    it('saves pass-rate targets through system settings service', async () => {
+      const targets = {
+        外协结构: 99.8,
+        机加BU: 99.9,
+      };
+
+      await DashboardService.savePassRateTargets(targets);
+
+      expect(SystemService.saveSettingValue).toHaveBeenCalledWith({
+        key: 'QMS_PASS_RATE_TARGETS',
+        value: JSON.stringify(targets),
+        description: 'QMS各工序目标合格率配置 (Quality Pass Rate Targets)',
+      });
+    });
   });
 
   describe('getStats', () => {
