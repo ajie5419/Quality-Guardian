@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+## [0.6.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.5.1...qgs-v0.6.0) (2026-06-07)
+
+
+### Features
+
+* **@qgs/backend:** add delete functionality for supervision ([9228765](https://github.com/ajie5419/Quality-Guardian/commit/9228765ad537b9c5b36eb513d5772edcc9eb3beb))
+* **@qgs/backend:** improve supervision report fields and auto-summary ([ff5ec83](https://github.com/ajie5419/Quality-Guardian/commit/ff5ec83bc908a27b79404d64a5ccaed0299f92b3))
+* **@qgs/backend:** public today incoming inspection page ([3f6ed20](https://github.com/ajie5419/Quality-Guardian/commit/3f6ed209beb1cc35479806610aaa0f456eaa4c12))
+* **@qgs/web-antd:** add share-as-image to supervision report detail ([85a4617](https://github.com/ajie5419/Quality-Guardian/commit/85a4617de3675970e766a8265f9e1b796167c0f0))
+* **@qgs/web-antd:** add work order selection to supervision project form ([a25dda1](https://github.com/ajie5419/Quality-Guardian/commit/a25dda1260ee3bfeacc1e5e6fed5d514f55e1777))
+* **@qgs/web-antd:** complete supervision report form and add card detail view ([60b899c](https://github.com/ajie5419/Quality-Guardian/commit/60b899c8729fe2197799f37472c69840125ae499))
+* **@qgs/web-antd:** show task status badge in report share image ([6927b9c](https://github.com/ajie5419/Quality-Guardian/commit/6927b9c012a9acbe1e343c9f25afb3b44d58a81f))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** make supervision report edit actually update ([d3e5814](https://github.com/ajie5419/Quality-Guardian/commit/d3e5814e8231b02b3998fc1f12d33bdf824183f7))
+* **@qgs/backend:** show real-time plan-task status in report details ([c42f36b](https://github.com/ajie5419/Quality-Guardian/commit/c42f36b6af10ac1e046dd09abe11821d1f592b04))
+* **@qgs/backend:** sync project progress from leaf tasks consistently ([cd4be39](https://github.com/ajie5419/Quality-Guardian/commit/cd4be3956af168cf5387fb8bc5028e5b3bc40eef))
+* **@qgs/shared:** correct delayed status logic for unstarted tasks ([50438ca](https://github.com/ajie5419/Quality-Guardian/commit/50438caf704e0bf43636831dfb4196e45f056665))
+* **@qgs/web-antd:** add report actions to mobile card view ([61f28f2](https://github.com/ajie5419/Quality-Guardian/commit/61f28f2a217bd26b97f5457c5aa870afa64d5f5b))
+
 ### 2026-06-07 新增公开端点：今日外购件检验情况
 
 **执行内容：**
