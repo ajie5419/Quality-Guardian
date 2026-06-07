@@ -116,6 +116,16 @@
 
 - 不得出现 `$queryRawUnsafe` + 模板字符串组合
 
+**代码地图：**
+
+- 新增 `apps/backend/modules/<x>/`、`apps/backend/api/<x>/`、`apps/backend/api/qms/<x>/`、`apps/web-antd/src/views/<x>/` 或 `apps/web-antd/src/views/qms/<x>/` 顶层目录时，同次变更必须同步更新 `code_map.md`（规则 B-MAP1）。仅在 `--changed` 模式生效。
+
+**测试位置与隔离：**
+
+- 后端测试文件不得放入集中目录（`__tests__/`、`tests/`、`test/`），必须与被测代码同目录（规则 B-TEST1）。
+- `foo.<suffix>.test.ts` 必须能在同目录找到 `foo.<suffix>.ts`；现存的合法跨文件聚合测试已写入 baseline 豁免，新增孤儿测试一律阻断（规则 B-TEST2）。需要测多个文件的聚合行为时，要么把被测代码合到一个 facade 文件，要么走 baseline 申报。
+- 测试文件 `import` 了 `~/utils/prisma`，必须在同文件 `vi.mock('~/utils/prisma', …)`，避免 mock 漏配置时打到真实数据库（规则 B-TEST3）。
+
 违反任一条即阻断提交。
 
 ## 执行流程规范（防止灾难性偏离）
@@ -199,3 +209,12 @@ modules/new-module/
 - 测试文件放在模块目录内（`xxx.service.test.ts`）
 - 不允许放在集中的 `__tests__/` 目录
 - 不允许存在 `modules/__tests__/` 目录
+
+## 错误处理与并发安全（2026-06-04 审计追加）
+
+来源：`docs/AUDIT-2026-06-04.md`。
+
+1. **错误码契约**：所有业务错误必须抛 `BusinessError(code: string, message: string, httpStatus: number)`。**禁止** `throw new Error('中文消息')`、`throw new Error('VALIDATION:...')` 等带前缀的字符串错误（旧风格），新代码不再允许。`response.ts` 必须将 `BusinessError.code` 透传到响应顶层，以便前端按 code 分级提示（warning / error / notification）。
+2. **并发写守卫**：凡是先 `findFirst` 检查状态、再执行写操作的流程，**状态检查必须在 `$transaction` 内完成**，或改用 `updateMany({ where: { id, status: ... } })` + 检查 `count` 做原子守卫。禁止"事务外检查、事务内写入"——这是经典竞态。
+3. **写路由所有权断言**：涉及用户/部门私有数据的 `delete` / `put` 路由，必须在 service 入口处校验 `createdBy` 或 `orgId` 与当前用户一致，或通过 `data-scope` 中间件覆盖。新增 delete/put 路由前必须确认归属模块在 `middleware/4.data-scope.ts` 的覆盖列表里，否则手动加校验。
+4. **禁止静默 catch**：`} catch {}` 或 `} catch (e) {}` 形式一律禁止。最低要求是 `logger.error(error, 'context')` 后再决定是否重新抛出。RBAC、data-scope、JWT 等核心安全路径上的 catch 必须记日志，便于排查权限问题。
