@@ -36,7 +36,9 @@ const { handleApiError } = useErrorHandler();
 const loading = ref(false);
 const detailDrawerOpen = ref(false);
 const detailDrawerTeamSource = ref<'current' | 'history'>('current');
-const detailDrawerType = ref<'inspector' | 'reinspection' | 'team'>('team');
+const detailDrawerType = ref<
+  'inspector' | 'reinspection' | 'supplier' | 'supplierReinspection' | 'team'
+>('team');
 const rangeMode = ref<'custom' | 'halfYear' | 'month' | 'quarter' | 'year'>(
   'month',
 );
@@ -72,6 +74,7 @@ const historyStatsOptions: Array<{
 
 const requestStats = ref({
   byInspector: [] as Array<{ count: number; inspector: string }>,
+  bySupplier: [] as Array<{ count: number; team: string }>,
   byTeam: [] as Array<{ count: number; team: string }>,
   dailyTrend: [] as Array<{
     closedCount: number;
@@ -94,6 +97,13 @@ const requestStats = ref({
   }>,
   pendingDispatchCount: 0,
   pendingInspectionCount: 0,
+  reinspectionRateBySupplier: [] as Array<{
+    inspectedCount: number;
+    reinspectionCount: number;
+    reinspectionRate: number;
+    submittedCount: number;
+    team: string;
+  }>,
   reinspectionRateByTeam: [] as Array<{
     inspectedCount: number;
     reinspectionCount: number;
@@ -125,6 +135,18 @@ const sortedTeamStats = computed(() =>
 const topTeamStats = computed(() => sortedTeamStats.value.slice(0, 12));
 const maxTeamCount = computed(() =>
   Math.max(1, ...topTeamStats.value.map((item) => item.count)),
+);
+
+const sortedSupplierStats = computed(() =>
+  [...requestStats.value.bySupplier].sort((a, b) => b.count - a.count),
+);
+const topSupplierStats = computed(() => sortedSupplierStats.value.slice(0, 12));
+const maxSupplierCount = computed(() =>
+  Math.max(1, ...topSupplierStats.value.map((item) => item.count)),
+);
+
+const topSupplierReinspectionStats = computed(() =>
+  [...requestStats.value.reinspectionRateBySupplier].slice(0, 8),
 );
 
 const hasDailyTrendData = computed(() =>
@@ -209,7 +231,12 @@ function minutesText(value?: number) {
 }
 
 function openDetailDrawer(
-  type: 'inspector' | 'reinspection' | 'team',
+  type:
+    | 'inspector'
+    | 'reinspection'
+    | 'supplier'
+    | 'supplierReinspection'
+    | 'team',
   teamSource: 'current' | 'history' = 'current',
 ) {
   detailDrawerType.value = type;
@@ -369,10 +396,17 @@ tryOnUnmounted(() => {
         </InspectionDashboardTrendCard>
 
         <InspectionDashboardRankCards
+          :max-supplier-count="maxSupplierCount"
           :max-team-count="maxTeamCount"
           :reinspection-stats-total="requestStats.reinspectionRateByTeam.length"
+          :supplier-reinspection-stats-total="
+            requestStats.reinspectionRateBySupplier.length
+          "
+          :supplier-stats-total="requestStats.bySupplier.length"
           :team-stats-total="requestStats.byTeam.length"
           :top-reinspection-stats="topReinspectionStats"
+          :top-supplier-reinspection-stats="topSupplierReinspectionStats"
+          :top-supplier-stats="topSupplierStats"
           :top-team-stats="topTeamStats"
           @open-detail="openDetailDrawer"
         />
@@ -421,6 +455,8 @@ tryOnUnmounted(() => {
       :inspector-stats="requestStats.historyByInspector"
       :range-label="dashboardRangeLabel"
       :reinspection-stats="requestStats.reinspectionRateByTeam"
+      :supplier-reinspection-stats="requestStats.reinspectionRateBySupplier"
+      :supplier-stats="requestStats.bySupplier"
       :team-stats="
         detailDrawerTeamSource === 'history'
           ? requestStats.historyByTeam

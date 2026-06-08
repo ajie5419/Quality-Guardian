@@ -5,7 +5,12 @@ import { Drawer, Input, Table } from 'ant-design-vue';
 
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 
-type DetailType = 'inspector' | 'reinspection' | 'team';
+type DetailType =
+  | 'inspector'
+  | 'reinspection'
+  | 'supplier'
+  | 'supplierReinspection'
+  | 'team';
 type TableScroll = { x: number | true };
 
 interface InspectorStat {
@@ -32,6 +37,8 @@ const props = defineProps<{
   open: boolean;
   rangeLabel: string;
   reinspectionStats: ReinspectionStat[];
+  supplierReinspectionStats: ReinspectionStat[];
+  supplierStats: TeamStat[];
   teamStats: TeamStat[];
   type: DetailType;
 }>();
@@ -49,7 +56,9 @@ const drawerWidth = computed(() =>
 
 const drawerTitle = computed(() => {
   if (props.type === 'reinspection') return '班组复检率完整排行';
+  if (props.type === 'supplierReinspection') return '供应商复检率完整排行';
   if (props.type === 'inspector') return '检验员效率完整排行';
+  if (props.type === 'supplier') return '供应商报检完整排行';
   return '班组报检完整排行';
 });
 
@@ -57,8 +66,14 @@ const drawerDescription = computed(() => {
   if (props.type === 'reinspection') {
     return `${props.rangeLabel}各班组复检率、复检数、已检数和报检数。`;
   }
+  if (props.type === 'supplierReinspection') {
+    return `${props.rangeLabel}各供应商复检率、复检数、已检数和报检数。`;
+  }
   if (props.type === 'inspector') {
     return `${props.rangeLabel}各检验员完成数量和平均任务时长。`;
+  }
+  if (props.type === 'supplier') {
+    return `${props.rangeLabel}各供应商报检数量和占比。`;
   }
   return `${props.rangeLabel}各班组报检数量和占比。`;
 });
@@ -88,6 +103,47 @@ const teamRows = computed(() =>
 
 const reinspectionRows = computed(() =>
   [...props.reinspectionStats]
+    .sort((a, b) => {
+      const rateDiff = b.reinspectionRate - a.reinspectionRate;
+      if (rateDiff !== 0) return rateDiff;
+      return b.submittedCount - a.submittedCount;
+    })
+    .map((item, index) => ({
+      inspectedCount: item.inspectedCount,
+      rank: index + 1,
+      reinspectionCount: item.reinspectionCount,
+      reinspectionRate: `${item.reinspectionRate}%`,
+      submittedCount: item.submittedCount,
+      team: item.team || '未填写',
+    }))
+    .filter((item) =>
+      item.team.toLowerCase().includes(normalizedKeyword.value),
+    ),
+);
+
+const supplierTotal = computed(() =>
+  props.supplierStats.reduce((sum, item) => sum + Number(item.count || 0), 0),
+);
+
+const supplierRows = computed(() =>
+  [...props.supplierStats]
+    .sort((a, b) => b.count - a.count)
+    .map((item, index) => ({
+      count: item.count,
+      rank: index + 1,
+      share:
+        supplierTotal.value > 0
+          ? `${Math.round((item.count / supplierTotal.value) * 1000) / 10}%`
+          : '0%',
+      team: item.team || '未填写',
+    }))
+    .filter((item) =>
+      item.team.toLowerCase().includes(normalizedKeyword.value),
+    ),
+);
+
+const supplierReinspectionRows = computed(() =>
+  [...props.supplierReinspectionStats]
     .sort((a, b) => {
       const rateDiff = b.reinspectionRate - a.reinspectionRate;
       if (rateDiff !== 0) return rateDiff;
@@ -176,29 +232,41 @@ watch(
     />
 
     <Table
-      v-if="props.type === 'team'"
-      :data-source="teamRows"
+      v-if="props.type === 'team' || props.type === 'supplier'"
+      :data-source="props.type === 'supplier' ? supplierRows : teamRows"
       :pagination="pagination"
       row-key="rank"
       :scroll="teamTableScroll"
       size="small"
     >
       <Table.Column title="排名" data-index="rank" :width="72" />
-      <Table.Column title="班组" data-index="team" />
+      <Table.Column
+        :title="props.type === 'supplier' ? '供应商' : '班组'"
+        data-index="team"
+      />
       <Table.Column title="报检数量" data-index="count" :width="110" />
       <Table.Column title="占比" data-index="share" :width="90" />
     </Table>
 
     <Table
-      v-else-if="props.type === 'reinspection'"
-      :data-source="reinspectionRows"
+      v-else-if="
+        props.type === 'reinspection' || props.type === 'supplierReinspection'
+      "
+      :data-source="
+        props.type === 'supplierReinspection'
+          ? supplierReinspectionRows
+          : reinspectionRows
+      "
       :pagination="pagination"
       row-key="rank"
       :scroll="reinspectionTableScroll"
       size="small"
     >
       <Table.Column title="排名" data-index="rank" :width="72" />
-      <Table.Column title="班组" data-index="team" />
+      <Table.Column
+        :title="props.type === 'supplierReinspection' ? '供应商' : '班组'"
+        data-index="team"
+      />
       <Table.Column title="报检数" data-index="submittedCount" :width="90" />
       <Table.Column title="已检数" data-index="inspectedCount" :width="90" />
       <Table.Column title="复检数" data-index="reinspectionCount" :width="90" />

@@ -1,3 +1,4 @@
+import { INCOMING_INSPECTION_PROCESS_NAME } from '~/modules/inspection/inspection-request';
 import prisma from '~/utils/prisma';
 
 const INSPECTION_EXECUTION_CODES = new Set(['QMS:Inspection:Requests:Close']);
@@ -250,9 +251,20 @@ export const InspectionRequestStatsService = {
         return a.status === 'BUSY' ? -1 : 1;
       });
     const teamMap = new Map<string, number>();
+    const supplierMap = new Map<string, number>();
     const inspectorMap = new Map<string, number>();
     const historyTeamMap = new Map<string, number>();
     const teamReinspectionMap = new Map<
+      string,
+      {
+        inspectedCount: number;
+        reinspectionCount: number;
+        reinspectionRate: number;
+        submittedCount: number;
+        team: string;
+      }
+    >();
+    const supplierReinspectionMap = new Map<
       string,
       {
         inspectedCount: number;
@@ -295,10 +307,18 @@ export const InspectionRequestStatsService = {
         const date = formatShanghaiDate(item.submittedAt);
         const daily = dailyTrendMap.get(date);
         if (daily) daily.submittedCount += 1;
+        const isIncoming =
+          item.processName === INCOMING_INSPECTION_PROCESS_NAME;
         const team = String(item.team || '未填写班组').trim();
-        teamMap.set(team, (teamMap.get(team) || 0) + 1);
-        historyTeamMap.set(team, (historyTeamMap.get(team) || 0) + 1);
-        const reinspectionStat = teamReinspectionMap.get(team) || {
+        const countMap = isIncoming ? supplierMap : teamMap;
+        countMap.set(team, (countMap.get(team) || 0) + 1);
+        if (!isIncoming) {
+          historyTeamMap.set(team, (historyTeamMap.get(team) || 0) + 1);
+        }
+        const reinspectionMap = isIncoming
+          ? supplierReinspectionMap
+          : teamReinspectionMap;
+        const reinspectionStat = reinspectionMap.get(team) || {
           inspectedCount: 0,
           reinspectionCount: 0,
           reinspectionRate: 0,
@@ -320,7 +340,7 @@ export const InspectionRequestStatsService = {
                   1000,
               ) / 10
             : 0;
-        teamReinspectionMap.set(team, reinspectionStat);
+        reinspectionMap.set(team, reinspectionStat);
       }
       if (
         item.closedAt &&
@@ -359,6 +379,9 @@ export const InspectionRequestStatsService = {
       byInspector: [...inspectorMap.entries()]
         .map(([inspector, count]) => ({ count, inspector }))
         .sort((a, b) => b.count - a.count),
+      bySupplier: [...supplierMap.entries()]
+        .map(([team, count]) => ({ count, team }))
+        .sort((a, b) => b.count - a.count),
       byTeam: [...teamMap.entries()]
         .map(([team, count]) => ({ count, team }))
         .sort((a, b) => b.count - a.count),
@@ -372,6 +395,13 @@ export const InspectionRequestStatsService = {
       inspectorStatus,
       pendingDispatchCount,
       pendingInspectionCount,
+      reinspectionRateBySupplier: [...supplierReinspectionMap.values()].sort(
+        (a, b) =>
+          b.reinspectionRate - a.reinspectionRate ||
+          b.reinspectionCount - a.reinspectionCount ||
+          b.inspectedCount - a.inspectedCount ||
+          b.submittedCount - a.submittedCount,
+      ),
       reinspectionRateByTeam: [...teamReinspectionMap.values()].sort(
         (a, b) =>
           b.reinspectionRate - a.reinspectionRate ||

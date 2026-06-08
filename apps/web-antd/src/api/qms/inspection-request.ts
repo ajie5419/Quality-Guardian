@@ -17,6 +17,7 @@ export * from '@qgs/shared';
 
 export interface InspectionRequestStats {
   byInspector: Array<{ count: number; inspector: string }>;
+  bySupplier: Array<{ count: number; team: string }>;
   byTeam: Array<{ count: number; team: string }>;
   dailyTrend: Array<{
     closedCount: number;
@@ -39,6 +40,13 @@ export interface InspectionRequestStats {
   }>;
   pendingDispatchCount: number;
   pendingInspectionCount: number;
+  reinspectionRateBySupplier: Array<{
+    inspectedCount: number;
+    reinspectionCount: number;
+    reinspectionRate: number;
+    submittedCount: number;
+    team: string;
+  }>;
   reinspectionRateByTeam: Array<{
     inspectedCount: number;
     reinspectionCount: number;
