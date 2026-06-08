@@ -193,4 +193,60 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       result.historyByTeam.find((t) => t.team === '供应商X'),
     ).toBeUndefined();
   });
+
+  it('returns category counts for submitted requests', async () => {
+    const requests = [
+      makeRequest({ id: 'r1', processName: '进货检验', team: '供应商X' }),
+      makeRequest({ id: 'r2', processName: '进货检验', team: '供应商Y' }),
+      makeRequest({ id: 'r3', processName: '过程检验', team: '班组A' }),
+      makeRequest({ id: 'r4', processName: '装配检验', team: '班组B' }),
+    ];
+    setupMocks(requests);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.todaySubmittedIncomingCount).toBe(2);
+    expect(result.todaySubmittedProcessCount).toBe(2);
+    expect(result.todaySubmittedCount).toBe(4);
+  });
+
+  it('returns category counts for closed requests', async () => {
+    const closedAt = new Date('2026-06-01T14:00:00+08:00');
+    const requests = [
+      makeRequest({
+        id: 'r1',
+        processName: '进货检验',
+        team: '供应商X',
+        status: 'CLOSED',
+        closedAt,
+      }),
+      makeRequest({
+        id: 'r2',
+        processName: '过程检验',
+        team: '班组A',
+        status: 'CLOSED',
+        closedAt,
+      }),
+      makeRequest({
+        id: 'r3',
+        processName: '过程检验',
+        team: '班组B',
+        status: 'CLOSED',
+        closedAt,
+      }),
+    ];
+    setupMocks(requests);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.todayClosedIncomingCount).toBe(1);
+    expect(result.todayClosedProcessCount).toBe(2);
+    expect(result.todayClosedCount).toBe(3);
+  });
 });

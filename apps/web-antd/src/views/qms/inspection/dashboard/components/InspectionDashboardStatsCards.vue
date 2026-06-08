@@ -11,7 +11,11 @@ defineProps<{
     pendingDispatchCount: number;
     pendingInspectionCount: number;
     todayClosedCount: number;
+    todayClosedIncomingCount: number;
+    todayClosedProcessCount: number;
     todaySubmittedCount: number;
+    todaySubmittedIncomingCount: number;
+    todaySubmittedProcessCount: number;
   };
 }>();
 </script>
@@ -22,6 +26,10 @@ defineProps<{
       <div class="text-sm font-medium text-gray-600">报检数量</div>
       <div class="mt-3 text-3xl font-semibold text-blue-900">
         {{ stats.todaySubmittedCount }}
+      </div>
+      <div class="mt-1 text-xs text-gray-400">
+        过程 {{ stats.todaySubmittedProcessCount }} · 进货
+        {{ stats.todaySubmittedIncomingCount }}
       </div>
       <div class="mt-2 flex items-center justify-between text-xs">
         <span class="text-gray-500">{{ rangeLabel }}</span>
@@ -34,6 +42,10 @@ defineProps<{
       <div class="text-sm font-medium text-gray-600">完成数量</div>
       <div class="mt-3 text-3xl font-semibold text-green-900">
         {{ stats.todayClosedCount }}
+      </div>
+      <div class="mt-1 text-xs text-gray-400">
+        过程 {{ stats.todayClosedProcessCount }} · 进货
+        {{ stats.todayClosedIncomingCount }}
       </div>
       <div class="mt-2 flex items-center justify-between text-xs">
         <span class="text-gray-500">待检验任务</span>

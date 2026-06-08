@@ -55,7 +55,11 @@ export interface InspectionRequestStats {
     team: string;
   }>;
   todayClosedCount: number;
+  todayClosedIncomingCount: number;
+  todayClosedProcessCount: number;
   todaySubmittedCount: number;
+  todaySubmittedIncomingCount: number;
+  todaySubmittedProcessCount: number;
 }
 
 export async function getInspectionRequests(params?: {

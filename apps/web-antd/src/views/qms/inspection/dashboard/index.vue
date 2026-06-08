@@ -112,7 +112,11 @@ const requestStats = ref({
     team: string;
   }>,
   todayClosedCount: 0,
+  todayClosedIncomingCount: 0,
+  todayClosedProcessCount: 0,
   todaySubmittedCount: 0,
+  todaySubmittedIncomingCount: 0,
+  todaySubmittedProcessCount: 0,
 });
 
 const dashboardRangeLabel = computed(() => {

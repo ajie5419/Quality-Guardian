@@ -289,6 +289,10 @@ export const InspectionRequestStatsService = {
     >();
     let todaySubmittedCount = 0;
     let todayClosedCount = 0;
+    let todaySubmittedIncomingCount = 0;
+    let todaySubmittedProcessCount = 0;
+    let todayClosedIncomingCount = 0;
+    let todayClosedProcessCount = 0;
     for (
       let cursor = new Date(start);
       cursor < end;
@@ -309,6 +313,11 @@ export const InspectionRequestStatsService = {
         if (daily) daily.submittedCount += 1;
         const isIncoming =
           item.processName === INCOMING_INSPECTION_PROCESS_NAME;
+        if (isIncoming) {
+          todaySubmittedIncomingCount += 1;
+        } else {
+          todaySubmittedProcessCount += 1;
+        }
         const team = String(item.team || '未填写班组').trim();
         const countMap = isIncoming ? supplierMap : teamMap;
         countMap.set(team, (countMap.get(team) || 0) + 1);
@@ -349,6 +358,13 @@ export const InspectionRequestStatsService = {
         item.status === 'CLOSED'
       ) {
         todayClosedCount += 1;
+        const closedIsIncoming =
+          item.processName === INCOMING_INSPECTION_PROCESS_NAME;
+        if (closedIsIncoming) {
+          todayClosedIncomingCount += 1;
+        } else {
+          todayClosedProcessCount += 1;
+        }
         const date = formatShanghaiDate(item.closedAt);
         const daily = dailyTrendMap.get(date);
         if (daily) daily.closedCount += 1;
@@ -410,7 +426,11 @@ export const InspectionRequestStatsService = {
           b.submittedCount - a.submittedCount,
       ),
       todayClosedCount,
+      todayClosedIncomingCount,
+      todayClosedProcessCount,
       todaySubmittedCount,
+      todaySubmittedIncomingCount,
+      todaySubmittedProcessCount,
     };
   },
 };
