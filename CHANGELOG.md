@@ -25,6 +25,15 @@
 
 ## 执行记录
 
+## [0.7.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.7.0...qgs-v0.7.1) (2026-06-08)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** keep cross-day pending incoming inspections visible ([ea83fe4](https://github.com/ajie5419/Quality-Guardian/commit/ea83fe4c04eb0270cfc2a966d0665645e62a5b0a))
+* **@qgs/web-antd:** enable name search in inspector picker for dispatch modal ([b109113](https://github.com/ajie5419/Quality-Guardian/commit/b109113b8fbd949a11b905503a879daa69ad38a8))
+* **@qgs/web-antd:** open inspection-request detail directly from QR query ([a52ce3a](https://github.com/ajie5419/Quality-Guardian/commit/a52ce3ac8aa588de4cea6475f2e2aef3d749397e))
+
 ## [0.7.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.6.0...qgs-v0.7.0) (2026-06-08)
 
 
