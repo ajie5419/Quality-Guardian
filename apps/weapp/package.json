@@ -9,16 +9,16 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@dcloudio/uni-app": "3.0.0-4060820250520001",
-    "@dcloudio/uni-components": "3.0.0-4060820250520001",
-    "@dcloudio/uni-mp-weixin": "3.0.0-4060820250520001",
+    "@dcloudio/uni-app": "3.0.0-alpha-5010220260604001",
+    "@dcloudio/uni-components": "3.0.0-alpha-5010220260604001",
+    "@dcloudio/uni-mp-weixin": "3.0.0-alpha-5010220260604001",
     "@qgs/shared": "workspace:*",
     "pinia": "catalog:",
     "pinia-plugin-persistedstate": "catalog:",
     "vue": "catalog:"
   },
   "devDependencies": {
-    "@dcloudio/uni-cli-vite": "3.0.0-4060820250520001",
+    "@dcloudio/vite-plugin-uni": "3.0.0-alpha-5010220260604001",
     "@dcloudio/types": "^3.4.14",
     "@uni-helper/uni-app-types": "^1.0.0-alpha.5",
     "typescript": "catalog:",
