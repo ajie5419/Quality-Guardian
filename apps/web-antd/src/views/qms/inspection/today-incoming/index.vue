@@ -82,6 +82,9 @@ onUnmounted(() => {
                 更新于 {{ generatedAtLabel }}
               </span>
             </p>
+            <p class="mt-1 text-xs text-gray-400">
+              待检验任务跨天累积，已检验结果按当天计
+            </p>
           </div>
           <Button :loading="loading" @click="fetchData">刷新</Button>
         </div>

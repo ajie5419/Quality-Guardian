@@ -233,7 +233,21 @@ export const InspectionPublicQueryService = {
       where: {
         isDeleted: false,
         processName: INCOMING_INSPECTION_PROCESS_NAME,
-        submittedAt: { gte: start, lt: end },
+        OR: [
+          {
+            status: {
+              in: [
+                INSPECTION_REQUEST_STATUS.SUBMITTED,
+                INSPECTION_REQUEST_STATUS.DISPATCHED,
+                INSPECTION_REQUEST_STATUS.INSPECTING,
+              ],
+            },
+          },
+          {
+            status: INSPECTION_REQUEST_STATUS.CLOSED,
+            closedAt: { gte: start, lt: end },
+          },
+        ],
       },
       orderBy: { submittedAt: 'desc' },
       take: TAKE_LIMIT,

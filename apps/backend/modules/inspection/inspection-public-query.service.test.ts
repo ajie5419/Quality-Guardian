@@ -193,7 +193,7 @@ describe('getTodayIncomingInspections', () => {
     expect(result.truncated).toBe(true);
   });
 
-  it('calls findMany with correct where clause including processName and isDeleted', async () => {
+  it('calls findMany with correct where clause including processName and OR status branches', async () => {
     (
       prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
     ).mockResolvedValue([]);
@@ -205,10 +205,24 @@ describe('getTodayIncomingInspections', () => {
         where: expect.objectContaining({
           isDeleted: false,
           processName: '进货检验',
-          submittedAt: expect.objectContaining({
-            gte: expect.any(Date),
-            lt: expect.any(Date),
-          }),
+          OR: expect.arrayContaining([
+            expect.objectContaining({
+              status: expect.objectContaining({
+                in: expect.arrayContaining([
+                  'SUBMITTED',
+                  'DISPATCHED',
+                  'INSPECTING',
+                ]),
+              }),
+            }),
+            expect.objectContaining({
+              status: 'CLOSED',
+              closedAt: expect.objectContaining({
+                gte: expect.any(Date),
+                lt: expect.any(Date),
+              }),
+            }),
+          ]),
         }),
       }),
     );
@@ -268,5 +282,70 @@ describe('getTodayIncomingInspections', () => {
 
     expect(result.passItems[0]?.submittedAt).toBe(submittedAt.toISOString());
     expect(result.passItems[0]?.closedAt).toBe(closedAt.toISOString());
+  });
+
+  it('keeps cross-day pending tasks (submittedAt yesterday, status SUBMITTED) in pending bucket', async () => {
+    const yesterday = new Date('2026-06-06T01:00:00Z');
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      makeRecord({
+        requestNo: 'IR-20260606-Y1',
+        status: 'SUBMITTED',
+        inspectionResult: 'PASS',
+        submittedAt: yesterday,
+        closedAt: null,
+      }),
+    ]);
+
+    const result =
+      await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(result.summary.pending).toBe(1);
+    expect(result.pendingItems[0]?.requestNo).toBe('IR-20260606-Y1');
+  });
+
+  it('keeps cross-day re-inspection (INSPECTING + FAIL submitted yesterday) in fail bucket', async () => {
+    const yesterday = new Date('2026-06-06T01:00:00Z');
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      makeRecord({
+        requestNo: 'IR-20260606-Y2',
+        status: 'INSPECTING',
+        inspectionResult: 'FAIL',
+        qualifiedQuantity: 0,
+        unqualifiedQuantity: 1,
+        submittedAt: yesterday,
+        closedAt: null,
+      }),
+    ]);
+
+    const result =
+      await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(result.summary.fail).toBe(1);
+    expect(result.failItems[0]?.requestNo).toBe('IR-20260606-Y2');
+  });
+
+  it('accepts records closed today even if submitted yesterday into pass bucket', async () => {
+    const yesterday = new Date('2026-06-06T01:00:00Z');
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      makeRecord({
+        requestNo: 'IR-20260606-Y3',
+        status: 'CLOSED',
+        inspectionResult: 'PASS',
+        submittedAt: yesterday,
+        closedAt,
+      }),
+    ]);
+
+    const result =
+      await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(result.summary.pass).toBe(1);
+    expect(result.passItems[0]?.requestNo).toBe('IR-20260606-Y3');
   });
 });
