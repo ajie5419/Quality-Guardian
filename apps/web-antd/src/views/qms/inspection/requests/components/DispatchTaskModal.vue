@@ -87,7 +87,19 @@ function handleSubmit() {
         <Select
           v-model:value="localForm.inspectorId"
           show-search
+          allow-clear
           :options="props.userOptions"
+          :filter-option="
+            (input, option) =>
+              String(option?.label || '')
+                .toLowerCase()
+                .includes(
+                  String(input || '')
+                    .trim()
+                    .toLowerCase(),
+                )
+          "
+          placeholder="输入姓名或账号搜索"
         />
       </Form.Item>
       <Form.Item label="优先级">
