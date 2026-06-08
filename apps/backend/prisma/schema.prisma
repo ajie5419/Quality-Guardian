@@ -1088,6 +1088,7 @@ model users {
   email                                             String?
   realName                                          String?
   wechatWorkId                                      String?
+  wxOpenId                                          String?   @unique
   phone                                             String?
   roleId                                            String
   department                                        String
@@ -1110,6 +1111,7 @@ model users {
 
   @@index([roleId], map: "users_roleId_fkey")
   @@index([wechatWorkId])
+  @@index([wxOpenId])
 }
 
 model work_orders {

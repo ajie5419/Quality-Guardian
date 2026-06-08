@@ -5,6 +5,10 @@
       "path": "apps/backend",
     },
     {
+      "name": "@qgs/weapp",
+      "path": "apps/weapp",
+    },
+    {
       "name": "@qgs/web-antd",
       "path": "apps/web-antd",
     },

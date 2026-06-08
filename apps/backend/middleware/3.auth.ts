@@ -7,6 +7,8 @@ const PUBLIC_PATH_PREFIXES = [
   '/api/auth/logout',
   '/api/auth/refresh',
   '/api/auth/register',
+  '/api/auth/wx-login',
+  '/api/auth/wx-bind',
   '/api/auth/departments',
   '/api/index',
   '/api/qms/public/',
