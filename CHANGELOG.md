@@ -25,6 +25,14 @@
 
 ## 执行记录
 
+## [0.7.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.6.0...qgs-v0.7.0) (2026-06-08)
+
+
+### Features
+
+* **@qgs/backend:** separate supplier dimension in inspection dashboard stats ([356e0b2](https://github.com/ajie5419/Quality-Guardian/commit/356e0b21a6bf87c0ac544210ff9cf1bc538763b6))
+* **@qgs/backend:** show process/incoming breakdown in dashboard stats cards ([ab7ec61](https://github.com/ajie5419/Quality-Guardian/commit/ab7ec61c57ac9f683ad865d32e463326b05dd3a8))
+
 ## [0.6.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.5.1...qgs-v0.6.0) (2026-06-07)
 
 
