@@ -20,6 +20,7 @@ import {
   closeInspectionRequest,
   deleteInspectionRequest,
   dispatchInspectionRequest,
+  getInspectionRequest,
 } from '#/api/qms/inspection-request';
 import {
   applyUploadResponse,
@@ -62,7 +63,6 @@ interface UseInspectionRequestTaskActionsOptions {
   handleApiError: (error: unknown, action?: string) => void;
   makeQr: (url: string) => Promise<string>;
   query: { keyword: string };
-  requests: Ref<InspectionRequest[]>;
   route: RouteLocationNormalizedLoaded;
   router: Router;
 }
@@ -81,7 +81,6 @@ export function useInspectionRequestTaskActions(
     handleApiError,
     makeQr,
     query,
-    requests,
     route,
     router,
   } = options;
@@ -456,16 +455,11 @@ export function useInspectionRequestTaskActions(
   }
 
   function applyRouteDispatchDetail() {
-    if (routeDispatchRequestId.value) {
-      if (routeDispatchRestoreKeyword.value === null) {
-        routeDispatchRestoreKeyword.value = query.keyword;
-      }
-      query.keyword = routeDispatchRequestId.value;
-      routeDispatchDetailConsumed.value = false;
-    }
+    // No-op: detail is now fetched directly by id from route query;
+    // see openDispatchDetailFromRoute. Kept for compat with existing callers.
   }
 
-  function openDispatchDetailFromRoute() {
+  async function openDispatchDetailFromRoute() {
     if (
       !routeDispatchRequestId.value ||
       dispatchDetailOpen.value ||
@@ -473,14 +467,19 @@ export function useInspectionRequestTaskActions(
     ) {
       return;
     }
-    const matched = requests.value.find(
-      (item) => item.id === routeDispatchRequestId.value,
-    );
-    if (matched) {
-      openDispatchDetail(matched);
-      routeDispatchDetailConsumed.value = true;
+    routeDispatchDetailConsumed.value = true;
+    try {
+      const record = await getInspectionRequest(routeDispatchRequestId.value);
+      if (!record) {
+        message.warning('任务不存在或已被删除');
+        return;
+      }
+      openDispatchDetail(record);
       routeDispatchDetailOpened.value = true;
-      restoreRouteDispatchKeyword();
+    } catch (error) {
+      handleApiError(error, 'Open Dispatch Detail From Route');
+      message.warning('任务不存在或已被删除');
+    } finally {
       const nextQuery = { ...route.query };
       delete nextQuery.dispatchRequestId;
       delete nextQuery.closeRequestId;

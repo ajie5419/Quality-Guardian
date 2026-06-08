@@ -259,7 +259,6 @@ const {
   linkedDefectSubtypeOptions,
   linkedIssueDraft,
   submitting,
-  applyRouteDispatchDetail,
   closeRouteDispatchDetail,
   confirmDelete,
   displayCloseReadonlyValue,
@@ -285,7 +284,6 @@ const {
   handleApiError,
   makeQr,
   query,
-  requests,
   route,
   router,
 });
@@ -346,7 +344,6 @@ function handleDispatchFormUpdate(nextValue: typeof dispatchForm) {
 }
 
 onMounted(async () => {
-  applyRouteDispatchDetail();
   await loadRequestEntryConfig();
   await Promise.all([
     loadDeptData(),
@@ -354,6 +351,7 @@ onMounted(async () => {
     loadRequests(),
     loadRequestStats(),
   ]);
+  await openDispatchDetailFromRoute();
   window.addEventListener(
     'qms:inspection-request-created',
     handleInspectionRequestCreated,
@@ -370,8 +368,7 @@ onUnmounted(() => {
 watch(
   () => route.query,
   async () => {
-    applyRouteDispatchDetail();
-    await loadRequests();
+    await openDispatchDetailFromRoute();
   },
 );
 </script>
