@@ -39,7 +39,7 @@ export function getUserList(params?: { page?: number; pageSize?: number }) {
     items: Array<{ id: string; realName: string; username: string }>;
     total: number;
   }>({
-    url: '/api/system/users',
+    url: '/api/system/user/list',
     method: 'GET',
     data: { page: 1, pageSize: 100, ...params } as Record<string, unknown>,
   });
