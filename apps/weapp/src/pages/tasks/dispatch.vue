@@ -8,12 +8,15 @@ import {
 } from '@/api/inspection';
 import { onLoad } from '@dcloudio/uni-app';
 
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5320';
+
 interface TaskInfo {
   requestNo: string;
   workOrderNumber: string;
   partName: string;
   processName: string;
   reporter: string;
+  attachments: Array<{ name: string; url: string }>;
 }
 
 interface InspectorOption {
@@ -44,12 +47,22 @@ async function loadData(id: string) {
     ]);
     if (detailRes.code === 0) {
       const d = detailRes.data as Record<string, unknown>;
+      const rawAttachments = Array.isArray(d.attachments) ? d.attachments : [];
       task.value = {
         requestNo: String(d.requestNo ?? ''),
         workOrderNumber: String(d.workOrderNumber ?? ''),
         partName: String(d.partName ?? ''),
         processName: String(d.processName ?? ''),
         reporter: String(d.reporter ?? ''),
+        attachments: rawAttachments.map((a: unknown) => {
+          if (typeof a === 'string')
+            return { name: a.split('/').pop() ?? '附件', url: a };
+          const obj = a as Record<string, string>;
+          return {
+            name: obj.name || obj.url?.split('/').pop() || '附件',
+            url: obj.url || '',
+          };
+        }),
       };
     } else {
       uni.showToast({ title: detailRes.message || '加载失败', icon: 'none' });
@@ -75,6 +88,18 @@ function onPickerChange(e: { detail: { value: number } }) {
 
 function onRemarkInput(e: { detail: { value: string } }) {
   dispatchRemark.value = e.detail.value;
+}
+
+function getFullUrl(url: string) {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  return `${BASE_URL}${url}`;
+}
+
+function previewImage(url: string) {
+  const fullUrl = getFullUrl(url);
+  const allUrls = (task.value?.attachments ?? []).map((a) => getFullUrl(a.url));
+  uni.previewImage({ urls: allUrls, current: fullUrl });
 }
 
 async function submitDispatch() {
@@ -149,6 +174,21 @@ onLoad((options) => {
         <view class="info-row">
           <text class="info-label">报检人</text>
           <text class="info-value">{{ task.reporter }}</text>
+        </view>
+
+        <!-- Attachments -->
+        <view v-if="task.attachments.length > 0" class="attachments-section">
+          <text class="info-label">报检附件</text>
+          <view class="attachment-grid">
+            <image
+              v-for="(att, idx) in task.attachments"
+              :key="idx"
+              class="attachment-img"
+              :src="getFullUrl(att.url)"
+              mode="aspectFill"
+              @tap="previewImage(att.url)"
+            />
+          </view>
         </view>
       </view>
 
@@ -305,6 +345,26 @@ onLoad((options) => {
   color: $text-color;
 }
 
+.attachments-section {
+  padding-top: 16rpx;
+  margin-top: 12rpx;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.attachment-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.attachment-img {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 8rpx;
+  background: #f5f5f5;
+}
+
 .request-no {
   font-weight: 600;
   color: $primary-color;
@@ -348,10 +408,10 @@ onLoad((options) => {
   }
 
   .picker-arrow {
+    display: inline-block;
     font-size: 36rpx;
     color: #bbb;
     transform: rotate(90deg);
-    display: inline-block;
   }
 }
 
@@ -369,12 +429,12 @@ onLoad((options) => {
   font-size: 30rpx;
   color: $text-color-secondary;
   background: #f5f5f5;
-  border-radius: 10rpx;
   border: 2rpx solid transparent;
+  border-radius: 10rpx;
 
   &.priority-btn-active {
     font-weight: 600;
-    border-color: currentColor;
+    border-color: currentcolor;
   }
 
   &.level-1 {
