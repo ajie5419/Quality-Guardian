@@ -64,8 +64,22 @@ onPullDownRefresh(() => {
   loadData();
 });
 
+const isDispatcher = computed(() => {
+  const roles = userStore.userInfo?.roles ?? [];
+  return roles.some(
+    (r) =>
+      r.includes('admin') ||
+      r.includes('dispatch') ||
+      r.includes('manager') ||
+      r.includes('schedule'),
+  );
+});
+
 function goToTask(id: string) {
-  uni.navigateTo({ url: `/pages/tasks/detail?id=${id}` });
+  const url = isDispatcher.value
+    ? `/pages/tasks/dispatch?id=${id}`
+    : `/pages/inspect/result?id=${id}`;
+  uni.navigateTo({ url });
 }
 </script>
 
