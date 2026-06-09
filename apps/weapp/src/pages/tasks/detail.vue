@@ -14,7 +14,7 @@ interface TaskDetail {
   reporterName: string;
   teamName: string;
   status: string;
-  assignedInspectorId: string;
+  inspectorId: string;
   attachments: string[];
 }
 
@@ -34,12 +34,15 @@ const selectedInspectorIndex = ref(-1);
 // In a real app these would come from a users API; static fallback for now
 const inspectorOptions = ref<InspectorOption[]>([]);
 
-const isDispatcher = computed(
-  () => userStore.userInfo?.roles?.includes('dispatcher') ?? false,
-);
+const isDispatcher = computed(() => {
+  const roles = userStore.userInfo?.roles ?? [];
+  return roles.some(
+    (r) => r === 'dispatcher' || r === 'super' || r === 'admin',
+  );
+});
 
 const isAssignedInspector = computed(
-  () => task.value?.assignedInspectorId === userStore.userInfo?.id,
+  () => task.value?.inspectorId === userStore.userInfo?.id,
 );
 
 const statusSteps = [
