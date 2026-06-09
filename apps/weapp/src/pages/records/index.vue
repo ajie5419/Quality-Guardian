@@ -6,12 +6,14 @@ import { onShow } from '@dcloudio/uni-app';
 
 interface RecordItem {
   id: string;
+  requestNo: string;
   workOrderNumber: string;
   partName: string;
-  overallResult: 'FAIL' | 'PASS';
-  passCount: number;
-  failCount: number;
-  inspectionDate: string;
+  inspectionResult: 'FAIL' | 'PASS' | string;
+  qualifiedQuantity: number;
+  unqualifiedQuantity: number;
+  closedAt: string;
+  updatedAt: string;
 }
 
 const records = ref<unknown[]>([]);
@@ -85,50 +87,44 @@ onShow(() => {
       </view>
 
       <view
-        v-for="record in records"
-        :key="(record as RecordItem).id"
+        v-for="record in records as RecordItem[]"
+        :key="record.id"
         class="card"
-        @tap="goDetail((record as RecordItem).id)"
+        @tap="goDetail(record.id)"
       >
         <view class="card-header">
           <text class="work-order">{{
-            (record as RecordItem).workOrderNumber
+            record.requestNo || record.workOrderNumber
           }}</text>
           <view
             class="result-badge"
             :class="
-              (record as RecordItem).overallResult === 'PASS'
-                ? 'badge-pass'
-                : 'badge-fail'
+              record.inspectionResult === 'PASS' ? 'badge-pass' : 'badge-fail'
             "
           >
             <text class="badge-text">
-              {{
-                (record as RecordItem).overallResult === 'PASS'
-                  ? '合格'
-                  : '不合格'
-              }}
+              {{ record.inspectionResult === 'PASS' ? '合格' : '不合格' }}
             </text>
           </view>
         </view>
 
         <view class="card-body">
-          <text class="part-name">{{ (record as RecordItem).partName }}</text>
+          <text class="part-name">{{ record.partName }}</text>
           <view class="summary">
             <text class="summary-pass"
-              >合格 {{ (record as RecordItem).passCount }}</text
+              >合格 {{ record.qualifiedQuantity ?? 0 }}</text
             >
             <text class="summary-sep"> / </text>
             <text class="summary-fail"
-              >不合格 {{ (record as RecordItem).failCount }}</text
+              >不合格 {{ record.unqualifiedQuantity ?? 0 }}</text
             >
           </view>
         </view>
 
         <view class="card-footer">
           <text class="meta"
-            >检验日期：{{
-              formatDate((record as RecordItem).inspectionDate)
+            >完成日期：{{
+              formatDate(record.closedAt || record.updatedAt)
             }}</text
           >
         </view>
