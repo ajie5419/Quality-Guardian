@@ -1,7 +1,6 @@
-import { defineConfig } from 'vite';
-
 // @ts-expect-error dcloudio CJS default export
 import uniPlugin from '@dcloudio/vite-plugin-uni';
+import { defineConfig } from 'vite';
 
 const uni = uniPlugin.default || uniPlugin;
 

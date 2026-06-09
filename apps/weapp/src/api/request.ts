@@ -78,6 +78,14 @@ export async function request<T = unknown>(
   );
 
   if (res.statusCode === 401) {
+    if (!getToken()) {
+      return {
+        code: -1,
+        data: null as T,
+        error: 'unauthorized',
+        message: '未登录',
+      };
+    }
     if (isRefreshing) {
       return new Promise((resolve) => {
         pendingRequests.push(() => resolve(request<T>(options)));
@@ -95,7 +103,11 @@ export async function request<T = unknown>(
         pendingRequests = [];
         uni.removeStorageSync('accessToken');
         uni.removeStorageSync('refreshToken');
-        uni.reLaunch({ url: '/pages/login/index' });
+        const pages = getCurrentPages();
+        const currentPath = pages[pages.length - 1]?.route ?? '';
+        if (!currentPath.includes('login')) {
+          uni.reLaunch({ url: '/pages/login/index' });
+        }
         return {
           code: -1,
           data: null as T,

@@ -2,10 +2,12 @@ import { request } from './request';
 
 export function getInspectionStats() {
   return request<{
-    openIssuesCount: number;
-    todayInspections: number;
-    todayWorkOrders: number;
-  }>({ url: '/api/qms/dashboard/workspace-summary' });
+    stats: {
+      openIssuesCount: number;
+      todayInspections: number;
+      todayWorkOrders: number;
+    };
+  }>({ url: '/api/qms/workspace' });
 }
 
 export function getMyTasks(params?: {

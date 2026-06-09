@@ -110,11 +110,13 @@ function goInspect() {
   uni.navigateTo({ url: `/pages/inspect/result?id=${taskId.value}` });
 }
 
-function getFileName(url: string) {
+function getFileName(url: unknown) {
+  if (typeof url !== 'string') return '附件';
   return url.split('/').pop() ?? url;
 }
 
-function previewFile(url: string) {
+function previewFile(url: unknown) {
+  if (typeof url !== 'string') return;
   uni.previewImage({ urls: [url], current: url });
 }
 
