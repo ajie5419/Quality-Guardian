@@ -1,87 +1,87 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
-import { closeInspection, getTaskDetail } from '@/api/inspection';
+import { closeInspectionRequest, getInspectionRequest } from '@/api/inspection';
 import { uploadFile } from '@/api/request';
 import { onLoad } from '@dcloudio/uni-app';
 
-interface InspectionItem {
-  checkItem: string;
-  standardValue: string;
-  measuredValue: string;
-  result: '' | 'FAIL' | 'PASS';
-}
-
-interface TaskInfo {
+interface TaskDetail {
+  requestNo: string;
   workOrderNumber: string;
   partName: string;
+  processName: string;
+  quantity: number;
+}
+
+interface Attachment {
+  name: string;
+  url: string;
 }
 
 const taskId = ref('');
-const task = ref<null | TaskInfo>(null);
-const inspectionItems = ref<InspectionItem[]>([]);
-const photoUrls = ref<string[]>([]);
-const remarks = ref('');
+const task = ref<null | TaskDetail>(null);
+const loading = ref(false);
 const submitting = ref(false);
 
+// Form state
+const result = ref<'FAIL' | 'PASS'>('PASS');
+const hasDocuments = ref(true);
+const closeRemark = ref('');
+const attachments = ref<Attachment[]>([]);
+
 async function fetchDetail() {
+  loading.value = true;
   try {
-    const res = await getTaskDetail(taskId.value);
+    const res = await getInspectionRequest(taskId.value);
     if (res.code === 0) {
       const data = res.data as Record<string, unknown>;
       task.value = {
-        workOrderNumber: data.workOrderNumber as string,
-        partName: data.partName as string,
+        requestNo: (data.requestNo as string) || '',
+        workOrderNumber: (data.workOrderNumber as string) || '',
+        partName: (data.partName as string) || '',
+        processName: (data.processName as string) || '',
+        quantity: (data.quantity as number) || 1,
       };
-      const template =
-        (data.inspectionTemplate as InspectionItem[] | null) ?? [];
-      inspectionItems.value = template.map((t) => ({
-        checkItem: t.checkItem,
-        standardValue: t.standardValue,
-        measuredValue: '',
-        result: '',
-      }));
-      if (inspectionItems.value.length === 0) {
-        inspectionItems.value = [
-          {
-            checkItem: '综合检验',
-            standardValue: '—',
-            measuredValue: '',
-            result: '',
-          },
-        ];
-      }
     } else {
       uni.showToast({ title: res.message || '加载失败', icon: 'none' });
     }
   } catch {
     uni.showToast({ title: '网络错误', icon: 'none' });
+  } finally {
+    loading.value = false;
   }
 }
 
-function onMeasuredInput(e: { detail: { value: string } }, idx: number) {
-  inspectionItems.value[idx].measuredValue = e.detail.value;
+function setResult(val: 'FAIL' | 'PASS') {
+  result.value = val;
+  if (val === 'PASS') {
+    attachments.value = [];
+  }
 }
 
-function setResult(idx: number, result: 'FAIL' | 'PASS') {
-  inspectionItems.value[idx].result = result;
-}
-
-function removePhoto(idx: number) {
-  photoUrls.value.splice(idx, 1);
+function removeAttachment(idx: number) {
+  attachments.value.splice(idx, 1);
 }
 
 function choosePhoto() {
+  const remaining = 3 - attachments.value.length;
+  if (remaining <= 0) return;
+
   uni.chooseImage({
-    count: 9 - photoUrls.value.length,
+    count: remaining,
     sizeType: ['compressed'],
-    sourceType: ['album', 'camera'],
+    sourceType: ['camera', 'album'],
     success: async (res) => {
       uni.showLoading({ title: '上传中...' });
       try {
         for (const path of res.tempFilePaths) {
-          const url = await uploadFile(path);
-          photoUrls.value.push(url);
+          const uploadRes = await uploadFile(path);
+          if (uploadRes.code === 0 && uploadRes.data?.url) {
+            const fileName = path.split('/').pop() || 'photo.jpg';
+            attachments.value.push({ url: uploadRes.data.url, name: fileName });
+          } else {
+            uni.showToast({ title: '上传失败', icon: 'none' });
+          }
         }
       } catch {
         uni.showToast({ title: '上传失败', icon: 'none' });
@@ -93,29 +93,32 @@ function choosePhoto() {
 }
 
 async function submitResult() {
-  const unfilled = inspectionItems.value.filter(
-    (i) => !i.measuredValue || !i.result,
-  );
-  if (unfilled.length > 0) {
-    uni.showToast({ title: '请填写所有检验项', icon: 'none' });
-    return;
-  }
+  if (!task.value || submitting.value) return;
+
   submitting.value = true;
   uni.showLoading({ title: '提交中...' });
+
+  const quantity = task.value.quantity;
+
   try {
-    const res = await closeInspection(taskId.value, {
-      inspectionItems: inspectionItems.value,
-      photos: photoUrls.value,
-      remarks: remarks.value,
+    const res = await closeInspectionRequest(taskId.value, {
+      result: result.value,
+      hasDocuments: hasDocuments.value,
+      closeRemark: closeRemark.value || undefined,
+      attachments: result.value === 'FAIL' ? attachments.value : undefined,
+      quantity,
+      qualifiedQuantity: result.value === 'PASS' ? quantity : 0,
+      unqualifiedQuantity: result.value === 'FAIL' ? quantity : 0,
     });
+
+    uni.hideLoading();
+
     if (res.code === 0) {
-      uni.hideLoading();
       uni.showToast({ title: '提交成功', icon: 'success' });
       setTimeout(() => {
         uni.navigateBack();
       }, 1500);
     } else {
-      uni.hideLoading();
       uni.showToast({ title: res.message || '提交失败', icon: 'none' });
     }
   } catch {
@@ -134,64 +137,98 @@ onLoad((options) => {
 
 <template>
   <view class="page">
-    <!-- Header -->
-    <view v-if="task" class="task-header">
-      <text class="work-order">{{ task.workOrderNumber }}</text>
-      <text class="part-name">{{ task.partName }}</text>
+    <!-- Detail section -->
+    <view v-if="task" class="detail-card">
+      <view class="detail-row">
+        <text class="detail-label">编号</text>
+        <text class="detail-value">{{ task.requestNo }}</text>
+      </view>
+      <view class="detail-row">
+        <text class="detail-label">工单号</text>
+        <text class="detail-value">{{ task.workOrderNumber }}</text>
+      </view>
+      <view class="detail-row">
+        <text class="detail-label">零件</text>
+        <text class="detail-value">{{ task.partName }}</text>
+      </view>
+      <view class="detail-row">
+        <text class="detail-label">工序</text>
+        <text class="detail-value">{{ task.processName }}</text>
+      </view>
+      <view class="detail-row">
+        <text class="detail-label">数量</text>
+        <text class="detail-value">{{ task.quantity }}</text>
+      </view>
     </view>
 
-    <scroll-view scroll-y class="scroll" :style="{ paddingBottom: '160rpx' }">
-      <!-- Inspection Items -->
+    <scroll-view scroll-y class="scroll">
+      <!-- Result segmented control -->
       <view class="card">
-        <view class="section-title">检验项目</view>
-        <view
-          v-for="(item, idx) in inspectionItems"
-          :key="idx"
-          class="inspect-item"
-        >
-          <view class="item-header">
-            <text class="item-label">{{ item.checkItem }}</text>
-            <text class="item-standard">标准值：{{ item.standardValue }}</text>
+        <view class="field-label required">检验结果</view>
+        <view class="segmented">
+          <view
+            class="seg-btn"
+            :class="{
+              'seg-btn--pass': result === 'PASS',
+              'seg-btn--active': result === 'PASS',
+            }"
+            @tap="setResult('PASS')"
+          >
+            <text>PASS</text>
           </view>
-          <view class="item-inputs">
-            <input
-              class="measured-input"
-              :value="item.measuredValue"
-              placeholder="请输入实测值"
-              @input="(e) => onMeasuredInput(e, idx)"
-            />
-            <view class="result-toggle">
-              <view
-                class="toggle-btn"
-                :class="{ selected: item.result === 'PASS' }"
-                @tap="setResult(idx, 'PASS')"
-              >
-                <text>合格</text>
-              </view>
-              <view
-                class="toggle-btn fail"
-                :class="{ selected: item.result === 'FAIL' }"
-                @tap="setResult(idx, 'FAIL')"
-              >
-                <text>不合格</text>
-              </view>
-            </view>
+          <view
+            class="seg-btn"
+            :class="{
+              'seg-btn--fail': result === 'FAIL',
+              'seg-btn--active': result === 'FAIL',
+            }"
+            @tap="setResult('FAIL')"
+          >
+            <text>FAIL</text>
           </view>
         </view>
       </view>
 
-      <!-- Photo Upload -->
+      <!-- Has documents switch -->
       <view class="card">
-        <view class="section-title">现场照片（最多9张）</view>
+        <view class="field-row">
+          <text class="field-label required">是否有资料</text>
+          <switch
+            :checked="hasDocuments"
+            color="#1890ff"
+            @change="
+              (e: { detail: { value: boolean } }) =>
+                (hasDocuments = e.detail.value)
+            "
+          />
+          <text class="switch-label">{{ hasDocuments ? '有' : '无' }}</text>
+        </view>
+      </view>
+
+      <!-- Remark textarea -->
+      <view class="card">
+        <view class="field-label">备注</view>
+        <textarea
+          v-model="closeRemark"
+          class="remark-input"
+          placeholder="检验备注（选填）"
+          :maxlength="300"
+          auto-height
+        ></textarea>
+      </view>
+
+      <!-- Photo upload — only shown when FAIL -->
+      <view v-if="result === 'FAIL'" class="card">
+        <view class="field-label">照片（最多3张）</view>
         <view class="photo-grid">
-          <view v-for="(url, idx) in photoUrls" :key="idx" class="photo-item">
-            <image :src="url" class="photo-img" mode="aspectFill" />
-            <view class="photo-delete" @tap="removePhoto(idx)">
+          <view v-for="(att, idx) in attachments" :key="idx" class="photo-item">
+            <image :src="att.url" class="photo-img" mode="aspectFill" />
+            <view class="photo-delete" @tap="removeAttachment(idx)">
               <text class="delete-icon">×</text>
             </view>
           </view>
           <view
-            v-if="photoUrls.length < 9"
+            v-if="attachments.length < 3"
             class="photo-add"
             @tap="choosePhoto"
           >
@@ -199,26 +236,14 @@ onLoad((options) => {
           </view>
         </view>
       </view>
-
-      <!-- Remarks -->
-      <view class="card">
-        <view class="section-title">备注</view>
-        <textarea
-          class="remarks-input"
-          v-model="remarks"
-          placeholder="请输入备注信息（选填）"
-          :maxlength="500"
-          auto-height
-        ></textarea>
-      </view>
     </scroll-view>
 
-    <!-- Submit Button -->
+    <!-- Submit button -->
     <view class="action-bar">
       <button
         class="btn btn-primary"
         :loading="submitting"
-        :disabled="submitting"
+        :disabled="submitting || loading"
         @tap="submitResult"
       >
         提交检验结果
@@ -235,23 +260,27 @@ onLoad((options) => {
   background: #f5f5f5;
 }
 
-.task-header {
-  display: flex;
+.detail-card {
   flex-shrink: 0;
-  flex-direction: column;
-  gap: 8rpx;
   padding: 24rpx 32rpx;
   background: #1890ff;
+}
 
-  .work-order {
-    font-size: 32rpx;
-    font-weight: 600;
-    color: #fff;
+.detail-row {
+  display: flex;
+  align-items: center;
+  padding: 6rpx 0;
+
+  .detail-label {
+    width: 120rpx;
+    font-size: 26rpx;
+    color: rgb(255 255 255 / 70%);
   }
 
-  .part-name {
-    font-size: 26rpx;
-    color: rgb(255 255 255 / 80%);
+  .detail-value {
+    flex: 1;
+    font-size: 28rpx;
+    color: #fff;
   }
 }
 
@@ -259,6 +288,7 @@ onLoad((options) => {
   flex: 1;
   padding: 20rpx;
   overflow: hidden;
+  padding-bottom: 160rpx;
 }
 
 .card {
@@ -269,81 +299,73 @@ onLoad((options) => {
   box-shadow: 0 2rpx 12rpx rgb(0 0 0 / 6%);
 }
 
-.section-title {
-  padding-bottom: 16rpx;
-  margin-bottom: 20rpx;
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #333;
-  border-bottom: 1rpx solid #f0f0f0;
-}
-
-.inspect-item {
-  padding: 16rpx 0;
-  border-bottom: 1rpx solid #f5f5f5;
-
-  &:last-child {
-    border-bottom: none;
-  }
-}
-
-.item-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.field-label {
   margin-bottom: 16rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #333;
 
-  .item-label {
-    font-size: 28rpx;
-    font-weight: 500;
-    color: #333;
-  }
-
-  .item-standard {
-    font-size: 24rpx;
-    color: #999;
+  &.required::before {
+    margin-right: 6rpx;
+    color: #f5222d;
+    content: '*';
   }
 }
 
-.item-inputs {
+.field-row {
   display: flex;
   gap: 16rpx;
   align-items: center;
+
+  .field-label {
+    flex: 1;
+    margin-bottom: 0;
+  }
 }
 
-.measured-input {
-  flex: 1;
-  height: 72rpx;
-  padding: 0 20rpx;
-  font-size: 28rpx;
-  color: #333;
-  background: #f9f9f9;
-  border: 1rpx solid #e8e8e8;
-  border-radius: 8rpx;
+.switch-label {
+  font-size: 26rpx;
+  color: #666;
 }
 
-.result-toggle {
+.segmented {
   display: flex;
   overflow: hidden;
   border: 1rpx solid #e8e8e8;
-  border-radius: 8rpx;
+  border-radius: 12rpx;
 }
 
-.toggle-btn {
-  padding: 16rpx 24rpx;
-  font-size: 26rpx;
+.seg-btn {
+  flex: 1;
+  padding: 20rpx 0;
+  font-size: 28rpx;
   color: #999;
-  background: #fff;
+  text-align: center;
+  background: #fafafa;
+  transition: background 0.2s;
 
-  &.selected {
+  &--active {
     color: #fff;
+  }
+
+  &--pass {
     background: #52c41a;
   }
 
-  &.fail.selected {
-    color: #fff;
+  &--fail {
     background: #f5222d;
   }
+}
+
+.remark-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 160rpx;
+  padding: 20rpx;
+  font-size: 28rpx;
+  color: #333;
+  background: #f9f9f9;
+  border-radius: 8rpx;
 }
 
 .photo-grid {
@@ -372,13 +394,13 @@ onLoad((options) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40rpx;
-  height: 40rpx;
+  width: 44rpx;
+  height: 44rpx;
   background: rgb(0 0 0 / 60%);
   border-radius: 50%;
 
   .delete-icon {
-    font-size: 28rpx;
+    font-size: 32rpx;
     line-height: 1;
     color: #fff;
   }
@@ -398,17 +420,6 @@ onLoad((options) => {
     font-size: 60rpx;
     color: #bbb;
   }
-}
-
-.remarks-input {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 160rpx;
-  padding: 20rpx;
-  font-size: 28rpx;
-  color: #333;
-  background: #f9f9f9;
-  border-radius: 8rpx;
 }
 
 .action-bar {

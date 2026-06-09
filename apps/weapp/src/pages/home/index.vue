@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import { getInspectionStats, getMyTasks } from '@/api/inspection';
+import { getInspectionRequests, getInspectionStats } from '@/api/inspection';
 import { useUserStore } from '@/stores/user';
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app';
 
@@ -44,7 +44,7 @@ async function loadData() {
   try {
     const [statsRes, tasksRes] = await Promise.all([
       getInspectionStats(),
-      getMyTasks({ page: 1, pageSize: 3 }),
+      getInspectionRequests({ mine: true, page: 1, pageSize: 3 }),
     ]);
     if (statsRes.code === 0 && statsRes.data?.stats)
       stats.value = statsRes.data.stats;

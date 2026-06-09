@@ -1,50 +1,81 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
-import { getMyTasks } from '@/api/inspection';
-import { onShow } from '@dcloudio/uni-app';
+import { getInspectionRequests } from '@/api/inspection';
+import { useUserStore } from '@/stores/user';
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app';
 
 interface TaskItem {
   id: string;
+  requestNo: string;
   workOrderNumber: string;
-  processName: string;
   partName: string;
-  status: string;
-  priority: string;
-  reporterName: string;
+  processName: string;
+  reporter: string;
+  priority: number;
+  submittedAt: string;
   createdAt: string;
 }
 
-const tabs = [
-  { label: '全部', value: '' },
-  { label: '待检验', value: 'DISPATCHED' },
-  { label: '检验中', value: 'INSPECTING' },
-  { label: '已完成', value: 'CLOSED' },
-];
-
-const activeTab = ref('');
-const tasks = ref<unknown[]>([]);
+const userStore = useUserStore();
+const tasks = ref<TaskItem[]>([]);
 const loading = ref(false);
-const refreshing = ref(false);
-const page = ref(1);
-const noMore = ref(false);
-const PAGE_SIZE = 10;
 
-async function fetchTasks(reset = false) {
+const isDispatcher = computed(() => {
+  const roles = userStore.userInfo?.roles ?? [];
+  const joined = roles.join(',').toLowerCase();
+  return (
+    joined.includes('admin') ||
+    joined.includes('dispatch') ||
+    joined.includes('manager') ||
+    joined.includes('schedule')
+  );
+});
+
+const pageTitle = computed(() => (isDispatcher.value ? '待派单' : '待检验'));
+
+function priorityLabel(priority: number): string {
+  if (priority <= 1) return '紧急';
+  if (priority === 2) return '高优';
+  return '普通';
+}
+
+function priorityClass(priority: number): string {
+  if (priority <= 1) return 'tag-urgent';
+  if (priority === 2) return 'tag-high';
+  return 'tag-normal';
+}
+
+function formatDate(value: string): string {
+  if (!value) return '-';
+  const d = new Date(value);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${mm}-${dd} ${hh}:${min}`;
+}
+
+function goTask(task: TaskItem) {
+  if (isDispatcher.value) {
+    uni.navigateTo({ url: `/pages/tasks/dispatch?id=${task.id}` });
+  } else {
+    uni.navigateTo({ url: `/pages/inspect/result?id=${task.id}` });
+  }
+}
+
+async function loadTasks() {
   if (loading.value) return;
   loading.value = true;
   try {
-    const currentPage = reset ? 1 : page.value;
-    const res = await getMyTasks({
-      status: activeTab.value || undefined,
-      page: currentPage,
-      pageSize: PAGE_SIZE,
+    const res = await getInspectionRequests({
+      status: isDispatcher.value ? 'SUBMITTED' : 'DISPATCHED',
+      mine: !isDispatcher.value,
+      page: 1,
+      pageSize: 50,
     });
     if (res.code === 0) {
-      const items = res.data.items;
-      tasks.value = reset ? items : [...tasks.value, ...items];
-      noMore.value = tasks.value.length >= res.data.total;
-      if (reset) page.value = 1;
+      tasks.value = (res.data.items ?? []) as TaskItem[];
     } else {
       uni.showToast({ title: res.message || '加载失败', icon: 'none' });
     }
@@ -52,149 +83,73 @@ async function fetchTasks(reset = false) {
     uni.showToast({ title: '网络错误', icon: 'none' });
   } finally {
     loading.value = false;
-    refreshing.value = false;
+    uni.stopPullDownRefresh();
   }
 }
 
-function switchTab(value: string) {
-  if (activeTab.value === value) return;
-  activeTab.value = value;
-  page.value = 1;
-  noMore.value = false;
-  fetchTasks(true);
-}
-
-function onRefresh() {
-  refreshing.value = true;
-  page.value = 1;
-  noMore.value = false;
-  fetchTasks(true);
-}
-
-function loadMore() {
-  if (noMore.value || loading.value) return;
-  page.value++;
-  fetchTasks(false);
-}
-
-function goDetail(id: string) {
-  uni.navigateTo({ url: `/pages/tasks/detail?id=${id}` });
-}
-
-function getStatusLabel(status: string) {
-  const map: Record<string, string> = {
-    SUBMITTED: '待派单',
-    DISPATCHED: '待检验',
-    INSPECTING: '检验中',
-    CLOSED: '已完成',
-  };
-  return map[status] ?? status;
-}
-
-function getStatusClass(status: string) {
-  const map: Record<string, string> = {
-    SUBMITTED: 'status-submitted',
-    DISPATCHED: 'status-dispatched',
-    INSPECTING: 'status-inspecting',
-    CLOSED: 'status-closed',
-  };
-  return map[status] ?? '';
-}
-
-function isPriority(priority: string) {
-  return priority === 'HIGH' || priority === 'URGENT';
-}
-
-function getPriorityLabel(priority: string) {
-  return priority === 'URGENT' ? '紧急' : '高优';
-}
-
-function formatDate(dateStr: string) {
-  if (!dateStr) return '';
-  return dateStr.slice(0, 10);
-}
-
 onShow(() => {
-  fetchTasks(true);
+  loadTasks();
+});
+
+onPullDownRefresh(() => {
+  loadTasks();
 });
 </script>
 
 <template>
   <view class="page">
-    <!-- Tab Filter -->
-    <view class="tabs">
-      <view
-        v-for="tab in tabs"
-        :key="tab.value"
-        class="tab-item"
-        :class="{ active: activeTab === tab.value }"
-        @tap="switchTab(tab.value)"
-      >
-        {{ tab.label }}
-      </view>
+    <!-- Role header -->
+    <view class="page-header">
+      <text class="page-title">{{ pageTitle }}</text>
+      <text class="task-count">{{ tasks.length }} 条</text>
     </view>
 
-    <!-- Task List -->
-    <scroll-view
-      class="list"
-      scroll-y
-      refresher-enabled
-      :refresher-triggered="refreshing"
-      @refresherrefresh="onRefresh"
-      @scrolltolower="loadMore"
-    >
+    <scroll-view scroll-y class="list">
+      <!-- Empty state -->
       <view v-if="tasks.length === 0 && !loading" class="empty">
-        <text class="empty-text">暂无任务</text>
+        <text class="empty-icon">📋</text>
+        <text class="empty-text">暂无{{ pageTitle }}任务</text>
+      </view>
+
+      <!-- Loading skeleton (first load) -->
+      <view v-if="loading && tasks.length === 0" class="loading-wrap">
+        <text class="loading-text">加载中...</text>
       </view>
 
       <view
         v-for="task in tasks"
-        :key="(task as TaskItem).id"
+        :key="task.id"
         class="card"
-        @tap="goDetail((task as TaskItem).id)"
+        @tap="goTask(task)"
       >
         <view class="card-header">
-          <text class="work-order">{{
-            (task as TaskItem).workOrderNumber
-          }}</text>
-          <view
-            class="status-badge"
-            :class="getStatusClass((task as TaskItem).status)"
-          >
-            <text class="status-text">{{
-              getStatusLabel((task as TaskItem).status)
+          <text class="request-no">{{ task.requestNo }}</text>
+          <view class="priority-tag" :class="priorityClass(task.priority)">
+            <text class="priority-text">{{
+              priorityLabel(task.priority)
             }}</text>
           </view>
         </view>
         <view class="card-body">
-          <text class="process-name"
-            >{{ (task as TaskItem).processName }} ·
-            {{ (task as TaskItem).partName }}</text
-          >
-          <view
-            v-if="isPriority((task as TaskItem).priority)"
-            class="priority-tag"
-          >
-            <text class="priority-text">{{
-              getPriorityLabel((task as TaskItem).priority)
-            }}</text>
+          <view class="info-row">
+            <text class="info-label">工单号</text>
+            <text class="info-value">{{ task.workOrderNumber }}</text>
+          </view>
+          <view class="info-row">
+            <text class="info-label">零件</text>
+            <text class="info-value">{{ task.partName }}</text>
+          </view>
+          <view class="info-row">
+            <text class="info-label">工序</text>
+            <text class="info-value">{{ task.processName }}</text>
           </view>
         </view>
         <view class="card-footer">
-          <text class="meta"
-            >申请人：{{ (task as TaskItem).reporterName }}</text
-          >
+          <text class="meta">报检人：{{ task.reporter }}</text>
           <text class="meta">{{
-            formatDate((task as TaskItem).createdAt)
+            formatDate(task.submittedAt || task.createdAt)
           }}</text>
         </view>
-      </view>
-
-      <view v-if="loading && tasks.length > 0" class="loading-more">
-        <text class="loading-text">加载中...</text>
-      </view>
-      <view v-if="noMore && tasks.length > 0" class="no-more">
-        <text class="no-more-text">没有更多了</text>
       </view>
     </scroll-view>
   </view>
@@ -205,28 +160,28 @@ onShow(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #f5f5f5;
+  background: $bg-color;
 }
 
-.tabs {
+.page-header {
   display: flex;
   flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 32rpx;
   background: #fff;
-  border-bottom: 1rpx solid #eee;
+  border-bottom: 1rpx solid $border-color;
 }
 
-.tab-item {
-  flex: 1;
-  padding: 24rpx 0;
-  font-size: 28rpx;
-  color: #666;
-  text-align: center;
+.page-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: $text-color;
+}
 
-  &.active {
-    font-weight: 600;
-    color: #1890ff;
-    border-bottom: 4rpx solid #1890ff;
-  }
+.task-count {
+  font-size: 26rpx;
+  color: $text-color-secondary;
 }
 
 .list {
@@ -237,13 +192,31 @@ onShow(() => {
 
 .empty {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 120rpx 0;
+  gap: 20rpx;
+
+  .empty-icon {
+    font-size: 80rpx;
+  }
 
   .empty-text {
     font-size: 28rpx;
-    color: #999;
+    color: #bbb;
+  }
+}
+
+.loading-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 0;
+
+  .loading-text {
+    font-size: 28rpx;
+    color: #bbb;
   }
 }
 
@@ -259,77 +232,75 @@ onShow(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16rpx;
+  margin-bottom: 20rpx;
 }
 
-.work-order {
+.request-no {
+  flex: 1;
+  margin-right: 16rpx;
+  overflow: hidden;
   font-size: 30rpx;
   font-weight: 600;
-  color: #333;
+  color: $text-color;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.status-badge {
-  padding: 6rpx 16rpx;
+.priority-tag {
+  padding: 6rpx 18rpx;
   border-radius: 8rpx;
 
-  &.status-submitted {
+  .priority-text {
+    font-size: 24rpx;
+  }
+
+  &.tag-urgent {
+    background: #fff1f0;
+
+    .priority-text {
+      color: $error-color;
+    }
+  }
+
+  &.tag-high {
     background: #fff7e6;
+
+    .priority-text {
+      color: #fa8c16;
+    }
   }
 
-  &.status-dispatched {
+  &.tag-normal {
     background: #e6f7ff;
-  }
 
-  &.status-inspecting {
-    background: #f6ffed;
-  }
-
-  &.status-closed {
-    background: #f5f5f5;
-  }
-}
-
-.status-text {
-  font-size: 24rpx;
-
-  .status-submitted & {
-    color: #fa8c16;
-  }
-
-  .status-dispatched & {
-    color: #1890ff;
-  }
-
-  .status-inspecting & {
-    color: #52c41a;
-  }
-
-  .status-closed & {
-    color: #999;
+    .priority-text {
+      color: $primary-color;
+    }
   }
 }
 
 .card-body {
-  display: flex;
-  gap: 16rpx;
-  align-items: center;
   margin-bottom: 16rpx;
+  padding-bottom: 16rpx;
+  border-bottom: 1rpx solid #f5f5f5;
 }
 
-.process-name {
-  font-size: 28rpx;
-  color: #555;
+.info-row {
+  display: flex;
+  padding: 10rpx 0;
 }
 
-.priority-tag {
-  padding: 4rpx 12rpx;
-  background: #fff1f0;
-  border-radius: 6rpx;
+.info-label {
+  flex-shrink: 0;
+  width: 100rpx;
+  font-size: 26rpx;
+  color: $text-color-secondary;
+}
 
-  .priority-text {
-    font-size: 22rpx;
-    color: #f5222d;
-  }
+.info-value {
+  flex: 1;
+  font-size: 26rpx;
+  color: $text-color;
 }
 
 .card-footer {
@@ -339,18 +310,6 @@ onShow(() => {
 
 .meta {
   font-size: 24rpx;
-  color: #999;
-}
-
-.loading-more,
-.no-more {
-  padding: 24rpx 0;
-  text-align: center;
-
-  .loading-text,
-  .no-more-text {
-    font-size: 24rpx;
-    color: #bbb;
-  }
+  color: #bbb;
 }
 </style>
