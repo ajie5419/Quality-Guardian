@@ -25,6 +25,7 @@ const isDispatcher = computed(() => {
   const roles = userStore.userInfo?.roles ?? [];
   const joined = roles.join(',').toLowerCase();
   return (
+    joined.includes('super') ||
     joined.includes('admin') ||
     joined.includes('dispatch') ||
     joined.includes('manager') ||
@@ -193,10 +194,10 @@ onPullDownRefresh(() => {
 .empty {
   display: flex;
   flex-direction: column;
+  gap: 20rpx;
   align-items: center;
   justify-content: center;
   padding: 120rpx 0;
-  gap: 20rpx;
 
   .empty-icon {
     font-size: 80rpx;
@@ -239,10 +240,10 @@ onPullDownRefresh(() => {
   flex: 1;
   margin-right: 16rpx;
   overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 30rpx;
   font-weight: 600;
   color: $text-color;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -280,8 +281,8 @@ onPullDownRefresh(() => {
 }
 
 .card-body {
-  margin-bottom: 16rpx;
   padding-bottom: 16rpx;
+  margin-bottom: 16rpx;
   border-bottom: 1rpx solid #f5f5f5;
 }
 

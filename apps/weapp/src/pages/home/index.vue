@@ -68,6 +68,7 @@ const isDispatcher = computed(() => {
   const roles = userStore.userInfo?.roles ?? [];
   return roles.some(
     (r) =>
+      r.includes('super') ||
       r.includes('admin') ||
       r.includes('dispatch') ||
       r.includes('manager') ||
