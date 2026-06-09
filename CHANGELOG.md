@@ -25,6 +25,22 @@
 
 ## 执行记录
 
+## [0.8.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.7.1...qgs-v0.8.0) (2026-06-09)
+
+
+### Features
+
+* **@qgs/weapp:** add WeChat mini-program with inspection workflow (Phase 1) ([f3001cd](https://github.com/ajie5419/Quality-Guardian/commit/f3001cdb5be5be12ef6452b4176a3db496752a40))
+
+
+### Bug Fixes
+
+* **@qgs/weapp:** correct dcloudio package versions to latest vue3 tag ([4bcc804](https://github.com/ajie5419/Quality-Guardian/commit/4bcc804ce56366cc1ea82350ea540d808915b287))
+* **@qgs/weapp:** fix auth race condition, API path, and null guards ([7fe3436](https://github.com/ajie5419/Quality-Guardian/commit/7fe3436f5dc2a3413f177186d33d2b5cbf490e64))
+* **@qgs/weapp:** fix vite-plugin-uni import and add placeholder tab icons ([2b3a558](https://github.com/ajie5419/Quality-Guardian/commit/2b3a55801a5fa552c6f7ac9a94577f4c2785bcc6))
+* **@qgs/weapp:** sort json keys per eslint jsonc/sort-keys rule ([457d519](https://github.com/ajie5419/Quality-Guardian/commit/457d51995c729baeee0ef50c48168fbef83d3fc2))
+* **ci:** skip weapp typecheck and ignore _dev from stylelint ([d727229](https://github.com/ajie5419/Quality-Guardian/commit/d7272295a7e184ac4642f4eda7a7ed37903ca688))
+
 ## [0.7.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.7.0...qgs-v0.7.1) (2026-06-08)
 
 
