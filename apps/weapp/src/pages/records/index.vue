@@ -9,6 +9,7 @@ interface RecordItem {
   requestNo: string;
   workOrderNumber: string;
   partName: string;
+  status: string;
   inspectionResult: 'FAIL' | 'PASS' | string;
   qualifiedQuantity: number;
   unqualifiedQuantity: number;
@@ -99,11 +100,21 @@ onShow(() => {
           <view
             class="result-badge"
             :class="
-              record.inspectionResult === 'PASS' ? 'badge-pass' : 'badge-fail'
+              record.status === 'INSPECTING'
+                ? 'badge-inspecting'
+                : record.inspectionResult === 'PASS'
+                  ? 'badge-pass'
+                  : 'badge-fail'
             "
           >
             <text class="badge-text">
-              {{ record.inspectionResult === 'PASS' ? '合格' : '不合格' }}
+              {{
+                record.status === 'INSPECTING'
+                  ? '待复检'
+                  : record.inspectionResult === 'PASS'
+                    ? '合格'
+                    : '不合格'
+              }}
             </text>
           </view>
         </view>
@@ -199,6 +210,10 @@ onShow(() => {
     background: #fff1f0;
   }
 
+  &.badge-inspecting {
+    background: #fff7e6;
+  }
+
   .badge-text {
     font-size: 24rpx;
 
@@ -208,6 +223,10 @@ onShow(() => {
 
     .badge-fail & {
       color: #f5222d;
+    }
+
+    .badge-inspecting & {
+      color: #fa8c16;
     }
   }
 }

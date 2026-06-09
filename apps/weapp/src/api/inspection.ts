@@ -98,12 +98,12 @@ export function getDepartments() {
   });
 }
 
-// Get my inspection records (completed)
+// Get my inspection records (completed + inspecting for re-inspection)
 export function getMyRecords(params?: { page?: number; pageSize?: number }) {
   return request<{ items: unknown[]; total: number }>({
     url: '/api/qms/inspection/requests',
     method: 'GET',
-    data: { status: 'CLOSED', mine: true, ...params } as Record<
+    data: { status: 'CLOSED,INSPECTING', mine: true, ...params } as Record<
       string,
       unknown
     >,
