@@ -1,0 +1,31 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="markClip">
+      <circle cx="256" cy="205" r="132"/>
+    </clipPath>
+  </defs>
+
+  <rect width="512" height="512" rx="96" fill="#FFFFFF"/>
+
+  <g clip-path="url(#markClip)">
+    <circle cx="256" cy="205" r="132" fill="#174A9B"/>
+    <path d="M124 199C127.1 128.6 185.2 73 256 73C326.8 73 384.9 128.6 388 199H124Z" fill="#27AFC8"/>
+
+    <path d="M114 205H186C212 205 226 199 247 192H398" stroke="#FFFFFF" stroke-width="15" stroke-linecap="butt"/>
+    <path d="M112 236H187C214 236 229 225 250 211H399" stroke="#FFFFFF" stroke-width="15" stroke-linecap="butt"/>
+    <path d="M114 268H187C215 268 231 251 255 231H399" stroke="#FFFFFF" stroke-width="15" stroke-linecap="butt"/>
+
+    <path d="M217 341V286C217 255 234 230 263 211" stroke="#FFFFFF" stroke-width="15" stroke-linecap="butt"/>
+    <path d="M256 342V292C256 261 274 239 304 225" stroke="#FFFFFF" stroke-width="15" stroke-linecap="butt"/>
+    <path d="M296 339V303C296 274 314 254 344 241H399" stroke="#FFFFFF" stroke-width="15" stroke-linecap="butt"/>
+  </g>
+
+  <g font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="76" letter-spacing="0">
+    <text x="34" y="453" fill="#174A9B">T</text>
+    <text x="103" y="453" fill="#FF4B16">O</text>
+    <text x="191" y="453" fill="#174A9B">L</text>
+    <text x="269" y="453" fill="#174A9B">I</text>
+    <text x="320" y="453" fill="#174A9B">A</text>
+    <text x="400" y="453" fill="#174A9B">N</text>
+  </g>
+</svg>

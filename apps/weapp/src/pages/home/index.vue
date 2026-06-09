@@ -46,7 +46,8 @@ async function loadData() {
       getInspectionStats(),
       getMyTasks({ page: 1, pageSize: 3 }),
     ]);
-    if (statsRes.code === 0 && statsRes.data?.stats) stats.value = statsRes.data.stats;
+    if (statsRes.code === 0 && statsRes.data?.stats)
+      stats.value = statsRes.data.stats;
     if (tasksRes.code === 0) recentTasks.value = tasksRes.data.items as Task[];
   } catch {
     uni.showToast({ title: '数据加载失败', icon: 'none' });

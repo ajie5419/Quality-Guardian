@@ -1919,6 +1919,29 @@
 
 - `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
 
+### 2026-06-08 小程序 LOGO 设计稿
+
+**执行内容：**
+
+- 读取原始 `/Users/zhaoxiaojie/Desktop/最新LOGO.svg`，确认其本质为嵌入 PNG 的 SVG 容器而非可编辑矢量路径。
+- 基于原图保留蓝色主视觉、橙色点缀和环形科技感，重做适合小程序头像场景的方形主标 `design/logo/miniprogram-logo.svg`。
+- 同步补充带字标的横版资产 `design/logo/miniprogram-logo-horizontal.svg`，便于后续落地到启动页、介绍页或宣传物料。
+- 新 LOGO 重点强化缩小识别度，删除原图中小尺寸下难辨认的细碎内部字形，改为更稳定的“连接 / 信号 / 平台”抽象图形。
+
+**验证结果：**
+
+- `sed -n '1,260p' /Users/zhaoxiaojie/Desktop/最新LOGO.svg`: 确认原文件为 `image xlink:href="data:image/png;base64,..."` 嵌入位图结构
+- 通过本地图像查看确认原始图标主体由蓝色圆环、内部科技线条和橙色点缀组成
+- 生成 SVG 文件成功：`design/logo/miniprogram-logo.svg`、`design/logo/miniprogram-logo-horizontal.svg`
+- 未运行前端构建命令；当前验证基于 SVG 结构检查与视觉设计一致性检查
+
+**commit:** 本次未提交
+
+**遗留问题：**
+
+- 若要直接用于微信小程序上传，后续通常还需要导出一版 512x512 或 1024x1024 的 PNG 成品。
+- 当前横版字标使用通用英文字形占位；如果你的小程序名称已确定，建议再按正式名称替换。
+
 ### 2026-05-27 报检任务模块重构
 
 **执行内容：**

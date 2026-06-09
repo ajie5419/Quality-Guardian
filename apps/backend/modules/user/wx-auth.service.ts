@@ -50,7 +50,10 @@ interface WxSessionResponse {
 async function fetchWxOpenId(
   code: string,
 ): Promise<{ openid: string; session_key: string }> {
-  if (process.env.NODE_ENV === 'development' && code.startsWith('the code is a mock')) {
+  if (
+    process.env.NODE_ENV === 'development' &&
+    code.startsWith('the code is a mock')
+  ) {
     logger.info('dev mode: using mock openid');
     return { openid: `dev_openid_${Date.now()}`, session_key: 'mock_sk' };
   }
@@ -65,7 +68,10 @@ async function fetchWxOpenId(
 
   if (data.errcode || !data.openid || !data.session_key) {
     if (process.env.NODE_ENV === 'development') {
-      logger.warn({ errcode: data.errcode, errmsg: data.errmsg }, 'dev mode: WeChat code invalid, returning mock openid');
+      logger.warn(
+        { errcode: data.errcode, errmsg: data.errmsg },
+        'dev mode: WeChat code invalid, returning mock openid',
+      );
       return { openid: `dev_openid_${code}`, session_key: 'mock_sk' };
     }
     logger.error(
