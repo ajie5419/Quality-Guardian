@@ -90,6 +90,14 @@ export function submitInspectionRequest(data: Record<string, unknown>) {
   });
 }
 
+// Get department list (for responsible-department picker)
+export function getDepartments() {
+  return request<Array<{ id: string; name: string }>>({
+    url: '/api/auth/departments',
+    method: 'GET',
+  });
+}
+
 // Get my inspection records (completed)
 export function getMyRecords(params?: { page?: number; pageSize?: number }) {
   return request<{ items: unknown[]; total: number }>({
