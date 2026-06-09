@@ -18,8 +18,8 @@
     "vue": "catalog:"
   },
   "devDependencies": {
-    "@dcloudio/vite-plugin-uni": "3.0.0-alpha-5010220260604001",
     "@dcloudio/types": "^3.4.14",
+    "@dcloudio/vite-plugin-uni": "3.0.0-alpha-5010220260604001",
     "@uni-helper/uni-app-types": "^1.0.0-alpha.5",
     "typescript": "catalog:",
     "vite": "catalog:",

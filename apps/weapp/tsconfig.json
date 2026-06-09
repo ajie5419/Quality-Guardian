@@ -1,18 +1,18 @@
 {
   "compilerOptions": {
     "target": "ESNext",
+    "jsx": "preserve",
+    "lib": ["ESNext", "DOM"],
+    "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "strict": true,
-    "jsx": "preserve",
-    "resolveJsonModule": true,
-    "esModuleInterop": true,
-    "lib": ["ESNext", "DOM"],
-    "types": ["@dcloudio/types", "@uni-helper/uni-app-types"],
     "paths": {
       "@/*": ["./src/*"]
     },
-    "baseUrl": "."
+    "resolveJsonModule": true,
+    "types": ["@dcloudio/types", "@uni-helper/uni-app-types"],
+    "strict": true,
+    "esModuleInterop": true
   },
   "include": ["src/**/*.ts", "src/**/*.vue", "src/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
