@@ -7,14 +7,14 @@ import { Background } from '@vue-flow/background';
 import { Controls } from '@vue-flow/controls';
 import { useVueFlow, VueFlow } from '@vue-flow/core';
 
-import '@vue-flow/core/dist/style.css';
-import '@vue-flow/core/dist/theme-default.css';
-import '@vue-flow/controls/dist/style.css';
-
 import ArchEdge from './ArchEdge.vue';
 import { edges, nodes } from './data';
 import GroupHeader from './GroupHeader.vue';
 import ModuleNode from './ModuleNode.vue';
+
+import '@vue-flow/core/dist/style.css';
+import '@vue-flow/core/dist/theme-default.css';
+import '@vue-flow/controls/dist/style.css';
 
 const FLOW_ID = 'qg-architecture';
 
@@ -31,7 +31,7 @@ const initialPositions = new Map(
 
 const visibleEdges = computed(() =>
   edges.filter((edge) => {
-    const kind = (edge.data as { kind?: string } | undefined)?.kind;
+    const kind = (edge.data as undefined | { kind?: string })?.kind;
     if (kind === 'dep') return showDeps.value;
     if (kind === 'flow' || kind === 'infra') return showFlow.value;
     return true;
@@ -152,27 +152,43 @@ const stats = {
 </template>
 
 <style>
+@keyframes dot-flow {
+  from {
+    background-position: 0% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
 .arch-page {
   display: flex;
   flex-direction: column;
   width: 100%;
   height: calc(100vh - 110px);
   min-height: 600px;
-  background: #0b1020;
-  color: #e5e7eb;
-  border-radius: 8px;
   overflow: hidden;
+  color: #e5e7eb;
+  background: #0b1020;
+  border-radius: 8px;
 }
 
 .topbar {
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 14px 22px;
+  background: rgb(8 12 24 / 85%);
   border-bottom: 1px solid #1f2937;
-  background: rgba(8, 12, 24, 0.85);
   backdrop-filter: blur(8px);
-  z-index: 5;
 }
 
 .brand-title {
@@ -183,21 +199,21 @@ const stats = {
 }
 
 .brand-sub {
+  margin-top: 2px;
   font-size: 12px;
   color: #6b7280;
-  margin-top: 2px;
 }
 
 .legend {
   display: flex;
-  align-items: center;
   gap: 18px;
+  align-items: center;
 }
 
 .toggle {
   display: inline-flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
   font-size: 12px;
   color: #d1d5db;
   cursor: pointer;
@@ -209,10 +225,10 @@ const stats = {
 }
 
 .dot {
+  display: inline-block;
   width: 18px;
   height: 3px;
   border-radius: 2px;
-  display: inline-block;
 }
 
 .dot-flow {
@@ -229,43 +245,34 @@ const stats = {
   animation: dot-flow 1.6s linear infinite;
 }
 
-@keyframes dot-flow {
-  from {
-    background-position: 0% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
 .reset-btn {
+  padding: 3px 10px;
   font-size: 12px;
   color: #e5e7eb;
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  border-radius: 4px;
-  padding: 3px 10px;
   cursor: pointer;
+  background: rgb(56 189 248 / 12%);
+  border: 1px solid rgb(56 189 248 / 40%);
+  border-radius: 4px;
   transition: background 0.15s ease;
 }
 
 .reset-btn:hover {
-  background: rgba(56, 189, 248, 0.22);
+  background: rgb(56 189 248 / 22%);
 }
 
 .reset-btn.reset-all {
   color: #fde68a;
-  background: rgba(251, 191, 36, 0.12);
-  border-color: rgba(251, 191, 36, 0.45);
+  background: rgb(251 191 36 / 12%);
+  border-color: rgb(251 191 36 / 45%);
 }
 
 .reset-btn.reset-all:hover {
-  background: rgba(251, 191, 36, 0.22);
+  background: rgb(251 191 36 / 22%);
 }
 
 .canvas {
-  flex: 1;
   position: relative;
+  flex: 1;
 }
 
 .arch-page .vue-flow__edge-path {
@@ -273,56 +280,57 @@ const stats = {
 }
 
 .arch-page .arch-edge.kind-flow {
+  filter: drop-shadow(0 0 4px rgb(56 189 248 / 40%));
+  fill: none;
   stroke: #38bdf8;
   stroke-width: 1.6px;
-  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.4));
-  fill: none;
 }
 
 .arch-page .arch-edge.kind-infra {
+  opacity: 0.85;
+  fill: none;
   stroke: #f97316;
   stroke-width: 1.4px;
   stroke-dasharray: 4 3;
-  opacity: 0.85;
-  fill: none;
 }
 
 .arch-page .arch-edge.kind-dep {
-  stroke: #475569;
-  stroke-width: 1px;
   opacity: 0.6;
   fill: none;
+  stroke: #475569;
+  stroke-width: 1px;
 }
 
 .arch-page .arch-edge.hl-dim {
-  stroke: #1f2937 !important;
   opacity: 0.18 !important;
+  filter: none !important;
+  stroke: #1f2937 !important;
   stroke-width: 1px !important;
   stroke-dasharray: none !important;
-  filter: none !important;
 }
 
 .arch-page .arch-edge.hl-out {
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 6px rgb(56 189 248 / 70%)) !important;
   stroke: #38bdf8 !important;
   stroke-width: 2.4px !important;
   stroke-dasharray: none !important;
-  opacity: 1 !important;
-  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.7)) !important;
 }
 
 .arch-page .arch-edge.hl-in {
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 6px rgb(244 114 182 / 65%)) !important;
   stroke: #f472b6 !important;
   stroke-width: 2.4px !important;
   stroke-dasharray: none !important;
-  opacity: 1 !important;
-  filter: drop-shadow(0 0 6px rgba(244, 114, 182, 0.65)) !important;
 }
 
 .arch-page .arch-edge-label {
-  fill: #94a3b8;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 10px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   pointer-events: none;
+  fill: #94a3b8;
 }
 
 .arch-page .arch-edge-label.hl-dim {
@@ -331,8 +339,8 @@ const stats = {
 
 .arch-page .arch-edge-label.hl-out,
 .arch-page .arch-edge-label.hl-in {
-  fill: #f9fafb;
   font-weight: 600;
+  fill: #f9fafb;
 }
 
 .arch-page .vue-flow__edge-textbg {
@@ -355,23 +363,17 @@ const stats = {
   stroke-dasharray: 4 3;
 }
 
-@keyframes dash-flow {
-  to {
-    stroke-dashoffset: -20;
-  }
-}
-
 .arch-page .vue-flow__controls {
-  background: rgba(15, 23, 42, 0.9);
+  background: rgb(15 23 42 / 90%);
   border: 1px solid #1f2937;
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 40%);
 }
 
 .arch-page .vue-flow__controls-button {
+  color: #d1d5db;
   background: transparent;
   border-bottom: 1px solid #1f2937;
-  color: #d1d5db;
   fill: #d1d5db;
 }
 
@@ -380,7 +382,8 @@ const stats = {
 }
 
 .arch-page .vue-flow__node {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .arch-page .vue-flow__minimap {

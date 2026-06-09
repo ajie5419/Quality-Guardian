@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { EdgeProps } from '@vue-flow/core';
+
 import type { Ref } from 'vue';
 
 import { computed, inject } from 'vue';
@@ -34,8 +35,7 @@ const path = computed(() => {
 const cssClass = computed(() => {
   const cls: string[] = ['arch-edge'];
   if (props.data?.kind) cls.push(`kind-${props.data.kind}`);
-  if (highlightState.value !== 'none')
-    cls.push(`hl-${highlightState.value}`);
+  if (highlightState.value !== 'none') cls.push(`hl-${highlightState.value}`);
   if (animated?.value && highlightState.value !== 'dim') {
     cls.push(highlightState.value === 'none' ? 'flow-anim' : 'flow-anim-fast');
   }

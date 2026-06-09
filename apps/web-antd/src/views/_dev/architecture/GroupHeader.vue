@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { NodeProps } from '@vue-flow/core';
+
 import type { ModuleNodeData } from './data';
 
 defineProps<NodeProps<ModuleNodeData>>();
@@ -29,25 +30,29 @@ defineProps<NodeProps<ModuleNodeData>>();
 }
 
 .subtitle {
+  margin-top: 1px;
   font-size: 9px;
   color: #64748b;
-  letter-spacing: 1.4px;
   text-transform: uppercase;
-  margin-top: 1px;
+  letter-spacing: 1.4px;
 }
 
 .is-inspection-domain .title {
   color: #34d399;
 }
+
 .is-quality-tracking .title {
   color: #fbbf24;
 }
+
 .is-operations .title {
   color: #fb7185;
 }
+
 .is-visualization .title {
   color: #c084fc;
 }
+
 .is-system-base .title {
   color: #60a5fa;
 }

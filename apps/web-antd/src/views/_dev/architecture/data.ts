@@ -3,13 +3,13 @@ import type { Edge, Node } from '@vue-flow/core';
 export type ModuleCategory =
   | 'client'
   | 'gateway'
-  | 'middleware'
+  | 'infrastructure'
   | 'inspection-domain'
-  | 'quality-tracking'
+  | 'middleware'
   | 'operations'
-  | 'visualization'
+  | 'quality-tracking'
   | 'system-base'
-  | 'infrastructure';
+  | 'visualization';
 
 export interface ModuleNodeData extends Record<string, unknown> {
   title: string;
