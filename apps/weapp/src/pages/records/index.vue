@@ -57,7 +57,7 @@ function loadMore() {
 }
 
 function goDetail(id: string) {
-  uni.navigateTo({ url: `/pages/tasks/detail?id=${id}` });
+  uni.navigateTo({ url: `/pages/inspect/result?id=${id}` });
 }
 
 function formatDate(dateStr: string) {
