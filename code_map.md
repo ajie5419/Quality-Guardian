@@ -25,7 +25,7 @@
 - **system/** — 系统配置与基础设置
 - **system-log/** — 系统操作日志记录与审计
 - **task-dispatch/** — ITP 任务派发与流转：分配、状态推进、归档联动
-- **user/** — 用户账号、认证（登录/刷新）、个人偏好
+- **user/** — 用户账号、认证（登录/刷新/微信小程序登录绑定）、个人偏好
 - **vehicle-commissioning/** — 车辆调试验收管理（含审批流）
 - **welder/** — 焊工资质台账与评分
 - **work-order/** — 生产工单：创建、状态流转、数据权限过滤
@@ -98,6 +98,19 @@
 ## 共享包
 
 - **`packages/qgs-shared/`** — 前后端同构共享：业务 DTO 类型、枚举、状态机常量、参数校验工具与领域模型
+
+## 微信小程序（`apps/weapp/`）
+
+基于 uni-app (Vue 3) 的微信小程序，面向一线质检人员。
+
+- **pages/login/** — 微信登录 + 账号绑定
+- **pages/home/** — 首页统计卡片与快捷入口
+- **pages/request/** — 报检申请提交
+- **pages/tasks/** — 检验任务列表与详情（含派单）
+- **pages/inspect/** — 检验结果录入（含拍照上传）
+- **pages/records/** — 我的检验记录
+
+后端 API 复用现有端点，新增微信认证端点（`api/auth/wx-login`、`wx-bind`、`wx-refresh`）。详细文档见 `docs/weapp-development.md`。
 
 ## 维护规则
 
