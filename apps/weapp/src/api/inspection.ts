@@ -90,6 +90,49 @@ export function submitInspectionRequest(data: Record<string, unknown>) {
   });
 }
 
+// Search work orders by keyword (public)
+export function searchWorkOrders(keyword: string) {
+  return request<{
+    items: Array<{
+      projectName: string;
+      quantity: number;
+      workOrderNumber: string;
+    }>;
+    total: number;
+  }>({
+    url: '/api/qms/public/inspection/requests/work-orders',
+    method: 'GET',
+    data: { keyword, page: 1, pageSize: 20 },
+  });
+}
+
+// Get processes for a given work order (public)
+export function getProcesses(workOrderNumber: string) {
+  return request<Array<{ processName: string }>>({
+    url: '/api/qms/public/inspection/requests/processes',
+    method: 'GET',
+    data: { workOrderNumber },
+  });
+}
+
+// Get BOM parts for a given work order (public)
+export function getBomParts(workOrderNumber: string) {
+  return request<Array<{ id: string; partName: string; partNumber: string }>>({
+    url: '/api/qms/public/inspection/requests/bom-parts',
+    method: 'GET',
+    data: { workOrderNumber },
+  });
+}
+
+// Get team list (public)
+export function getTeams(keyword?: string) {
+  return request<Array<{ group: string; label: string; value: string }>>({
+    url: '/api/qms/public/inspection/requests/teams',
+    method: 'GET',
+    data: keyword ? { keyword } : {},
+  });
+}
+
 // Get department list (for responsible-department picker)
 export function getDepartments() {
   return request<Array<{ id: string; name: string }>>({

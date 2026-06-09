@@ -1,85 +1,240 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 
-import { submitInspectionRequest } from '@/api/inspection';
+import {
+  getBomParts,
+  getProcesses,
+  getTeams,
+  searchWorkOrders,
+  submitInspectionRequest,
+} from '@/api/inspection';
+import { uploadFile } from '@/api/request';
 import { useUserStore } from '@/stores/user';
 import { onLoad } from '@dcloudio/uni-app';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5320';
+interface WorkOrderItem {
+  workOrderNumber: string;
+  projectName: string;
+  quantity: number;
+}
 
-type Priority = 'HIGH' | 'NORMAL' | 'URGENT';
+interface BomPartItem {
+  id: string;
+  partName: string;
+  partNumber: string;
+}
+
+interface TeamItem {
+  group: string;
+  label: string;
+  value: string;
+}
+
+interface AttachmentItem {
+  url: string;
+  name: string;
+}
 
 interface FormState {
   workOrderNumber: string;
   processName: string;
+  componentName: string;
   partName: string;
-  quantity: string;
+  quantity: null | number;
   team: string;
   reporter: string;
-  priority: Priority;
-  description: string;
-  attachments: string[];
+  selfCheckResult: string;
+  mutualCheckResult: string;
+  requestInfo: string;
+  attachments: AttachmentItem[];
 }
 
-interface FieldError {
-  workOrderNumber: boolean;
-  processName: boolean;
-  partName: boolean;
-  reporter: boolean;
-}
+const CHECK_RESULT_OPTIONS = ['PASS', 'FAIL', 'NA'];
+const OPTIONAL_COMPONENT_PROCESSES = new Set(['装配', '进货检验']);
 
 const userStore = useUserStore();
 
 const form = reactive<FormState>({
   workOrderNumber: '',
   processName: '',
+  componentName: '',
   partName: '',
-  quantity: '',
+  quantity: null,
   team: '',
   reporter: '',
-  priority: 'NORMAL',
-  description: '',
+  selfCheckResult: '',
+  mutualCheckResult: '',
+  requestInfo: '',
   attachments: [],
 });
 
-const errors = reactive<FieldError>({
+// Error flags
+const errors = reactive({
   workOrderNumber: false,
   processName: false,
-  partName: false,
+  componentName: false,
   reporter: false,
+  team: false,
+  attachments: false,
 });
+
+// Search state
+const workOrderKeyword = ref('');
+const workOrderResults = ref<WorkOrderItem[]>([]);
+const showWorkOrderDropdown = ref(false);
+const searchingWorkOrder = ref(false);
+let searchTimer: null | ReturnType<typeof setTimeout> = null;
+
+// Cascade data
+const processList = ref<string[]>([]);
+const bomPartList = ref<BomPartItem[]>([]);
+const teamList = ref<TeamItem[]>([]);
+
+// Picker indices
+const processIndex = ref(-1);
+const bomPartIndex = ref(-1);
+const teamIndex = ref(-1);
+const selfCheckIndex = ref(-1);
+const mutualCheckIndex = ref(-1);
+
+// Derived picker range labels
+const bomPartLabels = computed(() =>
+  bomPartList.value.map((p) => `${p.partName} (${p.partNumber})`),
+);
+const teamLabels = computed(() => teamList.value.map((t) => t.label));
+
+// Whether componentName is required
+const componentRequired = computed(
+  () => !OPTIONAL_COMPONENT_PROCESSES.has(form.processName),
+);
 
 const submitting = ref(false);
 const uploadingPhoto = ref(false);
 
-const priorityOptions = ['普通', '高', '紧急'];
-const priorityValues: Priority[] = ['NORMAL', 'HIGH', 'URGENT'];
-const priorityIndex = ref(0);
-
-onLoad(() => {
+onLoad(async () => {
   userStore.checkAuth();
   if (userStore.userInfo?.realName) {
     form.reporter = userStore.userInfo.realName;
   }
+  await loadTeams();
 });
 
-function onPriorityChange(e: { detail: { value: string } }) {
-  const idx = Number(e.detail.value);
-  priorityIndex.value = idx;
-  form.priority = priorityValues[idx];
+async function loadTeams() {
+  const res = await getTeams();
+  if (res.code === 0 && Array.isArray(res.data)) {
+    teamList.value = res.data;
+  }
 }
 
-function validate(): boolean {
-  errors.workOrderNumber = !form.workOrderNumber.trim();
-  errors.processName = !form.processName.trim();
-  errors.partName = !form.partName.trim();
-  errors.reporter = !form.reporter.trim();
-  return (
-    !errors.workOrderNumber &&
-    !errors.processName &&
-    !errors.partName &&
-    !errors.reporter
-  );
+function onWorkOrderInput(e: { detail: { value: string } }) {
+  const keyword = e.detail.value;
+  workOrderKeyword.value = keyword;
+  errors.workOrderNumber = false;
+
+  if (!keyword.trim()) {
+    workOrderResults.value = [];
+    showWorkOrderDropdown.value = false;
+    return;
+  }
+
+  if (searchTimer !== null) {
+    clearTimeout(searchTimer);
+  }
+  searchTimer = setTimeout(() => {
+    doSearchWorkOrders(keyword.trim());
+  }, 500);
+}
+
+async function doSearchWorkOrders(keyword: string) {
+  searchingWorkOrder.value = true;
+  try {
+    const res = await searchWorkOrders(keyword);
+    if (res.code === 0 && res.data?.items) {
+      workOrderResults.value = res.data.items;
+      showWorkOrderDropdown.value = res.data.items.length > 0;
+    }
+  } catch {
+    workOrderResults.value = [];
+  } finally {
+    searchingWorkOrder.value = false;
+  }
+}
+
+async function selectWorkOrder(item: WorkOrderItem) {
+  form.workOrderNumber = item.workOrderNumber;
+  workOrderKeyword.value = item.workOrderNumber;
+  showWorkOrderDropdown.value = false;
+  workOrderResults.value = [];
+  errors.workOrderNumber = false;
+
+  // Pre-fill quantity
+  form.quantity = item.quantity;
+
+  // Clear downstream selections
+  form.processName = '';
+  form.componentName = '';
+  form.partName = '';
+  processIndex.value = -1;
+  bomPartIndex.value = -1;
+  processList.value = [];
+  bomPartList.value = [];
+
+  // Load cascade data
+  const [procRes, partsRes] = await Promise.all([
+    getProcesses(item.workOrderNumber),
+    getBomParts(item.workOrderNumber),
+  ]);
+  if (procRes.code === 0 && Array.isArray(procRes.data)) {
+    processList.value = procRes.data.map((p) => p.processName);
+  }
+  if (partsRes.code === 0 && Array.isArray(partsRes.data)) {
+    bomPartList.value = partsRes.data;
+  }
+}
+
+function onProcessChange(e: { detail: { value: string } }) {
+  const idx = Number(e.detail.value);
+  processIndex.value = idx;
+  form.processName = processList.value[idx] ?? '';
+  errors.processName = false;
+  // Reset component/part when process changes
+  form.componentName = '';
+  form.partName = '';
+  bomPartIndex.value = -1;
+}
+
+function onBomPartChange(e: { detail: { value: string } }) {
+  const idx = Number(e.detail.value);
+  bomPartIndex.value = idx;
+  const part = bomPartList.value[idx];
+  if (part) {
+    form.componentName = part.partName;
+    form.partName = part.partName;
+    errors.componentName = false;
+  }
+}
+
+function onTeamChange(e: { detail: { value: string } }) {
+  const idx = Number(e.detail.value);
+  teamIndex.value = idx;
+  form.team = teamList.value[idx]?.value ?? '';
+  errors.team = false;
+}
+
+function onSelfCheckChange(e: { detail: { value: string } }) {
+  const idx = Number(e.detail.value);
+  selfCheckIndex.value = idx;
+  form.selfCheckResult = CHECK_RESULT_OPTIONS[idx] ?? '';
+}
+
+function onMutualCheckChange(e: { detail: { value: string } }) {
+  const idx = Number(e.detail.value);
+  mutualCheckIndex.value = idx;
+  form.mutualCheckResult = CHECK_RESULT_OPTIONS[idx] ?? '';
+}
+
+function dismissDropdown() {
+  showWorkOrderDropdown.value = false;
 }
 
 async function handleAddPhoto() {
@@ -104,27 +259,11 @@ async function handleAddPhoto() {
     uploadingPhoto.value = true;
     uni.showLoading({ title: '上传中...' });
     for (const path of res.tempFilePaths) {
-      const uploadRes =
-        await new Promise<UniApp.UploadFileSuccessCallbackResult>(
-          (resolve, reject) => {
-            uni.uploadFile({
-              url: `${BASE_URL}/api/uploads`,
-              filePath: path,
-              name: 'file',
-              header: {
-                Authorization: `Bearer ${uni.getStorageSync('accessToken') || ''}`,
-              },
-              success: resolve,
-              fail: reject,
-            });
-          },
-        );
-      const body = JSON.parse(uploadRes.data) as {
-        code: number;
-        data: { url: string };
-      };
-      if (body.code === 0 && body.data?.url) {
-        form.attachments.push(body.data.url);
+      const uploadRes = await uploadFile(path);
+      if (uploadRes.code === 0 && uploadRes.data?.url) {
+        const fileName = path.split('/').pop() ?? 'photo';
+        form.attachments.push({ url: uploadRes.data.url, name: fileName });
+        errors.attachments = false;
       }
     }
   } catch {
@@ -139,6 +278,23 @@ function handleRemovePhoto(index: number) {
   form.attachments.splice(index, 1);
 }
 
+function validate(): boolean {
+  errors.workOrderNumber = !form.workOrderNumber;
+  errors.processName = !form.processName;
+  errors.componentName = componentRequired.value && !form.componentName;
+  errors.reporter = !form.reporter.trim();
+  errors.team = !form.team;
+  errors.attachments = form.attachments.length === 0;
+  return (
+    !errors.workOrderNumber &&
+    !errors.processName &&
+    !errors.componentName &&
+    !errors.reporter &&
+    !errors.team &&
+    !errors.attachments
+  );
+}
+
 async function handleSubmit() {
   if (!validate()) {
     uni.showToast({ title: '请填写必填项', icon: 'none' });
@@ -149,16 +305,19 @@ async function handleSubmit() {
   uni.showLoading({ title: '提交中...' });
   try {
     const payload: Record<string, unknown> = {
-      workOrderNumber: form.workOrderNumber.trim(),
-      processName: form.processName.trim(),
-      partName: form.partName.trim(),
+      workOrderNumber: form.workOrderNumber,
+      processName: form.processName,
       reporter: form.reporter.trim(),
-      priority: form.priority,
+      team: form.team,
+      attachments: form.attachments,
     };
-    if (form.quantity.trim()) payload.quantity = Number(form.quantity);
-    if (form.team.trim()) payload.team = form.team.trim();
-    if (form.description.trim()) payload.description = form.description.trim();
-    if (form.attachments.length > 0) payload.attachments = form.attachments;
+    if (form.quantity !== null) payload.quantity = form.quantity;
+    if (form.componentName) payload.componentName = form.componentName;
+    if (form.partName) payload.partName = form.partName;
+    if (form.selfCheckResult) payload.selfCheckResult = form.selfCheckResult;
+    if (form.mutualCheckResult)
+      payload.mutualCheckResult = form.mutualCheckResult;
+    if (form.requestInfo.trim()) payload.requestInfo = form.requestInfo.trim();
 
     const res = await submitInspectionRequest(payload);
     if (res.code !== 0) throw new Error(res.message || '提交失败');
@@ -177,22 +336,41 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <view class="page">
+  <view class="page" @tap="dismissDropdown">
     <scroll-view class="scroll-body" scroll-y>
       <view class="card">
-        <!-- 工单号 -->
+        <!-- 工单号 — searchable -->
         <view class="form-item" :class="{ error: errors.workOrderNumber }">
           <view class="label-wrap">
             <text class="required-star">*</text>
             <text class="label">工单号</text>
           </view>
-          <input
-            v-model="form.workOrderNumber"
-            class="input"
-            placeholder="请输入工单号"
-            placeholder-class="input-placeholder"
-            @input="errors.workOrderNumber = false"
-          />
+          <view class="search-wrap">
+            <input
+              class="input"
+              :value="workOrderKeyword"
+              placeholder="搜索工单号"
+              placeholder-class="input-placeholder"
+              @input="onWorkOrderInput"
+              @tap.stop
+            />
+            <view v-if="searchingWorkOrder" class="search-loading">
+              <text class="search-loading-text">搜索中...</text>
+            </view>
+            <view v-if="showWorkOrderDropdown" class="dropdown" @tap.stop>
+              <view
+                v-for="item in workOrderResults"
+                :key="item.workOrderNumber"
+                class="dropdown-item"
+                @tap="selectWorkOrder(item)"
+              >
+                <text class="dropdown-item-title">{{
+                  item.workOrderNumber
+                }}</text>
+                <text class="dropdown-item-sub">{{ item.projectName }}</text>
+              </view>
+            </view>
+          </view>
         </view>
 
         <!-- 工序 -->
@@ -201,28 +379,59 @@ async function handleSubmit() {
             <text class="required-star">*</text>
             <text class="label">工序</text>
           </view>
-          <input
-            v-model="form.processName"
-            class="input"
-            placeholder="请输入工序名称"
-            placeholder-class="input-placeholder"
-            @input="errors.processName = false"
-          />
+          <picker
+            class="picker"
+            mode="selector"
+            :range="processList"
+            :value="processIndex"
+            :disabled="processList.length === 0"
+            @change="onProcessChange"
+          >
+            <view class="picker-inner">
+              <text
+                class="picker-text"
+                :class="{ 'picker-placeholder': !form.processName }"
+              >
+                {{
+                  form.processName ||
+                  (processList.length === 0 ? '请先选择工单号' : '请选择工序')
+                }}
+              </text>
+              <text class="picker-arrow">›</text>
+            </view>
+          </picker>
         </view>
 
-        <!-- 零件名称 -->
-        <view class="form-item" :class="{ error: errors.partName }">
+        <!-- 部件名称 -->
+        <view class="form-item" :class="{ error: errors.componentName }">
           <view class="label-wrap">
-            <text class="required-star">*</text>
-            <text class="label">零件名称</text>
+            <text v-if="componentRequired" class="required-star">*</text>
+            <text v-else class="label-spacer" />
+            <text class="label">部件名称</text>
           </view>
-          <input
-            v-model="form.partName"
-            class="input"
-            placeholder="请输入零件名称"
-            placeholder-class="input-placeholder"
-            @input="errors.partName = false"
-          />
+          <picker
+            class="picker"
+            mode="selector"
+            :range="bomPartLabels"
+            :value="bomPartIndex"
+            :disabled="bomPartList.length === 0"
+            @change="onBomPartChange"
+          >
+            <view class="picker-inner">
+              <text
+                class="picker-text"
+                :class="{ 'picker-placeholder': !form.componentName }"
+              >
+                {{
+                  form.componentName ||
+                  (bomPartList.length === 0
+                    ? '请先选择工单号'
+                    : `请选择部件${componentRequired ? '' : '（选填）'}`)
+                }}
+              </text>
+              <text class="picker-arrow">›</text>
+            </view>
+          </picker>
         </view>
 
         <!-- 数量 -->
@@ -232,12 +441,46 @@ async function handleSubmit() {
             <text class="label">数量</text>
           </view>
           <input
-            v-model="form.quantity"
             class="input"
             type="digit"
-            placeholder="请输入数量（选填）"
+            :value="form.quantity !== null ? String(form.quantity) : ''"
+            placeholder="请输入数量"
             placeholder-class="input-placeholder"
+            @input="
+              (e: { detail: { value: string } }) => {
+                form.quantity = e.detail.value ? Number(e.detail.value) : null;
+              }
+            "
           />
+        </view>
+
+        <!-- 班组 -->
+        <view class="form-item" :class="{ error: errors.team }">
+          <view class="label-wrap">
+            <text class="required-star">*</text>
+            <text class="label">班组</text>
+          </view>
+          <picker
+            class="picker"
+            mode="selector"
+            :range="teamLabels"
+            :value="teamIndex"
+            :disabled="teamList.length === 0"
+            @change="onTeamChange"
+          >
+            <view class="picker-inner">
+              <text
+                class="picker-text"
+                :class="{ 'picker-placeholder': !form.team }"
+              >
+                {{
+                  teamList.find((t) => t.value === form.team)?.label ||
+                  '请选择班组'
+                }}
+              </text>
+              <text class="picker-arrow">›</text>
+            </view>
+          </picker>
         </view>
 
         <!-- 报检人 -->
@@ -248,78 +491,79 @@ async function handleSubmit() {
           </view>
           <input
             v-model="form.reporter"
-            class="input input-readonly"
-            placeholder="报检人"
-            placeholder-class="input-placeholder"
-            :disabled="true"
-          />
-        </view>
-
-        <!-- 班组 -->
-        <view class="form-item">
-          <view class="label-wrap">
-            <text class="label-spacer" />
-            <text class="label">班组</text>
-          </view>
-          <input
-            v-model="form.team"
             class="input"
-            placeholder="请输入班组（选填）"
+            placeholder="请输入报检人"
             placeholder-class="input-placeholder"
+            @input="errors.reporter = false"
           />
         </view>
 
-        <!-- 优先级 -->
+        <!-- 自检结果 -->
         <view class="form-item">
           <view class="label-wrap">
             <text class="label-spacer" />
-            <text class="label">优先级</text>
+            <text class="label">自检结果</text>
           </view>
           <picker
             class="picker"
             mode="selector"
-            :range="priorityOptions"
-            :value="priorityIndex"
-            @change="onPriorityChange"
+            :range="CHECK_RESULT_OPTIONS"
+            :value="selfCheckIndex"
+            @change="onSelfCheckChange"
           >
             <view class="picker-inner">
-              <text class="picker-text">{{
-                priorityOptions[priorityIndex]
-              }}</text>
+              <text
+                class="picker-text"
+                :class="{ 'picker-placeholder': !form.selfCheckResult }"
+              >
+                {{ form.selfCheckResult || '请选择（选填）' }}
+              </text>
               <text class="picker-arrow">›</text>
             </view>
           </picker>
         </view>
 
-        <!-- 描述 -->
-        <view class="form-item form-item--textarea">
+        <!-- 互检结果 -->
+        <view class="form-item">
           <view class="label-wrap">
             <text class="label-spacer" />
-            <text class="label">描述</text>
+            <text class="label">互检结果</text>
           </view>
-          <textarea
-            v-model="form.description"
-            class="textarea"
-            placeholder="请输入描述（选填）"
-            placeholder-class="input-placeholder"
-            :maxlength="500"
-            auto-height
-          ></textarea>
+          <picker
+            class="picker"
+            mode="selector"
+            :range="CHECK_RESULT_OPTIONS"
+            :value="mutualCheckIndex"
+            @change="onMutualCheckChange"
+          >
+            <view class="picker-inner">
+              <text
+                class="picker-text"
+                :class="{ 'picker-placeholder': !form.mutualCheckResult }"
+              >
+                {{ form.mutualCheckResult || '请选择（选填）' }}
+              </text>
+              <text class="picker-arrow">›</text>
+            </view>
+          </picker>
         </view>
 
         <!-- 附件 -->
-        <view class="form-item form-item--attach">
-          <view class="label-wrap">
-            <text class="label-spacer" />
-            <text class="label">附件</text>
+        <view
+          class="form-item form-item--attach"
+          :class="{ error: errors.attachments }"
+        >
+          <view class="label-wrap label-wrap--top">
+            <text class="required-star">*</text>
+            <text class="label">自检记录</text>
           </view>
           <view class="photo-grid">
             <view
-              v-for="(url, idx) in form.attachments"
-              :key="url"
+              v-for="(att, idx) in form.attachments"
+              :key="att.url"
               class="photo-item"
             >
-              <image class="photo-thumb" :src="url" mode="aspectFill" />
+              <image class="photo-thumb" :src="att.url" mode="aspectFill" />
               <view class="photo-remove" @tap="handleRemovePhoto(idx)">
                 <text class="photo-remove-icon">×</text>
               </view>
@@ -330,9 +574,28 @@ async function handleSubmit() {
               @tap="handleAddPhoto"
             >
               <text class="photo-add-icon">+</text>
-              <text class="photo-add-text">添加图片</text>
+              <text class="photo-add-text">添加照片</text>
             </view>
           </view>
+          <text v-if="errors.attachments" class="field-error-tip"
+            >请至少上传1张图片</text
+          >
+        </view>
+
+        <!-- 补充说明 -->
+        <view class="form-item form-item--textarea">
+          <view class="label-wrap label-wrap--top">
+            <text class="label-spacer" />
+            <text class="label">补充说明</text>
+          </view>
+          <textarea
+            v-model="form.requestInfo"
+            class="textarea"
+            placeholder="请输入补充说明（选填）"
+            placeholder-class="input-placeholder"
+            :maxlength="500"
+            auto-height
+          ></textarea>
         </view>
       </view>
     </scroll-view>
@@ -366,12 +629,14 @@ async function handleSubmit() {
 
 .card {
   margin: 24rpx;
-  overflow: hidden;
+  overflow: visible;
   background: #fff;
   border-radius: 16rpx;
 }
 
+/* ---- Form items ---- */
 .form-item {
+  position: relative;
   display: flex;
   align-items: center;
   min-height: 96rpx;
@@ -394,6 +659,7 @@ async function handleSubmit() {
   }
 
   &--attach {
+    flex-direction: column;
     align-items: flex-start;
     padding-top: 24rpx;
     padding-bottom: 24rpx;
@@ -405,6 +671,11 @@ async function handleSubmit() {
   flex-shrink: 0;
   align-items: center;
   width: 160rpx;
+
+  &--top {
+    align-items: flex-start;
+    padding-top: 4rpx;
+  }
 }
 
 .required-star {
@@ -423,6 +694,7 @@ async function handleSubmit() {
   color: $text-color;
 }
 
+/* ---- Input ---- */
 .input {
   flex: 1;
   height: 64rpx;
@@ -432,16 +704,66 @@ async function handleSubmit() {
   background: transparent;
   border: 2rpx solid transparent;
   border-radius: 8rpx;
-
-  &-readonly {
-    color: $text-color-secondary;
-  }
 }
 
 .input-placeholder {
   color: #bfbfbf;
 }
 
+/* ---- Work order search ---- */
+.search-wrap {
+  position: relative;
+  flex: 1;
+}
+
+.search-loading {
+  padding: 8rpx 8rpx 0;
+}
+
+.search-loading-text {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.dropdown {
+  position: absolute;
+  top: 72rpx;
+  left: 0;
+  z-index: 100;
+  width: 100%;
+  max-height: 400rpx;
+  overflow-y: auto;
+  background: #fff;
+  border: 1rpx solid $border-color;
+  border-radius: 8rpx;
+  box-shadow: 0 8rpx 24rpx rgb(0 0 0 / 10%);
+}
+
+.dropdown-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 20rpx 24rpx;
+  border-bottom: 1rpx solid $border-color;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.dropdown-item-title {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: $text-color;
+}
+
+.dropdown-item-sub {
+  margin-top: 4rpx;
+  font-size: 24rpx;
+  color: $text-color-secondary;
+}
+
+/* ---- Picker ---- */
 .picker {
   flex: 1;
   border: 2rpx solid transparent;
@@ -461,12 +783,17 @@ async function handleSubmit() {
   color: $text-color;
 }
 
+.picker-placeholder {
+  color: #bfbfbf;
+}
+
 .picker-arrow {
   font-size: 36rpx;
   line-height: 1;
   color: #bfbfbf;
 }
 
+/* ---- Textarea ---- */
 .textarea {
   flex: 1;
   min-height: 120rpx;
@@ -476,11 +803,14 @@ async function handleSubmit() {
   color: $text-color;
 }
 
+/* ---- Photo grid ---- */
 .photo-grid {
   display: flex;
   flex: 1;
   flex-wrap: wrap;
   gap: 16rpx;
+  width: 100%;
+  margin-top: 4rpx;
 }
 
 .photo-item {
@@ -538,6 +868,13 @@ async function handleSubmit() {
   color: #bfbfbf;
 }
 
+.field-error-tip {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: $error-color;
+}
+
+/* ---- Footer ---- */
 .footer {
   position: fixed;
   right: 0;
