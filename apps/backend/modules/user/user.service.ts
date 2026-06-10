@@ -59,7 +59,7 @@ export const UserService = {
 
     const where = { isDeleted: false };
 
-    const [total, users] = await Promise.all([
+    const [total, users, workload] = await Promise.all([
       prisma.users.count({ where }),
       prisma.users.findMany({
         where,
@@ -70,7 +70,20 @@ export const UserService = {
           roles: true,
         },
       }),
+      prisma.qms_inspection_requests.groupBy({
+        by: ['inspectorId'],
+        where: {
+          isDeleted: false,
+          status: { in: ['DISPATCHED', 'INSPECTING'] },
+          inspectorId: { not: null },
+        },
+        _count: { id: true },
+      }),
     ]);
+
+    const workloadMap = new Map(
+      workload.map((w) => [w.inspectorId, w._count.id]),
+    );
 
     // Get all departments for deptName lookup
     const departments = await prisma.departments.findMany({
@@ -87,6 +100,7 @@ export const UserService = {
       roleIds: [user.roleId],
       roles: user.roles?.name ? [user.roles.name] : [],
       status: user.status === 'ACTIVE' ? 1 : 0,
+      activeTaskCount: workloadMap.get(user.id) ?? 0,
       createTime: user.createdAt
         ? new Date(user.createdAt).toLocaleString('zh-CN')
         : '',

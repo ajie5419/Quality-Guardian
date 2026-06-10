@@ -22,6 +22,7 @@ interface TaskInfo {
 interface InspectorOption {
   id: string;
   label: string;
+  activeTaskCount: number;
 }
 
 const taskId = ref('');
@@ -71,8 +72,13 @@ async function loadData(id: string) {
       inspectors.value = (usersRes.data.items ?? []).map((u) => ({
         id: u.id,
         label: u.realName || u.username,
+        activeTaskCount:
+          ((u as Record<string, unknown>).activeTaskCount as number) ?? 0,
       }));
-      inspectorNames.value = inspectors.value.map((i) => i.label);
+      inspectorNames.value = inspectors.value.map((i) => {
+        if (i.activeTaskCount === 0) return `${i.label} (空闲)`;
+        return `${i.label} (${i.activeTaskCount}条任务)`;
+      });
     }
   } catch {
     uni.showToast({ title: '网络错误', icon: 'none' });
@@ -361,8 +367,8 @@ onLoad((options) => {
 .attachment-img {
   width: 160rpx;
   height: 160rpx;
-  border-radius: 8rpx;
   background: #f5f5f5;
+  border-radius: 8rpx;
 }
 
 .request-no {
