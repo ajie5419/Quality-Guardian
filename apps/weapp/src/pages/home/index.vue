@@ -103,6 +103,18 @@ function formatStatus(status: string) {
   };
   return map[status] || status;
 }
+
+function handleLogout() {
+  uni.showModal({
+    title: '切换账号',
+    content: '确定退出当前账号？',
+    success(res) {
+      if (res.confirm) {
+        userStore.logout();
+      }
+    },
+  });
+}
 </script>
 
 <template>
@@ -180,6 +192,10 @@ function formatStatus(status: string) {
         }}</text>
         <text class="task-date">{{ task.createdAt }}</text>
       </view>
+    </view>
+
+    <view class="section logout-section">
+      <button class="btn-logout" @tap="handleLogout">切换账号</button>
     </view>
   </view>
 </template>
@@ -371,5 +387,21 @@ function formatStatus(status: string) {
 .task-date {
   font-size: 24rpx;
   color: $text-color-secondary;
+}
+
+.logout-section {
+  margin-top: 48rpx;
+  text-align: center;
+}
+
+.btn-logout {
+  width: 50%;
+  height: 76rpx;
+  font-size: 28rpx;
+  line-height: 76rpx;
+  color: $text-color-secondary;
+  background: #fff;
+  border: 1rpx solid #e8e8e8;
+  border-radius: 12rpx;
 }
 </style>
