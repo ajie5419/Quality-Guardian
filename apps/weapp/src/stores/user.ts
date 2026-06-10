@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue';
 
 import { wxBind, wxLogin } from '@/api/auth';
+import { request } from '@/api/request';
 import { defineStore } from 'pinia';
 
 export const useUserStore = defineStore('user', () => {
@@ -56,7 +57,12 @@ export const useUserStore = defineStore('user', () => {
     userInfo.value = res.data.userPayload;
   }
 
-  function logout() {
+  async function logout() {
+    try {
+      await request({ url: '/api/auth/wx-unbind', method: 'POST' });
+    } catch {
+      // ignore — still clear local state
+    }
     uni.removeStorageSync('accessToken');
     uni.removeStorageSync('refreshToken');
     uni.removeStorageSync('userInfo');

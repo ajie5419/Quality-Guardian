@@ -230,4 +230,11 @@ export const WxAuthService = {
 
     return { accessToken };
   },
+
+  async wxUnbind(userId: string) {
+    await prisma.users.update({
+      where: { id: userId },
+      data: { wxOpenId: null },
+    });
+  },
 };
