@@ -9,10 +9,6 @@
       "style": { "navigationBarTitleText": "登录" }
     },
     {
-      "path": "pages/request/create",
-      "style": { "navigationBarTitleText": "报检申请" }
-    },
-    {
       "path": "pages/tasks/index",
       "style": { "navigationBarTitleText": "检验任务" }
     },
@@ -26,7 +22,7 @@
     },
     {
       "path": "pages/records/index",
-      "style": { "navigationBarTitleText": "我的记录" }
+      "style": { "navigationBarTitleText": "检验记录" }
     }
   ],
   "globalStyle": {

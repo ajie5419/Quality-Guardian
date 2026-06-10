@@ -8,7 +8,8 @@ import { onPullDownRefresh, onShow } from '@dcloudio/uni-app';
 interface Task {
   id: string;
   requestNo: string;
-  productName: string;
+  partName: string;
+  workOrderNumber: string;
   status: string;
   createdAt: string;
 }
@@ -38,13 +39,35 @@ const today = computed(() => {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
 });
 
+const isDispatcher = computed(() => {
+  const roles = userStore.userInfo?.roles ?? [];
+  return roles.some(
+    (r) =>
+      r.includes('super') ||
+      r.includes('admin') ||
+      r.includes('dispatch') ||
+      r.includes('manager') ||
+      r.includes('schedule'),
+  );
+});
+
+const statusLabel = computed(() => {
+  if (isDispatcher.value)
+    return { s1: '待派单', s2: '今日已派', s3: '检验完成' };
+  return { s1: '我的待检', s2: '今日完成', s3: '待复检' };
+});
+
 async function loadData() {
   if (!userStore.isLoggedIn) return;
   loading.value = true;
   try {
+    const taskParams = isDispatcher.value
+      ? { status: 'SUBMITTED', mine: false, page: 1, pageSize: 5 }
+      : { status: 'DISPATCHED', mine: true, page: 1, pageSize: 5 };
+
     const [statsRes, tasksRes] = await Promise.all([
       getInspectionStats(),
-      getInspectionRequests({ mine: true, page: 1, pageSize: 3 }),
+      getInspectionRequests(taskParams),
     ]);
     if (statsRes.code === 0 && statsRes.data?.stats)
       stats.value = statsRes.data.stats;
@@ -64,23 +87,21 @@ onPullDownRefresh(() => {
   loadData();
 });
 
-const isDispatcher = computed(() => {
-  const roles = userStore.userInfo?.roles ?? [];
-  return roles.some(
-    (r) =>
-      r.includes('super') ||
-      r.includes('admin') ||
-      r.includes('dispatch') ||
-      r.includes('manager') ||
-      r.includes('schedule'),
-  );
-});
-
 function goToTask(id: string) {
   const url = isDispatcher.value
     ? `/pages/tasks/dispatch?id=${id}`
     : `/pages/inspect/result?id=${id}`;
   uni.navigateTo({ url });
+}
+
+function formatStatus(status: string) {
+  const map: Record<string, string> = {
+    SUBMITTED: '待派单',
+    DISPATCHED: '待检验',
+    INSPECTING: '检验中',
+    CLOSED: '已完成',
+  };
+  return map[status] || status;
 }
 </script>
 
@@ -91,20 +112,23 @@ function goToTask(id: string) {
         <text class="greeting">{{ greeting }}</text>
         <text class="date">{{ today }}</text>
       </view>
+      <view class="role-tag">
+        <text class="role-text">{{ isDispatcher ? '管理员' : '检验员' }}</text>
+      </view>
     </view>
 
     <view class="stats-row">
       <view class="stat-card stat-blue">
         <text class="stat-value">{{ stats.todayInspections }}</text>
-        <text class="stat-label">今日检验</text>
+        <text class="stat-label">{{ statusLabel.s1 }}</text>
       </view>
       <view class="stat-card stat-orange">
         <text class="stat-value">{{ stats.openIssuesCount }}</text>
-        <text class="stat-label">待处理</text>
+        <text class="stat-label">{{ statusLabel.s2 }}</text>
       </view>
       <view class="stat-card stat-green">
         <text class="stat-value">{{ stats.todayWorkOrders }}</text>
-        <text class="stat-label">今日工单</text>
+        <text class="stat-label">{{ statusLabel.s3 }}</text>
       </view>
     </view>
 
@@ -113,24 +137,32 @@ function goToTask(id: string) {
       <view class="quick-actions">
         <view
           class="action-btn"
-          @tap="uni.navigateTo({ url: '/pages/request/create' })"
+          @tap="uni.switchTab({ url: '/pages/tasks/index' })"
         >
-          <text class="action-icon">📋</text>
-          <text class="action-label">报检申请</text>
+          <view class="action-icon-wrap icon-task">
+            <text class="action-icon">📋</text>
+          </view>
+          <text class="action-label">{{
+            isDispatcher ? '待派单' : '待检验'
+          }}</text>
         </view>
         <view
           class="action-btn"
-          @tap="uni.switchTab({ url: '/pages/tasks/index' })"
+          @tap="uni.switchTab({ url: '/pages/records/index' })"
         >
-          <text class="action-icon">✅</text>
-          <text class="action-label">我的任务</text>
+          <view class="action-icon-wrap icon-record">
+            <text class="action-icon">📊</text>
+          </view>
+          <text class="action-label">检验记录</text>
         </view>
       </view>
     </view>
 
     <view class="section">
-      <text class="section-title">最近任务</text>
-      <view v-if="recentTasks.length === 0" class="empty-tip">
+      <text class="section-title">{{
+        isDispatcher ? '待派单任务' : '待检验任务'
+      }}</text>
+      <view v-if="recentTasks.length === 0 && !loading" class="empty-tip">
         <text>暂无任务</text>
       </view>
       <view
@@ -141,9 +173,11 @@ function goToTask(id: string) {
       >
         <view class="task-row">
           <text class="task-no">{{ task.requestNo }}</text>
-          <text class="task-status">{{ task.status }}</text>
+          <text class="task-status">{{ formatStatus(task.status) }}</text>
         </view>
-        <text class="task-name">{{ task.productName }}</text>
+        <text class="task-name">{{
+          task.partName || task.workOrderNumber
+        }}</text>
         <text class="task-date">{{ task.createdAt }}</text>
       </view>
     </view>
@@ -158,6 +192,9 @@ function goToTask(id: string) {
 }
 
 .header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   padding: 60rpx 40rpx 40rpx;
   background: $primary-color;
 }
@@ -175,10 +212,22 @@ function goToTask(id: string) {
   color: rgb(255 255 255 / 80%);
 }
 
+.role-tag {
+  padding: 8rpx 20rpx;
+  background: rgb(255 255 255 / 20%);
+  border-radius: 24rpx;
+}
+
+.role-text {
+  font-size: 24rpx;
+  color: #fff;
+}
+
 .stats-row {
   display: flex;
   gap: 20rpx;
   padding: 32rpx 32rpx 0;
+  margin-top: -20rpx;
 }
 
 .stat-card {
@@ -247,8 +296,25 @@ function goToTask(id: string) {
   box-shadow: 0 2rpx 12rpx rgb(0 0 0 / 6%);
 }
 
+.action-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+
+  &.icon-task {
+    background: #e6f7ff;
+  }
+
+  &.icon-record {
+    background: #f6ffed;
+  }
+}
+
 .action-icon {
-  font-size: 48rpx;
+  font-size: 40rpx;
 }
 
 .action-label {
