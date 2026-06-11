@@ -42,7 +42,7 @@
 - web-antd typecheck: 通过
 - qms architecture check: 通过
 
-**commit:** `7f8fe10f` feat(@qgs/backend): support work order multi-station inspections
+**commit:** `772d0232` feat(@qgs/backend): support work order multi-station inspections
 
 **遗留问题：**
 - 未运行前端 dev/build/start/serve；按仓库约束仅做 vue-tsc 和代码级验证。
