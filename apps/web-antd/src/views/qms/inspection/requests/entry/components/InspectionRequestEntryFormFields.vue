@@ -88,6 +88,9 @@ function handleWorkOrderChange(value: SelectProps['value']) {
       :mode="props.isIncomingEntry ? 'multiple' : undefined"
       :options="props.workOrderOptions"
       class="w-full"
+      :class="{
+        'inspection-entry-work-order-multiple': props.isIncomingEntry,
+      }"
       :placeholder="
         props.isIncomingEntry
           ? '请选择或搜索工单号，可多选'

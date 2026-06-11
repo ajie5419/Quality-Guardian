@@ -27,6 +27,41 @@
   white-space: normal;
 }
 
+.inspection-entry-form
+  .inspection-entry-work-order-multiple
+  .ant-select-selector {
+  align-items: flex-start;
+  height: auto;
+  min-height: 42px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.inspection-entry-form
+  .inspection-entry-work-order-multiple
+  .ant-select-selection-overflow {
+  row-gap: 4px;
+}
+
+.inspection-entry-form
+  .inspection-entry-work-order-multiple
+  .ant-select-selection-item {
+  max-width: 100%;
+  height: auto;
+  min-height: 28px;
+  margin-top: 0;
+  margin-bottom: 0;
+  line-height: 24px;
+  white-space: normal;
+}
+
+.inspection-entry-form
+  .inspection-entry-work-order-multiple
+  .ant-select-selection-search {
+  min-height: 28px;
+  line-height: 28px;
+}
+
 .inspection-entry-form .ant-upload {
   width: 100%;
 }
