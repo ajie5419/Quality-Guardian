@@ -8,14 +8,14 @@
 
 ## 技术栈
 
-| 层面 | 技术 |
-|------|------|
-| 框架 | uni-app 3.x (Vue 3 Composition API) |
-| 构建 | Vite + @dcloudio/vite-plugin-uni |
-| 状态管理 | Pinia |
-| 类型 | TypeScript (vue-tsc 跳过，uni-app-types 与 Vue 3.5 有冲突) |
-| 共享包 | @qgs/shared (枚举、DTO 类型) |
-| UI | 原生小程序组件 + 自定义样式 (SCSS) |
+| 层面     | 技术                                                       |
+| -------- | ---------------------------------------------------------- |
+| 框架     | uni-app 3.x (Vue 3 Composition API)                        |
+| 构建     | Vite + @dcloudio/vite-plugin-uni                           |
+| 状态管理 | Pinia                                                      |
+| 类型     | TypeScript (vue-tsc 跳过，uni-app-types 与 Vue 3.5 有冲突) |
+| 共享包   | @qgs/shared (枚举、DTO 类型)                               |
+| UI       | 原生小程序组件 + 自定义样式 (SCSS)                         |
 
 ## 目录结构
 
@@ -57,7 +57,7 @@ apps/weapp/
 ### 第一期（检验全流程）
 
 | 页面 | 功能 | 调用的后端 API |
-|------|------|---------------|
+| --- | --- | --- |
 | 登录 | 微信一键登录 + 首次绑定已有账号 | POST /api/auth/wx-login, POST /api/auth/wx-bind |
 | 首页 | 今日检验/待处理/工单统计 + 快捷入口 + 最近任务 | GET /api/qms/workspace |
 | 报检申请 | 表单提交 (工单号/工序/零件/数量/优先级/附件) | POST /api/qms/public/inspection/requests |
@@ -83,6 +83,7 @@ apps/weapp/
 ### 数据库
 
 `users` 表新增字段：
+
 ```prisma
 wxOpenId  String?  @unique
 ```
@@ -90,7 +91,7 @@ wxOpenId  String?  @unique
 ### 新增 API 端点
 
 | 端点 | 文件 | 说明 |
-|------|------|------|
+| --- | --- | --- |
 | POST /api/auth/wx-login | api/auth/wx-login.post.ts | 微信 code 换 token 或 needBind |
 | POST /api/auth/wx-bind | api/auth/wx-bind.post.ts | 绑定微信到已有账号 |
 | POST /api/auth/wx-refresh | api/auth/wx-refresh.post.ts | body 传 refreshToken 刷新 |
@@ -98,6 +99,7 @@ wxOpenId  String?  @unique
 ### 业务逻辑
 
 `modules/user/wx-auth.service.ts` — 三个方法：
+
 - `wxLogin(code)` — 调微信 API → 查绑定 → 返回 tokens 或 needBind
 - `wxBind(sessionToken, username, password)` — 验证凭据 → 绑定 openid → 返回 tokens
 - `wxRefresh(refreshToken)` — 验证 refresh token → 委托 AuthService 生成新 access token
@@ -109,12 +111,14 @@ wxOpenId  String?  @unique
 ### Auth 中间件
 
 `middleware/3.auth.ts` 的 `PUBLIC_PATH_PREFIXES` 已添加：
+
 - `/api/auth/wx-login`
 - `/api/auth/wx-bind`
 
 ### 环境变量
 
 `apps/backend/.env` 新增：
+
 ```
 WX_APPID=<微信公众平台获取>
 WX_APP_SECRET=<微信公众平台获取>
@@ -177,11 +181,13 @@ server {
 ### 环境配置
 
 `apps/weapp/.env`（不提交）：
+
 ```
 VITE_API_BASE_URL=http://<你的局域网IP>:5320
 ```
 
 `apps/weapp/.env.production`（不提交）：
+
 ```
 VITE_API_BASE_URL=https://api.tlqms.com
 ```
@@ -212,6 +218,7 @@ pnpm --filter @qgs/weapp build
 ### 门禁检查
 
 提交前必须通过：
+
 ```bash
 pnpm lint && pnpm run check:type && pnpm run check:qms-arch
 ```
@@ -250,6 +257,7 @@ weapp 的 typecheck 已配置为跳过（uni-app-types 与 Vue 3.5 全局类型�
 - wxRefresh：成功刷新 / refresh token 无效 / 账号不可用
 
 运行：
+
 ```bash
 pnpm --dir apps/backend exec vitest run modules/user/wx-auth.service.test.ts
 ```

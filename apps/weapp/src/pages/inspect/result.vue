@@ -764,9 +764,11 @@ $fail-color: #f5222d;
   &--done {
     background: $primary-color;
   }
+
   &--1 {
     left: 28%;
   }
+
   &--2 {
     right: 28%;
   }
@@ -833,9 +835,11 @@ $fail-color: #f5222d;
   &--active {
     color: #fff;
   }
+
   &--pass {
     background: $pass-color;
   }
+
   &--fail {
     background: $fail-color;
   }
@@ -906,8 +910,8 @@ $fail-color: #f5222d;
 .photo-img {
   width: 200rpx;
   height: 200rpx;
-  border-radius: 12rpx;
   object-fit: cover;
+  border-radius: 12rpx;
 }
 
 .photo-delete {
