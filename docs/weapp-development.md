@@ -8,15 +8,15 @@
 
 ## 技术栈
 
-| 层面 | 技术 |
-|------|------|
-| 框架 | uni-app 3.x (Vue 3 Composition API) |
-| 构建 | Vite + @dcloudio/vite-plugin-uni |
-| 状态管理 | Pinia |
-| 类型 | TypeScript（vue-tsc 跳过，uni-app-types 与 Vue 3.5 全局类型冲突） |
-| 共享包 | @qgs/shared (枚举、DTO 类型) |
-| UI | 原生小程序组件 + SCSS 样式 |
-| 图标 | tabBar PNG 81x81 |
+| 层面     | 技术                                                              |
+| -------- | ----------------------------------------------------------------- |
+| 框架     | uni-app 3.x (Vue 3 Composition API)                               |
+| 构建     | Vite + @dcloudio/vite-plugin-uni                                  |
+| 状态管理 | Pinia                                                             |
+| 类型     | TypeScript（vue-tsc 跳过，uni-app-types 与 Vue 3.5 全局类型冲突） |
+| 共享包   | @qgs/shared (枚举、DTO 类型)                                      |
+| UI       | 原生小程序组件 + SCSS 样式                                        |
+| 图标     | tabBar PNG 81x81                                                  |
 
 ## 目录结构
 
@@ -59,13 +59,13 @@ apps/weapp/
 
 ## 角色与页面权限
 
-| 页面 | 管理员/派工员 | 检验员 |
-|------|:---:|:---:|
-| 首页（待派单/待检验） | ✅ 显示待派单 | ✅ 显示待检验 |
-| 任务列表 | ✅ SUBMITTED 状态 | ✅ DISPATCHED + mine |
-| 派单 | ✅ | ❌ 不可见 |
-| 检验录入 | ❌ 不可见 | ✅ |
-| 检验记录 | ✅ | ✅ |
+| 页面                  |   管理员/派工员   |        检验员        |
+| --------------------- | :---------------: | :------------------: |
+| 首页（待派单/待检验） |   ✅ 显示待派单   |    ✅ 显示待检验     |
+| 任务列表              | ✅ SUBMITTED 状态 | ✅ DISPATCHED + mine |
+| 派单                  |        ✅         |      ❌ 不可见       |
+| 检验录入              |     ❌ 不可见     |          ✅          |
+| 检验记录              |        ✅         |          ✅          |
 
 **角色判断**：`userInfo.roles` 数组中包含 `super`/`admin`/`dispatch`/`manager`/`schedule` 之一即为管理员/派工员，否则为检验员。
 
@@ -106,7 +106,7 @@ App 启动 → checkAuth()
 ### 微信认证（`/api/auth/`）
 
 | 端点 | 鉴权 | 说明 |
-|------|:---:|------|
+| --- | :-: | --- |
 | POST /api/auth/wx-login | 公开 | code → openid → tokens 或 needBind |
 | POST /api/auth/wx-bind | 公开 | sessionToken + 账号密码 → 绑定 → tokens |
 | POST /api/auth/wx-refresh | 需 token | body 传 refreshToken → 新 accessToken |
@@ -115,7 +115,7 @@ App 启动 → checkAuth()
 ### 检验业务（需要 token）
 
 | 端点 | 小程序调用函数 | 说明 |
-|------|------|------|
+| --- | --- | --- |
 | GET /api/qms/workspace | `getInspectionStats()` | 首页统计数据 |
 | GET /api/qms/inspection/requests | `getInspectionRequests()` | 任务列表（支持 status/mine/page 过滤） |
 | GET /api/qms/inspection/requests/:id | `getInspectionRequest(id)` | 任务详情 |
@@ -127,7 +127,7 @@ App 启动 → checkAuth()
 ### 公开 API（无鉴权，`/api/qms/public/`）
 
 | 端点 | 函数 | 说明 |
-|------|------|------|
+| --- | --- | --- |
 | GET /work-orders?keyword= | `searchWorkOrders()` | 搜索工单 |
 | GET /processes?workOrderNumber= | `getProcesses()` | 工单的工序列表 |
 | GET /bom-parts?workOrderNumber= | `getBomParts()` | 工单的 BOM 零件 |
@@ -202,11 +202,13 @@ App 启动 → checkAuth()
 ### 环境变量
 
 `apps/weapp/.env`（不提交）：
+
 ```
 VITE_API_BASE_URL=http://<你的局域网IP>:5320
 ```
 
 `apps/weapp/.env.production`（不提交）：
+
 ```
 VITE_API_BASE_URL=https://api.tlqms.com
 ```
@@ -225,6 +227,7 @@ pnpm dev:antd    # 同时启动 backend + web-antd + weapp
 ### 后端监听
 
 后端需要监听所有接口才能被手机/模拟器访问：
+
 - `apps/backend/.env` 中需有 `HOST=0.0.0.0`
 
 ### 生产构建
@@ -250,6 +253,7 @@ pnpm --filter @qgs/weapp build
 ## 数据库
 
 `users` 表新增字段：
+
 ```prisma
 wxOpenId  String?  @unique  // 微信小程序 openid
 ```
@@ -259,6 +263,7 @@ wxOpenId  String?  @unique  // 微信小程序 openid
 ## 单元测试
 
 `apps/backend/modules/user/wx-auth.service.test.ts` — 14 个用例覆盖：
+
 - wxLogin：已绑定/未绑定/API 失败/账号禁用/缺少环境变量
 - wxBind：成功/token 无效/用户名错误/密码错误/已绑定其他微信/账号禁用
 - wxRefresh：成功/token 无效/账号不可用

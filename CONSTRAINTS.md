@@ -253,6 +253,7 @@ modules/new-module/
 ### 环境变量
 
 后端 `.env` 中小程序相关必需变量：
+
 - `WX_APPID` — 微信小程序 AppID
 - `WX_APP_SECRET` — 微信小程序 AppSecret
 - `WX_SESSION_SECRET` — 绑定会话签名密钥（随机 32 字节 hex）
