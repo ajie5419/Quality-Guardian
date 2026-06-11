@@ -45,6 +45,7 @@ model inspections {
   items               inspection_items[]
   archiveTask         inspection_archive_tasks?
   inspectionRequest   qms_inspection_requests?
+  inspectionRequestLinks qms_inspection_request_inspections[]
   process             processes?                 @relation(fields: [processId], references: [id], onDelete: SetNull)
   qualityRecords      quality_records[]
   work_order          work_orders               @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
@@ -1140,6 +1141,8 @@ model work_orders {
   quality_records           quality_records[]
   inspection_form_templates inspection_form_templates[]
   qms_inspection_requests   qms_inspection_requests[]
+  inspection_request_work_orders qms_inspection_request_work_orders[]
+  inspection_request_inspections qms_inspection_request_inspections[]
   work_order_requirements   work_order_requirements[]
 
   @@index([customerName])
@@ -1261,6 +1264,8 @@ model qms_inspection_requests {
   inspector           users?                    @relation("qms_inspection_requests_inspectorIdTousers", fields: [inspectorId], references: [id])
   dispatch_task       qms_task_dispatches?      @relation(fields: [dispatchTaskId], references: [id], onDelete: SetNull)
   inspection          inspections?              @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  workOrders          qms_inspection_request_work_orders[]
+  inspectionLinks     qms_inspection_request_inspections[]
 
   @@index([workOrderNumber])
   @@index([status])
@@ -1272,6 +1277,38 @@ model qms_inspection_requests {
   @@index([teamId])
   @@index([partId])
   @@index([componentId])
+}
+
+// @module inspection
+model qms_inspection_request_work_orders {
+  id              String                  @id @default(cuid())
+  requestId       String
+  workOrderNumber String
+  isPrimary       Boolean                 @default(false)
+  createdAt       DateTime                @default(now())
+  request         qms_inspection_requests @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  work_order      work_orders             @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+
+  @@unique([requestId, workOrderNumber])
+  @@index([workOrderNumber])
+}
+
+// @module inspection
+model qms_inspection_request_inspections {
+  id              String                  @id @default(cuid())
+  requestId       String
+  inspectionId    String
+  workOrderNumber String
+  isPrimary       Boolean                 @default(false)
+  createdAt       DateTime                @default(now())
+  request         qms_inspection_requests @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  inspection      inspections             @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  work_order      work_orders             @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+
+  @@unique([requestId, inspectionId])
+  @@unique([requestId, workOrderNumber])
+  @@index([inspectionId])
+  @@index([workOrderNumber])
 }
 
 model quality_losses {

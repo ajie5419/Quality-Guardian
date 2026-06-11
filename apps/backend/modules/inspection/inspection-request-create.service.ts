@@ -26,6 +26,11 @@ import {
   parseInspectionRequestQuantity,
 } from './inspection-request';
 import { publishInspectionRequestCreated } from './inspection-request-events';
+import {
+  assertWorkOrdersExist,
+  inspectionRequestWorkOrdersInclude,
+  normalizeInspectionRequestWorkOrderNumbers,
+} from './inspection-request-work-orders';
 
 type RequestBody = Record<string, unknown>;
 
@@ -37,38 +42,48 @@ export const InspectionRequestCreateService = {
     isPublic = false,
   ) {
     const payload = await buildCreateRequestPayload(body);
-    await assertWorkOrderExists(payload.workOrderNumber);
+    await assertWorkOrdersExist(prisma, payload.workOrderNumbers);
 
-    const created = await prisma.qms_inspection_requests.create({
-      data: {
-        attachments:
-          payload.attachments.length > 0
-            ? JSON.stringify(payload.attachments)
-            : null,
-        componentName: payload.componentName || null,
-        mutualCheckResult: normalizeInspectionRequestCheckResult(
-          body.mutualCheckResult,
-        ),
-        partName: payload.partName,
-        processId: payload.processId,
-        teamId: payload.teamId,
-        processName: payload.processName,
-        quantity: payload.quantity,
-        reporter: payload.reporter,
-        requestInfo: normalizeInspectionRequestText(body.requestInfo) || null,
-        requestNo: await generateInspectionRequestNo(prisma),
-        selfCheckResult: normalizeInspectionRequestCheckResult(
-          body.selfCheckResult,
-        ),
-        ...payload.governedFields,
-        ...payload.governedCanonicalIds,
-        workOrderNumber: payload.workOrderNumber,
-      },
-      include: {
-        dispatcher: { select: { realName: true, username: true } },
-        inspector: { select: { realName: true, username: true } },
-        process: { select: { name: true } },
-      },
+    const created = await prisma.$transaction(async (tx) => {
+      const request = await tx.qms_inspection_requests.create({
+        data: {
+          attachments:
+            payload.attachments.length > 0
+              ? JSON.stringify(payload.attachments)
+              : null,
+          componentName: payload.componentName || null,
+          mutualCheckResult: normalizeInspectionRequestCheckResult(
+            body.mutualCheckResult,
+          ),
+          partName: payload.partName,
+          processId: payload.processId,
+          teamId: payload.teamId,
+          processName: payload.processName,
+          quantity: payload.quantity,
+          reporter: payload.reporter,
+          requestInfo: normalizeInspectionRequestText(body.requestInfo) || null,
+          requestNo: await generateInspectionRequestNo(tx),
+          selfCheckResult: normalizeInspectionRequestCheckResult(
+            body.selfCheckResult,
+          ),
+          ...payload.governedFields,
+          ...payload.governedCanonicalIds,
+          workOrderNumber: payload.workOrderNumber,
+          workOrders: {
+            create: payload.workOrderNumbers.map((workOrderNumber, index) => ({
+              isPrimary: index === 0,
+              workOrderNumber,
+            })),
+          },
+        },
+        include: {
+          dispatcher: { select: { realName: true, username: true } },
+          inspector: { select: { realName: true, username: true } },
+          process: { select: { name: true } },
+          workOrders: inspectionRequestWorkOrdersInclude,
+        },
+      });
+      return request;
     });
 
     await FileStorageService.registerReferencesFromAttachments({
@@ -87,16 +102,12 @@ export const InspectionRequestCreateService = {
   },
 };
 
-async function assertWorkOrderExists(workOrderNumber: string) {
-  const workOrder = await prisma.work_orders.findUnique({
-    select: { workOrderNumber: true },
-    where: { workOrderNumber },
-  });
-  if (!workOrder) throw new Error('BAD_REQUEST:工单不存在');
-}
-
 async function buildCreateRequestPayload(body: RequestBody) {
-  const workOrderNumber = normalizeInspectionRequestText(body.workOrderNumber);
+  const workOrderNumbers = normalizeInspectionRequestWorkOrderNumbers(body);
+  const workOrderNumber =
+    normalizeInspectionRequestText(body.workOrderNumber) ||
+    workOrderNumbers[0] ||
+    '';
   const partName = normalizeInspectionRequestText(body.partName);
   const processName = normalizeInspectionRequestText(body.processName);
   const skipsComponentName =
@@ -129,6 +140,7 @@ async function buildCreateRequestPayload(body: RequestBody) {
     reporter,
     teamId: await resolveTeamIdForWrite({ team }),
     workOrderNumber,
+    workOrderNumbers,
   };
 }
 

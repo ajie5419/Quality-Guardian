@@ -8,6 +8,7 @@ import {
   normalizeInspectionRequestText,
   parseInspectionRequestQuantity,
 } from './inspection-request';
+import { normalizeInspectionRequestWorkOrderNumbers } from './inspection-request-work-orders';
 
 export { INCOMING_INSPECTION_PROCESS_NAME };
 
@@ -32,6 +33,7 @@ export const inspectionRequestCreateBodySchema = z.object({
   selfCheckResult: z.string().optional(),
   team: z.string().optional(),
   workOrderNumber: z.string().optional(),
+  workOrderNumbers: z.array(z.string()).optional(),
 });
 
 export type InspectionRequestCreateBody = z.infer<
@@ -41,7 +43,11 @@ export type InspectionRequestCreateBody = z.infer<
 export function validateInspectionRequestCreateBody(
   body: InspectionRequestCreateBody,
 ) {
-  const workOrderNumber = normalizeInspectionRequestText(body.workOrderNumber);
+  const workOrderNumbers = normalizeInspectionRequestWorkOrderNumbers(body);
+  const workOrderNumber =
+    normalizeInspectionRequestText(body.workOrderNumber) ||
+    workOrderNumbers[0] ||
+    '';
   const partName = normalizeInspectionRequestText(body.partName);
   const processName = normalizeInspectionRequestText(body.processName);
   const skipsComponentName =
@@ -59,7 +65,7 @@ export function validateInspectionRequestCreateBody(
     attachments,
     componentName,
     isValid:
-      Boolean(workOrderNumber) &&
+      workOrderNumbers.length > 0 &&
       Boolean(partName) &&
       Boolean(processName) &&
       (skipsComponentName || Boolean(componentName)) &&
@@ -71,5 +77,6 @@ export function validateInspectionRequestCreateBody(
     reporter,
     team,
     workOrderNumber,
+    workOrderNumbers,
   };
 }

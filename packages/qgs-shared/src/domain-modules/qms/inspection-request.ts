@@ -156,6 +156,7 @@ export interface InspectionRequestRecordLike {
   qualifiedQuantity?: null | number;
   qualityRecords?: unknown;
   unqualifiedQuantity?: null | number;
+  workOrders?: Array<{ workOrderNumber?: null | string }>;
 }
 
 export function mapInspectionRequestRecord<
@@ -173,6 +174,7 @@ export function mapInspectionRequestRecord<
   linkedIssueStatus: null | string;
   qualifiedQuantity: null | number;
   unqualifiedQuantity: null | number;
+  workOrderNumbers: string[];
 } {
   const issue = Array.isArray(record.qualityRecords)
     ? (record.qualityRecords.find(
@@ -205,7 +207,22 @@ export function mapInspectionRequestRecord<
       record.inspection?.unqualifiedQuantity ??
       issue?.quantity ??
       null,
+    workOrderNumbers: normalizeInspectionRequestWorkOrderNumbers(record),
   };
+}
+
+function normalizeInspectionRequestWorkOrderNumbers(
+  record: InspectionRequestRecordLike,
+) {
+  const numbers = Array.isArray(record.workOrders)
+    ? record.workOrders
+        .map((item) => normalizeInspectionRequestText(item.workOrderNumber))
+        .filter(Boolean)
+    : [];
+  const fallback = normalizeInspectionRequestText(
+    (record as { workOrderNumber?: unknown }).workOrderNumber,
+  );
+  return [...new Set(fallback ? [fallback, ...numbers] : numbers)];
 }
 
 export function buildInspectionRequestNo(params: {

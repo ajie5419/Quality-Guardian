@@ -57,6 +57,7 @@ export interface InspectionRequest {
   unqualifiedQuantity?: null | number;
   updatedAt: string;
   workOrderNumber: string;
+  workOrderNumbers?: string[];
 }
 
 export interface CreateInspectionRequestParams {
@@ -71,6 +72,7 @@ export interface CreateInspectionRequestParams {
   selfCheckResult?: InspectionRequestCheckResult;
   team: string;
   workOrderNumber: string;
+  workOrderNumbers?: string[];
 }
 
 export interface DispatchInspectionRequestParams {

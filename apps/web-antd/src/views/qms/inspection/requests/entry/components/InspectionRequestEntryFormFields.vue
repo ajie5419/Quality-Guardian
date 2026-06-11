@@ -58,23 +58,45 @@ const form = defineModel<{
   selfCheckResult: InspectionRequestCheckResult;
   team: string;
   workOrderNumber: string;
+  workOrderNumbers: string[];
 }>('form', { required: true });
 const attachmentFileList = defineModel<UploadFile[]>('attachmentFileList', {
   required: true,
 });
+
+function handleWorkOrderChange(value: SelectProps['value']) {
+  if (props.isIncomingEntry) {
+    const values = Array.isArray(value) ? value.map(String) : [];
+    form.value.workOrderNumbers = values;
+    form.value.workOrderNumber = values[0] || '';
+    return;
+  }
+  const nextValue = typeof value === 'string' ? value : '';
+  form.value.workOrderNumber = nextValue;
+  form.value.workOrderNumbers = nextValue ? [nextValue] : [];
+}
 </script>
 
 <template>
   <Form.Item label="工单号" required>
     <Select
-      v-model:value="form.workOrderNumber"
+      :value="
+        props.isIncomingEntry ? form.workOrderNumbers : form.workOrderNumber
+      "
       :filter-option="false"
       :loading="props.workOrderLoading"
+      :mode="props.isIncomingEntry ? 'multiple' : undefined"
       :options="props.workOrderOptions"
       class="w-full"
-      placeholder="请选择或搜索工单号"
+      :placeholder="
+        props.isIncomingEntry
+          ? '请选择或搜索工单号，可多选'
+          : '请选择或搜索工单号'
+      "
+      max-tag-count="responsive"
       show-search
       allow-clear
+      @change="handleWorkOrderChange"
       @search="(value) => emit('workOrderSearch', value)"
     />
   </Form.Item>

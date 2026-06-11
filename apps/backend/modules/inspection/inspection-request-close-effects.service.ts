@@ -28,6 +28,7 @@ export async function syncCloseAttachments(options: {
   closeAttachments: CloseAttachment;
   hasDocuments?: boolean;
   inspectionId: string;
+  inspectionIds?: string[];
   requestId: string;
 }) {
   await runClosePostCommitTask('request-file-references', () =>
@@ -38,33 +39,38 @@ export async function syncCloseAttachments(options: {
       fieldName: 'closeAttachments',
     }),
   );
-  const currentInspection = await prisma.inspections.findUnique({
-    select: { documents: true },
-    where: { id: options.inspectionId },
-  });
-  const inspectionDocuments = mergeInspectionRequestAttachments(
-    currentInspection?.documents,
-    options.closeAttachments,
-  );
-  const resolvedHasDocuments =
-    typeof options.hasDocuments === 'boolean'
-      ? options.hasDocuments
-      : inspectionDocuments.length > 0;
-  await runClosePostCommitTask('inspection-documents', async () => {
-    await prisma.inspections.update({
-      data: {
-        documents: stringifyCloseInspectionDocuments(inspectionDocuments),
-        hasDocuments: resolvedHasDocuments,
-      },
-      where: { id: options.inspectionId },
+  const inspectionIds = [
+    ...new Set([options.inspectionId, ...(options.inspectionIds || [])]),
+  ];
+  for (const inspectionId of inspectionIds) {
+    const currentInspection = await prisma.inspections.findUnique({
+      select: { documents: true },
+      where: { id: inspectionId },
     });
-    await FileStorageService.registerReferencesFromAttachments({
-      attachments: inspectionDocuments,
-      bizId: options.inspectionId,
-      bizType: 'inspection_record',
-      fieldName: 'documents',
+    const inspectionDocuments = mergeInspectionRequestAttachments(
+      currentInspection?.documents,
+      options.closeAttachments,
+    );
+    const resolvedHasDocuments =
+      typeof options.hasDocuments === 'boolean'
+        ? options.hasDocuments
+        : inspectionDocuments.length > 0;
+    await runClosePostCommitTask('inspection-documents', async () => {
+      await prisma.inspections.update({
+        data: {
+          documents: stringifyCloseInspectionDocuments(inspectionDocuments),
+          hasDocuments: resolvedHasDocuments,
+        },
+        where: { id: inspectionId },
+      });
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: inspectionDocuments,
+        bizId: inspectionId,
+        bizType: 'inspection_record',
+        fieldName: 'documents',
+      });
     });
-  });
+  }
 }
 
 export async function syncCloseIssueEffects(options: {

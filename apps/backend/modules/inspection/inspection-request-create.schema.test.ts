@@ -40,6 +40,19 @@ describe('inspection request create schema', () => {
     expect(validation.workOrderNumber).toBe('WO-001');
   });
 
+  it('accepts multiple work order numbers and keeps the first as primary', () => {
+    const parsed = inspectionRequestCreateBodySchema.parse({
+      ...buildValidPayload(),
+      workOrderNumber: '',
+      workOrderNumbers: ['WO-001', 'WO-002', 'WO-001'],
+    });
+    const validation = validateInspectionRequestCreateBody(parsed);
+
+    expect(validation.isValid).toBe(true);
+    expect(validation.workOrderNumber).toBe('WO-001');
+    expect(validation.workOrderNumbers).toEqual(['WO-001', 'WO-002']);
+  });
+
   it('requires componentName for non-assembly process', () => {
     const parsed = inspectionRequestCreateBodySchema.parse({
       ...buildValidPayload(),

@@ -9,6 +9,7 @@ import {
   normalizeInspectionRequestText,
   resolveInspectionRequestCurrentUserId,
 } from './inspection-request';
+import { inspectionRequestWorkOrdersInclude } from './inspection-request-work-orders';
 
 function normalizeRequestListQuery(query: Record<string, unknown>) {
   return {
@@ -131,6 +132,7 @@ export const InspectionRequestQueryService = {
         },
         inspector: { select: { realName: true, username: true } },
         process: { select: { name: true } },
+        workOrders: inspectionRequestWorkOrdersInclude,
       },
       where: { id, isDeleted: false },
     });
@@ -174,6 +176,7 @@ export const InspectionRequestQueryService = {
           },
           inspector: { select: { realName: true, username: true } },
           process: { select: { name: true } },
+          workOrders: inspectionRequestWorkOrdersInclude,
         },
         orderBy: { submittedAt: 'desc' },
         skip: (query.page - 1) * query.pageSize,

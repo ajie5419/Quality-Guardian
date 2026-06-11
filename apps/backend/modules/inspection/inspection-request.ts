@@ -152,7 +152,7 @@ function parseIncomingInspectionRequestInfo(value?: null | string) {
 }
 
 export async function generateInspectionRequestNo(
-  client: PrismaClient,
+  client: Pick<PrismaClient, 'qms_inspection_requests'>,
   now = new Date(),
 ) {
   const datePart = now.toISOString().slice(0, 10).replaceAll('-', '');
@@ -208,6 +208,7 @@ export async function buildInspectionRecordFromRequest(
     workOrderNumber: string;
   },
   body: Record<string, unknown>,
+  override?: { projectName?: null | string; workOrderNumber?: string },
 ) {
   return InspectionService.create(
     buildInspectionRecordPayloadCore({
@@ -217,6 +218,11 @@ export async function buildInspectionRecordFromRequest(
         processName:
           resolveCanonicalProcessName(request) ||
           normalizeInspectionRequestText(request.processName),
+        work_order:
+          override?.projectName === undefined
+            ? request.work_order
+            : { projectName: override.projectName },
+        workOrderNumber: override?.workOrderNumber || request.workOrderNumber,
       },
     }),
   );

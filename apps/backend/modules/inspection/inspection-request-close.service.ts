@@ -8,7 +8,6 @@ import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import prisma from '~/utils/prisma';
 
 import {
-  buildInspectionRecordFromRequest,
   INSPECTION_REQUEST_STATUS,
   mapInspectionRequest,
   normalizeInspectionRequestAttachments,
@@ -21,11 +20,13 @@ import {
   syncCloseIssueEffects,
 } from './inspection-request-close-effects.service';
 import { buildCloseLinkedIssueCreateResult } from './inspection-request-close-issue.service';
+import { createCloseInspectionRecords } from './inspection-request-close-records.service';
 import {
   failCloseRequest,
   parseCloseRequestNumber,
   validateCloseRequestBody,
 } from './inspection-request-close.schema';
+import { inspectionRequestWorkOrdersInclude } from './inspection-request-work-orders';
 
 function buildLinkedIssueWhere(
   request: { linkedIssueId?: null | string; linkedIssueNo?: null | string },
@@ -58,6 +59,7 @@ export const InspectionRequestCloseService = {
         include: {
           process: { select: { name: true } },
           work_order: { select: { projectName: true } },
+          workOrders: inspectionRequestWorkOrdersInclude,
         },
         where: { id, isDeleted: false },
       });
@@ -66,6 +68,11 @@ export const InspectionRequestCloseService = {
         failCloseRequest('BAD_REQUEST', '报检任务已检验完成');
 
       let inspectionId = explicitInspectionId;
+      let inspectionLinks: Array<{
+        inspectionId: string;
+        isPrimary: boolean;
+        workOrderNumber: string;
+      }> = [];
       if (inspectionId) {
         const inspection = await prisma.inspections.findFirst({
           select: { id: true },
@@ -80,12 +87,19 @@ export const InspectionRequestCloseService = {
             'BAD_REQUEST',
             '关联的检验记录不存在，或工单号与报检任务不一致',
           );
+        inspectionLinks = [
+          {
+            inspectionId,
+            isPrimary: true,
+            workOrderNumber: request.workOrderNumber,
+          },
+        ];
       } else {
-        const inspection = await buildInspectionRecordFromRequest(
-          request,
+        inspectionLinks = await createCloseInspectionRecords({
           body,
-        );
-        inspectionId = String(inspection.id);
+          request,
+        });
+        inspectionId = inspectionLinks[0]?.inspectionId || '';
       }
 
       const closeAttachments = normalizeInspectionRequestAttachments(
@@ -176,6 +190,15 @@ export const InspectionRequestCloseService = {
             where: { id: inspectionId },
           });
         }
+        await tx.qms_inspection_request_inspections.createMany({
+          data: inspectionLinks.map((item) => ({
+            inspectionId: item.inspectionId,
+            isPrimary: item.isPrimary,
+            requestId: id,
+            workOrderNumber: item.workOrderNumber,
+          })),
+          skipDuplicates: true,
+        });
         const record = await tx.qms_inspection_requests.update({
           data: {
             closeAttachments:
@@ -211,6 +234,7 @@ export const InspectionRequestCloseService = {
             },
             inspector: { select: { realName: true, username: true } },
             process: { select: { name: true } },
+            workOrders: inspectionRequestWorkOrdersInclude,
           },
           where: { id },
         });
@@ -230,6 +254,7 @@ export const InspectionRequestCloseService = {
             ? body.hasDocuments
             : undefined,
         inspectionId,
+        inspectionIds: inspectionLinks.map((item) => item.inspectionId),
         requestId: String(updated.id),
       });
       await syncCloseIssueEffects({

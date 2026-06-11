@@ -25,6 +25,25 @@
 
 ## 执行记录
 
+### 2026-06-11 功能：外购件报检支持多工单分别落检验记录
+
+**执行内容：**
+- 外购件/进货检验扫码入口工单号支持多选，提交时保留第一个工单号作为兼容主工单，同时传递完整工单数组。
+- 后端新增报检任务工单明细表和报检任务检验记录映射表，关闭报检任务时按工单分别创建 `inspections` 记录。
+- 保留 `qms_inspection_requests.workOrderNumber` 和 `inspectionId` 单值兼容旧列表、筛选、通知与聚合链路。
+- 更新 shared 类型、inspection 模块架构文档和相关单元测试。
+
+**验证结果：**
+- backend typecheck: 通过
+- web-antd typecheck: 通过
+- vitest: 81 文件 / 464 测试通过；相关回归 3 文件 / 9 测试通过
+- migration: 已由 Prisma schema diff 生成；本机 MySQL 未启动，未执行 `migrate dev`
+
+**commit:** `35eafb89` feat(/backend): support multi-work-order incoming requests
+
+**遗留问题：**
+- 未做浏览器端真实点击验证；前端项目按约束不运行 dev/build/start/serve。
+
 ## [0.8.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.7.1...qgs-v0.8.0) (2026-06-09)
 
 

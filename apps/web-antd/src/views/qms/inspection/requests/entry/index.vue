@@ -86,6 +86,7 @@ const requestForm = reactive({
   selfCheckResult: 'PASS' as InspectionRequestCheckResult,
   team: '',
   workOrderNumber: '',
+  workOrderNumbers: [] as string[],
 });
 
 const isIncomingEntry = computed(() =>
@@ -112,7 +113,9 @@ const entryCopy = computed(() =>
 );
 
 function applyRoutePrefill() {
-  requestForm.workOrderNumber = String(route.query.workOrderNumber || '');
+  const workOrderNumber = String(route.query.workOrderNumber || '');
+  requestForm.workOrderNumber = workOrderNumber;
+  requestForm.workOrderNumbers = workOrderNumber ? [workOrderNumber] : [];
   requestForm.partName = String(route.query.partName || '');
   requestForm.componentName = String(route.query.componentName || '');
   requestForm.processName = isIncomingEntry.value
@@ -137,6 +140,8 @@ function resetRequestForm() {
   requestForm.selfCheckResult = 'PASS';
   requestForm.mutualCheckResult = 'PASS';
   requestForm.team = '';
+  requestForm.workOrderNumber = '';
+  requestForm.workOrderNumbers = [];
 }
 
 async function loadWorkOrderOptions(keyword = '') {
@@ -326,6 +331,7 @@ async function submitRequest() {
 
   if (
     !requestForm.workOrderNumber ||
+    requestForm.workOrderNumbers.length === 0 ||
     (isIncomingEntry.value && !requestForm.incomingType) ||
     !requestForm.partName ||
     !requestForm.processName ||
@@ -366,6 +372,10 @@ async function submitRequest() {
             notes: requestForm.requestInfo,
           })
         : requestForm.requestInfo,
+      workOrderNumber: requestForm.workOrderNumber,
+      workOrderNumbers: isIncomingEntry.value
+        ? requestForm.workOrderNumbers
+        : [requestForm.workOrderNumber],
     });
     message.success(
       `${entryCopy.value.submitSuccessPrefix}：${created.requestNo}`,
