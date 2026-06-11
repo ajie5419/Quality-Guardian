@@ -1,6 +1,7 @@
 import type { UserSession } from '~/utils/jwt-utils';
 
 import prisma from '~/utils/prisma';
+import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import { buildTeamContainsWhere } from '~/utils/team-resolver';
 
 import {
@@ -79,6 +80,24 @@ function getRequestListStatusWhere(
   return {};
 }
 
+const requestQueryInclude = {
+  dispatcher: { select: { realName: true, username: true } },
+  inspection: {
+    select: {
+      qualifiedQuantity: true,
+      result: true,
+      unqualifiedQuantity: true,
+    },
+  },
+  inspector: { select: { realName: true, username: true } },
+  process: { select: { name: true } },
+};
+
+const requestQueryIncludeWithWorkOrders = {
+  ...requestQueryInclude,
+  workOrders: inspectionRequestWorkOrdersInclude,
+};
+
 async function findLinkedIssues(
   items: Array<{
     inspectionId: null | string;
@@ -120,25 +139,25 @@ async function findLinkedIssues(
 
 export const InspectionRequestQueryService = {
   async getRequestDetail(id: string) {
-    const request = await prisma.qms_inspection_requests.findFirst({
-      include: {
-        dispatcher: { select: { realName: true, username: true } },
-        inspection: {
-          select: {
-            qualifiedQuantity: true,
-            result: true,
-            unqualifiedQuantity: true,
-          },
-        },
-        inspector: { select: { realName: true, username: true } },
-        process: { select: { name: true } },
-        workOrders: inspectionRequestWorkOrdersInclude,
-      },
-      where: { id, isDeleted: false },
-    });
+    const findRequest = (includeWorkOrders: boolean) =>
+      prisma.qms_inspection_requests.findFirst({
+        include: includeWorkOrders
+          ? requestQueryIncludeWithWorkOrders
+          : requestQueryInclude,
+        where: { id, isDeleted: false },
+      });
+    let request;
+    try {
+      request = await findRequest(true);
+    } catch (error) {
+      if (!isPrismaSchemaMismatchError(error)) throw error;
+      request = await findRequest(false);
+    }
     if (!request) return null;
+    const mappedRequest =
+      'workOrders' in request ? request : { ...request, workOrders: [] };
 
-    const issues = await findLinkedIssues([request]);
+    const issues = await findLinkedIssues([mappedRequest]);
     const issueById = new Map(issues.map((issue) => [issue.id, issue]));
     const issueByInspectionId = new Map(
       issues
@@ -147,11 +166,13 @@ export const InspectionRequestQueryService = {
     );
 
     return mapInspectionRequest({
-      ...request,
+      ...mappedRequest,
       qualityRecords: [
-        request.linkedIssueId ? issueById.get(request.linkedIssueId) : null,
-        request.inspectionId
-          ? issueByInspectionId.get(request.inspectionId)
+        mappedRequest.linkedIssueId
+          ? issueById.get(mappedRequest.linkedIssueId)
+          : null,
+        mappedRequest.inspectionId
+          ? issueByInspectionId.get(mappedRequest.inspectionId)
           : null,
       ].filter(Boolean),
     });
@@ -163,28 +184,29 @@ export const InspectionRequestQueryService = {
   ) {
     const query = normalizeRequestListQuery(rawQuery);
     const where = await buildRequestListWhere(userinfo, query);
-    const [items, total] = await Promise.all([
-      prisma.qms_inspection_requests.findMany({
-        include: {
-          dispatcher: { select: { realName: true, username: true } },
-          inspection: {
-            select: {
-              qualifiedQuantity: true,
-              result: true,
-              unqualifiedQuantity: true,
-            },
-          },
-          inspector: { select: { realName: true, username: true } },
-          process: { select: { name: true } },
-          workOrders: inspectionRequestWorkOrdersInclude,
-        },
-        orderBy: { submittedAt: 'desc' },
-        skip: (query.page - 1) * query.pageSize,
-        take: query.pageSize,
-        where,
-      }),
-      prisma.qms_inspection_requests.count({ where }),
-    ]);
+    const runQuery = (includeWorkOrders: boolean) =>
+      Promise.all([
+        prisma.qms_inspection_requests.findMany({
+          include: includeWorkOrders
+            ? requestQueryIncludeWithWorkOrders
+            : requestQueryInclude,
+          orderBy: { submittedAt: 'desc' },
+          skip: (query.page - 1) * query.pageSize,
+          take: query.pageSize,
+          where,
+        }),
+        prisma.qms_inspection_requests.count({ where }),
+      ]);
+    let items;
+    let total;
+    try {
+      [items, total] = await runQuery(true);
+    } catch (error) {
+      if (!isPrismaSchemaMismatchError(error)) throw error;
+      const [fallbackItems, fallbackTotal] = await runQuery(false);
+      items = fallbackItems.map((item) => ({ ...item, workOrders: [] }));
+      total = fallbackTotal;
+    }
     const issues = await findLinkedIssues(items);
     const issueById = new Map(issues.map((issue) => [issue.id, issue]));
     const issueByInspectionId = new Map(
