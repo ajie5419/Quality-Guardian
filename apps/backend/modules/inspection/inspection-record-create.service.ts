@@ -129,6 +129,7 @@ export const InspectionRecordCreateService = {
                 data.hasDocuments === undefined ? true : data.hasDocuments,
               packingListArchived: data.packingListArchived,
               quantity: quantitySummary.quantity,
+              stationSelection: data.stationSelection || null,
               qualifiedQuantity: quantitySummary.qualifiedQuantity,
               unqualifiedQuantity: quantitySummary.unqualifiedQuantity,
               inspector: data.inspector,

@@ -12,6 +12,7 @@ const CHECK_RESULT_SET = new Set(['FAIL', 'NA', 'PASS']);
 const REQUEST_STATUS_SET = new Set<string>(
   Object.values(INSPECTION_REQUEST_STATUS),
 );
+const STATION_SELECTION_MODE_SET = new Set(['ALL', 'PARTIAL']);
 
 export function normalizeInspectionRequestText(value: unknown): string {
   return String(value ?? '').trim();
@@ -56,6 +57,69 @@ export function parseInspectionRequestQuantity(value: unknown, fallback = 1) {
   }
 
   return Math.max(1, Math.trunc(parsed));
+}
+
+export type NormalizedInspectionStationSelection = {
+  indexes: number[];
+  mode: 'ALL' | 'PARTIAL';
+};
+
+export function normalizeInspectionStationSelection(
+  value: unknown,
+  quantity?: unknown,
+): NormalizedInspectionStationSelection | null {
+  const rawQuantity = Number(quantity);
+  const totalQuantity = Number.isFinite(rawQuantity)
+    ? Math.max(1, Math.trunc(rawQuantity))
+    : null;
+  if (!value) return null;
+
+  let source: unknown = value;
+  if (typeof value === 'string') {
+    const raw = normalizeInspectionRequestText(value);
+    if (!raw) return null;
+    try {
+      source = JSON.parse(raw) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (!source || typeof source !== 'object') return null;
+
+  const record = source as Record<string, unknown>;
+  const mode = normalizeInspectionRequestText(record.mode).toUpperCase();
+  if (!STATION_SELECTION_MODE_SET.has(mode)) return null;
+
+  if (mode === 'ALL') {
+    return { indexes: [], mode: 'ALL' };
+  }
+
+  const rawIndexes = Array.isArray(record.indexes) ? record.indexes : [];
+  const indexes = [
+    ...new Set(
+      rawIndexes
+        .map((item) => Math.trunc(Number(item)))
+        .filter((item) => Number.isFinite(item) && item >= 1)
+        .map((item) => (totalQuantity ? Math.min(item, totalQuantity) : item)),
+    ),
+  ].sort((a, b) => a - b);
+
+  return indexes.length > 0 ? { indexes, mode: 'PARTIAL' } : null;
+}
+
+export function serializeInspectionStationSelection(
+  value: unknown,
+  quantity?: unknown,
+): null | string {
+  const normalized = normalizeInspectionStationSelection(value, quantity);
+  return normalized ? JSON.stringify(normalized) : null;
+}
+
+export function formatInspectionStationSelection(value: unknown): string {
+  const normalized = normalizeInspectionStationSelection(value);
+  if (!normalized) return '';
+  if (normalized.mode === 'ALL') return '全部台数';
+  return normalized.indexes.map((item) => `第 ${item} 台`).join('、');
 }
 
 type InspectionRequestAttachment = {
@@ -155,6 +219,7 @@ export interface InspectionRequestRecordLike {
   linkedIssueStatus?: null | string;
   qualifiedQuantity?: null | number;
   qualityRecords?: unknown;
+  stationSelection?: unknown;
   unqualifiedQuantity?: null | number;
   workOrders?: Array<{ workOrderNumber?: null | string }>;
 }
@@ -173,6 +238,7 @@ export function mapInspectionRequestRecord<
   linkedIssueNo: null | string;
   linkedIssueStatus: null | string;
   qualifiedQuantity: null | number;
+  stationSelection: NormalizedInspectionStationSelection | null;
   unqualifiedQuantity: null | number;
   workOrderNumbers: string[];
 } {
@@ -202,6 +268,10 @@ export function mapInspectionRequestRecord<
     linkedIssueStatus: issue?.status || record.linkedIssueStatus || null,
     qualifiedQuantity:
       record.qualifiedQuantity ?? record.inspection?.qualifiedQuantity ?? null,
+    stationSelection: normalizeInspectionStationSelection(
+      record.stationSelection,
+      (record as { quantity?: unknown }).quantity,
+    ),
     unqualifiedQuantity:
       record.unqualifiedQuantity ??
       record.inspection?.unqualifiedQuantity ??
@@ -262,6 +332,7 @@ export interface InspectionRecordPayloadInput {
     reporter: string;
     requestInfo?: null | string;
     selfCheckResult: string;
+    stationSelection?: null | string;
     team?: null | string;
     work_order?: null | { projectName?: null | string };
     workOrderNumber: string;
@@ -341,6 +412,7 @@ export function buildInspectionRecordPayloadCore(
       normalizeInspectionRequestText(input.body.closeRemark) ||
       requestInfo.notes,
     result: result === 'FAIL' ? 'FAIL' : 'PASS',
+    stationSelection: input.request.stationSelection,
     unqualifiedQuantity:
       typeof input.body.unqualifiedQuantity === 'string' ||
       typeof input.body.unqualifiedQuantity === 'number'

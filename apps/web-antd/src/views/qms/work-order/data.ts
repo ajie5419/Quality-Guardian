@@ -32,6 +32,7 @@ export const workOrderSchema = z.object({
     .number({ required_error: $t('ui.formRules.required') })
     .min(1, { message: $t('ui.formRules.minValue', { value: 1 }) })
     .max(999_999, { message: $t('ui.formRules.maxValue', { value: 999_999 }) }),
+  multiStationEnabled: z.boolean().optional(),
   // 交货日期：必填
   deliveryDate: z
     .string()
@@ -113,6 +114,15 @@ export const getFormSchema = (
       precision: 0,
     },
     rules: 'required',
+  },
+  {
+    fieldName: 'multiStationEnabled',
+    label: '多台策略',
+    component: 'Switch',
+    componentProps: {
+      checkedChildren: '启用',
+      unCheckedChildren: '关闭',
+    },
   },
   {
     fieldName: 'status',
@@ -201,6 +211,14 @@ export const getGridColumns = (
       width: 100,
       sortable: true,
       align: 'center',
+    },
+    {
+      field: 'multiStationEnabled',
+      title: '多台策略',
+      width: 100,
+      align: 'center',
+      formatter: ({ cellValue }: { cellValue: boolean | undefined }) =>
+        cellValue ? '启用' : '关闭',
     },
     {
       field: 'deliveryDate',

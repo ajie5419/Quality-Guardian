@@ -96,6 +96,7 @@ export const WorkOrderRouteService = {
           projectName: body.projectName as string | undefined,
           ...governedFields,
           quantity: parseWorkOrderQuantity(body.quantity, 1),
+          multiStationEnabled: body.multiStationEnabled === true,
           deliveryDate: parseRequiredDate(body.deliveryDate),
           effectiveTime: parseOptionalDate(body.effectiveTime),
           status: mapWorkOrderStatus(body.status),
@@ -162,6 +163,8 @@ export const WorkOrderRouteService = {
       updateData.projectName = body.projectName;
     if (body.quantity !== undefined && body.quantity !== null)
       updateData.quantity = parseWorkOrderQuantity(body.quantity, 1);
+    if (body.multiStationEnabled !== undefined)
+      updateData.multiStationEnabled = body.multiStationEnabled === true;
     if (body.deliveryDate !== undefined && body.deliveryDate !== null)
       updateData.deliveryDate = parseRequiredDate(body.deliveryDate);
     if (body.effectiveTime !== undefined)
@@ -232,6 +235,7 @@ export const WorkOrderRouteService = {
               item.quantity !== undefined && item.quantity !== null
                 ? parseWorkOrderQuantity(item.quantity, 1)
                 : undefined,
+            multiStationEnabled: item.multiStationEnabled === true,
             deliveryDate: parseRequiredDate(item.deliveryDate),
             effectiveTime: parseOptionalDate(item.effectiveTime),
             status: mapWorkOrderStatus(item.status),
@@ -246,6 +250,7 @@ export const WorkOrderRouteService = {
               division: item.division,
             }),
             quantity: parseWorkOrderQuantity(item.quantity, 1),
+            multiStationEnabled: item.multiStationEnabled === true,
             deliveryDate: parseRequiredDate(item.deliveryDate),
             effectiveTime: parseOptionalDate(item.effectiveTime),
             status: mapWorkOrderStatus(item.status),

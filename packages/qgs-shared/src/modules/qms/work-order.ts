@@ -6,6 +6,7 @@ export interface WorkOrderItem {
   division?: null | string;
   effectiveTime?: null | string;
   id: string; // workOrderNumber
+  multiStationEnabled?: boolean;
   overdueUnconfirmedRequirements?: number;
   plannedRequirements?: number;
   projectName?: null | string;

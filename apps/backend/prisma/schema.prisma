@@ -30,6 +30,7 @@ model inspections {
   hasDocuments        Boolean                   @default(true)
   packingListArchived String?
   quantity            Int                       @default(1)
+  stationSelection    String?                   @db.Text
   qualifiedQuantity   Int?
   unqualifiedQuantity Int?
   inspector           String
@@ -1124,6 +1125,7 @@ model work_orders {
   division                  String?
   divisionId                String?
   quantity                  Int
+  multiStationEnabled       Boolean                     @default(false)
   deliveryDate              DateTime
   status                    work_orders_status          @default(OPEN)
   createdAt                 DateTime                    @default(now())
@@ -1232,6 +1234,7 @@ model qms_inspection_requests {
   teamId              String?
   team                String?
   quantity            Int                       @default(1)
+  stationSelection    String?                   @db.Text
   reporter            String
   selfCheckResult     String                    @default("PASS")
   mutualCheckResult   String                    @default("PASS")

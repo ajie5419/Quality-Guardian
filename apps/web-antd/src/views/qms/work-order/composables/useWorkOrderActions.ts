@@ -52,6 +52,7 @@ export function useWorkOrderActions(options: {
       projectName: row.projectName || null,
       division: row.division || null,
       quantity: row.quantity || 0,
+      multiStationEnabled: Boolean(row.multiStationEnabled),
       deliveryDate: row.deliveryDate || '',
       status: row.status,
       effectiveTime: row.effectiveTime || null,

@@ -180,6 +180,7 @@ export const InspectionRequestCloseService = {
                 normalizeInspectionRequestText(body.inspector) ||
                 request.reporter,
               quantity: totalQuantity,
+              stationSelection: request.stationSelection,
               qualifiedQuantity,
               remarks:
                 normalizeInspectionRequestText(body.closeRemark) ||

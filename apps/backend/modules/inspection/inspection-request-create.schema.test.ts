@@ -18,6 +18,7 @@ function buildValidPayload() {
     quantity: '2',
     reporter: '张三',
     selfCheckResult: 'PASS',
+    stationSelection: { indexes: [1, 2], mode: 'PARTIAL' },
     team: '生产一班',
     workOrderNumber: 'WO-001',
   };

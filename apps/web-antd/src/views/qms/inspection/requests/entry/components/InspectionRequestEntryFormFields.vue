@@ -22,6 +22,11 @@ type EntryCopy = {
   teamPlaceholder: string;
 };
 
+type StationSelection = {
+  indexes: number[];
+  mode: 'ALL' | 'PARTIAL';
+};
+
 const props = defineProps<{
   beforeUpload: (file: File) => Promise<File>;
   bomPartOptions: Array<{ label: string; value: string }>;
@@ -31,12 +36,20 @@ const props = defineProps<{
   isIncomingEntry: boolean;
   processOptions: Array<{ label: string; value: string }>;
   requiresComponentName: boolean;
+  requiresStationSelection: boolean;
+  stationQuantity: number;
   submitting: boolean;
   teamLoading: boolean;
   teamOptions: SelectProps['options'];
   uploadAction: string;
   workOrderLoading: boolean;
-  workOrderOptions: Array<{ label: string; value: string }>;
+  workOrderOptions: Array<{
+    division?: null | string;
+    label: string;
+    multiStationEnabled?: boolean;
+    quantity?: number;
+    value: string;
+  }>;
   workOrderProcessesLoading: boolean;
 }>();
 
@@ -56,6 +69,7 @@ const form = defineModel<{
   reporter: string;
   requestInfo: string;
   selfCheckResult: InspectionRequestCheckResult;
+  stationSelection: null | StationSelection;
   team: string;
   workOrderNumber: string;
   workOrderNumbers: string[];
@@ -74,6 +88,26 @@ function handleWorkOrderChange(value: SelectProps['value']) {
   const nextValue = typeof value === 'string' ? value : '';
   form.value.workOrderNumber = nextValue;
   form.value.workOrderNumbers = nextValue ? [nextValue] : [];
+}
+
+function handleStationChange(value: SelectProps['value']) {
+  const values = Array.isArray(value) ? value.map(String) : [];
+  if (values.includes('ALL')) {
+    form.value.stationSelection = { indexes: [], mode: 'ALL' };
+    return;
+  }
+  const indexes = values
+    .map(Number)
+    .filter((item) => Number.isFinite(item) && item >= 1)
+    .sort((a, b) => a - b);
+  form.value.stationSelection =
+    indexes.length > 0 ? { indexes, mode: 'PARTIAL' } : null;
+}
+
+function resolveStationValue() {
+  if (!form.value.stationSelection) return [];
+  if (form.value.stationSelection.mode === 'ALL') return ['ALL'];
+  return form.value.stationSelection.indexes.map(String);
 }
 </script>
 
@@ -166,6 +200,24 @@ function handleWorkOrderChange(value: SelectProps['value']) {
         :min="1"
         :precision="0"
         class="w-full min-w-0"
+      />
+    </Form.Item>
+    <Form.Item v-if="props.requiresStationSelection" label="台数" required>
+      <Select
+        :value="resolveStationValue()"
+        :options="[
+          { label: '全部台数', value: 'ALL' },
+          ...Array.from({ length: props.stationQuantity || 0 }, (_, index) => ({
+            label: `第 ${index + 1} 台`,
+            value: String(index + 1),
+          })),
+        ]"
+        class="inspection-entry-station-multiple w-full"
+        mode="multiple"
+        max-tag-count="responsive"
+        placeholder="请选择第几台或全部台数"
+        allow-clear
+        @change="handleStationChange"
       />
     </Form.Item>
     <Form.Item :label="props.entryCopy.teamLabel" required>

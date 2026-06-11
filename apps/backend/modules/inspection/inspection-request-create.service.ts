@@ -24,6 +24,7 @@ import {
   normalizeInspectionRequestCheckResult,
   normalizeInspectionRequestText,
   parseInspectionRequestQuantity,
+  serializeInspectionStationSelection,
 } from './inspection-request';
 import { publishInspectionRequestCreated } from './inspection-request-events';
 import {
@@ -60,6 +61,7 @@ export const InspectionRequestCreateService = {
           teamId: payload.teamId,
           processName: payload.processName,
           quantity: payload.quantity,
+          stationSelection: payload.stationSelection,
           reporter: payload.reporter,
           requestInfo: normalizeInspectionRequestText(body.requestInfo) || null,
           requestNo: await generateInspectionRequestNo(tx),
@@ -119,6 +121,10 @@ async function buildCreateRequestPayload(body: RequestBody) {
   const reporter = normalizeInspectionRequestText(body.reporter);
   const team = normalizeInspectionRequestText(body.team);
   const quantity = parseInspectionRequestQuantity(body.quantity);
+  const stationSelection = serializeInspectionStationSelection(
+    body.stationSelection,
+    quantity,
+  );
   const attachments = normalizeInspectionRequestAttachments(body.attachments);
   const governedFields = buildGovernedWriteFieldsForTable(
     'qms_inspection_requests',
@@ -138,6 +144,7 @@ async function buildCreateRequestPayload(body: RequestBody) {
     processName,
     quantity,
     reporter,
+    stationSelection,
     teamId: await resolveTeamIdForWrite({ team }),
     workOrderNumber,
     workOrderNumbers,

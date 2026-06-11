@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+### 2026-06-11 功能：工单多台策略与报检台数落库
+
+**执行内容：**
+- 工单管理新建/编辑表单新增“多台策略”开关，并在工单列表显示当前策略状态。
+- 过程报检和进货/外购扫码入口读取所选工单的多台策略；当策略启用且工单数量大于 1 时，显示并提交台数多选。
+- 报检任务新增 `stationSelection` 持久化字段，支持选择全部台数或指定第几台。
+- 关闭报检生成检验记录时同步台数选择，检验记录列表和详情显示第几台/全部台数。
+- 更新 shared 类型、工单类型、台数解析/格式化逻辑、Prisma migration 和相关单元测试。
+
+**验证结果：**
+- shared build: 通过
+- shared vitest: 1 文件 / 3 测试通过
+- backend typecheck: 通过
+- backend vitest: 2 文件 / 6 测试通过
+- web-antd typecheck: 通过
+- qms architecture check: 通过
+
+**commit:** `7f8fe10f` feat(@qgs/backend): support work order multi-station inspections
+
+**遗留问题：**
+- 未运行前端 dev/build/start/serve；按仓库约束仅做 vue-tsc 和代码级验证。
+
 ### 2026-06-11 功能：外购件报检支持多工单分别落检验记录
 
 **执行内容：**

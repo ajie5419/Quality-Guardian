@@ -59,6 +59,7 @@ async function handleSubmit() {
       customerName: values.customerName || '',
       projectName: values.projectName || null,
       division: values.division || null,
+      multiStationEnabled: values.multiStationEnabled === true,
       effectiveTime: values.effectiveTime || null, // 确保 null 而非空字符串
     };
 
@@ -115,6 +116,7 @@ async function open({ record, deptData = [] }: OpenParams = {}) {
       customerName: record?.customerName || '',
       projectName: record?.projectName || '',
       division: record?.division || undefined,
+      multiStationEnabled: Boolean(record?.multiStationEnabled),
       quantity: record?.quantity || 1,
       status: record?.status || 'OPEN',
       deliveryDate: record?.deliveryDate || today.toISOString().split('T')[0],

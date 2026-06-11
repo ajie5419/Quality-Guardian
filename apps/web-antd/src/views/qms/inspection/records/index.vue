@@ -7,6 +7,7 @@ import { useRoute } from 'vue-router';
 import { Page } from '@vben/common-ui';
 
 import {
+  formatInspectionStationSelection,
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
 } from '@qgs/shared';
@@ -160,6 +161,12 @@ function getDetailNumber(key: string, fallback = '-') {
   const value = getDetailValue(key);
   if (typeof value === 'number') return String(value);
   return fallback;
+}
+
+function getDetailStationSelection() {
+  return (
+    formatInspectionStationSelection(getDetailValue('stationSelection')) || '-'
+  );
 }
 
 function isDetailFail() {
@@ -345,6 +352,9 @@ watch(
 
           <Descriptions.Item label="数量">
             {{ getDetailNumber('quantity') }}
+          </Descriptions.Item>
+          <Descriptions.Item label="台数">
+            {{ getDetailStationSelection() }}
           </Descriptions.Item>
           <Descriptions.Item label="检验员">
             {{ getDetailString('inspector') }}

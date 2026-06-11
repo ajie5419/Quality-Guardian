@@ -3,6 +3,7 @@ import type { InspectionRequest } from '#/api/qms/inspection-request';
 
 import { computed } from 'vue';
 
+import { formatInspectionStationSelection } from '@qgs/shared';
 import { Button, Drawer, Tag } from 'ant-design-vue';
 
 import { useMobileViewport } from '#/hooks/useMobileViewport';
@@ -45,6 +46,10 @@ const { isMobile } = useMobileViewport();
 const drawerWidth = computed(() =>
   isMobile.value ? '100vw' : 'min(100vw, 620px)',
 );
+
+function stationSelectionText(request: InspectionRequest) {
+  return formatInspectionStationSelection(request.stationSelection);
+}
 </script>
 
 <template>
@@ -92,6 +97,15 @@ const drawerWidth = computed(() =>
               <div class="text-gray-500">数量</div>
               <div class="mt-1 font-semibold text-gray-900">
                 {{ props.request.quantity || 1 }}
+              </div>
+            </div>
+            <div
+              v-if="stationSelectionText(props.request)"
+              class="rounded bg-gray-50 px-2 py-2"
+            >
+              <div class="text-gray-500">台数</div>
+              <div class="mt-1 font-semibold text-gray-900">
+                {{ stationSelectionText(props.request) }}
               </div>
             </div>
             <div class="rounded bg-gray-50 px-2 py-2">

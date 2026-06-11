@@ -19,7 +19,10 @@ export const incomingInspectionTypeOptions = [
 export const MACHINED_INCOMING_INSPECTION_TYPE = '机加成品件';
 
 type WorkOrderOptionSource = {
+  division?: null | string;
+  multiStationEnabled?: boolean;
   projectName?: null | string;
+  quantity?: null | number;
   workOrderNumber: string;
 };
 
@@ -42,9 +45,12 @@ export function mapInspectionRequestEntryWorkOrderOptions(
   items: WorkOrderOptionSource[],
 ) {
   return items.map((item) => ({
+    division: item.division || null,
     label: item.projectName
       ? `${item.workOrderNumber} - ${item.projectName}`
       : item.workOrderNumber,
+    multiStationEnabled: item.multiStationEnabled === true,
+    quantity: item.quantity || 0,
     value: item.workOrderNumber,
   }));
 }
@@ -131,10 +137,12 @@ export function buildInspectionRequestEntryRequiredMessage(
   copy: ReturnType<typeof getInspectionRequestEntryCopy>,
   requiresComponentName: boolean,
   isIncoming: boolean,
+  requiresStationSelection = false,
 ) {
   const componentText = requiresComponentName ? `${copy.componentLabel}、` : '';
   const incomingTypeText = isIncoming ? '进货类型、' : '';
-  return `工单号、${copy.processLabel}、${incomingTypeText}${copy.partLabel}、${componentText}数量、${copy.teamLabel}、报检人、${copy.attachmentRequiredMessage}`;
+  const stationText = requiresStationSelection ? '台数、' : '';
+  return `工单号、${copy.processLabel}、${incomingTypeText}${copy.partLabel}、${componentText}数量、${stationText}${copy.teamLabel}、报检人、${copy.attachmentRequiredMessage}`;
 }
 
 export function buildIncomingInspectionRequestInfo(input: {

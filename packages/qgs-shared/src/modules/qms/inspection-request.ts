@@ -13,12 +13,19 @@ export type InspectionRequestInspectionResult =
   | 'NA'
   | 'PASS';
 
+export type InspectionStationSelectionMode = 'ALL' | 'PARTIAL';
+
 export interface InspectionRequestAttachment {
   fileId?: string;
   name: string;
   size?: number;
   type?: string;
   url: string;
+}
+
+export interface InspectionStationSelection {
+  indexes: number[];
+  mode: InspectionStationSelectionMode;
 }
 
 export interface InspectionRequest {
@@ -51,6 +58,7 @@ export interface InspectionRequest {
   requestInfo?: null | string;
   requestNo: string;
   selfCheckResult: InspectionRequestCheckResult;
+  stationSelection?: InspectionStationSelection | null;
   status: InspectionRequestStatus;
   submittedAt: string;
   team?: null | string;
@@ -70,6 +78,7 @@ export interface CreateInspectionRequestParams {
   reporter: string;
   requestInfo?: string;
   selfCheckResult?: InspectionRequestCheckResult;
+  stationSelection?: InspectionStationSelection;
   team: string;
   workOrderNumber: string;
   workOrderNumbers?: string[];

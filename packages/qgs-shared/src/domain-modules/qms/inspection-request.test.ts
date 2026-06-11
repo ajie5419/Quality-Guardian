@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildInspectionRecordPayloadCore,
+  formatInspectionStationSelection,
   INCOMING_INSPECTION_PROCESS_NAME,
+  normalizeInspectionStationSelection,
 } from './inspection-request';
 
 describe('buildInspectionRecordPayloadCore', () => {
@@ -30,6 +32,7 @@ describe('buildInspectionRecordPayloadCore', () => {
           notes: 'Incoming batch',
         }),
         selfCheckResult: 'PASS',
+        stationSelection: JSON.stringify({ indexes: [1, 2], mode: 'PARTIAL' }),
         team: 'Supplier A',
         work_order: { projectName: 'Project A' },
         workOrderNumber: 'WO-001',
@@ -44,11 +47,32 @@ describe('buildInspectionRecordPayloadCore', () => {
       qualifiedQuantity: 8,
       quantity: 10,
       result: 'FAIL',
+      stationSelection: JSON.stringify({ indexes: [1, 2], mode: 'PARTIAL' }),
       supplierName: 'Supplier A',
       unqualifiedQuantity: 2,
       workOrderNumber: 'WO-001',
     });
     expect(payload).not.toHaveProperty('processName');
     expect(payload).not.toHaveProperty('level1Component');
+  });
+});
+
+describe('inspection station selection', () => {
+  it('normalizes partial station indexes within quantity bounds', () => {
+    expect(
+      normalizeInspectionStationSelection(
+        { indexes: [2, '1', 99, 2], mode: 'partial' },
+        3,
+      ),
+    ).toEqual({ indexes: [1, 2, 3], mode: 'PARTIAL' });
+  });
+
+  it('formats all and partial selections', () => {
+    expect(formatInspectionStationSelection({ indexes: [], mode: 'ALL' })).toBe(
+      '全部台数',
+    );
+    expect(
+      formatInspectionStationSelection({ indexes: [1, 2], mode: 'PARTIAL' }),
+    ).toBe('第 1 台、第 2 台');
   });
 });

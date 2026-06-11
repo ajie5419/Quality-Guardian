@@ -90,6 +90,7 @@ export interface InspectionRecordInput {
   hasDocuments?: boolean;
   packingListArchived?: string;
   quantity: number | string;
+  stationSelection?: null | string;
   qualifiedQuantity?: number | string;
   unqualifiedQuantity?: number | string;
   inspector: string;

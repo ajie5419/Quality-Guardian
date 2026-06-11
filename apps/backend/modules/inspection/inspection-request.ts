@@ -15,6 +15,7 @@ import {
   parseInspectionRequestAttachments as parseInspectionRequestAttachmentsRule,
   parseInspectionRequestPriority as parseInspectionRequestPriorityRule,
   parseInspectionRequestQuantity as parseInspectionRequestQuantityRule,
+  serializeInspectionStationSelection as serializeInspectionStationSelectionRule,
 } from '@qgs/shared';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { resolveTaskDispatchCurrentUserId } from '~/modules/task-dispatch/task-dispatch-rules';
@@ -51,6 +52,13 @@ export function parseInspectionRequestPriority(value: unknown, fallback = 3) {
 
 export function parseInspectionRequestQuantity(value: unknown, fallback = 1) {
   return parseInspectionRequestQuantityRule(value, fallback);
+}
+
+export function serializeInspectionStationSelection(
+  value: unknown,
+  quantity?: unknown,
+) {
+  return serializeInspectionStationSelectionRule(value, quantity);
 }
 
 export function normalizeInspectionRequestAttachments(value: unknown) {
@@ -90,6 +98,7 @@ export function buildInspectionRecordPayloadCore(input: {
     reporter: string;
     requestInfo?: null | string;
     selfCheckResult: string;
+    stationSelection?: null | string;
     team?: null | string;
     work_order?: null | { projectName?: null | string };
     workOrderNumber: string;
@@ -131,6 +140,7 @@ export function buildInspectionRecordPayloadCore(input: {
     quantity: payload.quantity,
     remarks: requestInfo.notes || payload.remarks,
     result: payload.result,
+    stationSelection: payload.stationSelection,
     supplierName: normalizeInspectionRequestText(input.request.team),
     unqualifiedQuantity: payload.unqualifiedQuantity,
     workOrderNumber: payload.workOrderNumber,
@@ -203,6 +213,7 @@ export async function buildInspectionRecordFromRequest(
     reporter: string;
     requestInfo?: null | string;
     selfCheckResult: string;
+    stationSelection?: null | string;
     team?: null | string;
     work_order?: null | { projectName?: null | string };
     workOrderNumber: string;

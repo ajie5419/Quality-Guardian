@@ -49,6 +49,7 @@ import {
   mapInspectionRequestEntryTeamOptions,
   mapInspectionRequestEntryWorkOrderOptions,
 } from './entry-mode';
+import { useInspectionRequestStationSelection } from './useInspectionRequestStationSelection';
 
 import './index.css';
 
@@ -63,7 +64,15 @@ const bomPartOptions = ref<Array<{ label: string; value: string }>>([]);
 const teamLoading = ref(false);
 const teamOptions = ref<SelectProps['options']>([]);
 const workOrderLoading = ref(false);
-const workOrderOptions = ref<Array<{ label: string; value: string }>>([]);
+const workOrderOptions = ref<
+  Array<{
+    division?: null | string;
+    label: string;
+    multiStationEnabled?: boolean;
+    quantity?: number;
+    value: string;
+  }>
+>([]);
 const workOrderProcessesLoading = ref(false);
 const { compressImage } = useImageCompress();
 const workOrderProcessOptions = ref<Array<{ label: string; value: string }>>(
@@ -84,6 +93,10 @@ const requestForm = reactive({
   reporter: '',
   requestInfo: '',
   selfCheckResult: 'PASS' as InspectionRequestCheckResult,
+  stationSelection: null as null | {
+    indexes: number[];
+    mode: 'ALL' | 'PARTIAL';
+  },
   team: '',
   workOrderNumber: '',
   workOrderNumbers: [] as string[],
@@ -112,6 +125,9 @@ const entryCopy = computed(() =>
   getInspectionRequestEntryCopy(isIncomingEntry.value),
 );
 
+const { requiresStationSelection, stationQuantity } =
+  useInspectionRequestStationSelection({ requestForm, workOrderOptions });
+
 function applyRoutePrefill() {
   const workOrderNumber = String(route.query.workOrderNumber || '');
   requestForm.workOrderNumber = workOrderNumber;
@@ -139,6 +155,7 @@ function resetRequestForm() {
   requestForm.requestInfo = '';
   requestForm.selfCheckResult = 'PASS';
   requestForm.mutualCheckResult = 'PASS';
+  requestForm.stationSelection = null;
   requestForm.team = '';
   requestForm.workOrderNumber = '';
   requestForm.workOrderNumbers = [];
@@ -337,6 +354,7 @@ async function submitRequest() {
     !requestForm.processName ||
     (requiresComponentName.value && !requestForm.componentName) ||
     !requestForm.quantity ||
+    (requiresStationSelection.value && !requestForm.stationSelection) ||
     !requestForm.team ||
     !requestForm.reporter ||
     requestForm.attachments.length === 0
@@ -346,6 +364,7 @@ async function submitRequest() {
         entryCopy.value,
         requiresComponentName.value,
         isIncomingEntry.value,
+        requiresStationSelection.value,
       ),
     );
     return;
@@ -372,6 +391,7 @@ async function submitRequest() {
             notes: requestForm.requestInfo,
           })
         : requestForm.requestInfo,
+      stationSelection: requestForm.stationSelection || undefined,
       workOrderNumber: requestForm.workOrderNumber,
       workOrderNumbers: isIncomingEntry.value
         ? requestForm.workOrderNumbers
@@ -442,7 +462,6 @@ watch(
   },
 );
 </script>
-
 <template>
   <InspectionRequestEntryShell :title="entryCopy.shellTitle">
     <Form class="inspection-entry-form" layout="vertical">
@@ -458,6 +477,8 @@ watch(
         :is-incoming-entry="isIncomingEntry"
         :process-options="processOptions"
         :requires-component-name="requiresComponentName"
+        :requires-station-selection="requiresStationSelection"
+        :station-quantity="stationQuantity"
         :submitting="submitting"
         :team-loading="teamLoading"
         :team-options="teamOptions"

@@ -3,6 +3,7 @@ import type { InspectionRequest } from '#/api/qms/inspection-request';
 
 import { IconifyIcon } from '@vben/icons';
 
+import { formatInspectionStationSelection } from '@qgs/shared';
 import {
   Button,
   Dropdown,
@@ -64,6 +65,10 @@ function isIncomingInspectionRequest(record: InspectionRequest) {
   return record.processName === INCOMING_INSPECTION_PROCESS_NAME;
 }
 
+function stationSelectionText(record: InspectionRequest) {
+  return formatInspectionStationSelection(record.stationSelection);
+}
+
 function handleActionMenuClick(record: InspectionRequest, key: unknown) {
   const action = String(key);
   if (action === 'delete') {
@@ -113,6 +118,9 @@ function handleActionMenuClick(record: InspectionRequest, key: unknown) {
             </Tag>
             <span v-else>{{ record.processName }}</span>
             <span> · {{ record.quantity || 1 }}</span>
+            <span v-if="stationSelectionText(record)">
+              · {{ stationSelectionText(record) }}
+            </span>
           </div>
           <div class="truncate text-xs text-gray-400">
             {{ record.requestNo }} / {{ record.workOrderNumber }}
@@ -278,6 +286,9 @@ function handleActionMenuClick(record: InspectionRequest, key: unknown) {
           </div>
           <div class="truncate text-xs text-gray-500">
             {{ record.processName }} · {{ record.quantity || 1 }}
+            <span v-if="stationSelectionText(record)">
+              · {{ stationSelectionText(record) }}
+            </span>
           </div>
           <div class="truncate text-xs text-gray-400">
             {{ record.requestNo }} / {{ record.workOrderNumber }}

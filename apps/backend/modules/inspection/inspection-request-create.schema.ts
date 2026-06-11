@@ -31,6 +31,12 @@ export const inspectionRequestCreateBodySchema = z.object({
   reporter: z.string().optional(),
   requestInfo: z.string().optional(),
   selfCheckResult: z.string().optional(),
+  stationSelection: z
+    .object({
+      indexes: z.array(z.union([z.number(), z.string()])).optional(),
+      mode: z.string(),
+    })
+    .optional(),
   team: z.string().optional(),
   workOrderNumber: z.string().optional(),
   workOrderNumbers: z.array(z.string()).optional(),

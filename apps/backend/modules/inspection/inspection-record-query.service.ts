@@ -4,7 +4,7 @@ import type {
 } from './inspection-record-types';
 
 import { Prisma } from '@prisma/client';
-import { formatDate } from '@qgs/shared';
+import { formatDate, normalizeInspectionStationSelection } from '@qgs/shared';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
@@ -94,6 +94,10 @@ export const InspectionRecordQueryService = {
       reportDate: inspection.reportDate
         ? formatDate(inspection.reportDate)
         : null,
+      stationSelection: normalizeInspectionStationSelection(
+        inspection.stationSelection,
+        inspection.quantity,
+      ),
     };
   },
   async findAll(params: {
@@ -242,6 +246,10 @@ export const InspectionRecordQueryService = {
             ? Math.max(0, Number(item.quantity || 1) - unqualifiedQuantity)
             : Number(item.qualifiedQuantity || 0),
         unqualifiedQuantity,
+        stationSelection: normalizeInspectionStationSelection(
+          item.stationSelection,
+          item.quantity,
+        ),
       };
     });
 

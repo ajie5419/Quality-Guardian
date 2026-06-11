@@ -55,6 +55,7 @@ export interface WorkOrderRecord {
   projectName?: null | string;
   division?: null | string;
   quantity: number;
+  multiStationEnabled?: boolean;
   deliveryDate: string; // ISO 日期字符串
   status: string; // 前端接收的原始字符串，由 normalizeStatus 转换
   createdAt?: string;

@@ -1,3 +1,5 @@
+import type { InspectionStationSelection } from './inspection-request';
+
 import { InspectionIssueStatusEnum } from './enums';
 
 export interface InspectionIssue {
@@ -53,6 +55,7 @@ export interface IncomingInspection {
   remarks?: string;
   reportDate: string;
   reporter: string;
+  stationSelection?: InspectionStationSelection | null;
   supplierName: string;
   templateId?: string;
   templateName?: string;
@@ -81,6 +84,7 @@ export interface ProcessInspection {
   quantity: number;
   remarks?: string;
   reporter: string;
+  stationSelection?: InspectionStationSelection | null;
   team: string;
   templateId?: string;
   templateName?: string;
@@ -109,6 +113,7 @@ export interface ShipmentInspection {
   remarks?: string;
   reportDate: string;
   reporter: string;
+  stationSelection?: InspectionStationSelection | null;
   templateId?: string;
   templateName?: string;
   unqualifiedQuantity?: number;

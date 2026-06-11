@@ -199,6 +199,9 @@ export const InspectionPublicQueryService = {
         skip: (params.page - 1) * params.pageSize,
         take: params.pageSize,
         select: {
+          division: true,
+          divisionId: true,
+          multiStationEnabled: true,
           projectName: true,
           quantity: true,
           status: true,
@@ -207,17 +210,44 @@ export const InspectionPublicQueryService = {
       }),
       prisma.work_orders.count({ where }),
     ]);
+    const divisionIds = [
+      ...new Set(
+        items
+          .flatMap((item) => [item.division, item.divisionId])
+          .map((item) => String(item || '').trim())
+          .filter((item) => item.startsWith('dept-')),
+      ),
+    ];
+    const departments =
+      divisionIds.length > 0
+        ? await prisma.departments.findMany({
+            where: { id: { in: divisionIds }, isDeleted: false },
+            select: { id: true, name: true },
+          })
+        : [];
+    const departmentNameById = new Map(
+      departments.map((item) => [item.id, item.name]),
+    );
     return {
-      items: items.map((item) => ({
-        createTime: null,
-        customerName: null,
-        deliveryDate: null,
-        id: item.workOrderNumber,
-        projectName: item.projectName || null,
-        quantity: item.quantity || 0,
-        status: item.status,
-        workOrderNumber: item.workOrderNumber,
-      })),
+      items: items.map((item) => {
+        const division =
+          departmentNameById.get(String(item.division || '')) ||
+          departmentNameById.get(String(item.divisionId || '')) ||
+          item.division ||
+          null;
+        return {
+          createTime: null,
+          customerName: null,
+          deliveryDate: null,
+          division,
+          id: item.workOrderNumber,
+          multiStationEnabled: Boolean(item.multiStationEnabled),
+          projectName: item.projectName || null,
+          quantity: item.quantity || 0,
+          status: item.status,
+          workOrderNumber: item.workOrderNumber,
+        };
+      }),
       total,
     };
   },

@@ -1,7 +1,10 @@
 import type { VxeGridPropTypes } from '#/adapter/vxe-table';
 import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
-import { INSPECTION_RECORD_TYPE } from '@qgs/shared';
+import {
+  formatInspectionStationSelection,
+  INSPECTION_RECORD_TYPE,
+} from '@qgs/shared';
 
 import { cloneInspectionProcessFallbackOptions } from '../../shared/constants/inspection-process-fallback';
 
@@ -59,6 +62,10 @@ export function mapDictionaryOptionsToInspectionProcessOnly(
       };
     })
     .filter(Boolean) as Array<{ label: string; value: string }>;
+}
+
+function formatStationSelectionCell({ cellValue }: { cellValue: unknown }) {
+  return formatInspectionStationSelection(cellValue) || '-';
 }
 
 export const getColumns = (
@@ -143,6 +150,13 @@ export const getColumns = (
 
   const endColumns: VxeGridPropTypes.Columns = [
     { field: 'quantity', title: '数量', width: 80 },
+    {
+      field: 'stationSelection',
+      title: '台数',
+      width: 140,
+      formatter: formatStationSelectionCell,
+      showOverflow: true,
+    },
     { field: 'inspector', title: '检验员', width: 100 },
     {
       field: 'result',

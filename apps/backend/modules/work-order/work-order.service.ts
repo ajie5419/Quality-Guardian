@@ -280,9 +280,9 @@ export const WorkOrderService = {
         prisma.work_orders.findMany({
           where: whereCondition,
           select: {
-            status: true,
             division: true,
             quantity: true,
+            status: true,
           },
         }),
       ]);
@@ -319,6 +319,7 @@ export const WorkOrderService = {
           projectName: wo.projectName || null,
           customerName: wo.customerName || null,
           division: wo.division || null,
+          multiStationEnabled: Boolean(wo.multiStationEnabled),
           quantity: wo.quantity || 0,
         };
       });
