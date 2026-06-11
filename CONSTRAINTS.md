@@ -218,3 +218,48 @@ modules/new-module/
 2. **并发写守卫**：凡是先 `findFirst` 检查状态、再执行写操作的流程，**状态检查必须在 `$transaction` 内完成**，或改用 `updateMany({ where: { id, status: ... } })` + 检查 `count` 做原子守卫。禁止"事务外检查、事务内写入"——这是经典竞态。
 3. **写路由所有权断言**：涉及用户/部门私有数据的 `delete` / `put` 路由，必须在 service 入口处校验 `createdBy` 或 `orgId` 与当前用户一致，或通过 `data-scope` 中间件覆盖。新增 delete/put 路由前必须确认归属模块在 `middleware/4.data-scope.ts` 的覆盖列表里，否则手动加校验。
 4. **禁止静默 catch**：`} catch {}` 或 `} catch (e) {}` 形式一律禁止。最低要求是 `logger.error(error, 'context')` 后再决定是否重新抛出。RBAC、data-scope、JWT 等核心安全路径上的 catch 必须记日志，便于排查权限问题。
+
+## 微信小程序约束（`apps/weapp/`）
+
+### API 层
+
+1. **禁止**在小程序中直接调用 `/api/qms/public/` 接口 — 公开接口暴露在外网有安全风险，小程序端应走鉴权接口
+2. **禁止**硬编码 API 地址 — 必须通过 `VITE_API_BASE_URL` 环境变量（`.env` / `.env.production`）
+3. **禁止**在小程序端存储用户密码 — 绑定完成后只保存 token
+4. **必须**所有需鉴权接口通过 `api/request.ts` 统一发送（自动注入 token、处理 401 刷新）
+5. **必须**上传文件使用 `uploadFile()` 函数（自动带 Authorization header）
+
+### 认证
+
+1. **禁止**绕过微信登录流程直接使用用户名密码登录
+2. **必须**切换账号时先调 `/api/auth/wx-unbind` 解绑再清除本地 token
+3. **必须**token 刷新失败时清除所有本地存储并跳转登录页
+4. **禁止**将 `WX_APPID`、`WX_APP_SECRET`、`WX_SESSION_SECRET` 提交到代码仓库
+
+### 角色与权限
+
+1. **必须**通过 `userInfo.roles` 判断用户角色，不得硬编码 userId 做权限判断
+2. **必须**派工员判断包含所有管理类角色：`super`/`admin`/`dispatch`/`manager`/`schedule`
+3. **禁止**检验员看到派单入口，禁止派工员看到检验录入入口
+
+### 代码规范
+
+1. **禁止** `as any`、`console.log`、非空断言 `!` — 与后端规则一致
+2. **必须**使用 rpx 单位做响应式布局
+3. **必须**使用 `uni.scss` 中定义的样式变量（$primary-color 等）
+4. **禁止**在页面中直接使用 `uni.getStorageSync('accessToken')` — 通过 `useUserStore` 管理状态
+5. **typecheck 豁免**：weapp 的 vue-tsc 检查配置为跳过（uni-app-types 全局类型冲突），但 eslint 和 prettier 必须通过
+
+### 环境变量
+
+后端 `.env` 中小程序相关必需变量：
+- `WX_APPID` — 微信小程序 AppID
+- `WX_APP_SECRET` — 微信小程序 AppSecret
+- `WX_SESSION_SECRET` — 绑定会话签名密钥（随机 32 字节 hex）
+- `HOST=0.0.0.0` — 开发环境后端需监听所有接口
+
+### 开发模式
+
+1. **开发环境 mock**：`NODE_ENV=development` 时微信 code 无效自动返回 mock openid，仅限开发调试
+2. **禁止**生产环境存在 mock 逻辑 — mock 分支由 `NODE_ENV` 严格守护
+3. **必须**修改 `.env` 后重启 `pnpm dev:antd`（VITE 环境变量只在启动时读取）
