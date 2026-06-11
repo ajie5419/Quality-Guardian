@@ -25,6 +25,33 @@
 
 ## 执行记录
 
+## [0.9.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.8.0...qgs-v0.9.0) (2026-06-11)
+
+
+### Features
+
+* **@qgs/backend:** support multi-work-order incoming requests ([270c052](https://github.com/ajie5419/Quality-Guardian/commit/270c052f0a54065d517bbde73a09d0745f35fc9b))
+* **@qgs/backend:** support work order multi-station inspections ([772d023](https://github.com/ajie5419/Quality-Guardian/commit/772d023247b90ac5f3d04e74a803f76ceee67e4a))
+* **@qgs/weapp:** add logout/switch account button on home page ([c1dbbf9](https://github.com/ajie5419/Quality-Guardian/commit/c1dbbf9c570b93271b3144f34a731dfa0d4bd10f))
+* **@qgs/weapp:** implement multi-step inspection close form ([be4b495](https://github.com/ajie5419/Quality-Guardian/commit/be4b49544587ab4e03917fd5d9d409ad2880896a))
+* **@qgs/weapp:** show inspection attachments on dispatch page ([4433d0c](https://github.com/ajie5419/Quality-Guardian/commit/4433d0c1553fd4e125fbd8cbdaebbdd763f8dc4e))
+* **@qgs/weapp:** show inspector workload status in dispatch picker ([d5d1bb2](https://github.com/ajie5419/Quality-Guardian/commit/d5d1bb26163c299d402988941dfa8a5dc345da81))
+* **@qgs/weapp:** unbind wx account on logout for easy account switching ([726c993](https://github.com/ajie5419/Quality-Guardian/commit/726c993365218b87c97a208b6ea1a789e67f7df5))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** tolerate pending inspection request migration ([b626e56](https://github.com/ajie5419/Quality-Guardian/commit/b626e5639710df68f3754be4c803bc39fb7b1fac))
+* **@qgs/weapp:** correct user list API path to /api/system/user/list ([1a04862](https://github.com/ajie5419/Quality-Guardian/commit/1a048620ce784ef36d3181c4b4429242078ef629))
+* **@qgs/weapp:** fix home page task navigation after detail page removal ([1abe84e](https://github.com/ajie5419/Quality-Guardian/commit/1abe84e068f5f3902739293b29dd8d766b576290))
+* **@qgs/weapp:** fix records page field mapping to match API response ([6c242d4](https://github.com/ajie5419/Quality-Guardian/commit/6c242d449c92a5aa503735885c36825d15943db9))
+* **@qgs/weapp:** fix records page navigation to removed detail page ([e61db27](https://github.com/ajie5419/Quality-Guardian/commit/e61db273ca7627241863ae66e69a59f06249a3d2))
+* **@qgs/weapp:** include 'super' role in dispatcher detection ([5d7a741](https://github.com/ajie5419/Quality-Guardian/commit/5d7a741c36239492cd8666f990a536be08c64d08))
+* **@qgs/weapp:** records page shows CLOSED + INSPECTING with status badge ([bbbd5cc](https://github.com/ajie5419/Quality-Guardian/commit/bbbd5cc59f0466c69f44a4d35a1e933830333fd2))
+* **@qgs/weapp:** replace placeholder tab icons with proper 81x81 PNGs ([f9a804d](https://github.com/ajie5419/Quality-Guardian/commit/f9a804d344efdd0868ac277d432e1629983d8654))
+* **@qgs/weapp:** use correct inspectorId field and relax dispatcher role check ([86459c5](https://github.com/ajie5419/Quality-Guardian/commit/86459c5c43a02de349887ce2f9be71d118a1ef5b))
+* **@qgs/web-antd:** prevent incoming request work order tag clipping ([4debe57](https://github.com/ajie5419/Quality-Guardian/commit/4debe57b9d4fdaa46470e559b5f7741fa51f8b6e))
+
 ### 2026-06-11 功能：工单多台策略与报检台数落库
 
 **执行内容：**
