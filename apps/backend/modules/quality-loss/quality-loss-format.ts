@@ -6,6 +6,7 @@ import type {
 import type { PaginationParams } from '~/utils/query-helpers';
 
 import { Prisma } from '@prisma/client';
+import { isValidQualityLossStatus } from '@qgs/shared';
 import { MONTHS } from '~/modules/quality-loss/locale';
 import {
   normalizeQualityLossSource,
@@ -67,7 +68,10 @@ export function buildManualLossesWhere(
     isDeleted: false,
   };
   if (params.status) {
-    where.status = normalizeQualityLossStatus(params.status);
+    const trimmedStatus = params.status.trim();
+    where.status = isValidQualityLossStatus(trimmedStatus)
+      ? normalizeQualityLossStatus(trimmedStatus)
+      : '__INVALID__';
   }
   if (params.year) {
     where.occurDate = {

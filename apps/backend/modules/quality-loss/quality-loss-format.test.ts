@@ -1,5 +1,5 @@
 import { Decimal } from '@prisma/client/runtime/library';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildManualLossesWhere,
   formatCommissioningIssueItem,
@@ -12,6 +12,20 @@ import {
   normalizeLossSourceFilter,
   sortByDateDesc,
 } from '~/modules/quality-loss/quality-loss-format';
+
+vi.mock('@qgs/shared', async () => {
+  const actual =
+    await vi.importActual<typeof import('@qgs/shared')>('@qgs/shared');
+  return {
+    ...actual,
+    isValidQualityLossStatus: (status: string) =>
+      ['CONFIRMED', 'PENDING', 'PROCESSING', 'RESOLVED'].includes(
+        String(status || '')
+          .trim()
+          .toUpperCase(),
+      ),
+  };
+});
 
 describe('quality-loss format helpers', () => {
   it('builds manual loss filters by normalized status and year range', () => {

@@ -4,6 +4,23 @@ export type UnifiedQualityLossStatus =
   | 'Processing'
   | 'Resolved';
 
+const VALID_UNIFIED_STATUSES = new Set<string>([
+  'CONFIRMED',
+  'PENDING',
+  'PROCESSING',
+  'RESOLVED',
+]);
+
+export function isValidQualityLossStatus(
+  status: null | string | undefined,
+): status is UnifiedQualityLossStatus {
+  return VALID_UNIFIED_STATUSES.has(
+    String(status || '')
+      .trim()
+      .toUpperCase(),
+  );
+}
+
 export type QualityLossSource =
   | 'Commissioning'
   | 'External'

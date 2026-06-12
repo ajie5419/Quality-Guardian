@@ -29,6 +29,19 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
+vi.mock('@qgs/shared', async () => {
+  const actual = await vi.importActual('@qgs/shared');
+  return {
+    ...actual,
+    isValidQualityLossStatus: (status: string) =>
+      ['CONFIRMED', 'PENDING', 'PROCESSING', 'RESOLVED'].includes(
+        String(status || '')
+          .trim()
+          .toUpperCase(),
+      ),
+  };
+});
+
 vi.mock('~/modules/dept/dept-tree', () => ({
   flattenDeptTree: vi.fn(() => []),
 }));
@@ -189,7 +202,7 @@ describe('qualityLossService – adversarial tests', () => {
       expect(result.items).toHaveLength(1);
     });
 
-    it('should match Pending items when filtering by invalid status (BUG: normalizeQualityLossStatus maps unknown→Pending)', async () => {
+    it('should return empty for invalid status (FIXED: no longer maps to Pending)', async () => {
       (prisma.quality_losses.findMany as any).mockResolvedValue([
         {
           id: '1',
@@ -209,7 +222,7 @@ describe('qualityLossService – adversarial tests', () => {
         status: 'INVALID_STATUS_XYZ',
       });
 
-      expect(result.items).toHaveLength(1);
+      expect(result.items).toHaveLength(0);
     });
   });
 
@@ -874,7 +887,7 @@ describe('qualityLossService – adversarial tests', () => {
 
   // ─── Bug documentation: known issues ───
   describe('known bugs / risky behaviors', () => {
-    it('bUG: any invalid status normalizes to "Pending", so invalid status filter includes Pending items', async () => {
+    it('fIXED: invalid status now returns empty instead of matching Pending', async () => {
       (prisma.quality_losses.findMany as any).mockResolvedValue([
         {
           id: '1',
@@ -894,7 +907,7 @@ describe('qualityLossService – adversarial tests', () => {
         status: 'totally_bogus_status',
       });
 
-      expect(result.items.length).toBeGreaterThan(0);
+      expect(result.items.length).toBe(0);
     });
 
     it('bUG: parsePagination treats pageSize=0 as falsy → defaults to 20', async () => {

@@ -31,6 +31,20 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
+vi.mock('@qgs/shared', async () => {
+  const actual =
+    await vi.importActual<typeof import('@qgs/shared')>('@qgs/shared');
+  return {
+    ...actual,
+    isValidQualityLossStatus: (status: string) =>
+      ['CONFIRMED', 'PENDING', 'PROCESSING', 'RESOLVED'].includes(
+        String(status || '')
+          .trim()
+          .toUpperCase(),
+      ),
+  };
+});
+
 describe('qualityLossService', () => {
   beforeEach(() => {
     vi.clearAllMocks();

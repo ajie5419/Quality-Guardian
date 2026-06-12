@@ -13,6 +13,7 @@ import type {
 } from './quality-loss-format';
 
 import { Prisma } from '@prisma/client';
+import { isValidQualityLossStatus } from '@qgs/shared';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { flattenDeptTree } from '~/modules/dept/dept-tree';
 import { DeptService } from '~/modules/dept/dept.service';
@@ -90,7 +91,10 @@ function filterQualityLossItemsByStatus(
   status?: string,
 ) {
   if (!status) return items;
-  const normalizedStatus = normalizeQualityLossStatus(status);
+  const trimmedStatus = status.trim();
+  if (trimmedStatus === '') return items;
+  if (!isValidQualityLossStatus(trimmedStatus)) return [];
+  const normalizedStatus = normalizeQualityLossStatus(trimmedStatus);
   return items.filter(
     (item) => normalizeQualityLossStatus(item.status) === normalizedStatus,
   );
@@ -206,13 +210,18 @@ async function getAllLossesUnpaginated(
   const sourceRecords = await fetchFromAllSources(params);
   const merged = await mergeAndFilter(sourceRecords, params);
   const { status, userContext } = params;
-  const statusFiltered = status
-    ? merged.filter(
-        (item) =>
-          normalizeQualityLossStatus(item.status) ===
-          normalizeQualityLossStatus(status),
-      )
-    : merged;
+  let statusFiltered: QualityLossItem[];
+  if (status && isValidQualityLossStatus(status.trim())) {
+    statusFiltered = merged.filter(
+      (item) =>
+        normalizeQualityLossStatus(item.status) ===
+        normalizeQualityLossStatus(status),
+    );
+  } else if (status) {
+    statusFiltered = [];
+  } else {
+    statusFiltered = merged;
+  }
 
   return QualityLossDataScopeService.sortFilteredByScope(
     statusFiltered,
