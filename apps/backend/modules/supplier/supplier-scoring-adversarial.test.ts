@@ -1,4 +1,16 @@
+import type { SupplierStats } from './supplier-scoring';
+
 import { describe, expect, it, vi } from 'vitest';
+
+import {
+  applyRecordsToStats,
+  buildInHouseOutsourcingScore,
+  buildSupplierScore,
+  calculateConsecutiveFailures,
+  classifyDefect,
+  createEmptyStats,
+  scoreSupplierListItem,
+} from './supplier-scoring';
 
 vi.mock('~/modules/supplier/supplier-query', () => ({
   IN_HOUSE_OUTSOURCING_MODE: 'IN_HOUSE_TEAM',
@@ -20,17 +32,6 @@ vi.mock('~/modules/supplier/supplier-query', () => ({
     return undefined;
   },
 }));
-
-import {
-  applyRecordsToStats,
-  buildInHouseOutsourcingScore,
-  buildSupplierScore,
-  calculateConsecutiveFailures,
-  classifyDefect,
-  createEmptyStats,
-  scoreSupplierListItem,
-} from './supplier-scoring';
-import type { SupplierStats } from './supplier-scoring';
 
 function makeStat(overrides: Partial<SupplierStats> = {}): SupplierStats {
   return { ...createEmptyStats(), ...overrides };
@@ -126,7 +127,7 @@ describe('classifyDefect', () => {
   });
 
   it('loss = NaN returns null', () => {
-    expect(classifyDefect(NaN)).toBeNull();
+    expect(classifyDefect(Number.NaN)).toBeNull();
   });
 
   it('loss = Infinity returns A (> 5000)', () => {
@@ -711,37 +712,25 @@ describe('applyRecordsToStats', () => {
 });
 
 describe('scoreSupplierListItem', () => {
-  it('Manual status=Frozen → stays Frozen even with high score', () => {
-    const result = scoreSupplierListItem(
-      { status: 'Frozen' },
-      makeStat(),
-    );
+  it('manual status=Frozen → stays Frozen even with high score', () => {
+    const result = scoreSupplierListItem({ status: 'Frozen' }, makeStat());
     expect(result.status).toBe('Frozen');
     expect(result.qualityScore).toBe(100);
   });
 
-  it('Manual status=Trial → stays Trial', () => {
-    const result = scoreSupplierListItem(
-      { status: 'Trial' },
-      makeStat(),
-    );
+  it('manual status=Trial → stays Trial', () => {
+    const result = scoreSupplierListItem({ status: 'Trial' }, makeStat());
     expect(result.status).toBe('Trial');
   });
 
-  it('Manual status=QUALIFIED (uppercase) → normalized then evaluated', () => {
-    const result = scoreSupplierListItem(
-      { status: 'QUALIFIED' },
-      makeStat(),
-    );
+  it('manual status=QUALIFIED (uppercase) → normalized then evaluated', () => {
+    const result = scoreSupplierListItem({ status: 'QUALIFIED' }, makeStat());
     // 'QUALIFIED'.toLowerCase() === 'qualified' → enters the scoring branch
     expect(result.status).toBe('Qualified');
   });
 
-  it('Manual status=Observation → stays Observation', () => {
-    const result = scoreSupplierListItem(
-      { status: 'Observation' },
-      makeStat(),
-    );
+  it('manual status=Observation → stays Observation', () => {
+    const result = scoreSupplierListItem({ status: 'Observation' }, makeStat());
     expect(result.status).toBe('Observation');
   });
 
@@ -782,7 +771,11 @@ describe('scoreSupplierListItem', () => {
     // But let's force 79: engA=1 (15) + engB=1 (5) + engC=1 (1) = 21 → 79
     const result = scoreSupplierListItem(
       {},
-      makeStat({ engineeringClassA: 1, engineeringClassB: 1, engineeringClassC: 1 }),
+      makeStat({
+        engineeringClassA: 1,
+        engineeringClassB: 1,
+        engineeringClassC: 1,
+      }),
     );
     expect(result.qualityScore).toBe(79);
     expect(result.level).toBe('C');
@@ -832,7 +825,11 @@ describe('scoreSupplierListItem', () => {
   it('freeze sets score=0 and status=Frozen', () => {
     const result = scoreSupplierListItem(
       {},
-      makeStat({ consecutiveBigFailures: 3, maxSingleLoss: 100_000, engineeringCount: 3 }),
+      makeStat({
+        consecutiveBigFailures: 3,
+        maxSingleLoss: 100_000,
+        engineeringCount: 3,
+      }),
     );
     expect(result.status).toBe('Frozen');
     expect(result.qualityScore).toBe(0);
@@ -854,10 +851,7 @@ describe('scoreSupplierListItem', () => {
     // Let's use only classB to avoid downgrade: classB=6 → 30 deduction → 70
     // Actually classB sum >= 3 triggers downgrade. Let's use failures only
     // failures=9 → 27 deduction → 73 < 75
-    const result = scoreSupplierListItem(
-      {},
-      makeStat({ failures: 9 }),
-    );
+    const result = scoreSupplierListItem({}, makeStat({ failures: 9 }));
     expect(result.status).toBe('Observation');
     expect(result.qualityScore).toBe(73);
   });
@@ -903,7 +897,11 @@ describe('scoreSupplierListItem', () => {
   it('warningReasons populated on freeze', () => {
     const result = scoreSupplierListItem(
       {},
-      makeStat({ consecutiveBigFailures: 3, maxSingleLoss: 100_000, engineeringCount: 3 }),
+      makeStat({
+        consecutiveBigFailures: 3,
+        maxSingleLoss: 100_000,
+        engineeringCount: 3,
+      }),
     );
     expect(result.warningReasons.length).toBeGreaterThan(0);
   });
@@ -919,7 +917,7 @@ describe('scoreSupplierListItem', () => {
       makeStat(),
     );
     expect(result.name).toBe('Test Supplier');
-    expect(result.foo).toBe('bar');
+    expect((result as any).foo).toBe('bar');
   });
 
   it('status defaults to Qualified when not provided', () => {

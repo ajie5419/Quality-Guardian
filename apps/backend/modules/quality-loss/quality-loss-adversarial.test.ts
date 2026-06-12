@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
+import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
+import { InspectionService } from '~/modules/inspection/inspection.service';
+import { QualityLossRecordMaintenanceService } from '~/modules/quality-loss/quality-loss-record-maintenance.service';
+import { QualityLossReportingService } from '~/modules/quality-loss/quality-loss-reporting.service';
+import { QualityLossSummaryService } from '~/modules/quality-loss/quality-loss-summary.service';
+import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
+import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -47,13 +53,16 @@ vi.mock('~/modules/inspection/inspection.service', () => ({
   },
 }));
 
-vi.mock('~/modules/vehicle-commissioning/vehicle-commissioning.service', () => ({
-  VehicleCommissioningService: {
-    getLossRecordsForAggregation: vi.fn().mockResolvedValue([]),
-    countLossRecordsForAggregation: vi.fn().mockResolvedValue(0),
-    getQualityLossTrendRows: vi.fn().mockResolvedValue([]),
-  },
-}));
+vi.mock(
+  '~/modules/vehicle-commissioning/vehicle-commissioning.service',
+  () => ({
+    VehicleCommissioningService: {
+      getLossRecordsForAggregation: vi.fn().mockResolvedValue([]),
+      countLossRecordsForAggregation: vi.fn().mockResolvedValue(0),
+      getQualityLossTrendRows: vi.fn().mockResolvedValue([]),
+    },
+  }),
+);
 
 vi.mock('~/modules/quality-loss/quality-loss-data-scope.service', () => ({
   QualityLossDataScopeService: {
@@ -62,13 +71,16 @@ vi.mock('~/modules/quality-loss/quality-loss-data-scope.service', () => ({
   },
 }));
 
-vi.mock('~/modules/quality-loss/quality-loss-record-maintenance.service', () => ({
-  QualityLossRecordMaintenanceService: {
-    deleteRecord: vi.fn(),
-    batchDelete: vi.fn(),
-    getDrillDown: vi.fn(),
-  },
-}));
+vi.mock(
+  '~/modules/quality-loss/quality-loss-record-maintenance.service',
+  () => ({
+    QualityLossRecordMaintenanceService: {
+      deleteRecord: vi.fn(),
+      batchDelete: vi.fn(),
+      getDrillDown: vi.fn(),
+    },
+  }),
+);
 
 vi.mock('~/modules/quality-loss/quality-loss-summary.service', () => ({
   QualityLossSummaryService: {
@@ -89,16 +101,7 @@ vi.mock('~/modules/quality-loss/quality-loss-route-update.service', () => ({
   QualityLossRouteUpdateService: { updateByRouteId: vi.fn() },
 }));
 
-import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
-import { QualityLossDataScopeService } from '~/modules/quality-loss/quality-loss-data-scope.service';
-import { QualityLossRecordMaintenanceService } from '~/modules/quality-loss/quality-loss-record-maintenance.service';
-import { QualityLossSummaryService } from '~/modules/quality-loss/quality-loss-summary.service';
-import { QualityLossReportingService } from '~/modules/quality-loss/quality-loss-reporting.service';
-import { InspectionService } from '~/modules/inspection/inspection.service';
-import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
-import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
-
-describe('QualityLossService – adversarial tests', () => {
+describe('qualityLossService – adversarial tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -155,7 +158,9 @@ describe('QualityLossService – adversarial tests', () => {
       ]);
       (prisma.quality_losses.count as any).mockResolvedValue(2);
 
-      const result = await QualityLossService.getAllLosses({ status: 'Pending' });
+      const result = await QualityLossService.getAllLosses({
+        status: 'Pending',
+      });
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0].status).toBe('Pending');
@@ -177,7 +182,9 @@ describe('QualityLossService – adversarial tests', () => {
       ]);
       (prisma.quality_losses.count as any).mockResolvedValue(1);
 
-      const result = await QualityLossService.getAllLosses({ status: 'pending' });
+      const result = await QualityLossService.getAllLosses({
+        status: 'pending',
+      });
 
       expect(result.items).toHaveLength(1);
     });
@@ -247,7 +254,7 @@ describe('QualityLossService – adversarial tests', () => {
       expect(result.items.length).toBeGreaterThan(0);
     });
 
-    it('BUG: pageSize=0 silently becomes 20 due to falsy coercion in parsePagination', async () => {
+    it('bUG: pageSize=0 silently becomes 20 due to falsy coercion in parsePagination', async () => {
       (prisma.quality_losses.findMany as any).mockResolvedValue(
         makeManualRecords(30),
       );
@@ -269,7 +276,7 @@ describe('QualityLossService – adversarial tests', () => {
 
       const result = await QualityLossService.getAllLosses({
         page: 1,
-        pageSize: 999999,
+        pageSize: 999_999,
       });
 
       expect(result.items.length).toBeLessThanOrEqual(100);
@@ -294,8 +301,8 @@ describe('QualityLossService – adversarial tests', () => {
       (prisma.quality_losses.count as any).mockResolvedValue(10);
 
       const result = await QualityLossService.getAllLosses({
-        page: '2',
-        pageSize: '5',
+        page: '2' as any,
+        pageSize: '5' as any,
       });
 
       expect(result.items.length).toBeLessThanOrEqual(5);
@@ -409,7 +416,7 @@ describe('QualityLossService – adversarial tests', () => {
       const result = await QualityLossService.getAllLosses({});
 
       expect(result.items).toHaveLength(1);
-      expect(result.items[0].amount).toBe(999999999999.99);
+      expect(result.items[0].amount).toBe(999_999_999_999.99);
     });
   });
 
@@ -451,9 +458,7 @@ describe('QualityLossService – adversarial tests', () => {
       });
 
       expect(result.items).toEqual([]);
-      expect(
-        InspectionService.getLossRecordsForAggregation,
-      ).toHaveBeenCalled();
+      expect(InspectionService.getLossRecordsForAggregation).toHaveBeenCalled();
     });
 
     it('should route to External source when lossSource=External', async () => {
@@ -469,9 +474,7 @@ describe('QualityLossService – adversarial tests', () => {
       });
 
       expect(result.items).toEqual([]);
-      expect(
-        AfterSalesService.getLossRecordsForAggregation,
-      ).toHaveBeenCalled();
+      expect(AfterSalesService.getLossRecordsForAggregation).toHaveBeenCalled();
     });
 
     it('should route to Commissioning source when lossSource=Commissioning', async () => {
@@ -653,9 +656,7 @@ describe('QualityLossService – adversarial tests', () => {
   describe('getTrendData', () => {
     it('should return 12 monthly entries for month granularity', async () => {
       (prisma.$queryRaw as any).mockResolvedValue([]);
-      (
-        InspectionService.getQualityLossTrendRows as any
-      ).mockResolvedValue([]);
+      (InspectionService.getQualityLossTrendRows as any).mockResolvedValue([]);
       (AfterSalesService.getQualityLossTrendRows as any).mockResolvedValue([]);
       (
         VehicleCommissioningService.getQualityLossTrendRows as any
@@ -672,9 +673,9 @@ describe('QualityLossService – adversarial tests', () => {
 
     it('should return empty trend when all queries fail', async () => {
       (prisma.$queryRaw as any).mockRejectedValue(new Error('DB error'));
-      (
-        InspectionService.getQualityLossTrendRows as any
-      ).mockRejectedValue(new Error('DB error'));
+      (InspectionService.getQualityLossTrendRows as any).mockRejectedValue(
+        new Error('DB error'),
+      );
       (AfterSalesService.getQualityLossTrendRows as any).mockRejectedValue(
         new Error('DB error'),
       );
@@ -692,9 +693,9 @@ describe('QualityLossService – adversarial tests', () => {
         { p: 1, a: 100 },
         { p: 3, a: 200 },
       ]);
-      (
-        InspectionService.getQualityLossTrendRows as any
-      ).mockRejectedValue(new Error('Partial fail'));
+      (InspectionService.getQualityLossTrendRows as any).mockRejectedValue(
+        new Error('Partial fail'),
+      );
       (AfterSalesService.getQualityLossTrendRows as any).mockResolvedValue([
         { p: 1, a: 50 },
       ]);
@@ -712,9 +713,7 @@ describe('QualityLossService – adversarial tests', () => {
         { p: 1, a: 100 },
         { p: 5, a: 200 },
       ]);
-      (
-        InspectionService.getQualityLossTrendRows as any
-      ).mockResolvedValue([]);
+      (InspectionService.getQualityLossTrendRows as any).mockResolvedValue([]);
       (AfterSalesService.getQualityLossTrendRows as any).mockResolvedValue([]);
       (
         VehicleCommissioningService.getQualityLossTrendRows as any
@@ -727,9 +726,7 @@ describe('QualityLossService – adversarial tests', () => {
 
     it('should return empty weekly trend when all sources empty', async () => {
       (prisma.$queryRaw as any).mockResolvedValue([]);
-      (
-        InspectionService.getQualityLossTrendRows as any
-      ).mockResolvedValue([]);
+      (InspectionService.getQualityLossTrendRows as any).mockResolvedValue([]);
       (AfterSalesService.getQualityLossTrendRows as any).mockResolvedValue([]);
       (
         VehicleCommissioningService.getQualityLossTrendRows as any
@@ -806,9 +803,9 @@ describe('QualityLossService – adversarial tests', () => {
   describe('reporting methods', () => {
     it('getStatsForDashboard delegates correctly', async () => {
       const params = { weekStart: new Date(), yearStart: new Date() };
-      (QualityLossReportingService.getStatsForDashboard as any).mockResolvedValue(
-        {},
-      );
+      (
+        QualityLossReportingService.getStatsForDashboard as any
+      ).mockResolvedValue({});
 
       await QualityLossService.getStatsForDashboard(params);
 
@@ -877,7 +874,7 @@ describe('QualityLossService – adversarial tests', () => {
 
   // ─── Bug documentation: known issues ───
   describe('known bugs / risky behaviors', () => {
-    it('BUG: any invalid status normalizes to "Pending", so invalid status filter includes Pending items', async () => {
+    it('bUG: any invalid status normalizes to "Pending", so invalid status filter includes Pending items', async () => {
       (prisma.quality_losses.findMany as any).mockResolvedValue([
         {
           id: '1',
@@ -900,7 +897,7 @@ describe('QualityLossService – adversarial tests', () => {
       expect(result.items.length).toBeGreaterThan(0);
     });
 
-    it('BUG: parsePagination treats pageSize=0 as falsy → defaults to 20', async () => {
+    it('bUG: parsePagination treats pageSize=0 as falsy → defaults to 20', async () => {
       (prisma.quality_losses.findMany as any).mockResolvedValue(
         makeManualRecords(30),
       );
@@ -928,11 +925,11 @@ describe('QualityLossService – adversarial tests', () => {
       expect(result.items.length).toBe(1);
     });
 
-    it('BUG: getTrendData Promise.all means ANY single source failure returns empty trend', async () => {
+    it('bUG: getTrendData Promise.all means ANY single source failure returns empty trend', async () => {
       (prisma.$queryRaw as any).mockResolvedValue([{ p: 1, a: 500 }]);
-      (
-        InspectionService.getQualityLossTrendRows as any
-      ).mockResolvedValue([{ p: 1, a: 300 }]);
+      (InspectionService.getQualityLossTrendRows as any).mockResolvedValue([
+        { p: 1, a: 300 },
+      ]);
       (AfterSalesService.getQualityLossTrendRows as any).mockResolvedValue([
         { p: 1, a: 200 },
       ]);

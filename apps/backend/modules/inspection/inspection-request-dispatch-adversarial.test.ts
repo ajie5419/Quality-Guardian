@@ -47,10 +47,12 @@ vi.mock('~/modules/inspection/inspection-request', () => ({
     if (v === null || v === undefined) return '';
     return String(v).trim();
   }),
-  parseInspectionRequestPriority: vi.fn().mockImplementation((v, fallback = 3) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : fallback;
-  }),
+  parseInspectionRequestPriority: vi
+    .fn()
+    .mockImplementation((v, fallback = 3) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    }),
   resolveInspectionRequestCurrentUserId: vi.fn().mockResolvedValue('admin-1'),
 }));
 
@@ -72,14 +74,18 @@ function makeInspector(id = 'inspector-1') {
   return { id, username: 'inspector_user' } as never;
 }
 
-function setupTransactionMocks(overrides: {
-  updateManyCount?: number;
-  taskCreateResult?: unknown;
-  updateResult?: unknown;
-} = {}) {
+function setupTransactionMocks(
+  overrides: {
+    taskCreateResult?: unknown;
+    updateManyCount?: number;
+    updateResult?: unknown;
+  } = {},
+) {
   const tx = {
     qms_inspection_requests: {
-      updateMany: vi.fn().mockResolvedValue({ count: overrides.updateManyCount ?? 1 }),
+      updateMany: vi
+        .fn()
+        .mockResolvedValue({ count: overrides.updateManyCount ?? 1 }),
       update: vi.fn().mockResolvedValue(
         overrides.updateResult ?? {
           id: 'req-1',
@@ -92,16 +98,16 @@ function setupTransactionMocks(overrides: {
       ),
     },
     qms_task_dispatches: {
-      create: vi.fn().mockResolvedValue(
-        overrides.taskCreateResult ?? { id: 'task-1' },
-      ),
+      create: vi
+        .fn()
+        .mockResolvedValue(overrides.taskCreateResult ?? { id: 'task-1' }),
     },
   };
   vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(tx));
   return tx;
 }
 
-describe('Adversarial: dispatchRequest state machine', () => {
+describe('adversarial: dispatchRequest state machine', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(prisma.users.findFirst).mockResolvedValue(makeInspector());
@@ -199,7 +205,7 @@ describe('Adversarial: dispatchRequest state machine', () => {
   });
 });
 
-describe('Adversarial: dispatchRequest input validation', () => {
+describe('adversarial: dispatchRequest input validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(prisma.users.findFirst).mockResolvedValue(makeInspector());
@@ -270,7 +276,7 @@ describe('Adversarial: dispatchRequest input validation', () => {
   });
 });
 
-describe('Adversarial: dispatchRequest permission checks', () => {
+describe('adversarial: dispatchRequest permission checks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(prisma.users.findFirst).mockResolvedValue(makeInspector());
@@ -329,7 +335,7 @@ describe('Adversarial: dispatchRequest permission checks', () => {
   });
 });
 
-describe('Adversarial: dispatchRequest edge cases', () => {
+describe('adversarial: dispatchRequest edge cases', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { RbacService } = await import('~/modules/rbac/rbac.service');
@@ -339,7 +345,9 @@ describe('Adversarial: dispatchRequest edge cases', () => {
     const { resolveInspectionRequestCurrentUserId } = await import(
       '~/modules/inspection/inspection-request'
     );
-    vi.mocked(resolveInspectionRequestCurrentUserId).mockResolvedValue('admin-1');
+    vi.mocked(resolveInspectionRequestCurrentUserId).mockResolvedValue(
+      'admin-1',
+    );
     vi.mocked(prisma.users.findFirst).mockResolvedValue(makeInspector());
     vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue(
       makeSubmittedRequest(),
