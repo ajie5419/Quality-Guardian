@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
-import { buildKeywordOr } from '~/utils/query-helpers';
+import { buildKeywordOr, parsePagination } from '~/utils/query-helpers';
 
 import { MetrologyImportService } from './metrology-import.service';
 import {
@@ -357,17 +357,15 @@ export const MetrologyService = {
   },
 
   async getList(params: MetrologyListParams) {
-    const page = Math.max(Number(params.page || 1), 1);
-    const pageSize = Math.min(Math.max(Number(params.pageSize || 20), 1), 100);
+    const { skip, take } = parsePagination(params);
     const where = buildQueryWhere(params);
-    const skip = (page - 1) * pageSize;
 
     const [items, total] = await Promise.all([
       prisma.measuring_instruments.findMany({
         where,
         orderBy: buildMetrologyOrderBy(params.sortBy, params.sortOrder),
         skip,
-        take: pageSize,
+        take,
       }),
       prisma.measuring_instruments.count({ where }),
     ]);

@@ -267,7 +267,7 @@ describe('qualityLossService – adversarial tests', () => {
       expect(result.items.length).toBeGreaterThan(0);
     });
 
-    it('bUG: pageSize=0 silently becomes 20 due to falsy coercion in parsePagination', async () => {
+    it('clamps pageSize=0 to 1 instead of defaulting to 20', async () => {
       (prisma.quality_losses.findMany as any).mockResolvedValue(
         makeManualRecords(30),
       );
@@ -278,7 +278,7 @@ describe('qualityLossService – adversarial tests', () => {
         pageSize: 0,
       });
 
-      expect(result.items.length).toBe(20);
+      expect(result.items.length).toBe(1);
     });
 
     it('should clamp pageSize=999999 to pageSize=100', async () => {
@@ -684,7 +684,7 @@ describe('qualityLossService – adversarial tests', () => {
       });
     });
 
-    it('should return empty trend when all queries fail', async () => {
+    it('should return monthly zero buckets when all sources fail', async () => {
       (prisma.$queryRaw as any).mockRejectedValue(new Error('DB error'));
       (InspectionService.getQualityLossTrendRows as any).mockRejectedValue(
         new Error('DB error'),
@@ -698,10 +698,11 @@ describe('qualityLossService – adversarial tests', () => {
 
       const result = await QualityLossService.getTrendData('month');
 
-      expect(result.trend).toEqual([]);
+      expect(result.trend).toHaveLength(12);
+      expect(result.trend.every((item) => item.totalAmount === 0)).toBe(true);
     });
 
-    it('should return empty trend when any source fails (Promise.all short-circuits)', async () => {
+    it('keeps healthy trend sources when one source fails', async () => {
       (prisma.$queryRaw as any).mockResolvedValue([
         { p: 1, a: 100 },
         { p: 3, a: 200 },
@@ -718,7 +719,12 @@ describe('qualityLossService – adversarial tests', () => {
 
       const result = await QualityLossService.getTrendData('month');
 
-      expect(result.trend).toEqual([]);
+      expect(result.trend).toHaveLength(12);
+      expect(result.trend[0]).toMatchObject({
+        externalAmount: 50,
+        manualAmount: 100,
+        totalAmount: 150,
+      });
     });
 
     it('should return weekly entries when data exists', async () => {
@@ -910,7 +916,7 @@ describe('qualityLossService – adversarial tests', () => {
       expect(result.items.length).toBe(0);
     });
 
-    it('bUG: parsePagination treats pageSize=0 as falsy → defaults to 20', async () => {
+    it('clamps pageSize=0 to 1 instead of defaulting to 20', async () => {
       (prisma.quality_losses.findMany as any).mockResolvedValue(
         makeManualRecords(30),
       );
@@ -921,7 +927,7 @@ describe('qualityLossService – adversarial tests', () => {
         pageSize: 0,
       });
 
-      expect(result.items.length).toBe(20);
+      expect(result.items.length).toBe(1);
     });
 
     it('negative pageSize correctly clamped to 1 (not buggy)', async () => {
@@ -938,7 +944,7 @@ describe('qualityLossService – adversarial tests', () => {
       expect(result.items.length).toBe(1);
     });
 
-    it('bUG: getTrendData Promise.all means ANY single source failure returns empty trend', async () => {
+    it('preserves healthy trend sources when one source times out', async () => {
       (prisma.$queryRaw as any).mockResolvedValue([{ p: 1, a: 500 }]);
       (InspectionService.getQualityLossTrendRows as any).mockResolvedValue([
         { p: 1, a: 300 },
@@ -952,7 +958,13 @@ describe('qualityLossService – adversarial tests', () => {
 
       const result = await QualityLossService.getTrendData('month');
 
-      expect(result.trend).toEqual([]);
+      expect(result.trend).toHaveLength(12);
+      expect(result.trend[0]).toMatchObject({
+        externalAmount: 200,
+        internalAmount: 300,
+        manualAmount: 500,
+        totalAmount: 1000,
+      });
     });
   });
 });

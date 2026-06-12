@@ -2621,8 +2621,14 @@ describe('uniqueNonEmpty — deep adversarial', () => {
     expect(uniqueNonEmpty(['A', 'a', 'B'])).toEqual(['A', 'a', 'B']);
   });
 
-  it('handles non-standard whitespace (zero-width space NOT caught by trim)', () => {
-    expect(uniqueNonEmpty(['\u200B', 'x'])).toEqual(['\u200B', 'x']);
+  it('filters zero-width whitespace-only permission codes', () => {
+    expect(uniqueNonEmpty(['\u200B', 'x'])).toEqual(['x']);
+  });
+
+  it('normalizes invisible characters before deduplication', () => {
+    expect(uniqueNonEmpty(['qms:view', '\u200Bqms:view\u200B'])).toEqual([
+      'qms:view',
+    ]);
   });
 
   it('handles very long strings', () => {

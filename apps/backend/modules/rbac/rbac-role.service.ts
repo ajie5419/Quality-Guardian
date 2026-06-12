@@ -6,8 +6,16 @@ import {
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
+const INVISIBLE_PERMISSION_CHARS = /[\u200B-\u200D\uFEFF]/g;
+
 export function uniqueNonEmpty(values: string[]) {
-  return [...new Set(values.filter((value) => value && value.trim() !== ''))];
+  return [
+    ...new Set(
+      values
+        .map((value) => value.replaceAll(INVISIBLE_PERMISSION_CHARS, '').trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 export function parseStringArrayJson(raw: null | string) {

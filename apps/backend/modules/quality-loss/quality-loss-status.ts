@@ -7,6 +7,7 @@ import type { QualityLossSource, UnifiedQualityLossStatus } from '@qgs/shared';
 import {
   normalizeQualityLossSource as normalizeQualityLossSourceRule,
   normalizeQualityLossStatus as normalizeQualityLossStatusRule,
+  parseQualityLossStatus as parseQualityLossStatusRule,
   QUALITY_LOSS_SOURCE,
   toAfterSalesClaimStatus as toAfterSalesClaimStatusRule,
   toQualityLossTargetType as toQualityLossTargetTypeRule,
@@ -21,6 +22,12 @@ export function normalizeQualityLossStatus(
   status: null | string | undefined,
 ): UnifiedQualityLossStatus {
   return normalizeQualityLossStatusRule(status);
+}
+
+export function parseQualityLossStatus(
+  status: null | string | undefined,
+): null | UnifiedQualityLossStatus {
+  return parseQualityLossStatusRule(status);
 }
 
 export function toAfterSalesClaimStatus(

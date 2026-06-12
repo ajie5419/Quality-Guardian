@@ -36,6 +36,17 @@ describe('quality-loss payload utils', () => {
     expect(data.occurDate).toBeInstanceOf(Date);
   });
 
+  it('defaults unknown status without treating it as valid input', () => {
+    const data = buildQualityLossCreateData(
+      {
+        status: 'unexpected-status',
+      },
+      'QL-2026-BBBBBB',
+    );
+
+    expect(data.status).toBe('Pending');
+  });
+
   it('builds response with mapped fields', () => {
     const response = buildQualityLossCreateResponse({
       actualClaim: new Decimal(20),

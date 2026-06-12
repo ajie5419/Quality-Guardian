@@ -1,4 +1,4 @@
-import { normalizeQualityLossStatus } from './quality-loss-status';
+import { parseQualityLossStatus } from './quality-loss-status';
 
 const QUALITY_LOSS_ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const QUALITY_LOSS_ID_SIZE = 6;
@@ -46,9 +46,8 @@ export function buildQualityLossCreateData(
     lossId,
     occurDate: parseQualityLossDate(body.date),
     respDept: (body.responsibleDepartment as null | string | undefined) || null,
-    status: normalizeQualityLossStatus(
-      (body.status as string | undefined) || 'Pending',
-    ),
+    status:
+      parseQualityLossStatus(body.status as string | undefined) || 'Pending',
     type: String(body.type || ''),
   };
 }

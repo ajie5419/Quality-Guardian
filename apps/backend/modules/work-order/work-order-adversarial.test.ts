@@ -40,6 +40,22 @@ vi.mock('~/utils/query-helpers', () => ({
   formatDateString: vi.fn((d: any) =>
     d instanceof Date ? d.toISOString().slice(0, 10) : String(d ?? ''),
   ),
+  parsePagination: vi.fn(
+    (params: { page?: number; pageSize?: number } = {}) => {
+      const rawPage = Number(params.page);
+      const rawPageSize = Number(params.pageSize);
+      const page = Number.isFinite(rawPage) ? Math.max(1, rawPage) : 1;
+      const pageSize = Number.isFinite(rawPageSize)
+        ? Math.min(100, Math.max(1, rawPageSize))
+        : 20;
+      return {
+        page,
+        pageSize,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      };
+    },
+  ),
 }));
 
 function makeWorkOrder(overrides: Record<string, any> = {}) {
@@ -148,26 +164,24 @@ describe('workOrderService – adversarial', () => {
       expect(result.total).toBe(0);
     });
 
-    it('bUG: page=0 produces negative skip (should clamp to 1)', async () => {
+    it('clamps page=0 to the first page', async () => {
       (prisma.work_orders.findMany as any).mockResolvedValue([]);
       (prisma.work_orders.count as any).mockResolvedValue(0);
 
       await WorkOrderService.getList({ page: 0, pageSize: 10 });
 
       const skip = (prisma.work_orders.findMany as any).mock.calls[0][0].skip;
-      // BUG: skip is -10 instead of 0 — page is not clamped
-      expect(skip).toBe(-10);
+      expect(skip).toBe(0);
     });
 
-    it('bUG: NaN page produces NaN skip (should default to 1)', async () => {
+    it('defaults NaN page to the first page', async () => {
       (prisma.work_orders.findMany as any).mockResolvedValue([]);
       (prisma.work_orders.count as any).mockResolvedValue(0);
 
       await WorkOrderService.getList({ page: Number.NaN, pageSize: 10 });
 
       const skip = (prisma.work_orders.findMany as any).mock.calls[0][0].skip;
-      // BUG: skip is NaN — no guard against non-numeric input
-      expect(Number.isNaN(skip)).toBe(true);
+      expect(skip).toBe(0);
     });
 
     it('formats deliveryDate in items', async () => {

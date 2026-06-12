@@ -25,6 +25,22 @@ vi.mock('~/utils/governed-write', () => ({
 
 vi.mock('~/utils/query-helpers', () => ({
   buildKeywordOr: vi.fn(() => null),
+  parsePagination: vi.fn(
+    (params: { page?: number; pageSize?: number } = {}) => {
+      const rawPage = Number(params.page);
+      const rawPageSize = Number(params.pageSize);
+      const page = Number.isFinite(rawPage) ? Math.max(1, rawPage) : 1;
+      const pageSize = Number.isFinite(rawPageSize)
+        ? Math.min(100, Math.max(1, rawPageSize))
+        : 20;
+      return {
+        page,
+        pageSize,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      };
+    },
+  ),
 }));
 
 vi.mock('~/utils/redis', () => ({
@@ -429,10 +445,10 @@ describe('metrologyService — getList pagination', () => {
     expect(call.take).toBe(100);
   });
 
-  it('defaults pageSize to 20 when pageSize=0 (falsy fallback)', async () => {
+  it('clamps pageSize to minimum 1 when pageSize=0', async () => {
     await MetrologyService.getList({ page: 1, pageSize: 0 });
     const call = mockPrisma.measuring_instruments.findMany.mock.calls[0][0];
-    expect(call.take).toBe(20);
+    expect(call.take).toBe(1);
   });
 
   it('defaults page=1, pageSize=20 when omitted', async () => {
@@ -1538,22 +1554,22 @@ describe('metrologyService — pagination edge cases', () => {
     expect(call.take).toBe(20);
   });
 
-  it('bUG: string page "abc" produces NaN skip (Math.max with NaN returns NaN)', async () => {
+  it('defaults string page "abc" to first page', async () => {
     await MetrologyService.getList({
       page: 'abc' as unknown as number,
       pageSize: 10,
     });
     const call = mockPrisma.measuring_instruments.findMany.mock.calls[0][0];
-    expect(call.skip).toBeNaN();
+    expect(call.skip).toBe(0);
   });
 
-  it('bUG: string pageSize "xyz" produces NaN take (Math.min with NaN returns NaN)', async () => {
+  it('defaults string pageSize "xyz" to 20', async () => {
     await MetrologyService.getList({
       page: 1,
       pageSize: 'xyz' as unknown as number,
     });
     const call = mockPrisma.measuring_instruments.findMany.mock.calls[0][0];
-    expect(call.take).toBeNaN();
+    expect(call.take).toBe(20);
   });
 
   it('pageSize=1 is allowed', async () => {

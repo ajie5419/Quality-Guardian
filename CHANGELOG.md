@@ -25,6 +25,31 @@
 
 ## 执行记录
 
+### 2026-06-12 修复：分页边界、质量损失趋势容错与 RBAC 权限清洗
+
+**执行内容：**
+
+- 修复通用分页解析，`page=0` / 负数 clamp 到第一页，非有限数字回退默认值，`pageSize=0` clamp 到 1，最大值仍限制为 100。
+- 工单列表与计量器具列表改用统一分页解析，避免负数或 `NaN` skip/take 进入 Prisma 查询。
+- 质量损失趋势按来源独立容错，单个来源查询失败时记录 warning 并保留其他来源趋势数据。
+- 新增质量损失严格状态解析，创建 payload 只接受已知状态/历史别名，未知状态回退默认值但不被当作合法输入。
+- RBAC 权限 code 去除零宽字符后再判空去重，避免不可见字符污染权限关系。
+- 更新相关对抗测试和 query helper 单元测试，并将既有聚合对抗测试登记到架构 baseline。
+
+**验证结果：**
+
+- `pnpm --dir packages/qgs-shared run build`: 通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/backend exec vitest run utils/query-helpers.test.ts modules/work-order/work-order-adversarial.test.ts modules/metrology/metrology-adversarial.test.ts modules/rbac/rbac-adversarial.test.ts modules/quality-loss/quality-loss-adversarial.test.ts modules/quality-loss/quality-loss-payload.test.ts modules/quality-loss/quality-loss-status.test.ts`: 7 文件 / 399 测试全部通过
+- `pnpm -C apps/backend exec vitest run modules/quality-loss modules/work-order modules/metrology modules/rbac utils/query-helpers.test.ts`: 43 文件 / 631 测试全部通过
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+
+**commit:** 本次未提交
+
+**遗留问题：**
+
+- `pnpm -C apps/backend exec vitest run ...` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
+
 ## [0.9.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.8.0...qgs-v0.9.0) (2026-06-11)
 
 

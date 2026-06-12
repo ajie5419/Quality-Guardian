@@ -10,6 +10,10 @@ export interface PaginationParams {
 
 export type SortDirection = 'asc' | 'desc';
 
+const DEFAULT_PAGE = 1;
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
+
 export function parseSortOrder(
   sortBy?: string,
   sortOrder?: string,
@@ -32,8 +36,12 @@ export function buildOrderBy(
 }
 
 export function parsePagination(params: PaginationParams = {}) {
-  const page = Math.max(1, Number(params.page) || 1);
-  const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 20));
+  const rawPage = Number(params.page);
+  const rawPageSize = Number(params.pageSize);
+  const page = Number.isFinite(rawPage) ? Math.max(1, rawPage) : DEFAULT_PAGE;
+  const pageSize = Number.isFinite(rawPageSize)
+    ? Math.min(MAX_PAGE_SIZE, Math.max(1, rawPageSize))
+    : DEFAULT_PAGE_SIZE;
   const skip = (page - 1) * pageSize;
   return { page, pageSize, skip, take: pageSize };
 }

@@ -14,7 +14,11 @@ import { WorkOrderRequirementService } from '~/modules/work-order-requirement';
 import { addYearsToDate } from '~/modules/work-order/work-order-query';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import { buildKeywordOr, formatDateString } from '~/utils/query-helpers';
+import {
+  buildKeywordOr,
+  formatDateString,
+  parsePagination,
+} from '~/utils/query-helpers';
 
 import { mapToDisplayStatus, WORK_ORDER_STATUS } from './work-order-status';
 
@@ -260,10 +264,10 @@ export const WorkOrderService = {
    * 获取工单列表（分页）
    */
   async getList(params: WorkOrderListParams): Promise<WorkOrderListResult> {
-    const {
-      page = WO_CONSTANTS.DEFAULT_PAGE,
-      pageSize = WO_CONSTANTS.DEFAULT_PAGE_SIZE,
-    } = params;
+    const { skip, take } = parsePagination({
+      page: params.page ?? WO_CONSTANTS.DEFAULT_PAGE,
+      pageSize: params.pageSize ?? WO_CONSTANTS.DEFAULT_PAGE_SIZE,
+    });
     const whereCondition = await buildWorkOrderWhereCondition(params);
 
     try {
@@ -271,8 +275,8 @@ export const WorkOrderService = {
       const [workOrders, total, summaryData] = await Promise.all([
         prisma.work_orders.findMany({
           where: whereCondition,
-          skip: (page - 1) * pageSize,
-          take: pageSize,
+          skip,
+          take,
           orderBy: { createdAt: 'desc' },
         }),
         prisma.work_orders.count({ where: whereCondition }),

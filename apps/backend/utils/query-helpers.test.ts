@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildKeywordOr } from './query-helpers';
+import { buildKeywordOr, parsePagination } from './query-helpers';
 
 describe('query helpers', () => {
   describe('buildKeywordOr', () => {
@@ -41,6 +41,38 @@ describe('query helpers', () => {
         'contact',
         'email',
       ]);
+    });
+  });
+
+  describe('parsePagination', () => {
+    it('clamps zero and negative values to minimum one', () => {
+      expect(parsePagination({ page: 0, pageSize: 0 })).toMatchObject({
+        page: 1,
+        pageSize: 1,
+        skip: 0,
+        take: 1,
+      });
+      expect(parsePagination({ page: -3, pageSize: -5 })).toMatchObject({
+        page: 1,
+        pageSize: 1,
+        skip: 0,
+        take: 1,
+      });
+    });
+
+    it('defaults non-finite values and caps pageSize at 100', () => {
+      expect(parsePagination({ page: 'abc', pageSize: 'xyz' })).toMatchObject({
+        page: 1,
+        pageSize: 20,
+        skip: 0,
+        take: 20,
+      });
+      expect(parsePagination({ page: 2, pageSize: 500 })).toMatchObject({
+        page: 2,
+        pageSize: 100,
+        skip: 100,
+        take: 100,
+      });
     });
   });
 });

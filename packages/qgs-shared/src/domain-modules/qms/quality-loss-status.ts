@@ -11,6 +11,16 @@ const VALID_UNIFIED_STATUSES = new Set<string>([
   'RESOLVED',
 ]);
 
+const KNOWN_STATUS_INPUTS = new Set<string>([
+  'CLAIMING',
+  'CLOSED',
+  'COMPLETED',
+  'IN_PROGRESS',
+  'NEGOTIATING',
+  'SUBMITTED',
+  ...VALID_UNIFIED_STATUSES,
+]);
+
 export function isValidQualityLossStatus(
   status: null | string | undefined,
 ): status is UnifiedQualityLossStatus {
@@ -70,6 +80,17 @@ export function normalizeQualityLossStatus(
     return 'Resolved';
   }
   return 'Pending';
+}
+
+export function parseQualityLossStatus(
+  status: null | string | undefined,
+): null | UnifiedQualityLossStatus {
+  const normalized = String(status || '')
+    .trim()
+    .toUpperCase();
+  return KNOWN_STATUS_INPUTS.has(normalized)
+    ? normalizeQualityLossStatus(status)
+    : null;
 }
 
 export function toAfterSalesClaimStatus(

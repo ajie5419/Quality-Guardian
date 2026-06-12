@@ -62,6 +62,21 @@ type AggregationSourceRecords = {
   manualRecords: Awaited<ReturnType<typeof prisma.quality_losses.findMany>>;
 };
 
+async function resolveTrendRows(
+  label: string,
+  loader: () => Promise<TrendRow[]>,
+): Promise<TrendRow[]> {
+  try {
+    return await loader();
+  } catch (error) {
+    logger.warn(
+      { err: error, source: label },
+      'Quality loss trend source failed',
+    );
+    return [];
+  }
+}
+
 async function getDeptNameMapper() {
   const deptTree =
     (await DeptService.findAll().catch((error) => {
@@ -365,21 +380,28 @@ export const QualityLossService = {
     const isWeek = granularity === 'week';
 
     try {
-      // Use Prisma.sql for safer raw queries
       const [manual, internal, external, commissioning] = await Promise.all([
-        isWeek
-          ? prisma.$queryRaw<
-              TrendRow[]
-            >`SELECT WEEK(occurDate, 3) as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`
-          : prisma.$queryRaw<
-              TrendRow[]
-            >`SELECT MONTH(occurDate) as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
-        InspectionService.getQualityLossTrendRows({ granularity, year }),
-        AfterSalesService.getQualityLossTrendRows({ granularity, year }),
-        VehicleCommissioningService.getQualityLossTrendRows({
-          granularity,
-          year,
-        }),
+        resolveTrendRows('manual', () =>
+          isWeek
+            ? prisma.$queryRaw<
+                TrendRow[]
+              >`SELECT WEEK(occurDate, 3) as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`
+            : prisma.$queryRaw<
+                TrendRow[]
+              >`SELECT MONTH(occurDate) as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
+        ),
+        resolveTrendRows('internal', () =>
+          InspectionService.getQualityLossTrendRows({ granularity, year }),
+        ),
+        resolveTrendRows('external', () =>
+          AfterSalesService.getQualityLossTrendRows({ granularity, year }),
+        ),
+        resolveTrendRows('commissioning', () =>
+          VehicleCommissioningService.getQualityLossTrendRows({
+            granularity,
+            year,
+          }),
+        ),
       ]);
 
       const merged = mergeTrendData(

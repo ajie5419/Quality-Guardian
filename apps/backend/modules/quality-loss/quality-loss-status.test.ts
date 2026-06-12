@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   normalizeQualityLossSource,
   normalizeQualityLossStatus,
+  parseQualityLossStatus,
   toAfterSalesClaimStatus,
   toQualityLossTargetType,
   toQualityRecordStatus,
@@ -13,6 +14,11 @@ describe('quality-loss status helpers', () => {
     expect(normalizeQualityLossStatus('completed')).toBe('Confirmed');
     expect(normalizeQualityLossStatus('pending')).toBe('Pending');
     expect(normalizeQualityLossStatus(undefined)).toBe('Pending');
+  });
+
+  it('strictly parses only known quality loss statuses', () => {
+    expect(parseQualityLossStatus('confirmed')).toBe('Confirmed');
+    expect(parseQualityLossStatus('unexpected')).toBeNull();
   });
 
   it('maps unified status to source table statuses', () => {
