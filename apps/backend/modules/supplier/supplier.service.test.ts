@@ -602,6 +602,34 @@ describe('supplierService standard scoring samples', () => {
     );
   });
 
+  it('refreshMissing should only load suppliers without score snapshots', async () => {
+    const missingSuppliers = [supplier('Missing A'), supplier('Missing B')];
+    (prisma.suppliers.findMany as any)
+      .mockResolvedValueOnce(missingSuppliers)
+      .mockResolvedValueOnce([]);
+    (InspectionService.getSupplierScoringData as any).mockResolvedValue({
+      engineeringStats: [],
+      engineeringStatusStats: [],
+      incomingStats: [],
+      records: [],
+    });
+    (prisma.after_sales.groupBy as any)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    (prisma.after_sales.findMany as any).mockResolvedValue([]);
+    (prisma.supplier_score_snapshots.upsert as any).mockResolvedValue({});
+
+    const result = await SupplierScoreSnapshotService.refreshMissing();
+
+    expect(result).toEqual({ batches: 1, processed: 2 });
+    expect(prisma.suppliers.findMany).toHaveBeenNthCalledWith(1, {
+      orderBy: { id: 'asc' },
+      take: 50,
+      where: { isDeleted: false, scoreSnapshot: { is: null } },
+    });
+    expect(prisma.supplier_score_snapshots.upsert).toHaveBeenCalledTimes(2);
+  });
+
   it('sample 11: external outsourcing should use supplier risk rules', async () => {
     setupScenario({
       suppliers: [

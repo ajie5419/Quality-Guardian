@@ -39,6 +39,6 @@
 - 列表远程排序必须映射到 `suppliers` 字段或 `supplier_score_snapshots` 字段，禁止当前页内存排序
 - 准入手续文件存储在 `suppliers.admissionDocuments`，创建/更新后必须同步登记 `file_references(bizType=supplier, fieldName=admissionDocuments)`
 - 画像历史使用项目必须通过 `InspectionService.getSupplierHistoryProjects()` 从报检任务聚合，禁止前端基于当前页列表或检验记录页结果拼接
-- 历史数据快照回填必须随生产 Docker image 发布，并由 deploy workflow 在 Prisma migration 后自动运行 `apps/backend/scripts/backfill-supplier-score-snapshots.ts`
+- 历史数据快照回填必须随生产 Docker image 发布；deploy workflow 在服务健康检查通过后异步运行 `SUPPLIER_SCORE_BACKFILL_MODE=missing apps/backend/scripts/backfill-supplier-score-snapshots.ts`，只补没有快照的供应商
 - 评分逻辑保持纯计算，快照 service 只负责聚合来源数据和落库
 - 黑名单判定：连续 3 次 A/B 类不合格 或 单次损失 > 80000

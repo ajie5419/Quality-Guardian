@@ -25,6 +25,32 @@
 
 ## 执行记录
 
+### 2026-06-17 修复：供应商评分快照回填避免阻塞发布
+
+**执行内容：**
+
+- `SupplierScoreSnapshotService` 新增 `refreshMissing()`，只选择 `scoreSnapshot IS NULL` 的供应商补齐快照，并返回处理批次和数量。
+- 供应商评分快照 backfill 脚本支持 `SUPPLIER_SCORE_BACKFILL_MODE=missing`、批大小和最大批次数环境变量，并记录结构化开始/结束日志。
+- deploy workflow 改为服务健康检查通过后启动异步临时容器执行缺失快照补齐，避免全量重算超过 SSH action 运行上限导致发布失败。
+- 更新供应商模块架构文档和总览架构文档，说明生产发布只补缺失快照，日常变更由业务写入路径刷新快照。
+
+**验证结果：**
+
+- `SUPPLIER_SCORE_BACKFILL_MODE=missing pnpm -C apps/backend exec tsx scripts/backfill-supplier-score-snapshots.ts`: 通过，当前库无缺失快照，处理 `0` 条。
+- `pnpm -C apps/backend exec vitest run modules/supplier/supplier.service.test.ts`: 1 文件 / 18 测试通过。
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过。
+- `pnpm run check:type`: 通过，3/3 typecheck 任务成功。
+- `pnpm run check:qms-arch`: 通过，0 violations。
+- `pnpm lint`: 通过。
+- `docker build --platform linux/amd64 -f infra/docker/Dockerfile.backend -t qgs-backend-backfill-flow-test .`: 通过。
+- `docker run --rm qgs-backend-backfill-flow-test sh -lc '...'`: 通过，确认维护脚本、`tsx`、供应商模块、workspace 包和 Prisma schema 均存在于容器内，且 `uploads` 未进入 image。
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 无。
+
 ## [0.10.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.10.0...qgs-v0.10.1) (2026-06-17)
 
 

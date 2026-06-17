@@ -27,6 +27,11 @@ type SupplierSnapshotInput = Pick<
 
 const SUPPLIER_SNAPSHOT_CHUNK_SIZE = 50;
 
+interface SupplierScoreRefreshOptions {
+  batchSize?: number;
+  maxBatches?: number;
+}
+
 function uniqueSupplierNames(names: Array<null | string | undefined>) {
   return [
     ...new Set(names.map((name) => String(name || '').trim()).filter(Boolean)),
@@ -236,19 +241,22 @@ async function refreshSupplierChunk(suppliers: SupplierSnapshotInput[]) {
       });
     }),
   );
+  return suppliers.length;
 }
 
 export const SupplierScoreSnapshotService = {
   async refreshSuppliers(suppliers: SupplierSnapshotInput[]) {
+    let processed = 0;
     for (
       let index = 0;
       index < suppliers.length;
       index += SUPPLIER_SNAPSHOT_CHUNK_SIZE
     ) {
-      await refreshSupplierChunk(
+      processed += await refreshSupplierChunk(
         suppliers.slice(index, index + SUPPLIER_SNAPSHOT_CHUNK_SIZE),
       );
     }
+    return { processed };
   },
 
   async refreshBySupplierIds(supplierIds: string[]) {
@@ -259,7 +267,7 @@ export const SupplierScoreSnapshotService = {
     const suppliers = await prisma.suppliers.findMany({
       where: { id: { in: ids }, isDeleted: false },
     });
-    await this.refreshSuppliers(suppliers);
+    return this.refreshSuppliers(suppliers);
   },
 
   async refreshBySupplierNames(names: string[]) {
@@ -268,21 +276,47 @@ export const SupplierScoreSnapshotService = {
     const suppliers = await prisma.suppliers.findMany({
       where: { name: { in: supplierNames }, isDeleted: false },
     });
-    await this.refreshSuppliers(suppliers);
+    return this.refreshSuppliers(suppliers);
   },
 
-  async refreshAll() {
+  async refreshAll(options: SupplierScoreRefreshOptions = {}) {
+    const batchSize = options.batchSize || SUPPLIER_SNAPSHOT_CHUNK_SIZE;
+    let batches = 0;
     let cursor: string | undefined;
+    let processed = 0;
     for (;;) {
       const suppliers = await prisma.suppliers.findMany({
         where: { isDeleted: false },
         orderBy: { id: 'asc' },
-        take: SUPPLIER_SNAPSHOT_CHUNK_SIZE,
+        take: batchSize,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       });
       if (suppliers.length === 0) break;
-      await this.refreshSuppliers(suppliers);
+      const result = await this.refreshSuppliers(suppliers);
+      processed += result.processed;
+      batches += 1;
       cursor = suppliers.at(-1)?.id;
+      if (options.maxBatches && batches >= options.maxBatches) break;
     }
+    return { batches, processed };
+  },
+
+  async refreshMissing(options: SupplierScoreRefreshOptions = {}) {
+    const batchSize = options.batchSize || SUPPLIER_SNAPSHOT_CHUNK_SIZE;
+    let batches = 0;
+    let processed = 0;
+    for (;;) {
+      const suppliers = await prisma.suppliers.findMany({
+        where: { isDeleted: false, scoreSnapshot: { is: null } },
+        orderBy: { id: 'asc' },
+        take: batchSize,
+      });
+      if (suppliers.length === 0) break;
+      const result = await this.refreshSuppliers(suppliers);
+      processed += result.processed;
+      batches += 1;
+      if (options.maxBatches && batches >= options.maxBatches) break;
+    }
+    return { batches, processed };
   },
 };

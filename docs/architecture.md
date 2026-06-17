@@ -45,7 +45,7 @@ QMS 不是普通 CRUD 系统，它有以下特有复杂度：
 3. `quality_records` 工程质量问题：问题数、损失金额、关闭状态
 4. `after_sales` 售后质量问题：问题数、售后损失、关闭状态
 
-写入路径更新上述来源数据后，必须调用 `SupplierScoreSnapshotService` 刷新关联供应商快照。历史数据的初始快照由生产 Docker image 内的 `apps/backend/scripts/backfill-supplier-score-snapshots.ts` 维护入口生成，deploy workflow 在 Prisma migration 后自动执行该幂等回填。
+写入路径更新上述来源数据后，必须调用 `SupplierScoreSnapshotService` 刷新关联供应商快照。历史数据的初始快照由生产 Docker image 内的 `apps/backend/scripts/backfill-supplier-score-snapshots.ts` 维护入口生成；deploy workflow 在服务健康检查通过后异步启动 `SUPPLIER_SCORE_BACKFILL_MODE=missing`，只补没有快照的供应商，避免发布被全量重算阻塞。
 
 ### 2.2 供应商/外协准入档案与画像
 

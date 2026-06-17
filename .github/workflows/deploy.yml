@@ -132,7 +132,8 @@ jobs:
 
             PRISMA_CMD="/app/apps/backend/node_modules/.bin/prisma"
             PRISMA_SCHEMA="/app/apps/backend/prisma/schema.prisma"
-            SUPPLIER_SCORE_BACKFILL_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-supplier-score-snapshots.ts"
+            SUPPLIER_SCORE_BACKFILL_CMD="cd /app/apps/backend && SUPPLIER_SCORE_BACKFILL_MODE=missing /app/apps/backend/node_modules/.bin/tsx scripts/backfill-supplier-score-snapshots.ts"
+            SUPPLIER_SCORE_BACKFILL_CONTAINER="qms-supplier-score-backfill"
 
             echo "docker disk usage before cleanup"
             docker system df || true
@@ -149,7 +150,6 @@ jobs:
             run_with_timeout 300 docker compose -f "$COMPOSE_FILE" pull backend frontend
             run_with_timeout 120 docker compose -f "$COMPOSE_FILE" up -d redis
             run_with_timeout 300 docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "$PRISMA_CMD migrate deploy --schema '$PRISMA_SCHEMA' || $PRISMA_CMD db push --skip-generate --schema '$PRISMA_SCHEMA'"
-            run_with_timeout 600 docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "$SUPPLIER_SCORE_BACKFILL_CMD"
             run_with_timeout 180 docker compose -f "$COMPOSE_FILE" up -d backend frontend
 
             ok=0
@@ -165,6 +165,9 @@ jobs:
               echo "healthcheck failed"
               exit 1
             fi
+
+            docker rm -f "$SUPPLIER_SCORE_BACKFILL_CONTAINER" >/dev/null 2>&1 || true
+            docker compose -f "$COMPOSE_FILE" run --rm -d --name "$SUPPLIER_SCORE_BACKFILL_CONTAINER" backend sh -lc "$SUPPLIER_SCORE_BACKFILL_CMD"
 
             trap - ERR
             rm -f "$COMPOSE_FILE.bak"
