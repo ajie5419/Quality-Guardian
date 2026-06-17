@@ -25,6 +25,19 @@
 
 ## 执行记录
 
+## [0.10.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.9.0...qgs-v0.10.0) (2026-06-17)
+
+
+### Features
+
+* enhance supplier and inspection workflows ([e0ab831](https://github.com/ajie5419/Quality-Guardian/commit/e0ab8311bf34c9a2abadee0e05084fd65133ea53))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** harden pagination and quality loss guards ([eee1c27](https://github.com/ajie5419/Quality-Guardian/commit/eee1c2727a78ced6e9ee02e833be73def7af40b9))
+* **@qgs/shared:** normalizeQualityLossStatus no longer maps unknown statuses to Pending ([f420162](https://github.com/ajie5419/Quality-Guardian/commit/f420162ca6fc8947612e01a6bc22944f9bfc51ee))
+
 ### 2026-06-17 功能：检验记录列表筛选
 
 **执行内容：**
