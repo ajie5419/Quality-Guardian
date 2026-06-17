@@ -25,6 +25,13 @@
 
 ## 执行记录
 
+## [0.10.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.10.1...qgs-v0.10.2) (2026-06-17)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** avoid blocking deploy on supplier score backfill ([c32d621](https://github.com/ajie5419/Quality-Guardian/commit/c32d621855298d5bfe51a18f0ae935bf24836672))
+
 ### 2026-06-17 修复：供应商评分快照回填避免阻塞发布
 
 **执行内容：**
