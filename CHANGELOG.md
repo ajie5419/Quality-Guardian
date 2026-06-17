@@ -25,6 +25,32 @@
 
 ## 执行记录
 
+### 2026-06-17 修复：供应商评分快照回填纳入发布流程
+
+**执行内容：**
+
+- 后端生产 Docker image 通过白名单复制维护入口运行所需的 `modules`、`utils`、`scripts`、Prisma schema、Nitro TS alias 文件和 workspace 包，并在构建阶段校验 `tsx` 和供应商评分快照回填脚本存在。
+- `@qgs/backend` 将 `tsx` 列为生产依赖，并新增 `maintenance:supplier-score-snapshots` 脚本，避免维护命令依赖根目录 devDependency。
+- deploy workflow 在 Prisma migration 后自动执行 `apps/backend/scripts/backfill-supplier-score-snapshots.ts`，并将 Prisma schema 路径改为显式 `/app/apps/backend/prisma/schema.prisma`。
+- 更新 `CONSTRAINTS.md`、`docs/architecture.md`、`apps/backend/modules/supplier/ARCHITECTURE.md`，明确快照/物化指标回填必须随 image 发布并由发布流程自动执行。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec tsx scripts/backfill-supplier-score-snapshots.ts`: 通过
+- `pnpm -C apps/backend exec vitest run modules/supplier/supplier.service.test.ts`: 1 文件 / 17 测试通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm run check:type`: 通过，3/3 typecheck 任务成功
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+- `pnpm lint`: 通过
+- `docker build --platform linux/amd64 -f infra/docker/Dockerfile.backend -t qgs-backend-backfill-flow-test .`: 通过
+- `docker run --rm qgs-backend-backfill-flow-test sh -lc '...'`: 通过，确认维护脚本、`tsx`、供应商模块、workspace 包和 Prisma schema 均存在于容器内，且 `apps/backend/uploads` 未进入 image
+
+**commit:** 已提交，最终 hash 以 Git 历史为准
+
+**遗留问题：**
+
+- 无
+
 ## [0.10.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.9.0...qgs-v0.10.0) (2026-06-17)
 
 

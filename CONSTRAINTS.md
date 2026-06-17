@@ -25,6 +25,7 @@
 6. **必须**使用 cuid 作为主键生成策略（禁止 Date.now()）
 7. **必须**分页接口限制 pageSize 上限（max 100）
 8. **必须**原始 SQL 使用参数化查询，防止注入
+9. **必须**在生产发布流程中把 migration 和幂等数据回填连续执行；依赖快照/物化指标的新功能不得要求人工进入生产容器补跑脚本
 
 ## 完成定义
 
@@ -55,6 +56,7 @@
 9. **禁止在 service 中嵌入文件解析逻辑** — Excel/CSV 解析提取到 utils/excel-parser.ts
 10. **禁止前端拼接供应商画像历史项目** — 供应商/外协画像的历史使用项目必须通过后端 service 从报检任务聚合，不能读取当前页列表、当前页检验记录或其他已分页结果后在前端合成
 11. **禁止混用报检自检记录和检验附件字段** — 报检入口 `qms_inspection_requests.attachments` 只能落到 `inspections.selfCheckDocuments`；关闭附件 `qms_inspection_requests.closeAttachments` 只能落到 `inspections.documents`，前端不得临时合并两个来源
+12. **禁止把生产维护脚本只留在仓库源码中** — 发布必需的 backfill/maintenance 入口必须随 Docker image 发布，并由 deploy workflow 调用
 
 ## 类型安全规范
 

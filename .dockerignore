@@ -11,5 +11,7 @@ dist
 .vscode
 test
 coverage
+uploads
+apps/backend/uploads
 apps/web-antd/dist
 apps/backend/.output
