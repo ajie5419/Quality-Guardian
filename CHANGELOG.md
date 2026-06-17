@@ -25,6 +25,13 @@
 
 ## 执行记录
 
+## [0.10.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.10.0...qgs-v0.10.1) (2026-06-17)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** run supplier score backfill during deploy ([c69fbff](https://github.com/ajie5419/Quality-Guardian/commit/c69fbff71636b929206071d9698193b948d21d32))
+
 ### 2026-06-17 修复：供应商评分快照回填纳入发布流程
 
 **执行内容：**
