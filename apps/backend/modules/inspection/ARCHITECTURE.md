@@ -40,6 +40,12 @@ inspection 是 QMS 的检验域模块，覆盖检验记录、检验表模板、�
 - 关闭报检任务生成检验记录时，按明细工单逐条创建 `inspections`，每条检验记录仍只绑定一个 `workOrderNumber`。
 - `qms_inspection_request_inspections` 记录报检任务与生成检验记录的多对多映射，主表 `inspectionId` 继续保存第一条检验记录以兼容旧页面。
 
+附件落库边界：
+
+- `qms_inspection_requests.attachments` 是报检入口上传的自检记录，关闭报检并生成或关联检验记录时，写入 `inspections.selfCheckDocuments`，并登记 `file_references(bizType=inspection_record, fieldName=selfCheckDocuments)`。
+- `qms_inspection_requests.closeAttachments` 是检验员关闭报检时上传的关闭附件，写入 `inspections.documents`，并登记 `file_references(bizType=inspection_record, fieldName=documents)`。
+- 自检记录和关闭附件不得混用同一个字段；检验记录详情展示必须分别读取 `selfCheckDocuments` 与 `documents`。
+
 ## Public 报检入口边界
 
 匿名扫码报检只能访问 `apps/backend/api/qms/public/inspection/requests/` 下的 public API。public 页面不得调用需要登录态的字典、工单、用户或模块内部接口。

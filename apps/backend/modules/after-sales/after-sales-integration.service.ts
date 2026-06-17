@@ -2,6 +2,15 @@ import { Prisma } from '@prisma/client';
 import { toAfterSalesClaimStatus } from '~/modules/quality-loss/quality-loss-status';
 import prisma from '~/utils/prisma';
 
+async function refreshSupplierScoreSnapshots(names: unknown[]) {
+  const supplierNames = names
+    .map((name) => String(name || '').trim())
+    .filter(Boolean);
+  if (supplierNames.length === 0) return;
+  const { SupplierScoreSnapshotService } = await import('~/modules/supplier');
+  await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
+}
+
 function buildAfterSalesVehicleDivisionWhere(vehicleDeptIds: string[]) {
   const divisions = vehicleDeptIds.filter(Boolean);
   if (divisions.length > 0) {
@@ -39,6 +48,10 @@ export const AfterSalesIntegrationService = {
     id: string;
     status?: string;
   }) {
+    const current = await prisma.after_sales.findUnique({
+      where: { id: params.id },
+      select: { supplierBrand: true },
+    });
     await prisma.after_sales.update({
       where: { id: params.id },
       data: {
@@ -49,6 +62,7 @@ export const AfterSalesIntegrationService = {
         updatedAt: new Date(),
       },
     });
+    await refreshSupplierScoreSnapshots([current?.supplierBrand]);
   },
 
   async getQualityLossTrendRows(params: {

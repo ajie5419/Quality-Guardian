@@ -46,6 +46,10 @@ export function getOutsourcingModeLabel(value?: string) {
   );
 }
 
+function formatDateValue(value?: string) {
+  return value ? value.split('T')[0] || value : '-';
+}
+
 /**
  * 获取表格列配置
  * @param category 类型
@@ -85,6 +89,23 @@ export const getColumns = (
       width: 130,
       sortable: true,
       slots: { default: 'outsourcing_mode' },
+    });
+  }
+
+  columns.push({
+    field: 'recognizedAt',
+    title: $t('qms.supplier.recognizedAt'),
+    width: 120,
+    sortable: true,
+    formatter: ({ cellValue }) => formatDateValue(cellValue),
+  });
+
+  if (category === 'Supplier') {
+    columns.push({
+      field: 'manufacturerNature',
+      title: $t('qms.supplier.manufacturerNature'),
+      width: 130,
+      sortable: true,
     });
   }
 
@@ -176,6 +197,7 @@ export const getFormSchema = (
         ? $t('qms.supplier.brand')
         : $t('qms.outsourcing.serviceRange'),
     component: 'Input',
+    rules: 'required',
     colProps: { span: 12 },
   },
   {
@@ -186,6 +208,7 @@ export const getFormSchema = (
     componentProps: {
       disabled: true,
     },
+    rules: 'required',
     colProps: { span: 12 },
   },
   ...(category === 'Outsourcing'
@@ -199,6 +222,7 @@ export const getFormSchema = (
             style: { width: '100%' },
           },
           defaultValue: 'EXTERNAL_PROCESSOR',
+          rules: 'selectRequired',
           colProps: { span: 12 },
         } satisfies SupplierFormSchema,
       ]
@@ -210,6 +234,7 @@ export const getFormSchema = (
         ? $t('qms.supplier.mainProduct')
         : $t('qms.outsourcing.mainProcessing'),
     component: 'Input',
+    rules: 'required',
     colProps: { span: 12 },
   },
   {
@@ -221,6 +246,7 @@ export const getFormSchema = (
       style: { width: '100%' },
     },
     defaultValue: 'Qualified',
+    rules: 'selectRequired',
     colProps: { span: 12 },
   },
   {
@@ -230,8 +256,30 @@ export const getFormSchema = (
         ? $t('qms.supplier.buyer')
         : $t('common.responsible'),
     component: 'Input',
+    rules: 'required',
     colProps: { span: 12 },
   },
+  {
+    fieldName: 'recognizedAt',
+    label: $t('qms.supplier.recognizedAt'),
+    component: 'DatePicker',
+    componentProps: {
+      style: { width: '100%' },
+    },
+    rules: 'required',
+    colProps: { span: 12 },
+  },
+  ...(category === 'Supplier'
+    ? [
+        {
+          fieldName: 'manufacturerNature',
+          label: $t('qms.supplier.manufacturerNature'),
+          component: 'Input',
+          rules: 'required',
+          colProps: { span: 12 },
+        } satisfies SupplierFormSchema,
+      ]
+    : []),
 ];
 
 /**

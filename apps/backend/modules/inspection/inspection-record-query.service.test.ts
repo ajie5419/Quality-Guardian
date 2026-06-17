@@ -235,5 +235,34 @@ describe('inspectionRecordQueryService', () => {
       expect(result.items[0].archiveIsOverdue).toBe(true);
       expect(result.items[0].archiveTaskStatus).toBe('PENDING');
     });
+
+    it('should apply incoming and process record filters to query where clause', async () => {
+      (prisma.inspections.findMany as any).mockResolvedValue([]);
+      (prisma.inspections.count as any).mockResolvedValue(0);
+
+      await InspectionRecordQueryService.findAll({
+        hasDocuments: false,
+        inspector: 'Inspector A',
+        level1Component: 'Frame',
+        processName: 'Welding',
+        supplierName: 'Supplier A',
+        team: 'Team A',
+        workOrderNumber: 'WO-001',
+      });
+
+      expect(prisma.inspections.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            hasDocuments: false,
+            inspector: { contains: 'Inspector A' },
+            level1Component: { contains: 'Frame' },
+            processName: { contains: 'Welding' },
+            supplierName: { contains: 'Supplier A' },
+            team: { contains: 'Team A' },
+            workOrderNumber: 'WO-001',
+          }),
+        }),
+      );
+    });
   });
 });

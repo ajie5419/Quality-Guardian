@@ -257,6 +257,7 @@ export const InspectionRequestCloseService = {
         inspectionId,
         inspectionIds: inspectionLinks.map((item) => item.inspectionId),
         requestId: String(updated.id),
+        selfCheckAttachments: request.attachments,
       });
       await syncCloseIssueEffects({
         closedLinkedIssueCount,

@@ -86,6 +86,23 @@ export function normalizeSupplierStatus(value: unknown): string {
   return normalizeSupplierString(value) ?? 'Qualified';
 }
 
+export function normalizeSupplierDate(value: unknown): Date | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  const date = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+export function normalizeSupplierAttachments(value: unknown) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  if (typeof value === 'string') {
+    return normalizeSupplierString(value) ?? null;
+  }
+  return JSON.stringify(value);
+}
+
 export function isOutsourcingCategory(value: unknown): boolean {
   return (
     normalizeSupplierString(value)?.toLowerCase() ===
@@ -116,17 +133,20 @@ export function normalizeOutsourcingMode(
 
 interface SupplierImportItem {
   address?: unknown;
+  admissionDocuments?: unknown;
   brand?: unknown;
   buyer?: unknown;
   category?: unknown;
   contact?: unknown;
   email?: unknown;
+  manufacturerNature?: unknown;
   name?: unknown;
   origin?: unknown;
   outsourcingMode?: unknown;
   phone?: unknown;
   productName?: unknown;
   project?: unknown;
+  recognizedAt?: unknown;
   score2025?: unknown;
   status?: unknown;
 }
@@ -163,6 +183,9 @@ export function buildSupplierUpsertPayload(
       buyer: normalizeSupplierString(item.buyer),
       category: category ?? DEFAULT_SUPPLIER_CATEGORY,
       outsourcingMode,
+      recognizedAt: normalizeSupplierDate(item.recognizedAt),
+      manufacturerNature: normalizeSupplierString(item.manufacturerNature),
+      admissionDocuments: normalizeSupplierAttachments(item.admissionDocuments),
       status: normalizeSupplierStatus(item.status),
     },
     update: {
@@ -171,6 +194,9 @@ export function buildSupplierUpsertPayload(
       buyer: normalizeSupplierString(item.buyer),
       category,
       outsourcingMode,
+      recognizedAt: normalizeSupplierDate(item.recognizedAt),
+      manufacturerNature: normalizeSupplierString(item.manufacturerNature),
+      admissionDocuments: normalizeSupplierAttachments(item.admissionDocuments),
       isDeleted: false,
       updatedAt: new Date(),
     },
@@ -189,6 +215,9 @@ function buildSupplierMutableData(input: SupplierImportItem) {
     origin: normalizeSupplierString(input.origin),
     project: normalizeSupplierString(input.project),
     buyer: normalizeSupplierString(input.buyer),
+    recognizedAt: normalizeSupplierDate(input.recognizedAt),
+    manufacturerNature: normalizeSupplierString(input.manufacturerNature),
+    admissionDocuments: normalizeSupplierAttachments(input.admissionDocuments),
     score2025: normalizeSupplierScore(input.score2025, 0),
     status: normalizeSupplierStatus(input.status),
     contact: normalizeSupplierString(input.contact),

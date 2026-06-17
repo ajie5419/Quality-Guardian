@@ -25,6 +25,7 @@ import {
   getInspectionIssues,
   getInspectionRecords,
 } from '#/api/qms/inspection';
+import { getSupplierHistoryProjects } from '#/api/qms/supplier';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 
@@ -39,6 +40,9 @@ const isDetailLoading = ref(false);
 const supplierInspections = ref<QmsInspectionApi.InspectionRecord[]>([]);
 const supplierAfterSales = ref<QmsAfterSalesApi.AfterSalesItem[]>([]);
 const supplierEngineeringIssues = ref<QmsInspectionApi.InspectionIssue[]>([]);
+const supplierHistoryProjects = ref<QmsSupplierApi.SupplierHistoryProject[]>(
+  [],
+);
 
 const [Drawer, drawerApi] = useVbenDrawer({
   title: t('common.detail'),
@@ -55,19 +59,55 @@ async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
   isDetailLoading.value = true;
 
   try {
-    const [inspections, afterSales, engineering] = await Promise.all([
-      getInspectionRecords({ keyword: row.name, type: 'INCOMING' }),
-      getAfterSalesList({ supplierBrand: row.brand || row.name }),
-      getInspectionIssues({ supplierName: row.name }),
-    ]);
+    const [inspections, afterSales, engineering, historyProjects] =
+      await Promise.all([
+        getInspectionRecords({ keyword: row.name, type: 'INCOMING' }),
+        getAfterSalesList({ supplierBrand: row.brand || row.name }),
+        getInspectionIssues({ supplierName: row.name }),
+        getSupplierHistoryProjects(row.id),
+      ]);
     supplierInspections.value = inspections.items || [];
     supplierAfterSales.value = afterSales;
     supplierEngineeringIssues.value = engineering.items || [];
+    supplierHistoryProjects.value = historyProjects.items || [];
   } catch (error) {
     handleApiError(error, 'Load Supplier Detail');
   } finally {
     isDetailLoading.value = false;
   }
+}
+
+interface AdmissionDocument {
+  name: string;
+  url: string;
+}
+
+function formatDateValue(value?: null | string) {
+  return value ? value.split('T')[0] : '-';
+}
+
+function parseAdmissionDocuments(value: unknown): AdmissionDocument[] {
+  if (!value) return [];
+  const source = Array.isArray(value)
+    ? value
+    : (() => {
+        try {
+          const parsed = JSON.parse(String(value));
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })();
+
+  return source
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const record = item as Record<string, unknown>;
+      const url = String(record.url || '').trim();
+      const name = String(record.name || record.originalName || url).trim();
+      return url && name ? { name, url } : null;
+    })
+    .filter(Boolean) as AdmissionDocument[];
 }
 
 async function open(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
@@ -220,6 +260,39 @@ defineExpose({
             <Descriptions.Item :label="t('qms.supplier.buyer')">
               {{ selectedSupplier.buyer }}
             </Descriptions.Item>
+            <Descriptions.Item :label="t('qms.supplier.recognizedAt')">
+              {{ formatDateValue(selectedSupplier.recognizedAt) }}
+            </Descriptions.Item>
+            <Descriptions.Item
+              v-if="selectedSupplier.category === 'Supplier'"
+              :label="t('qms.supplier.manufacturerNature')"
+            >
+              {{ selectedSupplier.manufacturerNature || '-' }}
+            </Descriptions.Item>
+            <Descriptions.Item
+              :label="t('qms.supplier.admissionDocuments')"
+              :span="2"
+            >
+              <template
+                v-if="
+                  parseAdmissionDocuments(selectedSupplier.admissionDocuments)
+                    .length > 0
+                "
+              >
+                <a
+                  v-for="file in parseAdmissionDocuments(
+                    selectedSupplier.admissionDocuments,
+                  )"
+                  :key="file.url"
+                  :href="file.url"
+                  class="mr-3"
+                  target="_blank"
+                >
+                  {{ file.name }}
+                </a>
+              </template>
+              <span v-else>-</span>
+            </Descriptions.Item>
             <Descriptions.Item :label="t('qms.supplier.qualityLevel')">
               <Tag color="purple">
                 {{ selectedSupplier.level ?? '-' }} {{ t('common.level') }}
@@ -321,7 +394,30 @@ defineExpose({
             </Table>
           </div>
         </TabPane>
-        <TabPane key="4" :tab="t('qms.common.tabs.incoming')">
+        <TabPane key="4" :tab="t('qms.supplier.historyProjects')">
+          <Table
+            :data-source="supplierHistoryProjects"
+            size="small"
+            :pagination="{ pageSize: 5 }"
+            row-key="workOrderNumber"
+            :loading="isDetailLoading"
+          >
+            <Table.Column
+              :title="t('qms.workOrder.workOrderNumber')"
+              data-index="workOrderNumber"
+              width="180"
+            />
+            <Table.Column
+              :title="t('qms.workOrder.projectName')"
+              data-index="projectName"
+            >
+              <template #default="{ text }">
+                {{ text || '-' }}
+              </template>
+            </Table.Column>
+          </Table>
+        </TabPane>
+        <TabPane key="5" :tab="t('qms.common.tabs.incoming')">
           <Table
             :data-source="supplierInspections"
             size="small"

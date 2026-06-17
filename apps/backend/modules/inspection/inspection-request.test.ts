@@ -58,6 +58,9 @@ describe('inspection request helpers', () => {
   it('honors an explicit hasDocuments choice over attachment count', async () => {
     await buildInspectionRecordFromRequest(
       {
+        attachments: [
+          { name: 'self-check.pdf', url: 'https://example.com/self.pdf' },
+        ],
         componentName: '',
         mutualCheckResult: 'PASS',
         partName: 'Bearing',
@@ -90,6 +93,9 @@ describe('inspection request helpers', () => {
   it('falls back to attachment count when hasDocuments is not provided', async () => {
     await buildInspectionRecordFromRequest(
       {
+        attachments: [
+          { name: 'self-check.pdf', url: 'https://example.com/self.pdf' },
+        ],
         componentName: '',
         mutualCheckResult: 'PASS',
         partName: 'Bearing',
@@ -114,7 +120,18 @@ describe('inspection request helpers', () => {
     );
 
     expect(InspectionService.create).toHaveBeenCalledWith(
-      expect.objectContaining({ hasDocuments: true }),
+      expect.objectContaining({
+        hasDocuments: true,
+        hasSelfCheckDocuments: true,
+      }),
     );
+    const payload = (InspectionService.create as ReturnType<typeof vi.fn>).mock
+      .calls[0][0];
+    expect(JSON.parse(String(payload.selfCheckDocuments))).toEqual([
+      expect.objectContaining({
+        name: 'self-check.pdf',
+        url: 'https://example.com/self.pdf',
+      }),
+    ]);
   });
 });

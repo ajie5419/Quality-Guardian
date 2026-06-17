@@ -323,6 +323,7 @@ function parseIncomingRequestInfo(value?: null | string) {
 export interface InspectionRecordPayloadInput {
   body: Record<string, unknown>;
   request: {
+    attachments?: unknown;
     closeRemark?: null | string;
     componentName?: null | string;
     mutualCheckResult: string;
@@ -351,6 +352,9 @@ export function buildInspectionRecordPayloadCore(
   const closeAttachments = normalizeInspectionRequestAttachments(
     input.body.attachments,
   );
+  const selfCheckAttachments = parseInspectionRequestAttachments(
+    input.request.attachments,
+  );
   const componentName = normalizeInspectionRequestText(
     input.request.componentName,
   );
@@ -378,6 +382,7 @@ export function buildInspectionRecordPayloadCore(
       typeof input.body.hasDocuments === 'boolean'
         ? input.body.hasDocuments
         : closeAttachments.length > 0,
+    hasSelfCheckDocuments: selfCheckAttachments.length > 0,
     inspectionDate:
       normalizeInspectionRequestText(input.body.inspectionDate) || new Date(),
     inspector:
@@ -412,6 +417,10 @@ export function buildInspectionRecordPayloadCore(
       normalizeInspectionRequestText(input.body.closeRemark) ||
       requestInfo.notes,
     result: result === 'FAIL' ? 'FAIL' : 'PASS',
+    selfCheckDocuments:
+      selfCheckAttachments.length > 0
+        ? JSON.stringify(selfCheckAttachments)
+        : null,
     stationSelection: input.request.stationSelection,
     unqualifiedQuantity:
       typeof input.body.unqualifiedQuantity === 'string' ||

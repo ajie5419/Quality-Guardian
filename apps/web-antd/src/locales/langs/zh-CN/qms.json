@@ -660,6 +660,11 @@
     "avgScore": "平均质量得分",
     "mainProduct": "主营产品",
     "origin": "原产地",
+    "recognizedAt": "认定时间",
+    "manufacturerNature": "厂商性质",
+    "admissionDocuments": "准入手续",
+    "uploadAdmissionDocuments": "上传准入手续",
+    "historyProjects": "历史使用项目",
     "status": {
       "active": "活跃",
       "blacklisted": "拉黑",

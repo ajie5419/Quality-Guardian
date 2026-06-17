@@ -143,10 +143,16 @@ export async function importInspectionIssues(
 // --- Inspection Records APIs ---
 
 export async function getInspectionRecords(params?: {
+  hasDocuments?: boolean;
+  inspector?: string;
   keyword?: string;
+  level1Component?: string;
   page?: number;
   pageSize?: number;
+  processName?: string;
   projectName?: string;
+  supplierName?: string;
+  team?: string;
   type?: string;
   workOrderNumber?: string;
   year?: number;
@@ -159,8 +165,14 @@ export async function getInspectionRecords(params?: {
 }
 
 export async function getInspectionRecordsExport(params?: {
+  hasDocuments?: boolean;
+  inspector?: string;
   keyword?: string;
+  level1Component?: string;
+  processName?: string;
   projectName?: string;
+  supplierName?: string;
+  team?: string;
   type?: string;
   workOrderNumber?: string;
   year?: number;

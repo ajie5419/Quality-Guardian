@@ -51,7 +51,10 @@
 5. **禁止 `execSync`** — 所有外部命令必须异步执行
 6. **禁止 `Date.now()` 生成 ID** — 统一使用 cuid
 7. **禁止全量加载到内存再分页** — 分页在 DB 层（skip + take），聚合用 groupBy/aggregate
-8. **禁止在 service 中嵌入文件解析逻辑** — Excel/CSV 解析提取到 utils/excel-parser.ts
+8. **禁止当前页内存排序伪装远程排序** — 列表开启远程排序时，`sortBy/sortOrder` 必须映射到数据库字段或已落库的指标快照字段，并在 DB 层完成 `orderBy + skip + take`
+9. **禁止在 service 中嵌入文件解析逻辑** — Excel/CSV 解析提取到 utils/excel-parser.ts
+10. **禁止前端拼接供应商画像历史项目** — 供应商/外协画像的历史使用项目必须通过后端 service 从报检任务聚合，不能读取当前页列表、当前页检验记录或其他已分页结果后在前端合成
+11. **禁止混用报检自检记录和检验附件字段** — 报检入口 `qms_inspection_requests.attachments` 只能落到 `inspections.selfCheckDocuments`；关闭附件 `qms_inspection_requests.closeAttachments` 只能落到 `inspections.documents`，前端不得临时合并两个来源
 
 ## 类型安全规范
 

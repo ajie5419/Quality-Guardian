@@ -17,10 +17,34 @@ export type OutsourcingMode =
  */
 export type SupplierStatus = 'Disqualified' | 'Qualified' | 'Warning' | string;
 
+export const SUPPLIER_LIST_SORT_KEYS = [
+  'afterSalesIssueCount',
+  'brand',
+  'buyer',
+  'category',
+  'createdAt',
+  'engineeringIssueCount',
+  'incomingQualifiedRate',
+  'level',
+  'manufacturerNature',
+  'name',
+  'outsourcingMode',
+  'phone',
+  'productName',
+  'qualityScore',
+  'rating',
+  'recognizedAt',
+  'status',
+  'updatedAt',
+] as const;
+
+export type SupplierListSortKey = (typeof SUPPLIER_LIST_SORT_KEYS)[number];
+
 /**
  * Supplier Item
  */
 export interface SupplierItem {
+  admissionDocuments?: unknown;
   afterSalesIssueCount?: number;
   afterSalesScore?: number;
   brand: string;
@@ -36,6 +60,7 @@ export interface SupplierItem {
   incomingTotalQuantity?: number;
   isWarning?: boolean;
   level?: string;
+  manufacturerNature?: string;
   name: string;
   origin: string;
   outsourcingMode?: OutsourcingMode;
@@ -44,6 +69,7 @@ export interface SupplierItem {
   // Quality Indicators
   qualityScore?: number;
   rating?: string;
+  recognizedAt?: string;
   score2025: number;
   scoringModel?: 'IN_HOUSE_OUTSOURCING' | 'SUPPLIER' | string;
   stabilityScore?: number;
@@ -73,7 +99,7 @@ export interface SupplierListParams {
   outsourcingMode?: OutsourcingMode;
   page?: number;
   pageSize?: number;
-  sortBy?: string;
+  sortBy?: string | SupplierListSortKey;
   sortOrder?: 'asc' | 'desc';
   status?: SupplierStatus;
 }
@@ -91,13 +117,16 @@ export interface SupplierListResponse {
  * Batch Import Supplier Data
  */
 export interface ImportSupplierItem {
+  admissionDocuments?: unknown;
   brand?: string;
   buyer?: string;
   category?: SupplierCategory;
+  manufacturerNature?: string;
   name: string;
   origin?: string;
   outsourcingMode?: OutsourcingMode;
   productName?: string;
   project?: string;
+  recognizedAt?: string;
   status?: SupplierStatus;
 }

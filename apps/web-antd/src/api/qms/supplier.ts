@@ -55,6 +55,18 @@ export async function updateSupplier(id: string, data: Partial<SupplierItem>) {
   return requestClient.put<SupplierItem>(`${QMS_API.SUPPLIER}/${id}`, data);
 }
 
+export interface SupplierHistoryProjectItem {
+  lastSubmittedAt?: null | string;
+  projectName?: null | string;
+  workOrderNumber: string;
+}
+
+export async function getSupplierHistoryProjects(id: string) {
+  return requestClient.get<{ items: SupplierHistoryProjectItem[] }>(
+    `${QMS_API.SUPPLIER}/${id}/history-projects`,
+  );
+}
+
 export async function deleteSupplier(id: string) {
   return requestClient.delete(`${QMS_API.SUPPLIER}/${id}`);
 }
@@ -107,6 +119,7 @@ export namespace QmsSupplierApi {
     incomingScore?: number;
     stabilityScore?: number;
   };
+  export type SupplierHistoryProject = SupplierHistoryProjectItem;
   export type SupplierStats = import('@qgs/shared').SupplierStats;
   export type SupplierListParams = import('@qgs/shared').SupplierListParams;
 }

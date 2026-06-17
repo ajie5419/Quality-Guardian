@@ -25,6 +25,127 @@
 
 ## 执行记录
 
+### 2026-06-17 功能：检验记录列表筛选
+
+**执行内容：**
+
+- 进货检验列表在表格上方新增显式筛选栏，支持工单号、供应商、是否有资料筛选，并将筛选参数传入后端列表与导出接口。
+- 过程检验列表在表格上方新增显式筛选栏，支持工单号、工序、一级部件、班组、检验员筛选，并在切换检验类型时重置不适用筛选字段。
+- `parseInspectionRecordListQuery()` 新增筛选参数解析，`InspectionRecordQueryService.findAll()` 在数据库层组装 `where` 条件，避免前端当前页过滤。
+- 补充 shared query parser 单元测试和后端查询 where 条件单元测试。
+
+**验证结果：**
+
+- `pnpm --dir packages/qgs-shared build`: 通过
+- `pnpm --dir packages/qgs-shared exec vitest run src/domain-modules/qms/inspection-record.test.ts`: 1 文件 / 1 测试通过
+- `pnpm -C apps/backend exec vitest run modules/inspection/inspection-record-query.service.test.ts modules/inspection/inspection-route.service.test.ts`: 2 文件 / 19 测试通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+- `pnpm lint`: 通过
+
+**commit:** 本次未提交
+
+**遗留问题：**
+
+- 无
+
+### 2026-06-17 功能：检验记录自检记录独立落库
+
+**执行内容：**
+
+- `inspections` 新增 `selfCheckDocuments`、`hasSelfCheckDocuments` 字段及 migration，用于独立保存报检入口上传的自检记录。
+- 调整报检关闭生成/关联检验记录链路：`qms_inspection_requests.attachments` 写入 `inspections.selfCheckDocuments`，关闭附件继续写入 `inspections.documents`。
+- 文件引用登记拆分为 `fieldName=documents` 与 `fieldName=selfCheckDocuments`，避免自检记录和检验记录附件混用。
+- 检验记录详情新增“自检记录”展示区，继续保留“检验记录附件”展示关闭附件。
+- 更新 shared 领域规则、后端单元测试、`CONSTRAINTS.md`、`docs/architecture.md`、`apps/backend/modules/inspection/ARCHITECTURE.md`。
+
+**验证结果：**
+
+- `pnpm --dir apps/backend exec prisma format`: 通过
+- `pnpm --dir apps/backend exec prisma generate`: 通过
+- `pnpm --dir packages/qgs-shared build`: 通过
+- `pnpm --dir packages/qgs-shared exec vitest run src/domain-modules/qms/inspection-request.test.ts`: 1 文件 / 3 测试全部通过
+- `pnpm -C apps/backend exec vitest run modules/inspection/inspection-request.test.ts modules/inspection/inspection-request-close-effects.service.test.ts modules/inspection/inspection-request-close.service.test.ts modules/inspection/inspection-request-close-records.service.test.ts`: 4 文件 / 12 测试全部通过
+- `pnpm -C apps/backend exec vitest run`: 185 文件 / 1774 测试全部通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+- `pnpm run check:prisma-migration`: 通过
+- `pnpm lint`: 通过
+- `pnpm --dir apps/backend exec prisma migrate deploy`: 通过，已应用 `20260617000100_add_inspection_self_check_documents`
+- `pnpm -C apps/backend exec node -e '...'`: 通过，确认 `inspections.selfCheckDocuments` 与 `inspections.hasSelfCheckDocuments` 两列存在，且同类 `inspections.findMany()` 可正常返回
+
+**commit:** 本次未提交
+
+**遗留问题：**
+
+- 无
+
+### 2026-06-15 功能：供应商/外协准入档案与画像历史项目
+
+**执行内容：**
+
+- `suppliers` 新增 `recognizedAt`、`manufacturerNature`、`admissionDocuments` 字段及 migration；供应商新增/编辑支持认定时间、厂商性质、准入手续上传，外协新增/编辑支持认定时间、准入手续上传。
+- 供应商/外协保存时将准入手续上传结果写入业务字段，并同步登记 `file_references(bizType=supplier, fieldName=admissionDocuments)`。
+- 新增 `InspectionRequestHistoryService.getSupplierHistoryProjects()`，以报检任务为事实源按工单去重读取历史使用项目，并通过 `SupplierService.getHistoryProjects()` 暴露给画像接口。
+- 新增 `/api/qms/supplier/:id/history-projects`，供应商画像新增“历史使用项目”页签，展示工单号和项目名称；基本档案显示认定时间、厂商性质和准入手续附件。
+- 调整供应商/外协新增编辑弹窗：展示字段全部设为必填，准入手续上传改为标准按钮上传块，并在提交时强制校验至少上传一个准入手续文件。
+- 更新 shared 类型/领域归一化、供应商/外协列表列配置、`CONSTRAINTS.md`、`docs/architecture.md`、`apps/backend/modules/supplier/ARCHITECTURE.md`。
+
+**验证结果：**
+
+- `pnpm --dir packages/qgs-shared build`: 通过
+- `pnpm --dir apps/backend exec prisma generate`: 通过
+- `pnpm --dir apps/backend exec prisma format`: 通过
+- `pnpm --dir apps/backend exec prisma migrate deploy`: 通过，已应用 `20260615000200_add_supplier_admission_fields`
+- `pnpm -C apps/backend exec vitest run modules/supplier/supplier.service.test.ts modules/inspection/inspection-request-history.service.test.ts`: 2 文件 / 18 测试全部通过
+- `pnpm -C apps/backend exec vitest run`: 185 文件 / 1774 测试全部通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm exec eslint apps/web-antd/src/views/qms/supplier/data.ts apps/web-antd/src/views/qms/supplier/components/SupplierEditModal.vue`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+- `pnpm run check:prisma-migration`: 通过
+- `pnpm lint`: 通过
+
+**commit:** 本次未提交
+
+**遗留问题：**
+
+- 测试环境仍会输出既有 `REDIS_URL not found, caching disabled` 警告，不影响门禁结果。
+
+### 2026-06-15 功能：供应商与外协评分排序快照化
+
+**执行内容：**
+
+- 新增 `supplier_score_snapshots` Prisma 模型与 migration，用于持久化供应商/外协的评分、等级、状态、来料合格率、工程问题数、售后问题数等列表指标。
+- 新增 `SupplierScoreSnapshotService`，复用现有评分算法生成快照；供应商新增/编辑/导入、检验不合格项变更、售后问题变更、质量损失状态变更后刷新关联供应商快照。
+- 将 `SupplierService.findAll()` 改为读取 `scoreSnapshot` 并在数据库层按快照字段排序分页，移除当前页内存动态排序。
+- 新增历史数据 backfill 脚本 `apps/backend/scripts/backfill-supplier-score-snapshots.ts`。
+- 在共享类型中导出 `SUPPLIER_LIST_SORT_KEYS`，明确供应商/外协列表排序契约。
+- 更新 `CONSTRAINTS.md`、`docs/architecture.md`、`code_map.md`、`apps/backend/modules/supplier/ARCHITECTURE.md`，记录远程排序必须 DB 排序后分页以及供应商评分快照架构。
+
+**验证结果：**
+
+- `pnpm -C apps/backend typecheck`: 通过
+- `pnpm -C apps/backend exec vitest run modules/supplier/supplier.service.test.ts`: 1 文件 / 14 测试全部通过
+- `pnpm -C apps/backend exec vitest run`: 184 文件 / 1770 测试全部通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+- `pnpm run check:prisma-migration`: 通过
+- `pnpm lint`: 通过
+
+**commit:** 本次未提交
+
+**遗留问题：**
+
+- 上线应用 migration 后，需要运行 `pnpm -C apps/backend exec tsx scripts/backfill-supplier-score-snapshots.ts` 为历史供应商生成初始快照。
+- 测试环境仍会输出既有 `REDIS_URL not found, caching disabled` 警告，不影响门禁结果。
+
 ### 2026-06-12 修复：分页边界、质量损失趋势容错与 RBAC 权限清洗
 
 **执行内容：**

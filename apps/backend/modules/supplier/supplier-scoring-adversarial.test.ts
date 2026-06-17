@@ -882,16 +882,36 @@ describe('scoreSupplierListItem', () => {
     expect(result.incomingQualifiedRate).toBe(80);
   });
 
-  it('in-house outsourcing: downgrade cap is 85 not 70', () => {
+  it('in-house outsourcing: downgrade cap is 85 (but score already below)', () => {
+    // engineeringClassA=2 → deduction=24 → score=76, min(76,85)=76
     const result = scoreSupplierListItem(
       { category: 'Outsourcing', outsourcingMode: 'IN_HOUSE_TEAM' },
       makeStat({ engineeringClassA: 2 }),
     );
     expect(result.status).toBe('Observation');
-    // in-house outsourcing uses cap 85, standard uses 70
-    // but the actual score depends on the scoring formula
-    expect(result.scoringModel).toBe('IN_HOUSE_OUTSOURCING');
-    expect(result.qualityScore).toBeLessThanOrEqual(85);
+    expect(result.qualityScore).toBe(76);
+  });
+
+  it('in-house outsourcing: downgrade cap 85 when score would be higher', () => {
+    // openIssueCount=3 triggers downgrade. No class deductions → score=100-6=94, min(94,85)=85
+    const result = scoreSupplierListItem(
+      { category: 'Outsourcing', outsourcingMode: 'IN_HOUSE_TEAM' },
+      makeStat({ openEngineeringCount: 3 }),
+    );
+    expect(result.status).toBe('Observation');
+    expect(result.qualityScore).toBe(85);
+  });
+
+  it('standard model: downgrade cap is 70 when score > 70', () => {
+    // engineeringClassA=1, engineeringClassB=1 → score=80, min(80,70)=70
+    // But classA=1, classB=1 → sum=1+1=2 < 3 for classB trigger, and classA sum=1 < 2
+    // No downgrade. Let's use classA=2: score=70, classA sum=2 → downgrade, min(70,70)=70
+    const result = scoreSupplierListItem(
+      {},
+      makeStat({ engineeringClassA: 2 }),
+    );
+    expect(result.status).toBe('Observation');
+    expect(result.qualityScore).toBe(70);
   });
 
   it('warningReasons populated on freeze', () => {

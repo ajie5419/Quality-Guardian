@@ -1,4 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FileStorageService } from '~/modules/file-storage';
+import { InspectionService } from '~/modules/inspection';
+import { SupplierScoreSnapshotService } from '~/modules/supplier/supplier-score-snapshot.service';
+import {
+  applyRecordsToStats,
+  classifyDefect,
+  createEmptyStats,
+  scoreSupplierListItem,
+} from '~/modules/supplier/supplier-scoring';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import prisma from '~/utils/prisma';
 
@@ -7,7 +16,14 @@ vi.mock('~/utils/prisma', () => ({
     suppliers: {
       aggregate: vi.fn(),
       count: vi.fn(),
+      create: vi.fn(),
       findMany: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
+    supplier_score_snapshots: {
+      aggregate: vi.fn(),
+      upsert: vi.fn(),
     },
     inspections: {
       groupBy: vi.fn(),
@@ -23,8 +39,23 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
+vi.mock('~/modules/file-storage', () => ({
+  FileStorageService: {
+    registerReferencesFromAttachments: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/inspection', () => ({
+  InspectionService: {
+    getSupplierHistoryProjects: vi.fn(),
+    getSupplierScoringData: vi.fn(),
+  },
+}));
+
 vi.mock('~/utils/canonical-master-data', () => ({
   MasterDataGovernanceKernel: {
+    resolveCanonicalIdForWrite: vi.fn().mockResolvedValue(undefined),
+    resolveCanonicalNameById: vi.fn().mockResolvedValue(undefined),
     resolveCanonicalIdsByNames: vi.fn().mockResolvedValue(new Map()),
   },
 }));
@@ -39,6 +70,121 @@ function supplier(name: string, status = 'Qualified') {
     qualityScore: 100,
     createdAt: now,
     updatedAt: now,
+  };
+}
+
+function buildStatsMap(input: {
+  afterSalesStats: any[];
+  afterSalesStatusStats: any[];
+  engineeringStats: any[];
+  engineeringStatusStats: any[];
+  incomingStats: any[];
+  recentAfterSales: any[];
+  recentQualityRecords: any[];
+}) {
+  const statsMap = new Map<string, ReturnType<typeof createEmptyStats>>();
+  input.incomingStats.forEach((s) => {
+    const current = statsMap.get(s.supplierName) || createEmptyStats();
+    current.count += s._count.id;
+    current.quantity += s._sum.quantity || 0;
+    if (s.result === 'PASS') current.qualifiedCount += s._count.id;
+    if (s.result === 'FAIL') {
+      current.failures += s._count.id;
+      current.failuresQuantity += s._sum.quantity || 0;
+    }
+    statsMap.set(s.supplierName, current);
+  });
+  input.afterSalesStats.forEach((s) => {
+    const current = statsMap.get(s.supplierBrand) || createEmptyStats();
+    current.afterSalesLoss +=
+      Number(s._sum.materialCost || 0) + Number(s._sum.laborTravelCost || 0);
+    current.afterSalesCount += s._count.id;
+    statsMap.set(s.supplierBrand, current);
+  });
+  input.engineeringStats.forEach((s) => {
+    const current = statsMap.get(s.supplierName) || createEmptyStats();
+    current.engineeringLoss += Number(s._sum.lossAmount || 0);
+    current.engineeringCount += s._count.id;
+    current.engineeringDefectQuantity += s._sum.quantity || 0;
+    statsMap.set(s.supplierName, current);
+  });
+  input.engineeringStatusStats.forEach((s) => {
+    if (s.status === 'CLOSED') return;
+    const current = statsMap.get(s.supplierName) || createEmptyStats();
+    current.openEngineeringCount += s._count.id;
+    statsMap.set(s.supplierName, current);
+  });
+  input.afterSalesStatusStats.forEach((s) => {
+    if (
+      ['CANCELLED', 'CLOSED', 'COMPLETED', 'RESOLVED'].includes(s.claimStatus)
+    ) {
+      return;
+    }
+    const current = statsMap.get(s.supplierBrand) || createEmptyStats();
+    current.openAfterSalesCount += s._count.id;
+    statsMap.set(s.supplierBrand, current);
+  });
+
+  const recordMap = new Map<string, any[]>();
+  [
+    ...input.recentQualityRecords.map((record) => ({
+      ...record,
+      origin: 'qualityRecords',
+    })),
+    ...input.recentAfterSales.map((record) => ({
+      ...record,
+      origin: 'afterSales',
+    })),
+  ].forEach((record) => {
+    const name =
+      record.origin === 'afterSales'
+        ? record.supplierBrand
+        : record.supplierName;
+    const loss =
+      record.origin === 'afterSales'
+        ? Number(record.materialCost || 0) + Number(record.laborTravelCost || 0)
+        : Number(record.lossAmount || 0);
+    const records = recordMap.get(name) || [];
+    records.push({
+      date:
+        record.origin === 'afterSales'
+          ? new Date(record.occurDate)
+          : new Date(record.date),
+      loss,
+      origin: record.origin,
+      type: classifyDefect(loss, record.severity || undefined),
+    });
+    recordMap.set(name, records);
+  });
+  recordMap.forEach((records, name) => {
+    const current = statsMap.get(name) || createEmptyStats();
+    records.sort((a, b) => b.date.getTime() - a.date.getTime());
+    statsMap.set(name, applyRecordsToStats(current, records));
+  });
+  return statsMap;
+}
+
+function buildScoreSnapshot(item: any, stat = createEmptyStats()) {
+  const scored = scoreSupplierListItem(item, stat);
+  return {
+    afterSalesIssueCount: scored.afterSalesIssueCount,
+    afterSalesScore: scored.afterSalesScore,
+    engineeringIssueCount: scored.engineeringIssueCount,
+    engineeringScore: scored.engineeringScore,
+    finalQualityScore: scored.qualityScore,
+    finalRating: scored.level,
+    finalStatus: scored.status,
+    incomingBatchCount: scored.incomingBatchCount,
+    incomingQualifiedRate: scored.incomingQualifiedRate,
+    incomingScore: scored.incomingScore,
+    incomingTotalQuantity: scored.incomingTotalQuantity,
+    isWarning: scored.isWarning,
+    outsourcingMode: scored.outsourcingMode,
+    scoringModel: scored.scoringModel,
+    stabilityScore: scored.stabilityScore,
+    totalAfterSalesLoss: scored.totalAfterSalesLoss,
+    totalEngineeringLoss: scored.totalEngineeringLoss,
+    warningReasons: scored.warningReasons,
   };
 }
 
@@ -62,18 +208,46 @@ function setupScenario(input: {
     recentAfterSales = [],
     recentQualityRecords = [],
   } = input;
+  const statsMap = buildStatsMap({
+    afterSalesStats,
+    afterSalesStatusStats,
+    engineeringStats,
+    engineeringStatusStats,
+    incomingStats,
+    recentAfterSales,
+    recentQualityRecords,
+  });
+  const supplierRows = suppliers.map((item) => ({
+    ...item,
+    scoreSnapshot:
+      item.scoreSnapshot || buildScoreSnapshot(item, statsMap.get(item.name)),
+  }));
 
-  (prisma.suppliers.findMany as any).mockResolvedValue(suppliers);
-  (prisma.suppliers.count as any).mockResolvedValue(suppliers.length);
+  (prisma.suppliers.findMany as any).mockResolvedValue(supplierRows);
+  (prisma.suppliers.count as any).mockResolvedValue(supplierRows.length);
   (prisma.suppliers.aggregate as any).mockResolvedValue({
     _avg: {
       qualityScore:
-        suppliers.reduce(
+        supplierRows.reduce(
           (sum, item) => sum + Number(item.qualityScore || 0),
           0,
-        ) / (suppliers.length || 1),
+        ) / (supplierRows.length || 1),
     },
   });
+  (prisma.supplier_score_snapshots.aggregate as any).mockResolvedValue({
+    _avg: {
+      finalQualityScore:
+        supplierRows.reduce(
+          (sum, item) =>
+            sum +
+            Number(
+              item.scoreSnapshot?.finalQualityScore ?? item.qualityScore ?? 0,
+            ),
+          0,
+        ) / (supplierRows.length || 1),
+    },
+  });
+  (prisma.supplier_score_snapshots.upsert as any).mockResolvedValue({});
   (prisma.inspections.groupBy as any).mockResolvedValue(incomingStats);
   (prisma.after_sales.groupBy as any)
     .mockResolvedValueOnce(afterSalesStats)
@@ -417,7 +591,11 @@ describe('supplierService standard scoring samples', () => {
     expect(names).toEqual(['S1', 'S2', 'S3']);
     expect(prisma.suppliers.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderBy: { qualityScore: 'desc' },
+        include: { scoreSnapshot: true },
+        orderBy: [
+          { scoreSnapshot: { finalQualityScore: 'desc' } },
+          { createdAt: 'desc' },
+        ],
         skip: 0,
         take: 20,
       }),
@@ -582,5 +760,93 @@ describe('supplierService standard scoring samples', () => {
     expect(row.scoringModel).toBe('SUPPLIER');
     expect(row.status).toBe('Frozen');
     expect(row.qualityScore).toBe(0);
+  });
+});
+
+describe('supplierService admission fields', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(
+      SupplierScoreSnapshotService,
+      'refreshSuppliers',
+    ).mockResolvedValue(undefined);
+  });
+
+  it('stores admission metadata and registers uploaded admission documents on create', async () => {
+    const created = supplier('Supplier A');
+    (prisma.suppliers.create as any).mockResolvedValue(created);
+    const admissionDocuments = [{ fileId: 'file-1', name: 'admission.pdf' }];
+
+    await SupplierService.createSupplier({
+      name: 'Supplier A',
+      recognizedAt: '2026-06-01',
+      manufacturerNature: 'Manufacturer',
+      admissionDocuments,
+    });
+
+    expect(prisma.suppliers.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: 'Supplier A',
+        recognizedAt: new Date('2026-06-01'),
+        manufacturerNature: 'Manufacturer',
+        admissionDocuments: JSON.stringify(admissionDocuments),
+      }),
+    });
+    expect(
+      FileStorageService.registerReferencesFromAttachments,
+    ).toHaveBeenCalledWith({
+      attachments: admissionDocuments,
+      bizId: created.id,
+      bizType: 'supplier',
+      fieldName: 'admissionDocuments',
+    });
+  });
+
+  it('updates admission metadata and refreshes admission document references', async () => {
+    const updated = supplier('Supplier A');
+    (prisma.suppliers.update as any).mockResolvedValue(updated);
+    const admissionDocuments = [{ fileId: 'file-2', name: 'renewal.pdf' }];
+
+    await SupplierService.updateSupplier(updated.id, {
+      recognizedAt: '2026-06-02T00:00:00.000Z',
+      admissionDocuments,
+    });
+
+    expect(prisma.suppliers.update).toHaveBeenCalledWith({
+      where: { id: updated.id },
+      data: expect.objectContaining({
+        recognizedAt: new Date('2026-06-02T00:00:00.000Z'),
+        admissionDocuments: JSON.stringify(admissionDocuments),
+      }),
+    });
+    expect(
+      FileStorageService.registerReferencesFromAttachments,
+    ).toHaveBeenCalledWith({
+      attachments: admissionDocuments,
+      bizId: updated.id,
+      bizType: 'supplier',
+      fieldName: 'admissionDocuments',
+    });
+  });
+
+  it('loads supplier history projects from inspection requests through inspection service', async () => {
+    (prisma.suppliers.findFirst as any).mockResolvedValue({
+      id: 'supplier-1',
+      name: 'Supplier A',
+      nameId: 'md-1',
+    });
+    (InspectionService.getSupplierHistoryProjects as any).mockResolvedValue([
+      { workOrderNumber: 'WO-1', projectName: 'Project A' },
+    ]);
+
+    const result = await SupplierService.getHistoryProjects('supplier-1');
+
+    expect(result).toEqual([
+      { workOrderNumber: 'WO-1', projectName: 'Project A' },
+    ]);
+    expect(InspectionService.getSupplierHistoryProjects).toHaveBeenCalledWith({
+      supplierName: 'Supplier A',
+      supplierNameId: 'md-1',
+    });
   });
 });

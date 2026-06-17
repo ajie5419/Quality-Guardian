@@ -128,8 +128,8 @@ function getDetailString(key: string, fallback = '-') {
   return fallback;
 }
 
-function parseDetailDocuments() {
-  const value = getDetailValue('documents');
+function parseDetailAttachmentList(key: string) {
+  const value = getDetailValue(key);
   if (!value) return [];
   if (Array.isArray(value)) return value;
   try {
@@ -138,6 +138,14 @@ function parseDetailDocuments() {
   } catch {
     return [];
   }
+}
+
+function parseDetailDocuments() {
+  return parseDetailAttachmentList('documents');
+}
+
+function parseDetailSelfCheckDocuments() {
+  return parseDetailAttachmentList('selfCheckDocuments');
 }
 
 function getDocumentName(file: unknown, index: number) {
@@ -400,6 +408,23 @@ watch(
             <div v-if="parseDetailDocuments().length > 0" class="space-y-1">
               <a
                 v-for="(file, index) in parseDetailDocuments()"
+                :key="`${getDocumentUrl(file)}-${index}`"
+                :href="getDocumentUrl(file)"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {{ getDocumentName(file, index) }}
+              </a>
+            </div>
+            <span v-else>-</span>
+          </Descriptions.Item>
+          <Descriptions.Item label="自检记录" :span="2">
+            <div
+              v-if="parseDetailSelfCheckDocuments().length > 0"
+              class="space-y-1"
+            >
+              <a
+                v-for="(file, index) in parseDetailSelfCheckDocuments()"
                 :key="`${getDocumentUrl(file)}-${index}`"
                 :href="getDocumentUrl(file)"
                 target="_blank"

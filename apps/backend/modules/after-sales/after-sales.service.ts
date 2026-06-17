@@ -39,6 +39,15 @@ function getResponsibleDepartmentsForResponse(item: {
   return item.respDept ? [item.respDept] : [];
 }
 
+async function refreshSupplierScoreSnapshots(names: unknown[]) {
+  const supplierNames = names
+    .map((name) => String(name || '').trim())
+    .filter(Boolean);
+  if (supplierNames.length === 0) return;
+  const { SupplierScoreSnapshotService } = await import('~/modules/supplier');
+  await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
+}
+
 export const AfterSalesService = {
   async findIdBySerialNumber(serialNumber: number) {
     return AfterSalesIntegrationService.findIdBySerialNumber(serialNumber);
@@ -121,29 +130,42 @@ export const AfterSalesService = {
   ): Promise<void> {
     const { costsChanged, data: updateData } =
       await buildGovernedAfterSalesUpdateData(bodyRecord);
+    const supplierChanged = updateData.supplierBrand !== undefined;
+    let previousSupplierBrand: null | string | undefined;
 
-    if (costsChanged) {
+    if (costsChanged || supplierChanged) {
       const current = await prisma.after_sales.findUnique({
         where: { id },
-        select: { laborTravelCost: true, materialCost: true },
+        select: {
+          laborTravelCost: true,
+          materialCost: true,
+          supplierBrand: true,
+        },
       });
-      if (!current) {
+      if (costsChanged && !current) {
         throw new Error('AFTER_SALES_NOT_FOUND');
       }
+      previousSupplierBrand = current?.supplierBrand;
 
-      const materialCost = Number(
-        updateData.materialCost ?? current.materialCost ?? 0,
-      );
-      const laborTravelCost = Number(
-        updateData.laborTravelCost ?? current.laborTravelCost ?? 0,
-      );
-      updateData.qualityLoss = materialCost + laborTravelCost;
+      if (costsChanged) {
+        const materialCost = Number(
+          updateData.materialCost ?? current?.materialCost ?? 0,
+        );
+        const laborTravelCost = Number(
+          updateData.laborTravelCost ?? current?.laborTravelCost ?? 0,
+        );
+        updateData.qualityLoss = materialCost + laborTravelCost;
+      }
     }
 
     await prisma.after_sales.update({
       where: { id },
       data: updateData,
     });
+    await refreshSupplierScoreSnapshots([
+      previousSupplierBrand,
+      updateData.supplierBrand,
+    ]);
   },
 
   /**

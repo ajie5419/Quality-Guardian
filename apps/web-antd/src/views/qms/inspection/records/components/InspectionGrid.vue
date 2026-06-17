@@ -12,7 +12,15 @@ import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
 } from '@qgs/shared';
-import { Button, message, Modal, Space, Tag } from 'ant-design-vue';
+import {
+  Button,
+  Input,
+  message,
+  Modal,
+  Select,
+  Space,
+  Tag,
+} from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
@@ -34,10 +42,22 @@ import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
 import { getColumns } from '../config';
 
-// Define strict type for schema item
-type GridFormSchema = NonNullable<
-  NonNullable<VxeGridProps['formOptions']>['schema']
->[number];
+type InspectionRecordFilterParams = {
+  hasDocuments?: boolean;
+  inspector?: string;
+  keyword?: string;
+  level1Component?: string;
+  processName?: string;
+  supplierName?: string;
+  team?: string;
+  workOrderNumber?: string;
+};
+type InspectionRecordFilterState = Omit<
+  InspectionRecordFilterParams,
+  'hasDocuments'
+> & {
+  hasDocuments?: string;
+};
 
 const props = defineProps<{
   isMobile?: boolean;
@@ -52,6 +72,9 @@ const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const { canCreate, canEdit, canDelete, canExport, canImport } =
   useQmsPermissions('QMS:Inspection:Records');
+const filters = ref<InspectionRecordFilterState>({
+  keyword: props.keyword,
+});
 
 const exportInspectionRecordsAsXlsx =
   createVxePhotoXlsxExportMethod<QmsInspectionApi.InspectionRecord>({
@@ -69,7 +92,7 @@ const exportInspectionRecordsAsXlsx =
         const response = await getInspectionRecordsExport({
           type: props.type,
           year: props.year,
-          keyword: (formValues?.keyword as string | undefined) || props.keyword,
+          ...buildFilterParams(formValues),
         });
         return filterBySourceInspectionId(response.items || []);
       }
@@ -109,6 +132,52 @@ const processedColumns = (type: string) => {
     return col;
   });
 };
+
+function normalizeFilterText(value: unknown) {
+  const text = String(value ?? '').trim();
+  return text || undefined;
+}
+
+function normalizeHasDocumentsFilter(value: unknown) {
+  if (typeof value === 'boolean') return value;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return undefined;
+}
+
+function buildFilterParams(
+  formValues: Record<string, unknown> = {},
+): InspectionRecordFilterParams {
+  const currentFilters = filters.value;
+  return {
+    hasDocuments: normalizeHasDocumentsFilter(
+      currentFilters.hasDocuments ?? formValues.hasDocuments,
+    ),
+    inspector:
+      normalizeFilterText(currentFilters.inspector) ||
+      normalizeFilterText(formValues.inspector),
+    keyword:
+      normalizeFilterText(currentFilters.keyword) ||
+      normalizeFilterText(formValues.keyword) ||
+      props.keyword,
+    level1Component:
+      normalizeFilterText(currentFilters.level1Component) ||
+      normalizeFilterText(formValues.level1Component),
+    processName:
+      normalizeFilterText(currentFilters.processName) ||
+      normalizeFilterText(formValues.processName),
+    supplierName:
+      normalizeFilterText(currentFilters.supplierName) ||
+      normalizeFilterText(formValues.supplierName),
+    team:
+      normalizeFilterText(currentFilters.team) ||
+      normalizeFilterText(formValues.team),
+    workOrderNumber:
+      normalizeFilterText(currentFilters.workOrderNumber) ||
+      normalizeFilterText(formValues.workOrderNumber),
+  };
+}
+
 const gridOptions = computed(() => ({
   columns: processedColumns(props.type),
   toolbarConfig: {
@@ -117,7 +186,7 @@ const gridOptions = computed(() => ({
     custom: true,
     export: canExport.value,
     import: canImport.value,
-    search: true,
+    search: false,
     slots: {
       buttons: 'toolbar-actions',
     },
@@ -189,7 +258,7 @@ const gridOptions = computed(() => ({
           year: props.year,
           page: props.sourceInspectionId ? 1 : page.currentPage,
           pageSize: props.sourceInspectionId ? 100_000 : page.pageSize,
-          keyword: (formValues?.keyword as string | undefined) || props.keyword,
+          ...buildFilterParams(formValues),
         });
         if (!props.sourceInspectionId) {
           return response;
@@ -212,7 +281,7 @@ const gridOptions = computed(() => ({
           year: props.year,
           page: 1,
           pageSize: 100_000,
-          keyword: (formValues?.keyword as string | undefined) || props.keyword,
+          ...buildFilterParams(formValues),
         });
         return { items: filterBySourceInspectionId(res.items || []) };
       },
@@ -279,25 +348,6 @@ const gridEvents = {
 const [Grid, gridApi] = useVbenVxeGrid({
   gridOptions: gridOptions as unknown as VxeGridProps,
   gridEvents,
-  formOptions: {
-    schema: [
-      {
-        fieldName: 'keyword',
-        label: t('common.search'),
-        component: 'Input',
-        componentProps: {
-          placeholder: t('common.pleaseInput'),
-        },
-        defaultValue: props.keyword,
-        colProps: {
-          span: props.isMobile ? 24 : 8,
-        },
-      } as unknown as GridFormSchema,
-    ],
-    showCollapseButton: false,
-    submitOnChange: true,
-    submitOnEnter: true,
-  },
 });
 
 function handleEdit(row: QmsInspectionApi.InspectionRecord) {
@@ -350,12 +400,26 @@ function reload() {
   gridApi.reload();
 }
 
+function applyFilters() {
+  reload();
+}
+
+function resetFilters(shouldReload = true) {
+  filters.value = {
+    keyword: props.keyword,
+  };
+  if (shouldReload) {
+    reload();
+  }
+}
+
 watch(
   () => props.type,
   (newType) => {
     gridApi.setGridOptions({
       columns: processedColumns(newType),
     });
+    resetFilters(false);
     reload();
   },
 );
@@ -367,13 +431,84 @@ watch(
 
 watch(
   () => [props.keyword, props.sourceInspectionId],
-  () => reload(),
+  () => {
+    filters.value.keyword = props.keyword;
+    reload();
+  },
 );
 
 defineExpose({ reload });
 </script>
 
 <template>
+  <div
+    class="mb-3 grid grid-cols-1 gap-3 rounded border border-gray-200 bg-gray-50 p-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6"
+  >
+    <Input
+      v-model:value="filters.workOrderNumber"
+      allow-clear
+      :placeholder="t('qms.workOrder.workOrderNumber')"
+      @press-enter="applyFilters"
+    />
+    <template v-if="props.type === 'incoming'">
+      <Input
+        v-model:value="filters.supplierName"
+        allow-clear
+        :placeholder="t('qms.supplier.name')"
+        @press-enter="applyFilters"
+      />
+      <Select
+        v-model:value="filters.hasDocuments"
+        allow-clear
+        :options="[
+          { label: '是', value: 'true' },
+          { label: '否', value: 'false' },
+        ]"
+        placeholder="是否有资料"
+      />
+    </template>
+    <template v-if="props.type === 'process'">
+      <Input
+        v-model:value="filters.processName"
+        allow-clear
+        :placeholder="t('qms.inspection.records.form.process')"
+        @press-enter="applyFilters"
+      />
+      <Input
+        v-model:value="filters.level1Component"
+        allow-clear
+        :placeholder="t('qms.inspection.records.form.level1')"
+        @press-enter="applyFilters"
+      />
+      <Input
+        v-model:value="filters.team"
+        allow-clear
+        :placeholder="t('qms.inspection.records.form.team')"
+        @press-enter="applyFilters"
+      />
+      <Input
+        v-model:value="filters.inspector"
+        allow-clear
+        placeholder="检验员"
+        @press-enter="applyFilters"
+      />
+    </template>
+    <Space>
+      <Button type="primary" @click="applyFilters">
+        <template #icon>
+          <IconifyIcon icon="lucide:search" />
+        </template>
+        查询
+      </Button>
+      <Button @click="resetFilters()">
+        <template #icon>
+          <IconifyIcon icon="lucide:rotate-ccw" />
+        </template>
+        重置
+      </Button>
+    </Space>
+  </div>
+
   <Grid>
     <template #toolbar-actions>
       <Space :direction="props.isMobile ? 'vertical' : 'horizontal'">

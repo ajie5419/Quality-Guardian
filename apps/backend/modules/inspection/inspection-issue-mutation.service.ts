@@ -23,6 +23,15 @@ import {
 
 type RequestBody = Record<string, unknown>;
 
+async function refreshSupplierScoreSnapshots(names: unknown[]) {
+  const supplierNames = names
+    .map((name) => String(name || '').trim())
+    .filter(Boolean);
+  if (supplierNames.length === 0) return;
+  const { SupplierScoreSnapshotService } = await import('~/modules/supplier');
+  await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
+}
+
 export const InspectionIssueMutationService = {
   async createIssue(userinfo: UserSession, body: RequestBody) {
     const sourceType = String(body.sourceType || '')
@@ -64,6 +73,7 @@ export const InspectionIssueMutationService = {
       },
     });
     await WelderScoreService.syncFromInspectionIssues();
+    await refreshSupplierScoreSnapshots([newRecord.supplierName]);
     return { ...newRecord, ncNumber: newRecord.nonConformanceNumber };
   },
 
@@ -73,6 +83,10 @@ export const InspectionIssueMutationService = {
     body: RequestBody,
     existingNcNumber: null | string,
   ) {
+    const current = await prisma.quality_records.findUnique({
+      where: { id },
+      select: { supplierName: true },
+    });
     const updateData = await buildInspectionIssueUpdateData(
       body,
       existingNcNumber,
@@ -96,6 +110,10 @@ export const InspectionIssueMutationService = {
       },
     });
     await WelderScoreService.syncFromInspectionIssues();
+    await refreshSupplierScoreSnapshots([
+      current?.supplierName,
+      updateData.supplierName,
+    ]);
   },
 
   async batchDeleteIssues(
@@ -103,11 +121,18 @@ export const InspectionIssueMutationService = {
     userinfo: UserSession,
     ids: string[],
   ) {
+    const existing = await prisma.quality_records.findMany({
+      where: { id: { in: ids } },
+      select: { supplierName: true },
+    });
     const result = await prisma.quality_records.updateMany({
       where: { id: { in: ids } },
       data: { isDeleted: true, updatedAt: new Date() },
     });
     if (result.count > 0) await WelderScoreService.syncFromInspectionIssues();
+    await refreshSupplierScoreSnapshots(
+      existing.map((item) => item.supplierName),
+    );
     await Promise.all(
       ids.map((id) =>
         FileStorageService.softDeleteReferences({
@@ -134,6 +159,7 @@ export const InspectionIssueMutationService = {
   ) {
     let successCount = 0;
     const rowErrors = [];
+    const supplierNamesToRefresh: string[] = [];
     let serialSeed = await getNextInspectionIssueSerialNumber();
     for (const [index, item] of items.entries()) {
       try {
@@ -155,7 +181,9 @@ export const InspectionIssueMutationService = {
           continue;
         }
         serialSeed++;
-        await prisma.quality_records.upsert(payload);
+        const saved = await prisma.quality_records.upsert(payload);
+        if (saved?.supplierName)
+          supplierNamesToRefresh.push(saved.supplierName);
         successCount++;
       } catch (error) {
         const message = toImportErrorMessage(error);
@@ -171,6 +199,7 @@ export const InspectionIssueMutationService = {
       }
     }
     if (successCount > 0) await WelderScoreService.syncFromInspectionIssues();
+    await refreshSupplierScoreSnapshots(supplierNamesToRefresh);
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
       action: 'CREATE',

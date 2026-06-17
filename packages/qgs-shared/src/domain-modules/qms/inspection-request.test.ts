@@ -12,7 +12,7 @@ describe('buildInspectionRecordPayloadCore', () => {
     const payload = buildInspectionRecordPayloadCore({
       body: {
         attachments: [
-          { name: 'incoming.jpg', url: 'https://example.test/i.jpg' },
+          { name: 'close.pdf', url: 'https://example.test/close.pdf' },
         ],
         inspector: 'Inspector A',
         qualifiedQuantity: 8,
@@ -21,6 +21,9 @@ describe('buildInspectionRecordPayloadCore', () => {
         unqualifiedQuantity: 2,
       },
       request: {
+        attachments: [
+          { name: 'self-check.jpg', url: 'https://example.test/self.jpg' },
+        ],
         componentName: '',
         mutualCheckResult: 'PASS',
         partName: 'Bearing',
@@ -54,6 +57,19 @@ describe('buildInspectionRecordPayloadCore', () => {
     });
     expect(payload).not.toHaveProperty('processName');
     expect(payload).not.toHaveProperty('level1Component');
+    expect(JSON.parse(String(payload.documents))).toEqual([
+      expect.objectContaining({
+        name: 'close.pdf',
+        url: 'https://example.test/close.pdf',
+      }),
+    ]);
+    expect(JSON.parse(String(payload.selfCheckDocuments))).toEqual([
+      expect.objectContaining({
+        name: 'self-check.jpg',
+        url: 'https://example.test/self.jpg',
+      }),
+    ]);
+    expect(payload.hasSelfCheckDocuments).toBe(true);
   });
 });
 

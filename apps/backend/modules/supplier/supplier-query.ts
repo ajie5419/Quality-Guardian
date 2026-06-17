@@ -27,17 +27,20 @@ export {
 
 interface SupplierImportItem {
   address?: unknown;
+  admissionDocuments?: unknown;
   brand?: unknown;
   buyer?: unknown;
   category?: unknown;
   contact?: unknown;
   email?: unknown;
+  manufacturerNature?: unknown;
   name?: unknown;
   origin?: unknown;
   outsourcingMode?: unknown;
   phone?: unknown;
   project?: unknown;
   productName?: unknown;
+  recognizedAt?: unknown;
   score2025?: unknown;
   status?: unknown;
 }

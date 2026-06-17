@@ -30,6 +30,7 @@ export async function syncCloseAttachments(options: {
   inspectionId: string;
   inspectionIds?: string[];
   requestId: string;
+  selfCheckAttachments?: unknown;
 }) {
   await runClosePostCommitTask('request-file-references', () =>
     FileStorageService.registerReferencesFromAttachments({
@@ -44,12 +45,16 @@ export async function syncCloseAttachments(options: {
   ];
   for (const inspectionId of inspectionIds) {
     const currentInspection = await prisma.inspections.findUnique({
-      select: { documents: true },
+      select: { documents: true, selfCheckDocuments: true },
       where: { id: inspectionId },
     });
     const inspectionDocuments = mergeInspectionRequestAttachments(
       currentInspection?.documents,
       options.closeAttachments,
+    );
+    const selfCheckDocuments = mergeInspectionRequestAttachments(
+      currentInspection?.selfCheckDocuments,
+      options.selfCheckAttachments,
     );
     const resolvedHasDocuments =
       typeof options.hasDocuments === 'boolean'
@@ -60,6 +65,9 @@ export async function syncCloseAttachments(options: {
         data: {
           documents: stringifyCloseInspectionDocuments(inspectionDocuments),
           hasDocuments: resolvedHasDocuments,
+          selfCheckDocuments:
+            stringifyCloseInspectionDocuments(selfCheckDocuments),
+          hasSelfCheckDocuments: selfCheckDocuments.length > 0,
         },
         where: { id: inspectionId },
       });
@@ -68,6 +76,12 @@ export async function syncCloseAttachments(options: {
         bizId: inspectionId,
         bizType: 'inspection_record',
         fieldName: 'documents',
+      });
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: selfCheckDocuments,
+        bizId: inspectionId,
+        bizType: 'inspection_record',
+        fieldName: 'selfCheckDocuments',
       });
     });
   }

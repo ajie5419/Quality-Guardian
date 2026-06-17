@@ -16,8 +16,21 @@ import {
 } from './after-sales-id';
 import { buildGovernedAfterSalesCreateData } from './after-sales-payload';
 
+async function refreshSupplierScoreSnapshots(names: unknown[]) {
+  const supplierNames = names
+    .map((name) => String(name || '').trim())
+    .filter(Boolean);
+  if (supplierNames.length === 0) return;
+  const { SupplierScoreSnapshotService } = await import('~/modules/supplier');
+  await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
+}
+
 export const AfterSalesRouteService = {
   async batchDelete(ids: string[]) {
+    const existing = await prisma.after_sales.findMany({
+      where: { id: { in: ids } },
+      select: { supplierBrand: true },
+    });
     const result = await prisma.after_sales.updateMany({
       where: { id: { in: ids } },
       data: { isDeleted: true, updatedAt: new Date() },
@@ -29,6 +42,9 @@ export const AfterSalesRouteService = {
           bizType: 'after_sales',
         }),
       ),
+    );
+    await refreshSupplierScoreSnapshots(
+      existing.map((item) => item.supplierBrand),
     );
     return result.count;
   },
@@ -56,12 +72,14 @@ export const AfterSalesRouteService = {
       targetId: String(created.id),
       detailsVariables: { id: created.id, projectName: created.projectName },
     });
+    await refreshSupplierScoreSnapshots([created.supplierBrand]);
     return created;
   },
 
   async importItems(items: Record<string, unknown>[]) {
     let successCount = 0;
     const rowErrors = [];
+    const supplierNamesToRefresh: string[] = [];
     let serialSeed = await getNextAfterSalesSerialNumber();
     for (const [index, item] of items.entries()) {
       try {
@@ -80,13 +98,16 @@ export const AfterSalesRouteService = {
           continue;
         }
         const serialNumber = serialSeed++;
-        await prisma.after_sales.create({
+        const created = await prisma.after_sales.create({
           data: await buildGovernedAfterSalesCreateData(item, {
             defaultWorkOrderNumber: woNumber,
             id: createAfterSalesId(),
             serialNumber,
           }),
         });
+        if (created.supplierBrand) {
+          supplierNamesToRefresh.push(created.supplierBrand);
+        }
         successCount++;
       } catch (error) {
         const message = toImportErrorMessage(error);
@@ -101,6 +122,7 @@ export const AfterSalesRouteService = {
         );
       }
     }
+    await refreshSupplierScoreSnapshots(supplierNamesToRefresh);
     return buildImportSummary({
       rowErrors,
       successCount,

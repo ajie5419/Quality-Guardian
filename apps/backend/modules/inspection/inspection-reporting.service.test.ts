@@ -21,6 +21,7 @@ vi.mock('~/utils/prisma', () => ({
       count: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
+      findUnique: vi.fn(),
       groupBy: vi.fn(),
       update: vi.fn(),
     },
@@ -34,6 +35,7 @@ vi.mock('~/modules/quality-loss/quality-loss-status', () => ({
 describe('inspectionReportingService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma.quality_records.findUnique as any).mockResolvedValue(null);
   });
 
   describe('findIssueIdBySerialNumber', () => {

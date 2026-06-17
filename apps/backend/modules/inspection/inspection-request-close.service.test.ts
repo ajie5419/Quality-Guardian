@@ -68,6 +68,9 @@ vi.mock('~/modules/system-log/audit-log', () => ({
 }));
 
 const mockRequest = {
+  attachments: JSON.stringify([
+    { name: 'self.pdf', url: 'http://example.com/self.pdf' },
+  ]),
   id: 'req-1',
   inspectorId: null,
   isDeleted: false,
@@ -130,6 +133,14 @@ describe('inspectionRequestCloseService', () => {
     expect(result).toBeDefined();
     expect(prisma.qms_inspection_requests.findFirst).toHaveBeenCalled();
     expect(prisma.$transaction).toHaveBeenCalled();
+    const { syncCloseAttachments } = await import(
+      '~/modules/inspection/inspection-request-close-effects.service'
+    );
+    expect(syncCloseAttachments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selfCheckAttachments: mockRequest.attachments,
+      }),
+    );
   });
 
   it('should throw when request not found', async () => {

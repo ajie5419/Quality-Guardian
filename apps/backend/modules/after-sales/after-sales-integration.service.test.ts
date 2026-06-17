@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -7,6 +8,7 @@ vi.mock('~/utils/prisma', () => ({
       count: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
+      findUnique: vi.fn(),
       groupBy: vi.fn(),
       update: vi.fn(),
     },
@@ -28,6 +30,7 @@ vi.mock('~/modules/quality-loss/quality-loss-status', () => ({
 describe('after-sales-integration.service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma.after_sales.findUnique as any).mockResolvedValue(null);
   });
 
   it('should find id by serial number', async () => {

@@ -34,6 +34,31 @@ QMS 不是普通 CRUD 系统，它有以下特有复杂度：
 | 状态机驱动 | 每个域都有状态流转 | if/else 散落在 service 中 |
 | 主数据治理 | 写入必须引用规范化的主数据 | MasterDataGovernanceKernel 手动调用 |
 
+### 2.1 供应商评分与远程排序
+
+供应商管理和外协管理共用 `supplier` 模块。列表中的评分、等级、状态、来料合格率、工程问题数、售后问题数不是分页查询后临时排序，而是先写入 `supplier_score_snapshots` 指标快照，再由列表接口在数据库层完成 `orderBy + skip + take`。
+
+评分来源包括：
+
+1. `suppliers` 基础资料：名称、分类、外协类型、负责人、状态基线
+2. `inspections` 来料检验统计：合格批次、总批次、合格率
+3. `quality_records` 工程质量问题：问题数、损失金额、关闭状态
+4. `after_sales` 售后质量问题：问题数、售后损失、关闭状态
+
+写入路径更新上述来源数据后，必须调用 `SupplierScoreSnapshotService` 刷新关联供应商快照。历史数据上线时通过 `apps/backend/scripts/backfill-supplier-score-snapshots.ts` 生成初始快照。
+
+### 2.2 供应商/外协准入档案与画像
+
+供应商管理和外协管理共用 `suppliers` 表保存准入档案。供应商和外协单位均保存 `recognizedAt` 认定时间与 `admissionDocuments` 准入手续附件；供应商额外保存 `manufacturerNature` 厂商性质。附件上传后由 `file-storage` 模块登记 `file_references`，业务表只保存附件 JSON 快照。
+
+供应商画像中的历史使用项目以报检任务为事实源：`supplier` 模块先读取供应商档案，再通过 `InspectionService.getSupplierHistoryProjects()` 聚合 `qms_inspection_requests` 的工单号，并读取 `work_orders.projectName` 展示项目名称。该数据禁止由前端当前页、检验记录列表或已分页数据拼接。
+
+### 2.3 报检自检记录与检验记录附件
+
+报检入口上传的自检记录以 `qms_inspection_requests.attachments` 为事实源。关闭报检任务生成或关联检验记录时，系统将该附件快照写入 `inspections.selfCheckDocuments`，并登记 `file_references(bizType=inspection_record, fieldName=selfCheckDocuments)`。
+
+检验员关闭报检时上传的关闭附件以 `qms_inspection_requests.closeAttachments` 为事实源，只写入 `inspections.documents`，并登记 `file_references(bizType=inspection_record, fieldName=documents)`。检验记录详情需要分别展示自检记录和检验记录附件，禁止前端把两个来源临时合并。
+
 ---
 
 ## 三、目标架构

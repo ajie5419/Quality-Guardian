@@ -89,6 +89,7 @@ export function buildInspectionRequestNo(params: {
 export function buildInspectionRecordPayloadCore(input: {
   body: Record<string, unknown>;
   request: {
+    attachments?: unknown;
     closeRemark?: null | string;
     componentName?: null | string;
     mutualCheckResult: string;
@@ -119,6 +120,7 @@ export function buildInspectionRecordPayloadCore(input: {
     category: 'INCOMING' as const,
     documents: payload.documents,
     hasDocuments: payload.hasDocuments,
+    hasSelfCheckDocuments: payload.hasSelfCheckDocuments,
     inspectionDate: payload.inspectionDate,
     inspector: payload.inspector,
     incomingType: requestInfo.incomingType || INCOMING_INSPECTION_PROCESS_NAME,
@@ -140,6 +142,7 @@ export function buildInspectionRecordPayloadCore(input: {
     quantity: payload.quantity,
     remarks: requestInfo.notes || payload.remarks,
     result: payload.result,
+    selfCheckDocuments: payload.selfCheckDocuments,
     stationSelection: payload.stationSelection,
     supplierName: normalizeInspectionRequestText(input.request.team),
     unqualifiedQuantity: payload.unqualifiedQuantity,
@@ -203,6 +206,7 @@ export async function resolveInspectionRequestCurrentUserId(
 
 export async function buildInspectionRecordFromRequest(
   request: {
+    attachments?: unknown;
     closeRemark?: null | string;
     componentName?: null | string;
     mutualCheckResult: string;

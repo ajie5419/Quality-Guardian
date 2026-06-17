@@ -82,6 +82,7 @@ describe('syncCloseAttachments', () => {
     );
     (prisma.inspections.findUnique as any).mockResolvedValue({
       documents: null,
+      selfCheckDocuments: null,
     });
     (prisma.inspections.update as any).mockResolvedValue({});
 
@@ -91,16 +92,44 @@ describe('syncCloseAttachments', () => {
       ],
       inspectionId: 'i-1',
       requestId: 'req-1',
+      selfCheckAttachments: [
+        {
+          name: 'self.pdf',
+          size: 2048,
+          type: 'application/pdf',
+          url: 'http://self',
+        },
+      ],
     });
 
     expect(prisma.inspections.findUnique).toHaveBeenCalledWith({
-      select: { documents: true },
+      select: { documents: true, selfCheckDocuments: true },
       where: { id: 'i-1' },
     });
-    expect(prisma.inspections.update).toHaveBeenCalled();
+    expect(prisma.inspections.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          hasSelfCheckDocuments: true,
+          selfCheckDocuments: JSON.stringify([
+            {
+              name: 'self.pdf',
+              size: 2048,
+              type: 'application/pdf',
+              url: 'http://self',
+            },
+          ]),
+        }),
+      }),
+    );
     expect(
       FileStorageService.registerReferencesFromAttachments,
-    ).toHaveBeenCalled();
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bizId: 'i-1',
+        bizType: 'inspection_record',
+        fieldName: 'selfCheckDocuments',
+      }),
+    );
   });
 });
 

@@ -6,6 +6,8 @@ vi.mock('~/utils/prisma', () => ({
   default: {
     quality_records: {
       create: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
       upsert: vi.fn(),
@@ -60,6 +62,8 @@ vi.mock('~/modules/inspection/inspection-issue', () => ({
 describe('inspectionIssueMutationService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma.quality_records.findMany as any).mockResolvedValue([]);
+    (prisma.quality_records.findUnique as any).mockResolvedValue(null);
   });
 
   describe('createIssue', () => {

@@ -62,6 +62,7 @@ vi.mock('~/utils/prisma', () => ({
   default: {
     after_sales: {
       create: vi.fn(),
+      findMany: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
@@ -141,6 +142,7 @@ function event() {
 describe('after-sales route services', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.after_sales.findMany).mockResolvedValue([]);
     getCurrentUser.mockReturnValue({ id: 'u-1', username: 'admin' });
     getRequiredRouterParam.mockReturnValue('as-1');
     getNextAfterSalesSerialNumber.mockResolvedValue(10);

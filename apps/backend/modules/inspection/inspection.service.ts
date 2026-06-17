@@ -1,6 +1,7 @@
 import { InspectionArchiveService } from './inspection-archive.service';
 import { InspectionCoreService } from './inspection-core.service';
 import { InspectionIssueService } from './inspection-issue.service';
+import { InspectionRequestHistoryService } from './inspection-request-history.service';
 import { InspectionTemplateService } from './inspection-template.service';
 
 export const InspectionService = {
@@ -32,6 +33,8 @@ export const InspectionService = {
   getReportSupplierPerformance:
     InspectionCoreService.getReportSupplierPerformance,
   getReportTopRiskProjects: InspectionCoreService.getReportTopRiskProjects,
+  getSupplierHistoryProjects:
+    InspectionRequestHistoryService.getSupplierHistoryProjects,
   getSupplierScoringData: InspectionCoreService.getSupplierScoringData,
   getWelderScoreIssues: InspectionCoreService.getWelderScoreIssues,
   getWeeklyReportIssues: InspectionCoreService.getWeeklyReportIssues,

@@ -1,10 +1,8 @@
 import type { Prisma } from '@prisma/client';
 import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
-import type { SupplierStats } from './supplier-scoring';
-
-import { AfterSalesService } from '~/modules/after-sales';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import { FileStorageService } from '~/modules/file-storage';
 import { InspectionService } from '~/modules/inspection';
 import {
   buildSupplierCreateDataWithCanonical,
@@ -14,17 +12,11 @@ import {
   normalizeOutsourcingMode,
   normalizeSupplierString,
 } from '~/modules/supplier/supplier-query';
-import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 import { buildKeywordOr } from '~/utils/query-helpers';
 
-import {
-  applyRecordsToStats,
-  classifyDefect,
-  createEmptyStats,
-  scoreSupplierListItem,
-} from './supplier-scoring';
+import { SupplierScoreSnapshotService } from './supplier-score-snapshot.service';
 
 export interface SupplierQueryParams {
   page?: number;
@@ -41,185 +33,106 @@ export interface SupplierQueryParams {
 }
 
 type SupplierWhereInput = Prisma.suppliersWhereInput;
-
-interface SupplierListItem extends Record<string, unknown> {
-  name: string;
-  status: string;
-  qualityScore: number;
-  [key: string]: unknown;
-}
+type SupplierAdmissionPayload = Record<string, unknown>;
 
 const SUPPLIER_SORT_FIELDS: Record<
   string,
   Prisma.suppliersOrderByWithRelationInput
 > = {
+  brand: { brand: 'asc' },
+  buyer: { buyer: 'asc' },
   category: { category: 'asc' },
   createdAt: { createdAt: 'asc' },
   email: { email: 'asc' },
+  manufacturerNature: { manufacturerNature: 'asc' },
   name: { name: 'asc' },
   phone: { phone: 'asc' },
-  qualityScore: { qualityScore: 'asc' },
-  rating: { rating: 'asc' },
-  status: { status: 'asc' },
+  productName: { productName: 'asc' },
+  recognizedAt: { recognizedAt: 'asc' },
+  outsourcingMode: { outsourcingMode: 'asc' },
   updatedAt: { updatedAt: 'asc' },
+};
+
+const SUPPLIER_SNAPSHOT_SORT_FIELDS: Record<string, string> = {
+  afterSalesIssueCount: 'afterSalesIssueCount',
+  engineeringIssueCount: 'engineeringIssueCount',
+  incomingQualifiedRate: 'incomingQualifiedRate',
+  level: 'finalRating',
+  qualityScore: 'finalQualityScore',
+  rating: 'finalRating',
+  status: 'finalStatus',
 };
 
 function buildSupplierOrderBy(
   sortBy?: string,
-  sortOrder?: 'asc' | 'desc',
-): Prisma.suppliersOrderByWithRelationInput {
+  sortOrder: 'asc' | 'desc' = 'asc',
+): Prisma.suppliersOrderByWithRelationInput[] {
+  const snapshotField = sortBy
+    ? SUPPLIER_SNAPSHOT_SORT_FIELDS[sortBy]
+    : undefined;
+  if (snapshotField) {
+    return [
+      {
+        scoreSnapshot: {
+          [snapshotField]: sortOrder,
+        },
+      } as Prisma.suppliersOrderByWithRelationInput,
+      { createdAt: 'desc' },
+    ];
+  }
   const configured = sortBy ? SUPPLIER_SORT_FIELDS[sortBy] : undefined;
-  if (!configured) return { createdAt: 'desc' };
+  if (!configured) return [{ createdAt: 'desc' }];
   const [field] = Object.keys(configured);
-  return { [field]: sortOrder || 'asc' };
+  return [{ [field]: sortOrder }, { createdAt: 'desc' }];
 }
 
-async function buildSupplierStatsMap(supplierNames: string[]) {
-  const statsMap = new Map<string, SupplierStats>();
-  if (supplierNames.length === 0) return statsMap;
+function mapSupplierListItem(
+  item: Prisma.suppliersGetPayload<{ include: { scoreSnapshot: true } }>,
+) {
+  const snapshot = item.scoreSnapshot;
+  return {
+    ...item,
+    afterSalesIssueCount: snapshot?.afterSalesIssueCount ?? 0,
+    afterSalesScore: snapshot?.afterSalesScore ?? 100,
+    engineeringIssueCount: snapshot?.engineeringIssueCount ?? 0,
+    engineeringScore: snapshot?.engineeringScore ?? 100,
+    incomingBatchCount: snapshot?.incomingBatchCount ?? 0,
+    incomingQualifiedRate: snapshot?.incomingQualifiedRate ?? 100,
+    incomingScore: snapshot?.incomingScore ?? 100,
+    incomingTotalQuantity: snapshot?.incomingTotalQuantity ?? 0,
+    isWarning: snapshot?.isWarning ?? false,
+    level: snapshot?.finalRating || item.rating || 'A',
+    outsourcingMode: snapshot?.outsourcingMode || item.outsourcingMode,
+    qualityScore: snapshot?.finalQualityScore ?? item.qualityScore ?? 100,
+    rating: snapshot?.finalRating || item.rating || 'A',
+    scoringModel: snapshot?.scoringModel || 'SUPPLIER',
+    stabilityScore: snapshot?.stabilityScore ?? 100,
+    status: snapshot?.finalStatus || item.status || 'Qualified',
+    totalAfterSalesLoss: snapshot?.totalAfterSalesLoss ?? 0,
+    totalEngineeringLoss: snapshot?.totalEngineeringLoss ?? 0,
+    warningReasons: snapshot?.warningReasons || [],
+    createdAt:
+      item.createdAt instanceof Date ? item.createdAt.toISOString() : null,
+    recognizedAt:
+      item.recognizedAt instanceof Date
+        ? item.recognizedAt.toISOString()
+        : null,
+    updatedAt:
+      item.updatedAt instanceof Date ? item.updatedAt.toISOString() : null,
+  };
+}
 
-  const now = new Date();
-  const oneYearAgo = new Date();
-  oneYearAgo.setFullYear(now.getFullYear() - 1);
-
-  const supplierNameToId =
-    await MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
-      configKey: 'supplierName',
-      names: supplierNames,
-    });
-  const supplierIds = [...supplierNameToId.values()].filter(
-    Boolean,
-  ) as string[];
-  const [inspectionScoring, afterSalesScoring] = await Promise.all([
-    InspectionService.getSupplierScoringData({
-      since: oneYearAgo,
-      supplierIds,
-      supplierNames,
-    }),
-    AfterSalesService.getSupplierScoringData({
-      since: oneYearAgo,
-      supplierNames,
-    }),
-  ]);
-  const {
-    incomingStats,
-    engineeringStats,
-    engineeringStatusStats,
-    records: recentQualityRecords,
-  } = inspectionScoring;
-  const {
-    stats: afterSalesStats,
-    statusStats: afterSalesStatusStats,
-    records: recentAfterSales,
-  } = afterSalesScoring;
-
-  incomingStats.forEach((s) => {
-    if (s.supplierName) {
-      const current = statsMap.get(s.supplierName) || createEmptyStats();
-      current.count += s._count.id;
-      current.quantity += s._sum.quantity || 0;
-      if (s.result === 'PASS') {
-        current.qualifiedCount += s._count.id;
-      } else if (s.result === 'FAIL') {
-        current.failures += s._count.id;
-        current.failuresQuantity += s._sum.quantity || 0;
-      }
-      statsMap.set(s.supplierName, current);
-    }
+async function registerAdmissionDocuments(
+  supplierId: string,
+  payload: SupplierAdmissionPayload,
+) {
+  if (!Object.hasOwn(payload, 'admissionDocuments')) return;
+  await FileStorageService.registerReferencesFromAttachments({
+    attachments: payload.admissionDocuments,
+    bizId: supplierId,
+    bizType: 'supplier',
+    fieldName: 'admissionDocuments',
   });
-
-  afterSalesStats.forEach((s) => {
-    if (s.supplierBrand) {
-      const current = statsMap.get(s.supplierBrand) || createEmptyStats();
-      current.afterSalesLoss +=
-        Number(s._sum.materialCost || 0) + Number(s._sum.laborTravelCost || 0);
-      current.afterSalesCount += s._count.id;
-      statsMap.set(s.supplierBrand, current);
-    }
-  });
-
-  engineeringStats.forEach((s) => {
-    if (s.supplierName) {
-      const current = statsMap.get(s.supplierName) || createEmptyStats();
-      current.engineeringLoss += Number(s._sum.lossAmount || 0);
-      current.engineeringCount += s._count.id;
-      current.engineeringDefectQuantity += s._sum.quantity || 0;
-      statsMap.set(s.supplierName, current);
-    }
-  });
-
-  engineeringStatusStats.forEach((s) => {
-    if (!s.supplierName) return;
-    if (s.status === 'CLOSED') return;
-    const current = statsMap.get(s.supplierName) || createEmptyStats();
-    current.openEngineeringCount += s._count.id;
-    statsMap.set(s.supplierName, current);
-  });
-
-  afterSalesStatusStats.forEach((s) => {
-    if (!s.supplierBrand) return;
-    if (
-      ['CANCELLED', 'CLOSED', 'COMPLETED', 'RESOLVED'].includes(s.claimStatus)
-    ) {
-      return;
-    }
-    const current = statsMap.get(s.supplierBrand) || createEmptyStats();
-    current.openAfterSalesCount += s._count.id;
-    statsMap.set(s.supplierBrand, current);
-  });
-
-  const supplierRecords: Record<
-    string,
-    Array<{
-      date: Date;
-      loss: number;
-      origin: 'afterSales' | 'qualityRecords';
-      type: 'A' | 'B' | 'C' | null;
-    }>
-  > = {};
-
-  const combinedRecords = [
-    ...recentAfterSales.map((r) => ({
-      ...r,
-      origin: 'afterSales' as const,
-    })),
-    ...recentQualityRecords.map((r) => ({
-      ...r,
-      origin: 'qualityRecords' as const,
-    })),
-  ];
-
-  combinedRecords.forEach((r) => {
-    const name = r.origin === 'afterSales' ? r.supplierBrand : r.supplierName;
-    if (!name) return;
-
-    let loss = 0;
-    let date = new Date();
-    if (r.origin === 'afterSales') {
-      loss = Number(r.materialCost || 0) + Number(r.laborTravelCost || 0);
-      date = new Date(r.occurDate);
-    } else {
-      loss = Number(r.lossAmount || 0);
-      date = new Date(r.date);
-    }
-
-    const classification = classifyDefect(loss, r.severity || undefined);
-    if (!supplierRecords[name]) supplierRecords[name] = [];
-    supplierRecords[name].push({
-      type: classification,
-      loss,
-      date,
-      origin: r.origin,
-    });
-  });
-
-  Object.entries(supplierRecords).forEach(([name, records]) => {
-    const current = statsMap.get(name) || createEmptyStats();
-    records.sort((a, b) => b.date.getTime() - a.date.getTime());
-    statsMap.set(name, applyRecordsToStats(current, records));
-  });
-
-  return statsMap;
 }
 
 async function buildSupplierGlobalStats(
@@ -228,21 +141,33 @@ async function buildSupplierGlobalStats(
 ) {
   const [qualifiedCount, warningCount, averageScore] = await Promise.all([
     prisma.suppliers.count({
-      where: { AND: [scopedWhere, { status: 'Qualified' }] },
+      where: {
+        AND: [
+          scopedWhere,
+          { scoreSnapshot: { is: { finalStatus: 'Qualified' } } },
+        ],
+      },
     }),
     prisma.suppliers.count({
       where: {
         AND: [
           scopedWhere,
           {
-            OR: [{ status: 'Observation' }, { qualityScore: { lt: 80 } }],
+            OR: [
+              { scoreSnapshot: { is: { finalStatus: 'Observation' } } },
+              { scoreSnapshot: { is: { finalStatus: 'Frozen' } } },
+              { scoreSnapshot: { is: { finalQualityScore: { lt: 80 } } } },
+            ],
           },
         ],
       },
     }),
-    prisma.suppliers.aggregate({
-      where: scopedWhere,
-      _avg: { qualityScore: true },
+    prisma.supplier_score_snapshots.aggregate({
+      where: {
+        supplier: { is: scopedWhere },
+        isDeleted: false,
+      },
+      _avg: { finalQualityScore: true },
     }),
   ]);
 
@@ -250,7 +175,7 @@ async function buildSupplierGlobalStats(
     total: totalCount,
     qualified: qualifiedCount,
     warning: warningCount,
-    avgScore: (averageScore._avg.qualityScore ?? 0).toFixed(1),
+    avgScore: (averageScore._avg.finalQualityScore ?? 0).toFixed(1),
   };
 }
 
@@ -258,14 +183,20 @@ export const SupplierService = {
   async createSupplier(payload: Record<string, unknown>) {
     const createData = await buildSupplierCreateDataWithCanonical(payload);
     if (!createData) return null;
-    return prisma.suppliers.create({ data: createData });
+    const created = await prisma.suppliers.create({ data: createData });
+    await registerAdmissionDocuments(created.id, payload);
+    await SupplierScoreSnapshotService.refreshSuppliers([created]);
+    return created;
   },
 
   async updateSupplier(id: string, payload: Record<string, unknown>) {
-    return prisma.suppliers.update({
+    const updated = await prisma.suppliers.update({
       where: { id },
       data: await buildSupplierUpdateDataWithCanonical(payload),
     });
+    await registerAdmissionDocuments(updated.id, payload);
+    await SupplierScoreSnapshotService.refreshSuppliers([updated]);
+    return updated;
   },
 
   async deleteSupplier(id: string) {
@@ -305,11 +236,12 @@ export const SupplierService = {
                 'suppliers',
                 payload.update,
               );
-            await prisma.suppliers.upsert({
+            const supplier = await prisma.suppliers.upsert({
               ...payload,
               create: { ...payload.create, ...createCanonicalIds },
               update: { ...payload.update, ...updateCanonicalIds },
             });
+            await SupplierScoreSnapshotService.refreshSuppliers([supplier]);
             results.success++;
           } catch {
             results.errors++;
@@ -342,11 +274,12 @@ export const SupplierService = {
             'suppliers',
             payload.update,
           );
-        await prisma.suppliers.upsert({
+        const supplier = await prisma.suppliers.upsert({
           ...payload,
           create: { ...payload.create, ...createCanonicalIds },
           update: { ...payload.update, ...updateCanonicalIds },
         });
+        await SupplierScoreSnapshotService.refreshSuppliers([supplier]);
         successCount++;
       } catch {
         // keep import behavior: ignore row-level failures
@@ -431,6 +364,7 @@ export const SupplierService = {
     const [rawItems, totalCount] = await Promise.all([
       prisma.suppliers.findMany({
         where: scopedWhere,
+        include: { scoreSnapshot: true },
         orderBy: buildSupplierOrderBy(sortBy, sortOrder),
         skip,
         take: safePageSize,
@@ -438,59 +372,25 @@ export const SupplierService = {
       prisma.suppliers.count({ where: scopedWhere }),
     ]);
 
-    // 3. 安全的数据映射
-    const listData = rawItems.map((item) => ({
-      ...item,
-      qualityScore: item.qualityScore ?? 100,
-      level: item.rating || 'A',
-      status: item.status || 'Qualified',
-      createdAt:
-        item.createdAt instanceof Date ? item.createdAt.toISOString() : null,
-      updatedAt:
-        item.updatedAt instanceof Date ? item.updatedAt.toISOString() : null,
-    }));
-
-    // 4. Statistics Aggregation
-    const supplierNames = listData.map((i) => i.name).filter(Boolean);
-    const [statsMap, globalStats] = await Promise.all([
-      buildSupplierStatsMap(supplierNames),
-      buildSupplierGlobalStats(scopedWhere, totalCount),
-    ]);
-
-    // 5. [Process Current Page]
-    const processedPageList = listData.map((item) =>
-      scoreSupplierListItem(
-        item,
-        statsMap.get(item.name) || createEmptyStats(),
-      ),
-    );
-
-    // 6. [Dynamic Sorting]
-    if (sortBy && sortOrder && !SUPPLIER_SORT_FIELDS[sortBy]) {
-      (processedPageList as SupplierListItem[]).sort((a, b) => {
-        const valA = a[sortBy];
-        const valB = b[sortBy];
-
-        if (valA === valB) return 0;
-
-        // Numeric comparison
-        if (typeof valA === 'number' && typeof valB === 'number') {
-          return sortOrder === 'asc' ? valA - valB : valB - valA;
-        }
-
-        // String comparison
-        const strA = String(valA || '');
-        const strB = String(valB || '');
-        return sortOrder === 'asc'
-          ? strA.localeCompare(strB)
-          : strB.localeCompare(strA);
-      });
-    }
+    const globalStats = await buildSupplierGlobalStats(scopedWhere, totalCount);
 
     return {
-      items: processedPageList,
+      items: rawItems.map((item) => mapSupplierListItem(item)),
       total: totalCount,
       stats: globalStats,
     };
+  },
+
+  async getHistoryProjects(id: string) {
+    const supplier = await prisma.suppliers.findFirst({
+      select: { id: true, name: true, nameId: true },
+      where: { id, isDeleted: false },
+    });
+    if (!supplier) return null;
+
+    return InspectionService.getSupplierHistoryProjects({
+      supplierName: supplier.name,
+      supplierNameId: supplier.nameId,
+    });
   },
 };

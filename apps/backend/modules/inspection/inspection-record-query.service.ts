@@ -102,10 +102,16 @@ export const InspectionRecordQueryService = {
   },
   async findAll(params: {
     forExport?: boolean;
+    hasDocuments?: boolean;
+    inspector?: string;
     keyword?: string;
+    level1Component?: string;
     page?: number;
     pageSize?: number;
+    processName?: string;
     projectName?: string;
+    supplierName?: string;
+    team?: string;
     type?: string;
     workOrderNumber?: string;
     year?: number;
@@ -116,8 +122,14 @@ export const InspectionRecordQueryService = {
       type = 'INCOMING',
       forExport = false,
       year,
+      hasDocuments,
+      inspector,
       keyword,
+      level1Component,
+      processName,
       projectName,
+      supplierName,
+      team,
       workOrderNumber,
     } = params;
 
@@ -136,6 +148,12 @@ export const InspectionRecordQueryService = {
 
     // Specific Filters
     if (workOrderNumber) where.workOrderNumber = workOrderNumber;
+    if (supplierName) where.supplierName = { contains: supplierName };
+    if (typeof hasDocuments === 'boolean') where.hasDocuments = hasDocuments;
+    if (processName) where.processName = { contains: processName };
+    if (level1Component) where.level1Component = { contains: level1Component };
+    if (team) where.team = { contains: team };
+    if (inspector) where.inspector = { contains: inspector };
     if (projectName) where.projectName = { contains: projectName };
 
     // Keyword Search

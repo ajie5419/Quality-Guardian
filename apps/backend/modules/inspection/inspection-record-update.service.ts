@@ -115,6 +115,8 @@ export const InspectionRecordUpdateService = {
           ...governedCanonicalIds,
           documents: data.documents,
           hasDocuments: data.hasDocuments,
+          selfCheckDocuments: data.selfCheckDocuments,
+          hasSelfCheckDocuments: data.hasSelfCheckDocuments,
           packingListArchived: data.packingListArchived,
           quantity: quantitySummary.quantity,
           qualifiedQuantity: quantitySummary.qualifiedQuantity,
@@ -212,6 +214,12 @@ export const InspectionRecordUpdateService = {
         bizId: String(inspection.id),
         bizType: 'inspection_record',
         fieldName: 'documents',
+      });
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: inspection.selfCheckDocuments,
+        bizId: String(inspection.id),
+        bizType: 'inspection_record',
+        fieldName: 'selfCheckDocuments',
       });
 
       return inspection;

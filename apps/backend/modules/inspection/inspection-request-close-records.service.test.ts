@@ -40,6 +40,9 @@ describe('createCloseInspectionRecords', () => {
         result: 'PASS',
       },
       request: {
+        attachments: [
+          { name: 'self.pdf', url: 'https://example.test/self.pdf' },
+        ],
         closeRemark: null,
         componentName: '',
         mutualCheckResult: 'PASS',
@@ -75,7 +78,16 @@ describe('createCloseInspectionRecords', () => {
     expect(InspectionService.create).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
+        hasSelfCheckDocuments: true,
         projectName: 'Project 1',
+        selfCheckDocuments: JSON.stringify([
+          {
+            name: 'self.pdf',
+            size: 0,
+            type: '',
+            url: 'https://example.test/self.pdf',
+          },
+        ]),
         workOrderNumber: 'WO-001',
       }),
     );

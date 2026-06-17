@@ -127,6 +127,9 @@ export const InspectionRecordCreateService = {
               documents: data.documents,
               hasDocuments:
                 data.hasDocuments === undefined ? true : data.hasDocuments,
+              selfCheckDocuments: data.selfCheckDocuments,
+              hasSelfCheckDocuments:
+                data.hasSelfCheckDocuments ?? Boolean(data.selfCheckDocuments),
               packingListArchived: data.packingListArchived,
               quantity: quantitySummary.quantity,
               stationSelection: data.stationSelection || null,
@@ -189,6 +192,12 @@ export const InspectionRecordCreateService = {
             bizId: String(inspection.id),
             bizType: 'inspection_record',
             fieldName: 'documents',
+          });
+          await FileStorageService.registerReferencesFromAttachments({
+            attachments: inspection.selfCheckDocuments,
+            bizId: String(inspection.id),
+            bizType: 'inspection_record',
+            fieldName: 'selfCheckDocuments',
           });
           return inspection;
         });

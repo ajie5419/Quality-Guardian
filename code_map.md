@@ -21,7 +21,7 @@
 - **rbac/** — 角色权限控制：角色分配与菜单/按钮授权
 - **report/** — 质量报表生成与路由（多维度报表输出）
 - **supervision/** — 质量监督检查：立项→任务分配→问题跟踪→报告
-- **supplier/** — 供应商质量评分：合格率、损失金额、黑名单/观察期
+- **supplier/** — 供应商质量评分：指标快照、全量排序、黑名单/观察期
 - **system/** — 系统配置与基础设置
 - **system-log/** — 系统操作日志记录与审计
 - **task-dispatch/** — ITP 任务派发与流转：分配、状态推进、归档联动
@@ -60,7 +60,7 @@
 - **quality-loss/** — 质量损失记录
 - **reports/** — 报表生成与查询
 - **supervision/** — 监督检查项目、任务、问题
-- **supplier/** — 供应商评分列表与统计
+- **supplier/** — 供应商评分列表、快照排序与统计
 - **task-dispatch/** — ITP 任务派发与状态
 - **vehicle-commissioning/** — 车辆调试验收
 - **welder/** — 焊工台账与评分
@@ -89,7 +89,7 @@
 - **reports/** — 报表查看与导出
 - **shared/** — QMS 内跨页面共享组件/工具
 - **supervision/** — 监督检查管理
-- **supplier/** — 供应商质量评分
+- **supplier/** — 供应商质量评分与外协评分
 - **vehicle-commissioning/** — 车辆调试验收
 - **welder/** — 焊工管理
 - **work-order/** — 工单管理

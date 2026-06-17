@@ -88,6 +88,8 @@ export interface InspectionRecordInput {
   teamId?: null | string;
   documents?: string;
   hasDocuments?: boolean;
+  selfCheckDocuments?: string;
+  hasSelfCheckDocuments?: boolean;
   packingListArchived?: string;
   quantity: number | string;
   stationSelection?: null | string;

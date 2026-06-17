@@ -2,6 +2,15 @@ import { Prisma } from '@prisma/client';
 import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
 import prisma from '~/utils/prisma';
 
+async function refreshSupplierScoreSnapshots(names: unknown[]) {
+  const supplierNames = names
+    .map((name) => String(name || '').trim())
+    .filter(Boolean);
+  if (supplierNames.length === 0) return;
+  const { SupplierScoreSnapshotService } = await import('~/modules/supplier');
+  await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
+}
+
 export const InspectionReportingService = {
   async findIssueIdBySerialNumber(serialNumber: number) {
     const row = await prisma.quality_records.findFirst({
@@ -16,6 +25,10 @@ export const InspectionReportingService = {
     id: string;
     status?: string;
   }) {
+    const current = await prisma.quality_records.findUnique({
+      where: { id: params.id },
+      select: { supplierName: true },
+    });
     await prisma.quality_records.update({
       where: { id: params.id },
       data: {
@@ -26,6 +39,7 @@ export const InspectionReportingService = {
         updatedAt: new Date(),
       },
     });
+    await refreshSupplierScoreSnapshots([current?.supplierName]);
   },
 
   async getQualityLossTrendRows(params: {

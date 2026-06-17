@@ -8,48 +8,50 @@ datasource db {
 }
 
 model inspections {
-  id                  String                    @id @default(cuid())
-  serialNumber        String?                   @unique
-  category            inspection_category
-  workOrderNumber     String
-  projectName         String?
-  projectId           String?
-  supplierName        String?
-  supplierId          String?
-  materialName        String?
-  materialNameId      String?
-  incomingType        String?
-  incomingTypeId      String?
-  processName         String?
-  processId           String?
-  teamId              String?
-  level1Component     String?
-  level2Component     String?
-  team                String?
-  documents           String?                   @db.LongText
-  hasDocuments        Boolean                   @default(true)
-  packingListArchived String?
-  quantity            Int                       @default(1)
-  stationSelection    String?                   @db.Text
-  qualifiedQuantity   Int?
-  unqualifiedQuantity Int?
-  inspector           String
-  templateId          String?
-  templateName        String?
-  inspectionDate      DateTime
-  reportDate          DateTime?
-  result              inspection_result         @default(PASS)
-  remarks             String?                   @db.Text
-  isDeleted           Boolean                   @default(false)
-  createdAt           DateTime                  @default(now())
-  updatedAt           DateTime                  @updatedAt
-  items               inspection_items[]
-  archiveTask         inspection_archive_tasks?
-  inspectionRequest   qms_inspection_requests?
+  id                     String                               @id @default(cuid())
+  serialNumber           String?                              @unique
+  category               inspection_category
+  workOrderNumber        String
+  projectName            String?
+  projectId              String?
+  supplierName           String?
+  supplierId             String?
+  materialName           String?
+  materialNameId         String?
+  incomingType           String?
+  incomingTypeId         String?
+  processName            String?
+  processId              String?
+  teamId                 String?
+  level1Component        String?
+  level2Component        String?
+  team                   String?
+  documents              String?                              @db.LongText
+  hasDocuments           Boolean                              @default(true)
+  selfCheckDocuments     String?                              @db.LongText
+  hasSelfCheckDocuments  Boolean                              @default(false)
+  packingListArchived    String?
+  quantity               Int                                  @default(1)
+  stationSelection       String?                              @db.Text
+  qualifiedQuantity      Int?
+  unqualifiedQuantity    Int?
+  inspector              String
+  templateId             String?
+  templateName           String?
+  inspectionDate         DateTime
+  reportDate             DateTime?
+  result                 inspection_result                    @default(PASS)
+  remarks                String?                              @db.Text
+  isDeleted              Boolean                              @default(false)
+  createdAt              DateTime                             @default(now())
+  updatedAt              DateTime                             @updatedAt
+  items                  inspection_items[]
+  archiveTask            inspection_archive_tasks?
+  inspectionRequest      qms_inspection_requests?
   inspectionRequestLinks qms_inspection_request_inspections[]
-  process             processes?                 @relation(fields: [processId], references: [id], onDelete: SetNull)
-  qualityRecords      quality_records[]
-  work_order          work_orders               @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+  process                processes?                           @relation(fields: [processId], references: [id], onDelete: SetNull)
+  qualityRecords         quality_records[]
+  work_order             work_orders                          @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([workOrderNumber])
   @@index([category])
@@ -114,63 +116,63 @@ model reports {
 }
 
 model after_sales {
-  id                  String                  @id
-  serialNumber        Int
-  occurDate           DateTime
-  claimStatus         after_sales_claimStatus
-  projectName         String
-  projectId           String?
-  productType         String?
-  shipDate            DateTime?
-  warrantyStatus      String?
-  issueDescription    String?                 @db.Text
-  quantity            Int
-  feedbackDept        String?
-  feedbackDeptId      String?
-  solution            String?                 @db.Text
-  actualSolution      String?                 @db.Text
-  qualityLoss         Decimal                 @default(0.00) @db.Decimal(10, 2)
-  actualClaim         Decimal                 @default(0.00) @db.Decimal(10, 2)
-  respDept            String?
-  responsibleDepartments String?              @db.Text // @module after-sales - JSON array
-  respDeptId          String?
-  supplierBrand       String?
-  supplierBrandId     String?
-  photos              String?                 @db.LongText
-  isClaim             Boolean                 @default(false)
-  remarks             String?                 @db.Text
-  failureType         String?
-  failureTypeId       String?
-  failureCause        String?
-  failureCauseId      String?
-  linkedEngineeringId String?
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
-  version             Int                     @default(1)
-  isDeleted           Boolean                 @default(false)
-  workOrderNumber     String
-  customerName        String?
-  location            String?
-  factoryDate         DateTime?
-  handler             String?
-  materialCost        Decimal?                @default(0.00) @db.Decimal(10, 2)
-  laborTravelCost     Decimal?                @default(0.00) @db.Decimal(10, 2)
-  closeDate           DateTime?
-  defectType          String?
-  defectSubtype       String?
-  defectTypeId        String?
-  defectSubtypeId     String?
-  severity            String?
-  productSubtype      String?
-  productSubtypeId    String?
-  productTypeId       String?
-  runningHours        Decimal?
-  division            String?
-  divisionId          String?
-  customerNameId      String?
-  partName            String?
-  partId              String?
-  work_orders         work_orders             @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+  id                     String                  @id
+  serialNumber           Int
+  occurDate              DateTime
+  claimStatus            after_sales_claimStatus
+  projectName            String
+  projectId              String?
+  productType            String?
+  shipDate               DateTime?
+  warrantyStatus         String?
+  issueDescription       String?                 @db.Text
+  quantity               Int
+  feedbackDept           String?
+  feedbackDeptId         String?
+  solution               String?                 @db.Text
+  actualSolution         String?                 @db.Text
+  qualityLoss            Decimal                 @default(0.00) @db.Decimal(10, 2)
+  actualClaim            Decimal                 @default(0.00) @db.Decimal(10, 2)
+  respDept               String?
+  responsibleDepartments String?                 @db.Text // @module after-sales - JSON array
+  respDeptId             String?
+  supplierBrand          String?
+  supplierBrandId        String?
+  photos                 String?                 @db.LongText
+  isClaim                Boolean                 @default(false)
+  remarks                String?                 @db.Text
+  failureType            String?
+  failureTypeId          String?
+  failureCause           String?
+  failureCauseId         String?
+  linkedEngineeringId    String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  version                Int                     @default(1)
+  isDeleted              Boolean                 @default(false)
+  workOrderNumber        String
+  customerName           String?
+  location               String?
+  factoryDate            DateTime?
+  handler                String?
+  materialCost           Decimal?                @default(0.00) @db.Decimal(10, 2)
+  laborTravelCost        Decimal?                @default(0.00) @db.Decimal(10, 2)
+  closeDate              DateTime?
+  defectType             String?
+  defectSubtype          String?
+  defectTypeId           String?
+  defectSubtypeId        String?
+  severity               String?
+  productSubtype         String?
+  productSubtypeId       String?
+  productTypeId          String?
+  runningHours           Decimal?
+  division               String?
+  divisionId             String?
+  customerNameId         String?
+  partName               String?
+  partId                 String?
+  work_orders            work_orders             @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([claimStatus])
   @@index([occurDate])
@@ -264,10 +266,10 @@ model dictionaries {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([dictType, dictKey, isDeleted])
   @@index([dictType])
   @@index([dictType, status])
   @@index([dictType, dictKey])
-  @@unique([dictType, dictKey, isDeleted])
 }
 
 model processes {
@@ -594,30 +596,30 @@ model quality_records {
 }
 
 model vehicle_commissioning_issues {
-  id                    String    @id
-  date                  DateTime
-  status                String    @default("OPEN")
-  partName              String?
-  partId                String?
-  description           String?   @db.Text
-  responsibleDepartment String?
+  id                      String    @id
+  date                    DateTime
+  status                  String    @default("OPEN")
+  partName                String?
+  partId                  String?
+  description             String?   @db.Text
+  responsibleDepartment   String?
   responsibleDepartmentId String?
-  projectName           String?
-  projectId             String?
-  workOrderNumber       String?
-  severity              String?
-  solution              String?   @db.Text
-  issuePhoto            String?   @db.Text
-  isClaim               Boolean   @default(false)
-  lossAmount            Decimal   @default(0.00) @db.Decimal(10, 2)
-  recoveredAmount       Decimal   @default(0.00) @db.Decimal(10, 2)
-  claimStatus           String    @default("OPEN")
-  claimNotes            String?   @db.Text
-  createdBy             String?
-  closedAt              DateTime?
-  isDeleted             Boolean   @default(false)
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  projectName             String?
+  projectId               String?
+  workOrderNumber         String?
+  severity                String?
+  solution                String?   @db.Text
+  issuePhoto              String?   @db.Text
+  isClaim                 Boolean   @default(false)
+  lossAmount              Decimal   @default(0.00) @db.Decimal(10, 2)
+  recoveredAmount         Decimal   @default(0.00) @db.Decimal(10, 2)
+  claimStatus             String    @default("OPEN")
+  claimNotes              String?   @db.Text
+  createdBy               String?
+  closedAt                DateTime?
+  isDeleted               Boolean   @default(false)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   @@index([date])
   @@index([status])
@@ -818,15 +820,15 @@ model supervision_issues {
 }
 
 model supervision_issue_actions {
-  id          String             @id @default(cuid())
-  issueId     String
-  actionType  String             @default("FOLLOW_UP")
+  id           String             @id @default(cuid())
+  issueId      String
+  actionType   String             @default("FOLLOW_UP")
   actionTypeId String?
-  description String?            @db.Text
-  attachments String?            @db.LongText
-  createdBy   String?
-  createdAt   DateTime           @default(now())
-  issue       supervision_issues @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  description  String?            @db.Text
+  attachments  String?            @db.LongText
+  createdBy    String?
+  createdAt    DateTime           @default(now())
+  issue        supervision_issues @relation(fields: [issueId], references: [id], onDelete: Cascade)
 
   @@index([issueId])
   @@index([actionType])
@@ -949,31 +951,35 @@ model file_references {
 }
 
 model suppliers {
-  id              String   @id @default(cuid())
-  category        String?
-  categoryId      String?
-  outsourcingMode String?
-  name            String   @unique
-  nameId          String?
-  productName     String?
-  productNameId   String?
-  brand           String?
-  origin          String?
-  project         String?
-  projectId       String?
-  buyer           String?
-  score2025       Float?
-  contact         String?
-  phone           String?
-  email           String?
-  address         String?
-  isDeleted       Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  version         Int      @default(1)
-  qualityScore    Float    @default(100)
-  rating          String   @default("A")
-  status          String   @default("Qualified")
+  id                 String                    @id @default(cuid())
+  category           String?
+  categoryId         String?
+  outsourcingMode    String?
+  name               String                    @unique
+  nameId             String?
+  productName        String?
+  productNameId      String?
+  brand              String?
+  origin             String?
+  project            String?
+  projectId          String?
+  buyer              String?
+  recognizedAt       DateTime?
+  manufacturerNature String?
+  admissionDocuments String?                   @db.LongText
+  score2025          Float?
+  contact            String?
+  phone              String?
+  email              String?
+  address            String?
+  isDeleted          Boolean                   @default(false)
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  version            Int                       @default(1)
+  qualityScore       Float                     @default(100)
+  rating             String                    @default("A")
+  status             String                    @default("Qualified")
+  scoreSnapshot      supplier_score_snapshots?
 
   @@index([status])
   @@index([nameId])
@@ -981,6 +987,47 @@ model suppliers {
   @@index([productNameId])
   @@index([projectId])
   @@index([buyer])
+  @@index([recognizedAt])
+}
+
+model supplier_score_snapshots {
+  id                    String    @id @default(cuid())
+  supplierId            String    @unique
+  supplierName          String
+  category              String?
+  outsourcingMode       String?
+  incomingQualifiedRate Float     @default(100)
+  incomingScore         Float     @default(100)
+  incomingBatchCount    Int       @default(0)
+  incomingTotalQuantity Float     @default(0)
+  engineeringIssueCount Int       @default(0)
+  engineeringScore      Float     @default(100)
+  afterSalesIssueCount  Int       @default(0)
+  afterSalesScore       Float     @default(100)
+  totalEngineeringLoss  Float     @default(0)
+  totalAfterSalesLoss   Float     @default(0)
+  finalQualityScore     Float     @default(100)
+  finalRating           String    @default("A")
+  finalStatus           String    @default("Qualified")
+  isWarning             Boolean   @default(false)
+  scoringModel          String    @default("SUPPLIER")
+  stabilityScore        Float     @default(100)
+  warningReasons        Json?
+  calculatedAt          DateTime  @default(now())
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  isDeleted             Boolean   @default(false)
+  supplier              suppliers @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([supplierName])
+  @@index([category])
+  @@index([outsourcingMode])
+  @@index([incomingQualifiedRate])
+  @@index([engineeringIssueCount])
+  @@index([afterSalesIssueCount])
+  @@index([finalQualityScore])
+  @@index([finalRating])
+  @@index([finalStatus])
 }
 
 model measuring_instruments {
@@ -1012,23 +1059,23 @@ model measuring_instruments {
 }
 
 model metrology_borrow_records {
-  id                 String                @id @default(cuid())
-  instrumentId       String
-  borrowerDepartment String
+  id                   String                @id @default(cuid())
+  instrumentId         String
+  borrowerDepartment   String
   borrowerDepartmentId String?
-  borrowerName       String
-  borrowerNameId     String?
-  borrowedAt         DateTime
-  expectedReturnAt   DateTime?
-  returnedAt         DateTime?
-  status             String
-  remark             String?               @db.Text
-  createdBy          String?
-  updatedBy          String?
-  isDeleted          Boolean               @default(false)
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  instrument         measuring_instruments @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  borrowerName         String
+  borrowerNameId       String?
+  borrowedAt           DateTime
+  expectedReturnAt     DateTime?
+  returnedAt           DateTime?
+  status               String
+  remark               String?               @db.Text
+  createdBy            String?
+  updatedBy            String?
+  isDeleted            Boolean               @default(false)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  instrument           measuring_instruments @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
 
   @@index([instrumentId])
   @@index([borrowerDepartmentId])
@@ -1090,7 +1137,7 @@ model users {
   email                                             String?
   realName                                          String?
   wechatWorkId                                      String?
-  wxOpenId                                          String?   @unique
+  wxOpenId                                          String?                   @unique
   phone                                             String?
   roleId                                            String
   department                                        String
@@ -1117,35 +1164,35 @@ model users {
 }
 
 model work_orders {
-  workOrderNumber           String                      @id
-  customerName              String
-  customerNameId            String?
-  projectName               String?
-  projectId                 String?
-  division                  String?
-  divisionId                String?
-  quantity                  Int
-  multiStationEnabled       Boolean                     @default(false)
-  deliveryDate              DateTime
-  status                    work_orders_status          @default(OPEN)
-  createdAt                 DateTime                    @default(now())
-  updatedAt                 DateTime                    @updatedAt
-  version                   Int                         @default(1)
-  isDeleted                 Boolean                     @default(false)
-  effectiveTime             DateTime?
-  after_sales               after_sales[]
-  bom_projects              bom_projects?
-  dfmea_projects            dfmea_projects[]
-  doc_projects              doc_projects?
-  inspections               inspections[]
-  project_boms              project_boms[]
-  quality_plans             quality_plans[]
-  quality_records           quality_records[]
-  inspection_form_templates inspection_form_templates[]
-  qms_inspection_requests   qms_inspection_requests[]
+  workOrderNumber                String                               @id
+  customerName                   String
+  customerNameId                 String?
+  projectName                    String?
+  projectId                      String?
+  division                       String?
+  divisionId                     String?
+  quantity                       Int
+  multiStationEnabled            Boolean                              @default(false)
+  deliveryDate                   DateTime
+  status                         work_orders_status                   @default(OPEN)
+  createdAt                      DateTime                             @default(now())
+  updatedAt                      DateTime                             @updatedAt
+  version                        Int                                  @default(1)
+  isDeleted                      Boolean                              @default(false)
+  effectiveTime                  DateTime?
+  after_sales                    after_sales[]
+  bom_projects                   bom_projects?
+  dfmea_projects                 dfmea_projects[]
+  doc_projects                   doc_projects?
+  inspections                    inspections[]
+  project_boms                   project_boms[]
+  quality_plans                  quality_plans[]
+  quality_records                quality_records[]
+  inspection_form_templates      inspection_form_templates[]
+  qms_inspection_requests        qms_inspection_requests[]
   inspection_request_work_orders qms_inspection_request_work_orders[]
   inspection_request_inspections qms_inspection_request_inspections[]
-  work_order_requirements   work_order_requirements[]
+  work_order_requirements        work_order_requirements[]
 
   @@index([customerName])
   @@index([customerNameId])
@@ -1222,8 +1269,8 @@ model qms_task_dispatches {
 }
 
 model qms_inspection_requests {
-  id                  String                    @id @default(cuid())
-  requestNo           String                    @unique
+  id                  String                               @id @default(cuid())
+  requestNo           String                               @unique
   workOrderNumber     String
   partName            String
   partId              String?
@@ -1233,40 +1280,40 @@ model qms_inspection_requests {
   processId           String?
   teamId              String?
   team                String?
-  quantity            Int                       @default(1)
-  stationSelection    String?                   @db.Text
+  quantity            Int                                  @default(1)
+  stationSelection    String?                              @db.Text
   reporter            String
-  selfCheckResult     String                    @default("PASS")
-  mutualCheckResult   String                    @default("PASS")
-  requestInfo         String?                   @db.Text
-  attachments         String?                   @db.LongText
-  status              inspection_request_status @default(SUBMITTED)
-  priority            Int                       @default(3)
+  selfCheckResult     String                               @default("PASS")
+  mutualCheckResult   String                               @default("PASS")
+  requestInfo         String?                              @db.Text
+  attachments         String?                              @db.LongText
+  status              inspection_request_status            @default(SUBMITTED)
+  priority            Int                                  @default(3)
   dispatcherId        String?
   inspectorId         String?
   dispatchTaskId      String?
-  inspectionId        String?                   @unique
-  inspectionResult    inspection_result         @default(PASS)
+  inspectionId        String?                              @unique
+  inspectionResult    inspection_result                    @default(PASS)
   qualifiedQuantity   Int?
   unqualifiedQuantity Int?
   linkedIssueId       String?
   linkedIssueNo       String?
   linkedIssueStatus   String?
-  dispatchRemark      String?                   @db.Text
-  closeRemark         String?                   @db.Text
-  closeAttachments    String?                   @db.LongText
-  submittedAt         DateTime                  @default(now())
+  dispatchRemark      String?                              @db.Text
+  closeRemark         String?                              @db.Text
+  closeAttachments    String?                              @db.LongText
+  submittedAt         DateTime                             @default(now())
   dispatchedAt        DateTime?
   closedAt            DateTime?
-  isDeleted           Boolean                   @default(false)
-  createdAt           DateTime                  @default(now())
-  updatedAt           DateTime                  @updatedAt
-  process             processes?                @relation(fields: [processId], references: [id], onDelete: SetNull)
-  work_order          work_orders               @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
-  dispatcher          users?                    @relation("qms_inspection_requests_dispatcherIdTousers", fields: [dispatcherId], references: [id])
-  inspector           users?                    @relation("qms_inspection_requests_inspectorIdTousers", fields: [inspectorId], references: [id])
-  dispatch_task       qms_task_dispatches?      @relation(fields: [dispatchTaskId], references: [id], onDelete: SetNull)
-  inspection          inspections?              @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  isDeleted           Boolean                              @default(false)
+  createdAt           DateTime                             @default(now())
+  updatedAt           DateTime                             @updatedAt
+  process             processes?                           @relation(fields: [processId], references: [id], onDelete: SetNull)
+  work_order          work_orders                          @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+  dispatcher          users?                               @relation("qms_inspection_requests_dispatcherIdTousers", fields: [dispatcherId], references: [id])
+  inspector           users?                               @relation("qms_inspection_requests_inspectorIdTousers", fields: [inspectorId], references: [id])
+  dispatch_task       qms_task_dispatches?                 @relation(fields: [dispatchTaskId], references: [id], onDelete: SetNull)
+  inspection          inspections?                         @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
   workOrders          qms_inspection_request_work_orders[]
   inspectionLinks     qms_inspection_request_inspections[]
 
