@@ -1387,6 +1387,35 @@ model quality_losses {
   @@index([createdBy])
 }
 
+// @module quality-loss
+// Materialized index over Manual / Internal / External / Commissioning loss
+// records. One row per (source, sourcePk); upsert from each source write path.
+model quality_loss_index {
+  id              String   @id
+  source          String   @db.VarChar(16)
+  sourcePk        String   @db.VarChar(64)
+  occurDate       DateTime
+  amount          Decimal  @default(0.00) @db.Decimal(10, 2)
+  actualClaim     Decimal  @default(0.00) @db.Decimal(10, 2)
+  status          String   @db.VarChar(32)
+  projectName     String?
+  workOrderNumber String?
+  respDept        String?
+  supplierBrandId String?
+  createdBy       String?
+  isDeleted       Boolean  @default(false)
+  indexedAt       DateTime @default(now())
+
+  @@unique([source, sourcePk])
+  @@index([occurDate])
+  @@index([source, occurDate])
+  @@index([workOrderNumber])
+  @@index([createdBy])
+  @@index([respDept])
+  @@index([supplierBrandId])
+  @@index([isDeleted, occurDate])
+}
+
 model knowledge_categories {
   id          String           @id @default(cuid())
   name        String

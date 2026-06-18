@@ -3,6 +3,7 @@ import type {
   QualityLossParams,
   QualityLossServiceTrendItem,
 } from '@qgs/shared';
+import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 import type { PaginationParams } from '~/utils/query-helpers';
 
 import { Prisma } from '@prisma/client';
@@ -30,7 +31,10 @@ interface TrendItem {
   manual: number;
 }
 
-export type QualityLossQueryParams = PaginationParams & QualityLossParams;
+export type QualityLossQueryParams = PaginationParams &
+  QualityLossParams & {
+    dataScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>;
+  };
 
 export const QL_CONSTANTS = {
   MONTHS,

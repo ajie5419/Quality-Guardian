@@ -5,6 +5,7 @@ import type {
   QualityLossItem,
   QualityLossServiceTrendItem,
 } from '@qgs/shared';
+import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
 import type {
   QualityLossQueryParams,
@@ -368,10 +369,7 @@ export const QualityLossService = {
 
   async updateByRouteId(params: {
     body: Record<string, unknown>;
-    dataScope?: Pick<
-      Awaited<ReturnType<typeof DataScopeService.getScopeForModule>>,
-      'deptIds' | 'scopeType'
-    >;
+    dataScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>;
     id: string;
     userId: string;
     username?: string;

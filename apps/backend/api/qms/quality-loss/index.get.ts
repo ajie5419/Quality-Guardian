@@ -21,6 +21,7 @@ export default defineValidatedHandler(
     try {
       const result = await QualityLossService.getAllLosses({
         ...params,
+        dataScope: event.context.dataScope,
         userContext: {
           userId: String(userinfo.id || userinfo.userId || ''),
           username: userinfo.username,
