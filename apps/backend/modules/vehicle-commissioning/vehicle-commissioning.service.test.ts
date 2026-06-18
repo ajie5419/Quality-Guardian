@@ -112,13 +112,11 @@ describe('vehicleCommissioningService', () => {
     await VehicleCommissioningService.updateQualityLossFields({
       actualClaim: 20,
       id: 'issue-1',
-      status: 'CONFIRMED',
     });
 
     expect(prisma.vehicle_commissioning_issues.update).toHaveBeenCalledWith({
       where: { id: 'issue-1' },
       data: expect.objectContaining({
-        claimStatus: 'CONFIRMED',
         recoveredAmount: 20,
         updatedAt: expect.any(Date),
       }),

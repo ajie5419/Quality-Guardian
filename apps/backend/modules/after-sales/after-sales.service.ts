@@ -53,11 +53,7 @@ export const AfterSalesService = {
     return AfterSalesIntegrationService.findIdBySerialNumber(serialNumber);
   },
 
-  async updateQualityLossFields(params: {
-    actualClaim?: number;
-    id: string;
-    status?: string;
-  }) {
+  async updateQualityLossFields(params: { actualClaim?: number; id: string }) {
     return AfterSalesIntegrationService.updateQualityLossFields(params);
   },
 

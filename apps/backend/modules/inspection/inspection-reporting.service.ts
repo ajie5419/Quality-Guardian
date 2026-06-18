@@ -1,5 +1,4 @@
 import { Prisma } from '@prisma/client';
-import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
 import prisma from '~/utils/prisma';
 
 async function refreshSupplierScoreSnapshots(names: unknown[]) {
@@ -20,11 +19,7 @@ export const InspectionReportingService = {
     return row?.id || null;
   },
 
-  async updateQualityLossFields(params: {
-    actualClaim?: number;
-    id: string;
-    status?: string;
-  }) {
+  async updateQualityLossFields(params: { actualClaim?: number; id: string }) {
     const current = await prisma.quality_records.findUnique({
       where: { id: params.id },
       select: { supplierName: true },
@@ -33,9 +28,6 @@ export const InspectionReportingService = {
       where: { id: params.id },
       data: {
         recoveredAmount: params.actualClaim,
-        ...(params.status
-          ? { status: toQualityRecordStatus(params.status) }
-          : {}),
         updatedAt: new Date(),
       },
     });

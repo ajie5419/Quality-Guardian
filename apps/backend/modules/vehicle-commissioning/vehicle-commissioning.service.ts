@@ -33,7 +33,6 @@ export const VehicleCommissioningService = {
     actualClaim?: number;
     amount?: number;
     id: string;
-    status?: string;
   }) {
     await prisma.vehicle_commissioning_issues.update({
       where: { id: params.id },
@@ -42,7 +41,6 @@ export const VehicleCommissioningService = {
         ...(params.actualClaim === undefined
           ? {}
           : { recoveredAmount: params.actualClaim }),
-        ...(params.status ? { claimStatus: params.status } : {}),
         updatedAt: new Date(),
       },
     });

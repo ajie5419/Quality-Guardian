@@ -283,7 +283,6 @@ describe('quality-loss core services', () => {
           actualClaim: 5,
           lossSource: 'External',
           pk: 'EXT-12',
-          status: 'Pending',
         },
         id: 'EXT-12',
         userId: 'u-1',
@@ -292,7 +291,6 @@ describe('quality-loss core services', () => {
     expect(AfterSalesService.updateQualityLossFields).toHaveBeenCalledWith({
       actualClaim: 5,
       id: 'as-1',
-      status: 'Pending',
     });
 
     await expect(

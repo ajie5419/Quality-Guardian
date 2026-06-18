@@ -1,5 +1,4 @@
 import { Prisma } from '@prisma/client';
-import { toAfterSalesClaimStatus } from '~/modules/quality-loss/quality-loss-status';
 import prisma from '~/utils/prisma';
 
 async function refreshSupplierScoreSnapshots(names: unknown[]) {
@@ -43,11 +42,7 @@ export const AfterSalesIntegrationService = {
     return row?.id || null;
   },
 
-  async updateQualityLossFields(params: {
-    actualClaim?: number;
-    id: string;
-    status?: string;
-  }) {
+  async updateQualityLossFields(params: { actualClaim?: number; id: string }) {
     const current = await prisma.after_sales.findUnique({
       where: { id: params.id },
       select: { supplierBrand: true },
@@ -56,9 +51,6 @@ export const AfterSalesIntegrationService = {
       where: { id: params.id },
       data: {
         actualClaim: params.actualClaim,
-        ...(params.status
-          ? { claimStatus: toAfterSalesClaimStatus(params.status) }
-          : {}),
         updatedAt: new Date(),
       },
     });

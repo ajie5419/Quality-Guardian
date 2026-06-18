@@ -1,12 +1,10 @@
+import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 import type { QualityLossSource } from '~/modules/quality-loss/quality-loss-status';
 
 import { Prisma } from '@prisma/client';
 import { resolveQualityLossTargetLocator } from '@qgs/shared';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
-import {
-  DataScopeService,
-  type ResolvedDataScope,
-} from '~/modules/data-scope/data-scope.service';
+import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import {
   normalizeQualityLossSource,
@@ -88,10 +86,10 @@ async function resolveQualityLossUpdateTarget(params: {
 
 async function loadOwnershipForTarget(
   target: Exclude<QualityLossUpdateTarget, { valid: false }>,
-): Promise<{
+): Promise<null | {
   createdBy: null | string;
   responsibleDepartments: string[];
-} | null> {
+}> {
   if (target.source === QUALITY_LOSS_SOURCE.MANUAL) {
     const row = await prisma.quality_losses.findFirst({
       where: target.where,
@@ -116,8 +114,11 @@ async function loadOwnershipForTarget(
     if (!row) return null;
     return {
       createdBy: row.createdBy,
-      responsibleDepartments: [row.respDept, row.feedbackDept, row.division]
-        .filter((value): value is string => Boolean(value)),
+      responsibleDepartments: [
+        row.respDept,
+        row.feedbackDept,
+        row.division,
+      ].filter(Boolean),
     };
   }
   if (target.source === QUALITY_LOSS_SOURCE.INTERNAL) {
@@ -132,8 +133,10 @@ async function loadOwnershipForTarget(
     if (!row) return null;
     return {
       createdBy: row.createdBy,
-      responsibleDepartments: [row.responsibleDepartment, row.responsibleBU]
-        .filter((value): value is string => Boolean(value)),
+      responsibleDepartments: [
+        row.responsibleDepartment,
+        row.responsibleBU,
+      ].filter(Boolean),
     };
   }
   // Commissioning
@@ -164,10 +167,7 @@ async function assertOwnership(params: {
   }
 
   if (scopeType === 'SELF') {
-    if (
-      ownership.createdBy &&
-      String(ownership.createdBy) === params.userId
-    ) {
+    if (ownership.createdBy && String(ownership.createdBy) === params.userId) {
       return;
     }
     throw new BusinessError('FORBIDDEN', '无权修改他人的质量损失记录', 403);
@@ -181,11 +181,7 @@ async function assertOwnership(params: {
       deptCandidates.includes(dept),
     );
     if (!inScope) {
-      throw new BusinessError(
-        'FORBIDDEN',
-        '该记录不在你的数据权限范围内',
-        403,
-      );
+      throw new BusinessError('FORBIDDEN', '该记录不在你的数据权限范围内', 403);
     }
   }
 }
@@ -229,6 +225,17 @@ export const QualityLossRouteUpdateService = {
       userId: params.userId,
     });
 
+    if (
+      target.source !== QUALITY_LOSS_SOURCE.MANUAL &&
+      parsedBody.status !== undefined
+    ) {
+      return {
+        ok: false as const,
+        code: 'BAD_REQUEST' as const,
+        message: '该来源的状态请回到对应业务页面修改',
+      };
+    }
+
     try {
       switch (target.source) {
         case QUALITY_LOSS_SOURCE.COMMISSIONING: {
@@ -236,7 +243,6 @@ export const QualityLossRouteUpdateService = {
             id: target.id,
             amount: parsedBody.amount,
             actualClaim: parsedBody.actualClaim,
-            status: parsedBody.status,
           });
           break;
         }
@@ -244,7 +250,6 @@ export const QualityLossRouteUpdateService = {
           await AfterSalesService.updateQualityLossFields({
             id: target.id,
             actualClaim: parsedBody.actualClaim,
-            status: parsedBody.status,
           });
           break;
         }
@@ -252,7 +257,6 @@ export const QualityLossRouteUpdateService = {
           await InspectionService.updateQualityLossFields({
             id: target.id,
             actualClaim: parsedBody.actualClaim,
-            status: parsedBody.status,
           });
           break;
         }

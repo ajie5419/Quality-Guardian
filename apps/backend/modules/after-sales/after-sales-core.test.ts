@@ -107,7 +107,6 @@ describe('after-sales core helpers and services', () => {
     await AfterSalesService.updateQualityLossFields({
       actualClaim: 10,
       id: 'as-1',
-      status: 'confirmed',
     });
     await AfterSalesService.getQualityLossTrendRows({
       granularity: 'month',
@@ -160,7 +159,6 @@ describe('after-sales core helpers and services', () => {
       where: { id: 'as-1' },
       data: expect.objectContaining({
         actualClaim: 10,
-        claimStatus: 'COMPLETED',
         updatedAt: expect.any(Date),
       }),
     });

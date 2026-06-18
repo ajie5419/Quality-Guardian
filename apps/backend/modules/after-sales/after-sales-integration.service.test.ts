@@ -71,17 +71,20 @@ describe('after-sales-integration.service', () => {
     await AfterSalesIntegrationService.updateQualityLossFields({
       actualClaim: 50,
       id: 'as-1',
-      status: 'confirmed',
     });
 
     expect(prisma.after_sales.update).toHaveBeenCalledWith({
       where: { id: 'as-1' },
       data: expect.objectContaining({
         actualClaim: 50,
-        claimStatus: 'CONFIRMED',
         updatedAt: expect.any(Date),
       }),
     });
+    expect(prisma.after_sales.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ claimStatus: expect.anything() }),
+      }),
+    );
   });
 
   it('should get quality loss trend rows for month granularity', async () => {

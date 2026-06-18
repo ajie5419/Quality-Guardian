@@ -150,7 +150,7 @@ describe('quality-loss-route-update.service', () => {
     );
 
     const result = await QualityLossRouteUpdateService.updateByRouteId({
-      body: { actualClaim: 5, lossSource: 'External', status: 'Pending' },
+      body: { actualClaim: 5, lossSource: 'External' },
       id: 'EXT-12',
       userId: 'user-1',
     });
@@ -159,8 +159,28 @@ describe('quality-loss-route-update.service', () => {
     expect(AfterSalesService.updateQualityLossFields).toHaveBeenCalledWith({
       actualClaim: 5,
       id: 'EXT-12',
-      status: 'Pending',
     });
+  });
+
+  it('rejects status changes on external records', async () => {
+    const { QualityLossRouteUpdateService } = await import(
+      '~/modules/quality-loss/quality-loss-route-update.service'
+    );
+
+    const result = await QualityLossRouteUpdateService.updateByRouteId({
+      body: { actualClaim: 5, lossSource: 'External', status: 'Closed' },
+      id: 'EXT-12',
+      userId: 'user-1',
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        code: 'BAD_REQUEST',
+        ok: false,
+        message: expect.stringContaining('对应业务页面'),
+      }),
+    );
+    expect(AfterSalesService.updateQualityLossFields).not.toHaveBeenCalled();
   });
 
   it('should return BAD_REQUEST for invalid body', async () => {

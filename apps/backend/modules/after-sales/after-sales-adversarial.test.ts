@@ -196,7 +196,6 @@ describe('afterSalesService – adversarial', () => {
       const result = await AfterSalesService.updateQualityLossFields({
         actualClaim: 5000,
         id: 'AS-001',
-        status: 'RESOLVED',
       });
       expect(result).toBeDefined();
     });

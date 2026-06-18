@@ -65,25 +65,23 @@ describe('inspectionReportingService', () => {
   });
 
   describe('updateQualityLossFields', () => {
-    it('should update recoveredAmount and status', async () => {
-      const { toQualityRecordStatus } = await import(
-        '~/modules/quality-loss/quality-loss-status'
-      );
-
+    it('should update recoveredAmount only and ignore status', async () => {
       await InspectionReportingService.updateQualityLossFields({
         actualClaim: 500,
         id: 'qr-1',
-        status: 'Closed',
       });
 
-      expect(toQualityRecordStatus).toHaveBeenCalledWith('Closed');
       expect(prisma.quality_records.update).toHaveBeenCalledWith({
         where: { id: 'qr-1' },
         data: expect.objectContaining({
           recoveredAmount: 500,
-          status: 'OPEN',
         }),
       });
+      expect(prisma.quality_records.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: expect.anything() }),
+        }),
+      );
     });
 
     it('should skip status when not provided', async () => {

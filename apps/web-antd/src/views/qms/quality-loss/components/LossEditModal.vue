@@ -109,9 +109,13 @@ async function handleOk() {
   try {
     await formRef.value?.validate();
     confirmLoading.value = true;
+    const payload = { ...formState };
+    if (!isManualSource.value) {
+      delete payload.status;
+    }
     await (props.isEditMode && formState.id
-      ? updateQualityLoss(formState.id, formState)
-      : createQualityLoss(formState));
+      ? updateQualityLoss(formState.id, payload)
+      : createQualityLoss(payload));
     message.success(t('common.saveSuccess'));
     emit('success');
     emit('update:open', false);
@@ -171,7 +175,7 @@ const responsibleDepartmentValue = computed<string | undefined>({
       <Alert
         v-if="!isManualSource"
         message="提示"
-        :description="`当前记录源自${t(SOURCE_STYLE_MAP[formState.lossSource as LossSource]?.labelKey || '')}，仅支持更新索赔金额与状态。`"
+        :description="`当前记录源自${t(SOURCE_STYLE_MAP[formState.lossSource as LossSource]?.labelKey || '')}，仅支持更新索赔金额。状态请回到对应业务页面修改。`"
         type="info"
         show-icon
         class="mb-4"
@@ -236,6 +240,7 @@ const responsibleDepartmentValue = computed<string | undefined>({
       <FormItem label="当前状态" name="status">
         <Select
           v-model:value="formState.status"
+          :disabled="!isManualSource"
           :options="
             (
               props.statusOptions || mapDictionaryOptionsToQualityLossStatus()
