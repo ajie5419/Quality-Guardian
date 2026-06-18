@@ -7,6 +7,7 @@ import type {
 import { ISSUE_TRACKING_STATUS, safeNumber } from '@qgs/shared';
 import { nanoid } from 'nanoid';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
@@ -34,7 +35,7 @@ export const VehicleCommissioningService = {
     amount?: number;
     id: string;
   }) {
-    await prisma.vehicle_commissioning_issues.update({
+    const updated = await prisma.vehicle_commissioning_issues.update({
       where: { id: params.id },
       data: {
         ...(params.amount === undefined ? {} : { lossAmount: params.amount }),
@@ -44,6 +45,7 @@ export const VehicleCommissioningService = {
         updatedAt: new Date(),
       },
     });
+    await QualityLossIndexService.upsertFromCommissioning(updated);
   },
 
   async getQualityLossTrendRows(params: {
@@ -248,6 +250,7 @@ export const VehicleCommissioningService = {
       });
     }
 
+    await QualityLossIndexService.upsertFromCommissioning(row);
     return mapVehicleCommissioningIssueToDto(row);
   },
 
@@ -385,6 +388,7 @@ export const VehicleCommissioningService = {
       });
     }
 
+    await QualityLossIndexService.upsertFromCommissioning(row);
     return mapVehicleCommissioningIssueToDto(row);
   },
   async updateIssueFromBody(

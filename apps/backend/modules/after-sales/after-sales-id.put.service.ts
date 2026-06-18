@@ -2,6 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { buildGovernedAfterSalesUpdateData } from '~/modules/after-sales/after-sales-payload';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
@@ -65,10 +66,11 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    await prisma.after_sales.update({
+    const updated = await prisma.after_sales.update({
       where: { id },
       data: updateData,
     });
+    await QualityLossIndexService.upsertFromAfterSales(updated);
     await refreshSupplierScoreSnapshots([
       previousSupplierBrand,
       updateData.supplierBrand,

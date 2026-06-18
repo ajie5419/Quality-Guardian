@@ -1,4 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
+import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import {
   buildQualityLossCreateDataWithCanonical,
   buildQualityLossCreateResponse,
@@ -43,6 +44,7 @@ export default defineEventHandler(async (event) => {
         type: newItem.type,
       },
     });
+    await QualityLossIndexService.upsertFromManual(newItem);
 
     return useResponseSuccess(buildQualityLossCreateResponse(newItem));
   } catch (error) {

@@ -6,6 +6,7 @@ import {
   inferImportErrorField,
   toImportErrorMessage,
 } from '~/modules/file-storage/import-report';
+import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { parseRequiredWorkOrderNumber } from '~/modules/work-order/work-order-query';
 import prisma from '~/utils/prisma';
@@ -43,6 +44,7 @@ export const AfterSalesRouteService = {
         }),
       ),
     );
+    await QualityLossIndexService.softDeleteSourceMany('External', ids);
     await refreshSupplierScoreSnapshots(
       existing.map((item) => item.supplierBrand),
     );
@@ -73,6 +75,7 @@ export const AfterSalesRouteService = {
       targetId: String(created.id),
       detailsVariables: { id: created.id, projectName: created.projectName },
     });
+    await QualityLossIndexService.upsertFromAfterSales(created);
     await refreshSupplierScoreSnapshots([created.supplierBrand]);
     return created;
   },
@@ -111,6 +114,7 @@ export const AfterSalesRouteService = {
             serialNumber,
           }),
         });
+        await QualityLossIndexService.upsertFromAfterSales(created);
         if (created.supplierBrand) {
           supplierNamesToRefresh.push(created.supplierBrand);
         }

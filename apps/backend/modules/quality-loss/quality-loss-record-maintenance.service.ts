@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
+import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import prisma from '~/utils/prisma';
@@ -29,6 +30,7 @@ export const QualityLossRecordMaintenanceService = {
       where: { id: target.id },
       data: { isDeleted: true },
     });
+    await QualityLossIndexService.softDeleteSource('Manual', target.id);
 
     await SystemLogService.auditLog('quality-loss', 'delete', {
       userId,
@@ -56,10 +58,12 @@ export const QualityLossRecordMaintenanceService = {
 
     if (targets.length === 0) return { count: 0 };
 
+    const targetIds = targets.map((target) => target.id);
     const result = await prisma.quality_losses.updateMany({
-      where: { id: { in: targets.map((target) => target.id) } },
+      where: { id: { in: targetIds } },
       data: { isDeleted: true },
     });
+    await QualityLossIndexService.softDeleteSourceMany('Manual', targetIds);
 
     await SystemLogService.auditLog('quality-loss', 'batchDelete', {
       userId,

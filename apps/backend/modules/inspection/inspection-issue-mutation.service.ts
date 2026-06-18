@@ -7,6 +7,7 @@ import {
   inferImportErrorField,
   toImportErrorMessage,
 } from '~/modules/file-storage/import-report';
+import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
@@ -73,6 +74,7 @@ export const InspectionIssueMutationService = {
         partName: newRecord.partName,
       },
     });
+    await QualityLossIndexService.upsertFromInternal(newRecord);
     await WelderScoreService.syncFromInspectionIssues();
     await refreshSupplierScoreSnapshots([newRecord.supplierName]);
     return { ...newRecord, ncNumber: newRecord.nonConformanceNumber };
@@ -92,7 +94,10 @@ export const InspectionIssueMutationService = {
       body,
       existingNcNumber,
     );
-    await prisma.quality_records.update({ where: { id }, data: updateData });
+    const updated = await prisma.quality_records.update({
+      where: { id },
+      data: updateData,
+    });
     if (body.photos !== undefined) {
       await FileStorageService.registerReferencesFromAttachments({
         attachments: body.photos,
@@ -110,6 +115,7 @@ export const InspectionIssueMutationService = {
         partName: updateData.partName || '未修改名称',
       },
     });
+    await QualityLossIndexService.upsertFromInternal(updated);
     await WelderScoreService.syncFromInspectionIssues();
     await refreshSupplierScoreSnapshots([
       current?.supplierName,
@@ -131,6 +137,7 @@ export const InspectionIssueMutationService = {
       data: { isDeleted: true, updatedAt: new Date() },
     });
     if (result.count > 0) await WelderScoreService.syncFromInspectionIssues();
+    await QualityLossIndexService.softDeleteSourceMany('Internal', ids);
     await refreshSupplierScoreSnapshots(
       existing.map((item) => item.supplierName),
     );
@@ -185,6 +192,7 @@ export const InspectionIssueMutationService = {
         }
         serialSeed++;
         const saved = await prisma.quality_records.upsert(payload);
+        await QualityLossIndexService.upsertFromInternal(saved);
         if (saved?.supplierName)
           supplierNamesToRefresh.push(saved.supplierName);
         successCount++;

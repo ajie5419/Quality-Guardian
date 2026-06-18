@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import prisma from '~/utils/prisma';
 
 async function refreshSupplierScoreSnapshots(names: unknown[]) {
@@ -24,13 +25,14 @@ export const InspectionReportingService = {
       where: { id: params.id },
       select: { supplierName: true },
     });
-    await prisma.quality_records.update({
+    const updated = await prisma.quality_records.update({
       where: { id: params.id },
       data: {
         recoveredAmount: params.actualClaim,
         updatedAt: new Date(),
       },
     });
+    await QualityLossIndexService.upsertFromInternal(updated);
     await refreshSupplierScoreSnapshots([current?.supplierName]);
   },
 

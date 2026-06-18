@@ -16,6 +16,7 @@ import { Prisma } from '@prisma/client';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { parseResponsibleDepartments } from '~/utils/department-multi';
 import prisma from '~/utils/prisma';
@@ -154,10 +155,11 @@ export const AfterSalesService = {
       }
     }
 
-    await prisma.after_sales.update({
+    const updated = await prisma.after_sales.update({
       where: { id },
       data: updateData,
     });
+    await QualityLossIndexService.upsertFromAfterSales(updated);
     await refreshSupplierScoreSnapshots([
       previousSupplierBrand,
       updateData.supplierBrand,
@@ -313,6 +315,8 @@ export const AfterSalesService = {
       bizId: id,
       bizType: 'after_sales',
     });
+
+    await QualityLossIndexService.softDeleteSource('External', id);
 
     // Record audit log
     await SystemLogService.auditLog('after-sales', 'delete', {

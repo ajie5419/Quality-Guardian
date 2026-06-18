@@ -6,6 +6,7 @@ import { resolveQualityLossTargetLocator } from '@qgs/shared';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
+import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import {
   normalizeQualityLossSource,
   QUALITY_LOSS_SOURCE,
@@ -261,8 +262,8 @@ export const QualityLossRouteUpdateService = {
           break;
         }
         default: {
-          await prisma.$transaction(async (tx) => {
-            await tx.quality_losses.update({
+          const updated = await prisma.$transaction(async (tx) =>
+            tx.quality_losses.update({
               where: target.where,
               data: {
                 ...(parsedBody.occurDate
@@ -284,8 +285,9 @@ export const QualityLossRouteUpdateService = {
                 ...(parsedBody.status ? { status: parsedBody.status } : {}),
                 updatedAt: new Date(),
               },
-            });
-          });
+            }),
+          );
+          await QualityLossIndexService.upsertFromManual(updated);
         }
       }
     } catch (error) {
