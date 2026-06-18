@@ -28,6 +28,7 @@ import {
 } from '#/views/qms/shared/utils/upload-file';
 
 import { DEFAULT_VALUES } from '../../issues/constants';
+import { normalizeIssuePhotoUrls } from '../../issues/utils/photo-upload';
 import { INCOMING_INSPECTION_PROCESS_NAME } from '../constants';
 
 type LinkedIssueDraftState = {
@@ -421,9 +422,7 @@ export function useInspectionRequestTaskActions(
       const payloadLinkedIssue = shouldCreateLinkedIssue.value
         ? {
             ...linkedIssueDraft.value,
-            photos: linkedIssueDraft.value.photos
-              .map((p) => p.url)
-              .filter(Boolean) as string[],
+            photos: normalizeIssuePhotoUrls(linkedIssueDraft.value.photos),
             quantity: linkedIssueDraft.value.unqualifiedQuantity,
           }
         : undefined;

@@ -25,6 +25,26 @@
 
 ## 执行记录
 
+### 2026-06-18 修复：报检完成检验不合格照片落库
+
+**执行内容：**
+
+- 新增不合格照片 URL 归一化工具，统一兼容 `file.response.data.url`、`file.url` 和 `file.thumbUrl`。
+- 报检任务完成检验创建关联不合格品项时，复用统一归一化逻辑，避免上传成功但未回填 `file.url` 时提交空照片数组。
+- 补充报检任务关闭 composable 单测，覆盖上传响应中仅包含 `response.data.url` 的不合格照片提交场景。
+
+**验证结果：**
+
+- `rtk pnpm exec vitest run apps/web-antd/src/views/qms/inspection/requests/composables/useInspectionRequestTaskActions.test.ts`: 1 文件 / 1 测试通过
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm exec eslint apps/web-antd/src/views/qms/inspection/issues/utils/photo-upload.ts apps/web-antd/src/views/qms/inspection/records/components/inspection-form.utils.ts apps/web-antd/src/views/qms/inspection/requests/composables/useInspectionRequestTaskActions.ts apps/web-antd/src/views/qms/inspection/requests/composables/useInspectionRequestTaskActions.test.ts`: 通过
+
+**commit:** 已提交，最终 hash 以 Git 历史为准
+
+**遗留问题：**
+
+- 未启动前端 dev server，按项目约束仅通过代码审查、单测、类型检查和 lint 验证。
+
 ## [0.10.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.10.1...qgs-v0.10.2) (2026-06-17)
 
 
