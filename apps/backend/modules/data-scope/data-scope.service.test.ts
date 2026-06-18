@@ -245,4 +245,35 @@ describe('dataScopeService', () => {
       ],
     });
   });
+
+  it('quality-loss SELF scope filters by createdBy when no department fallback exists', async () => {
+    (prisma.departments.findMany as any).mockResolvedValueOnce([]);
+
+    const where = await DataScopeService.buildQualityLossWhere(
+      { isDeleted: false },
+      { userId: 'u-self', username: 'tester' },
+      { scopeType: 'SELF', deptIds: [] },
+    );
+
+    expect(where).toEqual({ isDeleted: false });
+  });
+
+  it('quality-loss DEPT scope filters by respDept candidates', async () => {
+    (prisma.departments.findMany as any).mockResolvedValueOnce([
+      { name: 'QA' },
+    ]);
+
+    const where = await DataScopeService.buildQualityLossWhere(
+      { isDeleted: false },
+      { userId: 'u-dept', username: 'tester' },
+      { scopeType: 'DEPT', deptIds: ['dept-qa'] },
+    );
+
+    expect(where).toEqual({
+      AND: [
+        { isDeleted: false },
+        { respDept: { in: ['dept-qa', 'QA'] } },
+      ],
+    });
+  });
 });

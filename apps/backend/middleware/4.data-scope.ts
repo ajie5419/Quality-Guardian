@@ -4,6 +4,7 @@ import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 const QMS_MODULE_PREFIXES = [
   { module: 'after-sales', prefix: '/api/qms/after-sales' },
   { module: 'inspection', prefix: '/api/qms/inspection' },
+  { module: 'quality-loss', prefix: '/api/qms/quality-loss' },
   { module: 'supplier', prefix: '/api/qms/supplier' },
   { module: 'work-order', prefix: '/api/qms/work-order' },
 ];

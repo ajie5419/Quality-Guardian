@@ -1,8 +1,24 @@
+import type { Prisma } from '@prisma/client';
 import type { QualityLossItem } from '@qgs/shared';
 
-import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import {
+  DataScopeService,
+  type ResolvedDataScope,
+} from '~/modules/data-scope/data-scope.service';
 
 export const QualityLossDataScopeService = {
+  async applyManualWhere(params: {
+    baseWhere: Prisma.quality_lossesWhereInput;
+    dataScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>;
+    userContext: { userId: string; username?: string };
+  }): Promise<Prisma.quality_lossesWhereInput> {
+    return DataScopeService.buildQualityLossWhere(
+      params.baseWhere,
+      params.userContext,
+      params.dataScope,
+    );
+  },
+
   async apply(
     items: QualityLossItem[],
     userContext?: { userId: string; username?: string },

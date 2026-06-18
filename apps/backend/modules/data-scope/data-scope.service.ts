@@ -199,6 +199,19 @@ export const DataScopeService = {
     return this.buildScopedWhere('after-sales', baseWhere, user, resolvedScope);
   },
 
+  async buildQualityLossWhere(
+    baseWhere: Prisma.quality_lossesWhereInput,
+    user: UserContext,
+    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
+  ): Promise<Prisma.quality_lossesWhereInput> {
+    return this.buildScopedWhere(
+      'quality-loss',
+      baseWhere,
+      user,
+      resolvedScope,
+    );
+  },
+
   async buildWorkOrderWhere(
     baseWhere: Prisma.work_ordersWhereInput,
     user: UserContext,

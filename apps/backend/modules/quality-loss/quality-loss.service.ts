@@ -124,7 +124,14 @@ async function getSingleSourceLossPage(
   const workOrderNumber = params.workOrderNumber;
 
   if (source === QL_CONSTANTS.SOURCE.MANUAL) {
-    const where = buildManualLossesWhere(params);
+    const baseWhere = buildManualLossesWhere(params);
+    const where = params.userContext?.userId
+      ? await QualityLossDataScopeService.applyManualWhere({
+          baseWhere,
+          dataScope: params.dataScope,
+          userContext: params.userContext,
+        })
+      : baseWhere;
     const [rows, total] = await Promise.all([
       prisma.quality_losses.findMany({
         where,
@@ -143,10 +150,7 @@ async function getSingleSourceLossPage(
         );
         return formatted;
       });
-    return {
-      items: await applyQualityLossDataScope(items, params.userContext),
-      total,
-    };
+    return { items, total };
   }
 
   let sourceRecords:

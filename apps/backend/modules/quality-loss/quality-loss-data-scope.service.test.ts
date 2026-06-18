@@ -3,6 +3,7 @@ import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 
 vi.mock('~/modules/data-scope/data-scope.service', () => ({
   DataScopeService: {
+    buildQualityLossWhere: vi.fn(),
     getDeptCandidates: vi.fn(),
     getScopeForModule: vi.fn(),
   },
@@ -122,5 +123,30 @@ describe('quality-loss-data-scope.service', () => {
       { amount: 1, responsibleDepartment: 'QA' },
       { amount: 2, responsibleDepartment: 'ENG' },
     ]);
+  });
+
+  it('applyManualWhere delegates to DataScopeService.buildQualityLossWhere', async () => {
+    const { QualityLossDataScopeService } = await import(
+      '~/modules/quality-loss/quality-loss-data-scope.service'
+    );
+
+    vi.mocked(DataScopeService.buildQualityLossWhere).mockResolvedValue({
+      AND: [{ isDeleted: false }, { createdBy: 'u-1' }],
+    } as never);
+
+    const where = await QualityLossDataScopeService.applyManualWhere({
+      baseWhere: { isDeleted: false },
+      dataScope: { scopeType: 'SELF', deptIds: [] },
+      userContext: { userId: 'u-1', username: 'tester' },
+    });
+
+    expect(DataScopeService.buildQualityLossWhere).toHaveBeenCalledWith(
+      { isDeleted: false },
+      { userId: 'u-1', username: 'tester' },
+      { scopeType: 'SELF', deptIds: [] },
+    );
+    expect(where).toEqual({
+      AND: [{ isDeleted: false }, { createdBy: 'u-1' }],
+    });
   });
 });
