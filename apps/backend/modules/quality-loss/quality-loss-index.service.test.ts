@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import prisma from '~/utils/prisma';
 
@@ -12,7 +11,7 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-describe('QualityLossIndexService', () => {
+describe('qualityLossIndexService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

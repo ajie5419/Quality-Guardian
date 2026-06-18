@@ -225,4 +225,115 @@ export const QualityLossIndexService = {
       );
     }
   },
+
+  async backfillAfterSales(options: { batchSize?: number } = {}) {
+    const batchSize = options.batchSize ?? 500;
+    let processed = 0;
+    let cursor: string | undefined;
+    while (true) {
+      const rows = await prisma.after_sales.findMany({
+        where: { isDeleted: false },
+        orderBy: { id: 'asc' },
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        take: batchSize,
+      });
+      if (rows.length === 0) break;
+      for (const row of rows) {
+        await this.upsertFromAfterSales(row);
+      }
+      processed += rows.length;
+      cursor = rows[rows.length - 1]?.id;
+      if (rows.length < batchSize) break;
+    }
+    return { processed };
+  },
+
+  async backfillInternal(options: { batchSize?: number } = {}) {
+    const batchSize = options.batchSize ?? 500;
+    let processed = 0;
+    let cursor: string | undefined;
+    while (true) {
+      const rows = await prisma.quality_records.findMany({
+        where: { isDeleted: false, lossAmount: { gt: 0 } },
+        orderBy: { id: 'asc' },
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        take: batchSize,
+      });
+      if (rows.length === 0) break;
+      for (const row of rows) {
+        await this.upsertFromInternal({
+          createdBy: row.createdBy,
+          date: row.date,
+          id: row.id,
+          isDeleted: row.isDeleted,
+          lossAmount: row.lossAmount,
+          projectName: row.projectName,
+          recoveredAmount: row.recoveredAmount,
+          responsibleDepartment: row.responsibleDepartment,
+          status: row.status,
+          workOrderNumber: row.workOrderNumber,
+        });
+      }
+      processed += rows.length;
+      cursor = rows[rows.length - 1]?.id;
+      if (rows.length < batchSize) break;
+    }
+    return { processed };
+  },
+
+  async backfillCommissioning(options: { batchSize?: number } = {}) {
+    const batchSize = options.batchSize ?? 500;
+    let processed = 0;
+    let cursor: string | undefined;
+    while (true) {
+      const rows = await prisma.vehicle_commissioning_issues.findMany({
+        where: {
+          isDeleted: false,
+          OR: [{ isClaim: true }, { lossAmount: { gt: 0 } }],
+        },
+        orderBy: { id: 'asc' },
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        take: batchSize,
+      });
+      if (rows.length === 0) break;
+      for (const row of rows) {
+        await this.upsertFromCommissioning(row);
+      }
+      processed += rows.length;
+      cursor = rows[rows.length - 1]?.id;
+      if (rows.length < batchSize) break;
+    }
+    return { processed };
+  },
+
+  async backfillManual(options: { batchSize?: number } = {}) {
+    const batchSize = options.batchSize ?? 500;
+    let processed = 0;
+    let cursor: string | undefined;
+    while (true) {
+      const rows = await prisma.quality_losses.findMany({
+        where: { isDeleted: false, amount: { gt: 0 } },
+        orderBy: { id: 'asc' },
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        take: batchSize,
+      });
+      if (rows.length === 0) break;
+      for (const row of rows) {
+        await this.upsertFromManual({
+          actualClaim: row.actualClaim,
+          amount: row.amount,
+          createdBy: row.createdBy,
+          id: row.id,
+          isDeleted: row.isDeleted,
+          occurDate: row.occurDate,
+          respDept: row.respDept,
+          status: row.status,
+        });
+      }
+      processed += rows.length;
+      cursor = rows[rows.length - 1]?.id;
+      if (rows.length < batchSize) break;
+    }
+    return { processed };
+  },
 };
