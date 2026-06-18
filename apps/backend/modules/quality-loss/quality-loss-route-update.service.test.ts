@@ -3,10 +3,27 @@ import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    after_sales: {
+      findUnique: vi.fn(),
+    },
     quality_losses: {
+      findFirst: vi.fn(),
       update: vi.fn(),
     },
+    quality_records: {
+      findUnique: vi.fn(),
+    },
+    vehicle_commissioning_issues: {
+      findUnique: vi.fn(),
+    },
     $transaction: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/data-scope/data-scope.service', () => ({
+  DataScopeService: {
+    getDeptCandidates: vi.fn(async (deptIds: string[]) => deptIds),
+    getScopeForModule: vi.fn(),
   },
 }));
 
@@ -204,5 +221,194 @@ describe('quality-loss-route-update.service', () => {
     expect(result).toEqual(
       expect.objectContaining({ code: 'INTERNAL', ok: false }),
     );
+  });
+
+  describe('ownership guard', () => {
+    it('rejects SELF scope when manual record belongs to another user', async () => {
+      const { QualityLossRouteUpdateService } = await import(
+        '~/modules/quality-loss/quality-loss-route-update.service'
+      );
+      const prismaModule = await import('~/utils/prisma');
+      const prisma = prismaModule.default;
+
+      (prisma.quality_losses.findFirst as any).mockResolvedValue({
+        createdBy: 'user-2',
+        respDept: 'QA',
+      });
+
+      await expect(
+        QualityLossRouteUpdateService.updateByRouteId({
+          body: { amount: 1, lossSource: 'Manual' },
+          dataScope: { scopeType: 'SELF', deptIds: [] },
+          id: 'QL-1',
+          userId: 'user-1',
+        }),
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        httpStatus: 403,
+      });
+    });
+
+    it('passes SELF scope when manual record belongs to caller', async () => {
+      const { QualityLossRouteUpdateService } = await import(
+        '~/modules/quality-loss/quality-loss-route-update.service'
+      );
+      const prismaModule = await import('~/utils/prisma');
+      const prisma = prismaModule.default;
+
+      (prisma.quality_losses.findFirst as any).mockResolvedValue({
+        createdBy: 'user-1',
+        respDept: 'QA',
+      });
+      vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => {
+        const tx = { quality_losses: { update: vi.fn() } };
+        await cb(tx);
+        return tx;
+      });
+
+      const result = await QualityLossRouteUpdateService.updateByRouteId({
+        body: { amount: 1, lossSource: 'Manual' },
+        dataScope: { scopeType: 'SELF', deptIds: [] },
+        id: 'QL-1',
+        userId: 'user-1',
+      });
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('rejects SELF scope on external record owned by another user', async () => {
+      const { QualityLossRouteUpdateService } = await import(
+        '~/modules/quality-loss/quality-loss-route-update.service'
+      );
+      const prismaModule = await import('~/utils/prisma');
+      const prisma = prismaModule.default;
+
+      (prisma.after_sales.findUnique as any).mockResolvedValue({
+        createdBy: 'user-2',
+        division: null,
+        feedbackDept: null,
+        respDept: 'QA',
+      });
+
+      await expect(
+        QualityLossRouteUpdateService.updateByRouteId({
+          body: { actualClaim: 5, lossSource: 'External' },
+          dataScope: { scopeType: 'SELF', deptIds: [] },
+          id: 'EXT-12',
+          userId: 'user-1',
+        }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
+    });
+
+    it('passes DEPT scope when target respDept matches user departments', async () => {
+      const { QualityLossRouteUpdateService } = await import(
+        '~/modules/quality-loss/quality-loss-route-update.service'
+      );
+      const prismaModule = await import('~/utils/prisma');
+      const prisma = prismaModule.default;
+
+      (prisma.after_sales.findUnique as any).mockResolvedValue({
+        createdBy: 'user-2',
+        division: null,
+        feedbackDept: null,
+        respDept: 'dept-a',
+      });
+
+      const result = await QualityLossRouteUpdateService.updateByRouteId({
+        body: { actualClaim: 9, lossSource: 'External' },
+        dataScope: { scopeType: 'DEPT', deptIds: ['dept-a'] },
+        id: 'EXT-12',
+        userId: 'user-1',
+      });
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('rejects DEPT scope when target respDept is outside scope', async () => {
+      const { QualityLossRouteUpdateService } = await import(
+        '~/modules/quality-loss/quality-loss-route-update.service'
+      );
+      const prismaModule = await import('~/utils/prisma');
+      const prisma = prismaModule.default;
+
+      (prisma.quality_records.findUnique as any).mockResolvedValue({
+        createdBy: 'user-9',
+        responsibleBU: null,
+        responsibleDepartment: 'dept-other',
+      });
+
+      await expect(
+        QualityLossRouteUpdateService.updateByRouteId({
+          body: { actualClaim: 1, lossSource: 'Internal' },
+          dataScope: { scopeType: 'DEPT', deptIds: ['dept-a'] },
+          id: 'INT-1',
+          userId: 'user-1',
+        }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
+    });
+
+    it('rejects SELF scope on commissioning record owned by another user', async () => {
+      const { QualityLossRouteUpdateService } = await import(
+        '~/modules/quality-loss/quality-loss-route-update.service'
+      );
+      const prismaModule = await import('~/utils/prisma');
+      const prisma = prismaModule.default;
+      const { VehicleCommissioningService } = await import(
+        '~/modules/vehicle-commissioning/vehicle-commissioning.service'
+      );
+
+      vi.mocked(VehicleCommissioningService.findIssueId).mockResolvedValue(
+        'DA-1',
+      );
+      (prisma.vehicle_commissioning_issues.findUnique as any).mockResolvedValue(
+        {
+          createdBy: 'user-2',
+          responsibleDepartment: 'Service',
+        },
+      );
+
+      await expect(
+        QualityLossRouteUpdateService.updateByRouteId({
+          body: { actualClaim: 0, lossSource: 'Commissioning' },
+          dataScope: { scopeType: 'SELF', deptIds: [] },
+          id: 'DA-1',
+          userId: 'user-1',
+        }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
+    });
+
+    it('returns NOT_FOUND when target row no longer exists', async () => {
+      const { QualityLossRouteUpdateService } = await import(
+        '~/modules/quality-loss/quality-loss-route-update.service'
+      );
+      const prismaModule = await import('~/utils/prisma');
+      const prisma = prismaModule.default;
+
+      (prisma.quality_losses.findFirst as any).mockResolvedValue(null);
+
+      await expect(
+        QualityLossRouteUpdateService.updateByRouteId({
+          body: { amount: 1, lossSource: 'Manual' },
+          dataScope: { scopeType: 'SELF', deptIds: [] },
+          id: 'QL-missing',
+          userId: 'user-1',
+        }),
+      ).rejects.toMatchObject({ code: 'NOT_FOUND', httpStatus: 404 });
+    });
+
+    it('skips ownership checks under ALL scope', async () => {
+      const { QualityLossRouteUpdateService } = await import(
+        '~/modules/quality-loss/quality-loss-route-update.service'
+      );
+      const prismaModule = await import('~/utils/prisma');
+      const prisma = prismaModule.default;
+
+      const result = await QualityLossRouteUpdateService.updateByRouteId({
+        body: { actualClaim: 1, lossSource: 'External' },
+        dataScope: { scopeType: 'ALL', deptIds: [] },
+        id: 'EXT-12',
+        userId: 'user-1',
+      });
+      expect(result).toEqual({ ok: true });
+      expect(prisma.after_sales.findUnique).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,10 +1,8 @@
 import type { Prisma } from '@prisma/client';
 import type { QualityLossItem } from '@qgs/shared';
+import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
-import {
-  DataScopeService,
-  type ResolvedDataScope,
-} from '~/modules/data-scope/data-scope.service';
+import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 
 export const QualityLossDataScopeService = {
   async applyManualWhere(params: {

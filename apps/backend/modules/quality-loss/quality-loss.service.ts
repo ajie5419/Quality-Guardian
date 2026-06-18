@@ -368,8 +368,13 @@ export const QualityLossService = {
 
   async updateByRouteId(params: {
     body: Record<string, unknown>;
+    dataScope?: Pick<
+      Awaited<ReturnType<typeof DataScopeService.getScopeForModule>>,
+      'deptIds' | 'scopeType'
+    >;
     id: string;
     userId: string;
+    username?: string;
   }) {
     return QualityLossRouteUpdateService.updateByRouteId(params);
   },

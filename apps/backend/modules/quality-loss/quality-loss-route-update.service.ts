@@ -3,6 +3,10 @@ import type { QualityLossSource } from '~/modules/quality-loss/quality-loss-stat
 import { Prisma } from '@prisma/client';
 import { resolveQualityLossTargetLocator } from '@qgs/shared';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
+import {
+  DataScopeService,
+  type ResolvedDataScope,
+} from '~/modules/data-scope/data-scope.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import {
   normalizeQualityLossSource,
@@ -11,6 +15,7 @@ import {
 } from '~/modules/quality-loss/quality-loss-status';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
+import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 
@@ -81,11 +86,117 @@ async function resolveQualityLossUpdateTarget(params: {
     : { valid: false, message: '外部售后记录不存在' };
 }
 
+async function loadOwnershipForTarget(
+  target: Exclude<QualityLossUpdateTarget, { valid: false }>,
+): Promise<{
+  createdBy: null | string;
+  responsibleDepartments: string[];
+} | null> {
+  if (target.source === QUALITY_LOSS_SOURCE.MANUAL) {
+    const row = await prisma.quality_losses.findFirst({
+      where: target.where,
+      select: { createdBy: true, respDept: true },
+    });
+    if (!row) return null;
+    return {
+      createdBy: row.createdBy,
+      responsibleDepartments: row.respDept ? [row.respDept] : [],
+    };
+  }
+  if (target.source === QUALITY_LOSS_SOURCE.EXTERNAL) {
+    const row = await prisma.after_sales.findUnique({
+      where: { id: target.id },
+      select: {
+        createdBy: true,
+        division: true,
+        feedbackDept: true,
+        respDept: true,
+      },
+    });
+    if (!row) return null;
+    return {
+      createdBy: row.createdBy,
+      responsibleDepartments: [row.respDept, row.feedbackDept, row.division]
+        .filter((value): value is string => Boolean(value)),
+    };
+  }
+  if (target.source === QUALITY_LOSS_SOURCE.INTERNAL) {
+    const row = await prisma.quality_records.findUnique({
+      where: { id: target.id },
+      select: {
+        createdBy: true,
+        responsibleBU: true,
+        responsibleDepartment: true,
+      },
+    });
+    if (!row) return null;
+    return {
+      createdBy: row.createdBy,
+      responsibleDepartments: [row.responsibleDepartment, row.responsibleBU]
+        .filter((value): value is string => Boolean(value)),
+    };
+  }
+  // Commissioning
+  const row = await prisma.vehicle_commissioning_issues.findUnique({
+    where: { id: target.id },
+    select: { createdBy: true, responsibleDepartment: true },
+  });
+  if (!row) return null;
+  return {
+    createdBy: row.createdBy,
+    responsibleDepartments: row.responsibleDepartment
+      ? [row.responsibleDepartment]
+      : [],
+  };
+}
+
+async function assertOwnership(params: {
+  dataScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>;
+  target: Exclude<QualityLossUpdateTarget, { valid: false }>;
+  userId: string;
+}) {
+  const scopeType = params.dataScope?.scopeType ?? 'ALL';
+  if (scopeType === 'ALL') return;
+
+  const ownership = await loadOwnershipForTarget(params.target);
+  if (!ownership) {
+    throw new BusinessError('NOT_FOUND', '目标记录不存在', 404);
+  }
+
+  if (scopeType === 'SELF') {
+    if (
+      ownership.createdBy &&
+      String(ownership.createdBy) === params.userId
+    ) {
+      return;
+    }
+    throw new BusinessError('FORBIDDEN', '无权修改他人的质量损失记录', 403);
+  }
+
+  if (scopeType === 'DEPT') {
+    const deptCandidates = await DataScopeService.getDeptCandidates(
+      params.dataScope?.deptIds ?? [],
+    );
+    const inScope = ownership.responsibleDepartments.some((dept) =>
+      deptCandidates.includes(dept),
+    );
+    if (!inScope) {
+      throw new BusinessError(
+        'FORBIDDEN',
+        '该记录不在你的数据权限范围内',
+        403,
+      );
+    }
+  }
+}
+
 export const QualityLossRouteUpdateService = {
   async updateByRouteId(params: {
     body: Record<string, unknown>;
+    dataScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>;
     id: string;
     userId: string;
+    username?: string;
   }) {
     const source = normalizeQualityLossSource(
       params.body.lossSource as string | undefined,
@@ -111,6 +222,12 @@ export const QualityLossRouteUpdateService = {
         message: target.message,
       };
     }
+
+    await assertOwnership({
+      dataScope: params.dataScope,
+      target,
+      userId: params.userId,
+    });
 
     try {
       switch (target.source) {

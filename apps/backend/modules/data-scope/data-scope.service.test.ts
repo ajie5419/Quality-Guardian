@@ -270,10 +270,7 @@ describe('dataScopeService', () => {
     );
 
     expect(where).toEqual({
-      AND: [
-        { isDeleted: false },
-        { respDept: { in: ['dept-qa', 'QA'] } },
-      ],
+      AND: [{ isDeleted: false }, { respDept: { in: ['dept-qa', 'QA'] } }],
     });
   });
 });
