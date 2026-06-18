@@ -31,6 +31,7 @@ export default defineEventHandler(async (event) => {
       data: await buildQualityLossCreateDataWithCanonical(
         body as Record<string, unknown>,
         lossId,
+        { createdBy: String(userinfo.id || '') || undefined },
       ),
     });
 

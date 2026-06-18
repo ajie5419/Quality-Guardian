@@ -48,6 +48,7 @@ type AfterSalesBody = Record<string, unknown>;
 export function buildAfterSalesCreateData(
   body: AfterSalesBody,
   options: {
+    createdBy?: string;
     defaultWorkOrderNumber: string;
     id: string;
     serialNumber: number;
@@ -95,6 +96,7 @@ export function buildAfterSalesCreateData(
     isClaim: Boolean(body.isClaim),
     photos: normalizePhotos(body.photos) ?? null,
     isDeleted: false,
+    createdBy: options.createdBy || null,
     updatedAt: new Date(),
   };
 }

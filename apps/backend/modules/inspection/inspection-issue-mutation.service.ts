@@ -52,6 +52,7 @@ export const InspectionIssueMutationService = {
     const serialNumber = await getNextInspectionIssueSerialNumber();
     const newRecord = await prisma.quality_records.create({
       data: await buildInspectionIssueCreateData(body, {
+        createdBy: String(userinfo.id || '') || undefined,
         id: newId,
         inspection: linkedInspection,
         inspectorUsername: userinfo.username,
@@ -161,11 +162,13 @@ export const InspectionIssueMutationService = {
     const rowErrors = [];
     const supplierNamesToRefresh: string[] = [];
     let serialSeed = await getNextInspectionIssueSerialNumber();
+    const createdBy = String(userinfo.id || '') || undefined;
     for (const [index, item] of items.entries()) {
       try {
         const payload = await buildInspectionIssueUpsertPayload(
           item,
           serialSeed,
+          { createdBy },
         );
         if (!payload) {
           rowErrors.push(

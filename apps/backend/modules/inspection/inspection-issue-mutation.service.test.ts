@@ -82,6 +82,13 @@ describe('inspectionIssueMutationService', () => {
 
       expect(prisma.quality_records.create).toHaveBeenCalled();
       expect(result.ncNumber).toBe('NC-26KJ-001');
+      const { buildInspectionIssueCreateData } = await import(
+        '~/modules/inspection/inspection-issue'
+      );
+      expect(buildInspectionIssueCreateData).toHaveBeenCalledWith(
+        {},
+        expect.objectContaining({ createdBy: 'user-1' }),
+      );
     });
 
     it('should throw when sourceType is INSPECTION and inspectionId is missing', async () => {

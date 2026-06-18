@@ -172,6 +172,7 @@ model after_sales {
   customerNameId         String?
   partName               String?
   partId                 String?
+  createdBy              String?
   work_orders            work_orders             @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([claimStatus])
@@ -198,6 +199,7 @@ model after_sales {
   @@index([productSubtypeId])
   @@index([failureTypeId])
   @@index([failureCauseId])
+  @@index([createdBy])
 }
 
 model audit_logs {
@@ -563,6 +565,7 @@ model quality_records {
   rootCause                               String?                     @db.Text
   rootCauseId                             String?
   severity                                String?
+  createdBy                               String?
   users_quality_records_inspectorTousers  users?                      @relation("quality_records_inspectorTousers", fields: [inspector], references: [username])
   users_quality_records_lastEditorTousers users?                      @relation("quality_records_lastEditorTousers", fields: [lastEditor], references: [username])
   inspection                              inspections?                @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
@@ -593,6 +596,7 @@ model quality_records {
   @@index([processName])
   @@index([processId])
   @@index([rootCauseId])
+  @@index([createdBy])
 }
 
 model vehicle_commissioning_issues {
@@ -1376,9 +1380,11 @@ model quality_losses {
   isDeleted   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  createdBy   String?
 
   @@index([respDeptId])
   @@index([typeId])
+  @@index([createdBy])
 }
 
 model knowledge_categories {

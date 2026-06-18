@@ -17,10 +17,12 @@ export function createQualityLossId(now = new Date()): string {
 export function buildQualityLossCreateData(
   body: Record<string, unknown>,
   lossId: string,
+  options: { createdBy?: string } = {},
 ): Prisma.quality_lossesUncheckedCreateInput {
   const data = buildQualityLossCreateDataRule(
     body,
     lossId,
+    options,
   ) as Prisma.quality_lossesUncheckedCreateInput;
   return {
     ...data,
@@ -34,10 +36,12 @@ export function buildQualityLossCreateData(
 export async function buildQualityLossCreateDataWithCanonical(
   body: Record<string, unknown>,
   lossId: string,
+  options: { createdBy?: string } = {},
 ): Promise<Prisma.quality_lossesUncheckedCreateInput> {
   const data = buildQualityLossCreateDataRule(
     body,
     lossId,
+    options,
   ) as Prisma.quality_lossesUncheckedCreateInput;
   const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
     'quality_losses',

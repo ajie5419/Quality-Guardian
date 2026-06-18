@@ -56,6 +56,7 @@ function attachResponsibleDepartmentsToAfterSalesData<
 export async function buildGovernedAfterSalesCreateData(
   body: Record<string, unknown>,
   options: {
+    createdBy?: string;
     defaultWorkOrderNumber: string;
     id: string;
     serialNumber: number;

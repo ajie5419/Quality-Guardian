@@ -37,6 +37,7 @@ export function createQualityLossId(now = new Date()): string {
 export function buildQualityLossCreateData(
   body: Record<string, unknown>,
   lossId: string,
+  options: { createdBy?: string } = {},
 ) {
   return {
     actualClaim: parseQualityLossNumber(body.actualClaim, 0),
@@ -49,6 +50,7 @@ export function buildQualityLossCreateData(
     status:
       parseQualityLossStatus(body.status as string | undefined) || 'Pending',
     type: String(body.type || ''),
+    createdBy: options.createdBy || null,
   };
 }
 

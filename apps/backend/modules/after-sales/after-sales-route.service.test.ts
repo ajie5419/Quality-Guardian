@@ -177,6 +177,7 @@ describe('after-sales route services', () => {
     expect(buildGovernedAfterSalesCreateData).toHaveBeenCalledWith(
       { photos: ['/a.png'], workOrderNumber: 'WO-1' },
       expect.objectContaining({
+        createdBy: 'u-1',
         id: 'AS-2026-0001',
         serialNumber: 10,
       }),
@@ -199,11 +200,14 @@ describe('after-sales route services', () => {
       .mockResolvedValueOnce({ id: 'as-1' } as never)
       .mockRejectedValueOnce(new Error('bad supplier'));
 
-    const result = await AfterSalesRouteService.importItems([
-      { workOrderNumber: '' },
-      { workOrderNumber: 'WO-1' },
-      { workOrderNumber: 'WO-2' },
-    ]);
+    const result = await AfterSalesRouteService.importItems(
+      [
+        { workOrderNumber: '' },
+        { workOrderNumber: 'WO-1' },
+        { workOrderNumber: 'WO-2' },
+      ],
+      { id: 'u-import' },
+    );
 
     expect(result).toEqual(
       expect.objectContaining({
@@ -215,11 +219,11 @@ describe('after-sales route services', () => {
     );
     expect(buildGovernedAfterSalesCreateData).toHaveBeenCalledWith(
       { workOrderNumber: 'WO-1' },
-      expect.objectContaining({ serialNumber: 10 }),
+      expect.objectContaining({ createdBy: 'u-import', serialNumber: 10 }),
     );
     expect(buildGovernedAfterSalesCreateData).toHaveBeenCalledWith(
       { workOrderNumber: 'WO-2' },
-      expect.objectContaining({ serialNumber: 11 }),
+      expect.objectContaining({ createdBy: 'u-import', serialNumber: 11 }),
     );
   });
 

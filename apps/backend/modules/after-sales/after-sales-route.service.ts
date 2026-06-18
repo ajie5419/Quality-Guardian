@@ -56,6 +56,7 @@ export const AfterSalesRouteService = {
     const serialNumber = await getNextAfterSalesSerialNumber();
     const created = await prisma.after_sales.create({
       data: await buildGovernedAfterSalesCreateData(body, {
+        createdBy: String(userinfo.id || '') || undefined,
         defaultWorkOrderNumber: QMS_DEFAULT_VALUES.UNKNOWN_WORK_ORDER,
         id: createAfterSalesId(),
         serialNumber,
@@ -76,7 +77,11 @@ export const AfterSalesRouteService = {
     return created;
   },
 
-  async importItems(items: Record<string, unknown>[]) {
+  async importItems(
+    items: Record<string, unknown>[],
+    userinfo?: { id?: number | string; username?: string },
+  ) {
+    const createdBy = String(userinfo?.id || '') || undefined;
     let successCount = 0;
     const rowErrors = [];
     const supplierNamesToRefresh: string[] = [];
@@ -100,6 +105,7 @@ export const AfterSalesRouteService = {
         const serialNumber = serialSeed++;
         const created = await prisma.after_sales.create({
           data: await buildGovernedAfterSalesCreateData(item, {
+            createdBy,
             defaultWorkOrderNumber: woNumber,
             id: createAfterSalesId(),
             serialNumber,

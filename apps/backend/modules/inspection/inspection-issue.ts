@@ -137,6 +137,7 @@ export async function findInspectionForIssue(inspectionId?: string) {
 export async function buildInspectionIssueCreateData(
   body: Record<string, unknown>,
   options: {
+    createdBy?: string;
     id: string;
     inspection?: Awaited<ReturnType<typeof findInspectionForIssue>>;
     inspectorUsername?: string;
@@ -145,6 +146,7 @@ export async function buildInspectionIssueCreateData(
 ) {
   const createData = buildInspectionIssueCreateDataCore({
     body,
+    createdBy: options.createdBy,
     inspection: options.inspection,
     inspectorUsername: options.inspectorUsername,
     mapStatus: (value) => toQualityRecordStatus(value),
@@ -354,12 +356,14 @@ export async function buildInspectionIssueUpdateData(
 export async function buildInspectionIssueUpsertPayload(
   item: InspectionIssueImportItem,
   serialNumber: number,
+  options: { createdBy?: string } = {},
 ) {
   const payload = buildInspectionIssueUpsertPayloadCore(
     item,
     serialNumber,
     (value) => toQualityRecordStatus(value),
     createInspectionIssueId,
+    options,
   ) as null | Prisma.quality_recordsUpsertArgs;
   if (!payload) {
     return null;

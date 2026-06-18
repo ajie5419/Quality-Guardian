@@ -123,6 +123,7 @@ export function deriveIssueProcessNameFromInspection(
 
 export interface InspectionIssueCreateDataInput {
   body: Record<string, unknown>;
+  createdBy?: string;
   inspection?:
     | (LinkedInspectionPartView &
         LinkedInspectionProcessView & {
@@ -235,6 +236,7 @@ export function buildInspectionIssueCreateDataCore(
         ? '[]'
         : JSON.stringify(input.body.photos ?? []),
     isDeleted: false,
+    createdBy: input.createdBy ?? null,
     updatedAt: input.now ?? new Date(),
   };
 }
@@ -328,6 +330,7 @@ export function buildInspectionIssueUpsertPayloadCore(
   serialNumber: number,
   mapStatus: (value: null | string | undefined) => string,
   createId: () => string,
+  options: { createdBy?: string } = {},
 ) {
   const ncNumber =
     normalizeOptionalInspectionIssueString(item.nonConformanceNumber) ??
@@ -361,6 +364,7 @@ export function buildInspectionIssueUpsertPayloadCore(
       nonConformanceNumber: ncNumber,
       workOrderNumber:
         normalizeOptionalInspectionIssueString(item.workOrderNumber) ?? null,
+      createdBy: options.createdBy ?? null,
     },
     update: {
       partName: normalizeOptionalInspectionIssueString(item.partName),

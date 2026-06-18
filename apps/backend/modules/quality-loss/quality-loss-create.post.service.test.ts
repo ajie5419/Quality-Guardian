@@ -94,6 +94,14 @@ describe('quality-loss-create.post.service', () => {
         lossId: 'QL-2026-001',
       }),
     });
+    const { buildQualityLossCreateDataWithCanonical } = await import(
+      '~/modules/quality-loss/quality-loss-payload'
+    );
+    expect(buildQualityLossCreateDataWithCanonical).toHaveBeenCalledWith(
+      { amount: 100, type: 'Material' },
+      'QL-2026-001',
+      { createdBy: 'user-1' },
+    );
   });
 
   it('should return bad request when required fields are missing', async () => {

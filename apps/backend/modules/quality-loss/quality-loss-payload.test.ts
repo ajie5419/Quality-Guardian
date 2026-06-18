@@ -52,6 +52,7 @@ describe('quality-loss payload utils', () => {
       actualClaim: new Decimal(20),
       amount: new Decimal(100),
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      createdBy: null,
       description: '',
       id: 'cuid-1',
       isDeleted: false,
