@@ -1,16 +1,14 @@
 import { Decimal } from '@prisma/client/runtime/library';
 import { describe, expect, it, vi } from 'vitest';
+
 import {
+  buildIndexWhere,
   buildManualLossesWhere,
-  formatCommissioningIssueItem,
-  formatExternalSalesItem,
-  formatInternalRecordItem,
-  formatManualLossItem,
+  formatIndexRow,
   formatTrendItem,
   getWeekOfYear,
   mergeTrendData,
   normalizeLossSourceFilter,
-  sortByDateDesc,
 } from '~/modules/quality-loss/quality-loss-format';
 
 vi.mock('@qgs/shared', async () => {
@@ -44,136 +42,61 @@ describe('quality-loss format helpers', () => {
     });
   });
 
-  it('formats manual, internal, external, and commissioning quality loss items', () => {
-    const manual = formatManualLossItem({
-      actualClaim: new Decimal(20),
-      amount: new Decimal(100),
-      id: 'manual-pk',
-      lossId: '',
-      occurDate: new Date('2026-01-01T00:00:00.000Z'),
-      projectName: null,
-      respDept: 'QA',
-      status: 'pending',
-      type: 'Material',
-      workOrderNumber: null,
-    });
-    const internal = formatInternalRecordItem({
-      createdAt: new Date('2026-01-02T00:00:00.000Z'),
-      date: new Date('2026-01-02T00:00:00.000Z'),
-      description: '',
-      id: 'internal-pk',
-      lossAmount: new Decimal(200),
-      partName: null,
-      projectName: null,
-      recoveredAmount: new Decimal(30),
-      responsibleDepartment: 'QC',
-      serialNumber: 7,
-      status: 'closed',
-      workOrderNumber: null,
-    });
-    const external = formatExternalSalesItem({
-      actualClaim: new Decimal(40),
-      claimStatus: 'completed',
-      createdAt: new Date('2026-01-03T00:00:00.000Z'),
-      id: 'external-pk',
-      issueDescription: 'Issue',
-      laborTravelCost: new Decimal(25),
-      materialCost: new Decimal(75),
-      occurDate: new Date('2026-01-03T00:00:00.000Z'),
-      partName: null,
-      productSubtype: 'Subtype',
-      productType: 'Type',
-      projectName: null,
-      respDept: 'Service',
-      serialNumber: 8,
-      workOrderNumber: null,
-    });
-    const commissioning = formatCommissioningIssueItem({
-      claimNotes: 'Claim note',
-      claimStatus: 'processing',
-      createdAt: new Date('2026-01-04T00:00:00.000Z'),
-      date: new Date('2026-01-04T00:00:00.000Z'),
-      description: 'Description',
-      id: 'commissioning-pk',
-      lossAmount: new Decimal(300),
-      partName: null,
-      projectName: null,
-      recoveredAmount: new Decimal(50),
-      responsibleDepartment: 'Debug',
-      workOrderNumber: null,
+  it('builds index where with workOrder + lossSource + year filters', () => {
+    const where = buildIndexWhere({
+      lossSource: 'External',
+      workOrderNumber: 'WO-42',
+      year: 2026,
     });
 
-    expect(manual).toEqual(
+    expect(where).toEqual({
+      isDeleted: false,
+      source: 'External',
+      workOrderNumber: { contains: 'WO-42' },
+      occurDate: {
+        gte: new Date('2026-01-01T00:00:00.000Z'),
+        lte: new Date('2026-12-31T23:59:59.999Z'),
+      },
+    });
+  });
+
+  it('formats an index row into a QualityLossItem with normalized status', () => {
+    const row = formatIndexRow({
+      actualClaim: new Decimal(20),
+      amount: new Decimal(150),
+      createdBy: 'u-1',
+      description: null,
+      id: 'EXT-as-1',
+      indexedAt: new Date('2026-01-01T00:00:00.000Z'),
+      occurDate: new Date('2026-01-01T00:00:00.000Z'),
+      partName: 'Bolt',
+      projectName: 'Project',
+      respDept: 'QA',
+      source: 'External',
+      sourcePk: 'as-1',
+      status: 'CLOSED',
+      workOrderNumber: 'WO-1',
+    });
+
+    expect(row).toEqual(
       expect.objectContaining({
         actualClaim: 20,
-        amount: 100,
-        id: 'manual-pk',
-        lossSource: 'Manual',
-        projectName: '-',
-        status: 'Pending',
-      }),
-    );
-    expect(internal).toEqual(
-      expect.objectContaining({
-        actualClaim: 30,
-        amount: 200,
-        id: 'INT-7',
-        lossSource: 'Internal',
-        partName: '-',
-        status: 'Confirmed',
-      }),
-    );
-    expect(external).toEqual(
-      expect.objectContaining({
-        amount: 100,
-        id: 'EXT-8',
+        amount: 150,
+        id: 'EXT-as-1',
         lossSource: 'External',
-        partName: 'Subtype',
+        partName: 'Bolt',
+        pk: 'as-1',
+        projectName: 'Project',
         status: 'Confirmed',
-      }),
-    );
-    expect(commissioning).toEqual(
-      expect.objectContaining({
-        amount: 300,
-        description: 'Claim note',
-        id: 'commissioning-pk',
-        lossSource: 'Commissioning',
+        workOrderNumber: 'WO-1',
       }),
     );
   });
 
-  it('drops zero-amount external sales items', () => {
-    expect(
-      formatExternalSalesItem({
-        actualClaim: null,
-        claimStatus: 'pending',
-        createdAt: new Date('2026-01-01T00:00:00.000Z'),
-        id: 'external-pk',
-        issueDescription: null,
-        laborTravelCost: null,
-        materialCost: null,
-        occurDate: new Date('2026-01-01T00:00:00.000Z'),
-        partName: null,
-        productSubtype: null,
-        productType: null,
-        projectName: null,
-        respDept: null,
-        serialNumber: 1,
-        workOrderNumber: null,
-      }),
-    ).toBeNull();
-  });
-
-  it('sorts by date, normalizes source filters, and calculates week number', () => {
+  it('normalizes source filters and calculates week number', () => {
     expect(getWeekOfYear(new Date('2026-01-01T00:00:00.000Z'))).toBe(1);
     expect(normalizeLossSourceFilter('manual')).toBe('Manual');
     expect(normalizeLossSourceFilter('unknown')).toBe('Manual');
-    expect(
-      sortByDateDesc([
-        { date: '2026-01-01', id: 'old' } as any,
-        { date: '2026-01-03', id: 'new' } as any,
-      ]).map((item) => item.id),
-    ).toEqual(['new', 'old']);
   });
 
   it('merges trend rows and formats trend totals', () => {
