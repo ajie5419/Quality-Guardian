@@ -25,6 +25,49 @@
 
 ## 执行记录
 
+### 2026-06-22 Phase 1 + 2：售后/质量损失/报表 模块契约重构
+
+**执行内容：**
+
+- Step 1 `43256365`：给 after_sales / quality_records / quality_losses 三表加 createdBy 字段 + 索引，历史数据 backfill 成 'system'；@qgs/shared payload builders 与 4 个源写入入口贯通 createdBy。
+- Step 2 `139b1cc5`：中间件加 quality-loss 前缀；module 配置 dataScope（selfFields=['createdBy']、deptFields=['respDept']、selfFallsBackToDept=true）；DataScopeService.buildQualityLossWhere；manual 源走 DB 层 SELF/DEPT 过滤。
+- Step 3 `7c1b7cb1`：QualityLossRouteUpdateService.updateByRouteId 加 assertOwnership，4 source 各自查 createdBy 比对 userId，失败抛 BusinessError('FORBIDDEN', ..., 403)；路由翻译 BusinessError → HTTP。
+- Step 4 `129f889d`：跨源 PUT 带 status 返回 400 BAD_REQUEST；下游 service updateQualityLossFields 签名去掉 status 入参，类型上禁止回归；前端 status 下拉非 manual 源 disabled。
+- Step 5 `3bd08053`：建 quality_loss_index 物化表 + 8 索引；QualityLossQueryParams 新增 dataScope；list 路由透传 dataScope。
+- Step 6 `9ca585ee`：新建 QualityLossIndexService 写入门（upsertFromAfterSales/Internal/Commissioning/Manual + softDelete*）；4 源所有写入路径接入索引同步；D2 入列条件（isClaim || cost>0）落到写门。
+- Step 7 `89a82483`：新建 backfill-quality-loss-index.ts；service 加 4 个 backfill 函数（cursor 分批 500）；.github/workflows/deploy.yml 加 detached qms-quality-loss-backfill 容器。
+- Step 8 `c98e588b`：读路径全切索引表，DB 层 skip+take+orderBy；删 in-memory 合并 (getAllLossesUnpaginated/fetchFromAllSources/mergeAndFilter)；索引表加 partName/description 列 + migration；trend 钻取改读索引；quality-loss.service.ts 从 515 行瘦到 273 行（500 限内）。
+- Step 9 `bdd69c17`：删除 denormalized after_sales.qualityLoss 列；service 层手算逻辑全删；shared builder qualityLoss 字段删除；前端展示由 service.getList map 时 derive。
+- Step 10 `0357943b`：AfterSalesIntegrationService.getReportPeriodMetrics 返回 { grossCost, recovered, netLoss }；@qgs/shared AfterSalesPeriodMetrics 类型补充。
+- Step 11 `c95de98e`：报表"售后损失" KPI 取 netLoss（D1）；KPI desc 改"售后总成本扣减已追偿"；externalLoss 别名彻底删除。
+- Step 12 `4e93702d`：清理 4 个孤儿 formatter（formatManualLossItem 等）+ sortByDateDesc；formatIndexRow / buildIndexWhere 新增针对性单测；D2 入列条件由 QualityLossIndexService 单一实现。
+
+**修补：**
+- `2e7834da`：Redis.disconnect() + supplier-score / quality-loss-index backfill 脚本 finally 中释放 Redis 长连接。
+
+**验证结果：**
+
+- typecheck: 通过（0 error）
+- vitest: 244 文件 / 2179 测试全过
+- check:qms-arch: 0 violations
+- B-S1 隐性违规修复：quality-loss.service.ts 从 515 行（基线 508 + 7）回到 273 行
+- 4 个 Pending migration: 20260618000100..20260622000200
+
+**部署：**
+
+- 部署期按顺序：prisma migrate deploy → 重启 backend → backfill 容器（deploy workflow 自动）
+- 业务方知会项：
+  1. SELF/DEPT scope 用户首次部署后看不到历史数据（createdBy='system'）；需手工归属或配 ALL policy
+  2. PUT /api/qms/quality-loss/{id} 跨源带 status 返回 400
+  3. 售后单 cost=0 + isClaim=true 现在会进入损失列表
+  4. 报表"售后损失"= 净损失（不再是总成本）
+
+**遗留问题：**
+
+- `api/qms/quality-loss/[id].put.ts` 46 行，距 50 行限只剩 4 行余量
+- Phase 3 待办：supplier 评分异步化（Step 14）、supplierBrand→supplierBrandId 收敛（Step 15）、after-sales 对外只读 facade（Step 16）
+- 详细契约见 `docs/after-sales-quality-loss.md`
+
 ### 2026-06-18 修复：维护容器完成后不退出
 
 **执行内容：**

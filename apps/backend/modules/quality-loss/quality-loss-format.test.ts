@@ -1,6 +1,5 @@
 import { Decimal } from '@prisma/client/runtime/library';
 import { describe, expect, it, vi } from 'vitest';
-
 import {
   buildIndexWhere,
   buildManualLossesWhere,
