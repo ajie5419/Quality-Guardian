@@ -23,7 +23,9 @@ vi.mock('~/modules/inspection', () => ({
 
 vi.mock('~/modules/after-sales', () => ({
   AfterSalesService: {
-    getReportPeriodMetrics: vi.fn().mockResolvedValue({ externalLoss: 0 }),
+    getReportPeriodMetrics: vi
+      .fn()
+      .mockResolvedValue({ grossCost: 0, netLoss: 0, recovered: 0 }),
   },
 }));
 
@@ -126,6 +128,23 @@ describe('reportSummaryService', () => {
     expect(result.suppliers).toHaveProperty('worst');
     expect(result.majorEvents).toBeDefined();
     expect(result.processPassRates).toBeDefined();
+  });
+
+  it('uses netLoss (grossCost - recovered) as the external-loss KPI', async () => {
+    const { AfterSalesService } = await import('~/modules/after-sales');
+    vi.mocked(AfterSalesService.getReportPeriodMetrics).mockResolvedValue({
+      grossCost: 100,
+      netLoss: 70,
+      recovered: 30,
+    } as any);
+
+    const result = await ReportSummaryService.getSummary(
+      'monthly',
+      new Date('2026-03-15'),
+    );
+    const externalKpi = result.metrics.find((m) => m.label === '售后损失');
+    expect(externalKpi?.value).toBe(70);
+    expect(externalKpi?.desc).toBe('售后总成本扣减已追偿');
   });
 
   it('returns empty defects when no defect rows exist', async () => {

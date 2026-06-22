@@ -82,7 +82,7 @@ export const ReportSummaryService = {
             prevData.externalLoss,
             true,
           ),
-          desc: '售后赔偿及维修成本',
+          desc: '售后总成本扣减已追偿',
           history: historyMetrics.map((h) => h.externalLoss),
         },
         {
@@ -163,7 +163,8 @@ async function fetchPeriodMetrics(start: Date, end: Date) {
       : 100;
   const internalLoss =
     inspectionMetrics.internalLoss + qualityLossMetrics.manualLoss;
-  const externalLoss = afterSalesMetrics.externalLoss;
+  // D1: external KPI uses net loss (gross cost minus recovered claim)
+  const externalLoss = afterSalesMetrics.netLoss;
   return {
     passRate: passRateSummary.passRate,
     closingRate: Number(closingRate),

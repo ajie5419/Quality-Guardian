@@ -225,7 +225,6 @@ export const AfterSalesIntegrationService = {
   },
 
   async getReportPeriodMetrics(params: { end: Date; start: Date }): Promise<{
-    externalLoss: number;
     grossCost: number;
     netLoss: number;
     recovered: number;
@@ -245,13 +244,10 @@ export const AfterSalesIntegrationService = {
       Number(aggregate._sum.materialCost || 0) +
       Number(aggregate._sum.laborTravelCost || 0);
     const recovered = Number(aggregate._sum.actualClaim || 0);
-    const netLoss = grossCost - recovered;
     return {
       grossCost,
       recovered,
-      netLoss,
-      // Legacy alias retained until Step 11 migrates the report KPI to netLoss
-      externalLoss: grossCost,
+      netLoss: grossCost - recovered,
     };
   },
 

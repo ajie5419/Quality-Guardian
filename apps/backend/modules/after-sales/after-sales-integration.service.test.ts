@@ -281,7 +281,6 @@ describe('after-sales-integration.service', () => {
     });
 
     expect(result).toEqual({
-      externalLoss: 700,
       grossCost: 700,
       netLoss: 450,
       recovered: 250,
@@ -305,7 +304,6 @@ describe('after-sales-integration.service', () => {
     });
 
     expect(result).toEqual({
-      externalLoss: 0,
       grossCost: 0,
       netLoss: 0,
       recovered: 0,
