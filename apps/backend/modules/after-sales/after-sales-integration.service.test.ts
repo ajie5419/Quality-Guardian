@@ -264,7 +264,7 @@ describe('after-sales-integration.service', () => {
     expect(result).toEqual([{ id: 'as-1' }]);
   });
 
-  it('should get report period metrics', async () => {
+  it('should get report period metrics with grossCost / recovered / netLoss', async () => {
     const { AfterSalesIntegrationService } = await import(
       '~/modules/after-sales/after-sales-integration.service'
     );
@@ -272,7 +272,7 @@ describe('after-sales-integration.service', () => {
     const prisma = prismaModule.default;
 
     (prisma.after_sales.aggregate as any).mockResolvedValue({
-      _sum: { materialCost: 500, laborTravelCost: 200 },
+      _sum: { actualClaim: 250, laborTravelCost: 200, materialCost: 500 },
     });
 
     const result = await AfterSalesIntegrationService.getReportPeriodMetrics({
@@ -280,7 +280,36 @@ describe('after-sales-integration.service', () => {
       start: new Date('2026-01-01'),
     });
 
-    expect(result).toEqual({ externalLoss: 700 });
+    expect(result).toEqual({
+      externalLoss: 700,
+      grossCost: 700,
+      netLoss: 450,
+      recovered: 250,
+    });
+  });
+
+  it('should treat null sums as zero in report period metrics', async () => {
+    const { AfterSalesIntegrationService } = await import(
+      '~/modules/after-sales/after-sales-integration.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+
+    (prisma.after_sales.aggregate as any).mockResolvedValue({
+      _sum: { actualClaim: null, laborTravelCost: null, materialCost: null },
+    });
+
+    const result = await AfterSalesIntegrationService.getReportPeriodMetrics({
+      end: new Date('2026-01-31'),
+      start: new Date('2026-01-01'),
+    });
+
+    expect(result).toEqual({
+      externalLoss: 0,
+      grossCost: 0,
+      netLoss: 0,
+      recovered: 0,
+    });
   });
 
   it('should get stats for dashboard', async () => {

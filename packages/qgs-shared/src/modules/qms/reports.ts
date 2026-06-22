@@ -9,6 +9,23 @@ export interface ReportItem {
   totalInspections: number;
 }
 
+/**
+ * Period metrics returned by AfterSalesService.getReportPeriodMetrics.
+ *
+ * - grossCost: total cost (materialCost + laborTravelCost) over the period.
+ * - recovered: sum of actualClaim recovered from suppliers / customers.
+ * - netLoss = grossCost - recovered. This is the figure the weekly /
+ *   monthly report KPI now uses (D1 decision).
+ * - externalLoss: legacy alias equal to grossCost. Kept for backwards
+ *   compatibility while Step 11 migrates the KPI consumer.
+ */
+export interface AfterSalesPeriodMetrics {
+  externalLoss: number;
+  grossCost: number;
+  netLoss: number;
+  recovered: number;
+}
+
 export type ReportDetail = ReportItem;
 
 export interface ReportPageResult {

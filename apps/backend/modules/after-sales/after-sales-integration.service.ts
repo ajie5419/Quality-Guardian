@@ -224,18 +224,34 @@ export const AfterSalesIntegrationService = {
     return row?.occurDate || null;
   },
 
-  async getReportPeriodMetrics(params: { end: Date; start: Date }) {
+  async getReportPeriodMetrics(params: { end: Date; start: Date }): Promise<{
+    externalLoss: number;
+    grossCost: number;
+    netLoss: number;
+    recovered: number;
+  }> {
     const aggregate = await prisma.after_sales.aggregate({
-      _sum: { materialCost: true, laborTravelCost: true },
+      _sum: {
+        actualClaim: true,
+        laborTravelCost: true,
+        materialCost: true,
+      },
       where: {
         occurDate: { gte: params.start, lte: params.end },
         isDeleted: false,
       },
     });
+    const grossCost =
+      Number(aggregate._sum.materialCost || 0) +
+      Number(aggregate._sum.laborTravelCost || 0);
+    const recovered = Number(aggregate._sum.actualClaim || 0);
+    const netLoss = grossCost - recovered;
     return {
-      externalLoss:
-        Number(aggregate._sum.materialCost || 0) +
-        Number(aggregate._sum.laborTravelCost || 0),
+      grossCost,
+      recovered,
+      netLoss,
+      // Legacy alias retained until Step 11 migrates the report KPI to netLoss
+      externalLoss: grossCost,
     };
   },
 
