@@ -8,6 +8,26 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
+type SourceLabel =
+  (typeof QUALITY_LOSS_SOURCE)[keyof typeof QUALITY_LOSS_SOURCE];
+
+const TYPE_BY_SOURCE: Record<
+  SourceLabel,
+  'COMMISSIONING' | 'EXTERNAL' | 'INTERNAL' | 'MANUAL'
+> = {
+  Commissioning: 'COMMISSIONING',
+  External: 'EXTERNAL',
+  Internal: 'INTERNAL',
+  Manual: 'MANUAL',
+};
+
+function formatDate(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const granularity = (query.granularity as string) || 'week';
@@ -18,93 +38,26 @@ export default defineEventHandler(async (event) => {
       const range = getPeriodRangeFromTrend(period, granularity);
       if (!range) return useResponseSuccess({ drillDown: [], period });
 
-      const formatDate = (date: Date) => {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
-      };
-      const {
-        manualLosses,
-        internalLosses,
-        externalLosses,
-        commissioningLosses,
-      } = await QualityLossService.getDrillDown(range.start, range.end);
-
-      interface LossDetail {
-        id: string;
-        date: string;
-        type: 'COMMISSIONING' | 'EXTERNAL' | 'INTERNAL' | 'MANUAL';
-        amount: number;
-        dept: string;
-        desc: string;
-        workOrderNumber: string;
-        source: (typeof QUALITY_LOSS_SOURCE)[keyof typeof QUALITY_LOSS_SOURCE];
-        _ts: number;
-      }
-      const details: LossDetail[] = [];
-
-      manualLosses.forEach((item) => {
-        const amount = Number(item.amount);
-        if (amount <= 0) return;
-        details.push({
-          id: item.lossId || item.id,
-          date: formatDate(item.occurDate),
-          type: 'MANUAL',
-          amount,
-          dept: item.respDept || '-',
-          desc: item.description || '-',
-          workOrderNumber: '-',
-          source: QUALITY_LOSS_SOURCE.MANUAL,
-          _ts: item.occurDate.getTime(),
-        });
-      });
-      internalLosses.forEach((item) => {
-        const amount = Number(item.lossAmount);
-        if (amount <= 0) return;
-        details.push({
-          id: `INT-${item.serialNumber}`,
-          date: formatDate(item.date),
-          type: 'INTERNAL',
-          amount,
-          dept: item.responsibleDepartment || '-',
-          desc: item.description || '-',
-          workOrderNumber: item.workOrderNumber || '-',
-          source: QUALITY_LOSS_SOURCE.INTERNAL,
-          _ts: item.date.getTime(),
-        });
-      });
-      externalLosses.forEach((item) => {
-        const amount =
-          Number(item.materialCost || 0) + Number(item.laborTravelCost || 0);
-        if (amount <= 0) return;
-        details.push({
-          id: `EXT-${item.serialNumber}`,
-          date: formatDate(item.occurDate),
-          type: 'EXTERNAL',
-          amount: Number(amount.toFixed(2)),
-          dept: item.respDept || '-',
-          desc: item.issueDescription || '-',
-          workOrderNumber: item.workOrderNumber || '-',
-          source: QUALITY_LOSS_SOURCE.EXTERNAL,
-          _ts: item.occurDate.getTime(),
-        });
-      });
-      commissioningLosses.forEach((item) => {
-        const amount = Number(item.lossAmount || 0);
-        details.push({
-          id: item.id,
-          date: formatDate(item.date),
-          type: 'COMMISSIONING',
-          amount: Number(amount.toFixed(2)),
-          dept: item.responsibleDepartment || '-',
-          desc: item.description || '-',
-          workOrderNumber: item.workOrderNumber || '-',
-          source: QUALITY_LOSS_SOURCE.COMMISSIONING,
-          _ts: item.date.getTime(),
-        });
-      });
-      details.sort((a, b) => b._ts - a._ts);
+      const rows = await QualityLossService.getDrillDown(
+        range.start,
+        range.end,
+      );
+      const details = rows
+        .filter((row) => Number(row.amount) > 0)
+        .map((row) => ({
+          id: row.id,
+          date: formatDate(row.occurDate),
+          type:
+            TYPE_BY_SOURCE[row.source as SourceLabel] ??
+            (row.source as 'COMMISSIONING' | 'EXTERNAL' | 'INTERNAL' | 'MANUAL'),
+          amount: Number(Number(row.amount).toFixed(2)),
+          dept: row.respDept || '-',
+          desc: row.description || '-',
+          workOrderNumber: row.workOrderNumber || '-',
+          source: row.source as SourceLabel,
+          _ts: row.occurDate.getTime(),
+        }))
+        .sort((a, b) => b._ts - a._ts);
 
       return useResponseSuccess({ drillDown: details, period });
     }

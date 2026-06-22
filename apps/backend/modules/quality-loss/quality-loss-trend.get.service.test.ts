@@ -198,49 +198,48 @@ describe('quality-loss route handlers', () => {
     });
 
     getQuery.mockReturnValueOnce({ granularity: 'month', period: '1月' });
-    getDrillDown.mockResolvedValueOnce({
-      commissioningLosses: [
-        {
-          date: new Date('2026-01-04T00:00:00.000Z'),
-          description: 'Commissioning',
-          id: 'vc-1',
-          lossAmount: 30,
-          responsibleDepartment: 'Debug',
-          workOrderNumber: 'WO-3',
-        },
-      ],
-      externalLosses: [
-        {
-          issueDescription: 'External',
-          laborTravelCost: 5,
-          materialCost: 15,
-          occurDate: new Date('2026-01-03T00:00:00.000Z'),
-          respDept: 'Service',
-          serialNumber: 2,
-          workOrderNumber: 'WO-2',
-        },
-      ],
-      internalLosses: [
-        {
-          date: new Date('2026-01-02T00:00:00.000Z'),
-          description: 'Internal',
-          lossAmount: 20,
-          responsibleDepartment: 'QA',
-          serialNumber: 1,
-          workOrderNumber: 'WO-1',
-        },
-      ],
-      manualLosses: [
-        {
-          amount: 10,
-          description: 'Manual',
-          id: 'ql-1',
-          lossId: 'QL-1',
-          occurDate: new Date('2026-01-01T00:00:00.000Z'),
-          respDept: 'QA',
-        },
-      ],
-    });
+    getDrillDown.mockResolvedValueOnce([
+      {
+        amount: 30,
+        description: 'Commissioning',
+        id: 'DA-vc-1',
+        occurDate: new Date('2026-01-04T00:00:00.000Z'),
+        respDept: 'Debug',
+        source: 'Commissioning',
+        sourcePk: 'vc-1',
+        workOrderNumber: 'WO-3',
+      },
+      {
+        amount: 20,
+        description: 'External',
+        id: 'EXT-as-1',
+        occurDate: new Date('2026-01-03T00:00:00.000Z'),
+        respDept: 'Service',
+        source: 'External',
+        sourcePk: 'as-1',
+        workOrderNumber: 'WO-2',
+      },
+      {
+        amount: 20,
+        description: 'Internal',
+        id: 'INT-qr-1',
+        occurDate: new Date('2026-01-02T00:00:00.000Z'),
+        respDept: 'QA',
+        source: 'Internal',
+        sourcePk: 'qr-1',
+        workOrderNumber: 'WO-1',
+      },
+      {
+        amount: 10,
+        description: 'Manual',
+        id: 'QL-ql-1',
+        occurDate: new Date('2026-01-01T00:00:00.000Z'),
+        respDept: 'QA',
+        source: 'Manual',
+        sourcePk: 'ql-1',
+        workOrderNumber: null,
+      },
+    ]);
 
     const response = await handler(event());
     expect(response.data.period).toBe('1月');

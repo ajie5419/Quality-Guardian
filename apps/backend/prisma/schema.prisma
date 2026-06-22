@@ -1401,6 +1401,8 @@ model quality_loss_index {
   projectName     String?
   workOrderNumber String?
   respDept        String?
+  partName        String?
+  description     String?  @db.Text
   supplierBrandId String?
   createdBy       String?
   isDeleted       Boolean  @default(false)

@@ -1,26 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
 import prisma from '~/utils/prisma';
 
-// Mock prisma and logger
 vi.mock('~/utils/prisma', () => ({
   default: {
-    quality_losses: {
-      findMany: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    quality_records: {
-      findMany: vi.fn(),
-    },
-    vehicle_commissioning_issues: {
-      findMany: vi.fn(),
-    },
-    after_sales: {
+    quality_loss_index: {
+      count: vi.fn(),
       findMany: vi.fn(),
     },
     $queryRaw: vi.fn(),
-    $queryRawUnsafe: vi.fn(),
   },
+}));
+
+vi.mock('~/modules/data-scope/data-scope.service', () => ({
+  DataScopeService: {
+    buildQualityLossIndexWhere: vi.fn(async (where: unknown) => where),
+  },
+}));
+
+vi.mock('~/modules/dept/dept.service', () => ({
+  DeptService: {
+    findAll: vi.fn(async () => []),
+  },
+}));
+
+vi.mock('~/modules/dept/dept-tree', () => ({
+  flattenDeptTree: () => [],
 }));
 
 vi.mock('~/utils/logger', () => ({
@@ -45,176 +51,70 @@ vi.mock('@qgs/shared', async () => {
   };
 });
 
+function indexRow(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    actualClaim: 0,
+    amount: 100,
+    createdBy: 'system',
+    description: null,
+    id: 'EXT-as-1',
+    indexedAt: new Date('2024-01-01'),
+    isDeleted: false,
+    occurDate: new Date('2024-01-01'),
+    partName: 'Bolt',
+    projectName: 'P',
+    respDept: 'QA',
+    source: 'External',
+    sourcePk: 'as-1',
+    status: 'OPEN',
+    workOrderNumber: 'WO-1',
+    ...overrides,
+  };
+}
+
 describe('qualityLossService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe('getAllLosses', () => {
-    it('should correctly merge and format items from different sources', async () => {
-      // Mock Manual Loss
-      (prisma.quality_losses.findMany as any).mockResolvedValue([
-        {
-          id: 'manual-1',
-          lossId: 'M001',
-          occurDate: new Date('2024-01-01'),
-          amount: '100.00',
-          actualClaim: '50.00',
-          respDept: 'Production',
-          type: 'Material',
-          status: 'Pending',
-          isDeleted: false,
-        },
+    it('serves rows from quality_loss_index with DB pagination', async () => {
+      (prisma.quality_loss_index.findMany as any).mockResolvedValue([
+        indexRow({ id: 'EXT-as-1', source: 'External', amount: 350 }),
+        indexRow({
+          id: 'INT-qr-1',
+          source: 'Internal',
+          sourcePk: 'qr-1',
+          amount: 200,
+        }),
       ]);
-
-      // Mock Internal Loss
-      (prisma.quality_records.findMany as any).mockResolvedValue([
-        {
-          id: 'internal-1',
-          serialNumber: 101,
-          date: new Date('2024-01-02'),
-          lossAmount: '200.00',
-          recoveredAmount: '150.00',
-          responsibleDepartment: 'QC',
-          partName: 'Engine',
-          projectName: 'Project A',
-          workOrderNumber: 'WO001',
-          status: 'CLOSED',
-          isDeleted: false,
-          createdAt: new Date(),
-        },
-      ]);
-
-      // Mock External Loss
-      (prisma.after_sales.findMany as any).mockResolvedValue([
-        {
-          id: 'external-1',
-          serialNumber: 201,
-          occurDate: new Date('2024-01-03'),
-          materialCost: '300.00',
-          laborTravelCost: '50.00',
-          actualClaim: '200.00',
-          respDept: 'Service',
-          partName: 'Bolt',
-          projectName: 'Project B',
-          workOrderNumber: 'WO002',
-          claimStatus: 'CLOSED',
-          isDeleted: false,
-          createdAt: new Date(),
-        },
-      ]);
-      (prisma.vehicle_commissioning_issues.findMany as any).mockResolvedValue([
-        {
-          id: 'da-1',
-          date: new Date('2024-01-04'),
-          lossAmount: '80.00',
-          recoveredAmount: '20.00',
-          responsibleDepartment: 'Debug',
-          partName: 'Hydraulic',
-          projectName: 'Project C',
-          workOrderNumber: 'WO003',
-          description: 'Commissioning issue',
-          claimNotes: '',
-          claimStatus: 'Processing',
-          isDeleted: false,
-          createdAt: new Date(),
-        },
-      ]);
+      (prisma.quality_loss_index.count as any).mockResolvedValue(2);
 
       const result = await QualityLossService.getAllLosses();
 
-      expect(result.total).toBe(4);
-
-      // Check individual mapping
-      const manual = result.items.find((i) => i.lossSource === 'Manual');
-      expect(manual?.amount).toBe(100);
-      expect(manual?.id).toBe('M001');
-
-      const internal = result.items.find((i) => i.lossSource === 'Internal');
-      expect(internal?.amount).toBe(200);
-      expect(internal?.id).toBe('INT-101');
-
-      const external = result.items.find((i) => i.lossSource === 'External');
-      expect(external?.amount).toBe(350); // 300 + 50
-      expect(external?.id).toBe('EXT-201');
-
-      const commissioning = result.items.find(
-        (i) => i.lossSource === 'Commissioning',
+      expect(prisma.quality_loss_index.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ isDeleted: false }),
+          orderBy: { occurDate: 'desc' },
+        }),
       );
-      expect(commissioning?.amount).toBe(80);
-      expect(commissioning?.id).toBe('da-1');
+      expect(result.total).toBe(2);
+      expect(result.items.map((item) => item.lossSource).sort()).toEqual([
+        'External',
+        'Internal',
+      ]);
     });
 
-    it('should handle empty results gracefully', async () => {
-      (prisma.quality_losses.findMany as any).mockResolvedValue([]);
-      (prisma.quality_records.findMany as any).mockResolvedValue([]);
-      (prisma.after_sales.findMany as any).mockResolvedValue([]);
-      (prisma.vehicle_commissioning_issues.findMany as any).mockResolvedValue(
-        [],
-      );
+    it('applies lossSource filter to where clause', async () => {
+      (prisma.quality_loss_index.findMany as any).mockResolvedValue([]);
+      (prisma.quality_loss_index.count as any).mockResolvedValue(0);
 
-      const result = await QualityLossService.getAllLosses();
-      expect(result.items).toHaveLength(0);
-      expect(result.total).toBe(0);
-    });
+      await QualityLossService.getAllLosses({ lossSource: 'External' });
 
-    it('should filter by unified status across all sources', async () => {
-      (prisma.quality_losses.findMany as any).mockResolvedValue([
-        {
-          id: 'manual-1',
-          lossId: 'M001',
-          occurDate: new Date('2024-01-01'),
-          amount: '100.00',
-          actualClaim: '50.00',
-          respDept: 'Production',
-          type: 'Material',
-          status: 'Pending',
-          isDeleted: false,
-        },
-      ]);
-      (prisma.quality_records.findMany as any).mockResolvedValue([
-        {
-          id: 'internal-1',
-          serialNumber: 101,
-          date: new Date('2024-01-02'),
-          lossAmount: '200.00',
-          recoveredAmount: '150.00',
-          responsibleDepartment: 'QC',
-          partName: 'Engine',
-          projectName: 'Project A',
-          workOrderNumber: 'WO001',
-          status: 'CLOSED',
-          isDeleted: false,
-          createdAt: new Date(),
-        },
-      ]);
-      (prisma.after_sales.findMany as any).mockResolvedValue([
-        {
-          id: 'external-1',
-          serialNumber: 201,
-          occurDate: new Date('2024-01-03'),
-          materialCost: '300.00',
-          laborTravelCost: '50.00',
-          actualClaim: '200.00',
-          respDept: 'Service',
-          partName: 'Bolt',
-          projectName: 'Project B',
-          workOrderNumber: 'WO002',
-          claimStatus: 'COMPLETED',
-          isDeleted: false,
-          createdAt: new Date(),
-        },
-      ]);
-      (prisma.vehicle_commissioning_issues.findMany as any).mockResolvedValue(
-        [],
-      );
-
-      const confirmedOnly = await QualityLossService.getAllLosses({
-        status: 'Confirmed',
-      });
-      expect(confirmedOnly.total).toBe(2);
-      expect(confirmedOnly.items.every((i) => i.status === 'Confirmed')).toBe(
-        true,
+      expect(prisma.quality_loss_index.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ source: 'External' }),
+        }),
       );
     });
   });
@@ -242,19 +142,15 @@ describe('qualityLossService', () => {
 
     it('should handle BigInt period and sum values', async () => {
       (prisma.$queryRaw as any)
-        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(1000) }]) // manual
-        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(2000) }]) // internal
-        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(3000) }]) // external
-        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(500) }]); // commissioning
+        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(1000) }])
+        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(2000) }])
+        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(3000) }])
+        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(500) }]);
 
       const result = await QualityLossService.getTrendData('week');
       const w5 = result.trend.find((t) => t.period === 'W5');
       expect(w5).toBeDefined();
       expect(w5?.totalAmount).toBe(6500);
-      expect(w5?.manualAmount).toBe(1000);
-      expect(w5?.internalAmount).toBe(2000);
-      expect(w5?.externalAmount).toBe(3000);
-      expect(w5?.commissioningAmount).toBe(500);
     });
   });
 });

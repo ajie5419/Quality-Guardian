@@ -1,9 +1,6 @@
 import { Prisma } from '@prisma/client';
-import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
-import { InspectionService } from '~/modules/inspection/inspection.service';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import prisma from '~/utils/prisma';
 
 export const QualityLossRecordMaintenanceService = {
@@ -77,38 +74,13 @@ export const QualityLossRecordMaintenanceService = {
   },
 
   async getDrillDown(start: Date, end: Date) {
-    const [manualLosses, internalLosses, externalLosses, commissioningLosses] =
-      await Promise.all([
-        prisma.quality_losses.findMany({
-          where: {
-            isDeleted: false,
-            occurDate: { gte: start, lte: end },
-          },
-          orderBy: { occurDate: 'desc' },
-          take: 500,
-        }),
-        InspectionService.getQualityLossDrillDownRecords({
-          start,
-          end,
-          take: 500,
-        }),
-        AfterSalesService.getQualityLossDrillDownRecords({
-          start,
-          end,
-          take: 500,
-        }),
-        VehicleCommissioningService.getQualityLossDrillDownRecords({
-          start,
-          end,
-          take: 500,
-        }),
-      ]);
-
-    return {
-      manualLosses,
-      internalLosses,
-      externalLosses,
-      commissioningLosses,
-    };
+    return prisma.quality_loss_index.findMany({
+      where: {
+        isDeleted: false,
+        occurDate: { gte: start, lte: end },
+      },
+      orderBy: { occurDate: 'desc' },
+      take: 2000,
+    });
   },
 };

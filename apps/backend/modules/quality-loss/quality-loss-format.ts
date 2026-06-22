@@ -86,6 +86,73 @@ export function buildManualLossesWhere(
   return where;
 }
 
+export function buildIndexWhere(
+  params: Omit<QualityLossQueryParams, 'page' | 'pageSize'>,
+): Prisma.quality_loss_indexWhereInput {
+  const where: Prisma.quality_loss_indexWhereInput = {
+    isDeleted: false,
+  };
+  const source = normalizeLossSourceFilter(params.lossSource);
+  if (source) {
+    where.source = source;
+  }
+  if (params.status) {
+    const trimmedStatus = params.status.trim();
+    if (!isValidQualityLossStatus(trimmedStatus)) {
+      where.status = '__INVALID__';
+    }
+    // Status normalization happens at row formatting; leave the raw column alone.
+  }
+  if (params.workOrderNumber && String(params.workOrderNumber).trim() !== '') {
+    where.workOrderNumber = {
+      contains: String(params.workOrderNumber).trim(),
+    };
+  }
+  if (params.year) {
+    where.occurDate = {
+      gte: new Date(`${params.year}-01-01T00:00:00.000Z`),
+      lte: new Date(`${params.year}-12-31T23:59:59.999Z`),
+    };
+  }
+  return where;
+}
+
+interface IndexRowLike {
+  actualClaim: null | number | Prisma.Decimal;
+  amount: null | number | Prisma.Decimal;
+  createdBy: null | string;
+  description: null | string;
+  id: string;
+  indexedAt: Date;
+  occurDate: Date;
+  partName: null | string;
+  projectName: null | string;
+  respDept: null | string;
+  source: string;
+  sourcePk: string;
+  status: string;
+  workOrderNumber: null | string;
+}
+
+export function formatIndexRow(row: IndexRowLike): QualityLossItem {
+  return {
+    id: row.id,
+    pk: row.sourcePk,
+    date: formatDateString(row.occurDate),
+    amount: safeNumber(row.amount),
+    actualClaim: safeNumber(row.actualClaim),
+    responsibleDepartment: row.respDept,
+    description: row.description || undefined,
+    status: normalizeQualityLossStatus(row.status),
+    type: row.source,
+    lossSource: row.source,
+    workOrderNumber: row.workOrderNumber || '-',
+    projectName: row.projectName || '-',
+    partName: row.partName || '-',
+    createdAt: row.indexedAt.toISOString(),
+  };
+}
+
 export function formatManualLossItem(item: {
   actualClaim: unknown;
   amount: unknown;

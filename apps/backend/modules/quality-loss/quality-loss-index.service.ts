@@ -22,9 +22,13 @@ interface AfterSalesInput {
   id: string;
   isClaim?: boolean;
   isDeleted: boolean;
+  issueDescription?: null | string;
   laborTravelCost?: null | number | Prisma.Decimal;
   materialCost?: null | number | Prisma.Decimal;
   occurDate: Date;
+  partName?: null | string;
+  productSubtype?: null | string;
+  productType?: null | string;
   projectName: null | string;
   respDept: null | string;
   supplierBrandId?: null | string;
@@ -34,9 +38,11 @@ interface AfterSalesInput {
 interface InternalInput {
   createdBy: null | string;
   date: Date;
+  description?: null | string;
   id: string;
   isDeleted: boolean;
   lossAmount?: null | number | Prisma.Decimal;
+  partName?: null | string;
   projectName: null | string;
   recoveredAmount?: null | number | Prisma.Decimal;
   responsibleDepartment: null | string;
@@ -45,13 +51,16 @@ interface InternalInput {
 }
 
 interface CommissioningInput {
+  claimNotes?: null | string;
   claimStatus: null | string;
   createdBy: null | string;
   date: Date;
+  description?: null | string;
   id: string;
   isClaim?: boolean;
   isDeleted: boolean;
   lossAmount?: null | number | Prisma.Decimal;
+  partName?: null | string;
   projectName: null | string;
   recoveredAmount?: null | number | Prisma.Decimal;
   responsibleDepartment: null | string;
@@ -62,11 +71,13 @@ interface ManualInput {
   actualClaim?: null | number | Prisma.Decimal;
   amount: null | number | Prisma.Decimal;
   createdBy: null | string;
+  description?: null | string;
   id: string;
   isDeleted: boolean;
   occurDate: Date;
   respDept: null | string;
   status: null | string;
+  type?: null | string;
 }
 
 function num(value: null | number | Prisma.Decimal | undefined) {
@@ -124,6 +135,8 @@ export const QualityLossIndexService = {
       projectName: row.projectName,
       workOrderNumber: row.workOrderNumber,
       respDept: row.respDept,
+      partName: row.partName || row.productSubtype || row.productType || null,
+      description: row.issueDescription || null,
       supplierBrandId: row.supplierBrandId ?? null,
       createdBy: row.createdBy,
       isDeleted: false,
@@ -149,6 +162,8 @@ export const QualityLossIndexService = {
       projectName: row.projectName,
       workOrderNumber: row.workOrderNumber,
       respDept: row.responsibleDepartment,
+      partName: row.partName || null,
+      description: row.description || null,
       supplierBrandId: null,
       createdBy: row.createdBy,
       isDeleted: false,
@@ -175,6 +190,8 @@ export const QualityLossIndexService = {
       projectName: row.projectName,
       workOrderNumber: row.workOrderNumber,
       respDept: row.responsibleDepartment,
+      partName: row.partName || null,
+      description: row.claimNotes || row.description || null,
       supplierBrandId: null,
       createdBy: row.createdBy,
       isDeleted: false,
@@ -200,6 +217,8 @@ export const QualityLossIndexService = {
       projectName: null,
       workOrderNumber: null,
       respDept: row.respDept,
+      partName: row.type || null,
+      description: row.description || null,
       supplierBrandId: null,
       createdBy: row.createdBy,
       isDeleted: false,
@@ -264,9 +283,11 @@ export const QualityLossIndexService = {
         await this.upsertFromInternal({
           createdBy: row.createdBy,
           date: row.date,
+          description: row.description,
           id: row.id,
           isDeleted: row.isDeleted,
           lossAmount: row.lossAmount,
+          partName: row.partName,
           projectName: row.projectName,
           recoveredAmount: row.recoveredAmount,
           responsibleDepartment: row.responsibleDepartment,
@@ -323,11 +344,13 @@ export const QualityLossIndexService = {
           actualClaim: row.actualClaim,
           amount: row.amount,
           createdBy: row.createdBy,
+          description: row.description,
           id: row.id,
           isDeleted: row.isDeleted,
           occurDate: row.occurDate,
           respDept: row.respDept,
           status: row.status,
+          type: row.type,
         });
       }
       processed += rows.length;

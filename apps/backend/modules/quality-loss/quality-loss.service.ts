@@ -7,61 +7,32 @@ import type {
 } from '@qgs/shared';
 import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
-import type {
-  QualityLossQueryParams,
-  SingleQualityLossSource,
-  TrendRow,
-} from './quality-loss-format';
+import type { QualityLossQueryParams, TrendRow } from './quality-loss-format';
 
 import { Prisma } from '@prisma/client';
-import { isValidQualityLossStatus } from '@qgs/shared';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
+import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { flattenDeptTree } from '~/modules/dept/dept-tree';
 import { DeptService } from '~/modules/dept/dept.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
-import { normalizeQualityLossStatus } from '~/modules/quality-loss/quality-loss-status';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import {
-  applyPagination as paginateList,
-  parsePagination,
-  safeNumber,
-} from '~/utils/query-helpers';
+import { parsePagination } from '~/utils/query-helpers';
 
-import { QualityLossDataScopeService } from './quality-loss-data-scope.service';
 import {
-  buildManualLossesWhere,
-  formatCommissioningIssueItem,
-  formatExternalSalesItem,
-  formatInternalRecordItem,
-  formatManualLossItem,
+  buildIndexWhere,
+  formatIndexRow,
   formatTrendItem,
   mergeTrendData,
-  normalizeLossSourceFilter,
   QL_CONSTANTS,
-  sortByDateDesc,
 } from './quality-loss-format';
 import { QualityLossRecordMaintenanceService } from './quality-loss-record-maintenance.service';
 import { QualityLossReportingService } from './quality-loss-reporting.service';
 import { QualityLossRouteUpdateService } from './quality-loss-route-update.service';
 import { QualityLossSummaryService } from './quality-loss-summary.service';
 
-// 创建模块级 logger
 const logger = createModuleLogger('QualityLossService');
-
-type AggregationSourceRecords = {
-  commissioningIssues: Awaited<
-    ReturnType<typeof VehicleCommissioningService.getLossRecordsForAggregation>
-  >;
-  externalRecords: Awaited<
-    ReturnType<typeof AfterSalesService.getLossRecordsForAggregation>
-  >;
-  internalRecords: Awaited<
-    ReturnType<typeof InspectionService.getLossRecordsForAggregation>
-  >;
-  manualRecords: Awaited<ReturnType<typeof prisma.quality_losses.findMany>>;
-};
 
 async function resolveTrendRows(
   label: string,
@@ -95,259 +66,36 @@ async function getDeptNameMapper() {
   };
 }
 
-async function applyQualityLossDataScope(
-  items: QualityLossItem[],
-  userContext?: { userId: string; username?: string },
-) {
-  return QualityLossDataScopeService.apply(items, userContext);
-}
-
-function filterQualityLossItemsByStatus(
-  items: QualityLossItem[],
-  status?: string,
-) {
-  if (!status) return items;
-  const trimmedStatus = status.trim();
-  if (trimmedStatus === '') return items;
-  if (!isValidQualityLossStatus(trimmedStatus)) return [];
-  const normalizedStatus = normalizeQualityLossStatus(trimmedStatus);
-  return items.filter(
-    (item) => normalizeQualityLossStatus(item.status) === normalizedStatus,
-  );
-}
-
-async function getSingleSourceLossPage(
-  source: SingleQualityLossSource,
-  params: QualityLossQueryParams,
-): Promise<PageResult<QualityLossItem>> {
-  const { skip, take } = parsePagination(params);
+async function applyDeptNames(items: QualityLossItem[]) {
   const getDeptName = await getDeptNameMapper();
-  const workOrderNumber = params.workOrderNumber;
+  return items.map((item) => ({
+    ...item,
+    responsibleDepartment: getDeptName(item.responsibleDepartment),
+  }));
+}
 
-  if (source === QL_CONSTANTS.SOURCE.MANUAL) {
-    const baseWhere = buildManualLossesWhere(params);
-    const where = params.userContext?.userId
-      ? await QualityLossDataScopeService.applyManualWhere({
-          baseWhere,
-          dataScope: params.dataScope,
-          userContext: params.userContext,
-        })
-      : baseWhere;
-    const [rows, total] = await Promise.all([
-      prisma.quality_losses.findMany({
-        where,
-        orderBy: { occurDate: 'desc' },
-        skip,
-        take,
-      }),
-      prisma.quality_losses.count({ where }),
-    ]);
-    const items = rows
-      .filter((item) => safeNumber(item.amount) > 0)
-      .map((item) => {
-        const formatted = formatManualLossItem(item);
-        formatted.responsibleDepartment = getDeptName(
-          formatted.responsibleDepartment,
-        );
-        return formatted;
-      });
-    return { items, total };
-  }
-
-  let sourceRecords:
-    | Awaited<ReturnType<typeof AfterSalesService.getLossRecordsForAggregation>>
-    | Awaited<ReturnType<typeof InspectionService.getLossRecordsForAggregation>>
-    | Awaited<
-        ReturnType<
-          typeof VehicleCommissioningService.getLossRecordsForAggregation
-        >
-      >;
-  let total = 0;
-  if (source === QL_CONSTANTS.SOURCE.INTERNAL) {
-    [sourceRecords, total] = await Promise.all([
-      InspectionService.getLossRecordsForAggregation({
-        skip,
-        take,
-        workOrderNumber,
-      }),
-      InspectionService.countLossRecordsForAggregation({ workOrderNumber }),
-    ]);
-  } else if (source === QL_CONSTANTS.SOURCE.EXTERNAL) {
-    [sourceRecords, total] = await Promise.all([
-      AfterSalesService.getLossRecordsForAggregation({
-        skip,
-        take,
-        workOrderNumber,
-      }),
-      AfterSalesService.countLossRecordsForAggregation({
-        workOrderNumber,
-      }),
-    ]);
-  } else {
-    [sourceRecords, total] = await Promise.all([
-      VehicleCommissioningService.getLossRecordsForAggregation({
-        skip,
-        take,
-        workOrderNumber,
-      }),
-      VehicleCommissioningService.countLossRecordsForAggregation({
-        workOrderNumber,
-      }),
-    ]);
-  }
-
-  const formatted = sourceRecords
-    .map((item) => {
-      if (source === QL_CONSTANTS.SOURCE.INTERNAL) {
-        return formatInternalRecordItem(
-          item as Parameters<typeof formatInternalRecordItem>[0],
-        );
-      }
-      if (source === QL_CONSTANTS.SOURCE.EXTERNAL) {
-        return formatExternalSalesItem(
-          item as Parameters<typeof formatExternalSalesItem>[0],
-        );
-      }
-      return formatCommissioningIssueItem(
-        item as Parameters<typeof formatCommissioningIssueItem>[0],
-      );
-    })
-    .filter(Boolean);
-  const scoped = await applyQualityLossDataScope(
-    filterQualityLossItemsByStatus(formatted, params.status).map((item) => ({
-      ...item,
-      responsibleDepartment: getDeptName(item.responsibleDepartment),
-    })),
+async function buildScopedIndexWhere(
+  params: Omit<QualityLossQueryParams, 'page' | 'pageSize'>,
+): Promise<Prisma.quality_loss_indexWhereInput> {
+  const baseWhere = buildIndexWhere(params);
+  if (!params.userContext?.userId) return baseWhere;
+  return DataScopeService.buildQualityLossIndexWhere(
+    baseWhere,
     params.userContext,
-  );
-
-  return { items: scoped, total };
-}
-
-async function getAllLossesUnpaginated(
-  params: Omit<QualityLossQueryParams, 'page' | 'pageSize'> = {},
-): Promise<QualityLossItem[]> {
-  const sourceRecords = await fetchFromAllSources(params);
-  const merged = await mergeAndFilter(sourceRecords, params);
-  const { status, userContext } = params;
-  let statusFiltered: QualityLossItem[];
-  if (status && isValidQualityLossStatus(status.trim())) {
-    statusFiltered = merged.filter(
-      (item) =>
-        normalizeQualityLossStatus(item.status) ===
-        normalizeQualityLossStatus(status),
-    );
-  } else if (status) {
-    statusFiltered = [];
-  } else {
-    statusFiltered = merged;
-  }
-
-  return QualityLossDataScopeService.sortFilteredByScope(
-    statusFiltered,
-    sortByDateDesc,
-    userContext,
+    params.dataScope,
   );
 }
 
-async function fetchFromAllSources(
-  params: Omit<QualityLossQueryParams, 'page' | 'pageSize'> = {},
-): Promise<AggregationSourceRecords> {
-  const workOrderNumber = params.workOrderNumber;
-  const [manualRecords, internalRecords, externalRecords, commissioningIssues] =
-    await Promise.all([
-      prisma.quality_losses.findMany({
-        where: buildManualLossesWhere(params),
-      }),
-      InspectionService.getLossRecordsForAggregation({ workOrderNumber }),
-      AfterSalesService.getLossRecordsForAggregation({ workOrderNumber }),
-      VehicleCommissioningService.getLossRecordsForAggregation({
-        workOrderNumber,
-      }).catch((error) => {
-        logger.warn(
-          { err: error },
-          'vehicle_commissioning_issues query failed, skip commissioning quality loss source',
-        );
-        return [];
-      }),
-    ]);
-
-  return {
-    manualRecords,
-    internalRecords,
-    externalRecords,
-    commissioningIssues,
-  };
-}
-
-async function mergeAndFilter(
-  sourceRecords: AggregationSourceRecords,
-  params: Omit<QualityLossQueryParams, 'page' | 'pageSize'> = {},
+async function loadAllScopedItems(
+  params: Omit<QualityLossQueryParams, 'page' | 'pageSize'>,
 ): Promise<QualityLossItem[]> {
-  const { lossSource } = params;
-  const getDeptName = await getDeptNameMapper();
-
-  const result: QualityLossItem[] = [];
-
-  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.MANUAL) {
-    sourceRecords.manualRecords.forEach((item) => {
-      const itemRecord = item as typeof item & {
-        projectName?: null | string;
-        workOrderNumber?: null | string;
-      };
-      const amount = safeNumber(item.amount);
-      if (amount <= 0) return;
-      const formatted = formatManualLossItem({ ...item, ...itemRecord });
-      formatted.responsibleDepartment = getDeptName(
-        formatted.responsibleDepartment,
-      );
-      result.push(formatted);
-    });
-  }
-
-  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.INTERNAL) {
-    sourceRecords.internalRecords.forEach((item) => {
-      const formatted = formatInternalRecordItem(item);
-      formatted.responsibleDepartment = getDeptName(
-        formatted.responsibleDepartment,
-      );
-      result.push(formatted);
-    });
-  }
-
-  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.EXTERNAL) {
-    sourceRecords.externalRecords.forEach((item) => {
-      const formatted = formatExternalSalesItem(item);
-      if (formatted) {
-        formatted.responsibleDepartment = getDeptName(
-          formatted.responsibleDepartment,
-        );
-        result.push(formatted);
-      }
-    });
-  }
-
-  if (!lossSource || lossSource === QL_CONSTANTS.SOURCE.COMMISSIONING) {
-    sourceRecords.commissioningIssues.forEach((item) => {
-      const formatted = formatCommissioningIssueItem(item);
-      formatted.responsibleDepartment = getDeptName(
-        formatted.responsibleDepartment,
-      );
-      result.push(formatted);
-    });
-  }
-
-  return result;
+  const where = await buildScopedIndexWhere(params);
+  const rows = await prisma.quality_loss_index.findMany({
+    where,
+    orderBy: { occurDate: 'desc' },
+  });
+  return applyDeptNames(rows.map((row) => formatIndexRow(row)));
 }
-
-function applyPagination(
-  items: QualityLossItem[],
-  params: QualityLossQueryParams,
-): PageResult<QualityLossItem> {
-  return paginateList(items, params);
-}
-
-// ============ 主服务导出 ============
 
 export const QualityLossService = {
   async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
@@ -448,18 +196,27 @@ export const QualityLossService = {
   },
 
   /**
-   * 获取所有损失记录（分页）
+   * 获取所有损失记录（分页）— 直接查 quality_loss_index 物化表，DB 层分页
    */
   async getAllLosses(
     params: QualityLossQueryParams = {},
   ): Promise<PageResult<QualityLossItem>> {
     try {
-      const source = normalizeLossSourceFilter(params.lossSource);
-      if (source) {
-        return getSingleSourceLossPage(source, params);
-      }
-      const sorted = await getAllLossesUnpaginated(params);
-      return applyPagination(sorted, params);
+      const { skip, take } = parsePagination(params);
+      const where = await buildScopedIndexWhere(params);
+      const [rows, total] = await Promise.all([
+        prisma.quality_loss_index.findMany({
+          where,
+          orderBy: { occurDate: 'desc' },
+          skip,
+          take,
+        }),
+        prisma.quality_loss_index.count({ where }),
+      ]);
+      const items = await applyDeptNames(
+        rows.map((row) => formatIndexRow(row)),
+      );
+      return { items, total };
     } catch (error) {
       logger.error({ err: error }, 'getAllLosses 执行失败');
       throw error;
@@ -472,20 +229,20 @@ export const QualityLossService = {
   async getLossSummary(
     filters: Omit<QualityLossQueryParams, 'page' | 'pageSize'>,
   ): Promise<QualityLossItem[]> {
-    return getAllLossesUnpaginated(filters);
+    return loadAllScopedItems(filters);
   },
 
   async getDashboardSummary(
     filters: Omit<QualityLossQueryParams, 'page' | 'pageSize' | 'year'> = {},
   ): Promise<QualityLossDashboardSummary> {
-    const list = await getAllLossesUnpaginated(filters);
+    const list = await loadAllScopedItems(filters);
     return QualityLossSummaryService.getDashboardSummary(list);
   },
 
   async getYearlyCharts(
     filters: Omit<QualityLossQueryParams, 'page' | 'pageSize'> = {},
   ): Promise<QualityLossCharts> {
-    const list = await getAllLossesUnpaginated(filters);
+    const list = await loadAllScopedItems(filters);
     return QualityLossSummaryService.getYearlyCharts(list, filters);
   },
 

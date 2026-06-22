@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
-import { InspectionService } from '~/modules/inspection/inspection.service';
-import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    quality_loss_index: {
+      findMany: vi.fn(),
+      updateMany: vi.fn(),
+    },
     quality_losses: {
       findFirst: vi.fn(),
       findMany: vi.fn(),
@@ -14,32 +15,18 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
+vi.mock('~/modules/quality-loss/quality-loss-index.service', () => ({
+  QualityLossIndexService: {
+    softDeleteSource: vi.fn(),
+    softDeleteSourceMany: vi.fn(),
+  },
+}));
+
 vi.mock('~/modules/system-log/system-log.service', () => ({
   SystemLogService: {
     auditLog: vi.fn(),
   },
 }));
-
-vi.mock('~/modules/inspection/inspection.service', () => ({
-  InspectionService: {
-    getQualityLossDrillDownRecords: vi.fn(),
-  },
-}));
-
-vi.mock('~/modules/after-sales/after-sales.service', () => ({
-  AfterSalesService: {
-    getQualityLossDrillDownRecords: vi.fn(),
-  },
-}));
-
-vi.mock(
-  '~/modules/vehicle-commissioning/vehicle-commissioning.service',
-  () => ({
-    VehicleCommissioningService: {
-      getQualityLossDrillDownRecords: vi.fn(),
-    },
-  }),
-);
 
 describe('quality-loss-record-maintenance.service', () => {
   beforeEach(() => {
@@ -163,36 +150,32 @@ describe('quality-loss-record-maintenance.service', () => {
     expect(result).toEqual({ count: 0 });
   });
 
-  it('should return drill-down data from all sources', async () => {
+  it('should return drill-down rows from quality_loss_index', async () => {
     const { QualityLossRecordMaintenanceService } = await import(
       '~/modules/quality-loss/quality-loss-record-maintenance.service'
     );
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
 
-    (prisma.quality_losses.findMany as any).mockResolvedValue([
-      { id: 'manual-1' },
+    (prisma.quality_loss_index.findMany as any).mockResolvedValue([
+      { id: 'EXT-as-1', source: 'External', amount: 100 },
+      { id: 'INT-qr-1', source: 'Internal', amount: 50 },
     ]);
-    vi.mocked(
-      InspectionService.getQualityLossDrillDownRecords,
-    ).mockResolvedValue([{ id: 'internal-1' }] as never);
-    vi.mocked(
-      AfterSalesService.getQualityLossDrillDownRecords,
-    ).mockResolvedValue([{ id: 'external-1' }] as never);
-    vi.mocked(
-      VehicleCommissioningService.getQualityLossDrillDownRecords,
-    ).mockResolvedValue([{ id: 'commissioning-1' }] as never);
 
     const result = await QualityLossRecordMaintenanceService.getDrillDown(
       new Date('2026-01-01'),
       new Date('2026-01-31'),
     );
 
-    expect(result).toEqual({
-      commissioningLosses: [{ id: 'commissioning-1' }],
-      externalLosses: [{ id: 'external-1' }],
-      internalLosses: [{ id: 'internal-1' }],
-      manualLosses: [{ id: 'manual-1' }],
-    });
+    expect(prisma.quality_loss_index.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isDeleted: false }),
+        orderBy: { occurDate: 'desc' },
+      }),
+    );
+    expect(result).toEqual([
+      { id: 'EXT-as-1', source: 'External', amount: 100 },
+      { id: 'INT-qr-1', source: 'Internal', amount: 50 },
+    ]);
   });
 });

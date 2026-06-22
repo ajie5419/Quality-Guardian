@@ -212,6 +212,19 @@ export const DataScopeService = {
     );
   },
 
+  async buildQualityLossIndexWhere(
+    baseWhere: Prisma.quality_loss_indexWhereInput,
+    user: UserContext,
+    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
+  ): Promise<Prisma.quality_loss_indexWhereInput> {
+    return this.buildScopedWhere(
+      'quality-loss',
+      baseWhere,
+      user,
+      resolvedScope,
+    );
+  },
+
   async buildWorkOrderWhere(
     baseWhere: Prisma.work_ordersWhereInput,
     user: UserContext,

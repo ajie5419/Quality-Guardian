@@ -14,6 +14,12 @@ import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    quality_loss_index: {
+      count: vi.fn(),
+      findMany: vi.fn(),
+      updateMany: vi.fn(),
+      upsert: vi.fn(),
+    },
     quality_losses: {
       aggregate: vi.fn(),
       findFirst: vi.fn(),
@@ -193,9 +199,10 @@ describe('quality-loss core services', () => {
       QualityLossRecordMaintenanceService.deleteRecord('missing', 'u-1'),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
-    vi.mocked(prisma.quality_losses.findMany)
-      .mockResolvedValueOnce([{ id: 'ql-1' }, { id: 'ql-2' }] as never)
-      .mockResolvedValueOnce([{ id: 'manual' }] as never);
+    vi.mocked(prisma.quality_losses.findMany).mockResolvedValueOnce([
+      { id: 'ql-1' },
+      { id: 'ql-2' },
+    ] as never);
     vi.mocked(prisma.quality_losses.updateMany).mockResolvedValue({
       count: 2,
     } as never);
@@ -206,25 +213,16 @@ describe('quality-loss core services', () => {
       ),
     ).resolves.toEqual({ count: 2 });
 
-    vi.mocked(
-      InspectionService.getQualityLossDrillDownRecords,
-    ).mockResolvedValue([{ id: 'internal' }] as never);
-    vi.mocked(
-      AfterSalesService.getQualityLossDrillDownRecords,
-    ).mockResolvedValue([{ id: 'external' }] as never);
-    vi.mocked(
-      VehicleCommissioningService.getQualityLossDrillDownRecords,
-    ).mockResolvedValue([{ id: 'commissioning' }] as never);
+    vi.mocked(prisma.quality_loss_index.findMany).mockResolvedValueOnce([
+      { id: 'EXT-as-1', source: 'External', amount: 100 },
+    ] as never);
     const drillDown = await QualityLossRecordMaintenanceService.getDrillDown(
       new Date('2026-01-01T00:00:00.000Z'),
       new Date('2026-01-31T00:00:00.000Z'),
     );
-    expect(drillDown).toEqual({
-      commissioningLosses: [{ id: 'commissioning' }],
-      externalLosses: [{ id: 'external' }],
-      internalLosses: [{ id: 'internal' }],
-      manualLosses: [{ id: 'manual' }],
-    });
+    expect(drillDown).toEqual([
+      { id: 'EXT-as-1', source: 'External', amount: 100 },
+    ]);
   });
 
   it('reports dashboard, weekly tracking, and period metrics', async () => {
@@ -320,6 +318,8 @@ describe('quality-loss core services', () => {
   });
 
   it('facade delegates reporting, route update, delete, batch delete, and drill-down methods', async () => {
+    vi.mocked(prisma.quality_losses.aggregate).mockReset();
+    vi.mocked(prisma.quality_losses.findMany).mockReset();
     vi.mocked(prisma.quality_losses.aggregate)
       .mockResolvedValueOnce({ _sum: { amount: 100 } } as never)
       .mockResolvedValueOnce({ _sum: { amount: 20 } } as never);
@@ -343,6 +343,9 @@ describe('quality-loss core services', () => {
     vi.mocked(
       VehicleCommissioningService.getQualityLossDrillDownRecords,
     ).mockResolvedValue([] as never);
+    vi.mocked(prisma.quality_loss_index.findMany).mockResolvedValueOnce([
+      { id: 'QL-manual', source: 'Manual', amount: 1 },
+    ] as never);
 
     await expect(
       QualityLossService.getStatsForDashboard({
@@ -363,8 +366,6 @@ describe('quality-loss core services', () => {
     ).resolves.toEqual({ count: 1 });
     await expect(
       QualityLossService.getDrillDown(new Date(), new Date()),
-    ).resolves.toEqual(
-      expect.objectContaining({ manualLosses: [{ id: 'manual' }] }),
-    );
+    ).resolves.toEqual([{ id: 'QL-manual', source: 'Manual', amount: 1 }]);
   });
 });
