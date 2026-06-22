@@ -114,6 +114,14 @@ class RedisManager {
     return this.client;
   }
 
+  public disconnect(): void {
+    if (!this.client) return;
+    this.client.disconnect();
+    this.client = null;
+    this.isEnabled = false;
+    this.connectionErrorLogged = false;
+  }
+
   /**
    * Helper: Get from cache or fetch from source
    */

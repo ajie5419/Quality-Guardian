@@ -3,6 +3,7 @@ import process from 'node:process';
 import { QualityLossIndexService } from '~/modules/quality-loss';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 
 const logger = createModuleLogger('quality-loss-index-backfill');
 
@@ -53,4 +54,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    redis.disconnect();
   });

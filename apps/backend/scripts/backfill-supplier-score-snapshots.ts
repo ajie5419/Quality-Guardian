@@ -3,6 +3,7 @@ import process from 'node:process';
 import { SupplierScoreSnapshotService } from '~/modules/supplier';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 
 const logger = createModuleLogger('supplier-score-backfill');
 
@@ -34,4 +35,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    redis.disconnect();
   });
