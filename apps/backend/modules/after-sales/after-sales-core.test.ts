@@ -189,7 +189,6 @@ describe('after-sales core helpers and services', () => {
       where: { id: 'as-1' },
       data: expect.objectContaining({
         materialCost: 100,
-        qualityLoss: 120,
       }),
     });
     expect(prisma.after_sales.findUnique).toHaveBeenCalledTimes(1);

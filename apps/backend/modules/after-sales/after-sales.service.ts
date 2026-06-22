@@ -143,16 +143,6 @@ export const AfterSalesService = {
         throw new Error('AFTER_SALES_NOT_FOUND');
       }
       previousSupplierBrand = current?.supplierBrand;
-
-      if (costsChanged) {
-        const materialCost = Number(
-          updateData.materialCost ?? current?.materialCost ?? 0,
-        );
-        const laborTravelCost = Number(
-          updateData.laborTravelCost ?? current?.laborTravelCost ?? 0,
-        );
-        updateData.qualityLoss = materialCost + laborTravelCost;
-      }
     }
 
     const updated = await prisma.after_sales.update({

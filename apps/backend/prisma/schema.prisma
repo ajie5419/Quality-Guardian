@@ -131,7 +131,6 @@ model after_sales {
   feedbackDeptId         String?
   solution               String?                 @db.Text
   actualSolution         String?                 @db.Text
-  qualityLoss            Decimal                 @default(0.00) @db.Decimal(10, 2)
   actualClaim            Decimal                 @default(0.00) @db.Decimal(10, 2)
   respDept               String?
   responsibleDepartments String?                 @db.Text // @module after-sales - JSON array

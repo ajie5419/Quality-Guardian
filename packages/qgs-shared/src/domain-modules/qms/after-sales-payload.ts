@@ -83,7 +83,6 @@ export function buildAfterSalesCreateData(
     handler: normalizeString(body.handler),
     materialCost,
     laborTravelCost,
-    qualityLoss: materialCost + laborTravelCost,
     defectType: normalizeString(body.defectType),
     defectSubtype: normalizeString(body.defectSubtype),
     failureType: normalizeString(body.failureType),

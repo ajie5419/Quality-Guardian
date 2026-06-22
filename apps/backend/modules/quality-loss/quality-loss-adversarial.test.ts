@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
 import prisma from '~/utils/prisma';
 

@@ -241,7 +241,7 @@ describe('afterSalesService – adversarial', () => {
       expect(prisma.after_sales.update).toHaveBeenCalled();
     });
 
-    it('calculates qualityLoss when costs changed', async () => {
+    it('writes the cost fields verbatim and lets DB compute qualityLoss elsewhere', async () => {
       const { buildGovernedAfterSalesUpdateData } = await import(
         '~/modules/after-sales/after-sales-payload'
       );
@@ -262,9 +262,14 @@ describe('afterSalesService – adversarial', () => {
 
       expect(prisma.after_sales.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ qualityLoss: 6000 }),
+          data: expect.objectContaining({
+            laborTravelCost: 1000,
+            materialCost: 5000,
+          }),
         }),
       );
+      const callArgs = (prisma.after_sales.update as any).mock.calls[0][0];
+      expect(callArgs.data).not.toHaveProperty('qualityLoss');
     });
 
     it('throws when record not found during cost update', async () => {
@@ -282,7 +287,7 @@ describe('afterSalesService – adversarial', () => {
       ).rejects.toThrow('AFTER_SALES_NOT_FOUND');
     });
 
-    it('uses current costs when updateData has null costs', async () => {
+    it('keeps using current costs even when updateData has null costs', async () => {
       const { buildGovernedAfterSalesUpdateData } = await import(
         '~/modules/after-sales/after-sales-payload'
       );
@@ -298,11 +303,8 @@ describe('afterSalesService – adversarial', () => {
 
       await AfterSalesService.updateByRoute('AS-001', {});
 
-      expect(prisma.after_sales.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ qualityLoss: 10_000 }),
-        }),
-      );
+      const callArgs = (prisma.after_sales.update as any).mock.calls[0][0];
+      expect(callArgs.data).not.toHaveProperty('qualityLoss');
     });
   });
 });

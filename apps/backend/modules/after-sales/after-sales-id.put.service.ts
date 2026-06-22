@@ -54,16 +54,6 @@ export default defineEventHandler(async (event) => {
         return notFoundResponse(event, '售后记录不存在');
       }
       previousSupplierBrand = current?.supplierBrand;
-
-      if (costsChanged) {
-        const materialCost = Number(
-          updateData.materialCost ?? current?.materialCost ?? 0,
-        );
-        const laborTravelCost = Number(
-          updateData.laborTravelCost ?? current?.laborTravelCost ?? 0,
-        );
-        updateData.qualityLoss = materialCost + laborTravelCost;
-      }
     }
 
     const updated = await prisma.after_sales.update({

@@ -97,7 +97,7 @@ describe('after-sales-id.put.service', () => {
     });
   });
 
-  it('should recalculate qualityLoss when costs change', async () => {
+  it('writes cost fields verbatim and lets DB compute qualityLoss elsewhere', async () => {
     const { readBody } = await import('h3');
     const { default: handler } = await import(
       '~/modules/after-sales/after-sales-id.put.service'
@@ -118,9 +118,10 @@ describe('after-sales-id.put.service', () => {
       where: { id: 'test-id' },
       data: expect.objectContaining({
         materialCost: 100,
-        qualityLoss: 150,
       }),
     });
+    const callArgs = (prisma.after_sales.update as any).mock.calls[0][0];
+    expect(callArgs.data).not.toHaveProperty('qualityLoss');
   });
 
   it('should return not found when record does not exist during cost recalculation', async () => {

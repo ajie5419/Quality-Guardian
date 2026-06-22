@@ -49,7 +49,11 @@ export default defineEventHandler(async (event) => {
           date: formatDate(row.occurDate),
           type:
             TYPE_BY_SOURCE[row.source as SourceLabel] ??
-            (row.source as 'COMMISSIONING' | 'EXTERNAL' | 'INTERNAL' | 'MANUAL'),
+            (row.source as
+              | 'COMMISSIONING'
+              | 'EXTERNAL'
+              | 'INTERNAL'
+              | 'MANUAL'),
           amount: Number(Number(row.amount).toFixed(2)),
           dept: row.respDept || '-',
           desc: row.description || '-',

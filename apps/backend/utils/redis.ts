@@ -96,6 +96,14 @@ class RedisManager {
     }
   }
 
+  public disconnect(): void {
+    if (!this.client) return;
+    this.client.disconnect();
+    this.client = null;
+    this.isEnabled = false;
+    this.connectionErrorLogged = false;
+  }
+
   /**
    * Safe get method that swallows errors and returns null on failure
    */
@@ -112,14 +120,6 @@ class RedisManager {
 
   public getClient(): null | Redis {
     return this.client;
-  }
-
-  public disconnect(): void {
-    if (!this.client) return;
-    this.client.disconnect();
-    this.client = null;
-    this.isEnabled = false;
-    this.connectionErrorLogged = false;
   }
 
   /**

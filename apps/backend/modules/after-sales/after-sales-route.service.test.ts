@@ -246,7 +246,7 @@ describe('after-sales route services', () => {
     expect(await handler(event())).toEqual({ data: null, type: 'success' });
     expect(prisma.after_sales.update).toHaveBeenCalledWith({
       where: { id: 'as-1' },
-      data: expect.objectContaining({ qualityLoss: 100 }),
+      data: expect.objectContaining({ materialCost: 80, laborTravelCost: 20 }),
     });
     expect(registerReferencesFromAttachments).toHaveBeenCalledWith({
       attachments: ['/new.png'],
