@@ -337,9 +337,9 @@ describe('quality-loss core services', () => {
     vi.mocked(
       InspectionService.getQualityLossDrillDownRecords,
     ).mockResolvedValue([] as never);
-    vi.mocked(
-      AfterSalesAPI.getQualityLossDrillDownRecords,
-    ).mockResolvedValue([] as never);
+    vi.mocked(AfterSalesAPI.getQualityLossDrillDownRecords).mockResolvedValue(
+      [] as never,
+    );
     vi.mocked(
       VehicleCommissioningService.getQualityLossDrillDownRecords,
     ).mockResolvedValue([] as never);

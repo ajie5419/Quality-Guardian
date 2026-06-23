@@ -86,6 +86,54 @@ export function buildManualLossesWhere(
   return where;
 }
 
+/**
+ * Map a unified UI status (Pending / Processing / Confirmed / Resolved) to
+ * the raw status strings stored on quality_loss_index. The index column
+ * holds the source row's original status verbatim, so the filter has to
+ * enumerate every raw value that normalizes to the requested unified
+ * status. "Pending" is the catch-all bucket — represent it as
+ * "NOT IN (other three buckets)" so unknown / null / OPEN / CANCELLED all
+ * match.
+ */
+function buildIndexStatusFilter(
+  unifiedStatus: string,
+): Prisma.quality_loss_indexWhereInput['status'] | undefined {
+  const trimmed = unifiedStatus.trim();
+  if (!trimmed) return undefined;
+  const upper = trimmed.toUpperCase();
+  const PROCESSING_RAW = [
+    'CLAIMING',
+    'IN_PROGRESS',
+    'NEGOTIATING',
+    'PROCESSING',
+    'SUBMITTED',
+    'Claiming',
+    'In_progress',
+    'Negotiating',
+    'Processing',
+    'Submitted',
+  ];
+  const CONFIRMED_RAW = [
+    'CLOSED',
+    'COMPLETED',
+    'CONFIRMED',
+    'Closed',
+    'Completed',
+    'Confirmed',
+  ];
+  const RESOLVED_RAW = ['RESOLVED', 'Resolved'];
+  if (upper === 'PROCESSING') return { in: PROCESSING_RAW };
+  if (upper === 'CONFIRMED') return { in: CONFIRMED_RAW };
+  if (upper === 'RESOLVED') return { in: RESOLVED_RAW };
+  if (upper === 'PENDING') {
+    return {
+      notIn: [...PROCESSING_RAW, ...CONFIRMED_RAW, ...RESOLVED_RAW],
+    };
+  }
+  // Unknown unified status → block all rows (matches Step 8 invariant)
+  return '__INVALID__';
+}
+
 export function buildIndexWhere(
   params: Omit<QualityLossQueryParams, 'page' | 'pageSize'>,
 ): Prisma.quality_loss_indexWhereInput {
@@ -98,10 +146,12 @@ export function buildIndexWhere(
   }
   if (params.status) {
     const trimmedStatus = params.status.trim();
-    if (!isValidQualityLossStatus(trimmedStatus)) {
+    if (isValidQualityLossStatus(trimmedStatus)) {
+      const filter = buildIndexStatusFilter(trimmedStatus);
+      if (filter !== undefined) where.status = filter;
+    } else {
       where.status = '__INVALID__';
     }
-    // Status normalization happens at row formatting; leave the raw column alone.
   }
   if (params.workOrderNumber && String(params.workOrderNumber).trim() !== '') {
     where.workOrderNumber = {

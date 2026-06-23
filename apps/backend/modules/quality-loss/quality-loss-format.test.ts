@@ -59,6 +59,38 @@ describe('quality-loss format helpers', () => {
     });
   });
 
+  it('maps unified Confirmed status to raw CLOSED/COMPLETED/CONFIRMED bucket', () => {
+    const where = buildIndexWhere({ status: 'Confirmed' });
+    expect(where.status).toEqual({
+      in: expect.arrayContaining(['CLOSED', 'COMPLETED', 'CONFIRMED']),
+    });
+  });
+
+  it('maps unified Processing status to raw IN_PROGRESS/SUBMITTED/... bucket', () => {
+    const where = buildIndexWhere({ status: 'Processing' });
+    expect(where.status).toEqual({
+      in: expect.arrayContaining([
+        'CLAIMING',
+        'IN_PROGRESS',
+        'NEGOTIATING',
+        'PROCESSING',
+        'SUBMITTED',
+      ]),
+    });
+  });
+
+  it('maps unified Pending to NOT IN of the other three buckets', () => {
+    const where = buildIndexWhere({ status: 'Pending' });
+    expect(where.status).toEqual({
+      notIn: expect.arrayContaining(['CLOSED', 'IN_PROGRESS', 'RESOLVED']),
+    });
+  });
+
+  it('blocks invalid unified status with sentinel value', () => {
+    const where = buildIndexWhere({ status: 'BogusStatus' });
+    expect(where.status).toBe('__INVALID__');
+  });
+
   it('formats an index row into a QualityLossItem with normalized status', () => {
     const row = formatIndexRow({
       actualClaim: new Decimal(20),

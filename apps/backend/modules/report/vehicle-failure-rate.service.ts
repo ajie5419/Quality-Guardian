@@ -348,12 +348,11 @@ async function getDisplayYears(
   manualData: Record<string, number>,
   vehicleDeptIds: string[],
 ) {
-  const earliestAutoDate =
-    await AfterSalesAPI.findEarliestVehicleFailureDate({
-      end: endMonth,
-      productType: VEHICLE_PRODUCT_TYPE,
-      vehicleDeptIds,
-    });
+  const earliestAutoDate = await AfterSalesAPI.findEarliestVehicleFailureDate({
+    end: endMonth,
+    productType: VEHICLE_PRODUCT_TYPE,
+    vehicleDeptIds,
+  });
   const manualYears = Object.keys(manualData)
     .map((month) => Number(month.slice(0, 4)))
     .filter((year) => Number.isInteger(year) && year <= selectedYear);
