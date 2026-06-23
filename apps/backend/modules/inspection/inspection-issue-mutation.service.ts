@@ -11,6 +11,7 @@ import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-ind
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
+import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 import {
@@ -23,15 +24,6 @@ import {
 } from './inspection-issue';
 
 type RequestBody = Record<string, unknown>;
-
-async function refreshSupplierScoreSnapshots(names: unknown[]) {
-  const supplierNames = names
-    .map((name) => String(name || '').trim())
-    .filter(Boolean);
-  if (supplierNames.length === 0) return;
-  const { SupplierScoreSnapshotService } = await import('~/modules/supplier');
-  await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
-}
 
 export const InspectionIssueMutationService = {
   async createIssue(userinfo: UserSession, body: RequestBody) {
@@ -76,7 +68,9 @@ export const InspectionIssueMutationService = {
     });
     await QualityLossIndexService.upsertFromInternal(newRecord);
     await WelderScoreService.syncFromInspectionIssues();
-    await refreshSupplierScoreSnapshots([newRecord.supplierName]);
+    eventBus.emit('inspection_issue.changed', {
+      supplierNames: [newRecord.supplierName],
+    });
     return { ...newRecord, ncNumber: newRecord.nonConformanceNumber };
   },
 
@@ -117,10 +111,12 @@ export const InspectionIssueMutationService = {
     });
     await QualityLossIndexService.upsertFromInternal(updated);
     await WelderScoreService.syncFromInspectionIssues();
-    await refreshSupplierScoreSnapshots([
-      current?.supplierName,
-      updateData.supplierName,
-    ]);
+    eventBus.emit('inspection_issue.changed', {
+      supplierNames: [
+        current?.supplierName,
+        updateData.supplierName as null | string | undefined,
+      ],
+    });
   },
 
   async batchDeleteIssues(
@@ -138,9 +134,9 @@ export const InspectionIssueMutationService = {
     });
     if (result.count > 0) await WelderScoreService.syncFromInspectionIssues();
     await QualityLossIndexService.softDeleteSourceMany('Internal', ids);
-    await refreshSupplierScoreSnapshots(
-      existing.map((item) => item.supplierName),
-    );
+    eventBus.emit('inspection_issue.changed', {
+      supplierNames: existing.map((item) => item.supplierName),
+    });
     await Promise.all(
       ids.map((id) =>
         FileStorageService.softDeleteReferences({
@@ -210,7 +206,9 @@ export const InspectionIssueMutationService = {
       }
     }
     if (successCount > 0) await WelderScoreService.syncFromInspectionIssues();
-    await refreshSupplierScoreSnapshots(supplierNamesToRefresh);
+    eventBus.emit('inspection_issue.changed', {
+      supplierNames: supplierNamesToRefresh,
+    });
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
       action: 'CREATE',

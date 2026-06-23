@@ -19,6 +19,7 @@ import { FileStorageService } from '~/modules/file-storage/file-storage.service'
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { parseResponsibleDepartments } from '~/utils/department-multi';
+import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 import { AfterSalesAnalyticsService } from './after-sales-analytics.service';
@@ -38,15 +39,6 @@ function getResponsibleDepartmentsForResponse(item: {
     return responsibleDepartments;
   }
   return item.respDept ? [item.respDept] : [];
-}
-
-async function refreshSupplierScoreSnapshots(names: unknown[]) {
-  const supplierNames = names
-    .map((name) => String(name || '').trim())
-    .filter(Boolean);
-  if (supplierNames.length === 0) return;
-  const { SupplierScoreSnapshotService } = await import('~/modules/supplier');
-  await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
 }
 
 export const AfterSalesService = {
@@ -150,10 +142,12 @@ export const AfterSalesService = {
       data: updateData,
     });
     await QualityLossIndexService.upsertFromAfterSales(updated);
-    await refreshSupplierScoreSnapshots([
-      previousSupplierBrand,
-      updateData.supplierBrand,
-    ]);
+    eventBus.emit('after_sales.changed', {
+      supplierBrands: [
+        previousSupplierBrand,
+        updateData.supplierBrand as null | string | undefined,
+      ],
+    });
   },
 
   /**

@@ -1,15 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
+import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
-
-async function refreshSupplierScoreSnapshots(names: unknown[]) {
-  const supplierNames = names
-    .map((name) => String(name || '').trim())
-    .filter(Boolean);
-  if (supplierNames.length === 0) return;
-  const { SupplierScoreSnapshotService } = await import('~/modules/supplier');
-  await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
-}
 
 export const InspectionReportingService = {
   async findIssueIdBySerialNumber(serialNumber: number) {
@@ -33,7 +25,9 @@ export const InspectionReportingService = {
       },
     });
     await QualityLossIndexService.upsertFromInternal(updated);
-    await refreshSupplierScoreSnapshots([current?.supplierName]);
+    eventBus.emit('inspection_issue.changed', {
+      supplierNames: [current?.supplierName],
+    });
   },
 
   async getQualityLossTrendRows(params: {

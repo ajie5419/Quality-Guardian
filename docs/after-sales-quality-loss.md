@@ -5,7 +5,7 @@
 ## 默认决策（已锁定）
 
 | 编号 | 内容 |
-|---|---|
+| --- | --- |
 | D1 | 报表"售后损失" KPI = `grossCost − recovered`（净损失），不是总成本 |
 | D2 | 售后入列损失条件 = `isClaim = true OR (materialCost + laborTravelCost) > 0`，与 commissioning 一致 |
 | D3 | 一张售后单只对应一个供应商。多供应商分摊本轮不做 |
@@ -37,7 +37,7 @@
 每行一条索引（按 `(source, sourcePk)` 唯一），字段：
 
 | 字段 | 类型 | 说明 |
-|---|---|---|
+| --- | --- | --- |
 | `id` | VARCHAR(64) PK | 显示 ID。Manual 用 `QL-<pk>`, Internal 用 `INT-<pk>`, External 用 `EXT-<pk>`, Commissioning 用 `DA-<pk>` |
 | `source` | VARCHAR(16) | `Manual` / `Internal` / `External` / `Commissioning` |
 | `sourcePk` | VARCHAR(64) | 源表主键 |
@@ -56,7 +56,7 @@
 `QualityLossIndexService` 是 `quality_loss_index` 的**唯一写入门**。任何修改 4 个源表的代码路径都必须在主写入完成后调用对应的 `upsertFromXxx`：
 
 | 源 | 写入门 | D2 准入条件 |
-|---|---|---|
+| --- | --- | --- |
 | External (after_sales) | `upsertFromAfterSales(row)` | `row.isClaim OR (materialCost + laborTravelCost) > 0` |
 | Internal (quality_records) | `upsertFromInternal(row)` | `row.lossAmount > 0` |
 | Commissioning (vehicle_commissioning_issues) | `upsertFromCommissioning(row)` | `row.isClaim OR row.lossAmount > 0` |
@@ -83,6 +83,7 @@
 - `PUT /api/qms/quality-loss/{id}` 在 service 入口按 source 查 createdBy / respDept，与当前 user 比对，失败返回 403
 
 历史数据 `createdBy='system'`（migration 期间 backfill）。SELF scope 用户首次部署后看不到旧数据 —— 业务侧需要：
+
 - 给历史数据手工归属（UPDATE quality_records SET createdBy='<userId>' WHERE ...）
 - 或给相关角色配置 ALL data scope policy
 
@@ -92,9 +93,9 @@
 
 ```ts
 {
-  grossCost: number;   // SUM(materialCost + laborTravelCost)
-  recovered: number;   // SUM(actualClaim)
-  netLoss: number;     // grossCost - recovered
+  grossCost: number; // SUM(materialCost + laborTravelCost)
+  recovered: number; // SUM(actualClaim)
+  netLoss: number; // grossCost - recovered
 }
 ```
 

@@ -6,6 +6,7 @@ import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-ind
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
+import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
@@ -16,15 +17,6 @@ import {
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 const updateAfterSalesSchema = z.record(z.string(), z.unknown());
-
-async function refreshSupplierScoreSnapshots(names: unknown[]) {
-  const supplierNames = names
-    .map((name) => String(name || '').trim())
-    .filter(Boolean);
-  if (supplierNames.length === 0) return;
-  const { SupplierScoreSnapshotService } = await import('~/modules/supplier');
-  await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
-}
 
 export default defineEventHandler(async (event) => {
   const userinfo = getCurrentUser(event);
@@ -61,10 +53,12 @@ export default defineEventHandler(async (event) => {
       data: updateData,
     });
     await QualityLossIndexService.upsertFromAfterSales(updated);
-    await refreshSupplierScoreSnapshots([
-      previousSupplierBrand,
-      updateData.supplierBrand,
-    ]);
+    eventBus.emit('after_sales.changed', {
+      supplierBrands: [
+        previousSupplierBrand,
+        updateData.supplierBrand as null | string | undefined,
+      ],
+    });
     if (bodyRecord.photos !== undefined) {
       await FileStorageService.registerReferencesFromAttachments({
         attachments: bodyRecord.photos,

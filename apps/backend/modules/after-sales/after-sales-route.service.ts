@@ -9,6 +9,7 @@ import {
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { parseRequiredWorkOrderNumber } from '~/modules/work-order/work-order-query';
+import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 import {
@@ -16,15 +17,6 @@ import {
   getNextAfterSalesSerialNumber,
 } from './after-sales-id';
 import { buildGovernedAfterSalesCreateData } from './after-sales-payload';
-
-async function refreshSupplierScoreSnapshots(names: unknown[]) {
-  const supplierNames = names
-    .map((name) => String(name || '').trim())
-    .filter(Boolean);
-  if (supplierNames.length === 0) return;
-  const { SupplierScoreSnapshotService } = await import('~/modules/supplier');
-  await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
-}
 
 export const AfterSalesRouteService = {
   async batchDelete(ids: string[]) {
@@ -45,9 +37,9 @@ export const AfterSalesRouteService = {
       ),
     );
     await QualityLossIndexService.softDeleteSourceMany('External', ids);
-    await refreshSupplierScoreSnapshots(
-      existing.map((item) => item.supplierBrand),
-    );
+    eventBus.emit('after_sales.changed', {
+      supplierBrands: existing.map((item) => item.supplierBrand),
+    });
     return result.count;
   },
 
@@ -76,7 +68,9 @@ export const AfterSalesRouteService = {
       detailsVariables: { id: created.id, projectName: created.projectName },
     });
     await QualityLossIndexService.upsertFromAfterSales(created);
-    await refreshSupplierScoreSnapshots([created.supplierBrand]);
+    eventBus.emit('after_sales.changed', {
+      supplierBrands: [created.supplierBrand],
+    });
     return created;
   },
 
@@ -87,7 +81,7 @@ export const AfterSalesRouteService = {
     const createdBy = String(userinfo?.id || '') || undefined;
     let successCount = 0;
     const rowErrors = [];
-    const supplierNamesToRefresh: string[] = [];
+    const supplierNamesToRefresh: Array<null | string | undefined> = [];
     let serialSeed = await getNextAfterSalesSerialNumber();
     for (const [index, item] of items.entries()) {
       try {
@@ -132,7 +126,9 @@ export const AfterSalesRouteService = {
         );
       }
     }
-    await refreshSupplierScoreSnapshots(supplierNamesToRefresh);
+    eventBus.emit('after_sales.changed', {
+      supplierBrands: supplierNamesToRefresh,
+    });
     return buildImportSummary({
       rowErrors,
       successCount,
