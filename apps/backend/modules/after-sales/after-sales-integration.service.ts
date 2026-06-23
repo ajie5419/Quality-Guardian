@@ -118,13 +118,31 @@ export const AfterSalesIntegrationService = {
 
   async getSupplierScoringData(params: {
     since: Date;
+    supplierIds?: string[];
     supplierNames: string[];
   }) {
+    // Phase 3 Step 15b: prefer supplierBrandId (canonical ID) when the
+    // caller has resolved names → ids. Fall back to legacy supplierBrand
+    // string matching for unresolved entries until Step 15c drops the
+    // column. The two predicates are OR'd so renamed suppliers whose IDs
+    // we know still surface, and unmapped historic rows still match by
+    // name string.
+    const supplierIds = params.supplierIds?.filter(Boolean) ?? [];
+    const supplierWhere =
+      supplierIds.length > 0
+        ? {
+            OR: [
+              { supplierBrandId: { in: supplierIds } },
+              { supplierBrand: { in: params.supplierNames } },
+            ],
+          }
+        : { supplierBrand: { in: params.supplierNames } };
+
     const [stats, statusStats, records] = await Promise.all([
       prisma.after_sales.groupBy({
         by: ['supplierBrand'],
         where: {
-          supplierBrand: { in: params.supplierNames },
+          ...supplierWhere,
           isDeleted: false,
           occurDate: { gte: params.since },
         },
@@ -134,7 +152,7 @@ export const AfterSalesIntegrationService = {
       prisma.after_sales.groupBy({
         by: ['supplierBrand', 'claimStatus'],
         where: {
-          supplierBrand: { in: params.supplierNames },
+          ...supplierWhere,
           isDeleted: false,
           occurDate: { gte: params.since },
         },
@@ -142,7 +160,7 @@ export const AfterSalesIntegrationService = {
       }),
       prisma.after_sales.findMany({
         where: {
-          supplierBrand: { in: params.supplierNames },
+          ...supplierWhere,
           isDeleted: false,
           occurDate: { gte: params.since },
         },

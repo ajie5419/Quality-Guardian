@@ -79,6 +79,7 @@ export const AfterSalesService = {
 
   async getSupplierScoringData(params: {
     since: Date;
+    supplierIds?: string[];
     supplierNames: string[];
   }) {
     return AfterSalesIntegrationService.getSupplierScoringData(params);

@@ -62,6 +62,7 @@ async function buildSupplierStatsMap(supplierNames: string[]) {
     }),
     AfterSalesService.getSupplierScoringData({
       since: oneYearAgo,
+      supplierIds,
       supplierNames,
     }),
   ]);

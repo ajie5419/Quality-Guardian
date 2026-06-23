@@ -1,5 +1,3 @@
-import process from 'node:process';
-
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
