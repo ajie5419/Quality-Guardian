@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
+import { AfterSalesAPI } from '~/modules/after-sales';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -40,8 +40,8 @@ vi.mock('~/modules/inspection/inspection.service', () => ({
   },
 }));
 
-vi.mock('~/modules/after-sales/after-sales.service', () => ({
-  AfterSalesService: {
+vi.mock('~/modules/after-sales', () => ({
+  AfterSalesAPI: {
     findIdBySerialNumber: vi.fn(),
     updateQualityLossFields: vi.fn(),
   },
@@ -156,7 +156,7 @@ describe('quality-loss-route-update.service', () => {
     });
 
     expect(result).toEqual({ ok: true });
-    expect(AfterSalesService.updateQualityLossFields).toHaveBeenCalledWith({
+    expect(AfterSalesAPI.updateQualityLossFields).toHaveBeenCalledWith({
       actualClaim: 5,
       id: 'EXT-12',
     });
@@ -180,7 +180,7 @@ describe('quality-loss-route-update.service', () => {
         message: expect.stringContaining('对应业务页面'),
       }),
     );
-    expect(AfterSalesService.updateQualityLossFields).not.toHaveBeenCalled();
+    expect(AfterSalesAPI.updateQualityLossFields).not.toHaveBeenCalled();
   });
 
   it('should return BAD_REQUEST for invalid body', async () => {

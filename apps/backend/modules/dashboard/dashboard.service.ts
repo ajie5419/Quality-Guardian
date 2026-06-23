@@ -1,6 +1,6 @@
 import type { DashboardChartItem, DashboardStats } from '@qgs/shared';
 
-import { AfterSalesService } from '~/modules/after-sales';
+import { AfterSalesAPI } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
 import { QualityLossService } from '~/modules/quality-loss';
 import { getNetPassRateSummaryByRange } from '~/modules/report/pass-rate';
@@ -151,7 +151,7 @@ export const DashboardService = {
         const weekStart = getStartOfWeek();
         const [afterSales, inspection, commissioning, workOrder, qualityLoss] =
           await Promise.all([
-            AfterSalesService.getStatsForDashboard({ weekStart, yearStart }),
+            AfterSalesAPI.getStatsForDashboard({ weekStart, yearStart }),
             InspectionService.getStatsForDashboard({ weekStart, yearStart }),
             VehicleCommissioningService.getStatsForDashboard({
               weekStart,

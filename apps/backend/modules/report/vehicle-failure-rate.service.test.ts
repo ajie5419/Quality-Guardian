@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VehicleFailureRateService } from '~/modules/report/vehicle-failure-rate.service';
 
 vi.mock('~/modules/after-sales', () => ({
-  AfterSalesService: {
+  AfterSalesAPI: {
     findEarliestVehicleFailureDate: vi.fn().mockResolvedValue(null),
     getVehicleFailureRecords: vi.fn().mockResolvedValue([]),
   },
@@ -76,8 +76,8 @@ describe('vehicleFailureRateService', () => {
   });
 
   it('returns ranking based on failure records', async () => {
-    const { AfterSalesService } = await import('~/modules/after-sales');
-    (AfterSalesService.getVehicleFailureRecords as any).mockResolvedValue([
+    const { AfterSalesAPI } = await import('~/modules/after-sales');
+    (AfterSalesAPI.getVehicleFailureRecords as any).mockResolvedValue([
       {
         defectType: 'Crack',
         defectTypeId: 'dt-1',
@@ -153,8 +153,8 @@ describe('vehicleFailureRateService', () => {
   });
 
   it('builds year series for multiple years', async () => {
-    const { AfterSalesService } = await import('~/modules/after-sales');
-    (AfterSalesService.findEarliestVehicleFailureDate as any).mockResolvedValue(
+    const { AfterSalesAPI } = await import('~/modules/after-sales');
+    (AfterSalesAPI.findEarliestVehicleFailureDate as any).mockResolvedValue(
       new Date('2025-06-01'),
     );
 
@@ -167,13 +167,13 @@ describe('vehicleFailureRateService', () => {
   });
 
   it('ranking limits to top 10 defect types', async () => {
-    const { AfterSalesService } = await import('~/modules/after-sales');
+    const { AfterSalesAPI } = await import('~/modules/after-sales');
     const manyRecords = Array.from({ length: 15 }, (_, i) => ({
       defectType: `Defect ${String(i).padStart(2, '0')}`,
       defectTypeId: `dt-${i}`,
       occurDate: new Date('2026-01-01'),
     }));
-    (AfterSalesService.getVehicleFailureRecords as any).mockResolvedValue(
+    (AfterSalesAPI.getVehicleFailureRecords as any).mockResolvedValue(
       manyRecords,
     );
 

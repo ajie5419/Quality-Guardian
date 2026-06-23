@@ -2,7 +2,7 @@ import type { Prisma, suppliers } from '@prisma/client';
 
 import type { SupplierStats } from './supplier-scoring';
 
-import { AfterSalesService } from '~/modules/after-sales';
+import { AfterSalesAPI } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
@@ -60,7 +60,7 @@ async function buildSupplierStatsMap(supplierNames: string[]) {
       supplierIds,
       supplierNames,
     }),
-    AfterSalesService.getSupplierScoringData({
+    AfterSalesAPI.getSupplierScoringData({
       since: oneYearAgo,
       supplierIds,
       supplierNames,

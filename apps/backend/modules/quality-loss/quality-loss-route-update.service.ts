@@ -3,7 +3,7 @@ import type { QualityLossSource } from '~/modules/quality-loss/quality-loss-stat
 
 import { Prisma } from '@prisma/client';
 import { resolveQualityLossTargetLocator } from '@qgs/shared';
-import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
+import { AfterSalesAPI } from '~/modules/after-sales';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
@@ -79,7 +79,7 @@ async function resolveQualityLossUpdateTarget(params: {
       id: target.identifier,
     };
   }
-  const id = await AfterSalesService.findIdBySerialNumber(target.serial);
+  const id = await AfterSalesAPI.findIdBySerialNumber(target.serial);
   return id
     ? { source: QUALITY_LOSS_SOURCE.EXTERNAL, valid: true, id }
     : { valid: false, message: '外部售后记录不存在' };
@@ -248,7 +248,7 @@ export const QualityLossRouteUpdateService = {
           break;
         }
         case QUALITY_LOSS_SOURCE.EXTERNAL: {
-          await AfterSalesService.updateQualityLossFields({
+          await AfterSalesAPI.updateQualityLossFields({
             id: target.id,
             actualClaim: parsedBody.actualClaim,
           });

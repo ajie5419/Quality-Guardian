@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
+import { AfterSalesAPI } from '~/modules/after-sales';
 import { DashboardService } from '~/modules/dashboard/dashboard.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
@@ -39,7 +39,8 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-vi.mock('~/modules/after-sales/after-sales.service', () => ({
+vi.mock('~/modules/after-sales', () => ({
+  AfterSalesAPI: { getStatsForDashboard: vi.fn() },
   AfterSalesService: { getStatsForDashboard: vi.fn() },
 }));
 vi.mock('~/modules/inspection/inspection.service', () => ({
@@ -127,7 +128,7 @@ describe('dashboardService', () => {
 
   describe('getStats', () => {
     it('should aggregate statistics correctly', async () => {
-      (AfterSalesService.getStatsForDashboard as any).mockResolvedValue({
+      (AfterSalesAPI.getStatsForDashboard as any).mockResolvedValue({
         totalCount: 10,
         totalLoss: 1500,
         weeklyCount: 2,
@@ -185,7 +186,7 @@ describe('dashboardService', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      (AfterSalesService.getStatsForDashboard as any).mockRejectedValue(
+      (AfterSalesAPI.getStatsForDashboard as any).mockRejectedValue(
         new Error('DB Error'),
       );
 
@@ -200,7 +201,7 @@ describe('dashboardService', () => {
     });
 
     it('should return cached stats without querying downstream services', async () => {
-      (AfterSalesService.getStatsForDashboard as any).mockResolvedValue({
+      (AfterSalesAPI.getStatsForDashboard as any).mockResolvedValue({
         totalCount: 1,
         totalLoss: 10,
         weeklyCount: 1,
@@ -233,12 +234,12 @@ describe('dashboardService', () => {
       await DashboardService.getStats({ userId: 'u1', scope: 'all' });
       await DashboardService.getStats({ userId: 'u1', scope: 'all' });
 
-      expect(AfterSalesService.getStatsForDashboard).toHaveBeenCalledTimes(1);
+      expect(AfterSalesAPI.getStatsForDashboard).toHaveBeenCalledTimes(1);
 
       DashboardService.invalidateStatsCache({ userId: 'u1', scope: 'all' });
       await DashboardService.getStats({ userId: 'u1', scope: 'all' });
 
-      expect(AfterSalesService.getStatsForDashboard).toHaveBeenCalledTimes(2);
+      expect(AfterSalesAPI.getStatsForDashboard).toHaveBeenCalledTimes(2);
     });
   });
 

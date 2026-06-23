@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
+import { AfterSalesAPI } from '~/modules/after-sales';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { QualityLossDataScopeService } from '~/modules/quality-loss/quality-loss-data-scope.service';
@@ -54,8 +54,8 @@ vi.mock('~/modules/inspection/inspection.service', () => ({
   },
 }));
 
-vi.mock('~/modules/after-sales/after-sales.service', () => ({
-  AfterSalesService: {
+vi.mock('~/modules/after-sales', () => ({
+  AfterSalesAPI: {
     findIdBySerialNumber: vi.fn(),
     getQualityLossDrillDownRecords: vi.fn(),
     getQualityLossTrendRows: vi.fn(),
@@ -272,7 +272,7 @@ describe('quality-loss core services', () => {
       }),
     ).resolves.toEqual({ ok: true });
 
-    vi.mocked(AfterSalesService.findIdBySerialNumber).mockResolvedValue(
+    vi.mocked(AfterSalesAPI.findIdBySerialNumber).mockResolvedValue(
       'as-1' as never,
     );
     await expect(
@@ -286,7 +286,7 @@ describe('quality-loss core services', () => {
         userId: 'u-1',
       }),
     ).resolves.toEqual({ ok: true });
-    expect(AfterSalesService.updateQualityLossFields).toHaveBeenCalledWith({
+    expect(AfterSalesAPI.updateQualityLossFields).toHaveBeenCalledWith({
       actualClaim: 5,
       id: 'as-1',
     });
@@ -338,7 +338,7 @@ describe('quality-loss core services', () => {
       InspectionService.getQualityLossDrillDownRecords,
     ).mockResolvedValue([] as never);
     vi.mocked(
-      AfterSalesService.getQualityLossDrillDownRecords,
+      AfterSalesAPI.getQualityLossDrillDownRecords,
     ).mockResolvedValue([] as never);
     vi.mocked(
       VehicleCommissioningService.getQualityLossDrillDownRecords,

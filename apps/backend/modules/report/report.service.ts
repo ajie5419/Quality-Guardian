@@ -4,7 +4,7 @@ import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
 } from '@qgs/shared';
-import { AfterSalesService } from '~/modules/after-sales';
+import { AfterSalesAPI } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept';
 import { flattenDeptTree } from '~/modules/dept/dept-tree';
 import { InspectionService } from '~/modules/inspection';
@@ -94,7 +94,7 @@ export const ReportService = {
       });
 
       // 3. Fetch External Issues (This Week)
-      const externalIssuesRaw = await AfterSalesService.getWeeklyReportIssues({
+      const externalIssuesRaw = await AfterSalesAPI.getWeeklyReportIssues({
         end,
         start,
       });

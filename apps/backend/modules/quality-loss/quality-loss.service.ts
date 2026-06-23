@@ -10,7 +10,7 @@ import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service'
 import type { QualityLossQueryParams, TrendRow } from './quality-loss-format';
 
 import { Prisma } from '@prisma/client';
-import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
+import { AfterSalesAPI } from '~/modules/after-sales';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { flattenDeptTree } from '~/modules/dept/dept-tree';
 import { DeptService } from '~/modules/dept/dept.service';
@@ -149,7 +149,7 @@ export const QualityLossService = {
           InspectionService.getQualityLossTrendRows({ granularity, year }),
         ),
         resolveTrendRows('external', () =>
-          AfterSalesService.getQualityLossTrendRows({ granularity, year }),
+          AfterSalesAPI.getQualityLossTrendRows({ granularity, year }),
         ),
         resolveTrendRows('commissioning', () =>
           VehicleCommissioningService.getQualityLossTrendRows({

@@ -22,7 +22,7 @@ vi.mock('~/modules/inspection', () => ({
 }));
 
 vi.mock('~/modules/after-sales', () => ({
-  AfterSalesService: {
+  AfterSalesAPI: {
     getReportPeriodMetrics: vi
       .fn()
       .mockResolvedValue({ grossCost: 0, netLoss: 0, recovered: 0 }),
@@ -131,8 +131,8 @@ describe('reportSummaryService', () => {
   });
 
   it('uses netLoss (grossCost - recovered) as the external-loss KPI', async () => {
-    const { AfterSalesService } = await import('~/modules/after-sales');
-    vi.mocked(AfterSalesService.getReportPeriodMetrics).mockResolvedValue({
+    const { AfterSalesAPI } = await import('~/modules/after-sales');
+    vi.mocked(AfterSalesAPI.getReportPeriodMetrics).mockResolvedValue({
       grossCost: 100,
       netLoss: 70,
       recovered: 30,

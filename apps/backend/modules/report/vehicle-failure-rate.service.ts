@@ -1,4 +1,4 @@
-import { AfterSalesService } from '~/modules/after-sales';
+import { AfterSalesAPI } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept/dept.service';
 import { WorkOrderService } from '~/modules/work-order';
 import { addYearsToDate } from '~/modules/work-order/work-order-query';
@@ -135,7 +135,7 @@ export const VehicleFailureRateService = {
 };
 
 async function buildRanking(start: Date, end: Date, vehicleDeptIds: string[]) {
-  const records = await AfterSalesService.getVehicleFailureRecords({
+  const records = await AfterSalesAPI.getVehicleFailureRecords({
     end,
     productType: VEHICLE_PRODUCT_TYPE,
     start,
@@ -175,7 +175,7 @@ async function loadMonthlyCounts(
   const endYear = Math.max(...years);
   const start = new Date(startYear, 0, 1);
   const end = new Date(endYear, endMonthIndex + 1, 0, 23, 59, 59, 999);
-  const records = await AfterSalesService.getVehicleFailureRecords({
+  const records = await AfterSalesAPI.getVehicleFailureRecords({
     end,
     productType: VEHICLE_PRODUCT_TYPE,
     start,
@@ -349,7 +349,7 @@ async function getDisplayYears(
   vehicleDeptIds: string[],
 ) {
   const earliestAutoDate =
-    await AfterSalesService.findEarliestVehicleFailureDate({
+    await AfterSalesAPI.findEarliestVehicleFailureDate({
       end: endMonth,
       productType: VEHICLE_PRODUCT_TYPE,
       vehicleDeptIds,

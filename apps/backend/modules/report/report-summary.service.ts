@@ -4,7 +4,7 @@ import {
   resolveReportShortLabel,
   shiftReportAnchorDate,
 } from '@qgs/shared';
-import { AfterSalesService } from '~/modules/after-sales';
+import { AfterSalesAPI } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
 import { QualityLossService } from '~/modules/quality-loss';
 import {
@@ -151,7 +151,7 @@ async function fetchPeriodMetrics(start: Date, end: Date) {
   ] = await Promise.all([
     getNetPassRateSummaryByRange(start, end),
     InspectionService.getReportPeriodMetrics({ start, end }),
-    AfterSalesService.getReportPeriodMetrics({ start, end }),
+    AfterSalesAPI.getReportPeriodMetrics({ start, end }),
     QualityLossService.getReportPeriodMetrics({ start, end }),
   ]);
   const closingRate =
