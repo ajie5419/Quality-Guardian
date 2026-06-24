@@ -49,4 +49,33 @@ describe('inspection request query service', () => {
     expect(result.items[0]?.workOrderNumbers).toEqual(['WO-001']);
     expect(prisma.qms_inspection_requests.findMany).toHaveBeenCalledTimes(2);
   });
+
+  it('filters active tasks by inspector id and multiple statuses', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+    await InspectionRequestQueryService.getRequestList(
+      { id: 'manager-1' } as any,
+      {
+        inspectorId: 'inspector-1',
+        status: 'DISPATCHED,INSPECTING',
+      },
+    );
+
+    expect(prisma.qms_inspection_requests.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          inspectorId: 'inspector-1',
+          isDeleted: false,
+          status: { in: ['DISPATCHED', 'INSPECTING'] },
+        }),
+        orderBy: [
+          { priority: 'asc' },
+          { dispatchedAt: 'asc' },
+          { submittedAt: 'asc' },
+        ],
+      }),
+    );
+  });
 });

@@ -58,6 +58,7 @@ type InspectorStatusItem = {
   averageTaskMinutes: number;
   completedTaskCount: number;
   currentTaskMinutes: number;
+  inspectorId: string;
   inspector: string;
   status: 'BUSY' | 'IDLE';
 };
@@ -83,6 +84,8 @@ interface Props {
   }) => void;
   inspectorStatusItems: InspectorStatusItem[];
   inspectorStatusOpen: boolean;
+  inspectorStatusTaskLoading: boolean;
+  inspectorStatusTasks: InspectionRequest[];
   linkedDefectSubtypeOptions: Array<{ label: string; value: string }>;
   linkedIssueDraft: LinkedIssueDraft;
   minutesText: (value?: number) => string;
@@ -106,6 +109,7 @@ const emit = defineEmits<{
   updateDispatchForm: [value: DispatchForm];
   updateDispatchOpen: [value: boolean];
   updateInspectorStatusOpen: [value: boolean];
+  loadInspectorStatusTasks: [item: InspectorStatusItem];
   updateLinkedIssueDraft: [value: LinkedIssueDraft];
 }>();
 </script>
@@ -139,7 +143,14 @@ const emit = defineEmits<{
   <InspectorStatusDrawer
     :open="props.inspectorStatusOpen"
     :items="props.inspectorStatusItems"
+    :task-loading="props.inspectorStatusTaskLoading"
+    :tasks="props.inspectorStatusTasks"
     :minutes-text="props.minutesText"
+    :format-date-time="props.detailDrawerProps.formatDateTime"
+    :status-color="props.detailDrawerProps.statusColor"
+    :status-label="props.detailDrawerProps.statusLabel"
+    @open-task="(record) => emit('openInspectionRecord', record)"
+    @select-inspector="(item) => emit('loadInspectorStatusTasks', item)"
     @update:open="(value) => emit('updateInspectorStatusOpen', value)"
   />
 

@@ -26,6 +26,7 @@ interface InspectionRequestStatsState {
     averageTaskMinutes: number;
     completedTaskCount: number;
     currentTaskMinutes: number;
+    inspectorId: string;
     inspector: string;
     status: 'BUSY' | 'IDLE';
   }>;
@@ -123,6 +124,16 @@ export function useInspectionRequestListing(
     requestStats.value = await getInspectionRequestStats();
   }
 
+  async function loadInspectorActiveTasks(inspectorId: string) {
+    if (!inspectorId) return { items: [], total: 0 };
+    return getInspectionRequests({
+      inspectorId,
+      page: 1,
+      pageSize: 100,
+      status: 'DISPATCHED,INSPECTING',
+    });
+  }
+
   async function refreshInspectionRequestPage() {
     page.value = 1;
     await Promise.all([loadRequests(), loadRequestStats()]);
@@ -170,6 +181,7 @@ export function useInspectionRequestListing(
     handleViewChange,
     loadRequestStats,
     loadRequests,
+    loadInspectorActiveTasks,
     refreshInspectionRequestPage,
   };
 }

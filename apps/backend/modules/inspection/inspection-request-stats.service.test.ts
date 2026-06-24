@@ -100,6 +100,32 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     expect(result.bySupplier).toEqual([{ count: 2, team: '供应商X' }]);
   });
 
+  it('returns inspector id in inspector status rows', async () => {
+    const requests = [
+      makeRequest({
+        id: 'r1',
+        inspectorId: 'inspector-1',
+        inspector: { id: 'inspector-1', realName: '张三', username: 'zhangsan' },
+        status: 'DISPATCHED',
+      }),
+    ];
+    setupMocks(requests);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.inspectorStatus).toContainEqual(
+      expect.objectContaining({
+        activeTaskCount: 1,
+        inspector: '张三',
+        inspectorId: 'inspector-1',
+        status: 'BUSY',
+      }),
+    );
+  });
+
   it('calculates reinspection rate by team for non-incoming only', async () => {
     const requests = [
       makeRequest({

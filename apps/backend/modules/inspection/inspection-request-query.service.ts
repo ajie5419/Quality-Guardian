@@ -16,15 +16,23 @@ function normalizeRequestListQuery(query: Record<string, unknown>) {
   return {
     currentOnly: String(query.current || '') === 'true',
     includeClosed: String(query.includeClosed || '') === 'true',
+    inspectorId: normalizeInspectionRequestText(query.inspectorId),
     keyword: normalizeInspectionRequestText(query.keyword),
     mine: String(query.mine || '') === 'true',
     page: Math.max(Number(query.page || 1), 1),
     pageSize: Math.min(Math.max(Number(query.pageSize || 20), 1), 100),
     processName: normalizeInspectionRequestText(query.processName),
-    status: normalizeInspectionRequestStatus(query.status),
+    statuses: normalizeRequestListStatuses(query.status),
     team: normalizeInspectionRequestText(query.team),
     workOrderNumber: normalizeInspectionRequestText(query.workOrderNumber),
   };
+}
+
+function normalizeRequestListStatuses(value: unknown) {
+  return String(value ?? '')
+    .split(',')
+    .map((item) => normalizeInspectionRequestStatus(item))
+    .filter(Boolean);
 }
 
 async function buildRequestListWhere(
@@ -39,6 +47,7 @@ async function buildRequestListWhere(
   return {
     isDeleted: false,
     ...(query.mine && currentUserId ? { inspectorId: currentUserId } : {}),
+    ...(!query.mine && query.inspectorId ? { inspectorId: query.inspectorId } : {}),
     ...statusWhere,
     ...(query.workOrderNumber
       ? { workOrderNumber: query.workOrderNumber }
@@ -71,13 +80,35 @@ function getRequestListStatusWhere(
   if (query.mine && query.includeClosed) {
     return { status: { in: ['DISPATCHED', 'INSPECTING', 'CLOSED'] } };
   }
-  if (query.status) {
-    return { status: query.status };
+  if (query.statuses.length === 1) {
+    return { status: query.statuses[0] };
+  }
+  if (query.statuses.length > 1) {
+    return { status: { in: query.statuses } };
   }
   if (query.currentOnly) {
     return { status: { in: ['SUBMITTED', 'DISPATCHED', 'INSPECTING'] } };
   }
   return {};
+}
+
+function getRequestListOrderBy(
+  query: ReturnType<typeof normalizeRequestListQuery>,
+) {
+  const activeInspectorTaskQuery =
+    Boolean(query.inspectorId) &&
+    query.statuses.length > 0 &&
+    query.statuses.every((status) =>
+      ['DISPATCHED', 'INSPECTING'].includes(status),
+    );
+  if (activeInspectorTaskQuery) {
+    return [
+      { priority: 'asc' as const },
+      { dispatchedAt: 'asc' as const },
+      { submittedAt: 'asc' as const },
+    ];
+  }
+  return { submittedAt: 'desc' as const };
 }
 
 const requestQueryInclude = {
@@ -190,7 +221,7 @@ export const InspectionRequestQueryService = {
           include: includeWorkOrders
             ? requestQueryIncludeWithWorkOrders
             : requestQueryInclude,
-          orderBy: { submittedAt: 'desc' },
+          orderBy: getRequestListOrderBy(query),
           skip: (query.page - 1) * query.pageSize,
           take: query.pageSize,
           where,

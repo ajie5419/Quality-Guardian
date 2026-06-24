@@ -35,6 +35,7 @@ export interface InspectionRequestStats {
     averageTaskMinutes: number;
     completedTaskCount: number;
     currentTaskMinutes: number;
+    inspectorId: string;
     inspector: string;
     status: 'BUSY' | 'IDLE';
   }>;
@@ -65,6 +66,7 @@ export interface InspectionRequestStats {
 export async function getInspectionRequests(params?: {
   current?: boolean;
   includeClosed?: boolean;
+  inspectorId?: string;
   keyword?: string;
   mine?: boolean;
   page?: number;

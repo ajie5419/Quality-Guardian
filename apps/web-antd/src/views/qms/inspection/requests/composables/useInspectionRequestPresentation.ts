@@ -17,6 +17,7 @@ import {
   getIssueTrackingLabel,
   getIssueTrackingTagColor,
 } from '#/views/qms/shared/utils/issue-tracking';
+import { resolveQmsStatusUi } from '#/views/qms/shared/utils/status-ui';
 
 interface RequestStatsState {
   inspectorStatus: Array<{
@@ -24,6 +25,7 @@ interface RequestStatsState {
     averageTaskMinutes: number;
     completedTaskCount: number;
     currentTaskMinutes: number;
+    inspectorId: string;
     inspector: string;
     status: 'BUSY' | 'IDLE';
   }>;
@@ -88,7 +90,10 @@ export function useInspectionRequestPresentation(
   }
 
   function statusLabel(status: InspectionRequestStatus) {
-    return statusOptions.find((item) => item.value === status)?.label || status;
+    return (
+      statusOptions.find((item) => item.value === status)?.label ||
+      resolveQmsStatusUi(status, 'inspection-request').text
+    );
   }
 
   function hasLinkedIssue(record: InspectionRequest) {

@@ -6,6 +6,7 @@ interface InspectorStatusItem {
   averageTaskMinutes: number;
   completedTaskCount: number;
   currentTaskMinutes: number;
+  inspectorId: string;
   inspector: string;
   status: 'BUSY' | 'IDLE';
 }

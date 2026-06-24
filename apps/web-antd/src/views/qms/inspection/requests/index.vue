@@ -20,11 +20,7 @@ import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { convertToTreeSelectData } from '#/types';
 import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
-import {
-  useClaimOptions,
-  useDefectOptions,
-  useSeverityOptions,
-} from '../issues/constants';
+import { useClaimOptions, useDefectOptions, useSeverityOptions } from '../issues/constants';
 import InspectionRequestEntryModal from './components/InspectionRequestEntryModal.vue';
 import InspectionRequestFilterBar from './components/InspectionRequestFilterBar.vue';
 import InspectionRequestInspectorStatus from './components/InspectionRequestInspectorStatus.vue';
@@ -33,6 +29,7 @@ import InspectionRequestPageHeader from './components/InspectionRequestPageHeade
 import InspectionRequestStatsCards from './components/InspectionRequestStatsCards.vue';
 import InspectionRequestWorkflows from './components/InspectionRequestWorkflows.vue';
 import { useInspectionRequestEntryActions } from './composables/useInspectionRequestEntryActions';
+import { useInspectionRequestInspectorTasks } from './composables/useInspectionRequestInspectorTasks';
 import { useInspectionRequestListing } from './composables/useInspectionRequestListing';
 import { useInspectionRequestPresentation } from './composables/useInspectionRequestPresentation';
 import { useInspectionRequestTaskActions } from './composables/useInspectionRequestTaskActions';
@@ -87,6 +84,7 @@ const {
   total,
   handleStatusFilterChange,
   handleViewChange: handleListingViewChange,
+  loadInspectorActiveTasks,
   loadRequestStats,
   loadRequests,
   refreshInspectionRequestPage,
@@ -94,6 +92,16 @@ const {
   onRequestsLoaded() {
     openDispatchDetailFromRoute();
   },
+});
+
+const {
+  inspectorStatusTaskLoading,
+  inspectorStatusTasks,
+  loadInspectorStatusTasks,
+} = useInspectionRequestInspectorTasks({
+  handleApiError,
+  loadInspectorActiveTasks,
+  warn: message.warning,
 });
 
 const canDelete = computed(() =>
@@ -462,6 +470,8 @@ watch(
       :handle-close-attachment-upload-change="handleCloseAttachmentUploadChange"
       :inspector-status-items="sortedInspectorStatus"
       :inspector-status-open="inspectorStatusOpen"
+      :inspector-status-task-loading="inspectorStatusTaskLoading"
+      :inspector-status-tasks="inspectorStatusTasks"
       :linked-defect-subtype-options="linkedDefectSubtypeOptions"
       :linked-issue-draft="linkedIssueDraft"
       :minutes-text="minutesText"
@@ -469,6 +479,7 @@ watch(
       :submitting="submitting"
       :upload-headers="uploadHeaders"
       :user-options="userOptions"
+      @load-inspector-status-tasks="loadInspectorStatusTasks"
       @open-close="openCloseFromDispatchDetail"
       @open-inspection-record="openInspectionRecord"
       @submit-close="submitClose"

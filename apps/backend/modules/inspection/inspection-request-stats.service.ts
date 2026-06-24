@@ -164,16 +164,18 @@ export const InspectionRequestStatsService = {
         averageTaskMinutes: number;
         completedTaskCount: number;
         currentTaskMinutes: number;
+        inspectorId: string;
         inspector: string;
         status: 'BUSY' | 'IDLE';
         totalTaskMinutes: number;
       }
     >();
-    const createInspectorStatus = (inspector: string) => ({
+    const createInspectorStatus = (inspector: string, inspectorId = '') => ({
       activeTaskCount: 0,
       averageTaskMinutes: 0,
       completedTaskCount: 0,
       currentTaskMinutes: 0,
+      inspectorId,
       inspector,
       status: 'IDLE' as const,
       totalTaskMinutes: 0,
@@ -198,7 +200,10 @@ export const InspectionRequestStatsService = {
     for (const user of activeUsers.filter((item) => isInspectorUser(item)))
       inspectorStatusMap.set(
         user.id,
-        createInspectorStatus(user.realName || user.username || '未记录检验员'),
+        createInspectorStatus(
+          user.realName || user.username || '未记录检验员',
+          user.id,
+        ),
       );
     const resolveInspectorKey = (item: (typeof periodRequests)[number]) =>
       item.inspectorId ||
@@ -211,7 +216,7 @@ export const InspectionRequestStatsService = {
       const key = resolveInspectorKey(item);
       const existing = inspectorStatusMap.get(key);
       if (existing) return existing;
-      const created = createInspectorStatus(resolveInspectorName(item));
+      const created = createInspectorStatus(resolveInspectorName(item), key);
       inspectorStatusMap.set(key, created);
       return created;
     };
