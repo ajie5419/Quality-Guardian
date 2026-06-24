@@ -25,6 +25,125 @@
 
 ## 执行记录
 
+### 2026-06-24 功能：检验员状态查看当前任务
+
+**执行内容：**
+
+- 报检任务统计的 `inspectorStatus` 增加稳定 `inspectorId`，避免前端按姓名查任务。
+- 扩展报检任务列表查询，支持 `inspectorId` 过滤和逗号分隔多状态过滤；仅检验员当前任务查询使用优先级/派单时间排序，普通列表仍保持提交时间倒序。
+- 检验员状态抽屉改为桌面双栏/移动单栏布局：左侧检验员列表，点击人员后加载右侧“当前检验任务”。
+- 点击当前任务复用现有报检任务详情抽屉，不新增重复详情逻辑。
+- 新增 `useInspectionRequestInspectorTasks` 管理检验员任务加载状态，避免页面文件超过架构门禁行数限制。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec vitest run modules/inspection/inspection-request-query.service.test.ts modules/inspection/inspection-request-stats.service.test.ts`: 2 文件 / 11 测试通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 未启动前端 dev/build；按项目约束仅做代码级验证、类型检查、单测和架构门禁。
+
+### 2026-06-24 修复：QMS 状态展示中文化收口
+
+**执行内容：**
+
+- 新增前端共享状态展示工具 `status-ui.ts`，集中处理 QMS 常见状态码的中文标签和 Tag 颜色。
+- 重构 `QmsStatusTag`，状态展示统一走 `resolveQmsStatusUi()`，不再在组件内按业务域散落 switch 回退。
+- 替换文件中心列表和详情里的裸 `status` 展示，改为中文状态 Tag。
+- 调整质量损失、报检任务、工单状态的未知状态兜底，避免直接显示英文状态码。
+- 修复质量损失状态字典映射，字典返回 `Confirmed` / `Processing` 等英文值时也强制按统一状态展示工具转成中文。
+- 同步更新质量损失和工单状态相关单测期望。
+
+**验证结果：**
+
+- `pnpm -C apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm -C apps/web-antd exec vitest run src/views/qms/quality-loss/composables/useQualityLossGrid.test.ts src/views/qms/work-order/constants.test.ts`: 2 文件 / 22 测试通过
+- `pnpm -C apps/web-antd exec vitest run src/views/qms/quality-loss/constants.test.ts src/views/qms/quality-loss/composables/useQualityLossGrid.test.ts`: 2 文件 / 22 测试通过
+- 裸状态输出定向搜索：未发现 QMS 页面中 `{{ record.status }}` / `{{ row.status }}` 直接展示；剩余命中为状态条件判断或类型字段。
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 未启动前端 dev/build；按项目约束仅做代码级验证、类型检查和定向单测。
+
+### 2026-06-24 修复：供应商详情售后质量记录过滤字段
+
+**执行内容：**
+
+- 修复供应商详情抽屉“售后质量记录”过滤参数，改为使用供应商名称 `row.name` 查询售后记录。
+- 根因：列表“售后问题”数量按售后记录 `supplierBrand` 聚合到供应商名称；详情页此前优先使用 `row.brand || row.name`，当品牌字段为“自有”时会用“自有”过滤售后记录，导致列表有数量但详情为空。
+
+**验证结果：**
+
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 未启动前端 dev/build；按项目约束仅做代码修复、类型检查和架构门禁。
+
+### 2026-06-24 apple/container 本地测试环境
+
+**执行内容：**
+
+- 新增 `apple/container` 本地完整环境入口，覆盖 MySQL、Redis、后端镜像、前端镜像、真实测试数据库迁移、上传目录挂载与健康检查。
+- 新增前端本地专用 nginx 配置，将 `/api/` 和 `/uploads/` 代理到 `host.container.internal:3000`，避免依赖 Docker Compose 的 `backend` 服务名。
+- 新增 `.env.container.example`，约定本地私有 `.env.container.local` 使用 `quality_guard_container` 测试库，并通过 `host.container.internal:3307/6380` 访问本地容器化 MySQL/Redis。
+- 新增 `pnpm local:container:*` 命令入口，统一构建、启动、停止、日志、测试库 reset，以及 `pnpm dev:antd` 与本地容器化 MySQL/Redis 的组合启动；源码 dev 组合模式不创建 `host.container.internal` DNS，空测试库用 `prisma db push` 建表。
+
+**验证结果：**
+
+- `bash -n scripts/local/container-common.sh scripts/local/container-build.sh scripts/local/container-up.sh scripts/local/container-down.sh scripts/local/container-logs.sh scripts/local/container-reset-db.sh`: 通过
+- `node -e "const p=require('./package.json'); console.log(Object.keys(p.scripts).filter(k=>k.startsWith('local:container')).join('\n'))"`: 输出 6 个本地容器脚本
+- `bash -n scripts/local/container-dev-antd.sh`: 通过
+- `container --version`: `container CLI version 1.0.0 (build: release, commit: ee848e3)`
+- 官方命令参考确认 `container run` 支持 `--env-file`、`-p/--publish`、`--mount`、`--rm`，`container build` 支持 `-f`、`-t`、`-m`、`-c`
+- `pnpm local:container:up`: 首次运行按预期创建 `.env.container.local` 后退出，未启动容器栈
+- `pnpm local:container:dev:antd`: 首次试跑暴露出 `host.container.internal` DNS 需要 sudo；已移除源码 dev 组合模式里的 DNS 创建步骤
+- `pnpm local:container:dev:antd`: 空测试库执行 `migrate deploy` 命中历史迁移依赖已有表，已按本地开发语义改为 `prisma db push`
+- `pnpm local:container:dev:antd`: 可启动 MySQL/Redis、同步 Prisma schema 并进入 `pnpm dev:antd`；发现 Turbo 未透传 `DATABASE_URL/REDIS_URL`，已加入 `turbo.json` `globalEnv`
+- `pnpm local:container:dev:antd`: 后端已读取 `REDIS_URL`，但 Redis 刚启动时端口未就绪会短暂 `ECONNREFUSED`；已给 Redis 增加 `redis-cli ping` 就绪等待
+- `pnpm local:container:dev:antd`: Redis AOF 持久化在 apple/container named volume 下遇到 `appendonlydir: Permission denied`；本地开发改为无状态 Redis，不挂载数据卷、不启用 AOF
+- `pnpm local:container:dev:antd`: 如果旧后端占用 `5320`，前端会继续打旧后端并连到旧 `3306`；已增加 `5320` 端口占用检查，阻止 Nitro 静默切到 `3000`
+- `pnpm local:container:dev:antd`: 新测试库只 `db push` 会没有管理员账号；已增加 `users` 为空时自动 seed，默认账号 `vben / 123456`
+- 未运行实际镜像构建和启动；本次只落本地测试脚本并做静态验证
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 首次启动前需要创建 `.env.container.local`；测试库由 `qms-container-mysql` 首次启动时自动创建。
+- 只有 `pnpm local:container:up` 这种前后端都容器化的模式需要 `host.container.internal` DNS；`pnpm local:container:dev:antd` 不需要 sudo DNS。
+
+### 2026-06-24 修复：菜单接口 Prisma 错误日志保留根因
+
+**执行内容：**
+
+- 定位 `/api/menu/all` 的 `prisma.menus.findFirst()` 报错来自菜单同步链路 `ensureModuleMenus()`。
+- 增强 `sanitizeError()` 对 Prisma `Invalid invocation` 的摘要逻辑，保留后续根因行，避免日志只显示 `Invalid prisma... invocation`。
+- 新增 `utils/module-loader.test.ts`，覆盖模块菜单同步会按 `isDeleted + path + status` 查找父菜单，并在创建菜单后清理菜单缓存。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec vitest run utils/logger.test.ts utils/module-loader.test.ts`: 2 文件 / 4 测试通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations
+- 本地菜单探针：MySQL 容器运行后，`menus.findFirst` 查到 `/qms`，`ensureModuleMenus()` 执行成功
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 本次未启动前端 dev/build，按项目约束仅做后端探针、单测、类型检查和架构门禁。
+
 ### 2026-06-22 Phase 1 + 2：售后/质量损失/报表 模块契约重构
 
 **执行内容：**
