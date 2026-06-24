@@ -19,4 +19,21 @@ describe('logger error sanitization', () => {
       name: 'PrismaClientValidationError',
     });
   });
+
+  it('keeps the root cause line for prisma invalid invocation errors', () => {
+    const error = new Error(
+      [
+        'Invalid `prisma.menus.findFirst()` invocation:',
+        '',
+        'The column `menus.isDeleted` does not exist in the current database.',
+      ].join('\n'),
+    );
+    error.name = 'PrismaClientKnownRequestError';
+
+    expect(sanitizeError(error)).toEqual({
+      message:
+        'Invalid `prisma.menus.findFirst()` invocation: The column `menus.isDeleted` does not exist in the current database.',
+      name: 'PrismaClientKnownRequestError',
+    });
+  });
 });

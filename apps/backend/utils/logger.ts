@@ -86,10 +86,11 @@ export function sanitizeError(error: Error) {
 }
 
 function summarizeErrorMessage(message: string) {
-  const firstLine = message
+  const meaningfulLines = message
     .split('\n')
     .map((line) => line.trim())
-    .find(Boolean);
+    .filter(Boolean);
+  const firstLine = meaningfulLines[0];
 
   if (!firstLine) {
     return message;
@@ -103,7 +104,14 @@ function summarizeErrorMessage(message: string) {
   }
 
   if (message.includes('Invalid `prisma.')) {
-    return firstLine;
+    const reasonLine = meaningfulLines.find(
+      (line) =>
+        line !== firstLine &&
+        !line.startsWith('→') &&
+        !line.startsWith('prisma.') &&
+        !line.startsWith('const '),
+    );
+    return reasonLine ? `${firstLine} ${reasonLine}` : firstLine;
   }
 
   return message;
