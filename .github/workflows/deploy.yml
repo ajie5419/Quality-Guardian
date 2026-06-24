@@ -130,6 +130,32 @@ jobs:
               fi
             }
 
+            run_backend() {
+              local seconds="$1"
+              shift
+              run_with_timeout "$seconds" docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "$1"
+            }
+
+            baseline_existing_prisma_schema() {
+              echo "checking production schema before Prisma migration baseline"
+              run_backend 300 "set -e; cd /app/apps/backend; $PRISMA_CMD db pull --print --schema '$PRISMA_SCHEMA' > /tmp/qms-introspection.prisma; require_model() { if ! grep -q \"^model \$1 {\" /tmp/qms-introspection.prisma; then echo \"required production table is missing: \$1\"; exit 1; fi; }; mark_applied() { local migration=\"\$1\"; local resolve_log=\"/tmp/qms-resolve-\${migration}.log\"; if $PRISMA_CMD migrate resolve --schema '$PRISMA_SCHEMA' --applied \"\$migration\" >\"\$resolve_log\" 2>&1; then cat \"\$resolve_log\"; return 0; fi; if grep -Eiq 'already (applied|recorded|resolved)|has already been applied' \"\$resolve_log\"; then cat \"\$resolve_log\"; echo \"migration already tracked: \$migration\"; return 0; fi; cat \"\$resolve_log\"; return 1; }; require_model after_sales; require_model quality_records; require_model quality_losses; require_model qms_inspection_requests; require_model supplier_score_snapshots; if ! grep -q '^  selfCheckDocuments ' /tmp/qms-introspection.prisma; then echo 'production schema is older than qgs-v0.10.2; refusing automatic baseline'; exit 1; fi; baseline_through='20260617000100_add_inspection_self_check_documents'; echo \"baselining migrations through \${baseline_through}\"; for migration in \$(ls -1 prisma/migrations | sort); do if [ \"\$migration\" = 'migration_lock.toml' ]; then continue; fi; if [ ! -d \"prisma/migrations/\$migration\" ]; then continue; fi; mark_applied \"\$migration\"; if [ \"\$migration\" = \"\$baseline_through\" ]; then exit 0; fi; done; echo \"baseline migration not found: \${baseline_through}\"; exit 1"
+            }
+
+            deploy_prisma_migrations() {
+              local migration_log="/tmp/qms-migrate-deploy.log"
+              if run_with_timeout 300 docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "$PRISMA_CMD migrate deploy --schema '$PRISMA_SCHEMA'" 2>&1 | tee "$migration_log"; then
+                return 0
+              fi
+
+              if ! grep -q 'P3005' "$migration_log"; then
+                return 1
+              fi
+
+              echo "Prisma migrate deploy reported P3005; baselining existing production schema and retrying migrate deploy"
+              baseline_existing_prisma_schema
+              run_backend 300 "$PRISMA_CMD migrate deploy --schema '$PRISMA_SCHEMA'"
+            }
+
             PRISMA_CMD="/app/apps/backend/node_modules/.bin/prisma"
             PRISMA_SCHEMA="/app/apps/backend/prisma/schema.prisma"
             SUPPLIER_SCORE_BACKFILL_CMD="cd /app/apps/backend && SUPPLIER_SCORE_BACKFILL_MODE=missing /app/apps/backend/node_modules/.bin/tsx scripts/backfill-supplier-score-snapshots.ts"
@@ -151,7 +177,7 @@ jobs:
 
             run_with_timeout 300 docker compose -f "$COMPOSE_FILE" pull backend frontend
             run_with_timeout 120 docker compose -f "$COMPOSE_FILE" up -d redis
-            run_with_timeout 300 docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "$PRISMA_CMD migrate deploy --schema '$PRISMA_SCHEMA' || $PRISMA_CMD db push --skip-generate --schema '$PRISMA_SCHEMA'"
+            deploy_prisma_migrations
             run_with_timeout 180 docker compose -f "$COMPOSE_FILE" up -d backend frontend
 
             ok=0

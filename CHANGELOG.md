@@ -49,6 +49,28 @@
 * **@qgs/web-antd:** persist inspection request issue photos ([79c660b](https://github.com/ajie5419/Quality-Guardian/commit/79c660b9d6a558de81f65d0884aefc9983c5cefc))
 * **@qgs/web-antd:** query supplier after-sales by supplier name ([7f69754](https://github.com/ajie5419/Quality-Guardian/commit/7f69754d9107b94bff1c80ce049d5da30379c049))
 
+### 2026-06-24 修复：生产发布 Prisma 基线迁移
+
+**执行内容：**
+
+- 定位 `qgs-v0.11.0` 发布失败根因：生产库已有业务表但没有 Prisma migration 基线，`migrate deploy` 返回 `P3005`；旧脚本退到 `db push` 后又因将删除 `after_sales.qualityLoss` 且该列有 41 条非空数据而被 Prisma 阻断。
+- 修改 GitHub Actions 发布脚本，移除生产发布中的 `prisma db push` 兜底。
+- 当且仅当 `migrate deploy` 返回 `P3005` 时，发布脚本会先在后端容器内 introspect 生产 schema，确认生产库至少达到 `qgs-v0.10.2` 的 schema 边界，再用 `migrate resolve --applied` 对既有 schema 做一次受控 baseline。
+- baseline 固定停在 `20260617000100_add_inspection_self_check_documents`，让 `qgs-v0.11.0` 新增的 5 个 migration 继续按 migration 路径真实执行。
+- 第二、三次 deploy-only 证明生产库没有 `quality_loss_index` 表，最终确认自动 baseline 不能越过 `qgs-v0.11.0` 的新 migration。
+
+**验证结果：**
+
+- `ruby -e "require 'yaml'; YAML.load_file('.github/workflows/deploy.yml'); puts 'deploy.yml parsed'"`: 通过
+- `bash -n /tmp/qms-deploy-script.sh`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations
+
+**commit:** 待提交，等待本次发布修复提交
+
+**遗留问题：**
+
+- 当前 release `qgs-v0.11.0` 的前三次 deploy run 已失败，需要推送修复后用 `workflow_dispatch deploy_only=true` 对同一镜像标签重新发布。
+
 ### 2026-06-24 功能：检验员状态查看当前任务
 
 **执行内容：**
