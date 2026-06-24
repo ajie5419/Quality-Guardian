@@ -55,8 +55,8 @@ describe('mapDictionaryOptionsToQualityLossStatus', () => {
 
   it('maps dictionary options with correct color lookup', () => {
     const options = [
-      { dictKey: 'Pending', dictValue: '待处理' },
-      { dictKey: 'Resolved', dictValue: '已解决' },
+      { dictKey: 'Pending', dictValue: 'Pending' },
+      { dictKey: 'Resolved', dictValue: 'Resolved' },
     ];
     const result = mapDictionaryOptionsToQualityLossStatus(options as any);
     expect(result).toEqual([
@@ -65,10 +65,14 @@ describe('mapDictionaryOptionsToQualityLossStatus', () => {
     ]);
   });
 
-  it('uses default color for unknown status key', () => {
-    const options = [{ dictKey: 'UNKNOWN', dictValue: '未知' }];
+  it('uses normalized fallback for unknown status key', () => {
+    const options = [{ dictKey: 'UNKNOWN', dictValue: 'UNKNOWN' }];
     const result = mapDictionaryOptionsToQualityLossStatus(options as any);
-    expect(result[0]?.color).toBe('default');
+    expect(result[0]).toEqual({
+      value: 'UNKNOWN',
+      label: '待处理',
+      color: 'warning',
+    });
   });
 
   it('normalizes status key case for color lookup', () => {

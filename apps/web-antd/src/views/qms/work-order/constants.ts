@@ -53,7 +53,7 @@ export const getWorkOrderStatusUI = (
     WORK_ORDER_STATUS_UI_MAP[normalized] || {
       color: 'default',
       textKey: 'qms.workOrder.status.unknown',
-      defaultText: status,
+      defaultText: '未知状态',
       icon: 'lucide:help-circle',
     }
   );

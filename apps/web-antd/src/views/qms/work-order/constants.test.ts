@@ -35,7 +35,7 @@ describe('getWorkOrderStatusUI', () => {
     expect(result).toEqual({
       color: 'default',
       textKey: 'qms.workOrder.status.unknown',
-      defaultText: 'UNKNOWN_STATUS',
+      defaultText: '未知状态',
       icon: 'lucide:help-circle',
     });
   });

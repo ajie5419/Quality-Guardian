@@ -61,7 +61,7 @@ function buildStatusInfo(
   const canonical = mapAfterSalesStatus(status);
   return {
     color: AFTER_SALES_STATUS_COLOR_MAP[canonical] || 'default',
-    label: labelMap[canonical] || status,
+    label: labelMap[canonical] || '未知状态',
   };
 }
 

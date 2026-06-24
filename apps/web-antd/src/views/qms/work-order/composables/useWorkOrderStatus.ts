@@ -2,6 +2,8 @@ import type { StatusUIConfig } from '../types/workOrder';
 
 import { mapWorkOrderStatus, WorkOrderStatusEnum } from '@qgs/shared';
 
+import { resolveQmsStatusUi } from '#/views/qms/shared/utils/status-ui';
+
 import { WORK_ORDER_STATUS_UI_MAP } from '../constants';
 
 /**
@@ -25,11 +27,12 @@ export function getStatusInfo(s: null | string | undefined): StatusUIConfig {
 
   // 安全访问：使用 ?? 而非展开运算符
   const uiConfig = WORK_ORDER_STATUS_UI_MAP[status];
+  const fallback = resolveQmsStatusUi(status, 'work-order');
 
   return {
-    color: uiConfig?.color || 'default',
+    color: uiConfig?.color || fallback.color,
     textKey: uiConfig?.textKey || 'qms.common.unknownStatus',
-    defaultText: uiConfig?.defaultText || status,
+    defaultText: uiConfig?.defaultText || fallback.text,
     icon: uiConfig?.icon || 'lucide:help-circle',
   };
 }

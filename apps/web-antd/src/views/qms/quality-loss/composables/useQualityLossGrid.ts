@@ -6,6 +6,7 @@ import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
 import { computed } from 'vue';
 
 import { findNameById } from '#/types';
+import { resolveQmsStatusUi } from '#/views/qms/shared/utils/status-ui';
 
 import { LossSource } from '../types';
 
@@ -238,8 +239,8 @@ export function useQualityLossGrid(params: {
   function getStatusConfig(status: string) {
     return (
       qualityLossStatusOptions.value.find((item) => item.value === status) || {
-        label: status,
-        color: 'default',
+        label: resolveQmsStatusUi(status, 'quality-loss').text,
+        color: resolveQmsStatusUi(status, 'quality-loss').color,
       }
     );
   }

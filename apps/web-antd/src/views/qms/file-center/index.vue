@@ -36,6 +36,7 @@ import {
   scanMissingFiles,
 } from '#/api/qms/file-center';
 import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
+import { resolveQmsStatusUi } from '#/views/qms/shared/utils/status-ui';
 
 import FileStorageStatsCards from './components/FileStorageStatsCards.vue';
 
@@ -110,6 +111,10 @@ function formatDate(value?: Date | string) {
 
 function getReferenceCount(file: FileAssetItem) {
   return file._count?.references ?? file.references?.length ?? 0;
+}
+
+function fileStatusConfig(status: string) {
+  return resolveQmsStatusUi(status, 'file-asset');
 }
 
 function asFileAsset(record: Record<string, unknown>) {
@@ -322,16 +327,8 @@ onMounted(() => {
               {{ formatBytes(record.size) }}
             </template>
             <template v-else-if="column.dataIndex === 'status'">
-              <Tag
-                :color="
-                  record.status === 'ACTIVE'
-                    ? 'green'
-                    : record.status === 'MISSING'
-                      ? 'orange'
-                      : 'red'
-                "
-              >
-                {{ record.status }}
+              <Tag :color="fileStatusConfig(record.status).color">
+                {{ fileStatusConfig(record.status).text }}
               </Tag>
             </template>
             <template v-else-if="column.dataIndex === 'referenceCount'">
@@ -389,7 +386,9 @@ onMounted(() => {
               {{ detail.originalName }}
             </Descriptions.Item>
             <Descriptions.Item label="状态">
-              {{ detail.status }}
+              <Tag :color="fileStatusConfig(detail.status).color">
+                {{ fileStatusConfig(detail.status).text }}
+              </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="存储">
               {{ detail.storageProvider }}

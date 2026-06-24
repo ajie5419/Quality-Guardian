@@ -7,6 +7,8 @@ import {
   QUALITY_LOSS_TYPE_OPTIONS,
 } from '@qgs/shared';
 
+import { resolveQmsStatusUi } from '../shared/utils/status-ui';
+
 /**
  * 损失类型选项
  */
@@ -31,26 +33,28 @@ function normalizeStatusKey(value: string) {
 const QUALITY_LOSS_STATUS_COLOR_LOOKUP: Record<string, string> =
   QUALITY_LOSS_STATUS_COLOR_MAP;
 
+function buildQualityLossStatusOption(value: string) {
+  const statusUi = resolveQmsStatusUi(value, 'quality-loss');
+  return {
+    value,
+    label: statusUi.text,
+    color:
+      QUALITY_LOSS_STATUS_COLOR_LOOKUP[normalizeStatusKey(value)] ||
+      statusUi.color ||
+      'default',
+  };
+}
+
 export function mapDictionaryOptionsToQualityLossStatus(
   options?: DictionaryOptionItem[],
 ) {
   if (!options || options.length === 0) {
-    return QUALITY_LOSS_STATUS_FALLBACK_VALUES.map((value) => ({
-      value,
-      label: value,
-      color:
-        QUALITY_LOSS_STATUS_COLOR_LOOKUP[normalizeStatusKey(value)] ||
-        'default',
-    }));
+    return QUALITY_LOSS_STATUS_FALLBACK_VALUES.map((value) =>
+      buildQualityLossStatusOption(value),
+    );
   }
 
-  return options.map((item) => ({
-    value: item.dictKey,
-    label: item.dictValue || item.dictKey,
-    color:
-      QUALITY_LOSS_STATUS_COLOR_LOOKUP[normalizeStatusKey(item.dictKey)] ||
-      'default',
-  }));
+  return options.map((item) => buildQualityLossStatusOption(item.dictKey));
 }
 
 /**

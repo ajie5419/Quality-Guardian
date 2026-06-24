@@ -52,7 +52,7 @@ describe('useQualityLossGrid', () => {
     it('returns default when status not found', () => {
       const { getStatusConfig } = useQualityLossGrid(createParams());
       const config = getStatusConfig('UNKNOWN');
-      expect(config).toEqual({ label: 'UNKNOWN', color: 'default' });
+      expect(config).toEqual({ label: '待处理', color: 'warning' });
     });
   });
 
