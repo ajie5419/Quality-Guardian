@@ -12,7 +12,13 @@
     "scripts/*/src/**/*.ts",
     "scripts/*/src/**/*.json"
   ],
-  "globalEnv": ["NODE_ENV"],
+  "globalEnv": [
+    "DATABASE_URL",
+    "NODE_ENV",
+    "REDIS_ENABLED",
+    "REDIS_OPTIONAL",
+    "REDIS_URL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
