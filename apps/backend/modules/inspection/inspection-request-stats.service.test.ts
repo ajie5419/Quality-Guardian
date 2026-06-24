@@ -105,7 +105,11 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       makeRequest({
         id: 'r1',
         inspectorId: 'inspector-1',
-        inspector: { id: 'inspector-1', realName: '张三', username: 'zhangsan' },
+        inspector: {
+          id: 'inspector-1',
+          realName: '张三',
+          username: 'zhangsan',
+        },
         status: 'DISPATCHED',
       }),
     ];

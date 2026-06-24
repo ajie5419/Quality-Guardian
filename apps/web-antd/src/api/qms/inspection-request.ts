@@ -35,8 +35,8 @@ export interface InspectionRequestStats {
     averageTaskMinutes: number;
     completedTaskCount: number;
     currentTaskMinutes: number;
-    inspectorId: string;
     inspector: string;
+    inspectorId: string;
     status: 'BUSY' | 'IDLE';
   }>;
   pendingDispatchCount: number;

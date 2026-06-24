@@ -20,7 +20,11 @@ import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { convertToTreeSelectData } from '#/types';
 import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
-import { useClaimOptions, useDefectOptions, useSeverityOptions } from '../issues/constants';
+import {
+  useClaimOptions,
+  useDefectOptions,
+  useSeverityOptions,
+} from '../issues/constants';
 import InspectionRequestEntryModal from './components/InspectionRequestEntryModal.vue';
 import InspectionRequestFilterBar from './components/InspectionRequestFilterBar.vue';
 import InspectionRequestInspectorStatus from './components/InspectionRequestInspectorStatus.vue';

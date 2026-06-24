@@ -17,8 +17,8 @@ export function useInspectionRequestInspectorTasks(
   const inspectorStatusTasks = ref<InspectionRequest[]>([]);
 
   async function loadInspectorStatusTasks(item: {
-    inspectorId: string;
     inspector: string;
+    inspectorId: string;
   }) {
     if (!item.inspectorId) {
       inspectorStatusTasks.value = [];

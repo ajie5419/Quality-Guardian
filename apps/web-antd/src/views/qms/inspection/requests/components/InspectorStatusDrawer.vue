@@ -12,8 +12,8 @@ type InspectorStatusItem = {
   averageTaskMinutes: number;
   completedTaskCount: number;
   currentTaskMinutes: number;
-  inspectorId: string;
   inspector: string;
+  inspectorId: string;
   status: 'BUSY' | 'IDLE';
 };
 
@@ -128,7 +128,9 @@ const drawerWidth = computed(() =>
               <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-500">
                 <div>优先级 {{ task.priority || 3 }}</div>
                 <div class="text-right">
-                  {{ props.formatDateTime(task.dispatchedAt || task.submittedAt) }}
+                  {{
+                    props.formatDateTime(task.dispatchedAt || task.submittedAt)
+                  }}
                 </div>
               </div>
             </button>

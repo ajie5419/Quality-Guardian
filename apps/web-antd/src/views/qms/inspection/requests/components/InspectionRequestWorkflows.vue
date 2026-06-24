@@ -58,8 +58,8 @@ type InspectorStatusItem = {
   averageTaskMinutes: number;
   completedTaskCount: number;
   currentTaskMinutes: number;
-  inspectorId: string;
   inspector: string;
+  inspectorId: string;
   status: 'BUSY' | 'IDLE';
 };
 
@@ -98,6 +98,7 @@ interface Props {
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
+  loadInspectorStatusTasks: [item: InspectorStatusItem];
   openClose: [];
   openInspectionRecord: [record: InspectionRequest];
   submitClose: [];
@@ -109,7 +110,6 @@ const emit = defineEmits<{
   updateDispatchForm: [value: DispatchForm];
   updateDispatchOpen: [value: boolean];
   updateInspectorStatusOpen: [value: boolean];
-  loadInspectorStatusTasks: [item: InspectorStatusItem];
   updateLinkedIssueDraft: [value: LinkedIssueDraft];
 }>();
 </script>

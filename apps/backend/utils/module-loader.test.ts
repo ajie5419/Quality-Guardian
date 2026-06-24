@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
@@ -29,7 +28,9 @@ vi.mock('@paralleldrive/cuid2', () => ({
 describe('module-loader menu synchronization', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(prisma.menus.findFirst).mockResolvedValue({ id: 'root' } as never);
+    vi.mocked(prisma.menus.findFirst).mockResolvedValue({
+      id: 'root',
+    } as never);
     vi.mocked(prisma.menus.findMany).mockResolvedValue([]);
     vi.mocked(prisma.menus.create).mockResolvedValue({
       id: 'created-menu',

@@ -94,7 +94,9 @@ function normalizeStatusKey(status: unknown) {
 function resolveCommonStatusUi(status: unknown): QmsStatusUiConfig {
   const key = normalizeStatusKey(status);
   if (!key) return { color: 'default', text: '-' };
-  return COMMON_STATUS_UI_MAP[key] || { color: 'default', text: String(status) };
+  return (
+    COMMON_STATUS_UI_MAP[key] || { color: 'default', text: String(status) }
+  );
 }
 
 function resolveAfterSalesStatusUi(status: unknown): QmsStatusUiConfig {
@@ -111,7 +113,8 @@ function resolveAfterSalesStatusUi(status: unknown): QmsStatusUiConfig {
   };
   const config = map[canonical];
   return {
-    color: config?.color || AFTER_SALES_STATUS_COLOR_MAP[canonical] || 'default',
+    color:
+      config?.color || AFTER_SALES_STATUS_COLOR_MAP[canonical] || 'default',
     text: config?.text || String(status || '-'),
   };
 }
@@ -132,7 +135,10 @@ function resolveIssueTrackingStatusUi(status: unknown): QmsStatusUiConfig {
   const map: Record<string, QmsStatusUiConfig> = {
     [ISSUE_TRACKING_STATUS.CLAIMING]: { color: 'processing', text: '索赔中' },
     [ISSUE_TRACKING_STATUS.CLOSED]: { color: 'success', text: '已关闭' },
-    [ISSUE_TRACKING_STATUS.IN_PROGRESS]: { color: 'processing', text: '处理中' },
+    [ISSUE_TRACKING_STATUS.IN_PROGRESS]: {
+      color: 'processing',
+      text: '处理中',
+    },
     [ISSUE_TRACKING_STATUS.NO_ISSUE]: { color: 'default', text: '无问题' },
     [ISSUE_TRACKING_STATUS.OPEN]: { color: 'warning', text: '待处理' },
     [ISSUE_TRACKING_STATUS.RESOLVED]: { color: 'warning', text: '待验证' },
@@ -162,10 +168,14 @@ export function resolveQmsStatusUi(
     return FILE_ASSET_STATUS_UI_MAP[key] || resolveCommonStatusUi(status);
   }
   if (type === 'inspection') {
-    return INSPECTION_RESULT_STATUS_UI_MAP[key] || resolveCommonStatusUi(status);
+    return (
+      INSPECTION_RESULT_STATUS_UI_MAP[key] || resolveCommonStatusUi(status)
+    );
   }
   if (type === 'inspection-request') {
-    return INSPECTION_REQUEST_STATUS_UI_MAP[key] || resolveCommonStatusUi(status);
+    return (
+      INSPECTION_REQUEST_STATUS_UI_MAP[key] || resolveCommonStatusUi(status)
+    );
   }
   if (type === 'issue-tracking') return resolveIssueTrackingStatusUi(status);
   if (type === 'quality-loss') return resolveQualityLossStatusUi(status);

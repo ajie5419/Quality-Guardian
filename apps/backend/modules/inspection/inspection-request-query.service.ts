@@ -47,7 +47,9 @@ async function buildRequestListWhere(
   return {
     isDeleted: false,
     ...(query.mine && currentUserId ? { inspectorId: currentUserId } : {}),
-    ...(!query.mine && query.inspectorId ? { inspectorId: query.inspectorId } : {}),
+    ...(!query.mine && query.inspectorId
+      ? { inspectorId: query.inspectorId }
+      : {}),
     ...statusWhere,
     ...(query.workOrderNumber
       ? { workOrderNumber: query.workOrderNumber }

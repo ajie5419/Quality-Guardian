@@ -1,9 +1,9 @@
 <script lang="ts" setup>
+import type { QmsStatusType } from '#/views/qms/shared/utils/status-ui';
+
 import { computed } from 'vue';
 
 import { Tag } from 'ant-design-vue';
-
-import type { QmsStatusType } from '#/views/qms/shared/utils/status-ui';
 
 import { resolveQmsStatusUi } from '#/views/qms/shared/utils/status-ui';
 
@@ -19,7 +19,9 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-const statusConfig = computed(() => resolveQmsStatusUi(props.status, props.type));
+const statusConfig = computed(() =>
+  resolveQmsStatusUi(props.status, props.type),
+);
 </script>
 
 <template>
