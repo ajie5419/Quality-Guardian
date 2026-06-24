@@ -25,6 +25,30 @@
 
 ## 执行记录
 
+## [0.11.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.10.2...qgs-v0.11.0) (2026-06-24)
+
+
+### Features
+
+* **@qgs/backend:** add createdBy ownership column to loss-bearing tables ([4325636](https://github.com/ajie5419/Quality-Guardian/commit/43256365d269c704522ed6ccb0b88ec77c0a8baf))
+* **@qgs/backend:** enforce quality-loss ownership guard on PUT ([7c1b7cb](https://github.com/ajie5419/Quality-Guardian/commit/7c1b7cb10fd14fb5e7dfa9f6d44f160ef1641e71))
+* **@qgs/backend:** expose grossCost/recovered/netLoss in after-sales metrics ([0357943](https://github.com/ajie5419/Quality-Guardian/commit/0357943b1a463cbac50766ba9a69b95ad6021c5b))
+* **@qgs/backend:** introduce quality_loss_index materialized table ([3bd0805](https://github.com/ajie5419/Quality-Guardian/commit/3bd080538f70f1a7670c3566a690e0a15b21ac8d))
+* **@qgs/backend:** report external-loss KPI uses net loss after recovery ([c95de98](https://github.com/ajie5419/Quality-Guardian/commit/c95de98eb27d479de287eb9b5f4ae85c00e07cb7))
+* **@qgs/backend:** scope quality-loss queries via data-scope middleware ([139b1cc](https://github.com/ajie5419/Quality-Guardian/commit/139b1cc52e837ede0e000afdcca40a2fc183a477))
+* **@qgs/backend:** wire quality-loss index writes into 4 source modules ([9ca585e](https://github.com/ajie5419/Quality-Guardian/commit/9ca585eea521b3517db3b5482c42ff93693621f8))
+* **@qgs/web-antd:** show inspector active inspection tasks ([8b7d5df](https://github.com/ajie5419/Quality-Guardian/commit/8b7d5dfc5d9c344e915362db48a5641f03f578a4))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** preserve prisma invalid invocation root cause ([b93657c](https://github.com/ajie5419/Quality-Guardian/commit/b93657c2d11bf4dad723adba25c56c62e643e392))
+* **@qgs/backend:** release redis connection in maintenance scripts ([2e7834d](https://github.com/ajie5419/Quality-Guardian/commit/2e7834da405402a4a24e8da89b7ab0e06aa49cc2))
+* **@qgs/backend:** translate unified quality-loss status to raw status buckets when filtering the index ([b0e153a](https://github.com/ajie5419/Quality-Guardian/commit/b0e153a8d1bb75ad20dec3fa2951662c40347bcd))
+* **@qgs/web-antd:** localize qms status displays ([3b57219](https://github.com/ajie5419/Quality-Guardian/commit/3b57219ded3ff8b46f6398b4a3630e03989bf681))
+* **@qgs/web-antd:** persist inspection request issue photos ([79c660b](https://github.com/ajie5419/Quality-Guardian/commit/79c660b9d6a558de81f65d0884aefc9983c5cefc))
+* **@qgs/web-antd:** query supplier after-sales by supplier name ([7f69754](https://github.com/ajie5419/Quality-Guardian/commit/7f69754d9107b94bff1c80ce049d5da30379c049))
+
 ### 2026-06-24 功能：检验员状态查看当前任务
 
 **执行内容：**
