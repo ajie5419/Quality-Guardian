@@ -62,7 +62,7 @@ async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
     const [inspections, afterSales, engineering, historyProjects] =
       await Promise.all([
         getInspectionRecords({ keyword: row.name, type: 'INCOMING' }),
-        getAfterSalesList({ supplierBrand: row.brand || row.name }),
+        getAfterSalesList({ supplierBrand: row.name }),
         getInspectionIssues({ supplierName: row.name }),
         getSupplierHistoryProjects(row.id),
       ]);
