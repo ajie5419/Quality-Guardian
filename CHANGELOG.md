@@ -25,6 +25,15 @@
 
 ## 执行记录
 
+## [0.11.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.11.0...qgs-v0.11.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** restore inspection and work order flows ([5a3e32a](https://github.com/ajie5419/Quality-Guardian/commit/5a3e32acd751bc9ad0aa4a4ab0ac6869aa97a3c0))
+* **@qgs/backend:** restore inspection and work order flows ([3ec8f6c](https://github.com/ajie5419/Quality-Guardian/commit/3ec8f6c1329884c3887ec39f85059ab847560d1c))
+* **deploy:** baseline existing prisma schema ([6b23484](https://github.com/ajie5419/Quality-Guardian/commit/6b23484d5eea41aa5b47d9094daddc73dcc62575))
+
 ### 2026-06-25 修复：软删除工单编号无法重新新增
 
 **执行内容：**
