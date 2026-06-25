@@ -13,6 +13,7 @@ import type { SystemDeptApi } from '#/api/system/dept';
 
 import { computed, reactive, ref, watch } from 'vue';
 
+import { resolveInspectionRequestIssueResponsibility } from '@qgs/shared';
 import { message, Modal } from 'ant-design-vue';
 import dayjs from 'dayjs';
 
@@ -29,7 +30,6 @@ import {
 
 import { DEFAULT_VALUES } from '../../issues/constants';
 import { normalizeIssuePhotoUrls } from '../../issues/utils/photo-upload';
-import { INCOMING_INSPECTION_PROCESS_NAME } from '../constants';
 
 type LinkedIssueDraftState = {
   claim: string;
@@ -37,6 +37,7 @@ type LinkedIssueDraftState = {
   defectType: string;
   description: string;
   lossAmount: number;
+  ncNumber: string;
   partName: string;
   photos: UploadFileWithResponse[];
   processName: string;
@@ -75,7 +76,6 @@ export function useInspectionRequestTaskActions(
     canDelete,
     canDispatch,
     defectSubtypes,
-    deptRawData,
     onAfterMutation,
     buildRequestUrl,
     getCurrentUserName,
@@ -120,6 +120,7 @@ export function useInspectionRequestTaskActions(
     defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE,
     description: '',
     lossAmount: 0,
+    ncNumber: '',
     partName: '',
     processName: '',
     qualifiedQuantity: 1,
@@ -186,17 +187,19 @@ export function useInspectionRequestTaskActions(
       return false;
     }
 
-    if (closeForm.attachments.length === 0) {
-      message.warning('检验记录不能为空');
-      return false;
-    }
+    if (!shouldCreateLinkedIssue.value) {
+      if (closeForm.attachments.length === 0) {
+        message.warning('检验记录不能为空');
+        return false;
+      }
 
-    if (hasBlockingCloseAttachmentState()) {
-      message.warning('检验记录仍在上传或上传失败，请处理后再完成检验');
-      return false;
-    }
+      if (hasBlockingCloseAttachmentState()) {
+        message.warning('检验记录仍在上传或上传失败，请处理后再完成检验');
+        return false;
+      }
 
-    if (!shouldCreateLinkedIssue.value) return true;
+      return true;
+    }
 
     syncLinkedIssueQuantities();
 
@@ -222,6 +225,11 @@ export function useInspectionRequestTaskActions(
 
     if (linkedIssueDraft.value.unqualifiedQuantity <= 0) {
       message.warning('不合格数量必须大于 0');
+      return false;
+    }
+
+    if (normalizeIssuePhotoUrls(linkedIssueDraft.value.photos).length === 0) {
+      message.warning('不合格项照片不能为空');
       return false;
     }
 
@@ -336,37 +344,11 @@ export function useInspectionRequestTaskActions(
     });
   }
 
-  function findDeptIdByName(
-    departments: SystemDeptApi.Dept[],
-    targetName: string,
-  ): string {
-    const normalizedTarget = targetName.trim();
-    if (!normalizedTarget) return '';
-
-    for (const dept of departments) {
-      const name = String(dept.name || '').trim();
-      if (name === normalizedTarget || name.includes(normalizedTarget)) {
-        return String(dept.id);
-      }
-      const childId = findDeptIdByName(
-        (dept.children || []) as SystemDeptApi.Dept[],
-        normalizedTarget,
-      );
-      if (childId) return childId;
-    }
-
-    return '';
-  }
-
-  function defaultIssueResponsibleDepartment() {
-    return findDeptIdByName(deptRawData.value, '生产 OBU') || '生产 OBU';
-  }
-
-  function isIncomingInspectionRequest(record: InspectionRequest) {
-    return record.processName === INCOMING_INSPECTION_PROCESS_NAME;
-  }
-
   function openClose(record: InspectionRequest) {
+    const issueResponsibility = resolveInspectionRequestIssueResponsibility({
+      processName: record.processName,
+      team: record.team,
+    });
     currentRequest.value = record;
     closeAttachmentFileList.value = [];
     closeForm.attachments = [];
@@ -383,6 +365,7 @@ export function useInspectionRequestTaskActions(
       defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE,
       description: '',
       lossAmount: 0,
+      ncNumber: '',
       partName: record.componentName || record.partName || '',
       processName: record.processName || '',
       qualifiedQuantity: 0,
@@ -392,12 +375,10 @@ export function useInspectionRequestTaskActions(
       rootCause: '',
       solution: '',
       status: 'OPEN',
-      supplierName: isIncomingInspectionRequest(record)
-        ? record.team || ''
-        : '',
+      supplierName: issueResponsibility.supplierName,
       photos: [] as UploadFileWithResponse[],
       unqualifiedQuantity: record.quantity || 1,
-      responsibleDepartment: defaultIssueResponsibleDepartment(),
+      responsibleDepartment: issueResponsibility.responsibleDepartment,
       severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
     };
 
@@ -428,9 +409,11 @@ export function useInspectionRequestTaskActions(
         : undefined;
 
       await closeInspectionRequest(currentRequest.value.id, {
-        attachments: closeForm.attachments,
+        attachments: shouldCreateLinkedIssue.value ? [] : closeForm.attachments,
         closeRemark: closeForm.closeRemark,
-        hasDocuments: closeForm.hasDocuments,
+        hasDocuments: shouldCreateLinkedIssue.value
+          ? false
+          : closeForm.hasDocuments,
         inspectionId: closeForm.inspectionId || undefined,
         inspector: closeForm.inspector,
         linkedIssue: payloadLinkedIssue,

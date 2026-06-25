@@ -15,9 +15,7 @@ export default defineValidatedHandler(
   qualityLossListQuerySchema,
   async (event, query) => {
     const userinfo = getCurrentUser(event);
-
     const params = parseQualityLossListQuery(query);
-
     try {
       const result = await QualityLossService.getAllLosses({
         ...params,

@@ -1,7 +1,14 @@
 import type { Prisma } from '@prisma/client';
 import type { UserSession } from '~/utils/jwt-utils';
 
+import {
+  isIncomingInspectionRequestProcess,
+  isOutsourcingInspectionRequestProcess,
+  resolveInspectionRequestIssueResponsibility,
+  SUPPLIER_CATEGORY,
+} from '@qgs/shared';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
+import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import {
@@ -28,6 +35,7 @@ export async function buildCloseLinkedIssueCreateResult(options: {
     process?: null | { name?: null | string };
     processName: string;
     reporter: string;
+    team?: null | string;
     work_order?: null | { projectName?: null | string };
     workOrderNumber: string;
   };
@@ -36,18 +44,30 @@ export async function buildCloseLinkedIssueCreateResult(options: {
   const linkedInspection = await findInspectionForIssue(options.inspectionId);
   const newId = createInspectionIssueId();
   const serialNumber = await getNextInspectionIssueSerialNumber();
+  const linkedIssueProcessName = resolveCloseIssueProcessName({
+    linkedIssue: options.linkedIssue,
+    request: options.request,
+  });
+  const isOutsourcingTeam =
+    isIncomingInspectionRequestProcess(linkedIssueProcessName) ||
+    isOutsourcingInspectionRequestProcess(linkedIssueProcessName)
+      ? false
+      : await isOutsourcingInspectionRequestTeam(options.request.team);
   const issueBody = buildCloseLinkedIssueBody({
     body: options.body,
     inspectionId: options.inspectionId,
+    isOutsourcingTeam,
     linkedInspection,
     linkedIssue: options.linkedIssue,
+    ncNumber: normalizeInspectionRequestText(options.linkedIssue.ncNumber),
+    processName: linkedIssueProcessName,
     request: options.request,
   });
 
   return {
     auditVariables: {
       issue: issueBody.partName,
-      nonConformanceNumber: newId,
+      nonConformanceNumber: issueBody.ncNumber,
     },
     createData: await buildInspectionIssueCreateData(issueBody, {
       id: newId,
@@ -61,14 +81,18 @@ export async function buildCloseLinkedIssueCreateResult(options: {
 function buildCloseLinkedIssueBody(options: {
   body: Record<string, unknown>;
   inspectionId: string;
+  isOutsourcingTeam: boolean;
   linkedInspection: Awaited<ReturnType<typeof findInspectionForIssue>>;
   linkedIssue: Record<string, unknown>;
+  ncNumber: string;
+  processName: string;
   request: {
     componentName?: null | string;
     partName: string;
     process?: null | { name?: null | string };
     processName: string;
     reporter: string;
+    team?: null | string;
     work_order?: null | { projectName?: null | string };
     workOrderNumber: string;
   };
@@ -97,6 +121,12 @@ function buildCloseLinkedIssueBody(options: {
         undefined,
     },
   );
+  const issueResponsibility = resolveCloseIssueResponsibility({
+    isOutsourcingTeam: options.isOutsourcingTeam,
+    linkedIssue: options.linkedIssue,
+    processName: options.processName,
+    team: options.request.team,
+  });
 
   return {
     claim: normalizeInspectionRequestText(options.linkedIssue.claim) || 'No',
@@ -110,24 +140,17 @@ function buildCloseLinkedIssueBody(options: {
       normalizeInspectionRequestText(options.linkedIssue.partName) ||
       normalizeInspectionRequestText(options.request.componentName) ||
       options.request.partName,
-    processName:
-      normalizeInspectionRequestText(options.linkedIssue.processName) ||
-      normalizeInspectionRequestText(
-        resolveCanonicalProcessName(options.request),
-      ) ||
-      options.request.processName,
+    processName: options.processName,
     projectName:
       options.request.work_order?.projectName ||
       options.request.workOrderNumber,
     quantity: issueQuantity,
+    ncNumber: options.ncNumber,
     reportDate: normalizeInspectionRequestText(options.linkedIssue.reportDate),
     reportedBy:
       normalizeInspectionRequestText(options.linkedIssue.reportedBy) ||
       options.request.reporter,
-    responsibleDepartment:
-      normalizeInspectionRequestText(
-        options.linkedIssue.responsibleDepartment,
-      ) || '生产 OBU',
+    responsibleDepartment: issueResponsibility.responsibleDepartment,
     responsibleWelder:
       normalizeInspectionRequestText(options.linkedIssue.responsibleWelder) ||
       undefined,
@@ -137,13 +160,83 @@ function buildCloseLinkedIssueBody(options: {
     solution: normalizeInspectionRequestText(options.linkedIssue.solution),
     status:
       normalizeInspectionRequestText(options.linkedIssue.status) || 'OPEN',
-    supplierName: normalizeInspectionRequestText(
-      options.linkedIssue.supplierName,
-    ),
+    supplierName: issueResponsibility.supplierName,
     sourceType: 'INSPECTION_REQUEST',
     photos: Array.isArray(options.linkedIssue.photos)
       ? options.linkedIssue.photos
       : [],
     workOrderNumber: options.request.workOrderNumber,
   };
+}
+
+function resolveCloseIssueProcessName(options: {
+  linkedIssue: Record<string, unknown>;
+  request: {
+    process?: null | { name?: null | string };
+    processName: string;
+  };
+}) {
+  return (
+    normalizeInspectionRequestText(options.linkedIssue.processName) ||
+    normalizeInspectionRequestText(
+      resolveCanonicalProcessName(options.request),
+    ) ||
+    options.request.processName
+  );
+}
+
+function resolveCloseIssueResponsibility(options: {
+  isOutsourcingTeam: boolean;
+  linkedIssue: Record<string, unknown>;
+  processName: string;
+  team?: null | string;
+}) {
+  const defaults = resolveInspectionRequestIssueResponsibility({
+    processName: options.processName,
+    team: options.team,
+  });
+  const isExternal =
+    isIncomingInspectionRequestProcess(options.processName) ||
+    isOutsourcingInspectionRequestProcess(options.processName) ||
+    options.isOutsourcingTeam;
+  const explicitSupplierName = normalizeInspectionRequestText(
+    options.linkedIssue.supplierName,
+  );
+
+  if (isExternal) {
+    const externalDefaults = options.isOutsourcingTeam
+      ? resolveInspectionRequestIssueResponsibility({
+          processName: '外协',
+          team: options.team,
+        })
+      : defaults;
+    return {
+      responsibleDepartment: externalDefaults.responsibleDepartment,
+      supplierName: explicitSupplierName || externalDefaults.supplierName,
+    };
+  }
+
+  return {
+    responsibleDepartment:
+      normalizeInspectionRequestText(
+        options.linkedIssue.responsibleDepartment,
+      ) || defaults.responsibleDepartment,
+    supplierName: explicitSupplierName,
+  };
+}
+
+async function isOutsourcingInspectionRequestTeam(
+  team: null | string | undefined,
+) {
+  const normalizedTeam = normalizeInspectionRequestText(team);
+  if (!normalizedTeam) return false;
+  const supplier = await prisma.suppliers.findFirst({
+    select: { id: true },
+    where: {
+      category: SUPPLIER_CATEGORY.OUTSOURCING,
+      isDeleted: false,
+      name: normalizedTeam,
+    },
+  });
+  return Boolean(supplier);
 }

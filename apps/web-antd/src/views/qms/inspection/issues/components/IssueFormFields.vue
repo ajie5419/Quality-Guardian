@@ -181,10 +181,12 @@ const shouldShowSupplier = computed(() => {
 });
 
 const isAutoNc = ref(false);
+const isGeneratingNc = ref(false);
 
 async function autoFillNcNumber() {
-  if (props.isEditMode) return;
+  if (props.isEditMode || isGeneratingNc.value) return;
   try {
+    isGeneratingNc.value = true;
     const { ncNumber } = await generateInspectionNcNumber();
     if (!ncNumber) {
       message.warning('NC 编号生成接口未返回编号');
@@ -193,6 +195,8 @@ async function autoFillNcNumber() {
     formApi.setFieldValue('ncNumber', ncNumber);
   } catch (error) {
     handleApiError(error, 'Generate NC Number');
+  } finally {
+    isGeneratingNc.value = false;
   }
 }
 
@@ -386,7 +390,18 @@ defineExpose({
               }}
             </span>
           </div>
-          <div v-if="!isEditMode" class="flex flex-shrink-0 items-center gap-2">
+          <div
+            v-if="!isEditMode"
+            class="flex flex-shrink-0 flex-wrap items-center gap-2"
+          >
+            <Button
+              :loading="isGeneratingNc"
+              size="small"
+              type="primary"
+              @click="autoFillNcNumber"
+            >
+              {{ t('qms.inspection.issues.generateNumber') }}
+            </Button>
             <span class="text-xs text-gray-400">自动生成</span>
             <Switch v-model:checked="isAutoNc" size="small" />
           </div>

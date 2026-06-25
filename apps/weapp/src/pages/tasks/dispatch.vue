@@ -6,9 +6,8 @@ import {
   getInspectionRequest,
   getUserList,
 } from '@/api/inspection';
+import { buildApiUrl } from '@/api/request';
 import { onLoad } from '@dcloudio/uni-app';
-
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5320';
 
 interface TaskInfo {
   requestNo: string;
@@ -99,7 +98,7 @@ function onRemarkInput(e: { detail: { value: string } }) {
 function getFullUrl(url: string) {
   if (!url) return '';
   if (url.startsWith('http')) return url;
-  return `${BASE_URL}${url}`;
+  return buildApiUrl(url);
 }
 
 function previewImage(url: string) {

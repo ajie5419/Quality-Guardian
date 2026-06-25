@@ -25,6 +25,50 @@
 
 ## 执行记录
 
+### 2026-06-25 修复：软删除工单编号无法重新新增
+
+**执行内容：**
+
+- 修复工单单条新增入口对软删除记录的处理：当 `workOrderNumber` 已存在但 `isDeleted=true` 时，恢复该工单并覆盖本次提交的工单字段，而不是返回编号已存在。
+- 保持有效工单的编号唯一保护：当同编号工单未删除时仍返回明确冲突提示，避免覆盖已有工单关联的检验、售后和质量记录。
+- 补充工单路由服务单测，覆盖新增、软删除恢复、有效编号冲突三条路径。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec vitest run modules/work-order/work-order-route.service.test.ts`: 1 文件 / 14 测试通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 未连接生产数据库查询 `26-KJGZ-005` 当前记录状态；代码根因已确认是软删除主键占号时单条新增入口直接冲突。
+
+### 2026-06-24 修复：小程序连接与鉴权接口链路
+
+**执行内容：**
+
+- 移除小程序请求层默认回退到 `http://localhost:5320` 的逻辑；`VITE_API_BASE_URL` 未配置时直接抛出明确错误，避免微信开发者工具或真机误连本机 `localhost`。
+- 小程序报检提交、工单搜索、工序、BOM 部件、班组查询全部从 `/api/qms/public/inspection/requests/*` 切换到鉴权接口 `/api/qms/inspection/requests/*`。
+- 后端补齐小程序需要的鉴权版报检辅助查询路由：`work-orders`、`processes`、`bom-parts`、`teams`，复用现有 inspection 查询 service。
+- 新增鉴权上传入口 `/api/qms/upload`，小程序上传不再调用 public 路径；派工附件预览统一通过请求层拼接 API 地址。
+
+**验证结果：**
+
+- `rg "api/qms/public|api/upload|localhost:5320|VITE_API_BASE_URL \\|\\||BASE_URL" apps/weapp apps/backend/api/qms/inspection apps/backend/api/qms/upload.post.ts`: 小程序端无 public 路径、旧上传路径、localhost 回退残留。
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+- `pnpm lint`: 通过；存在既有 `IssueFormFields.test.ts` 的 9 个 `vue/one-component-per-file` warning，非本次小程序改动引入。
+- `pnpm --dir apps/weapp run typecheck`: 脚本执行成功；项目脚本当前为 `skipped: uni-app types incompatible with vue-tsc global check`。
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 未读取 `.env` 文件；需要在实际构建环境确认 `VITE_API_BASE_URL` 指向微信可访问的 HTTPS 后端域名，并在微信小程序后台配置合法 request/uploadFile 域名。
+- 按项目约束未启动小程序 dev/build 服务。
+
 ## [0.11.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.10.2...qgs-v0.11.0) (2026-06-24)
 
 
@@ -48,6 +92,31 @@
 * **@qgs/web-antd:** localize qms status displays ([3b57219](https://github.com/ajie5419/Quality-Guardian/commit/3b57219ded3ff8b46f6398b4a3630e03989bf681))
 * **@qgs/web-antd:** persist inspection request issue photos ([79c660b](https://github.com/ajie5419/Quality-Guardian/commit/79c660b9d6a558de81f65d0884aefc9983c5cefc))
 * **@qgs/web-antd:** query supplier after-sales by supplier name ([7f69754](https://github.com/ajie5419/Quality-Guardian/commit/7f69754d9107b94bff1c80ce049d5da30379c049))
+
+### 2026-06-24 修复：报检关闭不合格项责任归属与编号
+
+**执行内容：**
+
+- 新增报检任务生成不合格项的责任归属共享规则：进货检验把报检班组写入 `supplierName`，责任部门写 `采购部`；外协工序把报检班组写入 `supplierName`，责任部门写 `生产 OBU`；内部班组仍写责任部门。
+- 报检任务“完成检验”弹窗改为按共享规则预填不合格项责任字段，避免供应商/外协单位落到责任部门。
+- 后端创建关联不合格项时同步按同一规则兜底，避免绕过前端或旧前端 payload 继续写错字段。
+- 移除后端空不合格编号回退为内部 `ISS-*` id 的逻辑；未点击“生成编号”时，不合格项编号保持为空，只在前端明确传入 `ncNumber` 时落库。
+- 同步重建 `@qgs/shared` 本地构建产物，用于验证应用层测试真实解析到新增共享规则。
+
+**验证结果：**
+
+- `pnpm --dir packages/qgs-shared run build`: 通过
+- `pnpm -C apps/backend exec vitest run modules/inspection/inspection-request-close-issue.service.test.ts modules/inspection/inspection-request-close.schema.test.ts modules/inspection/inspection-request-close-adversarial.test.ts modules/inspection/inspection-request-close.service.test.ts`: 4 文件 / 48 测试通过
+- `pnpm exec vitest run --dom apps/web-antd/src/views/qms/inspection/requests/composables/useInspectionRequestTaskActions.test.ts apps/web-antd/src/views/qms/inspection/issues/components/IssueFormFields.test.ts packages/qgs-shared/src/domain-modules/qms/inspection-request.test.ts`: 3 文件 / 13 测试通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm --dir apps/web-antd run typecheck`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 未启动前端 dev/build；按项目约束仅做代码级验证、共享包构建、类型检查、单测和架构门禁。
 
 ### 2026-06-24 修复：生产发布 Prisma 基线迁移
 
@@ -2526,3 +2595,53 @@
 - `InspectionApiService` 仍保留不合格品 issue 相关兼容入口，本轮只清理报检任务主路径，未扩大到 issue API。
 - 报检任务派工、关闭 PASS/FAIL、public 创建仍建议继续补带数据库 mock 的流程测试。
 - `pnpm -C apps/backend exec vitest run` 仍会输出 `REDIS_URL not found, caching disabled` 测试环境警告，不影响门禁结果。
+
+### 2026-06-24 不合格项编号按钮恢复
+
+**执行内容：**
+
+- 恢复不合格项创建表单 `ncNumber` 字段右侧的显式“生成编号”按钮，保留原有自动生成开关。
+- 为生成编号请求增加 loading 与重复点击保护，避免用户连续点击触发多次编号请求。
+- 新增 `IssueFormFields.test.ts`，覆盖创建模式显示生成按钮、点击后写入编号、编辑模式隐藏生成入口。
+- 清理 `apps/backend/api/qms/quality-loss/index.get.ts` 中遗留的 `/tmp/qgs-quality-loss-query.log` 临时调试写文件代码。
+
+**验证结果：**
+
+- `pnpm exec vitest run --dom apps/web-antd/src/views/qms/inspection/issues/components/IssueFormFields.test.ts`: 1 文件 / 3 测试通过
+- `pnpm exec vitest run --dom apps/web-antd/src/views/qms/inspection/issues/composables/useNcNumber.test.ts apps/web-antd/src/views/qms/inspection/issues/components/IssueFormFields.test.ts`: 2 文件 / 7 测试通过
+- `pnpm --dir apps/web-antd run typecheck`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+
+**commit:** 本次未提交
+
+**遗留问题：**
+
+- 未启动前端 dev/build 服务；按项目约束，本次通过组件测试、类型检查与架构门禁验证。
+
+### 2026-06-24 报检任务不合格关闭流程调整
+
+**执行内容：**
+
+- 报检任务完成检验选择不合格时，不合格项责任部门默认落为当前报检任务的班组 `team`，前端和后端 fallback 均不再使用固定“生产 OBU”。
+- 不合格关闭时隐藏“已有检验记录 ID”“是否有资料”“检验记录”“上传检验记录”等检验记录相关入口。
+- 不合格关闭时不再要求关闭附件；提交 payload 固定传空附件与 `hasDocuments=false`。
+- 不合格项照片改为必填，前端提交前校验有效上传 URL，后端 `validateCloseRequestBody` 同步兜底校验。
+- 修复后端照片校验误用报检附件对象格式导致字符串 URL 照片被判空的问题，支持 `linkedIssue.photos` 传 URL 字符串数组或 `{ url }` 对象数组。
+- 修复完成检验嵌入不合格项表单生成的 `ncNumber` 未进入 `linkedIssue` payload，且后端未写入 `nonConformanceNumber` 的问题；前端生成编号优先落库，未传时后端生成编号兜底。
+
+**验证结果：**
+
+- `pnpm exec vitest run --dom apps/web-antd/src/views/qms/inspection/requests/composables/useInspectionRequestTaskActions.test.ts`: 1 文件 / 2 测试通过
+- `pnpm exec vitest run --dom apps/web-antd/src/views/qms/inspection/requests/composables/useInspectionRequestTaskActions.test.ts apps/web-antd/src/views/qms/inspection/issues/components/IssueFormFields.test.ts`: 2 文件 / 5 测试通过
+- `pnpm -C apps/backend exec vitest run modules/inspection/inspection-request-close-adversarial.test.ts modules/inspection/inspection-request-close-issue.service.test.ts modules/inspection/inspection-request-close.service.test.ts`: 3 文件 / 42 测试通过
+- `pnpm -C apps/backend exec vitest run modules/inspection/inspection-request-close.schema.test.ts modules/inspection/inspection-request-close-adversarial.test.ts modules/inspection/inspection-request-close-issue.service.test.ts modules/inspection/inspection-request-close.service.test.ts`: 4 文件 / 45 测试通过
+- `pnpm -C apps/backend exec vitest run modules/inspection/inspection-request-close-issue.service.test.ts modules/inspection/inspection-request-close.schema.test.ts modules/inspection/inspection-request-close-adversarial.test.ts modules/inspection/inspection-request-close.service.test.ts`: 4 文件 / 45 测试通过
+- `pnpm --dir apps/web-antd run typecheck`: 通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+
+**commit:** 本次未提交
+
+**遗留问题：**
+
+- 未启动前端 dev/build 服务；按项目约束，本次通过组件/组合式函数测试、后端单测、类型检查与架构门禁验证。

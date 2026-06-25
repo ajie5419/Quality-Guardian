@@ -69,17 +69,15 @@ describe('useInspectionRequestTaskActions', () => {
     composable.openClose({
       id: 'request-1',
       componentName: 'Bearing',
-      inspectionId: 'inspection-1',
       inspectorName: 'Inspector A',
       partName: 'Bearing',
       processName: 'Welding',
       quantity: 2,
+      team: 'Assembly Team A',
       workOrderNumber: 'WO-1',
     } as any);
     composable.closeForm.result = 'FAIL';
-    composable.closeForm.attachments = [
-      { name: 'inspection.pdf', url: '/api/uploads/inspection.pdf' },
-    ];
+    composable.linkedIssueDraft.value.ncNumber = 'NC-2026-001';
     composable.linkedIssueDraft.value.description = 'Weld pore';
     composable.linkedIssueDraft.value.rootCause = 'Parameter drift';
     composable.linkedIssueDraft.value.solution = 'Rework and inspect again';
@@ -103,12 +101,80 @@ describe('useInspectionRequestTaskActions', () => {
       expect.objectContaining({
         linkedIssue: expect.objectContaining({
           photos: ['/api/uploads/defect.jpg'],
+          ncNumber: 'NC-2026-001',
           quantity: 2,
+          responsibleDepartment: 'Assembly Team A',
         }),
+        attachments: [],
+        hasDocuments: false,
         result: 'FAIL',
         unqualifiedQuantity: 2,
       }),
     );
     expect(mockMessageSuccess).toHaveBeenCalledWith('报检任务检验完成');
+  });
+
+  it('prefills incoming supplier as supplierName and purchasing as responsible department', () => {
+    const composable = createComposable();
+
+    composable.openClose({
+      id: 'request-1',
+      componentName: '',
+      inspectorName: 'Inspector A',
+      partName: 'Bearing',
+      processName: '进货检验',
+      quantity: 2,
+      team: 'Supplier A',
+      workOrderNumber: 'WO-1',
+    } as any);
+
+    expect(composable.linkedIssueDraft.value).toMatchObject({
+      responsibleDepartment: '采购部',
+      supplierName: 'Supplier A',
+    });
+  });
+
+  it('prefills outsourcing unit as supplierName and production OBU as responsible department', () => {
+    const composable = createComposable();
+
+    composable.openClose({
+      id: 'request-1',
+      componentName: 'Bearing',
+      inspectorName: 'Inspector A',
+      partName: 'Bearing',
+      processName: '外协机加',
+      quantity: 2,
+      team: 'Outsourcing Plant A',
+      workOrderNumber: 'WO-1',
+    } as any);
+
+    expect(composable.linkedIssueDraft.value).toMatchObject({
+      responsibleDepartment: '生产 OBU',
+      supplierName: 'Outsourcing Plant A',
+    });
+  });
+
+  it('requires issue photos when closing as failed', async () => {
+    const composable = createComposable();
+
+    composable.openClose({
+      id: 'request-1',
+      componentName: 'Bearing',
+      inspectorName: 'Inspector A',
+      partName: 'Bearing',
+      processName: 'Welding',
+      quantity: 2,
+      team: 'Assembly Team A',
+      workOrderNumber: 'WO-1',
+    } as any);
+    composable.closeForm.result = 'FAIL';
+    composable.linkedIssueDraft.value.description = 'Weld pore';
+    composable.linkedIssueDraft.value.rootCause = 'Parameter drift';
+    composable.linkedIssueDraft.value.solution = 'Rework and inspect again';
+
+    await composable.submitClose();
+
+    expect(mockCloseInspectionRequest).not.toHaveBeenCalled();
+    expect(mockMessageWarning).toHaveBeenCalledWith('不合格项照片不能为空');
   });
 });
