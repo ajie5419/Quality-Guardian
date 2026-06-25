@@ -12,7 +12,21 @@ interface ApiResponse<T = unknown> {
   message: string;
 }
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5320';
+const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(
+  /\/+$/,
+  '',
+);
+
+function getApiBaseUrl(): string {
+  if (!API_BASE_URL) {
+    throw new Error('VITE_API_BASE_URL is not configured');
+  }
+  return API_BASE_URL;
+}
+
+function buildApiUrl(path: string): string {
+  return `${getApiBaseUrl()}${path}`;
+}
 
 let isRefreshing = false;
 let pendingRequests: Array<() => void> = [];
@@ -33,7 +47,7 @@ async function refreshToken(): Promise<boolean> {
     const res = await new Promise<UniApp.RequestSuccessCallbackResult>(
       (resolve, reject) => {
         uni.request({
-          url: `${BASE_URL}/api/auth/wx-refresh`,
+          url: buildApiUrl('/api/auth/wx-refresh'),
           method: 'POST',
           data: { refreshToken: rt },
           success: resolve,
@@ -67,7 +81,7 @@ export async function request<T = unknown>(
   const res = await new Promise<UniApp.RequestSuccessCallbackResult>(
     (resolve, reject) => {
       uni.request({
-        url: `${BASE_URL}${options.url}`,
+        url: buildApiUrl(options.url),
         method: options.method || 'GET',
         data: options.data,
         header,
@@ -128,7 +142,7 @@ export function uploadFile(
   const token = getToken();
   return new Promise((resolve, reject) => {
     uni.uploadFile({
-      url: `${BASE_URL}/api/upload`,
+      url: buildApiUrl('/api/qms/upload'),
       filePath,
       name: 'file',
       formData,
@@ -144,3 +158,4 @@ export function uploadFile(
 }
 
 export type { ApiResponse };
+export { buildApiUrl, getApiBaseUrl };

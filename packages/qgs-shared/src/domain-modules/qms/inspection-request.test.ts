@@ -5,6 +5,7 @@ import {
   formatInspectionStationSelection,
   INCOMING_INSPECTION_PROCESS_NAME,
   normalizeInspectionStationSelection,
+  resolveInspectionRequestIssueResponsibility,
 } from './inspection-request';
 
 describe('buildInspectionRecordPayloadCore', () => {
@@ -90,5 +91,43 @@ describe('inspection station selection', () => {
     expect(
       formatInspectionStationSelection({ indexes: [1, 2], mode: 'PARTIAL' }),
     ).toBe('第 1 台、第 2 台');
+  });
+});
+
+describe('resolveInspectionRequestIssueResponsibility', () => {
+  it('maps incoming supplier to supplierName and purchasing department', () => {
+    expect(
+      resolveInspectionRequestIssueResponsibility({
+        processName: INCOMING_INSPECTION_PROCESS_NAME,
+        team: 'Supplier A',
+      }),
+    ).toEqual({
+      responsibleDepartment: '采购部',
+      supplierName: 'Supplier A',
+    });
+  });
+
+  it('maps outsourcing unit to supplierName and production OBU', () => {
+    expect(
+      resolveInspectionRequestIssueResponsibility({
+        processName: '外协机加',
+        team: 'Outsourcing Plant A',
+      }),
+    ).toEqual({
+      responsibleDepartment: '生产 OBU',
+      supplierName: 'Outsourcing Plant A',
+    });
+  });
+
+  it('keeps internal teams as responsible departments', () => {
+    expect(
+      resolveInspectionRequestIssueResponsibility({
+        processName: '焊接',
+        team: 'Assembly Team A',
+      }),
+    ).toEqual({
+      responsibleDepartment: 'Assembly Team A',
+      supplierName: '',
+    });
   });
 });

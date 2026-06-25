@@ -79,37 +79,49 @@ export const WorkOrderRouteService = {
     const woNum = parseRequiredWorkOrderNumber(body.workOrderNumber);
     if (!woNum || !body.customerName)
       throw new Error('BAD_REQUEST:缺少必填字段');
-    const existing = await prisma.work_orders.findUnique({
-      where: { workOrderNumber: woNum },
-    });
-    if (existing)
-      throw new Error(`CONFLICT:工单号 ${woNum} 已存在，请使用其他编号`);
     const governedFields = buildGovernedWriteFieldsForTable('work_orders', {
       customerName: body.customerName,
       division: body.division,
     });
+    const workOrderData = {
+      customerName: body.customerName as string,
+      projectName: body.projectName as string | undefined,
+      ...governedFields,
+      quantity: parseWorkOrderQuantity(body.quantity, 1),
+      multiStationEnabled: body.multiStationEnabled === true,
+      deliveryDate: parseRequiredDate(body.deliveryDate),
+      effectiveTime: parseOptionalDate(body.effectiveTime),
+      status: mapWorkOrderStatus(body.status),
+      isDeleted: false,
+      updatedAt: new Date(),
+    };
     try {
-      const newWO = await prisma.work_orders.create({
-        data: {
-          workOrderNumber: woNum,
-          customerName: body.customerName as string,
-          projectName: body.projectName as string | undefined,
-          ...governedFields,
-          quantity: parseWorkOrderQuantity(body.quantity, 1),
-          multiStationEnabled: body.multiStationEnabled === true,
-          deliveryDate: parseRequiredDate(body.deliveryDate),
-          effectiveTime: parseOptionalDate(body.effectiveTime),
-          status: mapWorkOrderStatus(body.status),
-          isDeleted: false,
-          updatedAt: new Date(),
-        },
+      const existing = await prisma.work_orders.findUnique({
+        where: { workOrderNumber: woNum },
       });
+      if (existing && !existing.isDeleted)
+        throw new Error(
+          `CONFLICT:工单号 ${woNum} 已存在且未删除，请在工单列表搜索或调整筛选条件后处理`,
+        );
+      const newWO = existing?.isDeleted
+        ? await prisma.work_orders.update({
+            where: { workOrderNumber: woNum },
+            data: workOrderData,
+          })
+        : await prisma.work_orders.create({
+            data: {
+              workOrderNumber: woNum,
+              ...workOrderData,
+            },
+          });
       await recordBusinessAuditLog(event, {
         userId: userinfo.id,
-        action: 'CREATE',
+        action: existing?.isDeleted ? 'UPDATE' : 'CREATE',
         targetType: 'work_order',
         targetId: String(newWO.workOrderNumber),
-        detailsTemplate: '新增工单: {{workOrderNumber}} ({{customerName}})',
+        detailsTemplate: existing?.isDeleted
+          ? '恢复工单: {{workOrderNumber}} ({{customerName}})'
+          : '新增工单: {{workOrderNumber}} ({{customerName}})',
         detailsVariables: {
           customerName: newWO.customerName,
           workOrderNumber: newWO.workOrderNumber,

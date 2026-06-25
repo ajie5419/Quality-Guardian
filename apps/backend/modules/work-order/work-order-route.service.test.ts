@@ -180,10 +180,61 @@ describe('workOrderRouteService', () => {
 
       expect(result.id).toBe('WO-NEW');
       expect(result.createTime).toBeDefined();
+      expect(prisma.work_orders.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            isDeleted: false,
+            workOrderNumber: 'WO-NEW',
+          }),
+        }),
+      );
     });
 
-    it('should throw on duplicate work order number', async () => {
+    it('should restore a deleted work order instead of failing on the primary key', async () => {
       (prisma.work_orders.findUnique as any).mockResolvedValue({
+        isDeleted: true,
+        workOrderNumber: 'WO-DELETED',
+      });
+      (prisma.work_orders.update as any).mockResolvedValue({
+        workOrderNumber: 'WO-DELETED',
+        customerName: 'Customer',
+        projectName: 'Project',
+        division: 'Div',
+        quantity: 10,
+        status: 'OPEN',
+        createdAt: new Date('2024-01-01'),
+        multiStationEnabled: false,
+        effectiveTime: null,
+      });
+
+      const result = await WorkOrderRouteService.create(
+        mockEvent(),
+        {
+          workOrderNumber: 'WO-DELETED',
+          customerName: 'Customer',
+          projectName: 'Project',
+          division: 'Div',
+          quantity: 10,
+          deliveryDate: '2024-06-01',
+          status: 'OPEN',
+        },
+        mockUserinfo(),
+      );
+
+      expect(result.id).toBe('WO-DELETED');
+      expect(prisma.work_orders.create).not.toHaveBeenCalled();
+      expect(prisma.work_orders.update).toHaveBeenCalledWith({
+        where: { workOrderNumber: 'WO-DELETED' },
+        data: expect.objectContaining({
+          customerName: 'Customer',
+          isDeleted: false,
+        }),
+      });
+    });
+
+    it('should throw on active duplicate work order number', async () => {
+      (prisma.work_orders.findUnique as any).mockResolvedValue({
+        isDeleted: false,
         workOrderNumber: 'WO-EXIST',
       });
 
@@ -193,7 +244,9 @@ describe('workOrderRouteService', () => {
           { workOrderNumber: 'WO-EXIST', customerName: 'C' },
           mockUserinfo(),
         ),
-      ).rejects.toThrow('已存在');
+      ).rejects.toThrow('已存在且未删除');
+      expect(prisma.work_orders.create).not.toHaveBeenCalled();
+      expect(prisma.work_orders.update).not.toHaveBeenCalled();
     });
 
     it('should throw on missing required fields', async () => {

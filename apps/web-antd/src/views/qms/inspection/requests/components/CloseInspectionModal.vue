@@ -48,6 +48,7 @@ interface Props {
     defectType: string;
     description: string;
     lossAmount: number;
+    ncNumber: string;
     partName: string;
     photos: UploadFile[];
     processName: string;
@@ -151,10 +152,10 @@ function buildEmbeddedIssueValues() {
     quantity: total,
     inspector: localLinkedIssueDraft.reportedBy,
     reportDate: localLinkedIssueDraft.reportDate,
+    responsibleDepartment: localLinkedIssueDraft.responsibleDepartment,
     responsibleDepartments: localLinkedIssueDraft.responsibleDepartment
       ? [localLinkedIssueDraft.responsibleDepartment]
       : [],
-    responsibleDepartment: localLinkedIssueDraft.responsibleDepartment,
     responsibleWelder: localLinkedIssueDraft.responsibleWelder,
     supplierName: localLinkedIssueDraft.supplierName,
     status: localLinkedIssueDraft.status,
@@ -162,6 +163,7 @@ function buildEmbeddedIssueValues() {
     defectType: localLinkedIssueDraft.defectType,
     defectSubtype: localLinkedIssueDraft.defectSubtype,
     lossAmount: localLinkedIssueDraft.lossAmount,
+    ncNumber: localLinkedIssueDraft.ncNumber,
     claim: localLinkedIssueDraft.claim,
     description: localLinkedIssueDraft.description,
     rootCause: localLinkedIssueDraft.rootCause,
@@ -262,10 +264,15 @@ async function collectIssueFromForm() {
         .map((id) => String(id || '').trim())
         .filter(Boolean)
     : [];
+  const responsibleDepartment =
+    responsibleDepartments[0] ||
+    String(values.responsibleDepartment || '') ||
+    localLinkedIssueDraft.responsibleDepartment ||
+    '';
   Object.assign(localLinkedIssueDraft, {
     partName: String(values.partName || ''),
     processName: String(values.processName || ''),
-    responsibleDepartment: responsibleDepartments[0] || '',
+    responsibleDepartment,
     responsibleWelder: String(values.responsibleWelder || ''),
     supplierName: String(values.supplierName || ''),
     status: String(values.status || 'OPEN'),
@@ -273,6 +280,7 @@ async function collectIssueFromForm() {
     defectType: String(values.defectType || ''),
     defectSubtype: String(values.defectSubtype || ''),
     lossAmount: Number(values.lossAmount) || 0,
+    ncNumber: String(values.ncNumber || ''),
     claim: String(values.claim || ''),
     description: String(values.description || ''),
     rootCause: String(values.rootCause || ''),
@@ -319,8 +327,11 @@ async function handleBeforeUpload(file: File) {
   >
     <Form layout="vertical">
       <div class="mb-4 rounded border border-gray-100 bg-gray-50 px-3 py-2">
-        <div class="grid grid-cols-2 gap-3 text-xs">
-          <div>
+        <div
+          class="grid gap-3 text-xs"
+          :class="shouldCreateLinkedIssue ? 'grid-cols-1' : 'grid-cols-2'"
+        >
+          <div v-if="!shouldCreateLinkedIssue">
             <div class="mb-1 text-gray-500">已有检验记录 ID</div>
             <div class="truncate text-gray-400">
               {{ props.displayCloseReadonlyValue(localCloseForm.inspectionId) }}
@@ -351,7 +362,7 @@ async function handleBeforeUpload(file: File) {
             class="w-full"
           />
         </Form.Item>
-        <Form.Item label="是否有资料">
+        <Form.Item v-if="!shouldCreateLinkedIssue" label="是否有资料">
           <Switch
             v-model:checked="localCloseForm.hasDocuments"
             checked-children="有"
@@ -359,7 +370,7 @@ async function handleBeforeUpload(file: File) {
           />
         </Form.Item>
       </div>
-      <Form.Item label="检验记录">
+      <Form.Item v-if="!shouldCreateLinkedIssue" label="检验记录">
         <Upload
           :file-list="props.closeAttachmentFileList"
           action="/api/upload"

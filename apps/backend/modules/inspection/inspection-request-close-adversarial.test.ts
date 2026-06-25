@@ -50,7 +50,7 @@ vi.mock('~/modules/inspection/inspection-request-close.schema', () => ({
     if (result !== 'PASS' && result !== 'FAIL')
       throw new Error('VALIDATION:检验结果必须为合格或不合格');
     const closeAttachments = mockNormalizeAttachments(body.attachments);
-    if (closeAttachments.length === 0)
+    if (result === 'PASS' && closeAttachments.length === 0)
       throw new Error('VALIDATION:检验记录不能为空');
     const quantity = mockParseQuantity(body.quantity);
     const rawUQ = Number(body.unqualifiedQuantity);
@@ -66,6 +66,8 @@ vi.mock('~/modules/inspection/inspection-request-close.schema', () => ({
     if (!body.linkedIssue || typeof body.linkedIssue !== 'object')
       throw new Error('VALIDATION:检验结果为不合格时必须填写不合格项信息');
     const li = body.linkedIssue as Record<string, unknown>;
+    if (mockNormalizeAttachments(li.photos).length === 0)
+      throw new Error('VALIDATION:不合格项照片不能为空');
     for (const [key, label] of [
       ['partName', '组件名称'],
       ['processName', '工序'],
@@ -220,6 +222,7 @@ const VALID_LINKED_ISSUE = {
   defectSubtype: 'crack',
   defectType: 'surface',
   partName: 'Bearing',
+  photos: [{ name: 'defect.jpg', url: 'http://example.com/defect.jpg' }],
   processName: 'Welding',
   responsibleDepartment: 'Prod',
   rootCause: 'fatigue',
@@ -726,7 +729,7 @@ describe('inspection-request-close adversarial', () => {
   });
 
   describe('missing attachments', () => {
-    it('empty attachments array → rejected', async () => {
+    it('pASS: empty attachments array → rejected', async () => {
       (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
         makeRequest(),
       );
@@ -741,7 +744,7 @@ describe('inspection-request-close adversarial', () => {
       ).rejects.toThrow('VALIDATION:检验记录不能为空');
     });
 
-    it('no attachments key → rejected', async () => {
+    it('pASS: no attachments key → rejected', async () => {
       (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
         makeRequest(),
       );
@@ -754,6 +757,52 @@ describe('inspection-request-close adversarial', () => {
           MOCK_USER,
         ),
       ).rejects.toThrow('VALIDATION:检验记录不能为空');
+    });
+
+    it('fAIL: no close attachments key → accepted when linked issue has photos', async () => {
+      (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+        makeRequest(),
+      );
+      const txMock = makeTxMock({ status: 'INSPECTING' });
+      (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+        cb(txMock),
+      );
+
+      await InspectionRequestCloseService.closeRequest(
+        MOCK_EVENT,
+        'req-1',
+        {
+          linkedIssue: VALID_LINKED_ISSUE,
+          quantity: 10,
+          result: 'FAIL',
+          unqualifiedQuantity: 2,
+        },
+        MOCK_USER,
+      );
+
+      const data = txMock.qms_inspection_requests.update.mock.calls[0][0].data;
+      expect(data.inspectionResult).toBe('FAIL');
+      expect(data.closeAttachments).toBeNull();
+    });
+
+    it('fAIL: linkedIssue without photos → rejected', async () => {
+      (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+        makeRequest(),
+      );
+
+      await expect(
+        InspectionRequestCloseService.closeRequest(
+          MOCK_EVENT,
+          'req-1',
+          {
+            linkedIssue: { ...VALID_LINKED_ISSUE, photos: [] },
+            quantity: 10,
+            result: 'FAIL',
+            unqualifiedQuantity: 2,
+          },
+          MOCK_USER,
+        ),
+      ).rejects.toThrow('VALIDATION:不合格项照片不能为空');
     });
   });
 

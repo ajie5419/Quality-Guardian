@@ -37,6 +37,7 @@ type LinkedIssueDraft = {
   defectType: string;
   description: string;
   lossAmount: number;
+  ncNumber: string;
   partName: string;
   photos: UploadFile[];
   processName: string;

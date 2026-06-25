@@ -20,7 +20,7 @@ export function validateCloseRequestBody(body: Record<string, unknown>) {
   const closeAttachments = normalizeInspectionRequestAttachments(
     body.attachments,
   );
-  if (closeAttachments.length === 0)
+  if (result === 'PASS' && closeAttachments.length === 0)
     failCloseRequest('VALIDATION', '检验记录不能为空');
   const quantity = parseInspectionRequestQuantity(body.quantity);
   const rawUnqualifiedQuantity = parseCloseRequestNumber(
@@ -39,6 +39,9 @@ export function validateCloseRequestBody(body: Record<string, unknown>) {
   if (!body.linkedIssue || typeof body.linkedIssue !== 'object')
     failCloseRequest('VALIDATION', '检验结果为不合格时必须填写不合格项信息');
   const linkedIssue = body.linkedIssue as Record<string, unknown>;
+  const issuePhotos = normalizeIssuePhotoUrls(linkedIssue.photos);
+  if (issuePhotos.length === 0)
+    failCloseRequest('VALIDATION', '不合格项照片不能为空');
   for (const [key, label] of [
     ['partName', '组件名称'],
     ['processName', '工序'],
@@ -53,6 +56,24 @@ export function validateCloseRequestBody(body: Record<string, unknown>) {
   ] as const) {
     requireLinkedIssueText(linkedIssue, key, label);
   }
+}
+
+function normalizeIssuePhotoUrls(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Set(
+      value
+        .map((item) => {
+          if (typeof item === 'string')
+            return normalizeInspectionRequestText(item);
+          if (!item || typeof item !== 'object') return '';
+          return normalizeInspectionRequestText(
+            (item as Record<string, unknown>).url,
+          );
+        })
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function requireLinkedIssueText(

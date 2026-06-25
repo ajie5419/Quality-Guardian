@@ -7,6 +7,9 @@ export const INSPECTION_REQUEST_STATUS = {
 } as const;
 
 export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
+export const INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT = '采购部';
+export const OUTSOURCING_INSPECTION_PROCESS_KEYWORD = '外协';
+export const OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT = '生产 OBU';
 
 const CHECK_RESULT_SET = new Set(['FAIL', 'NA', 'PASS']);
 const REQUEST_STATUS_SET = new Set<string>(
@@ -39,6 +42,39 @@ export function isIncomingInspectionRequestProcess(value: unknown) {
   return (
     normalizeInspectionRequestText(value) === INCOMING_INSPECTION_PROCESS_NAME
   );
+}
+
+export function isOutsourcingInspectionRequestProcess(value: unknown) {
+  return normalizeInspectionRequestText(value).includes(
+    OUTSOURCING_INSPECTION_PROCESS_KEYWORD,
+  );
+}
+
+export function resolveInspectionRequestIssueResponsibility(input: {
+  processName?: unknown;
+  team?: unknown;
+}) {
+  const processName = normalizeInspectionRequestText(input.processName);
+  const team = normalizeInspectionRequestText(input.team);
+
+  if (isIncomingInspectionRequestProcess(processName)) {
+    return {
+      responsibleDepartment: INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT,
+      supplierName: team,
+    };
+  }
+
+  if (isOutsourcingInspectionRequestProcess(processName)) {
+    return {
+      responsibleDepartment: OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
+      supplierName: team,
+    };
+  }
+
+  return {
+    responsibleDepartment: team,
+    supplierName: '',
+  };
 }
 
 export function parseInspectionRequestPriority(value: unknown, fallback = 3) {

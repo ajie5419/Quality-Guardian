@@ -81,16 +81,16 @@ export function closeInspectionRequest(
   });
 }
 
-// Submit a new inspection request (public, no auth needed for basic submission)
+// Submit a new inspection request
 export function submitInspectionRequest(data: Record<string, unknown>) {
   return request<unknown>({
-    url: '/api/qms/public/inspection/requests',
+    url: '/api/qms/inspection/requests',
     method: 'POST',
     data,
   });
 }
 
-// Search work orders by keyword (public)
+// Search work orders by keyword
 export function searchWorkOrders(keyword: string) {
   return request<{
     items: Array<{
@@ -100,34 +100,34 @@ export function searchWorkOrders(keyword: string) {
     }>;
     total: number;
   }>({
-    url: '/api/qms/public/inspection/requests/work-orders',
+    url: '/api/qms/inspection/requests/work-orders',
     method: 'GET',
     data: { keyword, page: 1, pageSize: 20 },
   });
 }
 
-// Get processes for a given work order (public)
+// Get processes for a given work order
 export function getProcesses(workOrderNumber: string) {
   return request<Array<{ processName: string }>>({
-    url: '/api/qms/public/inspection/requests/processes',
+    url: '/api/qms/inspection/requests/processes',
     method: 'GET',
     data: { workOrderNumber },
   });
 }
 
-// Get BOM parts for a given work order (public)
+// Get BOM parts for a given work order
 export function getBomParts(workOrderNumber: string) {
   return request<Array<{ id: string; partName: string; partNumber: string }>>({
-    url: '/api/qms/public/inspection/requests/bom-parts',
+    url: '/api/qms/inspection/requests/bom-parts',
     method: 'GET',
     data: { workOrderNumber },
   });
 }
 
-// Get team list (public)
+// Get team list
 export function getTeams(keyword?: string) {
   return request<Array<{ group: string; label: string; value: string }>>({
-    url: '/api/qms/public/inspection/requests/teams',
+    url: '/api/qms/inspection/requests/teams',
     method: 'GET',
     data: keyword ? { keyword } : {},
   });

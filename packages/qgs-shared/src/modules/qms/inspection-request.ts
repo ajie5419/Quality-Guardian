@@ -112,6 +112,7 @@ export interface CloseInspectionRequestParams {
     defectType?: string;
     description?: string;
     lossAmount?: number;
+    ncNumber?: string;
     partName?: string;
     photos?: string[];
     processName?: string;
