@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +9,10 @@ import { defineConfig } from '@vben/vite-config';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(currentDir, '../..');
+const require = createRequire(
+  resolve(repoRoot, 'packages/stores/package.json'),
+);
+const piniaPersistedStateEntry = require.resolve('pinia-plugin-persistedstate');
 
 function resolveBuildVersion() {
   if (process.env.VITE_APP_VERSION) {
@@ -40,6 +45,14 @@ export default defineConfig(async () => {
     vite: {
       define: {
         'import.meta.env.VITE_APP_VERSION': JSON.stringify(buildVersion),
+      },
+      optimizeDeps: {
+        exclude: ['jiti'],
+      },
+      resolve: {
+        alias: {
+          'pinia-plugin-persistedstate': piniaPersistedStateEntry,
+        },
       },
       server: {
         proxy: {

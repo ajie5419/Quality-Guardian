@@ -28,6 +28,13 @@ function buildApiUrl(path: string): string {
   return `${getApiBaseUrl()}${path}`;
 }
 
+function buildResourceUrl(url: string): string {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith('/')) return buildApiUrl(url);
+  return url;
+}
+
 let isRefreshing = false;
 let pendingRequests: Array<() => void> = [];
 
@@ -158,4 +165,4 @@ export function uploadFile(
 }
 
 export type { ApiResponse };
-export { buildApiUrl, getApiBaseUrl };
+export { buildApiUrl, buildResourceUrl, getApiBaseUrl };

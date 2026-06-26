@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "uni -p mp-weixin",
+    "dev": "cross-env NODE_ENV=development uni -p mp-weixin",
     "build": "uni build -p mp-weixin",
     "typecheck": "echo 'skipped: uni-app types incompatible with vue-tsc global check'"
   },

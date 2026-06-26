@@ -14,7 +14,7 @@
   "scripts": {
     "build": "pnpm vite build --mode production",
     "build:analyze": "pnpm vite build --mode analyze",
-    "dev": "pnpm vite --mode development",
+    "dev": "cross-env NODE_ENV=development pnpm vite --mode development",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit --skipLibCheck"
   },

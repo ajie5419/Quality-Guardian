@@ -14,14 +14,20 @@ export const useUserStore = defineStore('user', () => {
 
   const isLoggedIn = computed(() => !!uni.getStorageSync('accessToken'));
 
-  function checkAuth() {
+  function restoreAuth() {
     const token = uni.getStorageSync('accessToken');
     const info = uni.getStorageSync('userInfo');
     if (token && info) {
       userInfo.value = JSON.parse(info);
-    } else {
-      uni.reLaunch({ url: '/pages/login/index' });
+      return true;
     }
+    return false;
+  }
+
+  function checkAuth() {
+    if (restoreAuth()) return true;
+    uni.reLaunch({ url: '/pages/login/index' });
+    return false;
   }
 
   async function login() {
@@ -70,5 +76,5 @@ export const useUserStore = defineStore('user', () => {
     uni.reLaunch({ url: '/pages/login/index' });
   }
 
-  return { userInfo, isLoggedIn, checkAuth, login, bind, logout };
+  return { userInfo, isLoggedIn, checkAuth, login, bind, logout, restoreAuth };
 });

@@ -8,7 +8,7 @@ import {
   searchWorkOrders,
   submitInspectionRequest,
 } from '@/api/inspection';
-import { uploadFile } from '@/api/request';
+import { buildResourceUrl, uploadFile } from '@/api/request';
 import { useUserStore } from '@/stores/user';
 import { onLoad } from '@dcloudio/uni-app';
 
@@ -563,7 +563,11 @@ async function handleSubmit() {
               :key="att.url"
               class="photo-item"
             >
-              <image class="photo-thumb" :src="att.url" mode="aspectFill" />
+              <image
+                class="photo-thumb"
+                :src="buildResourceUrl(att.url)"
+                mode="aspectFill"
+              />
               <view class="photo-remove" @tap="handleRemovePhoto(idx)">
                 <text class="photo-remove-icon">×</text>
               </view>

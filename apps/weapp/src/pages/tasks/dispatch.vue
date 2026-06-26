@@ -6,7 +6,7 @@ import {
   getInspectionRequest,
   getUserList,
 } from '@/api/inspection';
-import { buildApiUrl } from '@/api/request';
+import { buildResourceUrl } from '@/api/request';
 import { onLoad } from '@dcloudio/uni-app';
 
 interface TaskInfo {
@@ -96,9 +96,7 @@ function onRemarkInput(e: { detail: { value: string } }) {
 }
 
 function getFullUrl(url: string) {
-  if (!url) return '';
-  if (url.startsWith('http')) return url;
-  return buildApiUrl(url);
+  return buildResourceUrl(url);
 }
 
 function previewImage(url: string) {

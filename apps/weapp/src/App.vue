@@ -1,10 +1,8 @@
-<script setup lang="ts">
-import { useUserStore } from '@/stores/user';
-import { onLaunch } from '@dcloudio/uni-app';
+<script lang="ts">
+import { defineComponent } from 'vue';
 
-onLaunch(() => {
-  const userStore = useUserStore();
-  userStore.checkAuth();
+export default defineComponent({
+  name: 'App',
 });
 </script>
 

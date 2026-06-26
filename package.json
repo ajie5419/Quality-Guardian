@@ -42,7 +42,7 @@
     "clean": "node ./scripts/clean.mjs",
     "commit": "czg",
     "dev": "turbo-run dev",
-    "dev:antd": "turbo run dev --parallel --filter=@qgs/web-antd --filter=@qgs/backend --filter=@qgs/weapp",
+    "dev:antd": "cross-env NODE_ENV=development turbo run dev --parallel --filter=@qgs/web-antd --filter=@qgs/backend --filter=@qgs/weapp",
     "format": "vsh lint --format",
     "lint": "vsh lint",
     "postinstall": "pnpm -r run stub --if-present",

@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 
 import { getInspectionRequests, getInspectionStats } from '@/api/inspection';
+import { requestDispatchSubscribeMessage } from '@/api/subscribe';
 import { useUserStore } from '@/stores/user';
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app';
 
@@ -15,18 +16,19 @@ interface Task {
 }
 
 interface Stats {
-  todayInspections: number;
-  openIssuesCount: number;
-  todayWorkOrders: number;
+  pendingDispatchCount: number;
+  pendingInspectionCount: number;
+  todayClosedCount: number;
 }
 
 const userStore = useUserStore();
 const stats = ref<Stats>({
-  todayInspections: 0,
-  openIssuesCount: 0,
-  todayWorkOrders: 0,
+  pendingDispatchCount: 0,
+  pendingInspectionCount: 0,
+  todayClosedCount: 0,
 });
 const recentTasks = ref<Task[]>([]);
+const recentTaskTotal = ref(0);
 const loading = ref(false);
 
 const greeting = computed(() => {
@@ -52,10 +54,19 @@ const isDispatcher = computed(() => {
 });
 
 const statusLabel = computed(() => {
-  if (isDispatcher.value)
-    return { s1: '待派单', s2: '今日已派', s3: '检验完成' };
-  return { s1: '我的待检', s2: '今日完成', s3: '待复检' };
+  if (isDispatcher.value) return { s1: '待派单', s2: '待检验', s3: '今日完成' };
+  return { s1: '我的待检', s2: '全部待检', s3: '今日完成' };
 });
+
+const statValues = computed(() => ({
+  s1: isDispatcher.value
+    ? stats.value.pendingDispatchCount
+    : recentTaskTotal.value,
+  s2: isDispatcher.value
+    ? stats.value.pendingInspectionCount
+    : stats.value.pendingInspectionCount,
+  s3: stats.value.todayClosedCount,
+}));
 
 async function loadData() {
   if (!userStore.isLoggedIn) return;
@@ -69,9 +80,11 @@ async function loadData() {
       getInspectionStats(),
       getInspectionRequests(taskParams),
     ]);
-    if (statsRes.code === 0 && statsRes.data?.stats)
-      stats.value = statsRes.data.stats;
-    if (tasksRes.code === 0) recentTasks.value = tasksRes.data.items as Task[];
+    if (statsRes.code === 0 && statsRes.data) stats.value = statsRes.data;
+    if (tasksRes.code === 0) {
+      recentTasks.value = tasksRes.data.items as Task[];
+      recentTaskTotal.value = tasksRes.data.total;
+    }
   } catch {
     uni.showToast({ title: '数据加载失败', icon: 'none' });
   } finally {
@@ -81,6 +94,7 @@ async function loadData() {
 }
 
 onShow(() => {
+  if (!userStore.checkAuth()) return;
   loadData();
 });
 onPullDownRefresh(() => {
@@ -115,6 +129,10 @@ function handleLogout() {
     },
   });
 }
+
+function handleEnableNotifications() {
+  void requestDispatchSubscribeMessage({ silent: false });
+}
 </script>
 
 <template>
@@ -131,15 +149,15 @@ function handleLogout() {
 
     <view class="stats-row">
       <view class="stat-card stat-blue">
-        <text class="stat-value">{{ stats.todayInspections }}</text>
+        <text class="stat-value">{{ statValues.s1 }}</text>
         <text class="stat-label">{{ statusLabel.s1 }}</text>
       </view>
       <view class="stat-card stat-orange">
-        <text class="stat-value">{{ stats.openIssuesCount }}</text>
+        <text class="stat-value">{{ statValues.s2 }}</text>
         <text class="stat-label">{{ statusLabel.s2 }}</text>
       </view>
       <view class="stat-card stat-green">
-        <text class="stat-value">{{ stats.todayWorkOrders }}</text>
+        <text class="stat-value">{{ statValues.s3 }}</text>
         <text class="stat-label">{{ statusLabel.s3 }}</text>
       </view>
     </view>
@@ -166,6 +184,12 @@ function handleLogout() {
             <text class="action-icon">📊</text>
           </view>
           <text class="action-label">检验记录</text>
+        </view>
+        <view class="action-btn" @tap="handleEnableNotifications">
+          <view class="action-icon-wrap icon-notice">
+            <text class="action-icon">🔔</text>
+          </view>
+          <text class="action-label">派单通知</text>
         </view>
       </view>
     </view>
@@ -326,6 +350,10 @@ function handleLogout() {
 
   &.icon-record {
     background: #f6ffed;
+  }
+
+  &.icon-notice {
+    background: #f9f0ff;
   }
 }
 

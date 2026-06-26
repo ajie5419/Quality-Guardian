@@ -23,6 +23,7 @@ pnpm -F @qgs/backend run db:rbac:check
 
 echo -e "${GREEN}✅ 数据准备完成${NC}"
 echo -e "${BLUE}5/5 启动本地开发环境（前端+后端）...${NC}"
+export NODE_ENV=development
 pnpm dev:antd
 
 echo -e "${RED}如果看到这行，说明 dev 已退出。${NC}"

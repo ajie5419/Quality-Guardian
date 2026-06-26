@@ -6,7 +6,7 @@ import {
   getDepartments,
   getInspectionRequest,
 } from '@/api/inspection';
-import { uploadFile } from '@/api/request';
+import { buildResourceUrl, uploadFile } from '@/api/request';
 import { onLoad } from '@dcloudio/uni-app';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -461,7 +461,11 @@ onLoad((options) => {
               :key="idx"
               class="photo-item"
             >
-              <image :src="att.url" class="photo-img" mode="aspectFill" />
+              <image
+                :src="buildResourceUrl(att.url)"
+                class="photo-img"
+                mode="aspectFill"
+              />
               <view class="photo-delete" @tap="removeAttachment(idx)">
                 <text class="delete-icon">×</text>
               </view>

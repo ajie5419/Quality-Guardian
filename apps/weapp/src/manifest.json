@@ -1,13 +1,13 @@
 {
   "name": "质量检验助手",
-  "appid": "",
+  "appid": "wxce8ab3b21c4ee2fd",
   "description": "QGS 质量管理系统移动端",
   "versionName": "0.1.0",
   "versionCode": "100",
   "mp-weixin": {
-    "appid": "",
+    "appid": "wxce8ab3b21c4ee2fd",
     "setting": {
-      "urlCheck": false
+      "urlCheck": true
     },
     "usingComponents": true
   }

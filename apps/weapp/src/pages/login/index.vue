@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
+import { requestDispatchSubscribeMessage } from '@/api/subscribe';
 import { useUserStore } from '@/stores/user';
+import { onReady } from '@dcloudio/uni-app';
 
 const userStore = useUserStore();
 
@@ -10,6 +12,12 @@ const showBindForm = ref(false);
 const sessionToken = ref('');
 const username = ref('');
 const password = ref('');
+
+onReady(() => {
+  if (userStore.restoreAuth()) {
+    uni.switchTab({ url: '/pages/home/index' });
+  }
+});
 
 async function handleLogin() {
   if (loading.value) return;
@@ -20,6 +28,7 @@ async function handleLogin() {
       sessionToken.value = result.sessionToken;
       showBindForm.value = true;
     } else {
+      void requestDispatchSubscribeMessage();
       uni.switchTab({ url: '/pages/home/index' });
     }
   } catch (error) {
@@ -43,6 +52,7 @@ async function handleBind() {
       username.value.trim(),
       password.value,
     );
+    void requestDispatchSubscribeMessage();
     uni.switchTab({ url: '/pages/home/index' });
   } catch (error) {
     const msg = error instanceof Error ? error.message : '绑定失败，请重试';
@@ -84,7 +94,7 @@ async function handleBind() {
       <input
         v-model="password"
         class="input-field"
-        type="safe-password"
+        type="password"
         placeholder="请输入密码"
         placeholder-class="input-placeholder"
       />

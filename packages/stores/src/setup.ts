@@ -3,6 +3,7 @@ import type { Pinia } from 'pinia';
 import type { App } from 'vue';
 
 import { createPinia } from 'pinia';
+import { createPersistedState } from 'pinia-plugin-persistedstate';
 import SecureLS from 'secure-ls';
 
 let pinia: Pinia;
@@ -18,7 +19,6 @@ export interface InitStoreOptions {
  * @zh_CN 初始化pinia
  */
 export async function initStores(app: App, options: InitStoreOptions) {
-  const { createPersistedState } = await import('pinia-plugin-persistedstate');
   pinia = createPinia();
   const { namespace } = options;
   const ls = new SecureLS({

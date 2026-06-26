@@ -3,12 +3,10 @@ import { request } from './request';
 // Get inspection stats for home page
 export function getInspectionStats() {
   return request<{
-    stats: {
-      openIssuesCount: number;
-      todayInspections: number;
-      todayWorkOrders: number;
-    };
-  }>({ url: '/api/qms/workspace' });
+    pendingDispatchCount: number;
+    pendingInspectionCount: number;
+    todayClosedCount: number;
+  }>({ url: '/api/qms/inspection/requests/stats' });
 }
 
 // Get task list (inspection requests)

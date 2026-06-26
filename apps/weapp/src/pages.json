@@ -1,12 +1,12 @@
 {
   "pages": [
     {
-      "path": "pages/home/index",
-      "style": { "navigationBarTitleText": "质检首页" }
-    },
-    {
       "path": "pages/login/index",
       "style": { "navigationBarTitleText": "登录" }
+    },
+    {
+      "path": "pages/home/index",
+      "style": { "navigationBarTitleText": "质检首页" }
     },
     {
       "path": "pages/tasks/index",
