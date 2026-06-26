@@ -27,6 +27,7 @@ vi.mock('~/utils/prisma', () => ({
     },
     users: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
       update: vi.fn(),
     },
     data_permission_policies: {
@@ -269,6 +270,47 @@ describe('rbacRoleService', () => {
       const codes = await RbacRoleService.getUserPermissionCodes('u1');
 
       expect(codes).toEqual([]);
+    });
+  });
+
+  describe('getUserIdsByPermissionCode', () => {
+    it('returns users linked to roles with the requested permission', async () => {
+      (prisma.rbac_role_permissions.findMany as any).mockResolvedValue([
+        { roleId: 'role-dispatch' },
+      ]);
+      (prisma.roles.findMany as any).mockResolvedValue([]);
+      (prisma.rbac_user_roles.findMany as any).mockResolvedValue([
+        { userId: 'user-1' },
+      ]);
+      (prisma.users.findMany as any).mockResolvedValue([{ id: 'user-2' }]);
+
+      const userIds = await RbacRoleService.getUserIdsByPermissionCode(
+        'QMS:Inspection:Requests:Dispatch',
+      );
+
+      expect(userIds).toEqual(['user-1', 'user-2']);
+    });
+
+    it('includes active super/admin roles as dispatch receivers', async () => {
+      (prisma.rbac_role_permissions.findMany as any).mockResolvedValue([]);
+      (prisma.roles.findMany as any).mockResolvedValue([
+        { id: 'role-super', name: 'Super Admin' },
+        { id: 'role-user', name: 'operator' },
+      ]);
+      (prisma.rbac_user_roles.findMany as any).mockResolvedValue([
+        { userId: 'user-super' },
+      ]);
+      (prisma.users.findMany as any).mockResolvedValue([]);
+
+      const userIds = await RbacRoleService.getUserIdsByPermissionCode(
+        'QMS:Inspection:Requests:Dispatch',
+      );
+
+      expect(userIds).toEqual(['user-super']);
+      expect(prisma.rbac_user_roles.findMany).toHaveBeenCalledWith({
+        where: { roleId: { in: ['role-super'] } },
+        select: { userId: true },
+      });
     });
   });
 

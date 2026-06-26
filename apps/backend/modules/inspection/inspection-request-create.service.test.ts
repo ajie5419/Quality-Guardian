@@ -18,6 +18,12 @@ vi.mock('~/modules/system-log/audit-log', () => ({
   recordBusinessAuditLog: vi.fn(),
 }));
 
+vi.mock('~/modules/user', () => ({
+  WxSubscribeMessageService: {
+    sendPendingDispatchCreated: vi.fn(),
+  },
+}));
+
 vi.mock('~/utils/governed-write', () => ({
   buildGovernedCanonicalWritePairForTable: vi.fn().mockResolvedValue({}),
   buildGovernedWriteFieldsForTable: vi.fn().mockReturnValue({}),
@@ -62,6 +68,7 @@ const mockRequest = {
   id: 'req-1',
   partName: 'Bearing',
   processName: 'Welding',
+  reporter: 'Workshop',
   requestNo: 'REQ-20260611-001',
   workOrderNumber: 'WO-001',
 };
@@ -138,5 +145,31 @@ describe('inspectionRequestCreateService', () => {
     expect(publishInspectionRequestCreated).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'req-1' }),
     );
+  });
+
+  it('should send pending dispatch notification after creation', async () => {
+    const { WxSubscribeMessageService } = await import('~/modules/user');
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb({
+        qms_inspection_requests: {
+          create: vi.fn().mockResolvedValue(mockRequest),
+        },
+      }),
+    );
+
+    await InspectionRequestCreateService.createRequest(
+      {} as any,
+      { id: 'user-1', username: 'admin' } as any,
+      { partName: 'Bearing', processName: 'Welding' },
+    );
+
+    expect(
+      WxSubscribeMessageService.sendPendingDispatchCreated,
+    ).toHaveBeenCalledWith({
+      partName: 'Bearing',
+      reporter: 'Workshop',
+      requestNo: 'REQ-20260611-001',
+      workOrderNumber: 'WO-001',
+    });
   });
 });

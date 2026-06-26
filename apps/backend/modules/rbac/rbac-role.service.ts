@@ -7,6 +7,7 @@ import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
 const INVISIBLE_PERMISSION_CHARS = /[\u200B-\u200D\uFEFF]/g;
+const SUPER_ROLE_KEYWORDS = ['super', 'admin'] as const;
 
 export function uniqueNonEmpty(values: string[]) {
   return [
@@ -28,6 +29,11 @@ export function parseStringArrayJson(raw: null | string) {
   } catch {
     return [] as string[];
   }
+}
+
+function isSuperRoleName(name: string) {
+  const normalized = name.toLowerCase();
+  return SUPER_ROLE_KEYWORDS.some((keyword) => normalized.includes(keyword));
 }
 
 export const RbacRoleService = {
@@ -155,10 +161,7 @@ export const RbacRoleService = {
     if (roles.length === 0) return [] as string[];
 
     const roleIds = roles.map((role) => role.id);
-    const roleNames = roles.map((role) => role.name.toLowerCase());
-    const isSuper = roleNames.some(
-      (name) => name.includes('super') || name.includes('admin'),
-    );
+    const isSuper = roles.some((role) => isSuperRoleName(role.name));
 
     const rolePermissions = await prisma.rbac_role_permissions.findMany({
       where: { roleId: { in: roleIds } },
@@ -180,6 +183,50 @@ export const RbacRoleService = {
     }
 
     return codes;
+  },
+
+  async getUserIdsByPermissionCode(code: string) {
+    const rolePermissions = await prisma.rbac_role_permissions.findMany({
+      where: {
+        permission: { code, isDeleted: false },
+        role: { isDeleted: false, status: 1 },
+      },
+      select: { roleId: true },
+    });
+    const roleIds = uniqueNonEmpty(
+      rolePermissions.map((row) => String(row.roleId || '')),
+    );
+
+    const superRoles = await prisma.roles.findMany({
+      where: { isDeleted: false, status: 1 },
+      select: { id: true, name: true },
+    });
+    const superRoleIds = superRoles
+      .filter((role) => isSuperRoleName(role.name))
+      .map((role) => role.id);
+
+    const allRoleIds = uniqueNonEmpty([...roleIds, ...superRoleIds]);
+    if (allRoleIds.length === 0) return [] as string[];
+
+    const [v2Links, legacyUsers] = await Promise.all([
+      prisma.rbac_user_roles.findMany({
+        where: { roleId: { in: allRoleIds } },
+        select: { userId: true },
+      }),
+      prisma.users.findMany({
+        where: {
+          isDeleted: false,
+          roleId: { in: allRoleIds },
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    return uniqueNonEmpty([
+      ...v2Links.map((link) => link.userId),
+      ...legacyUsers.map((user) => user.id),
+    ]);
   },
 
   async saveRolePermissions(roleId: string, codes: string[]) {

@@ -25,6 +25,30 @@
 
 ## 执行记录
 
+### 2026-06-26 功能：车间报检待派单微信订阅提醒
+
+**执行内容：**
+
+- 新增待派单订阅消息链路：车间报检创建成功后，异步通知具备派单权限或管理员角色且已绑定微信的用户。
+- 新增待派单模板 ID 默认值 `phgvEZC0eVmZhA0pgQJf8ufuF-y649JSVs8s5I5SpZM`，并支持后端/小程序环境变量覆盖。
+- 小程序登录/首页“派单通知”授权现在同时申请派单给检验员模板和待派单提醒模板。
+- 补充 RBAC 接收人查询、待派单消息发送、报检创建触发通知的单元测试。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec vitest run modules/user/wx-subscribe-message.service.test.ts modules/inspection/inspection-request-create.service.test.ts modules/rbac/rbac-role.service.test.ts`: 3 文件 / 33 测试通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm --dir apps/weapp run typecheck`: 通过脚本，项目当前配置为跳过 uni-app vue-tsc 冲突检查
+- `pnpm lint`: 通过，0 error（9 个既有 warning）
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 生产发布后需要重新构建并上传微信小程序体验版，管理员需要在小程序端重新授权“派单通知”后才能接收待派单订阅消息。
+
 ## [0.12.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.12.0...qgs-v0.12.1) (2026-06-26)
 
 

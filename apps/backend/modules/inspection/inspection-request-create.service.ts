@@ -3,6 +3,7 @@ import type { UserSession } from '~/utils/jwt-utils';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
+import { WxSubscribeMessageService } from '~/modules/user';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
@@ -99,6 +100,12 @@ export const InspectionRequestCreateService = {
       await auditRequestCreate(event, userinfo, created);
     }
     publishInspectionRequestCreated(mapped);
+    void WxSubscribeMessageService.sendPendingDispatchCreated({
+      partName: mapped.partName,
+      reporter: mapped.reporter,
+      requestNo: mapped.requestNo,
+      workOrderNumber: mapped.workOrderNumber,
+    });
     void notifyTelegramNewRequest(mapped);
     return mapped;
   },

@@ -1,12 +1,17 @@
 import process from 'node:process';
 
+import { RbacService } from '~/modules/rbac';
 import { createModuleLogger } from '~/utils/logger';
+import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
 const logger = createModuleLogger('wx-subscribe-message');
 
 const ACCESS_TOKEN_CACHE_KEY = 'wx:miniapp:access-token';
 const ACCESS_TOKEN_TTL_SECONDS = 7000;
+const DISPATCH_PERMISSION_CODE = 'QMS:Inspection:Requests:Dispatch';
+const DEFAULT_PENDING_DISPATCH_TEMPLATE_ID =
+  'phgvEZC0eVmZhA0pgQJf8ufuF-y649JSVs8s5I5SpZM';
 
 type SubscribeMessageValue = {
   value: string;
@@ -36,6 +41,13 @@ function getWxAppSecret() {
 
 function getDispatchTemplateId() {
   return process.env.WX_DISPATCH_SUBSCRIBE_TEMPLATE_ID || '';
+}
+
+function getPendingDispatchTemplateId() {
+  return (
+    process.env.WX_PENDING_DISPATCH_SUBSCRIBE_TEMPLATE_ID ||
+    DEFAULT_PENDING_DISPATCH_TEMPLATE_ID
+  );
 }
 
 function truncate(value: string, maxLength: number) {
@@ -83,6 +95,44 @@ function buildDispatchMessageData(input: {
       value: truncate(input.workOrderNumber || input.requestNo || '无', 32),
     },
     [fields.updatedAt]: { value: formatDateTime(new Date()) },
+  };
+}
+
+function buildPendingDispatchMessageData(input: {
+  partName: string;
+  reporter: string;
+  requestNo: string;
+  workOrderNumber: string;
+}): SubscribeMessageData {
+  const fields = {
+    part: process.env.WX_PENDING_DISPATCH_SUBSCRIBE_FIELD_PART || 'thing12',
+    reporter:
+      process.env.WX_PENDING_DISPATCH_SUBSCRIBE_FIELD_REPORTER || 'thing23',
+    requestNo:
+      process.env.WX_PENDING_DISPATCH_SUBSCRIBE_FIELD_REQUEST_NO ||
+      'character_string13',
+    submittedAt:
+      process.env.WX_PENDING_DISPATCH_SUBSCRIBE_FIELD_SUBMITTED_AT || 'time4',
+    workOrder:
+      process.env.WX_PENDING_DISPATCH_SUBSCRIBE_FIELD_WORK_ORDER || 'thing24',
+  };
+  return {
+    [fields.part]: {
+      value: truncate(
+        input.partName || input.workOrderNumber || '报检任务',
+        20,
+      ),
+    },
+    [fields.workOrder]: {
+      value: truncate(input.workOrderNumber || input.requestNo || '工单', 20),
+    },
+    [fields.reporter]: {
+      value: truncate(input.reporter || '车间报检', 20),
+    },
+    [fields.requestNo]: {
+      value: truncate(input.requestNo || input.workOrderNumber || '无', 32),
+    },
+    [fields.submittedAt]: { value: formatDateTime(new Date()) },
   };
 }
 
@@ -178,6 +228,89 @@ export const WxSubscribeMessageService = {
       }
     } catch (error) {
       logger.warn({ err: error }, 'send wx dispatch subscribe message error');
+    }
+  },
+
+  async sendPendingDispatchCreated(input: {
+    partName: string;
+    reporter: string;
+    requestNo: string;
+    workOrderNumber: string;
+  }) {
+    const templateId = getPendingDispatchTemplateId();
+    if (!templateId) {
+      logger.debug(
+        'skip wx pending dispatch subscribe message: template not configured',
+      );
+      return;
+    }
+
+    try {
+      const userIds = await RbacService.getUserIdsByPermissionCode(
+        DISPATCH_PERMISSION_CODE,
+      );
+      if (userIds.length === 0) {
+        logger.info('skip wx pending dispatch subscribe message: no receivers');
+        return;
+      }
+
+      const receivers = await prisma.users.findMany({
+        where: {
+          id: { in: userIds },
+          isDeleted: false,
+          status: 'ACTIVE',
+          wxOpenId: { not: null },
+        },
+        select: { wxOpenId: true },
+      });
+      const openids: string[] = [];
+      const seenOpenids = new Set<string>();
+      for (const receiver of receivers) {
+        const openid = receiver.wxOpenId?.trim();
+        if (!openid || seenOpenids.has(openid)) continue;
+        seenOpenids.add(openid);
+        openids.push(openid);
+      }
+      if (openids.length === 0) {
+        logger.info(
+          'skip wx pending dispatch subscribe message: receivers have no openid',
+        );
+        return;
+      }
+
+      const accessToken = await getAccessToken();
+      if (!accessToken) return;
+      await Promise.all(
+        openids.map(async (openid) => {
+          const response = await fetch(
+            `https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token=${accessToken}`,
+            {
+              body: JSON.stringify({
+                data: buildPendingDispatchMessageData(input),
+                miniprogram_state:
+                  process.env.WX_SUBSCRIBE_MINIPROGRAM_STATE || 'formal',
+                page: 'pages/tasks/index',
+                template_id: templateId,
+                touser: openid,
+              }),
+              headers: { 'Content-Type': 'application/json' },
+              method: 'POST',
+            },
+          );
+          const body = (await response.json()) as SendMessageResponse;
+          if (body.errcode) {
+            logger.warn(
+              { errcode: body.errcode, errmsg: body.errmsg, openid },
+              'send wx pending dispatch subscribe message failed',
+            );
+          }
+        }),
+      );
+    } catch (error) {
+      logger.warn(
+        { err: error },
+        'send wx pending dispatch subscribe message error',
+      );
     }
   },
 };
