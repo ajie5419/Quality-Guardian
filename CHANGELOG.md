@@ -25,6 +25,19 @@
 
 ## 执行记录
 
+## [0.12.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.11.1...qgs-v0.12.0) (2026-06-26)
+
+
+### Features
+
+* **@qgs/backend:** add weapp dispatch notifications ([590662c](https://github.com/ajie5419/Quality-Guardian/commit/590662cb93153eb880125f04f3e4bbf5bb55c388))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** isolate dispatch adversarial test ([8c1fd3c](https://github.com/ajie5419/Quality-Guardian/commit/8c1fd3c992a9b92e13320e022e070238c1fc85bb))
+* **@qgs/weapp:** stabilize production login flow ([8a93d47](https://github.com/ajie5419/Quality-Guardian/commit/8a93d47402d1553d943baa90d1b5ffa2ea8f2011))
+
 ### 2026-06-25 功能：小程序派单微信订阅消息
 
 **执行内容：**
