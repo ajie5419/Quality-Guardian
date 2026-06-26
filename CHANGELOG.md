@@ -32,6 +32,28 @@
 
 * **@qgs/backend:** align weapp login roles with rbac ([0e5874c](https://github.com/ajie5419/Quality-Guardian/commit/0e5874ca9c2a8fc5fec00370948b292b478f3afa))
 
+### 2026-06-26 修复：小程序管理员角色展示误判
+
+**执行内容：**
+
+- 修复小程序首页角色判断大小写敏感的问题，避免 `Super Admin` 被误判为普通检验员。
+- 将首页和任务页的派单角色判断统一到 `canDispatchByRoles`，兼容角色名中的大小写、空格、下划线和横线。
+- 补充小程序角色判断单测，覆盖 `Super Admin`、`super_admin`、`dispatch-manager` 和检验员角色。
+
+**验证结果：**
+
+- `pnpm exec vitest run apps/weapp/src/utils/roles.test.ts`: 1 文件 / 3 测试通过
+- `pnpm --dir apps/weapp run typecheck`: 通过脚本，项目当前配置为跳过 uni-app vue-tsc 冲突检查
+- `pnpm lint`: 通过，0 error
+- `pnpm run check:type`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 需要重新构建并上传微信小程序体验版，手机端重新进入体验版后才能看到新前端判断。
+
 ## [0.12.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.11.1...qgs-v0.12.0) (2026-06-26)
 
 

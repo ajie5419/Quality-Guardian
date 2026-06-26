@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { getInspectionRequests, getInspectionStats } from '@/api/inspection';
 import { requestDispatchSubscribeMessage } from '@/api/subscribe';
 import { useUserStore } from '@/stores/user';
+import { canDispatchByRoles } from '@/utils/roles';
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app';
 
 interface Task {
@@ -43,14 +44,7 @@ const today = computed(() => {
 
 const isDispatcher = computed(() => {
   const roles = userStore.userInfo?.roles ?? [];
-  return roles.some(
-    (r) =>
-      r.includes('super') ||
-      r.includes('admin') ||
-      r.includes('dispatch') ||
-      r.includes('manager') ||
-      r.includes('schedule'),
-  );
+  return canDispatchByRoles(roles);
 });
 
 const statusLabel = computed(() => {

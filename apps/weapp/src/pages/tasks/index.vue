@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 
 import { getInspectionRequests } from '@/api/inspection';
 import { useUserStore } from '@/stores/user';
+import { canDispatchByRoles } from '@/utils/roles';
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app';
 
 interface TaskItem {
@@ -23,14 +24,7 @@ const loading = ref(false);
 
 const isDispatcher = computed(() => {
   const roles = userStore.userInfo?.roles ?? [];
-  const joined = roles.join(',').toLowerCase();
-  return (
-    joined.includes('super') ||
-    joined.includes('admin') ||
-    joined.includes('dispatch') ||
-    joined.includes('manager') ||
-    joined.includes('schedule')
-  );
+  return canDispatchByRoles(roles);
 });
 
 const pageTitle = computed(() => (isDispatcher.value ? '待派单' : '待检验'));
