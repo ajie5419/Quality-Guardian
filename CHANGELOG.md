@@ -52,7 +52,7 @@
 - `pnpm -C apps/backend exec tsc --noEmit`: 通过
 - `pnpm run check:qms-arch`: 通过，0 violations
 
-**commit:** `d7906d69` fix(@qgs/backend): align weapp login roles with rbac
+**commit:** `0e5874ca` fix(@qgs/backend): align weapp login roles with rbac
 
 **遗留问题：**
 
