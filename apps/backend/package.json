@@ -13,7 +13,7 @@
   "author": "Zhao XiaoJie",
   "scripts": {
     "build": "nitro build",
-    "dev": "cross-env PORT=5320 nitro dev",
+    "dev": "cross-env NODE_ENV=development PORT=5320 nitro dev",
     "start": "nitro dev",
     "stub": "prisma generate --schema=./prisma/schema.prisma && nitro prepare",
     "typecheck": "tsc --noEmit",

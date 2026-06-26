@@ -14,6 +14,7 @@ import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
 const logger = createModuleLogger('wx-auth');
+const DEV_WX_OPENID = 'dev_openid_local';
 
 function getWxAppId(): string {
   const val = process.env.WX_APPID;
@@ -55,7 +56,7 @@ async function fetchWxOpenId(
     code.startsWith('the code is a mock')
   ) {
     logger.info('dev mode: using mock openid');
-    return { openid: `dev_openid_${Date.now()}`, session_key: 'mock_sk' };
+    return { openid: DEV_WX_OPENID, session_key: 'mock_sk' };
   }
 
   const url =
@@ -72,7 +73,7 @@ async function fetchWxOpenId(
         { errcode: data.errcode, errmsg: data.errmsg },
         'dev mode: WeChat code invalid, returning mock openid',
       );
-      return { openid: `dev_openid_${code}`, session_key: 'mock_sk' };
+      return { openid: DEV_WX_OPENID, session_key: 'mock_sk' };
     }
     logger.error(
       { errcode: data.errcode, errmsg: data.errmsg },

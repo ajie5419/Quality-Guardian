@@ -81,6 +81,7 @@ function mockFetch(data: object, ok = true) {
 describe('wxAuthService.wxLogin', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.NODE_ENV = 'test';
     process.env.WX_APPID = 'test-appid';
     process.env.WX_APP_SECRET = 'test-secret';
     process.env.WX_SESSION_SECRET = 'test-session-secret';
@@ -115,6 +116,51 @@ describe('wxAuthService.wxLogin', () => {
     expect((result as any).sessionToken).toBe('mock-session-token');
     expect(jwt.sign).toHaveBeenCalledWith(
       { openid: 'wx-unbound-openid' },
+      'test-session-secret',
+      { expiresIn: '5m' },
+    );
+  });
+
+  it('uses a stable local openid for WeChat devtool mock codes', async () => {
+    process.env.NODE_ENV = 'development';
+    (prisma.users.findFirst as any).mockResolvedValue(null);
+    (jwt.sign as any).mockReturnValue('mock-session-token');
+
+    await WxAuthService.wxLogin('the code is a mock one');
+    await WxAuthService.wxLogin('the code is a mock two');
+
+    expect(jwt.sign).toHaveBeenNthCalledWith(
+      1,
+      { openid: 'dev_openid_local' },
+      'test-session-secret',
+      { expiresIn: '5m' },
+    );
+    expect(jwt.sign).toHaveBeenNthCalledWith(
+      2,
+      { openid: 'dev_openid_local' },
+      'test-session-secret',
+      { expiresIn: '5m' },
+    );
+  });
+
+  it('uses a stable local openid when WeChat rejects codes in development', async () => {
+    process.env.NODE_ENV = 'development';
+    mockFetch({ errcode: 40_029, errmsg: 'invalid code' });
+    (prisma.users.findFirst as any).mockResolvedValue(null);
+    (jwt.sign as any).mockReturnValue('mock-session-token');
+
+    await WxAuthService.wxLogin('wx-code-a');
+    await WxAuthService.wxLogin('wx-code-b');
+
+    expect(jwt.sign).toHaveBeenNthCalledWith(
+      1,
+      { openid: 'dev_openid_local' },
+      'test-session-secret',
+      { expiresIn: '5m' },
+    );
+    expect(jwt.sign).toHaveBeenNthCalledWith(
+      2,
+      { openid: 'dev_openid_local' },
       'test-session-secret',
       { expiresIn: '5m' },
     );

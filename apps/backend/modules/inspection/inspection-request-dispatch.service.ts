@@ -3,6 +3,7 @@ import type { UserSession } from '~/utils/jwt-utils';
 
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
+import { WxSubscribeMessageService } from '~/modules/user';
 import { BusinessError } from '~/utils/business-error';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
@@ -55,7 +56,7 @@ export const InspectionRequestDispatchService = {
         where: { id, isDeleted: false },
       }),
       prisma.users.findFirst({
-        select: { id: true },
+        select: { id: true, wxOpenId: true },
         where: { OR: [{ id: inspectorId }, { username: inspectorId }] },
       }),
     ]);
@@ -109,6 +110,15 @@ export const InspectionRequestDispatchService = {
       userId: userinfo.id,
     });
     const mapped = mapInspectionRequest(updated);
+    void WxSubscribeMessageService.sendDispatchAssigned({
+      dispatcher:
+        updated.dispatcher?.realName || updated.dispatcher?.username || '系统',
+      openid: inspector.wxOpenId,
+      partName: mapped.partName,
+      projectName: request.work_order?.projectName || mapped.workOrderNumber,
+      requestNo: mapped.requestNo,
+      workOrderNumber: mapped.workOrderNumber,
+    });
     return mapped;
   },
 };

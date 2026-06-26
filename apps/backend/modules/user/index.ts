@@ -6,3 +6,4 @@ export type {
   UpdateUserDto,
   UserQueryParams,
 } from './user.service';
+export { WxSubscribeMessageService } from './wx-subscribe-message.service';

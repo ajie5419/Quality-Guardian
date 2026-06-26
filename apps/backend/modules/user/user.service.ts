@@ -5,6 +5,7 @@ import { createId } from '@paralleldrive/cuid2';
 import bcrypt from 'bcrypt';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { getDefaultResetPassword } from '~/modules/user/user-security';
+import { BusinessError } from '~/utils/business-error';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import { generateAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
@@ -46,6 +47,29 @@ function generateTemporaryPassword() {
 function normalizeOptionalText(value: string | undefined) {
   const normalized = String(value ?? '').trim();
   return normalized || null;
+}
+
+async function resolveCreateRoleId(roleIds?: string[], roles?: string[]) {
+  const roleIdOrName = (roleIds?.[0] || roles?.[0] || '').trim();
+  const role = roleIdOrName
+    ? await prisma.roles.findFirst({
+        where: {
+          OR: [{ id: roleIdOrName }, { name: roleIdOrName }],
+          isDeleted: false,
+        },
+      })
+    : await prisma.roles.findFirst({
+        orderBy: { createdAt: 'asc' },
+        where: { isDeleted: false, name: 'user', status: 1 },
+      });
+  if (!role) {
+    throw new BusinessError(
+      'INVALID_ROLE',
+      roleIdOrName ? '所选角色不存在或已停用' : '请选择有效角色',
+      400,
+    );
+  }
+  return role.id;
 }
 
 export const UserService = {
@@ -117,21 +141,7 @@ export const UserService = {
    * Create a new user
    */
   async create(data: CreateUserDto) {
-    // Handle Role lookup
-    const rolesArray = data.roles || data.roleIds;
-    const roleIdOrName = rolesArray?.[0];
-    let finalRoleId = 'ROLE-DEFAULT';
-
-    if (roleIdOrName) {
-      const role = await prisma.roles.findFirst({
-        where: {
-          OR: [{ id: String(roleIdOrName) }, { name: String(roleIdOrName) }],
-        },
-      });
-      if (role) {
-        finalRoleId = role.id;
-      }
-    }
+    const finalRoleId = await resolveCreateRoleId(data.roleIds, data.roles);
 
     const statusEnum = data.status === 1 ? 'ACTIVE' : 'INACTIVE';
     const temporaryPassword = generateTemporaryPassword();

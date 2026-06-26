@@ -25,8 +25,73 @@
 
 ## 执行记录
 
-## [0.11.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.11.0...qgs-v0.11.1) (2026-06-25)
+### 2026-06-25 功能：小程序派单微信订阅消息
 
+**执行内容：**
+
+- 新增微信订阅消息后端服务，支持缓存小程序 `access_token`，派单成功后调用微信 `subscribe/send` 给检验员发送派单通知。
+- 派单服务在事务和审计完成后异步触发订阅消息发送；检验员没有 `wxOpenId`、模板未配置或微信接口失败时只记录日志，不阻断派单。
+- 用户模块通过 `index.ts` 导出订阅消息服务，派单模块只从模块公开出口调用，保持模块边界。
+- 新增小程序订阅授权 API，登录/绑定成功后静默申请派单通知授权；首页新增“派单通知”入口，已登录用户可主动重新授权。
+- 新增后端和小程序环境变量示例：`WX_DISPATCH_SUBSCRIBE_TEMPLATE_ID`、字段映射、`VITE_WX_DISPATCH_SUBSCRIBE_TEMPLATE_ID`；默认字段已适配“责任人委派通知”模板 `thing12/thing24/thing23/character_string13/time4`。
+- 将订阅消息相关环境变量加入 Turbo `globalEnv`，保证本地和构建任务能拿到配置。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec vitest run modules/inspection/inspection-request-dispatch.service.test.ts modules/user/wx-subscribe-message.service.test.ts`: 2 文件 / 5 测试通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations
+- `pnpm --dir apps/weapp run typecheck`: 通过脚本，项目当前配置为跳过 uni-app vue-tsc 冲突检查
+- `pnpm --filter @qgs/weapp dev`: 编译通过并生成 `apps/weapp/dist/dev/mp-weixin/`；已停止 watcher
+- `rg "requestSubscribeMessage|派单通知" apps/weapp/dist/dev/mp-weixin -g "*.js"`: 产物已包含订阅授权调用和首页入口
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 生产环境需要配置后端 `WX_DISPATCH_SUBSCRIBE_TEMPLATE_ID` 和小程序构建变量 `VITE_WX_DISPATCH_SUBSCRIBE_TEMPLATE_ID`；如果微信模板字段不同于“责任人委派通知”的 `thing12/thing24/thing23/character_string13/time4`，还需要配置字段映射变量。
+- 微信订阅消息必须由用户在小程序端授权；未授权或拒绝授权时，后端无法强制发送。
+
+### 2026-06-25 修复：小程序本地联调微信登录环境透传
+
+**执行内容：**
+
+- 修复 `pnpm local:container:dev:antd` 本地联调脚本未给后端注入微信登录必需环境变量的问题；开发环境默认使用 local-only 占位值，真实环境变量仍可覆盖。
+- 将 `WX_APPID`、`WX_APP_SECRET`、`WX_SESSION_SECRET` 加入 Turbo `globalEnv`，确保 `pnpm dev:antd` 启动 backend dev 任务时能拿到微信登录配置。
+- 定位当前小程序错误主因：AppID 已生效、API 地址已生效，当前阻断项是 `/api/auth/wx-login` 后端 500，而不是 `ERR_PROXY_CONNECTION_FAILED` 或游客 AppID。
+- 将小程序登录页绑定表单的密码输入从 `safe-password` 改为普通 `password`，避免开发者工具触发微信安全输入链路后出现渲染层 `addListener` / `operateWXData` 类内部错误；绑定系统账号不需要微信安全键盘能力。
+- 修复本地开发模式 mock 微信 openid 不稳定的问题；开发者工具每次返回不同 code 时，后端统一使用 `dev_openid_local`，避免同一系统账号反复绑定时误报“该账号已绑定其他微信”。
+- 补充微信登录单测，覆盖开发者工具 mock code 与开发环境 invalid code 都生成稳定本地 openid 的场景。
+- 调整小程序启动鉴权时序：移除 `App.onLaunch` 中的同步 `reLaunch`，改为首页 `onShow` 完成登录态检查，避免首屏首次渲染期间强制换页触发 `Expected updated data but get first rendering data`。
+- 保留 `App.vue` 的最小组件脚本，避免 uni 编译器因只有 `<style>` 而拒绝生成 `app.json`。
+- 将小程序启动页改为登录页，登录页 `onReady` 只在已有登录态时切到首页，避免未登录启动时先渲染首页再立即 `reLaunch` 的首屏时序问题。
+- 新增小程序资源 URL 规范化函数，将 `/uploads/*`、`/api/uploads/*` 等后端相对路径转换为完整 API 地址，修复图片被微信当成本地资源加载导致 500 的问题。
+- 报检、派工、检验结果页图片展示统一走资源 URL 规范化。
+- 修复小程序首页统计语义错误：不再把 `/api/qms/workspace` 的 `todayInspections` 当作“待派单”，改用 `/api/qms/inspection/requests/stats` 的 `pendingDispatchCount`、`pendingInspectionCount` 和 `todayClosedCount`。
+- 小程序首页检验员视角“我的待检”改用当前任务列表 total，避免把全局待检数误显示为个人待办数。
+
+**验证结果：**
+
+- `bash -n scripts/local/container-dev-antd.sh`: 通过
+- `node -e "JSON.parse(require('fs').readFileSync('turbo.json','utf8')); console.log('turbo.json ok')"`: 通过
+- `pnpm -C apps/backend exec vitest run modules/user/wx-auth.service.test.ts`: 1 文件 / 16 测试通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm --dir apps/weapp run typecheck`: 通过脚本，项目当前配置为跳过 uni-app vue-tsc 冲突检查
+- `rg "safe-password" apps/weapp/src`: 无匹配
+- `pnpm --filter @qgs/weapp dev`: 编译通过并生成 `apps/weapp/dist/dev/mp-weixin/app.json`；已停止 watcher
+- `rg "userStore\\.checkAuth\\(|onLaunch\\(\\)" apps/weapp/dist/dev/mp-weixin/app.js apps/weapp/dist/dev/mp-weixin/stores/user.js`: 无匹配
+- `apps/weapp/dist/dev/mp-weixin/app.json`: 首屏已生成为 `pages/login/index`
+- `rg "<image[^\\n]*:src=\\\"att\\.url\\\"|:src=\\\"[^\\\"]*\\.url\\\"" apps/weapp/src -g "*.vue"`: 无匹配
+- `rg "buildResourceUrl" apps/weapp/dist/dev/mp-weixin -g "*.js"`: 产物已包含资源 URL 规范化调用
+- `rg "inspection/requests/stats|qms/workspace|pendingDispatchCount|todayInspections" apps/weapp/dist/dev/mp-weixin -g "*.js"`: 产物已使用报检任务统计接口，未命中 `qms/workspace` / `todayInspections`
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 需在微信开发者工具重新导入/编译 `apps/weapp/dist/dev/mp-weixin/` 后确认渲染层错误是否消失。
+
+## [0.11.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.11.0...qgs-v0.11.1) (2026-06-25)
 
 ### Bug Fixes
 

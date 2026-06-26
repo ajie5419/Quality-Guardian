@@ -142,14 +142,14 @@ describe('userService', () => {
       expect(result.status).toBe(1);
     });
 
-    it('should use default role when none found', async () => {
+    it('should use default user role when no role is selected', async () => {
       mockBcryptHash.mockResolvedValue('hashed-pass');
-      (prisma.roles.findFirst as any).mockResolvedValue(null);
+      (prisma.roles.findFirst as any).mockResolvedValue({ id: 'role-user' });
       (prisma.users.create as any).mockResolvedValue({
         id: 'user-new',
         username: 'newuser',
         department: 'dept-1',
-        roleId: 'ROLE-DEFAULT',
+        roleId: 'role-user',
         status: 'INACTIVE',
       });
 
@@ -160,6 +160,26 @@ describe('userService', () => {
       });
 
       expect(result.status).toBe(0);
+      expect(prisma.users.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ roleId: 'role-user' }),
+        }),
+      );
+    });
+
+    it('should reject create when selected role is invalid', async () => {
+      (prisma.roles.findFirst as any).mockResolvedValue(null);
+
+      await expect(
+        UserService.create({
+          username: 'newuser',
+          realName: 'New User',
+          deptId: 'dept-1',
+          roles: ['missing-role'],
+        }),
+      ).rejects.toThrow('所选角色不存在或已停用');
+
+      expect(prisma.users.create).not.toHaveBeenCalled();
     });
   });
 

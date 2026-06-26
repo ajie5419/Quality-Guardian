@@ -13,10 +13,22 @@ ensure_redis
 
 cd "$ROOT_DIR"
 
-export DATABASE_URL="${DATABASE_URL:-mysql://$MYSQL_USER:$MYSQL_PASSWORD@127.0.0.1:${MYSQL_PORT}/$MYSQL_DATABASE}"
-export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:${REDIS_PORT}}"
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
+# container env files use host.container.internal for in-container runtime.
+# This script runs Prisma and Nitro dev on the host, so force localhost ports.
+export DATABASE_URL="mysql://$MYSQL_USER:$MYSQL_PASSWORD@127.0.0.1:${MYSQL_PORT}/$MYSQL_DATABASE"
+export REDIS_URL="redis://127.0.0.1:${REDIS_PORT}"
 export REDIS_ENABLED="${REDIS_ENABLED:-true}"
 export REDIS_OPTIONAL="${REDIS_OPTIONAL:-true}"
+export WX_APPID="${WX_APPID:-dev-local-wx-appid}"
+export WX_APP_SECRET="${WX_APP_SECRET:-dev-local-wx-app-secret}"
+export WX_SESSION_SECRET="${WX_SESSION_SECRET:-dev-local-wx-session-secret-32-bytes}"
 
 echo "apple/container dependencies are ready."
 echo "MySQL: 127.0.0.1:${MYSQL_PORT}/${MYSQL_DATABASE}"
@@ -32,5 +44,7 @@ if [[ "${CONTAINER_DEV_SEED:-false}" == "true" || "$USER_COUNT" == "0" ]]; then
 fi
 
 echo "Starting pnpm dev:antd..."
+
+export NODE_ENV=development
 
 pnpm dev:antd
