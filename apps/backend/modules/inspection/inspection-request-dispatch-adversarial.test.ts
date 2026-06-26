@@ -31,6 +31,12 @@ vi.mock('~/modules/system-log/audit-log', () => ({
   recordBusinessAuditLog: vi.fn(),
 }));
 
+vi.mock('~/modules/user', () => ({
+  WxSubscribeMessageService: {
+    sendDispatchAssigned: vi.fn(),
+  },
+}));
+
 vi.mock('~/utils/governed-write', () => ({
   buildGovernedWriteFieldsForTable: () => ({}),
 }));
@@ -420,7 +426,7 @@ describe('adversarial: dispatchRequest edge cases', () => {
     );
 
     expect(prisma.users.findFirst).toHaveBeenCalledWith({
-      select: { id: true },
+      select: { id: true, wxOpenId: true },
       where: { OR: [{ id: 'john_doe' }, { username: 'john_doe' }] },
     });
     expect(tx.qms_task_dispatches.create).toHaveBeenCalledWith(
