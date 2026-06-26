@@ -3,6 +3,7 @@ import process from 'node:process';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { RbacService } from '~/modules/rbac';
 import { AuthService } from '~/modules/user/auth.service';
 import { WxAuthService } from '~/modules/user/wx-auth.service';
 import { verifyRefreshToken } from '~/utils/jwt-utils';
@@ -40,6 +41,12 @@ vi.mock('~/utils/logger', () => ({
 vi.mock('~/modules/user/auth.service', () => ({
   AuthService: {
     refreshAccessToken: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/rbac', () => ({
+  RbacService: {
+    getUserRoles: vi.fn(),
   },
 }));
 
@@ -85,6 +92,9 @@ describe('wxAuthService.wxLogin', () => {
     process.env.WX_APPID = 'test-appid';
     process.env.WX_APP_SECRET = 'test-secret';
     process.env.WX_SESSION_SECRET = 'test-session-secret';
+    (RbacService.getUserRoles as any).mockResolvedValue([
+      { id: 'role-1', name: 'operator' },
+    ]);
   });
 
   it('returns tokens and userPayload when openid is bound to an active account', async () => {
@@ -102,7 +112,38 @@ describe('wxAuthService.wxLogin', () => {
     expect((result as any).userPayload).toMatchObject({
       username: 'testuser',
       realName: 'Test User',
+      roles: ['operator'],
     });
+  });
+
+  it('returns RBAC role names instead of the legacy single user role', async () => {
+    const boundUser = { ...mockUser, wxOpenId: 'wx-openid-123' };
+    mockFetch({ openid: 'wx-openid-123', session_key: 'sk' });
+    (prisma.users.findFirst as any).mockResolvedValue(boundUser);
+    (prisma.users.findUnique as any).mockResolvedValue(boundUser);
+    (prisma.departments.findUnique as any).mockResolvedValue(null);
+    (RbacService.getUserRoles as any).mockResolvedValue([
+      { id: 'role-super', name: 'super' },
+      { id: 'role-admin', name: 'admin' },
+    ]);
+
+    const result = await WxAuthService.wxLogin('auth-code');
+
+    expect(RbacService.getUserRoles).toHaveBeenCalledWith('user-cuid-1');
+    expect((result as any).userPayload.roles).toEqual(['super', 'admin']);
+  });
+
+  it('falls back to the legacy single user role when RBAC has no roles', async () => {
+    const boundUser = { ...mockUser, wxOpenId: 'wx-openid-123' };
+    mockFetch({ openid: 'wx-openid-123', session_key: 'sk' });
+    (prisma.users.findFirst as any).mockResolvedValue(boundUser);
+    (prisma.users.findUnique as any).mockResolvedValue(boundUser);
+    (prisma.departments.findUnique as any).mockResolvedValue(null);
+    (RbacService.getUserRoles as any).mockResolvedValue([]);
+
+    const result = await WxAuthService.wxLogin('auth-code');
+
+    expect((result as any).userPayload.roles).toEqual(['operator']);
   });
 
   it('returns needBind:true and sessionToken when openid has no bound account', async () => {
@@ -205,6 +246,9 @@ describe('wxAuthService.wxBind', () => {
     process.env.WX_SESSION_SECRET = 'test-session-secret';
     // default: session token verifies cleanly
     (jwt.verify as any).mockReturnValue({ openid: 'wx-openid-123' });
+    (RbacService.getUserRoles as any).mockResolvedValue([
+      { id: 'role-1', name: 'operator' },
+    ]);
   });
 
   it('updates wxOpenId and returns tokens on successful bind', async () => {
@@ -227,7 +271,10 @@ describe('wxAuthService.wxBind', () => {
     });
     expect(result.accessToken).toBe('mock-access-token');
     expect(result.refreshToken).toBe('mock-refresh-token');
-    expect(result.userPayload).toMatchObject({ username: 'testuser' });
+    expect(result.userPayload).toMatchObject({
+      username: 'testuser',
+      roles: ['operator'],
+    });
   });
 
   it('throws INVALID_SESSION_TOKEN when jwt.verify throws', async () => {

@@ -4,6 +4,7 @@ import process from 'node:process';
 
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { RbacService } from '~/modules/rbac';
 import { BusinessError } from '~/utils/business-error';
 import {
   generateAccessToken,
@@ -108,10 +109,20 @@ async function buildUserSession(userId: string): Promise<UserSession> {
     deptName,
     id: user.id,
     realName: user.realName ?? '',
-    roles: [user.roles?.name ?? 'user'],
+    roles: await resolveUserRoleNames(user.id, user.roles?.name),
     userId: user.id,
     username: user.username,
   };
+}
+
+async function resolveUserRoleNames(
+  userId: string,
+  fallbackRoleName?: null | string,
+): Promise<string[]> {
+  const rbacRoles = await RbacService.getUserRoles(userId);
+  const roleNames = rbacRoles.map((role) => role.name?.trim()).filter(Boolean);
+  if (roleNames.length > 0) return roleNames;
+  return [fallbackRoleName?.trim() || 'user'];
 }
 
 export const WxAuthService = {

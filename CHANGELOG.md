@@ -38,6 +38,26 @@
 * **@qgs/backend:** isolate dispatch adversarial test ([8c1fd3c](https://github.com/ajie5419/Quality-Guardian/commit/8c1fd3c992a9b92e13320e022e070238c1fc85bb))
 * **@qgs/weapp:** stabilize production login flow ([8a93d47](https://github.com/ajie5419/Quality-Guardian/commit/8a93d47402d1553d943baa90d1b5ffa2ea8f2011))
 
+### 2026-06-26 修复：小程序微信登录角色来源不一致
+
+**执行内容：**
+
+- 修复微信小程序登录/绑定生成用户会话时只读取 `users.roleId` 旧单角色的问题。
+- 微信登录现在使用 RBAC 多角色作为 `userPayload.roles`，与后台 `/api/user/info` 的角色来源保持一致；当 RBAC 未配置角色时才回退到旧单角色字段。
+- 补充微信登录单测，覆盖 RBAC 多角色返回和旧单角色回退。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec vitest run modules/user/wx-auth.service.test.ts`: 1 文件 / 18 测试通过
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations
+
+**commit:** `4b50539` fix(@qgs/backend): align weapp login roles with rbac
+
+**遗留问题：**
+
+- 生产发布后，已登录小程序用户需要退出/切换账号重新登录，刷新本地缓存的 `userInfo.roles`。
+
 ### 2026-06-25 功能：小程序派单微信订阅消息
 
 **执行内容：**
