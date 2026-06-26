@@ -48,7 +48,7 @@
 - `pnpm run check:type`: 通过
 - `pnpm run check:qms-arch`: 通过，0 violations
 
-**commit:** 待提交
+**commit:** `ea7cb5ec` fix(@qgs/weapp): normalize dispatch role detection
 
 **遗留问题：**
 
