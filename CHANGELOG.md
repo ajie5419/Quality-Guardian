@@ -25,6 +25,13 @@
 
 ## 执行记录
 
+## [0.12.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.12.0...qgs-v0.12.1) (2026-06-26)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** align weapp login roles with rbac ([0e5874c](https://github.com/ajie5419/Quality-Guardian/commit/0e5874ca9c2a8fc5fec00370948b292b478f3afa))
+
 ## [0.12.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.11.1...qgs-v0.12.0) (2026-06-26)
 
 
