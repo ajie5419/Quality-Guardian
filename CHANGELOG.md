@@ -25,6 +25,18 @@
 
 ## 执行记录
 
+## [0.13.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.12.1...qgs-v0.13.0) (2026-06-26)
+
+
+### Features
+
+* **@qgs/backend:** notify dispatchers on inspection request creation ([3bc61e9](https://github.com/ajie5419/Quality-Guardian/commit/3bc61e98ef0eaa634c0196b117c3eaa5c910411e))
+
+
+### Bug Fixes
+
+* **@qgs/weapp:** normalize dispatch role detection ([ea7cb5e](https://github.com/ajie5419/Quality-Guardian/commit/ea7cb5eccac2aeb4bf87c9145e1dc250d2d83ae0))
+
 ### 2026-06-26 功能：车间报检待派单微信订阅提醒
 
 **执行内容：**
