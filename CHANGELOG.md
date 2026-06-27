@@ -25,6 +25,25 @@
 
 ## 执行记录
 
+### 2026-06-27 修复：小程序任务与记录列表右侧溢出
+
+**执行内容：**
+
+- 修复小程序“检验任务”和“检验记录”列表卡片右侧标签、结果摘要贴边/溢出的问题。
+- 将 `scroll-view` 内边距迁移到内部内容容器，避免小程序渲染时卡片宽度和 padding 叠加导致右侧被裁。
+- 为卡片、状态标签、编号、零件名、底部日期增加明确的 `box-sizing`、宽度和文本截断约束。
+
+**验证结果：**
+
+- `/opt/homebrew/bin/pnpm --dir apps/weapp run typecheck`: 通过脚本，项目当前配置为跳过 uni-app vue-tsc 冲突检查
+- `/opt/homebrew/bin/pnpm lint`: 通过，0 error（9 个既有 warning）
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 需要重新上传小程序体验版后在手机端确认实际渲染效果。
+
 ## [0.13.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.12.1...qgs-v0.13.0) (2026-06-26)
 
 

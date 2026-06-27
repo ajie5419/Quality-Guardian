@@ -83,69 +83,71 @@ onShow(() => {
       @refresherrefresh="onRefresh"
       @scrolltolower="loadMore"
     >
-      <view v-if="records.length === 0 && !loading" class="empty">
-        <text class="empty-text">暂无记录</text>
-      </view>
+      <view class="list-content">
+        <view v-if="records.length === 0 && !loading" class="empty">
+          <text class="empty-text">暂无记录</text>
+        </view>
 
-      <view
-        v-for="record in records as RecordItem[]"
-        :key="record.id"
-        class="card"
-        @tap="goDetail(record.id)"
-      >
-        <view class="card-header">
-          <text class="work-order">{{
-            record.requestNo || record.workOrderNumber
-          }}</text>
-          <view
-            class="result-badge"
-            :class="
-              record.status === 'INSPECTING'
-                ? 'badge-inspecting'
-                : record.inspectionResult === 'PASS'
-                  ? 'badge-pass'
-                  : 'badge-fail'
-            "
-          >
-            <text class="badge-text">
-              {{
+        <view
+          v-for="record in records as RecordItem[]"
+          :key="record.id"
+          class="card"
+          @tap="goDetail(record.id)"
+        >
+          <view class="card-header">
+            <text class="work-order">{{
+              record.requestNo || record.workOrderNumber
+            }}</text>
+            <view
+              class="result-badge"
+              :class="
                 record.status === 'INSPECTING'
-                  ? '待复检'
+                  ? 'badge-inspecting'
                   : record.inspectionResult === 'PASS'
-                    ? '合格'
-                    : '不合格'
-              }}
-            </text>
+                    ? 'badge-pass'
+                    : 'badge-fail'
+              "
+            >
+              <text class="badge-text">
+                {{
+                  record.status === 'INSPECTING'
+                    ? '待复检'
+                    : record.inspectionResult === 'PASS'
+                      ? '合格'
+                      : '不合格'
+                }}
+              </text>
+            </view>
+          </view>
+
+          <view class="card-body">
+            <text class="part-name">{{ record.partName }}</text>
+            <view class="summary">
+              <text class="summary-pass"
+                >合格 {{ record.qualifiedQuantity ?? 0 }}</text
+              >
+              <text class="summary-sep"> / </text>
+              <text class="summary-fail"
+                >不合格 {{ record.unqualifiedQuantity ?? 0 }}</text
+              >
+            </view>
+          </view>
+
+          <view class="card-footer">
+            <text class="meta"
+              >完成日期：{{
+                formatDate(record.closedAt || record.updatedAt)
+              }}</text
+            >
           </view>
         </view>
 
-        <view class="card-body">
-          <text class="part-name">{{ record.partName }}</text>
-          <view class="summary">
-            <text class="summary-pass"
-              >合格 {{ record.qualifiedQuantity ?? 0 }}</text
-            >
-            <text class="summary-sep"> / </text>
-            <text class="summary-fail"
-              >不合格 {{ record.unqualifiedQuantity ?? 0 }}</text
-            >
-          </view>
+        <view v-if="loading && records.length > 0" class="loading-more">
+          <text class="loading-text">加载中...</text>
         </view>
-
-        <view class="card-footer">
-          <text class="meta"
-            >完成日期：{{
-              formatDate(record.closedAt || record.updatedAt)
-            }}</text
-          >
+        <view v-if="noMore && records.length > 0" class="no-more">
+          <text class="no-more-text">没有更多了</text>
         </view>
-      </view>
-
-      <view v-if="loading && records.length > 0" class="loading-more">
-        <text class="loading-text">加载中...</text>
-      </view>
-      <view v-if="noMore && records.length > 0" class="no-more">
-        <text class="no-more-text">没有更多了</text>
       </view>
     </scroll-view>
   </view>
@@ -161,8 +163,13 @@ onShow(() => {
 
 .list {
   flex: 1;
-  padding: 20rpx;
   overflow: hidden;
+}
+
+.list-content {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 20rpx;
 }
 
 .empty {
@@ -178,6 +185,8 @@ onShow(() => {
 }
 
 .card {
+  box-sizing: border-box;
+  width: 100%;
   padding: 28rpx;
   margin-bottom: 20rpx;
   background: #fff;
@@ -193,12 +202,21 @@ onShow(() => {
 }
 
 .work-order {
+  flex: 1;
+  min-width: 0;
+  margin-right: 16rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 30rpx;
   font-weight: 600;
   color: #333;
+  white-space: nowrap;
 }
 
 .result-badge {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  max-width: 128rpx;
   padding: 6rpx 16rpx;
   border-radius: 8rpx;
 
@@ -239,12 +257,19 @@ onShow(() => {
 }
 
 .part-name {
+  flex: 1;
+  min-width: 0;
+  margin-right: 16rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 28rpx;
   color: #555;
+  white-space: nowrap;
 }
 
 .summary {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
 
   .summary-pass {

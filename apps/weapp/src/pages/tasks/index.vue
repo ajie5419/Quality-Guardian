@@ -100,50 +100,52 @@ onPullDownRefresh(() => {
     </view>
 
     <scroll-view scroll-y class="list">
-      <!-- Empty state -->
-      <view v-if="tasks.length === 0 && !loading" class="empty">
-        <text class="empty-icon">📋</text>
-        <text class="empty-text">暂无{{ pageTitle }}任务</text>
-      </view>
+      <view class="list-content">
+        <!-- Empty state -->
+        <view v-if="tasks.length === 0 && !loading" class="empty">
+          <text class="empty-icon">📋</text>
+          <text class="empty-text">暂无{{ pageTitle }}任务</text>
+        </view>
 
-      <!-- Loading skeleton (first load) -->
-      <view v-if="loading && tasks.length === 0" class="loading-wrap">
-        <text class="loading-text">加载中...</text>
-      </view>
+        <!-- Loading skeleton (first load) -->
+        <view v-if="loading && tasks.length === 0" class="loading-wrap">
+          <text class="loading-text">加载中...</text>
+        </view>
 
-      <view
-        v-for="task in tasks"
-        :key="task.id"
-        class="card"
-        @tap="goTask(task)"
-      >
-        <view class="card-header">
-          <text class="request-no">{{ task.requestNo }}</text>
-          <view class="priority-tag" :class="priorityClass(task.priority)">
-            <text class="priority-text">{{
-              priorityLabel(task.priority)
+        <view
+          v-for="task in tasks"
+          :key="task.id"
+          class="card"
+          @tap="goTask(task)"
+        >
+          <view class="card-header">
+            <text class="request-no">{{ task.requestNo }}</text>
+            <view class="priority-tag" :class="priorityClass(task.priority)">
+              <text class="priority-text">{{
+                priorityLabel(task.priority)
+              }}</text>
+            </view>
+          </view>
+          <view class="card-body">
+            <view class="info-row">
+              <text class="info-label">工单号</text>
+              <text class="info-value">{{ task.workOrderNumber }}</text>
+            </view>
+            <view class="info-row">
+              <text class="info-label">零件</text>
+              <text class="info-value">{{ task.partName }}</text>
+            </view>
+            <view class="info-row">
+              <text class="info-label">工序</text>
+              <text class="info-value">{{ task.processName }}</text>
+            </view>
+          </view>
+          <view class="card-footer">
+            <text class="meta">报检人：{{ task.reporter }}</text>
+            <text class="meta meta-date">{{
+              formatDate(task.submittedAt || task.createdAt)
             }}</text>
           </view>
-        </view>
-        <view class="card-body">
-          <view class="info-row">
-            <text class="info-label">工单号</text>
-            <text class="info-value">{{ task.workOrderNumber }}</text>
-          </view>
-          <view class="info-row">
-            <text class="info-label">零件</text>
-            <text class="info-value">{{ task.partName }}</text>
-          </view>
-          <view class="info-row">
-            <text class="info-label">工序</text>
-            <text class="info-value">{{ task.processName }}</text>
-          </view>
-        </view>
-        <view class="card-footer">
-          <text class="meta">报检人：{{ task.reporter }}</text>
-          <text class="meta">{{
-            formatDate(task.submittedAt || task.createdAt)
-          }}</text>
         </view>
       </view>
     </scroll-view>
@@ -181,8 +183,13 @@ onPullDownRefresh(() => {
 
 .list {
   flex: 1;
-  padding: 20rpx;
   overflow: hidden;
+}
+
+.list-content {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 20rpx;
 }
 
 .empty {
@@ -216,6 +223,8 @@ onPullDownRefresh(() => {
 }
 
 .card {
+  box-sizing: border-box;
+  width: 100%;
   padding: 28rpx;
   margin-bottom: 20rpx;
   background: #fff;
@@ -242,6 +251,9 @@ onPullDownRefresh(() => {
 }
 
 .priority-tag {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  max-width: 120rpx;
   padding: 6rpx 18rpx;
   border-radius: 8rpx;
 
@@ -294,17 +306,30 @@ onPullDownRefresh(() => {
 
 .info-value {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 26rpx;
   color: $text-color;
+  white-space: nowrap;
 }
 
 .card-footer {
   display: flex;
+  gap: 16rpx;
   justify-content: space-between;
 }
 
 .meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 24rpx;
   color: #bbb;
+  white-space: nowrap;
+}
+
+.meta-date {
+  flex-shrink: 0;
 }
 </style>
