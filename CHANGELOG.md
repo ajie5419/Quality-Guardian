@@ -25,6 +25,25 @@
 
 ## 执行记录
 
+### 2026-06-29 清理：删除未启用认证子页面
+
+**执行内容：**
+
+- 删除仅可通过直达路由访问、且登录页已隐藏入口的 `code-login`、`qrcode-login`、`forget-password` 前端页面。
+- 从核心认证路由中移除验证码登录、二维码登录、忘记密码三个子路由。
+- 保留 `login` 和 `register`，因为当前登录页仍展示注册入口，后端也保留 `/api/auth/register`。
+
+**验证结果：**
+
+- `pnpm run check:type`: 通过，3/3 tasks successful
+- `pnpm lint`: 通过，0 error（9 个既有 warning）
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 前端 API `@qgs/shared` 再导出兼容层仍待单独清理。
+
 ### 2026-06-29 清理：删除旧部署入口与未使用前端依赖
 
 **执行内容：**
