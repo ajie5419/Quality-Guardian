@@ -25,6 +25,30 @@
 
 ## 执行记录
 
+### 2026-06-29 清理：删除构建产物与旧上传文件
+
+**执行内容：**
+
+- 删除本地历史发布包 `dist/deploy`，发布包改由部署脚本按需重新生成并上传 OSS。
+- 删除本地构建产物 `apps/backend/.output`、`apps/web-antd/dist`、`apps/weapp/dist`。
+- 清理后重新生成忽略的 Nitro 类型目录；`apps/backend/tsconfig.json` 依赖 `.nitro/types/tsconfig.json`，本机 typecheck 需要该生成目录存在。
+- 从 git 索引删除 `apps/web-antd/uploads` 下 36 个旧上传样例文件；该目录已在 `.gitignore` 中忽略，后续运行时上传文件不再进入仓库。
+
+**验证结果：**
+
+- `pnpm run check:dep`: 通过；仍提示 `@qgs/weapp` 既有 Uni/Vite 隐式依赖候选
+- `pnpm run check:qms-arch`: 通过，0 violations
+- `pnpm --dir apps/backend run stub`: 通过，重新生成 Prisma Client 与 Nitro 类型目录
+- `pnpm run check:type`: 通过，3/3 tasks successful
+- `pnpm lint`: 通过，0 error（9 个既有 warning）
+- `pnpm --dir apps/backend exec vitest run`: 通过，190 文件 / 1798 测试
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-29 清理：删除前端 API 共享类型再导出
 
 **执行内容：**
