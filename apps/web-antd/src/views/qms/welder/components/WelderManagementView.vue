@@ -1,8 +1,8 @@
 <script lang="ts" setup>
+import type { InspectionIssue } from '@qgs/shared';
 import type { Dayjs } from 'dayjs';
 
 import type { VxeGridProps } from '#/adapter/vxe-table';
-import type { InspectionIssue } from '#/api/qms/inspection';
 import type { QmsWelderApi } from '#/api/qms/welder';
 import type { SystemDeptApi } from '#/api/system/dept';
 import type { VxeCheckboxChangeParams } from '#/types';

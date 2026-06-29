@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { QualityReportSummary } from '#/api/qms/reports';
+import type { QualityReportSummary } from '@qgs/shared';
 
 import { computed } from 'vue';
 

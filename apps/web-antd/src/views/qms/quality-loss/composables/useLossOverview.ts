@@ -1,3 +1,8 @@
+import type {
+  QualityLossCharts,
+  QualityLossDashboardSummary,
+} from '@qgs/shared';
+
 import type { QualityLossQueryParams } from '#/api/qms/quality-loss';
 
 import { computed, ref } from 'vue';
@@ -6,10 +11,6 @@ import {
   getQualityLossCharts,
   getQualityLossDashboardSummary,
 } from '#/api/qms/quality-loss';
-
-type QualityLossCharts = import('#/api/qms/quality-loss').QualityLossCharts;
-type QualityLossDashboardSummary =
-  import('#/api/qms/quality-loss').QualityLossDashboardSummary;
 
 type ApiErrorHandler = (error: unknown, operation: string) => void;
 

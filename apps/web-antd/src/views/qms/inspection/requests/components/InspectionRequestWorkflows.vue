@@ -1,12 +1,12 @@
 <script setup lang="ts">
+import type {
+  InspectionRequest,
+  InspectionRequestAttachment,
+} from '@qgs/shared';
 import type { UploadFile } from 'ant-design-vue';
 
 import type { DispatchDetailDrawerProps } from './DispatchDetailDrawer.vue';
 
-import type {
-  InspectionRequest,
-  InspectionRequestAttachment,
-} from '#/api/qms/inspection-request';
 import type { TreeSelectNode } from '#/types';
 
 import CloseInspectionModal from './CloseInspectionModal.vue';

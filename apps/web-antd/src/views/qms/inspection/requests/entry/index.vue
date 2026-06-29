@@ -1,14 +1,13 @@
 <script lang="ts" setup>
 import type {
+  InspectionRequestAttachment,
+  InspectionRequestCheckResult,
+} from '@qgs/shared';
+import type {
   SelectProps,
   UploadChangeParam,
   UploadFile,
 } from 'ant-design-vue';
-
-import type {
-  InspectionRequestAttachment,
-  InspectionRequestCheckResult,
-} from '#/api/qms/inspection-request';
 
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';

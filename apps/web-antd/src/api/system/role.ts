@@ -5,7 +5,6 @@ import { requestClient } from '#/api/request';
 import { SYSTEM_API } from './constants';
 
 // Re-export for compatibility
-export * from '@qgs/shared';
 
 export const getRoleList = (params?: { page?: number; pageSize?: number }) => {
   const { page = 1, pageSize = 20 } = params || {};

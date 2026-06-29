@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { InspectionRequest } from '#/api/qms/inspection-request';
+import type { InspectionRequest } from '@qgs/shared';
 
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';

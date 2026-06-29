@@ -1,6 +1,7 @@
 <script lang="ts" setup>
+import type { Dept } from '@qgs/shared';
+
 import type { DailySummaryData } from '#/api/qms/reports';
-import type { Dept } from '#/api/system/dept';
 
 import { computed, onMounted, ref, watch } from 'vue';
 

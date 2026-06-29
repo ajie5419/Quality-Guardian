@@ -25,6 +25,27 @@
 
 ## 执行记录
 
+### 2026-06-29 清理：删除前端 API 共享类型再导出
+
+**执行内容：**
+
+- 删除 `apps/web-antd/src/api` 中面向 `@qgs/shared` 的 `export *` 兼容再导出。
+- 删除空的 `apps/web-antd/src/api/system/enums.ts`，调用方直接从 `@qgs/shared` 引入 `SysStatusEnum`。
+- 将受影响页面和组合函数中的共享类型导入改为直接来自 `@qgs/shared`，保留 API 文件本地 namespace 和运行时请求函数。
+- 将报检请求列表页从 502 行压回 500 行，满足 changed-scope 架构门禁。
+
+**验证结果：**
+
+- `pnpm run check:type`: 通过，3/3 tasks successful
+- `pnpm lint`: 通过，0 error（9 个既有 warning）
+- `pnpm run check:qms-arch`: 通过，0 violations
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-06-29 清理：删除未启用认证子页面
 
 **执行内容：**

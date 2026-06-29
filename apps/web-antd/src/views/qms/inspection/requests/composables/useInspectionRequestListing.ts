@@ -1,7 +1,4 @@
-import type {
-  InspectionRequest,
-  InspectionRequestStatus,
-} from '#/api/qms/inspection-request';
+import type { InspectionRequest, InspectionRequestStatus } from '@qgs/shared';
 
 import { reactive, ref } from 'vue';
 

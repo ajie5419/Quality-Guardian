@@ -1,7 +1,6 @@
 <script lang="ts" setup>
+import type { DfmeaItem } from '@qgs/shared';
 import type { Rule } from 'ant-design-vue/es/form';
-
-import type { DfmeaItem } from '#/api/qms/planning';
 
 import { reactive, ref, watch } from 'vue';
 

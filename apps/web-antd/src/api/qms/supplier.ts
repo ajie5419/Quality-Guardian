@@ -16,7 +16,6 @@ import { requestClient } from '#/api/request';
 import { QMS_API, QMS_IMPORT_TIMEOUT } from './constants';
 
 // Re-export shared types
-export * from '@qgs/shared';
 
 /**
  * Get Supplier list

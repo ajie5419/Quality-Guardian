@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { Dept } from '#/api/system/dept';
+import type { Dept } from '@qgs/shared';
 
 import { onMounted, ref } from 'vue';
 

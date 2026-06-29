@@ -10,7 +10,6 @@ import { QMS_IMPORT_TIMEOUT } from '#/api/qms/constants';
 import { requestClient } from '#/api/request';
 
 // Re-export types
-export * from '@qgs/shared';
 
 /**
  * Get After-sales list items for legacy array consumers.

@@ -1,3 +1,7 @@
+import type {
+  InspectionRequest,
+  InspectionRequestAttachment,
+} from '@qgs/shared';
 import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
 
 import type { Ref } from 'vue';
@@ -5,10 +9,6 @@ import type { RouteLocationNormalizedLoaded, Router } from 'vue-router';
 
 import type { UploadFileWithResponse } from '../../issues/types';
 
-import type {
-  InspectionRequest,
-  InspectionRequestAttachment,
-} from '#/api/qms/inspection-request';
 import type { SystemDeptApi } from '#/api/system/dept';
 
 import { computed, reactive, ref, watch } from 'vue';

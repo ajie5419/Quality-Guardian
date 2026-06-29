@@ -28,8 +28,6 @@ import { publicRequestClient, requestClient } from '#/api/request';
 
 import { QMS_API, QMS_IMPORT_TIMEOUT } from './constants';
 
-export * from '@qgs/shared';
-
 export async function getMetrologyList(params?: MetrologyListParams) {
   return requestClient.get<MetrologyListResponse>(QMS_API.METROLOGY, {
     params,

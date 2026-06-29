@@ -1,5 +1,6 @@
 <script lang="ts" setup>
-import type { WorkOrderItem } from '#/api/qms/work-order';
+import type { WorkOrderItem } from '@qgs/shared';
+
 import type { AfterSalesFormState, TreeSelectNode } from '#/types';
 
 import { useI18n } from '@vben/locales';

@@ -5,7 +5,6 @@ import type { QmsListResponse } from '#/api/qms/types';
 import { requestClient } from '#/api/request';
 
 // Re-export shared types
-export * from '@qgs/shared';
 
 export async function getTaskList(params?: {
   all?: string;

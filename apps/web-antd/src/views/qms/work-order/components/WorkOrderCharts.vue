@@ -1,7 +1,8 @@
 <script lang="ts" setup>
+import type { WorkOrderDashboardStats } from '@qgs/shared';
+
 import type { EchartsUIType } from '@vben/plugins/echarts';
 
-import type { WorkOrderDashboardStats } from '#/api/qms/work-order';
 import type { SystemDeptApi } from '#/api/system/dept';
 
 import { computed, nextTick, ref, shallowRef, watch } from 'vue';

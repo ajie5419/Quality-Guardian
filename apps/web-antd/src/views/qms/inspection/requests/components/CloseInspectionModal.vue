@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { UploadFile } from 'ant-design-vue';
-
 import type {
   InspectionRequest,
   InspectionRequestAttachment,
-} from '#/api/qms/inspection-request';
+} from '@qgs/shared';
+import type { UploadFile } from 'ant-design-vue';
+
 import type { TreeSelectNode } from '#/types';
 
 import { computed, nextTick, reactive, ref, watch } from 'vue';

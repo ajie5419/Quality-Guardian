@@ -12,7 +12,6 @@ import { requestClient } from '#/api/request';
 import { QMS_API } from './constants';
 
 // Re-export shared types
-export * from '@qgs/shared';
 
 export type DailySummaryData = SharedDailySummaryData & {
   archiveStats?: {

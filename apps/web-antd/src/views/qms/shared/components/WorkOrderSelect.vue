@@ -1,7 +1,6 @@
 <script lang="ts" setup>
+import type { WorkOrderItem } from '@qgs/shared';
 import type { SelectProps } from 'ant-design-vue';
-
-import type { WorkOrderItem } from '#/api/qms/work-order';
 
 import { computed, onMounted, toRef } from 'vue';
 

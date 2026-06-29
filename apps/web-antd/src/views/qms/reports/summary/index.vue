@@ -1,7 +1,6 @@
 <script lang="ts" setup>
+import type { QualityReportSummary } from '@qgs/shared';
 import type { Dayjs } from 'dayjs';
-
-import type { QualityReportSummary } from '#/api/qms/reports';
 
 import { computed, onMounted, ref, watch } from 'vue';
 

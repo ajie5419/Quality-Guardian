@@ -1,6 +1,6 @@
-import type { UploadFileWithResponse } from './common';
+import type { AfterSalesItem } from '@qgs/shared';
 
-import type { AfterSalesItem } from '#/api/qms/after-sales';
+import type { UploadFileWithResponse } from './common';
 
 /**
  * 售后工单表单状态

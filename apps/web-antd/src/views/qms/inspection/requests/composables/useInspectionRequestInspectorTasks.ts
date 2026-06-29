@@ -1,4 +1,4 @@
-import type { InspectionRequest } from '#/api/qms/inspection-request';
+import type { InspectionRequest } from '@qgs/shared';
 
 import { ref } from 'vue';
 

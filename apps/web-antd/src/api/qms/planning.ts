@@ -95,7 +95,6 @@ export interface ProjectDocProject {
 }
 
 // Re-export shared types
-export * from '@qgs/shared';
 
 /**
  * DFMEA Project APIs

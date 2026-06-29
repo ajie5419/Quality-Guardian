@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { WeeklyReportData } from '#/api/qms/reports-weekly';
+import type { WeeklyReportData } from '@qgs/shared';
 
 import { ref, watch } from 'vue';
 

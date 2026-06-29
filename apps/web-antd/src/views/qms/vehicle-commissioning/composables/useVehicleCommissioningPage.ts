@@ -3,9 +3,9 @@ import type {
   VehicleCommissioningDailyReport,
   VehicleCommissioningIssue,
   VehicleCommissioningIssueStatus,
+  WorkOrderItem,
 } from '@qgs/shared';
 
-import type { WorkOrderItem } from '#/api/qms/work-order';
 import type { TreeSelectNode } from '#/types';
 import type { UploadFileWithResponse } from '#/views/qms/inspection/issues/types';
 

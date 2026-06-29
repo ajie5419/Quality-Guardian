@@ -1,8 +1,7 @@
 <script setup lang="ts">
+import type { InspectionRequest } from '@qgs/shared';
 import type { UploadChangeParam, UploadProps } from 'ant-design-vue';
 import type { UploadFile } from 'ant-design-vue/es/upload/interface';
-
-import type { InspectionRequest } from '#/api/qms/inspection-request';
 
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';

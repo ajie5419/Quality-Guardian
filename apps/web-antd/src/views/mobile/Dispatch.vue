@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { InspectionRequest } from '#/api/qms/inspection-request';
+import type { InspectionRequest } from '@qgs/shared';
 
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';

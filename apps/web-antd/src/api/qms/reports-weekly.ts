@@ -2,8 +2,6 @@ import type { WeeklyReportData } from '@qgs/shared';
 
 import { requestClient } from '#/api/request';
 
-export * from '@qgs/shared';
-
 /**
  * Get Weekly Report Data
  */

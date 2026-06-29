@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { WorkOrderDashboardStats } from '@qgs/shared';
+
 import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 import type { SystemDeptApi } from '#/api/system/dept';
 import type { TreeSelectNode, VxeCheckboxChangeParams } from '#/types';
@@ -59,9 +61,7 @@ const loadDeptTree = async () => {
   }
 };
 onMounted(loadDeptTree);
-const workOrderStats = ref<
-  import('#/api/qms/work-order').WorkOrderDashboardStats | null
->(null);
+const workOrderStats = ref<null | WorkOrderDashboardStats>(null);
 const {
   aggregateData,
   aggregateLoading,

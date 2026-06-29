@@ -1,6 +1,7 @@
 <script lang="ts" setup>
+import type { WorkOrderItem } from '@qgs/shared';
+
 import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
-import type { WorkOrderItem } from '#/api/qms/work-order';
 import type { TreeSelectNode } from '#/types';
 
 import { computed, ref, toRef, watch } from 'vue';

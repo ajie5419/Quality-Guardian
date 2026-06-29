@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { InspectionRequestStatus } from '#/api/qms/inspection-request';
+import type { InspectionRequestStatus } from '@qgs/shared';
 
 import { IconifyIcon } from '@vben/icons';
 

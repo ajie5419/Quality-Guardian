@@ -1,11 +1,10 @@
 <script lang="ts" setup>
+import type { InspectionRequestCheckResult } from '@qgs/shared';
 import type {
   SelectProps,
   UploadChangeParam,
   UploadFile,
 } from 'ant-design-vue';
-
-import type { InspectionRequestCheckResult } from '#/api/qms/inspection-request';
 
 import { Form, Input, InputNumber, Select } from 'ant-design-vue';
 

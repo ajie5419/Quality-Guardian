@@ -8,6 +8,7 @@ import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
+import { SysStatusEnum } from '@qgs/shared';
 import {
   Button,
   Form,
@@ -27,7 +28,6 @@ import {
   getDictionaryList,
   updateDictionary,
 } from '#/api/system/dictionary';
-import { SysStatusEnum } from '#/api/system/enums';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useDictionaryTypeOptions } from '#/views/system/dictionary/composables/useDictionaryTypeOptions';
 

@@ -5,7 +5,6 @@ import { requestClient } from '#/api/request';
 import { SYSTEM_API } from './constants';
 
 // Re-export for compatibility
-export * from '@qgs/shared';
 
 export interface SystemUser extends SharedUser {
   wechatWorkId?: null | string;

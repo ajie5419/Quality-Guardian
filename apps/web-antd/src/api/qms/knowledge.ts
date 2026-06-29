@@ -11,7 +11,6 @@ import {
 import { requestClient } from '#/api/request';
 
 // Re-export shared types
-export * from '@qgs/shared';
 
 /**
  * 获取分类树

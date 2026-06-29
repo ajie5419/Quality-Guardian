@@ -13,8 +13,6 @@ import { publicRequestClient, requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
 
-export * from '@qgs/shared';
-
 export interface InspectionRequestStats {
   byInspector: Array<{ count: number; inspector: string }>;
   bySupplier: Array<{ count: number; team: string }>;

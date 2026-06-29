@@ -1,5 +1,6 @@
 <script lang="ts" setup>
-import type { InspectionIssue } from '#/api/qms/inspection';
+import type { InspectionIssue } from '@qgs/shared';
+
 import type { QmsWelderApi } from '#/api/qms/welder';
 import type { SystemDeptApi } from '#/api/system/dept';
 

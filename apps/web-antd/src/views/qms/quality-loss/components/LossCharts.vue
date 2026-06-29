@@ -1,7 +1,7 @@
 <script lang="ts" setup>
-import type { EchartsUIType } from '@vben/plugins/echarts';
+import type { QualityLossCharts } from '@qgs/shared';
 
-import type { QualityLossCharts } from '#/api/qms/quality-loss';
+import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import { computed, onUnmounted, ref, watch } from 'vue';
 

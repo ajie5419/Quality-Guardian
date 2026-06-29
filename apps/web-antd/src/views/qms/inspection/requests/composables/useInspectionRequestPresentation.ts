@@ -1,10 +1,10 @@
-import type { Ref } from 'vue';
-
 import type {
   InspectionRequest,
   InspectionRequestCheckResult,
   InspectionRequestStatus,
-} from '#/api/qms/inspection-request';
+} from '@qgs/shared';
+
+import type { Ref } from 'vue';
 
 import { computed } from 'vue';
 

@@ -19,7 +19,6 @@ import { requestClient } from '#/api/request';
 import { QMS_API } from './constants';
 
 // Re-export shared types
-export * from '@qgs/shared';
 
 /**
  * Get Work Order list (Paginated with Summary)

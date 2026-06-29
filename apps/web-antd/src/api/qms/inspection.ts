@@ -44,7 +44,6 @@ export type InspectionIssueChartAggregateItem = {
 };
 
 // Re-export types for backward compatibility (optional, can be removed if views are updated)
-export * from '@qgs/shared';
 
 export async function getInspectionIssues(params?: {
   dateMode?: 'month' | 'week' | 'year';

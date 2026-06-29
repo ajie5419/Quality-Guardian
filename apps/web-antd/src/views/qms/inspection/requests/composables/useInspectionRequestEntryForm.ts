@@ -1,13 +1,12 @@
-import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
-
-import type { LocationQuery } from 'vue-router';
-
 import type {
+  BomItem,
   InspectionRequestAttachment,
   InspectionRequestCheckResult,
   InspectionRequestCheckResult as InspectionRequestCheckResultValue,
-} from '#/api/qms/inspection-request';
-import type { BomItem } from '#/api/qms/planning';
+} from '@qgs/shared';
+import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
+
+import type { LocationQuery } from 'vue-router';
 
 import { computed, reactive, ref, watch } from 'vue';
 

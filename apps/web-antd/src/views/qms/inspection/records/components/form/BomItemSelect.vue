@@ -1,7 +1,6 @@
 <script lang="ts" setup>
+import type { BomItem } from '@qgs/shared';
 import type { SelectProps } from 'ant-design-vue';
-
-import type { BomItem } from '#/api/qms/planning';
 
 import { computed, ref, watch } from 'vue';
 

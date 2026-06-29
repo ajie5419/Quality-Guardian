@@ -1,5 +1,6 @@
 <script lang="ts" setup>
-import type { InspectionRequest } from '#/api/qms/inspection-request';
+import type { InspectionRequest } from '@qgs/shared';
+
 import type { SystemDeptApi } from '#/api/system/dept';
 import type { SystemUserApi } from '#/api/system/user';
 import type { TreeSelectNode } from '#/types';
@@ -108,12 +109,10 @@ const {
   warn: message.warning,
 });
 
-const canDelete = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Requests:Delete']),
-);
-const canDispatch = computed(() =>
-  hasAccessByCodes(['QMS:Inspection:Requests:Dispatch']),
-);
+const canUseRequestAction = (action: 'Delete' | 'Dispatch') =>
+  hasAccessByCodes([`QMS:Inspection:Requests:${action}`]);
+const canDelete = computed(() => canUseRequestAction('Delete'));
+const canDispatch = computed(() => canUseRequestAction('Dispatch'));
 
 const userOptions = computed(() =>
   users.value.map((user) => ({

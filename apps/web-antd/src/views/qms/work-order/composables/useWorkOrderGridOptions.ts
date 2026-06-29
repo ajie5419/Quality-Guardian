@@ -1,12 +1,11 @@
+import type { WorkOrderDashboardStats } from '@qgs/shared';
+
 import type { Ref } from 'vue';
 
 import type { WorkOrderSearchFormValues } from './useWorkOrderQueryFilters';
 
 import type { VxeGridProps } from '#/adapter/vxe-table';
-import type {
-  QmsWorkOrderApi,
-  WorkOrderDashboardStats,
-} from '#/api/qms/work-order';
+import type { QmsWorkOrderApi } from '#/api/qms/work-order';
 import type { SystemDeptApi } from '#/api/system/dept';
 
 import { computed } from 'vue';

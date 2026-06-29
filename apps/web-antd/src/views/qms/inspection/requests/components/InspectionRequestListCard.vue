@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { InspectionRequestTableProps } from './InspectionRequestTable.vue';
+import type { InspectionRequest } from '@qgs/shared';
 
-import type { InspectionRequest } from '#/api/qms/inspection-request';
+import type { InspectionRequestTableProps } from './InspectionRequestTable.vue';
 
 import { Card, Tag } from 'ant-design-vue';
 

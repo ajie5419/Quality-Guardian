@@ -8,6 +8,7 @@ import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
 
+import { SysStatusEnum } from '@qgs/shared';
 import {
   Button,
   Drawer,
@@ -23,7 +24,6 @@ import {
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getDeptList } from '#/api/system/dept';
-import { SysStatusEnum } from '#/api/system/enums';
 import {
   createRole,
   deleteRole,

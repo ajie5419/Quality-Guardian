@@ -9,7 +9,6 @@ import type {
 import { requestClient } from '#/api/request';
 
 // Re-export types
-export * from '@qgs/shared';
 
 export type QualityLossQueryParams = QualityLossParams;
 
