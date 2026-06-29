@@ -40,9 +40,6 @@
   },
   "devDependencies": {
     "@vben/vite-config": "workspace:*",
-    "autoprefixer": "catalog:",
-    "postcss": "catalog:",
-    "sass": "catalog:",
     "vite": "catalog:"
   }
 }

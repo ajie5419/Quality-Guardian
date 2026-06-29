@@ -25,6 +25,29 @@
 
 ## 执行记录
 
+### 2026-06-29 清理：删除旧部署入口与未使用前端依赖
+
+**执行内容：**
+
+- 删除根目录旧发布脚本 `publish.sh`，保留现有 `scripts/deploy/one-click-oss.sh` / `deploy-from-oss.sh` 发布路径。
+- 删除仓库内置 `tools/bin/ossutil` 二进制，部署脚本继续使用系统 `ossutil` 或 `OSSUTIL_BIN` 覆盖。
+- 删除仅用于开发架构可视化的 `_dev/architecture` 页面，并移除后端 `SystemArchitecture` 菜单声明。
+- 删除 `@vue-flow/*`、`@wangeditor/editor-for-vue`、`lodash-es`、`mammoth`、`pdfjs-dist`、`@types/lodash-es` 等未使用前端依赖。
+- 删除 `@vben-core/design` 中未使用的 `autoprefixer`、`postcss`、`sass` devDependencies，并同步更新 `pnpm-lock.yaml`。
+
+**验证结果：**
+
+- `pnpm run check:dep`: 通过；仅剩 `@qgs/weapp` 的 Uni/Vite 隐式依赖既有提示
+- `pnpm run check:qms-arch`: 通过，0 violations
+- `pnpm run check:type`: 通过，3/3 tasks successful
+- `pnpm lint`: 通过，0 error（9 个既有 warning）
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 认证子路由收缩和前端 API `@qgs/shared` 再导出清理需单独处理，避免混入产品行为变化和大范围 import diff。
+
 ### 2026-06-27 修复：小程序任务与记录列表右侧溢出
 
 **执行内容：**
