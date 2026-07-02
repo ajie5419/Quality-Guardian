@@ -25,6 +25,26 @@
 
 ## 执行记录
 
+### 2026-07-02 前端：质量照片详情缩略图加载优化
+
+**执行内容：**
+
+- 调整售后质量详情抽屉照片展示，详情页小图优先加载缩略图，点击预览时再加载原图。
+- 调整不合格项详情抽屉照片展示，复用同一缩略图 URL 解析逻辑，避免 96px 小图直接请求原图。
+- 保留旧数据兼容：历史照片仅保存原图 URL 时，前端按既有 `_thumb.webp` 规则推导缩略图地址，缩略图缺失时回退原图。
+
+**验证结果：**
+
+- `pnpm --dir apps/web-antd exec vue-tsc --noEmit`: 通过
+- `pnpm --dir apps/web-antd exec vitest run src/views/qms/after-sales/constants.test.ts`: 1 文件 / 3 测试通过
+- `pnpm --dir apps/web-antd exec vitest run src/views/qms/inspection/issues/composables/useIssueActions.test.ts`: 1 文件 / 2 测试通过
+
+**commit:** `7d2081cc` fix(@qgs/web-antd): use thumbnails in quality photo details
+
+**遗留问题：**
+
+- 未启动前端 dev/build 服务；按项目约束，本次通过类型检查与相关单测验证。
+
 ### 2026-06-29 清理：删除构建产物与旧上传文件
 
 **执行内容：**

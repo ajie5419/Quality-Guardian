@@ -11,6 +11,10 @@ import { Descriptions, Drawer, Image, Tag } from 'ant-design-vue';
 
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { findNameById } from '#/types';
+import {
+  extractPhotoThumbUrl,
+  extractPhotoUrl,
+} from '#/views/qms/shared/utils/photo-url';
 
 import {
   getSeverityColor,
@@ -36,22 +40,21 @@ const drawerWidth = computed(() =>
 
 const photos = computed(() => parsePhotos(props.record?.photos));
 
-function parsePhotos(value: unknown): string[] {
+type DetailPhoto = {
+  previewUrl: string;
+  thumbUrl: string;
+};
+
+function parsePhotos(value: unknown): DetailPhoto[] {
   if (!Array.isArray(value)) return [];
-  const result: string[] = [];
+  const result: DetailPhoto[] = [];
   for (const item of value) {
-    if (typeof item === 'string') {
-      result.push(item);
-      continue;
-    }
-    if (
-      item &&
-      typeof item === 'object' &&
-      'url' in item &&
-      typeof item.url === 'string'
-    ) {
-      result.push(item.url);
-    }
+    const previewUrl = extractPhotoUrl(item);
+    if (!previewUrl) continue;
+    result.push({
+      previewUrl,
+      thumbUrl: extractPhotoThumbUrl(item) || previewUrl,
+    });
   }
   return result;
 }
@@ -187,10 +190,12 @@ function formatDisplayDate(value: string | undefined) {
         <div v-if="photos.length > 0" class="flex flex-wrap gap-2">
           <Image
             v-for="(photo, index) in photos"
-            :key="`${photo}-${index}`"
+            :key="`${photo.previewUrl}-${index}`"
             :width="96"
             :height="96"
-            :src="photo"
+            :fallback="photo.previewUrl"
+            :preview="{ src: photo.previewUrl }"
+            :src="photo.thumbUrl"
             class="rounded border border-gray-200"
           />
         </div>

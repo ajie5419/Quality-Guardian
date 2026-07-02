@@ -10,6 +10,10 @@ import { Descriptions, Drawer, Image, Tag } from 'ant-design-vue';
 import { QmsStatusTag } from '#/components/Qms';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { findNameById } from '#/types';
+import {
+  extractPhotoThumbUrl,
+  extractPhotoUrl,
+} from '#/views/qms/shared/utils/photo-url';
 
 type DeptNode = {
   children?: DeptNode[];
@@ -35,18 +39,37 @@ const drawerWidth = computed(() =>
 );
 const photos = computed(() => parsePhotos(props.record?.photos));
 
-function parsePhotos(value: unknown): string[] {
+type DetailPhoto = {
+  previewUrl: string;
+  thumbUrl: string;
+};
+
+function parsePhotos(value: unknown): DetailPhoto[] {
+  const normalize = (item: unknown): DetailPhoto | null => {
+    const previewUrl = extractPhotoUrl(item);
+    if (!previewUrl) return null;
+    return {
+      previewUrl,
+      thumbUrl: extractPhotoThumbUrl(item) || previewUrl,
+    };
+  };
+
   if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === 'string');
+    return value
+      .map((item) => normalize(item))
+      .filter((item): item is DetailPhoto => !!item);
   }
   if (typeof value !== 'string') return [];
   try {
     const parsed = JSON.parse(value) as unknown;
     return Array.isArray(parsed)
-      ? parsed.filter((item): item is string => typeof item === 'string')
+      ? parsed
+          .map((item) => normalize(item))
+          .filter((item): item is DetailPhoto => !!item)
       : [];
   } catch {
-    return [];
+    const photo = normalize(value);
+    return photo ? [photo] : [];
   }
 }
 
@@ -195,10 +218,12 @@ function formatDepartments(record: QmsAfterSalesApi.AfterSalesItem) {
         <div v-if="photos.length > 0" class="flex flex-wrap gap-2">
           <Image
             v-for="(photo, index) in photos"
-            :key="`${photo}-${index}`"
+            :key="`${photo.previewUrl}-${index}`"
             :width="96"
             :height="96"
-            :src="photo"
+            :fallback="photo.previewUrl"
+            :preview="{ src: photo.previewUrl }"
+            :src="photo.thumbUrl"
             class="rounded border border-gray-200"
           />
         </div>
