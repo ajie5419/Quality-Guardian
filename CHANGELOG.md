@@ -39,7 +39,7 @@
 - `pnpm --dir apps/web-antd exec vitest run src/views/qms/after-sales/constants.test.ts`: 1 文件 / 3 测试通过
 - `pnpm --dir apps/web-antd exec vitest run src/views/qms/inspection/issues/composables/useIssueActions.test.ts`: 1 文件 / 2 测试通过
 
-**commit:** `7d2081cc` fix(@qgs/web-antd): use thumbnails in quality photo details
+**commit:** `eba8c0c9` fix(@qgs/web-antd): use thumbnails in quality photo details
 
 **遗留问题：**
 
