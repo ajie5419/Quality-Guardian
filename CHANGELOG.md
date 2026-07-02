@@ -25,6 +25,14 @@
 
 ## 执行记录
 
+## [0.13.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.13.0...qgs-v0.13.1) (2026-07-02)
+
+
+### Bug Fixes
+
+* **@qgs/weapp:** constrain list card overflow ([a814085](https://github.com/ajie5419/Quality-Guardian/commit/a814085208c9c14b1da2b14a4d5b2719df8e1546))
+* **@qgs/web-antd:** use thumbnails in quality photo details ([eba8c0c](https://github.com/ajie5419/Quality-Guardian/commit/eba8c0c9d73412051666a264e431e7e27ef137d9))
+
 ### 2026-07-02 前端：质量照片详情缩略图加载优化
 
 **执行内容：**
