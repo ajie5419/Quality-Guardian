@@ -111,6 +111,7 @@ describe('inspectionRequestCloseService', () => {
             ...mockRequest,
             status: 'CLOSED',
           }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         qms_task_dispatches: {
           updateMany: vi.fn(),

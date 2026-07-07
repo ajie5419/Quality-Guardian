@@ -64,7 +64,7 @@ async function loadTasks() {
   loading.value = true;
   try {
     const res = await getInspectionRequests({
-      status: isDispatcher.value ? 'SUBMITTED' : 'DISPATCHED',
+      status: isDispatcher.value ? 'SUBMITTED' : 'DISPATCHED,INSPECTING',
       mine: !isDispatcher.value,
       page: 1,
       pageSize: 50,

@@ -25,6 +25,30 @@
 
 ## 执行记录
 
+### 2026-07-07 修复：报检任务关闭链路事务重构（P0-1/P0-2）+ 关联查询修复（P1-2/P1-3）
+
+**执行内容：**
+
+- P0-1 关闭链路并发竞态：`inspection-request-close.service.ts` 将状态权威校验改为事务内 `updateMany({ where: { id, isDeleted: false, status: { not: CLOSED } } })` 原子守卫（count=0 即拒绝），事务外 `findFirst` 仅保留为快速失败预检。
+- P0-2 孤儿检验记录：检验记录创建与关联问题创建全部移入关闭事务内。`Prisma.TransactionClient` 贯穿 `createCloseInspectionRecords` → `buildInspectionRecordFromRequest` → `InspectionService.create`；`inspection-record-create.service.ts` 支持外部事务客户端（tx 模式单次尝试，序列号冲突上抛中止整个事务），关闭服务外层 `retryOnSerialNumberConflict` 整体重试关闭事务（建记录路径 3 次，显式 inspectionId 路径 1 次）。`isInspectionSerialNumberConflict` 迁至 `inspection-record-types.ts`；`assertWorkOrdersExist` 参数放宽为 `Pick<PrismaClient, 'work_orders'>` 以接受事务客户端。
+- P1-2 软删过滤：`inspection-reporting.service.ts` `findIssueIdBySerialNumber` 补 `isDeleted: false`。
+- P1-3 小程序任务列表状态过滤：`apps/weapp/src/pages/tasks/index.vue` 检验员视角查询状态改为 `'DISPATCHED,INSPECTING'`，不再拉取已关闭任务。
+- 生产代码 7 个文件；测试改动 6 个文件：新增 6 条并发/事务对抗用例（原子守卫顺序与形状、守卫拒绝、tx 透传、序列号冲突整体重试、非冲突错误不重试、显式路径不重试）、2 条 record-create 事务客户端用例、1 条 close-records tx 透传用例，并同步既有断言（vitest 对尾参 `undefined` 严格比较）。
+
+**验证结果：**
+
+- typecheck: 通过（`tsc --noEmit` + `pnpm run check:type` 3/3 tasks）
+- `pnpm run check:qms-arch`: 通过，0 violations
+- vitest: 192 文件 / 1816 测试全部通过（inspection 模块 56 文件 / 490 测试）
+- eslint: 全部改动文件通过（含 weapp vue）
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 第 2 组待修（已批准未开始）：P0-3 requestNo 计数竞态 + 问题单 serialNumber `_max+1` 竞态；P1-1 welder-sync 未保护 await（inspection-issue-mutation.service.ts:70,113）；P1-5 deleteRequest 缺状态/归属校验且写入非枚举 'CANCELLED'；P1-4 Telegram webhook 伪造 event/user（api/telegram/webhook.post.ts）。
+- 第 3 组 P2 清单：failCloseRequest → BusinessError、TASK_DISPATCH_STATUS 缺 CANCELLED、inspection.module.ts 审计/数据域声明与实际字段不符、跨模块非 index 导入、getWelderScoreIssues 全表扫描、供应商快照 openEngineeringCount 统计口径、公共 API 限流、supplier.service 静默 catch。
+
 ### 2026-07-02 前端：质量照片详情缩略图加载优化
 
 **执行内容：**
@@ -2943,3 +2967,52 @@
 **遗留问题：**
 
 - 未启动前端 dev/build 服务；按项目约束，本次通过组件/组合式函数测试、后端单测、类型检查与架构门禁验证。
+
+### 2026-07-06 架构总览页面恢复
+
+**执行内容：**
+
+- 恢复 `apps/web-antd/src/views/_dev/architecture/index.vue`，匹配现有菜单配置里的组件路径 `_dev/architecture/index`。
+- 页面不重新引入旧的可视化依赖，使用现有 `Page`、`IconifyIcon` 和 Ant Design Vue 组件展示架构总览、模块边界、验证门禁和路由解析信息。
+- 更新 `code_map.md`，补充新增 `_dev/` 前端视图目录说明。
+
+**验证结果：**
+
+- `rg --files apps/web-antd/src/views | rg '^apps/web-antd/src/views/_dev/architecture/index\.vue$'`: 通过，目标组件文件存在
+- `pnpm -C apps/web-antd typecheck`: 通过
+- `pnpm -C apps/backend exec vitest run utils/module-loader.test.ts modules/rbac/rbac-menu.service.test.ts`: 2 文件 / 24 测试通过
+- `pnpm run check:qms-arch -- --changed`: 通过，0 violations across 0 rules
+
+**commit:** 本次未提交
+
+**遗留问题：**
+
+- 未启动前端 dev/build 服务；按项目约束，本次通过路径匹配、前端类型检查、相关后端单测与架构门禁验证。
+
+### 2026-07-06 检验记录手动创建开关
+
+**执行内容：**
+
+- 新增系统设置开关"允许手动创建检验记录"，控制进货/过程/发货三类检验记录的手动新建入口；默认开启（向后兼容）。
+- 后端：`system_settings` 新增 key `INSPECTION_MANUAL_CREATE_ENABLED`；`SystemService.isInspectionManualCreateEnabled()` 读取判断；新增权限码 `System:InspectionSettings:Edit`（声明于 `modules/system/system.module.ts`，并同步写入 `prisma/seed.js` 的全量菜单表）。
+- 新增 API：`GET/POST /api/system/settings/inspection-manual-create`，POST 侧显式校验 `System:InspectionSettings:Edit` 权限码。
+- 检验记录创建入口 `api/qms/inspection/records/index.post.ts` 拆分为薄路由 + `modules/inspection/inspection-record-create.post.service.ts`（满足 API 文件 ≤50 行的架构约束），在写入前校验开关状态，关闭时抛出 `BusinessError('INSPECTION_MANUAL_CREATE_DISABLED', ..., 403)`。
+- 报检任务创建接口（`requests/index.post.ts`）经核实是独立的预检验申请流程（工单号/工序/自检记录），非"检验记录"本身，故未加此开关限制，避免误伤该工作流。
+- 前端：新增系统设置页 `views/system/inspection-settings/index.vue`（含 `hasAccessByCodes` 权限门控）；`InspectionGrid.vue` 的"新增"按钮叠加开关状态判断（`canCreate && manualCreateEnabled`）；新增 API 封装 `api/system/inspection-settings.ts`；补充中英文 i18n 文案。
+- 新增单测：`inspection-record-create.post.service.test.ts`、`inspection-manual-create.post.service.test.ts`，并为 `system.service.test.ts` 补充 `isInspectionManualCreateEnabled` 的 3 个用例。
+
+**验证结果：**
+
+- `pnpm -C apps/backend exec tsc --noEmit`: 通过
+- `pnpm -C apps/web-antd exec vue-tsc --noEmit --skipLibCheck`: 通过
+- `pnpm run check:type`（turbo，全部 40 个包）: 通过
+- `pnpm run check:qms-arch`: 通过，0 violations across 0 rules
+- `pnpm exec eslint --fix <全部改动文件>`: 通过，无遗留问题
+- `pnpm -C apps/backend exec vitest run modules/inspection modules/system modules/rbac utils/module-loader`: 73 文件 / 765 测试通过（含 12 个新增用例）
+
+**commit:** 本次未提交
+
+**遗留问题：**
+
+- 未启动前端 dev/build 服务验证界面渲染；按项目约束，本次通过类型检查、单测与架构门禁验证功能正确性。
+- `System:InspectionSettings:Edit` 权限需管理员在"角色管理"页面手动分配给目标角色后才能生效。

@@ -2,11 +2,14 @@ import type { Prisma } from '@prisma/client';
 import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
+import type { CloseInspectionRecordLink } from './inspection-request-close-records.service';
+
 import process from 'node:process';
 
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import prisma from '~/utils/prisma';
 
+import { isInspectionSerialNumberConflict } from './inspection-record-types';
 import {
   INSPECTION_REQUEST_STATUS,
   mapInspectionRequest,
@@ -67,17 +70,11 @@ export const InspectionRequestCloseService = {
       if (request.status === INSPECTION_REQUEST_STATUS.CLOSED)
         failCloseRequest('BAD_REQUEST', '报检任务已检验完成');
 
-      let inspectionId = explicitInspectionId;
-      let inspectionLinks: Array<{
-        inspectionId: string;
-        isPrimary: boolean;
-        workOrderNumber: string;
-      }> = [];
-      if (inspectionId) {
+      if (explicitInspectionId) {
         const inspection = await prisma.inspections.findFirst({
           select: { id: true },
           where: {
-            id: inspectionId,
+            id: explicitInspectionId,
             isDeleted: false,
             workOrderNumber: request.workOrderNumber,
           },
@@ -87,19 +84,6 @@ export const InspectionRequestCloseService = {
             'BAD_REQUEST',
             '关联的检验记录不存在，或工单号与报检任务不一致',
           );
-        inspectionLinks = [
-          {
-            inspectionId,
-            isPrimary: true,
-            workOrderNumber: request.workOrderNumber,
-          },
-        ];
-      } else {
-        inspectionLinks = await createCloseInspectionRecords({
-          body,
-          request,
-        });
-        inspectionId = inspectionLinks[0]?.inspectionId || '';
       }
 
       const closeAttachments = normalizeInspectionRequestAttachments(
@@ -130,123 +114,176 @@ export const InspectionRequestCloseService = {
         totalQuantity - unqualifiedQuantity,
       );
       const shouldCloseRequest = result === 'PASS';
-      let issueCreateData: Prisma.quality_recordsCreateInput | undefined;
-      let issueAuditVariables:
-        | undefined
-        | { issue: string; nonConformanceNumber: string };
       const closeInspectorId =
         request.inspectorId ||
         (await resolveInspectionRequestCurrentUserId(userinfo, prisma));
 
-      if (result === 'FAIL' && linkedIssue && inspectionId) {
-        const result = await buildCloseLinkedIssueCreateResult({
-          body,
-          inspectionId,
-          linkedIssue,
-          request,
-          userinfo,
+      const runCloseTransaction = () =>
+        prisma.$transaction(async (tx) => {
+          // Atomic guard: the authoritative status check happens inside the
+          // transaction, so concurrent close attempts cannot both pass.
+          const guard = await tx.qms_inspection_requests.updateMany({
+            data: { status: INSPECTION_REQUEST_STATUS.INSPECTING },
+            where: {
+              id,
+              isDeleted: false,
+              status: { not: INSPECTION_REQUEST_STATUS.CLOSED },
+            },
+          });
+          if (guard.count === 0)
+            failCloseRequest('BAD_REQUEST', '报检任务已检验完成');
+
+          let inspectionId = explicitInspectionId;
+          let inspectionLinks: CloseInspectionRecordLink[] =
+            explicitInspectionId
+              ? [
+                  {
+                    inspectionId: explicitInspectionId,
+                    isPrimary: true,
+                    workOrderNumber: request.workOrderNumber,
+                  },
+                ]
+              : [];
+          if (!inspectionId) {
+            // Created inside the transaction so a failed close leaves no
+            // orphan inspection records behind.
+            inspectionLinks = await createCloseInspectionRecords({
+              body,
+              request,
+              tx,
+            });
+            inspectionId = inspectionLinks[0]?.inspectionId || '';
+          }
+
+          let issueCreateData: Prisma.quality_recordsCreateInput | undefined;
+          let issueAuditVariables:
+            | undefined
+            | { issue: string; nonConformanceNumber: string };
+          if (result === 'FAIL' && linkedIssue && inspectionId) {
+            const built = await buildCloseLinkedIssueCreateResult({
+              body,
+              inspectionId,
+              linkedIssue,
+              request,
+              userinfo,
+            });
+            issueCreateData = built.createData;
+            issueAuditVariables = built.auditVariables;
+          }
+
+          const issueRecord = issueCreateData
+            ? await tx.quality_records.create({ data: issueCreateData })
+            : null;
+          const linkedIssueWhere = buildLinkedIssueWhere(
+            request,
+            issueRecord?.id,
+          );
+          let linkedIssueStatus =
+            issueRecord?.status || request.linkedIssueStatus || null;
+          let closedLinkedIssueCount = 0;
+          if (shouldCloseRequest && linkedIssueWhere) {
+            const linkedIssueUpdate = await tx.quality_records.updateMany({
+              data: { status: 'CLOSED' },
+              where: { ...linkedIssueWhere, status: { not: 'CLOSED' } },
+            });
+            closedLinkedIssueCount = linkedIssueUpdate.count;
+            linkedIssueStatus = 'CLOSED';
+          }
+          if (explicitInspectionId && inspectionId) {
+            await tx.inspections.update({
+              data: {
+                inspector:
+                  normalizeInspectionRequestText(body.inspector) ||
+                  request.reporter,
+                quantity: totalQuantity,
+                stationSelection: request.stationSelection,
+                qualifiedQuantity,
+                remarks:
+                  normalizeInspectionRequestText(body.closeRemark) ||
+                  request.requestInfo,
+                result: result === 'FAIL' ? 'FAIL' : 'PASS',
+                unqualifiedQuantity,
+              },
+              where: { id: inspectionId },
+            });
+          }
+          await tx.qms_inspection_request_inspections.createMany({
+            data: inspectionLinks.map((item) => ({
+              inspectionId: item.inspectionId,
+              isPrimary: item.isPrimary,
+              requestId: id,
+              workOrderNumber: item.workOrderNumber,
+            })),
+            skipDuplicates: true,
+          });
+          const record = await tx.qms_inspection_requests.update({
+            data: {
+              closeAttachments:
+                closeAttachments.length > 0
+                  ? JSON.stringify(closeAttachments)
+                  : null,
+              closeRemark:
+                normalizeInspectionRequestText(body.closeRemark) || null,
+              closedAt: shouldCloseRequest ? new Date() : null,
+              inspectionId,
+              inspectionResult: result === 'FAIL' ? 'FAIL' : 'PASS',
+              inspectorId: closeInspectorId || request.inspectorId,
+              linkedIssueId: issueRecord?.id || request.linkedIssueId || null,
+              linkedIssueNo:
+                issueRecord?.nonConformanceNumber ||
+                request.linkedIssueNo ||
+                null,
+              linkedIssueStatus,
+              qualifiedQuantity,
+              status: shouldCloseRequest
+                ? INSPECTION_REQUEST_STATUS.CLOSED
+                : INSPECTION_REQUEST_STATUS.INSPECTING,
+              unqualifiedQuantity,
+            },
+            include: {
+              dispatcher: { select: { realName: true, username: true } },
+              inspection: {
+                select: {
+                  qualifiedQuantity: true,
+                  result: true,
+                  unqualifiedQuantity: true,
+                },
+              },
+              inspector: { select: { realName: true, username: true } },
+              process: { select: { name: true } },
+              workOrders: inspectionRequestWorkOrdersInclude,
+            },
+            where: { id },
+          });
+          if (record.dispatchTaskId) {
+            await tx.qms_task_dispatches.updateMany({
+              data: {
+                status: shouldCloseRequest ? 'COMPLETED' : 'PROCESSING',
+              },
+              where: { id: record.dispatchTaskId },
+            });
+          }
+          return {
+            closedLinkedIssueCount,
+            inspectionId,
+            inspectionLinks,
+            issue: issueRecord,
+            issueAuditVariables,
+            record,
+          };
         });
-        issueCreateData = result.createData;
-        issueAuditVariables = result.auditVariables;
-      }
 
       const {
         closedLinkedIssueCount,
+        inspectionId,
+        inspectionLinks,
         issue,
+        issueAuditVariables,
         record: updated,
-      } = await prisma.$transaction(async (tx) => {
-        const issueRecord = issueCreateData
-          ? await tx.quality_records.create({ data: issueCreateData })
-          : null;
-        const linkedIssueWhere = buildLinkedIssueWhere(
-          request,
-          issueRecord?.id,
-        );
-        let linkedIssueStatus =
-          issueRecord?.status || request.linkedIssueStatus || null;
-        let closedLinkedIssueCount = 0;
-        if (shouldCloseRequest && linkedIssueWhere) {
-          const linkedIssueUpdate = await tx.quality_records.updateMany({
-            data: { status: 'CLOSED' },
-            where: { ...linkedIssueWhere, status: { not: 'CLOSED' } },
-          });
-          closedLinkedIssueCount = linkedIssueUpdate.count;
-          linkedIssueStatus = 'CLOSED';
-        }
-        if (explicitInspectionId && inspectionId) {
-          await tx.inspections.update({
-            data: {
-              inspector:
-                normalizeInspectionRequestText(body.inspector) ||
-                request.reporter,
-              quantity: totalQuantity,
-              stationSelection: request.stationSelection,
-              qualifiedQuantity,
-              remarks:
-                normalizeInspectionRequestText(body.closeRemark) ||
-                request.requestInfo,
-              result: result === 'FAIL' ? 'FAIL' : 'PASS',
-              unqualifiedQuantity,
-            },
-            where: { id: inspectionId },
-          });
-        }
-        await tx.qms_inspection_request_inspections.createMany({
-          data: inspectionLinks.map((item) => ({
-            inspectionId: item.inspectionId,
-            isPrimary: item.isPrimary,
-            requestId: id,
-            workOrderNumber: item.workOrderNumber,
-          })),
-          skipDuplicates: true,
-        });
-        const record = await tx.qms_inspection_requests.update({
-          data: {
-            closeAttachments:
-              closeAttachments.length > 0
-                ? JSON.stringify(closeAttachments)
-                : null,
-            closeRemark:
-              normalizeInspectionRequestText(body.closeRemark) || null,
-            closedAt: shouldCloseRequest ? new Date() : null,
-            inspectionId,
-            inspectionResult: result === 'FAIL' ? 'FAIL' : 'PASS',
-            inspectorId: closeInspectorId || request.inspectorId,
-            linkedIssueId: issueRecord?.id || request.linkedIssueId || null,
-            linkedIssueNo:
-              issueRecord?.nonConformanceNumber ||
-              request.linkedIssueNo ||
-              null,
-            linkedIssueStatus,
-            qualifiedQuantity,
-            status: shouldCloseRequest
-              ? INSPECTION_REQUEST_STATUS.CLOSED
-              : INSPECTION_REQUEST_STATUS.INSPECTING,
-            unqualifiedQuantity,
-          },
-          include: {
-            dispatcher: { select: { realName: true, username: true } },
-            inspection: {
-              select: {
-                qualifiedQuantity: true,
-                result: true,
-                unqualifiedQuantity: true,
-              },
-            },
-            inspector: { select: { realName: true, username: true } },
-            process: { select: { name: true } },
-            workOrders: inspectionRequestWorkOrdersInclude,
-          },
-          where: { id },
-        });
-        if (record.dispatchTaskId) {
-          await tx.qms_task_dispatches.updateMany({
-            data: { status: shouldCloseRequest ? 'COMPLETED' : 'PROCESSING' },
-            where: { id: record.dispatchTaskId },
-          });
-        }
-        return { closedLinkedIssueCount, issue: issueRecord, record };
-      });
+      } = await retryOnSerialNumberConflict(
+        runCloseTransaction,
+        explicitInspectionId ? 1 : 3,
+      );
 
       await syncCloseAttachments({
         closeAttachments,
@@ -294,3 +331,21 @@ export const InspectionRequestCloseService = {
     }
   },
 };
+
+async function retryOnSerialNumberConflict<T>(
+  run: () => Promise<T>,
+  maxAttempts: number,
+): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (error) {
+      // Inspection serial numbers are generated from a read outside the
+      // transaction; a concurrent create can win the unique index, so the
+      // whole close transaction is re-run as one unit.
+      if (attempt >= maxAttempts || !isInspectionSerialNumberConflict(error)) {
+        throw error;
+      }
+    }
+  }
+}

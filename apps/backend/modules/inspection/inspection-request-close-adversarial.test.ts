@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { syncCloseAttachments } from '~/modules/inspection/inspection-request-close-effects.service';
+import { createCloseInspectionRecords } from '~/modules/inspection/inspection-request-close-records.service';
 import { InspectionRequestCloseService } from '~/modules/inspection/inspection-request-close.service';
 import prisma from '~/utils/prisma';
 
@@ -193,6 +195,7 @@ function mockTransaction(updates: Record<string, unknown> = {}) {
       },
       qms_inspection_requests: {
         update: vi.fn().mockResolvedValue(requestUpdate),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       qms_task_dispatches: { updateMany: vi.fn() },
     }),
@@ -212,6 +215,7 @@ function makeTxMock(overrides: Record<string, unknown> = {}) {
     },
     qms_inspection_requests: {
       update: vi.fn().mockResolvedValue(requestUpdate),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     qms_task_dispatches: { updateMany: vi.fn() },
   };
@@ -1012,6 +1016,157 @@ describe('inspection-request-close adversarial', () => {
           MOCK_USER,
         ),
       ).rejects.toThrow('VALIDATION:检验结果为不合格时，不合格数量必须大于 0');
+    });
+  });
+
+  describe('concurrency guard and in-transaction record creation (P0-1/P0-2)', () => {
+    const PASS_BODY = {
+      attachments: ATTACHMENTS,
+      quantity: 10,
+      result: 'PASS',
+    };
+
+    function makeSerialConflictError() {
+      return Object.assign(
+        new Error(
+          'Unique constraint failed on the constraint: `inspections_serialNumber_key`',
+        ),
+        { code: 'P2002' },
+      );
+    }
+
+    it('performs an atomic status guard inside the transaction, before record creation', async () => {
+      (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+        makeRequest(),
+      );
+      const txMock = makeTxMock({ status: 'CLOSED' });
+      (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+        cb(txMock),
+      );
+
+      await InspectionRequestCloseService.closeRequest(
+        MOCK_EVENT,
+        'req-1',
+        { ...PASS_BODY },
+        MOCK_USER,
+      );
+
+      expect(txMock.qms_inspection_requests.updateMany).toHaveBeenCalledWith({
+        data: { status: 'INSPECTING' },
+        where: { id: 'req-1', isDeleted: false, status: { not: 'CLOSED' } },
+      });
+      const guardOrder =
+        txMock.qms_inspection_requests.updateMany.mock.invocationCallOrder[0];
+      const recordOrder = vi.mocked(createCloseInspectionRecords).mock
+        .invocationCallOrder[0];
+      expect(guardOrder).toBeLessThan(recordOrder);
+    });
+
+    it('rejects when a concurrent close wins between read and transaction (guard count=0)', async () => {
+      (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+        makeRequest({ status: 'DISPATCHED' }),
+      );
+      const txMock = makeTxMock({ status: 'CLOSED' });
+      txMock.qms_inspection_requests.updateMany.mockResolvedValue({
+        count: 0,
+      });
+      (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+        cb(txMock),
+      );
+
+      await expect(
+        InspectionRequestCloseService.closeRequest(
+          MOCK_EVENT,
+          'req-1',
+          { ...PASS_BODY },
+          MOCK_USER,
+        ),
+      ).rejects.toThrow('BAD_REQUEST:报检任务已检验完成');
+      expect(createCloseInspectionRecords).not.toHaveBeenCalled();
+      expect(txMock.qms_inspection_requests.update).not.toHaveBeenCalled();
+      expect(syncCloseAttachments).not.toHaveBeenCalled();
+    });
+
+    it('creates close inspection records inside the transaction (tx client forwarded)', async () => {
+      (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+        makeRequest(),
+      );
+      const txMock = makeTxMock({ status: 'CLOSED' });
+      (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+        cb(txMock),
+      );
+
+      await InspectionRequestCloseService.closeRequest(
+        MOCK_EVENT,
+        'req-1',
+        { ...PASS_BODY },
+        MOCK_USER,
+      );
+
+      expect(createCloseInspectionRecords).toHaveBeenCalledWith(
+        expect.objectContaining({ tx: txMock }),
+      );
+    });
+
+    it('retries the whole close transaction on inspection serial number conflict', async () => {
+      (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+        makeRequest(),
+      );
+      const txMock = makeTxMock({ status: 'CLOSED' });
+      (prisma.$transaction as any)
+        .mockRejectedValueOnce(makeSerialConflictError())
+        .mockImplementationOnce(async (cb: any) => cb(txMock));
+
+      const result = await InspectionRequestCloseService.closeRequest(
+        MOCK_EVENT,
+        'req-1',
+        { ...PASS_BODY },
+        MOCK_USER,
+      );
+
+      expect(result).toBeDefined();
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry non-conflict transaction failures', async () => {
+      (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+        makeRequest(),
+      );
+      (prisma.$transaction as any).mockRejectedValue(
+        new Error('DB_DOWN:connection lost'),
+      );
+
+      await expect(
+        InspectionRequestCloseService.closeRequest(
+          MOCK_EVENT,
+          'req-1',
+          { ...PASS_BODY },
+          MOCK_USER,
+        ),
+      ).rejects.toThrow('DB_DOWN:connection lost');
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(syncCloseAttachments).not.toHaveBeenCalled();
+    });
+
+    it('does not retry when closing with an explicit inspectionId', async () => {
+      (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+        makeRequest(),
+      );
+      (prisma.inspections.findFirst as any).mockResolvedValue({
+        id: 'insp-9',
+      });
+      (prisma.$transaction as any).mockRejectedValue(makeSerialConflictError());
+
+      await expect(
+        InspectionRequestCloseService.closeRequest(
+          MOCK_EVENT,
+          'req-1',
+          { ...PASS_BODY, inspectionId: 'insp-9' },
+          MOCK_USER,
+        ),
+      ).rejects.toThrow('Unique constraint failed');
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(createCloseInspectionRecords).not.toHaveBeenCalled();
     });
   });
 });

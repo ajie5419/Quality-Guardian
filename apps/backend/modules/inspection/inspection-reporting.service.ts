@@ -6,7 +6,7 @@ import prisma from '~/utils/prisma';
 export const InspectionReportingService = {
   async findIssueIdBySerialNumber(serialNumber: number) {
     const row = await prisma.quality_records.findFirst({
-      where: { serialNumber },
+      where: { isDeleted: false, serialNumber },
       select: { id: true },
     });
     return row?.id || null;

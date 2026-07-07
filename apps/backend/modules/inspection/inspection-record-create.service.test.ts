@@ -67,6 +67,7 @@ vi.mock('~/modules/inspection/inspection-record-types', () => ({
     }),
     assertResultQuantityConsistency: vi.fn(),
   },
+  isInspectionSerialNumberConflict: vi.fn().mockReturnValue(false),
 }));
 
 describe('inspectionRecordCreateService', () => {
@@ -120,6 +121,68 @@ describe('inspectionRecordCreateService', () => {
 
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(result).toEqual(mockInspection);
+    });
+
+    it('should use a provided transaction client without opening its own transaction', async () => {
+      const mockInspection = { id: 'insp-2', serialNumber: 'INS-002' };
+      (prisma.inspections.findFirst as any).mockResolvedValue(null);
+      const tx = {
+        inspections: { create: vi.fn().mockResolvedValue(mockInspection) },
+      };
+
+      const result = await InspectionRecordCreateService.create(
+        {
+          category: 'PROCESS',
+          inspector: 'Tester',
+          inspectionDate: '2026-01-01',
+          items: [],
+          processName: 'Welding',
+          quantity: 10,
+          qualifiedQuantity: 10,
+          unqualifiedQuantity: 0,
+          workOrderNumber: 'WO-1',
+        } as any,
+        tx as any,
+      );
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(tx.inspections.create).toHaveBeenCalled();
+      expect(result).toEqual(mockInspection);
+    });
+
+    it('should not retry serial conflicts when a transaction client is provided', async () => {
+      const { isInspectionSerialNumberConflict } = await import(
+        '~/modules/inspection/inspection-record-types'
+      );
+      vi.mocked(isInspectionSerialNumberConflict).mockReturnValueOnce(true);
+      const conflict = Object.assign(
+        new Error(
+          'Unique constraint failed on the constraint: `inspections_serialNumber_key`',
+        ),
+        { code: 'P2002' },
+      );
+      (prisma.inspections.findFirst as any).mockResolvedValue(null);
+      const tx = {
+        inspections: { create: vi.fn().mockRejectedValue(conflict) },
+      };
+
+      await expect(
+        InspectionRecordCreateService.create(
+          {
+            category: 'PROCESS',
+            inspector: 'Tester',
+            inspectionDate: '2026-01-01',
+            items: [],
+            processName: 'Welding',
+            quantity: 10,
+            qualifiedQuantity: 10,
+            unqualifiedQuantity: 0,
+            workOrderNumber: 'WO-1',
+          } as any,
+          tx as any,
+        ),
+      ).rejects.toBe(conflict);
+      expect(tx.inspections.create).toHaveBeenCalledTimes(1);
     });
   });
 });

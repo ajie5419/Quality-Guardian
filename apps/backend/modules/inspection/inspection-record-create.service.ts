@@ -1,4 +1,4 @@
-import type { inspection_result } from '@prisma/client';
+import type { inspection_result, Prisma } from '@prisma/client';
 
 import type {
   InspectionItemInput,
@@ -12,7 +12,6 @@ import {
 } from '~/utils/governed-write';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   resolveCanonicalProcessNameById,
   resolveProcessIdForWrite,
@@ -21,21 +20,13 @@ import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 import { syncInspectionArchiveTask } from './inspection-archive-sync.service';
 import { syncInspectionProjectDocuments } from './inspection-project-document-sync.service';
-import { InspectionRecordRules } from './inspection-record-types';
+import {
+  InspectionRecordRules,
+  isInspectionSerialNumberConflict,
+} from './inspection-record-types';
 import { resolveInspectionTemplateBinding } from './inspection-template-binding.service';
 
 const logger = createModuleLogger('InspectionService');
-
-function isInspectionSerialNumberConflict(error: unknown): boolean {
-  if (!isPrismaUniqueConstraintError(error)) {
-    return false;
-  }
-  const message = String((error as { message?: string })?.message || error);
-  return (
-    message.includes('serialNumber') ||
-    message.includes('inspections_serialNumber_key')
-  );
-}
 
 export const InspectionRecordCreateService = {
   async generateSerialNumber(): Promise<string> {
@@ -64,7 +55,7 @@ export const InspectionRecordCreateService = {
 
     return `${prefix}${String(seq).padStart(3, '0')}`;
   },
-  async create(data: InspectionRecordInput) {
+  async create(data: InspectionRecordInput, client?: Prisma.TransactionClient) {
     const overallResult = InspectionRecordRules.resolveOverallResult(data);
     const quantitySummary = InspectionRecordRules.normalizeQuantitySummary({
       quantity: data.quantity,
@@ -76,7 +67,9 @@ export const InspectionRecordCreateService = {
       overallResult,
       quantitySummary,
     );
-    const maxRetry = 5;
+    // Inside a caller-provided transaction a serial-number conflict must
+    // abort the whole transaction, so the caller retries it as one unit.
+    const maxRetry = client ? 1 : 5;
     for (let attempt = 1; attempt <= maxRetry; attempt++) {
       try {
         const serialNumber =
@@ -90,7 +83,7 @@ export const InspectionRecordCreateService = {
           explicitTeamId: data.teamId,
           team: inputTeam, // governance-allow-direct-name-id
         });
-        return await prisma.$transaction(async (tx) => {
+        const execute = async (tx: Prisma.TransactionClient) => {
           const governedFields = buildGovernedWriteFieldsForTable(
             'inspections',
             {
@@ -200,7 +193,8 @@ export const InspectionRecordCreateService = {
             fieldName: 'selfCheckDocuments',
           });
           return inspection;
-        });
+        };
+        return await (client ? execute(client) : prisma.$transaction(execute));
       } catch (error) {
         if (attempt < maxRetry && isInspectionSerialNumberConflict(error)) {
           logger.warn(

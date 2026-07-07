@@ -49,7 +49,7 @@ describe('inspectionReportingService', () => {
 
       expect(result).toBe('qr-1');
       expect(prisma.quality_records.findFirst).toHaveBeenCalledWith({
-        where: { serialNumber: 12_345 },
+        where: { isDeleted: false, serialNumber: 12_345 },
         select: { id: true },
       });
     });

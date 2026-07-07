@@ -2,12 +2,24 @@ import type { inspection_category, inspection_result } from '@prisma/client';
 
 import { deriveIssueTrackingStatus, ISSUE_TRACKING_STATUS } from '@qgs/shared';
 import { BusinessError } from '~/utils/business-error';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 
 const INSPECTION_CATEGORY_VALUES = new Set<string>([
   'INCOMING',
   'PROCESS',
   'SHIPMENT',
 ]);
+
+export function isInspectionSerialNumberConflict(error: unknown): boolean {
+  if (!isPrismaUniqueConstraintError(error)) {
+    return false;
+  }
+  const message = String((error as { message?: string })?.message || error);
+  return (
+    message.includes('serialNumber') ||
+    message.includes('inspections_serialNumber_key')
+  );
+}
 
 export function isInspectionCategory(
   value: string,

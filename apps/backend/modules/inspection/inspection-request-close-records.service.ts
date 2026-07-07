@@ -22,9 +22,11 @@ export type CloseInspectionRecordLink = {
 export async function createCloseInspectionRecords(options: {
   body: Record<string, unknown>;
   request: CloseRecordRequest;
+  tx?: Prisma.TransactionClient;
 }): Promise<CloseInspectionRecordLink[]> {
+  const client = options.tx ?? prisma;
   const numbers = resolveCloseWorkOrderNumbers(options.request);
-  const workOrders = await assertWorkOrdersExist(prisma, numbers);
+  const workOrders = await assertWorkOrdersExist(client, numbers);
   const projectByWorkOrder = new Map(
     workOrders.map((item) => [item.workOrderNumber, item.projectName]),
   );
@@ -38,6 +40,7 @@ export async function createCloseInspectionRecords(options: {
         projectName: projectByWorkOrder.get(workOrderNumber) || null,
         workOrderNumber,
       },
+      options.tx,
     );
     links.push({
       inspectionId: String(inspection.id),

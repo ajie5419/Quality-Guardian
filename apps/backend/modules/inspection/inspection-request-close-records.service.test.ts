@@ -90,6 +90,7 @@ describe('createCloseInspectionRecords', () => {
         ]),
         workOrderNumber: 'WO-001',
       }),
+      undefined,
     );
     expect(InspectionService.create).toHaveBeenNthCalledWith(
       2,
@@ -97,6 +98,63 @@ describe('createCloseInspectionRecords', () => {
         projectName: 'Project 2',
         workOrderNumber: 'WO-002',
       }),
+      undefined,
     );
+  });
+
+  it('uses the provided transaction client for lookups and record creation', async () => {
+    const tx = {
+      work_orders: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { projectName: 'Project 1', workOrderNumber: 'WO-001' },
+          ]),
+      },
+    } as any;
+    vi.mocked(InspectionService.create).mockResolvedValueOnce({
+      id: 'inspection-1',
+    } as any);
+
+    const links = await createCloseInspectionRecords({
+      body: {
+        attachments: [
+          { name: 'record.pdf', url: 'https://example.test/r.pdf' },
+        ],
+        result: 'PASS',
+      },
+      request: {
+        attachments: [],
+        closeRemark: null,
+        componentName: '',
+        mutualCheckResult: 'PASS',
+        partName: 'Bearing',
+        process: { name: 'Welding' },
+        processName: 'Welding',
+        quantity: 1,
+        reporter: 'Reporter',
+        requestInfo: null,
+        selfCheckResult: 'PASS',
+        team: 'Team A',
+        work_order: { projectName: 'Project 1' },
+        workOrderNumber: 'WO-001',
+        workOrders: [{ isPrimary: true, workOrderNumber: 'WO-001' }],
+      } as any,
+      tx,
+    });
+
+    expect(tx.work_orders.findMany).toHaveBeenCalled();
+    expect(prisma.work_orders.findMany).not.toHaveBeenCalled();
+    expect(InspectionService.create).toHaveBeenCalledWith(
+      expect.anything(),
+      tx,
+    );
+    expect(links).toEqual([
+      {
+        inspectionId: 'inspection-1',
+        isPrimary: true,
+        workOrderNumber: 'WO-001',
+      },
+    ]);
   });
 });

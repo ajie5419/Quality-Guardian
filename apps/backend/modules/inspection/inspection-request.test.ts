@@ -52,6 +52,7 @@ describe('inspection request helpers', () => {
         materialName: 'Bearing',
         supplierName: 'Supplier A',
       }),
+      undefined,
     );
   });
 
@@ -87,6 +88,7 @@ describe('inspection request helpers', () => {
 
     expect(InspectionService.create).toHaveBeenCalledWith(
       expect.objectContaining({ hasDocuments: false }),
+      undefined,
     );
   });
 
@@ -124,6 +126,7 @@ describe('inspection request helpers', () => {
         hasDocuments: true,
         hasSelfCheckDocuments: true,
       }),
+      undefined,
     );
     const payload = (InspectionService.create as ReturnType<typeof vi.fn>).mock
       .calls[0][0];

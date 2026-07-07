@@ -36,7 +36,7 @@ export function resolveRequestWorkOrderNumbers(request: {
 }
 
 export async function assertWorkOrdersExist(
-  prisma: PrismaClient,
+  prisma: Pick<PrismaClient, 'work_orders'>,
   workOrderNumbers: string[],
 ) {
   const normalized = [...new Set(workOrderNumbers.map((item) => item.trim()))];

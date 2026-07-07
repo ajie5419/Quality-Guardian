@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import type { InspectionRequestRecordLike } from '@qgs/shared';
 
 import {
@@ -224,6 +224,7 @@ export async function buildInspectionRecordFromRequest(
   },
   body: Record<string, unknown>,
   override?: { projectName?: null | string; workOrderNumber?: string },
+  client?: Prisma.TransactionClient,
 ) {
   return InspectionService.create(
     buildInspectionRecordPayloadCore({
@@ -240,5 +241,6 @@ export async function buildInspectionRecordFromRequest(
         workOrderNumber: override?.workOrderNumber || request.workOrderNumber,
       },
     }),
+    client,
   );
 }
