@@ -41,7 +41,7 @@
 - typecheck: 通过（backend tsc --noEmit）
 - vitest: 195 文件 / 1859 测试全部通过
 
-**commit:** 待提交（本条目随代码同 commit）
+**commit:** `01878ef8` fix(@qgs/backend): add unique constraint on quality_records.serialNumber
 
 **遗留问题：**
 
