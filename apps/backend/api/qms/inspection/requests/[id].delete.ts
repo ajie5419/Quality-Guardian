@@ -1,8 +1,11 @@
 import { defineEventHandler } from 'h3';
 import { InspectionRequestDeleteService } from '~/modules/inspection/inspection-request-delete.service';
 import { logApiError } from '~/utils/api-logger';
+import { BusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import {
+  badRequestResponse,
+  forbiddenResponse,
   internalServerErrorResponse,
   notFoundResponse,
   useResponseSuccess,
@@ -20,8 +23,14 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('inspection-request-delete', error, { id }, event);
-    if (error instanceof Error && error.message.startsWith('NOT_FOUND:'))
-      return notFoundResponse(event, error.message.replace('NOT_FOUND:', ''));
+    if (error instanceof BusinessError) {
+      if (error.httpStatus === 404)
+        return notFoundResponse(event, error.message);
+      if (error.httpStatus === 403)
+        return forbiddenResponse(event, error.message);
+      if (error.httpStatus === 400)
+        return badRequestResponse(event, error.message);
+    }
     return internalServerErrorResponse(event, '删除报检任务失败');
   }
 });

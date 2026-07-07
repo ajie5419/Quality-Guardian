@@ -9,6 +9,7 @@ import {
   buildGovernedWriteFieldsForTable,
 } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   resolveCanonicalProcessName,
   resolveProcessIdForWrite,
@@ -46,48 +47,55 @@ export const InspectionRequestCreateService = {
     const payload = await buildCreateRequestPayload(body);
     await assertWorkOrdersExist(prisma, payload.workOrderNumbers);
 
-    const created = await prisma.$transaction(async (tx) => {
-      const request = await tx.qms_inspection_requests.create({
-        data: {
-          attachments:
-            payload.attachments.length > 0
-              ? JSON.stringify(payload.attachments)
-              : null,
-          componentName: payload.componentName || null,
-          mutualCheckResult: normalizeInspectionRequestCheckResult(
-            body.mutualCheckResult,
-          ),
-          partName: payload.partName,
-          processId: payload.processId,
-          teamId: payload.teamId,
-          processName: payload.processName,
-          quantity: payload.quantity,
-          stationSelection: payload.stationSelection,
-          reporter: payload.reporter,
-          requestInfo: normalizeInspectionRequestText(body.requestInfo) || null,
-          requestNo: await generateInspectionRequestNo(tx),
-          selfCheckResult: normalizeInspectionRequestCheckResult(
-            body.selfCheckResult,
-          ),
-          ...payload.governedFields,
-          ...payload.governedCanonicalIds,
-          workOrderNumber: payload.workOrderNumber,
-          workOrders: {
-            create: payload.workOrderNumbers.map((workOrderNumber, index) => ({
-              isPrimary: index === 0,
-              workOrderNumber,
-            })),
+    const created = await retryOnRequestNoConflict(() =>
+      prisma.$transaction(async (tx) => {
+        const request = await tx.qms_inspection_requests.create({
+          data: {
+            attachments:
+              payload.attachments.length > 0
+                ? JSON.stringify(payload.attachments)
+                : null,
+            componentName: payload.componentName || null,
+            mutualCheckResult: normalizeInspectionRequestCheckResult(
+              body.mutualCheckResult,
+            ),
+            partName: payload.partName,
+            processId: payload.processId,
+            teamId: payload.teamId,
+            processName: payload.processName,
+            quantity: payload.quantity,
+            stationSelection: payload.stationSelection,
+            reporter: payload.reporter,
+            requestInfo:
+              normalizeInspectionRequestText(body.requestInfo) || null,
+            // requestNo is generated inside the retried scope so each attempt
+            // gets a fresh sequence number, avoiding persistent P2002 conflicts.
+            requestNo: await generateInspectionRequestNo(tx),
+            selfCheckResult: normalizeInspectionRequestCheckResult(
+              body.selfCheckResult,
+            ),
+            ...payload.governedFields,
+            ...payload.governedCanonicalIds,
+            workOrderNumber: payload.workOrderNumber,
+            workOrders: {
+              create: payload.workOrderNumbers.map(
+                (workOrderNumber, index) => ({
+                  isPrimary: index === 0,
+                  workOrderNumber,
+                }),
+              ),
+            },
           },
-        },
-        include: {
-          dispatcher: { select: { realName: true, username: true } },
-          inspector: { select: { realName: true, username: true } },
-          process: { select: { name: true } },
-          workOrders: inspectionRequestWorkOrdersInclude,
-        },
-      });
-      return request;
-    });
+          include: {
+            dispatcher: { select: { realName: true, username: true } },
+            inspector: { select: { realName: true, username: true } },
+            process: { select: { name: true } },
+            workOrders: inspectionRequestWorkOrdersInclude,
+          },
+        });
+        return request;
+      }),
+    );
 
     await FileStorageService.registerReferencesFromAttachments({
       attachments: payload.attachments,
@@ -184,4 +192,39 @@ async function auditRequestCreate(
     targetType: 'inspection_request',
     userId: userinfo.id,
   });
+}
+
+/**
+ * Returns true when the Prisma error is a P2002 unique-constraint violation
+ * targeting the requestNo column.
+ */
+function isRequestNoConflict(error: unknown): boolean {
+  if (!isPrismaUniqueConstraintError(error)) return false;
+  const message = String((error as { message?: string })?.message || '');
+  const target: unknown = (error as { meta?: { target?: unknown } })?.meta
+    ?.target;
+  const targetStr = Array.isArray(target)
+    ? target.join(',')
+    : String(target ?? '');
+  return message.includes('requestNo') || targetStr.includes('requestNo');
+}
+
+/**
+ * Retries the create transaction (max 3 attempts) when two concurrent creates
+ * collide on the requestNo unique index. Each retry re-enters the closure, which
+ * calls generateInspectionRequestNo again and picks the new highest count.
+ */
+async function retryOnRequestNoConflict<T>(
+  run: () => Promise<T>,
+  maxAttempts = 3,
+): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (error) {
+      if (attempt >= maxAttempts || !isRequestNoConflict(error)) {
+        throw error;
+      }
+    }
+  }
 }

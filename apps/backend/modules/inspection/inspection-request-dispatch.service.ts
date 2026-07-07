@@ -1,4 +1,4 @@
-import type { H3Event } from 'h3';
+import type { EventHandlerRequest, H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { RbacService } from '~/modules/rbac/rbac.service';
@@ -35,7 +35,7 @@ export const InspectionRequestDispatchService = {
   },
 
   async dispatchRequest(
-    event: H3Event,
+    event: H3Event<EventHandlerRequest> | null,
     id: string,
     body: RequestBody,
     userinfo: UserSession,

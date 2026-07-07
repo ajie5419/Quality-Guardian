@@ -15,7 +15,8 @@ interface BusinessAuditLogParams {
   userId?: number | string;
 }
 
-function resolveRequestIp(event: H3Event<EventHandlerRequest>) {
+function resolveRequestIp(event: H3Event<EventHandlerRequest> | null) {
+  if (!event) return 'telegram-webhook';
   const forwardedFor = getHeader(event, 'x-forwarded-for');
   const realIp = getHeader(event, 'x-real-ip');
   const socketIp = event.node.req.socket.remoteAddress;
@@ -25,7 +26,7 @@ function resolveRequestIp(event: H3Event<EventHandlerRequest>) {
 }
 
 export async function recordBusinessAuditLog(
-  event: H3Event<EventHandlerRequest>,
+  event: H3Event<EventHandlerRequest> | null,
   params: BusinessAuditLogParams,
 ) {
   if (params.userId === undefined || params.userId === null) return;
@@ -38,7 +39,9 @@ export async function recordBusinessAuditLog(
       ipAddress: resolveRequestIp(event),
       targetId: params.targetId,
       targetType: params.targetType,
-      userAgent: getHeader(event, 'user-agent') || 'Unknown',
+      userAgent: event
+        ? getHeader(event, 'user-agent') || 'Unknown'
+        : 'telegram-webhook',
       userId: String(params.userId),
     });
   } catch (error) {

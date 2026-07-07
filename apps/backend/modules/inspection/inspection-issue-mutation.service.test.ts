@@ -59,6 +59,16 @@ vi.mock('~/modules/inspection/inspection-issue', () => ({
   getNextInspectionIssueSerialNumber: vi.fn().mockResolvedValue(1),
 }));
 
+const mockLoggerFns = vi.hoisted(() => ({
+  error: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+}));
+vi.mock('~/utils/logger', () => ({
+  createModuleLogger: vi.fn(() => mockLoggerFns),
+}));
+
 describe('inspectionIssueMutationService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -141,6 +151,75 @@ describe('inspectionIssueMutationService', () => {
 
       expect(WelderScoreService.syncFromInspectionIssues).toHaveBeenCalled();
     });
+
+    it('should resolve successfully and log error when welder sync throws in createIssue', async () => {
+      const { WelderScoreService } = await import(
+        '~/modules/welder/welder-score.service'
+      );
+      const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+      (prisma.quality_records.create as any).mockResolvedValue({
+        id: 'ISS-2026-004',
+        nonConformanceNumber: 'NC-26KJ-004',
+        partName: 'Part',
+      });
+      const syncError = new Error('welder service unavailable');
+      vi.mocked(WelderScoreService.syncFromInspectionIssues).mockRejectedValue(
+        syncError,
+      );
+
+      const result = await InspectionIssueMutationService.createIssue(
+        mockUser,
+        {},
+      );
+
+      expect(result.ncNumber).toBe('NC-26KJ-004');
+      expect(mockLoggerFns.error).toHaveBeenCalledWith(
+        syncError,
+        'welder-score-sync after createIssue',
+      );
+    });
+
+    it('retries on P2002 serialNumber conflict and succeeds on second attempt; serial regenerated', async () => {
+      const { getNextInspectionIssueSerialNumber } = await import(
+        '~/modules/inspection/inspection-issue'
+      );
+      const serialMock = vi.mocked(getNextInspectionIssueSerialNumber);
+      serialMock.mockResolvedValueOnce(5).mockResolvedValueOnce(6);
+
+      const p2002 = Object.assign(
+        new Error('Unique constraint failed on the fields: (`serialNumber`)'),
+        { code: 'P2002', meta: { target: ['serialNumber'] } },
+      );
+      (prisma.quality_records.create as any)
+        .mockRejectedValueOnce(p2002)
+        .mockResolvedValueOnce({
+          id: 'ISS-retry-1',
+          nonConformanceNumber: 'NC-26KJ-010',
+          partName: 'Part',
+        });
+
+      const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+      const result = await InspectionIssueMutationService.createIssue(
+        mockUser,
+        {},
+      );
+
+      expect(prisma.quality_records.create).toHaveBeenCalledTimes(2);
+      expect(serialMock).toHaveBeenCalledTimes(2);
+      expect(result.ncNumber).toBe('NC-26KJ-010');
+    });
+
+    it('does not retry createIssue on a generic (non-P2002) error', async () => {
+      const networkError = new Error('DB connection lost');
+      (prisma.quality_records.create as any).mockRejectedValue(networkError);
+
+      const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+      await expect(
+        InspectionIssueMutationService.createIssue(mockUser, {}),
+      ).rejects.toThrow('DB connection lost');
+
+      expect(prisma.quality_records.create).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('updateIssue', () => {
@@ -203,6 +282,30 @@ describe('inspectionIssueMutationService', () => {
       expect(
         FileStorageService.registerReferencesFromAttachments,
       ).not.toHaveBeenCalled();
+    });
+
+    it('should resolve successfully and log error when welder sync throws in updateIssue', async () => {
+      const { WelderScoreService } = await import(
+        '~/modules/welder/welder-score.service'
+      );
+      const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+      (prisma.quality_records.update as any).mockResolvedValue({
+        id: 'rec-5',
+        partName: 'Updated',
+      });
+      const syncError = new Error('welder sync failed');
+      vi.mocked(WelderScoreService.syncFromInspectionIssues).mockRejectedValue(
+        syncError,
+      );
+
+      await expect(
+        InspectionIssueMutationService.updateIssue(mockUser, 'rec-5', {}, null),
+      ).resolves.toBeUndefined();
+
+      expect(mockLoggerFns.error).toHaveBeenCalledWith(
+        syncError,
+        'welder-score-sync after updateIssue',
+      );
     });
   });
 
@@ -271,6 +374,32 @@ describe('inspectionIssueMutationService', () => {
           action: 'DELETE',
           targetType: 'inspection_issue',
         }),
+      );
+    });
+
+    it('should resolve successfully and log error when welder sync throws in batchDeleteIssues', async () => {
+      const { WelderScoreService } = await import(
+        '~/modules/welder/welder-score.service'
+      );
+      const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+      (prisma.quality_records.updateMany as any).mockResolvedValue({
+        count: 1,
+      });
+      const syncError = new Error('welder batch sync failed');
+      vi.mocked(WelderScoreService.syncFromInspectionIssues).mockRejectedValue(
+        syncError,
+      );
+
+      const result = await InspectionIssueMutationService.batchDeleteIssues(
+        {} as any,
+        mockUser,
+        ['rec-10'],
+      );
+
+      expect(result).toBe(1);
+      expect(mockLoggerFns.error).toHaveBeenCalledWith(
+        syncError,
+        'welder-score-sync after batchDeleteIssues',
       );
     });
   });
@@ -364,6 +493,51 @@ describe('inspectionIssueMutationService', () => {
       ]);
 
       expect(buildImportRowError).toHaveBeenCalled();
+    });
+
+    it('should resolve successfully and log error when welder sync throws in importIssues', async () => {
+      const { WelderScoreService } = await import(
+        '~/modules/welder/welder-score.service'
+      );
+      const { buildInspectionIssueUpsertPayload } = await import(
+        '~/modules/inspection/inspection-issue'
+      );
+      const { buildImportSummary } = await import(
+        '~/modules/file-storage/import-report'
+      );
+      const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+
+      vi.mocked(buildInspectionIssueUpsertPayload).mockResolvedValue({
+        where: { workOrderNumber: 'WO-2' },
+        create: { partName: 'Part' },
+        update: { partName: 'Part' },
+      } as any);
+      (prisma.quality_records.upsert as any).mockResolvedValue({
+        id: 'ISS-2026-010',
+        supplierName: 'Supplier A',
+      });
+      vi.mocked(buildImportSummary).mockReturnValue({
+        errorCount: 0,
+        errors: [],
+        successCount: 1,
+        totalCount: 1,
+      } as any);
+      const syncError = new Error('welder import sync failed');
+      vi.mocked(WelderScoreService.syncFromInspectionIssues).mockRejectedValue(
+        syncError,
+      );
+
+      const result = await InspectionIssueMutationService.importIssues(
+        {} as any,
+        mockUser,
+        [{ workOrderNumber: 'WO-2', partName: 'Part' }],
+      );
+
+      expect(result.successCount).toBe(1);
+      expect(mockLoggerFns.error).toHaveBeenCalledWith(
+        syncError,
+        'welder-score-sync after importIssues',
+      );
     });
   });
 });

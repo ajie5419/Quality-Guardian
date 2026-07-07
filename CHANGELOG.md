@@ -25,6 +25,30 @@
 
 ## 执行记录
 
+### 2026-07-07 修复：报检任务关联缺陷第 2 组（P0-3/P1-1/P1-4/P1-5）
+
+**执行内容：**
+
+- P1-1 welder 同步保护：`inspection-issue-mutation.service.ts` 中 4 处主写入后的 `WelderScoreService.syncFromInspectionIssues()` 包裹 try/catch 并 `logger.error` 记录，同步失败不再导致已提交的主操作对外报 500。
+- P1-5 取消报检任务加固：`inspection-request-delete.service.ts` 重写——事务内原子守卫 `updateMany({ where: { id, isDeleted: false, status: in [SUBMITTED, DISPATCHED] } })`（INSPECTING/CLOSED 禁止取消），归属校验（reporter 本人或持 `QMS:Inspection:Requests:Dispatch` 权限码），状态写入改用 `INSPECTION_REQUEST_STATUS.CANCELLED` 常量，关联派单行同事务置 CANCELLED；API 层错误分发改用 `BusinessError`（404/403/400）。
+- P1-4 Telegram webhook 去伪造身份：删除 `{} as any` 伪造 event/user；回调处理逻辑整体下沉到新文件 `modules/inspection/telegram-dispatch.service.ts`，通过 `TELEGRAM_DISPATCHER_USERNAME` 环境变量解析真实用户（`isDeleted: false`），未配置或用户不存在则拒绝执行并告警；`dispatchRequest`/`recordBusinessAuditLog` 的 event 参数放宽为可空；`webhook.post.ts` 由 151 行压至 24 行（≤50 行架构规则达标，无守卫脚本改动）。
+- P0-3 编号生成竞态：`inspection-request-create.service.ts` 对 requestNo P2002 冲突整体重试事务（≤3 次，每次重新生成）；`inspection-issue-mutation.service.ts` createIssue 对 serialNumber P2002 冲突重试并重新取号（≤3 次），importIssues 冲突后刷新 serialSeed；关闭链路 serial 取号已在被重试事务闭包内，无需改动。
+- 生产代码 8 个文件（新增 1）；测试改动 5 个文件，新增 21 条用例（welder 失败不阻断 ×4、取消守卫/归属/联动 ×9、telegram 身份解析与回调路由 ×7 中新增部分、requestNo/serial 重试 ×5）。
+
+**验证结果：**
+
+- typecheck: 通过（`pnpm run check:type` 3/3 tasks）
+- `pnpm run check:qms-arch`: 通过，0 violations
+- vitest: 193 文件 / 1841 测试全部通过（较上一阶段净增 25 条）
+- eslint: 全部改动文件通过
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- P0-3 schema 部分未完成：本机 MySQL（127.0.0.1:3306）未启动，无法查重，`quality_records.serialNumber` 的 `@unique` migration 未创建。应用层重试代码已就位（约束存在时自动生效）。待 DB 可用后：先查重（`groupBy serialNumber having count > 1`）→ 如有重复先跑去重脚本 → `prisma migrate dev --name <ts>_add_quality_records_serial_unique`。
+- 第 3 组 P2 清单未动：failCloseRequest → BusinessError、TASK_DISPATCH_STATUS 缺 CANCELLED、inspection.module.ts 审计/数据域声明与实际字段不符、跨模块非 index 导入、getWelderScoreIssues 全表扫描、供应商快照统计口径、公共 API 限流、supplier.service 静默 catch。
+
 ### 2026-07-07 修复：报检任务关闭链路事务重构（P0-1/P0-2）+ 关联查询修复（P1-2/P1-3）
 
 **执行内容：**

@@ -542,4 +542,122 @@ describe('inspection-request-create adversarial', () => {
       expect(prisma.$transaction).toHaveBeenCalled();
     });
   });
+
+  describe('requestNo race condition retry (Race A)', () => {
+    function makeP2002RequestNoError() {
+      const err = Object.assign(
+        new Error('Unique constraint failed on the fields: (`requestNo`)'),
+        {
+          code: 'P2002',
+          meta: { target: ['requestNo'] },
+        },
+      );
+      return err;
+    }
+
+    it('retries once on P2002-requestNo conflict and succeeds; generator called twice', async () => {
+      const { generateInspectionRequestNo } = await import(
+        '~/modules/inspection/inspection-request'
+      );
+      const genMock = vi.mocked(generateInspectionRequestNo);
+      genMock
+        .mockResolvedValueOnce('IR-20260707-001')
+        .mockResolvedValueOnce('IR-20260707-002');
+
+      let callCount = 0;
+      (prisma.$transaction as any).mockImplementation(async (cb: any) => {
+        callCount++;
+        if (callCount === 1) {
+          // First attempt: call cb to trigger generateInspectionRequestNo,
+          // then throw P2002 on requestNo.
+          await cb({
+            qms_inspection_requests: {
+              create: vi.fn().mockRejectedValue(makeP2002RequestNoError()),
+            },
+          });
+        }
+        // Second attempt: succeeds.
+        return cb({
+          qms_inspection_requests: {
+            create: vi.fn().mockResolvedValue({
+              id: 'req-2',
+              componentName: '',
+              mutualCheckResult: 'PASS',
+              partName: 'Bearing',
+              processId: 'process-1',
+              processName: 'Welding',
+              quantity: 10,
+              requestInfo: null,
+              requestNo: 'IR-20260707-002',
+              selfCheckResult: 'PASS',
+              stationSelection: null,
+              teamId: 'team-1',
+              workOrderNumber: 'WO-1',
+            }),
+          },
+        });
+      });
+
+      await InspectionRequestCreateService.createRequest(
+        MOCK_EVENT,
+        MOCK_USER,
+        {
+          partName: 'Bearing',
+          processName: 'Welding',
+          quantity: 10,
+          reporter: 'Tester',
+          workOrderNumber: 'WO-1',
+        },
+      );
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(genMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry on a non-P2002 error', async () => {
+      const networkError = new Error('Connection refused');
+      (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+        cb({
+          qms_inspection_requests: {
+            create: vi.fn().mockRejectedValue(networkError),
+          },
+        }),
+      );
+
+      await expect(
+        InspectionRequestCreateService.createRequest(MOCK_EVENT, MOCK_USER, {
+          partName: 'Bearing',
+          processName: 'Welding',
+          quantity: 5,
+          reporter: 'Tester',
+          workOrderNumber: 'WO-1',
+        }),
+      ).rejects.toThrow('Connection refused');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('rethrows after 3 failed attempts on persistent requestNo conflict', async () => {
+      const p2002 = makeP2002RequestNoError();
+      (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+        cb({
+          qms_inspection_requests: {
+            create: vi.fn().mockRejectedValue(p2002),
+          },
+        }),
+      );
+
+      await expect(
+        InspectionRequestCreateService.createRequest(MOCK_EVENT, MOCK_USER, {
+          partName: 'Bearing',
+          processName: 'Welding',
+          quantity: 5,
+          reporter: 'Tester',
+          workOrderNumber: 'WO-1',
+        }),
+      ).rejects.toBe(p2002);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(3);
+    });
+  });
 });

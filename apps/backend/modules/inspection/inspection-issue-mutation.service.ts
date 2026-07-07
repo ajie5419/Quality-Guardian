@@ -12,7 +12,9 @@ import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
 import { eventBus } from '~/utils/event-bus';
+import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 
 import {
   buildInspectionIssueCreateData,
@@ -22,6 +24,8 @@ import {
   findInspectionForIssue,
   getNextInspectionIssueSerialNumber,
 } from './inspection-issue';
+
+const logger = createModuleLogger('InspectionIssueMutation');
 
 type RequestBody = Record<string, unknown>;
 
@@ -42,15 +46,21 @@ export const InspectionIssueMutationService = {
       body.inspectionId as string | undefined,
     );
     const newId = createInspectionIssueId();
-    const serialNumber = await getNextInspectionIssueSerialNumber();
-    const newRecord = await prisma.quality_records.create({
-      data: await buildInspectionIssueCreateData(body, {
-        createdBy: String(userinfo.id || '') || undefined,
-        id: newId,
-        inspection: linkedInspection,
-        inspectorUsername: userinfo.username,
-        serialNumber,
-      }),
+
+    // Retry on P2002 unique-constraint conflict on serialNumber: concurrent
+    // creates can race on the aggregate-max read. Each attempt regenerates the
+    // serial to pick up the latest committed value.
+    const newRecord = await createIssueWithSerialRetry(async () => {
+      const serialNumber = await getNextInspectionIssueSerialNumber();
+      return prisma.quality_records.create({
+        data: await buildInspectionIssueCreateData(body, {
+          createdBy: String(userinfo.id || '') || undefined,
+          id: newId,
+          inspection: linkedInspection,
+          inspectorUsername: userinfo.username,
+          serialNumber,
+        }),
+      });
     });
     await FileStorageService.registerReferencesFromAttachments({
       attachments: body.photos,
@@ -67,7 +77,11 @@ export const InspectionIssueMutationService = {
       },
     });
     await QualityLossIndexService.upsertFromInternal(newRecord);
-    await WelderScoreService.syncFromInspectionIssues();
+    try {
+      await WelderScoreService.syncFromInspectionIssues();
+    } catch (error) {
+      logger.error(error, 'welder-score-sync after createIssue');
+    }
     eventBus.emit('inspection_issue.changed', {
       supplierNames: [newRecord.supplierName],
     });
@@ -110,7 +124,11 @@ export const InspectionIssueMutationService = {
       },
     });
     await QualityLossIndexService.upsertFromInternal(updated);
-    await WelderScoreService.syncFromInspectionIssues();
+    try {
+      await WelderScoreService.syncFromInspectionIssues();
+    } catch (error) {
+      logger.error(error, 'welder-score-sync after updateIssue');
+    }
     eventBus.emit('inspection_issue.changed', {
       supplierNames: [
         current?.supplierName,
@@ -132,7 +150,13 @@ export const InspectionIssueMutationService = {
       where: { id: { in: ids } },
       data: { isDeleted: true, updatedAt: new Date() },
     });
-    if (result.count > 0) await WelderScoreService.syncFromInspectionIssues();
+    if (result.count > 0) {
+      try {
+        await WelderScoreService.syncFromInspectionIssues();
+      } catch (error) {
+        logger.error(error, 'welder-score-sync after batchDeleteIssues');
+      }
+    }
     await QualityLossIndexService.softDeleteSourceMany('Internal', ids);
     eventBus.emit('inspection_issue.changed', {
       supplierNames: existing.map((item) => item.supplierName),
@@ -187,11 +211,22 @@ export const InspectionIssueMutationService = {
           continue;
         }
         serialSeed++;
-        const saved = await prisma.quality_records.upsert(payload);
-        await QualityLossIndexService.upsertFromInternal(saved);
-        if (saved?.supplierName)
-          supplierNamesToRefresh.push(saved.supplierName);
-        successCount++;
+        try {
+          const saved = await prisma.quality_records.upsert(payload);
+          await QualityLossIndexService.upsertFromInternal(saved);
+          if (saved?.supplierName)
+            supplierNamesToRefresh.push(saved.supplierName);
+          successCount++;
+        } catch (upsertError) {
+          // On a serialNumber unique conflict, re-fetch the current max so the
+          // next row starts from a safe value, then re-throw so the row is
+          // recorded as an error (upsert conflicts are non-retryable here because
+          // the payload was already built with the old serial).
+          if (isSerialNumberConflict(upsertError)) {
+            serialSeed = await getNextInspectionIssueSerialNumber();
+          }
+          throw upsertError;
+        }
       } catch (error) {
         const message = toImportErrorMessage(error);
         rowErrors.push(
@@ -205,7 +240,13 @@ export const InspectionIssueMutationService = {
         );
       }
     }
-    if (successCount > 0) await WelderScoreService.syncFromInspectionIssues();
+    if (successCount > 0) {
+      try {
+        await WelderScoreService.syncFromInspectionIssues();
+      } catch (error) {
+        logger.error(error, 'welder-score-sync after importIssues');
+      }
+    }
     eventBus.emit('inspection_issue.changed', {
       supplierNames: supplierNamesToRefresh,
     });
@@ -224,3 +265,37 @@ export const InspectionIssueMutationService = {
     });
   },
 };
+
+/**
+ * Returns true when the Prisma error is a P2002 unique-constraint violation
+ * targeting the serialNumber column in quality_records.
+ */
+function isSerialNumberConflict(error: unknown): boolean {
+  if (!isPrismaUniqueConstraintError(error)) return false;
+  const message = String((error as { message?: string })?.message || '');
+  const target: unknown = (error as { meta?: { target?: unknown } })?.meta
+    ?.target;
+  const targetStr = Array.isArray(target)
+    ? target.join(',')
+    : String(target ?? '');
+  return message.includes('serialNumber') || targetStr.includes('serialNumber');
+}
+
+/**
+ * Executes `run` up to 3 times, retrying only on a serialNumber unique-
+ * constraint conflict. `run` must regenerate the serial on each call.
+ */
+async function createIssueWithSerialRetry<T>(
+  run: () => Promise<T>,
+  maxAttempts = 3,
+): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (error) {
+      if (attempt >= maxAttempts || !isSerialNumberConflict(error)) {
+        throw error;
+      }
+    }
+  }
+}
