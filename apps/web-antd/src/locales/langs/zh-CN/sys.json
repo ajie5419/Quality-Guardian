@@ -32,6 +32,12 @@
     "testConnection": "测试当前连接",
     "commonUrlRef": "常用地址参考"
   },
+  "inspectionSettings": {
+    "title": "检验记录设置",
+    "manualCreateLabel": "允许手动创建检验记录",
+    "manualCreateDesc": "关闭后，用户将无法通过“新增”按钮手动创建进货、过程、发货检验记录；由报检任务关闭等流程自动生成的记录不受影响。",
+    "noPermission": "您没有权限修改此设置"
+  },
   "user": {
     "title": "用户管理",
     "addUser": "新增用户",

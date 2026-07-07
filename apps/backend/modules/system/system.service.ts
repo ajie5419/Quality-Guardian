@@ -104,4 +104,11 @@ export const SystemService = {
   async getDatabaseMetrics() {
     return SystemMonitoringService.getDatabaseMetrics();
   },
+
+  async isInspectionManualCreateEnabled(): Promise<boolean> {
+    const value = await this.getSettingValue(
+      'INSPECTION_MANUAL_CREATE_ENABLED',
+    );
+    return value === 'true' || value === null;
+  },
 };

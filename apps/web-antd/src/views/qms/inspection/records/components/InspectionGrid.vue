@@ -3,7 +3,7 @@ import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsInspectionApi } from '#/api/qms/inspection';
 import type { VxeCheckboxChangeParams } from '#/types';
 
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
@@ -30,6 +30,7 @@ import {
   getInspectionRecordsExport,
   importInspectionRecords,
 } from '#/api/qms/inspection';
+import { getInspectionManualCreateSettingApi } from '#/api/system/inspection-settings';
 import { QmsStatusTag } from '#/components/Qms';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
@@ -72,8 +73,21 @@ const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const { canCreate, canEdit, canDelete, canExport, canImport } =
   useQmsPermissions('QMS:Inspection:Records');
+const manualCreateEnabled = ref(true);
+const canCreateRecord = computed(
+  () => canCreate.value && manualCreateEnabled.value,
+);
 const filters = ref<InspectionRecordFilterState>({
   keyword: props.keyword,
+});
+
+onMounted(async () => {
+  try {
+    const setting = await getInspectionManualCreateSettingApi();
+    manualCreateEnabled.value = setting.enabled;
+  } catch {
+    // Keep the default (enabled) if the setting cannot be fetched.
+  }
 });
 
 const exportInspectionRecordsAsXlsx =
@@ -513,7 +527,7 @@ defineExpose({ reload });
     <template #toolbar-actions>
       <Space :direction="props.isMobile ? 'vertical' : 'horizontal'">
         <Button
-          v-if="canCreate"
+          v-if="canCreateRecord"
           shape="round"
           type="primary"
           @click="emit('create')"

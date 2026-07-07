@@ -324,6 +324,26 @@ async function main() {
       meta: { title: '删除' },
     },
 
+    // --- 检验记录设置 ---
+    {
+      id: 19,
+      parentId: 10,
+      path: '/system/inspection-settings',
+      name: 'SystemInspectionSettings',
+      component: 'system/inspection-settings/index',
+      type: 'menu',
+      authCode: 'System:InspectionSettings:List',
+      meta: { title: '检验记录设置', icon: 'carbon:settings-adjust' },
+    },
+    {
+      id: 1900,
+      parentId: 19,
+      name: 'SystemInspectionSettingsEdit',
+      type: 'button',
+      authCode: 'System:InspectionSettings:Edit',
+      meta: { title: '修改配置' },
+    },
+
     // ===================== QMS 质量管理 =====================
     {
       id: 20,

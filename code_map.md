@@ -70,6 +70,7 @@
 ## 前端业务视图（`apps/web-antd/src/views/`）
 
 - **\_core/** — 框架核心视图：登录、404/fallback
+- **\_dev/** — 开发辅助视图：架构总览
 - **dashboard/** — 工作台首页（workspace 看板）
 - **mobile/** — 移动端精简视图：任务列表、派发、检验结果录入
 - **qms/** — QMS 业务视图（下级见下表）

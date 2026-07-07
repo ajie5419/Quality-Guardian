@@ -50,6 +50,9 @@ vi.mock('~/utils/prisma', () => ({
   default: {
     $queryRaw: vi.fn(),
     $queryRawUnsafe: vi.fn(),
+    system_settings: {
+      findUnique: vi.fn(),
+    },
   },
 }));
 
@@ -156,6 +159,36 @@ describe('systemService', () => {
       expect(metrics.status).toBe('Unhealthy');
       expect(metrics.error).toBe('DB Error');
       expect(metrics.latency).toBe(-1);
+    });
+  });
+
+  describe('isInspectionManualCreateEnabled', () => {
+    it('returns true when the setting has never been saved', async () => {
+      (prisma.system_settings.findUnique as any).mockResolvedValue(null);
+
+      await expect(
+        SystemService.isInspectionManualCreateEnabled(),
+      ).resolves.toBe(true);
+    });
+
+    it('returns true when the setting is explicitly "true"', async () => {
+      (prisma.system_settings.findUnique as any).mockResolvedValue({
+        value: 'true',
+      });
+
+      await expect(
+        SystemService.isInspectionManualCreateEnabled(),
+      ).resolves.toBe(true);
+    });
+
+    it('returns false when the setting is explicitly "false"', async () => {
+      (prisma.system_settings.findUnique as any).mockResolvedValue({
+        value: 'false',
+      });
+
+      await expect(
+        SystemService.isInspectionManualCreateEnabled(),
+      ).resolves.toBe(false);
     });
   });
 });
