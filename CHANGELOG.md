@@ -25,6 +25,21 @@
 
 ## 执行记录
 
+## [0.14.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.13.1...qgs-v0.14.0) (2026-07-07)
+
+
+### Features
+
+* **project:** add inspection manual-create setting with admin toggle ([db91fe7](https://github.com/ajie5419/Quality-Guardian/commit/db91fe77309313448af43faf907c160d5edd03ee))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** add unique constraint on quality_records.serialNumber ([01878ef](https://github.com/ajie5419/Quality-Guardian/commit/01878ef8dcf9b32a79a0240a97eca5a84401d716))
+* **@qgs/backend:** harden inspection request cross-module associations ([6b784aa](https://github.com/ajie5419/Quality-Guardian/commit/6b784aaec0cdb41b712ac5f51f6873a0580495d9))
+* **@qgs/backend:** make inspection request close chain transactional ([de5daa8](https://github.com/ajie5419/Quality-Guardian/commit/de5daa80bdd6ee2065170d5805bc68fed60f4d23))
+* **@qgs/backend:** unify error style, close silent catches, add public rate limit ([6d99834](https://github.com/ajie5419/Quality-Guardian/commit/6d99834723ee8d8aa5a4648690427979740b769e))
+
 ### 2026-07-07 修复：quality_records.serialNumber 唯一约束（P0-3 收尾）
 
 **执行内容：**
