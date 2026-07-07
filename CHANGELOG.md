@@ -42,7 +42,7 @@
 - vitest: 193 文件 / 1841 测试全部通过（较上一阶段净增 25 条）
 - eslint: 全部改动文件通过
 
-**commit:** 待提交
+**commit:** `6b784aae` fix(@qgs/backend): harden inspection request cross-module associations
 
 **遗留问题：**
 
