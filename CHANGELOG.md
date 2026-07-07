@@ -44,7 +44,7 @@
 - `pnpm run check:qms-arch`: 通过，0 violations
 - vitest: 195 文件 / 1859 测试全部通过（较上一阶段净增 18 条）
 
-**commit:** 待提交（本条目随代码同 commit）
+**commit:** `6d998347` fix(@qgs/backend): unify error style, close silent catches, add public rate limit
 
 **遗留问题：**
 
