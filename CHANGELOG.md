@@ -42,7 +42,7 @@
 - vitest: 192 文件 / 1816 测试全部通过（inspection 模块 56 文件 / 490 测试）
 - eslint: 全部改动文件通过（含 weapp vue）
 
-**commit:** 待提交
+**commit:** `de5daa80` fix(@qgs/backend): make inspection request close chain transactional
 
 **遗留问题：**
 
