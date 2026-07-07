@@ -122,6 +122,14 @@
 - 第 2 组待修（已批准未开始）：P0-3 requestNo 计数竞态 + 问题单 serialNumber `_max+1` 竞态；P1-1 welder-sync 未保护 await（inspection-issue-mutation.service.ts:70,113）；P1-5 deleteRequest 缺状态/归属校验且写入非枚举 'CANCELLED'；P1-4 Telegram webhook 伪造 event/user（api/telegram/webhook.post.ts）。
 - 第 3 组 P2 清单：failCloseRequest → BusinessError、TASK_DISPATCH_STATUS 缺 CANCELLED、inspection.module.ts 审计/数据域声明与实际字段不符、跨模块非 index 导入、getWelderScoreIssues 全表扫描、供应商快照 openEngineeringCount 统计口径、公共 API 限流、supplier.service 静默 catch。
 
+## [0.13.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.13.0...qgs-v0.13.1) (2026-07-02)
+
+
+### Bug Fixes
+
+* **@qgs/weapp:** constrain list card overflow ([a814085](https://github.com/ajie5419/Quality-Guardian/commit/a814085208c9c14b1da2b14a4d5b2719df8e1546))
+* **@qgs/web-antd:** use thumbnails in quality photo details ([eba8c0c](https://github.com/ajie5419/Quality-Guardian/commit/eba8c0c9d73412051666a264e431e7e27ef137d9))
+
 ### 2026-07-02 前端：质量照片详情缩略图加载优化
 
 **执行内容：**
