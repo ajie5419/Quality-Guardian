@@ -25,6 +25,29 @@
 
 ## 执行记录
 
+### 2026-07-07 修复：quality_records.serialNumber 唯一约束（P0-3 收尾）
+
+**执行内容：**
+
+- 手动测试确认第 1~3 组修复在本地容器环境（MySQL 3307）全部生效：P0-1 并发关闭一成功一拒绝、P0-2 单条检验记录、P1-5 取消守卫、P2-A 404/400 分发、P2-C 公共接口限流 429。
+- 查重：`quality_records` 按 serialNumber 分组无重复（8 行 0 重复组），无需去重脚本。
+- 本地容器库迁移历史缺失（此前经 `migrate reset`/`db push` 初始化，`_prisma_migrations` 未记录 33 个既有 migration）——先用 `prisma migrate resolve --applied` 基线化全部 33 个（`migrate diff` 确认库结构与 schema 完全一致后才执行），再新增 migration。
+- schema：`quality_records.serialNumber` 增加 `@unique`；新增 migration `20260707180000_add_quality_records_serial_unique`（`CREATE UNIQUE INDEX quality_records_serialNumber_key`，SQL 由 `prisma migrate diff` 生成，shadow DB 因历史 migration 依赖既有表无法重放，故未走 `migrate dev`）；`prisma migrate deploy` 应用成功，`SHOW INDEX` 验证 non_unique=0；`prisma generate` 已重跑。
+- 至此第 2 组遗留的 P0-3 schema 半边闭环：应用层重试（已上线）+ DB 唯一约束兜底。
+
+**验证结果：**
+
+- `prisma migrate status`: Database schema is up to date
+- typecheck: 通过（backend tsc --noEmit）
+- vitest: 195 文件 / 1859 测试全部通过
+
+**commit:** 待提交（本条目随代码同 commit）
+
+**遗留问题：**
+
+- 生产库部署时需先执行同样的查重检查再 `prisma migrate deploy`（生产数据量大，若有历史重复 serialNumber 需先去重）。
+- welder 计分相关索引（`quality_records(responsibleWelder, isDeleted)`）可在下次 migration 时顺带评估；groupBy 下推后非阻塞。
+
 ### 2026-07-07 修复：报检任务关联缺陷第 3 组（P2-A/P2-B/P2-C）
 
 **执行内容：**

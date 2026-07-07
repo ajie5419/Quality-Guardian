@@ -514,7 +514,7 @@ model itp_items {
 
 model quality_records {
   id                                      String                      @id
-  serialNumber                            Int
+  serialNumber                            Int                         @unique
   date                                    DateTime
   status                                  quality_records_status
   partName                                String
