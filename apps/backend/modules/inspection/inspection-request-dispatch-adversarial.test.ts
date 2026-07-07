@@ -154,7 +154,7 @@ describe('adversarial: dispatchRequest state machine', () => {
         { inspectorId: 'inspector-1' },
         userinfo,
       ),
-    ).rejects.toThrow('BAD_REQUEST:该报检任务已被派单或不可派单，请刷新后重试');
+    ).rejects.toThrow('该报检任务已被派单或不可派单，请刷新后重试');
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
@@ -171,7 +171,7 @@ describe('adversarial: dispatchRequest state machine', () => {
         { inspectorId: 'inspector-1' },
         userinfo,
       ),
-    ).rejects.toThrow('BAD_REQUEST:该报检任务已被派单或不可派单，请刷新后重试');
+    ).rejects.toThrow('该报检任务已被派单或不可派单，请刷新后重试');
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
@@ -188,7 +188,7 @@ describe('adversarial: dispatchRequest state machine', () => {
         { inspectorId: 'inspector-1' },
         userinfo,
       ),
-    ).rejects.toThrow('BAD_REQUEST:该报检任务已被派单或不可派单，请刷新后重试');
+    ).rejects.toThrow('该报检任务已被派单或不可派单，请刷新后重试');
   });
 
   it('5. race condition: second dispatch fails when updateMany returns count=0', async () => {
@@ -204,7 +204,7 @@ describe('adversarial: dispatchRequest state machine', () => {
         { inspectorId: 'inspector-1' },
         userinfo,
       ),
-    ).rejects.toThrow('BAD_REQUEST:该报检任务已被派单，请刷新后重试');
+    ).rejects.toThrow('该报检任务已被派单，请刷新后重试');
 
     expect(tx.qms_task_dispatches.create).not.toHaveBeenCalled();
     expect(tx.qms_inspection_requests.update).not.toHaveBeenCalled();
@@ -228,7 +228,7 @@ describe('adversarial: dispatchRequest input validation', () => {
         { inspectorId: '' },
         userinfo,
       ),
-    ).rejects.toThrow('BAD_REQUEST:检验员不能为空');
+    ).rejects.toThrow('检验员不能为空');
   });
 
   it('7. rejects when inspectorId is null', async () => {
@@ -239,7 +239,7 @@ describe('adversarial: dispatchRequest input validation', () => {
         { inspectorId: null },
         userinfo,
       ),
-    ).rejects.toThrow('BAD_REQUEST:检验员不能为空');
+    ).rejects.toThrow('检验员不能为空');
   });
 
   it('8. rejects when inspectorId is missing entirely', async () => {
@@ -250,7 +250,7 @@ describe('adversarial: dispatchRequest input validation', () => {
         {},
         userinfo,
       ),
-    ).rejects.toThrow('BAD_REQUEST:检验员不能为空');
+    ).rejects.toThrow('检验员不能为空');
   });
 
   it('9. rejects when inspector does not exist in DB', async () => {
@@ -263,7 +263,7 @@ describe('adversarial: dispatchRequest input validation', () => {
         { inspectorId: 'nonexistent' },
         userinfo,
       ),
-    ).rejects.toThrow('BAD_REQUEST:检验员不存在');
+    ).rejects.toThrow('检验员不存在');
   });
 
   it('10. rejects when request does not exist', async () => {
@@ -466,7 +466,7 @@ describe('adversarial: dispatchRequest edge cases', () => {
         { inspectorId: 'inspector-1' },
         userinfo,
       ),
-    ).rejects.toThrow('BAD_REQUEST:无法识别当前调度人');
+    ).rejects.toThrow('无法识别当前调度人');
   });
 
   it('20. passes high priority through to dispatch task', async () => {

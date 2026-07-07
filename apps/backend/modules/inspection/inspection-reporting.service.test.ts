@@ -476,16 +476,31 @@ describe('inspectionReportingService', () => {
     });
   });
 
-  describe('getWelderScoreIssues', () => {
-    it('should return issues with responsible welder', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
-        { id: 'q1', responsibleWelder: 'Welder A', severity: 'Major' },
+  describe('getWelderScoreStats', () => {
+    it('should return groupBy stats with responsible welder and severity', async () => {
+      (prisma.quality_records.groupBy as any).mockResolvedValue([
+        {
+          responsibleWelder: 'Welder A',
+          severity: 'major',
+          _count: { id: 3 },
+        },
       ]);
 
-      const result = await InspectionReportingService.getWelderScoreIssues();
+      const result = await InspectionReportingService.getWelderScoreStats();
 
       expect(result).toHaveLength(1);
       expect(result[0].responsibleWelder).toBe('Welder A');
+      expect(result[0]._count.id).toBe(3);
+      expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: ['responsibleWelder', 'severity'],
+          where: expect.objectContaining({
+            isDeleted: false,
+            responsibleWelder: { not: null },
+          }),
+          _count: { id: true },
+        }),
+      );
     });
   });
 

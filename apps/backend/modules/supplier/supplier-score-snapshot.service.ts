@@ -111,7 +111,7 @@ async function buildSupplierStatsMap(supplierNames: string[]) {
   });
 
   engineeringStatusStats.forEach((s) => {
-    if (!s.supplierName || s.status === 'CLOSED') return;
+    if (!s.supplierName || s.status !== 'OPEN') return;
     const current = statsMap.get(s.supplierName) || createEmptyStats();
     current.openEngineeringCount += s._count.id;
     statsMap.set(s.supplierName, current);

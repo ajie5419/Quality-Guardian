@@ -386,10 +386,11 @@ export const InspectionReportingService = {
     });
   },
 
-  async getWelderScoreIssues() {
-    return prisma.quality_records.findMany({
+  async getWelderScoreStats() {
+    return prisma.quality_records.groupBy({
+      by: ['responsibleWelder', 'severity'],
       where: { isDeleted: false, responsibleWelder: { not: null } },
-      select: { id: true, responsibleWelder: true, severity: true },
+      _count: { id: true },
     });
   },
 

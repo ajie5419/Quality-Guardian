@@ -14,7 +14,7 @@ vi.mock('~/utils/prisma', () => ({
 
 vi.mock('~/modules/inspection', () => ({
   InspectionService: {
-    getWelderScoreIssues: vi.fn(),
+    getWelderScoreStats: vi.fn(),
   },
 }));
 
@@ -23,15 +23,15 @@ describe('welderScoreService', () => {
     vi.clearAllMocks();
   });
 
-  it('should sync scores from matched inspection issues', async () => {
+  it('should sync scores from matched inspection issue stats', async () => {
     const { InspectionService } = await import('~/modules/inspection');
     (prisma.welders.findMany as any).mockResolvedValue([
       { id: 'w1', name: 'Alice', score: 12, welderCode: 'W-001' },
       { id: 'w2', name: 'Bob', score: 12, welderCode: 'W-002' },
     ]);
-    (InspectionService.getWelderScoreIssues as any).mockResolvedValue([
-      { responsibleWelder: 'Alice', severity: 'major' },
-      { responsibleWelder: 'Unknown', severity: 'minor' },
+    (InspectionService.getWelderScoreStats as any).mockResolvedValue([
+      { responsibleWelder: 'Alice', severity: 'major', _count: { id: 1 } },
+      { responsibleWelder: 'Unknown', severity: 'minor', _count: { id: 1 } },
     ]);
     (prisma.welders.update as any).mockResolvedValue({} as never);
     (prisma.$transaction as any).mockResolvedValue([] as never);
@@ -47,8 +47,8 @@ describe('welderScoreService', () => {
   it('should return zero counts when no welders exist', async () => {
     const { InspectionService } = await import('~/modules/inspection');
     (prisma.welders.findMany as any).mockResolvedValue([]);
-    (InspectionService.getWelderScoreIssues as any).mockResolvedValue([
-      { responsibleWelder: 'Alice', severity: 'major' },
+    (InspectionService.getWelderScoreStats as any).mockResolvedValue([
+      { responsibleWelder: 'Alice', severity: 'major', _count: { id: 1 } },
     ]);
 
     const result = await WelderScoreService.syncFromInspectionIssues();
@@ -66,7 +66,7 @@ describe('welderScoreService', () => {
     (prisma.welders.findMany as any).mockResolvedValue([
       { id: 'w1', name: 'Alice', score: 12, welderCode: 'W-001' },
     ]);
-    (InspectionService.getWelderScoreIssues as any).mockResolvedValue([]);
+    (InspectionService.getWelderScoreStats as any).mockResolvedValue([]);
 
     const result = await WelderScoreService.syncFromInspectionIssues();
 
@@ -83,8 +83,8 @@ describe('welderScoreService', () => {
     (prisma.welders.findMany as any).mockResolvedValue([
       { id: 'w1', name: 'Alice', score: null, welderCode: 'W-001' },
     ]);
-    (InspectionService.getWelderScoreIssues as any).mockResolvedValue([
-      { responsibleWelder: 'Alice', severity: 'minor' },
+    (InspectionService.getWelderScoreStats as any).mockResolvedValue([
+      { responsibleWelder: 'Alice', severity: 'minor', _count: { id: 1 } },
     ]);
     (prisma.welders.update as any).mockResolvedValue({} as never);
     (prisma.$transaction as any).mockResolvedValue([] as never);
@@ -100,8 +100,12 @@ describe('welderScoreService', () => {
     (prisma.welders.findMany as any).mockResolvedValue([
       { id: 'w1', name: 'Alice', score: 12, welderCode: 'W-001' },
     ]);
-    (InspectionService.getWelderScoreIssues as any).mockResolvedValue([
-      { responsibleWelder: 'Alice (W-001)', severity: 'major' },
+    (InspectionService.getWelderScoreStats as any).mockResolvedValue([
+      {
+        responsibleWelder: 'Alice (W-001)',
+        severity: 'major',
+        _count: { id: 1 },
+      },
     ]);
     (prisma.welders.update as any).mockResolvedValue({} as never);
     (prisma.$transaction as any).mockResolvedValue([] as never);
@@ -111,13 +115,17 @@ describe('welderScoreService', () => {
     expect(result.matchedIssueCount).toBe(1);
   });
 
-  it('should return zero matched when no issues match any welder', async () => {
+  it('should return zero matched when no stats match any welder', async () => {
     const { InspectionService } = await import('~/modules/inspection');
     (prisma.welders.findMany as any).mockResolvedValue([
       { id: 'w1', name: 'Alice', score: 12, welderCode: 'W-001' },
     ]);
-    (InspectionService.getWelderScoreIssues as any).mockResolvedValue([
-      { responsibleWelder: 'UnknownPerson', severity: 'major' },
+    (InspectionService.getWelderScoreStats as any).mockResolvedValue([
+      {
+        responsibleWelder: 'UnknownPerson',
+        severity: 'major',
+        _count: { id: 1 },
+      },
     ]);
 
     const result = await WelderScoreService.syncFromInspectionIssues();
@@ -126,12 +134,12 @@ describe('welderScoreService', () => {
     expect(result.updatedCount).toBe(0);
   });
 
-  it('should handle empty issues list', async () => {
+  it('should handle empty stats list', async () => {
     const { InspectionService } = await import('~/modules/inspection');
     (prisma.welders.findMany as any).mockResolvedValue([
       { id: 'w1', name: 'Alice', score: 12, welderCode: 'W-001' },
     ]);
-    (InspectionService.getWelderScoreIssues as any).mockResolvedValue([]);
+    (InspectionService.getWelderScoreStats as any).mockResolvedValue([]);
 
     const result = await WelderScoreService.syncFromInspectionIssues();
 
@@ -142,14 +150,15 @@ describe('welderScoreService', () => {
     });
   });
 
-  it('should accumulate deductions from multiple issues for same welder', async () => {
+  it('should accumulate deductions from multiple stat rows for same welder', async () => {
     const { InspectionService } = await import('~/modules/inspection');
     (prisma.welders.findMany as any).mockResolvedValue([
       { id: 'w1', name: 'Alice', score: 12, welderCode: 'W-001' },
     ]);
-    (InspectionService.getWelderScoreIssues as any).mockResolvedValue([
-      { responsibleWelder: 'Alice', severity: 'minor' },
-      { responsibleWelder: 'Alice', severity: 'major' },
+    // Two distinct (responsibleWelder, severity) groups for the same welder
+    (InspectionService.getWelderScoreStats as any).mockResolvedValue([
+      { responsibleWelder: 'Alice', severity: 'minor', _count: { id: 1 } },
+      { responsibleWelder: 'Alice', severity: 'major', _count: { id: 1 } },
     ]);
     (prisma.welders.update as any).mockResolvedValue({} as never);
     (prisma.$transaction as any).mockResolvedValue([] as never);
@@ -159,5 +168,29 @@ describe('welderScoreService', () => {
     expect(result.deductionIssueCount).toBe(2);
     expect(result.matchedIssueCount).toBe(2);
     expect(result.updatedCount).toBe(1);
+  });
+
+  it('should correctly count multiple issues in a single stat row', async () => {
+    const { InspectionService } = await import('~/modules/inspection');
+    (prisma.welders.findMany as any).mockResolvedValue([
+      { id: 'w1', name: 'Alice', score: 12, welderCode: 'W-001' },
+    ]);
+    // One group with 3 issues — same as 3 individual major rows
+    (InspectionService.getWelderScoreStats as any).mockResolvedValue([
+      { responsibleWelder: 'Alice', severity: 'major', _count: { id: 3 } },
+    ]);
+    (prisma.welders.update as any).mockResolvedValue({} as never);
+    (prisma.$transaction as any).mockResolvedValue([] as never);
+
+    const result = await WelderScoreService.syncFromInspectionIssues();
+
+    // 3 major issues × deduction 2 = 6 total deduction → score 12 - 6 = 6
+    expect(result.deductionIssueCount).toBe(3);
+    expect(result.matchedIssueCount).toBe(3);
+    expect(result.updatedCount).toBe(1);
+    expect(prisma.welders.update).toHaveBeenCalledWith({
+      where: { id: 'w1' },
+      data: { score: 6, updatedAt: expect.any(Date) },
+    });
   });
 });

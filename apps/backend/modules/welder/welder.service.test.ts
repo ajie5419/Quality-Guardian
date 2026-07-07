@@ -30,7 +30,7 @@ vi.mock('~/utils/prisma', () => ({
 
 vi.mock('~/modules/inspection', () => ({
   InspectionService: {
-    getWelderScoreIssues: vi.fn(),
+    getWelderScoreStats: vi.fn(),
   },
 }));
 
@@ -198,9 +198,9 @@ describe('welderService', () => {
       { id: 'w1', name: 'Alice', score: 12, welderCode: 'W-001' },
       { id: 'w2', name: 'Bob', score: 12, welderCode: 'W-002' },
     ] as never);
-    vi.mocked(InspectionService.getWelderScoreIssues).mockResolvedValue([
-      { responsibleWelder: 'Alice', severity: 'major' },
-      { responsibleWelder: 'Unknown', severity: 'minor' },
+    vi.mocked(InspectionService.getWelderScoreStats).mockResolvedValue([
+      { responsibleWelder: 'Alice', severity: 'major', _count: { id: 1 } },
+      { responsibleWelder: 'Unknown', severity: 'minor', _count: { id: 1 } },
     ] as never);
     vi.mocked(prisma.welders.update).mockResolvedValue({} as never);
     vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
@@ -224,8 +224,8 @@ describe('welderService', () => {
   it('returns score sync summary without updates when no welders exist', async () => {
     const { InspectionService } = await import('~/modules/inspection');
     vi.mocked(prisma.welders.findMany).mockResolvedValue([] as never);
-    vi.mocked(InspectionService.getWelderScoreIssues).mockResolvedValue([
-      { responsibleWelder: 'Alice', severity: 'major' },
+    vi.mocked(InspectionService.getWelderScoreStats).mockResolvedValue([
+      { responsibleWelder: 'Alice', severity: 'major', _count: { id: 1 } },
     ] as never);
 
     const result = await WelderScoreService.syncFromInspectionIssues();

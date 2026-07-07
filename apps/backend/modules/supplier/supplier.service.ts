@@ -13,10 +13,13 @@ import {
   normalizeSupplierString,
 } from '~/modules/supplier/supplier-query';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
+import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { buildKeywordOr } from '~/utils/query-helpers';
 
 import { SupplierScoreSnapshotService } from './supplier-score-snapshot.service';
+
+const logger = createModuleLogger('supplier-service');
 
 export interface SupplierQueryParams {
   page?: number;
@@ -243,7 +246,8 @@ export const SupplierService = {
             });
             await SupplierScoreSnapshotService.refreshSuppliers([supplier]);
             results.success++;
-          } catch {
+          } catch (error) {
+            logger.error(error, 'batchUpsertSuppliers: failed to upsert row');
             results.errors++;
           }
         }),
@@ -281,7 +285,8 @@ export const SupplierService = {
         });
         await SupplierScoreSnapshotService.refreshSuppliers([supplier]);
         successCount++;
-      } catch {
+      } catch (error) {
+        logger.error(error, 'importSuppliers: failed to upsert row; skipping');
         // keep import behavior: ignore row-level failures
       }
     }

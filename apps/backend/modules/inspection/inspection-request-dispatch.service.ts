@@ -47,8 +47,10 @@ export const InspectionRequestDispatchService = {
       userinfo,
       prisma,
     );
-    if (!inspectorId) throw new Error('BAD_REQUEST:检验员不能为空');
-    if (!dispatcherId) throw new Error('BAD_REQUEST:无法识别当前调度人');
+    if (!inspectorId)
+      throw new BusinessError('BAD_REQUEST', '检验员不能为空', 400);
+    if (!dispatcherId)
+      throw new BusinessError('BAD_REQUEST', '无法识别当前调度人', 400);
 
     const [request, inspector] = await Promise.all([
       prisma.qms_inspection_requests.findFirst({
@@ -62,8 +64,12 @@ export const InspectionRequestDispatchService = {
     ]);
     if (!request) throw new BusinessError('NOT_FOUND', '报检任务不存在', 404);
     if (request.status !== INSPECTION_REQUEST_STATUS.SUBMITTED)
-      throw new Error('BAD_REQUEST:该报检任务已被派单或不可派单，请刷新后重试');
-    if (!inspector) throw new Error('BAD_REQUEST:检验员不存在');
+      throw new BusinessError(
+        'BAD_REQUEST',
+        '该报检任务已被派单或不可派单，请刷新后重试',
+        400,
+      );
+    if (!inspector) throw new BusinessError('BAD_REQUEST', '检验员不存在', 400);
 
     const priority = parseInspectionRequestPriority(body.priority);
     const dispatchRemark =
@@ -81,7 +87,11 @@ export const InspectionRequestDispatchService = {
         },
       });
       if (result.count === 0)
-        throw new Error('BAD_REQUEST:该报检任务已被派单，请刷新后重试');
+        throw new BusinessError(
+          'BAD_REQUEST',
+          '该报检任务已被派单，请刷新后重试',
+          400,
+        );
       const task = await tx.qms_task_dispatches.create({
         data: buildDispatchTaskCreateData({
           assignorId: dispatcherId,

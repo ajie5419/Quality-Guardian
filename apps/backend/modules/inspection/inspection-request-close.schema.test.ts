@@ -41,7 +41,7 @@ describe('validateCloseRequestBody', () => {
         result: 'FAIL',
         unqualifiedQuantity: 1,
       }),
-    ).toThrow('VALIDATION:不合格项照片不能为空');
+    ).toThrow('不合格项照片不能为空');
   });
 
   it('keeps inspection record attachments required for pass close', () => {
@@ -50,6 +50,6 @@ describe('validateCloseRequestBody', () => {
         quantity: 2,
         result: 'PASS',
       }),
-    ).toThrow('VALIDATION:检验记录不能为空');
+    ).toThrow('检验记录不能为空');
   });
 });

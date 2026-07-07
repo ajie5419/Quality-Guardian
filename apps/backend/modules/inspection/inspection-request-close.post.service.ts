@@ -2,10 +2,13 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { InspectionRouteService } from '~/modules/inspection/inspection-route.service';
 import { logApiError } from '~/utils/api-logger';
+import { BusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
+  forbiddenResponse,
   internalServerErrorResponse,
+  notFoundResponse,
   useResponseSuccess,
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -28,25 +31,13 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(result);
   } catch (error) {
     logApiError('inspection-request-close', error, undefined, event);
-    if (!(error instanceof Error))
-      return internalServerErrorResponse(event, '关闭报检任务失败');
-    if (error.message.startsWith('VALIDATION:'))
-      return badRequestResponse(
-        event,
-        error.message.replace('VALIDATION:', ''),
-      );
-    if (error.message.startsWith('NOT_FOUND:'))
-      return badRequestResponse(event, error.message.replace('NOT_FOUND:', ''));
-    if (error.message.startsWith('BAD_REQUEST:'))
-      return badRequestResponse(
-        event,
-        error.message.replace('BAD_REQUEST:', ''),
-      );
-    if (error.message.startsWith('INTERNAL:'))
-      return internalServerErrorResponse(
-        event,
-        error.message.replace('INTERNAL:', ''),
-      );
+    if (error instanceof BusinessError) {
+      if (error.httpStatus === 404)
+        return notFoundResponse(event, error.message);
+      if (error.httpStatus === 403)
+        return forbiddenResponse(event, error.message);
+      return badRequestResponse(event, error.message);
+    }
     return internalServerErrorResponse(event, '关闭报检任务失败');
   }
 });

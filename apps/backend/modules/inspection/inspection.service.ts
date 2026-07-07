@@ -36,7 +36,7 @@ export const InspectionService = {
   getSupplierHistoryProjects:
     InspectionRequestHistoryService.getSupplierHistoryProjects,
   getSupplierScoringData: InspectionCoreService.getSupplierScoringData,
-  getWelderScoreIssues: InspectionCoreService.getWelderScoreIssues,
+  getWelderScoreStats: InspectionCoreService.getWelderScoreStats,
   getWeeklyReportIssues: InspectionCoreService.getWeeklyReportIssues,
   getWorkOrderAggregateInspections:
     InspectionCoreService.getWorkOrderAggregateInspections,

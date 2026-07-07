@@ -1,11 +1,22 @@
+import { BusinessError } from '~/utils/business-error';
+
 import {
   normalizeInspectionRequestAttachments,
   normalizeInspectionRequestText,
   parseInspectionRequestQuantity,
 } from './inspection-request';
 
+const PREFIX_STATUS_MAP: Record<string, number> = {
+  VALIDATION: 400,
+  BAD_REQUEST: 400,
+  NOT_FOUND: 404,
+  FORBIDDEN: 403,
+  INTERNAL: 500,
+};
+
 export function failCloseRequest(prefix: string, message: string): never {
-  throw new Error(`${prefix}:${message}`);
+  const httpStatus = PREFIX_STATUS_MAP[prefix] ?? 400;
+  throw new BusinessError(prefix, message, httpStatus);
 }
 
 export function parseCloseRequestNumber(value: unknown, fallback = 0) {

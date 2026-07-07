@@ -20,6 +20,7 @@ vi.mock('~/utils/prisma', () => ({
       findMany: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
+      upsert: vi.fn(),
     },
     supplier_score_snapshots: {
       aggregate: vi.fn(),
@@ -60,6 +61,23 @@ vi.mock('~/utils/canonical-master-data', () => ({
   },
 }));
 
+const mockLogger = vi.hoisted(() => ({
+  error: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+}));
+vi.mock('~/utils/logger', () => ({
+  createModuleLogger: () => mockLogger,
+}));
+
+vi.mock('~/utils/governed-write', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('~/utils/governed-write')>();
+  return {
+    ...actual,
+    buildGovernedCanonicalWritePairForTable: vi.fn().mockResolvedValue({}),
+  };
+});
 function supplier(name: string, status = 'Qualified') {
   const now = new Date('2026-02-14T00:00:00.000Z');
   return {
@@ -109,7 +127,7 @@ function buildStatsMap(input: {
     statsMap.set(s.supplierName, current);
   });
   input.engineeringStatusStats.forEach((s) => {
-    if (s.status === 'CLOSED') return;
+    if (s.status !== 'OPEN') return;
     const current = statsMap.get(s.supplierName) || createEmptyStats();
     current.openEngineeringCount += s._count.id;
     statsMap.set(s.supplierName, current);
@@ -876,5 +894,88 @@ describe('supplierService admission fields', () => {
       supplierName: 'Supplier A',
       supplierNameId: 'md-1',
     });
+  });
+});
+
+describe('supplierService silent-catch fix: batchUpsertSuppliers and importSuppliers log errors', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default mocks so unrelated paths don't blow up
+    (prisma.suppliers.upsert as any).mockResolvedValue({
+      id: 'ok',
+      name: 'S1',
+    });
+    (prisma.supplier_score_snapshots.upsert as any).mockResolvedValue({});
+    (prisma.inspections.groupBy as any).mockResolvedValue([]);
+    (prisma.after_sales.groupBy as any).mockResolvedValue([]);
+    (prisma.quality_records.groupBy as any).mockResolvedValue([]);
+    (prisma.after_sales.findMany as any).mockResolvedValue([]);
+    (prisma.quality_records.findMany as any).mockResolvedValue([]);
+  });
+
+  it('batchUpsertSuppliers: logs error and increments errors counter on row failure', async () => {
+    const boom = new Error('db constraint violation');
+    (prisma.suppliers.upsert as any).mockRejectedValue(boom);
+
+    const item = { name: 'S1', code: 'C1', category: 'Supplier' };
+    const result = await SupplierService.batchUpsertSuppliers([item]);
+
+    expect(result.errors).toBe(1);
+    expect(result.success).toBe(0);
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      boom,
+      'batchUpsertSuppliers: failed to upsert row',
+    );
+  });
+
+  it('batchUpsertSuppliers: continues processing remaining rows after a failure', async () => {
+    const boom = new Error('fail first');
+    (prisma.suppliers.upsert as any)
+      .mockRejectedValueOnce(boom)
+      .mockResolvedValue({ id: 'ok', name: 'S2' });
+
+    const items = [
+      { name: 'S1', code: 'C1', category: 'Supplier' },
+      { name: 'S2', code: 'C2', category: 'Supplier' },
+    ];
+    const result = await SupplierService.batchUpsertSuppliers(items);
+
+    expect(result.errors).toBe(1);
+    expect(result.success).toBe(1);
+    expect(mockLogger.error).toHaveBeenCalledTimes(1);
+  });
+
+  it('importSuppliers: logs error and keeps going on row failure', async () => {
+    const boom = new Error('upsert row boom');
+    (prisma.suppliers.upsert as any)
+      .mockRejectedValueOnce(boom)
+      .mockResolvedValue({ id: 'ok', name: 'S2' });
+
+    const items = [
+      { name: 'S1', code: 'C1', category: 'Supplier' },
+      { name: 'S2', code: 'C2', category: 'Supplier' },
+    ];
+    const result = await SupplierService.importSuppliers(items, 'Supplier');
+
+    expect(result.successCount).toBe(1);
+    expect(result.totalCount).toBe(2);
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      boom,
+      'importSuppliers: failed to upsert row; skipping',
+    );
+  });
+
+  it('importSuppliers: does not throw when all rows fail', async () => {
+    (prisma.suppliers.upsert as any).mockRejectedValue(new Error('all fail'));
+
+    const items = [
+      { name: 'S1', code: 'C1', category: 'Supplier' },
+      { name: 'S2', code: 'C2', category: 'Supplier' },
+    ];
+    const result = await SupplierService.importSuppliers(items);
+
+    expect(result.successCount).toBe(0);
+    expect(result.totalCount).toBe(2);
+    expect(mockLogger.error).toHaveBeenCalledTimes(2);
   });
 });

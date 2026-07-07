@@ -1,6 +1,7 @@
 import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
+import { TASK_DISPATCH_STATUS } from '@qgs/shared';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
@@ -79,7 +80,7 @@ export const InspectionRequestDeleteService = {
       }
       if (existing.dispatchTaskId) {
         await tx.qms_task_dispatches.updateMany({
-          data: { status: 'CANCELLED' },
+          data: { status: TASK_DISPATCH_STATUS.CANCELLED },
           where: { id: existing.dispatchTaskId },
         });
       }

@@ -25,6 +25,32 @@
 
 ## 执行记录
 
+### 2026-07-07 修复：报检任务关联缺陷第 3 组（P2-A/P2-B/P2-C）
+
+**执行内容：**
+
+- P2-A 错误风格统一：`inspection-request-close.schema.ts` 的 `failCloseRequest` 由抛前缀字符串 `Error('PREFIX:msg')` 改为 `BusinessError(prefix, message, httpStatus)`（PREFIX→状态码映射：VALIDATION/BAD_REQUEST→400、NOT_FOUND→404、FORBIDDEN→403、INTERNAL→500），close 链路 16 处调用点全部生效；`inspection-request-dispatch.service.ts` 4 处 `Error('BAD_REQUEST:...')` 同步转换；close/dispatch 两个路由错误分发改为 `instanceof BusinessError` 按 httpStatus 分发（404→notFound、403→forbidden、其余→badRequest）。
+- P2-A 枚举补全：`TASK_DISPATCH_STATUS` 增加 `CANCELLED`，`inspection-request-delete.service.ts` 派单行取消改用常量（替换裸字符串）。
+- P2-A 声明核查：`inspection.module.ts` 审计动作（requestCreate/requestDispatch/requestDelete/requestClose）与 dataScope selfFields 经核对与实现一致，无需改动（原怀疑的漂移不成立）。
+- P2-B 静默 catch 清理：`supplier.service.ts` 批量导入两处 `catch {}` 改为 `logger.error` 后计入 `results.errors`；`supplier-score-snapshot.service.ts` 开放问题口径由 `status !== 'CLOSED'` 改为 `status === 'OPEN'`（原口径把 IN_PROGRESS/RESOLVED/CLAIMING 误计为开放，与工作台口径不一致，为真实统计 bug）。
+- P2-C welder 计分聚合下推：`getWelderScoreIssues`（全表 findMany 拉内存）改为 `getWelderScoreStats`（`groupBy(['responsibleWelder','severity'])` + `_count`），`welder-score.service.ts` 扣分计算改为按分组计数累加，数学等价；避免 quality_records 全量载入内存（2C/4G 生产约束）。
+- P2-C 公共 API 限流：新增 `utils/rate-limit.ts`（Redis INCR/EXPIRE 固定窗口 60 次/60 秒，Redis 不可用时退化为有界内存 Map（上限 10000 键）并放行）与 `middleware/5.public-rate-limit.ts`（仅作用于 `/api/qms/public/` 前缀，按 IP+路径限流，超限返回 429）。
+- 生产代码 12 个文件（新增 2）；测试改动 9 个文件（新增 2：`rate-limit.test.ts`、`supplier-score-snapshot.service.test.ts`），含 close 路由测试同步为 BusinessError mock（NOT_FOUND 断言改为 notFoundResponse）。
+- 明确不做：跨模块非 `index.ts` 深导入清理（after-sales/metrology/work-order 等全仓既有惯例，改动面大于收益，维持现状）。
+
+**验证结果：**
+
+- typecheck: 通过（`pnpm run check:type` 3/3 tasks）
+- `pnpm run check:qms-arch`: 通过，0 violations
+- vitest: 195 文件 / 1859 测试全部通过（较上一阶段净增 18 条）
+
+**commit:** 待提交（本条目随代码同 commit）
+
+**遗留问题：**
+
+- `quality_records.serialNumber` 的 `@unique` migration 仍待 MySQL 可用（见第 2 组遗留，步骤不变）。
+- welder 计分相关索引（`quality_records(responsibleWelder, isDeleted)`）可在下次 migration 时顺带评估；groupBy 下推后非阻塞。
+
 ### 2026-07-07 修复：报检任务关联缺陷第 2 组（P0-3/P1-1/P1-4/P1-5）
 
 **执行内容：**

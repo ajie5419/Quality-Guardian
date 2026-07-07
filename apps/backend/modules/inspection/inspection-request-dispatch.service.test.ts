@@ -67,7 +67,7 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
         { inspectorId: 'inspector-1' },
         userinfo,
       ),
-    ).rejects.toThrow('BAD_REQUEST:该报检任务已被派单或不可派单，请刷新后重试');
+    ).rejects.toThrow('该报检任务已被派单或不可派单，请刷新后重试');
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
@@ -99,7 +99,7 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
         { inspectorId: 'inspector-1' },
         userinfo,
       ),
-    ).rejects.toThrow('BAD_REQUEST:该报检任务已被派单，请刷新后重试');
+    ).rejects.toThrow('该报检任务已被派单，请刷新后重试');
 
     expect(tx.qms_task_dispatches.create).not.toHaveBeenCalled();
     expect(tx.qms_inspection_requests.update).not.toHaveBeenCalled();

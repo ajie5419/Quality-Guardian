@@ -14,16 +14,26 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-vi.mock('~/modules/inspection/inspection-request-close.schema', () => ({
-  failCloseRequest: (prefix: string, message: string) => {
-    throw new Error(`${prefix}:${message}`);
-  },
-  parseCloseRequestNumber: (value: unknown, fallback = 0) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  },
-  validateCloseRequestBody: vi.fn(),
-}));
+vi.mock('~/modules/inspection/inspection-request-close.schema', async () => {
+  const { BusinessError: BE } = await import('~/utils/business-error');
+  return {
+    failCloseRequest: (prefix: string, message: string) => {
+      const map: Record<string, number> = {
+        VALIDATION: 400,
+        BAD_REQUEST: 400,
+        NOT_FOUND: 404,
+        FORBIDDEN: 403,
+        INTERNAL: 500,
+      };
+      throw new BE(prefix, message, map[prefix] ?? 400);
+    },
+    parseCloseRequestNumber: (value: unknown, fallback = 0) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    },
+    validateCloseRequestBody: vi.fn(),
+  };
+});
 
 vi.mock(
   '~/modules/inspection/inspection-request-close-records.service',
@@ -154,7 +164,11 @@ describe('inspectionRequestCloseService', () => {
         { result: 'PASS', attachments: [{ name: 'f.pdf', url: 'http://x' }] },
         mockUserInfo,
       ),
-    ).rejects.toThrow('NOT_FOUND:报检任务不存在');
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: '报检任务不存在',
+      httpStatus: 404,
+    });
   });
 
   it('should throw when request already closed', async () => {
@@ -170,6 +184,9 @@ describe('inspectionRequestCloseService', () => {
         { result: 'PASS', attachments: [{ name: 'f.pdf', url: 'http://x' }] },
         mockUserInfo,
       ),
-    ).rejects.toThrow('BAD_REQUEST:报检任务已检验完成');
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: '报检任务已检验完成',
+    });
   });
 });

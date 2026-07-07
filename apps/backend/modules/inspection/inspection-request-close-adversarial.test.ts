@@ -39,54 +39,77 @@ const { mockNormalizeText, mockNormalizeAttachments, mockParseQuantity } =
     },
   }));
 
-vi.mock('~/modules/inspection/inspection-request-close.schema', () => ({
-  failCloseRequest: (prefix: string, message: string) => {
-    throw new Error(`${prefix}:${message}`);
-  },
-  parseCloseRequestNumber: (value: unknown, fallback = 0) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  },
-  validateCloseRequestBody: (body: Record<string, unknown>) => {
-    const result = mockNormalizeText(body.result).toUpperCase();
-    if (result !== 'PASS' && result !== 'FAIL')
-      throw new Error('VALIDATION:检验结果必须为合格或不合格');
-    const closeAttachments = mockNormalizeAttachments(body.attachments);
-    if (result === 'PASS' && closeAttachments.length === 0)
-      throw new Error('VALIDATION:检验记录不能为空');
-    const quantity = mockParseQuantity(body.quantity);
-    const rawUQ = Number(body.unqualifiedQuantity);
-    const fallback = result === 'FAIL' ? 1 : 0;
-    const unqualifiedQuantity = Number.isFinite(rawUQ)
-      ? Math.max(0, Math.min(quantity, rawUQ))
-      : fallback;
-    if (result === 'PASS' && unqualifiedQuantity > 0)
-      throw new Error('VALIDATION:检验结果为合格时，不合格数量必须为 0');
-    if (result !== 'FAIL') return;
-    if (unqualifiedQuantity <= 0)
-      throw new Error('VALIDATION:检验结果为不合格时，不合格数量必须大于 0');
-    if (!body.linkedIssue || typeof body.linkedIssue !== 'object')
-      throw new Error('VALIDATION:检验结果为不合格时必须填写不合格项信息');
-    const li = body.linkedIssue as Record<string, unknown>;
-    if (mockNormalizeAttachments(li.photos).length === 0)
-      throw new Error('VALIDATION:不合格项照片不能为空');
-    for (const [key, label] of [
-      ['partName', '组件名称'],
-      ['processName', '工序'],
-      ['responsibleDepartment', '责任部门'],
-      ['defectType', '缺陷分类'],
-      ['defectSubtype', '二级分类'],
-      ['severity', '严重程度'],
-      ['status', '状态'],
-      ['description', '不合格描述'],
-      ['rootCause', '原因分析'],
-      ['solution', '解决方案'],
-    ] as const) {
-      if (!mockNormalizeText(li[key]))
-        throw new Error(`VALIDATION:不合格项${label}不能为空`);
-    }
-  },
-}));
+vi.mock('~/modules/inspection/inspection-request-close.schema', async () => {
+  const { BusinessError: BE } = await import('~/utils/business-error');
+  return {
+    failCloseRequest: (prefix: string, message: string) => {
+      const map: Record<string, number> = {
+        VALIDATION: 400,
+        BAD_REQUEST: 400,
+        NOT_FOUND: 404,
+        FORBIDDEN: 403,
+        INTERNAL: 500,
+      };
+      throw new BE(prefix, message, map[prefix] ?? 400);
+    },
+    parseCloseRequestNumber: (value: unknown, fallback = 0) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    },
+    validateCloseRequestBody: (body: Record<string, unknown>) => {
+      const BE2 = BE;
+      const result = mockNormalizeText(body.result).toUpperCase();
+      if (result !== 'PASS' && result !== 'FAIL')
+        throw new BE2('VALIDATION', '检验结果必须为合格或不合格', 400);
+      const closeAttachments = mockNormalizeAttachments(body.attachments);
+      if (result === 'PASS' && closeAttachments.length === 0)
+        throw new BE2('VALIDATION', '检验记录不能为空', 400);
+      const quantity = mockParseQuantity(body.quantity);
+      const rawUQ = Number(body.unqualifiedQuantity);
+      const fallback = result === 'FAIL' ? 1 : 0;
+      const unqualifiedQuantity = Number.isFinite(rawUQ)
+        ? Math.max(0, Math.min(quantity, rawUQ))
+        : fallback;
+      if (result === 'PASS' && unqualifiedQuantity > 0)
+        throw new BE2(
+          'VALIDATION',
+          '检验结果为合格时，不合格数量必须为 0',
+          400,
+        );
+      if (result !== 'FAIL') return;
+      if (unqualifiedQuantity <= 0)
+        throw new BE2(
+          'VALIDATION',
+          '检验结果为不合格时，不合格数量必须大于 0',
+          400,
+        );
+      if (!body.linkedIssue || typeof body.linkedIssue !== 'object')
+        throw new BE2(
+          'VALIDATION',
+          '检验结果为不合格时必须填写不合格项信息',
+          400,
+        );
+      const li = body.linkedIssue as Record<string, unknown>;
+      if (mockNormalizeAttachments(li.photos).length === 0)
+        throw new BE2('VALIDATION', '不合格项照片不能为空', 400);
+      for (const [key, label] of [
+        ['partName', '组件名称'],
+        ['processName', '工序'],
+        ['responsibleDepartment', '责任部门'],
+        ['defectType', '缺陷分类'],
+        ['defectSubtype', '二级分类'],
+        ['severity', '严重程度'],
+        ['status', '状态'],
+        ['description', '不合格描述'],
+        ['rootCause', '原因分析'],
+        ['solution', '解决方案'],
+      ] as const) {
+        if (!mockNormalizeText(li[key]))
+          throw new BE2('VALIDATION', `不合格项${label}不能为空`, 400);
+      }
+    },
+  };
+});
 
 vi.mock(
   '~/modules/inspection/inspection-request-close-records.service',
@@ -253,7 +276,7 @@ describe('inspection-request-close adversarial', () => {
           { attachments: ATTACHMENTS, result: undefined, quantity: 10 },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:检验结果必须为合格或不合格');
+      ).rejects.toThrow('检验结果必须为合格或不合格');
     });
 
     it('rejects result="" (empty string)', async () => {
@@ -268,7 +291,7 @@ describe('inspection-request-close adversarial', () => {
           { attachments: ATTACHMENTS, result: '', quantity: 10 },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:检验结果必须为合格或不合格');
+      ).rejects.toThrow('检验结果必须为合格或不合格');
     });
 
     it('accepts result="pass" (case-insensitive → PASS)', async () => {
@@ -334,7 +357,7 @@ describe('inspection-request-close adversarial', () => {
           { attachments: ATTACHMENTS, result: 'PASSING', quantity: 10 },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:检验结果必须为合格或不合格');
+      ).rejects.toThrow('检验结果必须为合格或不合格');
     });
 
     it('rejects result="OK" (not a valid value)', async () => {
@@ -349,7 +372,7 @@ describe('inspection-request-close adversarial', () => {
           { attachments: ATTACHMENTS, result: 'OK', quantity: 10 },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:检验结果必须为合格或不合格');
+      ).rejects.toThrow('检验结果必须为合格或不合格');
     });
   });
 
@@ -371,7 +394,7 @@ describe('inspection-request-close adversarial', () => {
           },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:检验结果为合格时，不合格数量必须为 0');
+      ).rejects.toThrow('检验结果为合格时，不合格数量必须为 0');
     });
 
     it('pASS path: unqualifiedQuantity forced to 0 regardless of input', async () => {
@@ -415,7 +438,7 @@ describe('inspection-request-close adversarial', () => {
           },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:检验结果为不合格时，不合格数量必须大于 0');
+      ).rejects.toThrow('检验结果为不合格时，不合格数量必须大于 0');
     });
 
     it('fAIL: unqualifiedQuantity > totalQuantity → clamped to totalQuantity', async () => {
@@ -516,7 +539,7 @@ describe('inspection-request-close adversarial', () => {
           },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:检验结果为不合格时必须填写不合格项信息');
+      ).rejects.toThrow('检验结果为不合格时必须填写不合格项信息');
     });
 
     it('fAIL: linkedIssue with empty required field → rejected', async () => {
@@ -540,7 +563,7 @@ describe('inspection-request-close adversarial', () => {
           },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:不合格项不合格描述不能为空');
+      ).rejects.toThrow('不合格项不合格描述不能为空');
     });
 
     it('fAIL: linkedIssue with whitespace-only required field → rejected', async () => {
@@ -564,7 +587,7 @@ describe('inspection-request-close adversarial', () => {
           },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:不合格项不合格描述不能为空');
+      ).rejects.toThrow('不合格项不合格描述不能为空');
     });
   });
 
@@ -713,7 +736,11 @@ describe('inspection-request-close adversarial', () => {
           { attachments: ATTACHMENTS, quantity: 10, result: 'PASS' },
           MOCK_USER,
         ),
-      ).rejects.toThrow('NOT_FOUND:报检任务不存在');
+      ).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+        message: '报检任务不存在',
+        httpStatus: 404,
+      });
     });
 
     it('already CLOSED → throws BAD_REQUEST', async () => {
@@ -728,7 +755,10 @@ describe('inspection-request-close adversarial', () => {
           { attachments: ATTACHMENTS, quantity: 10, result: 'PASS' },
           MOCK_USER,
         ),
-      ).rejects.toThrow('BAD_REQUEST:报检任务已检验完成');
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: '报检任务已检验完成',
+      });
     });
   });
 
@@ -745,7 +775,7 @@ describe('inspection-request-close adversarial', () => {
           { attachments: [], quantity: 10, result: 'PASS' },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:检验记录不能为空');
+      ).rejects.toThrow('检验记录不能为空');
     });
 
     it('pASS: no attachments key → rejected', async () => {
@@ -760,7 +790,7 @@ describe('inspection-request-close adversarial', () => {
           { quantity: 10, result: 'PASS' },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:检验记录不能为空');
+      ).rejects.toThrow('检验记录不能为空');
     });
 
     it('fAIL: no close attachments key → accepted when linked issue has photos', async () => {
@@ -806,7 +836,7 @@ describe('inspection-request-close adversarial', () => {
           },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:不合格项照片不能为空');
+      ).rejects.toThrow('不合格项照片不能为空');
     });
   });
 
@@ -928,7 +958,7 @@ describe('inspection-request-close adversarial', () => {
           },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:不合格项组件名称不能为空');
+      ).rejects.toThrow('不合格项组件名称不能为空');
     });
 
     it('rejects when linkedIssue is null', async () => {
@@ -949,7 +979,7 @@ describe('inspection-request-close adversarial', () => {
           },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:检验结果为不合格时必须填写不合格项信息');
+      ).rejects.toThrow('检验结果为不合格时必须填写不合格项信息');
     });
 
     it('rejects when linkedIssue is a string', async () => {
@@ -970,7 +1000,7 @@ describe('inspection-request-close adversarial', () => {
           },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:检验结果为不合格时必须填写不合格项信息');
+      ).rejects.toThrow('检验结果为不合格时必须填写不合格项信息');
     });
   });
 
@@ -992,7 +1022,7 @@ describe('inspection-request-close adversarial', () => {
           },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:检验结果为合格时，不合格数量必须为 0');
+      ).rejects.toThrow('检验结果为合格时，不合格数量必须为 0');
     });
   });
 
@@ -1015,7 +1045,7 @@ describe('inspection-request-close adversarial', () => {
           },
           MOCK_USER,
         ),
-      ).rejects.toThrow('VALIDATION:检验结果为不合格时，不合格数量必须大于 0');
+      ).rejects.toThrow('检验结果为不合格时，不合格数量必须大于 0');
     });
   });
 
@@ -1081,7 +1111,10 @@ describe('inspection-request-close adversarial', () => {
           { ...PASS_BODY },
           MOCK_USER,
         ),
-      ).rejects.toThrow('BAD_REQUEST:报检任务已检验完成');
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: '报检任务已检验完成',
+      });
       expect(createCloseInspectionRecords).not.toHaveBeenCalled();
       expect(txMock.qms_inspection_requests.update).not.toHaveBeenCalled();
       expect(syncCloseAttachments).not.toHaveBeenCalled();
