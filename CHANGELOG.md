@@ -46,7 +46,7 @@
 - check:qms-arch: 0 violations 通过
 - vitest: file-storage 模块 24/24 通过
 
-**commit:** `待填`
+**commit:** `c9b46791` fix(project): stop large photos from saturating 3Mbps egress causing 10s timeouts
 
 **遗留问题：**
 
