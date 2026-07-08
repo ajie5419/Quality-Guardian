@@ -20,7 +20,8 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "maintenance:supplier-score-snapshots": "tsx scripts/backfill-supplier-score-snapshots.ts"
+    "maintenance:supplier-score-snapshots": "tsx scripts/backfill-supplier-score-snapshots.ts",
+    "maintenance:backfill-thumbnails": "tsx scripts/backfill-missing-thumbnails.ts"
   },
   "dependencies": {
     "@fastify/busboy": "^3.2.0",

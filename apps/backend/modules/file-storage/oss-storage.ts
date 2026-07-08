@@ -31,6 +31,16 @@ function buildOssObjectKey(storedName: string) {
     .join('/');
 }
 
+export function putOssObject(
+  objectKey: string,
+  data: Buffer,
+  contentType: string,
+) {
+  return getOssClient().put(objectKey, data, {
+    headers: { 'Content-Type': contentType },
+  });
+}
+
 function createOssClient() {
   return new OSS({
     accessKeyId: process.env.OSS_ACCESS_KEY_ID || '',

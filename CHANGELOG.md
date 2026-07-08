@@ -25,6 +25,35 @@
 
 ## 执行记录
 
+### 2026-07-08 修复：生产页面切换 10s 超时（公网带宽被大图占满）
+
+**根因排查结论：**
+
+- 症状：生产环境切换页面偶发 axios `timeout of 10000ms exceeded`（ECONNABORTED）
+- 排除：RDS 数据库（CPU ~1%、慢 SQL 为零）、容器 OOM/重启、Telegram 通知（fire-and-forget 不阻塞）
+- 实锤：ECS 公网带宽仅 3Mbps，复现时"公网流出带宽使用率"两次顶到 90%+；nginx 日志抓到 2.1MB 原图经 `/api/uploads/` 全量代理传输，独占带宽 6~11 秒，期间所有 API 请求排队直至前端 10s 超时
+- 漏洞成因：前端 `evidence` 压缩预设 `maxSizeMB: 3 / quality: 1`，3MB 以下手机照片原样上传；缩略图缺失时前端 `:fallback` 与后端 `getFileBuffer(preferThumb)` 均静默回退原图
+
+**执行内容：**
+
+- `apps/web-antd/src/composables/useImageCompress.ts`：`evidence` 预设收紧为 maxSizeMB 0.8 / quality 0.8 / 2048px
+- `apps/web-antd/nginx.conf`：`/api/uploads/`（OSS 代理）与 `/uploads/`（本地文件）增加 `limit_rate_after 300k; limit_rate 150k;`，单连接限速 ~1.2Mbps，保证 API 请求始终有带宽；缩略图（<300KB）不受影响
+- 新增 `apps/backend/modules/file-storage/thumbnail-backfill.ts` + `apps/backend/scripts/backfill-missing-thumbnails.ts`：存量图片补生成缩略图（游标分批、支持 dry-run、>20MB 跳过）；`oss-storage.ts` 导出 `putOssObject`；package.json 增加 `maintenance:backfill-thumbnails`
+
+**验证结果：**
+
+- typecheck: 后端 tsc 通过 / 前端 vue-tsc 通过
+- check:qms-arch: 0 violations 通过
+- vitest: file-storage 模块 24/24 通过
+
+**commit:** `待填`
+
+**遗留问题：**
+
+- nginx 限速需重建 frontend 镜像发版后生效；可先手动同步到生产 `/opt/qms/nginx.conf` 并 `nginx -s reload` 立即止血
+- 存量缩略图脚本需在生产手动执行一次（先 `THUMBNAIL_BACKFILL_DRY_RUN=1` 试跑）
+- 存量已上传的大原图未压缩（有限速兜底，暂不处理）
+
 ## [0.14.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.13.1...qgs-v0.14.0) (2026-07-07)
 
 

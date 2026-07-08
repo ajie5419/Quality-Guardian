@@ -10,11 +10,13 @@ interface CompressOptions {
 }
 
 const PRESETS: Record<CompressPreset, CompressOptions> = {
+  // Production egress bandwidth is only 3 Mbps; photos above ~0.8MB
+  // saturate it and cause 10s axios timeouts on other pages.
   evidence: {
-    maxHeight: 2560,
-    maxSizeMB: 3,
-    maxWidth: 2560,
-    quality: 1,
+    maxHeight: 2048,
+    maxSizeMB: 0.8,
+    maxWidth: 2048,
+    quality: 0.8,
   },
   lossy: {
     maxHeight: 1920,
