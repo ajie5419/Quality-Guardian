@@ -37,7 +37,7 @@
 - 文档变更：已人工核对内容与 `.github/workflows/release-please.yml`、`.github/workflows/deploy.yml` 当前配置一致。
 - 自动化测试：未运行；本次仅文档变更。
 
-**commit:** 待提交
+**commit:** `8708c79` docs(project): document release workflow
 
 **遗留问题：**
 
