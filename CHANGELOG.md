@@ -25,6 +25,18 @@
 
 ## 执行记录
 
+## [0.15.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.14.0...qgs-v0.15.0) (2026-07-09)
+
+
+### Features
+
+* **project:** add inspection request reassignment ([a6eb458](https://github.com/ajie5419/Quality-Guardian/commit/a6eb4587b4fe666d3a7f44361c3bc9dd1e77a701))
+
+
+### Bug Fixes
+
+* **project:** stop large photos from saturating 3Mbps egress causing 10s timeouts ([c9b4679](https://github.com/ajie5419/Quality-Guardian/commit/c9b46791ee2896f8a062c89b0375c3a34225ddbe))
+
 ### 2026-07-09 功能：报检任务已派单改派
 
 **执行内容：**
