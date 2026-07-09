@@ -87,6 +87,7 @@ pnpm dev
 - [API 设计规范](docs/api-conventions.md) — 添加新端点时必读
 - [数据库文档](docs/database.md) — Schema 设计、Migration 规范、命名约定
 - [测试标准](docs/testing.md) — 测试分层、覆盖要求、编写规范
+- [发布工作流](docs/release-workflow.md) — 功能 PR、release-please、tag 与生产部署流程
 - [硬约束](CONSTRAINTS.md) — 禁止/必须的明确规则
 - [项目进度](PROGRESS.md) — 当前工作状态与下一步
 - [执行记录](CHANGELOG.md) — 每次重构执行的结果记录

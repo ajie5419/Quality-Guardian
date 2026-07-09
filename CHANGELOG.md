@@ -25,6 +25,24 @@
 
 ## 执行记录
 
+### 2026-07-09 文档：记录标准发布工作流
+
+**执行内容：**
+
+- 新增 `docs/release-workflow.md`，记录功能分支、功能 PR、release-please 发布 PR、`qgs-v*` tag、deploy workflow 的完整发布链路。
+- 更新 `AGENTS.md` 详细文档列表，加入发布工作流入口。
+
+**验证结果：**
+
+- 文档变更：已人工核对内容与 `.github/workflows/release-please.yml`、`.github/workflows/deploy.yml` 当前配置一致。
+- 自动化测试：未运行；本次仅文档变更。
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-07-08 修复：生产页面切换 10s 超时（公网带宽被大图占满）
 
 **根因排查结论：**
