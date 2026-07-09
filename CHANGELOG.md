@@ -41,7 +41,7 @@
 - check:qms-arch: 0 violations 通过
 - vitest: 后端全量 195 文件 / 1860 测试全部通过；后端派单定向 2 文件 / 27 测试通过；前端任务动作 1 文件 / 6 测试通过
 
-**commit:** 未提交
+**commit:** `a6eb458` feat(project): add inspection request reassignment
 
 **遗留问题：**
 
