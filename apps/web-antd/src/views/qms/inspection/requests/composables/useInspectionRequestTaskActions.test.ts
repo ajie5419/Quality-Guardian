@@ -43,6 +43,7 @@ vi.mock('ant-design-vue', () => ({
 beforeEach(() => {
   vi.resetAllMocks();
   mockCloseInspectionRequest.mockResolvedValue({ id: 'request-1' });
+  mockDispatchInspectionRequest.mockResolvedValue({ id: 'request-1' });
 });
 
 describe('useInspectionRequestTaskActions', () => {
@@ -62,6 +63,50 @@ describe('useInspectionRequestTaskActions', () => {
       router: { replace: vi.fn() } as any,
     });
   }
+
+  it('submits a new dispatch request with the dispatch success message', async () => {
+    const composable = createComposable();
+
+    composable.openDispatch({
+      id: 'request-1',
+      inspectorId: '',
+      partName: 'Bearing',
+      priority: 3,
+      status: 'SUBMITTED',
+    } as any);
+    composable.dispatchForm.inspectorId = 'inspector-1';
+
+    await composable.submitDispatch();
+
+    expect(mockDispatchInspectionRequest).toHaveBeenCalledWith('request-1', {
+      dispatchRemark: '',
+      inspectorId: 'inspector-1',
+      priority: 3,
+    });
+    expect(mockMessageSuccess).toHaveBeenCalledWith('报检任务已派单');
+  });
+
+  it('submits a reassignment with the reassign success message', async () => {
+    const composable = createComposable();
+
+    composable.openDispatch({
+      id: 'request-1',
+      inspectorId: 'old-inspector',
+      partName: 'Bearing',
+      priority: 2,
+      status: 'DISPATCHED',
+    } as any);
+    composable.dispatchForm.inspectorId = 'new-inspector';
+
+    await composable.submitDispatch();
+
+    expect(mockDispatchInspectionRequest).toHaveBeenCalledWith('request-1', {
+      dispatchRemark: '',
+      inspectorId: 'new-inspector',
+      priority: 2,
+    });
+    expect(mockMessageSuccess).toHaveBeenCalledWith('报检任务已改派');
+  });
 
   it('submits linked issue photos from upload response URLs when closing as failed', async () => {
     const composable = createComposable();

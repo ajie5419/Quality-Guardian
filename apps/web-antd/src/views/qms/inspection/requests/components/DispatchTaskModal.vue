@@ -6,6 +6,7 @@ import { Form, Input, InputNumber, Modal, Select } from 'ant-design-vue';
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 
 interface Props {
+  title?: string;
   open: boolean;
   submitting: boolean;
   userOptions: Array<{ label: string; value: string }>;
@@ -75,7 +76,7 @@ function handleSubmit() {
 <template>
   <Modal
     :open="props.open"
-    title="派发检验任务"
+    :title="props.title || '派发检验任务'"
     :width="modalWidth"
     :wrap-class-name="modalWrapClassName"
     :confirm-loading="props.submitting"

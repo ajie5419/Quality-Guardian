@@ -14,6 +14,7 @@ vi.mock('~/utils/prisma', () => ({
     },
     qms_task_dispatches: {
       create: vi.fn(),
+      updateMany: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -70,6 +71,7 @@ function makeSubmittedRequest(overrides: Record<string, unknown> = {}) {
     id: 'req-1',
     requestNo: 'IR-20260612-001',
     status: 'SUBMITTED',
+    updatedAt: new Date('2026-06-12T08:00:00.000Z'),
     workOrderNumber: 'WO-1',
     work_order: { projectName: 'Project Alpha' },
     ...overrides,
@@ -83,6 +85,7 @@ function makeInspector(id = 'inspector-1') {
 function setupTransactionMocks(
   overrides: {
     taskCreateResult?: unknown;
+    taskUpdateManyCount?: number;
     updateManyCount?: number;
     updateResult?: unknown;
   } = {},
@@ -107,6 +110,9 @@ function setupTransactionMocks(
       create: vi
         .fn()
         .mockResolvedValue(overrides.taskCreateResult ?? { id: 'task-1' }),
+      updateMany: vi
+        .fn()
+        .mockResolvedValue({ count: overrides.taskUpdateManyCount ?? 1 }),
     },
   };
   vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(tx));
@@ -135,7 +141,10 @@ describe('adversarial: dispatchRequest state machine', () => {
     expect(result).toBeDefined();
     expect(tx.qms_inspection_requests.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'req-1', status: 'SUBMITTED' },
+        where: expect.objectContaining({
+          id: 'req-1',
+          status: { in: ['SUBMITTED', 'DISPATCHED'] },
+        }),
         data: expect.objectContaining({ status: 'DISPATCHED' }),
       }),
     );
@@ -154,7 +163,7 @@ describe('adversarial: dispatchRequest state machine', () => {
         { inspectorId: 'inspector-1' },
         userinfo,
       ),
-    ).rejects.toThrow('该报检任务已被派单或不可派单，请刷新后重试');
+    ).rejects.toThrow('该报检任务当前状态不可派单或改派，请刷新后重试');
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
@@ -171,15 +180,51 @@ describe('adversarial: dispatchRequest state machine', () => {
         { inspectorId: 'inspector-1' },
         userinfo,
       ),
-    ).rejects.toThrow('该报检任务已被派单或不可派单，请刷新后重试');
+    ).rejects.toThrow('该报检任务当前状态不可派单或改派，请刷新后重试');
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('4. rejects dispatch when request is DISPATCHED', async () => {
+  it('4. reassigns a DISPATCHED request by updating the existing dispatch task', async () => {
     vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue(
-      makeSubmittedRequest({ status: 'DISPATCHED' }),
+      makeSubmittedRequest({
+        dispatchTaskId: 'task-1',
+        status: 'DISPATCHED',
+      }),
     );
+    const tx = setupTransactionMocks();
+
+    await InspectionRequestDispatchService.dispatchRequest(
+      event,
+      'req-1',
+      { inspectorId: 'inspector-1', priority: 2 },
+      userinfo,
+    );
+
+    expect(tx.qms_task_dispatches.create).not.toHaveBeenCalled();
+    expect(tx.qms_task_dispatches.updateMany).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        assigneeId: 'inspector-1',
+        priority: 2,
+        status: 'DISPATCHED',
+      }),
+      where: { id: 'task-1', status: 'DISPATCHED' },
+    });
+    expect(tx.qms_inspection_requests.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { dispatchTaskId: 'task-1' },
+      }),
+    );
+  });
+
+  it('5. rejects reassign when the linked dispatch task is already processing', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue(
+      makeSubmittedRequest({
+        dispatchTaskId: 'task-1',
+        status: 'DISPATCHED',
+      }),
+    );
+    const tx = setupTransactionMocks({ taskUpdateManyCount: 0 });
 
     await expect(
       InspectionRequestDispatchService.dispatchRequest(
@@ -188,10 +233,13 @@ describe('adversarial: dispatchRequest state machine', () => {
         { inspectorId: 'inspector-1' },
         userinfo,
       ),
-    ).rejects.toThrow('该报检任务已被派单或不可派单，请刷新后重试');
+    ).rejects.toThrow('关联派单任务已开始处理，不能改派');
+
+    expect(tx.qms_task_dispatches.create).not.toHaveBeenCalled();
+    expect(tx.qms_inspection_requests.update).not.toHaveBeenCalled();
   });
 
-  it('5. race condition: second dispatch fails when updateMany returns count=0', async () => {
+  it('6. race condition: second dispatch fails when updateMany returns count=0', async () => {
     vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue(
       makeSubmittedRequest(),
     );
@@ -204,7 +252,7 @@ describe('adversarial: dispatchRequest state machine', () => {
         { inspectorId: 'inspector-1' },
         userinfo,
       ),
-    ).rejects.toThrow('该报检任务已被派单，请刷新后重试');
+    ).rejects.toThrow('该报检任务状态已变化，请刷新后重试');
 
     expect(tx.qms_task_dispatches.create).not.toHaveBeenCalled();
     expect(tx.qms_inspection_requests.update).not.toHaveBeenCalled();
