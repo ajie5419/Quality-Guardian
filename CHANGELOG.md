@@ -30,7 +30,6 @@
 
 ### Features
 
-* **project:** add inspection request reassignment ([1a0d561](https://github.com/ajie5419/Quality-Guardian/commit/1a0d561ec2ec864cf73dd48f1e3db3d74981749a))
 * **project:** add inspection request reassignment ([a6eb458](https://github.com/ajie5419/Quality-Guardian/commit/a6eb4587b4fe666d3a7f44361c3bc9dd1e77a701))
 
 
