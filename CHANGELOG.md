@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+### 2026-07-09 功能：报检任务已派单改派
+
+**执行内容：**
+
+- 后端 `inspection-request-dispatch.service.ts` 支持 `DISPATCHED` 报检任务改派：同一事务内用 `updatedAt` 版本保护防止并发覆盖，原地更新关联 `qms_task_dispatches` 执行人、调度人、优先级和内容；`INSPECTING`、`CLOSED` 等已检验/处理中状态继续拒绝改派。
+- 收紧 `/api/qms/inspection/requests/[id]/dispatch` 入参 zod 校验，明确要求 `inspectorId`，限制 `priority` 为 1-5。
+- 前端报检任务列表对 `DISPATCHED` 行开放“改派”入口，弹窗标题和成功提示区分首次派单/改派，复用既有派单 API 和刷新流程。
+- 补充后端派单状态机/并发单元测试和前端任务动作测试，覆盖已派单改派、关联派工任务已处理时拒绝、提交文案。
+
+**验证结果：**
+
+- lint: 通过（保留既有 `IssueFormFields.test.ts` 9 条 `vue/one-component-per-file` warning）
+- typecheck: 通过（`pnpm run check:type`）
+- check:qms-arch: 0 violations 通过
+- vitest: 后端全量 195 文件 / 1860 测试全部通过；后端派单定向 2 文件 / 27 测试通过；前端任务动作 1 文件 / 6 测试通过
+
+**commit:** `a6eb458` feat(project): add inspection request reassignment
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-07-09 文档：记录标准发布工作流
 
 **执行内容：**

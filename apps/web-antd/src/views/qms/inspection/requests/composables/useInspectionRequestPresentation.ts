@@ -238,7 +238,7 @@ export function useInspectionRequestPresentation(
   }
 
   function isDispatchable(record: InspectionRequest) {
-    return record.status === 'SUBMITTED';
+    return record.status === 'SUBMITTED' || record.status === 'DISPATCHED';
   }
 
   function isCompletable(record: InspectionRequest) {

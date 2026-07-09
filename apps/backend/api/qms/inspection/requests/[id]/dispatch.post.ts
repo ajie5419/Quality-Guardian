@@ -1,6 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
-import { z } from 'zod';
-import { InspectionRequestDispatchService } from '~/modules/inspection/inspection-request-dispatch.service';
+import {
+  InspectionRequestDispatchService,
+  parseInspectionRequestDispatchBody,
+} from '~/modules/inspection/inspection-request-dispatch.service';
 import { logApiError } from '~/utils/api-logger';
 import { BusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
@@ -13,17 +15,14 @@ import {
 } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 
-const schema = z.object({}).passthrough();
-
 export default defineEventHandler(async (event) => {
   const userinfo = getCurrentUser(event);
 
   const id = getRequiredRouterParam(event, 'id', 'ID required');
   if (typeof id !== 'string') return id;
 
-  const body = schema.parse(await readBody(event));
-
   try {
+    const body = parseInspectionRequestDispatchBody(await readBody(event));
     const updated = await InspectionRequestDispatchService.dispatchRequest(
       event,
       id,

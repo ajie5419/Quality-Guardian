@@ -118,6 +118,11 @@ const emit = defineEmits<{
 <template>
   <DispatchTaskModal
     :open="props.dispatchOpen"
+    :title="
+      props.currentRequest?.status === 'DISPATCHED'
+        ? '改派检验任务'
+        : '派发检验任务'
+    "
     :submitting="props.submitting"
     :user-options="props.userOptions"
     :form="props.dispatchForm"

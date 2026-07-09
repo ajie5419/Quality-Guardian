@@ -12,6 +12,7 @@ vi.mock('~/utils/prisma', () => ({
     },
     qms_task_dispatches: {
       create: vi.fn(),
+      updateMany: vi.fn(),
     },
     users: {
       findFirst: vi.fn(),
@@ -54,10 +55,10 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
     } as never);
   });
 
-  it('rejects dispatch when the request is no longer SUBMITTED', async () => {
+  it('rejects dispatch when the request is already closed', async () => {
     vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
       id: 'req-1',
-      status: 'DISPATCHED',
+      status: 'CLOSED',
     } as never);
 
     await expect(
@@ -67,7 +68,7 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
         { inspectorId: 'inspector-1' },
         userinfo,
       ),
-    ).rejects.toThrow('该报检任务已被派单或不可派单，请刷新后重试');
+    ).rejects.toThrow('该报检任务当前状态不可派单或改派，请刷新后重试');
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
@@ -78,6 +79,7 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
       work_order: { projectName: 'Project A' },
       status: 'SUBMITTED',
       requestNo: 'IR-1',
+      updatedAt: new Date('2026-06-12T08:00:00.000Z'),
       workOrderNumber: 'WO-1',
     } as never);
 
@@ -88,6 +90,7 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
       },
       qms_task_dispatches: {
         create: vi.fn(),
+        updateMany: vi.fn(),
       },
     };
     vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
@@ -99,7 +102,7 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
         { inspectorId: 'inspector-1' },
         userinfo,
       ),
-    ).rejects.toThrow('该报检任务已被派单，请刷新后重试');
+    ).rejects.toThrow('该报检任务状态已变化，请刷新后重试');
 
     expect(tx.qms_task_dispatches.create).not.toHaveBeenCalled();
     expect(tx.qms_inspection_requests.update).not.toHaveBeenCalled();
@@ -111,6 +114,7 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
       status: 'SUBMITTED',
       requestNo: 'IR-1',
       work_order: { projectName: 'Project A' },
+      updatedAt: new Date('2026-06-12T08:00:00.000Z'),
       workOrderNumber: 'WO-1',
     } as never);
 
@@ -128,6 +132,7 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
       },
       qms_task_dispatches: {
         create: vi.fn().mockResolvedValue({ id: 'task-1' }),
+        updateMany: vi.fn(),
       },
     };
     vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
@@ -141,7 +146,10 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
 
     expect(tx.qms_inspection_requests.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'req-1', status: 'SUBMITTED' },
+        where: expect.objectContaining({
+          id: 'req-1',
+          status: { in: ['SUBMITTED', 'DISPATCHED'] },
+        }),
       }),
     );
     expect(tx.qms_task_dispatches.create).toHaveBeenCalledTimes(1);

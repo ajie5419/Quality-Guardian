@@ -310,7 +310,11 @@ export function useInspectionRequestTaskActions(
         inspectorId: dispatchForm.inspectorId,
         priority: dispatchForm.priority,
       });
-      message.success('报检任务已派单');
+      message.success(
+        currentRequest.value.status === 'DISPATCHED'
+          ? '报检任务已改派'
+          : '报检任务已派单',
+      );
       dispatchOpen.value = false;
       await onAfterMutation();
     } finally {

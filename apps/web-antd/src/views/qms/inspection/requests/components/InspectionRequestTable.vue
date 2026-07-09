@@ -221,7 +221,7 @@ function handleActionMenuClick(record: InspectionRequest, key: unknown) {
             @click="emit('dispatch', record)"
           >
             <template #icon><IconifyIcon icon="lucide:send" /></template>
-            派单
+            {{ record.status === 'DISPATCHED' ? '改派' : '派单' }}
           </Button>
           <Button
             v-if="props.isCompletable(record)"
@@ -352,7 +352,7 @@ function handleActionMenuClick(record: InspectionRequest, key: unknown) {
           @click="emit('dispatch', record)"
         >
           <template #icon><IconifyIcon icon="lucide:send" /></template>
-          派单
+          {{ record.status === 'DISPATCHED' ? '改派' : '派单' }}
         </Button>
         <Button
           v-if="props.isCompletable(record)"

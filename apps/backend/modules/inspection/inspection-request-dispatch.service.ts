@@ -1,6 +1,9 @@
+import type { Prisma } from '@prisma/client';
 import type { EventHandlerRequest, H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
+import { TASK_DISPATCH_STATUS } from '@qgs/shared';
+import { z } from 'zod';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { WxSubscribeMessageService } from '~/modules/user';
@@ -19,6 +22,23 @@ import {
 type RequestBody = Record<string, unknown>;
 
 const DISPATCH_PERMISSION_CODE = 'QMS:Inspection:Requests:Dispatch';
+const DISPATCHABLE_STATUSES = [
+  INSPECTION_REQUEST_STATUS.SUBMITTED,
+  INSPECTION_REQUEST_STATUS.DISPATCHED,
+];
+const dispatchRequestSchema = z.object({
+  dispatchRemark: z.string().optional(),
+  inspectorId: z.string().min(1),
+  priority: z.coerce.number().int().min(1).max(5).optional(),
+});
+
+export function parseInspectionRequestDispatchBody(input: unknown) {
+  const result = dispatchRequestSchema.safeParse(input);
+  if (!result.success) {
+    throw new BusinessError('BAD_REQUEST', '派单参数无效', 400);
+  }
+  return result.data;
+}
 
 export const InspectionRequestDispatchService = {
   async ensureDispatchPermission(userinfo: UserSession) {
@@ -63,10 +83,13 @@ export const InspectionRequestDispatchService = {
       }),
     ]);
     if (!request) throw new BusinessError('NOT_FOUND', '报检任务不存在', 404);
-    if (request.status !== INSPECTION_REQUEST_STATUS.SUBMITTED)
+    if (
+      request.status !== INSPECTION_REQUEST_STATUS.SUBMITTED &&
+      request.status !== INSPECTION_REQUEST_STATUS.DISPATCHED
+    )
       throw new BusinessError(
         'BAD_REQUEST',
-        '该报检任务已被派单或不可派单，请刷新后重试',
+        '该报检任务当前状态不可派单或改派，请刷新后重试',
         400,
       );
     if (!inspector) throw new BusinessError('BAD_REQUEST', '检验员不存在', 400);
@@ -74,9 +97,15 @@ export const InspectionRequestDispatchService = {
     const priority = parseInspectionRequestPriority(body.priority);
     const dispatchRemark =
       normalizeInspectionRequestText(body.dispatchRemark) || null;
+    const isReassign = request.status === INSPECTION_REQUEST_STATUS.DISPATCHED;
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.qms_inspection_requests.updateMany({
-        where: { id, status: INSPECTION_REQUEST_STATUS.SUBMITTED },
+        where: {
+          id,
+          isDeleted: false,
+          status: { in: DISPATCHABLE_STATUSES },
+          updatedAt: request.updatedAt,
+        },
         data: {
           dispatchedAt: new Date(),
           dispatcherId,
@@ -89,19 +118,17 @@ export const InspectionRequestDispatchService = {
       if (result.count === 0)
         throw new BusinessError(
           'BAD_REQUEST',
-          '该报检任务已被派单，请刷新后重试',
+          '该报检任务状态已变化，请刷新后重试',
           400,
         );
-      const task = await tx.qms_task_dispatches.create({
-        data: buildDispatchTaskCreateData({
-          assignorId: dispatcherId,
-          inspectorId: inspector.id,
-          priority,
-          request,
-        }),
+      const dispatchTaskId = await upsertDispatchTask(tx, {
+        assignorId: dispatcherId,
+        inspectorId: inspector.id,
+        priority,
+        request,
       });
       return tx.qms_inspection_requests.update({
-        data: { dispatchTaskId: task.id },
+        data: { dispatchTaskId },
         include: {
           dispatcher: { select: { realName: true, username: true } },
           inspector: { select: { realName: true, username: true } },
@@ -113,7 +140,9 @@ export const InspectionRequestDispatchService = {
 
     await recordBusinessAuditLog(event, {
       action: 'UPDATE',
-      detailsTemplate: '派发报检任务: {{requestNo}}',
+      detailsTemplate: isReassign
+        ? '改派报检任务: {{requestNo}}'
+        : '派发报检任务: {{requestNo}}',
       detailsVariables: { requestNo: updated.requestNo },
       targetId: String(updated.id),
       targetType: 'inspection_request',
@@ -133,6 +162,65 @@ export const InspectionRequestDispatchService = {
   },
 };
 
+async function upsertDispatchTask(
+  tx: Prisma.TransactionClient,
+  options: {
+    assignorId: string;
+    inspectorId: string;
+    priority: number;
+    request: {
+      dispatchTaskId?: null | string;
+      id: string;
+      requestNo: string;
+      workOrderNumber: string;
+    };
+  },
+) {
+  const data = buildDispatchTaskUpdateData(options);
+  if (!options.request.dispatchTaskId) {
+    const task = await tx.qms_task_dispatches.create({
+      data: buildDispatchTaskCreateData(options),
+    });
+    return task.id;
+  }
+
+  const updated = await tx.qms_task_dispatches.updateMany({
+    data,
+    where: {
+      id: options.request.dispatchTaskId,
+      status: TASK_DISPATCH_STATUS.DISPATCHED,
+    },
+  });
+  if (updated.count === 0) {
+    throw new BusinessError(
+      'BAD_REQUEST',
+      '关联派单任务已开始处理，不能改派',
+      400,
+    );
+  }
+  return options.request.dispatchTaskId;
+}
+
+function buildDispatchTaskUpdateData(options: {
+  assignorId: string;
+  inspectorId: string;
+  priority: number;
+  request: { id: string; requestNo: string; workOrderNumber: string };
+}) {
+  return {
+    assigneeId: options.inspectorId,
+    assignorId: options.assignorId,
+    content: JSON.stringify({
+      inspectionRequestId: options.request.id,
+      requestNo: options.request.requestNo,
+      workOrderNumber: options.request.workOrderNumber,
+    }),
+    priority: options.priority,
+    status: TASK_DISPATCH_STATUS.DISPATCHED,
+    title: `报检任务 ${options.request.requestNo}`,
+  };
+}
+
 function buildDispatchTaskCreateData(options: {
   assignorId: string;
   inspectorId: string;
@@ -148,7 +236,7 @@ function buildDispatchTaskCreateData(options: {
       workOrderNumber: options.request.workOrderNumber,
     }),
     priority: options.priority,
-    status: 'DISPATCHED',
+    status: TASK_DISPATCH_STATUS.DISPATCHED,
     title: `报检任务 ${options.request.requestNo}`,
     type: 'INSPECTION_REQUEST',
   };
