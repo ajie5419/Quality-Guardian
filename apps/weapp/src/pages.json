@@ -23,6 +23,22 @@
     {
       "path": "pages/records/index",
       "style": { "navigationBarTitleText": "检验记录" }
+    },
+    {
+      "path": "pages/issues/index",
+      "style": { "navigationBarTitleText": "不合格品项" }
+    },
+    {
+      "path": "pages/issues/create",
+      "style": { "navigationBarTitleText": "新增不合格品项" }
+    },
+    {
+      "path": "pages/issues/detail",
+      "style": { "navigationBarTitleText": "不合格品项详情" }
+    },
+    {
+      "path": "pages/issues/edit",
+      "style": { "navigationBarTitleText": "编辑不合格品项" }
     }
   ],
   "globalStyle": {

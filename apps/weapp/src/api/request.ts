@@ -121,9 +121,9 @@ export async function request<T = unknown>(
         pendingRequests = [];
         return request<T>(options);
       } else {
+        uni.clearStorageSync();
+        pendingRequests.forEach((cb) => cb());
         pendingRequests = [];
-        uni.removeStorageSync('accessToken');
-        uni.removeStorageSync('refreshToken');
         const pages = getCurrentPages();
         const currentPath = pages[pages.length - 1]?.route ?? '';
         if (!currentPath.includes('login')) {

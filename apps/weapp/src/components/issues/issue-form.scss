@@ -1,0 +1,192 @@
+/* stylelint-disable unit-no-unknown -- Uni App uses rpx for device-width scaling. */
+
+.issue-form-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: $bg-color;
+}
+
+.step-bar {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: space-around;
+  padding: 24rpx 16rpx;
+  background: #fff;
+  border-bottom: 1rpx solid $border-color;
+}
+
+.step-item {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8rpx;
+  align-items: center;
+  font-size: 22rpx;
+  color: $text-color-secondary;
+
+  .active {
+    color: $primary-color;
+  }
+}
+
+.step-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44rpx;
+  height: 44rpx;
+  color: #fff;
+  background: #bfbfbf;
+  border-radius: 50%;
+
+  &.active {
+    color: #fff;
+    background: $primary-color;
+  }
+}
+
+.form-scroll {
+  flex: 1;
+  overflow: hidden;
+}
+
+.form-card {
+  padding: 8rpx 28rpx;
+  margin: 24rpx;
+  background: #fff;
+  border-radius: 12rpx;
+}
+
+.field {
+  position: relative;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.label {
+  display: block;
+  margin-bottom: 14rpx;
+  font-size: 26rpx;
+  font-weight: 500;
+  color: $text-color;
+
+  &.required::before {
+    margin-right: 6rpx;
+    color: $error-color;
+    content: '*';
+  }
+}
+
+.input,
+.picker-value,
+.readonly-value {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 76rpx;
+  padding: 18rpx 20rpx;
+  font-size: 28rpx;
+  color: $text-color;
+  background: #fafafa;
+  border: 1rpx solid $border-color;
+  border-radius: 8rpx;
+}
+
+.readonly-value,
+.placeholder {
+  color: $text-color-secondary;
+}
+
+.field-tip,
+.result-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: $text-color-secondary;
+}
+
+.search-results {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 20;
+  max-height: 360rpx;
+  overflow-y: auto;
+  background: #fff;
+  border: 1rpx solid $border-color;
+  border-radius: 8rpx;
+  box-shadow: 0 8rpx 24rpx rgb(0 0 0 / 12%);
+}
+
+.search-result {
+  padding: 20rpx;
+  font-size: 26rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.department-list {
+  max-height: 420rpx;
+  padding: 12rpx 20rpx;
+  overflow-y: auto;
+  background: #fafafa;
+  border: 1rpx solid $border-color;
+  border-top: 0;
+}
+
+.check-row {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+  padding: 14rpx 0;
+  font-size: 26rpx;
+}
+
+.textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 180rpx;
+  padding: 18rpx 20rpx;
+  font-size: 28rpx;
+  background: #fafafa;
+  border: 1rpx solid $border-color;
+  border-radius: 8rpx;
+}
+
+.draft-actions {
+  padding: 0 24rpx 32rpx;
+}
+
+.draft-button {
+  font-size: 24rpx;
+  color: $text-color-secondary;
+  background: transparent;
+}
+
+.bottom-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 20rpx;
+  padding: 20rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: #fff;
+  border-top: 1rpx solid $border-color;
+}
+
+.primary-button,
+.secondary-button {
+  flex: 1;
+  height: 84rpx;
+  font-size: 28rpx;
+  line-height: 84rpx;
+  border-radius: 8rpx;
+}
+
+.primary-button {
+  color: #fff;
+  background: $primary-color;
+}
+
+.secondary-button {
+  color: $text-color;
+  background: #fff;
+  border: 1rpx solid $border-color;
+}

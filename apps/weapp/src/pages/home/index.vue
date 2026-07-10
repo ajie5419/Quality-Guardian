@@ -6,6 +6,7 @@ import { requestDispatchSubscribeMessage } from '@/api/subscribe';
 import { useUserStore } from '@/stores/user';
 import { canDispatchByRoles } from '@/utils/roles';
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app';
+import { INSPECTION_ISSUE_PERMISSION_CODES } from '@qgs/shared';
 
 interface Task {
   id: string;
@@ -47,6 +48,10 @@ const isDispatcher = computed(() => {
   return canDispatchByRoles(roles);
 });
 
+const canViewIssues = computed(() =>
+  userStore.hasPermission(INSPECTION_ISSUE_PERMISSION_CODES.LIST),
+);
+
 const statusLabel = computed(() => {
   if (isDispatcher.value) return { s1: '待派单', s2: '待检验', s3: '今日完成' };
   return { s1: '我的待检', s2: '全部待检', s3: '今日完成' };
@@ -87,9 +92,10 @@ async function loadData() {
   }
 }
 
-onShow(() => {
+onShow(async () => {
   if (!userStore.checkAuth()) return;
-  loadData();
+  await userStore.loadPermissionCodes();
+  await loadData();
 });
 onPullDownRefresh(() => {
   loadData();
@@ -184,6 +190,16 @@ function handleEnableNotifications() {
             <text class="action-icon">🔔</text>
           </view>
           <text class="action-label">派单通知</text>
+        </view>
+        <view
+          v-if="canViewIssues"
+          class="action-btn"
+          @tap="uni.navigateTo({ url: '/pages/issues/index' })"
+        >
+          <view class="action-icon-wrap icon-issue">
+            <text class="action-icon">!</text>
+          </view>
+          <text class="action-label">不合格项</text>
         </view>
       </view>
     </view>
@@ -348,6 +364,11 @@ function handleEnableNotifications() {
 
   &.icon-notice {
     background: #f9f0ff;
+  }
+
+  &.icon-issue {
+    color: $error-color;
+    background: #fff1f0;
   }
 }
 

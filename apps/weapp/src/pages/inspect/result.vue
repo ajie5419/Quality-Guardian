@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { DepartmentNode } from '@/api/inspection';
+
 import { computed, ref, watch } from 'vue';
 
 import {
@@ -7,6 +9,7 @@ import {
   getInspectionRequest,
 } from '@/api/inspection';
 import { buildResourceUrl, uploadFile } from '@/api/request';
+import { ISSUE_DEFECT_SUBTYPES, ISSUE_DEFECT_TYPES } from '@/utils/issues';
 import { onLoad } from '@dcloudio/uni-app';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -24,38 +27,6 @@ interface Attachment {
   url: string;
 }
 
-interface Department {
-  id: string;
-  name: string;
-}
-
-// ─── Defect option maps ───────────────────────────────────────────────────────
-
-const DEFECT_TYPES = [
-  '设计缺陷',
-  '制造缺陷',
-  '零部件缺陷',
-  '工艺缺陷',
-  '其他缺陷',
-];
-
-const DEFECT_SUBTYPE_MAP: Record<string, string[]> = {
-  设计缺陷: ['机械设计', '液压设计', '电气设计', '其他'],
-  制造缺陷: [
-    '焊接缺陷',
-    '加工尺寸偏差',
-    '漏加工',
-    '制造干涉',
-    '安装错位',
-    '漏油渗油',
-    '紧固件松动',
-    '其他',
-  ],
-  零部件缺陷: ['功能失效', '元器件故障', '本身质量问题', '其他'],
-  工艺缺陷: ['加工精度缺陷', '其他'],
-  其他缺陷: ['加工精度缺陷', '其他'],
-};
-
 const SEVERITY_OPTIONS = ['Minor-轻微', 'Major-严重', 'Critical-重大'];
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -64,7 +35,7 @@ const taskId = ref('');
 const task = ref<null | TaskDetail>(null);
 const loading = ref(false);
 const submitting = ref(false);
-const departments = ref<Department[]>([]);
+const departments = ref<Array<{ id: string; name: string }>>([]);
 
 // Step: 1-indexed; only meaningful when result === 'FAIL'
 const currentStep = ref(1);
@@ -95,7 +66,7 @@ const isFail = computed(() => result.value === 'FAIL');
 const totalSteps = computed(() => (isFail.value ? 3 : 1));
 
 const currentSubtypeOptions = computed(
-  () => DEFECT_SUBTYPE_MAP[defectType.value] ?? ['其他'],
+  () => ISSUE_DEFECT_SUBTYPES[defectType.value] ?? ['其他'],
 );
 
 const departmentNames = computed(() => departments.value.map((d) => d.name));
@@ -104,7 +75,7 @@ const departmentNames = computed(() => departments.value.map((d) => d.name));
 
 // Reset subtype when defect type changes
 watch(defectType, (newType) => {
-  const opts = DEFECT_SUBTYPE_MAP[newType] ?? ['其他'];
+  const opts = ISSUE_DEFECT_SUBTYPES[newType] ?? ['其他'];
   defectSubtype.value = opts[0] ?? '其他';
 });
 
@@ -143,14 +114,26 @@ async function fetchDepartments() {
   try {
     const res = await getDepartments();
     if (res.code === 0 && Array.isArray(res.data)) {
-      departments.value = res.data;
-      if (res.data.length > 0) {
-        responsibleDepartment.value = res.data[0]?.name ?? '';
+      departments.value = flattenDepartments(res.data);
+      if (departments.value.length > 0) {
+        responsibleDepartment.value = departments.value[0]?.name ?? '';
       }
     }
   } catch {
     // Non-fatal: leave departments empty, user can still submit
   }
+}
+
+function flattenDepartments(nodes: DepartmentNode[]) {
+  const result: Array<{ id: string; name: string }> = [];
+  const visit = (items: DepartmentNode[]) => {
+    for (const item of items) {
+      result.push({ id: item.id, name: item.name });
+      if (item.children?.length) visit(item.children);
+    }
+  };
+  visit(nodes);
+  return result;
 }
 
 // ─── Photo upload ─────────────────────────────────────────────────────────────
@@ -191,7 +174,8 @@ function choosePhoto() {
 // ─── Picker handlers ──────────────────────────────────────────────────────────
 
 function onDefectTypeChange(e: { detail: { value: string } }) {
-  defectType.value = DEFECT_TYPES[Number(e.detail.value)] ?? DEFECT_TYPES[0];
+  defectType.value =
+    ISSUE_DEFECT_TYPES[Number(e.detail.value)] ?? ISSUE_DEFECT_TYPES[0];
 }
 
 function onDefectSubtypeChange(e: { detail: { value: string } }) {
@@ -299,6 +283,7 @@ async function submitResult() {
       solution: solution.value,
       quantity: unqualified,
       lossAmount: lossAmount.value,
+      photos: attachments.value.map((item) => item.url),
     };
   }
 
@@ -499,8 +484,8 @@ onLoad((options) => {
         <view class="card">
           <view class="field-label required">缺陷分类</view>
           <picker
-            :value="DEFECT_TYPES.indexOf(defectType)"
-            :range="DEFECT_TYPES"
+            :value="ISSUE_DEFECT_TYPES.indexOf(defectType)"
+            :range="ISSUE_DEFECT_TYPES"
             @change="onDefectTypeChange"
           >
             <view class="picker-val">
