@@ -22,29 +22,27 @@ import {
 export default defineValidatedHandler(
   z.object({}).passthrough(),
   async (event, query) => {
-    const year = parseOptionalIssueYear(query.year);
-    const dateMode = parseInspectionIssueDateMode(query.dateMode);
-    const dateValue = parseInspectionIssueDateValue(query.dateValue);
-
     try {
+      const userinfo = getCurrentUser(event);
       await InspectionIssueAccessService.ensurePermission(
-        getCurrentUser(event),
+        userinfo,
         INSPECTION_ISSUE_PERMISSION_CODES.LIST,
       );
       const result = await InspectionService.getIssueStats({
-        dateMode,
-        dateValue,
-        year,
+        dateMode: parseInspectionIssueDateMode(query.dateMode),
+        dateValue: parseInspectionIssueDateValue(query.dateValue),
+        userContext: {
+          roles: userinfo.roles,
+          userId: String(userinfo.id || userinfo.userId || ''),
+        },
+        year: parseOptionalIssueYear(query.year),
       });
       return useResponseSuccess(result);
     } catch (error) {
       logApiError('inspection-issue-stats', error, undefined, event);
       const businessError = legacyErrorToBusinessError(error);
       if (businessError) return businessErrorResponse(event, businessError);
-      return internalServerErrorResponse(
-        event,
-        'Failed to fetch inspection issue stats',
-      );
+      return internalServerErrorResponse(event, 'Failed to fetch issue stats');
     }
   },
 );

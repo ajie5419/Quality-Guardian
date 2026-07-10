@@ -14,12 +14,6 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-vi.mock('~/modules/data-scope/data-scope.service', () => ({
-  DataScopeService: {
-    buildInspectionWhere: vi.fn().mockResolvedValue({}),
-  },
-}));
-
 vi.mock('~/utils/canonical-master-data', () => ({
   MasterDataGovernanceKernel: {
     resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
@@ -33,13 +27,30 @@ vi.mock('~/modules/inspection/inspection-issue', () => ({
   }),
 }));
 
-vi.mock('@qgs/shared', () => ({
-  formatDate: vi.fn((d: Date) => d.toISOString().slice(0, 10)),
-}));
+vi.mock('@qgs/shared', async () => {
+  const actual =
+    await vi.importActual<typeof import('@qgs/shared')>('@qgs/shared');
+  return {
+    ...actual,
+    formatDate: vi.fn((d: Date) => d.toISOString().slice(0, 10)),
+  };
+});
+
+function mockIssueGroupBy(
+  options: {
+    typeRows?: Array<{ _count: { id: number }; defectType: null | string }>;
+  } = {},
+) {
+  (prisma.quality_records.groupBy as any).mockResolvedValue(
+    options.typeRows || [],
+  );
+}
 
 describe('inspectionIssueStatsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIssueGroupBy();
+    (prisma.$queryRaw as any).mockResolvedValue([]);
   });
 
   describe('getIssueStats', () => {
@@ -90,10 +101,12 @@ describe('inspectionIssueStatsService', () => {
         _sum: { lossAmount: 0 },
       });
       (prisma.quality_records.count as any).mockResolvedValue(0);
-      (prisma.quality_records.groupBy as any).mockResolvedValue([
-        { defectType: '焊接缺陷', _count: { id: 2 } },
-        { defectType: null, _count: { id: 1 } },
-      ]);
+      mockIssueGroupBy({
+        typeRows: [
+          { defectType: '焊接缺陷', _count: { id: 2 } },
+          { defectType: null, _count: { id: 1 } },
+        ],
+      });
       (prisma.$queryRaw as any).mockResolvedValue([]);
 
       const stats = await InspectionIssueStatsService.getIssueStats({
@@ -116,10 +129,12 @@ describe('inspectionIssueStatsService', () => {
         _sum: { lossAmount: 0 },
       });
       (prisma.quality_records.count as any).mockResolvedValue(0);
-      (prisma.quality_records.groupBy as any).mockResolvedValue([
-        { defectType: 'A', _count: { id: 3 } },
-        { defectType: 'B', _count: { id: 1 } },
-      ]);
+      mockIssueGroupBy({
+        typeRows: [
+          { defectType: 'A', _count: { id: 3 } },
+          { defectType: 'B', _count: { id: 1 } },
+        ],
+      });
       (prisma.$queryRaw as any).mockResolvedValue([]);
 
       const stats = await InspectionIssueStatsService.getIssueStats({
@@ -140,8 +155,8 @@ describe('inspectionIssueStatsService', () => {
       (prisma.quality_records.count as any).mockResolvedValue(0);
       (prisma.quality_records.groupBy as any).mockResolvedValue([]);
       (prisma.$queryRaw as any).mockResolvedValue([
-        { month: 1, amount: 100 },
-        { month: 3, amount: 200 },
+        { amount: 100, month: 1 },
+        { amount: 200, month: 3 },
       ]);
 
       const stats = await InspectionIssueStatsService.getIssueStats({
@@ -153,16 +168,55 @@ describe('inspectionIssueStatsService', () => {
       expect(stats.trendData[2]).toEqual({ period: '2024-03', value: 200 });
       expect(stats.trendData[1]).toEqual({ period: '2024-02', value: 0 });
     });
+
+    it('uses the creator-only scope for ordinary-user stats', async () => {
+      (prisma.quality_records.aggregate as any).mockResolvedValue({
+        _count: { id: 0 },
+        _sum: { lossAmount: null },
+      });
+      (prisma.quality_records.count as any).mockResolvedValue(0);
+
+      await InspectionIssueStatsService.getIssueStats({
+        userContext: { roles: ['inspector'], userId: 'user-1' },
+        year: 2024,
+      });
+
+      expect(prisma.quality_records.aggregate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ createdBy: 'user-1' }),
+        }),
+      );
+      const trendQuery = (prisma.$queryRaw as any).mock.calls[0][0];
+      expect(trendQuery.values).toContain('user-1');
+    });
+
+    it('does not apply a creator filter to system-admin stats', async () => {
+      (prisma.quality_records.aggregate as any).mockResolvedValue({
+        _count: { id: 0 },
+        _sum: { lossAmount: null },
+      });
+      (prisma.quality_records.count as any).mockResolvedValue(0);
+
+      await InspectionIssueStatsService.getIssueStats({
+        userContext: { roles: ['system_admin'], userId: 'admin-1' },
+        year: 2024,
+      });
+
+      const where = (prisma.quality_records.aggregate as any).mock.calls[0][0]
+        .where;
+      expect(where.createdBy).toBeUndefined();
+    });
   });
 
   describe('buildIssueTrendData', () => {
     it('should return monthly trend for default mode', async () => {
-      (prisma.$queryRaw as any).mockResolvedValue([{ month: 6, amount: 50 }]);
+      (prisma.$queryRaw as any).mockResolvedValue([{ amount: 50, month: 6 }]);
 
       const result = await InspectionIssueStatsService.buildIssueTrendData({
         currentYear: 2024,
         end: new Date('2024-12-31'),
         start: new Date('2024-01-01'),
+        where: { isDeleted: false },
       });
 
       expect(result).toHaveLength(12);
@@ -171,8 +225,8 @@ describe('inspectionIssueStatsService', () => {
 
     it('should return daily trend for month mode', async () => {
       (prisma.$queryRaw as any).mockResolvedValue([
-        { day: '2024-03-01', amount: 10 },
-        { day: '2024-03-02', amount: 20 },
+        { amount: 15, day: '2024-03-01' },
+        { amount: 20, day: '2024-03-02' },
       ]);
 
       const result = await InspectionIssueStatsService.buildIssueTrendData({
@@ -180,16 +234,17 @@ describe('inspectionIssueStatsService', () => {
         dateMode: 'month',
         end: new Date('2024-04-01'),
         start: new Date('2024-03-01'),
+        where: { createdBy: 'user-1', isDeleted: false },
       });
 
       expect(result).toHaveLength(31);
-      expect(result[0]).toEqual({ period: '2024-03-01', value: 10 });
+      expect(result[0]).toEqual({ period: '2024-03-01', value: 15 });
       expect(result[1]).toEqual({ period: '2024-03-02', value: 20 });
     });
 
     it('should return daily trend for week mode', async () => {
       (prisma.$queryRaw as any).mockResolvedValue([
-        { day: '2024-03-04', amount: 5 },
+        { amount: 5, day: new Date('2024-03-04') },
       ]);
 
       const result = await InspectionIssueStatsService.buildIssueTrendData({
@@ -197,6 +252,7 @@ describe('inspectionIssueStatsService', () => {
         dateMode: 'week',
         end: new Date('2024-03-11'),
         start: new Date('2024-03-04'),
+        where: { createdBy: 'user-1', isDeleted: false },
       });
 
       expect(result).toHaveLength(7);

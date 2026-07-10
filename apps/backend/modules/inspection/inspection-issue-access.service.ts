@@ -1,7 +1,22 @@
 import type { UserSession } from '~/utils/jwt-utils';
 
+import { shouldRestrictInspectionIssueRead } from '@qgs/shared';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { BusinessError } from '~/utils/business-error';
+
+export interface InspectionIssueUserContext {
+  roles?: unknown;
+  userId: string;
+  username?: string;
+}
+
+export function applyInspectionIssueReadOwnership<T extends object>(
+  where: T,
+  userContext: InspectionIssueUserContext,
+): T & { createdBy?: string } {
+  if (!shouldRestrictInspectionIssueRead(userContext.roles)) return where;
+  return { ...where, createdBy: userContext.userId };
+}
 
 export const InspectionIssueAccessService = {
   async ensurePermission(userinfo: UserSession, permissionCode: string) {

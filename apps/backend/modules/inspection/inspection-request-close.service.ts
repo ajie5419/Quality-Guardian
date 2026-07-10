@@ -269,10 +269,7 @@ export const InspectionRequestCloseService = {
       issue,
       issueAuditVariables,
       record: updated,
-    } = await retryOnSerialNumberConflict(
-      runCloseTransaction,
-      explicitInspectionId ? 1 : 3,
-    );
+    } = await retryOnSerialNumberConflict(runCloseTransaction, 3);
 
     await syncCloseAttachments({
       closeAttachments,

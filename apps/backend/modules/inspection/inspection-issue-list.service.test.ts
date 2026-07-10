@@ -13,12 +13,6 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-vi.mock('~/modules/data-scope/data-scope.service', () => ({
-  DataScopeService: {
-    buildInspectionWhere: vi.fn().mockResolvedValue({}),
-  },
-}));
-
 vi.mock('~/modules/dept/dept-tree', () => ({
   findDeptSubtree: vi.fn().mockReturnValue([]),
 }));
@@ -233,6 +227,40 @@ describe('inspectionIssueListService', () => {
       );
     });
 
+    it('restricts ordinary users to records they created', async () => {
+      (prisma.quality_records.count as any).mockResolvedValue(0);
+      (prisma.quality_records.findMany as any).mockResolvedValue([]);
+
+      await InspectionIssueListService.getIssues({
+        userContext: {
+          roles: ['quality_inspector'],
+          userId: 'user-1',
+        },
+        year: 2024,
+      });
+
+      expect(prisma.quality_records.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ createdBy: 'user-1' }),
+      });
+    });
+
+    it.each([['admin'], ['super_admin'], ['system_admin']])(
+      'does not restrict %s users by creator',
+      async (role) => {
+        (prisma.quality_records.count as any).mockResolvedValue(0);
+        (prisma.quality_records.findMany as any).mockResolvedValue([]);
+
+        await InspectionIssueListService.getIssues({
+          userContext: { roles: [role], userId: 'admin-1' },
+          year: 2024,
+        });
+
+        const where = (prisma.quality_records.count as any).mock.calls[0][0]
+          .where;
+        expect(where.createdBy).toBeUndefined();
+      },
+    );
+
     it('should map ncNumber sort field to nonConformanceNumber', async () => {
       (prisma.quality_records.count as any).mockResolvedValue(0);
       (prisma.quality_records.findMany as any).mockResolvedValue([]);
@@ -293,20 +321,11 @@ describe('inspectionIssueListService', () => {
   });
 
   describe('getIssueById', () => {
-    it('queries by id inside the resolved data scope and reuses list mapping', async () => {
-      const { DataScopeService } = await import(
-        '~/modules/data-scope/data-scope.service'
-      );
+    it('queries ordinary-user detail by id and creator', async () => {
       const { resolveCanonicalProcessName } = await import(
         '~/utils/process-resolver'
       );
       vi.mocked(resolveCanonicalProcessName).mockReturnValue('Welding');
-      vi.mocked(DataScopeService.buildInspectionWhere).mockResolvedValue({
-        AND: [
-          { id: 'rec-1', isDeleted: false },
-          { responsibleDepartment: { in: ['dept-1'] } },
-        ],
-      });
       (prisma.quality_records.findFirst as any).mockResolvedValue({
         id: 'rec-1',
         nonConformanceNumber: 'NC-26KJ-001',
@@ -333,17 +352,20 @@ describe('inspectionIssueListService', () => {
 
       const result = await InspectionIssueListService.getIssueById({
         id: 'rec-1',
-        userContext: { userId: 'user-1', username: 'inspector' },
+        userContext: {
+          roles: ['quality_inspector'],
+          userId: 'user-1',
+          username: 'inspector',
+        },
       });
 
-      expect(DataScopeService.buildInspectionWhere).toHaveBeenCalledWith(
-        { id: 'rec-1', isDeleted: false },
-        { userId: 'user-1', username: 'inspector' },
-        undefined,
-      );
       expect(prisma.quality_records.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ AND: expect.any(Array) }),
+          where: {
+            createdBy: 'user-1',
+            id: 'rec-1',
+            isDeleted: false,
+          },
         }),
       );
       expect(result).toMatchObject({
@@ -351,6 +373,21 @@ describe('inspectionIssueListService', () => {
         ncNumber: 'NC-26KJ-001',
         processName: 'Welding',
       });
+    });
+
+    it('allows a super admin to query detail without a creator filter', async () => {
+      (prisma.quality_records.findFirst as any).mockResolvedValue(null);
+
+      await InspectionIssueListService.getIssueById({
+        id: 'rec-2',
+        userContext: { roles: ['super_admin'], userId: 'admin-1' },
+      });
+
+      expect(prisma.quality_records.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'rec-2', isDeleted: false },
+        }),
+      );
     });
   });
 });

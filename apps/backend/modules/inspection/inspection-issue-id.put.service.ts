@@ -38,9 +38,8 @@ export default defineEventHandler(async (event) => {
     existingNcNumber = existingRecord.nonConformanceNumber;
     if (
       !hasInspectionIssueWriteAccess({
-        inspector: existingRecord.inspector,
-        roles: userinfo.roles,
-        username: userinfo.username,
+        createdBy: existingRecord.createdBy,
+        userId: userinfo.id || userinfo.userId,
       })
     )
       return forbiddenResponse(event, '无权修改：您只能修改自己创建的数据');

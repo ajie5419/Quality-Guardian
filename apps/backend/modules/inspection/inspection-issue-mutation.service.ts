@@ -12,6 +12,7 @@ import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-ind
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
+import { BusinessError } from '~/utils/business-error';
 import { eventBus } from '~/utils/event-bus';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -112,16 +113,25 @@ export const InspectionIssueMutationService = {
       userinfo,
       INSPECTION_ISSUE_PERMISSION_CODES.EDIT,
     );
+    const userId = String(userinfo.id || userinfo.userId || '');
+    const ownershipWhere = { createdBy: userId, id, isDeleted: false };
     const current = await prisma.quality_records.findUnique({
-      where: { id },
+      where: ownershipWhere,
       select: { supplierName: true },
     });
+    if (!current) {
+      throw new BusinessError(
+        'FORBIDDEN',
+        '无权修改：您只能修改自己创建的数据',
+        403,
+      );
+    }
     const updateData = await buildInspectionIssueUpdateData(
       body,
       existingNcNumber,
     );
     const updated = await prisma.quality_records.update({
-      where: { id },
+      where: ownershipWhere,
       data: updateData,
     });
     if (body.photos !== undefined) {
@@ -164,12 +174,28 @@ export const InspectionIssueMutationService = {
       userinfo,
       INSPECTION_ISSUE_PERMISSION_CODES.DELETE,
     );
+    const userId = String(userinfo.id || userinfo.userId || '');
+    const uniqueIds = [...new Set(ids)];
     const existing = await prisma.quality_records.findMany({
-      where: { id: { in: ids } },
-      select: { supplierName: true },
+      where: { id: { in: uniqueIds }, isDeleted: false },
+      select: { createdBy: true, id: true, supplierName: true },
     });
+    if (
+      existing.length !== uniqueIds.length ||
+      existing.some((item) => item.createdBy !== userId)
+    ) {
+      throw new BusinessError(
+        'FORBIDDEN',
+        '无权删除：只能批量删除自己创建的数据',
+        403,
+      );
+    }
     const result = await prisma.quality_records.updateMany({
-      where: { id: { in: ids } },
+      where: {
+        createdBy: userId,
+        id: { in: uniqueIds },
+        isDeleted: false,
+      },
       data: { isDeleted: true, updatedAt: new Date() },
     });
     if (result.count > 0) {
@@ -179,12 +205,12 @@ export const InspectionIssueMutationService = {
         logger.error(error, 'welder-score-sync after batchDeleteIssues');
       }
     }
-    await QualityLossIndexService.softDeleteSourceMany('Internal', ids);
+    await QualityLossIndexService.softDeleteSourceMany('Internal', uniqueIds);
     eventBus.emit('inspection_issue.changed', {
       supplierNames: existing.map((item) => item.supplierName),
     });
     await Promise.all(
-      ids.map((id) =>
+      uniqueIds.map((id) =>
         FileStorageService.softDeleteReferences({
           bizId: id,
           bizType: 'inspection_issue',
@@ -195,7 +221,7 @@ export const InspectionIssueMutationService = {
       userId: userinfo.id,
       action: 'DELETE',
       targetType: 'inspection_issue',
-      targetId: ids.join(','),
+      targetId: uniqueIds.join(','),
       detailsTemplate: '批量删除不合格品项: {{count}} 条',
       detailsVariables: { count: result.count },
     });
@@ -215,7 +241,7 @@ export const InspectionIssueMutationService = {
     const rowErrors = [];
     const supplierNamesToRefresh: string[] = [];
     let serialSeed = await getNextInspectionIssueSerialNumber();
-    const createdBy = String(userinfo.id || '') || undefined;
+    const createdBy = String(userinfo.id || userinfo.userId || '') || undefined;
     for (const [index, item] of items.entries()) {
       try {
         const payload = await buildInspectionIssueUpsertPayload(
@@ -238,7 +264,31 @@ export const InspectionIssueMutationService = {
         }
         serialSeed++;
         try {
-          const saved = await prisma.quality_records.upsert(payload);
+          const ncNumber = String(payload.where.nonConformanceNumber || '');
+          const existingRecord = await prisma.quality_records.findUnique({
+            where: { nonConformanceNumber: ncNumber },
+            select: { createdBy: true, isDeleted: true },
+          });
+          if (
+            existingRecord &&
+            (existingRecord.createdBy !== createdBy || existingRecord.isDeleted)
+          ) {
+            throw new BusinessError(
+              'FORBIDDEN',
+              '该不合格编号不属于当前用户，禁止通过导入覆盖',
+              403,
+            );
+          }
+          const saved = existingRecord
+            ? await prisma.quality_records.update({
+                where: {
+                  createdBy,
+                  isDeleted: false,
+                  nonConformanceNumber: ncNumber,
+                },
+                data: payload.update,
+              })
+            : await prisma.quality_records.create({ data: payload.create });
           await QualityLossIndexService.upsertFromInternal(saved);
           if (saved?.supplierName)
             supplierNamesToRefresh.push(saved.supplierName);

@@ -65,10 +65,10 @@ export default defineValidatedHandler(schema, async (event, query) => {
       top: Number.isNaN(top) ? 15 : top,
       year: parseOptionalIssueYear(query.year),
       userContext: {
+        roles: userinfo.roles,
         userId: String(userinfo.id || userinfo.userId || ''),
         username: userinfo.username,
       },
-      dataScope: event.context.dataScope,
     });
     return useResponseSuccess({ items: result });
   } catch (error) {

@@ -85,12 +85,12 @@ describe('inspection-issue-id.delete.service', () => {
 
     vi.mocked(getCurrentUser).mockReturnValue({
       id: 'u1',
-      username: 'other',
-      roles: [],
+      username: 'admin',
+      roles: ['admin'],
     } as any);
     vi.mocked(getRequiredRouterParam).mockReturnValue('rec-1' as any);
     vi.mocked(findInspectionIssueAccessRecord).mockResolvedValue({
-      inspector: 'admin',
+      createdBy: 'other-user',
       nonConformanceNumber: 'NC-001',
       inspectionId: null,
     } as any);
@@ -107,6 +107,10 @@ describe('inspection-issue-id.delete.service', () => {
 
     await handler(event);
 
+    expect(hasInspectionIssueWriteAccess).toHaveBeenCalledWith({
+      createdBy: 'other-user',
+      userId: 'u1',
+    });
     expect(forbiddenResponse).toHaveBeenCalledWith(
       event,
       '无权删除：您只能删除自己创建的数据',
@@ -133,7 +137,7 @@ describe('inspection-issue-id.delete.service', () => {
     } as any);
     vi.mocked(getRequiredRouterParam).mockReturnValue('rec-1' as any);
     vi.mocked(findInspectionIssueAccessRecord).mockResolvedValue({
-      inspector: 'admin',
+      createdBy: 'u1',
       nonConformanceNumber: 'NC-001',
       inspectionId: null,
     } as any);
@@ -156,5 +160,37 @@ describe('inspection-issue-id.delete.service', () => {
       'QMS:Inspection:Issues:Delete',
     );
     expect(useResponseSuccess).toHaveBeenCalledWith(null);
+  });
+
+  it('returns a business error when the record is deleted concurrently', async () => {
+    const { findInspectionIssueAccessRecord, hasInspectionIssueWriteAccess } =
+      await import('~/modules/inspection/inspection-issue');
+    const { InspectionService } = await import(
+      '~/modules/inspection/inspection.service'
+    );
+    const { businessErrorResponse, legacyErrorToBusinessError } = await import(
+      '~/utils/business-error'
+    );
+    const { getCurrentUser } = await import('~/utils/current-user');
+    const { getRequiredRouterParam } = await import('~/utils/route-param');
+    const notFoundError = { code: 'NOT_FOUND', httpStatus: 404 };
+
+    vi.mocked(getCurrentUser).mockReturnValue({ id: 'u1' } as any);
+    vi.mocked(getRequiredRouterParam).mockReturnValue('rec-1' as any);
+    vi.mocked(findInspectionIssueAccessRecord).mockResolvedValue({
+      createdBy: 'u1',
+    } as any);
+    vi.mocked(hasInspectionIssueWriteAccess).mockReturnValue(true);
+    vi.mocked(InspectionService.deleteRecord).mockRejectedValue(notFoundError);
+    vi.mocked(legacyErrorToBusinessError).mockReturnValue(notFoundError as any);
+
+    const handlerModule = await import(
+      '~/modules/inspection/inspection-issue-id.delete.service'
+    );
+    const event = { context: {}, node: { req: {} } } as any;
+
+    await handlerModule.default(event);
+
+    expect(businessErrorResponse).toHaveBeenCalledWith(event, notFoundError);
   });
 });

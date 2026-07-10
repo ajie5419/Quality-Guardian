@@ -42,9 +42,8 @@ export default defineEventHandler(async (event) => {
 
     if (
       !hasInspectionIssueWriteAccess({
-        inspector: existingRecord.inspector,
-        roles: userinfo.roles,
-        username: userinfo.username,
+        createdBy: existingRecord.createdBy,
+        userId: userinfo.id || userinfo.userId,
       })
     ) {
       return forbiddenResponse(event, '无权删除：您只能删除自己创建的数据');
@@ -61,6 +60,8 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('issues', error, undefined, event);
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) return businessErrorResponse(event, businessError);
     return internalServerErrorResponse(event, '删除问题失败');
   }
 });

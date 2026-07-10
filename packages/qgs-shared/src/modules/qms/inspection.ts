@@ -4,6 +4,7 @@ import { InspectionIssueStatusEnum } from './enums';
 
 export interface InspectionIssue {
   claim: string; // 索赔
+  createdBy?: null | string; // Creator user ID
   date: string; // 发现日期 (from Prisma date field)
   defectSubtype?: string;
   defectType?: string;

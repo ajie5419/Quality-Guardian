@@ -36,6 +36,7 @@ describe('inspection-issue-id.get.service', () => {
     const { getRequiredRouterParam } = await import('~/utils/route-param');
     vi.mocked(getCurrentUser).mockReturnValue({
       id: 'user-1',
+      roles: ['quality_inspector'],
       username: 'inspector',
     } as never);
     vi.mocked(getRequiredRouterParam).mockReturnValue('issue-1' as never);
@@ -64,9 +65,12 @@ describe('inspection-issue-id.get.service', () => {
       'QMS:Inspection:Issues:View',
     );
     expect(InspectionIssueListService.getIssueById).toHaveBeenCalledWith({
-      dataScope: expect.objectContaining({ scopeType: 'DEPT' }),
       id: 'issue-1',
-      userContext: { userId: 'user-1', username: 'inspector' },
+      userContext: {
+        roles: ['quality_inspector'],
+        userId: 'user-1',
+        username: 'inspector',
+      },
     });
     expect(result).toMatchObject({ code: 0, data: { id: 'issue-1' } });
   });

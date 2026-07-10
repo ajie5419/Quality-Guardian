@@ -26,9 +26,9 @@ export default defineEventHandler(async (event) => {
       INSPECTION_ISSUE_PERMISSION_CODES.VIEW,
     );
     const issue = await InspectionIssueListService.getIssueById({
-      dataScope: event.context.dataScope,
       id,
       userContext: {
+        roles: userinfo.roles,
         userId: String(userinfo.id || userinfo.userId || ''),
         username: userinfo.username,
       },

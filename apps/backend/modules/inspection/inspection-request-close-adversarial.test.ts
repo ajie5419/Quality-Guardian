@@ -1181,24 +1181,27 @@ describe('inspection-request-close adversarial', () => {
       expect(syncCloseAttachments).not.toHaveBeenCalled();
     });
 
-    it('does not retry when closing with an explicit inspectionId', async () => {
+    it('retries issue serial conflicts when closing with an explicit inspectionId', async () => {
       (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
         makeRequest(),
       );
       (prisma.inspections.findFirst as any).mockResolvedValue({
         id: 'insp-9',
       });
-      (prisma.$transaction as any).mockRejectedValue(makeSerialConflictError());
+      const txMock = makeTxMock({ status: 'CLOSED' });
+      (prisma.$transaction as any)
+        .mockRejectedValueOnce(makeSerialConflictError())
+        .mockImplementationOnce(async (cb: any) => cb(txMock));
 
-      await expect(
-        InspectionRequestCloseService.closeRequest(
-          MOCK_EVENT,
-          'req-1',
-          { ...PASS_BODY, inspectionId: 'insp-9' },
-          MOCK_USER,
-        ),
-      ).rejects.toThrow('Unique constraint failed');
-      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      const result = await InspectionRequestCloseService.closeRequest(
+        MOCK_EVENT,
+        'req-1',
+        { ...PASS_BODY, inspectionId: 'insp-9' },
+        MOCK_USER,
+      );
+
+      expect(result).toBeDefined();
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
       expect(createCloseInspectionRecords).not.toHaveBeenCalled();
     });
   });

@@ -88,7 +88,7 @@ describe('buildCloseLinkedIssueCreateResult', () => {
       expect.objectContaining({
         ncNumber: 'NC-2026-001',
       }),
-      expect.any(Object),
+      expect.objectContaining({ createdBy: 'user-1' }),
     );
   });
 

@@ -85,12 +85,12 @@ describe('inspection-issue-id.put.service', () => {
 
     vi.mocked(getCurrentUser).mockReturnValue({
       id: 'u1',
-      username: 'other',
-      roles: [],
+      username: 'admin',
+      roles: ['admin'],
     } as any);
     vi.mocked(getRequiredRouterParam).mockReturnValue('rec-1' as any);
     vi.mocked(findInspectionIssueAccessRecord).mockResolvedValue({
-      inspector: 'admin',
+      createdBy: 'other-user',
       nonConformanceNumber: 'NC-001',
       inspectionId: null,
     } as any);
@@ -107,6 +107,10 @@ describe('inspection-issue-id.put.service', () => {
 
     await handler(event);
 
+    expect(hasInspectionIssueWriteAccess).toHaveBeenCalledWith({
+      createdBy: 'other-user',
+      userId: 'u1',
+    });
     expect(forbiddenResponse).toHaveBeenCalledWith(
       event,
       '无权修改：您只能修改自己创建的数据',

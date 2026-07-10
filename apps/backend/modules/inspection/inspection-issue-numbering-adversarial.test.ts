@@ -9,7 +9,7 @@ vi.mock('~/utils/prisma', () => ({
   default: {
     quality_records: {
       findFirst: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -29,6 +29,7 @@ vi.mock('~/modules/system-log/system-log.service', () => ({
 describe('inspectionIssueNumberingService – adversarial tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma.quality_records.updateMany as any).mockResolvedValue({ count: 1 });
   });
 
   // ─── generateNextNcNumber ───
@@ -257,7 +258,9 @@ describe('inspectionIssueNumberingService – adversarial tests', () => {
   // ─── deleteRecord ───
   describe('deleteRecord', () => {
     it('should soft delete and record audit log', async () => {
-      (prisma.quality_records.update as any).mockResolvedValue({});
+      (prisma.quality_records.updateMany as any).mockResolvedValue({
+        count: 1,
+      });
       (FileStorageService.softDeleteReferences as any).mockResolvedValue(
         undefined,
       );
@@ -268,8 +271,8 @@ describe('inspectionIssueNumberingService – adversarial tests', () => {
 
       await InspectionIssueNumberingService.deleteRecord('issue-1', 'user-1');
 
-      expect(prisma.quality_records.update).toHaveBeenCalledWith({
-        where: { id: 'issue-1' },
+      expect(prisma.quality_records.updateMany).toHaveBeenCalledWith({
+        where: { createdBy: 'user-1', id: 'issue-1', isDeleted: false },
         data: {
           isDeleted: true,
           updatedAt: expect.any(Date),
@@ -278,7 +281,9 @@ describe('inspectionIssueNumberingService – adversarial tests', () => {
     });
 
     it('should soft delete file references', async () => {
-      (prisma.quality_records.update as any).mockResolvedValue({});
+      (prisma.quality_records.updateMany as any).mockResolvedValue({
+        count: 1,
+      });
       (FileStorageService.softDeleteReferences as any).mockResolvedValue(
         undefined,
       );
@@ -296,7 +301,9 @@ describe('inspectionIssueNumberingService – adversarial tests', () => {
     });
 
     it('should sync welder scores after delete', async () => {
-      (prisma.quality_records.update as any).mockResolvedValue({});
+      (prisma.quality_records.updateMany as any).mockResolvedValue({
+        count: 1,
+      });
       (FileStorageService.softDeleteReferences as any).mockResolvedValue(
         undefined,
       );
@@ -311,7 +318,9 @@ describe('inspectionIssueNumberingService – adversarial tests', () => {
     });
 
     it('should record audit log with correct params', async () => {
-      (prisma.quality_records.update as any).mockResolvedValue({});
+      (prisma.quality_records.updateMany as any).mockResolvedValue({
+        count: 1,
+      });
       (FileStorageService.softDeleteReferences as any).mockResolvedValue(
         undefined,
       );
@@ -334,7 +343,9 @@ describe('inspectionIssueNumberingService – adversarial tests', () => {
     });
 
     it('should handle empty id and userId', async () => {
-      (prisma.quality_records.update as any).mockResolvedValue({});
+      (prisma.quality_records.updateMany as any).mockResolvedValue({
+        count: 1,
+      });
       (FileStorageService.softDeleteReferences as any).mockResolvedValue(
         undefined,
       );
@@ -345,12 +356,12 @@ describe('inspectionIssueNumberingService – adversarial tests', () => {
 
       await InspectionIssueNumberingService.deleteRecord('', '');
 
-      expect(prisma.quality_records.update).toHaveBeenCalled();
+      expect(prisma.quality_records.updateMany).toHaveBeenCalled();
       expect(SystemLogService.auditLog).toHaveBeenCalled();
     });
 
     it('should propagate prisma error on invalid id', async () => {
-      (prisma.quality_records.update as any).mockRejectedValue(
+      (prisma.quality_records.updateMany as any).mockRejectedValue(
         new Error('Record not found'),
       );
 

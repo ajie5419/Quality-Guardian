@@ -285,6 +285,12 @@ describe('inspectionIssueMutationService', () => {
   });
 
   describe('updateIssue', () => {
+    beforeEach(() => {
+      (prisma.quality_records.findUnique as any).mockResolvedValue({
+        supplierName: null,
+      });
+    });
+
     it('should update the quality record', async () => {
       const { SystemLogService } = await import(
         '~/modules/system-log/system-log.service'
@@ -299,7 +305,11 @@ describe('inspectionIssueMutationService', () => {
       );
 
       expect(prisma.quality_records.update).toHaveBeenCalledWith({
-        where: { id: 'rec-1' },
+        where: {
+          createdBy: 'user-1',
+          id: 'rec-1',
+          isDeleted: false,
+        },
         data: { partName: 'Updated' },
       });
       expect(SystemLogService.auditLog).toHaveBeenCalled();
@@ -369,6 +379,34 @@ describe('inspectionIssueMutationService', () => {
         'welder-score-sync after updateIssue',
       );
     });
+
+    it('rejects an admin updating a record created by another user', async () => {
+      const mockUser = {
+        id: 'admin-1',
+        username: 'admin',
+        roles: ['admin'],
+      } as any;
+      (prisma.quality_records.findUnique as any).mockResolvedValue(null);
+
+      await expect(
+        InspectionIssueMutationService.updateIssue(
+          mockUser,
+          'rec-other',
+          {},
+          null,
+        ),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
+
+      expect(prisma.quality_records.findUnique).toHaveBeenCalledWith({
+        where: {
+          createdBy: 'admin-1',
+          id: 'rec-other',
+          isDeleted: false,
+        },
+        select: { supplierName: true },
+      });
+      expect(prisma.quality_records.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('batchDeleteIssues', () => {
@@ -380,6 +418,10 @@ describe('inspectionIssueMutationService', () => {
         '~/modules/inspection/inspection-issue-access.service'
       );
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+      (prisma.quality_records.findMany as any).mockResolvedValue([
+        { createdBy: 'user-1', id: 'rec-1', supplierName: null },
+        { createdBy: 'user-1', id: 'rec-2', supplierName: null },
+      ]);
       (prisma.quality_records.updateMany as any).mockResolvedValue({
         count: 2,
       });
@@ -395,7 +437,11 @@ describe('inspectionIssueMutationService', () => {
         InspectionIssueAccessService.ensurePermission,
       ).toHaveBeenCalledWith(mockUser, 'QMS:Inspection:Issues:Delete');
       expect(prisma.quality_records.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: ['rec-1', 'rec-2'] } },
+        where: {
+          createdBy: 'user-1',
+          id: { in: ['rec-1', 'rec-2'] },
+          isDeleted: false,
+        },
         data: { isDeleted: true, updatedAt: expect.any(Date) },
       });
       expect(FileStorageService.softDeleteReferences).toHaveBeenCalledTimes(2);
@@ -406,6 +452,9 @@ describe('inspectionIssueMutationService', () => {
         '~/modules/welder/welder-score.service'
       );
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+      (prisma.quality_records.findMany as any).mockResolvedValue([
+        { createdBy: 'user-1', id: 'rec-3', supplierName: null },
+      ]);
       (prisma.quality_records.updateMany as any).mockResolvedValue({
         count: 0,
       });
@@ -426,6 +475,9 @@ describe('inspectionIssueMutationService', () => {
         '~/modules/system-log/audit-log'
       );
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+      (prisma.quality_records.findMany as any).mockResolvedValue([
+        { createdBy: 'user-1', id: 'rec-4', supplierName: null },
+      ]);
       (prisma.quality_records.updateMany as any).mockResolvedValue({
         count: 1,
       });
@@ -450,6 +502,9 @@ describe('inspectionIssueMutationService', () => {
         '~/modules/welder/welder-score.service'
       );
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+      (prisma.quality_records.findMany as any).mockResolvedValue([
+        { createdBy: 'user-1', id: 'rec-10', supplierName: null },
+      ]);
       (prisma.quality_records.updateMany as any).mockResolvedValue({
         count: 1,
       });
@@ -470,6 +525,27 @@ describe('inspectionIssueMutationService', () => {
         'welder-score-sync after batchDeleteIssues',
       );
     });
+
+    it('rejects the whole batch when any record belongs to another user', async () => {
+      const mockUser = {
+        id: 'admin-1',
+        username: 'admin',
+        roles: ['admin'],
+      } as any;
+      (prisma.quality_records.findMany as any).mockResolvedValue([
+        { createdBy: 'admin-1', id: 'rec-1', supplierName: null },
+        { createdBy: 'user-2', id: 'rec-2', supplierName: null },
+      ]);
+
+      await expect(
+        InspectionIssueMutationService.batchDeleteIssues({} as any, mockUser, [
+          'rec-1',
+          'rec-2',
+        ]),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
+
+      expect(prisma.quality_records.updateMany).not.toHaveBeenCalled();
+    });
   });
 
   describe('importIssues', () => {
@@ -486,7 +562,7 @@ describe('inspectionIssueMutationService', () => {
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
 
       vi.mocked(buildInspectionIssueUpsertPayload).mockResolvedValue({
-        where: { workOrderNumber: 'WO-1' },
+        where: { nonConformanceNumber: 'NC-001' },
         create: { partName: 'Part' },
         update: { partName: 'Part' },
       } as any);
@@ -508,7 +584,9 @@ describe('inspectionIssueMutationService', () => {
       expect(
         InspectionIssueAccessService.ensurePermission,
       ).toHaveBeenCalledWith(mockUser, 'QMS:Inspection:Issues:Create');
-      expect(prisma.quality_records.upsert).toHaveBeenCalled();
+      expect(prisma.quality_records.create).toHaveBeenCalledWith({
+        data: { partName: 'Part' },
+      });
     });
 
     it('should record row error when upsert payload is null', async () => {
@@ -538,7 +616,7 @@ describe('inspectionIssueMutationService', () => {
       expect(buildImportRowError).toHaveBeenCalled();
     });
 
-    it('should record row error when upsert throws', async () => {
+    it('should record row error when create throws', async () => {
       const { buildImportRowError, buildImportSummary } = await import(
         '~/modules/file-storage/import-report'
       );
@@ -548,11 +626,11 @@ describe('inspectionIssueMutationService', () => {
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
 
       vi.mocked(buildInspectionIssueUpsertPayload).mockResolvedValue({
-        where: { workOrderNumber: 'WO-1' },
+        where: { nonConformanceNumber: 'NC-001' },
         create: {},
         update: {},
       } as any);
-      (prisma.quality_records.upsert as any).mockRejectedValue(
+      (prisma.quality_records.create as any).mockRejectedValue(
         new Error('duplicate'),
       );
       vi.mocked(buildImportSummary).mockReturnValue({
@@ -582,11 +660,11 @@ describe('inspectionIssueMutationService', () => {
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
 
       vi.mocked(buildInspectionIssueUpsertPayload).mockResolvedValue({
-        where: { workOrderNumber: 'WO-2' },
+        where: { nonConformanceNumber: 'NC-002' },
         create: { partName: 'Part' },
         update: { partName: 'Part' },
       } as any);
-      (prisma.quality_records.upsert as any).mockResolvedValue({
+      (prisma.quality_records.create as any).mockResolvedValue({
         id: 'ISS-2026-010',
         supplierName: 'Supplier A',
       });
@@ -612,6 +690,46 @@ describe('inspectionIssueMutationService', () => {
         syncError,
         'welder-score-sync after importIssues',
       );
+    });
+
+    it('records a row error instead of overwriting another user record', async () => {
+      const { buildImportRowError, buildImportSummary } = await import(
+        '~/modules/file-storage/import-report'
+      );
+      const { buildInspectionIssueUpsertPayload } = await import(
+        '~/modules/inspection/inspection-issue'
+      );
+      const mockUser = {
+        id: 'admin-1',
+        username: 'admin',
+        roles: ['admin'],
+      } as any;
+      vi.mocked(buildInspectionIssueUpsertPayload).mockResolvedValue({
+        where: { nonConformanceNumber: 'NC-OTHER' },
+        create: { partName: 'Part' },
+        update: { partName: 'Changed' },
+      } as any);
+      (prisma.quality_records.findUnique as any).mockResolvedValue({
+        createdBy: 'user-2',
+        isDeleted: false,
+      });
+      vi.mocked(buildImportSummary).mockReturnValue({
+        errorCount: 1,
+        errors: [{ reason: 'error', row: 1 }],
+        successCount: 0,
+        totalCount: 1,
+      } as any);
+
+      const result = await InspectionIssueMutationService.importIssues(
+        {} as any,
+        mockUser,
+        [{ ncNumber: 'NC-OTHER' }],
+      );
+
+      expect(result.successCount).toBe(0);
+      expect(buildImportRowError).toHaveBeenCalled();
+      expect(prisma.quality_records.create).not.toHaveBeenCalled();
+      expect(prisma.quality_records.update).not.toHaveBeenCalled();
     });
   });
 });

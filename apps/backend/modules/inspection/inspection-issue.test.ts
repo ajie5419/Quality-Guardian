@@ -1,13 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import prisma from '~/utils/prisma';
 
 import {
   buildInspectionIssueCreateData,
   buildInspectionIssueUpdateData,
   buildInspectionIssueUpsertPayload,
+  findInspectionIssueAccessRecord,
+  hasInspectionIssueAdminAccess,
+  hasInspectionIssueWriteAccess,
 } from './inspection-issue';
 
 vi.mock('~/utils/prisma', () => ({
-  default: {},
+  default: {
+    quality_records: {
+      findUnique: vi.fn(),
+    },
+  },
 }));
 
 vi.mock('~/utils/process-resolver', () => ({
@@ -273,5 +281,45 @@ describe('inspection-issue processId dual write', () => {
     expect((payload?.update as Record<string, unknown>)?.rootCauseId).toBe(
       'dict-root-cause',
     );
+  });
+});
+
+describe('inspection issue ownership rules', () => {
+  it('excludes soft-deleted records from ownership checks', async () => {
+    vi.mocked(prisma.quality_records.findUnique).mockResolvedValue(null);
+
+    await findInspectionIssueAccessRecord('issue-1');
+
+    expect(prisma.quality_records.findUnique).toHaveBeenCalledWith({
+      where: { id: 'issue-1', isDeleted: false },
+      select: {
+        createdBy: true,
+        inspectionId: true,
+        nonConformanceNumber: true,
+      },
+    });
+  });
+
+  it.each(['admin', 'super_admin', 'system_admin'])(
+    'recognizes %s as read-all administration',
+    (role) => {
+      expect(hasInspectionIssueAdminAccess([role])).toBe(true);
+    },
+  );
+
+  it.each(['quality_supervisor', 'supervisor', 'administrator'])(
+    'does not treat %s as read-all administration',
+    (role) => {
+      expect(hasInspectionIssueAdminAccess([role])).toBe(false);
+    },
+  );
+
+  it('allows writes only for the creating user, including for admins', () => {
+    expect(
+      hasInspectionIssueWriteAccess({ createdBy: 'user-1', userId: 'user-1' }),
+    ).toBe(true);
+    expect(
+      hasInspectionIssueWriteAccess({ createdBy: 'user-1', userId: 'admin-1' }),
+    ).toBe(false);
   });
 });
