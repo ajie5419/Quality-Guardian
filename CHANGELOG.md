@@ -34,6 +34,9 @@
 - 小程序新增不合格品项权限入口、列表筛选与分页、详情、新增、编辑和三步表单；复用工单、工序、部门、供应商/外协和焊工主数据。
 - 补齐手机场景必要能力：照片上传、按用户隔离的本地草稿、账号切换安全、参考数据局部失败降级、列表失败后分页恢复和明确的上传/保存提示。
 - 修复报检结果为 `FAIL` 时未向关联不合格品项传递 `photos` 的断链，以及 token 刷新失败时并发请求等待队列不被唤醒的问题。
+- 修复小程序 GET 请求把未选择的筛选条件序列化为字符串 `undefined`，导致不合格品项列表错误返回空数据；公共请求层现在会剔除未定义的查询字段，并保留 `false`、`0` 和空字符串等有效值。
+- 微信开发者工具本地联调关闭域名校验；重新登录后确认当前账号拥有 157 个权限码，包含不合格品项查看权限，权限、列表、部门接口均返回 200。
+- 排查并修复本地增量产物未刷新页面注册表的问题；`app.js` 已包含列表、详情、新增、编辑四个页面，开发者工具不再提示 `Page has not been registered yet`。
 
 **验证结果：**
 
@@ -42,16 +45,19 @@
 - typecheck: `pnpm run check:type` 3/3 tasks 通过；Web `vue-tsc` 通过；shared 构建和声明文件生成通过
 - check:qms-arch: 0 violations 通过
 - vitest: 后端全量 198 文件 / 1871 测试全部通过；不合格品项定向 117/117 通过
+- vitest: 小程序请求参数清理单测 2/2 通过
+- 微信开发者工具: 列表加载真实数据通过；详情、编辑、新增页面路由通过；自动化控制台 0 error、0 exception
 
 **commit:**
 
 - `d717a6b` feat(@qgs/backend): support mobile inspection issues
 - `73dc5a3` feat(@qgs/weapp): add inspection issue workflow
 - `c93cee2` refactor(@qgs/web-antd): reuse inspection issue contract
+- `ae7b6610` fix(@qgs/weapp): omit undefined query filters
 
 **遗留问题：**
 
-- 遵循仓库约束，未运行前端 dev/build；尚未在微信开发者工具或真机完成点击流程验收，不宣称视觉与设备端交互已验证。
+- 未完成真机、实际新增提交、照片上传、分页、草稿和账号切换验收；当前结论只覆盖微信开发者工具的列表数据加载和页面路由冒烟测试。
 - 既有不合格品项统计趋势 SQL 已补 List RBAC，但仍未完整应用行级 data scope；小程序本期不调用该统计接口。
 
 ## [0.15.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.14.0...qgs-v0.15.0) (2026-07-09)
