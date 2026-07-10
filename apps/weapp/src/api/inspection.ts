@@ -1,9 +1,18 @@
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
+
 import { request } from './request';
 
 export interface DepartmentNode {
   children?: DepartmentNode[];
   id: string;
   name: string;
+}
+
+export interface DictionaryOptionItem {
+  dictKey: string;
+  dictValue: string;
+  id: string;
+  sort: number;
 }
 
 // Get inspection stats for home page
@@ -117,6 +126,14 @@ export function getProcesses(workOrderNumber: string) {
     url: '/api/qms/inspection/requests/processes',
     method: 'GET',
     data: { workOrderNumber },
+  });
+}
+
+export function getProcessDictionaryOptions() {
+  return request<DictionaryOptionItem[]>({
+    url: '/api/system/dictionary/options',
+    method: 'GET',
+    data: { dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName },
   });
 }
 

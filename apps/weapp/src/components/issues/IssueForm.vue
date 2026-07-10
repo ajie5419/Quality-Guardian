@@ -41,6 +41,7 @@ const {
   requiresSupplier,
   requiresWelder,
   searching,
+  selectedProcessLabel,
   selectedDepartmentNames,
   showDepartments,
   showWorkOrderResults,
@@ -124,12 +125,16 @@ onMounted(initialize);
         </view>
         <view class="field">
           <text class="label required">工序</text>
-          <picker :range="processOptions" @change="onProcessChange">
+          <picker
+            :range="processOptions"
+            range-key="label"
+            @change="onProcessChange"
+          >
             <view
               class="picker-value"
               :class="{ placeholder: !form.processName }"
             >
-              {{ form.processName || '请先选择工单' }}
+              {{ selectedProcessLabel || '请选择工序' }}
             </view>
           </picker>
         </view>

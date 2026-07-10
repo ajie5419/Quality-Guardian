@@ -3,14 +3,18 @@ import type { InspectionIssueRecord } from '@/api/issues';
 
 import { computed, ref } from 'vue';
 
-import { getInspectionIssue } from '@/api/issues';
+import { deleteInspectionIssue, getInspectionIssue } from '@/api/issues';
 import { buildResourceUrl } from '@/api/request';
 import { useUserStore } from '@/stores/user';
 import {
   formatDepartmentNames,
   loadDepartmentNameMap,
 } from '@/utils/departments';
-import { getIssueSeverityLabel, getIssueStatusLabel } from '@/utils/issues';
+import {
+  getIssueSeverityLabel,
+  getIssueStatusLabel,
+  isInspectionIssueOwner,
+} from '@/utils/issues';
 import { onLoad, onShow } from '@dcloudio/uni-app';
 import { INSPECTION_ISSUE_PERMISSION_CODES } from '@qgs/shared';
 
@@ -22,7 +26,18 @@ const departmentNames = ref(new Map<string, string>());
 const errorMessage = ref('');
 
 const canEdit = computed(() =>
-  userStore.hasPermission(INSPECTION_ISSUE_PERMISSION_CODES.EDIT),
+  Boolean(
+    issue.value &&
+      userStore.hasPermission(INSPECTION_ISSUE_PERMISSION_CODES.EDIT) &&
+      isInspectionIssueOwner(issue.value, userStore.userInfo?.id),
+  ),
+);
+const canDelete = computed(() =>
+  Boolean(
+    issue.value &&
+      userStore.hasPermission(INSPECTION_ISSUE_PERMISSION_CODES.DELETE) &&
+      isInspectionIssueOwner(issue.value, userStore.userInfo?.id),
+  ),
 );
 
 async function loadIssue() {
@@ -61,8 +76,34 @@ function previewPhoto(photo: string) {
 }
 
 function editIssue() {
-  if (!issue.value) return;
+  if (!issue.value || !canEdit.value) return;
   uni.navigateTo({ url: `/pages/issues/edit?id=${issue.value.id}` });
+}
+
+function deleteIssue() {
+  if (!issue.value || !canDelete.value) return;
+  uni.showModal({
+    title: '删除不合格品项',
+    content: `确定删除 ${issue.value.ncNumber || issue.value.partName}？`,
+    success: (result) => {
+      if (result.confirm) void performDelete();
+    },
+  });
+}
+
+async function performDelete() {
+  if (!issue.value) return;
+  try {
+    const res = await deleteInspectionIssue(issue.value.id);
+    if (res.code !== 0) {
+      uni.showToast({ title: res.message || '删除失败', icon: 'none' });
+      return;
+    }
+    uni.showToast({ title: '删除成功', icon: 'success' });
+    setTimeout(() => uni.navigateBack(), 600);
+  } catch {
+    uni.showToast({ title: '网络错误，删除失败', icon: 'none' });
+  }
 }
 
 onLoad(async (options) => {
@@ -197,8 +238,13 @@ onShow(() => {
         </view>
       </scroll-view>
 
-      <view v-if="canEdit" class="bottom-actions">
-        <button class="edit-button" @tap="editIssue">编辑</button>
+      <view v-if="canEdit || canDelete" class="bottom-actions">
+        <button v-if="canEdit" class="edit-button" @tap="editIssue">
+          编辑
+        </button>
+        <button v-if="canDelete" class="delete-button" @tap="deleteIssue">
+          删除
+        </button>
       </view>
     </template>
   </view>
@@ -335,18 +381,32 @@ onShow(() => {
 }
 
 .bottom-actions {
+  display: flex;
   flex-shrink: 0;
+  gap: 20rpx;
   padding: 20rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
   background: #fff;
   border-top: 1rpx solid $border-color;
 }
 
 .edit-button {
+  flex: 1;
   height: 84rpx;
   font-size: 28rpx;
   line-height: 84rpx;
   color: #fff;
   background: $primary-color;
+  border-radius: 8rpx;
+}
+
+.delete-button {
+  flex: 1;
+  height: 84rpx;
+  font-size: 28rpx;
+  line-height: 84rpx;
+  color: $error-color;
+  background: #fff;
+  border: 1rpx solid $error-color;
   border-radius: 8rpx;
 }
 </style>

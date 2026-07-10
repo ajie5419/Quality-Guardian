@@ -47,3 +47,31 @@ export function getIssueSeverityLabel(severity: string) {
     severity
   );
 }
+
+export function isInspectionIssueOwner(
+  issue: { createdBy?: null | string },
+  currentUserId?: null | string,
+) {
+  if (!issue.createdBy || !currentUserId) return false;
+  return String(issue.createdBy) === String(currentUserId);
+}
+
+export interface InspectionProcessOption {
+  label: string;
+  value: string;
+}
+
+export function mergeInspectionProcessOptions(
+  ...groups: ReadonlyArray<ReadonlyArray<InspectionProcessOption>>
+): InspectionProcessOption[] {
+  const options = new Map<string, InspectionProcessOption>();
+  for (const group of groups) {
+    for (const item of group) {
+      const value = String(item.value || '').trim();
+      if (!value || options.has(value)) continue;
+      const label = String(item.label || value).trim() || value;
+      options.set(value, { label, value });
+    }
+  }
+  return [...options.values()];
+}

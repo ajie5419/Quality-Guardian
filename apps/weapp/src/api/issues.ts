@@ -3,6 +3,7 @@ import type { InspectionIssue } from '@qgs/shared';
 import { request } from './request';
 
 export interface InspectionIssueRecord extends InspectionIssue {
+  createdBy?: null | string;
   division?: string;
   processName?: string;
   responsibleDepartments?: string[];
@@ -69,6 +70,13 @@ export function updateInspectionIssue(
     url: `/api/qms/inspection/issues/${id}`,
     method: 'PUT',
     data: data as Record<string, unknown>,
+  });
+}
+
+export function deleteInspectionIssue(id: string) {
+  return request<null>({
+    url: `/api/qms/inspection/issues/${id}`,
+    method: 'DELETE',
   });
 }
 

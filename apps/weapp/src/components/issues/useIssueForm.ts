@@ -9,6 +9,7 @@ import { computed, reactive, ref, watch } from 'vue';
 
 import {
   getDepartments,
+  getProcessDictionaryOptions,
   getProcesses,
   searchWorkOrders,
 } from '@/api/inspection';
@@ -26,8 +27,13 @@ import {
   ISSUE_DEFECT_TYPES,
   ISSUE_SEVERITY_OPTIONS,
   ISSUE_STATUS_OPTIONS,
+  mergeInspectionProcessOptions,
 } from '@/utils/issues';
-import { INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS } from '@qgs/shared';
+import {
+  INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS,
+  INSPECTION_PROCESS_FALLBACK_ITEMS,
+  mergeInspectionProcessNames,
+} from '@qgs/shared';
 
 export interface IssueFormProps {
   initialData?: InspectionIssueRecord;
@@ -78,7 +84,11 @@ export function useIssueForm(
   const showDepartments = ref(false);
   const ready = ref(false);
   const workOrderResults = ref<WorkOrderItem[]>([]);
-  const processOptions = ref<string[]>([]);
+  const fallbackProcessOptions = INSPECTION_PROCESS_FALLBACK_ITEMS.map(
+    (item) => ({ label: item.value, value: item.value }),
+  );
+  const processReferenceOptions = ref([...fallbackProcessOptions]);
+  const processOptions = ref([...fallbackProcessOptions]);
   const departments = ref<FlatDepartment[]>([]);
   const supplierOptions = ref<IssueOption[]>([]);
   const welderOptions = ref<IssueOption[]>([]);
@@ -135,7 +145,14 @@ export function useIssueForm(
       names.includes('生产')
     );
   });
-  const requiresWelder = computed(() => form.processName.trim() === '焊接');
+  const selectedProcessLabel = computed(
+    () =>
+      processOptions.value.find((item) => item.value === form.processName)
+        ?.label || form.processName,
+  );
+  const requiresWelder = computed(
+    () => selectedProcessLabel.value.trim() === '焊接',
+  );
   const supplierCategory = computed<'Outsourcing' | 'Supplier'>(() => {
     const names = selectedDepartmentNames.value;
     return names.includes(INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS.PRODUCTION) ||
@@ -154,6 +171,16 @@ export function useIssueForm(
   function includeLegacyOption(options: IssueOption[], value: string) {
     if (!value || options.some((item) => item.value === value)) return options;
     return [{ label: value, value }, ...options];
+  }
+
+  function resetProcessOptions(preferredOptions: ReadonlyArray<unknown> = []) {
+    const preferred = mergeInspectionProcessNames(preferredOptions).map(
+      (value) => ({ label: value, value }),
+    );
+    processOptions.value = mergeInspectionProcessOptions(
+      preferred,
+      processReferenceOptions.value,
+    );
   }
 
   function applyData(data?: InspectionIssueRecord) {
@@ -182,7 +209,7 @@ export function useIssueForm(
         data.status || ISSUE_DEFAULTS.DEFAULT_STATUS,
       ).toUpperCase(),
     });
-    if (form.processName) processOptions.value = [form.processName];
+    resetProcessOptions(form.processName ? [form.processName] : []);
   }
 
   function restoreDraft() {
@@ -201,14 +228,18 @@ export function useIssueForm(
   }
 
   async function loadReferenceData() {
-    const [departmentResult, welderResult] = await Promise.allSettled([
-      getDepartments(),
-      getIssueWelders(),
-    ]);
+    const [departmentResult, processResult, welderResult] =
+      await Promise.allSettled([
+        getDepartments(),
+        getProcessDictionaryOptions(),
+        getIssueWelders(),
+      ]);
     const departmentRes =
       departmentResult.status === 'fulfilled' ? departmentResult.value : null;
     const welderRes =
       welderResult.status === 'fulfilled' ? welderResult.value : null;
+    const processRes =
+      processResult.status === 'fulfilled' ? processResult.value : null;
     if (departmentRes?.code === 0 && Array.isArray(departmentRes.data)) {
       departments.value = flattenDepartments(departmentRes.data);
     }
@@ -220,6 +251,16 @@ export function useIssueForm(
         value: item.welderCode || item.name,
       }));
     }
+    if (processRes?.code === 0 && processRes.data.length > 0) {
+      processReferenceOptions.value = mergeInspectionProcessOptions(
+        processRes.data.map((item) => ({
+          label: item.dictValue || item.dictKey,
+          value: item.dictKey,
+        })),
+        fallbackProcessOptions,
+      );
+    }
+    resetProcessOptions(form.processName ? [form.processName] : []);
     await loadSuppliers();
   }
 
@@ -251,7 +292,8 @@ export function useIssueForm(
     form.workOrderNumber = event.detail.value;
     form.projectName = '';
     form.division = '';
-    processOptions.value = [];
+    form.processName = '';
+    resetProcessOptions();
     if (searchTimer) clearTimeout(searchTimer);
     const keyword = form.workOrderNumber.trim();
     if (!keyword) {
@@ -289,19 +331,21 @@ export function useIssueForm(
     showWorkOrderResults.value = false;
     try {
       const res = await getProcesses(item.workOrderNumber);
-      if (res.code !== 0 || !Array.isArray(res.data)) return;
-      processOptions.value = res.data.map((entry) => entry.processName);
-      if (!processOptions.value.includes(form.processName)) {
-        form.processName = '';
-      }
+      const workOrderProcesses =
+        res.code === 0 && Array.isArray(res.data)
+          ? res.data.map((entry) => entry.processName)
+          : [];
+      resetProcessOptions(workOrderProcesses);
+      form.processName = '';
     } catch {
-      processOptions.value = [];
+      resetProcessOptions();
       uni.showToast({ title: '工序加载失败', icon: 'none' });
     }
   }
 
   function onProcessChange(event: { detail: { value: string } }) {
-    form.processName = processOptions.value[Number(event.detail.value)] || '';
+    form.processName =
+      processOptions.value[Number(event.detail.value)]?.value || '';
   }
 
   function onDateChange(event: { detail: { value: string } }) {
@@ -496,6 +540,7 @@ export function useIssueForm(
     requiresSupplier,
     requiresWelder,
     searching,
+    selectedProcessLabel,
     selectedDepartmentNames,
     showDepartments,
     showWorkOrderResults,

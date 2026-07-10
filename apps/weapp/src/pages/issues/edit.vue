@@ -6,6 +6,7 @@ import { ref } from 'vue';
 import { getInspectionIssue } from '@/api/issues';
 import IssueForm from '@/components/issues/IssueForm.vue';
 import { useUserStore } from '@/stores/user';
+import { isInspectionIssueOwner } from '@/utils/issues';
 import { onLoad } from '@dcloudio/uni-app';
 import { INSPECTION_ISSUE_PERMISSION_CODES } from '@qgs/shared';
 
@@ -18,7 +19,11 @@ async function loadIssue(id: string) {
   try {
     const res = await getInspectionIssue(id);
     if (res.code === 0 && res.data) {
-      issue.value = res.data;
+      if (isInspectionIssueOwner(res.data, userStore.userInfo?.id)) {
+        issue.value = res.data;
+      } else {
+        message = '只能编辑自己创建的不合格品项';
+      }
     } else {
       message = res.message || '记录加载失败';
     }

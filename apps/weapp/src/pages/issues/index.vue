@@ -3,14 +3,18 @@ import type { InspectionIssueRecord } from '@/api/issues';
 
 import { computed, ref } from 'vue';
 
-import { getInspectionIssues } from '@/api/issues';
+import { deleteInspectionIssue, getInspectionIssues } from '@/api/issues';
 import { buildResourceUrl } from '@/api/request';
 import { useUserStore } from '@/stores/user';
 import {
   formatDepartmentNames,
   loadDepartmentNameMap,
 } from '@/utils/departments';
-import { getIssueSeverityLabel, getIssueStatusLabel } from '@/utils/issues';
+import {
+  getIssueSeverityLabel,
+  getIssueStatusLabel,
+  isInspectionIssueOwner,
+} from '@/utils/issues';
 import { onShow } from '@dcloudio/uni-app';
 import { INSPECTION_ISSUE_PERMISSION_CODES } from '@qgs/shared';
 
@@ -35,10 +39,21 @@ const departmentNames = ref(new Map<string, string>());
 const canCreate = computed(() =>
   userStore.hasPermission(INSPECTION_ISSUE_PERMISSION_CODES.CREATE),
 );
-const canEdit = computed(() =>
-  userStore.hasPermission(INSPECTION_ISSUE_PERMISSION_CODES.EDIT),
-);
 const noMore = computed(() => issues.value.length >= total.value);
+
+function canEditIssue(issue: InspectionIssueRecord) {
+  return (
+    userStore.hasPermission(INSPECTION_ISSUE_PERMISSION_CODES.EDIT) &&
+    isInspectionIssueOwner(issue, userStore.userInfo?.id)
+  );
+}
+
+function canDeleteIssue(issue: InspectionIssueRecord) {
+  return (
+    userStore.hasPermission(INSPECTION_ISSUE_PERMISSION_CODES.DELETE) &&
+    isInspectionIssueOwner(issue, userStore.userInfo?.id)
+  );
+}
 
 async function loadIssues(reset = false) {
   if (loading.value) return;
@@ -92,7 +107,33 @@ function openIssue(issue: InspectionIssueRecord) {
 }
 
 function editIssue(issue: InspectionIssueRecord) {
+  if (!canEditIssue(issue)) return;
   uni.navigateTo({ url: `/pages/issues/edit?id=${issue.id}` });
+}
+
+function deleteIssue(issue: InspectionIssueRecord) {
+  if (!canDeleteIssue(issue)) return;
+  uni.showModal({
+    title: '删除不合格品项',
+    content: `确定删除 ${issue.ncNumber || issue.partName}？`,
+    success: (result) => {
+      if (result.confirm) void performDelete(issue.id);
+    },
+  });
+}
+
+async function performDelete(id: string) {
+  try {
+    const res = await deleteInspectionIssue(id);
+    if (res.code !== 0) {
+      uni.showToast({ title: res.message || '删除失败', icon: 'none' });
+      return;
+    }
+    uni.showToast({ title: '删除成功', icon: 'success' });
+    await loadIssues(true);
+  } catch {
+    uni.showToast({ title: '网络错误，删除失败', icon: 'none' });
+  }
 }
 
 function previewPhoto(issue: InspectionIssueRecord) {
@@ -216,12 +257,20 @@ onShow(async () => {
               @tap.stop="previewPhoto(issue)"
             />
             <button
-              v-if="canEdit"
+              v-if="canEditIssue(issue)"
               class="edit-button"
               size="mini"
               @tap.stop="editIssue(issue)"
             >
               编辑
+            </button>
+            <button
+              v-if="canDeleteIssue(issue)"
+              class="delete-button"
+              size="mini"
+              @tap.stop="deleteIssue(issue)"
+            >
+              删除
             </button>
           </view>
         </view>
@@ -418,6 +467,12 @@ onShow(async () => {
   margin: 0 0 0 auto;
   color: $primary-color;
   background: #e6f7ff;
+}
+
+.delete-button {
+  margin: 0 0 0 12rpx;
+  color: $error-color;
+  background: #fff1f0;
 }
 
 .empty,
