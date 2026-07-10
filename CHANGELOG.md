@@ -25,6 +25,35 @@
 
 ## 执行记录
 
+### 2026-07-10 功能：小程序不合格品项登记
+
+**执行内容：**
+
+- 后端继续使用 `quality_records` 和 `OPEN / IN_PROGRESS / CLOSED` 状态，新增严格 Zod create/update schema、详情 API、统一列表/详情映射、RBAC 权限校验和数据范围查询；NC 编号由后端生成，并在唯一键冲突时自动重试。
+- `@qgs/shared` 新增不合格品项权限码、字段限制、缺陷类型和二级分类契约；电脑版改为直接复用共享契约，避免移动端与电脑端分类漂移。
+- 小程序新增不合格品项权限入口、列表筛选与分页、详情、新增、编辑和三步表单；复用工单、工序、部门、供应商/外协和焊工主数据。
+- 补齐手机场景必要能力：照片上传、按用户隔离的本地草稿、账号切换安全、参考数据局部失败降级、列表失败后分页恢复和明确的上传/保存提示。
+- 修复报检结果为 `FAIL` 时未向关联不合格品项传递 `photos` 的断链，以及 token 刷新失败时并发请求等待队列不被唤醒的问题。
+
+**验证结果：**
+
+- lint: 通过（0 error；保留既有 `IssueFormFields.test.ts` 9 条 warning）
+- stylelint: 小程序不合格品项页面与样式通过
+- typecheck: `pnpm run check:type` 3/3 tasks 通过；Web `vue-tsc` 通过；shared 构建和声明文件生成通过
+- check:qms-arch: 0 violations 通过
+- vitest: 后端全量 198 文件 / 1871 测试全部通过；不合格品项定向 117/117 通过
+
+**commit:**
+
+- `d717a6b` feat(@qgs/backend): support mobile inspection issues
+- `73dc5a3` feat(@qgs/weapp): add inspection issue workflow
+- `c93cee2` refactor(@qgs/web-antd): reuse inspection issue contract
+
+**遗留问题：**
+
+- 遵循仓库约束，未运行前端 dev/build；尚未在微信开发者工具或真机完成点击流程验收，不宣称视觉与设备端交互已验证。
+- 既有不合格品项统计趋势 SQL 已补 List RBAC，但仍未完整应用行级 data scope；小程序本期不调用该统计接口。
+
 ## [0.15.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.14.0...qgs-v0.15.0) (2026-07-09)
 
 
