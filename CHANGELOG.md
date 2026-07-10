@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+### 2026-07-10 修复：关闭多工单报检时检验记录流水号冲突
+
+**执行内容：**
+
+- 修复检验记录创建服务在调用方事务中仍使用全局 Prisma 客户端生成流水号的问题；现在流水号查询与记录创建使用同一个事务客户端，同一报检任务连续创建多条检验记录时可以看到事务内上一条记录并递增编号。
+- 保留关闭报检整笔事务的现有冲突重试机制，用于处理不同事务之间的并发流水号竞争。
+- 补充回归断言，确保调用方传入事务客户端时，流水号查询不会退回全局 Prisma 客户端。
+
+**验证结果：**
+
+- 定向测试：3 个文件 / 51 个测试全部通过。
+- 后端全量测试：195 个文件 / 1861 个测试全部通过。
+- lint：通过（0 error，保留既有测试文件 9 条 warning）。
+- typecheck：通过（3/3 workspace tasks）。
+- check:qms-arch：0 violations 通过。
+
+**commit:** `de6b21b` fix(@qgs/backend): avoid duplicate inspection serials on request close
+
+**遗留问题：**
+
+- 无。
+
 ## [0.15.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.14.0...qgs-v0.15.0) (2026-07-09)
 
 
