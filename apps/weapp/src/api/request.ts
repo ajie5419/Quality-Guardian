@@ -35,6 +35,13 @@ function buildResourceUrl(url: string): string {
   return url;
 }
 
+function sanitizeQueryData(data?: Record<string, unknown>) {
+  if (!data) return undefined;
+  return Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined),
+  );
+}
+
 let isRefreshing = false;
 let pendingRequests: Array<() => void> = [];
 
@@ -76,6 +83,7 @@ async function refreshToken(): Promise<boolean> {
 export async function request<T = unknown>(
   options: RequestOptions,
 ): Promise<ApiResponse<T>> {
+  const method = options.method || 'GET';
   const token = getToken();
   const header: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -89,8 +97,8 @@ export async function request<T = unknown>(
     (resolve, reject) => {
       uni.request({
         url: buildApiUrl(options.url),
-        method: options.method || 'GET',
-        data: options.data,
+        method,
+        data: method === 'GET' ? sanitizeQueryData(options.data) : options.data,
         header,
         success: resolve,
         fail: reject,
@@ -165,4 +173,4 @@ export function uploadFile(
 }
 
 export type { ApiResponse };
-export { buildApiUrl, buildResourceUrl, getApiBaseUrl };
+export { buildApiUrl, buildResourceUrl, getApiBaseUrl, sanitizeQueryData };
