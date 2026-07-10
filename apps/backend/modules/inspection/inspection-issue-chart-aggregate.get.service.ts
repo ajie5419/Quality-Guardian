@@ -1,11 +1,17 @@
+import { INSPECTION_ISSUE_PERMISSION_CODES } from '@qgs/shared';
 import { z } from 'zod';
 import {
   parseInspectionIssueDateMode,
   parseInspectionIssueDateValue,
   parseOptionalIssueYear,
 } from '~/modules/inspection/inspection-issue';
+import { InspectionIssueAccessService } from '~/modules/inspection/inspection-issue-access.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
+import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import {
@@ -37,6 +43,10 @@ export default defineValidatedHandler(schema, async (event, query) => {
     return internalServerErrorResponse(event, 'Invalid chart aggregate params');
 
   try {
+    await InspectionIssueAccessService.ensurePermission(
+      userinfo,
+      INSPECTION_ISSUE_PERMISSION_CODES.LIST,
+    );
     const result = await InspectionService.getIssueChartAggregation({
       dateMode: parseInspectionIssueDateMode(query.dateMode),
       dateValue: parseInspectionIssueDateValue(query.dateValue),
@@ -63,6 +73,8 @@ export default defineValidatedHandler(schema, async (event, query) => {
     return useResponseSuccess({ items: result });
   } catch (error) {
     logApiError('inspection-issue-chart-aggregate', error, undefined, event);
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) return businessErrorResponse(event, businessError);
     return internalServerErrorResponse(
       event,
       'Failed to fetch inspection issue chart aggregate',

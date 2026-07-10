@@ -1,5 +1,6 @@
 import type { UserSession } from '~/utils/jwt-utils';
 
+import { INSPECTION_ISSUE_PERMISSION_CODES } from '@qgs/shared';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import {
   buildImportRowError,
@@ -24,6 +25,8 @@ import {
   findInspectionForIssue,
   getNextInspectionIssueSerialNumber,
 } from './inspection-issue';
+import { InspectionIssueAccessService } from './inspection-issue-access.service';
+import { InspectionIssueNumberingService } from './inspection-issue-numbering.service';
 
 const logger = createModuleLogger('InspectionIssueMutation');
 
@@ -31,6 +34,10 @@ type RequestBody = Record<string, unknown>;
 
 export const InspectionIssueMutationService = {
   async createIssue(userinfo: UserSession, body: RequestBody) {
+    await InspectionIssueAccessService.ensurePermission(
+      userinfo,
+      INSPECTION_ISSUE_PERMISSION_CODES.CREATE,
+    );
     const sourceType = String(body.sourceType || '')
       .trim()
       .toUpperCase();
@@ -46,14 +53,21 @@ export const InspectionIssueMutationService = {
       body.inspectionId as string | undefined,
     );
     const newId = createInspectionIssueId();
+    const shouldGenerateNcNumber = !String(body.ncNumber || '').trim();
 
-    // Retry on P2002 unique-constraint conflict on serialNumber: concurrent
-    // creates can race on the aggregate-max read. Each attempt regenerates the
-    // serial to pick up the latest committed value.
+    // Aggregate-based serial and generated NC values can race under concurrent
+    // creates, so both generated values are refreshed on a matching conflict.
     const newRecord = await createIssueWithSerialRetry(async () => {
       const serialNumber = await getNextInspectionIssueSerialNumber();
+      const createBody = shouldGenerateNcNumber
+        ? {
+            ...body,
+            ncNumber:
+              await InspectionIssueNumberingService.generateNextNcNumber(),
+          }
+        : body;
       return prisma.quality_records.create({
-        data: await buildInspectionIssueCreateData(body, {
+        data: await buildInspectionIssueCreateData(createBody, {
           createdBy: String(userinfo.id || '') || undefined,
           id: newId,
           inspection: linkedInspection,
@@ -61,7 +75,7 @@ export const InspectionIssueMutationService = {
           serialNumber,
         }),
       });
-    });
+    }, shouldGenerateNcNumber);
     await FileStorageService.registerReferencesFromAttachments({
       attachments: body.photos,
       bizId: String(newRecord.id),
@@ -94,6 +108,10 @@ export const InspectionIssueMutationService = {
     body: RequestBody,
     existingNcNumber: null | string,
   ) {
+    await InspectionIssueAccessService.ensurePermission(
+      userinfo,
+      INSPECTION_ISSUE_PERMISSION_CODES.EDIT,
+    );
     const current = await prisma.quality_records.findUnique({
       where: { id },
       select: { supplierName: true },
@@ -142,6 +160,10 @@ export const InspectionIssueMutationService = {
     userinfo: UserSession,
     ids: string[],
   ) {
+    await InspectionIssueAccessService.ensurePermission(
+      userinfo,
+      INSPECTION_ISSUE_PERMISSION_CODES.DELETE,
+    );
     const existing = await prisma.quality_records.findMany({
       where: { id: { in: ids } },
       select: { supplierName: true },
@@ -185,6 +207,10 @@ export const InspectionIssueMutationService = {
     userinfo: UserSession,
     items: Array<Record<string, unknown>>,
   ) {
+    await InspectionIssueAccessService.ensurePermission(
+      userinfo,
+      INSPECTION_ISSUE_PERMISSION_CODES.CREATE,
+    );
     let successCount = 0;
     const rowErrors = [];
     const supplierNamesToRefresh: string[] = [];
@@ -282,20 +308,39 @@ function isSerialNumberConflict(error: unknown): boolean {
 }
 
 /**
- * Executes `run` up to 3 times, retrying only on a serialNumber unique-
- * constraint conflict. `run` must regenerate the serial on each call.
+ * Executes `run` up to 3 times for generated identifier conflicts. `run` must
+ * regenerate the serial and, when applicable, the NC number on each call.
  */
 async function createIssueWithSerialRetry<T>(
   run: () => Promise<T>,
+  retryNcNumberConflict: boolean,
   maxAttempts = 3,
 ): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
       return await run();
     } catch (error) {
-      if (attempt >= maxAttempts || !isSerialNumberConflict(error)) {
+      if (
+        attempt >= maxAttempts ||
+        (!isSerialNumberConflict(error) &&
+          !(retryNcNumberConflict && isNcNumberConflict(error)))
+      ) {
         throw error;
       }
     }
   }
+}
+
+function isNcNumberConflict(error: unknown): boolean {
+  if (!isPrismaUniqueConstraintError(error)) return false;
+  const message = String((error as { message?: string })?.message || '');
+  const target: unknown = (error as { meta?: { target?: unknown } })?.meta
+    ?.target;
+  const targetStr = Array.isArray(target)
+    ? target.join(',')
+    : String(target ?? '');
+  return (
+    message.includes('nonConformanceNumber') ||
+    targetStr.includes('nonConformanceNumber')
+  );
 }

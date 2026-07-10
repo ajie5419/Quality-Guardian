@@ -6,6 +6,12 @@ vi.mock('~/modules/inspection/inspection-api.service', () => ({
   },
 }));
 
+vi.mock('~/modules/inspection/inspection-issue-access.service', () => ({
+  InspectionIssueAccessService: {
+    ensurePermission: vi.fn(),
+  },
+}));
+
 vi.mock('~/modules/inspection/inspection-issue', () => ({
   findInspectionIssueAccessRecord: vi.fn(),
   hasInspectionIssueWriteAccess: vi.fn(),

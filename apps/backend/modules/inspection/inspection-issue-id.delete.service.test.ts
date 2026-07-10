@@ -11,6 +11,12 @@ vi.mock('~/modules/inspection/inspection.service', () => ({
   },
 }));
 
+vi.mock('~/modules/inspection/inspection-issue-access.service', () => ({
+  InspectionIssueAccessService: {
+    ensurePermission: vi.fn(),
+  },
+}));
+
 vi.mock('~/utils/current-user', () => ({
   getCurrentUser: vi.fn(),
 }));
@@ -24,6 +30,11 @@ vi.mock('~/utils/response', () => ({
   internalServerErrorResponse: vi.fn(),
   notFoundResponse: vi.fn(),
   useResponseSuccess: vi.fn(),
+}));
+
+vi.mock('~/utils/business-error', () => ({
+  businessErrorResponse: vi.fn(),
+  legacyErrorToBusinessError: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('~/utils/api-logger', () => ({
@@ -108,6 +119,9 @@ describe('inspection-issue-id.delete.service', () => {
     const { InspectionService } = await import(
       '~/modules/inspection/inspection.service'
     );
+    const { InspectionIssueAccessService } = await import(
+      '~/modules/inspection/inspection-issue-access.service'
+    );
     const { useResponseSuccess } = await import('~/utils/response');
     const { getCurrentUser } = await import('~/utils/current-user');
     const { getRequiredRouterParam } = await import('~/utils/route-param');
@@ -137,6 +151,10 @@ describe('inspection-issue-id.delete.service', () => {
     await handler(event);
 
     expect(InspectionService.deleteRecord).toHaveBeenCalledWith('rec-1', 'u1');
+    expect(InspectionIssueAccessService.ensurePermission).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'u1' }),
+      'QMS:Inspection:Issues:Delete',
+    );
     expect(useResponseSuccess).toHaveBeenCalledWith(null);
   });
 });

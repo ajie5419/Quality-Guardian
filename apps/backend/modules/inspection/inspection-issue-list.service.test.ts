@@ -6,6 +6,7 @@ vi.mock('~/utils/prisma', () => ({
   default: {
     quality_records: {
       count: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
     },
     $queryRawUnsafe: vi.fn(),
@@ -288,6 +289,68 @@ describe('inspectionIssueListService', () => {
       expect(result.items[0].lossAmount).toBe(0);
       expect(result.items[0].title).toBe('');
       expect(result.items[0].claim).toBe('No');
+    });
+  });
+
+  describe('getIssueById', () => {
+    it('queries by id inside the resolved data scope and reuses list mapping', async () => {
+      const { DataScopeService } = await import(
+        '~/modules/data-scope/data-scope.service'
+      );
+      const { resolveCanonicalProcessName } = await import(
+        '~/utils/process-resolver'
+      );
+      vi.mocked(resolveCanonicalProcessName).mockReturnValue('Welding');
+      vi.mocked(DataScopeService.buildInspectionWhere).mockResolvedValue({
+        AND: [
+          { id: 'rec-1', isDeleted: false },
+          { responsibleDepartment: { in: ['dept-1'] } },
+        ],
+      });
+      (prisma.quality_records.findFirst as any).mockResolvedValue({
+        id: 'rec-1',
+        nonConformanceNumber: 'NC-26KJ-001',
+        date: new Date('2026-07-10'),
+        severity: 'Major',
+        status: 'OPEN',
+        lossAmount: 12,
+        inspector: 'inspector',
+        responsibleDepartment: 'dept-1',
+        responsibleDepartments: null,
+        responsibleWelder: null,
+        rootCause: 'Cause',
+        solution: 'Solution',
+        partName: 'Frame',
+        description: 'Issue',
+        isClaim: false,
+        issuePhoto: '[]',
+        projectName: 'Project',
+        workOrderNumber: 'WO-1',
+        quantity: 1,
+        updatedAt: new Date('2026-07-10'),
+        process: { name: 'Welding' },
+      });
+
+      const result = await InspectionIssueListService.getIssueById({
+        id: 'rec-1',
+        userContext: { userId: 'user-1', username: 'inspector' },
+      });
+
+      expect(DataScopeService.buildInspectionWhere).toHaveBeenCalledWith(
+        { id: 'rec-1', isDeleted: false },
+        { userId: 'user-1', username: 'inspector' },
+        undefined,
+      );
+      expect(prisma.quality_records.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ AND: expect.any(Array) }),
+        }),
+      );
+      expect(result).toMatchObject({
+        id: 'rec-1',
+        ncNumber: 'NC-26KJ-001',
+        processName: 'Welding',
+      });
     });
   });
 });

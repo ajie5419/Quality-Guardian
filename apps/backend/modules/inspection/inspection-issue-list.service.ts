@@ -40,6 +40,18 @@ type QualityRecordOrderField = keyof Pick<
   | 'workOrderNumber'
 >;
 
+const inspectionIssueInclude = {
+  process: {
+    select: {
+      name: true,
+    },
+  },
+} satisfies Prisma.quality_recordsInclude;
+
+type InspectionIssueRecord = Prisma.quality_recordsGetPayload<{
+  include: typeof inspectionIssueInclude;
+}>;
+
 const QUALITY_RECORD_ORDER_FIELD_MAP: Record<string, QualityRecordOrderField> =
   {
     createdAt: 'createdAt',
@@ -97,7 +109,61 @@ function getResponsibleDepartmentsForResponse(issue: {
   return issue.responsibleDepartment ? [issue.responsibleDepartment] : [];
 }
 
+export function mapInspectionIssueRecord(
+  issue: InspectionIssueRecord,
+): InspectionIssue {
+  const photos = tryParsePhotos(issue.issuePhoto as string);
+  const canonicalProcessName = resolveCanonicalProcessNameByRelation(issue);
+  const responsibleDepartments = getResponsibleDepartmentsForResponse(issue);
+
+  return {
+    ...issue,
+    inspectionId: issue.inspectionId || undefined,
+    ncNumber: issue.nonConformanceNumber || '',
+    reportDate: formatDate(issue.date),
+    date: formatDate(issue.date),
+    claim: issue.isClaim ? 'Yes' : 'No',
+    isClaim: issue.isClaim,
+    photos,
+    severity: (issue.severity as 'Critical' | 'Major' | 'Minor') || 'Minor',
+    status: issue.status as InspectionIssueStatusEnum,
+    lossAmount: Number(issue.lossAmount) || 0,
+    responsibleDepartment: issue.responsibleDepartment || '',
+    responsibleDepartments,
+    responsibleWelder: issue.responsibleWelder || '',
+    reportedBy: issue.inspector || '',
+    rootCause: issue.rootCause || '',
+    solution: issue.solution || '',
+    title: issue.partName || '',
+    updatedAt: issue.updatedAt.toISOString(),
+    workOrderNumber: issue.workOrderNumber || '',
+    projectName: issue.projectName || '',
+    quantity: issue.quantity || 0,
+    inspector: issue.inspector || '',
+    description: issue.description || '',
+    partName: issue.partName || '',
+    processName: canonicalProcessName || '',
+  };
+}
+
 export const InspectionIssueListService = {
+  async getIssueById(params: {
+    dataScope?: ResolvedDataScope;
+    id: string;
+    userContext: { userId: string; username?: string };
+  }): Promise<InspectionIssue | null> {
+    const where = await DataScopeService.buildInspectionWhere(
+      { id: params.id, isDeleted: false },
+      params.userContext,
+      params.dataScope,
+    );
+    const issue = await prisma.quality_records.findFirst({
+      where,
+      include: inspectionIssueInclude,
+    });
+    return issue ? mapInspectionIssueRecord(issue) : null;
+  },
+
   async getIssues(params: {
     dataScope?: ResolvedDataScope;
     dateMode?: InspectionIssueDateMode;
@@ -255,51 +321,11 @@ export const InspectionIssueListService = {
         orderBy,
         skip,
         take,
-        include: {
-          process: {
-            select: {
-              name: true,
-            },
-          },
-        },
+        include: inspectionIssueInclude,
       }),
     ]);
 
-    const items: InspectionIssue[] = issues.map((issue) => {
-      const photos = tryParsePhotos(issue.issuePhoto as string);
-      const canonicalProcessName = resolveCanonicalProcessNameByRelation(issue);
-      const responsibleDepartments =
-        getResponsibleDepartmentsForResponse(issue);
-
-      return {
-        ...issue,
-        inspectionId: issue.inspectionId || undefined,
-        ncNumber: issue.nonConformanceNumber || '',
-        reportDate: formatDate(issue.date),
-        date: formatDate(issue.date),
-        claim: issue.isClaim ? 'Yes' : 'No',
-        isClaim: issue.isClaim,
-        photos,
-        severity: (issue.severity as 'Critical' | 'Major' | 'Minor') || 'Minor',
-        status: issue.status as InspectionIssueStatusEnum,
-        lossAmount: Number(issue.lossAmount) || 0,
-        responsibleDepartment: issue.responsibleDepartment || '',
-        responsibleDepartments,
-        responsibleWelder: issue.responsibleWelder || '',
-        reportedBy: issue.inspector || '', // Use inspector for reportedBy
-        rootCause: issue.rootCause || '',
-        solution: issue.solution || '',
-        title: issue.partName || '',
-        updatedAt: issue.updatedAt.toISOString(),
-        workOrderNumber: issue.workOrderNumber || '',
-        projectName: issue.projectName || '',
-        quantity: issue.quantity || 0,
-        inspector: issue.inspector || '',
-        description: issue.description || '',
-        partName: issue.partName || '',
-        processName: canonicalProcessName || '',
-      };
-    });
+    const items = issues.map((issue) => mapInspectionIssueRecord(issue));
 
     return { items, total };
   },

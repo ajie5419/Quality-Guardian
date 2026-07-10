@@ -10,6 +10,7 @@ export * from './domain-modules/qms/import-report';
 export * from './domain-modules/qms/inspection-archive';
 export * from './domain-modules/qms/inspection-form';
 
+export * from './domain-modules/qms/inspection-issue-contract';
 export * from './domain-modules/qms/inspection-issue-core';
 export * from './domain-modules/qms/inspection-issue-query';
 

@@ -59,6 +59,18 @@ vi.mock('~/modules/inspection/inspection-issue', () => ({
   getNextInspectionIssueSerialNumber: vi.fn().mockResolvedValue(1),
 }));
 
+vi.mock('~/modules/inspection/inspection-issue-access.service', () => ({
+  InspectionIssueAccessService: {
+    ensurePermission: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/inspection/inspection-issue-numbering.service', () => ({
+  InspectionIssueNumberingService: {
+    generateNextNcNumber: vi.fn().mockResolvedValue('NC-26KJ-001'),
+  },
+}));
+
 const mockLoggerFns = vi.hoisted(() => ({
   error: vi.fn(),
   info: vi.fn(),
@@ -96,9 +108,59 @@ describe('inspectionIssueMutationService', () => {
         '~/modules/inspection/inspection-issue'
       );
       expect(buildInspectionIssueCreateData).toHaveBeenCalledWith(
-        {},
+        { ncNumber: 'NC-26KJ-001' },
         expect.objectContaining({ createdBy: 'user-1' }),
       );
+    });
+
+    it('preserves an explicit NC number without generating a replacement', async () => {
+      const { InspectionIssueNumberingService } = await import(
+        '~/modules/inspection/inspection-issue-numbering.service'
+      );
+      const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+      (prisma.quality_records.create as any).mockResolvedValue({
+        id: 'ISS-2026-001',
+        nonConformanceNumber: 'NC-CUSTOM-001',
+        partName: 'Part',
+      });
+
+      await InspectionIssueMutationService.createIssue(mockUser, {
+        ncNumber: 'NC-CUSTOM-001',
+      });
+
+      expect(
+        InspectionIssueNumberingService.generateNextNcNumber,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('regenerates an automatic NC number after a unique conflict', async () => {
+      const { InspectionIssueNumberingService } = await import(
+        '~/modules/inspection/inspection-issue-numbering.service'
+      );
+      vi.mocked(InspectionIssueNumberingService.generateNextNcNumber)
+        .mockResolvedValueOnce('NC-26KJ-001')
+        .mockResolvedValueOnce('NC-26KJ-002');
+      const conflict = Object.assign(
+        new Error('Unique constraint failed on nonConformanceNumber'),
+        { code: 'P2002', meta: { target: ['nonConformanceNumber'] } },
+      );
+      (prisma.quality_records.create as any)
+        .mockRejectedValueOnce(conflict)
+        .mockResolvedValueOnce({
+          id: 'ISS-2026-002',
+          nonConformanceNumber: 'NC-26KJ-002',
+          partName: 'Part',
+        });
+
+      const result = await InspectionIssueMutationService.createIssue(
+        { id: 'user-1', username: 'admin' } as any,
+        {},
+      );
+
+      expect(
+        InspectionIssueNumberingService.generateNextNcNumber,
+      ).toHaveBeenCalledTimes(2);
+      expect(result.ncNumber).toBe('NC-26KJ-002');
     });
 
     it('should throw when sourceType is INSPECTION and inspectionId is missing', async () => {
@@ -314,6 +376,9 @@ describe('inspectionIssueMutationService', () => {
       const { FileStorageService } = await import(
         '~/modules/file-storage/file-storage.service'
       );
+      const { InspectionIssueAccessService } = await import(
+        '~/modules/inspection/inspection-issue-access.service'
+      );
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
       (prisma.quality_records.updateMany as any).mockResolvedValue({
         count: 2,
@@ -326,6 +391,9 @@ describe('inspectionIssueMutationService', () => {
       );
 
       expect(result).toBe(2);
+      expect(
+        InspectionIssueAccessService.ensurePermission,
+      ).toHaveBeenCalledWith(mockUser, 'QMS:Inspection:Issues:Delete');
       expect(prisma.quality_records.updateMany).toHaveBeenCalledWith({
         where: { id: { in: ['rec-1', 'rec-2'] } },
         data: { isDeleted: true, updatedAt: expect.any(Date) },
@@ -412,6 +480,9 @@ describe('inspectionIssueMutationService', () => {
       const { buildInspectionIssueUpsertPayload } = await import(
         '~/modules/inspection/inspection-issue'
       );
+      const { InspectionIssueAccessService } = await import(
+        '~/modules/inspection/inspection-issue-access.service'
+      );
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
 
       vi.mocked(buildInspectionIssueUpsertPayload).mockResolvedValue({
@@ -434,6 +505,9 @@ describe('inspectionIssueMutationService', () => {
 
       expect(result.successCount).toBe(1);
       expect(result.totalCount).toBe(1);
+      expect(
+        InspectionIssueAccessService.ensurePermission,
+      ).toHaveBeenCalledWith(mockUser, 'QMS:Inspection:Issues:Create');
       expect(prisma.quality_records.upsert).toHaveBeenCalled();
     });
 
