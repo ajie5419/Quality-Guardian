@@ -58,7 +58,41 @@
 **遗留问题：**
 
 - 未完成真机、实际新增提交、照片上传、分页、草稿和账号切换验收；当前结论只覆盖微信开发者工具的列表数据加载和页面路由冒烟测试。
-- 既有不合格品项统计趋势 SQL 已补 List RBAC，但仍未完整应用行级 data scope；小程序本期不调用该统计接口。
+
+### 2026-07-10 修复：不合格品项按创建人隔离
+
+**执行内容：**
+
+- 普通账号的不合格品项列表、详情、统计和图表统一按 `createdBy` 查询，只返回当前登录账号创建的数据；`admin`、`super` 及其派生管理员角色返回全部数据。
+- 管理员角色改为按 `admin` / `super` 独立词元识别，避免 `supervisor`、`administrator` 等普通角色被误判为管理员。
+- 更新、单条删除、批量删除和导入覆盖统一校验创建人 ID；管理员也不能修改或删除他人记录，历史 `createdBy` 为空的记录仅管理员可查看。
+- 单条删除改为原子软删除并返回明确的 404，避免重复点击或并发删除变成 500。
+- 报检关闭生成不合格品项时补写 `createdBy`，避免检验员提交后看不到自己生成的记录。
+- 显式关联检验记录关闭报检时同样保留流水号冲突重试，避免并发创建不合格品项时关闭失败。
+- 小程序和电脑版均按记录隐藏他人的编辑、删除入口，并在直达编辑、批量删除和操作函数中再次校验所有权；电脑版仍允许管理员选择他人记录用于查看和导出。
+- 小程序工序选择与电脑版保持一致：显示字典 `dictValue`、提交 `dictKey`，同时合并工单工序和共享兜底工序。
+- 统计趋势使用带创建人条件的参数化 SQL 在数据库按天/月聚合，避免年度管理员统计把明细行加载到 4 GB 应用服务器内存。
+
+**验证结果：**
+
+- vitest: 不合格品项、报检关闭、共享规则、电脑版和小程序定向 17 文件 / 201 测试通过
+- vitest: 后端全量 198 文件 / 1892 测试通过
+- vitest: 电脑版所有权操作 5/5 通过
+- vitest: 小程序所有权与工序选项 5/5 通过
+- lint: 通过（0 error；保留既有 `IssueFormFields.test.ts` 9 条 warning）
+- typecheck: `pnpm run check:type` 3/3 tasks 通过
+- check:qms-arch: 0 violations 通过
+
+**commit:** `5a57413` fix(@qgs/backend): enforce inspection issue ownership
+
+**commit:** `fd5a016` fix(@qgs/weapp): complete inspection issue ownership flow
+
+**commit:** `ef0dcfd` fix(@qgs/web-antd): restrict inspection issue owner actions
+
+**遗留问题：**
+
+- 未运行前端 dev/build；遵循仓库约束，通过单元测试、类型检查、Lint 和架构门禁验证。
+- 真机账号切换后的列表可见范围和实际删除流程仍需现场验收。
 
 ## [0.15.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.14.0...qgs-v0.15.0) (2026-07-09)
 
