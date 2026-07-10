@@ -14,6 +14,7 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useKnowledgeSettlement } from '#/hooks/useKnowledgeSettlement';
 
 export function useIssueActions(options: {
+  canManageIssue: (row: InspectionIssue) => boolean;
   checkedRows: Ref<InspectionIssue[]>;
   gridApi: { reload: () => void };
   invalidateInspectionIssues: () => void;
@@ -21,6 +22,7 @@ export function useIssueActions(options: {
   t: (key: string, params?: Record<string, unknown>) => string;
 }) {
   const {
+    canManageIssue,
     checkedRows,
     gridApi,
     invalidateInspectionIssues,
@@ -41,12 +43,20 @@ export function useIssueActions(options: {
   }
 
   function handleEdit(row: InspectionIssue) {
+    if (!canManageIssue(row)) {
+      message.warning(t('qms.inspection.issues.ownerOnly'));
+      return;
+    }
     isEditMode.value = true;
     currentRecord.value = { ...row };
     modalVisible.value = true;
   }
 
   async function handleDelete(row: InspectionIssue) {
+    if (!canManageIssue(row)) {
+      message.warning(t('qms.inspection.issues.ownerOnly'));
+      return;
+    }
     Modal.confirm({
       title: t('qms.inspection.issues.deleteConfirm'),
       content: t('qms.inspection.issues.deleteContent', {
@@ -69,6 +79,10 @@ export function useIssueActions(options: {
   function handleBatchDelete() {
     if (checkedRows.value.length === 0) {
       message.warning(t('common.pleaseSelectData'));
+      return;
+    }
+    if (checkedRows.value.some((row) => !canManageIssue(row))) {
+      message.warning(t('qms.inspection.issues.ownerOnly'));
       return;
     }
     Modal.confirm({

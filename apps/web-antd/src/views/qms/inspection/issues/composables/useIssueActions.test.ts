@@ -2,7 +2,7 @@ import type { InspectionIssue } from '../types';
 
 import { ref } from 'vue';
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useIssueActions } from './useIssueActions';
 
@@ -44,8 +44,13 @@ vi.mock('ant-design-vue', () => ({
 }));
 
 describe('useIssueActions', () => {
-  function createIssue(id: string): InspectionIssue {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function createIssue(id: string, createdBy = 'user-1'): InspectionIssue {
     return {
+      createdBy,
       id,
       ncNumber: `NC-${id}`,
       reportDate: '2026-01-01',
@@ -76,6 +81,7 @@ describe('useIssueActions', () => {
       onAfterDeleteSuccess,
       invalidateInspectionIssues,
       ...useIssueActions({
+        canManageIssue: (row) => row.createdBy === 'user-1',
         checkedRows,
         gridApi,
         invalidateInspectionIssues,
@@ -104,5 +110,42 @@ describe('useIssueActions', () => {
     expect(composable.invalidateInspectionIssues).toHaveBeenCalled();
     expect(composable.gridApi.reload).toHaveBeenCalled();
     expect(composable.onAfterDeleteSuccess).toHaveBeenCalled();
+  });
+
+  it('blocks editing an issue created by another user', () => {
+    const composable = createComposable();
+
+    composable.handleEdit(createIssue('other', 'user-2'));
+
+    expect(composable.modalVisible.value).toBe(false);
+    expect(mockMessageWarning).toHaveBeenCalledWith(
+      'qms.inspection.issues.ownerOnly',
+    );
+  });
+
+  it('blocks deleting an issue created by another user', async () => {
+    const composable = createComposable();
+
+    await composable.handleDelete(createIssue('other', 'user-2'));
+
+    expect(mockDeleteInspectionIssue).not.toHaveBeenCalled();
+    expect(mockMessageWarning).toHaveBeenCalledWith(
+      'qms.inspection.issues.ownerOnly',
+    );
+  });
+
+  it('blocks batch deletion when the selection contains another owner', () => {
+    const composable = createComposable();
+    composable.checkedRows.value = [
+      createIssue('own'),
+      createIssue('other', 'user-2'),
+    ];
+
+    composable.handleBatchDelete();
+
+    expect(mockBatchDeleteInspectionIssues).not.toHaveBeenCalled();
+    expect(mockMessageWarning).toHaveBeenCalledWith(
+      'qms.inspection.issues.ownerOnly',
+    );
   });
 });

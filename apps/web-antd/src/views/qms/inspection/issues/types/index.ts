@@ -46,6 +46,7 @@ export type DefectType = (typeof DefectType)[keyof typeof DefectType];
  * 质量问题实体
  */
 export interface InspectionIssue {
+  createdBy?: null | string;
   id: string;
   inspectionId?: string;
   ncNumber: string;

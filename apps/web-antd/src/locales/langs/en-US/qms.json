@@ -171,6 +171,7 @@
       "matchCasesSuccess": "Cases Matched Successfully",
       "deleteConfirm": "Confirm Delete",
       "deleteContent": "Are you sure to delete {ncNumber}?",
+      "ownerOnly": "You can only edit or delete issues you created.",
       "defects": {
         "design": "Design Defect",
         "process": "Process Defect",

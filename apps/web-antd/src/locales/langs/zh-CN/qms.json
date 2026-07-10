@@ -409,6 +409,7 @@
       "matchCasesSuccess": "相似案例匹配成功",
       "deleteConfirm": "确认删除",
       "deleteContent": "确定要删除 {ncNumber} 吗？",
+      "ownerOnly": "只能编辑或删除自己创建的不合格品项",
       "defects": {
         "design": "设计缺陷",
         "process": "工艺缺陷",
