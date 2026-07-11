@@ -25,6 +25,13 @@
 
 ## 执行记录
 
+## [0.15.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.15.0...qgs-v0.15.1) (2026-07-11)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** avoid duplicate inspection serials on request close ([de6b21b](https://github.com/ajie5419/Quality-Guardian/commit/de6b21b77efe4c169cfc6ef58dd72d8358aa3efd))
+
 ### 2026-07-10 修复：关闭多工单报检时检验记录流水号冲突
 
 **执行内容：**
