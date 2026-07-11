@@ -29,12 +29,14 @@ import { resolveInspectionTemplateBinding } from './inspection-template-binding.
 const logger = createModuleLogger('InspectionService');
 
 export const InspectionRecordCreateService = {
-  async generateSerialNumber(): Promise<string> {
+  async generateSerialNumber(
+    client: Pick<Prisma.TransactionClient, 'inspections'> = prisma,
+  ): Promise<string> {
     const dateStr = new Date().toISOString().slice(0, 10).replaceAll('-', '');
     const prefix = `INS-${dateStr}-`;
 
     // Find last record today
-    const lastRecord = await prisma.inspections.findFirst({
+    const lastRecord = await client.inspections.findFirst({
       where: {
         serialNumber: {
           startsWith: prefix,
@@ -73,7 +75,9 @@ export const InspectionRecordCreateService = {
     for (let attempt = 1; attempt <= maxRetry; attempt++) {
       try {
         const serialNumber =
-          await InspectionRecordCreateService.generateSerialNumber();
+          await InspectionRecordCreateService.generateSerialNumber(
+            client ?? prisma,
+          );
         const inputTeam = data.team;
         const resolvedProcessId = await resolveProcessIdForWrite({
           explicitProcessId: data.processId,
