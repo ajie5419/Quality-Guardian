@@ -30,7 +30,6 @@
 
 ### Bug Fixes
 
-* **@qgs/backend:** avoid duplicate inspection serials on request close ([18a4c6e](https://github.com/ajie5419/Quality-Guardian/commit/18a4c6eae3eb11e97dc645de45b6a06c86eda3ac))
 * **@qgs/backend:** avoid duplicate inspection serials on request close ([de6b21b](https://github.com/ajie5419/Quality-Guardian/commit/de6b21b77efe4c169cfc6ef58dd72d8358aa3efd))
 
 ### 2026-07-10 修复：关闭多工单报检时检验记录流水号冲突
