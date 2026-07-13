@@ -11,22 +11,21 @@ interface UnresolvedRow {
 }
 
 async function findUnresolved(): Promise<UnresolvedRow[]> {
-  const rows = await prisma.after_sales.findMany({
-    where: {
-      isDeleted: false,
-      supplierBrandId: null,
-      supplierBrand: { not: null },
-    },
-    select: { id: true, serialNumber: true, supplierBrand: true },
-    orderBy: { serialNumber: 'asc' },
-  });
-  return rows
-    .filter((row): row is UnresolvedRow => Boolean(row.supplierBrand))
-    .map((row) => ({
-      id: row.id,
-      serialNumber: row.serialNumber,
-      supplierBrand: row.supplierBrand as string,
-    }));
+  return prisma.$queryRaw<UnresolvedRow[]>`
+    SELECT
+      a.id,
+      a.serialNumber,
+      a.supplierBrand
+    FROM after_sales AS a
+    LEFT JOIN suppliers AS s
+      ON s.id = a.supplierBrandId
+      AND s.isDeleted = 0
+    WHERE a.isDeleted = 0
+      AND a.supplierBrand IS NOT NULL
+      AND a.supplierBrand <> ''
+      AND s.id IS NULL
+    ORDER BY a.serialNumber ASC
+  `;
 }
 
 async function main() {
@@ -34,8 +33,8 @@ async function main() {
 
   // The backfill SQL has already been applied by the matching migration
   // (20260623000100_backfill_after_sales_supplier_brand_id). This script
-  // only reports rows whose supplierBrand could not be resolved against
-  // suppliers.name so the business team can reconcile them manually.
+  // The reconciliation migration rewrites both missing IDs and legacy IDs
+  // from the wrong namespace. This script reports anything still unresolved.
   const unresolved = await findUnresolved();
 
   if (unresolved.length === 0) {

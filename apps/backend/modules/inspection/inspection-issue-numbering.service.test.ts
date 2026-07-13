@@ -6,7 +6,7 @@ vi.mock('~/utils/prisma', () => ({
   default: {
     quality_records: {
       findFirst: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -32,6 +32,7 @@ vi.mock('~/modules/welder/welder-score.service', () => ({
 describe('inspectionIssueNumberingService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma.quality_records.updateMany as any).mockResolvedValue({ count: 1 });
   });
 
   describe('generateNextNcNumber', () => {
@@ -109,8 +110,8 @@ describe('inspectionIssueNumberingService', () => {
 
       await InspectionIssueNumberingService.deleteRecord('rec-1', 'user-1');
 
-      expect(prisma.quality_records.update).toHaveBeenCalledWith({
-        where: { id: 'rec-1' },
+      expect(prisma.quality_records.updateMany).toHaveBeenCalledWith({
+        where: { createdBy: 'user-1', id: 'rec-1', isDeleted: false },
         data: {
           isDeleted: true,
           updatedAt: expect.any(Date),
@@ -130,6 +131,16 @@ describe('inspectionIssueNumberingService', () => {
           detailsVariables: {},
         },
       );
+    });
+
+    it('returns not found when the record was already deleted', async () => {
+      (prisma.quality_records.updateMany as any).mockResolvedValue({
+        count: 0,
+      });
+
+      await expect(
+        InspectionIssueNumberingService.deleteRecord('rec-1', 'user-1'),
+      ).rejects.toMatchObject({ code: 'NOT_FOUND', httpStatus: 404 });
     });
   });
 });

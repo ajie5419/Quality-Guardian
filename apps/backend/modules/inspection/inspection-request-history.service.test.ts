@@ -38,14 +38,13 @@ describe('inspectionRequestHistoryService', () => {
     const result =
       await InspectionRequestHistoryService.getSupplierHistoryProjects({
         supplierName: 'Supplier A',
-        supplierNameId: 'md-1',
       });
 
     expect(prisma.qms_inspection_requests.groupBy).toHaveBeenCalledWith({
       by: ['workOrderNumber'],
       where: {
         isDeleted: false,
-        OR: [{ team: 'Supplier A' }, { teamId: 'md-1' }],
+        team: 'Supplier A',
       },
       _max: { submittedAt: true },
       orderBy: { _max: { submittedAt: 'desc' } },

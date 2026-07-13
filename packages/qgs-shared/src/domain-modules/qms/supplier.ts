@@ -3,14 +3,33 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 200;
 const DEFAULT_SUPPLIER_CATEGORY = 'Supplier';
 export const DEFAULT_OUTSOURCING_MODE = 'EXTERNAL_PROCESSOR';
+export const EXTERNAL_SERVICE_OUTSOURCING_MODE = 'EXTERNAL_SERVICE';
 export const IN_HOUSE_OUTSOURCING_MODE = 'IN_HOUSE_TEAM';
 export const OUTSOURCING_CATEGORY = 'Outsourcing';
 
 export const OUTSOURCING_MODES = new Set([
   'EXTERNAL_PROCESSOR',
-  'EXTERNAL_SERVICE',
+  EXTERNAL_SERVICE_OUTSOURCING_MODE,
   IN_HOUSE_OUTSOURCING_MODE,
 ]);
+
+export interface SupplierInspectionPolicy {
+  identitySource: 'supplier' | 'team';
+  inspectionCategory: 'INCOMING' | 'PROCESS';
+  profileSource: 'incoming' | 'process';
+}
+
+const INCOMING_SUPPLIER_INSPECTION_POLICY = {
+  identitySource: 'supplier',
+  inspectionCategory: 'INCOMING',
+  profileSource: 'incoming',
+} as const satisfies SupplierInspectionPolicy;
+
+const PROCESS_TEAM_INSPECTION_POLICY = {
+  identitySource: 'team',
+  inspectionCategory: 'PROCESS',
+  profileSource: 'process',
+} as const satisfies SupplierInspectionPolicy;
 
 const OUTSOURCING_MODE_ALIASES: Record<string, string> = {
   'external processor': 'EXTERNAL_PROCESSOR',
@@ -129,6 +148,30 @@ export function normalizeOutsourcingMode(
   }
 
   return isOutsourcingCategory(category) ? DEFAULT_OUTSOURCING_MODE : undefined;
+}
+
+/**
+ * Resolve the inspection data source for supplier metrics and portraits.
+ * External processors are accepted through incoming inspection, while teams
+ * working on-site or providing external services are tracked by process
+ * inspection under the production team identity.
+ */
+export function resolveSupplierInspectionPolicy(input: {
+  category?: unknown;
+  outsourcingMode?: unknown;
+}): SupplierInspectionPolicy {
+  if (!isOutsourcingCategory(input.category)) {
+    return INCOMING_SUPPLIER_INSPECTION_POLICY;
+  }
+
+  const outsourcingMode = normalizeOutsourcingMode(
+    input.outsourcingMode,
+    input.category,
+  );
+  return outsourcingMode === IN_HOUSE_OUTSOURCING_MODE ||
+    outsourcingMode === EXTERNAL_SERVICE_OUTSOURCING_MODE
+    ? PROCESS_TEAM_INSPECTION_POLICY
+    : INCOMING_SUPPLIER_INSPECTION_POLICY;
 }
 
 interface SupplierImportItem {

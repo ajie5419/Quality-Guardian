@@ -43,3 +43,7 @@ export function wxBind(
     data: { sessionToken, username, password },
   });
 }
+
+export function getPermissionCodes() {
+  return request<string[]>({ url: '/api/auth/codes', method: 'GET' });
+}

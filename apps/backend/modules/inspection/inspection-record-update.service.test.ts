@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRecordUpdateService } from '~/modules/inspection/inspection-record-update.service';
+import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
     $transaction: vi.fn(),
   },
+}));
+
+vi.mock('~/utils/event-bus', () => ({
+  eventBus: { emit: vi.fn() },
 }));
 
 vi.mock('~/utils/governed-write', () => ({
@@ -70,6 +75,8 @@ describe('inspectionRecordUpdateService', () => {
       processId: 'process-1',
       processName: 'Welding',
       documents: null,
+      supplierName: 'Supplier B',
+      team: 'Team B',
       workOrderNumber: 'WO-1',
     };
     const txInspectionsUpdate = vi.fn().mockResolvedValue(mockInspection);
@@ -81,6 +88,8 @@ describe('inspectionRecordUpdateService', () => {
             incomingType: null,
             processId: 'process-old',
             processName: 'Old',
+            supplierName: 'Supplier A',
+            team: 'Team A',
             templateId: null,
             templateName: null,
             workOrderNumber: 'WO-1',
@@ -108,6 +117,10 @@ describe('inspectionRecordUpdateService', () => {
 
     expect(prisma.$transaction).toHaveBeenCalled();
     expect(result).toEqual(mockInspection);
+    expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
+      supplierNames: ['Supplier A', 'Supplier B'],
+      teamNames: ['Team A', 'Team B'],
+    });
   });
 
   it('should replace items (delete old, create new)', async () => {
@@ -196,5 +209,24 @@ describe('inspectionRecordUpdateService', () => {
     } as any);
 
     expect(syncInspectionProjectDocuments).toHaveBeenCalled();
+  });
+
+  it('does not publish a change event when the transaction rolls back', async () => {
+    const failure = new Error('transaction failed');
+    vi.mocked(prisma.$transaction).mockRejectedValue(failure);
+
+    await expect(
+      InspectionRecordUpdateService.update('i-1', {
+        category: 'PROCESS',
+        items: [],
+        processName: 'Welding',
+        quantity: 1,
+        qualifiedQuantity: 1,
+        unqualifiedQuantity: 0,
+        workOrderNumber: 'WO-1',
+      } as any),
+    ).rejects.toBe(failure);
+
+    expect(eventBus.emit).not.toHaveBeenCalled();
   });
 });

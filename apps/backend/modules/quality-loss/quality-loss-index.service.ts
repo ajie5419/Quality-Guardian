@@ -75,9 +75,12 @@ interface ManualInput {
   id: string;
   isDeleted: boolean;
   occurDate: Date;
+  partName: null | string;
+  projectName: null | string;
   respDept: null | string;
   status: null | string;
-  type?: null | string;
+  type: null | string;
+  workOrderNumber: null | string;
 }
 
 function num(value: null | number | Prisma.Decimal | undefined) {
@@ -214,10 +217,11 @@ export const QualityLossIndexService = {
       amount,
       actualClaim: num(row.actualClaim),
       status: row.status || 'Pending',
-      projectName: null,
-      workOrderNumber: null,
+      lossType: row.type,
+      projectName: row.projectName,
+      workOrderNumber: row.workOrderNumber,
       respDept: row.respDept,
-      partName: row.type || null,
+      partName: row.partName,
       description: row.description || null,
       supplierBrandId: null,
       createdBy: row.createdBy,

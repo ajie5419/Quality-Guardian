@@ -26,6 +26,7 @@ export interface SupplierStats {
   engineeringCount: number;
   engineeringDefectQuantity: number;
   engineeringLoss: number;
+  engineeringTotalCount: number;
   failures: number;
   failuresQuantity: number;
   maxSingleLoss: number;
@@ -50,6 +51,7 @@ export function createEmptyStats(): SupplierStats {
     engineeringCount: 0,
     engineeringDefectQuantity: 0,
     engineeringLoss: 0,
+    engineeringTotalCount: 0,
     failures: 0,
     failuresQuantity: 0,
     maxSingleLoss: 0,

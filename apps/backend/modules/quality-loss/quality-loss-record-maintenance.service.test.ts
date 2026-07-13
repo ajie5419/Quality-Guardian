@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    $transaction: vi.fn(async (operations: Promise<unknown>[]) =>
+      Promise.all(operations),
+    ),
     quality_loss_index: {
       findMany: vi.fn(),
       updateMany: vi.fn(),
@@ -15,10 +20,9 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-vi.mock('~/modules/quality-loss/quality-loss-index.service', () => ({
-  QualityLossIndexService: {
-    softDeleteSource: vi.fn(),
-    softDeleteSourceMany: vi.fn(),
+vi.mock('~/modules/data-scope/data-scope.service', () => ({
+  DataScopeService: {
+    getDeptCandidates: vi.fn(),
   },
 }));
 
@@ -31,22 +35,25 @@ vi.mock('~/modules/system-log/system-log.service', () => ({
 describe('quality-loss-record-maintenance.service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.quality_loss_index.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.quality_loss_index.updateMany).mockResolvedValue({
+      count: 1,
+    });
   });
 
   it('should delete a record by id', async () => {
     const { QualityLossRecordMaintenanceService } = await import(
       '~/modules/quality-loss/quality-loss-record-maintenance.service'
     );
-    const prismaModule = await import('~/utils/prisma');
-    const prisma = prismaModule.default;
-
     (prisma.quality_losses.findFirst as any).mockResolvedValue({ id: 'ql-1' });
-    (prisma.quality_losses.update as any).mockResolvedValue({});
+    (prisma.quality_losses.updateMany as any).mockResolvedValue({ count: 1 });
 
-    await QualityLossRecordMaintenanceService.deleteRecord('ql-1', 'user-1');
+    await QualityLossRecordMaintenanceService.deleteRecord('ql-1', {
+      userId: 'user-1',
+    });
 
-    expect(prisma.quality_losses.update).toHaveBeenCalledWith({
-      where: { id: 'ql-1' },
+    expect(prisma.quality_losses.updateMany).toHaveBeenCalledWith({
+      where: { id: 'ql-1', isDeleted: false },
       data: { isDeleted: true },
     });
   });
@@ -55,37 +62,132 @@ describe('quality-loss-record-maintenance.service', () => {
     const { QualityLossRecordMaintenanceService } = await import(
       '~/modules/quality-loss/quality-loss-record-maintenance.service'
     );
-    const prismaModule = await import('~/utils/prisma');
-    const prisma = prismaModule.default;
-
     (prisma.quality_losses.findFirst as any).mockResolvedValue({ id: 'ql-1' });
-    (prisma.quality_losses.update as any).mockResolvedValue({});
+    (prisma.quality_losses.updateMany as any).mockResolvedValue({ count: 1 });
 
-    await QualityLossRecordMaintenanceService.deleteRecord(
-      'QL-2026-001',
-      'user-1',
-    );
+    await QualityLossRecordMaintenanceService.deleteRecord('QL-2026-001', {
+      userId: 'user-1',
+    });
 
     expect(prisma.quality_losses.findFirst).toHaveBeenCalledWith({
       where: {
         isDeleted: false,
         OR: [{ id: 'QL-2026-001' }, { lossId: 'QL-2026-001' }],
       },
-      select: { id: true },
+      select: { createdBy: true, id: true, respDept: true },
     });
+  });
+
+  it('should resolve a materialized manual index id to its source primary key', async () => {
+    const { QualityLossRecordMaintenanceService } = await import(
+      '~/modules/quality-loss/quality-loss-record-maintenance.service'
+    );
+    vi.mocked(prisma.quality_loss_index.findMany).mockResolvedValue([
+      {
+        id: 'QL-cmrirra7i00lyng01jigslrpf',
+        source: 'Manual',
+        sourcePk: 'cmrirra7i00lyng01jigslrpf',
+      },
+    ] as never);
+    vi.mocked(prisma.quality_losses.findFirst).mockResolvedValue({
+      createdBy: 'user-1',
+      id: 'cmrirra7i00lyng01jigslrpf',
+      respDept: 'QA',
+    } as never);
+    vi.mocked(prisma.quality_losses.updateMany).mockResolvedValue({
+      count: 1,
+    });
+
+    await QualityLossRecordMaintenanceService.deleteRecord(
+      'QL-cmrirra7i00lyng01jigslrpf',
+      { userId: 'user-1' },
+    );
+
+    expect(prisma.quality_losses.findFirst).toHaveBeenCalledWith({
+      where: {
+        isDeleted: false,
+        OR: [
+          { id: 'cmrirra7i00lyng01jigslrpf' },
+          { lossId: 'cmrirra7i00lyng01jigslrpf' },
+        ],
+      },
+      select: { createdBy: true, id: true, respDept: true },
+    });
+    expect(prisma.quality_loss_index.updateMany).toHaveBeenCalledWith({
+      where: {
+        source: 'Manual',
+        sourcePk: 'cmrirra7i00lyng01jigslrpf',
+      },
+      data: { isDeleted: true, indexedAt: expect.any(Date) },
+    });
+  });
+
+  it('should reject deletion of a source-derived index row', async () => {
+    const { QualityLossRecordMaintenanceService } = await import(
+      '~/modules/quality-loss/quality-loss-record-maintenance.service'
+    );
+    vi.mocked(prisma.quality_loss_index.findMany).mockResolvedValue([
+      { id: 'EXT-as-1', source: 'External', sourcePk: 'as-1' },
+    ] as never);
+
+    await expect(
+      QualityLossRecordMaintenanceService.deleteRecord('EXT-as-1', {
+        userId: 'user-1',
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SOURCE' });
+    expect(prisma.quality_losses.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('should enforce self scope before deletion', async () => {
+    const { QualityLossRecordMaintenanceService } = await import(
+      '~/modules/quality-loss/quality-loss-record-maintenance.service'
+    );
+    vi.mocked(prisma.quality_losses.findFirst).mockResolvedValue({
+      createdBy: 'other-user',
+      id: 'ql-1',
+      respDept: 'QA',
+    } as never);
+
+    await expect(
+      QualityLossRecordMaintenanceService.deleteRecord('ql-1', {
+        dataScope: { deptIds: [], scopeType: 'SELF' },
+        userId: 'user-1',
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(prisma.quality_losses.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('should enforce department scope before deletion', async () => {
+    const { QualityLossRecordMaintenanceService } = await import(
+      '~/modules/quality-loss/quality-loss-record-maintenance.service'
+    );
+    vi.mocked(prisma.quality_losses.findFirst).mockResolvedValue({
+      createdBy: 'other-user',
+      id: 'ql-1',
+      respDept: 'QA',
+    } as never);
+    vi.mocked(DataScopeService.getDeptCandidates).mockResolvedValue([
+      'Production',
+    ]);
+
+    await expect(
+      QualityLossRecordMaintenanceService.deleteRecord('ql-1', {
+        dataScope: { deptIds: ['dept-production'], scopeType: 'DEPT' },
+        userId: 'user-1',
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
   it('should throw NOT_FOUND when record does not exist', async () => {
     const { QualityLossRecordMaintenanceService } = await import(
       '~/modules/quality-loss/quality-loss-record-maintenance.service'
     );
-    const prismaModule = await import('~/utils/prisma');
-    const prisma = prismaModule.default;
-
     (prisma.quality_losses.findFirst as any).mockResolvedValue(null);
 
     await expect(
-      QualityLossRecordMaintenanceService.deleteRecord('missing', 'user-1'),
+      QualityLossRecordMaintenanceService.deleteRecord('missing', {
+        userId: 'user-1',
+      }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
@@ -93,9 +195,6 @@ describe('quality-loss-record-maintenance.service', () => {
     const { QualityLossRecordMaintenanceService } = await import(
       '~/modules/quality-loss/quality-loss-record-maintenance.service'
     );
-    const prismaModule = await import('~/utils/prisma');
-    const prisma = prismaModule.default;
-
     (prisma.quality_losses.findMany as any).mockResolvedValue([
       { id: 'ql-1' },
       { id: 'ql-2' },
@@ -104,7 +203,7 @@ describe('quality-loss-record-maintenance.service', () => {
 
     const result = await QualityLossRecordMaintenanceService.batchDelete(
       ['ql-1', 'ql-2', 'ql-1', ' '],
-      'user-1',
+      { userId: 'user-1' },
     );
 
     expect(result).toEqual({ count: 2 });
@@ -116,7 +215,7 @@ describe('quality-loss-record-maintenance.service', () => {
           { lossId: { in: ['ql-1', 'ql-2'] } },
         ],
       },
-      select: { id: true },
+      select: { createdBy: true, id: true, respDept: true },
     });
   });
 
@@ -125,10 +224,9 @@ describe('quality-loss-record-maintenance.service', () => {
       '~/modules/quality-loss/quality-loss-record-maintenance.service'
     );
 
-    const result = await QualityLossRecordMaintenanceService.batchDelete(
-      [],
-      'user-1',
-    );
+    const result = await QualityLossRecordMaintenanceService.batchDelete([], {
+      userId: 'user-1',
+    });
 
     expect(result).toEqual({ count: 0 });
   });
@@ -137,14 +235,11 @@ describe('quality-loss-record-maintenance.service', () => {
     const { QualityLossRecordMaintenanceService } = await import(
       '~/modules/quality-loss/quality-loss-record-maintenance.service'
     );
-    const prismaModule = await import('~/utils/prisma');
-    const prisma = prismaModule.default;
-
     (prisma.quality_losses.findMany as any).mockResolvedValue([]);
 
     const result = await QualityLossRecordMaintenanceService.batchDelete(
       ['missing-id'],
-      'user-1',
+      { userId: 'user-1' },
     );
 
     expect(result).toEqual({ count: 0 });
@@ -154,9 +249,6 @@ describe('quality-loss-record-maintenance.service', () => {
     const { QualityLossRecordMaintenanceService } = await import(
       '~/modules/quality-loss/quality-loss-record-maintenance.service'
     );
-    const prismaModule = await import('~/utils/prisma');
-    const prisma = prismaModule.default;
-
     (prisma.quality_loss_index.findMany as any).mockResolvedValue([
       { id: 'EXT-as-1', source: 'External', amount: 100 },
       { id: 'INT-qr-1', source: 'Internal', amount: 50 },

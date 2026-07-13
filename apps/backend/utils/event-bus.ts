@@ -18,6 +18,10 @@ export interface DomainEvents {
   'inspection_issue.changed': {
     supplierNames: Array<null | string | undefined>;
   };
+  'inspection_record.changed': {
+    supplierNames: Array<null | string | undefined>;
+    teamNames: Array<null | string | undefined>;
+  };
 }
 
 // EventEmitter is preferred over EventTarget for typed Node-side

@@ -1,8 +1,8 @@
 import type { quality_records_status } from '@prisma/client';
 import type { InspectionIssue } from '@qgs/shared';
-import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
 import type { InspectionIssueDateMode } from './inspection-issue';
+import type { InspectionIssueUserContext } from './inspection-issue-access.service';
 
 import { Prisma } from '@prisma/client';
 import {
@@ -10,7 +10,6 @@ import {
   InspectionIssueStatusEnum,
   tryParsePhotos,
 } from '@qgs/shared';
-import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { findDeptSubtree } from '~/modules/dept/dept-tree';
 import { DeptService } from '~/modules/dept/dept.service';
 import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
@@ -22,6 +21,7 @@ import {
 } from '~/utils/process-resolver';
 
 import { buildInspectionIssueDateRange } from './inspection-issue';
+import { applyInspectionIssueReadOwnership } from './inspection-issue-access.service';
 
 type QualityRecordOrderField = keyof Pick<
   Prisma.quality_recordsOrderByWithRelationInput,
@@ -39,6 +39,18 @@ type QualityRecordOrderField = keyof Pick<
   | 'updatedAt'
   | 'workOrderNumber'
 >;
+
+const inspectionIssueInclude = {
+  process: {
+    select: {
+      name: true,
+    },
+  },
+} satisfies Prisma.quality_recordsInclude;
+
+type InspectionIssueRecord = Prisma.quality_recordsGetPayload<{
+  include: typeof inspectionIssueInclude;
+}>;
 
 const QUALITY_RECORD_ORDER_FIELD_MAP: Record<string, QualityRecordOrderField> =
   {
@@ -97,9 +109,60 @@ function getResponsibleDepartmentsForResponse(issue: {
   return issue.responsibleDepartment ? [issue.responsibleDepartment] : [];
 }
 
+export function mapInspectionIssueRecord(
+  issue: InspectionIssueRecord,
+): InspectionIssue {
+  const photos = tryParsePhotos(issue.issuePhoto as string);
+  const canonicalProcessName = resolveCanonicalProcessNameByRelation(issue);
+  const responsibleDepartments = getResponsibleDepartmentsForResponse(issue);
+
+  return {
+    ...issue,
+    inspectionId: issue.inspectionId || undefined,
+    ncNumber: issue.nonConformanceNumber || '',
+    reportDate: formatDate(issue.date),
+    date: formatDate(issue.date),
+    claim: issue.isClaim ? 'Yes' : 'No',
+    isClaim: issue.isClaim,
+    photos,
+    severity: (issue.severity as 'Critical' | 'Major' | 'Minor') || 'Minor',
+    status: issue.status as InspectionIssueStatusEnum,
+    lossAmount: Number(issue.lossAmount) || 0,
+    responsibleDepartment: issue.responsibleDepartment || '',
+    responsibleDepartments,
+    responsibleWelder: issue.responsibleWelder || '',
+    reportedBy: issue.inspector || '',
+    rootCause: issue.rootCause || '',
+    solution: issue.solution || '',
+    title: issue.partName || '',
+    updatedAt: issue.updatedAt.toISOString(),
+    workOrderNumber: issue.workOrderNumber || '',
+    projectName: issue.projectName || '',
+    quantity: issue.quantity || 0,
+    inspector: issue.inspector || '',
+    description: issue.description || '',
+    partName: issue.partName || '',
+    processName: canonicalProcessName || '',
+  };
+}
+
 export const InspectionIssueListService = {
+  async getIssueById(params: {
+    id: string;
+    userContext: InspectionIssueUserContext;
+  }): Promise<InspectionIssue | null> {
+    const where = applyInspectionIssueReadOwnership(
+      { id: params.id, isDeleted: false },
+      params.userContext,
+    );
+    const issue = await prisma.quality_records.findFirst({
+      where,
+      include: inspectionIssueInclude,
+    });
+    return issue ? mapInspectionIssueRecord(issue) : null;
+  },
+
   async getIssues(params: {
-    dataScope?: ResolvedDataScope;
     dateMode?: InspectionIssueDateMode;
     dateValue?: string;
     defectType?: string | string[];
@@ -114,7 +177,7 @@ export const InspectionIssueListService = {
     sortOrder?: 'asc' | 'desc';
     status?: string | string[];
     supplierName?: string;
-    userContext?: { userId: string; username?: string };
+    userContext?: InspectionIssueUserContext;
     workOrderNumber?: string;
     year?: number;
   }): Promise<{ items: InspectionIssue[]; total: number }> {
@@ -227,14 +290,7 @@ export const InspectionIssueListService = {
     }
 
     if (params.userContext?.userId) {
-      where = await DataScopeService.buildInspectionWhere(
-        where,
-        {
-          userId: params.userContext.userId,
-          username: params.userContext.username,
-        },
-        params.dataScope,
-      );
+      where = applyInspectionIssueReadOwnership(where, params.userContext);
     }
 
     const {
@@ -255,51 +311,11 @@ export const InspectionIssueListService = {
         orderBy,
         skip,
         take,
-        include: {
-          process: {
-            select: {
-              name: true,
-            },
-          },
-        },
+        include: inspectionIssueInclude,
       }),
     ]);
 
-    const items: InspectionIssue[] = issues.map((issue) => {
-      const photos = tryParsePhotos(issue.issuePhoto as string);
-      const canonicalProcessName = resolveCanonicalProcessNameByRelation(issue);
-      const responsibleDepartments =
-        getResponsibleDepartmentsForResponse(issue);
-
-      return {
-        ...issue,
-        inspectionId: issue.inspectionId || undefined,
-        ncNumber: issue.nonConformanceNumber || '',
-        reportDate: formatDate(issue.date),
-        date: formatDate(issue.date),
-        claim: issue.isClaim ? 'Yes' : 'No',
-        isClaim: issue.isClaim,
-        photos,
-        severity: (issue.severity as 'Critical' | 'Major' | 'Minor') || 'Minor',
-        status: issue.status as InspectionIssueStatusEnum,
-        lossAmount: Number(issue.lossAmount) || 0,
-        responsibleDepartment: issue.responsibleDepartment || '',
-        responsibleDepartments,
-        responsibleWelder: issue.responsibleWelder || '',
-        reportedBy: issue.inspector || '', // Use inspector for reportedBy
-        rootCause: issue.rootCause || '',
-        solution: issue.solution || '',
-        title: issue.partName || '',
-        updatedAt: issue.updatedAt.toISOString(),
-        workOrderNumber: issue.workOrderNumber || '',
-        projectName: issue.projectName || '',
-        quantity: issue.quantity || 0,
-        inspector: issue.inspector || '',
-        description: issue.description || '',
-        partName: issue.partName || '',
-        processName: canonicalProcessName || '',
-      };
-    });
+    const items = issues.map((issue) => mapInspectionIssueRecord(issue));
 
     return { items, total };
   },

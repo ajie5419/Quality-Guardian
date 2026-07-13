@@ -1,4 +1,19 @@
+import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
+
 import { request } from './request';
+
+export interface DepartmentNode {
+  children?: DepartmentNode[];
+  id: string;
+  name: string;
+}
+
+export interface DictionaryOptionItem {
+  dictKey: string;
+  dictValue: string;
+  id: string;
+  sort: number;
+}
 
 // Get inspection stats for home page
 export function getInspectionStats() {
@@ -92,6 +107,7 @@ export function submitInspectionRequest(data: Record<string, unknown>) {
 export function searchWorkOrders(keyword: string) {
   return request<{
     items: Array<{
+      division?: string;
       projectName: string;
       quantity: number;
       workOrderNumber: string;
@@ -110,6 +126,14 @@ export function getProcesses(workOrderNumber: string) {
     url: '/api/qms/inspection/requests/processes',
     method: 'GET',
     data: { workOrderNumber },
+  });
+}
+
+export function getProcessDictionaryOptions() {
+  return request<DictionaryOptionItem[]>({
+    url: '/api/system/dictionary/options',
+    method: 'GET',
+    data: { dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName },
   });
 }
 
@@ -133,7 +157,7 @@ export function getTeams(keyword?: string) {
 
 // Get department list (for responsible-department picker)
 export function getDepartments() {
-  return request<Array<{ id: string; name: string }>>({
+  return request<DepartmentNode[]>({
     url: '/api/auth/departments',
     method: 'GET',
   });

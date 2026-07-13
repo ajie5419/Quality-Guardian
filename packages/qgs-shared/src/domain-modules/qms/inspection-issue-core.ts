@@ -45,27 +45,29 @@ export function normalizeOptionalInspectionIssueDate(
 }
 
 export function hasInspectionIssueAdminAccess(roles: unknown): boolean {
-  if (!Array.isArray(roles)) {
-    return false;
-  }
+  if (!Array.isArray(roles)) return false;
+  return roles.some((role) => {
+    const normalizedRole = normalizeOptionalInspectionIssueString(role)
+      ?.toLowerCase()
+      .replaceAll('-', '_')
+      .replaceAll(' ', '_');
+    if (!normalizedRole) return false;
+    return normalizedRole
+      .split('_')
+      .some((segment) => segment === 'admin' || segment === 'super');
+  });
+}
 
-  const normalizedRoles = roles
-    .map((role) => normalizeOptionalInspectionIssueString(role)?.toLowerCase())
-    .filter(Boolean) as string[];
-
-  return normalizedRoles.some(
-    (role) => role === 'admin' || role === 'super' || role === 'super admin',
-  );
+export function shouldRestrictInspectionIssueRead(roles: unknown): boolean {
+  return !hasInspectionIssueAdminAccess(roles);
 }
 
 export function hasInspectionIssueWriteAccess(params: {
-  inspector: null | string;
-  roles: unknown;
-  username: unknown;
+  createdBy: null | string;
+  userId: unknown;
 }): boolean {
-  const isAdmin = hasInspectionIssueAdminAccess(params.roles);
-  const isOwner = params.inspector === String(params.username ?? '');
-  return isAdmin || isOwner;
+  const userId = String(params.userId ?? '').trim();
+  return Boolean(userId && params.createdBy === userId);
 }
 
 export function createInspectionIssueId(now: Date, idPart: string): string {

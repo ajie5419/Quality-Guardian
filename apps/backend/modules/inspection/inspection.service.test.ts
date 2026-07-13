@@ -44,6 +44,7 @@ vi.mock('~/utils/prisma', () => ({
 describe('inspectionService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma.$queryRaw as any).mockResolvedValue([]);
     (prisma.$queryRawUnsafe as any).mockResolvedValue([]);
   });
 
@@ -144,11 +145,13 @@ describe('inspectionService', () => {
         _sum: { lossAmount: 300 },
       });
       (prisma.quality_records.count as any).mockResolvedValue(1);
-      (prisma.quality_records.groupBy as any).mockResolvedValue([
+      (prisma.quality_records.groupBy as any).mockResolvedValueOnce([
         { defectType: 'Minor', _count: { id: 1 } },
         { defectType: 'Major', _count: { id: 1 } },
       ]);
-      (prisma.$queryRaw as any).mockResolvedValue([{ month: 1, amount: 300 }]);
+      (prisma.$queryRaw as any).mockResolvedValueOnce([
+        { amount: 300, month: 1 },
+      ]);
 
       const stats = await InspectionService.getIssueStats({ year: 2024 });
 

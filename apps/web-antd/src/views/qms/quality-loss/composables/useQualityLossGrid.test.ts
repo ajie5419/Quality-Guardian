@@ -87,7 +87,9 @@ describe('useQualityLossGrid', () => {
         createParams({ canEdit: ref(true), canDelete: ref(true) }),
       );
       const actionCol = gridOptions.value.columns?.at(-1);
-      const options = (actionCol as any).cellRender.props.options;
+      const options = (actionCol as any).cellRender.props.options({
+        lossSource: 'Manual',
+      });
       const codes = options.map((o: any) => o.code || o);
       expect(codes).toContain('claim');
       expect(codes).toContain('edit');
@@ -97,9 +99,23 @@ describe('useQualityLossGrid', () => {
     it('only includes claim when edit and delete disabled', () => {
       const { gridOptions } = useQualityLossGrid(createParams());
       const actionCol = gridOptions.value.columns?.at(-1);
-      const options = (actionCol as any).cellRender.props.options;
+      const options = (actionCol as any).cellRender.props.options({
+        lossSource: 'Manual',
+      });
       const codes = options.map((o: any) => o.code || o);
       expect(codes).toEqual(['claim']);
+    });
+
+    it('hides delete for source-derived records', () => {
+      const { gridOptions } = useQualityLossGrid(
+        createParams({ canDelete: ref(true) }),
+      );
+      const actionCol = gridOptions.value.columns?.at(-1);
+      const options = (actionCol as any).cellRender.props.options({
+        lossSource: 'External',
+      });
+      const codes = options.map((option: any) => option.code || option);
+      expect(codes).not.toContain('delete');
     });
 
     it('formats amount with yen symbol', () => {
@@ -127,6 +143,16 @@ describe('useQualityLossGrid', () => {
       );
       const result = (col as any).formatter({ cellValue: null });
       expect(result).toBe('¥0');
+    });
+
+    it('formats missing work order, project and part as display-only placeholders', () => {
+      const { gridOptions } = useQualityLossGrid(createParams());
+      for (const field of ['workOrderNumber', 'projectName', 'partName']) {
+        const col = gridOptions.value.columns?.find(
+          (candidate: any) => candidate.field === field,
+        );
+        expect((col as any).formatter({ cellValue: null })).toBe('-');
+      }
     });
 
     it('formats responsibleDepartment via findNameById', () => {

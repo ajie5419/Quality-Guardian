@@ -169,6 +169,17 @@ export async function buildWorkOrderWhereCondition(
 }
 
 export const WorkOrderService = {
+  async findQualityLossReference(workOrderNumber: string) {
+    return prisma.work_orders.findFirst({
+      where: { isDeleted: false, workOrderNumber },
+      select: {
+        projectId: true,
+        projectName: true,
+        workOrderNumber: true,
+      },
+    });
+  },
+
   async countCreatedSince(date: Date) {
     return prisma.work_orders.count({
       where: { createdAt: { gte: date }, isDeleted: false },

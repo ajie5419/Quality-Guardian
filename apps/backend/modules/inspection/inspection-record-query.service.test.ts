@@ -265,4 +265,67 @@ describe('inspectionRecordQueryService', () => {
       );
     });
   });
+
+  describe('findSupplierHistory', () => {
+    it('reads incoming supplier records by canonical identity and maps material name', async () => {
+      (prisma.inspections.findMany as any).mockResolvedValue([
+        {
+          ...baseInspection,
+          category: 'INCOMING',
+          level1Component: null,
+          materialName: 'Gear',
+        },
+      ]);
+      (prisma.inspections.count as any).mockResolvedValue(1);
+
+      const result = await InspectionRecordQueryService.findSupplierHistory({
+        category: 'INCOMING',
+        identitySource: 'supplier',
+        supplierId: 'supplier-1',
+        supplierName: 'Supplier A',
+      });
+
+      expect(prisma.inspections.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            category: 'INCOMING',
+            isDeleted: false,
+            OR: [{ supplierId: 'supplier-1' }, { supplierName: 'Supplier A' }],
+          },
+        }),
+      );
+      expect(result.items[0].partName).toBe('Gear');
+    });
+
+    it('reads process records by team fallback and maps level-one component', async () => {
+      (prisma.inspections.findMany as any).mockResolvedValue([
+        {
+          ...baseInspection,
+          level1Component: 'Main Beam',
+          materialName: null,
+          team: 'Resident Team',
+        },
+      ]);
+      (prisma.inspections.count as any).mockResolvedValue(1);
+
+      const result = await InspectionRecordQueryService.findSupplierHistory({
+        category: 'PROCESS',
+        identitySource: 'team',
+        supplierId: 'supplier-1',
+        supplierName: 'Resident Team',
+        teamNameId: 'team-1',
+      });
+
+      expect(prisma.inspections.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            category: 'PROCESS',
+            isDeleted: false,
+            OR: [{ team: 'Resident Team' }, { teamId: 'team-1' }],
+          },
+        }),
+      );
+      expect(result.items[0].partName).toBe('Main Beam');
+    });
+  });
 });

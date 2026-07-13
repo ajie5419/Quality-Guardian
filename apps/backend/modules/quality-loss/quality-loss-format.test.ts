@@ -99,6 +99,7 @@ describe('quality-loss format helpers', () => {
       description: null,
       id: 'EXT-as-1',
       indexedAt: new Date('2026-01-01T00:00:00.000Z'),
+      lossType: null,
       occurDate: new Date('2026-01-01T00:00:00.000Z'),
       partName: 'Bolt',
       projectName: 'Project',
@@ -120,6 +121,35 @@ describe('quality-loss format helpers', () => {
         projectName: 'Project',
         status: 'Confirmed',
         workOrderNumber: 'WO-1',
+      }),
+    );
+  });
+
+  it('keeps missing context fields null instead of serializing display placeholders', () => {
+    const row = formatIndexRow({
+      actualClaim: new Decimal(0),
+      amount: new Decimal(100),
+      createdBy: 'u-1',
+      description: null,
+      id: 'QL-manual-1',
+      indexedAt: new Date('2026-01-01T00:00:00.000Z'),
+      lossType: 'Scrap',
+      occurDate: new Date('2026-01-01T00:00:00.000Z'),
+      partName: null,
+      projectName: null,
+      respDept: 'QA',
+      source: 'Manual',
+      sourcePk: 'manual-1',
+      status: 'Pending',
+      workOrderNumber: null,
+    });
+
+    expect(row).toEqual(
+      expect.objectContaining({
+        partName: null,
+        projectName: null,
+        type: 'Scrap',
+        workOrderNumber: null,
       }),
     );
   });

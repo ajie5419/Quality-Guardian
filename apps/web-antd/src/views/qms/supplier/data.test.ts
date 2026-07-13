@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { getStatusOptions, mapDictionaryOptionsToSelect } from './data';
+import {
+  getColumns,
+  getStatusOptions,
+  mapDictionaryOptionsToSelect,
+} from './data';
 
 vi.mock('@vben/locales', () => ({
   $t: (key: string) => key,
@@ -32,5 +36,18 @@ describe('supplier data dictionary mapping', () => {
         { dictKey: 'Trial', dictValue: '' },
       ] as any),
     ).toEqual([{ label: 'Trial', value: 'Trial' }]);
+  });
+});
+
+describe('supplier metric columns', () => {
+  it('labels outsourcing yield as processing qualified rate', () => {
+    const columns = getColumns('Outsourcing') as any[];
+    const rateColumn = columns.find(
+      (column) => column.field === 'incomingQualifiedRate',
+    );
+
+    expect(rateColumn.title).toBe('qms.outsourcing.qualifiedRate');
+    expect(rateColumn.formatter({ cellValue: null })).toBe('-');
+    expect(rateColumn.formatter({ cellValue: 0 })).toBe('0%');
   });
 });

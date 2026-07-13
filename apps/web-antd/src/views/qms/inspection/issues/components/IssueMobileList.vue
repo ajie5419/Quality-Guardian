@@ -20,6 +20,7 @@ import {
 export interface IssueMobileListProps {
   canDelete: boolean;
   canEdit: boolean;
+  canManageIssue: (record: InspectionIssue) => boolean;
   canSettle: boolean;
   issues: InspectionGridRow[];
   page: number;
@@ -137,7 +138,11 @@ function displayValue(value?: null | number | string) {
           </template>
           {{ t('common.detail') }}
         </Button>
-        <Button v-if="props.canEdit" size="small" @click="emit('edit', record)">
+        <Button
+          v-if="props.canEdit && props.canManageIssue(record)"
+          size="small"
+          @click="emit('edit', record)"
+        >
           <template #icon>
             <IconifyIcon icon="lucide:pencil" />
           </template>
@@ -154,7 +159,7 @@ function displayValue(value?: null | number | string) {
           {{ t('qms.inspection.issues.settleToKnowledge') }}
         </Button>
         <Button
-          v-if="props.canDelete"
+          v-if="props.canDelete && props.canManageIssue(record)"
           danger
           size="small"
           @click="emit('delete', record)"

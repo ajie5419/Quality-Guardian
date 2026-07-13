@@ -46,10 +46,16 @@ export function buildQualityLossCreateData(
     isDeleted: false,
     lossId,
     occurDate: parseQualityLossDate(body.date),
+    partId: (body.partId as null | string | undefined) || null,
+    partName: (body.partName as null | string | undefined) || null,
+    projectId: (body.projectId as null | string | undefined) || null,
+    projectName: (body.projectName as null | string | undefined) || null,
     respDept: (body.responsibleDepartment as null | string | undefined) || null,
     status:
       parseQualityLossStatus(body.status as string | undefined) || 'Pending',
     type: String(body.type || ''),
+    workOrderNumber:
+      (body.workOrderNumber as null | string | undefined) || null,
     createdBy: options.createdBy || null,
   };
 }

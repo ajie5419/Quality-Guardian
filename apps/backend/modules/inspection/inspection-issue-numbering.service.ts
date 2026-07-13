@@ -1,6 +1,7 @@
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
+import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 
 export const InspectionIssueNumberingService = {
@@ -41,13 +42,16 @@ export const InspectionIssueNumberingService = {
     return `${prefix}${sequenceStr}`;
   },
   async deleteRecord(id: string, userId: string): Promise<void> {
-    await prisma.quality_records.update({
-      where: { id },
+    const result = await prisma.quality_records.updateMany({
+      where: { createdBy: userId, id, isDeleted: false },
       data: {
         isDeleted: true,
         updatedAt: new Date(),
       },
     });
+    if (result.count === 0) {
+      throw new BusinessError('NOT_FOUND', '记录不存在', 404);
+    }
     await FileStorageService.softDeleteReferences({
       bizId: id,
       bizType: 'inspection_issue',

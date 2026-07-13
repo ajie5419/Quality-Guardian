@@ -55,7 +55,7 @@ export interface SupplierItem {
   engineeringScore?: number;
   id: string;
   incomingBatchCount?: number;
-  incomingQualifiedRate?: number;
+  incomingQualifiedRate?: null | number;
   incomingScore?: number;
   incomingTotalQuantity?: number;
   isWarning?: boolean;

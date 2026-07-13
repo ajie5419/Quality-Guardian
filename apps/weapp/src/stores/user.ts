@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 
-import { wxBind, wxLogin } from '@/api/auth';
+import { getPermissionCodes, wxBind, wxLogin } from '@/api/auth';
 import { request } from '@/api/request';
 import { defineStore } from 'pinia';
 
@@ -11,6 +11,8 @@ export const useUserStore = defineStore('user', () => {
     roles: string[];
     username: string;
   }>(null);
+  const permissionCodes = ref<string[]>([]);
+  let permissionRequest: null | Promise<void> = null;
 
   const isLoggedIn = computed(() => !!uni.getStorageSync('accessToken'));
 
@@ -19,9 +21,39 @@ export const useUserStore = defineStore('user', () => {
     const info = uni.getStorageSync('userInfo');
     if (token && info) {
       userInfo.value = JSON.parse(info);
+      const storedCodes = uni.getStorageSync('permissionCodes');
+      permissionCodes.value = Array.isArray(storedCodes) ? storedCodes : [];
+      void loadPermissionCodes(true);
       return true;
     }
     return false;
+  }
+
+  async function loadPermissionCodes(force = false) {
+    if (!isLoggedIn.value) {
+      permissionCodes.value = [];
+      return;
+    }
+    if (!force && permissionCodes.value.length > 0) return;
+    if (permissionRequest) return permissionRequest;
+    permissionRequest = (async () => {
+      try {
+        const res = await getPermissionCodes();
+        if (res.code === 0 && Array.isArray(res.data)) {
+          permissionCodes.value = res.data;
+          uni.setStorageSync('permissionCodes', res.data);
+        }
+      } catch {
+        // Keep the cached permissions for transient network failures.
+      } finally {
+        permissionRequest = null;
+      }
+    })();
+    return permissionRequest;
+  }
+
+  function hasPermission(code: string) {
+    return permissionCodes.value.includes(code);
   }
 
   function checkAuth() {
@@ -46,6 +78,7 @@ export const useUserStore = defineStore('user', () => {
     uni.setStorageSync('refreshToken', res.data.refreshToken ?? '');
     uni.setStorageSync('userInfo', JSON.stringify(res.data.userPayload));
     userInfo.value = res.data.userPayload ?? null;
+    await loadPermissionCodes(true);
     return { needBind: false };
   }
 
@@ -61,6 +94,7 @@ export const useUserStore = defineStore('user', () => {
     uni.setStorageSync('refreshToken', res.data.refreshToken);
     uni.setStorageSync('userInfo', JSON.stringify(res.data.userPayload));
     userInfo.value = res.data.userPayload;
+    await loadPermissionCodes(true);
   }
 
   async function logout() {
@@ -72,9 +106,22 @@ export const useUserStore = defineStore('user', () => {
     uni.removeStorageSync('accessToken');
     uni.removeStorageSync('refreshToken');
     uni.removeStorageSync('userInfo');
+    uni.removeStorageSync('permissionCodes');
     userInfo.value = null;
+    permissionCodes.value = [];
     uni.reLaunch({ url: '/pages/login/index' });
   }
 
-  return { userInfo, isLoggedIn, checkAuth, login, bind, logout, restoreAuth };
+  return {
+    userInfo,
+    permissionCodes,
+    isLoggedIn,
+    checkAuth,
+    login,
+    bind,
+    logout,
+    restoreAuth,
+    loadPermissionCodes,
+    hasPermission,
+  };
 });

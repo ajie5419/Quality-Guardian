@@ -19,6 +19,7 @@ const {
   logApiError,
   logApiWarn,
   readBody,
+  resolveManualQualityLossContext,
   useResponseSuccess,
 } = vi.hoisted(() => ({
   auditLog: vi.fn(),
@@ -45,6 +46,13 @@ const {
   logApiError: vi.fn(),
   logApiWarn: vi.fn(),
   readBody: vi.fn(),
+  resolveManualQualityLossContext: vi.fn(async () => ({
+    partId: 'part-1',
+    partName: '主梁',
+    projectId: 'project-1',
+    projectName: '1000t 架桥机',
+    workOrderNumber: 'WO-468624',
+  })),
   useResponseSuccess: vi.fn((data) => ({ data, type: 'success' })),
 }));
 
@@ -98,6 +106,10 @@ vi.mock('~/modules/quality-loss/quality-loss-payload', () => ({
   createQualityLossId,
 }));
 
+vi.mock('~/modules/quality-loss/quality-loss-manual-context', () => ({
+  resolveManualQualityLossContext,
+}));
+
 vi.mock('~/modules/quality-loss/quality-loss.service', () => ({
   QualityLossService: {
     getDrillDown,
@@ -122,7 +134,12 @@ describe('quality-loss route handlers', () => {
       '~/modules/quality-loss/quality-loss-create.post.service'
     );
     const handler = mod.default;
-    readBody.mockResolvedValue({ amount: 100, type: 'Manual' });
+    readBody.mockResolvedValue({
+      amount: 100,
+      partName: '主梁',
+      type: 'Manual',
+      workOrderNumber: 'WO-468624',
+    });
     vi.mocked(prisma.quality_losses.create).mockResolvedValue({
       amount: 100,
       id: 'db-1',
@@ -140,13 +157,17 @@ describe('quality-loss route handlers', () => {
       expect.objectContaining({ targetId: 'db-1', userId: 'u-1' }),
     );
 
-    getMissingRequiredFields.mockReturnValueOnce(['type']);
+    readBody.mockResolvedValueOnce({});
     expect(await handler(event())).toEqual({
-      message: '缺少必填字段: type',
+      message: '缺少必填字段: partName',
       type: 'bad',
     });
 
-    getMissingRequiredFields.mockReturnValue([]);
+    readBody.mockResolvedValueOnce({
+      partName: '主梁',
+      type: 'Manual',
+      workOrderNumber: 'WO-468624',
+    });
     vi.mocked(prisma.quality_losses.create).mockRejectedValueOnce(
       new Error('db'),
     );

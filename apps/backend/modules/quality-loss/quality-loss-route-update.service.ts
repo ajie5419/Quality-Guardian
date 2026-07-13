@@ -7,6 +7,7 @@ import { AfterSalesAPI } from '~/modules/after-sales';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
+import { resolveManualQualityLossContext } from '~/modules/quality-loss/quality-loss-manual-context';
 import {
   normalizeQualityLossSource,
   QUALITY_LOSS_SOURCE,
@@ -14,7 +15,7 @@ import {
 } from '~/modules/quality-loss/quality-loss-status';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
-import { BusinessError } from '~/utils/business-error';
+import { BusinessError, isBusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 
@@ -262,6 +263,14 @@ export const QualityLossRouteUpdateService = {
           break;
         }
         default: {
+          const hasManualContext = [
+            'partId',
+            'partName',
+            'workOrderNumber',
+          ].some((field) => Object.hasOwn(params.body, field));
+          const manualContext = hasManualContext
+            ? await resolveManualQualityLossContext(params.body)
+            : null;
           const updated = await prisma.$transaction(async (tx) =>
             tx.quality_losses.update({
               where: target.where,
@@ -283,6 +292,7 @@ export const QualityLossRouteUpdateService = {
                   ? {}
                   : { description: params.body.description }),
                 ...(parsedBody.status ? { status: parsedBody.status } : {}),
+                ...manualContext,
                 updatedAt: new Date(),
               },
             }),
@@ -291,6 +301,16 @@ export const QualityLossRouteUpdateService = {
         }
       }
     } catch (error) {
+      if (isBusinessError(error)) {
+        return {
+          ok: false as const,
+          code:
+            error.httpStatus === 404
+              ? ('NOT_FOUND' as const)
+              : ('BAD_REQUEST' as const),
+          message: error.message,
+        };
+      }
       if (isPrismaNotFoundError(error)) {
         return {
           ok: false as const,

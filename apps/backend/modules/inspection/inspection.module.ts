@@ -1,6 +1,9 @@
 import type { ModuleDeclaration } from '~/utils/module-types';
 
-import { AUDIT_TEMPLATES } from '@qgs/shared';
+import {
+  AUDIT_TEMPLATES,
+  INSPECTION_ISSUE_PERMISSION_CODES,
+} from '@qgs/shared';
 
 export const inspectionModule: ModuleDeclaration = {
   name: 'inspection',
@@ -56,6 +59,70 @@ export const inspectionModule: ModuleDeclaration = {
           name: 'QMSInspectionRequestsDelete',
           order: 4,
           title: '删除',
+        },
+      ],
+    },
+    {
+      key: 'inspection-issues',
+      parentPath: '/qms/inspection',
+      path: '/qms/inspection/issues',
+      name: 'QMSInspectionIssues',
+      component: 'qms/inspection/issues/index',
+      authCode: INSPECTION_ISSUE_PERMISSION_CODES.LIST,
+      order: 4,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:warning-alt',
+        title: '不合格品项',
+      },
+      buttons: [
+        {
+          authCode: INSPECTION_ISSUE_PERMISSION_CODES.VIEW,
+          name: 'QMSInspectionIssuesView',
+          order: 1,
+          title: '查看',
+        },
+        {
+          authCode: INSPECTION_ISSUE_PERMISSION_CODES.CREATE,
+          name: 'QMSInspectionIssuesCreate',
+          order: 2,
+          title: '新增',
+        },
+        {
+          authCode: INSPECTION_ISSUE_PERMISSION_CODES.EDIT,
+          name: 'QMSInspectionIssuesEdit',
+          order: 3,
+          title: '编辑',
+        },
+        {
+          authCode: INSPECTION_ISSUE_PERMISSION_CODES.DELETE,
+          name: 'QMSInspectionIssuesDelete',
+          order: 4,
+          title: '删除',
+        },
+        {
+          authCode: 'QMS:Inspection:Issues:Settle',
+          name: 'QMSInspectionIssuesSettle',
+          order: 5,
+          title: '案例沉淀',
+        },
+        {
+          authCode: 'QMS:Inspection:Issues:ChartAdd',
+          name: 'QMSInspectionIssuesChartAdd',
+          order: 6,
+          title: '新增图表',
+        },
+        {
+          authCode: 'QMS:Inspection:Issues:ChartEdit',
+          name: 'QMSInspectionIssuesChartEdit',
+          order: 7,
+          title: '编辑图表',
+        },
+        {
+          authCode: 'QMS:Inspection:Issues:ChartDelete',
+          name: 'QMSInspectionIssuesChartDelete',
+          order: 8,
+          title: '删除图表',
         },
       ],
     },

@@ -1,4 +1,5 @@
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation } from '~/utils/process-resolver';
 
@@ -6,7 +7,7 @@ import { syncInspectionProjectDocuments } from './inspection-project-document-sy
 
 export const InspectionRecordDeleteService = {
   async delete(id: string) {
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const inspection = await tx.inspections.findUnique({
         where: { id },
         select: {
@@ -26,6 +27,8 @@ export const InspectionRecordDeleteService = {
           processName: true,
           projectName: true,
           result: true,
+          supplierName: true,
+          team: true,
           workOrderNumber: true,
         },
       });
@@ -65,11 +68,16 @@ export const InspectionRecordDeleteService = {
         bizType: 'inspection_record',
       });
 
-      return deleted;
+      return { deleted, inspection };
     });
+    eventBus.emit('inspection_record.changed', {
+      supplierNames: [result.inspection?.supplierName],
+      teamNames: [result.inspection?.team],
+    });
+    return result.deleted;
   },
   async batchDelete(ids: string[]) {
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const inspections = await tx.inspections.findMany({
         where: { id: { in: ids } },
         select: {
@@ -89,11 +97,13 @@ export const InspectionRecordDeleteService = {
           processName: true,
           projectName: true,
           result: true,
+          supplierName: true,
+          team: true,
           workOrderNumber: true,
         },
       });
 
-      const result = await tx.inspections.updateMany({
+      const deleted = await tx.inspections.updateMany({
         where: { id: { in: ids } },
         data: { isDeleted: true },
       });
@@ -132,7 +142,12 @@ export const InspectionRecordDeleteService = {
         ),
       );
 
-      return result;
+      return { deleted, inspections };
     });
+    eventBus.emit('inspection_record.changed', {
+      supplierNames: result.inspections.map((item) => item.supplierName),
+      teamNames: result.inspections.map((item) => item.team),
+    });
+    return result.deleted;
   },
 };

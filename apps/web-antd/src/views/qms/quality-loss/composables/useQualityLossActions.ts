@@ -49,6 +49,11 @@ export function useQualityLossActions(
       status: 'PENDING',
       type: 'Scrap',
       lossSource: LossSource.MANUAL,
+      partId: null,
+      partName: null,
+      projectId: null,
+      projectName: null,
+      workOrderNumber: null,
     };
     modalVisible.value = true;
   }
@@ -70,7 +75,7 @@ export function useQualityLossActions(
       content: t('common.confirmDeleteContent'),
       onOk: async () => {
         try {
-          await deleteQualityLoss(row.id);
+          await deleteQualityLoss(row.pk || row.id);
           message.success(t('common.deleteSuccess'));
           invalidateFn();
           gridApi.reload();
@@ -99,7 +104,7 @@ export function useQualityLossActions(
       }),
       onOk: async () => {
         try {
-          const ids = checkedRows.value.map((r) => r.id);
+          const ids = checkedRows.value.map((r) => r.pk || r.id);
           const res = await batchDeleteQualityLoss(ids);
           message.success(
             t('common.deleteSuccessCount', { count: res.successCount }),

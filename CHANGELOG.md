@@ -25,6 +25,84 @@
 
 ## 执行记录
 
+### 2026-07-13 修复：供应商与外协质量指标和画像口径统一
+
+**执行内容：**
+
+- 在共享领域层建立唯一的检验口径：供应商和机加成品外协按供应商规范 ID 读取进货检验，驻厂外协按团队规范 ID 读取过程检验，列表、快照和画像复用同一策略。
+- 修复评分聚合的名称漂移、团队字段错用和 `0 || 100` 逻辑；无检验批次时返回空值并显示 `-`，真实零合格率保留为 `0%`。
+- 工程问题数改为全历史实际数量，评分窗口仍保持近 12 个月；检验记录变更后会按影响的供应商或外协团队刷新快照。
+- 快照升级为第二版评分模型；部署时的 `refreshMissing` 会同时重算缺失和旧版快照，避免旧的 100% 结果继续残留。
+- 供应商画像新增独立的分页检验履历接口，并按检验类型正确映射部件名称；前端修复详情分页并发覆盖和单个子请求失败导致整个画像空白的问题。
+- 售后记录的 `supplierBrandId` 统一为供应商主键，新增 Prisma migration 幂等对齐历史名称可匹配数据；无法可靠匹配的历史名称仅在维护审计中报告，不伪造关联。
+
+**验证结果：**
+
+- vitest: 供应商 159/159、检验 552/552、售后 69/69、前端与共享领域 20/20，共 800/800 通过
+- lint: 通过（0 error；保留既有 `IssueFormFields.test.ts` 9 条 warning）
+- typecheck: `pnpm run check:type` 3/3 tasks 通过
+- Prisma: schema validate 通过，已新增历史售后供应商 ID 对齐 migration
+- check:qms-arch: 0 violations 通过
+- 前端 dev/build: 未运行；遵循仓库约束，通过组件测试、类型检查和 Lint 验证
+
+**commit:** `8dc71106` fix(project): align supplier quality metrics
+
+**遗留问题：**
+
+- 代码和数据迁移已就绪；生产历史快照重算和售后供应商 ID 对齐需随正常部署流程执行。
+- 历史售后供应商名称如果无法唯一匹配当前供应商，保留为未解析数据并由审计脚本列出。
+
+### 2026-07-13 修复：手工质量损失工单、项目和部件上下文
+
+**执行内容：**
+
+- `quality_losses` 新增工单、项目和部件的规范 ID 与名称快照，通过 Prisma migration 增加可空工单外键及查询索引。
+- 手工新建和编辑统一验证工单存在、工单已配置项目、部件属于该工单 BOM；项目信息由后端按工单派生，不信任客户端自由文本。
+- 手工录入弹窗复用共享工单选择器，自动带出只读项目名称，并按工单加载 BOM 部件；切换工单时清空旧部件，同时防止旧异步请求覆盖新选项。
+- `quality_loss_index` 新增 `lossType`，手工损失类型与真实部件名称分字段保存；空值仅在表格显示阶段格式化为 `-`，不再写回脏占位符。
+- 现有部署回填脚本会幂等重建手工索引，清除历史错误的 `partName=type`；无法可靠推断的历史工单和部件保留为空，禁止伪造业务数据。
+
+**验证结果：**
+
+- vitest: 后端全量 200 文件 / 1903 测试全部通过
+- vitest: 前端质量损失定向 18/18 通过
+- lint: 通过（0 error；保留既有 `IssueFormFields.test.ts` 9 条 warning）
+- typecheck: `pnpm run check:type` 3/3 tasks 通过
+- Prisma: schema format / validate 通过，migration 由 `prisma migrate diff` 生成
+- check:qms-arch: 0 violations 通过
+- 前端 dev/build: 未运行；遵循仓库约束，通过组件单测、类型检查和 Lint 验证
+
+**commit:** `94de027` fix(project): persist manual quality loss context
+
+**遗留问题：**
+
+- 历史手工记录本身没有保存工单和部件，回填无法可靠恢复；部署后将显示为空，需在编辑时选择真实工单和 BOM 部件。
+
+### 2026-07-13 修复：质量损失统一列表删除误报记录不存在
+
+**执行内容：**
+
+- 修复统一列表把 `quality_loss_index.id` 当作 `quality_losses.id` 传给删除接口的 ID 契约错位；后端兼容解析 `QL-<cuid>` 物化索引 ID，前端改为传递源记录 `pk`。
+- 单条与批量删除共用相同的手工来源定位规则，并在同一 Prisma transaction 内软删除源记录和物化索引，避免列表留下幽灵数据。
+- 删除入口增加 `SELF` / `DEPT` 数据权限校验，非手工来源在统一页隐藏删除按钮，后端对旧客户端请求也明确拒绝跨模块删除。
+- 同步修复手工记录编辑时的同类 ID 错位，当请求带有 `pk` 时优先按源表主键定位。
+- 补充后端索引 ID、非手工来源、数据权限、并发软删除测试，以及前端 `pk` 传递和来源按钮可见性测试。
+
+**验证结果：**
+
+- vitest: 质量损失跨端定向 5 文件 / 38 测试通过
+- vitest: 后端全量 198 文件 / 1895 测试通过
+- lint: 通过（0 error；保留既有 `IssueFormFields.test.ts` 9 条 warning）
+- typecheck: `pnpm run check:type` 3/3 tasks 通过
+- check:qms-arch: 0 violations 通过
+- 前端 dev/build: 未运行；遵循仓库约束，通过单元测试、类型检查和 Lint 验证
+
+**commit:** `e8fc491` fix(project): resolve quality loss delete targets
+
+**遗留问题：**
+
+- 无。
+
 ## [0.15.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.15.0...qgs-v0.15.1) (2026-07-11)
 
 
@@ -53,6 +131,75 @@
 **遗留问题：**
 
 - 无。
+
+### 2026-07-10 功能：小程序不合格品项登记
+
+**执行内容：**
+
+- 后端继续使用 `quality_records` 和 `OPEN / IN_PROGRESS / CLOSED` 状态，新增严格 Zod create/update schema、详情 API、统一列表/详情映射、RBAC 权限校验和数据范围查询；NC 编号由后端生成，并在唯一键冲突时自动重试。
+- `@qgs/shared` 新增不合格品项权限码、字段限制、缺陷类型和二级分类契约；电脑版改为直接复用共享契约，避免移动端与电脑端分类漂移。
+- 小程序新增不合格品项权限入口、列表筛选与分页、详情、新增、编辑和三步表单；复用工单、工序、部门、供应商/外协和焊工主数据。
+- 补齐手机场景必要能力：照片上传、按用户隔离的本地草稿、账号切换安全、参考数据局部失败降级、列表失败后分页恢复和明确的上传/保存提示。
+- 修复报检结果为 `FAIL` 时未向关联不合格品项传递 `photos` 的断链，以及 token 刷新失败时并发请求等待队列不被唤醒的问题。
+- 修复小程序 GET 请求把未选择的筛选条件序列化为字符串 `undefined`，导致不合格品项列表错误返回空数据；公共请求层现在会剔除未定义的查询字段，并保留 `false`、`0` 和空字符串等有效值。
+- 微信开发者工具本地联调关闭域名校验；重新登录后确认当前账号拥有 157 个权限码，包含不合格品项查看权限，权限、列表、部门接口均返回 200。
+- 排查并修复本地增量产物未刷新页面注册表的问题；`app.js` 已包含列表、详情、新增、编辑四个页面，开发者工具不再提示 `Page has not been registered yet`。
+
+**验证结果：**
+
+- lint: 通过（0 error；保留既有 `IssueFormFields.test.ts` 9 条 warning）
+- stylelint: 小程序不合格品项页面与样式通过
+- typecheck: `pnpm run check:type` 3/3 tasks 通过；Web `vue-tsc` 通过；shared 构建和声明文件生成通过
+- check:qms-arch: 0 violations 通过
+- vitest: 后端全量 198 文件 / 1871 测试全部通过；不合格品项定向 117/117 通过
+- vitest: 小程序请求参数清理单测 2/2 通过
+- 微信开发者工具: 列表加载真实数据通过；详情、编辑、新增页面路由通过；自动化控制台 0 error、0 exception
+
+**commit:**
+
+- `d717a6b` feat(@qgs/backend): support mobile inspection issues
+- `73dc5a3` feat(@qgs/weapp): add inspection issue workflow
+- `c93cee2` refactor(@qgs/web-antd): reuse inspection issue contract
+- `ae7b6610` fix(@qgs/weapp): omit undefined query filters
+
+**遗留问题：**
+
+- 未完成真机、实际新增提交、照片上传、分页、草稿和账号切换验收；当前结论只覆盖微信开发者工具的列表数据加载和页面路由冒烟测试。
+
+### 2026-07-10 修复：不合格品项按创建人隔离
+
+**执行内容：**
+
+- 普通账号的不合格品项列表、详情、统计和图表统一按 `createdBy` 查询，只返回当前登录账号创建的数据；`admin`、`super` 及其派生管理员角色返回全部数据。
+- 管理员角色改为按 `admin` / `super` 独立词元识别，避免 `supervisor`、`administrator` 等普通角色被误判为管理员。
+- 更新、单条删除、批量删除和导入覆盖统一校验创建人 ID；管理员也不能修改或删除他人记录，历史 `createdBy` 为空的记录仅管理员可查看。
+- 单条删除改为原子软删除并返回明确的 404，避免重复点击或并发删除变成 500。
+- 报检关闭生成不合格品项时补写 `createdBy`，避免检验员提交后看不到自己生成的记录。
+- 显式关联检验记录关闭报检时同样保留流水号冲突重试，避免并发创建不合格品项时关闭失败。
+- 小程序和电脑版均按记录隐藏他人的编辑、删除入口，并在直达编辑、批量删除和操作函数中再次校验所有权；电脑版仍允许管理员选择他人记录用于查看和导出。
+- 小程序工序选择与电脑版保持一致：显示字典 `dictValue`、提交 `dictKey`，同时合并工单工序和共享兜底工序。
+- 统计趋势使用带创建人条件的参数化 SQL 在数据库按天/月聚合，避免年度管理员统计把明细行加载到 4 GB 应用服务器内存。
+
+**验证结果：**
+
+- vitest: 不合格品项、报检关闭、共享规则、电脑版和小程序定向 17 文件 / 201 测试通过
+- vitest: 后端全量 198 文件 / 1892 测试通过
+- vitest: 电脑版所有权操作 5/5 通过
+- vitest: 小程序所有权与工序选项 5/5 通过
+- lint: 通过（0 error；保留既有 `IssueFormFields.test.ts` 9 条 warning）
+- typecheck: `pnpm run check:type` 3/3 tasks 通过
+- check:qms-arch: 0 violations 通过
+
+**commit:** `5a57413` fix(@qgs/backend): enforce inspection issue ownership
+
+**commit:** `fd5a016` fix(@qgs/weapp): complete inspection issue ownership flow
+
+**commit:** `ef0dcfd` fix(@qgs/web-antd): restrict inspection issue owner actions
+
+**遗留问题：**
+
+- 未运行前端 dev/build；遵循仓库约束，通过单元测试、类型检查、Lint 和架构门禁验证。
+- 真机账号切换后的列表可见范围和实际删除流程仍需现场验收。
 
 ## [0.15.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.14.0...qgs-v0.15.0) (2026-07-09)
 

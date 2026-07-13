@@ -239,9 +239,27 @@ describe('after-sales-integration.service', () => {
 
     const result = await AfterSalesIntegrationService.getSupplierScoringData({
       since: new Date('2026-01-01'),
+      supplierIds: ['supplier-1'],
       supplierNames: ['A'],
     });
 
+    expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        by: ['supplierBrandId', 'supplierBrand'],
+        where: expect.objectContaining({
+          OR: [
+            { supplierBrandId: { in: ['supplier-1'] } },
+            { supplierBrand: { in: ['A'] } },
+          ],
+        }),
+      }),
+    );
+    expect(prisma.after_sales.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ supplierBrandId: true }),
+      }),
+    );
     expect(result.stats).toHaveLength(1);
     expect(result.statusStats).toHaveLength(1);
     expect(result.records).toHaveLength(1);

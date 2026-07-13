@@ -81,3 +81,5 @@ public 报检禁止：
 - 查询软删除表时必须包含 `isDeleted: false`。
 - 新增业务逻辑必须附带单元测试。
 - public API 只能暴露匿名提交所需的最小数据。
+- 供应商画像和评分读取检验记录时必须消费共享 `resolveSupplierInspectionPolicy()`：进货检验按 `supplierId/supplierName`，驻厂过程检验按 `teamId/team`，两个身份域不得用 OR 混查。
+- 检验记录自身事务提交后发布 `inspection_record.changed`；报检关闭在外层事务提交后发布，禁止在未提交事务内刷新供应商快照。

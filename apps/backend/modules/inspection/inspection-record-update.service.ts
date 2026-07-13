@@ -3,6 +3,7 @@ import type { inspection_result } from '@prisma/client';
 import type { InspectionRecordInput } from './inspection-record-types';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { eventBus } from '~/utils/event-bus';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
@@ -36,7 +37,7 @@ export const InspectionRecordUpdateService = {
       quantitySummary,
     );
 
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const inputTeam = data.team;
       const governedFields = buildGovernedWriteFieldsForTable('inspections', {
         incomingType: data.incomingType,
@@ -58,6 +59,8 @@ export const InspectionRecordUpdateService = {
           incomingType: true,
           processId: true,
           processName: true,
+          supplierName: true,
+          team: true,
           templateId: true,
           templateName: true,
           workOrderNumber: true,
@@ -222,7 +225,15 @@ export const InspectionRecordUpdateService = {
         fieldName: 'selfCheckDocuments',
       });
 
-      return inspection;
+      return { inspection, previousInspection };
     });
+    eventBus.emit('inspection_record.changed', {
+      supplierNames: [
+        result.previousInspection?.supplierName,
+        result.inspection.supplierName,
+      ],
+      teamNames: [result.previousInspection?.team, result.inspection.team],
+    });
+    return result.inspection;
   },
 };

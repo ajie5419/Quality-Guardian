@@ -1,15 +1,14 @@
-import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
-
 import type { InspectionIssueDateMode } from './inspection-issue';
+import type { InspectionIssueUserContext } from './inspection-issue-access.service';
 
 import { Prisma } from '@prisma/client';
 import { formatDate } from '@qgs/shared';
-import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
 import { buildInspectionIssueDateRange } from './inspection-issue';
+import { applyInspectionIssueReadOwnership } from './inspection-issue-access.service';
 
 const logger = createModuleLogger('InspectionService');
 
@@ -64,6 +63,7 @@ export const InspectionIssueStatsService = {
   async getIssueStats(params: {
     dateMode?: InspectionIssueDateMode;
     dateValue?: string;
+    userContext?: InspectionIssueUserContext;
     year?: number;
   }): Promise<IssueStats> {
     const currentYear = params.year || new Date().getFullYear();
@@ -72,10 +72,13 @@ export const InspectionIssueStatsService = {
       dateValue: params.dateValue,
       year: params.year,
     });
-    const where: Prisma.quality_recordsWhereInput = {
+    let where: Prisma.quality_recordsWhereInput = {
       isDeleted: false,
       date: { gte: start, lt: end },
     };
+    if (params.userContext?.userId) {
+      where = applyInspectionIssueReadOwnership(where, params.userContext);
+    }
 
     try {
       // 1. Core aggregations (Total, Loss, Status counts)
@@ -122,12 +125,12 @@ export const InspectionIssueStatsService = {
         };
       });
 
-      // 3. Monthly Trend (Using Raw Query for efficiency)
       const trendData = await InspectionIssueStatsService.buildIssueTrendData({
         currentYear,
         dateMode: params.dateMode,
         end,
         start,
+        where,
       });
 
       return {
@@ -146,13 +149,12 @@ export const InspectionIssueStatsService = {
     }
   },
   async getIssueChartAggregation(params: {
-    dataScope?: ResolvedDataScope;
     dateMode?: InspectionIssueDateMode;
     dateValue?: string;
     dimension: InspectionIssueChartDimension;
     metric: InspectionIssueChartMetric;
     top?: number;
-    userContext?: { userId: string; username?: string };
+    userContext?: InspectionIssueUserContext;
     year?: number;
   }): Promise<InspectionIssueChartAggregateItem[]> {
     const { start, end } = buildInspectionIssueDateRange({
@@ -166,14 +168,7 @@ export const InspectionIssueStatsService = {
       date: { gte: start, lt: end },
     };
     if (params.userContext?.userId) {
-      where = await DataScopeService.buildInspectionWhere(
-        where,
-        {
-          userId: params.userContext.userId,
-          username: params.userContext.username,
-        },
-        params.dataScope,
-      );
+      where = applyInspectionIssueReadOwnership(where, params.userContext);
     }
 
     const rows = await prisma.quality_records.findMany({
@@ -282,8 +277,26 @@ export const InspectionIssueStatsService = {
     dateMode?: InspectionIssueDateMode;
     end: Date;
     start: Date;
+    where: Prisma.quality_recordsWhereInput;
   }): Promise<TrendDataItem[]> {
+    const ownershipFilter =
+      typeof params.where.createdBy === 'string'
+        ? Prisma.sql`AND createdBy = ${params.where.createdBy}`
+        : Prisma.sql``;
+
     if (params.dateMode === 'month' || params.dateMode === 'week') {
+      const trendResults = await prisma.$queryRaw<
+        Array<{ amount: number; day: Date | string }>
+      >(Prisma.sql`
+        SELECT DATE(date) AS day, SUM(IFNULL(lossAmount, 0)) AS amount
+        FROM quality_records
+        WHERE isDeleted = 0
+          AND date >= ${params.start}
+          AND date < ${params.end}
+          ${ownershipFilter}
+        GROUP BY DATE(date)
+        ORDER BY day ASC
+      `);
       const dayMap = new Map<string, number>();
       const cursor = new Date(params.start);
 
@@ -293,21 +306,13 @@ export const InspectionIssueStatsService = {
         cursor.setDate(cursor.getDate() + 1);
       }
 
-      const trendResults = await prisma.$queryRaw<
-        Array<{ amount: number; day: string }>
-      >`
-        SELECT 
-          DATE(date) as day,
-          SUM(IFNULL(lossAmount, 0)) as amount
-        FROM quality_records
-        WHERE isDeleted = 0 AND date >= ${params.start} AND date < ${params.end}
-        GROUP BY DATE(date)
-      `;
-
       trendResults.forEach((item) => {
-        const key = String(item.day);
+        const key =
+          item.day instanceof Date
+            ? formatDate(item.day)
+            : String(item.day).slice(0, 10);
         if (dayMap.has(key)) {
-          dayMap.set(key, Number(Number(item.amount).toFixed(2)));
+          dayMap.set(key, Number(Number(item.amount || 0).toFixed(2)));
         }
       });
 
@@ -319,14 +324,16 @@ export const InspectionIssueStatsService = {
 
     const trendResults = await prisma.$queryRaw<
       Array<{ amount: number; month: number }>
-    >`
-      SELECT 
-        MONTH(date) as month,
-        SUM(IFNULL(lossAmount, 0)) as amount
+    >(Prisma.sql`
+      SELECT MONTH(date) AS month, SUM(IFNULL(lossAmount, 0)) AS amount
       FROM quality_records
-      WHERE isDeleted = 0 AND date >= ${params.start} AND date < ${params.end}
-      GROUP BY month
-    `;
+      WHERE isDeleted = 0
+        AND date >= ${params.start}
+        AND date < ${params.end}
+        ${ownershipFilter}
+      GROUP BY MONTH(date)
+      ORDER BY month ASC
+    `);
 
     const trendMap = new Map<string, number>();
     for (let i = 1; i <= 12; i++) {
@@ -334,11 +341,10 @@ export const InspectionIssueStatsService = {
       trendMap.set(monthKey, 0);
     }
 
-    trendResults.forEach((r) => {
-      const monthKey = `${params.currentYear}-${String(r.month).padStart(2, '0')}`;
-      if (trendMap.has(monthKey)) {
-        trendMap.set(monthKey, Number(Number(r.amount).toFixed(2)));
-      }
+    trendResults.forEach((item) => {
+      const monthKey = `${params.currentYear}-${String(item.month).padStart(2, '0')}`;
+      if (!trendMap.has(monthKey)) return;
+      trendMap.set(monthKey, Number(Number(item.amount || 0).toFixed(2)));
     });
 
     return [...trendMap.entries()].map(([period, value]) => ({

@@ -31,6 +31,16 @@ vi.mock('~/modules/quality-loss/quality-loss-payload', () => ({
   createQualityLossId: vi.fn(() => 'QL-2026-001'),
 }));
 
+vi.mock('~/modules/quality-loss/quality-loss-manual-context', () => ({
+  resolveManualQualityLossContext: vi.fn(async () => ({
+    partId: 'part-1',
+    partName: '主梁',
+    projectId: 'project-1',
+    projectName: '1000t 架桥机',
+    workOrderNumber: 'WO-468624',
+  })),
+}));
+
 vi.mock('~/utils/current-user', () => ({
   getCurrentUser: vi.fn(() => ({
     id: 'user-1',
@@ -75,7 +85,12 @@ describe('quality-loss-create.post.service', () => {
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
 
-    vi.mocked(readBody).mockResolvedValue({ amount: 100, type: 'Material' });
+    vi.mocked(readBody).mockResolvedValue({
+      amount: 100,
+      partName: '主梁',
+      type: 'Material',
+      workOrderNumber: 'WO-468624',
+    });
     (prisma.quality_losses.create as any).mockResolvedValue({
       id: 'new-id',
       amount: 100,
@@ -98,7 +113,15 @@ describe('quality-loss-create.post.service', () => {
       '~/modules/quality-loss/quality-loss-payload'
     );
     expect(buildQualityLossCreateDataWithCanonical).toHaveBeenCalledWith(
-      { amount: 100, type: 'Material' },
+      {
+        amount: 100,
+        partId: 'part-1',
+        partName: '主梁',
+        projectId: 'project-1',
+        projectName: '1000t 架桥机',
+        type: 'Material',
+        workOrderNumber: 'WO-468624',
+      },
       'QL-2026-001',
       { createdBy: 'user-1' },
     );
@@ -127,7 +150,11 @@ describe('quality-loss-create.post.service', () => {
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
 
-    vi.mocked(readBody).mockResolvedValue({ type: 'Material' });
+    vi.mocked(readBody).mockResolvedValue({
+      partName: '主梁',
+      type: 'Material',
+      workOrderNumber: 'WO-468624',
+    });
     (prisma.quality_losses.create as any).mockRejectedValue(
       new Error('db error'),
     );

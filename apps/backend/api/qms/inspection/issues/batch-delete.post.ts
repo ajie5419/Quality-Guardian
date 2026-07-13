@@ -2,6 +2,10 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
 import { logApiError } from '~/utils/api-logger';
+import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import { parseNonEmptyIdList } from '~/utils/id-list';
 import {
@@ -28,6 +32,8 @@ export default defineEventHandler(async (event) => {
     });
   } catch (error) {
     logApiError('batch-delete', error, undefined, event);
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) return businessErrorResponse(event, businessError);
     return internalServerErrorResponse(event, '批量删除失败');
   }
 });

@@ -129,7 +129,10 @@ setupVbenVxeTable({
       renderTableDefault(renderOpts, params) {
         const { props } = renderOpts;
         const { row } = params;
-        const { options = [], onClick } = props || {};
+        const { options: rawOptions = [], onClick } = props || {};
+        const options =
+          (typeof rawOptions === 'function' ? rawOptions(row) : rawOptions) ||
+          [];
         const buttons = [];
 
         // 预设配置

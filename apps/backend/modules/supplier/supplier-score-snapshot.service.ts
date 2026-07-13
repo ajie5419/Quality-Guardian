@@ -2,6 +2,7 @@ import type { Prisma, suppliers } from '@prisma/client';
 
 import type { SupplierStats } from './supplier-scoring';
 
+import { resolveSupplierInspectionPolicy } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
@@ -26,6 +27,10 @@ type SupplierSnapshotInput = Pick<
 >;
 
 const SUPPLIER_SNAPSHOT_CHUNK_SIZE = 50;
+const CURRENT_SCORING_MODELS = [
+  'IN_HOUSE_OUTSOURCING_V2',
+  'SUPPLIER_V2',
+] as const;
 
 interface SupplierScoreRefreshOptions {
   batchSize?: number;
@@ -38,31 +43,86 @@ function uniqueSupplierNames(names: Array<null | string | undefined>) {
   ];
 }
 
-async function buildSupplierStatsMap(supplierNames: string[]) {
+async function buildSupplierStatsMap(suppliers: SupplierSnapshotInput[]) {
   const statsMap = new Map<string, SupplierStats>();
-  if (supplierNames.length === 0) return statsMap;
+  if (suppliers.length === 0) return statsMap;
+
+  const supplierNames = uniqueSupplierNames(
+    suppliers.map((supplier) => supplier.name),
+  );
 
   const now = new Date();
   const oneYearAgo = new Date();
   oneYearAgo.setFullYear(now.getFullYear() - 1);
 
-  const supplierNameToId =
+  const teamNameToId =
     await MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
-      configKey: 'supplierName',
+      configKey: 'team',
       names: supplierNames,
     });
-  const supplierIds = [...supplierNameToId.values()].filter(
-    Boolean,
-  ) as string[];
+  const supplierByName = new Map(
+    suppliers.map((supplier) => [supplier.name, supplier]),
+  );
+  const supplierById = new Map(
+    suppliers.map((supplier) => [supplier.id, supplier]),
+  );
+  const supplierByTeamId = new Map<string, SupplierSnapshotInput>();
+  for (const supplier of suppliers) {
+    const teamId = teamNameToId.get(supplier.name);
+    if (teamId) supplierByTeamId.set(teamId, supplier);
+  }
+  const incomingSuppliers = suppliers.filter(
+    (supplier) =>
+      resolveSupplierInspectionPolicy(supplier).inspectionCategory ===
+      'INCOMING',
+  );
+  const processSuppliers = suppliers.filter(
+    (supplier) =>
+      resolveSupplierInspectionPolicy(supplier).inspectionCategory ===
+      'PROCESS',
+  );
+  const resolveSupplierIdentity = (record: {
+    supplierId?: null | string;
+    supplierName?: null | string;
+  }) => {
+    if (record.supplierId) {
+      const byId = supplierById.get(record.supplierId);
+      if (byId) return byId;
+    }
+    if (record.supplierName) {
+      const byName = supplierByName.get(record.supplierName);
+      if (byName) return byName;
+    }
+    return undefined;
+  };
+  const resolveTeamIdentity = (record: {
+    team?: null | string;
+    teamId?: null | string;
+  }) => {
+    if (record.teamId) {
+      const byTeamId = supplierByTeamId.get(record.teamId);
+      if (byTeamId) return byTeamId;
+    }
+    return record.team ? supplierByName.get(record.team) : undefined;
+  };
+  const getStats = (supplier: SupplierSnapshotInput) =>
+    statsMap.get(supplier.id) || createEmptyStats();
+
   const [inspectionScoring, afterSalesScoring] = await Promise.all([
     InspectionService.getSupplierScoringData({
+      engineeringSupplierIds: suppliers.map((item) => item.id),
+      engineeringSupplierNames: suppliers.map((item) => item.name),
+      incomingSupplierIds: incomingSuppliers.map((item) => item.id),
+      incomingSupplierNames: incomingSuppliers.map((item) => item.name),
+      processTeamIds: processSuppliers
+        .map((item) => teamNameToId.get(item.name))
+        .filter(Boolean) as string[],
+      processTeamNames: processSuppliers.map((item) => item.name),
       since: oneYearAgo,
-      supplierIds,
-      supplierNames,
     }),
     AfterSalesAPI.getSupplierScoringData({
       since: oneYearAgo,
-      supplierIds,
+      supplierIds: suppliers.map((item) => item.id),
       supplierNames,
     }),
   ]);
@@ -72,6 +132,8 @@ async function buildSupplierStatsMap(supplierNames: string[]) {
     engineeringStatusStats,
     records: recentQualityRecords,
   } = inspectionScoring;
+  const engineeringTotalStats =
+    inspectionScoring.engineeringTotalStats ?? engineeringStats;
   const {
     stats: afterSalesStats,
     statusStats: afterSalesStatusStats,
@@ -79,8 +141,13 @@ async function buildSupplierStatsMap(supplierNames: string[]) {
   } = afterSalesScoring;
 
   incomingStats.forEach((s) => {
-    if (!s.supplierName) return;
-    const current = statsMap.get(s.supplierName) || createEmptyStats();
+    if (s.result === 'NA') return;
+    const supplier =
+      s.category === 'PROCESS'
+        ? resolveTeamIdentity(s)
+        : resolveSupplierIdentity(s);
+    if (!supplier) return;
+    const current = getStats(supplier);
     current.count += s._count.id;
     current.quantity += s._sum.quantity || 0;
     if (s.result === 'PASS') {
@@ -89,44 +156,61 @@ async function buildSupplierStatsMap(supplierNames: string[]) {
       current.failures += s._count.id;
       current.failuresQuantity += s._sum.quantity || 0;
     }
-    statsMap.set(s.supplierName, current);
+    statsMap.set(supplier.id, current);
   });
 
   afterSalesStats.forEach((s) => {
-    if (!s.supplierBrand) return;
-    const current = statsMap.get(s.supplierBrand) || createEmptyStats();
+    const supplier =
+      (s.supplierBrandId ? supplierById.get(s.supplierBrandId) : undefined) ||
+      (s.supplierBrand ? supplierByName.get(s.supplierBrand) : undefined);
+    if (!supplier) return;
+    const current = getStats(supplier);
     current.afterSalesLoss +=
       Number(s._sum.materialCost || 0) + Number(s._sum.laborTravelCost || 0);
     current.afterSalesCount += s._count.id;
-    statsMap.set(s.supplierBrand, current);
+    statsMap.set(supplier.id, current);
   });
 
   engineeringStats.forEach((s) => {
-    if (!s.supplierName) return;
-    const current = statsMap.get(s.supplierName) || createEmptyStats();
+    const supplier = resolveSupplierIdentity(s);
+    if (!supplier) return;
+    const current = getStats(supplier);
     current.engineeringLoss += Number(s._sum.lossAmount || 0);
     current.engineeringCount += s._count.id;
     current.engineeringDefectQuantity += s._sum.quantity || 0;
-    statsMap.set(s.supplierName, current);
+    statsMap.set(supplier.id, current);
+  });
+
+  engineeringTotalStats.forEach((s) => {
+    const supplier = resolveSupplierIdentity(s);
+    if (!supplier) return;
+    const current = getStats(supplier);
+    current.engineeringTotalCount += s._count.id;
+    statsMap.set(supplier.id, current);
   });
 
   engineeringStatusStats.forEach((s) => {
-    if (!s.supplierName || s.status !== 'OPEN') return;
-    const current = statsMap.get(s.supplierName) || createEmptyStats();
+    if (s.status !== 'OPEN') return;
+    const supplier = resolveSupplierIdentity(s);
+    if (!supplier) return;
+    const current = getStats(supplier);
     current.openEngineeringCount += s._count.id;
-    statsMap.set(s.supplierName, current);
+    statsMap.set(supplier.id, current);
   });
 
   afterSalesStatusStats.forEach((s) => {
-    if (!s.supplierBrand) return;
     if (
       ['CANCELLED', 'CLOSED', 'COMPLETED', 'RESOLVED'].includes(s.claimStatus)
     ) {
       return;
     }
-    const current = statsMap.get(s.supplierBrand) || createEmptyStats();
+    const supplier =
+      (s.supplierBrandId ? supplierById.get(s.supplierBrandId) : undefined) ||
+      (s.supplierBrand ? supplierByName.get(s.supplierBrand) : undefined);
+    if (!supplier) return;
+    const current = getStats(supplier);
     current.openAfterSalesCount += s._count.id;
-    statsMap.set(s.supplierBrand, current);
+    statsMap.set(supplier.id, current);
   });
 
   const supplierRecords = new Map<
@@ -152,7 +236,16 @@ async function buildSupplierStatsMap(supplierNames: string[]) {
 
   combinedRecords.forEach((r) => {
     const name = r.origin === 'afterSales' ? r.supplierBrand : r.supplierName;
-    if (!name) return;
+    let supplier: SupplierSnapshotInput | undefined;
+    if (r.origin === 'qualityRecords') {
+      supplier = resolveSupplierIdentity(r);
+    } else if (r.supplierBrandId) {
+      supplier = supplierById.get(r.supplierBrandId);
+    }
+    if (!supplier && name) {
+      supplier = supplierByName.get(name);
+    }
+    if (!supplier) return;
 
     const loss =
       r.origin === 'afterSales'
@@ -160,20 +253,20 @@ async function buildSupplierStatsMap(supplierNames: string[]) {
         : Number(r.lossAmount || 0);
     const date =
       r.origin === 'afterSales' ? new Date(r.occurDate) : new Date(r.date);
-    const records = supplierRecords.get(name) || [];
+    const records = supplierRecords.get(supplier.id) || [];
     records.push({
       type: classifyDefect(loss, r.severity || undefined),
       loss,
       date,
       origin: r.origin,
     });
-    supplierRecords.set(name, records);
+    supplierRecords.set(supplier.id, records);
   });
 
-  supplierRecords.forEach((records, name) => {
-    const current = statsMap.get(name) || createEmptyStats();
+  supplierRecords.forEach((records, supplierId) => {
+    const current = statsMap.get(supplierId) || createEmptyStats();
     records.sort((a, b) => b.date.getTime() - a.date.getTime());
-    statsMap.set(name, applyRecordsToStats(current, records));
+    statsMap.set(supplierId, applyRecordsToStats(current, records));
   });
 
   return statsMap;
@@ -201,22 +294,24 @@ function toSnapshotData(
     supplierName: supplier.name,
     category: supplier.category,
     outsourcingMode: String(scored.outsourcingMode || ''),
-    incomingQualifiedRate: Number(scored.incomingQualifiedRate || 100),
-    incomingScore: Number(scored.incomingScore || 100),
+    incomingQualifiedRate: Number(scored.incomingQualifiedRate ?? 100),
+    incomingScore: Number(scored.incomingScore ?? 100),
     incomingBatchCount: Number(scored.incomingBatchCount || 0),
     incomingTotalQuantity: Number(scored.incomingTotalQuantity || 0),
-    engineeringIssueCount: Number(scored.engineeringIssueCount || 0),
-    engineeringScore: Number(scored.engineeringScore || 100),
+    engineeringIssueCount: Number(
+      stat.engineeringTotalCount ?? scored.engineeringIssueCount ?? 0,
+    ),
+    engineeringScore: Number(scored.engineeringScore ?? 100),
     afterSalesIssueCount: Number(scored.afterSalesIssueCount || 0),
-    afterSalesScore: Number(scored.afterSalesScore || 100),
+    afterSalesScore: Number(scored.afterSalesScore ?? 100),
     totalEngineeringLoss: Number(scored.totalEngineeringLoss || 0),
     totalAfterSalesLoss: Number(scored.totalAfterSalesLoss || 0),
     finalQualityScore: Number(scored.qualityScore || 0),
     finalRating: String(scored.level || scored.rating || 'A'),
     finalStatus: String(scored.status || 'Qualified'),
     isWarning: Boolean(scored.isWarning),
-    scoringModel: String(scored.scoringModel || 'SUPPLIER'),
-    stabilityScore: Number(scored.stabilityScore || 100),
+    scoringModel: `${String(scored.scoringModel || 'SUPPLIER')}_V2`,
+    stabilityScore: Number(scored.stabilityScore ?? 100),
     warningReasons: scored.warningReasons,
     calculatedAt: new Date(),
     isDeleted: false,
@@ -224,13 +319,12 @@ function toSnapshotData(
 }
 
 async function refreshSupplierChunk(suppliers: SupplierSnapshotInput[]) {
-  const supplierNames = uniqueSupplierNames(suppliers.map((item) => item.name));
-  const statsMap = await buildSupplierStatsMap(supplierNames);
+  const statsMap = await buildSupplierStatsMap(suppliers);
   await Promise.all(
     suppliers.map((supplier) => {
       const data = toSnapshotData(
         supplier,
-        statsMap.get(supplier.name) || createEmptyStats(),
+        statsMap.get(supplier.id) || createEmptyStats(),
       );
       return prisma.supplier_score_snapshots.upsert({
         where: { supplierId: supplier.id },
@@ -308,7 +402,17 @@ export const SupplierScoreSnapshotService = {
     let processed = 0;
     for (;;) {
       const suppliers = await prisma.suppliers.findMany({
-        where: { isDeleted: false, scoreSnapshot: { is: null } },
+        where: {
+          isDeleted: false,
+          OR: [
+            { scoreSnapshot: { is: null } },
+            {
+              scoreSnapshot: {
+                is: { scoringModel: { notIn: [...CURRENT_SCORING_MODELS] } },
+              },
+            },
+          ],
+        },
         orderBy: { id: 'asc' },
         take: batchSize,
       });

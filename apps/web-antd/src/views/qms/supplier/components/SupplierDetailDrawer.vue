@@ -3,7 +3,7 @@ import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
 import type { QmsInspectionApi } from '#/api/qms/inspection';
 import type { QmsSupplierApi } from '#/api/qms/supplier';
 
-import { ref } from 'vue';
+import { reactive, ref } from 'vue';
 
 import { useVbenDrawer } from '@vben/common-ui';
 import { useI18n } from '@vben/locales';
@@ -21,15 +21,19 @@ import {
 } from 'ant-design-vue';
 
 import { getAfterSalesList } from '#/api/qms/after-sales';
+import { getInspectionIssues } from '#/api/qms/inspection';
 import {
-  getInspectionIssues,
-  getInspectionRecords,
-} from '#/api/qms/inspection';
-import { getSupplierHistoryProjects } from '#/api/qms/supplier';
+  getSupplierHistoryProjects,
+  getSupplierInspectionHistory,
+} from '#/api/qms/supplier';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 
 import { getOutsourcingModeLabel } from '../data';
+import {
+  formatIncomingQualifiedRate,
+  hasIncomingQualifiedRate,
+} from './supplier-detail';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
@@ -37,20 +41,51 @@ const { isMobile } = useMobileViewport();
 
 const selectedSupplier = ref<null | QmsSupplierApi.SupplierItem>(null);
 const isDetailLoading = ref(false);
-const supplierInspections = ref<QmsInspectionApi.InspectionRecord[]>([]);
+const supplierInspections = ref<QmsSupplierApi.SupplierInspectionHistory[]>([]);
+const supplierInspectionPagination = reactive({
+  current: 1,
+  pageSize: 5,
+  showSizeChanger: true,
+  total: 0,
+});
+const isInspectionHistoryLoading = ref(false);
 const supplierAfterSales = ref<QmsAfterSalesApi.AfterSalesItem[]>([]);
 const supplierEngineeringIssues = ref<QmsInspectionApi.InspectionIssue[]>([]);
 const supplierHistoryProjects = ref<QmsSupplierApi.SupplierHistoryProject[]>(
   [],
 );
+let detailRequestSequence = 0;
+let inspectionPageRequestSequence = 0;
 
 const [Drawer, drawerApi] = useVbenDrawer({
   title: t('common.detail'),
   class: isMobile.value ? 'w-[100vw]' : 'w-[950px]',
 });
 
+function clearDetailData() {
+  supplierInspections.value = [];
+  supplierInspectionPagination.current = 1;
+  supplierInspectionPagination.total = 0;
+  isInspectionHistoryLoading.value = false;
+  supplierAfterSales.value = [];
+  supplierEngineeringIssues.value = [];
+  supplierHistoryProjects.value = [];
+}
+
+function reportRejectedDetailRequest(
+  result: PromiseSettledResult<unknown>,
+  context: string,
+) {
+  if (result.status === 'rejected') {
+    handleApiError(result.reason, context);
+  }
+}
+
 async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
+  const requestSequence = ++detailRequestSequence;
+  const inspectionRequestSequence = ++inspectionPageRequestSequence;
   selectedSupplier.value = row;
+  clearDetailData();
   const prefix = titlePrefix || t('qms.supplier.title');
   // 使用 qms.portrait 确保在 local qms.json 根部能找到
   drawerApi.setState({
@@ -60,20 +95,99 @@ async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
 
   try {
     const [inspections, afterSales, engineering, historyProjects] =
-      await Promise.all([
-        getInspectionRecords({ keyword: row.name, type: 'INCOMING' }),
+      await Promise.allSettled([
+        getSupplierInspectionHistory(row.id, {
+          page: supplierInspectionPagination.current,
+          pageSize: supplierInspectionPagination.pageSize,
+        }),
         getAfterSalesList({ supplierBrand: row.name }),
         getInspectionIssues({ supplierName: row.name }),
         getSupplierHistoryProjects(row.id),
       ]);
-    supplierInspections.value = inspections.items || [];
-    supplierAfterSales.value = afterSales;
-    supplierEngineeringIssues.value = engineering.items || [];
-    supplierHistoryProjects.value = historyProjects.items || [];
+
+    if (
+      requestSequence !== detailRequestSequence ||
+      selectedSupplier.value?.id !== row.id
+    ) {
+      return;
+    }
+
+    if (
+      inspections.status === 'fulfilled' &&
+      inspectionRequestSequence === inspectionPageRequestSequence
+    ) {
+      supplierInspections.value = inspections.value.items || [];
+      supplierInspectionPagination.total = inspections.value.total || 0;
+    }
+    if (afterSales.status === 'fulfilled') {
+      supplierAfterSales.value = afterSales.value;
+    }
+    if (engineering.status === 'fulfilled') {
+      supplierEngineeringIssues.value = engineering.value.items || [];
+    }
+    if (historyProjects.status === 'fulfilled') {
+      supplierHistoryProjects.value = historyProjects.value.items || [];
+    }
+
+    reportRejectedDetailRequest(
+      inspections,
+      'Load Supplier Inspection History',
+    );
+    reportRejectedDetailRequest(afterSales, 'Load Supplier After Sales');
+    reportRejectedDetailRequest(engineering, 'Load Supplier Engineering');
+    reportRejectedDetailRequest(
+      historyProjects,
+      'Load Supplier History Projects',
+    );
   } catch (error) {
-    handleApiError(error, 'Load Supplier Detail');
+    if (requestSequence === detailRequestSequence) {
+      handleApiError(error, 'Load Supplier Detail');
+    }
   } finally {
-    isDetailLoading.value = false;
+    if (requestSequence === detailRequestSequence) {
+      isDetailLoading.value = false;
+    }
+  }
+}
+
+interface InspectionPaginationChange {
+  current?: number;
+  pageSize?: number;
+}
+
+async function handleInspectionPageChange(
+  pagination: InspectionPaginationChange,
+) {
+  if (!selectedSupplier.value) return;
+
+  const supplierId = selectedSupplier.value.id;
+  const requestSequence = ++inspectionPageRequestSequence;
+  const page = pagination.current || 1;
+  const pageSize = pagination.pageSize || 5;
+  isInspectionHistoryLoading.value = true;
+  try {
+    const result = await getSupplierInspectionHistory(supplierId, {
+      page,
+      pageSize,
+    });
+    if (
+      requestSequence !== inspectionPageRequestSequence ||
+      selectedSupplier.value?.id !== supplierId
+    ) {
+      return;
+    }
+    supplierInspections.value = result.items || [];
+    supplierInspectionPagination.current = page;
+    supplierInspectionPagination.pageSize = pageSize;
+    supplierInspectionPagination.total = result.total || 0;
+  } catch (error) {
+    if (requestSequence === inspectionPageRequestSequence) {
+      handleApiError(error, 'Load Supplier Inspection History');
+    }
+  } finally {
+    if (requestSequence === inspectionPageRequestSequence) {
+      isInspectionHistoryLoading.value = false;
+    }
   }
 }
 
@@ -111,8 +225,9 @@ function parseAdmissionDocuments(value: unknown): AdmissionDocument[] {
 }
 
 async function open(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
-  await loadDetail(row, titlePrefix);
+  const loading = loadDetail(row, titlePrefix);
   drawerApi.open();
+  await loading;
 }
 
 defineExpose({
@@ -171,8 +286,20 @@ defineExpose({
               <Col :span="5">
                 <Statistic
                   :title="t('qms.common.passRate')"
-                  :value="selectedSupplier.incomingQualifiedRate ?? 0"
-                  suffix="%"
+                  :value="
+                    formatIncomingQualifiedRate(
+                      selectedSupplier.incomingBatchCount,
+                      selectedSupplier.incomingQualifiedRate,
+                    )
+                  "
+                  :suffix="
+                    hasIncomingQualifiedRate(
+                      selectedSupplier.incomingBatchCount,
+                      selectedSupplier.incomingQualifiedRate,
+                    )
+                      ? '%'
+                      : undefined
+                  "
                   :value-style="{ color: '#3f8600', fontSize: '16px' }"
                 />
               </Col>
@@ -417,13 +544,14 @@ defineExpose({
             </Table.Column>
           </Table>
         </TabPane>
-        <TabPane key="5" :tab="t('qms.common.tabs.incoming')">
+        <TabPane key="5" :tab="t('qms.common.tabs.inspectionHistory')">
           <Table
             :data-source="supplierInspections"
             size="small"
-            :pagination="{ pageSize: 5 }"
+            :pagination="supplierInspectionPagination"
             row-key="id"
-            :loading="isDetailLoading"
+            :loading="isDetailLoading || isInspectionHistoryLoading"
+            @change="handleInspectionPageChange"
           >
             <Table.Column
               :title="t('qms.inspection.records.form.inspectionDate')"
@@ -440,8 +568,8 @@ defineExpose({
               width="140"
             />
             <Table.Column
-              :title="t('qms.inspection.records.form.materialName')"
-              data-index="materialName"
+              :title="t('qms.inspection.issues.partName')"
+              data-index="partName"
             />
             <Table.Column
               :title="t('qms.inspection.records.form.quantity')"

@@ -71,9 +71,8 @@ export function hasInspectionIssueAdminAccess(roles: unknown): boolean {
 }
 
 export function hasInspectionIssueWriteAccess(params: {
-  inspector: null | string;
-  roles: unknown;
-  username: unknown;
+  createdBy: null | string;
+  userId: unknown;
 }): boolean {
   return domainHasInspectionIssueWriteAccess(params);
 }
@@ -111,8 +110,12 @@ interface InspectionIssueImportItem {
 
 export async function findInspectionIssueAccessRecord(id: string) {
   return prisma.quality_records.findUnique({
-    where: { id },
-    select: { inspector: true, nonConformanceNumber: true, inspectionId: true },
+    where: { id, isDeleted: false },
+    select: {
+      createdBy: true,
+      nonConformanceNumber: true,
+      inspectionId: true,
+    },
   });
 }
 

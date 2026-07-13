@@ -1,9 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildGovernedAfterSalesCreateData,
   buildGovernedAfterSalesUpdateData,
 } from './after-sales-payload';
+
+vi.mock('~/utils/governed-write', () => ({
+  buildGovernedCanonicalWritePairForTable: vi.fn(
+    async (_table: string, data: Record<string, unknown>) =>
+      data.supplierBrand
+        ? { supplierBrandId: `supplier:${String(data.supplierBrand)}` }
+        : {},
+  ),
+}));
 
 describe('after-sales payload governance helpers', () => {
   it('builds governed create payload without runtime reference error', async () => {
@@ -52,6 +61,25 @@ describe('after-sales payload governance helpers', () => {
     });
   });
 
+  it('writes canonical supplier ID on create', async () => {
+    await expect(
+      buildGovernedAfterSalesCreateData(
+        {
+          supplierBrand: 'Supplier A',
+          workOrderNumber: 'WO-808512',
+        },
+        {
+          defaultWorkOrderNumber: 'UNKNOWN',
+          id: 'AS-UT-003',
+          serialNumber: 3,
+        },
+      ),
+    ).resolves.toMatchObject({
+      supplierBrand: 'Supplier A',
+      supplierBrandId: 'supplier:Supplier A',
+    });
+  });
+
   it('builds governed update payload without runtime reference error', async () => {
     await expect(
       buildGovernedAfterSalesUpdateData({
@@ -78,6 +106,25 @@ describe('after-sales payload governance helpers', () => {
         feedbackDept: '生产部',
         respDept: '生产部',
         responsibleDepartments: JSON.stringify(['生产部', '工艺部']),
+      },
+    });
+  });
+
+  it('updates and clears canonical supplier ID with supplier name', async () => {
+    await expect(
+      buildGovernedAfterSalesUpdateData({ supplierBrand: 'Supplier B' }),
+    ).resolves.toMatchObject({
+      data: {
+        supplierBrand: 'Supplier B',
+        supplierBrandId: 'supplier:Supplier B',
+      },
+    });
+    await expect(
+      buildGovernedAfterSalesUpdateData({ supplierBrand: '' }),
+    ).resolves.toMatchObject({
+      data: {
+        supplierBrand: null,
+        supplierBrandId: null,
       },
     });
   });

@@ -70,6 +70,9 @@ export async function buildCloseLinkedIssueCreateResult(options: {
       nonConformanceNumber: issueBody.ncNumber,
     },
     createData: await buildInspectionIssueCreateData(issueBody, {
+      createdBy:
+        String(options.userinfo.id || options.userinfo.userId || '') ||
+        undefined,
       id: newId,
       inspection: linkedInspection,
       inspectorUsername: options.userinfo.username,

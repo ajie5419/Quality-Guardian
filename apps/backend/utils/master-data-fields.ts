@@ -387,15 +387,16 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
     backfillPolicy: 'canonical-id',
     auditPolicy: 'canonical-id-and-orphan',
     source: {
-      type: 'dictionary',
-      dictType: 'supplier_brand',
+      type: 'table',
+      table: 'suppliers',
+      valueColumn: 'name',
+      where: 'isDeleted = 0',
     },
     canonical: {
-      table: 'dictionaries',
+      table: 'suppliers',
       idColumn: 'id',
-      nameColumn: 'dictKey',
-      activeWhere:
-        "isDeleted = 0 AND status = 1 AND dictType = 'supplier_brand'",
+      nameColumn: 'name',
+      activeWhere: 'isDeleted = 0',
     },
     targets: [
       {
@@ -929,6 +930,12 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
         nullable: true,
       },
       {
+        table: 'quality_losses',
+        nameColumn: 'projectName',
+        idColumn: 'projectId',
+        nullable: true,
+      },
+      {
         table: 'work_orders',
         nameColumn: 'projectName',
         idColumn: 'projectId',
@@ -1291,6 +1298,12 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
         nameColumn: 'partName',
         idColumn: 'partId',
         nullable: false,
+      },
+      {
+        table: 'quality_losses',
+        nameColumn: 'partName',
+        idColumn: 'partId',
+        nullable: true,
       },
       {
         table: 'qms_inspection_requests',

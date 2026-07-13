@@ -33,6 +33,7 @@ export type InspectionGridRow = InspectionIssue & {
 };
 
 interface UseIssueGridOptionsParams {
+  canManageIssue: (row: InspectionIssue) => boolean;
   currentDateMode: Ref<'month' | 'week' | 'year'>;
   currentDateValue: ComputedRef<string> | Ref<string>;
   canDelete: Ref<boolean>;
@@ -119,6 +120,7 @@ function formatDepartmentList(
 }
 
 export function useIssueGridOptions({
+  canManageIssue,
   currentDateMode,
   currentDateValue,
   canDelete,
@@ -305,8 +307,8 @@ export function useIssueGridOptions({
             cellRender: {
               name: 'CellOperation',
               props: {
-                options: [
-                  ...(canEdit.value ? ['edit'] : []),
+                options: (row: InspectionIssue) => [
+                  ...(canEdit.value && canManageIssue(row) ? ['edit'] : []),
                   ...(canSettle.value
                     ? [
                         {
@@ -316,7 +318,7 @@ export function useIssueGridOptions({
                         },
                       ]
                     : []),
-                  ...(canDelete.value ? ['delete'] : []),
+                  ...(canDelete.value && canManageIssue(row) ? ['delete'] : []),
                 ],
                 onClick: ({
                   code,

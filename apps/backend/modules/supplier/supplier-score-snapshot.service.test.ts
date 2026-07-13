@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
 import { SupplierScoreSnapshotService } from '~/modules/supplier/supplier-score-snapshot.service';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -170,5 +171,192 @@ describe('supplierScoreSnapshotService openEngineeringCount open-status definiti
     expect(s1Call[0].create.finalQualityScore).toBe(
       s2Call[0].create.finalQualityScore,
     );
+  });
+
+  it('preserves a real zero percent qualified rate in the snapshot', async () => {
+    (InspectionService.getSupplierScoringData as any).mockResolvedValue({
+      ...buildInspectionScoringData([]),
+      engineeringTotalStats: [],
+      incomingStats: [
+        {
+          category: 'INCOMING',
+          supplierId: null,
+          supplierName: 'S1',
+          team: null,
+          result: 'FAIL',
+          _count: { id: 1 },
+          _sum: { quantity: 10 },
+        },
+      ],
+    });
+
+    await SupplierScoreSnapshotService.refreshSuppliers([makeSupplier('S1')]);
+
+    const data = (prisma.supplier_score_snapshots.upsert as any).mock
+      .calls[0][0].create;
+    expect(data.incomingQualifiedRate).toBe(0);
+    expect(data.scoringModel).toBe('SUPPLIER_V2');
+  });
+
+  it('excludes NA batches and keeps conditional batches in the denominator', async () => {
+    (InspectionService.getSupplierScoringData as any).mockResolvedValue({
+      ...buildInspectionScoringData([]),
+      engineeringTotalStats: [],
+      incomingStats: [
+        {
+          category: 'INCOMING',
+          supplierId: null,
+          supplierName: 'S1',
+          team: null,
+          result: 'NA',
+          _count: { id: 5 },
+          _sum: { quantity: 50 },
+        },
+        {
+          category: 'INCOMING',
+          supplierId: null,
+          supplierName: 'S1',
+          team: null,
+          result: 'CONDITIONAL',
+          _count: { id: 1 },
+          _sum: { quantity: 2 },
+        },
+      ],
+    });
+
+    await SupplierScoreSnapshotService.refreshSuppliers([makeSupplier('S1')]);
+
+    const data = (prisma.supplier_score_snapshots.upsert as any).mock
+      .calls[0][0].create;
+    expect(data.incomingBatchCount).toBe(1);
+    expect(data.incomingTotalQuantity).toBe(2);
+    expect(data.incomingQualifiedRate).toBe(0);
+  });
+
+  it('uses process team inspections for in-house outsourcing', async () => {
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalIdsByNames,
+    ).mockResolvedValue(new Map([['Team A', 'team-1']]));
+    (InspectionService.getSupplierScoringData as any).mockResolvedValue({
+      ...buildInspectionScoringData([]),
+      engineeringTotalStats: [],
+      incomingStats: [
+        {
+          category: 'PROCESS',
+          supplierId: null,
+          supplierName: null,
+          team: 'Legacy Team Name',
+          teamId: 'team-1',
+          result: 'FAIL',
+          _count: { id: 1 },
+          _sum: { quantity: 3 },
+        },
+      ],
+    });
+    const supplier = {
+      ...makeSupplier('Team A'),
+      category: 'Outsourcing',
+      outsourcingMode: 'IN_HOUSE_TEAM',
+    };
+
+    await SupplierScoreSnapshotService.refreshSuppliers([supplier]);
+
+    expect(InspectionService.getSupplierScoringData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        incomingSupplierNames: [],
+        processTeamIds: ['team-1'],
+        processTeamNames: ['Team A'],
+      }),
+    );
+    const data = (prisma.supplier_score_snapshots.upsert as any).mock
+      .calls[0][0].create;
+    expect(data.incomingBatchCount).toBe(1);
+    expect(data.incomingQualifiedRate).toBe(0);
+  });
+
+  it('maps supplier ID matches back to the current supplier name', async () => {
+    (InspectionService.getSupplierScoringData as any).mockResolvedValue({
+      ...buildInspectionScoringData([]),
+      engineeringTotalStats: [],
+      incomingStats: [
+        {
+          category: 'INCOMING',
+          supplierId: 'Current Name-id',
+          supplierName: 'Legacy Name',
+          team: null,
+          result: 'PASS',
+          _count: { id: 2 },
+          _sum: { quantity: 4 },
+        },
+      ],
+    });
+
+    await SupplierScoreSnapshotService.refreshSuppliers([
+      makeSupplier('Current Name'),
+    ]);
+
+    const data = (prisma.supplier_score_snapshots.upsert as any).mock
+      .calls[0][0].create;
+    expect(data.incomingBatchCount).toBe(2);
+    expect(data.incomingQualifiedRate).toBe(100);
+  });
+
+  it('stores all-time engineering issue count while scoring recent issues', async () => {
+    (InspectionService.getSupplierScoringData as any).mockResolvedValue({
+      ...buildInspectionScoringData([]),
+      engineeringStats: [
+        {
+          supplierId: null,
+          supplierName: 'S1',
+          _count: { id: 1 },
+          _sum: { lossAmount: 100, quantity: 1 },
+        },
+      ],
+      engineeringTotalStats: [
+        {
+          supplierId: 'S1-id',
+          supplierName: 'Legacy S1',
+          _count: { id: 3 },
+        },
+        {
+          supplierId: 'S1-id',
+          supplierName: 'S1',
+          _count: { id: 4 },
+        },
+      ],
+    });
+
+    await SupplierScoreSnapshotService.refreshSuppliers([makeSupplier('S1')]);
+
+    const data = (prisma.supplier_score_snapshots.upsert as any).mock
+      .calls[0][0].create;
+    expect(data.engineeringIssueCount).toBe(7);
+  });
+
+  it('maps after-sales history by supplier ID after a supplier rename', async () => {
+    (InspectionService.getSupplierScoringData as any).mockResolvedValue(
+      buildInspectionScoringData([]),
+    );
+    (AfterSalesAPI.getSupplierScoringData as any).mockResolvedValue({
+      records: [],
+      stats: [
+        {
+          supplierBrandId: 'Current Name-id',
+          supplierBrand: 'Legacy Name',
+          _count: { id: 2 },
+          _sum: { laborTravelCost: 20, materialCost: 30 },
+        },
+      ],
+      statusStats: [],
+    });
+
+    await SupplierScoreSnapshotService.refreshSuppliers([
+      makeSupplier('Current Name'),
+    ]);
+
+    const data = (prisma.supplier_score_snapshots.upsert as any).mock
+      .calls[0][0].create;
+    expect(data.afterSalesIssueCount).toBe(2);
+    expect(data.totalAfterSalesLoss).toBe(50);
   });
 });

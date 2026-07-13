@@ -141,16 +141,19 @@ export function useQualityLossGrid(params: {
         field: 'workOrderNumber',
         title: t('qms.workOrder.workOrderNumber'),
         width: 120,
+        formatter: ({ cellValue }) => cellValue || '-',
       },
       {
         field: 'projectName',
         title: t('qms.workOrder.projectName'),
         minWidth: 150,
+        formatter: ({ cellValue }) => cellValue || '-',
       },
       {
         field: 'partName',
         title: t('qms.inspection.issues.partName'),
         minWidth: 150,
+        formatter: ({ cellValue }) => cellValue || '-',
       },
       {
         field: 'date',
@@ -192,7 +195,7 @@ export function useQualityLossGrid(params: {
         cellRender: {
           name: 'CellOperation',
           props: {
-            options: [
+            options: (row: QualityLossItem) => [
               {
                 code: 'claim',
                 icon: 'ant-design:solution-outlined',
@@ -201,7 +204,9 @@ export function useQualityLossGrid(params: {
                 ghost: true,
               },
               ...(canEdit.value ? ['edit'] : []),
-              ...(canDelete.value ? ['delete'] : []),
+              ...(canDelete.value && row.lossSource === LossSource.MANUAL
+                ? ['delete']
+                : []),
             ],
             onClick: ({
               code,

@@ -9,6 +9,8 @@ import { useI18n } from '@vben/locales';
 import {
   INSPECTION_ISSUE_CLAIM_OPTIONS,
   INSPECTION_ISSUE_DEFAULT_VALUES,
+  INSPECTION_ISSUE_DEFECT_OPTIONS,
+  INSPECTION_ISSUE_DEFECT_SUBTYPES,
   INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS,
   INSPECTION_ISSUE_SEVERITY_OPTIONS,
   INSPECTION_ISSUE_STATUS_UI_MAP,
@@ -70,6 +72,49 @@ export interface StatusOption {
   value: string;
 }
 
+const DEFECT_LABEL_KEYS: Record<string, string> = {
+  设计缺陷: 'qms.inspection.issues.defects.design',
+  工艺缺陷: 'qms.inspection.issues.defects.process',
+  制造缺陷: 'qms.inspection.issues.defects.manufacturing',
+  零部件缺陷: 'qms.inspection.issues.defects.part',
+  其他缺陷: 'qms.inspection.issues.defects.other',
+};
+
+const DEFECT_SUBTYPE_LABEL_KEYS: Record<string, Record<string, string>> = {
+  设计缺陷: {
+    干涉: 'qms.inspection.issues.defects.designSub.interference',
+    尺寸错误: 'qms.inspection.issues.defects.designSub.sizeError',
+    程序错误: 'qms.inspection.issues.defects.designSub.programError',
+    选型问题: 'qms.inspection.issues.defects.designSub.selection',
+    其他: 'qms.inspection.issues.defects.designSub.other',
+  },
+  工艺缺陷: {
+    料单错误: 'qms.inspection.issues.defects.processSub.bomError',
+    焊接工艺问题: 'qms.inspection.issues.defects.processSub.welding',
+    组对工艺问题: 'qms.inspection.issues.defects.processSub.assembly',
+    装配工艺问题: 'qms.inspection.issues.defects.processSub.mounting',
+    其他: 'qms.inspection.issues.defects.processSub.other',
+  },
+  制造缺陷: {
+    加工精度缺陷: 'qms.inspection.issues.defects.manufacturingSub.precision',
+    装配缺陷: 'qms.inspection.issues.defects.manufacturingSub.assembly',
+    焊接缺陷: 'qms.inspection.issues.defects.manufacturingSub.welding',
+    表面处理缺陷: 'qms.inspection.issues.defects.manufacturingSub.surface',
+    人员操作问题: 'qms.inspection.issues.defects.manufacturingSub.operation',
+    设备问题: 'qms.inspection.issues.defects.manufacturingSub.equipment',
+    外观缺陷: 'qms.inspection.issues.defects.manufacturingSub.appearance',
+    其他: 'qms.inspection.issues.defects.manufacturingSub.other',
+  },
+  零部件缺陷: {
+    与图纸协议不符: 'qms.inspection.issues.defects.partSub.mismatch',
+    外观问题: 'qms.inspection.issues.defects.partSub.appearance',
+    功能失效: 'qms.inspection.issues.defects.partSub.failure',
+    型号错误: 'qms.inspection.issues.defects.partSub.wrongModel',
+    其他: 'qms.inspection.issues.defects.partSub.other',
+  },
+  其他缺陷: {},
+};
+
 function normalizeStatusKey(value: string) {
   return String(value || '')
     .trim()
@@ -82,121 +127,24 @@ function normalizeStatusKey(value: string) {
 export function useDefectOptions() {
   const { t } = useI18n();
 
-  const defectOptions: ComputedRef<DefectOption[]> = computed(() => [
-    { label: t('qms.inspection.issues.defects.design'), value: '设计缺陷' },
-    { label: t('qms.inspection.issues.defects.process'), value: '工艺缺陷' },
-    {
-      label: t('qms.inspection.issues.defects.manufacturing'),
-      value: '制造缺陷',
-    },
-    { label: t('qms.inspection.issues.defects.part'), value: '零部件缺陷' },
-    { label: t('qms.inspection.issues.defects.other'), value: '其他缺陷' },
-  ]);
+  const defectOptions: ComputedRef<DefectOption[]> = computed(() =>
+    INSPECTION_ISSUE_DEFECT_OPTIONS.map((value) => ({
+      label: t(DEFECT_LABEL_KEYS[value] || value),
+      value,
+    })),
+  );
 
   const defectSubtypes: ComputedRef<Record<string, DefectOption[]>> = computed(
-    () => ({
-      设计缺陷: [
-        {
-          label: t('qms.inspection.issues.defects.designSub.interference'),
-          value: '干涉',
-        },
-        {
-          label: t('qms.inspection.issues.defects.designSub.sizeError'),
-          value: '尺寸错误',
-        },
-        {
-          label: t('qms.inspection.issues.defects.designSub.programError'),
-          value: '程序错误',
-        },
-        {
-          label: t('qms.inspection.issues.defects.designSub.selection'),
-          value: '选型问题',
-        },
-        {
-          label: t('qms.inspection.issues.defects.designSub.other'),
-          value: '其他',
-        },
-      ],
-      工艺缺陷: [
-        {
-          label: t('qms.inspection.issues.defects.processSub.bomError'),
-          value: '料单错误',
-        },
-        {
-          label: t('qms.inspection.issues.defects.processSub.welding'),
-          value: '焊接工艺问题',
-        },
-        {
-          label: t('qms.inspection.issues.defects.processSub.assembly'),
-          value: '组对工艺问题',
-        },
-        {
-          label: t('qms.inspection.issues.defects.processSub.mounting'),
-          value: '装配工艺问题',
-        },
-        {
-          label: t('qms.inspection.issues.defects.processSub.other'),
-          value: '其他',
-        },
-      ],
-      制造缺陷: [
-        {
-          label: t('qms.inspection.issues.defects.manufacturingSub.precision'),
-          value: '加工精度缺陷',
-        },
-        {
-          label: t('qms.inspection.issues.defects.manufacturingSub.assembly'),
-          value: '装配缺陷',
-        },
-        {
-          label: t('qms.inspection.issues.defects.manufacturingSub.welding'),
-          value: '焊接缺陷',
-        },
-        {
-          label: t('qms.inspection.issues.defects.manufacturingSub.surface'),
-          value: '表面处理缺陷',
-        },
-        {
-          label: t('qms.inspection.issues.defects.manufacturingSub.operation'),
-          value: '人员操作问题',
-        },
-        {
-          label: t('qms.inspection.issues.defects.manufacturingSub.equipment'),
-          value: '设备问题',
-        },
-        {
-          label: t('qms.inspection.issues.defects.manufacturingSub.appearance'),
-          value: '外观缺陷',
-        },
-        {
-          label: t('qms.inspection.issues.defects.manufacturingSub.other'),
-          value: '其他',
-        },
-      ],
-      零部件缺陷: [
-        {
-          label: t('qms.inspection.issues.defects.partSub.mismatch'),
-          value: '与图纸协议不符',
-        },
-        {
-          label: t('qms.inspection.issues.defects.partSub.appearance'),
-          value: '外观问题',
-        },
-        {
-          label: t('qms.inspection.issues.defects.partSub.failure'),
-          value: '功能失效',
-        },
-        {
-          label: t('qms.inspection.issues.defects.partSub.wrongModel'),
-          value: '型号错误',
-        },
-        {
-          label: t('qms.inspection.issues.defects.partSub.other'),
-          value: '其他',
-        },
-      ],
-      其他缺陷: [],
-    }),
+    () =>
+      Object.fromEntries(
+        INSPECTION_ISSUE_DEFECT_OPTIONS.map((defectType) => [
+          defectType,
+          INSPECTION_ISSUE_DEFECT_SUBTYPES[defectType].map((value) => ({
+            label: t(DEFECT_SUBTYPE_LABEL_KEYS[defectType]?.[value] || value),
+            value,
+          })),
+        ]),
+      ),
   );
 
   return { defectOptions, defectSubtypes };

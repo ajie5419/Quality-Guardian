@@ -79,6 +79,16 @@ vi.mock('~/modules/quality-loss/quality-loss-update', () => ({
   }),
 }));
 
+vi.mock('~/modules/quality-loss/quality-loss-manual-context', () => ({
+  resolveManualQualityLossContext: vi.fn(async () => ({
+    partId: 'part-1',
+    partName: '主梁',
+    projectId: 'project-1',
+    projectName: '1000t 架桥机',
+    workOrderNumber: 'WO-468624',
+  })),
+}));
+
 vi.mock('@qgs/shared', () => ({
   resolveQualityLossTargetLocator: vi.fn((params: any) => {
     if (params.source === 'Manual' || !params.source) {
@@ -142,6 +152,53 @@ describe('quality-loss-route-update.service', () => {
 
     expect(result).toEqual({ ok: true });
     expect(prisma.$transaction).toHaveBeenCalled();
+  });
+
+  it('should persist resolved work order, project and BOM part on manual update', async () => {
+    const { QualityLossRouteUpdateService } = await import(
+      '~/modules/quality-loss/quality-loss-route-update.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+    const update = vi.fn().mockResolvedValue({
+      actualClaim: 0,
+      amount: 100,
+      createdBy: 'user-1',
+      id: 'manual-1',
+      isDeleted: false,
+      occurDate: new Date(),
+      partName: '主梁',
+      projectName: '1000t 架桥机',
+      respDept: 'QA',
+      status: 'Pending',
+      workOrderNumber: 'WO-468624',
+    });
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({ quality_losses: { update } }),
+    );
+
+    const result = await QualityLossRouteUpdateService.updateByRouteId({
+      body: {
+        lossSource: 'Manual',
+        partName: '主梁',
+        workOrderNumber: 'WO-468624',
+      },
+      id: 'QL-2026-001',
+      userId: 'user-1',
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          partId: 'part-1',
+          partName: '主梁',
+          projectId: 'project-1',
+          projectName: '1000t 架桥机',
+          workOrderNumber: 'WO-468624',
+        }),
+      }),
+    );
   });
 
   it('should update external record via AfterSalesService', async () => {

@@ -79,6 +79,15 @@ const isAdmin = computed(() => {
   );
 });
 
+function canManageIssue(issue: InspectionIssue) {
+  const currentUserId = String(userStore.userInfo?.userId || '').trim();
+  return Boolean(
+    currentUserId &&
+      issue.createdBy &&
+      String(issue.createdBy) === currentUserId,
+  );
+}
+
 const checkedRows = ref<InspectionIssue[]>([]);
 const { isMobile } = useMobileViewport();
 const mobileIssues = ref<InspectionGridRow[]>([]);
@@ -185,6 +194,7 @@ const {
   handleBatchDelete,
   handleSettleToKnowledge,
 } = useIssueActions({
+  canManageIssue,
   checkedRows,
   t,
   invalidateInspectionIssues,
@@ -252,6 +262,7 @@ function handleMobilePageChange(nextPage: number, nextPageSize: number) {
 }
 
 const { gridOptions } = useIssueGridOptions({
+  canManageIssue,
   currentDateMode,
   currentDateValue,
   canDelete,
@@ -393,6 +404,7 @@ async function handleGenerateInsight() {
         v-if="isMobile"
         :can-delete="canDelete"
         :can-edit="canEdit"
+        :can-manage-issue="canManageIssue"
         :can-settle="canSettle"
         :issues="mobileIssues"
         :page="mobilePage"

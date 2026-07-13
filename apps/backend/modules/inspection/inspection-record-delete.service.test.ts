@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRecordDeleteService } from '~/modules/inspection/inspection-record-delete.service';
+import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
     $transaction: vi.fn(),
   },
+}));
+
+vi.mock('~/utils/event-bus', () => ({
+  eventBus: { emit: vi.fn() },
 }));
 
 vi.mock('~/modules/file-storage/file-storage.service', () => ({
@@ -48,6 +53,8 @@ describe('inspectionRecordDeleteService', () => {
         processName: 'Welding',
         projectName: null,
         result: 'PASS',
+        supplierName: 'Supplier A',
+        team: null,
         workOrderNumber: 'WO-1',
       };
       const txFindUnique = vi.fn().mockResolvedValue(inspection);
@@ -85,6 +92,10 @@ describe('inspectionRecordDeleteService', () => {
         bizId: 'i-1',
         bizType: 'inspection_record',
       });
+      expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
+        supplierNames: ['Supplier A'],
+        teamNames: [null],
+      });
     });
 
     it('should handle missing inspection gracefully', async () => {
@@ -104,6 +115,10 @@ describe('inspectionRecordDeleteService', () => {
       const result = await InspectionRecordDeleteService.delete('i-1');
 
       expect(result).toEqual({ id: 'i-1' });
+      expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
+        supplierNames: [undefined],
+        teamNames: [undefined],
+      });
     });
   });
 
@@ -126,6 +141,8 @@ describe('inspectionRecordDeleteService', () => {
           processName: 'Welding',
           projectName: null,
           result: 'PASS',
+          supplierName: null,
+          team: 'Outsourcing Team A',
           workOrderNumber: 'WO-1',
         },
       ];
@@ -154,6 +171,10 @@ describe('inspectionRecordDeleteService', () => {
         data: { isDeleted: true },
       });
       expect(FileStorageService.softDeleteReferences).toHaveBeenCalled();
+      expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
+        supplierNames: [null],
+        teamNames: ['Outsourcing Team A'],
+      });
     });
 
     it('should handle empty ids array', async () => {
@@ -179,6 +200,17 @@ describe('inspectionRecordDeleteService', () => {
         where: { id: { in: [] } },
         data: { isDeleted: true },
       });
+    });
+
+    it('does not publish a change event when the transaction rolls back', async () => {
+      const failure = new Error('transaction failed');
+      vi.mocked(prisma.$transaction).mockRejectedValue(failure);
+
+      await expect(
+        InspectionRecordDeleteService.batchDelete(['i-1']),
+      ).rejects.toBe(failure);
+
+      expect(eventBus.emit).not.toHaveBeenCalled();
     });
   });
 });

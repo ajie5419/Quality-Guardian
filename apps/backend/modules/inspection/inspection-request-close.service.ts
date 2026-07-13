@@ -5,6 +5,7 @@ import type { UserSession } from '~/utils/jwt-utils';
 import type { CloseInspectionRecordLink } from './inspection-request-close-records.service';
 
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
+import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 import { isInspectionSerialNumberConflict } from './inspection-record-types';
@@ -269,10 +270,12 @@ export const InspectionRequestCloseService = {
       issue,
       issueAuditVariables,
       record: updated,
-    } = await retryOnSerialNumberConflict(
-      runCloseTransaction,
-      explicitInspectionId ? 1 : 3,
-    );
+    } = await retryOnSerialNumberConflict(runCloseTransaction, 3);
+
+    eventBus.emit('inspection_record.changed', {
+      supplierNames: [request.team],
+      teamNames: [request.team],
+    });
 
     await syncCloseAttachments({
       closeAttachments,
