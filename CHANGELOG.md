@@ -25,6 +25,31 @@
 
 ## 执行记录
 
+### 2026-07-13 发布：qgs v0.16.0
+
+**执行内容：**
+
+- 推送并合并功能 PR #44，交付小程序不合格品项、质量损失修复、供应商与外协质量指标口径统一及相关 Prisma migrations。
+- release-please 生成并合并发布 PR #45，创建 GitHub Release 与 tag `qgs-v0.16.0`。
+- deploy workflow 完成后端/前端镜像构建、ACR 推送、Prisma migration、ECS 更新与健康检查。
+
+**验证结果：**
+
+- 本地门禁：Lint 通过（0 error，保留既有 9 条 warning）；Typecheck 3/3 通过；QMS architecture 0 violations。
+- 本地全量测试：268 个文件 / 2379 个测试全部通过；Prisma schema/migration 同步检查通过。
+- GitHub：功能 PR #44 和发布 PR #45 的 6 项 CI Gate 全部通过。
+- 生产部署：run `29241681684` 成功，用时 7 分 31 秒。
+
+**commit:**
+
+- `b5646af` Merge pull request #44 from ajie5419/codex-weapp-inspection-issues
+- `fa8b422` Merge pull request #45 from ajie5419/release-please--branches--main--components--qgs
+
+**遗留问题：**
+
+- deploy workflow 的 tag 触发格式为 `qgs-v*`，但版本识别分支仍匹配 `v*`；正常发布不受影响，`deploy_only` 重试时需使用实际带 merge SHA 的镜像 tag。
+- GitHub Actions 提示 `actions/checkout@v4` 依赖的 Node.js 20 已废弃，当前 runner 已强制使用 Node.js 24，后续需升级 action 版本消除告警。
+
 ## [0.16.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.15.1...qgs-v0.16.0) (2026-07-13)
 
 

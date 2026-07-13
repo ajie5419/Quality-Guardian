@@ -7,7 +7,7 @@
 - Lint: 通过（0 error，保留既有测试文件 9 条 warning）
 - Typecheck: 0 error（weapp 自身脚本为项目既有 skip，已用定向 ESLint/Stylelint 补充验证）
 - 模块 TS 文件数: 497（含测试）
-- 当前版本: `0.15.0`
+- 当前版本: `0.16.0`
 
 ## 已完成
 
