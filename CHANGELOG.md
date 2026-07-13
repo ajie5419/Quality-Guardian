@@ -25,6 +25,32 @@
 
 ## 执行记录
 
+### 2026-07-13 修复：手工质量损失工单、项目和部件上下文
+
+**执行内容：**
+
+- `quality_losses` 新增工单、项目和部件的规范 ID 与名称快照，通过 Prisma migration 增加可空工单外键及查询索引。
+- 手工新建和编辑统一验证工单存在、工单已配置项目、部件属于该工单 BOM；项目信息由后端按工单派生，不信任客户端自由文本。
+- 手工录入弹窗复用共享工单选择器，自动带出只读项目名称，并按工单加载 BOM 部件；切换工单时清空旧部件，同时防止旧异步请求覆盖新选项。
+- `quality_loss_index` 新增 `lossType`，手工损失类型与真实部件名称分字段保存；空值仅在表格显示阶段格式化为 `-`，不再写回脏占位符。
+- 现有部署回填脚本会幂等重建手工索引，清除历史错误的 `partName=type`；无法可靠推断的历史工单和部件保留为空，禁止伪造业务数据。
+
+**验证结果：**
+
+- vitest: 后端全量 200 文件 / 1903 测试全部通过
+- vitest: 前端质量损失定向 18/18 通过
+- lint: 通过（0 error；保留既有 `IssueFormFields.test.ts` 9 条 warning）
+- typecheck: `pnpm run check:type` 3/3 tasks 通过
+- Prisma: schema format / validate 通过，migration 由 `prisma migrate diff` 生成
+- check:qms-arch: 0 violations 通过
+- 前端 dev/build: 未运行；遵循仓库约束，通过组件单测、类型检查和 Lint 验证
+
+**commit:** `94de027` fix(project): persist manual quality loss context
+
+**遗留问题：**
+
+- 历史手工记录本身没有保存工单和部件，回填无法可靠恢复；部署后将显示为空，需在编辑时选择真实工单和 BOM 部件。
+
 ### 2026-07-13 修复：质量损失统一列表删除误报记录不存在
 
 **执行内容：**
