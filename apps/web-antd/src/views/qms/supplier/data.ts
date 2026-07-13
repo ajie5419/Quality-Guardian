@@ -133,10 +133,14 @@ export const getColumns = (
     },
     {
       field: 'incomingQualifiedRate',
-      title: $t('qms.supplier.qualifiedRate'),
+      title:
+        category === 'Outsourcing'
+          ? $t('qms.outsourcing.qualifiedRate')
+          : $t('qms.supplier.qualifiedRate'),
       width: 100,
       sortable: true,
-      formatter: ({ cellValue }) => `${cellValue ?? 0}%`,
+      formatter: ({ cellValue }) =>
+        cellValue === null || cellValue === undefined ? '-' : `${cellValue}%`,
     },
     {
       field: 'engineeringIssueCount',

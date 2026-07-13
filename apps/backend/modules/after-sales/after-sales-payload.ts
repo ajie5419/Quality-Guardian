@@ -5,6 +5,7 @@ import {
   parseResponsibleDepartments,
   serializeResponsibleDepartments,
 } from '~/utils/department-multi';
+import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 
 const { buildAfterSalesCreateData, buildAfterSalesUpdateData } = qgsDomain;
 export { buildAfterSalesCreateData, buildAfterSalesUpdateData };
@@ -67,7 +68,12 @@ export async function buildGovernedAfterSalesCreateData(
     body,
     options,
   ) as unknown as Prisma.after_salesUncheckedCreateInput;
-  return attachResponsibleDepartmentsToAfterSalesData(body, createData);
+  const data = attachResponsibleDepartmentsToAfterSalesData(body, createData);
+  const canonicalFields = await buildGovernedCanonicalWritePairForTable(
+    'after_sales',
+    data,
+  );
+  return { ...data, ...canonicalFields };
 }
 
 export async function buildGovernedAfterSalesUpdateData(
@@ -81,8 +87,16 @@ export async function buildGovernedAfterSalesUpdateData(
     costsChanged: boolean;
     data: Prisma.after_salesUncheckedUpdateInput;
   };
+  const data = attachResponsibleDepartmentsToAfterSalesData(body, result.data);
+  const canonicalFields = await buildGovernedCanonicalWritePairForTable(
+    'after_sales',
+    data,
+  );
+  if (Object.hasOwn(data, 'supplierBrand') && !data.supplierBrand) {
+    canonicalFields.supplierBrandId = null;
+  }
   return {
     ...result,
-    data: attachResponsibleDepartmentsToAfterSalesData(body, result.data),
+    data: { ...data, ...canonicalFields },
   };
 }

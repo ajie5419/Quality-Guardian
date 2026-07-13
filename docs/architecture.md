@@ -41,17 +41,19 @@ QMS 不是普通 CRUD 系统，它有以下特有复杂度：
 评分来源包括：
 
 1. `suppliers` 基础资料：名称、分类、外协类型、负责人、状态基线
-2. `inspections` 来料检验统计：合格批次、总批次、合格率
+2. `inspections` 检验统计：普通供应商/外部加工读取 `INCOMING + supplierId/supplierName`，驻厂队伍/外部服务读取 `PROCESS + teamId/team`
 3. `quality_records` 工程质量问题：问题数、损失金额、关闭状态
 4. `after_sales` 售后质量问题：问题数、售后损失、关闭状态
 
-写入路径更新上述来源数据后，必须调用 `SupplierScoreSnapshotService` 刷新关联供应商快照。历史数据的初始快照由生产 Docker image 内的 `apps/backend/scripts/backfill-supplier-score-snapshots.ts` 维护入口生成；deploy workflow 在服务健康检查通过后异步启动 `SUPPLIER_SCORE_BACKFILL_MODE=missing`，只补没有快照的供应商，避免发布被全量重算阻塞。
+写入路径更新上述来源数据后，必须通过领域事件调用 `SupplierScoreSnapshotService` 刷新关联供应商快照。检验记录自身事务和报检关闭外层事务都只在提交成功后发布 `inspection_record.changed`。历史数据的初始快照由生产 Docker image 内的 `apps/backend/scripts/backfill-supplier-score-snapshots.ts` 维护入口生成；deploy workflow 在服务健康检查通过后异步启动 `SUPPLIER_SCORE_BACKFILL_MODE=missing`，补无快照及评分模型版本过期的供应商，避免规则升级后保留旧指标。
+
+快照中的合格率区分“无样本”和真实满分：无有效批次对外返回 `null`，真实 0% 保持为 0%。工程问题展示数量使用全部历史记录，评分扣分和风险趋势继续使用最近 12 个月窗口。检验与工程问题的 canonical identity 使用 `suppliers.id`；驻厂过程检验使用独立的 team canonical ID，禁止混用 `suppliers.nameId` 或 team 字典 ID。
 
 ### 2.2 供应商/外协准入档案与画像
 
 供应商管理和外协管理共用 `suppliers` 表保存准入档案。供应商和外协单位均保存 `recognizedAt` 认定时间与 `admissionDocuments` 准入手续附件；供应商额外保存 `manufacturerNature` 厂商性质。附件上传后由 `file-storage` 模块登记 `file_references`，业务表只保存附件 JSON 快照。
 
-供应商画像中的历史使用项目以报检任务为事实源：`supplier` 模块先读取供应商档案，再通过 `InspectionService.getSupplierHistoryProjects()` 聚合 `qms_inspection_requests` 的工单号，并读取 `work_orders.projectName` 展示项目名称。该数据禁止由前端当前页、检验记录列表或已分页数据拼接。
+供应商画像中的历史使用项目以报检任务为事实源：`supplier` 模块先读取供应商档案，再通过 `InspectionService.getSupplierHistoryProjects()` 聚合 `qms_inspection_requests` 的工单号，并读取 `work_orders.projectName` 展示项目名称。检验履历由后端按共享供应商检验策略选择 INCOMING 或 PROCESS 来源，统一映射 `partName` 并提供服务端分页。上述数据禁止由前端当前页、关键字搜索结果或已分页数据拼接。
 
 ### 2.3 报检自检记录与检验记录附件
 

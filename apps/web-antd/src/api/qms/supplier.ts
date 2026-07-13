@@ -1,5 +1,6 @@
 import type {
   ImportSupplierItem,
+  InspectionRecord,
   SupplierItem,
   SupplierListParams,
   SupplierListResponse,
@@ -66,6 +67,31 @@ export async function getSupplierHistoryProjects(id: string) {
   );
 }
 
+export type SupplierInspectionHistorySource = 'INCOMING' | 'PROCESS';
+
+export type SupplierInspectionHistoryItem = InspectionRecord & {
+  inspectionDate?: null | string;
+  partName: null | string;
+  result?: null | string;
+  workOrderNumber: string;
+};
+
+export interface SupplierInspectionHistoryResponse {
+  items: SupplierInspectionHistoryItem[];
+  source: SupplierInspectionHistorySource;
+  total: number;
+}
+
+export async function getSupplierInspectionHistory(
+  id: string,
+  params: { page: number; pageSize: number },
+) {
+  return requestClient.get<SupplierInspectionHistoryResponse>(
+    `${QMS_API.SUPPLIER}/${id}/inspection-history`,
+    { params },
+  );
+}
+
 export async function deleteSupplier(id: string) {
   return requestClient.delete(`${QMS_API.SUPPLIER}/${id}`);
 }
@@ -119,6 +145,9 @@ export namespace QmsSupplierApi {
     stabilityScore?: number;
   };
   export type SupplierHistoryProject = SupplierHistoryProjectItem;
+  export type SupplierInspectionHistory = SupplierInspectionHistoryItem;
+  export type SupplierInspectionHistorySource =
+    import('#/api/qms/supplier').SupplierInspectionHistorySource;
   export type SupplierStats = import('@qgs/shared').SupplierStats;
   export type SupplierListParams = import('@qgs/shared').SupplierListParams;
 }

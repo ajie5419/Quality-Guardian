@@ -14,7 +14,8 @@
       "basic": "Basic Profile",
       "engineering": "Eng. Quality Records",
       "afterSales": "After-Sales Records",
-      "incoming": "Incoming Inspection History"
+      "incoming": "Incoming Inspection History",
+      "inspectionHistory": "Inspection History"
     },
     "saveSuccess": "Saved successfully",
     "deleteSuccess": "Deleted successfully",

@@ -23,6 +23,7 @@ export {
   normalizeSupplierString,
   OUTSOURCING_CATEGORY,
   OUTSOURCING_MODES,
+  resolveSupplierInspectionPolicy,
 } from '@qgs/shared';
 
 interface SupplierImportItem {

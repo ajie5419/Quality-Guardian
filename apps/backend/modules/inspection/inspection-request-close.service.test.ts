@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRequestCloseService } from '~/modules/inspection/inspection-request-close.service';
+import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -95,6 +96,7 @@ const mockRequest = {
   requestInfo: null,
   requestNo: 'REQ-001',
   status: 'PENDING',
+  team: 'Resident Team',
   workOrderNumber: 'WO-1',
   workOrders: [],
   work_order: { projectName: 'Project A' },
@@ -108,6 +110,7 @@ describe('inspectionRequestCloseService', () => {
   });
 
   it('should close request with PASS result', async () => {
+    const eventEmit = vi.spyOn(eventBus, 'emit');
     (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
       mockRequest,
     );
@@ -144,6 +147,10 @@ describe('inspectionRequestCloseService', () => {
     expect(result).toBeDefined();
     expect(prisma.qms_inspection_requests.findFirst).toHaveBeenCalled();
     expect(prisma.$transaction).toHaveBeenCalled();
+    expect(eventEmit).toHaveBeenCalledWith('inspection_record.changed', {
+      supplierNames: ['Resident Team'],
+      teamNames: ['Resident Team'],
+    });
     const { syncCloseAttachments } = await import(
       '~/modules/inspection/inspection-request-close-effects.service'
     );

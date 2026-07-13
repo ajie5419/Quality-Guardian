@@ -26,6 +26,55 @@ import { resolveTemplateMetaFromAttachment } from './inspection-template-meta.se
 const logger = createModuleLogger('InspectionService');
 
 export const InspectionRecordQueryService = {
+  async findSupplierHistory(params: {
+    category: 'INCOMING' | 'PROCESS';
+    identitySource: 'supplier' | 'team';
+    page?: number;
+    pageSize?: number;
+    supplierId: string;
+    supplierName: string;
+    teamNameId?: null | string;
+  }) {
+    const identityOr: Prisma.inspectionsWhereInput[] =
+      params.identitySource === 'supplier'
+        ? [
+            { supplierId: params.supplierId },
+            { supplierName: params.supplierName },
+          ]
+        : [{ team: params.supplierName }];
+    if (params.identitySource === 'team' && params.teamNameId) {
+      identityOr.push({ teamId: params.teamNameId });
+    }
+    const where: Prisma.inspectionsWhereInput = {
+      category: params.category,
+      isDeleted: false,
+      OR: identityOr,
+    };
+    const { skip, take } = parsePagination({
+      page: params.page,
+      pageSize: params.pageSize,
+    });
+    const [items, total] = await Promise.all([
+      prisma.inspections.findMany({
+        where,
+        skip,
+        take,
+        orderBy: [{ inspectionDate: 'desc' }, { createdAt: 'desc' }],
+      }),
+      prisma.inspections.count({ where }),
+    ]);
+
+    return {
+      items: items.map((item) => ({
+        ...item,
+        partName:
+          params.category === 'INCOMING'
+            ? item.materialName || item.level1Component
+            : item.level1Component || item.materialName,
+      })),
+      total,
+    };
+  },
   async findById(id: string) {
     const inspection = await prisma.inspections.findFirst({
       where: {

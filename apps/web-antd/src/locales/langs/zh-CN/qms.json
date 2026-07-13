@@ -15,7 +15,8 @@
       "basic": "基本档案",
       "engineering": "工程质量记录",
       "afterSales": "售后质量记录",
-      "incoming": "进货检验履历"
+      "incoming": "进货检验履历",
+      "inspectionHistory": "检验履历"
     },
     "saveSuccess": "保存成功",
     "deleteSuccess": "删除成功",

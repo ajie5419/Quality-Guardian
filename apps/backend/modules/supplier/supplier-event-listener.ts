@@ -48,4 +48,10 @@ export function registerSupplierEventListeners(): void {
   eventBus.on('inspection_issue.changed', async (payload) => {
     await refresh(uniqueNonEmpty(payload.supplierNames));
   });
+
+  eventBus.on('inspection_record.changed', async (payload) => {
+    await refresh(
+      uniqueNonEmpty([...payload.supplierNames, ...payload.teamNames]),
+    );
+  });
 }

@@ -6,6 +6,7 @@ import type {
 } from './inspection-record-types';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { eventBus } from '~/utils/event-bus';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
@@ -194,7 +195,18 @@ export const InspectionRecordCreateService = {
           });
           return inspection;
         };
-        return await (client ? execute(client) : prisma.$transaction(execute));
+        const inspection = await (client
+          ? execute(client)
+          : prisma.$transaction(execute));
+        // A caller-provided client belongs to an outer transaction. Its owner
+        // must publish after commit so snapshots never observe rolled-back data.
+        if (!client) {
+          eventBus.emit('inspection_record.changed', {
+            supplierNames: [inspection.supplierName],
+            teamNames: [inspection.team],
+          });
+        }
+        return inspection;
       } catch (error) {
         if (attempt < maxRetry && isInspectionSerialNumberConflict(error)) {
           logger.warn(

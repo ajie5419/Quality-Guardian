@@ -11,7 +11,9 @@ import {
   DEFAULT_OUTSOURCING_MODE,
   normalizeOutsourcingMode,
   normalizeSupplierString,
+  resolveSupplierInspectionPolicy,
 } from '~/modules/supplier/supplier-query';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -100,7 +102,10 @@ function mapSupplierListItem(
     engineeringIssueCount: snapshot?.engineeringIssueCount ?? 0,
     engineeringScore: snapshot?.engineeringScore ?? 100,
     incomingBatchCount: snapshot?.incomingBatchCount ?? 0,
-    incomingQualifiedRate: snapshot?.incomingQualifiedRate ?? 100,
+    incomingQualifiedRate:
+      snapshot && snapshot.incomingBatchCount > 0
+        ? snapshot.incomingQualifiedRate
+        : null,
     incomingScore: snapshot?.incomingScore ?? 100,
     incomingTotalQuantity: snapshot?.incomingTotalQuantity ?? 0,
     isWarning: snapshot?.isWarning ?? false,
@@ -395,7 +400,46 @@ export const SupplierService = {
 
     return InspectionService.getSupplierHistoryProjects({
       supplierName: supplier.name,
-      supplierNameId: supplier.nameId,
     });
+  },
+
+  async getInspectionHistory(
+    id: string,
+    params: { page?: number; pageSize?: number } = {},
+  ) {
+    const supplier = await prisma.suppliers.findFirst({
+      select: {
+        category: true,
+        id: true,
+        name: true,
+        outsourcingMode: true,
+      },
+      where: { id, isDeleted: false },
+    });
+    if (!supplier) return null;
+
+    const policy = resolveSupplierInspectionPolicy(supplier);
+    let teamNameId: string | undefined;
+    if (policy.identitySource === 'team') {
+      const teamNameToId =
+        await MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
+          configKey: 'team',
+          names: [supplier.name],
+        });
+      teamNameId = teamNameToId.get(supplier.name);
+    }
+    const history = await InspectionService.findSupplierHistory({
+      category: policy.inspectionCategory,
+      identitySource: policy.identitySource,
+      page: params.page,
+      pageSize: params.pageSize,
+      supplierId: supplier.id,
+      supplierName: supplier.name,
+      ...(teamNameId ? { teamNameId } : {}),
+    });
+    return {
+      ...history,
+      source: policy.inspectionCategory,
+    };
   },
 };

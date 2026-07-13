@@ -227,18 +227,24 @@ describe('inspectionReportingService', () => {
       (prisma.inspections.groupBy as any).mockResolvedValue([]);
       (prisma.quality_records.groupBy as any)
         .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
       (prisma.quality_records.findMany as any).mockResolvedValue([]);
 
       const result = await InspectionReportingService.getSupplierScoringData({
+        engineeringSupplierIds: ['s-1'],
+        engineeringSupplierNames: ['Supplier A'],
         since: new Date('2024-01-01'),
-        supplierIds: ['s-1'],
-        supplierNames: ['Supplier A'],
+        incomingSupplierIds: ['s-1'],
+        incomingSupplierNames: ['Supplier A'],
+        processTeamIds: [],
+        processTeamNames: [],
       });
 
       expect(result).toHaveProperty('incomingStats');
       expect(result).toHaveProperty('engineeringStats');
       expect(result).toHaveProperty('engineeringStatusStats');
+      expect(result).toHaveProperty('engineeringTotalStats');
       expect(result).toHaveProperty('records');
     });
 
@@ -246,19 +252,72 @@ describe('inspectionReportingService', () => {
       (prisma.inspections.groupBy as any).mockResolvedValue([]);
       (prisma.quality_records.groupBy as any)
         .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
       (prisma.quality_records.findMany as any).mockResolvedValue([]);
 
       await InspectionReportingService.getSupplierScoringData({
+        engineeringSupplierIds: [],
+        engineeringSupplierNames: ['Supplier A'],
         since: new Date('2024-01-01'),
-        supplierIds: [],
-        supplierNames: ['Supplier A'],
+        incomingSupplierIds: [],
+        incomingSupplierNames: ['Supplier A'],
+        processTeamIds: [],
+        processTeamNames: [],
       });
 
       expect(prisma.inspections.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            OR: [{ supplierName: { in: ['Supplier A'] } }],
+            OR: [
+              {
+                category: 'INCOMING',
+                OR: [{ supplierName: { in: ['Supplier A'] } }],
+              },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('should query resident outsourcing from process team records', async () => {
+      (prisma.inspections.groupBy as any).mockResolvedValue([]);
+      (prisma.quality_records.groupBy as any)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+      (prisma.quality_records.findMany as any).mockResolvedValue([]);
+
+      await InspectionReportingService.getSupplierScoringData({
+        engineeringSupplierIds: ['supplier-1'],
+        engineeringSupplierNames: ['Resident Team'],
+        since: new Date('2024-01-01'),
+        incomingSupplierIds: [],
+        incomingSupplierNames: [],
+        processTeamIds: ['team-1'],
+        processTeamNames: ['Resident Team'],
+      });
+
+      expect(prisma.inspections.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: [
+            'category',
+            'supplierId',
+            'supplierName',
+            'teamId',
+            'team',
+            'result',
+          ],
+          where: expect.objectContaining({
+            OR: [
+              {
+                category: 'PROCESS',
+                OR: [
+                  { team: { in: ['Resident Team'] } },
+                  { teamId: { in: ['team-1'] } },
+                ],
+              },
+            ],
           }),
         }),
       );

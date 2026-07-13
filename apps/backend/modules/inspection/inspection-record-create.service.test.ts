@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRecordCreateService } from '~/modules/inspection/inspection-record-create.service';
+import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -9,6 +10,10 @@ vi.mock('~/utils/prisma', () => ({
     },
     $transaction: vi.fn(),
   },
+}));
+
+vi.mock('~/utils/event-bus', () => ({
+  eventBus: { emit: vi.fn() },
 }));
 
 vi.mock('~/utils/governed-write', () => ({
@@ -98,7 +103,12 @@ describe('inspectionRecordCreateService', () => {
 
   describe('create', () => {
     it('should call prisma transaction with correct data', async () => {
-      const mockInspection = { id: 'insp-1', serialNumber: 'INS-001' };
+      const mockInspection = {
+        id: 'insp-1',
+        serialNumber: 'INS-001',
+        supplierName: 'Supplier A',
+        team: null,
+      };
       (prisma.$transaction as any).mockImplementation(async (cb: any) =>
         cb({
           inspections: {
@@ -121,6 +131,10 @@ describe('inspectionRecordCreateService', () => {
 
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(result).toEqual(mockInspection);
+      expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
+        supplierNames: ['Supplier A'],
+        teamNames: [null],
+      });
     });
 
     it('should use a provided transaction client without opening its own transaction', async () => {
@@ -148,6 +162,7 @@ describe('inspectionRecordCreateService', () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(tx.inspections.create).toHaveBeenCalled();
       expect(result).toEqual(mockInspection);
+      expect(eventBus.emit).not.toHaveBeenCalled();
     });
 
     it('should not retry serial conflicts when a transaction client is provided', async () => {
@@ -183,6 +198,7 @@ describe('inspectionRecordCreateService', () => {
         ),
       ).rejects.toBe(conflict);
       expect(tx.inspections.create).toHaveBeenCalledTimes(1);
+      expect(eventBus.emit).not.toHaveBeenCalled();
     });
   });
 });

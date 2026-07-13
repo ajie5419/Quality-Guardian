@@ -9,6 +9,7 @@ import {
   scoreSupplierListItem,
 } from '~/modules/supplier/supplier-scoring';
 import { SupplierService } from '~/modules/supplier/supplier.service';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -48,6 +49,7 @@ vi.mock('~/modules/file-storage', () => ({
 
 vi.mock('~/modules/inspection', () => ({
   InspectionService: {
+    findSupplierHistory: vi.fn(),
     getSupplierHistoryProjects: vi.fn(),
     getSupplierScoringData: vi.fn(),
   },
@@ -643,7 +645,21 @@ describe('supplierService standard scoring samples', () => {
     expect(prisma.suppliers.findMany).toHaveBeenNthCalledWith(1, {
       orderBy: { id: 'asc' },
       take: 50,
-      where: { isDeleted: false, scoreSnapshot: { is: null } },
+      where: {
+        isDeleted: false,
+        OR: [
+          { scoreSnapshot: { is: null } },
+          {
+            scoreSnapshot: {
+              is: {
+                scoringModel: {
+                  notIn: ['IN_HOUSE_OUTSOURCING_V2', 'SUPPLIER_V2'],
+                },
+              },
+            },
+          },
+        ],
+      },
     });
     expect(prisma.supplier_score_snapshots.upsert).toHaveBeenCalledTimes(2);
   });
@@ -892,7 +908,42 @@ describe('supplierService admission fields', () => {
     ]);
     expect(InspectionService.getSupplierHistoryProjects).toHaveBeenCalledWith({
       supplierName: 'Supplier A',
-      supplierNameId: 'md-1',
+    });
+  });
+
+  it('loads in-house outsourcing history from process team records', async () => {
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalIdsByNames,
+    ).mockResolvedValue(new Map([['Resident Team', 'team-1']]));
+    (prisma.suppliers.findFirst as any).mockResolvedValue({
+      category: 'Outsourcing',
+      id: 'supplier-1',
+      name: 'Resident Team',
+      outsourcingMode: 'IN_HOUSE_TEAM',
+    });
+    (InspectionService.findSupplierHistory as any).mockResolvedValue({
+      items: [{ id: 'inspection-1', partName: 'Beam' }],
+      total: 1,
+    });
+
+    const result = await SupplierService.getInspectionHistory('supplier-1', {
+      page: 2,
+      pageSize: 5,
+    });
+
+    expect(InspectionService.findSupplierHistory).toHaveBeenCalledWith({
+      category: 'PROCESS',
+      identitySource: 'team',
+      page: 2,
+      pageSize: 5,
+      supplierId: 'supplier-1',
+      supplierName: 'Resident Team',
+      teamNameId: 'team-1',
+    });
+    expect(result).toEqual({
+      items: [{ id: 'inspection-1', partName: 'Beam' }],
+      source: 'PROCESS',
+      total: 1,
     });
   });
 });
