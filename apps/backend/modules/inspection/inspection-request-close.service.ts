@@ -316,9 +316,8 @@ async function retryOnSerialNumberConflict<T>(
     try {
       return await run();
     } catch (error) {
-      // Inspection serial numbers are generated from a read outside the
-      // transaction; a concurrent create can win the unique index, so the
-      // whole close transaction is re-run as one unit.
+      // Concurrent transactions can select the same next serial number, so a
+      // unique-index conflict must retry the whole close transaction as one unit.
       if (attempt >= maxAttempts || !isInspectionSerialNumberConflict(error)) {
         throw error;
       }

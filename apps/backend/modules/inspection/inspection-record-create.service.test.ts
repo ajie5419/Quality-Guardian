@@ -139,9 +139,11 @@ describe('inspectionRecordCreateService', () => {
 
     it('should use a provided transaction client without opening its own transaction', async () => {
       const mockInspection = { id: 'insp-2', serialNumber: 'INS-002' };
-      (prisma.inspections.findFirst as any).mockResolvedValue(null);
       const tx = {
-        inspections: { create: vi.fn().mockResolvedValue(mockInspection) },
+        inspections: {
+          create: vi.fn().mockResolvedValue(mockInspection),
+          findFirst: vi.fn().mockResolvedValue(null),
+        },
       };
 
       const result = await InspectionRecordCreateService.create(
@@ -160,9 +162,54 @@ describe('inspectionRecordCreateService', () => {
       );
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(tx.inspections.findFirst).toHaveBeenCalled();
+      expect(prisma.inspections.findFirst).not.toHaveBeenCalled();
       expect(tx.inspections.create).toHaveBeenCalled();
       expect(result).toEqual(mockInspection);
       expect(eventBus.emit).not.toHaveBeenCalled();
+    });
+
+    it('should generate distinct serial numbers for consecutive creates in one transaction', async () => {
+      const createdSerialNumbers: string[] = [];
+      const dateStr = new Date().toISOString().slice(0, 10).replaceAll('-', '');
+      const tx = {
+        inspections: {
+          create: vi.fn().mockImplementation(({ data }) => {
+            createdSerialNumbers.push(data.serialNumber);
+            return { id: `insp-${createdSerialNumbers.length}`, ...data };
+          }),
+          findFirst: vi.fn().mockImplementation(() => {
+            const serialNumber = createdSerialNumbers.at(-1);
+            return serialNumber ? { serialNumber } : null;
+          }),
+        },
+      };
+      const input = {
+        category: 'PROCESS',
+        inspector: 'Tester',
+        inspectionDate: '2026-01-01',
+        items: [],
+        processName: 'Welding',
+        quantity: 10,
+        qualifiedQuantity: 10,
+        unqualifiedQuantity: 0,
+      } as any;
+
+      await InspectionRecordCreateService.create(
+        { ...input, workOrderNumber: 'WO-1' },
+        tx as any,
+      );
+      await InspectionRecordCreateService.create(
+        { ...input, workOrderNumber: 'WO-2' },
+        tx as any,
+      );
+
+      expect(createdSerialNumbers).toEqual([
+        `INS-${dateStr}-001`,
+        `INS-${dateStr}-002`,
+      ]);
+      expect(tx.inspections.findFirst).toHaveBeenCalledTimes(2);
+      expect(prisma.inspections.findFirst).not.toHaveBeenCalled();
     });
 
     it('should not retry serial conflicts when a transaction client is provided', async () => {
@@ -176,9 +223,11 @@ describe('inspectionRecordCreateService', () => {
         ),
         { code: 'P2002' },
       );
-      (prisma.inspections.findFirst as any).mockResolvedValue(null);
       const tx = {
-        inspections: { create: vi.fn().mockRejectedValue(conflict) },
+        inspections: {
+          create: vi.fn().mockRejectedValue(conflict),
+          findFirst: vi.fn().mockResolvedValue(null),
+        },
       };
 
       await expect(
