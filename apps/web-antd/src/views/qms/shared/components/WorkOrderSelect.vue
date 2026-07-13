@@ -19,7 +19,7 @@ const props = withDefaults(
     allowClear?: boolean;
     disabled?: boolean;
     placeholder?: string;
-    value?: string;
+    value?: null | string;
   }>(),
   {
     value: undefined,
@@ -81,7 +81,7 @@ onMounted(() => {
 
 <template>
   <Select
-    :value="value"
+    :value="value ?? undefined"
     :placeholder="placeholder"
     :disabled="disabled"
     :allow-clear="allowClear"

@@ -2,35 +2,24 @@
 
 ## 职责
 
-质量损失记录与分析：损失金额统计、缺陷分类（A/B/C 级）、供应商关联、趋势追踪。
+统一管理手工质量损失，并将手工、内部不合格、外部售后和调试验收四类来源物化到 `quality_loss_index`，供统一列表、统计、图表和导出使用。
 
-## 文件结构
+## 数据模型
 
-- `quality-loss.service.ts` — 主 service，CRUD + 统计 + 导入
-- `quality-loss.definition.ts` — 模块定义（待删除）
+- `quality_losses` 是手工录入的源表。
+- `quality_loss_index` 是可重建的统一物化索引，以 `(source, sourcePk)` 唯一定位源记录。
+- 手工记录同时保存 `workOrderNumber`、`projectId/projectName`、`partId/partName` 快照；工单号关联 `work_orders`，项目由工单派生，部件必须属于该工单 BOM。
+- `quality_loss_index.lossType` 只保存手工损失类型；`partName` 只保存真实部件，不得以损失类型代替。
 
-## 对外接口
+## 主要边界
 
-- `QualityLossService.findAll(params, userinfo)` — 列表查询（分页、筛选、数据权限）
-- `QualityLossService.create(data, userinfo)` — 创建损失记录
-- `QualityLossService.update(id, data, userinfo)` — 更新
-- `QualityLossService.importBatch(rows, userinfo)` — 批量导入
+- 路由层只处理认证、参数解析和响应映射；创建、更新、删除和数据权限逻辑在本模块 service 中。
+- `quality-loss-manual-context.ts` 通过 `work-order` 和 `planning` 模块公开入口解析手工录入上下文，不直接读取其他模块内部表。
+- 各源写入后调用 `QualityLossIndexService` 幂等 upsert；部署流程运行 `backfill-quality-loss-index.ts` 重建索引。
+- 历史手工记录无法可靠反推工单和部件，回填时保留空值，禁止根据损失类型猜测部件。
 
-## 调用方
+## 对外入口
 
-- `api/qms/quality-loss/` — 质量损失路由
-- `modules/supplier/` — 供应商评分聚合损失金额
-- `modules/dashboard/` — 概览统计
-
-## 依赖
-
-- `~/utils/prisma`
-- `~/core/master-data/` — 主数据治理写入
-- `~/modules/data-scope/` — 数据权限
-- `~/utils/quality-loss-*` — 工具函数（精简后迁入本目录）
-
-## 特殊约束
-
-- 损失分级：A 级 > 5000 元，B 级 1000~5000，C 级 < 1000
-- 与供应商评分联动：A/B 级损失影响供应商质量评分
-- 导入时必须校验供应商名称是否存在于主数据
+- `QualityLossService`：列表、统计、图表、更新与删除。
+- `QualityLossIndexService`：各业务源的索引 upsert、软删除与回填。
+- `resolveManualQualityLossContext`：验证工单、项目和 BOM 部件后返回规范化写入字段。

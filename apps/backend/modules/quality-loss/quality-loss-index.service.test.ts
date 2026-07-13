@@ -172,12 +172,24 @@ describe('qualityLossIndexService', () => {
         id: 'ql-1',
         isDeleted: false,
         occurDate: new Date('2026-06-18T00:00:00.000Z'),
+        partName: '主梁',
+        projectName: '1000t 架桥机',
         respDept: 'QA',
         status: 'Pending',
+        type: 'Scrap',
+        workOrderNumber: 'WO-468624',
       });
       const call = (prisma.quality_loss_index.upsert as any).mock.calls[0][0];
       expect(call.create.id).toBe('QL-ql-1');
       expect(call.create.amount).toBe(100);
+      expect(call.create).toEqual(
+        expect.objectContaining({
+          partName: '主梁',
+          projectName: '1000t 架桥机',
+          lossType: 'Scrap',
+          workOrderNumber: 'WO-468624',
+        }),
+      );
     });
 
     it('soft-deletes when amount is zero', async () => {
@@ -188,8 +200,12 @@ describe('qualityLossIndexService', () => {
         id: 'ql-2',
         isDeleted: false,
         occurDate: new Date(),
+        partName: null,
+        projectName: null,
         respDept: 'QA',
         status: 'Pending',
+        type: 'Scrap',
+        workOrderNumber: null,
       });
       expect(prisma.quality_loss_index.updateMany).toHaveBeenCalled();
     });

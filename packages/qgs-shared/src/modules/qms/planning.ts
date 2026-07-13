@@ -79,6 +79,7 @@ export interface BomProject {
 export interface BomItem {
   id: string;
   inspectionProgress?: BomInspectionProgress[];
+  partId?: null | string;
   partName: string;
   partNumber: string;
   projectId: string;

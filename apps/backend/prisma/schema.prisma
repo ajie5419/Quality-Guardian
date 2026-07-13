@@ -1196,6 +1196,7 @@ model work_orders {
   inspection_request_work_orders qms_inspection_request_work_orders[]
   inspection_request_inspections qms_inspection_request_inspections[]
   work_order_requirements        work_order_requirements[]
+  quality_losses                 quality_losses[]
 
   @@index([customerName])
   @@index([customerNameId])
@@ -1365,25 +1366,34 @@ model qms_inspection_request_inspections {
 }
 
 model quality_losses {
-  id          String   @id @default(cuid())
-  lossId      String   @unique
-  occurDate   DateTime
-  type        String
-  typeId      String?
-  amount      Decimal  @default(0.00) @db.Decimal(10, 2)
-  actualClaim Decimal  @default(0.00) @db.Decimal(10, 2)
-  description String?  @db.Text
-  respDept    String?
-  respDeptId  String?
-  status      String   @default("Pending")
-  isDeleted   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  createdBy   String?
+  id              String       @id @default(cuid())
+  lossId          String       @unique
+  occurDate       DateTime
+  type            String
+  typeId          String?
+  amount          Decimal      @default(0.00) @db.Decimal(10, 2)
+  actualClaim     Decimal      @default(0.00) @db.Decimal(10, 2)
+  description     String?      @db.Text
+  respDept        String?
+  respDeptId      String?
+  workOrderNumber String?
+  projectName     String?
+  projectId       String?
+  partName        String?
+  partId          String?
+  status          String       @default("Pending")
+  isDeleted       Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  createdBy       String?
+  work_order      work_orders? @relation(fields: [workOrderNumber], references: [workOrderNumber], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([respDeptId])
   @@index([typeId])
   @@index([createdBy])
+  @@index([workOrderNumber])
+  @@index([projectId])
+  @@index([partId])
 }
 
 // @module quality-loss
@@ -1397,6 +1407,7 @@ model quality_loss_index {
   amount          Decimal  @default(0.00) @db.Decimal(10, 2)
   actualClaim     Decimal  @default(0.00) @db.Decimal(10, 2)
   status          String   @db.VarChar(32)
+  lossType        String?
   projectName     String?
   workOrderNumber String?
   respDept        String?

@@ -929,6 +929,12 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
         nullable: true,
       },
       {
+        table: 'quality_losses',
+        nameColumn: 'projectName',
+        idColumn: 'projectId',
+        nullable: true,
+      },
+      {
         table: 'work_orders',
         nameColumn: 'projectName',
         idColumn: 'projectId',
@@ -1291,6 +1297,12 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
         nameColumn: 'partName',
         idColumn: 'partId',
         nullable: false,
+      },
+      {
+        table: 'quality_losses',
+        nameColumn: 'partName',
+        idColumn: 'partId',
+        nullable: true,
       },
       {
         table: 'qms_inspection_requests',

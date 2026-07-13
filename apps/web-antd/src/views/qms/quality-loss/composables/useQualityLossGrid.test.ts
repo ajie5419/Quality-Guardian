@@ -145,6 +145,16 @@ describe('useQualityLossGrid', () => {
       expect(result).toBe('¥0');
     });
 
+    it('formats missing work order, project and part as display-only placeholders', () => {
+      const { gridOptions } = useQualityLossGrid(createParams());
+      for (const field of ['workOrderNumber', 'projectName', 'partName']) {
+        const col = gridOptions.value.columns?.find(
+          (candidate: any) => candidate.field === field,
+        );
+        expect((col as any).formatter({ cellValue: null })).toBe('-');
+      }
+    });
+
     it('formats responsibleDepartment via findNameById', () => {
       const { gridOptions } = useQualityLossGrid(createParams());
       const col = gridOptions.value.columns?.find(

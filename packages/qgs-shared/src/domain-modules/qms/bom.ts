@@ -129,6 +129,7 @@ export function mapProjectBomItem(item: {
   inspectionProgress?: BomInspectionProgress[];
   part_name: string;
   part_number: null | string;
+  partId?: null | string;
   quantity: number;
   remarks: null | string;
   required_processes?: null | string;
@@ -139,6 +140,7 @@ export function mapProjectBomItem(item: {
     id: item.id,
     inspectionProgress: item.inspectionProgress || [],
     parentId: item.work_order_number,
+    partId: item.partId ?? null,
     partName: item.part_name,
     partNumber: item.part_number,
     quantity: item.quantity,

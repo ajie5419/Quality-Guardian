@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import type { BomItem, WorkOrderItem } from '@qgs/shared';
 import type { Rule } from 'ant-design-vue/es/form';
 
 import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
@@ -26,6 +27,8 @@ import { createQualityLoss, updateQualityLoss } from '#/api/qms/quality-loss';
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
+import BomItemSelect from '#/views/qms/shared/components/BomItemSelect.vue';
+import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
 
 import {
   mapDictionaryOptionsToLossType,
@@ -83,6 +86,33 @@ const rules: Record<string, Rule[]> = {
   ],
   responsibleDepartment: [
     { required: true, message: '请选择责任部门', trigger: 'change' },
+  ],
+  workOrderNumber: [
+    {
+      validator: (_rule: unknown, value: null | string | undefined) =>
+        !isManualSource.value || String(value ?? '').trim()
+          ? Promise.resolve()
+          : Promise.reject(new Error('请选择工单')),
+      trigger: 'change',
+    },
+  ],
+  partName: [
+    {
+      validator: (_rule: unknown, value: null | string | undefined) =>
+        !isManualSource.value || String(value ?? '').trim()
+          ? Promise.resolve()
+          : Promise.reject(new Error('请选择部件')),
+      trigger: 'change',
+    },
+  ],
+  projectName: [
+    {
+      validator: (_rule: unknown, value: null | string | undefined) =>
+        !isManualSource.value || String(value ?? '').trim()
+          ? Promise.resolve()
+          : Promise.reject(new Error('所选工单未配置项目名称')),
+      trigger: 'change',
+    },
   ],
 };
 
@@ -151,6 +181,30 @@ const responsibleDepartmentValue = computed<string | undefined>({
     formState.responsibleDepartment = value ?? null;
   },
 });
+
+function handleWorkOrderChange(
+  value: null | string | undefined,
+  option?: { item?: WorkOrderItem },
+) {
+  formState.workOrderNumber = value || null;
+  formState.projectName = option?.item?.projectName || null;
+  formState.projectId = null;
+  formState.partName = null;
+  formState.partId = null;
+}
+
+function handlePartChange(value: unknown, option?: unknown) {
+  const selectedOption =
+    option && !Array.isArray(option) && typeof option === 'object'
+      ? (option as { item?: BomItem })
+      : undefined;
+  formState.partName = String(value ?? '').trim() || null;
+  formState.partId = selectedOption?.item?.partId || null;
+}
+
+function handlePartModelUpdate(value: unknown) {
+  formState.partName = String(value ?? '').trim() || null;
+}
 </script>
 
 <template>
@@ -180,6 +234,46 @@ const responsibleDepartmentValue = computed<string | undefined>({
         show-icon
         class="mb-4"
       />
+
+      <Row :gutter="16">
+        <Col :span="isMobile ? 24 : 12">
+          <FormItem
+            label="工单号"
+            name="workOrderNumber"
+            :required="isManualSource"
+          >
+            <WorkOrderSelect
+              :value="formState.workOrderNumber"
+              :disabled="!isManualSource"
+              @update:value="formState.workOrderNumber = $event || null"
+              @change="handleWorkOrderChange"
+            />
+          </FormItem>
+        </Col>
+        <Col :span="isMobile ? 24 : 12">
+          <FormItem
+            label="项目名称"
+            name="projectName"
+            :required="isManualSource"
+          >
+            <Input
+              :value="formState.projectName || ''"
+              placeholder="选择工单后自动带出"
+              readonly
+            />
+          </FormItem>
+        </Col>
+      </Row>
+
+      <FormItem label="部件名称" name="partName" :required="isManualSource">
+        <BomItemSelect
+          :value="formState.partName"
+          :work-order-number="formState.workOrderNumber"
+          :disabled="!isManualSource || !formState.workOrderNumber"
+          @update:value="handlePartModelUpdate"
+          @change="handlePartChange"
+        />
+      </FormItem>
 
       <Row :gutter="16">
         <Col :span="isMobile ? 24 : 12">

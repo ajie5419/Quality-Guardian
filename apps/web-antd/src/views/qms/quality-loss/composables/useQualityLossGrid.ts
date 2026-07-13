@@ -141,16 +141,19 @@ export function useQualityLossGrid(params: {
         field: 'workOrderNumber',
         title: t('qms.workOrder.workOrderNumber'),
         width: 120,
+        formatter: ({ cellValue }) => cellValue || '-',
       },
       {
         field: 'projectName',
         title: t('qms.workOrder.projectName'),
         minWidth: 150,
+        formatter: ({ cellValue }) => cellValue || '-',
       },
       {
         field: 'partName',
         title: t('qms.inspection.issues.partName'),
         minWidth: 150,
+        formatter: ({ cellValue }) => cellValue || '-',
       },
       {
         field: 'date',

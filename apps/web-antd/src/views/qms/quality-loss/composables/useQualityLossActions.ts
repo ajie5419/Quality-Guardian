@@ -49,6 +49,11 @@ export function useQualityLossActions(
       status: 'PENDING',
       type: 'Scrap',
       lossSource: LossSource.MANUAL,
+      partId: null,
+      partName: null,
+      projectId: null,
+      projectName: null,
+      workOrderNumber: null,
     };
     modalVisible.value = true;
   }

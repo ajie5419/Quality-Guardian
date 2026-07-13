@@ -174,6 +174,7 @@ interface IndexRowLike {
   description: null | string;
   id: string;
   indexedAt: Date;
+  lossType: null | string;
   occurDate: Date;
   partName: null | string;
   projectName: null | string;
@@ -194,11 +195,11 @@ export function formatIndexRow(row: IndexRowLike): QualityLossItem {
     responsibleDepartment: row.respDept,
     description: row.description || undefined,
     status: normalizeQualityLossStatus(row.status),
-    type: row.source,
+    type: row.lossType || row.source,
     lossSource: row.source,
-    workOrderNumber: row.workOrderNumber || '-',
-    projectName: row.projectName || '-',
-    partName: row.partName || '-',
+    workOrderNumber: row.workOrderNumber,
+    projectName: row.projectName,
+    partName: row.partName,
     createdAt: row.indexedAt.toISOString(),
   };
 }

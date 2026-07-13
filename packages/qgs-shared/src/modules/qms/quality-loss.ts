@@ -6,13 +6,15 @@ export interface QualityLossItem {
   description?: string;
   id: string; // 界面显示的 ID (e.g. INT-1, EXT-5)
   lossSource: string;
-  partName: string;
+  partId?: null | string;
+  partName: null | string;
   pk: string; // 数据库主键 ID
-  projectName: string;
+  projectId?: null | string;
+  projectName: null | string;
   responsibleDepartment: null | string;
   status: string;
   type?: string;
-  workOrderNumber: string;
+  workOrderNumber: null | string;
 }
 
 export type QualityLossDetail = QualityLossItem;

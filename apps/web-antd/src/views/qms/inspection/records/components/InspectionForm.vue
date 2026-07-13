@@ -14,6 +14,7 @@ import dayjs from 'dayjs';
 import { useVbenForm } from '#/adapter/form';
 import { getWelderListPage } from '#/api/qms/welder';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+import BomItemSelect from '#/views/qms/shared/components/BomItemSelect.vue';
 
 import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
@@ -27,7 +28,6 @@ import {
   useSeverityOptions,
 } from '../../issues/constants';
 import { mapDictionaryOptionsToInspectionProcess } from '../config';
-import BomItemSelect from './form/BomItemSelect.vue';
 import TeamSelect from './form/TeamSelect.vue';
 import { getFormSchema } from './formData';
 import {

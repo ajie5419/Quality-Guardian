@@ -19,7 +19,7 @@ export interface UseSelectPaginationOptions<T> {
 
 export function useSelectPagination<T>(
   optionsConfig: UseSelectPaginationOptions<T>,
-  propsValue: Ref<T[keyof T] | undefined>,
+  propsValue: Ref<null | T[keyof T] | undefined>,
   emit: (event: 'change' | 'update:value', ...args: unknown[]) => void,
 ) {
   const { fetchDataFn, getParams, valueKey, echoFetcher } = optionsConfig;

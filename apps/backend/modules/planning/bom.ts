@@ -19,6 +19,7 @@ export type { BomInspectionProgress } from '@qgs/shared';
 
 export const projectBomItemSelect = {
   id: true,
+  partId: true,
   part_name: true,
   part_number: true,
   quantity: true,

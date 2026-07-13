@@ -20,9 +20,14 @@ describe('quality-loss payload utils', () => {
         amount: '100.5',
         date: 'invalid',
         description: 'desc',
+        partId: 'part-1',
+        partName: '主梁',
+        projectId: 'project-1',
+        projectName: '1000t 架桥机',
         responsibleDepartment: 'QA',
         status: 'completed',
         type: 'Process',
+        workOrderNumber: 'WO-468624',
       },
       'QL-2026-AAAAAA',
     );
@@ -33,6 +38,15 @@ describe('quality-loss payload utils', () => {
     expect(data.status).toBe('Confirmed');
     expect(data.respDept).toBe('QA');
     expect(data.type).toBe('Process');
+    expect(data).toEqual(
+      expect.objectContaining({
+        partId: 'part-1',
+        partName: '主梁',
+        projectId: 'project-1',
+        projectName: '1000t 架桥机',
+        workOrderNumber: 'WO-468624',
+      }),
+    );
     expect(data.occurDate).toBeInstanceOf(Date);
   });
 
@@ -58,12 +72,17 @@ describe('quality-loss payload utils', () => {
       isDeleted: false,
       lossId: 'QL-2026-ABC123',
       occurDate: new Date('2026-01-02T00:00:00.000Z'),
+      partId: null,
+      partName: null,
+      projectId: null,
+      projectName: null,
       respDept: 'QA',
       respDeptId: 'dept-qa',
       status: 'Pending',
       type: 'Process',
       typeId: null,
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      workOrderNumber: null,
     });
 
     expect(response.id).toBe('QL-2026-ABC123');
