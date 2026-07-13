@@ -25,6 +25,20 @@
 
 ## 执行记录
 
+## [0.16.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.15.1...qgs-v0.16.0) (2026-07-13)
+
+
+### Features
+
+* **project:** ship mobile inspection issues and quality fixes ([b5646af](https://github.com/ajie5419/Quality-Guardian/commit/b5646af7ac07e470c5fe14b9851a4ee83b0cf068))
+
+
+### Bug Fixes
+
+* **project:** align supplier quality metrics ([8dc7110](https://github.com/ajie5419/Quality-Guardian/commit/8dc7110607cd7ed3dd09af4cd8d639dda5c57d3b))
+* **project:** persist manual quality loss context ([94de027](https://github.com/ajie5419/Quality-Guardian/commit/94de027a7b592fd7887891451b272da1abceac3d))
+* **project:** resolve quality loss delete targets ([e8fc491](https://github.com/ajie5419/Quality-Guardian/commit/e8fc491dd2c8c91665c2e332ed9cb1bcf63c523e))
+
 ### 2026-07-13 修复：供应商与外协质量指标和画像口径统一
 
 **执行内容：**
