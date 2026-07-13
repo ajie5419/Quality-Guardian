@@ -1,8 +1,12 @@
-import { defineEventHandler, setResponseStatus } from 'h3';
+import { defineEventHandler } from 'h3';
 import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
-import { useResponseError, useResponseSuccess } from '~/utils/response';
+import {
+  internalServerErrorResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
@@ -14,14 +18,14 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    await QualityLossService.deleteRecord(id, String(userinfo.id));
+    await QualityLossService.deleteRecord(id, {
+      dataScope: event.context.dataScope,
+      userId: String(userinfo.id),
+    });
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('quality-loss', error, undefined, event);
-    const errorCode = (error as { code?: string }).code;
-    setResponseStatus(event, errorCode === 'NOT_FOUND' ? 404 : 500);
-    return useResponseError(
-      errorCode === 'NOT_FOUND' ? '记录不存在' : '删除质量损失记录失败',
-    );
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
+    return internalServerErrorResponse(event, '删除质量损失记录失败');
   }
 });

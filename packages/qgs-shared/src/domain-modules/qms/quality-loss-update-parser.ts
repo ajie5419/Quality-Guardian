@@ -128,11 +128,19 @@ export function resolveQualityLossTargetLocator(params: {
   source: QualityLossSource;
 }): QualityLossTargetLocatorResult {
   const { pathId, pk, source } = params;
-  const identifier =
-    normalizeQualityLossUpdateText(pk) ||
-    normalizeQualityLossUpdateText(pathId);
+  const sourcePk = normalizeQualityLossUpdateText(pk);
+  const identifier = sourcePk || normalizeQualityLossUpdateText(pathId);
 
   if (source === QUALITY_LOSS_SOURCE.MANUAL) {
+    if (sourcePk) {
+      return {
+        identifier: sourcePk,
+        lookup: 'manualId',
+        serial: null,
+        source: QUALITY_LOSS_SOURCE.MANUAL,
+        valid: true,
+      };
+    }
     if (pathId.startsWith('QL-')) {
       return {
         identifier: pathId,

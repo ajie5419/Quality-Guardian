@@ -99,6 +99,17 @@ describe('quality-loss update utils', () => {
       expect(manual.lookup).toBe('manualLossId');
     }
 
+    const indexedManual = resolveQualityLossTargetLocator({
+      pathId: 'QL-cmrirra7i00lyng01jigslrpf',
+      pk: 'cmrirra7i00lyng01jigslrpf',
+      source: QUALITY_LOSS_SOURCE.MANUAL,
+    });
+    expect(indexedManual).toMatchObject({
+      identifier: 'cmrirra7i00lyng01jigslrpf',
+      lookup: 'manualId',
+      valid: true,
+    });
+
     const mismatch = resolveQualityLossTargetLocator({
       pathId: 'EXT-8',
       pk: undefined,

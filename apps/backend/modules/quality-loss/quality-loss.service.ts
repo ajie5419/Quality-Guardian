@@ -249,8 +249,14 @@ export const QualityLossService = {
   /**
    * Delete a single record with audit logging
    */
-  async deleteRecord(id: string, userId: string): Promise<void> {
-    return QualityLossRecordMaintenanceService.deleteRecord(id, userId);
+  async deleteRecord(
+    id: string,
+    context: {
+      dataScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>;
+      userId: string;
+    },
+  ): Promise<void> {
+    return QualityLossRecordMaintenanceService.deleteRecord(id, context);
   },
 
   /**
@@ -258,9 +264,12 @@ export const QualityLossService = {
    */
   async batchDelete(
     ids: string[],
-    userId: string,
+    context: {
+      dataScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>;
+      userId: string;
+    },
   ): Promise<Prisma.BatchPayload> {
-    return QualityLossRecordMaintenanceService.batchDelete(ids, userId);
+    return QualityLossRecordMaintenanceService.batchDelete(ids, context);
   },
 
   /**

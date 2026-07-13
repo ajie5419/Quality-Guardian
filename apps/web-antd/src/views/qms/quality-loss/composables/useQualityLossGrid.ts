@@ -192,7 +192,7 @@ export function useQualityLossGrid(params: {
         cellRender: {
           name: 'CellOperation',
           props: {
-            options: [
+            options: (row: QualityLossItem) => [
               {
                 code: 'claim',
                 icon: 'ant-design:solution-outlined',
@@ -201,7 +201,9 @@ export function useQualityLossGrid(params: {
                 ghost: true,
               },
               ...(canEdit.value ? ['edit'] : []),
-              ...(canDelete.value ? ['delete'] : []),
+              ...(canDelete.value && row.lossSource === LossSource.MANUAL
+                ? ['delete']
+                : []),
             ],
             onClick: ({
               code,

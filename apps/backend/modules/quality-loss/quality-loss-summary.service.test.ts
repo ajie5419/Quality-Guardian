@@ -27,7 +27,9 @@ vi.mock('~/utils/prisma', () => ({
       update: vi.fn(),
       updateMany: vi.fn(),
     },
-    $transaction: vi.fn(),
+    $transaction: vi.fn(async (operations: Promise<unknown>[]) =>
+      Promise.all(operations),
+    ),
     $queryRaw: vi.fn(),
   },
 }));
@@ -84,6 +86,10 @@ vi.mock('~/utils/prisma-error', () => ({
 describe('quality-loss core services', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.$transaction).mockReset();
+    vi.mocked(prisma.$transaction).mockImplementation((operations: any) =>
+      Promise.all(operations),
+    );
   });
 
   it('builds dashboard summary and yearly charts across month/week/year granularities', () => {
@@ -179,13 +185,21 @@ describe('quality-loss core services', () => {
   });
 
   it('deletes manual records, batch deletes normalized ids, and returns drill-down data', async () => {
+    vi.mocked(prisma.quality_loss_index.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.quality_loss_index.updateMany).mockResolvedValue({
+      count: 1,
+    } as never);
     vi.mocked(prisma.quality_losses.findFirst).mockResolvedValue({
       id: 'ql-1',
     } as never);
-    vi.mocked(prisma.quality_losses.update).mockResolvedValue({} as never);
-    await QualityLossRecordMaintenanceService.deleteRecord('QL-1', 'u-1');
-    expect(prisma.quality_losses.update).toHaveBeenCalledWith({
-      where: { id: 'ql-1' },
+    vi.mocked(prisma.quality_losses.updateMany).mockResolvedValue({
+      count: 1,
+    } as never);
+    await QualityLossRecordMaintenanceService.deleteRecord('QL-1', {
+      userId: 'u-1',
+    });
+    expect(prisma.quality_losses.updateMany).toHaveBeenCalledWith({
+      where: { id: 'ql-1', isDeleted: false },
       data: { isDeleted: true },
     });
     expect(SystemLogService.auditLog).toHaveBeenCalledWith(
@@ -196,7 +210,9 @@ describe('quality-loss core services', () => {
 
     vi.mocked(prisma.quality_losses.findFirst).mockResolvedValueOnce(null);
     await expect(
-      QualityLossRecordMaintenanceService.deleteRecord('missing', 'u-1'),
+      QualityLossRecordMaintenanceService.deleteRecord('missing', {
+        userId: 'u-1',
+      }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
     vi.mocked(prisma.quality_losses.findMany).mockResolvedValueOnce([
@@ -209,7 +225,7 @@ describe('quality-loss core services', () => {
     await expect(
       QualityLossRecordMaintenanceService.batchDelete(
         ['ql-1', 'ql-2', 'ql-1', ' '],
-        'u-1',
+        { userId: 'u-1' },
       ),
     ).resolves.toEqual({ count: 2 });
 
@@ -343,9 +359,10 @@ describe('quality-loss core services', () => {
     vi.mocked(
       VehicleCommissioningService.getQualityLossDrillDownRecords,
     ).mockResolvedValue([] as never);
-    vi.mocked(prisma.quality_loss_index.findMany).mockResolvedValueOnce([
-      { id: 'QL-manual', source: 'Manual', amount: 1 },
-    ] as never);
+    vi.mocked(prisma.quality_loss_index.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.quality_loss_index.updateMany).mockResolvedValue({
+      count: 1,
+    } as never);
 
     await expect(
       QualityLossService.getStatsForDashboard({
@@ -360,10 +377,13 @@ describe('quality-loss core services', () => {
         start: new Date(),
       }),
     ).resolves.toEqual([{ id: 'weekly' }]);
-    await QualityLossService.deleteRecord('ql-1', 'u-1');
+    await QualityLossService.deleteRecord('ql-1', { userId: 'u-1' });
     await expect(
-      QualityLossService.batchDelete(['ql-1'], 'u-1'),
+      QualityLossService.batchDelete(['ql-1'], { userId: 'u-1' }),
     ).resolves.toEqual({ count: 1 });
+    vi.mocked(prisma.quality_loss_index.findMany).mockResolvedValueOnce([
+      { id: 'QL-manual', source: 'Manual', amount: 1 },
+    ] as never);
     await expect(
       QualityLossService.getDrillDown(new Date(), new Date()),
     ).resolves.toEqual([{ id: 'QL-manual', source: 'Manual', amount: 1 }]);
