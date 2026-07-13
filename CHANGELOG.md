@@ -25,6 +25,31 @@
 
 ## 执行记录
 
+### 2026-07-13 修复：质量损失统一列表删除误报记录不存在
+
+**执行内容：**
+
+- 修复统一列表把 `quality_loss_index.id` 当作 `quality_losses.id` 传给删除接口的 ID 契约错位；后端兼容解析 `QL-<cuid>` 物化索引 ID，前端改为传递源记录 `pk`。
+- 单条与批量删除共用相同的手工来源定位规则，并在同一 Prisma transaction 内软删除源记录和物化索引，避免列表留下幽灵数据。
+- 删除入口增加 `SELF` / `DEPT` 数据权限校验，非手工来源在统一页隐藏删除按钮，后端对旧客户端请求也明确拒绝跨模块删除。
+- 同步修复手工记录编辑时的同类 ID 错位，当请求带有 `pk` 时优先按源表主键定位。
+- 补充后端索引 ID、非手工来源、数据权限、并发软删除测试，以及前端 `pk` 传递和来源按钮可见性测试。
+
+**验证结果：**
+
+- vitest: 质量损失跨端定向 5 文件 / 38 测试通过
+- vitest: 后端全量 198 文件 / 1895 测试通过
+- lint: 通过（0 error；保留既有 `IssueFormFields.test.ts` 9 条 warning）
+- typecheck: `pnpm run check:type` 3/3 tasks 通过
+- check:qms-arch: 0 violations 通过
+- 前端 dev/build: 未运行；遵循仓库约束，通过单元测试、类型检查和 Lint 验证
+
+**commit:** `e8fc491` fix(project): resolve quality loss delete targets
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-07-10 功能：小程序不合格品项登记
 
 **执行内容：**
