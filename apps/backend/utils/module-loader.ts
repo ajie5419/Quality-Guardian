@@ -23,6 +23,7 @@ import { qualityLossModule } from '~/modules/quality-loss/quality-loss.module';
 import { rbacModule } from '~/modules/rbac/rbac.module';
 import { reportModule } from '~/modules/report/report.module';
 import { supervisionModule } from '~/modules/supervision/supervision.module';
+import { supplierIdentityModule } from '~/modules/supplier-identity/supplier-identity.module';
 import { supplierModule } from '~/modules/supplier/supplier.module';
 import { systemLogModule } from '~/modules/system-log/system-log.module';
 import { systemModule } from '~/modules/system/system.module';
@@ -52,6 +53,7 @@ const MODULE_DECLARATIONS: ModuleDeclaration[] = [
   reportModule,
   supervisionModule,
   supplierModule,
+  supplierIdentityModule,
   systemModule,
   systemLogModule,
   taskDispatchModule,
