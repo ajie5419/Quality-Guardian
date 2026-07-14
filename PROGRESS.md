@@ -2,12 +2,12 @@
 
 ## 当前状态
 
-- 最新变更: 供应商画像数据源契约修复已完成，历史项目改为按报检任务聚合，工程问题统一按规范供应商 ID 读取，等待 PR 与补丁版本发布
+- 最新变更: 供应商画像数据源契约修复已通过 PR #50/#51 发布为 `qgs-v0.17.1`，生产身份回填、ECS 更新和健康检查已通过
 - 测试状态: 全量 289/289 个文件、2474/2474 个用例通过
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
 - 模块 TS 文件数: 506（含测试）
-- 当前版本: `0.17.0`
+- 当前版本: `0.17.1`
 
 ## 已完成
 
@@ -41,7 +41,7 @@
 apps/backend/
 ├── api/          # 路由薄层（≤50 行）
 ├── middleware/   # 认证、数据权限、日志
-├── modules/      # 业务逻辑（25 个模块，505 个 TS 文件）
+├── modules/      # 业务逻辑（25 个模块，506 个 TS 文件）
 ├── prisma/       # Schema + Migrations
 ├── routes/       # catch-all 404
 └── utils/        # 基础设施（24 个文件）
@@ -52,7 +52,7 @@ apps/backend/
 - [ ] 完成不合格品项剩余设备验收（真机、实际新增提交、照片上传、分页、草稿、账号切换）；微信开发者工具的权限、列表、详情、编辑、新增页面已验证
 - [ ] 持续补强端到端业务流程验证
 - [x] 完成 supplier identity wave 的 PR、release-please、部署、migration、回填和健康检查
-- [ ] 补丁版本发布后，使用已登录业务账号验收秦皇岛吉兴机械制造有限公司供应商画像的 7 月 8 日不合格项、手工工程问题和完整历史项目
+- [ ] 使用已登录业务账号验收秦皇岛吉兴机械制造有限公司供应商画像的 7 月 8 日不合格项、手工工程问题、进货合格率和完整历史项目
 - [ ] 为 `unresolved_master_data_refs` 增加人工处置 API/UI，并为 `supplier_identity_links` 增加管理 UI
 - [ ] 为 supervision 等尚未覆盖的存量供应商引用补齐回填、unresolved 审计和生产指标核对
 - [ ] 将其他受控主数据从 `DUAL_WRITE/legacy` 逐 wave 推进到在线 `ID-required`
