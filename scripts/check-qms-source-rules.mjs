@@ -599,6 +599,30 @@ function analyzeIdentityFile(rootDir, filePath) {
   }
 
   function inspectNameBasedScoringIdentity(node) {
+    if (
+      repoPath ===
+        'apps/web-antd/src/views/qms/supplier/components/SupplierDetailDrawer.vue' &&
+      ts.isCallExpression(node)
+    ) {
+      const expression = unwrapExpression(node.expression);
+      const firstArgument = node.arguments[0]
+        ? resolveObjectLiteral(sourceFile, node.arguments[0])
+        : undefined;
+      if (
+        ts.isIdentifier(expression) &&
+        expression.text === 'getAfterSalesList' &&
+        firstArgument &&
+        getObjectProperty(firstArgument, 'supplierBrand') &&
+        !getObjectProperty(firstArgument, 'supplierBrandId')
+      ) {
+        addFinding(
+          'B-ID4',
+          node,
+          'Supplier portrait after-sales queries must use supplierBrandId.',
+          'supplier-portrait-after-sales-name-query',
+        );
+      }
+    }
     if (!ID_FIRST_SCORING_FILES.has(repoPath)) return;
     if (ts.isPropertyAssignment(node)) {
       const propertyName = getPropertyNameText(node.name);

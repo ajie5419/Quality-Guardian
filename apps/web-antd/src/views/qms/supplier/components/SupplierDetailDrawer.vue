@@ -112,7 +112,7 @@ async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
           page: supplierInspectionPagination.current,
           pageSize: supplierInspectionPagination.pageSize,
         }),
-        getAfterSalesList({ supplierBrand: row.name }),
+        getAfterSalesList({ supplierBrandId: row.id }),
         getSupplierQualityIssues(row.id, {
           page: supplierEngineeringPagination.current,
           pageSize: supplierEngineeringPagination.pageSize,

@@ -44,6 +44,7 @@ export interface AfterSalesParams {
   projectName?: string;
   status?: string;
   supplierBrand?: string;
+  supplierBrandId?: string;
   workOrderNumber?: string;
   year?: number;
 }

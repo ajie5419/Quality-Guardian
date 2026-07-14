@@ -191,6 +191,7 @@ export const AfterSalesService = {
       projectName,
       status,
       supplierBrand,
+      supplierBrandId,
       workOrderNumber,
       year,
     } = params;
@@ -227,7 +228,9 @@ export const AfterSalesService = {
         where.claimStatus = claimStatus;
       }
     }
-    if (supplierBrand && String(supplierBrand).trim() !== '') {
+    if (supplierBrandId && String(supplierBrandId).trim() !== '') {
+      where.supplierBrandId = String(supplierBrandId).trim();
+    } else if (supplierBrand && String(supplierBrand).trim() !== '') {
       where.OR = [
         { supplierBrand: { contains: String(supplierBrand).trim() } },
         { projectName: { contains: String(supplierBrand).trim() } },

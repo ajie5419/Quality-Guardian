@@ -228,6 +228,12 @@ MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
   names: ['Supplier A'],
 });
 `,
+      'apps/web-antd/src/views/qms/supplier/components/SupplierDetailDrawer.vue': `
+<script setup lang="ts">
+getAfterSalesList({ supplierBrand: row.name });
+</script>
+<template><div /></template>
+`,
       'apps/backend/modules/inspection/legacy-import.service.ts': `
 prisma.quality_records.create({
   data: { supplierName: 'Legacy Supplier' },
