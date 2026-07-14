@@ -47,7 +47,6 @@ const userConfig = {
     defaultScope: scopeComplete,
     // English
     typesAppend: [
-      { name: 'workflow: workflow improvements', value: 'workflow' },
       { name: 'types:    type definition file changes', value: 'types' },
     ],
 

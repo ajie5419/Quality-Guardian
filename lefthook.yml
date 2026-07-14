@@ -45,30 +45,48 @@ pre-commit:
   parallel: true
   commands:
     code-workspace:
-      run: pnpm vsh code-workspace --auto-commit
+      files: if git diff --cached --name-only --diff-filter=ACMR | grep -Eq '(^|/)package\.json$|^pnpm-workspace\.yaml$'; then printf '%s\n' tools/vben-admin.code-workspace; fi
+      run: pnpm vsh code-workspace
+      stage_fixed: true
     lint-md:
       run: pnpm prettier --cache --ignore-unknown --write {staged_files}
       glob: '*.md'
+      stage_fixed: true
     lint-vue:
       run: pnpm prettier --write {staged_files} && pnpm eslint --cache --fix {staged_files} && pnpm stylelint --fix --allow-empty-input {staged_files}
       glob: '*.vue'
+      stage_fixed: true
     lint-js:
       run: pnpm prettier --cache --ignore-unknown --write {staged_files} && pnpm eslint --cache --fix {staged_files}
-      glob: '*.{js,jsx,ts,tsx}'
+      glob: '*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}'
+      stage_fixed: true
     lint-style:
       run: pnpm prettier --cache --ignore-unknown --write {staged_files} && pnpm stylelint --fix --allow-empty-input {staged_files}
-      glob: '*.{scss,less,styl,html,vue,css}'
+      glob: '*.{scss,less,styl,html,css}'
+      stage_fixed: true
     lint-package:
       run: pnpm prettier --cache --write {staged_files}
       glob: 'package.json'
+      stage_fixed: true
     lint-json:
       run: pnpm prettier --cache --write --parser json {staged_files}
       glob: '{!(package)*.json,*.code-snippets,.!(browserslist)*rc}'
+      stage_fixed: true
+
+pre-push:
+  parallel: true
+  commands:
+    typecheck:
+      run: pnpm run check:type
+    qms-arch:
+      run: pnpm run check:qms-arch
 
 post-merge:
+  files: git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD
   commands:
     install:
-      run: pnpm install
+      run: pnpm install --frozen-lockfile
+      glob: '{package.json,**/package.json,pnpm-lock.yaml,pnpm-workspace.yaml}'
 
 commit-msg:
   commands:
