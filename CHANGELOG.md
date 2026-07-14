@@ -25,6 +25,37 @@
 
 ## 执行记录
 
+### 2026-07-14 治理：supplier identity governance wave 文档与发布边界
+
+**执行内容：**
+
+- 记录 7 月 8 日供应商画像漏数根因：该不合格项属于驻厂 TEAM 身份域，旧画像按供应商名称聚合，未通过 `supplier_identity_links` 将 TEAM 映射到供应商，因此画像截止日期停留在 6 月 28 日。
+- 新增 `supplier_identity_links` 和 `unresolved_master_data_refs` Prisma migration，建立 `TEAM -> supplier` 显式映射、外键保护和无法解析引用的持久化审计。
+- 将供应商画像、评分、历史项目、检验履历、不合格项和售后评分改为按供应商 ID 查询；驻厂过程检验通过 TEAM 映射聚合，禁止名称等值关联和名称 `OR` 回退。
+- 增加报检 TEAM/供应商、检验、售后和不合格项身份 dry-run/apply 回填，部署流程在 migration 后连续执行幂等分批回填。
+- 增加 B-ID1/B-ID2/B-ID3/B-ID4/B-ID5 门禁，保护受控选择器、事件 ID、检验供应商写入、供应商画像和评分查询，并限制 legacy 名称解析只能出现在审核过的 import adapter。
+- 更新 inspection、supplier、supplier-identity、after-sales、supervision 模块架构文档，明确 ID-first、名称快照、TEAM 映射、legacy/dual-write 边界和模块职责。
+- 完善 `docs/master-data-identity-governance.md`，明确本次仅完成 supplier identity governance wave，不宣称全项目 `ID_ONLY`；记录 migration、分批 dry-run/apply 回填、`unresolved_master_data_refs` 和 B-ID1/B-ID2/B-ID3/B-ID4/B-ID5 门禁。
+- 更新 `PROGRESS.md`，记录全量门禁结果，将 PR、release-please、部署和生产指标核对保留为发布待办。
+
+**验证结果：**
+
+- 已完成定向验证：售后事件 30/30、ID-only 评分 86/86、售后失效刷新 14/14、不合格项契约 47/47、画像 ID 查询与门禁 21/21、身份回填 15/15、身份管理权限 6/6。
+- 全量单元测试：289 个文件 / 2471 个用例全部通过。
+- lint：通过（0 error）；typecheck：3/3 workspace tasks 通过。
+- `check:qms-arch` 与 `check:qms-arch:all`：0 violations；`check:prisma-migration`：schema 变更已配套 migration。
+- `git diff --check`：通过。
+- 发布验证：本地门禁已完成；GitHub PR、release-please、tag/deploy workflow 和生产健康检查待发布流程验证。
+- 数据库验证：本地未读取生产凭据；migration 与身份回填由部署流程连续执行。
+
+**commit:** `2cee6c43` fix(@qgs/backend): enforce inspection identity governance；`01944f26` fix(@qgs/web-antd): submit canonical inspection identities。本轮文档提交见 Git 历史；当前不虚构最终 merge commit、PR、tag 或 deploy 结果。
+
+**遗留问题：**
+
+- supervision 等尚未覆盖的存量供应商引用仍需补齐回填和 unresolved 审计；其他未迁移主数据必须由后续治理 wave 切换到在线 `ID-required`。
+- `unresolved_master_data_refs` 尚无人工处置 API/UI，`supplier_identity_links` 尚无前端管理界面。
+- 当前 EventEmitter 为单进程、fire-and-forget，监听器失败只记录日志且无持久化重试；扩容前需替换可靠事件机制。
+
 ### 2026-07-14 修复：完善 ESLint 与后端架构规则约束
 
 **执行内容：**

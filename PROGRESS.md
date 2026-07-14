@@ -2,11 +2,11 @@
 
 ## 当前状态
 
-- 最新变更: 完善 ESLint Flat Config 累计规则与后端源码约束；新增 TypeScript AST 架构门禁、递减 baseline 和 CI 全量扫描
-- 测试状态: 后端 201/201 文件、1919/1919 用例通过；ESLint 最终配置与架构脚本回归 10/10 通过
+- 最新变更: supplier identity governance wave 代码、迁移回填、文档与本地全量门禁已完成；PR、发布和生产回填待验证
+- 测试状态: 全量 289/289 个文件、2471/2471 个用例通过
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
-- 模块 TS 文件数: 497（含测试）
+- 模块 TS 文件数: 505（含测试）
 - 当前版本: `0.16.0`
 
 ## 已完成
@@ -31,6 +31,7 @@
 - [x] 报检任务模块重构（状态机文档、创建 schema、查询/创建/派工/删除/关闭服务拆分）
 - [x] 小程序不合格品项模块（列表、详情、新增、编辑、照片、草稿、RBAC，复用电脑版数据与状态）
 - [x] 不合格品项所有权隔离（普通用户仅本人、管理员全部、写操作仅创建人）
+- [x] supplier identity governance wave（供应商画像、评分、检验、不合格项、售后评分、TEAM 映射、存量回填与 unresolved 审计）
 - [ ] 后端业务模块逐功能测试覆盖补齐（进行中）
 
 ## 当前架构
@@ -49,11 +50,16 @@ apps/backend/
 
 - [ ] 完成不合格品项剩余设备验收（真机、实际新增提交、照片上传、分页、草稿、账号切换）；微信开发者工具的权限、列表、详情、编辑、新增页面已验证
 - [ ] 持续补强端到端业务流程验证
+- [ ] 完成 supplier identity wave 的 PR、release-please、部署和生产指标核对
+- [ ] 为 `unresolved_master_data_refs` 增加人工处置 API/UI，并为 `supplier_identity_links` 增加管理 UI
+- [ ] 为 supervision 等尚未覆盖的存量供应商引用补齐回填、unresolved 审计和生产指标核对
+- [ ] 将其他受控主数据从 `DUAL_WRITE/legacy` 逐 wave 推进到在线 `ID-required`
+- [ ] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制
 
 ## 基线数据（用于异常检测）
 
-- 模块 TS 文件数: 497（含测试）
+- 模块 TS 文件数: 505（含测试）
 - utils TS 文件数: 41
-- 测试文件数: 193（modules 内）；后端总计待下次全量基线刷新
+- 测试文件数: 195（modules 内）；后端总计 212
 - 导出入口基线: 约 610；已完成 343，剩余 267
 - 顶层目录: api/ middleware/ modules/ prisma/ routes/ utils/
