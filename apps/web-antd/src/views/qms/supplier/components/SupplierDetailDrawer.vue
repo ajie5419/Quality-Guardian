@@ -21,10 +21,10 @@ import {
 } from 'ant-design-vue';
 
 import { getAfterSalesList } from '#/api/qms/after-sales';
-import { getInspectionIssues } from '#/api/qms/inspection';
 import {
   getSupplierHistoryProjects,
   getSupplierInspectionHistory,
+  getSupplierQualityIssues,
 } from '#/api/qms/supplier';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
@@ -51,10 +51,18 @@ const supplierInspectionPagination = reactive({
 const isInspectionHistoryLoading = ref(false);
 const supplierAfterSales = ref<QmsAfterSalesApi.AfterSalesItem[]>([]);
 const supplierEngineeringIssues = ref<QmsInspectionApi.InspectionIssue[]>([]);
+const supplierEngineeringPagination = reactive({
+  current: 1,
+  pageSize: 5,
+  showSizeChanger: true,
+  total: 0,
+});
+const isEngineeringHistoryLoading = ref(false);
 const supplierHistoryProjects = ref<QmsSupplierApi.SupplierHistoryProject[]>(
   [],
 );
 let detailRequestSequence = 0;
+let engineeringPageRequestSequence = 0;
 let inspectionPageRequestSequence = 0;
 
 const [Drawer, drawerApi] = useVbenDrawer({
@@ -69,6 +77,9 @@ function clearDetailData() {
   isInspectionHistoryLoading.value = false;
   supplierAfterSales.value = [];
   supplierEngineeringIssues.value = [];
+  supplierEngineeringPagination.current = 1;
+  supplierEngineeringPagination.total = 0;
+  isEngineeringHistoryLoading.value = false;
   supplierHistoryProjects.value = [];
 }
 
@@ -83,6 +94,7 @@ function reportRejectedDetailRequest(
 
 async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
   const requestSequence = ++detailRequestSequence;
+  const engineeringRequestSequence = ++engineeringPageRequestSequence;
   const inspectionRequestSequence = ++inspectionPageRequestSequence;
   selectedSupplier.value = row;
   clearDetailData();
@@ -101,7 +113,10 @@ async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
           pageSize: supplierInspectionPagination.pageSize,
         }),
         getAfterSalesList({ supplierBrand: row.name }),
-        getInspectionIssues({ supplierName: row.name }),
+        getSupplierQualityIssues(row.id, {
+          page: supplierEngineeringPagination.current,
+          pageSize: supplierEngineeringPagination.pageSize,
+        }),
         getSupplierHistoryProjects(row.id),
       ]);
 
@@ -122,8 +137,12 @@ async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
     if (afterSales.status === 'fulfilled') {
       supplierAfterSales.value = afterSales.value;
     }
-    if (engineering.status === 'fulfilled') {
+    if (
+      engineering.status === 'fulfilled' &&
+      engineeringRequestSequence === engineeringPageRequestSequence
+    ) {
       supplierEngineeringIssues.value = engineering.value.items || [];
+      supplierEngineeringPagination.total = engineering.value.total || 0;
     }
     if (historyProjects.status === 'fulfilled') {
       supplierHistoryProjects.value = historyProjects.value.items || [];
@@ -187,6 +206,42 @@ async function handleInspectionPageChange(
   } finally {
     if (requestSequence === inspectionPageRequestSequence) {
       isInspectionHistoryLoading.value = false;
+    }
+  }
+}
+
+async function handleEngineeringPageChange(
+  pagination: InspectionPaginationChange,
+) {
+  if (!selectedSupplier.value) return;
+
+  const supplierId = selectedSupplier.value.id;
+  const requestSequence = ++engineeringPageRequestSequence;
+  const page = pagination.current || 1;
+  const pageSize = pagination.pageSize || 5;
+  isEngineeringHistoryLoading.value = true;
+  try {
+    const result = await getSupplierQualityIssues(supplierId, {
+      page,
+      pageSize,
+    });
+    if (
+      requestSequence !== engineeringPageRequestSequence ||
+      selectedSupplier.value?.id !== supplierId
+    ) {
+      return;
+    }
+    supplierEngineeringIssues.value = result.items || [];
+    supplierEngineeringPagination.current = page;
+    supplierEngineeringPagination.pageSize = pageSize;
+    supplierEngineeringPagination.total = result.total || 0;
+  } catch (error) {
+    if (requestSequence === engineeringPageRequestSequence) {
+      handleApiError(error, 'Load Supplier Engineering');
+    }
+  } finally {
+    if (requestSequence === engineeringPageRequestSequence) {
+      isEngineeringHistoryLoading.value = false;
     }
   }
 }
@@ -432,9 +487,10 @@ defineExpose({
             <Table
               :data-source="supplierEngineeringIssues"
               size="small"
-              :pagination="{ pageSize: 5 }"
+              :pagination="supplierEngineeringPagination"
               row-key="id"
-              :loading="isDetailLoading"
+              :loading="isDetailLoading || isEngineeringHistoryLoading"
+              @change="handleEngineeringPageChange"
             >
               <Table.Column
                 :title="t('common.date')"

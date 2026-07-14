@@ -70,6 +70,8 @@ type IssueFormValues = Partial<{
   responsibleWelder: string;
   rootCause: string;
   solution: string;
+  supplierId: string;
+  supplierName: string;
   workOrderNumber: string;
 }>;
 const formValues = ref<IssueFormValues>({});
@@ -227,7 +229,7 @@ watch(
   (show) => {
     formApi.updateSchema([
       {
-        fieldName: 'supplierName',
+        fieldName: 'supplierId',
         dependencies: {
           triggerFields: ['responsibleDepartments'],
           show: () => show,
@@ -360,6 +362,14 @@ function handleWorkOrderChange(
   }
 }
 
+function handleSupplierChange(
+  supplierId: string | undefined,
+  option?: { item?: { id: string; name: string } },
+) {
+  formApi.setFieldValue('supplierId', supplierId);
+  formApi.setFieldValue('supplierName', option?.item?.name || '');
+}
+
 defineExpose({
   validate: () => formApi.validate(),
   getValues: () => formApi.getValues(),
@@ -412,11 +422,14 @@ defineExpose({
         <WorkOrderSelect v-bind="slotProps" @change="handleWorkOrderChange" />
       </template>
 
-      <template #supplierName="slotProps">
+      <template #supplierId="slotProps">
         <SupplierSelect
           v-bind="slotProps"
           :key="targetUnitCategory"
           :category="targetUnitCategory"
+          :legacy-name="formValues.supplierName"
+          value-mode="id"
+          @change="handleSupplierChange"
         />
       </template>
 
