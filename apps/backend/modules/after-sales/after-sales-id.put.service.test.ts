@@ -60,6 +60,10 @@ vi.mock('~/utils/api-logger', () => ({
   logApiError: vi.fn(),
 }));
 
+vi.mock('~/utils/event-bus', () => ({
+  eventBus: { emit: vi.fn() },
+}));
+
 vi.mock('~/utils/prisma-error', () => ({
   isPrismaNotFoundError: vi.fn(
     (error: unknown) => error instanceof Error && error.message === 'not found',
@@ -122,6 +126,40 @@ describe('after-sales-id.put.service', () => {
     });
     const callArgs = (prisma.after_sales.update as any).mock.calls[0][0];
     expect(callArgs.data).not.toHaveProperty('qualityLoss');
+  });
+
+  it('refreshes both supplier snapshots for an ID-only reassignment', async () => {
+    const { readBody } = await import('h3');
+    const { default: handler } = await import(
+      '~/modules/after-sales/after-sales-id.put.service'
+    );
+    const { buildGovernedAfterSalesUpdateData } = await import(
+      '~/modules/after-sales/after-sales-payload'
+    );
+    const { eventBus } = await import('~/utils/event-bus');
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+
+    vi.mocked(readBody).mockResolvedValue({ supplierBrandId: 'supplier-2' });
+    vi.mocked(buildGovernedAfterSalesUpdateData).mockResolvedValueOnce({
+      costsChanged: false,
+      data: { supplierBrandId: 'supplier-2' },
+    });
+    vi.mocked(prisma.after_sales.findUnique).mockResolvedValue({
+      supplierBrand: 'Supplier A',
+      supplierBrandId: 'supplier-1',
+    } as never);
+    vi.mocked(prisma.after_sales.update).mockResolvedValue({
+      supplierBrand: 'Supplier B',
+      supplierBrandId: 'supplier-2',
+    } as never);
+
+    await handler({} as any);
+
+    expect(eventBus.emit).toHaveBeenCalledWith('after_sales.changed', {
+      supplierBrands: ['Supplier A', 'Supplier B'],
+      supplierIds: ['supplier-1', 'supplier-2'],
+    });
   });
 
   it('should return not found when record does not exist during cost recalculation', async () => {

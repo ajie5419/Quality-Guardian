@@ -116,7 +116,9 @@ export const AfterSalesService = {
   ): Promise<void> {
     const { costsChanged, data: updateData } =
       await buildGovernedAfterSalesUpdateData(bodyRecord);
-    const supplierChanged = updateData.supplierBrand !== undefined;
+    const supplierChanged =
+      updateData.supplierBrand !== undefined ||
+      updateData.supplierBrandId !== undefined;
     let previousSupplierBrand: null | string | undefined;
     let previousSupplierId: null | string | undefined;
 
@@ -285,7 +287,7 @@ export const AfterSalesService = {
    * Soft delete a record with audit logging
    */
   async deleteRecord(id: string, userId: string): Promise<void> {
-    await prisma.after_sales.update({
+    const deleted = await prisma.after_sales.update({
       where: { id },
       data: {
         isDeleted: true,
@@ -299,6 +301,10 @@ export const AfterSalesService = {
     });
 
     await QualityLossIndexService.softDeleteSource('External', id);
+    eventBus.emit('after_sales.changed', {
+      supplierBrands: [deleted.supplierBrand],
+      supplierIds: [deleted.supplierBrandId],
+    });
 
     // Record audit log
     await SystemLogService.auditLog('after-sales', 'delete', {

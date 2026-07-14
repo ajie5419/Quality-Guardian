@@ -30,7 +30,9 @@ export default defineEventHandler(async (event) => {
     const bodyRecord = updateAfterSalesSchema.parse(await readBody(event));
     const { costsChanged, data: updateData } =
       await buildGovernedAfterSalesUpdateData(bodyRecord);
-    const supplierChanged = updateData.supplierBrand !== undefined;
+    const supplierChanged =
+      updateData.supplierBrand !== undefined ||
+      updateData.supplierBrandId !== undefined;
     let previousSupplierBrand: null | string | undefined;
     let previousSupplierId: null | string | undefined;
 
