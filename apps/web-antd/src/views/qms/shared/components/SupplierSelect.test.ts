@@ -120,6 +120,62 @@ describe('supplier select', () => {
     ]);
   });
 
+  it('loads the selected id option from its legacy name for edit echo', async () => {
+    const supplier = createSupplier('supplier-42', 'Supplier Z');
+    getSupplierList.mockResolvedValueOnce({ items: [supplier], total: 1 });
+
+    const wrapper = mount(SupplierSelect, {
+      props: {
+        legacyName: 'Supplier Z',
+        value: 'supplier-42',
+        valueMode: 'id',
+      },
+    });
+    await flushPromises();
+
+    expect(
+      wrapper
+        .findComponent({ name: 'MockSupplierSelectProbe' })
+        .props('options'),
+    ).toEqual([
+      expect.objectContaining({
+        label: 'Supplier Z',
+        value: 'supplier-42',
+      }),
+    ]);
+    expect(wrapper.emitted('update:value')).toBeUndefined();
+    expect(wrapper.emitted('change')).toBeUndefined();
+  });
+
+  it('uses the selected id to disambiguate duplicate legacy names', async () => {
+    const selected = createSupplier('supplier-2', 'Supplier A');
+    getSupplierList.mockResolvedValueOnce({
+      items: [createSupplier('supplier-1', 'Supplier A'), selected],
+      total: 2,
+    });
+
+    const wrapper = mount(SupplierSelect, {
+      props: {
+        legacyName: 'Supplier A',
+        value: 'supplier-2',
+        valueMode: 'id',
+      },
+    });
+    await flushPromises();
+
+    expect(
+      wrapper
+        .findComponent({ name: 'MockSupplierSelectProbe' })
+        .props('options'),
+    ).toEqual([
+      expect.objectContaining({
+        label: 'Supplier A',
+        value: 'supplier-2',
+      }),
+    ]);
+    expect(wrapper.emitted('update:value')).toBeUndefined();
+  });
+
   it('does not guess when a legacy name matches multiple suppliers', async () => {
     getSupplierList.mockResolvedValueOnce({
       items: [

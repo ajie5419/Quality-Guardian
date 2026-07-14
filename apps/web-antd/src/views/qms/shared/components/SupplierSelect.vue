@@ -95,7 +95,7 @@ let legacyResolutionToken = 0;
 
 async function resolveLegacyName() {
   const legacyName = props.legacyName?.trim();
-  if (props.valueMode !== 'id' || props.value || !legacyName) return false;
+  if (props.valueMode !== 'id' || !legacyName) return false;
 
   const resolutionToken = ++legacyResolutionToken;
   const exactMatches = new Map<string, SupplierItem>();
@@ -115,11 +115,21 @@ async function resolveLegacyName() {
       result.items.forEach((item) => {
         if (item.name.trim() === legacyName) exactMatches.set(item.id, item);
       });
-      if (exactMatches.size > 1) return true;
+      if (exactMatches.size > 1 && !props.value) return true;
       page += 1;
     } while ((page - 1) * pageSize < total);
 
     if (resolutionToken !== legacyResolutionToken) return true;
+    if (props.value) {
+      const currentMatch = exactMatches.get(props.value);
+      if (
+        currentMatch &&
+        !options.value.some((item) => item.id === currentMatch.id)
+      ) {
+        options.value = [currentMatch, ...options.value];
+      }
+      return Boolean(currentMatch);
+    }
     const exactMatch = [...exactMatches.values()][0];
     if (!exactMatch) return true;
 

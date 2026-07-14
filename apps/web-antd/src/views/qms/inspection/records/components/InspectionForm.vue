@@ -57,6 +57,7 @@ interface LinkedIssueDraft {
   rootCause: string;
   solution: string;
   status: string;
+  supplierId: string;
   supplierName: string;
   photos: UploadFileWithResponse[];
   unqualifiedQuantity: number;
@@ -85,6 +86,7 @@ const linkedIssueDraft = ref<LinkedIssueDraft>({
   rootCause: '',
   solution: '',
   status: 'OPEN',
+  supplierId: '',
   supplierName: '',
   photos: [],
   unqualifiedQuantity: 0,
@@ -225,10 +227,15 @@ async function handleWorkOrderChange(
   }
 }
 
-async function handleSupplierChange(val: string | undefined) {
-  formApi.setFieldValue('supplierName', val);
+async function handleSupplierChange(
+  val: string | undefined,
+  option?: { item?: { name?: string } },
+) {
+  const supplierName = String(option?.item?.name || '').trim();
+  formApi.setFieldValue('supplierId', val);
+  formApi.setFieldValue('supplierName', supplierName || undefined);
   setTimeout(() => {
-    formApi.validateField('supplierName');
+    formApi.validateField('supplierId');
   }, 200);
 }
 
@@ -254,7 +261,7 @@ watch(
       const isMachined = newVal === '机加成品件';
       formApi.updateSchema([
         {
-          fieldName: 'supplierName',
+          fieldName: 'supplierId',
           componentProps: {
             category: isMachined ? 'Outsourcing' : 'Supplier',
             placeholder: isMachined ? '请选择外协单位' : '请选择供应商',
@@ -268,6 +275,7 @@ watch(
 
       // Clear value if type changes and it's not the initial load (optimization)
       if (newVal !== oldVal && oldVal !== undefined) {
+        formApi.setFieldValue('supplierId', undefined);
         formApi.setFieldValue('supplierName', undefined);
       }
     }
@@ -308,6 +316,7 @@ watch(
       rootCause: '',
       solution: '',
       status: 'OPEN',
+      supplierId: String(activeValues.value.supplierId || ''),
       supplierName: String(activeValues.value.supplierName || ''),
       photos: [],
       unqualifiedQuantity: 0,
@@ -352,6 +361,7 @@ defineExpose({
               props.type,
               activeValues.value,
             ),
+            supplierId: String(activeValues.value.supplierId || '').trim(),
             supplierName: String(activeValues.value.supplierName || '').trim(),
             reportDate: String(activeValues.value.inspectionDate || '')
               .trim()
@@ -434,8 +444,13 @@ defineExpose({
     </template>
 
     <!-- Slot for SupplierSelect -->
-    <template #supplierName="slotProps">
-      <SupplierSelect v-bind="slotProps" @change="handleSupplierChange" />
+    <template #supplierId="slotProps">
+      <SupplierSelect
+        v-bind="slotProps"
+        :legacy-name="String(activeValues.supplierName || '')"
+        value-mode="id"
+        @change="handleSupplierChange"
+      />
     </template>
 
     <!-- Slot for BomItemSelect -->

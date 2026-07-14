@@ -78,7 +78,7 @@ export const getFormSchema = (
         },
       },
       {
-        fieldName: 'supplierName',
+        fieldName: 'supplierId',
         label: '单位',
         component: 'SupplierSelect',
         rules: 'required',
