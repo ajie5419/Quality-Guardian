@@ -51,6 +51,7 @@ model inspections {
   inspectionRequestLinks qms_inspection_request_inspections[]
   process                processes?                           @relation(fields: [processId], references: [id], onDelete: SetNull)
   qualityRecords         quality_records[]
+  supplier               suppliers?                           @relation("inspections_supplier", fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   work_order             work_orders                          @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([workOrderNumber])
@@ -569,6 +570,7 @@ model quality_records {
   users_quality_records_lastEditorTousers users?                      @relation("quality_records_lastEditorTousers", fields: [lastEditor], references: [username])
   inspection                              inspections?                @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
   process                                 processes?                  @relation(fields: [processId], references: [id], onDelete: SetNull)
+  supplier                                suppliers?                  @relation("quality_records_supplier", fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   work_orders                             work_orders?                @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([createdAt])
@@ -983,6 +985,9 @@ model suppliers {
   rating             String                    @default("A")
   status             String                    @default("Qualified")
   scoreSnapshot      supplier_score_snapshots?
+  identityLinks      supplier_identity_links[]
+  inspections        inspections[]             @relation("inspections_supplier")
+  qualityRecords     quality_records[]         @relation("quality_records_supplier")
 
   @@index([status])
   @@index([nameId])
@@ -991,6 +996,46 @@ model suppliers {
   @@index([projectId])
   @@index([buyer])
   @@index([recognizedAt])
+}
+
+// @module supplier
+model supplier_identity_links {
+  id                   String                 @id @default(cuid())
+  supplierId           String
+  identityType         supplier_identity_type
+  identityId           String
+  identityNameSnapshot String
+  isDeleted            Boolean                @default(false)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  supplier             suppliers              @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([identityType, identityId])
+  @@index([supplierId, identityType, isDeleted])
+  @@index([identityNameSnapshot])
+}
+
+// @module supplier-identity
+model unresolved_master_data_refs {
+  id             String                        @id @default(cuid())
+  entityType     String
+  entityId       String
+  fieldName      String
+  rawId          String?
+  rawName        String?
+  reason         String
+  evidence       Json?
+  status         master_data_resolution_status @default(OPEN)
+  resolvedId     String?
+  resolutionNote String?                       @db.Text
+  firstSeenAt    DateTime                      @default(now())
+  lastSeenAt     DateTime                      @updatedAt
+  resolvedAt     DateTime?
+  isDeleted      Boolean                       @default(false)
+
+  @@unique([entityType, entityId, fieldName])
+  @@index([status, isDeleted])
+  @@index([entityType, fieldName])
 }
 
 model supplier_score_snapshots {
@@ -1567,6 +1612,16 @@ enum inspection_category {
   INCOMING
   PROCESS
   SHIPMENT
+}
+
+enum supplier_identity_type {
+  TEAM
+}
+
+enum master_data_resolution_status {
+  OPEN
+  RESOLVED
+  IGNORED
 }
 
 enum inspection_result {
