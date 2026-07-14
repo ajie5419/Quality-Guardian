@@ -10,6 +10,7 @@ vi.mock('~/utils/prisma', () => ({
     },
     inspections: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -97,6 +98,7 @@ const mockRequest = {
   requestNo: 'REQ-001',
   status: 'PENDING',
   team: 'Resident Team',
+  teamId: 'team-1',
   workOrderNumber: 'WO-1',
   workOrders: [],
   work_order: { projectName: 'Project A' },
@@ -107,6 +109,14 @@ const mockUserInfo = { id: 'user-1', username: 'admin' } as any;
 describe('inspectionRequestCloseService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.inspections.findMany).mockResolvedValue([
+      {
+        supplierId: 'supplier-1',
+        supplierName: 'Resident Team',
+        team: 'Resident Team',
+        teamId: 'team-1',
+      },
+    ] as never);
   });
 
   it('should close request with PASS result', async () => {
@@ -148,7 +158,9 @@ describe('inspectionRequestCloseService', () => {
     expect(prisma.qms_inspection_requests.findFirst).toHaveBeenCalled();
     expect(prisma.$transaction).toHaveBeenCalled();
     expect(eventEmit).toHaveBeenCalledWith('inspection_record.changed', {
+      supplierIds: ['supplier-1'],
       supplierNames: ['Resident Team'],
+      teamIds: ['team-1'],
       teamNames: ['Resident Team'],
     });
     const { syncCloseAttachments } = await import(

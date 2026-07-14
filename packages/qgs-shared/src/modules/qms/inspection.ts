@@ -31,6 +31,7 @@ export interface InspectionIssue {
   severity: 'Critical' | 'Major' | 'Minor';
   solution: string; // 解决方案
   status: 'Closed' | 'Open' | 'Resolved' | InspectionIssueStatusEnum;
+  supplierId?: null | string; // Canonical supplier reference
   supplierName?: string; // 供应商名称
   title: string;
   updatedAt: string; // 最后编辑时间

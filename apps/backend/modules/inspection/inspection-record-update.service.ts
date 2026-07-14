@@ -3,6 +3,7 @@ import type { inspection_result } from '@prisma/client';
 import type { InspectionRecordInput } from './inspection-record-types';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { eventBus } from '~/utils/event-bus';
 import {
   buildGovernedCanonicalWritePairForTable,
@@ -60,7 +61,9 @@ export const InspectionRecordUpdateService = {
           processId: true,
           processName: true,
           supplierName: true,
+          supplierId: true,
           team: true,
+          teamId: true,
           templateId: true,
           templateName: true,
           workOrderNumber: true,
@@ -83,6 +86,24 @@ export const InspectionRecordUpdateService = {
         keepExistingWhenNameMissing: true,
         team: inputTeam, // governance-allow-direct-name-id
       });
+      const governedSupplierId =
+        typeof governedCanonicalIds.supplierId === 'string'
+          ? governedCanonicalIds.supplierId
+          : data.supplierId;
+      const supplierIdForResolution =
+        governedSupplierId === undefined && data.supplierName === undefined
+          ? previousInspection?.supplierId
+          : governedSupplierId;
+      const teamIdForResolution =
+        resolvedTeamId === undefined
+          ? previousInspection?.teamId
+          : resolvedTeamId;
+      const supplierIdentity =
+        await SupplierIdentityService.resolveSupplierForInspection({
+          category: data.category || previousInspection?.category || 'PROCESS',
+          supplierId: supplierIdForResolution,
+          teamId: teamIdForResolution,
+        });
       const templateProcessId =
         resolvedProcessId === undefined
           ? (previousInspection?.processId ?? undefined)
@@ -116,6 +137,8 @@ export const InspectionRecordUpdateService = {
           level2Component: data.level2Component,
           ...governedFields,
           ...governedCanonicalIds,
+          supplierId: supplierIdentity?.id ?? null,
+          supplierName: supplierIdentity?.name ?? null,
           documents: data.documents,
           hasDocuments: data.hasDocuments,
           selfCheckDocuments: data.selfCheckDocuments,
@@ -228,10 +251,15 @@ export const InspectionRecordUpdateService = {
       return { inspection, previousInspection };
     });
     eventBus.emit('inspection_record.changed', {
+      supplierIds: [
+        result.previousInspection?.supplierId,
+        result.inspection.supplierId,
+      ],
       supplierNames: [
         result.previousInspection?.supplierName,
         result.inspection.supplierName,
       ],
+      teamIds: [result.previousInspection?.teamId, result.inspection.teamId],
       teamNames: [result.previousInspection?.team, result.inspection.team],
     });
     return result.inspection;

@@ -282,7 +282,6 @@ describe('inspectionRecordQueryService', () => {
         category: 'INCOMING',
         identitySource: 'supplier',
         supplierId: 'supplier-1',
-        supplierName: 'Supplier A',
       });
 
       expect(prisma.inspections.findMany).toHaveBeenCalledWith(
@@ -290,14 +289,14 @@ describe('inspectionRecordQueryService', () => {
           where: {
             category: 'INCOMING',
             isDeleted: false,
-            OR: [{ supplierId: 'supplier-1' }, { supplierName: 'Supplier A' }],
+            supplierId: 'supplier-1',
           },
         }),
       );
       expect(result.items[0].partName).toBe('Gear');
     });
 
-    it('reads process records by team fallback and maps level-one component', async () => {
+    it('reads process records by mapped TEAM IDs and maps level-one component', async () => {
       (prisma.inspections.findMany as any).mockResolvedValue([
         {
           ...baseInspection,
@@ -312,8 +311,7 @@ describe('inspectionRecordQueryService', () => {
         category: 'PROCESS',
         identitySource: 'team',
         supplierId: 'supplier-1',
-        supplierName: 'Resident Team',
-        teamNameId: 'team-1',
+        teamIds: ['team-1'],
       });
 
       expect(prisma.inspections.findMany).toHaveBeenCalledWith(
@@ -321,11 +319,23 @@ describe('inspectionRecordQueryService', () => {
           where: {
             category: 'PROCESS',
             isDeleted: false,
-            OR: [{ team: 'Resident Team' }, { teamId: 'team-1' }],
+            teamId: { in: ['team-1'] },
           },
         }),
       );
       expect(result.items[0].partName).toBe('Main Beam');
+    });
+
+    it('returns no process history when no TEAM mapping exists', async () => {
+      await expect(
+        InspectionRecordQueryService.findSupplierHistory({
+          category: 'PROCESS',
+          identitySource: 'team',
+          supplierId: 'supplier-1',
+          teamIds: [],
+        }),
+      ).resolves.toEqual({ items: [], total: 0 });
+      expect(prisma.inspections.findMany).not.toHaveBeenCalled();
     });
   });
 });

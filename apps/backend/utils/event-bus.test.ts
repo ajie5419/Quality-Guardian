@@ -1,9 +1,21 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { eventBus } from '~/utils/event-bus';
 
+const { mockLoggerWarn } = vi.hoisted(() => ({
+  mockLoggerWarn: vi.fn(),
+}));
+
+vi.mock('~/utils/logger', () => ({
+  createModuleLogger: () => ({ warn: mockLoggerWarn }),
+}));
+
 describe('eventBus', () => {
-  it('emits payload to subscribed handlers', async () => {
+  beforeEach(() => {
     eventBus.reset();
+    vi.clearAllMocks();
+  });
+
+  it('emits payload to subscribed handlers', async () => {
     const handler = vi.fn();
     eventBus.on('after_sales.changed', handler);
 
@@ -14,7 +26,6 @@ describe('eventBus', () => {
   });
 
   it('isolates handler errors from the emitter', async () => {
-    eventBus.reset();
     eventBus.on('after_sales.changed', () => {
       throw new Error('handler boom');
     });
@@ -29,12 +40,20 @@ describe('eventBus', () => {
   });
 
   it('routes async rejection to the bus logger without unhandled rejection', async () => {
-    eventBus.reset();
     eventBus.on('after_sales.changed', async () => {
       throw new Error('async boom');
     });
 
     eventBus.emit('after_sales.changed', { supplierBrands: ['X'] });
     await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mockLoggerWarn).toHaveBeenCalledOnce();
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      {
+        err: expect.objectContaining({ message: 'async boom' }),
+        event: 'after_sales.changed',
+      },
+      'event listener handler failed',
+    );
   });
 });

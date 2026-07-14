@@ -6,6 +6,7 @@ import type {
 } from './inspection-record-types';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { eventBus } from '~/utils/event-bus';
 import {
   buildGovernedCanonicalWritePairForTable,
@@ -105,6 +106,16 @@ export const InspectionRecordCreateService = {
               'inspections',
               governedFields as Record<string, unknown>,
             );
+          const governedSupplierId =
+            typeof governedCanonicalIds.supplierId === 'string'
+              ? governedCanonicalIds.supplierId
+              : data.supplierId;
+          const supplierIdentity =
+            await SupplierIdentityService.resolveSupplierForInspection({
+              category: data.category,
+              supplierId: governedSupplierId,
+              teamId: resolvedTeamId,
+            });
           const templateBinding = await resolveInspectionTemplateBinding(
             tx,
             data,
@@ -122,6 +133,8 @@ export const InspectionRecordCreateService = {
               level2Component: data.level2Component,
               ...governedFields,
               ...governedCanonicalIds,
+              supplierId: supplierIdentity?.id ?? null,
+              supplierName: supplierIdentity?.name ?? null,
               documents: data.documents,
               hasDocuments:
                 data.hasDocuments === undefined ? true : data.hasDocuments,
@@ -206,7 +219,9 @@ export const InspectionRecordCreateService = {
         // must publish after commit so snapshots never observe rolled-back data.
         if (!client) {
           eventBus.emit('inspection_record.changed', {
+            supplierIds: [inspection.supplierId],
             supplierNames: [inspection.supplierName],
+            teamIds: [inspection.teamId],
             teamNames: [inspection.team],
           });
         }

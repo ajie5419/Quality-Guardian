@@ -11,11 +11,10 @@ export const InspectionReportingService = {
     });
     return row?.id || null;
   },
-
   async updateQualityLossFields(params: { actualClaim?: number; id: string }) {
     const current = await prisma.quality_records.findUnique({
       where: { id: params.id },
-      select: { supplierName: true },
+      select: { supplierId: true, supplierName: true },
     });
     const updated = await prisma.quality_records.update({
       where: { id: params.id },
@@ -26,6 +25,7 @@ export const InspectionReportingService = {
     });
     await QualityLossIndexService.upsertFromInternal(updated);
     eventBus.emit('inspection_issue.changed', {
+      supplierIds: [current?.supplierId],
       supplierNames: [current?.supplierName],
     });
   },

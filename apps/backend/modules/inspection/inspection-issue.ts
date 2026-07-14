@@ -30,6 +30,8 @@ import {
 import prisma from '~/utils/prisma';
 import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 
+import { resolveIssueSupplierBody } from './inspection-issue-supplier';
+
 export function buildInspectionIssueDateRange(params: {
   dateMode?: InspectionIssueDateMode;
   dateValue?: string;
@@ -147,8 +149,13 @@ export async function buildInspectionIssueCreateData(
     serialNumber: number;
   },
 ) {
-  const createData = buildInspectionIssueCreateDataCore({
+  const supplierBody = await resolveIssueSupplierBody(
     body,
+    options.inspection,
+    true,
+  );
+  const createData = buildInspectionIssueCreateDataCore({
+    body: supplierBody,
     createdBy: options.createdBy,
     inspection: options.inspection,
     inspectorUsername: options.inspectorUsername,
@@ -221,16 +228,26 @@ async function attachProcessIdToIssueCreateData(
     'quality_records',
     createData as Record<string, unknown>,
   );
-  const { processId: _ignoredProcessId, ...governedCanonicalIds } =
-    governedCanonicalIdsRaw;
+  const {
+    processId: _ignoredProcessId,
+    supplierId: governedSupplierId,
+    ...governedCanonicalIds
+  } = governedCanonicalIdsRaw;
   const governedFields = buildGovernedWriteFieldsForTable(
     'quality_records',
     createData as Record<string, unknown>,
   );
+  const rawCreateData = createData as Record<string, unknown>;
+  const supplierId = normalizeOptionalInspectionIssueString(
+    governedSupplierId || rawCreateData.supplierId,
+  );
+  const { supplierId: _ignoredSupplierId, ...createDataWithoutSupplierId } =
+    rawCreateData;
   const normalizedCreateData = {
-    ...createData,
+    ...createDataWithoutSupplierId,
     ...governedFields,
     ...governedCanonicalIds,
+    ...(supplierId ? { supplier: { connect: { id: supplierId } } } : {}),
   } as Prisma.quality_recordsCreateInput;
   if (!processId) {
     return normalizedCreateData;
@@ -255,16 +272,34 @@ async function attachProcessIdToIssueUpdateData(
     'quality_records',
     workOrderUpdateData as Record<string, unknown>,
   );
-  const { processId: _ignoredProcessId, ...governedCanonicalIds } =
-    governedCanonicalIdsRaw;
+  const {
+    processId: _ignoredProcessId,
+    supplierId: governedSupplierId,
+    ...governedCanonicalIds
+  } = governedCanonicalIdsRaw;
   const governedFields = buildGovernedWriteFieldsForTable(
     'quality_records',
     workOrderUpdateData as Record<string, unknown>,
   );
+  const rawUpdateData = workOrderUpdateData as Record<string, unknown>;
+  const supplierId = normalizeOptionalInspectionIssueString(
+    governedSupplierId || rawUpdateData.supplierId,
+  );
+  const { supplierId: _ignoredSupplierId, ...updateDataWithoutSupplierId } =
+    rawUpdateData;
+  const hasSupplierInput =
+    body.supplierId !== undefined || body.supplierName !== undefined;
   const normalizedUpdateData = {
-    ...workOrderUpdateData,
+    ...updateDataWithoutSupplierId,
     ...governedFields,
     ...governedCanonicalIds,
+    ...(hasSupplierInput
+      ? {
+          supplier: supplierId
+            ? { connect: { id: supplierId } }
+            : { disconnect: true },
+        }
+      : {}),
     ...(workOrderNumber === undefined
       ? {}
       : {
@@ -343,15 +378,21 @@ function normalizeInspectorRelationForIssueUpdate(
 export async function buildInspectionIssueUpdateData(
   body: Record<string, unknown>,
   existingNcNumber: null | string,
+  inspection?: null | {
+    category: string;
+    supplierId?: null | string;
+    teamId?: null | string;
+  },
 ) {
+  const supplierBody = await resolveIssueSupplierBody(body, inspection, false);
   const updateData = buildInspectionIssueUpdateDataCore(
-    body,
+    supplierBody,
     existingNcNumber,
     (value) => toQualityRecordStatus(value),
   ) as Prisma.quality_recordsUpdateInput;
   const withRelations = await attachProcessIdToIssueUpdateData(
-    body,
-    attachResponsibleDepartmentsToIssueUpdateData(body, updateData),
+    supplierBody,
+    attachResponsibleDepartmentsToIssueUpdateData(supplierBody, updateData),
   );
   return normalizeInspectorRelationForIssueUpdate(withRelations);
 }

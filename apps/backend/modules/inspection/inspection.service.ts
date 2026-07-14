@@ -12,6 +12,7 @@ export const InspectionService = {
   deleteRecord: InspectionIssueService.deleteRecord,
   determineItemResult: InspectionCoreService.determineItemResult,
   findAll: InspectionCoreService.findAll,
+  findSupplierIssues: InspectionCoreService.findSupplierIssues,
   findSupplierHistory: InspectionCoreService.findSupplierHistory,
   findById: InspectionTemplateService.findById,
   findIssueIdBySerialNumber: InspectionCoreService.findIssueIdBySerialNumber,

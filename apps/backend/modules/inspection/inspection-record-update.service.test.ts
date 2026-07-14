@@ -27,6 +27,14 @@ vi.mock('~/utils/team-resolver', () => ({
   resolveTeamIdForWrite: vi.fn().mockResolvedValue('team-1'),
 }));
 
+vi.mock('~/modules/supplier-identity', () => ({
+  SupplierIdentityService: {
+    resolveSupplierForInspection: vi
+      .fn()
+      .mockResolvedValue({ id: 'supplier-2', name: 'Supplier B' }),
+  },
+}));
+
 vi.mock('~/modules/file-storage/file-storage.service', () => ({
   FileStorageService: {
     registerReferencesFromAttachments: vi.fn(),
@@ -75,8 +83,10 @@ describe('inspectionRecordUpdateService', () => {
       processId: 'process-1',
       processName: 'Welding',
       documents: null,
+      supplierId: 'supplier-2',
       supplierName: 'Supplier B',
       team: 'Team B',
+      teamId: 'team-2',
       workOrderNumber: 'WO-1',
     };
     const txInspectionsUpdate = vi.fn().mockResolvedValue(mockInspection);
@@ -89,7 +99,9 @@ describe('inspectionRecordUpdateService', () => {
             processId: 'process-old',
             processName: 'Old',
             supplierName: 'Supplier A',
+            supplierId: 'supplier-1',
             team: 'Team A',
+            teamId: 'team-1',
             templateId: null,
             templateName: null,
             workOrderNumber: 'WO-1',
@@ -118,7 +130,9 @@ describe('inspectionRecordUpdateService', () => {
     expect(prisma.$transaction).toHaveBeenCalled();
     expect(result).toEqual(mockInspection);
     expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
+      supplierIds: ['supplier-1', 'supplier-2'],
       supplierNames: ['Supplier A', 'Supplier B'],
+      teamIds: ['team-1', 'team-2'],
       teamNames: ['Team A', 'Team B'],
     });
   });

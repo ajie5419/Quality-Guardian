@@ -162,6 +162,54 @@ export const InspectionIssueListService = {
     return issue ? mapInspectionIssueRecord(issue) : null;
   },
 
+  async findSupplierIssues(params: {
+    category: 'INCOMING' | 'PROCESS';
+    page?: number;
+    pageSize?: number;
+    supplierId: string;
+    teamIds?: string[];
+  }): Promise<{ items: InspectionIssue[]; total: number }> {
+    if (params.category === 'PROCESS' && !params.teamIds?.length) {
+      return { items: [], total: 0 };
+    }
+    const inspectionIdentity: Prisma.inspectionsWhereInput =
+      params.category === 'PROCESS'
+        ? {
+            category: 'PROCESS',
+            isDeleted: false,
+            teamId: { in: params.teamIds },
+          }
+        : {
+            category: 'INCOMING',
+            isDeleted: false,
+            supplierId: params.supplierId,
+          };
+    const where: Prisma.quality_recordsWhereInput = {
+      isDeleted: false,
+      OR: [
+        { supplierId: params.supplierId },
+        { inspection: { is: inspectionIdentity } },
+      ],
+    };
+    const page = Math.max(Number(params.page) || 1, 1);
+    const pageSize = Math.min(Math.max(Number(params.pageSize) || 20, 1), 100);
+    const [total, issues] = await Promise.all([
+      prisma.quality_records.count({ where }),
+      prisma.quality_records.findMany({
+        where,
+        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: inspectionIssueInclude,
+      }),
+    ]);
+
+    return {
+      items: issues.map((issue) => mapInspectionIssueRecord(issue)),
+      total,
+    };
+  },
+
   async getIssues(params: {
     dateMode?: InspectionIssueDateMode;
     dateValue?: string;

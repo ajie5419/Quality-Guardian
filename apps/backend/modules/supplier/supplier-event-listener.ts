@@ -1,3 +1,4 @@
+import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { eventBus } from '~/utils/event-bus';
 import { createModuleLogger } from '~/utils/logger';
 
@@ -14,8 +15,13 @@ function uniqueNonEmpty(values: Array<null | string | undefined>): string[] {
   return [...set];
 }
 
-async function refresh(supplierNames: string[]) {
-  if (supplierNames.length === 0) return;
+async function refresh(params: {
+  supplierIds?: string[];
+  supplierNames?: string[];
+}) {
+  const supplierIds = params.supplierIds || [];
+  const supplierNames = params.supplierNames || [];
+  if (supplierIds.length === 0 && supplierNames.length === 0) return;
   try {
     // Dynamic import keeps supplier-event-listener.ts free of the
     // supplier-score-snapshot ↔ inspection circular dependency at module
@@ -23,13 +29,31 @@ async function refresh(supplierNames: string[]) {
     const { SupplierScoreSnapshotService } = await import(
       './supplier-score-snapshot.service'
     );
-    await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
+    if (supplierIds.length > 0) {
+      await SupplierScoreSnapshotService.refreshBySupplierIds(supplierIds);
+    }
+    if (supplierNames.length > 0) {
+      await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
+    }
   } catch (error) {
     logger.warn(
-      { err: error, count: supplierNames.length },
+      {
+        err: error,
+        supplierIdCount: supplierIds.length,
+        supplierNameCount: supplierNames.length,
+      },
       'supplier score refresh from event listener failed',
     );
   }
+}
+
+async function resolveTeamSupplierIds(teamIds: string[]) {
+  const suppliers = await Promise.all(
+    teamIds.map((teamId) =>
+      SupplierIdentityService.resolveSupplierByTeamId(teamId),
+    ),
+  );
+  return uniqueNonEmpty(suppliers.map((supplier) => supplier?.id));
 }
 
 /**
@@ -42,16 +66,26 @@ export function registerSupplierEventListeners(): void {
   registered = true;
 
   eventBus.on('after_sales.changed', async (payload) => {
-    await refresh(uniqueNonEmpty(payload.supplierBrands));
+    await refresh({ supplierNames: uniqueNonEmpty(payload.supplierBrands) });
   });
 
   eventBus.on('inspection_issue.changed', async (payload) => {
-    await refresh(uniqueNonEmpty(payload.supplierNames));
+    await refresh({
+      supplierIds: uniqueNonEmpty(payload.supplierIds || []),
+      supplierNames: uniqueNonEmpty(payload.supplierNames),
+    });
   });
 
   eventBus.on('inspection_record.changed', async (payload) => {
-    await refresh(
-      uniqueNonEmpty([...payload.supplierNames, ...payload.teamNames]),
+    const teamSupplierIds = await resolveTeamSupplierIds(
+      uniqueNonEmpty(payload.teamIds || []),
     );
+    await refresh({
+      supplierIds: uniqueNonEmpty([
+        ...(payload.supplierIds || []),
+        ...teamSupplierIds,
+      ]),
+      supplierNames: uniqueNonEmpty(payload.supplierNames),
+    });
   });
 }
