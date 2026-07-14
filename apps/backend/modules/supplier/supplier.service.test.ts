@@ -661,7 +661,7 @@ describe('supplierService standard scoring samples', () => {
             scoreSnapshot: {
               is: {
                 scoringModel: {
-                  notIn: ['IN_HOUSE_OUTSOURCING_V2', 'SUPPLIER_V2'],
+                  notIn: ['IN_HOUSE_OUTSOURCING_V3', 'SUPPLIER_V3'],
                 },
               },
             },
@@ -905,18 +905,24 @@ describe('supplierService admission fields', () => {
       id: 'supplier-1',
       outsourcingMode: null,
     });
-    (InspectionService.getSupplierHistoryProjects as any).mockResolvedValue([
-      { workOrderNumber: 'WO-1', projectName: 'Project A' },
-    ]);
+    (InspectionService.getSupplierHistoryProjects as any).mockResolvedValue({
+      items: [{ workOrderNumber: 'WO-1', projectName: 'Project A' }],
+      total: 1,
+    });
 
-    const result = await SupplierService.getHistoryProjects('supplier-1');
+    const result = await SupplierService.getHistoryProjects('supplier-1', {
+      page: 2,
+      pageSize: 5,
+    });
 
-    expect(result).toEqual([
-      { workOrderNumber: 'WO-1', projectName: 'Project A' },
-    ]);
+    expect(result).toEqual({
+      items: [{ workOrderNumber: 'WO-1', projectName: 'Project A' }],
+      total: 1,
+    });
     expect(InspectionService.getSupplierHistoryProjects).toHaveBeenCalledWith({
-      category: 'INCOMING',
       identitySource: 'supplier',
+      page: 2,
+      pageSize: 5,
       supplierId: 'supplier-1',
       teamIds: [],
     });
@@ -936,8 +942,9 @@ describe('supplierService admission fields', () => {
     await SupplierService.getHistoryProjects('supplier-1');
 
     expect(InspectionService.getSupplierHistoryProjects).toHaveBeenCalledWith({
-      category: 'PROCESS',
       identitySource: 'team',
+      page: undefined,
+      pageSize: undefined,
       supplierId: 'supplier-1',
       teamIds: ['team-1'],
     });
@@ -978,10 +985,7 @@ describe('supplierService admission fields', () => {
     });
   });
 
-  it('loads quality issues through mapped TEAM IDs', async () => {
-    vi.mocked(SupplierIdentityService.teamIdsForSupplier).mockResolvedValue([
-      'team-1',
-    ]);
+  it('loads quality issues by canonical supplier ID', async () => {
     vi.mocked(prisma.suppliers.findFirst).mockResolvedValue({
       category: 'Outsourcing',
       id: 'supplier-1',
@@ -997,11 +1001,9 @@ describe('supplierService admission fields', () => {
       SupplierService.getQualityIssues('supplier-1', { page: 1, pageSize: 5 }),
     ).resolves.toEqual({ items: [{ id: 'issue-1' }], total: 1 });
     expect(InspectionService.findSupplierIssues).toHaveBeenCalledWith({
-      category: 'PROCESS',
       page: 1,
       pageSize: 5,
       supplierId: 'supplier-1',
-      teamIds: ['team-1'],
     });
   });
 });

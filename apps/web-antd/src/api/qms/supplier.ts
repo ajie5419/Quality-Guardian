@@ -62,10 +62,14 @@ export interface SupplierHistoryProjectItem {
   workOrderNumber: string;
 }
 
-export async function getSupplierHistoryProjects(id: string) {
-  return requestClient.get<{ items: SupplierHistoryProjectItem[] }>(
-    `${QMS_API.SUPPLIER}/${id}/history-projects`,
-  );
+export async function getSupplierHistoryProjects(
+  id: string,
+  params: { page: number; pageSize: number },
+) {
+  return requestClient.get<{
+    items: SupplierHistoryProjectItem[];
+    total: number;
+  }>(`${QMS_API.SUPPLIER}/${id}/history-projects`, { params });
 }
 
 export type SupplierInspectionHistorySource = 'INCOMING' | 'PROCESS';

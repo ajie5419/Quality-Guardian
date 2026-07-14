@@ -198,7 +198,7 @@ describe('supplierScoreSnapshotService openEngineeringCount open-status definiti
     const data = (prisma.supplier_score_snapshots.upsert as any).mock
       .calls[0][0].create;
     expect(data.incomingQualifiedRate).toBe(0);
-    expect(data.scoringModel).toBe('SUPPLIER_V2');
+    expect(data.scoringModel).toBe('SUPPLIER_V3');
   });
 
   it('excludes NA batches and keeps conditional batches in the denominator', async () => {
@@ -234,6 +234,7 @@ describe('supplierScoreSnapshotService openEngineeringCount open-status definiti
     expect(data.incomingBatchCount).toBe(1);
     expect(data.incomingTotalQuantity).toBe(2);
     expect(data.incomingQualifiedRate).toBe(0);
+    expect(data.incomingScore).toBe(97);
   });
 
   it('uses process team inspections for in-house outsourcing', async () => {

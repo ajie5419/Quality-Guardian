@@ -22,6 +22,7 @@ import {
 
 import { buildInspectionIssueDateRange } from './inspection-issue';
 import { applyInspectionIssueReadOwnership } from './inspection-issue-access.service';
+import { buildSupplierEngineeringIssueWhere } from './inspection-supplier-profile';
 
 type QualityRecordOrderField = keyof Pick<
   Prisma.quality_recordsOrderByWithRelationInput,
@@ -163,34 +164,13 @@ export const InspectionIssueListService = {
   },
 
   async findSupplierIssues(params: {
-    category: 'INCOMING' | 'PROCESS';
     page?: number;
     pageSize?: number;
     supplierId: string;
-    teamIds?: string[];
   }): Promise<{ items: InspectionIssue[]; total: number }> {
-    if (params.category === 'PROCESS' && !params.teamIds?.length) {
-      return { items: [], total: 0 };
-    }
-    const inspectionIdentity: Prisma.inspectionsWhereInput =
-      params.category === 'PROCESS'
-        ? {
-            category: 'PROCESS',
-            isDeleted: false,
-            teamId: { in: params.teamIds },
-          }
-        : {
-            category: 'INCOMING',
-            isDeleted: false,
-            supplierId: params.supplierId,
-          };
-    const where: Prisma.quality_recordsWhereInput = {
-      isDeleted: false,
-      OR: [
-        { supplierId: params.supplierId },
-        { inspection: { is: inspectionIdentity } },
-      ],
-    };
+    const where = buildSupplierEngineeringIssueWhere({
+      supplierIds: [params.supplierId],
+    });
     const page = Math.max(Number(params.page) || 1, 1);
     const pageSize = Math.min(Math.max(Number(params.pageSize) || 20, 1), 100);
     const [total, issues] = await Promise.all([

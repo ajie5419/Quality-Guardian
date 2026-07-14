@@ -25,6 +25,32 @@
 
 ## 执行记录
 
+### 2026-07-14 修复：供应商画像历史项目与质量数据源契约
+
+**执行内容：**
+
+- 历史使用项目不再依赖已生成的检验记录，直接按报检任务自身的 `supplierId/teamId` 聚合；合并主工单与多工单明细，按工单去重并改为服务端分页，消除未检验任务、多工单和静默截断 50 条造成的漏数。
+- 进货合格率统一读取最近 12 个月规范检验批次：非 `NA` 批次进入分母，只有 `PASS` 进入分子，`FAIL` 和 `CONDITIONAL` 均按失败批次处理。
+- 工程问题列表、全历史数量和最近 12 个月评分统一按 `quality_records.supplierId` 归属；移除 PROCESS 类型缺少 TEAM 映射时直接返回空的错误分支，使已具备规范供应商 ID 的手工工程问题正常进入画像。
+- 增强生产身份回填：历史无效供应商 ID 可通过关联检验证据或唯一精确供应商名称修复；模糊、重名和冲突记录继续写入 unresolved 审计，不恢复在线名称回退。
+- 快照模型升级为 `SUPPLIER_V3` / `IN_HOUSE_OUTSOURCING_V3`，部署后自动重算旧快照，避免旧口径缓存继续展示。
+- 更新 inspection、supplier 架构边界和主数据身份治理文档；修复全仓 ESLint 配置回归测试的易超时问题。
+
+**验证结果：**
+
+- 定向测试：98/98 个用例通过。
+- 全量测试：289/289 个文件、2474/2474 个用例通过。
+- lint：通过；typecheck：前后端及全工作区通过。
+- `check:qms-arch`、`check:qms-arch:all`、`check:prisma-migration`：全部通过。
+- `git diff --check`：通过。
+- 前端 dev/build：未运行；遵循仓库约束，通过组件测试、类型检查和 lint 验证。
+
+**commit:** `c6ef0749` fix(project): correct supplier profile source contracts
+
+**遗留问题：**
+
+- 功能尚待 PR、release-please 补丁版本和生产 deploy 完整链路发布；发布后需在生产业务页面核对秦皇岛吉兴机械制造有限公司的 7 月 8 日工程问题、手工登记问题、进货合格率和完整历史项目。
+
 ## [0.17.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.16.0...qgs-v0.17.0) (2026-07-14)
 
 

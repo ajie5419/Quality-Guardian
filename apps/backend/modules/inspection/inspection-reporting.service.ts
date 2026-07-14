@@ -3,6 +3,8 @@ import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-ind
 import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
+import { buildSupplierEngineeringIssueWhere } from './inspection-supplier-profile';
+
 export const InspectionReportingService = {
   async findIssueIdBySerialNumber(serialNumber: number) {
     const row = await prisma.quality_records.findFirst({
@@ -148,6 +150,13 @@ export const InspectionReportingService = {
     processTeamIds: string[];
     since: Date;
   }) {
+    const recentEngineeringWhere = buildSupplierEngineeringIssueWhere({
+      since: params.since,
+      supplierIds: params.engineeringSupplierIds,
+    });
+    const allEngineeringWhere = buildSupplierEngineeringIssueWhere({
+      supplierIds: params.engineeringSupplierIds,
+    });
     const inspectionSourceOr: Prisma.inspectionsWhereInput[] = [];
     if (params.incomingSupplierIds.length > 0) {
       inspectionSourceOr.push({
@@ -188,29 +197,17 @@ export const InspectionReportingService = {
       }),
       prisma.quality_records.groupBy({
         by: ['supplierId', 'supplierName'],
-        where: {
-          isDeleted: false,
-          date: { gte: params.since },
-          supplierId: { in: params.engineeringSupplierIds },
-        },
+        where: recentEngineeringWhere,
         _sum: { lossAmount: true, quantity: true },
         _count: { id: true },
       }),
       prisma.quality_records.groupBy({
         by: ['supplierId', 'supplierName', 'status'],
-        where: {
-          isDeleted: false,
-          date: { gte: params.since },
-          supplierId: { in: params.engineeringSupplierIds },
-        },
+        where: recentEngineeringWhere,
         _count: { id: true },
       }),
       prisma.quality_records.findMany({
-        where: {
-          isDeleted: false,
-          date: { gte: params.since },
-          supplierId: { in: params.engineeringSupplierIds },
-        },
+        where: recentEngineeringWhere,
         select: {
           supplierId: true,
           supplierName: true,
@@ -222,10 +219,7 @@ export const InspectionReportingService = {
       }),
       prisma.quality_records.groupBy({
         by: ['supplierId', 'supplierName'],
-        where: {
-          isDeleted: false,
-          supplierId: { in: params.engineeringSupplierIds },
-        },
+        where: allEngineeringWhere,
         _count: { id: true },
       }),
     ]);

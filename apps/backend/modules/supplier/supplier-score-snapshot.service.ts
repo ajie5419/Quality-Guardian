@@ -28,8 +28,8 @@ type SupplierSnapshotInput = Pick<
 
 const SUPPLIER_SNAPSHOT_CHUNK_SIZE = 50;
 const CURRENT_SCORING_MODELS = [
-  'IN_HOUSE_OUTSOURCING_V2',
-  'SUPPLIER_V2',
+  'IN_HOUSE_OUTSOURCING_V3',
+  'SUPPLIER_V3',
 ] as const;
 
 interface SupplierScoreRefreshOptions {
@@ -122,7 +122,7 @@ async function buildSupplierStatsMap(suppliers: SupplierSnapshotInput[]) {
     current.quantity += s._sum.quantity || 0;
     if (s.result === 'PASS') {
       current.qualifiedCount += s._count.id;
-    } else if (s.result === 'FAIL') {
+    } else {
       current.failures += s._count.id;
       current.failuresQuantity += s._sum.quantity || 0;
     }
@@ -276,7 +276,7 @@ function toSnapshotData(
     finalRating: String(scored.level || scored.rating || 'A'),
     finalStatus: String(scored.status || 'Qualified'),
     isWarning: Boolean(scored.isWarning),
-    scoringModel: `${String(scored.scoringModel || 'SUPPLIER')}_V2`,
+    scoringModel: `${String(scored.scoringModel || 'SUPPLIER')}_V3`,
     stabilityScore: Number(scored.stabilityScore ?? 100),
     warningReasons: scored.warningReasons,
     calculatedAt: new Date(),
