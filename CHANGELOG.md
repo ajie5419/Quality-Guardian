@@ -25,6 +25,40 @@
 
 ## 执行记录
 
+## [0.17.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.16.0...qgs-v0.17.0) (2026-07-14)
+
+
+### Features
+
+* **@qgs/backend:** manage supplier identity links ([c9b8831](https://github.com/ajie5419/Quality-Guardian/commit/c9b8831215c8ea1d9942f0e04903df87106b7869))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** accept supplier ids for quality issues ([607324e](https://github.com/ajie5419/Quality-Guardian/commit/607324e1b02fb133628c195af20d840d91cafb49))
+* **@qgs/backend:** add governed supplier identity mapping ([6793000](https://github.com/ajie5419/Quality-Guardian/commit/67930001b7dc75cddce006333e62bc298ae966f9))
+* **@qgs/backend:** aggregate supplier scores by id ([1fbbe81](https://github.com/ajie5419/Quality-Guardian/commit/1fbbe81fed8c1601b2a0883c213f78ad37466e5b))
+* **@qgs/backend:** audit after sales supplier identities ([63e53ba](https://github.com/ajie5419/Quality-Guardian/commit/63e53ba47186cc676f74484e20ce32151ea4f386))
+* **@qgs/backend:** backfill inspection supplier identities ([1ccf8ae](https://github.com/ajie5419/Quality-Guardian/commit/1ccf8ae894e72b457635fd28d248d5774fd8cfb7))
+* **@qgs/backend:** enforce canonical master data identity ([8273c6d](https://github.com/ajie5419/Quality-Guardian/commit/8273c6d83c66423f78e85e6b5d5c2d3d0686151b))
+* **@qgs/backend:** enforce inspection identity governance ([2cee6c4](https://github.com/ajie5419/Quality-Guardian/commit/2cee6c43fb6c71365a42d1052be6e254f99254ed))
+* **@qgs/backend:** invalidate supplier snapshots on after sales changes ([7ddea96](https://github.com/ajie5419/Quality-Guardian/commit/7ddea96e7a1cec9fb8cd606617cc68041aafcd6d))
+* **@qgs/backend:** make supplier quality identity id first ([2bd6e35](https://github.com/ajie5419/Quality-Guardian/commit/2bd6e35c253df629c72880be1c4382dcf1d8ff89))
+* **@qgs/backend:** query supplier project history by id ([5181754](https://github.com/ajie5419/Quality-Guardian/commit/5181754cf26571c8599b97ee2d4b4a00b92c887e))
+* **@qgs/backend:** refresh supplier snapshots by id ([f87520e](https://github.com/ajie5419/Quality-Guardian/commit/f87520ee8db61bdbf36bcedc5179eb58cd9cc20b))
+* **@qgs/backend:** require supplier ids for online writes ([f2fca31](https://github.com/ajie5419/Quality-Guardian/commit/f2fca31d52bf9b03b542c5d192104c3b6b1e8d0e))
+* **@qgs/backend:** restrict supplier identity management ([df4d0fb](https://github.com/ajie5419/Quality-Guardian/commit/df4d0fb1407fb898d7cae972cb722470678346f0))
+* **@qgs/web-antd:** bind supplier selectors by id ([8e9fb8b](https://github.com/ajie5419/Quality-Guardian/commit/8e9fb8bf83eb42525f9217298b7990eac7482cf2))
+* **@qgs/web-antd:** submit canonical inspection identities ([01944f2](https://github.com/ajie5419/Quality-Guardian/commit/01944f26feed5b6436eea75903a9a50d83e93340))
+* **@qgs/web-antd:** submit inspection supplier identities ([8dc4ef6](https://github.com/ajie5419/Quality-Guardian/commit/8dc4ef647992483986cedb5165a065ea021d997c))
+* **@qgs/web-antd:** submit supplier ids for quality issues ([8c40f8b](https://github.com/ajie5419/Quality-Guardian/commit/8c40f8bcb265f22dc12d1a3dea649b5785c93202))
+* **lint:** enforce backend architecture constraints ([387ee0c](https://github.com/ajie5419/Quality-Guardian/commit/387ee0c9ad90e827d3eb9bb9b1eaf76bdaa9c6ad))
+* **lint:** enforce backend source safety ([4b9ab3f](https://github.com/ajie5419/Quality-Guardian/commit/4b9ab3f9f545d784d3b09e5b18242e0e791146d2))
+* **lint:** preserve cumulative rule constraints ([fac9448](https://github.com/ajie5419/Quality-Guardian/commit/fac9448750e0f8fec927362cd563815d1c3eadcc))
+* **project:** enforce supplier identity governance ([6171c04](https://github.com/ajie5419/Quality-Guardian/commit/6171c049cc6838101cee0f16ccd1eab7a60e2cc3))
+* **project:** propagate supplier ids across quality forms ([fb50cec](https://github.com/ajie5419/Quality-Guardian/commit/fb50cecf8f4b5777774808623340280c3e0dbbdc))
+* **project:** query supplier after sales by id ([b31105d](https://github.com/ajie5419/Quality-Guardian/commit/b31105dd2be14acb4e41dd0b7bd9e2aea9b99ba0))
+
 ### 2026-07-14 治理：supplier identity governance wave 文档与发布边界
 
 **执行内容：**
