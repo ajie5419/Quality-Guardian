@@ -65,6 +65,8 @@
 3. **禁止 `as unknown as T` 双重断言** — 说明类型设计有问题，需修正类型定义
 4. **允许 `as const`** — 安全的类型收窄
 5. **允许测试文件中的 `as any`** — mock 场景需要
+6. **后端非测试 TypeScript 必须通过类型感知 ESLint** — 禁止悬空 Promise、把 Promise 当布尔值或 void 回调、对非 Promise 使用 `await`、抛出非 `Error` 值、遗漏联合类型或枚举的 `switch` 分支，以及使用未标注为 `unknown` 的 Promise catch 参数
+7. **测试文件必须包含有效断言且不得禁用测试** — 禁止无断言测试、重复 hook、无效 describe 回调和无效 expect 调用
 
 ## 模块边界规范
 

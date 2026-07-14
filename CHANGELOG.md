@@ -25,6 +25,30 @@
 
 ## 执行记录
 
+### 2026-07-14 修复：启用后端类型感知 ESLint
+
+**执行内容：**
+
+- 使用 TypeScript Project Service 覆盖全部 `apps/backend/**/*.ts` 非测试源码，移除失效的全局 `project` 通配配置，并将废弃的 `no-var-requires` 替换为 `no-require-imports`。
+- 新增悬空 Promise、Promise 误用、无效 await、异常抛出类型、错误处理返回 await、switch 穷尽性和 Promise catch 参数类型规则。
+- 新增测试断言、禁用测试、重复 hook、describe 回调和 expect 有效性规则；最终配置测试改用真实后端文件并验证类型服务实际触发规则。
+- 修复规则发现的 25 处后端问题，包括无效 await、Promise 布尔判断、异步 finally、catch 参数、遗漏的 switch 分支和事件总线无断言测试。
+- 更新 `process-resolver` 测试 mock，使其匹配主数据治理内核的新依赖边界，恢复全量测试门禁。
+
+**验证结果：**
+
+- lint: `pnpm lint` 通过（0 error，0 warning）
+- typecheck: `pnpm run check:type` 3/3 tasks 通过
+- check:qms-arch:all: 635 个后端生产 TS 文件、497 个模块 TS 文件扫描通过，0 violations
+- vitest: 后端 204/204 文件、1927/1927 用例通过
+- ESLint 最终配置回归: 4/4 用例通过
+
+**commit:** `64c79c3a` fix(lint): enforce typed backend rules
+
+**遗留问题：**
+
+- 类型感知 lint 会增加全仓 lint 的执行时间，这是 TypeScript 类型分析的预期成本；当前完整门禁已稳定通过。
+
 ### 2026-07-14 修复：完善 ESLint 与后端架构规则约束
 
 **执行内容：**
