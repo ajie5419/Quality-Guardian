@@ -2,8 +2,10 @@ import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { WxSubscribeMessageService } from '~/modules/user';
+import { BusinessError } from '~/utils/business-error';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
@@ -14,7 +16,6 @@ import {
   resolveCanonicalProcessName,
   resolveProcessIdForWrite,
 } from '~/utils/process-resolver';
-import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 import { notifyTelegramNewRequest } from '~/utils/telegram-bot';
 
 import {
@@ -61,6 +62,7 @@ export const InspectionRequestCreateService = {
             ),
             partName: payload.partName,
             processId: payload.processId,
+            supplierId: payload.supplierId,
             teamId: payload.teamId,
             processName: payload.processName,
             quantity: payload.quantity,
@@ -134,7 +136,30 @@ async function buildCreateRequestPayload(body: RequestBody) {
     ? ''
     : normalizeInspectionRequestText(body.componentName);
   const reporter = normalizeInspectionRequestText(body.reporter);
-  const team = normalizeInspectionRequestText(body.team);
+  const isIncoming = isIncomingInspectionRequestProcess(processName);
+  const supplier = isIncoming
+    ? await SupplierIdentityService.resolveSupplierById(
+        normalizeInspectionRequestText(body.supplierId),
+      )
+    : null;
+  const teamIdentity = isIncoming
+    ? null
+    : await SupplierIdentityService.resolveTeamById(
+        normalizeInspectionRequestText(body.teamId),
+      );
+  if (isIncoming && !supplier) {
+    throw new BusinessError(
+      'SUPPLIER_ID_REQUIRED',
+      'supplierId is required for incoming inspection requests',
+    );
+  }
+  if (!isIncoming && !teamIdentity) {
+    throw new BusinessError(
+      'TEAM_ID_REQUIRED',
+      'teamId is required for process inspection requests',
+    );
+  }
+  const team = supplier?.name || teamIdentity?.name || '';
   const quantity = parseInspectionRequestQuantity(body.quantity);
   const stationSelection = serializeInspectionStationSelection(
     body.stationSelection,
@@ -151,7 +176,9 @@ async function buildCreateRequestPayload(body: RequestBody) {
     componentName,
     governedCanonicalIds: await buildGovernedCanonicalWritePairForTable(
       'qms_inspection_requests',
-      governedFields,
+      isIncoming
+        ? { componentName: governedFields.componentName }
+        : { ...governedFields, teamId: teamIdentity?.id },
     ),
     governedFields,
     partName,
@@ -160,7 +187,8 @@ async function buildCreateRequestPayload(body: RequestBody) {
     quantity,
     reporter,
     stationSelection,
-    teamId: await resolveTeamIdForWrite({ team }),
+    supplierId: supplier?.id || null,
+    teamId: teamIdentity?.id || null,
     workOrderNumber,
     workOrderNumbers,
   };

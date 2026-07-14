@@ -6,13 +6,17 @@ import {
   toImportErrorMessage,
 } from '~/modules/file-storage/import-report';
 import { InspectionService } from '~/modules/inspection/inspection.service';
+import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { logApiError } from '~/utils/api-logger';
+import { BusinessError } from '~/utils/business-error';
+import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 import { parseNonEmptyArray } from '~/utils/request-validation';
 import {
   badRequestResponse,
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
+import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 const DEFAULT_INSPECTION_CATEGORY = 'PROCESS';
 const INSPECTION_CATEGORIES = new Set(['INCOMING', 'PROCESS', 'SHIPMENT']);
@@ -25,6 +29,46 @@ function normalizeInspectionCategory(value: unknown): InspectionCategory {
   return INSPECTION_CATEGORIES.has(normalized)
     ? (normalized as InspectionCategory)
     : DEFAULT_INSPECTION_CATEGORY;
+}
+
+async function prepareIdentityImportPayload(
+  item: Record<string, unknown>,
+  category: InspectionCategory,
+) {
+  if (category === 'INCOMING') {
+    const identity = await buildGovernedCanonicalWritePairForTable(
+      'inspections',
+      item,
+      { mode: 'legacy-import' },
+    );
+    const supplierId = String(
+      identity.supplierId || item.supplierId || '',
+    ).trim();
+    const supplier =
+      await SupplierIdentityService.resolveSupplierById(supplierId);
+    if (!supplier) {
+      throw new BusinessError(
+        'SUPPLIER_ID_REQUIRED',
+        'A canonical supplier identity is required for incoming inspections',
+      );
+    }
+    return { supplierId: supplier.id, supplierName: supplier.name };
+  }
+  if (category === 'PROCESS') {
+    const teamId = await resolveTeamIdForWrite({
+      explicitTeamId: String(item.teamId || '').trim() || undefined,
+      team: String(item.team || '').trim(), // governance-allow-direct-name-id
+    });
+    const team = await SupplierIdentityService.resolveTeamById(teamId);
+    if (!team) {
+      throw new BusinessError(
+        'TEAM_ID_REQUIRED',
+        'A canonical TEAM identity is required for process inspections',
+      );
+    }
+    return { team: team.name, teamId: team.id };
+  }
+  return {};
 }
 
 export default defineEventHandler(async (event) => {
@@ -42,11 +86,14 @@ export default defineEventHandler(async (event) => {
     const rowErrors = [];
     for (const [index, item] of items.entries()) {
       try {
+        const itemCategory = normalizeInspectionCategory(
+          item.category ?? normalizedCategory,
+        );
+        const identity = await prepareIdentityImportPayload(item, itemCategory);
         const payload = {
           ...item,
-          category: normalizeInspectionCategory(
-            item.category ?? normalizedCategory,
-          ),
+          category: itemCategory,
+          ...identity,
         } as Parameters<typeof InspectionService.create>[0];
         await InspectionService.create(payload);
         successCount++;

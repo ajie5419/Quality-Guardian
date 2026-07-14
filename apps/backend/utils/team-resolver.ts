@@ -54,25 +54,6 @@ function markGovernanceLookupSuccess() {
   teamGovernanceFailoverUntil = 0;
 }
 
-function resolveTeamIdForWriteFallback(options: {
-  explicitTeamId?: null | string;
-  fallbackTeamId?: null | string;
-  keepExistingWhenNameMissing?: boolean;
-  team?: null | string;
-}): null | string | undefined {
-  if (options.explicitTeamId !== undefined) {
-    return options.explicitTeamId;
-  }
-  const normalizedTeam = normalizeTeamName(options.team);
-  if (!normalizedTeam) {
-    if (options.keepExistingWhenNameMissing) {
-      return undefined;
-    }
-    return options.fallbackTeamId ?? null;
-  }
-  return options.fallbackTeamId ?? null;
-}
-
 export async function resolveTeamIdsByNames(
   teams: Array<null | string | undefined>,
 ) {
@@ -129,9 +110,6 @@ export async function resolveTeamIdForWrite(options: {
   keepExistingWhenNameMissing?: boolean;
   team?: null | string;
 }): Promise<null | string | undefined> {
-  if (shouldBypassGovernanceLookup()) {
-    return resolveTeamIdForWriteFallback(options);
-  }
   try {
     const teamId = await MasterDataGovernanceKernel.resolveCanonicalIdForWrite({
       configKey: 'team',
@@ -144,7 +122,7 @@ export async function resolveTeamIdForWrite(options: {
     return teamId;
   } catch (error) {
     markGovernanceLookupFailure(error, 'resolveTeamIdForWrite');
-    return resolveTeamIdForWriteFallback(options);
+    throw error;
   }
 }
 

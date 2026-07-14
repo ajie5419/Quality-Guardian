@@ -404,6 +404,7 @@ export interface InspectionRecordPayloadInput {
     requestInfo?: null | string;
     selfCheckResult: string;
     stationSelection?: null | string;
+    supplierId?: null | string;
     team?: null | string;
     teamId?: null | string;
     work_order?: null | { projectName?: null | string };
@@ -508,6 +509,7 @@ export function buildInspectionRecordPayloadCore(
       incomingType:
         requestInfo.incomingType || INCOMING_INSPECTION_PROCESS_NAME,
       materialName: input.request.partName,
+      supplierId: normalizeInspectionRequestText(input.request.supplierId),
       supplierName: normalizeInspectionRequestText(input.request.team),
     };
   }

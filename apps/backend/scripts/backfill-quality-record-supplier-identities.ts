@@ -8,6 +8,8 @@ import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
 import { backfillAfterSalesSupplierIdentities } from './backfill-after-sales-supplier-identities';
+import { backfillInspectionRequestSupplierIdentities } from './backfill-inspection-request-supplier-identities';
+import { backfillInspectionRequestTeamIdentities } from './backfill-inspection-request-team-identities';
 import { backfillInspectionSupplierIdentities } from './backfill-inspection-supplier-identities';
 import {
   parseBackfillOptions,
@@ -56,6 +58,8 @@ async function main() {
   const identityContext = await loadSupplierIdentityContext(
     teamBootstrap.effectiveLinks,
   );
+  await backfillInspectionRequestTeamIdentities(options, identityContext);
+  await backfillInspectionRequestSupplierIdentities(options, identityContext);
   await backfillInspectionSupplierIdentities(options, identityContext);
   await backfillAfterSalesSupplierIdentities(options, identityContext);
 

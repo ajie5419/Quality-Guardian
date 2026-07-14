@@ -235,6 +235,9 @@ getAfterSalesList({ supplierBrand: row.name });
 <template><div /></template>
 `,
       'apps/backend/modules/inspection/legacy-import.service.ts': `
+buildGovernedCanonicalWritePairForTable('quality_records', data, {
+  mode: 'legacy-import',
+});
 prisma.quality_records.create({
   data: { supplierName: 'Legacy Supplier' },
 });
@@ -248,6 +251,7 @@ prisma.quality_records.create({
       expect(result.output).toContain('[B-ID2]');
       expect(result.output).toContain('[B-ID3]');
       expect(result.output).toContain('[B-ID4]');
+      expect(result.output).toContain('[B-ID5]');
       expect(result.output).toContain('legacy-import.service.ts');
     } finally {
       rmSync(rootDir, { force: true, recursive: true });

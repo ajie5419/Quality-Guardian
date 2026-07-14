@@ -172,17 +172,23 @@ export async function loadSupplierIdentityContext(
 }
 
 export async function persistResolutionAudit(params: {
-  entityType: 'after_sales' | 'inspections' | 'quality_records';
+  entityType:
+    | 'after_sales'
+    | 'inspections'
+    | 'qms_inspection_requests'
+    | 'quality_records';
+  fieldName?: 'supplierId' | 'teamId';
   resolved: Array<{ entityId: string; resolvedId: string }>;
   unresolved: UnresolvedRefInput[];
 }) {
+  const fieldName = params.fieldName || 'supplierId';
   const operations = [
     ...params.resolved.map((item) =>
       prisma.unresolved_master_data_refs.updateMany({
         where: {
           entityId: item.entityId,
           entityType: params.entityType,
-          fieldName: 'supplierId',
+          fieldName,
           isDeleted: false,
           status: 'OPEN',
         },
@@ -200,14 +206,14 @@ export async function persistResolutionAudit(params: {
           entityType_entityId_fieldName: {
             entityId: item.entityId,
             entityType: params.entityType,
-            fieldName: 'supplierId',
+            fieldName,
           },
         },
         create: {
           entityId: item.entityId,
           entityType: params.entityType,
           evidence: item.evidence,
-          fieldName: 'supplierId',
+          fieldName,
           rawId: item.rawId,
           rawName: item.rawName,
           reason: item.reason,

@@ -34,9 +34,15 @@ const PRISMA_WRITE_METHODS = new Set([
   'updateMany',
   'upsert',
 ]);
-// Legacy migrations must be individually reviewed before their exact path is
-// added here. Business modules and regular import services are never exempt.
+// Legacy import adapters must be individually reviewed before their exact path
+// is added here. Online business services are never exempt.
 const NAME_ONLY_SUPPLIER_WRITE_ALLOWLIST = new Set([]);
+const LEGACY_IDENTITY_IMPORT_ALLOWLIST = new Set([
+  'apps/backend/modules/after-sales/after-sales-route.service.ts',
+  'apps/backend/modules/inspection/inspection-issue.ts',
+  'apps/backend/modules/inspection/inspection-record-import.post.service.ts',
+  'apps/backend/utils/governed-write.ts',
+]);
 
 function parseArguments(argv) {
   const options = {
@@ -669,6 +675,18 @@ function analyzeIdentityFile(rootDir, filePath) {
   }
 
   function visit(node) {
+    if (
+      ts.isStringLiteral(node) &&
+      node.text === 'legacy-import' &&
+      !LEGACY_IDENTITY_IMPORT_ALLOWLIST.has(repoPath)
+    ) {
+      addFinding(
+        'B-ID5',
+        node,
+        'Legacy name-to-ID resolution is restricted to reviewed import adapters.',
+        'unapproved-legacy-identity-import',
+      );
+    }
     if (ts.isPropertyAssignment(node)) {
       const initializer = unwrapExpression(node.initializer);
       if (

@@ -1,29 +1,36 @@
 import type { inspection_category, Prisma } from '@prisma/client';
 
 import { BusinessError } from '~/utils/business-error';
+import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 
 export interface SupplierIdentityInput {
   supplierId: string;
   teamId: string;
 }
 
+const logger = createModuleLogger('SupplierIdentityService');
+
 function normalizeId(value: unknown) {
   return String(value || '').trim();
 }
 
-async function validateLinkInput(input: SupplierIdentityInput) {
+async function validateLinkInput(
+  input: SupplierIdentityInput,
+  client: Pick<Prisma.TransactionClient, 'dictionaries' | 'suppliers'>,
+) {
   const supplierId = normalizeId(input.supplierId);
   const teamId = normalizeId(input.teamId);
   if (!supplierId || !teamId) {
     throw new BusinessError('VALIDATION', 'supplierId and teamId are required');
   }
   const [supplier, team] = await Promise.all([
-    prisma.suppliers.findFirst({
+    client.suppliers.findFirst({
       select: { id: true, name: true },
       where: { id: supplierId, isDeleted: false },
     }),
-    prisma.dictionaries.findFirst({
+    client.dictionaries.findFirst({
       select: { dictKey: true, id: true },
       where: {
         dictType: 'team',
@@ -48,42 +55,65 @@ const linkInclude = {
   },
 } satisfies Prisma.supplier_identity_linksInclude;
 
+function teamIdentityConflict() {
+  return new BusinessError(
+    'TEAM_IDENTITY_CONFLICT',
+    'TEAM is already linked to another supplier',
+    409,
+  );
+}
+
 export const SupplierIdentityService = {
   async create(input: SupplierIdentityInput) {
-    const { supplier, team } = await validateLinkInput(input);
-    const existing = await prisma.supplier_identity_links.findUnique({
-      where: {
-        identityType_identityId: { identityId: team.id, identityType: 'TEAM' },
-      },
-    });
-    if (
-      existing &&
-      !existing.isDeleted &&
-      existing.supplierId !== supplier.id
-    ) {
-      throw new BusinessError(
-        'TEAM_IDENTITY_CONFLICT',
-        'TEAM is already linked to another supplier',
-        409,
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const { supplier, team } = await validateLinkInput(input, tx);
+        const existing = await tx.supplier_identity_links.findUnique({
+          where: {
+            identityType_identityId: {
+              identityId: team.id,
+              identityType: 'TEAM',
+            },
+          },
+        });
+        if (
+          existing &&
+          !existing.isDeleted &&
+          existing.supplierId !== supplier.id
+        ) {
+          throw teamIdentityConflict();
+        }
+        if (existing) {
+          return tx.supplier_identity_links.update({
+            where: { id: existing.id },
+            data: {
+              identityNameSnapshot: team.dictKey,
+              isDeleted: false,
+              supplierId: supplier.id,
+            },
+            include: linkInclude,
+          });
+        }
+        return tx.supplier_identity_links.create({
+          data: {
+            identityId: team.id,
+            identityNameSnapshot: team.dictKey,
+            identityType: 'TEAM',
+            supplierId: supplier.id,
+          },
+          include: linkInclude,
+        });
+      });
+    } catch (error) {
+      logger.error(
+        { err: error, supplierId: input.supplierId, teamId: input.teamId },
+        'failed to create supplier identity link',
       );
+      if (isPrismaUniqueConstraintError(error)) {
+        throw teamIdentityConflict();
+      }
+      throw error;
     }
-    return prisma.supplier_identity_links.upsert({
-      where: {
-        identityType_identityId: { identityId: team.id, identityType: 'TEAM' },
-      },
-      create: {
-        identityId: team.id,
-        identityNameSnapshot: team.dictKey,
-        identityType: 'TEAM',
-        supplierId: supplier.id,
-      },
-      update: {
-        identityNameSnapshot: team.dictKey,
-        isDeleted: false,
-        supplierId: supplier.id,
-      },
-      include: linkInclude,
-    });
   },
 
   async delete(id: string) {
@@ -150,6 +180,57 @@ export const SupplierIdentityService = {
     return { id: link.supplier.id, name: link.supplier.name };
   },
 
+  async resolveTeamById(teamId: null | string | undefined) {
+    const id = normalizeId(teamId);
+    if (!id) return null;
+    const team = await prisma.dictionaries.findFirst({
+      select: { dictKey: true, id: true },
+      where: {
+        dictType: 'team',
+        id,
+        isDeleted: false,
+        status: 1,
+      },
+    });
+    if (!team) {
+      throw new BusinessError('INVALID_TEAM_ID', 'Active TEAM does not exist');
+    }
+    return { id: team.id, name: team.dictKey };
+  },
+
+  async listTeamOptions(keyword = '') {
+    const normalizedKeyword = keyword.trim();
+    const teams = await prisma.dictionaries.findMany({
+      where: {
+        dictType: 'team',
+        isDeleted: false,
+        status: 1,
+        ...(normalizedKeyword
+          ? { dictKey: { contains: normalizedKeyword } }
+          : {}),
+      },
+      orderBy: [{ sort: 'asc' }, { dictKey: 'asc' }],
+      take: 100,
+      select: { dictKey: true, id: true },
+    });
+    const links = await prisma.supplier_identity_links.findMany({
+      where: {
+        identityId: { in: teams.map((team) => team.id) },
+        identityType: 'TEAM',
+        isDeleted: false,
+      },
+      select: { identityId: true },
+    });
+    const linkedTeamIds = new Set(links.map((link) => link.identityId));
+    return teams.map((team) => ({
+      group: linkedTeamIds.has(team.id)
+        ? ('external' as const)
+        : ('internal' as const),
+      label: team.dictKey,
+      value: team.id,
+    }));
+  },
+
   async resolveSupplierForInspection(input: {
     category: inspection_category | string;
     supplierId?: null | string;
@@ -206,42 +287,49 @@ export const SupplierIdentityService = {
   },
 
   async update(id: string, input: SupplierIdentityInput) {
-    const current = await prisma.supplier_identity_links.findFirst({
-      select: { id: true },
-      where: { id, isDeleted: false },
-    });
-    if (!current) {
-      throw new BusinessError(
-        'NOT_FOUND',
-        'Supplier identity link not found',
-        404,
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const { supplier, team } = await validateLinkInput(input, tx);
+        const current = await tx.supplier_identity_links.findFirst({
+          select: { id: true },
+          where: { id, isDeleted: false },
+        });
+        if (!current) {
+          throw new BusinessError(
+            'NOT_FOUND',
+            'Supplier identity link not found',
+            404,
+          );
+        }
+        const conflict = await tx.supplier_identity_links.findFirst({
+          select: { id: true },
+          where: {
+            id: { not: id },
+            identityId: team.id,
+            identityType: 'TEAM',
+            isDeleted: false,
+          },
+        });
+        if (conflict) throw teamIdentityConflict();
+        return tx.supplier_identity_links.update({
+          where: { id },
+          data: {
+            identityId: team.id,
+            identityNameSnapshot: team.dictKey,
+            supplierId: supplier.id,
+          },
+          include: linkInclude,
+        });
+      });
+    } catch (error) {
+      logger.error(
+        { err: error, id, supplierId: input.supplierId, teamId: input.teamId },
+        'failed to update supplier identity link',
       );
+      if (isPrismaUniqueConstraintError(error)) {
+        throw teamIdentityConflict();
+      }
+      throw error;
     }
-    const { supplier, team } = await validateLinkInput(input);
-    const conflict = await prisma.supplier_identity_links.findFirst({
-      select: { id: true },
-      where: {
-        id: { not: id },
-        identityId: team.id,
-        identityType: 'TEAM',
-        isDeleted: false,
-      },
-    });
-    if (conflict) {
-      throw new BusinessError(
-        'TEAM_IDENTITY_CONFLICT',
-        'TEAM is already linked to another supplier',
-        409,
-      );
-    }
-    return prisma.supplier_identity_links.update({
-      where: { id },
-      data: {
-        identityId: team.id,
-        identityNameSnapshot: team.dictKey,
-        supplierId: supplier.id,
-      },
-      include: linkInclude,
-    });
   },
 };

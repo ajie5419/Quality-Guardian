@@ -61,7 +61,9 @@ export interface InspectionRequest {
   stationSelection?: InspectionStationSelection | null;
   status: InspectionRequestStatus;
   submittedAt: string;
+  supplierId?: null | string;
   team?: null | string;
+  teamId?: null | string;
   unqualifiedQuantity?: null | number;
   updatedAt: string;
   workOrderNumber: string;
@@ -79,7 +81,9 @@ export interface CreateInspectionRequestParams {
   requestInfo?: string;
   selfCheckResult?: InspectionRequestCheckResult;
   stationSelection?: InspectionStationSelection;
+  supplierId?: string;
   team: string;
+  teamId?: string;
   workOrderNumber: string;
   workOrderNumbers?: string[];
 }

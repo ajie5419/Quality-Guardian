@@ -58,6 +58,7 @@ vi.mock('~/modules/inspection', () => ({
 
 vi.mock('~/modules/supplier-identity', () => ({
   SupplierIdentityService: {
+    teamIdsBySupplierIds: vi.fn().mockResolvedValue(new Map()),
     teamIdsForSupplier: vi.fn().mockResolvedValue([]),
   },
 }));

@@ -2,6 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import prisma from '~/utils/prisma';
 
+vi.mock('~/modules/supplier-identity', () => ({
+  SupplierIdentityService: {
+    resolveSupplierForInspection: vi.fn().mockResolvedValue(null),
+    resolveTeamById: vi.fn().mockImplementation(async (teamId: string) => ({
+      id: teamId,
+      name: 'A班',
+    })),
+  },
+}));
+
 // Mock prisma
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -247,6 +257,8 @@ describe('inspectionService', () => {
               incomingType: null,
               processId: 'process-old',
               processName: '旧工序',
+              team: 'A班',
+              teamId: 'team-1',
               templateId: null,
               templateName: null,
               workOrderNumber: 'WO-1001',
@@ -283,6 +295,7 @@ describe('inspectionService', () => {
           quantity: 1,
           inspector: 'tester',
           inspectionDate: new Date('2026-01-01'),
+          teamId: 'team-1',
         } as any),
       ).rejects.toThrow('stop-after-template-binding');
 
@@ -295,7 +308,7 @@ describe('inspectionService', () => {
       );
     });
 
-    it('normalizes team through governance helper when updating inspection', async () => {
+    it('loads the canonical team name when updating inspection', async () => {
       const stopError = new Error('stop-after-template-binding');
       const inspectionFormFindFirst = vi.fn().mockResolvedValue(null);
       const inspectionsUpdate = vi.fn().mockResolvedValue({
@@ -343,6 +356,7 @@ describe('inspectionService', () => {
           inspector: 'tester',
           inspectionDate: new Date('2026-01-01'),
           team: '  A班 ',
+          teamId: 'team-1',
         } as any),
       ).rejects.toThrow('stop-after-template-binding');
 

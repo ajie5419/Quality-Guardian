@@ -987,6 +987,7 @@ model suppliers {
   scoreSnapshot      supplier_score_snapshots?
   identityLinks      supplier_identity_links[]
   inspections        inspections[]             @relation("inspections_supplier")
+  inspectionRequests qms_inspection_requests[] @relation("inspection_requests_supplier")
   qualityRecords     quality_records[]         @relation("quality_records_supplier")
 
   @@index([status])
@@ -1327,6 +1328,7 @@ model qms_inspection_requests {
   componentId         String?
   processName         String
   processId           String?
+  supplierId          String?
   teamId              String?
   team                String?
   quantity            Int                                  @default(1)
@@ -1358,6 +1360,7 @@ model qms_inspection_requests {
   createdAt           DateTime                             @default(now())
   updatedAt           DateTime                             @updatedAt
   process             processes?                           @relation(fields: [processId], references: [id], onDelete: SetNull)
+  supplier            suppliers?                           @relation("inspection_requests_supplier", fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   work_order          work_orders                          @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
   dispatcher          users?                               @relation("qms_inspection_requests_dispatcherIdTousers", fields: [dispatcherId], references: [id])
   inspector           users?                               @relation("qms_inspection_requests_inspectorIdTousers", fields: [inspectorId], references: [id])
@@ -1373,6 +1376,7 @@ model qms_inspection_requests {
   @@index([submittedAt])
   @@index([workOrderNumber, processName, partName])
   @@index([processId])
+  @@index([supplierId])
   @@index([teamId])
   @@index([partId])
   @@index([componentId])

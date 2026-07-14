@@ -4,6 +4,7 @@ import type { InspectionRecordInput } from './inspection-record-types';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
+import { BusinessError } from '~/utils/business-error';
 import { eventBus } from '~/utils/event-bus';
 import {
   buildGovernedCanonicalWritePairForTable,
@@ -14,7 +15,6 @@ import {
   resolveCanonicalProcessNameById,
   resolveProcessIdForWrite,
 } from '~/utils/process-resolver';
-import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 import { syncInspectionArchiveTask } from './inspection-archive-sync.service';
 import { syncInspectionProjectDocuments } from './inspection-project-document-sync.service';
@@ -39,20 +39,6 @@ export const InspectionRecordUpdateService = {
     );
 
     const result = await prisma.$transaction(async (tx) => {
-      const inputTeam = data.team;
-      const governedFields = buildGovernedWriteFieldsForTable('inspections', {
-        incomingType: data.incomingType,
-        materialName: data.materialName,
-        processName: data.processName,
-        projectName: data.projectName,
-        supplierName: data.supplierName,
-        team: inputTeam,
-      });
-      const governedCanonicalIds =
-        await buildGovernedCanonicalWritePairForTable('inspections', {
-          ...governedFields,
-          supplierId: data.supplierId,
-        });
       const previousInspection = await tx.inspections.findUnique({
         where: { id },
         select: {
@@ -81,11 +67,47 @@ export const InspectionRecordUpdateService = {
         keepExistingWhenNameMissing: true,
         processName: data.processName,
       });
-      const resolvedTeamId = await resolveTeamIdForWrite({
-        explicitTeamId: data.teamId,
-        keepExistingWhenNameMissing: true,
-        team: inputTeam, // governance-allow-direct-name-id
+      const inspectionCategory =
+        data.category || previousInspection?.category || 'PROCESS';
+      const teamIdentityChanged =
+        data.teamId !== undefined || data.team !== undefined;
+      const explicitTeamId = String(data.teamId || '').trim();
+      if (
+        inspectionCategory === 'PROCESS' &&
+        teamIdentityChanged &&
+        !explicitTeamId
+      ) {
+        throw new BusinessError(
+          'TEAM_ID_REQUIRED',
+          'A canonical TEAM identity is required for process inspections',
+        );
+      }
+      const teamIdForResolution =
+        inspectionCategory === 'PROCESS'
+          ? explicitTeamId || previousInspection?.teamId
+          : null;
+      if (inspectionCategory === 'PROCESS' && !teamIdForResolution) {
+        throw new BusinessError(
+          'TEAM_ID_REQUIRED',
+          'A canonical TEAM identity is required for process inspections',
+        );
+      }
+      const teamIdentity = teamIdForResolution
+        ? await SupplierIdentityService.resolveTeamById(teamIdForResolution)
+        : null;
+      const governedFields = buildGovernedWriteFieldsForTable('inspections', {
+        incomingType: data.incomingType,
+        materialName: data.materialName,
+        processName: data.processName,
+        projectName: data.projectName,
+        supplierName: data.supplierName,
+        team: teamIdentity?.name ?? null,
       });
+      const governedCanonicalIds =
+        await buildGovernedCanonicalWritePairForTable('inspections', {
+          ...governedFields,
+          supplierId: data.supplierId,
+        });
       const governedSupplierId =
         typeof governedCanonicalIds.supplierId === 'string'
           ? governedCanonicalIds.supplierId
@@ -94,16 +116,18 @@ export const InspectionRecordUpdateService = {
         governedSupplierId === undefined && data.supplierName === undefined
           ? previousInspection?.supplierId
           : governedSupplierId;
-      const teamIdForResolution =
-        resolvedTeamId === undefined
-          ? previousInspection?.teamId
-          : resolvedTeamId;
       const supplierIdentity =
         await SupplierIdentityService.resolveSupplierForInspection({
-          category: data.category || previousInspection?.category || 'PROCESS',
+          category: inspectionCategory,
           supplierId: supplierIdForResolution,
           teamId: teamIdForResolution,
         });
+      if (inspectionCategory === 'INCOMING' && !supplierIdentity) {
+        throw new BusinessError(
+          'SUPPLIER_ID_REQUIRED',
+          'A canonical supplier identity is required for incoming inspections',
+        );
+      }
       const templateProcessId =
         resolvedProcessId === undefined
           ? (previousInspection?.processId ?? undefined)
@@ -132,7 +156,7 @@ export const InspectionRecordUpdateService = {
           materialName: data.materialName,
           incomingType: data.incomingType,
           processId: resolvedProcessId,
-          teamId: resolvedTeamId, // governance-allow-direct-name-id
+          teamId: teamIdentity?.id ?? null,
           level1Component: data.level1Component,
           level2Component: data.level2Component,
           ...governedFields,
