@@ -25,6 +25,14 @@
 
 ## 执行记录
 
+## [0.17.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.0...qgs-v0.17.1) (2026-07-14)
+
+
+### Bug Fixes
+
+* **project:** correct supplier profile source contracts ([7395741](https://github.com/ajie5419/Quality-Guardian/commit/7395741bd4dd9a71db253b418e3d5eac549f3e96))
+* **project:** correct supplier profile source contracts ([c6ef074](https://github.com/ajie5419/Quality-Guardian/commit/c6ef074984760e3b60437d7b0c67668497b6fce5))
+
 ### 2026-07-14 修复：供应商画像历史项目与质量数据源契约
 
 **执行内容：**
