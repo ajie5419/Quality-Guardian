@@ -30,7 +30,6 @@
 
 ### Bug Fixes
 
-* **project:** correct supplier profile source contracts ([7395741](https://github.com/ajie5419/Quality-Guardian/commit/7395741bd4dd9a71db253b418e3d5eac549f3e96))
 * **project:** correct supplier profile source contracts ([c6ef074](https://github.com/ajie5419/Quality-Guardian/commit/c6ef074984760e3b60437d7b0c67668497b6fce5))
 
 ### 2026-07-14 修复：供应商画像历史项目与质量数据源契约
@@ -52,12 +51,15 @@
 - `check:qms-arch`、`check:qms-arch:all`、`check:prisma-migration`：全部通过。
 - `git diff --check`：通过。
 - 前端 dev/build：未运行；遵循仓库约束，通过组件测试、类型检查和 lint 验证。
+- GitHub：功能 PR #50 和发布 PR #51 均已合并，两个 PR 的 6 项 CI Gate 全部通过；已生成 GitHub Release 与 tag `qgs-v0.17.1`。
+- 生产部署：deploy run `29324151555` 成功，耗时 7 分 55 秒；backend/frontend 镜像构建、ACR 推送、ECS 更新与 HTTP 健康检查全部通过，生产数据库无待执行 migration。
+- 生产工程问题身份回填：扫描 197 条，136 条已有有效规范身份，61 条缺少确定性身份依据并保留为 unresolved，0 条冲突；未使用名称猜测绑定。
 
-**commit:** `c6ef0749` fix(project): correct supplier profile source contracts
+**commit:** `c6ef0749` fix(project): correct supplier profile source contracts；`7395741b` Merge pull request #50；`cecd2591` Merge pull request #51
 
 **遗留问题：**
 
-- 功能尚待 PR、release-please 补丁版本和生产 deploy 完整链路发布；发布后需在生产业务页面核对秦皇岛吉兴机械制造有限公司的 7 月 8 日工程问题、手工登记问题、进货合格率和完整历史项目。
+- 生产发布已完成；仍需在已登录业务会话中核对秦皇岛吉兴机械制造有限公司的 7 月 8 日工程问题、手工登记问题、进货合格率和完整历史项目。自动化已验证代码、回填、部署和健康检查，不把登录页外的 HTTP 检查当作业务数据验收。
 
 ## [0.17.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.16.0...qgs-v0.17.0) (2026-07-14)
 
