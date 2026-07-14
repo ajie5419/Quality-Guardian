@@ -25,6 +25,35 @@
 
 ## 执行记录
 
+### 2026-07-14 修复：完善 ESLint 与后端架构规则约束
+
+**执行内容：**
+
+- 修复 ESLint Flat Config 后置覆盖问题，确保后端语法审计、QMS import / 状态 / 枚举 / 常量限制累计生效；Vue 推荐规则只作用于 `.vue`，非测试 TS 仅保留组合式 API 所需规则。
+- 后端生产代码启用非空断言、`console.*` 和空 `catch` 阻断；清理 7 处 console、3 处空 catch，并统一使用 `createModuleLogger` 或 `logApiError`。
+- 新增 TypeScript AST 架构检查器，覆盖 `as any`、`as unknown as T`、非空断言、`Date.now()` 生成 ID、跨模块内部导入、中文字符串条件、空 catch 和 catch 未记录错误。
+- 新增稳定指纹 baseline：B-T1、B-T3、B-S4、B-S5、B-E1 保持零基线；B-T2、B-M1、B-M2、B-E2 和单文件行数历史债务冻结为只能递减。
+- 新增真实临时 Git 仓库回归测试，验证 10 条源码规则、合法反例和 baseline 数量增长阻断；CI 改为执行 `check:qms-arch:all`。
+
+**验证结果：**
+
+- lint: 通过（0 error，0 warning）
+- typecheck: `pnpm run check:type` 3/3 tasks 通过
+- check:qms-arch:all: 635 个后端生产 TS 文件、497 个模块 TS 文件扫描通过，0 violations
+- vitest: 后端 201/201 文件、1919/1919 用例通过
+- 配置与架构脚本回归: 3 个文件、10/10 用例通过
+
+**commit:**
+
+- `fac94487` fix(lint): preserve cumulative rule constraints
+- `4b9ab3f9` fix(lint): enforce backend source safety
+- `387ee0c9` fix(lint): enforce backend architecture constraints
+
+**遗留问题：**
+
+- 历史 baseline 仍包含 B-T2 13 处、B-M1 151 处、B-M2 39 处、B-E2 81 处及 1 个 520 行模块文件；新违规和数量增长已阻断，后续修复时必须同步收紧 baseline。
+- Vue TS 完整 strict 规则当前会新增 146 errors / 2 warnings，未在本阶段强制启用；应作为独立类型债务治理任务处理。
+
 ### 2026-07-13 发布：qgs v0.16.0
 
 **执行内容：**

@@ -2,10 +2,10 @@
 
 ## 当前状态
 
-- 最新变更: 统一供应商与外协质量指标口径；机加成品外协读取进货检验，驻厂外协读取过程检验，并修复工程问题数、合格率、画像履历和历史快照漂移
-- 测试状态: 供应商、检验、售后、前端与共享领域相关 800/800 测试通过
-- Lint: 通过（0 error，保留既有测试文件 9 条 warning）
-- Typecheck: 0 error（weapp 自身脚本为项目既有 skip，已用定向 ESLint/Stylelint 补充验证）
+- 最新变更: 完善 ESLint Flat Config 累计规则与后端源码约束；新增 TypeScript AST 架构门禁、递减 baseline 和 CI 全量扫描
+- 测试状态: 后端 201/201 文件、1919/1919 用例通过；ESLint 最终配置与架构脚本回归 10/10 通过
+- Lint: 通过（0 error，0 warning）
+- Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
 - 模块 TS 文件数: 497（含测试）
 - 当前版本: `0.16.0`
 
@@ -27,6 +27,7 @@
 - [x] 前后端类型契约（@qgs/shared API 响应类型）
 - [x] 根目录 + 后端脏数据清理
 - [x] 偏离修复（文件超限、governance 残留、route-handlers 合并、prisma 脚本清理）
+- [x] ESLint 与架构门禁完善（累计 Flat Config、AST 语义规则、历史债务递减 baseline、CI 全量扫描）
 - [x] 报检任务模块重构（状态机文档、创建 schema、查询/创建/派工/删除/关闭服务拆分）
 - [x] 小程序不合格品项模块（列表、详情、新增、编辑、照片、草稿、RBAC，复用电脑版数据与状态）
 - [x] 不合格品项所有权隔离（普通用户仅本人、管理员全部、写操作仅创建人）
