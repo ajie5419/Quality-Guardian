@@ -58,6 +58,7 @@ Rules:
   B-ID1: selector value keys must use canonical IDs, not names
   B-ID2: supplier-related change events must pair identity names with IDs
   B-ID3: controlled supplier writes must pair supplierName with supplierId
+  B-ID4: supplier scoring queries and mappings must use canonical IDs
   B-SEC1: raw SQL must not combine $queryRawUnsafe with template strings
   B-MAP1: new module/route/view directories must update code_map.md (changed mode only)
   B-TEST1: backend tests must not live in centralized __tests__/tests/test directories

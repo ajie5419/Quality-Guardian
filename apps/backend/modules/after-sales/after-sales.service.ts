@@ -77,11 +77,7 @@ export const AfterSalesService = {
     return AfterSalesIntegrationService.getQualityLossDrillDownRecords(params);
   },
 
-  async getSupplierScoringData(params: {
-    since: Date;
-    supplierIds?: string[];
-    supplierNames: string[];
-  }) {
+  async getSupplierScoringData(params: { since: Date; supplierIds: string[] }) {
     return AfterSalesIntegrationService.getSupplierScoringData(params);
   },
 

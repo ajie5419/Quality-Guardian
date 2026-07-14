@@ -161,7 +161,7 @@ describe('afterSalesService – adversarial', () => {
     it('delegates to integration service', async () => {
       const result = await AfterSalesService.getSupplierScoringData({
         since: new Date('2025-01-01'),
-        supplierNames: ['Supplier A'],
+        supplierIds: ['supplier-1'],
       });
 
       expect(result.stats).toEqual([]);

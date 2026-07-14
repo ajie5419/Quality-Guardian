@@ -19,13 +19,13 @@ export interface DomainEvents {
     supplierIds: Array<null | string | undefined>;
   };
   'inspection_issue.changed': {
-    supplierIds?: Array<null | string | undefined>;
+    supplierIds: Array<null | string | undefined>;
     supplierNames: Array<null | string | undefined>;
   };
   'inspection_record.changed': {
-    supplierIds?: Array<null | string | undefined>;
+    supplierIds: Array<null | string | undefined>;
     supplierNames: Array<null | string | undefined>;
-    teamIds?: Array<null | string | undefined>;
+    teamIds: Array<null | string | undefined>;
     teamNames: Array<null | string | undefined>;
   };
 }

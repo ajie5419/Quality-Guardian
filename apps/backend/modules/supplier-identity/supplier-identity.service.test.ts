@@ -73,4 +73,33 @@ describe('supplier identity service', () => {
     ).rejects.toMatchObject({ code: 'INVALID_TEAM_ID' });
     expect(prisma.supplier_identity_links.upsert).not.toHaveBeenCalled();
   });
+
+  it('loads TEAM identities for suppliers in one query', async () => {
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
+      { identityId: 'team-1', supplierId: 'supplier-1' },
+      { identityId: 'team-2', supplierId: 'supplier-1' },
+      { identityId: 'team-3', supplierId: 'supplier-2' },
+    ] as never);
+
+    await expect(
+      SupplierIdentityService.teamIdsBySupplierIds([
+        'supplier-1',
+        'supplier-1',
+        'supplier-2',
+      ]),
+    ).resolves.toEqual(
+      new Map([
+        ['supplier-1', ['team-1', 'team-2']],
+        ['supplier-2', ['team-3']],
+      ]),
+    );
+    expect(prisma.supplier_identity_links.findMany).toHaveBeenCalledWith({
+      select: { identityId: true, supplierId: true },
+      where: {
+        identityType: 'TEAM',
+        isDeleted: false,
+        supplierId: { in: ['supplier-1', 'supplier-2'] },
+      },
+    });
+  });
 });

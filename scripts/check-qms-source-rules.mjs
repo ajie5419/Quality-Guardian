@@ -17,6 +17,16 @@ const INSPECTION_CHANGED_EVENTS = new Set([
   'inspection_record.changed',
 ]);
 const CONTROLLED_SUPPLIER_MODELS = new Set(['inspections', 'quality_records']);
+const ID_FIRST_SCORING_FILES = new Set([
+  'apps/backend/modules/after-sales/after-sales-integration.service.ts',
+  'apps/backend/modules/inspection/inspection-reporting.service.ts',
+  'apps/backend/modules/supplier/supplier-score-snapshot.service.ts',
+]);
+const NAME_IDENTITY_QUERY_PROPERTIES = new Set([
+  'supplierBrand',
+  'supplierName',
+  'team',
+]);
 const PRISMA_WRITE_METHODS = new Set([
   'create',
   'createMany',
@@ -588,6 +598,52 @@ function analyzeIdentityFile(rootDir, filePath) {
     }
   }
 
+  function inspectNameBasedScoringIdentity(node) {
+    if (!ID_FIRST_SCORING_FILES.has(repoPath)) return;
+    if (ts.isPropertyAssignment(node)) {
+      const propertyName = getPropertyNameText(node.name);
+      const initializer = unwrapExpression(node.initializer);
+      if (
+        NAME_IDENTITY_QUERY_PROPERTIES.has(propertyName) &&
+        ts.isObjectLiteralExpression(initializer) &&
+        getObjectProperty(initializer, 'in')
+      ) {
+        addFinding(
+          'B-ID4',
+          node,
+          `Supplier scoring queries must use canonical IDs instead of ${propertyName}.`,
+          `name-based-scoring-query-${propertyName}`,
+        );
+      }
+    }
+    if (!ts.isCallExpression(node)) return;
+    const expression = unwrapExpression(node.expression);
+    if (
+      ts.isPropertyAccessExpression(expression) &&
+      ts.isIdentifier(expression.expression) &&
+      expression.expression.text === 'supplierByName' &&
+      expression.name.text === 'get'
+    ) {
+      addFinding(
+        'B-ID4',
+        node,
+        'Supplier score snapshots must not resolve supplier identity by name.',
+        'supplier-score-name-map',
+      );
+    }
+    if (
+      ts.isPropertyAccessExpression(expression) &&
+      expression.name.text === 'resolveCanonicalIdsByNames'
+    ) {
+      addFinding(
+        'B-ID4',
+        node,
+        'Supplier score snapshots must use explicit identity links instead of name-derived TEAM IDs.',
+        'supplier-score-name-derived-team-id',
+      );
+    }
+  }
+
   function visit(node) {
     if (ts.isPropertyAssignment(node)) {
       const initializer = unwrapExpression(node.initializer);
@@ -606,6 +662,7 @@ function analyzeIdentityFile(rootDir, filePath) {
     }
     inspectChangedEvent(node);
     inspectControlledSupplierWrite(node);
+    inspectNameBasedScoringIdentity(node);
     ts.forEachChild(node, visit);
   }
 

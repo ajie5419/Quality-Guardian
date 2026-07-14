@@ -183,6 +183,28 @@ export const SupplierIdentityService = {
     return links.map((link) => link.identityId);
   },
 
+  async teamIdsBySupplierIds(supplierIds: string[]) {
+    const ids = [
+      ...new Set(supplierIds.map((supplierId) => normalizeId(supplierId))),
+    ].filter(Boolean);
+    if (ids.length === 0) return new Map<string, string[]>();
+    const links = await prisma.supplier_identity_links.findMany({
+      select: { identityId: true, supplierId: true },
+      where: {
+        identityType: 'TEAM',
+        isDeleted: false,
+        supplierId: { in: ids },
+      },
+    });
+    const result = new Map<string, string[]>();
+    for (const link of links) {
+      const teamIds = result.get(link.supplierId) || [];
+      teamIds.push(link.identityId);
+      result.set(link.supplierId, teamIds);
+    }
+    return result;
+  },
+
   async update(id: string, input: SupplierIdentityInput) {
     const current = await prisma.supplier_identity_links.findFirst({
       select: { id: true },

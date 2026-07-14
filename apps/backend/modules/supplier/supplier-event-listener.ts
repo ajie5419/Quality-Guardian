@@ -15,13 +15,9 @@ function uniqueNonEmpty(values: Array<null | string | undefined>): string[] {
   return [...set];
 }
 
-async function refresh(params: {
-  supplierIds?: string[];
-  supplierNames?: string[];
-}) {
+async function refresh(params: { supplierIds?: string[] }) {
   const supplierIds = params.supplierIds || [];
-  const supplierNames = params.supplierNames || [];
-  if (supplierIds.length === 0 && supplierNames.length === 0) return;
+  if (supplierIds.length === 0) return;
   try {
     // Dynamic import keeps supplier-event-listener.ts free of the
     // supplier-score-snapshot ↔ inspection circular dependency at module
@@ -32,15 +28,11 @@ async function refresh(params: {
     if (supplierIds.length > 0) {
       await SupplierScoreSnapshotService.refreshBySupplierIds(supplierIds);
     }
-    if (supplierIds.length === 0 && supplierNames.length > 0) {
-      await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
-    }
   } catch (error) {
     logger.warn(
       {
         err: error,
         supplierIdCount: supplierIds.length,
-        supplierNameCount: supplierNames.length,
       },
       'supplier score refresh from event listener failed',
     );
@@ -68,27 +60,21 @@ export function registerSupplierEventListeners(): void {
   eventBus.on('after_sales.changed', async (payload) => {
     await refresh({
       supplierIds: uniqueNonEmpty(payload.supplierIds),
-      supplierNames: uniqueNonEmpty(payload.supplierBrands),
     });
   });
 
   eventBus.on('inspection_issue.changed', async (payload) => {
     await refresh({
-      supplierIds: uniqueNonEmpty(payload.supplierIds || []),
-      supplierNames: uniqueNonEmpty(payload.supplierNames),
+      supplierIds: uniqueNonEmpty(payload.supplierIds),
     });
   });
 
   eventBus.on('inspection_record.changed', async (payload) => {
     const teamSupplierIds = await resolveTeamSupplierIds(
-      uniqueNonEmpty(payload.teamIds || []),
+      uniqueNonEmpty(payload.teamIds),
     );
     await refresh({
-      supplierIds: uniqueNonEmpty([
-        ...(payload.supplierIds || []),
-        ...teamSupplierIds,
-      ]),
-      supplierNames: uniqueNonEmpty(payload.supplierNames),
+      supplierIds: uniqueNonEmpty([...payload.supplierIds, ...teamSupplierIds]),
     });
   });
 }

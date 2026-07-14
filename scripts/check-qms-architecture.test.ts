@@ -215,6 +215,19 @@ tx.inspections.update({
   data: { supplierName: 'Supplier A' },
 });
 `,
+      'apps/backend/modules/after-sales/after-sales-integration.service.ts': `
+prisma.after_sales.findMany({
+  where: { supplierBrand: { in: ['Supplier A'] } },
+});
+`,
+      'apps/backend/modules/supplier/supplier-score-snapshot.service.ts': `
+const supplierByName = new Map();
+supplierByName.get('Supplier A');
+MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
+  configKey: 'team',
+  names: ['Supplier A'],
+});
+`,
       'apps/backend/modules/inspection/legacy-import.service.ts': `
 prisma.quality_records.create({
   data: { supplierName: 'Legacy Supplier' },
@@ -228,6 +241,7 @@ prisma.quality_records.create({
       expect(result.output).toContain('[B-ID1]');
       expect(result.output).toContain('[B-ID2]');
       expect(result.output).toContain('[B-ID3]');
+      expect(result.output).toContain('[B-ID4]');
       expect(result.output).toContain('legacy-import.service.ts');
     } finally {
       rmSync(rootDir, { force: true, recursive: true });
