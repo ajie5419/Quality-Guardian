@@ -61,8 +61,16 @@ const isEngineeringHistoryLoading = ref(false);
 const supplierHistoryProjects = ref<QmsSupplierApi.SupplierHistoryProject[]>(
   [],
 );
+const supplierHistoryProjectPagination = reactive({
+  current: 1,
+  pageSize: 5,
+  showSizeChanger: true,
+  total: 0,
+});
+const isHistoryProjectsLoading = ref(false);
 let detailRequestSequence = 0;
 let engineeringPageRequestSequence = 0;
+let historyProjectPageRequestSequence = 0;
 let inspectionPageRequestSequence = 0;
 
 const [Drawer, drawerApi] = useVbenDrawer({
@@ -81,6 +89,9 @@ function clearDetailData() {
   supplierEngineeringPagination.total = 0;
   isEngineeringHistoryLoading.value = false;
   supplierHistoryProjects.value = [];
+  supplierHistoryProjectPagination.current = 1;
+  supplierHistoryProjectPagination.total = 0;
+  isHistoryProjectsLoading.value = false;
 }
 
 function reportRejectedDetailRequest(
@@ -95,6 +106,7 @@ function reportRejectedDetailRequest(
 async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
   const requestSequence = ++detailRequestSequence;
   const engineeringRequestSequence = ++engineeringPageRequestSequence;
+  const historyProjectRequestSequence = ++historyProjectPageRequestSequence;
   const inspectionRequestSequence = ++inspectionPageRequestSequence;
   selectedSupplier.value = row;
   clearDetailData();
@@ -117,7 +129,10 @@ async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
           page: supplierEngineeringPagination.current,
           pageSize: supplierEngineeringPagination.pageSize,
         }),
-        getSupplierHistoryProjects(row.id),
+        getSupplierHistoryProjects(row.id, {
+          page: supplierHistoryProjectPagination.current,
+          pageSize: supplierHistoryProjectPagination.pageSize,
+        }),
       ]);
 
     if (
@@ -144,8 +159,12 @@ async function loadDetail(row: QmsSupplierApi.SupplierItem, titlePrefix = '') {
       supplierEngineeringIssues.value = engineering.value.items || [];
       supplierEngineeringPagination.total = engineering.value.total || 0;
     }
-    if (historyProjects.status === 'fulfilled') {
+    if (
+      historyProjects.status === 'fulfilled' &&
+      historyProjectRequestSequence === historyProjectPageRequestSequence
+    ) {
       supplierHistoryProjects.value = historyProjects.value.items || [];
+      supplierHistoryProjectPagination.total = historyProjects.value.total || 0;
     }
 
     reportRejectedDetailRequest(
@@ -242,6 +261,42 @@ async function handleEngineeringPageChange(
   } finally {
     if (requestSequence === engineeringPageRequestSequence) {
       isEngineeringHistoryLoading.value = false;
+    }
+  }
+}
+
+async function handleHistoryProjectPageChange(
+  pagination: InspectionPaginationChange,
+) {
+  if (!selectedSupplier.value) return;
+
+  const supplierId = selectedSupplier.value.id;
+  const requestSequence = ++historyProjectPageRequestSequence;
+  const page = pagination.current || 1;
+  const pageSize = pagination.pageSize || 5;
+  isHistoryProjectsLoading.value = true;
+  try {
+    const result = await getSupplierHistoryProjects(supplierId, {
+      page,
+      pageSize,
+    });
+    if (
+      requestSequence !== historyProjectPageRequestSequence ||
+      selectedSupplier.value?.id !== supplierId
+    ) {
+      return;
+    }
+    supplierHistoryProjects.value = result.items || [];
+    supplierHistoryProjectPagination.current = page;
+    supplierHistoryProjectPagination.pageSize = pageSize;
+    supplierHistoryProjectPagination.total = result.total || 0;
+  } catch (error) {
+    if (requestSequence === historyProjectPageRequestSequence) {
+      handleApiError(error, 'Load Supplier History Projects');
+    }
+  } finally {
+    if (requestSequence === historyProjectPageRequestSequence) {
+      isHistoryProjectsLoading.value = false;
     }
   }
 }
@@ -581,9 +636,10 @@ defineExpose({
           <Table
             :data-source="supplierHistoryProjects"
             size="small"
-            :pagination="{ pageSize: 5 }"
+            :pagination="supplierHistoryProjectPagination"
             row-key="workOrderNumber"
-            :loading="isDetailLoading"
+            :loading="isDetailLoading || isHistoryProjectsLoading"
+            @change="handleHistoryProjectPageChange"
           >
             <Table.Column
               :title="t('qms.workOrder.workOrderNumber')"

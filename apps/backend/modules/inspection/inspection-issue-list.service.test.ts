@@ -42,16 +42,14 @@ describe('inspectionIssueListService', () => {
   });
 
   describe('findSupplierIssues', () => {
-    it('finds process issues by supplier ID or mapped TEAM inspection', async () => {
+    it('finds engineering issues by canonical supplier ID', async () => {
       vi.mocked(prisma.quality_records.count).mockResolvedValue(0);
       vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
 
       await InspectionIssueListService.findSupplierIssues({
-        category: 'PROCESS',
         page: 2,
         pageSize: 5,
         supplierId: 'supplier-1',
-        teamIds: ['team-1'],
       });
 
       expect(prisma.quality_records.findMany).toHaveBeenCalledWith(
@@ -61,60 +59,38 @@ describe('inspectionIssueListService', () => {
           take: 5,
           where: {
             isDeleted: false,
-            OR: [
-              { supplierId: 'supplier-1' },
-              {
-                inspection: {
-                  is: {
-                    category: 'PROCESS',
-                    isDeleted: false,
-                    teamId: { in: ['team-1'] },
-                  },
-                },
-              },
-            ],
+            supplierId: { in: ['supplier-1'] },
           },
         }),
       );
     });
 
-    it('does not fall back to names for incoming supplier issues', async () => {
+    it('does not fall back to names or inspection relations', async () => {
       vi.mocked(prisma.quality_records.count).mockResolvedValue(0);
       vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
 
       await InspectionIssueListService.findSupplierIssues({
-        category: 'INCOMING',
         supplierId: 'supplier-1',
       });
 
       expect(prisma.quality_records.count).toHaveBeenCalledWith({
         where: {
           isDeleted: false,
-          OR: [
-            { supplierId: 'supplier-1' },
-            {
-              inspection: {
-                is: {
-                  category: 'INCOMING',
-                  isDeleted: false,
-                  supplierId: 'supplier-1',
-                },
-              },
-            },
-          ],
+          supplierId: { in: ['supplier-1'] },
         },
       });
     });
 
-    it('returns empty process issues without a TEAM mapping', async () => {
+    it('keeps manual process issues visible without a TEAM mapping', async () => {
+      vi.mocked(prisma.quality_records.count).mockResolvedValue(1);
+      vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
       await expect(
         InspectionIssueListService.findSupplierIssues({
-          category: 'PROCESS',
           supplierId: 'supplier-1',
-          teamIds: [],
         }),
-      ).resolves.toEqual({ items: [], total: 0 });
-      expect(prisma.quality_records.findMany).not.toHaveBeenCalled();
+      ).resolves.toEqual({ items: [], total: 1 });
+      expect(prisma.quality_records.findMany).toHaveBeenCalled();
     });
   });
 

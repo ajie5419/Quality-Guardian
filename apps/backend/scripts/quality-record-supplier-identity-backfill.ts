@@ -160,9 +160,6 @@ function resolveInspectionCandidate(
 export function resolveQualityRecordSupplierIdentity(
   input: QualityRecordIdentityInput,
 ): SupplierIdentityResolution {
-  if (input.existingSupplierId && !input.existingSupplier) {
-    return { action: 'unresolved', reason: 'INVALID_EXISTING_ID' };
-  }
   const inspectionCandidate = input.inspection
     ? resolveInspectionCandidate(input.inspection)
     : null;

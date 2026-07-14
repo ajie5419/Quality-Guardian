@@ -81,7 +81,8 @@ public 报检禁止：
 - 查询软删除表时必须包含 `isDeleted: false`。
 - 新增业务逻辑必须附带单元测试。
 - public API 只能暴露匿名提交所需的最小数据。
-- 供应商画像和评分读取检验记录时必须消费共享 `resolveSupplierInspectionPolicy()`：普通供应商和外部加工按 `supplierId`，驻厂队伍和外部服务按 `teamId` 及 `supplier_identity_links` 映射，两个身份域不得用 OR 混查；名称字段仅是展示快照或搜索条件，不能作为关联回退。
+- 供应商画像和评分读取检验记录时必须消费共享 `resolveSupplierInspectionPolicy()`：普通供应商和外部加工按 `supplierId`，驻厂队伍和外部服务按 `teamId` 及 `supplier_identity_links` 映射，两个身份域不得用 OR 混查；工程问题统一按 `quality_records.supplierId` 读取。名称字段仅是展示快照或搜索条件，不能作为在线关联回退。
+- 供应商历史项目直接以报检任务主表的 `supplierId/teamId` 归属，合并主工单和多工单明细后按工单去重、服务端分页；不得要求任务已关联检验记录。
 - 检验记录自身事务提交后发布 `inspection_record.changed`；报检关闭在外层事务提交后发布，禁止在未提交事务内刷新供应商快照。
 
 ## 供应商身份契约
@@ -91,13 +92,13 @@ public 报检禁止：
 - 过程检验保存 `teamId + team`，通过 `supplier_identity_links` 解析供应商 ID；禁止比较 TEAM 名称和供应商名称。
 - 关联不合格项必须优先继承已提交检验记录返回的 canonical `supplierId/supplierName`，不信任提交前的表单快照。
 - `inspection_issue.changed` 携带供应商名称时必须同时携带 `supplierIds`；`inspection_record.changed` 携带供应商或 TEAM 名称时必须同时携带对应的 `supplierIds/teamIds`。
-- 存量回填先处理报检任务的 `teamId/supplierId`，再处理 `inspections`，最后以检验记录作为证据处理 `quality_records`；无效 ID、冲突和缺少 TEAM 映射只写入 `unresolved_master_data_refs`。
+- 存量回填先处理报检任务的 `teamId/supplierId`，再处理 `inspections`，最后以关联检验或唯一精确供应商名称作为确定性证据处理 `quality_records`；模糊、重名、冲突和缺少 TEAM 映射的数据写入 `unresolved_master_data_refs`。
 
 ## 供应商身份治理 wave 状态
 
 - 本模块的进货检验、驻厂过程检验和不合格项在线写入已切换到 ID-first：进货写入 `supplierId + supplierName`，过程写入 `teamId + team`，服务端校验 ID 并生成 canonical 名称快照。
 - 检验记录变更事件使用 `supplierIds/teamIds` 驱动下游刷新；名称集合只用于日志和诊断，不能单独触发画像或评分刷新。
-- 存量回填支持 dry-run/apply、分批和并发条件更新；无法解析、无效旧 ID、冲突或缺少 TEAM 映射的记录进入 `unresolved_master_data_refs`，不静默猜测。
+- 存量回填支持 dry-run/apply、分批和并发条件更新；无效旧 ID 仅在存在关联检验证据或唯一精确名称候选时修复，其他无法解析、冲突或缺少 TEAM 映射的记录进入 `unresolved_master_data_refs`，不静默猜测。
 - 本 wave 只覆盖供应商身份相关的检验链路，不代表其他主数据（部门、项目、工序等）已完成全项目 `ID_ONLY` 迁移。未纳入模块必须显式标注治理阶段并单独推进。
 
 跨模块的通用规则见 `docs/master-data-identity-governance.md`。

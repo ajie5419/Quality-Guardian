@@ -80,7 +80,7 @@ describe('quality record supplier identity backfill', () => {
     });
   });
 
-  it('does not overwrite an invalid existing supplier ID', () => {
+  it('repairs an invalid supplier ID from canonical inspection evidence', () => {
     expect(
       resolveQualityRecordSupplierIdentity({
         existingSupplier: null,
@@ -92,6 +92,36 @@ describe('quality record supplier identity backfill', () => {
           supplierByName: supplierA,
         },
         supplierByRecordName: supplierA,
+      }),
+    ).toEqual({
+      action: 'update',
+      candidate: supplierA,
+      reason: 'INCOMING_INSPECTION_ID',
+    });
+  });
+
+  it('repairs a manual issue from one exact supplier name candidate', () => {
+    expect(
+      resolveQualityRecordSupplierIdentity({
+        existingSupplier: null,
+        existingSupplierId: 'legacy-name-id',
+        inspection: null,
+        supplierByRecordName: supplierA,
+      }),
+    ).toEqual({
+      action: 'update',
+      candidate: supplierA,
+      reason: 'QUALITY_RECORD_NAME',
+    });
+  });
+
+  it('keeps an invalid supplier ID unresolved without deterministic evidence', () => {
+    expect(
+      resolveQualityRecordSupplierIdentity({
+        existingSupplier: null,
+        existingSupplierId: 'legacy-id',
+        inspection: null,
+        supplierByRecordName: null,
       }),
     ).toEqual({
       action: 'unresolved',

@@ -1,6 +1,6 @@
-import type { Prisma } from '@prisma/client';
-
+import { Prisma } from '@prisma/client';
 import prisma from '~/utils/prisma';
+import { parsePagination } from '~/utils/query-helpers';
 
 export interface SupplierHistoryProject {
   lastSubmittedAt: null | string;
@@ -8,68 +8,87 @@ export interface SupplierHistoryProject {
   workOrderNumber: string;
 }
 
-function buildSupplierRequestWhere(params: {
-  category: 'INCOMING' | 'PROCESS';
+function buildRequestIdentityFilter(params: {
   identitySource: 'supplier' | 'team';
   supplierId: string;
   teamIds: string[];
-}): Prisma.qms_inspection_requestsWhereInput {
-  const inspectionIdentity: Prisma.inspectionsWhereInput = {
-    category: params.category,
-    ...(params.identitySource === 'team'
-      ? { teamId: { in: params.teamIds } }
-      : { supplierId: params.supplierId }),
-  };
-  return {
-    isDeleted: false,
-    OR: [
-      { inspection: { is: inspectionIdentity } },
-      {
-        inspectionLinks: {
-          some: { inspection: { is: inspectionIdentity } },
-        },
-      },
-    ],
-  };
+}) {
+  return params.identitySource === 'team'
+    ? Prisma.sql`request_row.teamId IN (${Prisma.join(params.teamIds)})`
+    : Prisma.sql`request_row.supplierId = ${params.supplierId}`;
+}
+
+function buildSupplierRequestWorkOrdersSql(params: {
+  identitySource: 'supplier' | 'team';
+  supplierId: string;
+  teamIds: string[];
+}) {
+  const identityFilter = buildRequestIdentityFilter(params);
+  return Prisma.sql`
+    SELECT request_row.workOrderNumber, request_row.submittedAt
+    FROM qms_inspection_requests AS request_row
+    WHERE request_row.isDeleted = 0 AND ${identityFilter}
+
+    UNION ALL
+
+    SELECT request_work_order.workOrderNumber, request_row.submittedAt
+    FROM qms_inspection_request_work_orders AS request_work_order
+    INNER JOIN qms_inspection_requests AS request_row
+      ON request_row.id = request_work_order.requestId
+    WHERE request_row.isDeleted = 0 AND ${identityFilter}
+  `;
 }
 
 export const InspectionRequestHistoryService = {
   async getSupplierHistoryProjects(params: {
-    category: 'INCOMING' | 'PROCESS';
     identitySource: 'supplier' | 'team';
-    limit?: number;
+    page?: number;
+    pageSize?: number;
     supplierId: string;
     teamIds: string[];
-  }): Promise<SupplierHistoryProject[]> {
-    const limit = Math.min(Math.max(Number(params.limit) || 50, 1), 100);
-    const grouped = await prisma.qms_inspection_requests.groupBy({
-      by: ['workOrderNumber'],
-      where: buildSupplierRequestWhere(params),
-      _max: { submittedAt: true },
-      orderBy: { _max: { submittedAt: 'desc' } },
-      take: limit,
-    });
-    const workOrderNumbers = grouped.map((item) => item.workOrderNumber);
-    if (workOrderNumbers.length === 0) return [];
+  }): Promise<{ items: SupplierHistoryProject[]; total: number }> {
+    if (params.identitySource === 'team' && params.teamIds.length === 0) {
+      return { items: [], total: 0 };
+    }
 
-    const workOrders = await prisma.work_orders.findMany({
-      select: { projectName: true, workOrderNumber: true },
-      where: {
-        workOrderNumber: { in: workOrderNumbers },
-        isDeleted: false,
-      },
-    });
-    const projectNameByWorkOrder = new Map(
-      workOrders.map((item) => [item.workOrderNumber, item.projectName]),
-    );
+    const { pageSize, skip } = parsePagination(params);
+    const requestWorkOrdersSql = buildSupplierRequestWorkOrdersSql(params);
+    const [countRows, rows] = await Promise.all([
+      prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
+        SELECT COUNT(*) AS total
+        FROM (
+          SELECT history_row.workOrderNumber
+          FROM (${requestWorkOrdersSql}) AS history_row
+          GROUP BY history_row.workOrderNumber
+        ) AS grouped_history
+      `),
+      prisma.$queryRaw<
+        Array<{
+          lastSubmittedAt: Date | null;
+          projectName: null | string;
+          workOrderNumber: string;
+        }>
+      >(Prisma.sql`
+        SELECT
+          history_row.workOrderNumber,
+          MAX(history_row.submittedAt) AS lastSubmittedAt,
+          MAX(work_order.projectName) AS projectName
+        FROM (${requestWorkOrdersSql}) AS history_row
+        LEFT JOIN work_orders AS work_order
+          ON work_order.workOrderNumber = history_row.workOrderNumber
+        GROUP BY history_row.workOrderNumber
+        ORDER BY lastSubmittedAt DESC, history_row.workOrderNumber ASC
+        LIMIT ${pageSize} OFFSET ${skip}
+      `),
+    ]);
 
-    return grouped.map((item) => ({
-      workOrderNumber: item.workOrderNumber,
-      projectName: projectNameByWorkOrder.get(item.workOrderNumber) ?? null,
-      lastSubmittedAt:
-        item._max.submittedAt instanceof Date
-          ? item._max.submittedAt.toISOString()
-          : null,
-    }));
+    return {
+      items: rows.map((row) => ({
+        workOrderNumber: row.workOrderNumber,
+        projectName: row.projectName,
+        lastSubmittedAt: row.lastSubmittedAt?.toISOString() ?? null,
+      })),
+      total: Number(countRows[0]?.total || 0),
+    };
   },
 };

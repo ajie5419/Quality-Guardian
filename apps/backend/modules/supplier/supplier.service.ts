@@ -391,7 +391,10 @@ export const SupplierService = {
     };
   },
 
-  async getHistoryProjects(id: string) {
+  async getHistoryProjects(
+    id: string,
+    params: { page?: number; pageSize?: number } = {},
+  ) {
     const supplier = await prisma.suppliers.findFirst({
       select: {
         category: true,
@@ -408,8 +411,9 @@ export const SupplierService = {
         ? await SupplierIdentityService.teamIdsForSupplier(supplier.id)
         : [];
     return InspectionService.getSupplierHistoryProjects({
-      category: policy.inspectionCategory,
       identitySource: policy.identitySource,
+      page: params.page,
+      pageSize: params.pageSize,
       supplierId: supplier.id,
       teamIds,
     });
@@ -454,28 +458,15 @@ export const SupplierService = {
     params: { page?: number; pageSize?: number } = {},
   ) {
     const supplier = await prisma.suppliers.findFirst({
-      select: {
-        category: true,
-        id: true,
-        name: true,
-        outsourcingMode: true,
-      },
+      select: { id: true },
       where: { id, isDeleted: false },
     });
     if (!supplier) return null;
 
-    const policy = resolveSupplierInspectionPolicy(supplier);
-    const teamIds =
-      policy.identitySource === 'team'
-        ? await SupplierIdentityService.teamIdsForSupplier(supplier.id)
-        : [];
-
     return InspectionService.findSupplierIssues({
-      category: policy.inspectionCategory,
       page: params.page,
       pageSize: params.pageSize,
       supplierId: supplier.id,
-      teamIds,
     });
   },
 };
