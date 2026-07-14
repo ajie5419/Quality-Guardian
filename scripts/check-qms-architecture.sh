@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Quality Guardian Architecture Check v2 — phase 8 step 40
+# Quality Guardian Architecture Check v3
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="${QMS_ARCH_ROOT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 QMS_VIEWS_DIR="$ROOT_DIR/apps/web-antd/src/views/qms"
 BACKEND_DIR="$ROOT_DIR/apps/backend"
+SOURCE_RULE_CHECKER="$SCRIPT_DIR/check-qms-source-rules.mjs"
 MAX_INDEX_LINES=500
 BASELINE_FILE="${QMS_ARCH_BASELINE:-$ROOT_DIR/scripts/qms-architecture-baseline.txt}"
 SCOPE="${QMS_ARCH_SCOPE:-changed}"
@@ -25,6 +27,7 @@ declare -a violated_rules=()
 declare -a QMS_VIEW_TARGETS=()
 declare -a API_TS_TARGETS=()
 declare -a MODULE_TS_TARGETS=()
+declare -a BACKEND_SOURCE_TARGETS=()
 declare -a REPO_TS_TARGETS=()
 declare -a BACKEND_TEST_TARGETS=()
 
@@ -39,8 +42,18 @@ Rules:
   B-R1: api/ files must not import prisma directly
   B-R2: api/ files must stay thin
   B-R3: api/ files must not bypass request body typing
+  B-S1: modules/ source files must not exceed 500 lines
   B-S2: modules/ files must not cast Prisma delegates to any
   B-S3: modules/ files must not use execSync
+  B-S4: backend IDs must not be generated with Date.now()
+  B-S5: modules/ source files must not use console.*
+  B-T1: backend source must not assert values as any
+  B-T2: backend source must not use double assertions through unknown
+  B-T3: backend source must not use non-null assertions
+  B-M1: cross-module imports must use the target module index
+  B-M2: conditions must not branch on Chinese string literals
+  B-E1: empty catch blocks are forbidden
+  B-E2: catch blocks must record errors with an approved logger
   B-SEC1: raw SQL must not combine $queryRawUnsafe with template strings
   B-MAP1: new module/route/view directories must update code_map.md (changed mode only)
   B-TEST1: backend tests must not live in centralized __tests__/tests/test directories
@@ -175,6 +188,7 @@ load_targets() {
   collect_targets "$TMP_DIR/qms-view-targets.txt" '^apps/web-antd/src/views/qms/.*\.(vue|ts|tsx|js|jsx)$'
   collect_targets "$TMP_DIR/api-ts-targets.txt" '^apps/backend/api/.*\.ts$'
   collect_targets "$TMP_DIR/module-ts-targets.txt" '^apps/backend/modules/.*\.ts$'
+  collect_targets "$TMP_DIR/backend-source-targets.txt" '^apps/backend/(api|middleware|modules|utils)/.*\.ts$'
   collect_targets "$TMP_DIR/repo-ts-targets.txt" '.*\.ts$'
   collect_targets "$TMP_DIR/backend-test-targets.txt" '^apps/backend/.*\.test\.ts$'
 
@@ -191,6 +205,12 @@ load_targets() {
   done <"$TMP_DIR/module-ts-targets.txt"
 
   while IFS= read -r file; do
+    if [[ -n "$file" && -f "$file" && "$file" != *.test.ts && "$file" != *.spec.ts && "$file" != */__tests__/* ]]; then
+      BACKEND_SOURCE_TARGETS+=("$file")
+    fi
+  done <"$TMP_DIR/backend-source-targets.txt"
+
+  while IFS= read -r file; do
     [[ -n "$file" && -f "$file" ]] && REPO_TS_TARGETS+=("$file")
   done <"$TMP_DIR/repo-ts-targets.txt"
 
@@ -205,6 +225,13 @@ baseline_r3_limit() {
   awk -F'|' -v path="$repo_path" '$1 == "R3" && $2 == path { print $3; found = 1 } END { if (!found) exit 1 }' "$BASELINE_FILE"
 }
 
+baseline_line_limit() {
+  local rule="$1"
+  local repo_path="$2"
+  [[ -f "$BASELINE_FILE" ]] || return 1
+  awk -F'|' -v rule="$rule" -v path="$repo_path" '$1 == rule && $2 == path { print $3; found = 1 } END { if (!found) exit 1 }' "$BASELINE_FILE"
+}
+
 baseline_has_test2() {
   local repo_path="$1"
   [[ -f "$BASELINE_FILE" ]] || return 1
@@ -217,17 +244,18 @@ grep_rule() {
   local pattern="$3"
   shift 3
   local file=''
+  local line=''
   local match=''
   local repo_path=''
 
-  for file in "$@"; do
-    [[ -f "$file" ]] || continue
-    while IFS= read -r match; do
-      [[ -n "$match" ]] || continue
-      repo_path="$(to_repo_path "$file")"
-      report_violation "$rule" "$repo_path:$match" "$message"
-    done < <(grep -nE "$pattern" "$file" || true)
-  done
+  while IFS= read -r match; do
+    [[ -n "$match" ]] || continue
+    file="${match%%:*}"
+    match="${match#*:}"
+    line="${match%%:*}"
+    repo_path="$(to_repo_path "$file")"
+    report_violation "$rule" "$repo_path:$line" "$message"
+  done < <(grep -nHE "$pattern" "$@" || true)
 }
 
 count_lines_violation() {
@@ -322,9 +350,76 @@ check_b_s2() {
   grep_rule "B-S2" "Prisma delegate casts to any are not allowed in modules." '\(prisma\.[a-zA-Z_]+ as any\)' "${MODULE_TS_TARGETS[@]}"
 }
 
+check_b_s1() {
+  local file=''
+  local repo_path=''
+  local lines=''
+  local baseline_limit=''
+
+  (( ${#MODULE_TS_TARGETS[@]} == 0 )) && return 0
+  for file in "${MODULE_TS_TARGETS[@]}"; do
+    [[ "$file" == *.test.ts || "$file" == *.spec.ts || "$file" == */__tests__/* ]] && continue
+    repo_path="$(to_repo_path "$file")"
+    lines="$(wc -l <"$file" | tr -d ' ')"
+    (( lines <= 500 )) && continue
+
+    baseline_limit=''
+    if baseline_limit="$(baseline_line_limit "B-S1" "$repo_path")" && (( lines <= baseline_limit )); then
+      echo -e "${YELLOW}Baseline B-S1:${NC} $repo_path ($lines lines, baseline <= $baseline_limit)"
+      baseline_hits=$((baseline_hits + 1))
+    elif [[ -n "$baseline_limit" ]]; then
+      report_violation "B-S1" "$repo_path:$lines" "Module source exceeds baseline $baseline_limit lines."
+    else
+      report_violation "B-S1" "$repo_path:$lines" "Module source exceeds 500 lines."
+    fi
+  done
+}
+
 check_b_s3() {
   (( ${#MODULE_TS_TARGETS[@]} == 0 )) && return 0
   grep_rule "B-S3" "Use async process execution instead of execSync." 'execSync' "${MODULE_TS_TARGETS[@]}"
+}
+
+check_b_s5() {
+  local file=''
+  local -a source_files=()
+
+  (( ${#MODULE_TS_TARGETS[@]} == 0 )) && return 0
+  for file in "${MODULE_TS_TARGETS[@]}"; do
+    [[ "$file" == *.test.ts || "$file" == *.spec.ts || "$file" == */__tests__/* ]] && continue
+    source_files+=("$file")
+  done
+  (( ${#source_files[@]} == 0 )) && return 0
+  grep_rule "B-S5" "Use createModuleLogger instead of console.* in modules." 'console\.(log|warn|error)' "${source_files[@]}"
+}
+
+check_backend_source_rules() {
+  local output_file="$TMP_DIR/source-rule-output.txt"
+  local files_file="$TMP_DIR/backend-source-files.txt"
+  local kind=''
+  local rule=''
+  local location=''
+  local message=''
+
+  (( ${#BACKEND_SOURCE_TARGETS[@]} == 0 )) && return 0
+  printf '%s\n' "${BACKEND_SOURCE_TARGETS[@]}" >"$files_file"
+  if ! node "$SOURCE_RULE_CHECKER" \
+    --root "$ROOT_DIR" \
+    --baseline "$BASELINE_FILE" \
+    --files-from "$files_file" >"$output_file"; then
+    echo -e "${RED}Backend source rule checker failed.${NC}"
+    exit 2
+  fi
+
+  while IFS=$'\t' read -r kind rule location message; do
+    [[ -n "$kind" ]] || continue
+    if [[ "$kind" == "BASELINE" ]]; then
+      echo -e "${YELLOW}Baseline $rule:${NC} $location ($message)"
+      baseline_hits=$((baseline_hits + 1))
+    elif [[ "$kind" == "VIOLATION" ]]; then
+      report_violation "$rule" "$location" "$message"
+    fi
+  done <"$output_file"
 }
 
 check_b_sec1() {
@@ -426,7 +521,7 @@ echo "baseline: $BASELINE_FILE"
 echo
 
 load_targets
-echo "target files: qms=${#QMS_VIEW_TARGETS[@]} api=${#API_TS_TARGETS[@]} modules=${#MODULE_TS_TARGETS[@]} repo-ts=${#REPO_TS_TARGETS[@]} backend-tests=${#BACKEND_TEST_TARGETS[@]}"
+echo "target files: qms=${#QMS_VIEW_TARGETS[@]} api=${#API_TS_TARGETS[@]} modules=${#MODULE_TS_TARGETS[@]} backend-source=${#BACKEND_SOURCE_TARGETS[@]} repo-ts=${#REPO_TS_TARGETS[@]} backend-tests=${#BACKEND_TEST_TARGETS[@]}"
 echo
 
 check_r1
@@ -435,8 +530,11 @@ check_b_d1
 check_b_r1
 check_b_r2
 check_b_r3
+check_b_s1
 check_b_s2
 check_b_s3
+check_b_s5
+check_backend_source_rules
 check_b_sec1
 check_b_map1
 check_b_test1
@@ -451,13 +549,3 @@ fi
 
 echo "0 violations across 0 rules"
 echo -e "${GREEN}QMS architecture check passed.${NC}"
-
-# === Backend rules pending cleanup ===
-# B-S1 modules/ single file <= 500 lines       — 16 violations, scheduled for phase 9+
-# B-S4 Date.now() for ID generation only       — needs refined matcher (not all Date.now() are IDs)
-# B-S5 no console.* in modules/                — 3 violations, low effort, schedule TBD
-# B-T1 no ` as any` in modules/                — ~12 violations
-# B-T2 no `as unknown as` in modules/ (utils excluded for lib bridges) — ~7 violations
-# B-M1 cross-module non-index import (A != B)  — many violations, requires module index re-exports
-# B-T3 non-null assertion `!`                  — scan-only initially
-# B-M2 Chinese string literal in condition     — needs pre-scan

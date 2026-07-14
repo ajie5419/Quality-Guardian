@@ -72,7 +72,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Run QMS architecture check
-        run: pnpm run check:qms-arch
+        run: pnpm run check:qms-arch:all
 
   unit-tests:
     name: Unit Tests
