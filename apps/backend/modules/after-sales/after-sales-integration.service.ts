@@ -38,7 +38,7 @@ export const AfterSalesIntegrationService = {
   async updateQualityLossFields(params: { actualClaim?: number; id: string }) {
     const current = await prisma.after_sales.findUnique({
       where: { id: params.id },
-      select: { supplierBrand: true },
+      select: { supplierBrand: true, supplierBrandId: true },
     });
     const updated = await prisma.after_sales.update({
       where: { id: params.id },
@@ -50,6 +50,7 @@ export const AfterSalesIntegrationService = {
     await QualityLossIndexService.upsertFromAfterSales(updated);
     eventBus.emit('after_sales.changed', {
       supplierBrands: [current?.supplierBrand],
+      supplierIds: [current?.supplierBrandId],
     });
   },
 

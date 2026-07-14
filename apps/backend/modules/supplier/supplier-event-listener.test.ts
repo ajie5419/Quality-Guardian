@@ -8,10 +8,11 @@ const handlers = vi.hoisted(
     new Map<
       string,
       (payload: {
+        supplierBrands?: Array<null | string | undefined>;
         supplierIds?: Array<null | string | undefined>;
-        supplierNames: Array<null | string | undefined>;
+        supplierNames?: Array<null | string | undefined>;
         teamIds?: Array<null | string | undefined>;
-        teamNames: Array<null | string | undefined>;
+        teamNames?: Array<null | string | undefined>;
       }) => Promise<void>
     >(),
 );
@@ -66,9 +67,20 @@ describe('supplierEventListener', () => {
       'supplier-1',
       'supplier-team-1',
     ]);
-    expect(refreshBySupplierNames).toHaveBeenCalledWith([
-      'Supplier A',
-      'Shared Partner',
-    ]);
+    expect(refreshBySupplierNames).not.toHaveBeenCalled();
+  });
+
+  it('refreshes after-sales snapshots by canonical supplier ID', async () => {
+    registerSupplierEventListeners();
+    const handler = handlers.get('after_sales.changed');
+
+    await handler?.({
+      supplierBrands: ['Supplier A'],
+      supplierIds: ['supplier-1'],
+      teamNames: [],
+    });
+
+    expect(refreshBySupplierIds).toHaveBeenCalledWith(['supplier-1']);
+    expect(refreshBySupplierNames).not.toHaveBeenCalled();
   });
 });

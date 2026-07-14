@@ -22,7 +22,7 @@ export const AfterSalesRouteService = {
   async batchDelete(ids: string[]) {
     const existing = await prisma.after_sales.findMany({
       where: { id: { in: ids } },
-      select: { supplierBrand: true },
+      select: { supplierBrand: true, supplierBrandId: true },
     });
     const result = await prisma.after_sales.updateMany({
       where: { id: { in: ids } },
@@ -39,6 +39,7 @@ export const AfterSalesRouteService = {
     await QualityLossIndexService.softDeleteSourceMany('External', ids);
     eventBus.emit('after_sales.changed', {
       supplierBrands: existing.map((item) => item.supplierBrand),
+      supplierIds: existing.map((item) => item.supplierBrandId),
     });
     return result.count;
   },
@@ -70,6 +71,7 @@ export const AfterSalesRouteService = {
     await QualityLossIndexService.upsertFromAfterSales(created);
     eventBus.emit('after_sales.changed', {
       supplierBrands: [created.supplierBrand],
+      supplierIds: [created.supplierBrandId],
     });
     return created;
   },
@@ -81,6 +83,7 @@ export const AfterSalesRouteService = {
     const createdBy = String(userinfo?.id || '') || undefined;
     let successCount = 0;
     const rowErrors = [];
+    const supplierIdsToRefresh: Array<null | string | undefined> = [];
     const supplierNamesToRefresh: Array<null | string | undefined> = [];
     let serialSeed = await getNextAfterSalesSerialNumber();
     for (const [index, item] of items.entries()) {
@@ -112,6 +115,9 @@ export const AfterSalesRouteService = {
         if (created.supplierBrand) {
           supplierNamesToRefresh.push(created.supplierBrand);
         }
+        if (created.supplierBrandId) {
+          supplierIdsToRefresh.push(created.supplierBrandId);
+        }
         successCount++;
       } catch (error) {
         const message = toImportErrorMessage(error);
@@ -128,6 +134,7 @@ export const AfterSalesRouteService = {
     }
     eventBus.emit('after_sales.changed', {
       supplierBrands: supplierNamesToRefresh,
+      supplierIds: supplierIdsToRefresh,
     });
     return buildImportSummary({
       rowErrors,

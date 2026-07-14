@@ -12,6 +12,7 @@ const TEST_FILE_PATTERN =
 const ID_NAME_PATTERN = /^(?:id|.*(?:Id|ID|_id))$/u;
 const ERROR_LOG_FUNCTIONS = new Set(['logApiError', 'logDatabaseError']);
 const INSPECTION_CHANGED_EVENTS = new Set([
+  'after_sales.changed',
   'inspection_issue.changed',
   'inspection_record.changed',
 ]);
@@ -534,6 +535,7 @@ function analyzeIdentityFile(rootDir, filePath) {
     if (!payload) return;
 
     for (const [nameProperty, idProperty] of [
+      ['supplierBrands', 'supplierIds'],
       ['supplierNames', 'supplierIds'],
       ['teamNames', 'teamIds'],
       ['teams', 'teamIds'],

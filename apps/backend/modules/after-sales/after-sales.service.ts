@@ -122,6 +122,7 @@ export const AfterSalesService = {
       await buildGovernedAfterSalesUpdateData(bodyRecord);
     const supplierChanged = updateData.supplierBrand !== undefined;
     let previousSupplierBrand: null | string | undefined;
+    let previousSupplierId: null | string | undefined;
 
     if (costsChanged || supplierChanged) {
       const current = await prisma.after_sales.findUnique({
@@ -130,12 +131,14 @@ export const AfterSalesService = {
           laborTravelCost: true,
           materialCost: true,
           supplierBrand: true,
+          supplierBrandId: true,
         },
       });
       if (costsChanged && !current) {
         throw new Error('AFTER_SALES_NOT_FOUND');
       }
       previousSupplierBrand = current?.supplierBrand;
+      previousSupplierId = current?.supplierBrandId;
     }
 
     const updated = await prisma.after_sales.update({
@@ -144,10 +147,8 @@ export const AfterSalesService = {
     });
     await QualityLossIndexService.upsertFromAfterSales(updated);
     eventBus.emit('after_sales.changed', {
-      supplierBrands: [
-        previousSupplierBrand,
-        updateData.supplierBrand as null | string | undefined,
-      ],
+      supplierBrands: [previousSupplierBrand, updated.supplierBrand],
+      supplierIds: [previousSupplierId, updated.supplierBrandId],
     });
   },
 

@@ -56,7 +56,7 @@ Rules:
   B-E1: empty catch blocks are forbidden
   B-E2: catch blocks must record errors with an approved logger
   B-ID1: selector value keys must use canonical IDs, not names
-  B-ID2: inspection change events must pair identity names with IDs
+  B-ID2: supplier-related change events must pair identity names with IDs
   B-ID3: controlled supplier writes must pair supplierName with supplierId
   B-SEC1: raw SQL must not combine $queryRawUnsafe with template strings
   B-MAP1: new module/route/view directories must update code_map.md (changed mode only)

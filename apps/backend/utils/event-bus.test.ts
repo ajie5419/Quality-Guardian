@@ -19,10 +19,16 @@ describe('eventBus', () => {
     const handler = vi.fn();
     eventBus.on('after_sales.changed', handler);
 
-    eventBus.emit('after_sales.changed', { supplierBrands: ['Acme'] });
+    eventBus.emit('after_sales.changed', {
+      supplierBrands: ['Acme'],
+      supplierIds: ['supplier-1'],
+    });
     await new Promise((resolve) => setImmediate(resolve));
 
-    expect(handler).toHaveBeenCalledWith({ supplierBrands: ['Acme'] });
+    expect(handler).toHaveBeenCalledWith({
+      supplierBrands: ['Acme'],
+      supplierIds: ['supplier-1'],
+    });
   });
 
   it('isolates handler errors from the emitter', async () => {
@@ -33,7 +39,10 @@ describe('eventBus', () => {
     eventBus.on('after_sales.changed', ok);
 
     expect(() =>
-      eventBus.emit('after_sales.changed', { supplierBrands: [] }),
+      eventBus.emit('after_sales.changed', {
+        supplierBrands: [],
+        supplierIds: [],
+      }),
     ).not.toThrow();
     await new Promise((resolve) => setImmediate(resolve));
     expect(ok).toHaveBeenCalled();
@@ -44,7 +53,10 @@ describe('eventBus', () => {
       throw new Error('async boom');
     });
 
-    eventBus.emit('after_sales.changed', { supplierBrands: ['X'] });
+    eventBus.emit('after_sales.changed', {
+      supplierBrands: ['X'],
+      supplierIds: ['supplier-1'],
+    });
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(mockLoggerWarn).toHaveBeenCalledOnce();

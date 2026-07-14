@@ -192,11 +192,20 @@ const issuePayload = {
 };
 eventBus.emit('inspection_issue.changed', issuePayload);
 
+eventBus.emit('after_sales.changed', {
+  supplierBrands: ['Supplier A'],
+});
+
 eventBus.emit('inspection_record.changed', {
   supplierIds: ['supplier-1'],
   supplierNames: ['Supplier A'],
   teamNames: ['Team A'],
   teams: ['Team A'],
+});
+
+eventBus.emit('after_sales.changed', {
+  supplierBrands: ['Supplier A'],
+  supplierIds: ['supplier-1'],
 });
 
 const issueData = { supplierName: 'Supplier A' };

@@ -32,6 +32,7 @@ export default defineEventHandler(async (event) => {
       await buildGovernedAfterSalesUpdateData(bodyRecord);
     const supplierChanged = updateData.supplierBrand !== undefined;
     let previousSupplierBrand: null | string | undefined;
+    let previousSupplierId: null | string | undefined;
 
     if (costsChanged || supplierChanged) {
       const current = await prisma.after_sales.findUnique({
@@ -40,12 +41,14 @@ export default defineEventHandler(async (event) => {
           laborTravelCost: true,
           materialCost: true,
           supplierBrand: true,
+          supplierBrandId: true,
         },
       });
       if (costsChanged && !current) {
         return notFoundResponse(event, '售后记录不存在');
       }
       previousSupplierBrand = current?.supplierBrand;
+      previousSupplierId = current?.supplierBrandId;
     }
 
     const updated = await prisma.after_sales.update({
@@ -54,10 +57,8 @@ export default defineEventHandler(async (event) => {
     });
     await QualityLossIndexService.upsertFromAfterSales(updated);
     eventBus.emit('after_sales.changed', {
-      supplierBrands: [
-        previousSupplierBrand,
-        updateData.supplierBrand as null | string | undefined,
-      ],
+      supplierBrands: [previousSupplierBrand, updated.supplierBrand],
+      supplierIds: [previousSupplierId, updated.supplierBrandId],
     });
     if (bodyRecord.photos !== undefined) {
       await FileStorageService.registerReferencesFromAttachments({

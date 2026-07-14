@@ -32,7 +32,7 @@ async function refresh(params: {
     if (supplierIds.length > 0) {
       await SupplierScoreSnapshotService.refreshBySupplierIds(supplierIds);
     }
-    if (supplierNames.length > 0) {
+    if (supplierIds.length === 0 && supplierNames.length > 0) {
       await SupplierScoreSnapshotService.refreshBySupplierNames(supplierNames);
     }
   } catch (error) {
@@ -66,7 +66,10 @@ export function registerSupplierEventListeners(): void {
   registered = true;
 
   eventBus.on('after_sales.changed', async (payload) => {
-    await refresh({ supplierNames: uniqueNonEmpty(payload.supplierBrands) });
+    await refresh({
+      supplierIds: uniqueNonEmpty(payload.supplierIds),
+      supplierNames: uniqueNonEmpty(payload.supplierBrands),
+    });
   });
 
   eventBus.on('inspection_issue.changed', async (payload) => {
