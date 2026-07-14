@@ -198,6 +198,11 @@ function createConsoleMethod(
 
         break;
       }
+      case 'info': {
+        console.info('[INFO]', merged, message);
+
+        break;
+      }
       case 'trace': {
         console.debug('[TRACE]', merged, message);
 
@@ -207,9 +212,6 @@ function createConsoleMethod(
         console.warn('[WARN]', merged, message);
 
         break;
-      }
-      default: {
-        console.info('[INFO]', merged, message);
       }
     }
   };

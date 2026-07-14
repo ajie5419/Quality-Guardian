@@ -262,7 +262,7 @@ export const QualityLossRouteUpdateService = {
           });
           break;
         }
-        default: {
+        case QUALITY_LOSS_SOURCE.MANUAL: {
           const hasManualContext = [
             'partId',
             'partName',

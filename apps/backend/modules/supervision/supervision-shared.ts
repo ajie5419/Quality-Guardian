@@ -162,8 +162,10 @@ export function summarizePlanTasks(tasks: SupervisionPlanTask[]) {
         summary.inProgress += 1;
         break;
       }
-      default: {
+      case 'NOT_STARTED':
+      case 'RISK': {
         summary.notStarted += 1;
+        break;
       }
     }
   }

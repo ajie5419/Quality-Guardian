@@ -7,7 +7,7 @@ import prisma from '~/utils/prisma';
 import { isPrismaMissingColumnError } from '~/utils/prisma-error';
 
 export async function project_docs_projects_index_get(event: H3Event) {
-  const userinfo = await verifyAccessToken(event);
+  const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
 
   try {

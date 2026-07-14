@@ -175,6 +175,9 @@ export const WorkOrderRequirementService = {
     };
 
     switch (filter) {
+      case 'all': {
+        break;
+      }
       case 'confirmed': {
         where.confirmStatus = 'CONFIRMED';
         break;
@@ -186,9 +189,6 @@ export const WorkOrderRequirementService = {
       }
       case 'pending': {
         where.NOT = { confirmStatus: 'CONFIRMED' };
-        break;
-      }
-      default: {
         break;
       }
     }

@@ -48,11 +48,16 @@ async function main() {
   );
 }
 
-main()
-  .catch((error: unknown) => {
-    throw error;
-  })
-  .finally(async () => {
+async function run() {
+  try {
+    await main();
+  } finally {
     await prisma.$disconnect();
     redis.disconnect();
-  });
+  }
+}
+
+void run().catch((error: unknown) => {
+  logger.fatal({ err: error }, 'quality-loss index backfill failed');
+  process.exitCode = 1;
+});

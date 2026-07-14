@@ -42,7 +42,7 @@ export const eventBus = {
     emitter.on(event, (payload: DomainEvents[K]) => {
       void Promise.resolve()
         .then(() => handler(payload))
-        .catch((error) => {
+        .catch((error: unknown) => {
           logger.warn({ err: error, event }, 'event listener handler failed');
         });
     });

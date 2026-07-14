@@ -23,10 +23,15 @@ async function main() {
   logger.info(result, 'thumbnail backfill finished');
 }
 
-main()
-  .catch((error: unknown) => {
-    throw error;
-  })
-  .finally(async () => {
+async function run() {
+  try {
+    await main();
+  } finally {
     await prisma.$disconnect();
-  });
+  }
+}
+
+void run().catch((error: unknown) => {
+  logger.fatal({ err: error }, 'thumbnail backfill failed');
+  process.exitCode = 1;
+});

@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
 
   const update = (await readBody(event)) as { callback_query?: CallbackQuery };
   if (update.callback_query) {
-    void handleTelegramCallback(update.callback_query).catch((error) =>
+    void handleTelegramCallback(update.callback_query).catch((error: unknown) =>
       logger.error({ err: error }, 'callback handler error'),
     );
   }

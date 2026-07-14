@@ -33,7 +33,7 @@ async function getRuleSeverity(filePath: string, ruleId: string) {
 
 describe('final ESLint configuration', () => {
   it('keeps base and audit syntax restrictions in backend modules', async () => {
-    const filePath = 'apps/backend/modules/example/example.service.ts';
+    const filePath = 'apps/backend/modules/dashboard/dashboard.service.ts';
     const rule = await getRule(filePath, 'no-restricted-syntax');
     const selectors = getRestrictedSyntaxSelectors(rule);
 
@@ -118,16 +118,48 @@ describe('final ESLint configuration', () => {
   });
 
   it('enforces backend source safety without blocking test fixtures', async () => {
-    const sourceFile = 'apps/backend/modules/example/example.service.ts';
-    const testFile = 'apps/backend/modules/example/example.service.test.ts';
+    const sourceFile = 'apps/backend/modules/dashboard/dashboard.service.ts';
+    const testFile = 'apps/backend/utils/event-bus.test.ts';
+    const sourceConfig = await eslint.calculateConfigForFile(sourceFile);
+
+    expect(sourceConfig?.languageOptions?.parserOptions).toEqual(
+      expect.objectContaining({
+        projectService: true,
+      }),
+    );
+    expect(
+      sourceConfig?.languageOptions?.parserOptions?.project,
+    ).toBeUndefined();
 
     for (const ruleId of [
+      '@typescript-eslint/await-thenable',
+      '@typescript-eslint/no-floating-promises',
+      '@typescript-eslint/no-misused-promises',
       '@typescript-eslint/no-non-null-assertion',
+      '@typescript-eslint/only-throw-error',
+      '@typescript-eslint/return-await',
+      '@typescript-eslint/switch-exhaustiveness-check',
+      '@typescript-eslint/use-unknown-in-catch-callback-variable',
       'no-console',
       'no-empty',
     ]) {
       expect(await getRuleSeverity(sourceFile, ruleId)).toBe(2);
     }
+
+    expect(
+      await getRule(sourceFile, '@typescript-eslint/return-await'),
+    ).toEqual([2, 'error-handling-correctness-only']);
+
+    const typedResults = await eslint.lintText('Promise.resolve();', {
+      filePath: sourceFile,
+    });
+    expect(typedResults[0]?.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ruleId: '@typescript-eslint/no-floating-promises',
+        }),
+      ]),
+    );
 
     expect(
       await getRuleSeverity(sourceFile, '@typescript-eslint/no-explicit-any'),
@@ -142,5 +174,37 @@ describe('final ESLint configuration', () => {
       ),
     ).toBe(0);
     expect(await getRuleSeverity(testFile, 'no-console')).toBe(0);
+    const testConfig = await eslint.calculateConfigForFile(testFile);
+    expect(
+      testConfig?.languageOptions?.parserOptions?.projectService,
+    ).toBeUndefined();
+    for (const ruleId of [
+      '@typescript-eslint/await-thenable',
+      '@typescript-eslint/no-floating-promises',
+      '@typescript-eslint/no-misused-promises',
+      '@typescript-eslint/only-throw-error',
+      '@typescript-eslint/return-await',
+      '@typescript-eslint/switch-exhaustiveness-check',
+      '@typescript-eslint/use-unknown-in-catch-callback-variable',
+    ]) {
+      expect(await getRule(testFile, ruleId)).toBeUndefined();
+    }
+    expect(await getRuleSeverity(sourceFile, 'no-throw-literal')).toBe(0);
+    expect(
+      await getRuleSeverity(
+        sourceFile,
+        '@typescript-eslint/no-require-imports',
+      ),
+    ).toBe(2);
+
+    for (const ruleId of [
+      'test/expect-expect',
+      'test/no-disabled-tests',
+      'test/no-duplicate-hooks',
+      'test/valid-describe-callback',
+      'test/valid-expect',
+    ]) {
+      expect(await getRuleSeverity(testFile, ruleId)).toBe(2);
+    }
   });
 });
