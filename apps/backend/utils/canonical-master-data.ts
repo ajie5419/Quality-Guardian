@@ -38,9 +38,30 @@ export interface MissingCanonicalIdItem {
   totalWithName: number;
 }
 
+export interface InvalidCanonicalIdItem {
+  invalidCanonicalId: number;
+  mismatchedCanonicalName: number;
+  table: string;
+}
+
+export interface MasterDataAuditReport {
+  invalid: Array<InvalidCanonicalIdItem & { configKey: string }>;
+  missing: Array<MissingCanonicalIdItem & { configKey: string }>;
+  orphans: MasterDataOrphanItem[];
+  summary: {
+    fieldCount: number;
+    invalidCanonicalId: number;
+    mismatchedCanonicalName: number;
+    missingCanonicalId: number;
+    orphanCount: number;
+    status: 'pass' | 'warn';
+  };
+}
+
 export interface GovernanceFieldRunResult {
   audit: {
     invalidCanonicalId?: number;
+    mismatchedCanonicalName?: number;
     missingCanonicalId?: number;
     orphanCount: number;
     status: 'pass' | 'warn';
@@ -157,10 +178,11 @@ async function getSinglePrimaryKeyColumn(tableName: string) {
   return keys[0];
 }
 
-async function buildActiveRowWhereSql(tableName: string) {
+async function buildActiveRowWhereSql(tableName: string, alias = '') {
   const columnSet = await getTableColumnSet(tableName);
   if (columnSet.has('isDeleted')) {
-    return '`isDeleted` = 0';
+    const prefix = alias ? `${quoteIdentifier(alias)}.` : '';
+    return `${prefix}\`isDeleted\` = 0`;
   }
   return '1 = 1';
 }
@@ -747,13 +769,16 @@ export const MasterDataGovernanceKernel = {
     });
   },
 
-  async auditOrphans(): Promise<MasterDataOrphanItem[]> {
+  async auditOrphans(configKeys?: string[]): Promise<MasterDataOrphanItem[]> {
     const orphanMap = new Map<
       string,
       { configKey: string; count: number; tables: Set<string>; value: string }
     >();
 
-    const fields = listMasterDataGovernanceFields();
+    const configKeySet = configKeys?.length ? new Set(configKeys) : null;
+    const fields = listMasterDataGovernanceFields().filter(
+      (field) => !configKeySet || configKeySet.has(field.key),
+    );
 
     for (const field of fields) {
       const sourceValues = await fetchSourceValues(field);
@@ -821,7 +846,26 @@ export const MasterDataGovernanceKernel = {
     const field = getFieldOrThrow(options.configKey);
     const explicitCanonicalId = options.explicitCanonicalId;
     if (explicitCanonicalId !== undefined) {
-      return explicitCanonicalId;
+      const normalizedExplicitId = normalizeValue(explicitCanonicalId);
+      if (!normalizedExplicitId || !field.canonical) {
+        return normalizedExplicitId || null;
+      }
+      const canonicalName = await readCanonicalNameById(
+        field.canonical,
+        normalizedExplicitId,
+      );
+      if (!canonicalName) {
+        throw new Error(
+          `INVALID_CANONICAL_ID:${field.key}:${normalizedExplicitId}`,
+        );
+      }
+      const normalizedName = normalizeValue(options.name);
+      if (normalizedName && normalizedName !== canonicalName) {
+        throw new Error(
+          `CANONICAL_NAME_MISMATCH:${field.key}:${normalizedExplicitId}`,
+        );
+      }
+      return normalizedExplicitId;
     }
     const normalizedName = normalizeValue(options.name);
     if (!normalizedName) {
@@ -1050,6 +1094,7 @@ export const MasterDataGovernanceKernel = {
       const tableName = quoteIdentifier(target.table);
       const nameColumn = quoteIdentifier(target.nameColumn);
       const idColumn = quoteIdentifier(target.idColumn);
+      const activeRowWhere = await buildActiveRowWhereSql(target.table);
       const rows = await prisma.$queryRawUnsafe<
         Array<{
           missingCanonicalId: bigint | number | string;
@@ -1065,7 +1110,8 @@ export const MasterDataGovernanceKernel = {
              WHEN ${nameColumn} IS NOT NULL AND TRIM(${nameColumn}) <> '' AND ${idColumn} IS NULL THEN 1
              ELSE 0
            END) AS missingCanonicalId
-         FROM ${tableName}`,
+         FROM ${tableName}
+         WHERE ${activeRowWhere}`,
       );
       const row = rows[0];
       results.push({
@@ -1080,35 +1126,124 @@ export const MasterDataGovernanceKernel = {
   async auditInvalidCanonicalIds(configKey: string) {
     const field = getFieldOrThrow(configKey);
     if (!field.canonical) {
-      return [] as Array<{ invalidCanonicalId: number; table: string }>;
+      return [] as InvalidCanonicalIdItem[];
     }
     const canonicalTable = quoteIdentifier(field.canonical.table);
     const canonicalIdColumn = quoteIdentifier(field.canonical.idColumn);
+    const canonicalNameColumn = quoteIdentifier(field.canonical.nameColumn);
     const canonicalActiveWhere = field.canonical.activeWhere
       ? ` AND ${qualifyActiveWhereClause(field.canonical.activeWhere, 'c')}`
       : '';
 
-    const results: Array<{ invalidCanonicalId: number; table: string }> = [];
+    const results: InvalidCanonicalIdItem[] = [];
     for (const target of field.targets) {
       if (!target.idColumn) continue;
       const tableName = quoteIdentifier(target.table);
       const idColumn = quoteIdentifier(target.idColumn);
+      const nameColumn = quoteIdentifier(target.nameColumn);
+      const activeRowWhere = await buildActiveRowWhereSql(target.table, 't');
       const rows = await prisma.$queryRawUnsafe<
-        Array<{ invalidCanonicalId: bigint | number | string }>
+        Array<{
+          invalidCanonicalId: bigint | number | string;
+          mismatchedCanonicalName: bigint | number | string;
+        }>
       >(
-        `SELECT COUNT(1) AS invalidCanonicalId
+        `SELECT
+           SUM(CASE
+             WHEN t.${idColumn} IS NOT NULL AND c.${canonicalIdColumn} IS NULL THEN 1
+             ELSE 0
+           END) AS invalidCanonicalId,
+           SUM(CASE
+             WHEN t.${idColumn} IS NOT NULL
+               AND c.${canonicalIdColumn} IS NOT NULL
+               AND t.${nameColumn} IS NOT NULL
+               AND TRIM(t.${nameColumn}) <> ''
+               AND BINARY TRIM(t.${nameColumn}) <> BINARY TRIM(c.${canonicalNameColumn})
+             THEN 1
+             ELSE 0
+           END) AS mismatchedCanonicalName
          FROM ${tableName} t
          LEFT JOIN ${canonicalTable} c
            ON t.${idColumn} = c.${canonicalIdColumn}${canonicalActiveWhere}
-         WHERE t.${idColumn} IS NOT NULL
-           AND c.${canonicalIdColumn} IS NULL`,
+         WHERE ${activeRowWhere}`,
       );
       results.push({
         table: target.table,
         invalidCanonicalId: toAffectedRows(rows[0]?.invalidCanonicalId),
+        mismatchedCanonicalName: toAffectedRows(
+          rows[0]?.mismatchedCanonicalName,
+        ),
       });
     }
     return results;
+  },
+
+  async auditGovernance(
+    options: { configKeys?: string[] } = {},
+  ): Promise<MasterDataAuditReport> {
+    const configKeySet = options.configKeys?.length
+      ? new Set(options.configKeys)
+      : null;
+    const fields = listMasterDataGovernanceFields().filter(
+      (field) =>
+        Boolean(field.canonical) &&
+        (!configKeySet || configKeySet.has(field.key)),
+    );
+    const orphans = await this.auditOrphans(fields.map((field) => field.key));
+    const missing: MasterDataAuditReport['missing'] = [];
+    const invalid: MasterDataAuditReport['invalid'] = [];
+
+    // Run count queries sequentially to avoid an admin audit saturating the DB pool.
+    for (const field of fields) {
+      const missingRows = await this.auditMissingCanonicalIds(field.key);
+      missing.push(
+        ...missingRows
+          .filter((item) => item.missingCanonicalId > 0)
+          .map((item) => ({ ...item, configKey: field.key })),
+      );
+      const invalidRows = await this.auditInvalidCanonicalIds(field.key);
+      invalid.push(
+        ...invalidRows
+          .filter(
+            (item) =>
+              item.invalidCanonicalId > 0 || item.mismatchedCanonicalName > 0,
+          )
+          .map((item) => ({ ...item, configKey: field.key })),
+      );
+    }
+
+    const orphanCount = orphans.reduce((sum, item) => sum + item.count, 0);
+    const missingCanonicalId = missing.reduce(
+      (sum, item) => sum + item.missingCanonicalId,
+      0,
+    );
+    const invalidCanonicalId = invalid.reduce(
+      (sum, item) => sum + item.invalidCanonicalId,
+      0,
+    );
+    const mismatchedCanonicalName = invalid.reduce(
+      (sum, item) => sum + item.mismatchedCanonicalName,
+      0,
+    );
+    const hasIssues =
+      orphanCount > 0 ||
+      missingCanonicalId > 0 ||
+      invalidCanonicalId > 0 ||
+      mismatchedCanonicalName > 0;
+
+    return {
+      invalid,
+      missing,
+      orphans,
+      summary: {
+        fieldCount: fields.length,
+        invalidCanonicalId,
+        mismatchedCanonicalName,
+        missingCanonicalId,
+        orphanCount,
+        status: hasIssues ? 'warn' : 'pass',
+      },
+    };
   },
 
   async seedCanonicalFromSource(configKey: string) {
@@ -1172,7 +1307,7 @@ export const MasterDataGovernanceKernel = {
     }
 
     if (runAudit) {
-      const orphans = await this.auditOrphans();
+      const orphans = await this.auditOrphans([field.key]);
       const fieldOrphans = orphans.filter(
         (item) => item.configKey === field.key,
       );
@@ -1184,6 +1319,7 @@ export const MasterDataGovernanceKernel = {
 
       let missingCanonicalId = 0;
       let invalidCanonicalId = 0;
+      let mismatchedCanonicalName = 0;
       if (field.canonical) {
         const missingRows = await this.auditMissingCanonicalIds(field.key);
         const invalidRows = await this.auditInvalidCanonicalIds(field.key);
@@ -1195,15 +1331,23 @@ export const MasterDataGovernanceKernel = {
           (sum, item) => sum + item.invalidCanonicalId,
           0,
         );
+        mismatchedCanonicalName = invalidRows.reduce(
+          (sum, item) => sum + item.mismatchedCanonicalName,
+          0,
+        );
         result.audit.missingCanonicalId = missingCanonicalId;
         result.audit.invalidCanonicalId = invalidCanonicalId;
+        result.audit.mismatchedCanonicalName = mismatchedCanonicalName;
       }
       const hasAuditError =
-        orphanCount > 0 || missingCanonicalId > 0 || invalidCanonicalId > 0;
+        orphanCount > 0 ||
+        missingCanonicalId > 0 ||
+        invalidCanonicalId > 0 ||
+        mismatchedCanonicalName > 0;
       result.audit.status = hasAuditError ? 'warn' : 'pass';
       if (hasAuditError && failOnAuditError) {
         throw new Error(
-          `AUDIT_FAILED:${field.key}:orphan=${orphanCount},missing=${missingCanonicalId},invalid=${invalidCanonicalId}`,
+          `AUDIT_FAILED:${field.key}:orphan=${orphanCount},missing=${missingCanonicalId},invalid=${invalidCanonicalId},mismatch=${mismatchedCanonicalName}`,
         );
       }
     }
