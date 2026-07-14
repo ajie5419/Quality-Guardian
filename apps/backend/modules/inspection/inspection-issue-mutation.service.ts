@@ -98,6 +98,7 @@ export const InspectionIssueMutationService = {
       logger.error(error, 'welder-score-sync after createIssue');
     }
     eventBus.emit('inspection_issue.changed', {
+      supplierIds: [newRecord.supplierId],
       supplierNames: [newRecord.supplierName],
     });
     return { ...newRecord, ncNumber: newRecord.nonConformanceNumber };
@@ -117,7 +118,13 @@ export const InspectionIssueMutationService = {
     const ownershipWhere = { createdBy: userId, id, isDeleted: false };
     const current = await prisma.quality_records.findUnique({
       where: ownershipWhere,
-      select: { supplierName: true },
+      select: {
+        inspection: {
+          select: { category: true, supplierId: true, teamId: true },
+        },
+        supplierId: true,
+        supplierName: true,
+      },
     });
     if (!current) {
       throw new BusinessError(
@@ -129,6 +136,7 @@ export const InspectionIssueMutationService = {
     const updateData = await buildInspectionIssueUpdateData(
       body,
       existingNcNumber,
+      current.inspection,
     );
     const updated = await prisma.quality_records.update({
       where: ownershipWhere,
@@ -158,10 +166,8 @@ export const InspectionIssueMutationService = {
       logger.error(error, 'welder-score-sync after updateIssue');
     }
     eventBus.emit('inspection_issue.changed', {
-      supplierNames: [
-        current?.supplierName,
-        updateData.supplierName as null | string | undefined,
-      ],
+      supplierIds: [current?.supplierId, updated.supplierId],
+      supplierNames: [current?.supplierName, updated.supplierName],
     });
   },
 
@@ -178,7 +184,12 @@ export const InspectionIssueMutationService = {
     const uniqueIds = [...new Set(ids)];
     const existing = await prisma.quality_records.findMany({
       where: { id: { in: uniqueIds }, isDeleted: false },
-      select: { createdBy: true, id: true, supplierName: true },
+      select: {
+        createdBy: true,
+        id: true,
+        supplierId: true,
+        supplierName: true,
+      },
     });
     if (
       existing.length !== uniqueIds.length ||
@@ -207,6 +218,7 @@ export const InspectionIssueMutationService = {
     }
     await QualityLossIndexService.softDeleteSourceMany('Internal', uniqueIds);
     eventBus.emit('inspection_issue.changed', {
+      supplierIds: existing.map((item) => item.supplierId),
       supplierNames: existing.map((item) => item.supplierName),
     });
     await Promise.all(
@@ -239,6 +251,7 @@ export const InspectionIssueMutationService = {
     );
     let successCount = 0;
     const rowErrors = [];
+    const supplierIdsToRefresh: string[] = [];
     const supplierNamesToRefresh: string[] = [];
     let serialSeed = await getNextInspectionIssueSerialNumber();
     const createdBy = String(userinfo.id || userinfo.userId || '') || undefined;
@@ -290,6 +303,7 @@ export const InspectionIssueMutationService = {
               })
             : await prisma.quality_records.create({ data: payload.create });
           await QualityLossIndexService.upsertFromInternal(saved);
+          if (saved?.supplierId) supplierIdsToRefresh.push(saved.supplierId);
           if (saved?.supplierName)
             supplierNamesToRefresh.push(saved.supplierName);
           successCount++;
@@ -324,6 +338,7 @@ export const InspectionIssueMutationService = {
       }
     }
     eventBus.emit('inspection_issue.changed', {
+      supplierIds: supplierIdsToRefresh,
       supplierNames: supplierNamesToRefresh,
     });
     await recordBusinessAuditLog(event, {

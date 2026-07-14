@@ -9,8 +9,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
+import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { SupplierScoreSnapshotService } from '~/modules/supplier/supplier-score-snapshot.service';
-import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -36,9 +36,9 @@ vi.mock('~/modules/after-sales', () => ({
   },
 }));
 
-vi.mock('~/utils/canonical-master-data', () => ({
-  MasterDataGovernanceKernel: {
-    resolveCanonicalIdsByNames: vi.fn().mockResolvedValue(new Map()),
+vi.mock('~/modules/supplier-identity', () => ({
+  SupplierIdentityService: {
+    teamIdsBySupplierIds: vi.fn().mockResolvedValue(new Map()),
   },
 }));
 
@@ -66,7 +66,10 @@ function buildInspectionScoringData(
   return {
     incomingStats: [],
     engineeringStats: [],
-    engineeringStatusStats,
+    engineeringStatusStats: engineeringStatusStats.map((item) => ({
+      ...item,
+      supplierId: `${item.supplierName}-id`,
+    })),
     records: [],
   };
 }
@@ -180,7 +183,7 @@ describe('supplierScoreSnapshotService openEngineeringCount open-status definiti
       incomingStats: [
         {
           category: 'INCOMING',
-          supplierId: null,
+          supplierId: 'S1-id',
           supplierName: 'S1',
           team: null,
           result: 'FAIL',
@@ -205,7 +208,7 @@ describe('supplierScoreSnapshotService openEngineeringCount open-status definiti
       incomingStats: [
         {
           category: 'INCOMING',
-          supplierId: null,
+          supplierId: 'S1-id',
           supplierName: 'S1',
           team: null,
           result: 'NA',
@@ -214,7 +217,7 @@ describe('supplierScoreSnapshotService openEngineeringCount open-status definiti
         },
         {
           category: 'INCOMING',
-          supplierId: null,
+          supplierId: 'S1-id',
           supplierName: 'S1',
           team: null,
           result: 'CONDITIONAL',
@@ -234,9 +237,9 @@ describe('supplierScoreSnapshotService openEngineeringCount open-status definiti
   });
 
   it('uses process team inspections for in-house outsourcing', async () => {
-    vi.mocked(
-      MasterDataGovernanceKernel.resolveCanonicalIdsByNames,
-    ).mockResolvedValue(new Map([['Team A', 'team-1']]));
+    vi.mocked(SupplierIdentityService.teamIdsBySupplierIds).mockResolvedValue(
+      new Map([['Team A-id', ['team-1']]]),
+    );
     (InspectionService.getSupplierScoringData as any).mockResolvedValue({
       ...buildInspectionScoringData([]),
       engineeringTotalStats: [],
@@ -263,9 +266,7 @@ describe('supplierScoreSnapshotService openEngineeringCount open-status definiti
 
     expect(InspectionService.getSupplierScoringData).toHaveBeenCalledWith(
       expect.objectContaining({
-        incomingSupplierNames: [],
         processTeamIds: ['team-1'],
-        processTeamNames: ['Team A'],
       }),
     );
     const data = (prisma.supplier_score_snapshots.upsert as any).mock
@@ -306,7 +307,7 @@ describe('supplierScoreSnapshotService openEngineeringCount open-status definiti
       ...buildInspectionScoringData([]),
       engineeringStats: [
         {
-          supplierId: null,
+          supplierId: 'S1-id',
           supplierName: 'S1',
           _count: { id: 1 },
           _sum: { lossAmount: 100, quantity: 1 },

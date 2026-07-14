@@ -85,7 +85,9 @@
 
 ## 架构守护（自动化检测）
 
-`pnpm run check:qms-arch` 在提交前自动执行，检测以下规则：
+本地提交前运行 `pnpm run check:qms-arch` 检查当前分支和工作树变更；CI 运行 `pnpm run check:qms-arch:all` 扫描全部已跟踪文件。两种模式执行相同规则，检测范围不同。
+
+简单文本规则由 shell 批量扫描；类型断言、ID 生成、跨模块导入、中文条件分支和 `catch` 日志规则使用 TypeScript AST 检测，禁止用注释、换行或语法变体绕过。
 
 **目录结构：**
 
@@ -120,6 +122,18 @@
 **安全：**
 
 - 不得出现 `$queryRawUnsafe` + 模板字符串组合
+
+**错误处理：**
+
+- 不得出现空 `catch`（规则 B-E1）
+- 每个 `catch` 必须调用 `logApiError`、`logDatabaseError` 或 logger 的 `error` / `fatal` 方法记录原始错误（规则 B-E2）
+
+**历史债务基线：**
+
+- `scripts/qms-architecture-baseline.txt` 只用于冻结已确认的历史债务，不是永久豁免
+- AST 规则按 `rule|path|stable-fingerprint|count` 记录；行数规则按 `rule|path|max-lines` 记录
+- 允许债务数量和文件行数下降；新增指纹、数量增长或超过行数上限必须阻断
+- 修复历史债务时必须同步删除或收紧对应 baseline，禁止扩大 baseline 规避门禁
 
 **代码地图：**
 

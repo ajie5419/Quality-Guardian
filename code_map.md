@@ -22,6 +22,7 @@
 - **report/** — 质量报表生成与路由（多维度报表输出）
 - **supervision/** — 质量监督检查：立项→任务分配→问题跟踪→报告
 - **supplier/** — 供应商质量评分：指标快照、全量排序、黑名单/观察期
+- **supplier-identity/** — 供应商跨身份域映射与解析
 - **system/** — 系统配置与基础设置
 - **system-log/** — 系统操作日志记录与审计
 - **task-dispatch/** — ITP 任务派发与流转：分配、状态推进、归档联动
@@ -61,6 +62,7 @@
 - **reports/** — 报表生成与查询
 - **supervision/** — 监督检查项目、任务、问题
 - **supplier/** — 供应商评分列表、快照排序与统计
+- **supplier-identity-links/** — 供应商身份映射管理
 - **task-dispatch/** — ITP 任务派发与状态
 - **vehicle-commissioning/** — 车辆调试验收
 - **welder/** — 焊工台账与评分

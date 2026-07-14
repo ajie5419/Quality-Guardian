@@ -31,6 +31,7 @@ export const inspectionRequestCreateBodySchema = z.object({
   reporter: z.string().optional(),
   requestInfo: z.string().optional(),
   selfCheckResult: z.string().optional(),
+  supplierId: z.string().trim().optional(),
   stationSelection: z
     .object({
       indexes: z.array(z.union([z.number(), z.string()])).optional(),
@@ -38,6 +39,7 @@ export const inspectionRequestCreateBodySchema = z.object({
     })
     .optional(),
   team: z.string().optional(),
+  teamId: z.string().trim().optional(),
   workOrderNumber: z.string().optional(),
   workOrderNumbers: z.array(z.string()).optional(),
 });
@@ -63,7 +65,9 @@ export function validateInspectionRequestCreateBody(
     ? ''
     : normalizeInspectionRequestText(body.componentName);
   const reporter = normalizeInspectionRequestText(body.reporter);
+  const supplierId = normalizeInspectionRequestText(body.supplierId);
   const team = normalizeInspectionRequestText(body.team);
+  const teamId = normalizeInspectionRequestText(body.teamId);
   parseInspectionRequestQuantity(body.quantity);
   const attachments = normalizeInspectionRequestAttachments(body.attachments);
 
@@ -76,12 +80,17 @@ export function validateInspectionRequestCreateBody(
       Boolean(processName) &&
       (skipsComponentName || Boolean(componentName)) &&
       Boolean(team) &&
+      (isIncomingInspectionRequestProcess(processName)
+        ? Boolean(supplierId)
+        : Boolean(teamId)) &&
       Boolean(reporter) &&
       attachments.length > 0,
     partName,
     processName,
     reporter,
+    supplierId,
     team,
+    teamId,
     workOrderNumber,
     workOrderNumbers,
   };

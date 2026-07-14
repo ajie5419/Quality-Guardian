@@ -30,6 +30,12 @@ export default defineEventHandler(async (event) => {
       });
     } catch (error) {
       if (!isPrismaSchemaMismatchError(error)) throw error;
+      logApiError(
+        'supervision-issues-attachment-registration',
+        error,
+        { issueId: id },
+        event,
+      );
     }
     return useResponseSuccess(data);
   } catch (error) {

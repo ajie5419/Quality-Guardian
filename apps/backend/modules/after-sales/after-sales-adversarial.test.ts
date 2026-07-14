@@ -147,6 +147,23 @@ describe('afterSalesService – adversarial', () => {
 
       expect(result).toHaveLength(1);
     });
+
+    it('filters supplier portrait records by canonical supplier ID', async () => {
+      (prisma.after_sales.findMany as any).mockResolvedValue([]);
+
+      await AfterSalesService.getList({
+        supplierBrand: 'Stale Supplier Name',
+        supplierBrandId: 'supplier-1',
+      });
+
+      expect(prisma.after_sales.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ supplierBrandId: 'supplier-1' }),
+        }),
+      );
+      const where = (prisma.after_sales.findMany as any).mock.calls[0][0].where;
+      expect(where).not.toHaveProperty('OR');
+    });
   });
 
   describe('getStats', () => {
@@ -161,7 +178,7 @@ describe('afterSalesService – adversarial', () => {
     it('delegates to integration service', async () => {
       const result = await AfterSalesService.getSupplierScoringData({
         since: new Date('2025-01-01'),
-        supplierNames: ['Supplier A'],
+        supplierIds: ['supplier-1'],
       });
 
       expect(result.stats).toEqual([]);

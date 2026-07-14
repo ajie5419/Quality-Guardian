@@ -1,4 +1,7 @@
+import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+
+const logger = createModuleLogger('SystemMetadata');
 
 export async function getMetadata<T>(key: string, defaultValue: T): Promise<T> {
   try {
@@ -10,7 +13,7 @@ export async function getMetadata<T>(key: string, defaultValue: T): Promise<T> {
     }
     return JSON.parse(setting.value) as T;
   } catch (error) {
-    console.error(`Failed to get metadata for ${key}:`, error);
+    logger.error({ err: error, key }, 'Failed to get system metadata');
     return defaultValue;
   }
 }
@@ -31,6 +34,6 @@ export async function setMetadata<T>(key: string, value: T): Promise<void> {
       },
     });
   } catch (error) {
-    console.error(`Failed to set metadata for ${key}:`, error);
+    logger.error({ err: error, key }, 'Failed to set system metadata');
   }
 }

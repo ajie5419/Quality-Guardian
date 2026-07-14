@@ -17,8 +17,13 @@ export default eventHandler(async (event) => {
     if (value) {
       try {
         value = JSON.parse(value);
-      } catch {
-        // stay as string
+      } catch (error) {
+        logApiError(
+          `parse_system_setting_${key}`,
+          error,
+          { settingKey: key },
+          event,
+        );
       }
     }
 

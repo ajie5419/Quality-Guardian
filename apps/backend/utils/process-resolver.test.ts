@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '~/utils/prisma';
 
 import {
+  __resetProcessResolverRuntimeForTest,
   buildProcessNameWhere,
   resolveCanonicalProcessNameById,
   resolveProcessIdForWrite,
@@ -20,6 +21,7 @@ vi.mock('~/utils/prisma', () => ({
 describe('process-resolver helpers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    __resetProcessResolverRuntimeForTest();
     (prisma.$queryRawUnsafe as any).mockResolvedValue([]);
   });
 

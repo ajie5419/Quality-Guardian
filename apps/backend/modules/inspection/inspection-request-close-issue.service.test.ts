@@ -1,18 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildCloseLinkedIssueCreateResult } from '~/modules/inspection/inspection-request-close-issue.service';
 
-const { mockFindFirstSupplier, mockResolveCanonicalProcessName } = vi.hoisted(
-  () => ({
-    mockFindFirstSupplier: vi.fn(),
+const { mockResolveSupplierByTeamId, mockResolveCanonicalProcessName } =
+  vi.hoisted(() => ({
+    mockResolveSupplierByTeamId: vi.fn(),
     mockResolveCanonicalProcessName: vi.fn(),
-  }),
-);
+  }));
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    suppliers: {
-      findFirst: mockFindFirstSupplier,
-    },
+vi.mock('~/modules/supplier-identity', () => ({
+  SupplierIdentityService: {
+    resolveSupplierByTeamId: mockResolveSupplierByTeamId,
   },
 }));
 
@@ -51,7 +48,7 @@ vi.mock('~/modules/inspection/inspection-request-close.schema', () => ({
 describe('buildCloseLinkedIssueCreateResult', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFindFirstSupplier.mockResolvedValue(null);
+    mockResolveSupplierByTeamId.mockResolvedValue(null);
     mockResolveCanonicalProcessName.mockReturnValue('Process A');
   });
 
@@ -221,9 +218,12 @@ describe('buildCloseLinkedIssueCreateResult', () => {
     );
   });
 
-  it('uses outsourcing supplier table match when process name is internal', async () => {
+  it('uses the TEAM identity mapping when process name is internal', async () => {
     mockResolveCanonicalProcessName.mockReturnValue('Welding');
-    mockFindFirstSupplier.mockResolvedValue({ id: 'supplier-1' });
+    mockResolveSupplierByTeamId.mockResolvedValue({
+      id: 'supplier-1',
+      name: 'Outsourcing Plant A',
+    });
     const { buildInspectionIssueCreateData } = await import(
       '~/modules/inspection/inspection-issue'
     );
@@ -239,22 +239,17 @@ describe('buildCloseLinkedIssueCreateResult', () => {
         processName: 'Welding',
         reporter: 'Reporter',
         team: 'Outsourcing Plant A',
+        teamId: 'team-1',
         workOrderNumber: 'WO-1',
       },
       userinfo: { id: 'user-1', username: 'admin' } as any,
     });
 
-    expect(mockFindFirstSupplier).toHaveBeenCalledWith({
-      select: { id: true },
-      where: {
-        category: 'Outsourcing',
-        isDeleted: false,
-        name: 'Outsourcing Plant A',
-      },
-    });
+    expect(mockResolveSupplierByTeamId).toHaveBeenCalledWith('team-1');
     expect(buildInspectionIssueCreateData).toHaveBeenLastCalledWith(
       expect.objectContaining({
         responsibleDepartment: '生产 OBU',
+        supplierId: 'supplier-1',
         supplierName: 'Outsourcing Plant A',
       }),
       expect.any(Object),

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 
 import {
   buildGovernedAfterSalesCreateData,
@@ -7,10 +8,15 @@ import {
 
 vi.mock('~/utils/governed-write', () => ({
   buildGovernedCanonicalWritePairForTable: vi.fn(
-    async (_table: string, data: Record<string, unknown>) =>
-      data.supplierBrand
-        ? { supplierBrandId: `supplier:${String(data.supplierBrand)}` }
-        : {},
+    async (_table: string, data: Record<string, unknown>) => {
+      if (data.supplierBrandId !== undefined) {
+        return { supplierBrandId: data.supplierBrandId };
+      }
+      if (data.supplierBrand) {
+        return { supplierBrandId: `supplier:${String(data.supplierBrand)}` };
+      }
+      return {};
+    },
   ),
 }));
 
@@ -80,6 +86,33 @@ describe('after-sales payload governance helpers', () => {
     });
   });
 
+  it('preserves explicit supplier ID for canonical validation on create', async () => {
+    await expect(
+      buildGovernedAfterSalesCreateData(
+        {
+          supplierBrand: 'Supplier A',
+          supplierBrandId: 'supplier-1',
+          workOrderNumber: 'WO-808512',
+        },
+        {
+          defaultWorkOrderNumber: 'UNKNOWN',
+          id: 'AS-UT-004',
+          serialNumber: 4,
+        },
+      ),
+    ).resolves.toMatchObject({
+      supplierBrand: 'Supplier A',
+      supplierBrandId: 'supplier-1',
+    });
+    expect(buildGovernedCanonicalWritePairForTable).toHaveBeenCalledWith(
+      'after_sales',
+      expect.objectContaining({
+        supplierBrand: 'Supplier A',
+        supplierBrandId: 'supplier-1',
+      }),
+    );
+  });
+
   it('builds governed update payload without runtime reference error', async () => {
     await expect(
       buildGovernedAfterSalesUpdateData({
@@ -127,5 +160,26 @@ describe('after-sales payload governance helpers', () => {
         supplierBrandId: null,
       },
     });
+  });
+
+  it('preserves explicit supplier ID for canonical validation on update', async () => {
+    await expect(
+      buildGovernedAfterSalesUpdateData({
+        supplierBrand: 'Supplier B',
+        supplierBrandId: 'supplier-2',
+      }),
+    ).resolves.toMatchObject({
+      data: {
+        supplierBrand: 'Supplier B',
+        supplierBrandId: 'supplier-2',
+      },
+    });
+    expect(buildGovernedCanonicalWritePairForTable).toHaveBeenCalledWith(
+      'after_sales',
+      expect.objectContaining({
+        supplierBrand: 'Supplier B',
+        supplierBrandId: 'supplier-2',
+      }),
+    );
   });
 });

@@ -233,12 +233,9 @@ describe('inspectionReportingService', () => {
 
       const result = await InspectionReportingService.getSupplierScoringData({
         engineeringSupplierIds: ['s-1'],
-        engineeringSupplierNames: ['Supplier A'],
         since: new Date('2024-01-01'),
         incomingSupplierIds: ['s-1'],
-        incomingSupplierNames: ['Supplier A'],
         processTeamIds: [],
-        processTeamNames: [],
       });
 
       expect(result).toHaveProperty('incomingStats');
@@ -248,7 +245,7 @@ describe('inspectionReportingService', () => {
       expect(result).toHaveProperty('records');
     });
 
-    it('should use only supplierNames when supplierIds is empty', async () => {
+    it('should not fall back to supplier names when IDs are empty', async () => {
       (prisma.inspections.groupBy as any).mockResolvedValue([]);
       (prisma.quality_records.groupBy as any)
         .mockResolvedValueOnce([])
@@ -258,24 +255,21 @@ describe('inspectionReportingService', () => {
 
       await InspectionReportingService.getSupplierScoringData({
         engineeringSupplierIds: [],
-        engineeringSupplierNames: ['Supplier A'],
         since: new Date('2024-01-01'),
         incomingSupplierIds: [],
-        incomingSupplierNames: ['Supplier A'],
         processTeamIds: [],
-        processTeamNames: [],
       });
 
       expect(prisma.inspections.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            OR: [
-              {
-                category: 'INCOMING',
-                OR: [{ supplierName: { in: ['Supplier A'] } }],
-              },
-            ],
+            OR: [],
           }),
+        }),
+      );
+      expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ supplierId: { in: [] } }),
         }),
       );
     });
@@ -290,12 +284,9 @@ describe('inspectionReportingService', () => {
 
       await InspectionReportingService.getSupplierScoringData({
         engineeringSupplierIds: ['supplier-1'],
-        engineeringSupplierNames: ['Resident Team'],
         since: new Date('2024-01-01'),
         incomingSupplierIds: [],
-        incomingSupplierNames: [],
         processTeamIds: ['team-1'],
-        processTeamNames: ['Resident Team'],
       });
 
       expect(prisma.inspections.groupBy).toHaveBeenCalledWith(
@@ -312,10 +303,7 @@ describe('inspectionReportingService', () => {
             OR: [
               {
                 category: 'PROCESS',
-                OR: [
-                  { team: { in: ['Resident Team'] } },
-                  { teamId: { in: ['team-1'] } },
-                ],
+                teamId: { in: ['team-1'] },
               },
             ],
           }),

@@ -5,10 +5,9 @@ import {
   isIncomingInspectionRequestProcess,
   isOutsourcingInspectionRequestProcess,
   resolveInspectionRequestIssueResponsibility,
-  SUPPLIER_CATEGORY,
 } from '@qgs/shared';
+import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
-import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import {
@@ -36,6 +35,7 @@ export async function buildCloseLinkedIssueCreateResult(options: {
     processName: string;
     reporter: string;
     team?: null | string;
+    teamId?: null | string;
     work_order?: null | { projectName?: null | string };
     workOrderNumber: string;
   };
@@ -48,15 +48,13 @@ export async function buildCloseLinkedIssueCreateResult(options: {
     linkedIssue: options.linkedIssue,
     request: options.request,
   });
-  const isOutsourcingTeam =
-    isIncomingInspectionRequestProcess(linkedIssueProcessName) ||
-    isOutsourcingInspectionRequestProcess(linkedIssueProcessName)
-      ? false
-      : await isOutsourcingInspectionRequestTeam(options.request.team);
+  const teamSupplier = await SupplierIdentityService.resolveSupplierByTeamId(
+    options.request.teamId,
+  );
   const issueBody = buildCloseLinkedIssueBody({
     body: options.body,
     inspectionId: options.inspectionId,
-    isOutsourcingTeam,
+    teamSupplier,
     linkedInspection,
     linkedIssue: options.linkedIssue,
     ncNumber: normalizeInspectionRequestText(options.linkedIssue.ncNumber),
@@ -84,7 +82,6 @@ export async function buildCloseLinkedIssueCreateResult(options: {
 function buildCloseLinkedIssueBody(options: {
   body: Record<string, unknown>;
   inspectionId: string;
-  isOutsourcingTeam: boolean;
   linkedInspection: Awaited<ReturnType<typeof findInspectionForIssue>>;
   linkedIssue: Record<string, unknown>;
   ncNumber: string;
@@ -96,9 +93,11 @@ function buildCloseLinkedIssueBody(options: {
     processName: string;
     reporter: string;
     team?: null | string;
+    teamId?: null | string;
     work_order?: null | { projectName?: null | string };
     workOrderNumber: string;
   };
+  teamSupplier: null | { id: string; name: string };
 }) {
   const issueQuantity = Math.max(
     1,
@@ -125,7 +124,7 @@ function buildCloseLinkedIssueBody(options: {
     },
   );
   const issueResponsibility = resolveCloseIssueResponsibility({
-    isOutsourcingTeam: options.isOutsourcingTeam,
+    teamSupplier: options.teamSupplier,
     linkedIssue: options.linkedIssue,
     processName: options.processName,
     team: options.request.team,
@@ -164,6 +163,7 @@ function buildCloseLinkedIssueBody(options: {
     status:
       normalizeInspectionRequestText(options.linkedIssue.status) || 'OPEN',
     supplierName: issueResponsibility.supplierName,
+    supplierId: issueResponsibility.supplierId,
     sourceType: 'INSPECTION_REQUEST',
     photos: Array.isArray(options.linkedIssue.photos)
       ? options.linkedIssue.photos
@@ -189,10 +189,10 @@ function resolveCloseIssueProcessName(options: {
 }
 
 function resolveCloseIssueResponsibility(options: {
-  isOutsourcingTeam: boolean;
   linkedIssue: Record<string, unknown>;
   processName: string;
   team?: null | string;
+  teamSupplier: null | { id: string; name: string };
 }) {
   const defaults = resolveInspectionRequestIssueResponsibility({
     processName: options.processName,
@@ -201,13 +201,13 @@ function resolveCloseIssueResponsibility(options: {
   const isExternal =
     isIncomingInspectionRequestProcess(options.processName) ||
     isOutsourcingInspectionRequestProcess(options.processName) ||
-    options.isOutsourcingTeam;
+    Boolean(options.teamSupplier);
   const explicitSupplierName = normalizeInspectionRequestText(
     options.linkedIssue.supplierName,
   );
 
   if (isExternal) {
-    const externalDefaults = options.isOutsourcingTeam
+    const externalDefaults = options.teamSupplier
       ? resolveInspectionRequestIssueResponsibility({
           processName: '外协',
           team: options.team,
@@ -215,7 +215,11 @@ function resolveCloseIssueResponsibility(options: {
       : defaults;
     return {
       responsibleDepartment: externalDefaults.responsibleDepartment,
-      supplierName: explicitSupplierName || externalDefaults.supplierName,
+      supplierId: options.teamSupplier?.id,
+      supplierName:
+        options.teamSupplier?.name ||
+        explicitSupplierName ||
+        externalDefaults.supplierName,
     };
   }
 
@@ -225,21 +229,6 @@ function resolveCloseIssueResponsibility(options: {
         options.linkedIssue.responsibleDepartment,
       ) || defaults.responsibleDepartment,
     supplierName: explicitSupplierName,
+    supplierId: undefined,
   };
-}
-
-async function isOutsourcingInspectionRequestTeam(
-  team: null | string | undefined,
-) {
-  const normalizedTeam = normalizeInspectionRequestText(team);
-  if (!normalizedTeam) return false;
-  const supplier = await prisma.suppliers.findFirst({
-    select: { id: true },
-    where: {
-      category: SUPPLIER_CATEGORY.OUTSOURCING,
-      isDeleted: false,
-      name: normalizedTeam,
-    },
-  });
-  return Boolean(supplier);
 }

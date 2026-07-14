@@ -272,9 +272,25 @@ export const InspectionRequestCloseService = {
       record: updated,
     } = await retryOnSerialNumberConflict(runCloseTransaction, 3);
 
+    const changedInspectionIdentities = await prisma.inspections.findMany({
+      select: {
+        supplierId: true,
+        supplierName: true,
+        team: true,
+        teamId: true,
+      },
+      where: {
+        id: { in: inspectionLinks.map((item) => item.inspectionId) },
+        isDeleted: false,
+      },
+    });
     eventBus.emit('inspection_record.changed', {
-      supplierNames: [request.team],
-      teamNames: [request.team],
+      supplierIds: changedInspectionIdentities.map((item) => item.supplierId),
+      supplierNames: changedInspectionIdentities.map(
+        (item) => item.supplierName,
+      ),
+      teamIds: changedInspectionIdentities.map((item) => item.teamId),
+      teamNames: changedInspectionIdentities.map((item) => item.team),
     });
 
     await syncCloseAttachments({

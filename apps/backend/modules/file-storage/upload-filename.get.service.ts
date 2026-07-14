@@ -6,6 +6,7 @@ import { defineEventHandler, setResponseStatus } from 'h3';
 import sharp from 'sharp';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { logApiError } from '~/utils/api-logger';
+import { createModuleLogger } from '~/utils/logger';
 import { UPLOAD_DIR } from '~/utils/paths';
 import { useResponseError } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
@@ -22,6 +23,7 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 const THUMB_SUFFIX = '_thumb.webp';
+const logger = createModuleLogger('UploadFile');
 const THUMB_SOURCE_EXTENSIONS = [
   '.jpg',
   '.jpeg',
@@ -104,8 +106,10 @@ export default defineEventHandler(async (event) => {
       return managedFile.buffer;
     }
 
-    // Log absolute path to help identify shared DB vs local storage discrepancies
-    console.error(`[Serving] File not found at absolute path: ${filePath}`);
+    logger.error(
+      { filePath, filename },
+      'File not found in managed or local storage',
+    );
     setResponseStatus(event, 404);
     return useResponseError('File not found');
   }

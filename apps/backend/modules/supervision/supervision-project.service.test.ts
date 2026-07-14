@@ -1,9 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupervisionProjectService } from '~/modules/supervision/supervision-project.service';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/governed-write';
 
 vi.mock('~/utils/governed-write', () => ({
-  buildGovernedCanonicalWritePairForTable: vi.fn().mockResolvedValue({}),
-  buildGovernedWriteFieldsForTable: vi.fn().mockReturnValue({}),
+  buildGovernedCanonicalWritePairForTable: vi.fn(
+    async (_table: string, fields: Record<string, unknown>) =>
+      fields.supplierId === undefined ? {} : { supplierId: fields.supplierId },
+  ),
+  buildGovernedWriteFieldsForTable: vi.fn(
+    (_table: string, fields: Record<string, unknown>) =>
+      fields.supplierName === undefined
+        ? {}
+        : { supplierName: fields.supplierName },
+  ),
 }));
 
 vi.mock('~/utils/query-helpers', () => ({
@@ -39,6 +51,8 @@ vi.mock('~/modules/supervision/supervision-shared', async (orig) => {
           stage: null,
           status: 'PLANNING',
           summary: null,
+          supplierId: 'supplier-1',
+          supplierName: 'Supplier A',
           supervisor: null,
           updatedAt: new Date(),
           workOrderNumber: null,
@@ -60,6 +74,8 @@ vi.mock('~/modules/supervision/supervision-shared', async (orig) => {
           stage: null,
           status: 'PLANNING',
           summary: null,
+          supplierId: 'supplier-1',
+          supplierName: 'Supplier A',
           supervisor: null,
           updatedAt: new Date(),
           workOrderNumber: null,
@@ -84,6 +100,7 @@ describe('supervisionProjectService', () => {
       expect(result).toHaveProperty('id', 'sp-1');
       expect(result).toHaveProperty('projectName', 'Test Project');
       expect(result).toHaveProperty('status', 'PLANNED');
+      expect(result).toHaveProperty('supplierId', 'supplier-1');
     });
 
     it('should default status to PLANNED', async () => {
@@ -92,6 +109,35 @@ describe('supervisionProjectService', () => {
       });
 
       expect(result.status).toBe('PLANNED');
+    });
+
+    it('should validate and write explicit supplier identity', async () => {
+      await SupervisionProjectService.createProject({
+        projectName: 'Supplier Project',
+        supplierId: 'supplier-1',
+        supplierName: 'Supplier A',
+      });
+
+      expect(buildGovernedWriteFieldsForTable).toHaveBeenCalledWith(
+        'supervision_projects',
+        expect.objectContaining({ supplierName: 'Supplier A' }),
+      );
+      expect(buildGovernedCanonicalWritePairForTable).toHaveBeenCalledWith(
+        'supervision_projects',
+        expect.objectContaining({
+          supplierId: 'supplier-1',
+          supplierName: 'Supplier A',
+        }),
+      );
+      const { prisma: mockPrisma } = await import(
+        '~/modules/supervision/supervision-shared'
+      );
+      expect(mockPrisma.supervision_projects.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          supplierId: 'supplier-1',
+          supplierName: 'Supplier A',
+        }),
+      });
     });
   });
 
@@ -122,6 +168,31 @@ describe('supervisionProjectService', () => {
 
       expect(result).toHaveProperty('id');
       expect(result).toHaveProperty('projectName');
+    });
+
+    it('should validate and update explicit supplier identity', async () => {
+      await SupervisionProjectService.updateProject('sp-1', {
+        supplierId: 'supplier-2',
+        supplierName: 'Supplier B',
+      });
+
+      expect(buildGovernedCanonicalWritePairForTable).toHaveBeenCalledWith(
+        'supervision_projects',
+        expect.objectContaining({
+          supplierId: 'supplier-2',
+          supplierName: 'Supplier B',
+        }),
+      );
+      const { prisma: mockPrisma } = await import(
+        '~/modules/supervision/supervision-shared'
+      );
+      expect(mockPrisma.supervision_projects.update).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          supplierId: 'supplier-2',
+          supplierName: 'Supplier B',
+        }),
+        where: { id: 'sp-1' },
+      });
     });
   });
 

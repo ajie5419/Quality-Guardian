@@ -287,6 +287,13 @@ describe('inspectionIssueMutationService', () => {
   describe('updateIssue', () => {
     beforeEach(() => {
       (prisma.quality_records.findUnique as any).mockResolvedValue({
+        inspection: null,
+        supplierId: null,
+        supplierName: null,
+      });
+      (prisma.quality_records.update as any).mockResolvedValue({
+        id: 'rec-updated',
+        supplierId: null,
         supplierName: null,
       });
     });
@@ -403,7 +410,13 @@ describe('inspectionIssueMutationService', () => {
           id: 'rec-other',
           isDeleted: false,
         },
-        select: { supplierName: true },
+        select: {
+          inspection: {
+            select: { category: true, supplierId: true, teamId: true },
+          },
+          supplierId: true,
+          supplierName: true,
+        },
       });
       expect(prisma.quality_records.update).not.toHaveBeenCalled();
     });

@@ -77,11 +77,7 @@ export const AfterSalesService = {
     return AfterSalesIntegrationService.getQualityLossDrillDownRecords(params);
   },
 
-  async getSupplierScoringData(params: {
-    since: Date;
-    supplierIds?: string[];
-    supplierNames: string[];
-  }) {
+  async getSupplierScoringData(params: { since: Date; supplierIds: string[] }) {
     return AfterSalesIntegrationService.getSupplierScoringData(params);
   },
 
@@ -120,8 +116,11 @@ export const AfterSalesService = {
   ): Promise<void> {
     const { costsChanged, data: updateData } =
       await buildGovernedAfterSalesUpdateData(bodyRecord);
-    const supplierChanged = updateData.supplierBrand !== undefined;
+    const supplierChanged =
+      updateData.supplierBrand !== undefined ||
+      updateData.supplierBrandId !== undefined;
     let previousSupplierBrand: null | string | undefined;
+    let previousSupplierId: null | string | undefined;
 
     if (costsChanged || supplierChanged) {
       const current = await prisma.after_sales.findUnique({
@@ -130,12 +129,14 @@ export const AfterSalesService = {
           laborTravelCost: true,
           materialCost: true,
           supplierBrand: true,
+          supplierBrandId: true,
         },
       });
       if (costsChanged && !current) {
         throw new Error('AFTER_SALES_NOT_FOUND');
       }
       previousSupplierBrand = current?.supplierBrand;
+      previousSupplierId = current?.supplierBrandId;
     }
 
     const updated = await prisma.after_sales.update({
@@ -144,10 +145,8 @@ export const AfterSalesService = {
     });
     await QualityLossIndexService.upsertFromAfterSales(updated);
     eventBus.emit('after_sales.changed', {
-      supplierBrands: [
-        previousSupplierBrand,
-        updateData.supplierBrand as null | string | undefined,
-      ],
+      supplierBrands: [previousSupplierBrand, updated.supplierBrand],
+      supplierIds: [previousSupplierId, updated.supplierBrandId],
     });
   },
 
@@ -192,6 +191,7 @@ export const AfterSalesService = {
       projectName,
       status,
       supplierBrand,
+      supplierBrandId,
       workOrderNumber,
       year,
     } = params;
@@ -228,7 +228,9 @@ export const AfterSalesService = {
         where.claimStatus = claimStatus;
       }
     }
-    if (supplierBrand && String(supplierBrand).trim() !== '') {
+    if (supplierBrandId && String(supplierBrandId).trim() !== '') {
+      where.supplierBrandId = String(supplierBrandId).trim();
+    } else if (supplierBrand && String(supplierBrand).trim() !== '') {
       where.OR = [
         { supplierBrand: { contains: String(supplierBrand).trim() } },
         { projectName: { contains: String(supplierBrand).trim() } },
@@ -288,7 +290,7 @@ export const AfterSalesService = {
    * Soft delete a record with audit logging
    */
   async deleteRecord(id: string, userId: string): Promise<void> {
-    await prisma.after_sales.update({
+    const deleted = await prisma.after_sales.update({
       where: { id },
       data: {
         isDeleted: true,
@@ -302,6 +304,10 @@ export const AfterSalesService = {
     });
 
     await QualityLossIndexService.softDeleteSource('External', id);
+    eventBus.emit('after_sales.changed', {
+      supplierBrands: [deleted.supplierBrand],
+      supplierIds: [deleted.supplierBrandId],
+    });
 
     // Record audit log
     await SystemLogService.auditLog('after-sales', 'delete', {

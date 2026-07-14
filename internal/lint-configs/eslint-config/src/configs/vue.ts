@@ -10,15 +10,26 @@ export async function vue(): Promise<Linter.Config[]> {
     interopDefault(import('@typescript-eslint/parser')),
   ] as const);
 
-  const flatEssential = pluginVue.configs?.['flat/essential'] || [];
-  const flatStronglyRecommended =
-    pluginVue.configs?.['flat/strongly-recommended'] || [];
   const flatRecommended = pluginVue.configs?.['flat/recommended'] || [];
 
+  const scopedVueConfigs = flatRecommended.map((config) => ({
+    ...config,
+    files: ['**/*.vue'],
+  }));
+
   return [
-    ...flatEssential,
-    ...flatStronglyRecommended,
-    ...flatRecommended,
+    {
+      files: ['**/*.?([cm])[jt]s?(x)'],
+      ignores: ['**/__tests__/**', '**/*.spec.ts', '**/*.test.ts'],
+      plugins: {
+        vue: pluginVue,
+      },
+      rules: {
+        'vue/one-component-per-file': 'error',
+        'vue/prefer-import-from-vue': 'error',
+      },
+    },
+    ...scopedVueConfigs,
     {
       files: ['**/*.vue'],
       languageOptions: {

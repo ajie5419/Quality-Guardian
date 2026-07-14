@@ -14,12 +14,18 @@ const logger = createModuleLogger('event-bus');
  * write path that emits an event never sees a listener exception.
  */
 export interface DomainEvents {
-  'after_sales.changed': { supplierBrands: Array<null | string | undefined> };
+  'after_sales.changed': {
+    supplierBrands: Array<null | string | undefined>;
+    supplierIds: Array<null | string | undefined>;
+  };
   'inspection_issue.changed': {
+    supplierIds: Array<null | string | undefined>;
     supplierNames: Array<null | string | undefined>;
   };
   'inspection_record.changed': {
+    supplierIds: Array<null | string | undefined>;
     supplierNames: Array<null | string | undefined>;
+    teamIds: Array<null | string | undefined>;
     teamNames: Array<null | string | undefined>;
   };
 }
@@ -42,7 +48,7 @@ export const eventBus = {
     emitter.on(event, (payload: DomainEvents[K]) => {
       void Promise.resolve()
         .then(() => handler(payload))
-        .catch((error) => {
+        .catch((error: unknown) => {
           logger.warn({ err: error, event }, 'event listener handler failed');
         });
     });

@@ -2,11 +2,11 @@
 
 ## 当前状态
 
-- 最新变更: 统一供应商与外协质量指标口径；机加成品外协读取进货检验，驻厂外协读取过程检验，并修复工程问题数、合格率、画像履历和历史快照漂移
-- 测试状态: 供应商、检验、售后、前端与共享领域相关 800/800 测试通过
-- Lint: 通过（0 error，保留既有测试文件 9 条 warning）
-- Typecheck: 0 error（weapp 自身脚本为项目既有 skip，已用定向 ESLint/Stylelint 补充验证）
-- 模块 TS 文件数: 497（含测试）
+- 最新变更: supplier identity governance wave 代码、迁移回填、文档与本地全量门禁已完成；PR、发布和生产回填待验证
+- 测试状态: 全量 289/289 个文件、2471/2471 个用例通过
+- Lint: 通过（0 error，0 warning）
+- Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
+- 模块 TS 文件数: 505（含测试）
 - 当前版本: `0.16.0`
 
 ## 已完成
@@ -27,9 +27,11 @@
 - [x] 前后端类型契约（@qgs/shared API 响应类型）
 - [x] 根目录 + 后端脏数据清理
 - [x] 偏离修复（文件超限、governance 残留、route-handlers 合并、prisma 脚本清理）
+- [x] ESLint 与架构门禁完善（累计 Flat Config、AST 语义规则、历史债务递减 baseline、CI 全量扫描）
 - [x] 报检任务模块重构（状态机文档、创建 schema、查询/创建/派工/删除/关闭服务拆分）
 - [x] 小程序不合格品项模块（列表、详情、新增、编辑、照片、草稿、RBAC，复用电脑版数据与状态）
 - [x] 不合格品项所有权隔离（普通用户仅本人、管理员全部、写操作仅创建人）
+- [x] supplier identity governance wave（供应商画像、评分、检验、不合格项、售后评分、TEAM 映射、存量回填与 unresolved 审计）
 - [ ] 后端业务模块逐功能测试覆盖补齐（进行中）
 
 ## 当前架构
@@ -48,11 +50,16 @@ apps/backend/
 
 - [ ] 完成不合格品项剩余设备验收（真机、实际新增提交、照片上传、分页、草稿、账号切换）；微信开发者工具的权限、列表、详情、编辑、新增页面已验证
 - [ ] 持续补强端到端业务流程验证
+- [ ] 完成 supplier identity wave 的 PR、release-please、部署和生产指标核对
+- [ ] 为 `unresolved_master_data_refs` 增加人工处置 API/UI，并为 `supplier_identity_links` 增加管理 UI
+- [ ] 为 supervision 等尚未覆盖的存量供应商引用补齐回填、unresolved 审计和生产指标核对
+- [ ] 将其他受控主数据从 `DUAL_WRITE/legacy` 逐 wave 推进到在线 `ID-required`
+- [ ] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制
 
 ## 基线数据（用于异常检测）
 
-- 模块 TS 文件数: 497（含测试）
+- 模块 TS 文件数: 505（含测试）
 - utils TS 文件数: 41
-- 测试文件数: 193（modules 内）；后端总计待下次全量基线刷新
+- 测试文件数: 195（modules 内）；后端总计 212
 - 导出入口基线: 约 610；已完成 343，剩余 267
 - 顶层目录: api/ middleware/ modules/ prisma/ routes/ utils/

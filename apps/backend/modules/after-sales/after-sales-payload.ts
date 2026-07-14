@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import type { GovernedCanonicalWriteMode } from '~/utils/governed-write';
 
 import * as qgsDomain from '@qgs/shared';
 import {
@@ -60,6 +61,7 @@ export async function buildGovernedAfterSalesCreateData(
     createdBy?: string;
     defaultWorkOrderNumber: string;
     id: string;
+    identityMode?: GovernedCanonicalWriteMode;
     serialNumber: number;
   },
 ): Promise<Prisma.after_salesUncheckedCreateInput> {
@@ -69,10 +71,11 @@ export async function buildGovernedAfterSalesCreateData(
     options,
   ) as unknown as Prisma.after_salesUncheckedCreateInput;
   const data = attachResponsibleDepartmentsToAfterSalesData(body, createData);
-  const canonicalFields = await buildGovernedCanonicalWritePairForTable(
-    'after_sales',
-    data,
-  );
+  const canonicalFields = options.identityMode
+    ? await buildGovernedCanonicalWritePairForTable('after_sales', data, {
+        mode: options.identityMode,
+      })
+    : await buildGovernedCanonicalWritePairForTable('after_sales', data);
   return { ...data, ...canonicalFields };
 }
 

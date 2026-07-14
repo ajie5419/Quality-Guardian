@@ -14,6 +14,16 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
+vi.mock('~/modules/supplier-identity', () => ({
+  SupplierIdentityService: {
+    listTeamOptions: vi
+      .fn()
+      .mockResolvedValue([
+        { group: 'internal', label: 'Team A', value: 'team-1' },
+      ]),
+  },
+}));
+
 describe('inspection public query service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -21,7 +31,7 @@ describe('inspection public query service', () => {
 
   it('lists public suppliers from the supplier category by default', async () => {
     (prisma.suppliers.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { name: 'Supplier A' },
+      { id: 'supplier-1', name: 'Supplier A' },
     ]);
 
     const result = await InspectionPublicQueryService.getPublicSuppliers(
@@ -37,14 +47,14 @@ describe('inspection public query service', () => {
       },
       orderBy: { name: 'asc' },
       take: 100,
-      select: { name: true },
+      select: { id: true, name: true },
     });
-    expect(result).toEqual([{ label: 'Supplier A', value: 'Supplier A' }]);
+    expect(result).toEqual([{ label: 'Supplier A', value: 'supplier-1' }]);
   });
 
   it('lists public suppliers from the requested outsourcing category', async () => {
     (prisma.suppliers.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { name: 'Outsourcing A' },
+      { id: 'supplier-2', name: 'Outsourcing A' },
     ]);
 
     const result = await InspectionPublicQueryService.getPublicSuppliers(
@@ -59,10 +69,16 @@ describe('inspection public query service', () => {
       },
       orderBy: { name: 'asc' },
       take: 100,
-      select: { name: true },
+      select: { id: true, name: true },
     });
-    expect(result).toEqual([
-      { label: 'Outsourcing A', value: 'Outsourcing A' },
+    expect(result).toEqual([{ label: 'Outsourcing A', value: 'supplier-2' }]);
+  });
+
+  it('returns canonical TEAM IDs for process inspection selection', async () => {
+    await expect(
+      InspectionPublicQueryService.getPublicTeams('Team'),
+    ).resolves.toEqual([
+      { group: 'internal', label: 'Team A', value: 'team-1' },
     ]);
   });
 });

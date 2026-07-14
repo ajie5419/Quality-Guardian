@@ -41,6 +41,7 @@ function mapProject(row: any, extras?: Partial<SupervisionProject>) {
     stage: row.stage || '',
     status: normalizeProjectStatus(row.status) as SupervisionProject['status'],
     summary: row.summary || '',
+    supplierId: row.supplierId || null,
     supplierName: row.supplierName || '',
     supervisor: row.supervisor || '',
     updatedAt: row.updatedAt?.toISOString(),
@@ -53,6 +54,10 @@ export const SupervisionProjectService = {
   async createProject(payload: Record<string, unknown>) {
     const normalizedParticipants = stringifyList(payload.participants);
     const normalizedProjectType = normalizeProjectType(payload.projectType);
+    const normalizedSupplierId =
+      payload.supplierId === undefined
+        ? undefined
+        : normalizeText(payload.supplierId) || null;
     const governedFields = buildGovernedWriteFieldsForTable(
       'supervision_projects',
       {
@@ -63,7 +68,10 @@ export const SupervisionProjectService = {
     );
     const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
       'supervision_projects',
-      governedFields as Record<string, unknown>,
+      {
+        ...governedFields,
+        supplierId: normalizedSupplierId,
+      },
     );
     const normalizedGovernedFields = {
       ...governedFields,
@@ -178,6 +186,10 @@ export const SupervisionProjectService = {
       payload.projectType === undefined
         ? undefined
         : normalizeProjectType(payload.projectType);
+    const normalizedSupplierId =
+      payload.supplierId === undefined
+        ? undefined
+        : normalizeText(payload.supplierId) || null;
     const governedFields = buildGovernedWriteFieldsForTable(
       'supervision_projects',
       {
@@ -191,7 +203,10 @@ export const SupervisionProjectService = {
     );
     const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
       'supervision_projects',
-      governedFields as Record<string, unknown>,
+      {
+        ...governedFields,
+        supplierId: normalizedSupplierId,
+      },
     );
     const normalizedGovernedFields = {
       ...governedFields,

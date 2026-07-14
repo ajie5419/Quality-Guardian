@@ -28,7 +28,9 @@ export const InspectionRecordDeleteService = {
           projectName: true,
           result: true,
           supplierName: true,
+          supplierId: true,
           team: true,
+          teamId: true,
           workOrderNumber: true,
         },
       });
@@ -71,7 +73,9 @@ export const InspectionRecordDeleteService = {
       return { deleted, inspection };
     });
     eventBus.emit('inspection_record.changed', {
+      supplierIds: [result.inspection?.supplierId],
       supplierNames: [result.inspection?.supplierName],
+      teamIds: [result.inspection?.teamId],
       teamNames: [result.inspection?.team],
     });
     return result.deleted;
@@ -98,7 +102,9 @@ export const InspectionRecordDeleteService = {
           projectName: true,
           result: true,
           supplierName: true,
+          supplierId: true,
           team: true,
+          teamId: true,
           workOrderNumber: true,
         },
       });
@@ -145,7 +151,9 @@ export const InspectionRecordDeleteService = {
       return { deleted, inspections };
     });
     eventBus.emit('inspection_record.changed', {
+      supplierIds: result.inspections.map((item) => item.supplierId),
       supplierNames: result.inspections.map((item) => item.supplierName),
+      teamIds: result.inspections.map((item) => item.teamId),
       teamNames: result.inspections.map((item) => item.team),
     });
     return result.deleted;

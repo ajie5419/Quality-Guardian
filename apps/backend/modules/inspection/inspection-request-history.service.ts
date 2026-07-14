@@ -9,18 +9,37 @@ export interface SupplierHistoryProject {
 }
 
 function buildSupplierRequestWhere(params: {
-  supplierName: string;
+  category: 'INCOMING' | 'PROCESS';
+  identitySource: 'supplier' | 'team';
+  supplierId: string;
+  teamIds: string[];
 }): Prisma.qms_inspection_requestsWhereInput {
+  const inspectionIdentity: Prisma.inspectionsWhereInput = {
+    category: params.category,
+    ...(params.identitySource === 'team'
+      ? { teamId: { in: params.teamIds } }
+      : { supplierId: params.supplierId }),
+  };
   return {
     isDeleted: false,
-    team: params.supplierName,
+    OR: [
+      { inspection: { is: inspectionIdentity } },
+      {
+        inspectionLinks: {
+          some: { inspection: { is: inspectionIdentity } },
+        },
+      },
+    ],
   };
 }
 
 export const InspectionRequestHistoryService = {
   async getSupplierHistoryProjects(params: {
+    category: 'INCOMING' | 'PROCESS';
+    identitySource: 'supplier' | 'team';
     limit?: number;
-    supplierName: string;
+    supplierId: string;
+    teamIds: string[];
   }): Promise<SupplierHistoryProject[]> {
     const limit = Math.min(Math.max(Number(params.limit) || 50, 1), 100);
     const grouped = await prisma.qms_inspection_requests.groupBy({

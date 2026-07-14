@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 import type { AfterSalesFormState, TreeSelectNode } from '#/types';
 
+import { computed } from 'vue';
+
 import { useI18n } from '@vben/locales';
 
 import { FormItem, InputNumber, TreeSelect } from 'ant-design-vue';
@@ -17,6 +19,21 @@ const formState = defineModel<AfterSalesFormState>('formState', {
 });
 
 const { t } = useI18n();
+const supplierBrandId = computed({
+  get: () => formState.value.supplierBrandId || undefined,
+  set: (value: string | undefined) => {
+    formState.value.supplierBrandId = value;
+  },
+});
+
+function handleSupplierChange(
+  value: string | undefined,
+  option?: { item?: { name?: string } },
+) {
+  formState.value.supplierBrandId = value;
+  formState.value.supplierBrand =
+    String(option?.item?.name || '').trim() || undefined;
+}
 </script>
 
 <template>
@@ -46,8 +63,11 @@ const { t } = useI18n();
         class="mb-0"
       >
         <SupplierSelect
-          v-model:value="formState.supplierBrand"
+          v-model:value="supplierBrandId"
+          :legacy-name="formState.supplierBrand || undefined"
           :placeholder="t('qms.afterSales.placeholder.selectSupplier')"
+          value-mode="id"
+          @change="handleSupplierChange"
         />
       </FormItem>
       <div class="grid grid-cols-2 gap-2">

@@ -4,6 +4,8 @@ import js from '@eslint/js';
 import pluginUnusedImports from 'eslint-plugin-unused-imports';
 import globals from 'globals';
 
+import { BASE_RESTRICTED_SYNTAX_SELECTORS } from '../rule-options';
+
 export async function javascript(): Promise<Linter.Config[]> {
   return [
     {
@@ -130,14 +132,7 @@ export async function javascript(): Promise<Linter.Config[]> {
             property: '__lookupSetter__',
           },
         ],
-        'no-restricted-syntax': [
-          'error',
-          'DebuggerStatement',
-          'LabeledStatement',
-          'WithStatement',
-          'TSEnumDeclaration[const=true]',
-          'TSExportAssignment',
-        ],
+        'no-restricted-syntax': ['error', ...BASE_RESTRICTED_SYNTAX_SELECTORS],
         'no-self-assign': ['error', { props: true }],
         'no-self-compare': 'error',
         'no-sequences': 'error',

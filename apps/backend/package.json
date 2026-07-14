@@ -21,6 +21,7 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "maintenance:supplier-score-snapshots": "tsx scripts/backfill-supplier-score-snapshots.ts",
+    "maintenance:supplier-identities": "tsx scripts/backfill-quality-record-supplier-identities.ts",
     "maintenance:backfill-thumbnails": "tsx scripts/backfill-missing-thumbnails.ts"
   },
   "dependencies": {

@@ -186,7 +186,6 @@ function createConsoleMethod(
     if (level === 'trace' && LOG_LEVEL !== 'trace') return;
     if (level === 'debug' && !['debug', 'trace'].includes(LOG_LEVEL)) return;
 
-    /* eslint-disable no-console */
     switch (level) {
       case 'debug': {
         console.debug('[DEBUG]', merged, message);
@@ -213,7 +212,6 @@ function createConsoleMethod(
         console.info('[INFO]', merged, message);
       }
     }
-    /* eslint-enable no-console */
   };
 }
 

@@ -89,6 +89,7 @@ export interface InspectionRecordInput {
   category: 'INCOMING' | 'PROCESS' | 'SHIPMENT';
   workOrderNumber: string;
   projectName?: string;
+  supplierId?: null | string;
   supplierName?: string;
   materialName?: string;
   incomingType?: string;

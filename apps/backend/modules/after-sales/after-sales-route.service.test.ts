@@ -219,11 +219,19 @@ describe('after-sales route services', () => {
     );
     expect(buildGovernedAfterSalesCreateData).toHaveBeenCalledWith(
       { workOrderNumber: 'WO-1' },
-      expect.objectContaining({ createdBy: 'u-import', serialNumber: 10 }),
+      expect.objectContaining({
+        createdBy: 'u-import',
+        identityMode: 'legacy-import',
+        serialNumber: 10,
+      }),
     );
     expect(buildGovernedAfterSalesCreateData).toHaveBeenCalledWith(
       { workOrderNumber: 'WO-2' },
-      expect.objectContaining({ createdBy: 'u-import', serialNumber: 11 }),
+      expect.objectContaining({
+        createdBy: 'u-import',
+        identityMode: 'legacy-import',
+        serialNumber: 11,
+      }),
     );
   });
 

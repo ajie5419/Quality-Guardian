@@ -6,6 +6,8 @@ import type {
 } from './inspection-record-types';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { SupplierIdentityService } from '~/modules/supplier-identity';
+import { BusinessError } from '~/utils/business-error';
 import { eventBus } from '~/utils/event-bus';
 import {
   buildGovernedCanonicalWritePairForTable,
@@ -17,7 +19,6 @@ import {
   resolveCanonicalProcessNameById,
   resolveProcessIdForWrite,
 } from '~/utils/process-resolver';
-import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 import { syncInspectionArchiveTask } from './inspection-archive-sync.service';
 import { syncInspectionProjectDocuments } from './inspection-project-document-sync.service';
@@ -79,15 +80,21 @@ export const InspectionRecordCreateService = {
           await InspectionRecordCreateService.generateSerialNumber(
             client ?? prisma,
           );
-        const inputTeam = data.team;
         const resolvedProcessId = await resolveProcessIdForWrite({
           explicitProcessId: data.processId,
           processName: data.processName,
         });
-        const resolvedTeamId = await resolveTeamIdForWrite({
-          explicitTeamId: data.teamId,
-          team: inputTeam, // governance-allow-direct-name-id
-        });
+        const explicitTeamId = String(data.teamId || '').trim();
+        if (data.category === 'PROCESS' && !explicitTeamId) {
+          throw new BusinessError(
+            'TEAM_ID_REQUIRED',
+            'A canonical TEAM identity is required for process inspections',
+          );
+        }
+        const teamIdentity =
+          data.category === 'PROCESS'
+            ? await SupplierIdentityService.resolveTeamById(explicitTeamId)
+            : null;
         const execute = async (tx: Prisma.TransactionClient) => {
           const governedFields = buildGovernedWriteFieldsForTable(
             'inspections',
@@ -97,14 +104,30 @@ export const InspectionRecordCreateService = {
               processName: data.processName,
               projectName: data.projectName,
               supplierName: data.supplierName,
-              team: inputTeam,
+              team: teamIdentity?.name ?? null,
             },
           );
           const governedCanonicalIds =
-            await buildGovernedCanonicalWritePairForTable(
-              'inspections',
-              governedFields as Record<string, unknown>,
+            await buildGovernedCanonicalWritePairForTable('inspections', {
+              ...governedFields,
+              supplierId: data.supplierId,
+            });
+          const governedSupplierId =
+            typeof governedCanonicalIds.supplierId === 'string'
+              ? governedCanonicalIds.supplierId
+              : data.supplierId;
+          const supplierIdentity =
+            await SupplierIdentityService.resolveSupplierForInspection({
+              category: data.category,
+              supplierId: governedSupplierId,
+              teamId: teamIdentity?.id,
+            });
+          if (data.category === 'INCOMING' && !supplierIdentity) {
+            throw new BusinessError(
+              'SUPPLIER_ID_REQUIRED',
+              'A canonical supplier identity is required for incoming inspections',
             );
+          }
           const templateBinding = await resolveInspectionTemplateBinding(
             tx,
             data,
@@ -117,11 +140,13 @@ export const InspectionRecordCreateService = {
               materialName: data.materialName,
               incomingType: data.incomingType,
               processId: resolvedProcessId,
-              teamId: resolvedTeamId, // governance-allow-direct-name-id
+              teamId: teamIdentity?.id ?? null,
               level1Component: data.level1Component,
               level2Component: data.level2Component,
               ...governedFields,
               ...governedCanonicalIds,
+              supplierId: supplierIdentity?.id ?? null,
+              supplierName: supplierIdentity?.name ?? null,
               documents: data.documents,
               hasDocuments:
                 data.hasDocuments === undefined ? true : data.hasDocuments,
@@ -206,7 +231,9 @@ export const InspectionRecordCreateService = {
         // must publish after commit so snapshots never observe rolled-back data.
         if (!client) {
           eventBus.emit('inspection_record.changed', {
+            supplierIds: [inspection.supplierId],
             supplierNames: [inspection.supplierName],
+            teamIds: [inspection.teamId],
             teamNames: [inspection.team],
           });
         }

@@ -157,6 +157,7 @@ export function createInitialFormState() {
     severity: 'P2 级',
     status: AFTER_SALES_STATUS.IN_PROGRESS,
     supplierBrand: '',
+    supplierBrandId: undefined,
     warrantyStatus: '在保',
     photos: [],
   };

@@ -39,6 +39,7 @@ vi.mock('#/adapter/form', () => ({
         return () =>
           h('div', [
             slots.ncNumber?.({ modelValue: '' }),
+            slots.supplierId?.({ value: undefined }),
             slots['description-label']?.(),
           ]);
       },
@@ -127,6 +128,12 @@ vi.mock('ant-design-vue', () => ({
 vi.mock('../../../shared/components/SupplierSelect.vue', () => ({
   default: defineComponent({
     name: 'MockSupplierSelect',
+    props: {
+      category: String,
+      legacyName: String,
+      valueMode: String,
+    },
+    emits: ['change'],
     setup() {
       return () => h('div');
     },
@@ -202,5 +209,24 @@ describe('issue form fields nc number controls', () => {
 
     expect(wrapper.text()).not.toContain('生成编号');
     expect(wrapper.text()).not.toContain('自动生成');
+  });
+
+  it('writes the supplier id and name snapshot together', async () => {
+    const wrapper = mountComponent(false);
+    const supplierSelect = wrapper.findComponent({
+      name: 'MockSupplierSelect',
+    });
+
+    expect(supplierSelect.props('valueMode')).toBe('id');
+    supplierSelect.vm.$emit('change', 'supplier-1', {
+      item: { id: 'supplier-1', name: 'Supplier A' },
+    });
+    await wrapper.vm.$nextTick();
+
+    expect(mockSetFieldValue).toHaveBeenCalledWith('supplierId', 'supplier-1');
+    expect(mockSetFieldValue).toHaveBeenCalledWith(
+      'supplierName',
+      'Supplier A',
+    );
   });
 });

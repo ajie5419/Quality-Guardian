@@ -153,6 +153,13 @@ export function getIssueFormSchema(
     },
     {
       fieldName: 'supplierName',
+      label: '',
+      component: 'Input',
+      hideLabel: true,
+      formItemClass: 'hidden',
+    },
+    {
+      fieldName: 'supplierId',
       label: t('qms.inspection.issues.responsibleUnit'),
       component: 'Input',
       rules: 'required',

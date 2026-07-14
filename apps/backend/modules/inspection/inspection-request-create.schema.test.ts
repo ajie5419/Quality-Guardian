@@ -20,6 +20,7 @@ function buildValidPayload() {
     selfCheckResult: 'PASS',
     stationSelection: { indexes: [1, 2], mode: 'PARTIAL' },
     team: '生产一班',
+    teamId: 'team-1',
     workOrderNumber: 'WO-001',
   };
 }
@@ -78,6 +79,7 @@ describe('inspection request create schema', () => {
       ...buildValidPayload(),
       componentName: '',
       processName: INCOMING_INSPECTION_PROCESS_NAME,
+      supplierId: 'supplier-1',
       team: '供应商A',
     });
 

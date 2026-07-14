@@ -404,7 +404,9 @@ export interface InspectionRecordPayloadInput {
     requestInfo?: null | string;
     selfCheckResult: string;
     stationSelection?: null | string;
+    supplierId?: null | string;
     team?: null | string;
+    teamId?: null | string;
     work_order?: null | { projectName?: null | string };
     workOrderNumber: string;
   };
@@ -507,6 +509,7 @@ export function buildInspectionRecordPayloadCore(
       incomingType:
         requestInfo.incomingType || INCOMING_INSPECTION_PROCESS_NAME,
       materialName: input.request.partName,
+      supplierId: normalizeInspectionRequestText(input.request.supplierId),
       supplierName: normalizeInspectionRequestText(input.request.team),
     };
   }
@@ -518,5 +521,6 @@ export function buildInspectionRecordPayloadCore(
     level2Component: componentName || undefined,
     processName: input.request.processName,
     team: normalizeInspectionRequestText(input.request.team),
+    teamId: normalizeInspectionRequestText(input.request.teamId),
   };
 }

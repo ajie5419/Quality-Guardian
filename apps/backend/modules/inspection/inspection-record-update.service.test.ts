@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRecordUpdateService } from '~/modules/inspection/inspection-record-update.service';
 import { eventBus } from '~/utils/event-bus';
+import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -23,8 +24,15 @@ vi.mock('~/utils/process-resolver', () => ({
   resolveProcessIdForWrite: vi.fn().mockResolvedValue('process-1'),
 }));
 
-vi.mock('~/utils/team-resolver', () => ({
-  resolveTeamIdForWrite: vi.fn().mockResolvedValue('team-1'),
+vi.mock('~/modules/supplier-identity', () => ({
+  SupplierIdentityService: {
+    resolveSupplierForInspection: vi
+      .fn()
+      .mockResolvedValue({ id: 'supplier-2', name: 'Supplier B' }),
+    resolveTeamById: vi
+      .fn()
+      .mockResolvedValue({ id: 'team-1', name: 'Team A' }),
+  },
 }));
 
 vi.mock('~/modules/file-storage/file-storage.service', () => ({
@@ -75,8 +83,10 @@ describe('inspectionRecordUpdateService', () => {
       processId: 'process-1',
       processName: 'Welding',
       documents: null,
+      supplierId: 'supplier-2',
       supplierName: 'Supplier B',
       team: 'Team B',
+      teamId: 'team-2',
       workOrderNumber: 'WO-1',
     };
     const txInspectionsUpdate = vi.fn().mockResolvedValue(mockInspection);
@@ -89,7 +99,9 @@ describe('inspectionRecordUpdateService', () => {
             processId: 'process-old',
             processName: 'Old',
             supplierName: 'Supplier A',
+            supplierId: 'supplier-1',
             team: 'Team A',
+            teamId: 'team-1',
             templateId: null,
             templateName: null,
             workOrderNumber: 'WO-1',
@@ -116,9 +128,15 @@ describe('inspectionRecordUpdateService', () => {
     } as any);
 
     expect(prisma.$transaction).toHaveBeenCalled();
+    expect(buildGovernedCanonicalWritePairForTable).toHaveBeenCalledWith(
+      'inspections',
+      expect.objectContaining({ supplierId: undefined }),
+    );
     expect(result).toEqual(mockInspection);
     expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
+      supplierIds: ['supplier-1', 'supplier-2'],
       supplierNames: ['Supplier A', 'Supplier B'],
+      teamIds: ['team-1', 'team-2'],
       teamNames: ['Team A', 'Team B'],
     });
   });
@@ -134,6 +152,7 @@ describe('inspectionRecordUpdateService', () => {
             incomingType: null,
             processId: null,
             processName: null,
+            teamId: 'team-1',
             templateId: null,
             templateName: null,
             workOrderNumber: 'WO-1',
@@ -179,6 +198,7 @@ describe('inspectionRecordUpdateService', () => {
             incomingType: null,
             processId: null,
             processName: null,
+            teamId: 'team-1',
             templateId: null,
             templateName: null,
             workOrderNumber: 'WO-1',
@@ -228,5 +248,33 @@ describe('inspectionRecordUpdateService', () => {
     ).rejects.toBe(failure);
 
     expect(eventBus.emit).not.toHaveBeenCalled();
+  });
+
+  it('rejects a process inspection without a canonical TEAM identity', async () => {
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb({
+        inspections: {
+          findUnique: vi.fn().mockResolvedValue({
+            category: 'PROCESS',
+            processId: null,
+            processName: 'Welding',
+            teamId: null,
+            workOrderNumber: 'WO-1',
+          }),
+        },
+      }),
+    );
+
+    await expect(
+      InspectionRecordUpdateService.update('i-1', {
+        category: 'PROCESS',
+        inspector: 'Tester',
+        inspectionDate: '2026-01-01',
+        items: [],
+        processName: 'Welding',
+        quantity: 10,
+        workOrderNumber: 'WO-1',
+      }),
+    ).rejects.toMatchObject({ code: 'TEAM_ID_REQUIRED' });
   });
 });

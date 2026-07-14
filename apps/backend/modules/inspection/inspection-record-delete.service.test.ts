@@ -53,8 +53,10 @@ describe('inspectionRecordDeleteService', () => {
         processName: 'Welding',
         projectName: null,
         result: 'PASS',
+        supplierId: 'supplier-1',
         supplierName: 'Supplier A',
         team: null,
+        teamId: 'team-1',
         workOrderNumber: 'WO-1',
       };
       const txFindUnique = vi.fn().mockResolvedValue(inspection);
@@ -93,7 +95,9 @@ describe('inspectionRecordDeleteService', () => {
         bizType: 'inspection_record',
       });
       expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
+        supplierIds: ['supplier-1'],
         supplierNames: ['Supplier A'],
+        teamIds: ['team-1'],
         teamNames: [null],
       });
     });
@@ -116,7 +120,9 @@ describe('inspectionRecordDeleteService', () => {
 
       expect(result).toEqual({ id: 'i-1' });
       expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
+        supplierIds: [undefined],
         supplierNames: [undefined],
+        teamIds: [undefined],
         teamNames: [undefined],
       });
     });
@@ -141,8 +147,10 @@ describe('inspectionRecordDeleteService', () => {
           processName: 'Welding',
           projectName: null,
           result: 'PASS',
+          supplierId: 'supplier-1',
           supplierName: null,
           team: 'Outsourcing Team A',
+          teamId: 'team-1',
           workOrderNumber: 'WO-1',
         },
       ];
@@ -172,7 +180,9 @@ describe('inspectionRecordDeleteService', () => {
       });
       expect(FileStorageService.softDeleteReferences).toHaveBeenCalled();
       expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
+        supplierIds: ['supplier-1'],
         supplierNames: [null],
+        teamIds: ['team-1'],
         teamNames: ['Outsourcing Team A'],
       });
     });

@@ -60,6 +60,8 @@ export function buildAfterSalesCreateData(
   const laborTravelCost =
     normalizeNumber(body.laborTravelCost, { fallback: 0 }) || 0;
 
+  const supplierBrandId = normalizeString(body.supplierBrandId);
+
   return {
     id: options.id,
     serialNumber: options.serialNumber,
@@ -92,6 +94,9 @@ export function buildAfterSalesCreateData(
     division: normalizeString(body.division),
     partName: normalizeString(body.partName),
     supplierBrand: normalizeString(body.supplierBrand) || null,
+    ...(body.supplierBrandId === undefined
+      ? {}
+      : { supplierBrandId: supplierBrandId || null }),
     isClaim: Boolean(body.isClaim),
     photos: normalizePhotos(body.photos) ?? null,
     isDeleted: false,
@@ -152,6 +157,10 @@ export function buildAfterSalesUpdateData(body: AfterSalesBody): {
     if (body[field] !== undefined) {
       data[field] = normalizeString(body[field]) || null;
     }
+  }
+
+  if (body.supplierBrandId !== undefined) {
+    data.supplierBrandId = normalizeString(body.supplierBrandId) || null;
   }
 
   if (body.isClaim !== undefined) {

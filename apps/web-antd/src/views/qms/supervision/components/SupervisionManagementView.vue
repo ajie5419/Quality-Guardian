@@ -75,6 +75,7 @@ type ProjectFormState = {
   plannedStartAt?: dayjs.Dayjs;
   projectName: string;
   supervisor: string;
+  supplierId: string;
   supplierName: string;
   workOrderNumber: string;
 };
@@ -173,6 +174,7 @@ const detailReport = ref<SupervisionDailyReport>();
 
 const projectForm = reactive<ProjectFormState>({
   projectName: '',
+  supplierId: '',
   supplierName: '',
   supervisor: '',
   workOrderNumber: '',
@@ -854,6 +856,7 @@ function resetProjectForm() {
     plannedEndAt: undefined,
     plannedStartAt: undefined,
     projectName: '',
+    supplierId: '',
     supplierName: '',
     supervisor: '',
   });
@@ -876,6 +879,7 @@ async function openProjectDrawer(record?: SupervisionProject) {
         ? dayjs(record.plannedStartAt)
         : undefined,
       projectName: record.projectName,
+      supplierId: record.supplierId || '',
       supplierName: record.supplierName || '',
       supervisor: record.supervisor || '',
     });
@@ -888,6 +892,7 @@ function buildProjectPayload() {
     plannedEndAt: toDate(projectForm.plannedEndAt),
     plannedStartAt: toDate(projectForm.plannedStartAt),
     projectName: projectForm.projectName,
+    supplierId: projectForm.supplierId,
     supplierName: projectForm.supplierName,
     supervisor: projectForm.supervisor,
     workOrderNumber: projectForm.workOrderNumber,
