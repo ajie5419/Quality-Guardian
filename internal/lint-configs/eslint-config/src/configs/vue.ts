@@ -15,10 +15,17 @@ export async function vue(): Promise<Linter.Config[]> {
     pluginVue.configs?.['flat/strongly-recommended'] || [];
   const flatRecommended = pluginVue.configs?.['flat/recommended'] || [];
 
-  return [
+  const scopedVueConfigs = [
     ...flatEssential,
     ...flatStronglyRecommended,
     ...flatRecommended,
+  ].map((config) => ({
+    ...config,
+    files: ['**/*.vue'],
+  }));
+
+  return [
+    ...scopedVueConfigs,
     {
       files: ['**/*.vue'],
       languageOptions: {

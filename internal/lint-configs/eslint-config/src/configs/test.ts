@@ -29,7 +29,7 @@ export async function test(): Promise<Linter.Config[]> {
       },
       rules: {
         'no-console': 'off',
-        'node/prefer-global/process': 'off',
+        'n/prefer-global/process': 'off',
         'test/consistent-test-it': [
           'error',
           { fn: 'it', withinDescribe: 'it' },
