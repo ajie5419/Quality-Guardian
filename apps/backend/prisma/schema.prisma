@@ -998,7 +998,7 @@ model suppliers {
   @@index([recognizedAt])
 }
 
-// @module supplier
+// @module supplier-identity
 model supplier_identity_links {
   id                   String                 @id @default(cuid())
   supplierId           String

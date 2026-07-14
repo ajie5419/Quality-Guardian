@@ -1,7 +1,11 @@
 import { defineEventHandler } from 'h3';
-import { SupplierIdentityService } from '~/modules/supplier-identity';
+import {
+  SupplierIdentityAccessService,
+  SupplierIdentityService,
+} from '~/modules/supplier-identity';
 import { logApiError } from '~/utils/api-logger';
 import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   internalServerErrorResponse,
   useResponseSuccess,
@@ -9,13 +13,14 @@ import {
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
-  const id = getRequiredRouterParam(
-    event,
-    'id',
-    'Identity link ID is required',
-  );
-  if (typeof id !== 'string') return id;
   try {
+    SupplierIdentityAccessService.ensureAdmin(getCurrentUser(event));
+    const id = getRequiredRouterParam(
+      event,
+      'id',
+      'Identity link ID is required',
+    );
+    if (typeof id !== 'string') return id;
     await SupplierIdentityService.delete(id);
     return useResponseSuccess(null);
   } catch (error: unknown) {

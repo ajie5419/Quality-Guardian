@@ -1,9 +1,11 @@
 import {
+  SupplierIdentityAccessService,
   supplierIdentityInputSchema,
   SupplierIdentityService,
 } from '~/modules/supplier-identity';
 import { logApiError } from '~/utils/api-logger';
 import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
+import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import {
   internalServerErrorResponse,
@@ -14,13 +16,14 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 export default defineValidatedHandler(
   supplierIdentityInputSchema,
   async (event, body) => {
-    const id = getRequiredRouterParam(
-      event,
-      'id',
-      'Identity link ID is required',
-    );
-    if (typeof id !== 'string') return id;
     try {
+      SupplierIdentityAccessService.ensureAdmin(getCurrentUser(event));
+      const id = getRequiredRouterParam(
+        event,
+        'id',
+        'Identity link ID is required',
+      );
+      if (typeof id !== 'string') return id;
       return useResponseSuccess(await SupplierIdentityService.update(id, body));
     } catch (error: unknown) {
       logApiError('supplier-identity', error, undefined, event);
