@@ -32,6 +32,7 @@ export interface SupervisionProject {
   status: SupervisionProjectStatus;
   summary?: string;
   supervisor?: string;
+  supplierId?: null | string;
   supplierName?: string;
   totalIssueCount?: number;
   updatedAt?: string;

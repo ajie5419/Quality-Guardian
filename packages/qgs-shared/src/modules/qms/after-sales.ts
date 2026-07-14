@@ -31,6 +31,7 @@ export interface AfterSalesItem {
   shipDate?: string; // 发货日期
   status: string; // 状态
   supplierBrand?: string; // 供应商名称/品牌
+  supplierBrandId?: null | string; // Canonical supplier reference
   warrantyStatus: string; // 在保状态
   workOrderNumber: string; // 工单号
 }
