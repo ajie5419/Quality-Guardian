@@ -102,10 +102,10 @@ export const InspectionRecordCreateService = {
             },
           );
           const governedCanonicalIds =
-            await buildGovernedCanonicalWritePairForTable(
-              'inspections',
-              governedFields as Record<string, unknown>,
-            );
+            await buildGovernedCanonicalWritePairForTable('inspections', {
+              ...governedFields,
+              supplierId: data.supplierId,
+            });
           const governedSupplierId =
             typeof governedCanonicalIds.supplierId === 'string'
               ? governedCanonicalIds.supplierId

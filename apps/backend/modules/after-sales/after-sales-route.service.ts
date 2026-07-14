@@ -108,6 +108,7 @@ export const AfterSalesRouteService = {
             createdBy,
             defaultWorkOrderNumber: woNumber,
             id: createAfterSalesId(),
+            identityMode: 'legacy-import',
             serialNumber,
           }),
         });

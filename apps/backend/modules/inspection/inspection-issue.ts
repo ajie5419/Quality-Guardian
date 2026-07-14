@@ -419,6 +419,7 @@ export async function buildInspectionIssueUpsertPayload(
   const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
     'quality_records',
     item as Record<string, unknown>,
+    { mode: 'legacy-import' },
   );
   const governedFields = buildGovernedWriteFieldsForTable(
     'quality_records',

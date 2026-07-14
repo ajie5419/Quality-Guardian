@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRecordCreateService } from '~/modules/inspection/inspection-record-create.service';
 import { eventBus } from '~/utils/event-bus';
+import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -140,6 +141,10 @@ describe('inspectionRecordCreateService', () => {
       } as any);
 
       expect(prisma.$transaction).toHaveBeenCalled();
+      expect(buildGovernedCanonicalWritePairForTable).toHaveBeenCalledWith(
+        'inspections',
+        expect.objectContaining({ supplierId: undefined }),
+      );
       expect(result).toEqual(mockInspection);
       expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
         supplierIds: ['supplier-1'],

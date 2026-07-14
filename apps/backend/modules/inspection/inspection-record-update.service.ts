@@ -49,10 +49,10 @@ export const InspectionRecordUpdateService = {
         team: inputTeam,
       });
       const governedCanonicalIds =
-        await buildGovernedCanonicalWritePairForTable(
-          'inspections',
-          governedFields as Record<string, unknown>,
-        );
+        await buildGovernedCanonicalWritePairForTable('inspections', {
+          ...governedFields,
+          supplierId: data.supplierId,
+        });
       const previousInspection = await tx.inspections.findUnique({
         where: { id },
         select: {

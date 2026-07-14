@@ -1,3 +1,4 @@
+import { BusinessError } from './business-error';
 import { MasterDataGovernanceKernel } from './canonical-master-data';
 import {
   getMasterDataGovernanceField,
@@ -19,6 +20,7 @@ export type GovernedCanonicalWritePair = Record<
   string,
   null | string | undefined
 >;
+export type GovernedCanonicalWriteMode = 'legacy-import' | 'online';
 
 const TABLE_ALIAS_HELPER_NAME: Record<string, string> = {
   inspections: 'buildGovernedInspectionWriteFields',
@@ -269,6 +271,7 @@ function extractCanonicalTargetByField(
 export async function buildGovernedCanonicalWritePairForTable(
   targetTable: string,
   input: GovernedWriteInput,
+  options: { mode?: GovernedCanonicalWriteMode } = {},
 ): Promise<GovernedCanonicalWritePair> {
   const mapping = GOVERNED_FIELD_MAPPING_BY_TABLE.get(targetTable);
   if (!mapping) {
@@ -276,11 +279,27 @@ export async function buildGovernedCanonicalWritePairForTable(
   }
   const output: GovernedCanonicalWritePair = {};
   const canonicalTargets = extractCanonicalTargetByField(targetTable, mapping);
+  const mode = options.mode || 'online';
   for (const target of canonicalTargets) {
+    const field = getMasterDataGovernanceField(target.configKey);
+    if (!field) {
+      throw new Error(`INVALID_GOVERNANCE_CONFIG:${target.configKey}`);
+    }
     const explicitCanonicalId = normalizeCanonicalIdValue(
       input[target.idField],
     );
     let governedName = normalizeGovernedNameValue(input[target.nameField]);
+    if (
+      field.onlineWritePolicy === 'id-required' &&
+      mode === 'online' &&
+      governedName &&
+      !explicitCanonicalId
+    ) {
+      throw new BusinessError(
+        'CANONICAL_ID_REQUIRED',
+        `${target.idField} is required when ${target.nameField} is provided`,
+      );
+    }
     let inferredCanonicalId: null | string | undefined;
     if (explicitCanonicalId === undefined && governedName) {
       const canonicalName =
@@ -304,6 +323,28 @@ export async function buildGovernedCanonicalWritePairForTable(
       });
     if (resolvedCanonicalId !== undefined) {
       output[target.idField] = resolvedCanonicalId;
+    }
+    if (
+      field.onlineWritePolicy === 'id-required' &&
+      mode === 'legacy-import' &&
+      governedName &&
+      !resolvedCanonicalId
+    ) {
+      throw new BusinessError(
+        'UNRESOLVED_CANONICAL_REFERENCE',
+        `${target.nameField} cannot be resolved to a unique canonical ID`,
+      );
+    }
+    if (resolvedCanonicalId) {
+      const canonicalName =
+        await MasterDataGovernanceKernel.resolveCanonicalNameById({
+          canonicalId: resolvedCanonicalId,
+          configKey: target.configKey,
+          fallbackName: null,
+        });
+      if (canonicalName) {
+        output[target.nameField] = canonicalName;
+      }
     }
   }
   return output;

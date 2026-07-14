@@ -455,9 +455,12 @@ async function resolveCanonicalIdByName(
     `SELECT ${idColumn} AS id
      FROM ${table}
      WHERE ${nameColumn} = ?${whereSql}
-     LIMIT 1`,
+     LIMIT 2`,
     name,
   );
+  if (rows.length !== 1) {
+    return null;
+  }
   const id = normalizeValue(rows[0]?.id);
   return id || null;
 }

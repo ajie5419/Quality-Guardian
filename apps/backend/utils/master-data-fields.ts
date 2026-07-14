@@ -33,6 +33,7 @@ export interface MasterDataGovernanceField {
   auditPolicy: 'canonical-id-and-orphan' | 'orphan-only';
   backfillPolicy: 'canonical-id' | 'none';
   key: string;
+  onlineWritePolicy?: 'id-required';
   readStrategy: 'canonical-first' | 'name-only';
   rolloutWave: number;
   requiresDerivedRuleFreeze?: boolean;
@@ -381,6 +382,7 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
   },
   {
     key: 'supplierBrand',
+    onlineWritePolicy: 'id-required',
     rolloutWave: 2,
     writeStrategy: 'dual-write',
     readStrategy: 'canonical-first',
@@ -785,6 +787,7 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
   },
   {
     key: 'supplierName',
+    onlineWritePolicy: 'id-required',
     rolloutWave: 2,
     writeStrategy: 'dual-write',
     readStrategy: 'canonical-first',
