@@ -25,6 +25,12 @@ function getRestrictedImportPatterns(rule: unknown) {
   return options.patterns ?? [];
 }
 
+async function getRuleSeverity(filePath: string, ruleId: string) {
+  const rule = await getRule(filePath, ruleId);
+  expect(Array.isArray(rule)).toBe(true);
+  return (rule as unknown[])[0];
+}
+
 describe('final ESLint configuration', () => {
   it('keeps base and audit syntax restrictions in backend modules', async () => {
     const filePath = 'apps/backend/modules/example/example.service.ts';
@@ -102,5 +108,39 @@ describe('final ESLint configuration', () => {
     expect(
       await getRule(filePath, 'node/prefer-global/process'),
     ).toBeUndefined();
+
+    expect(
+      await getRule(
+        'packages/@core/base/shared/src/utils/inference.ts',
+        'vue/prefer-import-from-vue',
+      ),
+    ).toEqual([2]);
+  });
+
+  it('enforces backend source safety without blocking test fixtures', async () => {
+    const sourceFile = 'apps/backend/modules/example/example.service.ts';
+    const testFile = 'apps/backend/modules/example/example.service.test.ts';
+
+    for (const ruleId of [
+      '@typescript-eslint/no-non-null-assertion',
+      'no-console',
+      'no-empty',
+    ]) {
+      expect(await getRuleSeverity(sourceFile, ruleId)).toBe(2);
+    }
+
+    expect(
+      await getRuleSeverity(sourceFile, '@typescript-eslint/no-explicit-any'),
+    ).toBe(0);
+    expect(
+      await getRuleSeverity(testFile, '@typescript-eslint/no-explicit-any'),
+    ).toBe(0);
+    expect(
+      await getRuleSeverity(
+        testFile,
+        '@typescript-eslint/no-non-null-assertion',
+      ),
+    ).toBe(0);
+    expect(await getRuleSeverity(testFile, 'no-console')).toBe(0);
   });
 });

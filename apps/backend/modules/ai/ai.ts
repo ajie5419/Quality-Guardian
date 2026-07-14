@@ -1,6 +1,9 @@
 import { extractAiJson } from '@qgs/shared';
 import { AI_SETTINGS } from '~/modules/system/system-data';
+import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+
+const logger = createModuleLogger('AI');
 
 export interface AiMessage {
   role: 'assistant' | 'system' | 'user';
@@ -104,7 +107,10 @@ export async function callAi(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[AI-Error] Status: ${response.status}`, errorText);
+      logger.error(
+        { responseBody: errorText, status: response.status },
+        'AI provider returned an error response',
+      );
       throw new Error(
         `AI 服务返回错误 (${response.status}): ${errorText.slice(0, 200)}`,
       );
@@ -145,7 +151,7 @@ export function extractJson<T extends AiJsonValue = Record<string, unknown>>(
   try {
     return extractAiJson(content) as T;
   } catch (error) {
-    console.error('[AI-JSON-Parse-Error] Raw Content:', content);
+    logger.error({ content, err: error }, 'Failed to parse AI JSON response');
     throw error;
   }
 }

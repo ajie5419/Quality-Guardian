@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getMetadata, setMetadata } from '~/modules/system/metadata';
 import prisma from '~/utils/prisma';
 
+const { mockLoggerError } = vi.hoisted(() => ({
+  mockLoggerError: vi.fn(),
+}));
+
 vi.mock('~/utils/prisma', () => ({
   default: {
     system_settings: {
@@ -11,10 +15,13 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
+vi.mock('~/utils/logger', () => ({
+  createModuleLogger: vi.fn(() => ({ error: mockLoggerError })),
+}));
+
 describe('system metadata', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   it('returns parsed metadata value when setting exists', async () => {
@@ -44,7 +51,10 @@ describe('system metadata', () => {
       ok: false,
     });
 
-    expect(console.error).toHaveBeenCalledTimes(1);
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      { err: expect.any(SyntaxError), key: 'invalid' },
+      'Failed to get system metadata',
+    );
   });
 
   it('upserts serialized metadata and swallows persistence errors', async () => {
@@ -64,13 +74,15 @@ describe('system metadata', () => {
       },
     });
 
-    (prisma.system_settings.upsert as any).mockRejectedValueOnce(
-      new Error('write failed'),
-    );
+    const writeError = new Error('write failed');
+    (prisma.system_settings.upsert as any).mockRejectedValueOnce(writeError);
 
     await expect(
       setMetadata('qms:metadata', { ok: true }),
     ).resolves.toBeUndefined();
-    expect(console.error).toHaveBeenCalled();
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      { err: writeError, key: 'qms:metadata' },
+      'Failed to set system metadata',
+    );
   });
 });

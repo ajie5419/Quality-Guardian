@@ -281,6 +281,26 @@ const customConfig: Linter.Config[] = [
     },
   },
   {
+    files: [
+      'apps/backend/api/**/*.ts',
+      'apps/backend/middleware/**/*.ts',
+      'apps/backend/modules/**/*.ts',
+      'apps/backend/utils/**/*.ts',
+    ],
+    ignores: ['**/__tests__/**', '**/*.spec.ts', '**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      'no-console': 'error',
+      'no-empty': ['error', { allowEmptyCatch: false }],
+    },
+  },
+  {
+    files: ['apps/backend/utils/logger.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+  {
     // QMS governance restrictions are cumulative to avoid Flat Config overrides.
     files: ['apps/web-antd/src/views/qms/**/**'],
     rules: {

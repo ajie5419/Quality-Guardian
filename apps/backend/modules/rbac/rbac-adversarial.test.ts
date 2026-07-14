@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ensureModuleMenus } from '~/utils/module-loader';
 import prisma from '~/utils/prisma';

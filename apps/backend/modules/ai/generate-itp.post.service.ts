@@ -61,7 +61,9 @@ export default defineEventHandler(async (event) => {
         const filePath = join(UPLOAD_DIR, filename);
         extractedText = await readFile(filePath, 'utf8');
         extractedText = extractedText.slice(0, 10_000);
-      } catch {}
+      } catch (error) {
+        logApiError('generate-itp-file-read', error, { filename }, event);
+      }
     }
   }
 

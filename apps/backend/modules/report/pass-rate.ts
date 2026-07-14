@@ -15,8 +15,11 @@ import {
   resolveIssueProcessBucket,
   roundPercent,
 } from '~/modules/report/pass-rate-process';
+import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
+
+const logger = createModuleLogger('ReportPassRate');
 
 interface DrillDownItem {
   category: string;
@@ -85,8 +88,11 @@ export async function createPassRateTargetResolver() {
       // Keep non-process custom keys from saved settings (e.g. incoming types),
       // while forcing canonical process keys to current definitions.
       targets = { ...saved, ...canonicalTargets };
-    } catch {
-      // Ignore dirty config and fallback to defaults
+    } catch (error) {
+      logger.error(
+        { err: error, settingKey: 'QMS_PASS_RATE_TARGETS' },
+        'Failed to parse pass rate targets; using defaults',
+      );
     }
   }
 

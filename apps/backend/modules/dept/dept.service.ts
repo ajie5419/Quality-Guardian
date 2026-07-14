@@ -2,8 +2,11 @@ import type { DeptTreeNode } from '~/modules/dept/dept-tree';
 
 import { createId } from '@paralleldrive/cuid2';
 import { buildDeptTree } from '~/modules/dept/dept-tree';
+import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
+
+const logger = createModuleLogger('DeptService');
 
 export interface CreateDeptDto {
   businessUnit?: string;
@@ -42,7 +45,7 @@ export const DeptService = {
     // Cache key: qms:dept:tree
     const cached = await redis.get('qms:dept:tree');
     if (cached) {
-      console.warn('[Dept Cache] HIT - Key: qms:dept:tree');
+      logger.debug({ cacheKey: 'qms:dept:tree' }, 'Department cache hit');
       return cached as Array<DeptTreeNode<DeptItem>>;
     }
 
@@ -55,7 +58,7 @@ export const DeptService = {
       return buildDeptTree(departments);
     })();
 
-    console.warn('[Dept Cache] MISS - Key: qms:dept:tree');
+    logger.debug({ cacheKey: 'qms:dept:tree' }, 'Department cache miss');
     await redis.set('qms:dept:tree', result, 3600 * 24);
     return result;
   },
