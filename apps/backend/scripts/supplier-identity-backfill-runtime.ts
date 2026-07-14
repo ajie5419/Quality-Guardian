@@ -172,7 +172,7 @@ export async function loadSupplierIdentityContext(
 }
 
 export async function persistResolutionAudit(params: {
-  entityType: 'inspections' | 'quality_records';
+  entityType: 'after_sales' | 'inspections' | 'quality_records';
   resolved: Array<{ entityId: string; resolvedId: string }>;
   unresolved: UnresolvedRefInput[];
 }) {

@@ -7,6 +7,7 @@ import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
+import { backfillAfterSalesSupplierIdentities } from './backfill-after-sales-supplier-identities';
 import { backfillInspectionSupplierIdentities } from './backfill-inspection-supplier-identities';
 import {
   parseBackfillOptions,
@@ -56,6 +57,7 @@ async function main() {
     teamBootstrap.effectiveLinks,
   );
   await backfillInspectionSupplierIdentities(options, identityContext);
+  await backfillAfterSalesSupplierIdentities(options, identityContext);
 
   let batches = 0;
   let conflicts = 0;
