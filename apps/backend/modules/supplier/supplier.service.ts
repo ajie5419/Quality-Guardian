@@ -393,13 +393,25 @@ export const SupplierService = {
 
   async getHistoryProjects(id: string) {
     const supplier = await prisma.suppliers.findFirst({
-      select: { id: true, name: true, nameId: true },
+      select: {
+        category: true,
+        id: true,
+        outsourcingMode: true,
+      },
       where: { id, isDeleted: false },
     });
     if (!supplier) return null;
 
+    const policy = resolveSupplierInspectionPolicy(supplier);
+    const teamIds =
+      policy.identitySource === 'team'
+        ? await SupplierIdentityService.teamIdsForSupplier(supplier.id)
+        : [];
     return InspectionService.getSupplierHistoryProjects({
-      supplierName: supplier.name,
+      category: policy.inspectionCategory,
+      identitySource: policy.identitySource,
+      supplierId: supplier.id,
+      teamIds,
     });
   },
 

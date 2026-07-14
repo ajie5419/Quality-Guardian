@@ -900,9 +900,9 @@ describe('supplierService admission fields', () => {
 
   it('loads supplier history projects from inspection requests through inspection service', async () => {
     (prisma.suppliers.findFirst as any).mockResolvedValue({
+      category: 'Supplier',
       id: 'supplier-1',
-      name: 'Supplier A',
-      nameId: 'md-1',
+      outsourcingMode: null,
     });
     (InspectionService.getSupplierHistoryProjects as any).mockResolvedValue([
       { workOrderNumber: 'WO-1', projectName: 'Project A' },
@@ -914,7 +914,31 @@ describe('supplierService admission fields', () => {
       { workOrderNumber: 'WO-1', projectName: 'Project A' },
     ]);
     expect(InspectionService.getSupplierHistoryProjects).toHaveBeenCalledWith({
-      supplierName: 'Supplier A',
+      category: 'INCOMING',
+      identitySource: 'supplier',
+      supplierId: 'supplier-1',
+      teamIds: [],
+    });
+  });
+
+  it('loads process history projects through mapped TEAM IDs', async () => {
+    vi.mocked(SupplierIdentityService.teamIdsForSupplier).mockResolvedValue([
+      'team-1',
+    ]);
+    (prisma.suppliers.findFirst as any).mockResolvedValue({
+      category: 'Outsourcing',
+      id: 'supplier-1',
+      outsourcingMode: 'IN_HOUSE_TEAM',
+    });
+    (InspectionService.getSupplierHistoryProjects as any).mockResolvedValue([]);
+
+    await SupplierService.getHistoryProjects('supplier-1');
+
+    expect(InspectionService.getSupplierHistoryProjects).toHaveBeenCalledWith({
+      category: 'PROCESS',
+      identitySource: 'team',
+      supplierId: 'supplier-1',
+      teamIds: ['team-1'],
     });
   });
 
