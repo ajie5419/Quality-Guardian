@@ -25,6 +25,31 @@
 
 ## 执行记录
 
+### 2026-07-14 修复：完善 Git hooks 分层门禁
+
+**执行内容：**
+
+- 为所有会写文件的 pre-commit 命令启用 `stage_fixed`，确保 Prettier、ESLint 和 Stylelint 修复后的内容重新进入暂存区。
+- 消除 `.vue` 同时被两个并行命令修改的问题，并补齐 `.mjs`、`.cjs`、`.mts`、`.cts` 的 hook 覆盖。
+- workspace 文件只在 package/workspace 清单变化时生成，并由 Lefthook 统一暂存，避免普通提交被污染和并行 `git add` 竞争。
+- 新增 pre-push 类型检查与增量 QMS 架构检查；post-merge 仅在依赖清单变化时执行冻结安装。
+- 删除 Commitlint 提示中无法通过 `type-enum` 校验的 `workflow` 类型。
+
+**验证结果：**
+
+- lint: `pnpm lint` 通过（0 error，0 warning）
+- lefthook: `lefthook validate` 通过，最终配置展开正确
+- pre-commit: 实测自动修复后重新暂存；非 package 提交跳过 workspace，package 变更触发同步
+- pre-push: typecheck 3/3 tasks 通过，增量架构检查 0 violations
+- post-merge: 非依赖文件变更正确跳过安装
+- commitlint: 合法 `fix(lint)` 通过，非法 `workflow(project)` 被拒绝
+
+**commit:** `a7fda7ed` fix(dev): harden git hooks
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-07-14 修复：启用后端类型感知 ESLint
 
 **执行内容：**

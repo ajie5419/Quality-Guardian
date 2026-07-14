@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 最新变更: 后端全部非测试 TypeScript 启用 projectService 类型感知 lint，新增 Promise、异常、switch 完整性和测试有效性规则
+- 最新变更: 完善 Lefthook 分层门禁，修复自动修复未重新暂存、Vue 并行写入、无关 workspace 生成和 Commitlint 类型冲突
 - 测试状态: 后端 204/204 文件、1927/1927 用例通过；ESLint 最终配置回归 4/4 通过
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
@@ -29,6 +29,7 @@
 - [x] 偏离修复（文件超限、governance 残留、route-handlers 合并、prisma 脚本清理）
 - [x] ESLint 与架构门禁完善（累计 Flat Config、AST 语义规则、历史债务递减 baseline、CI 全量扫描）
 - [x] 后端类型感知 ESLint 完善（Promise 生命周期、异常类型、switch 穷尽性、测试断言与禁用测试约束）
+- [x] Git hooks 完善（pre-commit 自动修复重暂存、pre-push 类型与架构检查、条件化 post-merge 安装）
 - [x] 报检任务模块重构（状态机文档、创建 schema、查询/创建/派工/删除/关闭服务拆分）
 - [x] 小程序不合格品项模块（列表、详情、新增、编辑、照片、草稿、RBAC，复用电脑版数据与状态）
 - [x] 不合格品项所有权隔离（普通用户仅本人、管理员全部、写操作仅创建人）

@@ -27,6 +27,13 @@
 8. **必须**原始 SQL 使用参数化查询，防止注入
 9. **必须**在生产发布流程中把 migration 和幂等数据回填连续执行；依赖快照/物化指标的新功能不得要求人工进入生产容器补跑脚本
 
+## Git Hooks 与质量门禁
+
+1. **pre-commit** — 只处理暂存文件；Prettier、ESLint 和 Stylelint 自动修复后必须通过 Lefthook `stage_fixed` 重新暂存，禁止提交修复前的旧索引内容
+2. **pre-push** — 并行执行 `pnpm run check:type` 与 `pnpm run check:qms-arch`，阻止类型错误和新增架构违规进入远端
+3. **post-merge** — 仅当 `package.json`、`pnpm-lock.yaml` 或 `pnpm-workspace.yaml` 变化时执行 `pnpm install --frozen-lockfile`
+4. **CI** — 执行全量 lint、typecheck、`check:qms-arch:all`、测试、migration 检查和密钥扫描；本地 hook 不能替代 CI
+
 ## 完成定义
 
 功能完成 = 端到端验证通过，不是"代码写完了"。

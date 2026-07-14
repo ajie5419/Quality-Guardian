@@ -60,7 +60,7 @@ pnpm --dir apps/backend exec prisma migrate dev --name <desc>
 pnpm --dir apps/backend exec prisma generate
 ```
 
-**Pre-commit gate** (must pass before any commit): `pnpm lint && pnpm run check:type && pnpm run check:qms-arch`. Lefthook also runs prettier/eslint/stylelint per file glob; commitlint enforces commit-msg format.
+**Quality gates:** Before committing, run `pnpm lint && pnpm run check:type && pnpm run check:qms-arch`. Lefthook automatically fixes and re-stages matching files in `pre-commit`; `pre-push` runs typecheck and the changed-file QMS architecture check; CI runs the full lint, typecheck, architecture, test, migration, and secret-scan gates. Commitlint enforces the commit message format.
 
 ## Backend architecture (the part that takes reading multiple files to understand)
 
