@@ -1,40 +1,25 @@
 import type { SupplierIdentity } from './quality-record-supplier-identity-backfill';
+import type { UnresolvedRefInput } from './supplier-identity-backfill-runtime';
 
 import process from 'node:process';
 
-import { resolveSupplierInspectionPolicy } from '@qgs/shared';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
+import { backfillInspectionSupplierIdentities } from './backfill-inspection-supplier-identities';
 import {
-  buildUniqueIdentityMap,
   parseBackfillOptions,
   resolveQualityRecordSupplierIdentity,
 } from './quality-record-supplier-identity-backfill';
+import {
+  bootstrapExactTeamLinks,
+  loadSupplierIdentityContext,
+  persistResolutionAudit,
+} from './supplier-identity-backfill-runtime';
 
 const logger = createModuleLogger('quality-record-supplier-identity-backfill');
 const SAMPLE_LIMIT = 20;
-
-interface EffectiveTeamLink {
-  supplier: SupplierIdentity;
-}
-
-interface TeamLinkBootstrapResult {
-  ambiguous: number;
-  conflicts: number;
-  created: number;
-  effectiveLinks: Map<string, EffectiveTeamLink>;
-  reactivated: number;
-}
-
-interface UnresolvedRefInput {
-  entityId: string;
-  evidence: Record<string, null | number | string>;
-  rawId: null | string;
-  rawName: null | string;
-  reason: string;
-}
 
 type ResolutionSample = {
   date: Date;
@@ -49,179 +34,6 @@ type ResolutionSample = {
 
 function addSample(samples: ResolutionSample[], sample: ResolutionSample) {
   if (samples.length < SAMPLE_LIMIT) samples.push(sample);
-}
-
-async function bootstrapExactTeamLinks(
-  mode: 'apply' | 'dry-run',
-): Promise<TeamLinkBootstrapResult> {
-  const [suppliers, teams, links] = await Promise.all([
-    prisma.suppliers.findMany({
-      where: { isDeleted: false },
-      select: {
-        category: true,
-        id: true,
-        name: true,
-        outsourcingMode: true,
-      },
-    }),
-    prisma.dictionaries.findMany({
-      where: { dictType: 'team', isDeleted: false, status: 1 },
-      select: { dictKey: true, id: true },
-    }),
-    prisma.supplier_identity_links.findMany({
-      where: { identityType: 'TEAM' },
-      include: {
-        supplier: { select: { id: true, isDeleted: true, name: true } },
-      },
-    }),
-  ]);
-
-  const processSuppliers = suppliers.filter(
-    (supplier) =>
-      resolveSupplierInspectionPolicy(supplier).identitySource === 'team',
-  );
-  const uniqueSupplierByName = buildUniqueIdentityMap(processSuppliers);
-  const uniqueTeamByName = buildUniqueIdentityMap(
-    teams.map((team) => ({ id: team.id, name: team.dictKey })),
-  );
-  const linkByTeamId = new Map(links.map((link) => [link.identityId, link]));
-  const effectiveLinks = new Map<string, EffectiveTeamLink>();
-  const creates: Array<{
-    identityId: string;
-    identityNameSnapshot: string;
-    supplierId: string;
-  }> = [];
-  const reactivations: Array<{
-    id: string;
-    identityNameSnapshot: string;
-  }> = [];
-  let conflicts = 0;
-
-  for (const link of links) {
-    if (link.isDeleted || link.supplier.isDeleted) continue;
-    effectiveLinks.set(link.identityId, {
-      supplier: { id: link.supplier.id, name: link.supplier.name },
-    });
-  }
-
-  for (const supplier of uniqueSupplierByName.values()) {
-    const team = uniqueTeamByName.get(supplier.name);
-    if (!team) continue;
-    const existingLink = linkByTeamId.get(team.id);
-    if (existingLink && existingLink.supplierId !== supplier.id) {
-      conflicts += 1;
-      continue;
-    }
-    if (existingLink?.isDeleted) {
-      reactivations.push({
-        id: existingLink.id,
-        identityNameSnapshot: team.name,
-      });
-    } else if (!existingLink) {
-      creates.push({
-        identityId: team.id,
-        identityNameSnapshot: team.name,
-        supplierId: supplier.id,
-      });
-    }
-    if (!existingLink || existingLink.isDeleted) {
-      effectiveLinks.set(team.id, {
-        supplier: { id: supplier.id, name: supplier.name },
-      });
-    }
-  }
-
-  if (mode === 'apply' && (creates.length > 0 || reactivations.length > 0)) {
-    await prisma.$transaction([
-      ...reactivations.map((link) =>
-        prisma.supplier_identity_links.update({
-          where: { id: link.id },
-          data: {
-            identityNameSnapshot: link.identityNameSnapshot,
-            isDeleted: false,
-          },
-        }),
-      ),
-      prisma.supplier_identity_links.createMany({
-        data: creates.map((link) => ({
-          ...link,
-          identityType: 'TEAM' as const,
-        })),
-        skipDuplicates: true,
-      }),
-    ]);
-  }
-
-  return {
-    ambiguous:
-      processSuppliers.length -
-      uniqueSupplierByName.size +
-      teams.length -
-      uniqueTeamByName.size,
-    conflicts,
-    created: creates.length,
-    effectiveLinks,
-    reactivated: reactivations.length,
-  };
-}
-
-async function persistResolutionAudit(params: {
-  resolved: Array<{ entityId: string; resolvedId: string }>;
-  unresolved: UnresolvedRefInput[];
-}) {
-  const operations = [
-    ...params.resolved.map((item) =>
-      prisma.unresolved_master_data_refs.updateMany({
-        where: {
-          entityId: item.entityId,
-          entityType: 'quality_records',
-          fieldName: 'supplierId',
-          isDeleted: false,
-          status: 'OPEN',
-        },
-        data: {
-          resolutionNote: 'Resolved by supplier identity backfill',
-          resolvedAt: new Date(),
-          resolvedId: item.resolvedId,
-          status: 'RESOLVED',
-        },
-      }),
-    ),
-    ...params.unresolved.map((item) =>
-      prisma.unresolved_master_data_refs.upsert({
-        where: {
-          entityType_entityId_fieldName: {
-            entityId: item.entityId,
-            entityType: 'quality_records',
-            fieldName: 'supplierId',
-          },
-        },
-        create: {
-          entityId: item.entityId,
-          entityType: 'quality_records',
-          evidence: item.evidence,
-          fieldName: 'supplierId',
-          rawId: item.rawId,
-          rawName: item.rawName,
-          reason: item.reason,
-        },
-        update: {
-          evidence: item.evidence,
-          isDeleted: false,
-          rawId: item.rawId,
-          rawName: item.rawName,
-          reason: item.reason,
-          resolutionNote: null,
-          resolvedAt: null,
-          resolvedId: null,
-          status: 'OPEN',
-        },
-      }),
-    ),
-  ];
-  if (operations.length > 0) {
-    await prisma.$transaction(operations);
-  }
 }
 
 async function main() {
@@ -240,25 +52,10 @@ async function main() {
     'exact supplier to TEAM identity link bootstrap finished',
   );
 
-  const [suppliers, teams] = await Promise.all([
-    prisma.suppliers.findMany({
-      where: { isDeleted: false },
-      select: { id: true, name: true },
-    }),
-    prisma.dictionaries.findMany({
-      where: { dictType: 'team', isDeleted: false, status: 1 },
-      select: { dictKey: true, id: true },
-    }),
-  ]);
-  const supplierById = new Map(suppliers.map((item) => [item.id, item]));
-  const supplierByName = buildUniqueIdentityMap(suppliers);
-  const teamIdByName = new Map(
-    [
-      ...buildUniqueIdentityMap(
-        teams.map((item) => ({ id: item.id, name: item.dictKey })),
-      ),
-    ].map(([name, item]) => [name, item.id]),
+  const identityContext = await loadSupplierIdentityContext(
+    teamBootstrap.effectiveLinks,
   );
+  await backfillInspectionSupplierIdentities(options, identityContext);
 
   let batches = 0;
   let conflicts = 0;
@@ -311,18 +108,14 @@ async function main() {
     const batchUnresolved: UnresolvedRefInput[] = [];
 
     for (const row of rows) {
-      const inspectionTeamId =
-        row.inspection?.teamId ||
-        (row.inspection?.team
-          ? teamIdByName.get(row.inspection.team) || null
-          : null);
+      const inspectionTeamId = row.inspection?.teamId || null;
       const teamLink = inspectionTeamId
-        ? teamBootstrap.effectiveLinks.get(inspectionTeamId)
+        ? identityContext.effectiveLinks.get(inspectionTeamId)
         : undefined;
       const processSupplier = teamLink?.supplier || null;
       const resolution = resolveQualityRecordSupplierIdentity({
         existingSupplier: row.supplierId
-          ? supplierById.get(row.supplierId) || null
+          ? identityContext.supplierById.get(row.supplierId) || null
           : null,
         existingSupplierId: row.supplierId,
         inspection: row.inspection
@@ -330,15 +123,18 @@ async function main() {
               category: row.inspection.category,
               processSupplier,
               supplierById: row.inspection.supplierId
-                ? supplierById.get(row.inspection.supplierId) || null
+                ? identityContext.supplierById.get(row.inspection.supplierId) ||
+                  null
                 : null,
               supplierByName: row.inspection.supplierName
-                ? supplierByName.get(row.inspection.supplierName) || null
+                ? identityContext.supplierByName.get(
+                    row.inspection.supplierName,
+                  ) || null
                 : null,
             }
           : null,
         supplierByRecordName: row.supplierName
-          ? supplierByName.get(row.supplierName) || null
+          ? identityContext.supplierByName.get(row.supplierName) || null
           : null,
       });
 
@@ -432,6 +228,7 @@ async function main() {
     }
     if (options.mode === 'apply') {
       await persistResolutionAudit({
+        entityType: 'quality_records',
         resolved: batchResolved,
         unresolved: batchUnresolved,
       });

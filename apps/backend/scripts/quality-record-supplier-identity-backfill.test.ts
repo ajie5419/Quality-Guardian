@@ -80,6 +80,25 @@ describe('quality record supplier identity backfill', () => {
     });
   });
 
+  it('does not overwrite an invalid existing supplier ID', () => {
+    expect(
+      resolveQualityRecordSupplierIdentity({
+        existingSupplier: null,
+        existingSupplierId: 'legacy-id',
+        inspection: {
+          category: 'INCOMING',
+          processSupplier: null,
+          supplierById: supplierA,
+          supplierByName: supplierA,
+        },
+        supplierByRecordName: supplierA,
+      }),
+    ).toEqual({
+      action: 'unresolved',
+      reason: 'INVALID_EXISTING_ID',
+    });
+  });
+
   it('only exposes names with one exact identity candidate', () => {
     expect([
       ...buildUniqueIdentityMap([supplierA, supplierB]).entries(),
