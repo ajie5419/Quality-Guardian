@@ -70,7 +70,7 @@
 - 增加 B-ID1/B-ID2/B-ID3/B-ID4/B-ID5 门禁，保护受控选择器、事件 ID、检验供应商写入、供应商画像和评分查询，并限制 legacy 名称解析只能出现在审核过的 import adapter。
 - 更新 inspection、supplier、supplier-identity、after-sales、supervision 模块架构文档，明确 ID-first、名称快照、TEAM 映射、legacy/dual-write 边界和模块职责。
 - 完善 `docs/master-data-identity-governance.md`，明确本次仅完成 supplier identity governance wave，不宣称全项目 `ID_ONLY`；记录 migration、分批 dry-run/apply 回填、`unresolved_master_data_refs` 和 B-ID1/B-ID2/B-ID3/B-ID4/B-ID5 门禁。
-- 更新 `PROGRESS.md`，记录全量门禁结果，将 PR、release-please、部署和生产指标核对保留为发布待办。
+- 更新 `PROGRESS.md`，记录全量门禁、PR、release-please、部署和生产回填结果。
 
 **验证结果：**
 
@@ -79,16 +79,19 @@
 - lint：通过（0 error）；typecheck：3/3 workspace tasks 通过。
 - `check:qms-arch` 与 `check:qms-arch:all`：0 violations；`check:prisma-migration`：schema 变更已配套 migration。
 - `git diff --check`：通过。
-- 发布验证：本地门禁已完成；GitHub PR、release-please、tag/deploy workflow 和生产健康检查待发布流程验证。
-- 数据库验证：本地未读取生产凭据；migration 与身份回填由部署流程连续执行。
+- GitHub：功能 PR #47 和发布 PR #48 均已合并，两个 PR 的 6 项 CI Gate 全部通过；已生成 GitHub Release 与 tag `qgs-v0.17.0`。
+- 生产部署：deploy run `29309174127` 成功，耗时 7 分 37 秒；backend/frontend 镜像构建、ACR 推送、ECS 更新与 HTTP 健康检查全部通过。
+- 生产数据库：`20260714000100_add_supplier_identity_links` 和 `20260714000200_add_inspection_request_supplier_identity` 已成功应用。
+- 生产回填：新建 6 条精确 `TEAM -> supplier` 映射；报检供应商身份更新 813 条，检验身份更新 824 条，不合格项身份更新 2 条。无法唯一解析的存量数据已写入 `unresolved_master_data_refs`，未伪造关联。
 
-**commit:** `2cee6c43` fix(@qgs/backend): enforce inspection identity governance；`01944f26` fix(@qgs/web-antd): submit canonical inspection identities。本轮文档提交见 Git 历史；当前不虚构最终 merge commit、PR、tag 或 deploy 结果。
+**commit:** `2cee6c43` fix(@qgs/backend): enforce inspection identity governance；`01944f26` fix(@qgs/web-antd): submit canonical inspection identities；`6171c049` Merge pull request #47；`3ee1d608` Merge pull request #48。
 
 **遗留问题：**
 
 - supervision 等尚未覆盖的存量供应商引用仍需补齐回填和 unresolved 审计；其他未迁移主数据必须由后续治理 wave 切换到在线 `ID-required`。
 - `unresolved_master_data_refs` 尚无人工处置 API/UI，`supplier_identity_links` 尚无前端管理界面。
 - 当前 EventEmitter 为单进程、fire-and-forget，监听器失败只记录日志且无持久化重试；扩容前需替换可靠事件机制。
+- 生产页面的精确供应商画像数据仍需在已登录业务会话中做最终人工验收；本次自动化已验证部署、健康检查、迁移和回填。
 
 ### 2026-07-14 修复：完善 ESLint 与后端架构规则约束
 
