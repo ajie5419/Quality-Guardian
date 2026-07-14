@@ -173,4 +173,107 @@ void second;
       rmSync(rootDir, { force: true, recursive: true });
     }
   });
+
+  it('blocks name-based identity selectors, events, and controlled writes', () => {
+    const rootDir = createFixture({
+      'apps/web-antd/src/views/qms/example/BadSelect.vue': `
+<script setup lang="ts">
+const options = {
+  valueKey:
+    'name',
+};
+void options;
+</script>
+<template><div /></template>
+`,
+      'apps/backend/modules/inspection/identity-violations.service.ts': `
+const issuePayload = {
+  supplierNames: ['Supplier A'],
+};
+eventBus.emit('inspection_issue.changed', issuePayload);
+
+eventBus.emit('inspection_record.changed', {
+  supplierIds: ['supplier-1'],
+  supplierNames: ['Supplier A'],
+  teamNames: ['Team A'],
+  teams: ['Team A'],
+});
+
+const issueData = { supplierName: 'Supplier A' };
+prisma.quality_records.create({ data: issueData });
+tx.inspections.update({
+  where: { id: 'inspection-1' },
+  data: { supplierName: 'Supplier A' },
+});
+`,
+      'apps/backend/modules/inspection/legacy-import.service.ts': `
+prisma.quality_records.create({
+  data: { supplierName: 'Legacy Supplier' },
+});
+`,
+    });
+
+    try {
+      const result = runCheck(rootDir);
+      expect(result.status).toBe(1);
+      expect(result.output).toContain('[B-ID1]');
+      expect(result.output).toContain('[B-ID2]');
+      expect(result.output).toContain('[B-ID3]');
+      expect(result.output).toContain('legacy-import.service.ts');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
+
+  it('allows canonical identity pairs and empty event name arrays', () => {
+    const rootDir = createFixture({
+      'apps/web-antd/src/views/qms/example/GoodSelect.vue': `
+<script setup lang="ts">
+const valueMode = 'id';
+const options = {
+  valueKey: valueMode === 'id' ? 'id' : 'name',
+};
+void options;
+</script>
+<template><div /></template>
+`,
+      'apps/backend/modules/inspection/identity-pairs.service.ts': `
+const issuePayload = {
+  supplierIds: ['supplier-1'],
+  supplierNames: ['Supplier A'],
+};
+eventBus.emit('inspection_issue.changed', issuePayload);
+
+eventBus.emit('inspection_record.changed', {
+  supplierNames: [],
+  teamNames: [],
+});
+
+const issueData = {
+  supplierId: 'supplier-1',
+  supplierName: 'Supplier A',
+};
+prisma.quality_records.create({ data: issueData });
+tx.inspections.upsert({
+  where: { id: 'inspection-1' },
+  create: {
+    supplierId: 'supplier-1',
+    supplierName: 'Supplier A',
+  },
+  update: {
+    supplierId: 'supplier-1',
+    supplierName: 'Supplier A',
+  },
+});
+`,
+    });
+
+    try {
+      const result = runCheck(rootDir);
+      expect(result.status).toBe(0);
+      expect(result.output).toContain('QMS architecture check passed.');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
 });

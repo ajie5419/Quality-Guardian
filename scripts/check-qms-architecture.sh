@@ -29,6 +29,7 @@ declare -a API_TS_TARGETS=()
 declare -a MODULE_TS_TARGETS=()
 declare -a BACKEND_SOURCE_TARGETS=()
 declare -a REPO_TS_TARGETS=()
+declare -a REPO_IDENTITY_TARGETS=()
 declare -a BACKEND_TEST_TARGETS=()
 
 usage() {
@@ -54,6 +55,9 @@ Rules:
   B-M2: conditions must not branch on Chinese string literals
   B-E1: empty catch blocks are forbidden
   B-E2: catch blocks must record errors with an approved logger
+  B-ID1: selector value keys must use canonical IDs, not names
+  B-ID2: inspection change events must pair identity names with IDs
+  B-ID3: controlled supplier writes must pair supplierName with supplierId
   B-SEC1: raw SQL must not combine $queryRawUnsafe with template strings
   B-MAP1: new module/route/view directories must update code_map.md (changed mode only)
   B-TEST1: backend tests must not live in centralized __tests__/tests/test directories
@@ -190,6 +194,7 @@ load_targets() {
   collect_targets "$TMP_DIR/module-ts-targets.txt" '^apps/backend/modules/.*\.ts$'
   collect_targets "$TMP_DIR/backend-source-targets.txt" '^apps/backend/(api|middleware|modules|utils)/.*\.ts$'
   collect_targets "$TMP_DIR/repo-ts-targets.txt" '.*\.ts$'
+  collect_targets "$TMP_DIR/repo-identity-targets.txt" '^(apps|packages)/.*\.(js|jsx|ts|tsx|vue)$'
   collect_targets "$TMP_DIR/backend-test-targets.txt" '^apps/backend/.*\.test\.ts$'
 
   while IFS= read -r file; do
@@ -213,6 +218,10 @@ load_targets() {
   while IFS= read -r file; do
     [[ -n "$file" && -f "$file" ]] && REPO_TS_TARGETS+=("$file")
   done <"$TMP_DIR/repo-ts-targets.txt"
+
+  while IFS= read -r file; do
+    [[ -n "$file" && -f "$file" ]] && REPO_IDENTITY_TARGETS+=("$file")
+  done <"$TMP_DIR/repo-identity-targets.txt"
 
   while IFS= read -r file; do
     [[ -n "$file" && -f "$file" ]] && BACKEND_TEST_TARGETS+=("$file")
@@ -396,17 +405,26 @@ check_b_s5() {
 check_backend_source_rules() {
   local output_file="$TMP_DIR/source-rule-output.txt"
   local files_file="$TMP_DIR/backend-source-files.txt"
+  local identity_files_file="$TMP_DIR/identity-source-files.txt"
   local kind=''
   local rule=''
   local location=''
   local message=''
 
-  (( ${#BACKEND_SOURCE_TARGETS[@]} == 0 )) && return 0
-  printf '%s\n' "${BACKEND_SOURCE_TARGETS[@]}" >"$files_file"
+  (( ${#BACKEND_SOURCE_TARGETS[@]} == 0 && ${#REPO_IDENTITY_TARGETS[@]} == 0 )) && return 0
+  : >"$files_file"
+  : >"$identity_files_file"
+  if (( ${#BACKEND_SOURCE_TARGETS[@]} > 0 )); then
+    printf '%s\n' "${BACKEND_SOURCE_TARGETS[@]}" >"$files_file"
+  fi
+  if (( ${#REPO_IDENTITY_TARGETS[@]} > 0 )); then
+    printf '%s\n' "${REPO_IDENTITY_TARGETS[@]}" >"$identity_files_file"
+  fi
   if ! node "$SOURCE_RULE_CHECKER" \
     --root "$ROOT_DIR" \
     --baseline "$BASELINE_FILE" \
-    --files-from "$files_file" >"$output_file"; then
+    --files-from "$files_file" \
+    --identity-files-from "$identity_files_file" >"$output_file"; then
     echo -e "${RED}Backend source rule checker failed.${NC}"
     exit 2
   fi
@@ -521,7 +539,7 @@ echo "baseline: $BASELINE_FILE"
 echo
 
 load_targets
-echo "target files: qms=${#QMS_VIEW_TARGETS[@]} api=${#API_TS_TARGETS[@]} modules=${#MODULE_TS_TARGETS[@]} backend-source=${#BACKEND_SOURCE_TARGETS[@]} repo-ts=${#REPO_TS_TARGETS[@]} backend-tests=${#BACKEND_TEST_TARGETS[@]}"
+echo "target files: qms=${#QMS_VIEW_TARGETS[@]} api=${#API_TS_TARGETS[@]} modules=${#MODULE_TS_TARGETS[@]} backend-source=${#BACKEND_SOURCE_TARGETS[@]} repo-ts=${#REPO_TS_TARGETS[@]} identity=${#REPO_IDENTITY_TARGETS[@]} backend-tests=${#BACKEND_TEST_TARGETS[@]}"
 echo
 
 check_r1
