@@ -29,7 +29,7 @@ import {
 } from '../../issues/constants';
 import { mapDictionaryOptionsToInspectionProcess } from '../config';
 import TeamSelect from './form/TeamSelect.vue';
-import { getFormSchema } from './formData';
+import { buildTeamIdentityFields, getFormSchema } from './formData';
 import {
   deriveIssuePartName,
   deriveIssueProcessName,
@@ -239,6 +239,21 @@ async function handleSupplierChange(
   }, 200);
 }
 
+interface TeamSelectOption {
+  label: string;
+  value: string;
+}
+
+function handleTeamChange(
+  value: string | undefined,
+  option?: TeamSelectOption,
+) {
+  const identity = buildTeamIdentityFields(value, option);
+  formApi.setFieldValue('teamId', identity.teamId);
+  formApi.setFieldValue('team', identity.team);
+  clearFieldValidator('teamId');
+}
+
 function clearFieldValidator(fieldName: string) {
   setTimeout(() => {
     formApi.validateField(fieldName);
@@ -350,6 +365,12 @@ defineExpose({
     const qualifiedQuantity = totalQuantity - unqualifiedQuantity;
     return {
       ...values,
+      ...(props.type === 'process'
+        ? {
+            team: String(values.team || activeValues.value.team || '').trim(),
+            teamId: String(values.teamId || '').trim(),
+          }
+        : {}),
       qualifiedQuantity,
       unqualifiedQuantity,
       linkedIssue: shouldCreateLinkedIssue.value
@@ -468,15 +489,12 @@ defineExpose({
     </template>
 
     <!-- Slot for TeamSelect -->
-    <template #team="slotProps">
+    <template #teamId="slotProps">
       <TeamSelect
         v-bind="slotProps"
-        @change="
-          (val) => {
-            formApi.setFieldValue('team', val);
-            clearFieldValidator('team');
-          }
-        "
+        :legacy-name="String(activeValues.team || '')"
+        @change="handleTeamChange"
+        @resolved="handleTeamChange"
       />
     </template>
   </Form>

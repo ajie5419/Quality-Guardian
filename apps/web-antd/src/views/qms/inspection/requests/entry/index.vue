@@ -3,16 +3,11 @@ import type {
   InspectionRequestAttachment,
   InspectionRequestCheckResult,
 } from '@qgs/shared';
-import type {
-  SelectProps,
-  UploadChangeParam,
-  UploadFile,
-} from 'ant-design-vue';
+import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
 
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import { SUPPLIER_CATEGORY } from '@qgs/shared';
 import { Form, message } from 'ant-design-vue';
 
 import { QMS_UPLOAD_ACTIONS } from '#/api/qms/constants';
@@ -21,8 +16,6 @@ import {
   getPublicInspectionRequestBomParts,
   getPublicInspectionRequestProcessDictionaryOptions,
   getPublicInspectionRequestProcesses,
-  getPublicInspectionRequestSuppliers,
-  getPublicInspectionRequestTeams,
   getPublicInspectionRequestWorkOrders,
 } from '#/api/qms/inspection-request';
 import { useImageCompress } from '#/composables/useImageCompress';
@@ -43,11 +36,10 @@ import {
   INCOMING_INSPECTION_PROCESS_NAME,
   inspectionRequestEntryCheckResultOptions,
   isIncomingInspectionEntryPath,
-  MACHINED_INCOMING_INSPECTION_TYPE,
   mapInspectionRequestEntryBomPartOptions,
-  mapInspectionRequestEntryTeamOptions,
   mapInspectionRequestEntryWorkOrderOptions,
 } from './entry-mode';
+import { useInspectionRequestIdentityOptions } from './useInspectionRequestIdentityOptions';
 import { useInspectionRequestStationSelection } from './useInspectionRequestStationSelection';
 
 import './index.css';
@@ -60,8 +52,6 @@ const submitting = ref(false);
 const attachmentFileList = ref<UploadFile[]>([]);
 const bomPartsLoading = ref(false);
 const bomPartOptions = ref<Array<{ label: string; value: string }>>([]);
-const teamLoading = ref(false);
-const teamOptions = ref<SelectProps['options']>([]);
 const workOrderLoading = ref(false);
 const workOrderOptions = ref<
   Array<{
@@ -96,7 +86,9 @@ const requestForm = reactive({
     indexes: number[];
     mode: 'ALL' | 'PARTIAL';
   },
+  supplierId: '',
   team: '',
+  teamId: '',
   workOrderNumber: '',
   workOrderNumbers: [] as string[],
 });
@@ -104,6 +96,13 @@ const requestForm = reactive({
 const isIncomingEntry = computed(() =>
   isIncomingInspectionEntryPath(String(route.path || '')),
 );
+
+const {
+  clearResponsibleUnitIdentity,
+  loadResponsibleUnitOptions,
+  teamLoading,
+  teamOptions,
+} = useInspectionRequestIdentityOptions({ isIncomingEntry, requestForm });
 
 const processOptions = computed(() =>
   buildInspectionRequestEntryProcessOptions(
@@ -138,6 +137,7 @@ function applyRoutePrefill() {
     : String(route.query.processName || '');
   requestForm.reporter = String(route.query.reporter || '');
   requestForm.team = String(route.query.team || '');
+  clearResponsibleUnitIdentity();
 }
 
 function resetRequestForm() {
@@ -155,7 +155,7 @@ function resetRequestForm() {
   requestForm.selfCheckResult = 'PASS';
   requestForm.mutualCheckResult = 'PASS';
   requestForm.stationSelection = null;
-  requestForm.team = '';
+  clearResponsibleUnitIdentity(true);
   requestForm.workOrderNumber = '';
   requestForm.workOrderNumbers = [];
 }
@@ -176,45 +176,6 @@ async function loadWorkOrderOptions(keyword = '') {
   } finally {
     workOrderLoading.value = false;
   }
-}
-
-async function loadTeamOptions(keyword = '') {
-  teamLoading.value = true;
-  try {
-    const list = await getPublicInspectionRequestTeams({
-      keyword: keyword.trim() || undefined,
-    });
-    teamOptions.value = mapInspectionRequestEntryTeamOptions(list);
-  } catch {
-    teamOptions.value = [];
-  } finally {
-    teamLoading.value = false;
-  }
-}
-
-async function loadSupplierOptions(keyword = '') {
-  teamLoading.value = true;
-  try {
-    teamOptions.value = await getPublicInspectionRequestSuppliers({
-      category:
-        requestForm.incomingType === MACHINED_INCOMING_INSPECTION_TYPE
-          ? SUPPLIER_CATEGORY.OUTSOURCING
-          : SUPPLIER_CATEGORY.SUPPLIER,
-      keyword: keyword.trim() || undefined,
-    });
-  } catch {
-    teamOptions.value = [];
-  } finally {
-    teamLoading.value = false;
-  }
-}
-
-async function loadResponsibleUnitOptions(keyword = '') {
-  if (isIncomingEntry.value) {
-    await loadSupplierOptions(keyword);
-    return;
-  }
-  await loadTeamOptions(keyword);
 }
 
 function syncAttachmentsFromFiles(files: UploadFile[]) {
@@ -355,6 +316,7 @@ async function submitRequest() {
     !requestForm.quantity ||
     (requiresStationSelection.value && !requestForm.stationSelection) ||
     !requestForm.team ||
+    (isIncomingEntry.value ? !requestForm.supplierId : !requestForm.teamId) ||
     !requestForm.reporter ||
     requestForm.attachments.length === 0
   ) {
@@ -447,17 +409,6 @@ watch(
     if (isAssemblyProcess.value) {
       requestForm.componentName = '';
     }
-  },
-);
-
-watch(
-  () => requestForm.incomingType,
-  (nextValue, previousValue) => {
-    if (!isIncomingEntry.value) return;
-    if (nextValue !== previousValue && previousValue !== undefined) {
-      requestForm.team = '';
-    }
-    void loadSupplierOptions(requestForm.team);
   },
 );
 </script>

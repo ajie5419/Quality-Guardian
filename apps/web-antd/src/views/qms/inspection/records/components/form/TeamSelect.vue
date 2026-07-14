@@ -1,101 +1,85 @@
 <script lang="ts" setup>
-import type { Dept } from '@qgs/shared';
-
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 import { Select } from 'ant-design-vue';
 
-import { getSupplierList } from '#/api/qms/supplier';
-import { getDeptList } from '#/api/system/dept';
+import { getPublicInspectionRequestTeams } from '#/api/qms/inspection-request';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
+
+interface TeamOption {
+  group: 'current' | 'external' | 'internal';
+  label: string;
+  value: string;
+}
 
 defineOptions({ name: 'TeamSelect' });
 
-defineProps({
-  value: {
-    type: String,
-    default: undefined,
+const props = withDefaults(
+  defineProps<{
+    disabled?: boolean;
+    legacyName?: string;
+    value?: string;
+  }>(),
+  {
+    disabled: false,
+    legacyName: '',
+    value: undefined,
   },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
-});
+);
 
-const emit = defineEmits(['update:value', 'change']);
+const emit = defineEmits<{
+  change: [value: string | undefined, option?: TeamOption];
+  resolved: [value: string, option: TeamOption];
+  'update:value': [value: string | undefined];
+}>();
 const { handleApiError } = useErrorHandler();
 
 const loading = ref(false);
-const options = ref<
-  Array<{ label: string; options: Array<{ label: string; value: string }> }>
->([]);
+const teamOptions = ref<TeamOption[]>([]);
+const currentOption = computed<TeamOption | undefined>(() => {
+  const value = String(props.value || '').trim();
+  const label = String(props.legacyName || '').trim();
+  if (!value || !label) return undefined;
+  if (teamOptions.value.some((option) => option.value === value)) {
+    return undefined;
+  }
+  return { group: 'current', label, value };
+});
+const options = computed(() => {
+  const groups = [
+    { group: 'current' as const, label: '当前值' },
+    { group: 'internal' as const, label: '内部生产车间' },
+    { group: 'external' as const, label: '外协加工单位' },
+  ];
+  return groups
+    .map(({ group, label }) => ({
+      label,
+      options: [
+        ...(currentOption.value?.group === group ? [currentOption.value] : []),
+        ...teamOptions.value.filter((option) => option.group === group),
+      ],
+    }))
+    .filter((group) => group.options.length > 0);
+});
+
+function findCanonicalOption(value: string | undefined) {
+  const normalizedValue = String(value || '').trim();
+  if (!normalizedValue) return undefined;
+  return [...teamOptions.value, currentOption.value].find(
+    (option) => option?.value === normalizedValue,
+  );
+}
+
+function resolveCurrentValue() {
+  const option = findCanonicalOption(props.value);
+  if (option) emit('resolved', option.value, option);
+}
 
 async function loadData() {
   loading.value = true;
   try {
-    // 1. 获取部门 (过滤出叶子节点，即实际车间/班组，排除顶级公司节点)
-    const [deptList, supplierRes] = await Promise.all([
-      getDeptList(),
-      getSupplierList({ page: 1, pageSize: 1000, category: 'outsourcing' }),
-    ]);
-
-    const targetDepts: Dept[] = [];
-
-    // 精确类型定义
-    const collectLeaves = (node: Dept, leaves: Dept[]) => {
-      if (!node.children || node.children.length === 0) {
-        leaves.push(node);
-      } else {
-        node.children.forEach((child) => collectLeaves(child, leaves));
-      }
-    };
-
-    const findProductionObuAndCollectLeaves = (nodes: Dept[]) => {
-      for (const node of nodes) {
-        // 判断当前节点是否是目标 OBU
-        const isProductionObu =
-          node.name.includes('生产') || node.name.includes('制造');
-
-        if (isProductionObu) {
-          collectLeaves(node, targetDepts);
-        } else {
-          if (node.children && node.children.length > 0) {
-            findProductionObuAndCollectLeaves(node.children);
-          }
-        }
-      }
-    };
-
-    findProductionObuAndCollectLeaves(deptList);
-
-    // 如果没有找到任何 OBU，作为兜底，还是显示所有叶子节点
-    if (targetDepts.length === 0) {
-      const findLeaves = (nodes: Dept[]) => {
-        nodes.forEach((node) => {
-          if (node.children && node.children.length > 0) {
-            findLeaves(node.children);
-          } else {
-            targetDepts.push(node);
-          }
-        });
-      };
-      findLeaves(deptList);
-    }
-
-    const internalOptions = targetDepts.map((d) => ({
-      label: d.name,
-      value: d.name,
-    }));
-
-    const externalOptions = (supplierRes.items || []).map((s) => ({
-      label: s.name,
-      value: s.name,
-    }));
-
-    options.value = [
-      { label: '内部生产车间', options: internalOptions },
-      { label: '外协加工单位', options: externalOptions },
-    ];
+    teamOptions.value = await getPublicInspectionRequestTeams();
+    resolveCurrentValue();
   } catch (error) {
     handleApiError(error, 'Load Team Select Data');
   } finally {
@@ -103,14 +87,20 @@ async function loadData() {
   }
 }
 
-function handleChange(val: unknown) {
-  emit('update:value', val);
-  emit('change', val);
+function handleChange(value: unknown) {
+  const selectedValue = typeof value === 'string' ? value : undefined;
+  const option = findCanonicalOption(selectedValue);
+  const canonicalValue = option?.value;
+  emit('update:value', canonicalValue);
+  emit('change', canonicalValue, option);
 }
 
-onMounted(() => {
-  loadData();
-});
+onMounted(loadData);
+
+watch(
+  () => props.value,
+  () => resolveCurrentValue(),
+);
 </script>
 
 <template>
@@ -119,6 +109,7 @@ onMounted(() => {
     :options="options"
     :loading="loading"
     :disabled="disabled"
+    option-filter-prop="label"
     placeholder="请选择或搜索班组/外协单位"
     show-search
     allow-clear

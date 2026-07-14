@@ -7,6 +7,18 @@ import { Modal } from 'ant-design-vue';
 
 import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
 
+export function buildTeamIdentityFields(
+  value: string | undefined,
+  option?: { label?: unknown },
+) {
+  const teamId = String(value || '').trim();
+  const team = String(option?.label || '').trim();
+  return {
+    team: team || undefined,
+    teamId: teamId || undefined,
+  };
+}
+
 export const getFormSchema = (
   type: string,
   processOptionsOverride?:
@@ -144,7 +156,7 @@ export const getFormSchema = (
         rules: 'required',
       },
       {
-        fieldName: 'team',
+        fieldName: 'teamId',
         label: $t('qms.inspection.records.form.team'),
         component: 'TeamSelect',
         rules: 'required',
