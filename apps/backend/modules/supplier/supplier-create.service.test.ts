@@ -120,4 +120,13 @@ describe('createSupplierRecord', () => {
     );
     expect(prisma.suppliers.findUnique).not.toHaveBeenCalled();
   });
+
+  it('normalizes non-Error failures before rethrowing', async () => {
+    (prisma.suppliers.create as any).mockRejectedValue('database unavailable');
+
+    await expect(createSupplierRecord({ name: 'Supplier A' })).rejects.toEqual(
+      new Error('database unavailable'),
+    );
+    expect(prisma.suppliers.findUnique).not.toHaveBeenCalled();
+  });
 });

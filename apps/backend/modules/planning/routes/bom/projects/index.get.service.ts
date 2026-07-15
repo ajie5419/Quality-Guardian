@@ -10,7 +10,7 @@ import { verifyAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 
 export async function bom_projects_index_get(event: H3Event) {
-  const userinfo = await verifyAccessToken(event);
+  const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
 
   try {

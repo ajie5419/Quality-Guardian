@@ -12,7 +12,7 @@ import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 export async function inspection_forms_match_get(event: H3Event) {
-  const userinfo = await verifyAccessToken(event);
+  const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
 
   const query = getQuery(event);

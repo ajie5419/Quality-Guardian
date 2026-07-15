@@ -74,7 +74,7 @@ export async function itp_import_post(event: H3Event) {
               ...governedCanonicalIds,
             },
           })
-          .catch((error) => {
+          .catch((error: unknown) => {
             const message = toImportErrorMessage(error);
             rowErrors.push(
               buildImportRowError({

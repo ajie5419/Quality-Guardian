@@ -7,7 +7,7 @@ import prisma from '~/utils/prisma';
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export async function inspection_forms_id_delete(event: H3Event) {
-  const userinfo = await verifyAccessToken(event);
+  const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
 
   const id = getRequiredRouterParam(event, 'id', 'ID is required');

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import prisma from '~/utils/prisma';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 
 import {
   __resetProcessResolverRuntimeForTest,
@@ -9,12 +9,12 @@ import {
   resolveProcessIdsByNames,
 } from './process-resolver';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    $queryRawUnsafe: vi.fn(),
-    processes: {
-      findMany: vi.fn(),
-    },
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    buildNameWhere: vi.fn(),
+    resolveCanonicalIdForWrite: vi.fn(),
+    resolveCanonicalIdsByNames: vi.fn(),
+    resolveCanonicalNameById: vi.fn(),
   },
 }));
 
@@ -22,7 +22,30 @@ describe('process-resolver helpers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     __resetProcessResolverRuntimeForTest();
-    (prisma.$queryRawUnsafe as any).mockResolvedValue([]);
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalIdForWrite,
+    ).mockImplementation(async (options) => {
+      if (options.explicitCanonicalId !== undefined) {
+        return options.explicitCanonicalId;
+      }
+      if (!String(options.name || '').trim()) {
+        return options.keepExistingWhenNameMissing
+          ? undefined
+          : (options.fallbackCanonicalId ?? null);
+      }
+      return options.fallbackCanonicalId ?? null;
+    });
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalIdsByNames,
+    ).mockResolvedValue(new Map());
+    vi.mocked(MasterDataGovernanceKernel.buildNameWhere).mockImplementation(
+      async (options) => ({
+        [options.field || 'processName']: options.name,
+      }),
+    );
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalNameById,
+    ).mockImplementation(async (options) => options.fallbackName || null);
   });
 
   it('resolveProcessIdForWrite returns explicit process id first', async () => {
@@ -32,7 +55,9 @@ describe('process-resolver helpers', () => {
     });
 
     expect(processId).toBe('p-explicit');
-    expect((prisma.processes.findMany as any).mock.calls.length).toBe(0);
+    expect(
+      MasterDataGovernanceKernel.resolveCanonicalIdForWrite,
+    ).toHaveBeenCalledOnce();
   });
 
   it('resolveProcessIdForWrite returns undefined when keeping existing and name missing', async () => {
@@ -54,10 +79,14 @@ describe('process-resolver helpers', () => {
   });
 
   it('resolveProcessIdsByNames batches lookup and de-duplicates names', async () => {
-    (prisma.$queryRawUnsafe as any).mockResolvedValue([
-      { id: 'p-weld', name: '焊接' },
-      { id: 'p-paint', name: '喷涂' },
-    ]);
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalIdsByNames,
+    ).mockResolvedValue(
+      new Map([
+        ['喷涂', 'p-paint'],
+        ['焊接', 'p-weld'],
+      ]),
+    );
 
     const result = await resolveProcessIdsByNames([
       '焊接',
@@ -68,13 +97,20 @@ describe('process-resolver helpers', () => {
       '',
     ]);
 
-    expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
+    expect(
+      MasterDataGovernanceKernel.resolveCanonicalIdsByNames,
+    ).toHaveBeenCalledWith({
+      configKey: 'processName',
+      names: ['焊接', '喷涂'],
+    });
     expect(result.get('焊接')).toBe('p-weld');
     expect(result.get('喷涂')).toBe('p-paint');
   });
 
   it('buildProcessNameWhere returns OR condition when process id resolved', async () => {
-    (prisma.$queryRawUnsafe as any).mockResolvedValue([{ id: 'p-weld' }]);
+    vi.mocked(MasterDataGovernanceKernel.buildNameWhere).mockResolvedValue({
+      OR: [{ processName: '焊接' }, { processId: 'p-weld' }],
+    });
 
     const where = await buildProcessNameWhere('焊接');
 
@@ -84,8 +120,6 @@ describe('process-resolver helpers', () => {
   });
 
   it('buildProcessNameWhere returns field-only condition when process id missing', async () => {
-    (prisma.$queryRawUnsafe as any).mockResolvedValue([]);
-
     const where = await buildProcessNameWhere('未知工序', {
       field: 'inspectionProcessName',
     });
@@ -96,7 +130,7 @@ describe('process-resolver helpers', () => {
   });
 
   it('buildProcessNameWhere falls back to plain name condition when governance lookup fails', async () => {
-    (prisma.$queryRawUnsafe as any).mockRejectedValueOnce(
+    vi.mocked(MasterDataGovernanceKernel.buildNameWhere).mockRejectedValueOnce(
       new Error('db unavailable'),
     );
 
@@ -108,9 +142,9 @@ describe('process-resolver helpers', () => {
   });
 
   it('resolveProcessIdForWrite falls back to legacy behavior when governance lookup fails', async () => {
-    (prisma.$queryRawUnsafe as any).mockRejectedValueOnce(
-      new Error('db unavailable'),
-    );
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalIdForWrite,
+    ).mockRejectedValueOnce(new Error('db unavailable'));
 
     const processId = await resolveProcessIdForWrite({
       processName: '焊接',
@@ -126,9 +160,9 @@ describe('process-resolver helpers', () => {
         findFirst: vi.fn().mockResolvedValue(null),
       },
     };
-    (prisma.$queryRawUnsafe as any).mockRejectedValueOnce(
-      new Error('db unavailable'),
-    );
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalNameById,
+    ).mockRejectedValueOnce(new Error('db unavailable'));
 
     const processName = await resolveCanonicalProcessNameById(
       tx as any,

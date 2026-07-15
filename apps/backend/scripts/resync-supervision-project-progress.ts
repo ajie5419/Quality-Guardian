@@ -82,9 +82,15 @@ async function main() {
   );
 }
 
-main()
-  .catch((error) => {
-    console.error('Resync failed:', error);
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+async function run() {
+  try {
+    await main();
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+void run().catch((error: unknown) => {
+  console.error('Resync failed:', error);
+  process.exitCode = 1;
+});

@@ -28,6 +28,8 @@
 - [x] 根目录 + 后端脏数据清理
 - [x] 偏离修复（文件超限、governance 残留、route-handlers 合并、prisma 脚本清理）
 - [x] ESLint 与架构门禁完善（累计 Flat Config、AST 语义规则、历史债务递减 baseline、CI 全量扫描）
+- [x] 后端类型感知 ESLint 完善（Promise 生命周期、异常类型、switch 穷尽性、测试断言与禁用测试约束）
+- [x] Git hooks 完善（pre-commit 自动修复重暂存、pre-push 类型与架构检查、条件化 post-merge 安装）
 - [x] 报检任务模块重构（状态机文档、创建 schema、查询/创建/派工/删除/关闭服务拆分）
 - [x] 小程序不合格品项模块（列表、详情、新增、编辑、照片、草稿、RBAC，复用电脑版数据与状态）
 - [x] 不合格品项所有权隔离（普通用户仅本人、管理员全部、写操作仅创建人）

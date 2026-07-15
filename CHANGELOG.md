@@ -25,6 +25,54 @@
 
 ## 执行记录
 
+### 2026-07-14 修复：完善 Git hooks 分层门禁
+
+**执行内容：**
+
+- 为所有会写文件的 pre-commit 命令启用 `stage_fixed`，确保 Prettier、ESLint 和 Stylelint 修复后的内容重新进入暂存区。
+- 消除 `.vue` 同时被两个并行命令修改的问题，并补齐 `.mjs`、`.cjs`、`.mts`、`.cts` 的 hook 覆盖。
+- workspace 文件只在 package/workspace 清单变化时生成，并由 Lefthook 统一暂存，避免普通提交被污染和并行 `git add` 竞争。
+- 新增 pre-push 类型检查与增量 QMS 架构检查；post-merge 仅在依赖清单变化时执行冻结安装。
+- 删除 Commitlint 提示中无法通过 `type-enum` 校验的 `workflow` 类型。
+
+**验证结果：**
+
+- lint: `pnpm lint` 通过（0 error，0 warning）
+- lefthook: `lefthook validate` 通过，最终配置展开正确
+- pre-commit: 实测自动修复后重新暂存；非 package 提交跳过 workspace，package 变更触发同步
+- pre-push: typecheck 3/3 tasks 通过，增量架构检查 0 violations
+- post-merge: 非依赖文件变更正确跳过安装
+- commitlint: 合法 `fix(lint)` 通过，非法 `workflow(project)` 被拒绝
+
+**commit:** `a7fda7ed` fix(dev): harden git hooks
+
+**遗留问题：**
+
+- 无。
+
+### 2026-07-14 修复：启用后端类型感知 ESLint
+
+**执行内容：**
+
+- 使用 TypeScript Project Service 覆盖全部 `apps/backend/**/*.ts` 非测试源码，移除失效的全局 `project` 通配配置，并将废弃的 `no-var-requires` 替换为 `no-require-imports`。
+- 新增悬空 Promise、Promise 误用、无效 await、异常抛出类型、错误处理返回 await、switch 穷尽性和 Promise catch 参数类型规则。
+- 新增测试断言、禁用测试、重复 hook、describe 回调和 expect 有效性规则；最终配置测试改用真实后端文件并验证类型服务实际触发规则。
+- 修复规则发现的 25 处后端问题，包括无效 await、Promise 布尔判断、异步 finally、catch 参数、遗漏的 switch 分支和事件总线无断言测试。
+- 更新 `process-resolver` 测试 mock，使其匹配主数据治理内核的新依赖边界，恢复全量测试门禁。
+
+**验证结果：**
+
+- lint: `pnpm lint` 通过（0 error，0 warning）
+- typecheck: `pnpm run check:type` 3/3 tasks 通过
+- check:qms-arch:all: 635 个后端生产 TS 文件、497 个模块 TS 文件扫描通过，0 violations
+- vitest: 后端 204/204 文件、1927/1927 用例通过
+- ESLint 最终配置回归: 4/4 用例通过
+
+**commit:** `64c79c3a` fix(lint): enforce typed backend rules
+
+**遗留问题：**
+
+- 类型感知 lint 会增加全仓 lint 的执行时间，这是 TypeScript 类型分析的预期成本；当前完整门禁已稳定通过。
 ## [0.17.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.1...qgs-v0.17.2) (2026-07-15)
 
 
@@ -41,12 +89,14 @@
 - 创建流程采用先插入、仅在精确识别 `name` / `suppliers_name_key` 的 Prisma P2002 后处理冲突；同名活动供应商返回 `SUPPLIER_NAME_CONFLICT` 409，其他唯一键或数据库异常继续按真实异常处理。
 - 恢复写入使用带 `id + name + isDeleted=true` 条件的 `updateMany` 原子守卫；并发恢复只有一个请求成功，其他请求重新读取当前状态并返回业务冲突，禁止生成重复身份。
 - 恢复操作记录 `RESTORE` 审计；已处理的业务冲突只记录 warning，非预期异常保留 error 日志。
+- 创建服务将捕获到的非 `Error` 失败值收窄为 `Error` 后再记录和抛出，避免非标准异常穿透到 Nitro 错误处理链。
 - 本修复不修改数据库结构，不需要 migration 或人工修改生产数据。
 
 **验证结果：**
 
 - 定向测试：3/3 个文件、34/34 个用例通过。
 - 全量后端测试：213/213 个文件、1990/1990 个用例通过。
+- 开发分支合并复验：213/213 个后端测试文件、1991/1991 个用例通过；新增非 `Error` 异常回归用例。
 - 全仓测试：290/290 个文件、2479/2479 个用例通过。
 - lint：通过；typecheck：3/3 workspace tasks 通过。
 - `check:qms-arch`、`check:qms-arch:all`、`check:prisma-migration`、`git diff --check`：全部通过。

@@ -245,7 +245,7 @@ export const DashboardService = {
           '12月',
         ];
         const currentMonthIndex = new Date().getMonth();
-        return Promise.all(
+        return await Promise.all(
           months.map(async (m, idx) => {
             const start = new Date(currentYear, idx, 1);
             const end = new Date(currentYear, idx + 1, 0, 23, 59, 59, 999);

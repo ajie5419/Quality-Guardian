@@ -1,3 +1,5 @@
+import process from 'node:process';
+
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
@@ -63,11 +65,16 @@ async function main() {
   );
 }
 
-main()
-  .catch((error: unknown) => {
-    throw error;
-  })
-  .finally(async () => {
+async function run() {
+  try {
+    await main();
+  } finally {
     await prisma.$disconnect();
     redis.disconnect();
-  });
+  }
+}
+
+void run().catch((error: unknown) => {
+  logger.fatal({ err: error }, 'after-sales supplier brand backfill failed');
+  process.exitCode = 1;
+});

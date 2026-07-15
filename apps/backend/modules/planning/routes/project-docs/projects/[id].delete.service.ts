@@ -8,7 +8,7 @@ import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export async function project_docs_projects_id_delete(event: H3Event) {
-  const userinfo = await verifyAccessToken(event);
+  const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
 
   const id = getRequiredRouterParam(event, 'id', 'ID is required');

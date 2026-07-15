@@ -62,7 +62,7 @@ function parseRedisEvent(message: string) {
 async function ensureRedisSubscription() {
   const client = redis.getClient();
   if (!client || redisSubscriber) return;
-  if (redisSubscribePromise) {
+  if (redisSubscribePromise !== null) {
     await redisSubscribePromise;
     return;
   }
@@ -83,7 +83,7 @@ async function ensureRedisSubscription() {
       redisSubscriber = subscriber;
       logger.info('Redis inspection request event subscription ready');
     })
-    .catch((error) => {
+    .catch((error: unknown) => {
       redisSubscribePromise = null;
       redisSubscriber = null;
       subscriber.disconnect();

@@ -17,7 +17,7 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 const inspectionFormUpdateBodySchema = z.record(z.string(), z.unknown());
 
 export async function inspection_forms_id_put(event: H3Event) {
-  const userinfo = await verifyAccessToken(event);
+  const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
 
   const id = getRequiredRouterParam(event, 'id', 'ID is required');

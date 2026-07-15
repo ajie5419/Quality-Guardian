@@ -62,7 +62,7 @@ function getMetricValueFromRow(
     case 'runningHours': {
       return Number(row.runningHours || 0);
     }
-    default: {
+    case 'totalLoss': {
       return Number(row.materialCost || 0) + Number(row.laborTravelCost || 0);
     }
   }
@@ -97,7 +97,7 @@ function getMetricValueFromGroupedItem(
     case 'runningHours': {
       return Number(sum?.runningHours || 0);
     }
-    default: {
+    case 'totalLoss': {
       return Number(sum?.materialCost || 0) + Number(sum?.laborTravelCost || 0);
     }
   }

@@ -14,7 +14,7 @@ import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 
 export async function inspection_forms_index_post(event: H3Event) {
-  const userinfo = await verifyAccessToken(event);
+  const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
 
   try {

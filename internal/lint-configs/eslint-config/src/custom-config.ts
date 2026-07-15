@@ -281,17 +281,44 @@ const customConfig: Linter.Config[] = [
     },
   },
   {
-    files: [
-      'apps/backend/api/**/*.ts',
-      'apps/backend/middleware/**/*.ts',
-      'apps/backend/modules/**/*.ts',
-      'apps/backend/utils/**/*.ts',
+    files: ['apps/backend/**/*.ts'],
+    ignores: [
+      '**/__tests__/**',
+      '**/*.spec.ts',
+      '**/*.test.ts',
+      '**/*.bench.ts',
+      '**/*.benchmark.ts',
     ],
-    ignores: ['**/__tests__/**', '**/*.spec.ts', '**/*.test.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+      },
+    },
     rules: {
+      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/no-floating-promises': [
+        'error',
+        { ignoreIIFE: false, ignoreVoid: true },
+      ],
+      '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/no-non-null-assertion': 'error',
+      '@typescript-eslint/only-throw-error': [
+        'error',
+        {
+          allowRethrowing: true,
+          allowThrowingAny: false,
+          allowThrowingUnknown: false,
+        },
+      ],
+      '@typescript-eslint/return-await': [
+        'error',
+        'error-handling-correctness-only',
+      ],
+      '@typescript-eslint/switch-exhaustiveness-check': 'error',
+      '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
       'no-console': 'error',
       'no-empty': ['error', { allowEmptyCatch: false }],
+      'no-throw-literal': 'off',
     },
   },
   {

@@ -40,10 +40,14 @@ function supplierNameConflict(): BusinessError {
   return new BusinessError(SUPPLIER_NAME_CONFLICT, '供应商名称已存在', 409);
 }
 
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 async function restoreDeletedSupplier(
   name: string,
   payload: Record<string, unknown>,
-  originalError: unknown,
+  originalError: Error,
 ): Promise<SupplierCreateOutcome> {
   const existing = await prisma.suppliers.findUnique({ where: { name } });
   if (!existing) throw originalError;
@@ -82,10 +86,11 @@ export async function createSupplierRecord(
       supplier: await prisma.suppliers.create({ data: createData }),
     };
   } catch (error: unknown) {
+    const originalError = toError(error);
     if (!isSupplierNameUniqueConflict(error)) {
-      logger.error(error, 'createSupplierRecord failed');
-      throw error;
+      logger.error(originalError, 'createSupplierRecord failed');
+      throw originalError;
     }
-    return restoreDeletedSupplier(createData.name, payload, error);
+    return restoreDeletedSupplier(createData.name, payload, originalError);
   }
 }

@@ -44,7 +44,7 @@ export default eventHandler(async (event) => {
         file.resume();
         return;
       }
-      if (uploadTask) {
+      if (uploadTask !== null) {
         file.resume();
         return;
       }
@@ -65,7 +65,7 @@ export default eventHandler(async (event) => {
         .then((result) => {
           uploaded = result;
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           uploadError =
             error instanceof Error ? error : new Error(String(error));
         });

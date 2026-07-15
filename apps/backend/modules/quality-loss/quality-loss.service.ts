@@ -51,7 +51,7 @@ async function resolveTrendRows(
 
 async function getDeptNameMapper() {
   const deptTree =
-    (await DeptService.findAll().catch((error) => {
+    (await DeptService.findAll().catch((error: unknown) => {
       logger.warn(
         { err: error },
         'DeptService.findAll failed, fallback to raw dept id',
