@@ -32,6 +32,30 @@
 
 * **project:** harden backend checks and supplier errors ([b0e9ef7](https://github.com/ajie5419/Quality-Guardian/commit/b0e9ef76a8a0de55c6dd969bca9d5b18a3847877))
 
+### 2026-07-15 发布：qgs-v0.17.3
+
+**执行内容：**
+
+- 将后端类型感知 lint、Git hooks 分层门禁和供应商创建异常收窄通过功能 PR #56 合并到 `main`。
+- 合并 release-please 发布 PR #57，生成 GitHub Release 和 tag `qgs-v0.17.3`。
+- 通过 deploy workflow 构建并推送 backend/frontend 镜像，更新生产 ECS，执行 migration 检查、主数据身份回填、健康检查并启动发布后维护任务。
+
+**验证结果：**
+
+- 功能 PR #56 和发布 PR #57 的 6 项 CI Gate 全部通过。
+- 全仓测试：290/290 个文件、2480/2480 个用例通过；后端本地复验 213/213 个文件、1991/1991 个用例通过。
+- lint 通过；typecheck 3/3 workspace tasks 通过；QMS 架构检查、Prisma migration 检查和密钥扫描通过。
+- deploy run `29391542599` 成功，耗时 7 分 40 秒；镜像构建、ACR 推送、ECS 更新和 HTTP 健康检查全部通过。
+- 生产数据库检测到 38 个 migration，无待执行 migration；身份治理回填完成且未产生新的自动更新，无法确定归属的历史数据继续保留在 unresolved 审计队列。
+- 生产首页返回 HTTP 200。
+
+**commit:** `b0e9ef76` Merge pull request #56；`1a30b09a` Merge pull request #57
+
+**遗留问题：**
+
+- 仍需使用真实业务表单复验同名活动供应商的 409 提示和同名软删除供应商的原 ID 恢复行为；自动化未在生产创建测试供应商，避免污染业务数据。
+- GitHub Actions 提示 `actions/checkout@v4` 的 Node.js 20 运行时已弃用，本次 runner 已强制使用 Node.js 24 并成功完成发布。
+
 ### 2026-07-14 修复：完善 Git hooks 分层门禁
 
 **执行内容：**
