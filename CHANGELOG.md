@@ -25,6 +25,31 @@
 
 ## 执行记录
 
+### 2026-07-15 修复：新增供应商恢复同名软删除档案
+
+**执行内容：**
+
+- 修复 `suppliers.name` 全表唯一键与软删除语义冲突：新增同名软删除供应商时不再重复建档，而是恢复原记录并保留原供应商 ID，确保历史检验、工程问题、售后和 TEAM 映射继续关联同一身份。
+- 创建流程采用先插入、仅在精确识别 `name` / `suppliers_name_key` 的 Prisma P2002 后处理冲突；同名活动供应商返回 `SUPPLIER_NAME_CONFLICT` 409，其他唯一键或数据库异常继续按真实异常处理。
+- 恢复写入使用带 `id + name + isDeleted=true` 条件的 `updateMany` 原子守卫；并发恢复只有一个请求成功，其他请求重新读取当前状态并返回业务冲突，禁止生成重复身份。
+- 恢复操作记录 `RESTORE` 审计；已处理的业务冲突只记录 warning，非预期异常保留 error 日志。
+- 本修复不修改数据库结构，不需要 migration 或人工修改生产数据。
+
+**验证结果：**
+
+- 定向测试：3/3 个文件、34/34 个用例通过。
+- 全量后端测试：213/213 个文件、1990/1990 个用例通过。
+- 全仓测试：290/290 个文件、2479/2479 个用例通过。
+- lint：通过；typecheck：3/3 workspace tasks 通过。
+- `check:qms-arch`、`check:qms-arch:all`、`check:prisma-migration`、`git diff --check`：全部通过。
+- 前端 dev/build：未运行；本次无前端改动，并遵循仓库约束。
+
+**commit:** `030e5e6e` fix(project): restore soft-deleted suppliers on create
+
+**遗留问题：**
+
+- 等待功能 PR、release-please 发布 PR 和生产 deploy 完成后，使用生产页面重新提交同名软删除供应商进行业务验收。
+
 ## [0.17.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.0...qgs-v0.17.1) (2026-07-14)
 
 

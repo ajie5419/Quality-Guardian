@@ -39,6 +39,7 @@
 
 - 列表远程排序必须映射到 `suppliers` 字段或 `supplier_score_snapshots` 字段，禁止当前页内存排序
 - 准入手续文件存储在 `suppliers.admissionDocuments`，创建/更新后必须同步登记 `file_references(bizType=supplier, fieldName=admissionDocuments)`
+- `suppliers.name` 在包含软删除记录的全表范围内唯一；创建同名活动供应商返回冲突，创建同名软删除供应商必须恢复原记录并保留原 ID，禁止新建第二个身份或要求人工改名绕过。
 - 检验来源由共享 `resolveSupplierInspectionPolicy()` 唯一决定：普通供应商和外部加工读取 `INCOMING + supplierId`；驻厂队伍和外部服务读取 `PROCESS + teamId`，再通过 `supplier_identity_links` 映射到供应商。名称只保留为快照或搜索条件，评分、画像和前端不得自行复制判断或名称回退。
 - 画像检验履历必须通过 `SupplierService.getInspectionHistory()` 返回统一 `partName` 和服务端分页；禁止前端用关键字拼接通用检验列表。
 - 画像历史使用项目必须通过 `InspectionService.getSupplierHistoryProjects()` 直接按报检任务自身的 `supplierId/teamId` 聚合，合并主工单与 `qms_inspection_request_work_orders` 多工单明细，并执行服务端分页；不得依赖任务是否已生成检验记录，禁止按供应商名称查询，也禁止前端基于当前页结果拼接。
