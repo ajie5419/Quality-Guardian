@@ -25,6 +25,14 @@
 
 ## 执行记录
 
+## [0.17.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.1...qgs-v0.17.2) (2026-07-15)
+
+
+### Bug Fixes
+
+* **project:** restore soft-deleted suppliers on create ([329c5e1](https://github.com/ajie5419/Quality-Guardian/commit/329c5e103c1c71ab30ff75b448ccbb0119655cc1))
+* **project:** restore soft-deleted suppliers on create ([030e5e6](https://github.com/ajie5419/Quality-Guardian/commit/030e5e6e9427cdf25007ad4d1dbd27aea6744a17))
+
 ### 2026-07-15 修复：新增供应商恢复同名软删除档案
 
 **执行内容：**
