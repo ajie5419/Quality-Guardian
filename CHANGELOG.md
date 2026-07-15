@@ -25,6 +25,13 @@
 
 ## 执行记录
 
+## [0.17.3](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.2...qgs-v0.17.3) (2026-07-15)
+
+
+### Bug Fixes
+
+* **project:** harden backend checks and supplier errors ([b0e9ef7](https://github.com/ajie5419/Quality-Guardian/commit/b0e9ef76a8a0de55c6dd969bca9d5b18a3847877))
+
 ### 2026-07-14 修复：完善 Git hooks 分层门禁
 
 **执行内容：**
