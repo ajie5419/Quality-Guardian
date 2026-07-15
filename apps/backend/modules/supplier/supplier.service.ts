@@ -6,7 +6,6 @@ import { FileStorageService } from '~/modules/file-storage';
 import { InspectionService } from '~/modules/inspection';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import {
-  buildSupplierCreateDataWithCanonical,
   buildSupplierUpdateDataWithCanonical,
   buildSupplierUpsertPayload,
   DEFAULT_OUTSOURCING_MODE,
@@ -19,6 +18,7 @@ import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { buildKeywordOr } from '~/utils/query-helpers';
 
+import { createSupplierRecord } from './supplier-create.service';
 import { SupplierScoreSnapshotService } from './supplier-score-snapshot.service';
 
 const logger = createModuleLogger('supplier-service');
@@ -143,6 +143,14 @@ async function registerAdmissionDocuments(
   });
 }
 
+async function createSupplierWithOutcome(payload: SupplierAdmissionPayload) {
+  const outcome = await createSupplierRecord(payload);
+  if (!outcome) return null;
+  await registerAdmissionDocuments(outcome.supplier.id, payload);
+  await SupplierScoreSnapshotService.refreshSuppliers([outcome.supplier]);
+  return outcome;
+}
+
 async function buildSupplierGlobalStats(
   scopedWhere: SupplierWhereInput,
   totalCount: number,
@@ -188,13 +196,11 @@ async function buildSupplierGlobalStats(
 }
 
 export const SupplierService = {
+  createSupplierWithOutcome,
+
   async createSupplier(payload: Record<string, unknown>) {
-    const createData = await buildSupplierCreateDataWithCanonical(payload);
-    if (!createData) return null;
-    const created = await prisma.suppliers.create({ data: createData });
-    await registerAdmissionDocuments(created.id, payload);
-    await SupplierScoreSnapshotService.refreshSuppliers([created]);
-    return created;
+    const outcome = await createSupplierWithOutcome(payload);
+    return outcome?.supplier ?? null;
   },
 
   async updateSupplier(id: string, payload: Record<string, unknown>) {

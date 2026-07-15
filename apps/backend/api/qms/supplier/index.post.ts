@@ -2,12 +2,11 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
-import { logApiError } from '~/utils/api-logger';
+import { logApiError, logApiWarn } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
-import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
   badRequestResponse,
-  conflictResponse,
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
@@ -19,28 +18,30 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = createSupplierBodySchema.parse(await readBody(event));
-    const newSupplier = await SupplierService.createSupplier(body);
-    if (!newSupplier) {
+    const outcome = await SupplierService.createSupplierWithOutcome(body);
+    if (!outcome) {
       return badRequestResponse(event, '缺少必填字段: name');
     }
+    const { action, supplier } = outcome;
 
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
-      action: 'CREATE',
+      action,
       targetType: 'supplier',
-      targetId: String(newSupplier.id),
-      detailsTemplate: '新增供应商/外协单位: {{name}}',
+      targetId: String(supplier.id),
+      detailsTemplate: '保存供应商/外协单位: {{name}}',
       detailsVariables: {
-        name: newSupplier.name,
+        name: supplier.name,
       },
     });
 
-    return useResponseSuccess(newSupplier);
+    return useResponseSuccess(supplier);
   } catch (error: unknown) {
-    logApiError('supplier', error, undefined, event);
-    if (isPrismaUniqueConstraintError(error)) {
-      return conflictResponse(event, '供应商名称已存在');
+    if (isBusinessError(error)) {
+      logApiWarn('supplier', error.code, undefined, event);
+      return businessErrorResponse(event, error);
     }
+    logApiError('supplier', error, undefined, event);
     return internalServerErrorResponse(event, '创建供应商失败');
   }
 });

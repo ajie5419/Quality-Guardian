@@ -4,7 +4,13 @@ import { getHeader } from 'h3';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 
-type AuditAction = 'CREATE' | 'DELETE' | 'EXPORT' | 'READ' | 'UPDATE';
+type AuditAction =
+  | 'CREATE'
+  | 'DELETE'
+  | 'EXPORT'
+  | 'READ'
+  | 'RESTORE'
+  | 'UPDATE';
 
 interface BusinessAuditLogParams {
   action: AuditAction;
