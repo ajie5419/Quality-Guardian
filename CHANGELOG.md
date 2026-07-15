@@ -51,12 +51,16 @@
 - lint：通过；typecheck：3/3 workspace tasks 通过。
 - `check:qms-arch`、`check:qms-arch:all`、`check:prisma-migration`、`git diff --check`：全部通过。
 - 前端 dev/build：未运行；本次无前端改动，并遵循仓库约束。
+- GitHub：功能 PR #53 和发布 PR #54 均已合并，两个 PR 的 6 项 CI Gate 全部通过；已生成 GitHub Release 与 tag `qgs-v0.17.2`。
+- 生产部署：deploy run `29380845117` 成功，耗时 8 分 6 秒；backend/frontend 镜像构建、ACR 推送、ECS 更新与 HTTP 健康检查全部通过。
+- 生产数据库：38 个 migration 均已记录，无待执行 migration；本次修复未修改数据库结构或人工修改生产数据。
+- 生产外网检查：首页返回 HTTP 200，静态资源更新时间与 `qgs-v0.17.2` frontend 镜像构建完成时间一致。
 
-**commit:** `030e5e6e` fix(project): restore soft-deleted suppliers on create
+**commit:** `030e5e6e` fix(project): restore soft-deleted suppliers on create；`329c5e10` Merge pull request #53；`694420c0` Merge pull request #54
 
 **遗留问题：**
 
-- 等待功能 PR、release-please 发布 PR 和生产 deploy 完成后，使用生产页面重新提交同名软删除供应商进行业务验收。
+- 生产发布已完成；仍需使用真实业务表单重新提交同名软删除供应商，确认页面返回原供应商 ID 并展示恢复后的档案。自动化未在生产创建测试供应商，避免污染业务数据。
 
 ## [0.17.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.0...qgs-v0.17.1) (2026-07-14)
 
