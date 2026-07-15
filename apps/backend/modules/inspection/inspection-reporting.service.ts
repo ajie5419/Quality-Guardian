@@ -3,6 +3,8 @@ import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-ind
 import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
+import { buildSupplierEngineeringIssueWhere } from './inspection-supplier-profile';
+
 export const InspectionReportingService = {
   async findIssueIdBySerialNumber(serialNumber: number) {
     const row = await prisma.quality_records.findFirst({
@@ -11,11 +13,10 @@ export const InspectionReportingService = {
     });
     return row?.id || null;
   },
-
   async updateQualityLossFields(params: { actualClaim?: number; id: string }) {
     const current = await prisma.quality_records.findUnique({
       where: { id: params.id },
-      select: { supplierName: true },
+      select: { supplierId: true, supplierName: true },
     });
     const updated = await prisma.quality_records.update({
       where: { id: params.id },
@@ -26,6 +27,7 @@ export const InspectionReportingService = {
     });
     await QualityLossIndexService.upsertFromInternal(updated);
     eventBus.emit('inspection_issue.changed', {
+      supplierIds: [current?.supplierId],
       supplierNames: [current?.supplierName],
     });
   },
@@ -144,60 +146,28 @@ export const InspectionReportingService = {
 
   async getSupplierScoringData(params: {
     engineeringSupplierIds: string[];
-    engineeringSupplierNames: string[];
     incomingSupplierIds: string[];
-    incomingSupplierNames: string[];
     processTeamIds: string[];
-    processTeamNames: string[];
     since: Date;
   }) {
-    const buildSupplierIdentityOr = (
-      supplierIds: string[],
-      names: string[],
-    ) => {
-      const identityOr: Prisma.inspectionsWhereInput[] = [];
-      if (names.length > 0) {
-        identityOr.push({ supplierName: { in: names } });
-      }
-      if (supplierIds.length > 0) {
-        identityOr.push({ supplierId: { in: supplierIds } });
-      }
-      return identityOr;
-    };
-    const incomingIdentityOr = buildSupplierIdentityOr(
-      params.incomingSupplierIds,
-      params.incomingSupplierNames,
-    );
-    const processIdentityOr: Prisma.inspectionsWhereInput[] = [];
-    if (params.processTeamNames.length > 0) {
-      processIdentityOr.push({ team: { in: params.processTeamNames } });
-    }
-    if (params.processTeamIds.length > 0) {
-      processIdentityOr.push({ teamId: { in: params.processTeamIds } });
-    }
+    const recentEngineeringWhere = buildSupplierEngineeringIssueWhere({
+      since: params.since,
+      supplierIds: params.engineeringSupplierIds,
+    });
+    const allEngineeringWhere = buildSupplierEngineeringIssueWhere({
+      supplierIds: params.engineeringSupplierIds,
+    });
     const inspectionSourceOr: Prisma.inspectionsWhereInput[] = [];
-    if (incomingIdentityOr.length > 0) {
+    if (params.incomingSupplierIds.length > 0) {
       inspectionSourceOr.push({
         category: 'INCOMING',
-        OR: incomingIdentityOr,
+        supplierId: { in: params.incomingSupplierIds },
       });
     }
-    if (processIdentityOr.length > 0) {
+    if (params.processTeamIds.length > 0) {
       inspectionSourceOr.push({
         category: 'PROCESS',
-        OR: processIdentityOr,
-      });
-    }
-
-    const qualityRecordIdentityOr: Prisma.quality_recordsWhereInput[] = [];
-    if (params.engineeringSupplierNames.length > 0) {
-      qualityRecordIdentityOr.push({
-        supplierName: { in: params.engineeringSupplierNames },
-      });
-    }
-    if (params.engineeringSupplierIds.length > 0) {
-      qualityRecordIdentityOr.push({
-        supplierId: { in: params.engineeringSupplierIds },
+        teamId: { in: params.processTeamIds },
       });
     }
 
@@ -227,29 +197,17 @@ export const InspectionReportingService = {
       }),
       prisma.quality_records.groupBy({
         by: ['supplierId', 'supplierName'],
-        where: {
-          OR: qualityRecordIdentityOr,
-          isDeleted: false,
-          date: { gte: params.since },
-        },
+        where: recentEngineeringWhere,
         _sum: { lossAmount: true, quantity: true },
         _count: { id: true },
       }),
       prisma.quality_records.groupBy({
         by: ['supplierId', 'supplierName', 'status'],
-        where: {
-          OR: qualityRecordIdentityOr,
-          isDeleted: false,
-          date: { gte: params.since },
-        },
+        where: recentEngineeringWhere,
         _count: { id: true },
       }),
       prisma.quality_records.findMany({
-        where: {
-          OR: qualityRecordIdentityOr,
-          isDeleted: false,
-          date: { gte: params.since },
-        },
+        where: recentEngineeringWhere,
         select: {
           supplierId: true,
           supplierName: true,
@@ -261,10 +219,7 @@ export const InspectionReportingService = {
       }),
       prisma.quality_records.groupBy({
         by: ['supplierId', 'supplierName'],
-        where: {
-          OR: qualityRecordIdentityOr,
-          isDeleted: false,
-        },
+        where: allEngineeringWhere,
         _count: { id: true },
       }),
     ]);

@@ -23,6 +23,7 @@ type ProjectFormState = {
   plannedStartAt?: dayjs.Dayjs;
   projectName: string;
   supervisor: string;
+  supplierId: string;
   supplierName: string;
   workOrderNumber: string;
 };
@@ -47,6 +48,7 @@ const localForm = reactive<ProjectFormState>({
   plannedStartAt: undefined,
   projectName: '',
   supervisor: '',
+  supplierId: '',
   supplierName: '',
   workOrderNumber: '',
 });
@@ -57,6 +59,7 @@ function copyForm(source: ProjectFormState): ProjectFormState {
     plannedStartAt: source.plannedStartAt,
     projectName: source.projectName,
     supervisor: source.supervisor,
+    supplierId: source.supplierId,
     supplierName: source.supplierName,
     workOrderNumber: source.workOrderNumber,
   };
@@ -91,6 +94,14 @@ function handleUpdateOpen(value: boolean) {
 function handleSubmit() {
   emit('update:form', copyForm(localForm));
   emit('submit');
+}
+
+function handleSupplierChange(
+  value: string | undefined,
+  option?: { item?: { name?: string } },
+) {
+  localForm.supplierId = value || '';
+  localForm.supplierName = String(option?.item?.name || '').trim();
 }
 
 watch(
@@ -136,8 +147,11 @@ watch(
       </Form.Item>
       <Form.Item label="供应商">
         <SupplierSelect
-          v-model:value="localForm.supplierName"
+          v-model:value="localForm.supplierId"
           category="Supplier"
+          :legacy-name="localForm.supplierName"
+          value-mode="id"
+          @change="handleSupplierChange"
         />
       </Form.Item>
       <Form.Item label="监造员">

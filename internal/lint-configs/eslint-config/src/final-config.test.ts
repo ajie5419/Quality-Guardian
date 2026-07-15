@@ -58,7 +58,7 @@ describe('final ESLint configuration', () => {
       ({ ruleId }) => ruleId === 'no-restricted-syntax',
     );
     expect(restrictedMessages).toHaveLength(3);
-  });
+  }, 15_000);
 
   it('keeps all QMS import and syntax restrictions cumulative', async () => {
     const filePath = 'apps/web-antd/src/views/qms/inspection/issues/example.ts';

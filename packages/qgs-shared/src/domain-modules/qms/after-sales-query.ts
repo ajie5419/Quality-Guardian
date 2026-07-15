@@ -113,5 +113,6 @@ export function parseAfterSalesListQuery(
       ? mapAfterSalesStatus(normalizeQueryText(query.status))
       : undefined,
     supplierBrand: normalizeQueryText(query.supplierBrand),
+    supplierBrandId: normalizeQueryText(query.supplierBrandId),
   };
 }

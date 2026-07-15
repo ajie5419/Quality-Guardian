@@ -153,6 +153,8 @@ describe('useInspectionRecords', () => {
         processName: '焊接',
         projectName: 'Proj',
         quantity: 10,
+        supplierId: 'supplier-1',
+        supplierName: 'Supplier A',
         team: '质量部',
       }),
       validate: vi.fn().mockResolvedValue(undefined),
@@ -168,9 +170,46 @@ describe('useInspectionRecords', () => {
         partName: 'Steel',
         severity: 'Minor',
         sourceType: 'INSPECTION_RECORD',
+        supplierId: 'supplier-1',
+        supplierName: 'Supplier A',
       }),
     );
     expect(mockMessageSuccess).toHaveBeenCalledWith('已自动创建关联不合格项');
+  });
+
+  it('inherits the persisted supplier identity for a linked process issue', async () => {
+    mockCreateInspectionRecord.mockResolvedValueOnce({
+      id: 'rec-process-1',
+      supplierId: 'supplier-team-1',
+      supplierName: 'Resident Team Supplier',
+    });
+    const { activeKey, handleSubmit, formRef } = useInspectionRecords();
+    activeKey.value = 'process';
+
+    formRef.value = {
+      getValues: vi.fn().mockResolvedValue({
+        linkedIssue: {
+          description: 'Process defect',
+          enabled: true,
+          supplierId: 'stale-supplier',
+          supplierName: 'Stale Supplier',
+        },
+        supplierId: 'stale-form-supplier',
+        supplierName: 'Stale Form Supplier',
+        team: 'Resident Team A',
+      }),
+      validate: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await handleSubmit();
+
+    expect(mockCreateInspectionIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inspectionId: 'rec-process-1',
+        supplierId: 'supplier-team-1',
+        supplierName: 'Resident Team Supplier',
+      }),
+    );
   });
 
   it('handleSubmit shows warning when linked issue creation fails', async () => {

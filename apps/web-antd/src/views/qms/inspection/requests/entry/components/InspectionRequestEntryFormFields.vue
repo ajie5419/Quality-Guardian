@@ -69,7 +69,9 @@ const form = defineModel<{
   requestInfo: string;
   selfCheckResult: InspectionRequestCheckResult;
   stationSelection: null | StationSelection;
+  supplierId: string;
   team: string;
+  teamId: string;
   workOrderNumber: string;
   workOrderNumbers: string[];
 }>('form', { required: true });
@@ -107,6 +109,25 @@ function resolveStationValue() {
   if (!form.value.stationSelection) return [];
   if (form.value.stationSelection.mode === 'ALL') return ['ALL'];
   return form.value.stationSelection.indexes.map(String);
+}
+
+function handleResponsibleUnitChange(
+  value: SelectProps['value'],
+  option: unknown,
+) {
+  const identityId = typeof value === 'string' ? value : '';
+  const label =
+    option && typeof option === 'object' && 'label' in option
+      ? String((option as { label?: unknown }).label || '').trim()
+      : '';
+  form.value.team = label;
+  if (props.isIncomingEntry) {
+    form.value.supplierId = identityId;
+    form.value.teamId = '';
+    return;
+  }
+  form.value.supplierId = '';
+  form.value.teamId = identityId;
 }
 </script>
 
@@ -221,7 +242,8 @@ function resolveStationValue() {
     </Form.Item>
     <Form.Item :label="props.entryCopy.teamLabel" required>
       <Select
-        v-model:value="form.team"
+        data-testid="responsible-unit-select"
+        :value="props.isIncomingEntry ? form.supplierId : form.teamId"
         :filter-option="false"
         :loading="props.teamLoading"
         :options="props.teamOptions"
@@ -229,6 +251,7 @@ function resolveStationValue() {
         :placeholder="props.entryCopy.teamPlaceholder"
         show-search
         allow-clear
+        @change="handleResponsibleUnitChange"
         @search="(value) => emit('responsibleUnitSearch', value)"
       />
     </Form.Item>

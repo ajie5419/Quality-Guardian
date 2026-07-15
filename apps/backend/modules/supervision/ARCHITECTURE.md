@@ -26,3 +26,12 @@
 
 - 子服务之间有调用关系（issue 关联 plan-task，report 汇总 issue）
 - 监督项目有状态流转：草稿 → 进行中 → 已完成
+
+## 供应商身份契约与治理阶段
+
+- `supervision_projects.supplierId` 是供应商关联 ID，`supplierName` 仅为名称快照；服务端应根据 ID 校验并生成 canonical 名称。
+- `supplierName` 查询仅用于关键字搜索和历史数据排查，不得用于画像、统计或跨表关联，也不得以名称作为 ID 缺失时的在线回退。
+- 当前 supervision 在线写入已要求 `supplierId`，服务端按 ID 重建 canonical 名称快照；本模块尚未纳入本轮供应商身份存量回填及 unresolved 审计。
+- 后续治理 wave 必须补齐 supervision 存量回填、审计和生产指标核对；任何 import/backfill 名称解析都必须建立显式白名单和审计。
+
+本轮 supplier identity governance wave 不代表 supervision 存量或其他主数据已达到全项目 `ID_ONLY`。通用规则见 `docs/master-data-identity-governance.md`。

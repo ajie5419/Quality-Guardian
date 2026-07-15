@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRecordCreateService } from '~/modules/inspection/inspection-record-create.service';
 import { eventBus } from '~/utils/event-bus';
+import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -26,8 +27,15 @@ vi.mock('~/utils/process-resolver', () => ({
   resolveProcessIdForWrite: vi.fn().mockResolvedValue('process-1'),
 }));
 
-vi.mock('~/utils/team-resolver', () => ({
-  resolveTeamIdForWrite: vi.fn().mockResolvedValue('team-1'),
+vi.mock('~/modules/supplier-identity', () => ({
+  SupplierIdentityService: {
+    resolveSupplierForInspection: vi
+      .fn()
+      .mockResolvedValue({ id: 'supplier-1', name: 'Supplier A' }),
+    resolveTeamById: vi
+      .fn()
+      .mockResolvedValue({ id: 'team-1', name: 'Team A' }),
+  },
 }));
 
 vi.mock('~/modules/file-storage/file-storage.service', () => ({
@@ -106,8 +114,10 @@ describe('inspectionRecordCreateService', () => {
       const mockInspection = {
         id: 'insp-1',
         serialNumber: 'INS-001',
+        supplierId: 'supplier-1',
         supplierName: 'Supplier A',
         team: null,
+        teamId: 'team-1',
       };
       (prisma.$transaction as any).mockImplementation(async (cb: any) =>
         cb({
@@ -125,14 +135,21 @@ describe('inspectionRecordCreateService', () => {
         processName: 'Welding',
         quantity: 10,
         qualifiedQuantity: 10,
+        teamId: 'team-1',
         unqualifiedQuantity: 0,
         workOrderNumber: 'WO-1',
       } as any);
 
       expect(prisma.$transaction).toHaveBeenCalled();
+      expect(buildGovernedCanonicalWritePairForTable).toHaveBeenCalledWith(
+        'inspections',
+        expect.objectContaining({ supplierId: undefined }),
+      );
       expect(result).toEqual(mockInspection);
       expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
+        supplierIds: ['supplier-1'],
         supplierNames: ['Supplier A'],
+        teamIds: ['team-1'],
         teamNames: [null],
       });
     });
@@ -155,6 +172,7 @@ describe('inspectionRecordCreateService', () => {
           processName: 'Welding',
           quantity: 10,
           qualifiedQuantity: 10,
+          teamId: 'team-1',
           unqualifiedQuantity: 0,
           workOrderNumber: 'WO-1',
         } as any,
@@ -167,6 +185,21 @@ describe('inspectionRecordCreateService', () => {
       expect(tx.inspections.create).toHaveBeenCalled();
       expect(result).toEqual(mockInspection);
       expect(eventBus.emit).not.toHaveBeenCalled();
+    });
+
+    it('rejects a process inspection without a canonical TEAM identity', async () => {
+      await expect(
+        InspectionRecordCreateService.create({
+          category: 'PROCESS',
+          inspector: 'Tester',
+          inspectionDate: '2026-01-01',
+          items: [],
+          processName: 'Welding',
+          quantity: 10,
+          workOrderNumber: 'WO-1',
+        }),
+      ).rejects.toMatchObject({ code: 'TEAM_ID_REQUIRED' });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
     it('should generate distinct serial numbers for consecutive creates in one transaction', async () => {
@@ -192,6 +225,7 @@ describe('inspectionRecordCreateService', () => {
         processName: 'Welding',
         quantity: 10,
         qualifiedQuantity: 10,
+        teamId: 'team-1',
         unqualifiedQuantity: 0,
       } as any;
 
@@ -240,6 +274,7 @@ describe('inspectionRecordCreateService', () => {
             processName: 'Welding',
             quantity: 10,
             qualifiedQuantity: 10,
+            teamId: 'team-1',
             unqualifiedQuantity: 0,
             workOrderNumber: 'WO-1',
           } as any,

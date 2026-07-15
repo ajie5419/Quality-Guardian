@@ -32,23 +32,17 @@ export const InspectionRecordQueryService = {
     page?: number;
     pageSize?: number;
     supplierId: string;
-    supplierName: string;
-    teamNameId?: null | string;
+    teamIds?: string[];
   }) {
-    const identityOr: Prisma.inspectionsWhereInput[] =
-      params.identitySource === 'supplier'
-        ? [
-            { supplierId: params.supplierId },
-            { supplierName: params.supplierName },
-          ]
-        : [{ team: params.supplierName }];
-    if (params.identitySource === 'team' && params.teamNameId) {
-      identityOr.push({ teamId: params.teamNameId });
+    if (params.identitySource === 'team' && !params.teamIds?.length) {
+      return { items: [], total: 0 };
     }
     const where: Prisma.inspectionsWhereInput = {
       category: params.category,
       isDeleted: false,
-      OR: identityOr,
+      ...(params.identitySource === 'supplier'
+        ? { supplierId: params.supplierId }
+        : { teamId: { in: params.teamIds } }),
     };
     const { skip, take } = parsePagination({
       page: params.page,

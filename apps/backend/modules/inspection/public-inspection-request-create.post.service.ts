@@ -5,6 +5,7 @@ import {
 } from '~/modules/inspection/inspection-request-create.schema';
 import { InspectionRequestCreateService } from '~/modules/inspection/inspection-request-create.service';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -33,6 +34,7 @@ export default defineEventHandler(async (event) => {
     );
   } catch (error) {
     logApiError('public-inspection-request-create', error, undefined, event);
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
     if (error instanceof Error && error.message.startsWith('BAD_REQUEST:'))
       return badRequestResponse(
         event,

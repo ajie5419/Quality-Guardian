@@ -44,6 +44,7 @@ describe('inspection issue schema', () => {
       projectName: 'Project A',
       responsibleDepartments: ['dept-1', 'dept-2'],
       responsibleWelder: 'Welder A',
+      supplierId: 'supplier-1',
       supplierName: 'Supplier A',
     });
 
@@ -51,6 +52,7 @@ describe('inspection issue schema', () => {
       claim: 'No',
       ncNumber: 'NC-26KJ-001',
       responsibleDepartments: ['dept-1', 'dept-2'],
+      supplierId: 'supplier-1',
     });
   });
 

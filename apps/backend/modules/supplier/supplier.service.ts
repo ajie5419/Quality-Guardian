@@ -4,8 +4,8 @@ import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service'
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { FileStorageService } from '~/modules/file-storage';
 import { InspectionService } from '~/modules/inspection';
+import { SupplierIdentityService } from '~/modules/supplier-identity';
 import {
-  buildSupplierCreateDataWithCanonical,
   buildSupplierUpdateDataWithCanonical,
   buildSupplierUpsertPayload,
   DEFAULT_OUTSOURCING_MODE,
@@ -13,12 +13,12 @@ import {
   normalizeSupplierString,
   resolveSupplierInspectionPolicy,
 } from '~/modules/supplier/supplier-query';
-import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { buildKeywordOr } from '~/utils/query-helpers';
 
+import { createSupplierRecord } from './supplier-create.service';
 import { SupplierScoreSnapshotService } from './supplier-score-snapshot.service';
 
 const logger = createModuleLogger('supplier-service');
@@ -143,6 +143,14 @@ async function registerAdmissionDocuments(
   });
 }
 
+async function createSupplierWithOutcome(payload: SupplierAdmissionPayload) {
+  const outcome = await createSupplierRecord(payload);
+  if (!outcome) return null;
+  await registerAdmissionDocuments(outcome.supplier.id, payload);
+  await SupplierScoreSnapshotService.refreshSuppliers([outcome.supplier]);
+  return outcome;
+}
+
 async function buildSupplierGlobalStats(
   scopedWhere: SupplierWhereInput,
   totalCount: number,
@@ -188,13 +196,11 @@ async function buildSupplierGlobalStats(
 }
 
 export const SupplierService = {
+  createSupplierWithOutcome,
+
   async createSupplier(payload: Record<string, unknown>) {
-    const createData = await buildSupplierCreateDataWithCanonical(payload);
-    if (!createData) return null;
-    const created = await prisma.suppliers.create({ data: createData });
-    await registerAdmissionDocuments(created.id, payload);
-    await SupplierScoreSnapshotService.refreshSuppliers([created]);
-    return created;
+    const outcome = await createSupplierWithOutcome(payload);
+    return outcome?.supplier ?? null;
   },
 
   async updateSupplier(id: string, payload: Record<string, unknown>) {
@@ -391,15 +397,31 @@ export const SupplierService = {
     };
   },
 
-  async getHistoryProjects(id: string) {
+  async getHistoryProjects(
+    id: string,
+    params: { page?: number; pageSize?: number } = {},
+  ) {
     const supplier = await prisma.suppliers.findFirst({
-      select: { id: true, name: true, nameId: true },
+      select: {
+        category: true,
+        id: true,
+        outsourcingMode: true,
+      },
       where: { id, isDeleted: false },
     });
     if (!supplier) return null;
 
+    const policy = resolveSupplierInspectionPolicy(supplier);
+    const teamIds =
+      policy.identitySource === 'team'
+        ? await SupplierIdentityService.teamIdsForSupplier(supplier.id)
+        : [];
     return InspectionService.getSupplierHistoryProjects({
-      supplierName: supplier.name,
+      identitySource: policy.identitySource,
+      page: params.page,
+      pageSize: params.pageSize,
+      supplierId: supplier.id,
+      teamIds,
     });
   },
 
@@ -419,27 +441,38 @@ export const SupplierService = {
     if (!supplier) return null;
 
     const policy = resolveSupplierInspectionPolicy(supplier);
-    let teamNameId: string | undefined;
-    if (policy.identitySource === 'team') {
-      const teamNameToId =
-        await MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
-          configKey: 'team',
-          names: [supplier.name],
-        });
-      teamNameId = teamNameToId.get(supplier.name);
-    }
+    const teamIds =
+      policy.identitySource === 'team'
+        ? await SupplierIdentityService.teamIdsForSupplier(supplier.id)
+        : [];
     const history = await InspectionService.findSupplierHistory({
       category: policy.inspectionCategory,
       identitySource: policy.identitySource,
       page: params.page,
       pageSize: params.pageSize,
       supplierId: supplier.id,
-      supplierName: supplier.name,
-      ...(teamNameId ? { teamNameId } : {}),
+      teamIds,
     });
     return {
       ...history,
       source: policy.inspectionCategory,
     };
+  },
+
+  async getQualityIssues(
+    id: string,
+    params: { page?: number; pageSize?: number } = {},
+  ) {
+    const supplier = await prisma.suppliers.findFirst({
+      select: { id: true },
+      where: { id, isDeleted: false },
+    });
+    if (!supplier) return null;
+
+    return InspectionService.findSupplierIssues({
+      page: params.page,
+      pageSize: params.pageSize,
+      supplierId: supplier.id,
+    });
   },
 };

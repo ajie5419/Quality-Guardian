@@ -6,6 +6,7 @@ import type {
   SupplierListResponse,
 } from '@qgs/shared';
 
+import type { QmsInspectionApi } from '#/api/qms/inspection';
 import type { QmsImportSummary } from '#/api/qms/types';
 
 import {
@@ -61,10 +62,14 @@ export interface SupplierHistoryProjectItem {
   workOrderNumber: string;
 }
 
-export async function getSupplierHistoryProjects(id: string) {
-  return requestClient.get<{ items: SupplierHistoryProjectItem[] }>(
-    `${QMS_API.SUPPLIER}/${id}/history-projects`,
-  );
+export async function getSupplierHistoryProjects(
+  id: string,
+  params: { page: number; pageSize: number },
+) {
+  return requestClient.get<{
+    items: SupplierHistoryProjectItem[];
+    total: number;
+  }>(`${QMS_API.SUPPLIER}/${id}/history-projects`, { params });
 }
 
 export type SupplierInspectionHistorySource = 'INCOMING' | 'PROCESS';
@@ -90,6 +95,16 @@ export async function getSupplierInspectionHistory(
     `${QMS_API.SUPPLIER}/${id}/inspection-history`,
     { params },
   );
+}
+
+export async function getSupplierQualityIssues(
+  id: string,
+  params: { page: number; pageSize: number },
+) {
+  return requestClient.get<{
+    items: QmsInspectionApi.InspectionIssue[];
+    total: number;
+  }>(`${QMS_API.SUPPLIER}/${id}/quality-issues`, { params });
 }
 
 export async function deleteSupplier(id: string) {

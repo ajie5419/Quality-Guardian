@@ -5,12 +5,7 @@ import { InspectionRequestHistoryService } from './inspection-request-history.se
 
 vi.mock('~/utils/prisma', () => ({
   default: {
-    qms_inspection_requests: {
-      groupBy: vi.fn(),
-    },
-    work_orders: {
-      findMany: vi.fn(),
-    },
+    $queryRaw: vi.fn(),
   },
 }));
 
@@ -19,48 +14,89 @@ describe('inspectionRequestHistoryService', () => {
     vi.clearAllMocks();
   });
 
-  it('groups supplier inspection requests by work order and returns project names', async () => {
-    (prisma.qms_inspection_requests.groupBy as any).mockResolvedValue([
-      {
-        workOrderNumber: 'WO-2',
-        _max: { submittedAt: new Date('2026-06-02T00:00:00.000Z') },
-      },
-      {
-        workOrderNumber: 'WO-1',
-        _max: { submittedAt: new Date('2026-06-01T00:00:00.000Z') },
-      },
-    ]);
-    vi.mocked(prisma.work_orders.findMany).mockResolvedValue([
-      { workOrderNumber: 'WO-1', projectName: 'Project A' },
-      { workOrderNumber: 'WO-2', projectName: 'Project B' },
-    ] as never);
+  it('returns paged supplier request work orders with their latest submission', async () => {
+    vi.mocked(prisma.$queryRaw)
+      .mockResolvedValueOnce([{ total: 2n }])
+      .mockResolvedValueOnce([
+        {
+          workOrderNumber: 'WO-2',
+          projectName: 'Project B',
+          lastSubmittedAt: new Date('2026-06-02T00:00:00.000Z'),
+        },
+        {
+          workOrderNumber: 'WO-1',
+          projectName: 'Project A',
+          lastSubmittedAt: new Date('2026-06-01T00:00:00.000Z'),
+        },
+      ]);
 
     const result =
       await InspectionRequestHistoryService.getSupplierHistoryProjects({
-        supplierName: 'Supplier A',
+        identitySource: 'supplier',
+        page: 2,
+        pageSize: 5,
+        supplierId: 'supplier-1',
+        teamIds: [],
       });
 
-    expect(prisma.qms_inspection_requests.groupBy).toHaveBeenCalledWith({
-      by: ['workOrderNumber'],
-      where: {
-        isDeleted: false,
-        team: 'Supplier A',
-      },
-      _max: { submittedAt: true },
-      orderBy: { _max: { submittedAt: 'desc' } },
-      take: 50,
+    expect(result).toEqual({
+      items: [
+        {
+          workOrderNumber: 'WO-2',
+          projectName: 'Project B',
+          lastSubmittedAt: '2026-06-02T00:00:00.000Z',
+        },
+        {
+          workOrderNumber: 'WO-1',
+          projectName: 'Project A',
+          lastSubmittedAt: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+      total: 2,
     });
-    expect(result).toEqual([
-      {
-        workOrderNumber: 'WO-2',
-        projectName: 'Project B',
-        lastSubmittedAt: '2026-06-02T00:00:00.000Z',
-      },
-      {
-        workOrderNumber: 'WO-1',
-        projectName: 'Project A',
-        lastSubmittedAt: '2026-06-01T00:00:00.000Z',
-      },
-    ]);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    const querySql = vi
+      .mocked(prisma.$queryRaw)
+      .mock.calls.map(([query]) =>
+        String((query as { sql?: string }).sql || ''),
+      )
+      .join('\n');
+    expect(querySql).toContain('qms_inspection_requests');
+    expect(querySql).toContain('qms_inspection_request_work_orders');
+    expect(querySql).toContain('request_row.supplierId');
+    expect(querySql).not.toContain('inspectionLinks');
+  });
+
+  it('returns no process history when the supplier has no TEAM mapping', async () => {
+    await expect(
+      InspectionRequestHistoryService.getSupplierHistoryProjects({
+        identitySource: 'team',
+        supplierId: 'supplier-1',
+        teamIds: [],
+      }),
+    ).resolves.toEqual({ items: [], total: 0 });
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('queries process history through mapped TEAM identities', async () => {
+    vi.mocked(prisma.$queryRaw)
+      .mockResolvedValueOnce([{ total: 1 }])
+      .mockResolvedValueOnce([
+        {
+          workOrderNumber: 'WO-3',
+          projectName: null,
+          lastSubmittedAt: null,
+        },
+      ]);
+
+    const result =
+      await InspectionRequestHistoryService.getSupplierHistoryProjects({
+        identitySource: 'team',
+        supplierId: 'supplier-1',
+        teamIds: ['team-1', 'team-2'],
+      });
+
+    expect(result.total).toBe(1);
+    expect(result.items[0]?.workOrderNumber).toBe('WO-3');
   });
 });

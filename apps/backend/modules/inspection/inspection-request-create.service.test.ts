@@ -14,6 +14,19 @@ vi.mock('~/modules/file-storage/file-storage.service', () => ({
   },
 }));
 
+vi.mock('~/modules/supplier-identity', () => ({
+  SupplierIdentityService: {
+    resolveSupplierById: vi.fn().mockResolvedValue({
+      id: 'supplier-1',
+      name: 'Supplier A',
+    }),
+    resolveTeamById: vi.fn().mockResolvedValue({
+      id: 'team-1',
+      name: 'Team A',
+    }),
+  },
+}));
+
 vi.mock('~/modules/system-log/audit-log', () => ({
   recordBusinessAuditLog: vi.fn(),
 }));

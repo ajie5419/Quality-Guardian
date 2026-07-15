@@ -22,6 +22,7 @@ import {
 
 import { buildInspectionIssueDateRange } from './inspection-issue';
 import { applyInspectionIssueReadOwnership } from './inspection-issue-access.service';
+import { buildSupplierEngineeringIssueWhere } from './inspection-supplier-profile';
 
 type QualityRecordOrderField = keyof Pick<
   Prisma.quality_recordsOrderByWithRelationInput,
@@ -160,6 +161,33 @@ export const InspectionIssueListService = {
       include: inspectionIssueInclude,
     });
     return issue ? mapInspectionIssueRecord(issue) : null;
+  },
+
+  async findSupplierIssues(params: {
+    page?: number;
+    pageSize?: number;
+    supplierId: string;
+  }): Promise<{ items: InspectionIssue[]; total: number }> {
+    const where = buildSupplierEngineeringIssueWhere({
+      supplierIds: [params.supplierId],
+    });
+    const page = Math.max(Number(params.page) || 1, 1);
+    const pageSize = Math.min(Math.max(Number(params.pageSize) || 20, 1), 100);
+    const [total, issues] = await Promise.all([
+      prisma.quality_records.count({ where }),
+      prisma.quality_records.findMany({
+        where,
+        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: inspectionIssueInclude,
+      }),
+    ]);
+
+    return {
+      items: issues.map((issue) => mapInspectionIssueRecord(issue)),
+      total,
+    };
   },
 
   async getIssues(params: {

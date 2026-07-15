@@ -240,7 +240,6 @@ describe('after-sales-integration.service', () => {
     const result = await AfterSalesIntegrationService.getSupplierScoringData({
       since: new Date('2026-01-01'),
       supplierIds: ['supplier-1'],
-      supplierNames: ['A'],
     });
 
     expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
@@ -248,10 +247,7 @@ describe('after-sales-integration.service', () => {
       expect.objectContaining({
         by: ['supplierBrandId', 'supplierBrand'],
         where: expect.objectContaining({
-          OR: [
-            { supplierBrandId: { in: ['supplier-1'] } },
-            { supplierBrand: { in: ['A'] } },
-          ],
+          supplierBrandId: { in: ['supplier-1'] },
         }),
       }),
     );

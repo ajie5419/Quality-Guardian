@@ -91,6 +91,7 @@ describe('afterSalesService', () => {
           division: 'Div A',
           partName: 'Part A',
           supplierBrand: 'Brand A',
+          supplierBrandId: 'supplier-1',
           runningHours: 100,
         },
       ];
@@ -104,6 +105,7 @@ describe('afterSalesService', () => {
       expect(item.id).toBe('AS-1');
       expect(item.qualityLoss).toBe(150);
       expect(item.responsibleDepartments).toEqual(['Quality', 'Engineering']);
+      expect(item.supplierBrandId).toBe('supplier-1');
     });
   });
 });

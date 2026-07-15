@@ -37,6 +37,7 @@ interface LinkedIssuePayload {
   solution?: string;
   photos?: string[];
   status?: string;
+  supplierId?: string;
   supplierName?: string;
   responsibleDepartment?: string;
   severity?: 'Critical' | 'Major' | 'Minor';
@@ -63,6 +64,7 @@ type InspectionIssueCreatePayload = {
   solution?: string;
   sourceType?: string;
   status?: string;
+  supplierId?: string;
   supplierName?: string;
   workOrderNumber?: string;
 };
@@ -105,6 +107,10 @@ export function useInspectionRecords() {
         isEdit.value && currentRecord.value?.id
           ? await updateInspectionRecord(currentRecord.value.id, values)
           : await createInspectionRecord(values);
+      const persistedSupplierIdentity = inspectionRecord as {
+        supplierId?: null | string;
+        supplierName?: null | string;
+      };
 
       const inspectionId = String(
         inspectionRecord?.id || currentRecord.value?.id || '',
@@ -136,8 +142,16 @@ export function useInspectionRecords() {
             severity: linkedIssue.severity || 'Minor',
             solution: linkedIssue.solution || '',
             status: linkedIssue.status || 'OPEN',
+            supplierId:
+              persistedSupplierIdentity.supplierId ||
+              linkedIssue.supplierId ||
+              String(values.supplierId || '') ||
+              undefined,
             supplierName:
-              linkedIssue.supplierName || String(values.supplierName || ''),
+              persistedSupplierIdentity.supplierName ||
+              linkedIssue.supplierName ||
+              String(values.supplierName || '') ||
+              undefined,
             sourceType: 'INSPECTION_RECORD',
             photos: Array.isArray(linkedIssue.photos) ? linkedIssue.photos : [],
             workOrderNumber: String(values.workOrderNumber || ''),

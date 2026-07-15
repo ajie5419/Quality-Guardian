@@ -100,7 +100,9 @@ export function buildInspectionRecordPayloadCore(input: {
     requestInfo?: null | string;
     selfCheckResult: string;
     stationSelection?: null | string;
+    supplierId?: null | string;
     team?: null | string;
+    teamId?: null | string;
     work_order?: null | { projectName?: null | string };
     workOrderNumber: string;
   };
@@ -218,7 +220,9 @@ export async function buildInspectionRecordFromRequest(
     requestInfo?: null | string;
     selfCheckResult: string;
     stationSelection?: null | string;
+    supplierId?: null | string;
     team?: null | string;
+    teamId?: null | string;
     work_order?: null | { projectName?: null | string };
     workOrderNumber: string;
   },

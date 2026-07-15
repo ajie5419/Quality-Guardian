@@ -41,6 +41,59 @@ describe('inspectionIssueListService', () => {
     vi.clearAllMocks();
   });
 
+  describe('findSupplierIssues', () => {
+    it('finds engineering issues by canonical supplier ID', async () => {
+      vi.mocked(prisma.quality_records.count).mockResolvedValue(0);
+      vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+      await InspectionIssueListService.findSupplierIssues({
+        page: 2,
+        pageSize: 5,
+        supplierId: 'supplier-1',
+      });
+
+      expect(prisma.quality_records.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+          skip: 5,
+          take: 5,
+          where: {
+            isDeleted: false,
+            supplierId: { in: ['supplier-1'] },
+          },
+        }),
+      );
+    });
+
+    it('does not fall back to names or inspection relations', async () => {
+      vi.mocked(prisma.quality_records.count).mockResolvedValue(0);
+      vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+      await InspectionIssueListService.findSupplierIssues({
+        supplierId: 'supplier-1',
+      });
+
+      expect(prisma.quality_records.count).toHaveBeenCalledWith({
+        where: {
+          isDeleted: false,
+          supplierId: { in: ['supplier-1'] },
+        },
+      });
+    });
+
+    it('keeps manual process issues visible without a TEAM mapping', async () => {
+      vi.mocked(prisma.quality_records.count).mockResolvedValue(1);
+      vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+      await expect(
+        InspectionIssueListService.findSupplierIssues({
+          supplierId: 'supplier-1',
+        }),
+      ).resolves.toEqual({ items: [], total: 1 });
+      expect(prisma.quality_records.findMany).toHaveBeenCalled();
+    });
+  });
+
   describe('getIssues', () => {
     it('should return empty results when no records exist', async () => {
       (prisma.quality_records.count as any).mockResolvedValue(0);

@@ -73,6 +73,148 @@
 **遗留问题：**
 
 - 类型感知 lint 会增加全仓 lint 的执行时间，这是 TypeScript 类型分析的预期成本；当前完整门禁已稳定通过。
+## [0.17.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.1...qgs-v0.17.2) (2026-07-15)
+
+
+### Bug Fixes
+
+* **project:** restore soft-deleted suppliers on create ([329c5e1](https://github.com/ajie5419/Quality-Guardian/commit/329c5e103c1c71ab30ff75b448ccbb0119655cc1))
+* **project:** restore soft-deleted suppliers on create ([030e5e6](https://github.com/ajie5419/Quality-Guardian/commit/030e5e6e9427cdf25007ad4d1dbd27aea6744a17))
+
+### 2026-07-15 修复：新增供应商恢复同名软删除档案
+
+**执行内容：**
+
+- 修复 `suppliers.name` 全表唯一键与软删除语义冲突：新增同名软删除供应商时不再重复建档，而是恢复原记录并保留原供应商 ID，确保历史检验、工程问题、售后和 TEAM 映射继续关联同一身份。
+- 创建流程采用先插入、仅在精确识别 `name` / `suppliers_name_key` 的 Prisma P2002 后处理冲突；同名活动供应商返回 `SUPPLIER_NAME_CONFLICT` 409，其他唯一键或数据库异常继续按真实异常处理。
+- 恢复写入使用带 `id + name + isDeleted=true` 条件的 `updateMany` 原子守卫；并发恢复只有一个请求成功，其他请求重新读取当前状态并返回业务冲突，禁止生成重复身份。
+- 恢复操作记录 `RESTORE` 审计；已处理的业务冲突只记录 warning，非预期异常保留 error 日志。
+- 创建服务将捕获到的非 `Error` 失败值收窄为 `Error` 后再记录和抛出，避免非标准异常穿透到 Nitro 错误处理链。
+- 本修复不修改数据库结构，不需要 migration 或人工修改生产数据。
+
+**验证结果：**
+
+- 定向测试：3/3 个文件、34/34 个用例通过。
+- 全量后端测试：213/213 个文件、1990/1990 个用例通过。
+- 开发分支合并复验：213/213 个后端测试文件、1991/1991 个用例通过；新增非 `Error` 异常回归用例。
+- 全仓测试：290/290 个文件、2479/2479 个用例通过。
+- lint：通过；typecheck：3/3 workspace tasks 通过。
+- `check:qms-arch`、`check:qms-arch:all`、`check:prisma-migration`、`git diff --check`：全部通过。
+- 前端 dev/build：未运行；本次无前端改动，并遵循仓库约束。
+- GitHub：功能 PR #53 和发布 PR #54 均已合并，两个 PR 的 6 项 CI Gate 全部通过；已生成 GitHub Release 与 tag `qgs-v0.17.2`。
+- 生产部署：deploy run `29380845117` 成功，耗时 8 分 6 秒；backend/frontend 镜像构建、ACR 推送、ECS 更新与 HTTP 健康检查全部通过。
+- 生产数据库：38 个 migration 均已记录，无待执行 migration；本次修复未修改数据库结构或人工修改生产数据。
+- 生产外网检查：首页返回 HTTP 200，静态资源更新时间与 `qgs-v0.17.2` frontend 镜像构建完成时间一致。
+
+**commit:** `030e5e6e` fix(project): restore soft-deleted suppliers on create；`329c5e10` Merge pull request #53；`694420c0` Merge pull request #54
+
+**遗留问题：**
+
+- 生产发布已完成；仍需使用真实业务表单重新提交同名软删除供应商，确认页面返回原供应商 ID 并展示恢复后的档案。自动化未在生产创建测试供应商，避免污染业务数据。
+
+## [0.17.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.0...qgs-v0.17.1) (2026-07-14)
+
+
+### Bug Fixes
+
+* **project:** correct supplier profile source contracts ([c6ef074](https://github.com/ajie5419/Quality-Guardian/commit/c6ef074984760e3b60437d7b0c67668497b6fce5))
+
+### 2026-07-14 修复：供应商画像历史项目与质量数据源契约
+
+**执行内容：**
+
+- 历史使用项目不再依赖已生成的检验记录，直接按报检任务自身的 `supplierId/teamId` 聚合；合并主工单与多工单明细，按工单去重并改为服务端分页，消除未检验任务、多工单和静默截断 50 条造成的漏数。
+- 进货合格率统一读取最近 12 个月规范检验批次：非 `NA` 批次进入分母，只有 `PASS` 进入分子，`FAIL` 和 `CONDITIONAL` 均按失败批次处理。
+- 工程问题列表、全历史数量和最近 12 个月评分统一按 `quality_records.supplierId` 归属；移除 PROCESS 类型缺少 TEAM 映射时直接返回空的错误分支，使已具备规范供应商 ID 的手工工程问题正常进入画像。
+- 增强生产身份回填：历史无效供应商 ID 可通过关联检验证据或唯一精确供应商名称修复；模糊、重名和冲突记录继续写入 unresolved 审计，不恢复在线名称回退。
+- 快照模型升级为 `SUPPLIER_V3` / `IN_HOUSE_OUTSOURCING_V3`，部署后自动重算旧快照，避免旧口径缓存继续展示。
+- 更新 inspection、supplier 架构边界和主数据身份治理文档；修复全仓 ESLint 配置回归测试的易超时问题。
+
+**验证结果：**
+
+- 定向测试：98/98 个用例通过。
+- 全量测试：289/289 个文件、2474/2474 个用例通过。
+- lint：通过；typecheck：前后端及全工作区通过。
+- `check:qms-arch`、`check:qms-arch:all`、`check:prisma-migration`：全部通过。
+- `git diff --check`：通过。
+- 前端 dev/build：未运行；遵循仓库约束，通过组件测试、类型检查和 lint 验证。
+- GitHub：功能 PR #50 和发布 PR #51 均已合并，两个 PR 的 6 项 CI Gate 全部通过；已生成 GitHub Release 与 tag `qgs-v0.17.1`。
+- 生产部署：deploy run `29324151555` 成功，耗时 7 分 55 秒；backend/frontend 镜像构建、ACR 推送、ECS 更新与 HTTP 健康检查全部通过，生产数据库无待执行 migration。
+- 生产工程问题身份回填：扫描 197 条，136 条已有有效规范身份，61 条缺少确定性身份依据并保留为 unresolved，0 条冲突；未使用名称猜测绑定。
+
+**commit:** `c6ef0749` fix(project): correct supplier profile source contracts；`7395741b` Merge pull request #50；`cecd2591` Merge pull request #51
+
+**遗留问题：**
+
+- 生产发布已完成；仍需在已登录业务会话中核对秦皇岛吉兴机械制造有限公司的 7 月 8 日工程问题、手工登记问题、进货合格率和完整历史项目。自动化已验证代码、回填、部署和健康检查，不把登录页外的 HTTP 检查当作业务数据验收。
+
+## [0.17.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.16.0...qgs-v0.17.0) (2026-07-14)
+
+
+### Features
+
+* **@qgs/backend:** manage supplier identity links ([c9b8831](https://github.com/ajie5419/Quality-Guardian/commit/c9b8831215c8ea1d9942f0e04903df87106b7869))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** accept supplier ids for quality issues ([607324e](https://github.com/ajie5419/Quality-Guardian/commit/607324e1b02fb133628c195af20d840d91cafb49))
+* **@qgs/backend:** add governed supplier identity mapping ([6793000](https://github.com/ajie5419/Quality-Guardian/commit/67930001b7dc75cddce006333e62bc298ae966f9))
+* **@qgs/backend:** aggregate supplier scores by id ([1fbbe81](https://github.com/ajie5419/Quality-Guardian/commit/1fbbe81fed8c1601b2a0883c213f78ad37466e5b))
+* **@qgs/backend:** audit after sales supplier identities ([63e53ba](https://github.com/ajie5419/Quality-Guardian/commit/63e53ba47186cc676f74484e20ce32151ea4f386))
+* **@qgs/backend:** backfill inspection supplier identities ([1ccf8ae](https://github.com/ajie5419/Quality-Guardian/commit/1ccf8ae894e72b457635fd28d248d5774fd8cfb7))
+* **@qgs/backend:** enforce canonical master data identity ([8273c6d](https://github.com/ajie5419/Quality-Guardian/commit/8273c6d83c66423f78e85e6b5d5c2d3d0686151b))
+* **@qgs/backend:** enforce inspection identity governance ([2cee6c4](https://github.com/ajie5419/Quality-Guardian/commit/2cee6c43fb6c71365a42d1052be6e254f99254ed))
+* **@qgs/backend:** invalidate supplier snapshots on after sales changes ([7ddea96](https://github.com/ajie5419/Quality-Guardian/commit/7ddea96e7a1cec9fb8cd606617cc68041aafcd6d))
+* **@qgs/backend:** make supplier quality identity id first ([2bd6e35](https://github.com/ajie5419/Quality-Guardian/commit/2bd6e35c253df629c72880be1c4382dcf1d8ff89))
+* **@qgs/backend:** query supplier project history by id ([5181754](https://github.com/ajie5419/Quality-Guardian/commit/5181754cf26571c8599b97ee2d4b4a00b92c887e))
+* **@qgs/backend:** refresh supplier snapshots by id ([f87520e](https://github.com/ajie5419/Quality-Guardian/commit/f87520ee8db61bdbf36bcedc5179eb58cd9cc20b))
+* **@qgs/backend:** require supplier ids for online writes ([f2fca31](https://github.com/ajie5419/Quality-Guardian/commit/f2fca31d52bf9b03b542c5d192104c3b6b1e8d0e))
+* **@qgs/backend:** restrict supplier identity management ([df4d0fb](https://github.com/ajie5419/Quality-Guardian/commit/df4d0fb1407fb898d7cae972cb722470678346f0))
+* **@qgs/web-antd:** bind supplier selectors by id ([8e9fb8b](https://github.com/ajie5419/Quality-Guardian/commit/8e9fb8bf83eb42525f9217298b7990eac7482cf2))
+* **@qgs/web-antd:** submit canonical inspection identities ([01944f2](https://github.com/ajie5419/Quality-Guardian/commit/01944f26feed5b6436eea75903a9a50d83e93340))
+* **@qgs/web-antd:** submit inspection supplier identities ([8dc4ef6](https://github.com/ajie5419/Quality-Guardian/commit/8dc4ef647992483986cedb5165a065ea021d997c))
+* **@qgs/web-antd:** submit supplier ids for quality issues ([8c40f8b](https://github.com/ajie5419/Quality-Guardian/commit/8c40f8bcb265f22dc12d1a3dea649b5785c93202))
+* **lint:** enforce backend architecture constraints ([387ee0c](https://github.com/ajie5419/Quality-Guardian/commit/387ee0c9ad90e827d3eb9bb9b1eaf76bdaa9c6ad))
+* **lint:** enforce backend source safety ([4b9ab3f](https://github.com/ajie5419/Quality-Guardian/commit/4b9ab3f9f545d784d3b09e5b18242e0e791146d2))
+* **lint:** preserve cumulative rule constraints ([fac9448](https://github.com/ajie5419/Quality-Guardian/commit/fac9448750e0f8fec927362cd563815d1c3eadcc))
+* **project:** enforce supplier identity governance ([6171c04](https://github.com/ajie5419/Quality-Guardian/commit/6171c049cc6838101cee0f16ccd1eab7a60e2cc3))
+* **project:** propagate supplier ids across quality forms ([fb50cec](https://github.com/ajie5419/Quality-Guardian/commit/fb50cecf8f4b5777774808623340280c3e0dbbdc))
+* **project:** query supplier after sales by id ([b31105d](https://github.com/ajie5419/Quality-Guardian/commit/b31105dd2be14acb4e41dd0b7bd9e2aea9b99ba0))
+
+### 2026-07-14 治理：supplier identity governance wave 文档与发布边界
+
+**执行内容：**
+
+- 记录 7 月 8 日供应商画像漏数根因：该不合格项属于驻厂 TEAM 身份域，旧画像按供应商名称聚合，未通过 `supplier_identity_links` 将 TEAM 映射到供应商，因此画像截止日期停留在 6 月 28 日。
+- 新增 `supplier_identity_links` 和 `unresolved_master_data_refs` Prisma migration，建立 `TEAM -> supplier` 显式映射、外键保护和无法解析引用的持久化审计。
+- 将供应商画像、评分、历史项目、检验履历、不合格项和售后评分改为按供应商 ID 查询；驻厂过程检验通过 TEAM 映射聚合，禁止名称等值关联和名称 `OR` 回退。
+- 增加报检 TEAM/供应商、检验、售后和不合格项身份 dry-run/apply 回填，部署流程在 migration 后连续执行幂等分批回填。
+- 增加 B-ID1/B-ID2/B-ID3/B-ID4/B-ID5 门禁，保护受控选择器、事件 ID、检验供应商写入、供应商画像和评分查询，并限制 legacy 名称解析只能出现在审核过的 import adapter。
+- 更新 inspection、supplier、supplier-identity、after-sales、supervision 模块架构文档，明确 ID-first、名称快照、TEAM 映射、legacy/dual-write 边界和模块职责。
+- 完善 `docs/master-data-identity-governance.md`，明确本次仅完成 supplier identity governance wave，不宣称全项目 `ID_ONLY`；记录 migration、分批 dry-run/apply 回填、`unresolved_master_data_refs` 和 B-ID1/B-ID2/B-ID3/B-ID4/B-ID5 门禁。
+- 更新 `PROGRESS.md`，记录全量门禁、PR、release-please、部署和生产回填结果。
+
+**验证结果：**
+
+- 已完成定向验证：售后事件 30/30、ID-only 评分 86/86、售后失效刷新 14/14、不合格项契约 47/47、画像 ID 查询与门禁 21/21、身份回填 15/15、身份管理权限 6/6。
+- 全量单元测试：289 个文件 / 2471 个用例全部通过。
+- lint：通过（0 error）；typecheck：3/3 workspace tasks 通过。
+- `check:qms-arch` 与 `check:qms-arch:all`：0 violations；`check:prisma-migration`：schema 变更已配套 migration。
+- `git diff --check`：通过。
+- GitHub：功能 PR #47 和发布 PR #48 均已合并，两个 PR 的 6 项 CI Gate 全部通过；已生成 GitHub Release 与 tag `qgs-v0.17.0`。
+- 生产部署：deploy run `29309174127` 成功，耗时 7 分 37 秒；backend/frontend 镜像构建、ACR 推送、ECS 更新与 HTTP 健康检查全部通过。
+- 生产数据库：`20260714000100_add_supplier_identity_links` 和 `20260714000200_add_inspection_request_supplier_identity` 已成功应用。
+- 生产回填：新建 6 条精确 `TEAM -> supplier` 映射；报检供应商身份更新 813 条，检验身份更新 824 条，不合格项身份更新 2 条。无法唯一解析的存量数据已写入 `unresolved_master_data_refs`，未伪造关联。
+
+**commit:** `2cee6c43` fix(@qgs/backend): enforce inspection identity governance；`01944f26` fix(@qgs/web-antd): submit canonical inspection identities；`6171c049` Merge pull request #47；`3ee1d608` Merge pull request #48。
+
+**遗留问题：**
+
+- supervision 等尚未覆盖的存量供应商引用仍需补齐回填和 unresolved 审计；其他未迁移主数据必须由后续治理 wave 切换到在线 `ID-required`。
+- `unresolved_master_data_refs` 尚无人工处置 API/UI，`supplier_identity_links` 尚无前端管理界面。
+- 当前 EventEmitter 为单进程、fire-and-forget，监听器失败只记录日志且无持久化重试；扩容前需替换可靠事件机制。
+- 生产页面的精确供应商画像数据仍需在已登录业务会话中做最终人工验收；本次自动化已验证部署、健康检查、迁移和回填。
 
 ### 2026-07-14 修复：完善 ESLint 与后端架构规则约束
 

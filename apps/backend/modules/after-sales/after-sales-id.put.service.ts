@@ -5,6 +5,7 @@ import { FileStorageService } from '~/modules/file-storage/file-storage.service'
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
@@ -30,8 +31,11 @@ export default defineEventHandler(async (event) => {
     const bodyRecord = updateAfterSalesSchema.parse(await readBody(event));
     const { costsChanged, data: updateData } =
       await buildGovernedAfterSalesUpdateData(bodyRecord);
-    const supplierChanged = updateData.supplierBrand !== undefined;
+    const supplierChanged =
+      updateData.supplierBrand !== undefined ||
+      updateData.supplierBrandId !== undefined;
     let previousSupplierBrand: null | string | undefined;
+    let previousSupplierId: null | string | undefined;
 
     if (costsChanged || supplierChanged) {
       const current = await prisma.after_sales.findUnique({
@@ -40,12 +44,14 @@ export default defineEventHandler(async (event) => {
           laborTravelCost: true,
           materialCost: true,
           supplierBrand: true,
+          supplierBrandId: true,
         },
       });
       if (costsChanged && !current) {
         return notFoundResponse(event, '售后记录不存在');
       }
       previousSupplierBrand = current?.supplierBrand;
+      previousSupplierId = current?.supplierBrandId;
     }
 
     const updated = await prisma.after_sales.update({
@@ -54,10 +60,8 @@ export default defineEventHandler(async (event) => {
     });
     await QualityLossIndexService.upsertFromAfterSales(updated);
     eventBus.emit('after_sales.changed', {
-      supplierBrands: [
-        previousSupplierBrand,
-        updateData.supplierBrand as null | string | undefined,
-      ],
+      supplierBrands: [previousSupplierBrand, updated.supplierBrand],
+      supplierIds: [previousSupplierId, updated.supplierBrandId],
     });
     if (bodyRecord.photos !== undefined) {
       await FileStorageService.registerReferencesFromAttachments({
@@ -76,6 +80,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('after-sales', error, undefined, event);
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '售后记录不存在');
     }

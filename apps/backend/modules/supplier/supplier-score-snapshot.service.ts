@@ -5,7 +5,7 @@ import type { SupplierStats } from './supplier-scoring';
 import { resolveSupplierInspectionPolicy } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
-import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
+import { SupplierIdentityService } from '~/modules/supplier-identity';
 import prisma from '~/utils/prisma';
 
 import {
@@ -28,8 +28,8 @@ type SupplierSnapshotInput = Pick<
 
 const SUPPLIER_SNAPSHOT_CHUNK_SIZE = 50;
 const CURRENT_SCORING_MODELS = [
-  'IN_HOUSE_OUTSOURCING_V2',
-  'SUPPLIER_V2',
+  'IN_HOUSE_OUTSOURCING_V3',
+  'SUPPLIER_V3',
 ] as const;
 
 interface SupplierScoreRefreshOptions {
@@ -47,30 +47,13 @@ async function buildSupplierStatsMap(suppliers: SupplierSnapshotInput[]) {
   const statsMap = new Map<string, SupplierStats>();
   if (suppliers.length === 0) return statsMap;
 
-  const supplierNames = uniqueSupplierNames(
-    suppliers.map((supplier) => supplier.name),
-  );
-
   const now = new Date();
   const oneYearAgo = new Date();
   oneYearAgo.setFullYear(now.getFullYear() - 1);
 
-  const teamNameToId =
-    await MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
-      configKey: 'team',
-      names: supplierNames,
-    });
-  const supplierByName = new Map(
-    suppliers.map((supplier) => [supplier.name, supplier]),
-  );
   const supplierById = new Map(
     suppliers.map((supplier) => [supplier.id, supplier]),
   );
-  const supplierByTeamId = new Map<string, SupplierSnapshotInput>();
-  for (const supplier of suppliers) {
-    const teamId = teamNameToId.get(supplier.name);
-    if (teamId) supplierByTeamId.set(teamId, supplier);
-  }
   const incomingSuppliers = suppliers.filter(
     (supplier) =>
       resolveSupplierInspectionPolicy(supplier).inspectionCategory ===
@@ -81,29 +64,20 @@ async function buildSupplierStatsMap(suppliers: SupplierSnapshotInput[]) {
       resolveSupplierInspectionPolicy(supplier).inspectionCategory ===
       'PROCESS',
   );
-  const resolveSupplierIdentity = (record: {
-    supplierId?: null | string;
-    supplierName?: null | string;
-  }) => {
-    if (record.supplierId) {
-      const byId = supplierById.get(record.supplierId);
-      if (byId) return byId;
+  const teamIdsBySupplier = await SupplierIdentityService.teamIdsBySupplierIds(
+    processSuppliers.map((supplier) => supplier.id),
+  );
+  const supplierByTeamId = new Map<string, SupplierSnapshotInput>();
+  for (const supplier of processSuppliers) {
+    for (const teamId of teamIdsBySupplier.get(supplier.id) || []) {
+      supplierByTeamId.set(teamId, supplier);
     }
-    if (record.supplierName) {
-      const byName = supplierByName.get(record.supplierName);
-      if (byName) return byName;
-    }
-    return undefined;
+  }
+  const resolveSupplierIdentity = (record: { supplierId?: null | string }) => {
+    return record.supplierId ? supplierById.get(record.supplierId) : undefined;
   };
-  const resolveTeamIdentity = (record: {
-    team?: null | string;
-    teamId?: null | string;
-  }) => {
-    if (record.teamId) {
-      const byTeamId = supplierByTeamId.get(record.teamId);
-      if (byTeamId) return byTeamId;
-    }
-    return record.team ? supplierByName.get(record.team) : undefined;
+  const resolveTeamIdentity = (record: { teamId?: null | string }) => {
+    return record.teamId ? supplierByTeamId.get(record.teamId) : undefined;
   };
   const getStats = (supplier: SupplierSnapshotInput) =>
     statsMap.get(supplier.id) || createEmptyStats();
@@ -111,19 +85,15 @@ async function buildSupplierStatsMap(suppliers: SupplierSnapshotInput[]) {
   const [inspectionScoring, afterSalesScoring] = await Promise.all([
     InspectionService.getSupplierScoringData({
       engineeringSupplierIds: suppliers.map((item) => item.id),
-      engineeringSupplierNames: suppliers.map((item) => item.name),
       incomingSupplierIds: incomingSuppliers.map((item) => item.id),
-      incomingSupplierNames: incomingSuppliers.map((item) => item.name),
-      processTeamIds: processSuppliers
-        .map((item) => teamNameToId.get(item.name))
-        .filter(Boolean) as string[],
-      processTeamNames: processSuppliers.map((item) => item.name),
+      processTeamIds: processSuppliers.flatMap(
+        (item) => teamIdsBySupplier.get(item.id) || [],
+      ),
       since: oneYearAgo,
     }),
     AfterSalesAPI.getSupplierScoringData({
       since: oneYearAgo,
       supplierIds: suppliers.map((item) => item.id),
-      supplierNames,
     }),
   ]);
   const {
@@ -152,7 +122,7 @@ async function buildSupplierStatsMap(suppliers: SupplierSnapshotInput[]) {
     current.quantity += s._sum.quantity || 0;
     if (s.result === 'PASS') {
       current.qualifiedCount += s._count.id;
-    } else if (s.result === 'FAIL') {
+    } else {
       current.failures += s._count.id;
       current.failuresQuantity += s._sum.quantity || 0;
     }
@@ -160,9 +130,9 @@ async function buildSupplierStatsMap(suppliers: SupplierSnapshotInput[]) {
   });
 
   afterSalesStats.forEach((s) => {
-    const supplier =
-      (s.supplierBrandId ? supplierById.get(s.supplierBrandId) : undefined) ||
-      (s.supplierBrand ? supplierByName.get(s.supplierBrand) : undefined);
+    const supplier = s.supplierBrandId
+      ? supplierById.get(s.supplierBrandId)
+      : undefined;
     if (!supplier) return;
     const current = getStats(supplier);
     current.afterSalesLoss +=
@@ -204,9 +174,9 @@ async function buildSupplierStatsMap(suppliers: SupplierSnapshotInput[]) {
     ) {
       return;
     }
-    const supplier =
-      (s.supplierBrandId ? supplierById.get(s.supplierBrandId) : undefined) ||
-      (s.supplierBrand ? supplierByName.get(s.supplierBrand) : undefined);
+    const supplier = s.supplierBrandId
+      ? supplierById.get(s.supplierBrandId)
+      : undefined;
     if (!supplier) return;
     const current = getStats(supplier);
     current.openAfterSalesCount += s._count.id;
@@ -235,15 +205,11 @@ async function buildSupplierStatsMap(suppliers: SupplierSnapshotInput[]) {
   ];
 
   combinedRecords.forEach((r) => {
-    const name = r.origin === 'afterSales' ? r.supplierBrand : r.supplierName;
     let supplier: SupplierSnapshotInput | undefined;
     if (r.origin === 'qualityRecords') {
       supplier = resolveSupplierIdentity(r);
     } else if (r.supplierBrandId) {
       supplier = supplierById.get(r.supplierBrandId);
-    }
-    if (!supplier && name) {
-      supplier = supplierByName.get(name);
     }
     if (!supplier) return;
 
@@ -310,7 +276,7 @@ function toSnapshotData(
     finalRating: String(scored.level || scored.rating || 'A'),
     finalStatus: String(scored.status || 'Qualified'),
     isWarning: Boolean(scored.isWarning),
-    scoringModel: `${String(scored.scoringModel || 'SUPPLIER')}_V2`,
+    scoringModel: `${String(scored.scoringModel || 'SUPPLIER')}_V3`,
     stabilityScore: Number(scored.stabilityScore ?? 100),
     warningReasons: scored.warningReasons,
     calculatedAt: new Date(),

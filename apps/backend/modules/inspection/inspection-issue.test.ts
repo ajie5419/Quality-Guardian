@@ -22,6 +22,12 @@ vi.mock('~/utils/process-resolver', () => ({
   resolveProcessIdForWrite: vi.fn(),
 }));
 
+vi.mock('~/modules/supplier-identity', () => ({
+  SupplierIdentityService: {
+    resolveSupplierForInspection: vi.fn().mockResolvedValue(null),
+  },
+}));
+
 vi.mock('~/utils/governed-write', async () => {
   const actual = await vi.importActual<typeof import('~/utils/governed-write')>(
     '~/utils/governed-write',
@@ -84,6 +90,32 @@ describe('inspection-issue processId dual write', () => {
     expect(data.responsibleDepartments).toBe(
       JSON.stringify(['生产部', '工艺部']),
     );
+  });
+
+  it('writes supplier identity resolved from a process TEAM mapping', async () => {
+    const { SupplierIdentityService } = await import(
+      '~/modules/supplier-identity'
+    );
+    vi.mocked(
+      SupplierIdentityService.resolveSupplierForInspection,
+    ).mockResolvedValueOnce({ id: 'supplier-1', name: 'Supplier A' });
+
+    const data = await buildInspectionIssueCreateData(
+      { responsibleDepartment: 'Production' },
+      {
+        id: 'ISS-2026-SUPPLIER',
+        inspection: {
+          category: 'PROCESS',
+          supplierId: null,
+          teamId: 'team-1',
+        } as never,
+        serialNumber: 3,
+      },
+    );
+
+    expect(data.supplierName).toBe('Supplier A');
+    expect(data.supplier).toEqual({ connect: { id: 'supplier-1' } });
+    expect((data as Record<string, unknown>).supplierId).toBeUndefined();
   });
 
   it('injects processId into update payload when processName is provided', async () => {

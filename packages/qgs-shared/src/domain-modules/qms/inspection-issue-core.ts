@@ -133,7 +133,9 @@ export interface InspectionIssueCreateDataInput {
           id?: string;
           projectName?: null | string;
           quantity?: null | number;
+          supplierId?: null | string;
           supplierName?: null | string;
+          teamId?: null | string;
           work_order?: null | {
             division?: null | string;
           };
@@ -168,9 +170,15 @@ export function buildInspectionIssueCreateDataCore(
     normalizeOptionalInspectionIssueString(input.body.partName) ||
     deriveIssuePartNameFromInspection(linkedInspection || undefined) ||
     'Unknown';
+  const supplierId =
+    normalizeOptionalInspectionIssueString(input.body.supplierId) ||
+    linkedInspection?.supplierId ||
+    undefined;
   const supplierName =
-    linkedInspection?.supplierName ||
-    normalizeOptionalInspectionIssueString(input.body.supplierName);
+    normalizeOptionalInspectionIssueString(input.body.supplierName) ||
+    (linkedInspection?.category === 'INCOMING'
+      ? linkedInspection.supplierName || undefined
+      : undefined);
   const division =
     linkedInspection?.work_order?.division ||
     normalizeOptionalInspectionIssueString(input.body.division);
@@ -226,6 +234,7 @@ export function buildInspectionIssueCreateDataCore(
       normalizeOptionalInspectionIssueString(input.body.responsibleWelder) ??
       null,
     supplierName: supplierName ?? null,
+    supplierId: supplierId ?? null,
     category:
       linkedInspection?.category ??
       normalizeOptionalInspectionIssueString(input.body.category),
@@ -268,6 +277,7 @@ export function buildInspectionIssueUpdateDataCore(
     'responsibleDepartment',
     'responsibleWelder',
     'supplierName',
+    'supplierId',
     'rootCause',
     'solution',
     'defectType',

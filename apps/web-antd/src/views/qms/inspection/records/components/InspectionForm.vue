@@ -29,7 +29,7 @@ import {
 } from '../../issues/constants';
 import { mapDictionaryOptionsToInspectionProcess } from '../config';
 import TeamSelect from './form/TeamSelect.vue';
-import { getFormSchema } from './formData';
+import { buildTeamIdentityFields, getFormSchema } from './formData';
 import {
   deriveIssuePartName,
   deriveIssueProcessName,
@@ -57,6 +57,7 @@ interface LinkedIssueDraft {
   rootCause: string;
   solution: string;
   status: string;
+  supplierId: string;
   supplierName: string;
   photos: UploadFileWithResponse[];
   unqualifiedQuantity: number;
@@ -85,6 +86,7 @@ const linkedIssueDraft = ref<LinkedIssueDraft>({
   rootCause: '',
   solution: '',
   status: 'OPEN',
+  supplierId: '',
   supplierName: '',
   photos: [],
   unqualifiedQuantity: 0,
@@ -225,11 +227,31 @@ async function handleWorkOrderChange(
   }
 }
 
-async function handleSupplierChange(val: string | undefined) {
-  formApi.setFieldValue('supplierName', val);
+async function handleSupplierChange(
+  val: string | undefined,
+  option?: { item?: { name?: string } },
+) {
+  const supplierName = String(option?.item?.name || '').trim();
+  formApi.setFieldValue('supplierId', val);
+  formApi.setFieldValue('supplierName', supplierName || undefined);
   setTimeout(() => {
-    formApi.validateField('supplierName');
+    formApi.validateField('supplierId');
   }, 200);
+}
+
+interface TeamSelectOption {
+  label: string;
+  value: string;
+}
+
+function handleTeamChange(
+  value: string | undefined,
+  option?: TeamSelectOption,
+) {
+  const identity = buildTeamIdentityFields(value, option);
+  formApi.setFieldValue('teamId', identity.teamId);
+  formApi.setFieldValue('team', identity.team);
+  clearFieldValidator('teamId');
 }
 
 function clearFieldValidator(fieldName: string) {
@@ -254,7 +276,7 @@ watch(
       const isMachined = newVal === '机加成品件';
       formApi.updateSchema([
         {
-          fieldName: 'supplierName',
+          fieldName: 'supplierId',
           componentProps: {
             category: isMachined ? 'Outsourcing' : 'Supplier',
             placeholder: isMachined ? '请选择外协单位' : '请选择供应商',
@@ -268,6 +290,7 @@ watch(
 
       // Clear value if type changes and it's not the initial load (optimization)
       if (newVal !== oldVal && oldVal !== undefined) {
+        formApi.setFieldValue('supplierId', undefined);
         formApi.setFieldValue('supplierName', undefined);
       }
     }
@@ -308,6 +331,7 @@ watch(
       rootCause: '',
       solution: '',
       status: 'OPEN',
+      supplierId: String(activeValues.value.supplierId || ''),
       supplierName: String(activeValues.value.supplierName || ''),
       photos: [],
       unqualifiedQuantity: 0,
@@ -341,6 +365,12 @@ defineExpose({
     const qualifiedQuantity = totalQuantity - unqualifiedQuantity;
     return {
       ...values,
+      ...(props.type === 'process'
+        ? {
+            team: String(values.team || activeValues.value.team || '').trim(),
+            teamId: String(values.teamId || '').trim(),
+          }
+        : {}),
       qualifiedQuantity,
       unqualifiedQuantity,
       linkedIssue: shouldCreateLinkedIssue.value
@@ -352,6 +382,7 @@ defineExpose({
               props.type,
               activeValues.value,
             ),
+            supplierId: String(activeValues.value.supplierId || '').trim(),
             supplierName: String(activeValues.value.supplierName || '').trim(),
             reportDate: String(activeValues.value.inspectionDate || '')
               .trim()
@@ -434,8 +465,13 @@ defineExpose({
     </template>
 
     <!-- Slot for SupplierSelect -->
-    <template #supplierName="slotProps">
-      <SupplierSelect v-bind="slotProps" @change="handleSupplierChange" />
+    <template #supplierId="slotProps">
+      <SupplierSelect
+        v-bind="slotProps"
+        :legacy-name="String(activeValues.supplierName || '')"
+        value-mode="id"
+        @change="handleSupplierChange"
+      />
     </template>
 
     <!-- Slot for BomItemSelect -->
@@ -453,15 +489,12 @@ defineExpose({
     </template>
 
     <!-- Slot for TeamSelect -->
-    <template #team="slotProps">
+    <template #teamId="slotProps">
       <TeamSelect
         v-bind="slotProps"
-        @change="
-          (val) => {
-            formApi.setFieldValue('team', val);
-            clearFieldValidator('team');
-          }
-        "
+        :legacy-name="String(activeValues.team || '')"
+        @change="handleTeamChange"
+        @resolved="handleTeamChange"
       />
     </template>
   </Form>

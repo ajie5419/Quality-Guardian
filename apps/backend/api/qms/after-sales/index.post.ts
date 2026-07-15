@@ -2,6 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { AfterSalesRouteService } from '~/modules/after-sales/after-sales-route.service';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import { getMissingRequiredFields } from '~/utils/request-validation';
 import {
@@ -27,6 +28,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(newItem);
   } catch (error: unknown) {
     logApiError('after-sales-create', error, undefined, event);
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return internalServerErrorResponse(

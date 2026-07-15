@@ -11,6 +11,7 @@ import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept/dept.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -47,6 +48,10 @@ vi.mock('~/modules/system-log/system-log.service', () => ({
   SystemLogService: {
     auditLog: vi.fn(),
   },
+}));
+
+vi.mock('~/utils/event-bus', () => ({
+  eventBus: { emit: vi.fn() },
 }));
 
 vi.mock('~/modules/dept/dept.service', () => ({
@@ -129,7 +134,7 @@ describe('after-sales core helpers and services', () => {
     });
     await AfterSalesService.getSupplierScoringData({
       since: new Date('2026-01-01T00:00:00.000Z'),
-      supplierNames: ['Supplier A'],
+      supplierIds: ['supplier-1'],
     });
     await AfterSalesService.getWeeklyReportIssues({
       end: new Date('2026-01-07T00:00:00.000Z'),
@@ -198,13 +203,43 @@ describe('after-sales core helpers and services', () => {
     });
   });
 
+  it('refreshes both supplier snapshots for an ID-only reassignment', async () => {
+    const { buildGovernedAfterSalesUpdateData } = await import(
+      '~/modules/after-sales/after-sales-payload'
+    );
+    vi.mocked(buildGovernedAfterSalesUpdateData).mockResolvedValueOnce({
+      costsChanged: false,
+      data: { supplierBrandId: 'supplier-2' },
+    });
+    vi.mocked(prisma.after_sales.findUnique).mockResolvedValue({
+      supplierBrand: 'Supplier A',
+      supplierBrandId: 'supplier-1',
+    } as never);
+    vi.mocked(prisma.after_sales.update).mockResolvedValue({
+      supplierBrand: 'Supplier B',
+      supplierBrandId: 'supplier-2',
+    } as never);
+
+    await AfterSalesService.updateByRoute('as-1', {
+      supplierBrandId: 'supplier-2',
+    });
+
+    expect(eventBus.emit).toHaveBeenCalledWith('after_sales.changed', {
+      supplierBrands: ['Supplier A', 'Supplier B'],
+      supplierIds: ['supplier-1', 'supplier-2'],
+    });
+  });
+
   it('throws not-found when updating route costs for missing record and deletes records with references/audit', async () => {
     vi.mocked(prisma.after_sales.findUnique).mockResolvedValue(null);
     await expect(
       AfterSalesService.updateByRoute('as-404', { laborTravelCost: 10 }),
     ).rejects.toThrow('AFTER_SALES_NOT_FOUND');
 
-    vi.mocked(prisma.after_sales.update).mockResolvedValue({} as never);
+    vi.mocked(prisma.after_sales.update).mockResolvedValue({
+      supplierBrand: 'Supplier A',
+      supplierBrandId: 'supplier-1',
+    } as never);
     await AfterSalesService.deleteRecord('as-1', 'user-1');
 
     expect(prisma.after_sales.update).toHaveBeenCalledWith({
@@ -223,6 +258,10 @@ describe('after-sales core helpers and services', () => {
       'delete',
       expect.objectContaining({ targetId: 'as-1', userId: 'user-1' }),
     );
+    expect(eventBus.emit).toHaveBeenCalledWith('after_sales.changed', {
+      supplierBrands: ['Supplier A'],
+      supplierIds: ['supplier-1'],
+    });
   });
 
   it('builds chart aggregation from grouped rows, department names, report months, and scoped queries', async () => {

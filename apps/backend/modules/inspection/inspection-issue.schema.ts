@@ -64,6 +64,7 @@ const issueFields = {
   solution: requiredLongText,
   sourceType: shortText.optional(),
   status: z.enum(['CLOSED', 'IN_PROGRESS', 'OPEN']),
+  supplierId: shortText.optional(),
   supplierName: shortText.optional(),
   workOrderNumber: requiredText,
 };
