@@ -25,6 +25,27 @@
 
 ## 执行记录
 
+### 2026-07-16 修复：区分历史 unresolved 与本次回填异常
+
+**执行内容：**
+
+- 修复 `qgs-v0.17.4` 首次 deploy 的身份回填门禁：生产既有 unresolved 已写入人工处置队列，不再因每次扫描仍可见而永久阻断发布。
+- apply 模式在回填前后读取 OPEN 审计快照，仅对本次新增或证据变化的 OPEN 记录失败；主数据歧义和并发写入仍始终阻断。
+- dry-run 不写审计，继续按扫描到的 conflict/unresolved 严格失败，避免审计模式静默放行。
+
+**验证结果：**
+
+- 失败复现：deploy run `29476120993` 在身份回填阶段检测到历史 `inspection-teams.unresolved=7`、`inspection-suppliers.conflicts=1`、`inspection-suppliers.unresolved=84`、`quality-records.unresolved=1` 后回滚。
+- 定向测试：3/3 个文件、22/22 个用例通过。
+- 全量后端测试：218/218 个文件、2015/2015 个用例通过。
+- lint、typecheck 3/3 workspace tasks、`check:qms-arch` 均通过。
+
+**commit:** `6bc5e10` fix(@qgs/backend): baseline known identity audits
+
+**遗留问题：**
+
+- 生产历史 OPEN unresolved 继续保留，等待人工处置 API/UI；hotfix 发布后需复验身份回填审计增量为 0、ECS 健康检查通过。
+
 ## [0.17.4](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.3...qgs-v0.17.4) (2026-07-16)
 
 
