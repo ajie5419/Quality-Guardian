@@ -25,6 +25,14 @@
 
 ## 执行记录
 
+## [0.17.5](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.4...qgs-v0.17.5) (2026-07-16)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** baseline known identity audits ([ead426b](https://github.com/ajie5419/Quality-Guardian/commit/ead426b69b612e89f726fef734babe35666bb5e1))
+* **@qgs/backend:** baseline known identity audits ([6bc5e10](https://github.com/ajie5419/Quality-Guardian/commit/6bc5e10042a2328e921c778e3601e06d5714382d))
+
 ### 2026-07-16 修复：区分历史 unresolved 与本次回填异常
 
 **执行内容：**
