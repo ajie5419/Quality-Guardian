@@ -125,6 +125,7 @@ export interface WorkspaceWorkOrderAggregateResponse {
     requirementName: string;
     responsiblePerson: string;
     responsibleTeam: string;
+    responsibleTeamId: string;
     status: 'EXECUTED' | 'NOT_EXECUTED';
     workOrderNumber: string;
   }>;

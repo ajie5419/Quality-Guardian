@@ -11,11 +11,13 @@ import { backfillAfterSalesSupplierIdentities } from './backfill-after-sales-sup
 import { backfillInspectionRequestSupplierIdentities } from './backfill-inspection-request-supplier-identities';
 import { backfillInspectionRequestTeamIdentities } from './backfill-inspection-request-team-identities';
 import { backfillInspectionSupplierIdentities } from './backfill-inspection-supplier-identities';
+import { backfillInspectionTeamIdentities } from './backfill-inspection-team-identities';
 import {
   parseBackfillOptions,
   resolveQualityRecordSupplierIdentity,
 } from './quality-record-supplier-identity-backfill';
 import {
+  assertBackfillIntegrity,
   bootstrapExactTeamLinks,
   loadSupplierIdentityContext,
   persistResolutionAudit,
@@ -58,10 +60,22 @@ async function main() {
   const identityContext = await loadSupplierIdentityContext(
     teamBootstrap.effectiveLinks,
   );
-  await backfillInspectionRequestTeamIdentities(options, identityContext);
-  await backfillInspectionRequestSupplierIdentities(options, identityContext);
-  await backfillInspectionSupplierIdentities(options, identityContext);
-  await backfillAfterSalesSupplierIdentities(options, identityContext);
+  const inspectionRequestTeamSummary =
+    await backfillInspectionRequestTeamIdentities(options, identityContext);
+  const inspectionRequestSupplierSummary =
+    await backfillInspectionRequestSupplierIdentities(options, identityContext);
+  const inspectionTeamSummary = await backfillInspectionTeamIdentities(
+    options,
+    identityContext,
+  );
+  const inspectionSupplierSummary = await backfillInspectionSupplierIdentities(
+    options,
+    identityContext,
+  );
+  const afterSalesSummary = await backfillAfterSalesSupplierIdentities(
+    options,
+    identityContext,
+  );
 
   let batches = 0;
   let conflicts = 0;
@@ -110,7 +124,10 @@ async function main() {
       existingSupplierId: null | string;
       id: string;
     }> = [];
-    const batchResolved: Array<{ entityId: string; resolvedId: string }> = [];
+    const batchResolved: Array<{
+      entityId: string;
+      resolvedId: null | string;
+    }> = [];
     const batchUnresolved: UnresolvedRefInput[] = [];
 
     for (const row of rows) {
@@ -124,6 +141,7 @@ async function main() {
           ? identityContext.supplierById.get(row.supplierId) || null
           : null,
         existingSupplierId: row.supplierId,
+        existingSupplierName: row.supplierName,
         inspection: row.inspection
           ? {
               category: row.inspection.category,
@@ -146,9 +164,7 @@ async function main() {
 
       if (resolution.action === 'skip') {
         skipped += 1;
-        if (row.supplierId) {
-          batchResolved.push({ entityId: row.id, resolvedId: row.supplierId });
-        }
+        batchResolved.push({ entityId: row.id, resolvedId: row.supplierId });
         continue;
       }
       const sample = {
@@ -251,21 +267,38 @@ async function main() {
     );
   }
 
+  const qualityRecordSummary = {
+    batches,
+    concurrentChanges,
+    conflictSamples,
+    conflicts,
+    mode: options.mode,
+    processed,
+    skipped,
+    unresolved,
+    unresolvedSamples,
+    updated,
+  };
   logger.info(
-    {
-      batches,
-      concurrentChanges,
-      conflictSamples,
-      conflicts,
-      mode: options.mode,
-      processed,
-      skipped,
-      unresolved,
-      unresolvedSamples,
-      updated,
-    },
+    qualityRecordSummary,
     'supplier identity audit/backfill finished',
   );
+  assertBackfillIntegrity([
+    {
+      ambiguous: teamBootstrap.ambiguous,
+      conflicts: teamBootstrap.conflicts,
+      name: 'team-links',
+    },
+    { ...inspectionRequestTeamSummary, name: 'inspection-request-teams' },
+    {
+      ...inspectionRequestSupplierSummary,
+      name: 'inspection-request-suppliers',
+    },
+    { ...inspectionTeamSummary, name: 'inspection-teams' },
+    { ...inspectionSupplierSummary, name: 'inspection-suppliers' },
+    { ...afterSalesSummary, name: 'after-sales' },
+    { ...qualityRecordSummary, name: 'quality-records' },
+  ]);
 }
 
 async function run() {

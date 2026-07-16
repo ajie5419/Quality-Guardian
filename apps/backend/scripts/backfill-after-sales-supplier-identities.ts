@@ -59,7 +59,10 @@ export async function backfillAfterSalesSupplierIdentities(
       existingSupplierId: null | string;
       id: string;
     }> = [];
-    const batchResolved: Array<{ entityId: string; resolvedId: string }> = [];
+    const batchResolved: Array<{
+      entityId: string;
+      resolvedId: null | string;
+    }> = [];
     const batchUnresolved: UnresolvedRefInput[] = [];
 
     for (const row of rows) {
@@ -68,18 +71,17 @@ export async function backfillAfterSalesSupplierIdentities(
           ? context.supplierById.get(row.supplierBrandId) || null
           : null,
         existingSupplierId: row.supplierBrandId,
+        existingSupplierName: row.supplierBrand,
         supplierByName: row.supplierBrand
           ? context.supplierByName.get(row.supplierBrand) || null
           : null,
       });
       if (resolution.action === 'skip') {
         skipped += 1;
-        if (row.supplierBrandId) {
-          batchResolved.push({
-            entityId: row.id,
-            resolvedId: row.supplierBrandId,
-          });
-        }
+        batchResolved.push({
+          entityId: row.id,
+          resolvedId: row.supplierBrandId,
+        });
         continue;
       }
       if (resolution.action === 'unresolved') {

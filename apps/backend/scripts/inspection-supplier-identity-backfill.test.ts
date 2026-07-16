@@ -56,8 +56,21 @@ describe('inspection supplier identity backfill', () => {
     });
   });
 
-  it('requires an explicit TEAM to supplier mapping', () => {
+  it('does not require a supplier identity for an internal TEAM', () => {
     expect(resolve({ category: 'PROCESS', teamById: teamA })).toEqual({
+      action: 'skip',
+      reason: 'NO_SUPPLIER_IDENTITY_REQUIRED',
+    });
+  });
+
+  it('audits supplier evidence without an explicit TEAM mapping', () => {
+    expect(
+      resolve({
+        category: 'PROCESS',
+        existingSupplierName: supplierA.name,
+        teamById: teamA,
+      }),
+    ).toEqual({
       action: 'unresolved',
       reason: 'MISSING_PROCESS_TEAM_LINK',
     });

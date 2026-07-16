@@ -86,6 +86,7 @@ const requirementForm = ref({
   requirementName: '',
   responsiblePerson: '',
   responsibleTeam: '',
+  responsibleTeamId: '',
 });
 
 const workOrderStatusLabel = computed(() => {
@@ -220,6 +221,7 @@ function openRequirementModal() {
     requirementName: '',
     responsiblePerson: '',
     responsibleTeam: '',
+    responsibleTeamId: '',
   };
   requirementModalVisible.value = true;
 }
@@ -239,6 +241,12 @@ async function submitRequirement() {
     .split('\n')
     .map((item) => item.trim())
     .filter(Boolean);
+  const responsibleTeam = requirementForm.value.responsibleTeam.trim();
+  const responsibleTeamId = requirementForm.value.responsibleTeamId.trim();
+  const responsibleTeamIdentity =
+    responsibleTeam && responsibleTeamId
+      ? { responsibleTeam, responsibleTeamId }
+      : {};
 
   creatingRequirement.value = true;
   try {
@@ -254,8 +262,7 @@ async function submitRequirement() {
           requirementName,
           responsiblePerson:
             requirementForm.value.responsiblePerson.trim() || undefined,
-          responsibleTeam:
-            requirementForm.value.responsibleTeam.trim() || undefined,
+          ...responsibleTeamIdentity,
           workOrderNumber,
         },
       ],
@@ -268,6 +275,14 @@ async function submitRequirement() {
   } finally {
     creatingRequirement.value = false;
   }
+}
+
+function handleResponsibleTeamChange(
+  value: string | undefined,
+  option?: { label?: unknown },
+) {
+  requirementForm.value.responsibleTeamId = String(value || '').trim();
+  requirementForm.value.responsibleTeam = String(option?.label || '').trim();
 }
 
 async function confirmRequirement(id: string) {
@@ -686,7 +701,12 @@ onMounted(() => {
           </Upload>
         </Form.Item>
         <Form.Item label="责任班组">
-          <TeamSelect v-model:value="requirementForm.responsibleTeam" />
+          <TeamSelect
+            v-model:value="requirementForm.responsibleTeamId"
+            :legacy-name="requirementForm.responsibleTeam"
+            @change="handleResponsibleTeamChange"
+            @resolved="handleResponsibleTeamChange"
+          />
         </Form.Item>
         <Form.Item label="责任人">
           <Input

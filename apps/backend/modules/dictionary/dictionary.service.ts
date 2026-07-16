@@ -1,4 +1,5 @@
 import { QMS_DICTIONARY_TYPES } from '@qgs/shared';
+import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 import { buildKeywordOr } from '~/utils/query-helpers';
@@ -130,6 +131,9 @@ export const DictionaryService = {
         '系统内置字典项不允许删除',
       );
     }
+    if (existing.dictType === 'team') {
+      await SupplierIdentityService.assertTeamCanBeRetired(existing.id);
+    }
 
     await prisma.dictionaries.update({
       where: { id },
@@ -245,6 +249,14 @@ export const DictionaryService = {
         'FORBIDDEN_SYSTEM_DICT',
         '系统内置字典项不允许禁用',
       );
+    }
+    if (
+      existing.dictType === 'team' &&
+      existing.status !== 0 &&
+      data.status !== undefined &&
+      normalizeStatus(data.status, existing.status) === 0
+    ) {
+      await SupplierIdentityService.assertTeamCanBeRetired(existing.id);
     }
 
     if (dictKey !== undefined && dictKey !== existing.dictKey) {

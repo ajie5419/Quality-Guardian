@@ -132,6 +132,7 @@ export const WorkOrderAggregateService = {
         requirementName: String(item.requirementName || '').trim() || '-',
         responsiblePerson: item.responsiblePerson || '',
         responsibleTeam: item.responsibleTeam || '',
+        responsibleTeamId: item.responsibleTeamId || '',
         status: 'NOT_EXECUTED' as 'EXECUTED' | 'NOT_EXECUTED',
         workOrderNumber,
       };

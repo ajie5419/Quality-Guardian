@@ -40,12 +40,20 @@ export const WorkOrderRequirementRouteService = {
       requirementName: String(item.requirementName || '').trim(),
       responsiblePerson: String(item.responsiblePerson || '').trim() || null,
       responsibleTeam: String(item.responsibleTeam || '').trim() || null,
+      responsibleTeamId: String(item.responsibleTeamId || '').trim() || null,
       workOrderNumber: String(item.workOrderNumber || '').trim(),
     }));
     const createPayloads = await Promise.all(
       normalized.map(async (item) => ({
         attachment: item.attachments,
         createdBy: userinfo.username,
+        requirementItems: JSON.stringify(item.items || []),
+        requirementName: item.requirementName,
+        responsiblePerson: item.responsiblePerson,
+        responsibleTeam: item.responsibleTeam,
+        status: 'active',
+        updatedBy: userinfo.username,
+        workOrderNumber: item.workOrderNumber,
         ...buildGovernedWriteFieldsForTable('work_order_requirements', {
           partName: item.partName,
           processName: item.processName,
@@ -59,15 +67,9 @@ export const WorkOrderRequirementRouteService = {
             processName: item.processName,
             requirementName: item.requirementName,
             responsibleTeam: item.responsibleTeam,
+            responsibleTeamId: item.responsibleTeamId,
           },
         )),
-        requirementItems: JSON.stringify(item.items || []),
-        requirementName: item.requirementName,
-        responsiblePerson: item.responsiblePerson,
-        responsibleTeam: item.responsibleTeam,
-        status: 'active',
-        updatedBy: userinfo.username,
-        workOrderNumber: item.workOrderNumber,
       })),
     );
     const created =
@@ -112,7 +114,13 @@ export const WorkOrderRequirementRouteService = {
     );
     const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
       'work_order_requirements',
-      governedFields as Record<string, unknown>,
+      {
+        ...governedFields,
+        responsibleTeamId:
+          body.responsibleTeamId === undefined
+            ? undefined
+            : String(body.responsibleTeamId || '').trim() || null,
+      },
     );
     const updated = await WorkOrderRequirementService.updateById(id, {
       confirmedAt: confirm ? new Date() : null,
@@ -160,6 +168,7 @@ export const WorkOrderRequirementRouteService = {
       requirementName: item.requirementName || '',
       responsiblePerson: item.responsiblePerson || '',
       responsibleTeam: item.responsibleTeam || '',
+      responsibleTeamId: item.responsibleTeamId || '',
       workOrderNumber: item.workOrderNumber,
     }));
   },
@@ -201,6 +210,7 @@ export const WorkOrderRequirementRouteService = {
         requirementName: item.requirementName || '',
         responsiblePerson: item.responsiblePerson || '',
         responsibleTeam: item.responsibleTeam || '',
+        responsibleTeamId: item.responsibleTeamId || '',
         workOrderNumber: item.workOrderNumber,
         workOrderStatus: item.work_order?.status || '',
       })),

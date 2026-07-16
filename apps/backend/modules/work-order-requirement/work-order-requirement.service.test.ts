@@ -115,6 +115,7 @@ describe('workOrderRequirementService', () => {
       select: expect.objectContaining({
         process: { select: { name: true } },
         requirementName: true,
+        responsibleTeamId: true,
       }),
     });
   });
@@ -127,6 +128,7 @@ describe('workOrderRequirementService', () => {
       select: expect.objectContaining({
         process: { select: { name: true } },
         responsibleTeam: true,
+        responsibleTeamId: true,
       }),
     });
   });

@@ -25,6 +25,29 @@
 
 ## 执行记录
 
+### 2026-07-16 修复：恢复 TEAM 主数据链路与身份契约
+
+**执行内容：**
+
+- 新增幂等 TEAM bootstrap：从启用部门叶子节点和 TEAM 策略供应商初始化 canonical TEAM，并接入本地容器、容器重置、OSS 发布和 GitHub 发布链路，统一执行 `migration -> TEAM bootstrap -> identity backfill`。
+- 修复焊工和工单责任班组的 ID/name 混用，前后端统一显式提交 `teamId + team`、`responsibleTeamId + responsibleTeam`，并在 API 边界校验成对字段。
+- 增加 `inspections.teamId` 独立回填；内部 PROCESS 无供应商证据时按非适用处理，有错误 ID/name、冲突或无法解析的证据时持久化 unresolved 并阻断回填进程。
+- TEAM 映射冲突写入 unresolved 审计；TEAM 字典删除或禁用前检查活动供应商映射，避免身份链接悬空。
+- 修复 zsh 直接 source 本地容器公共脚本的 `BASH_SOURCE` 崩溃，并让报检班组/供应商下拉加载异常进入统一错误处理。
+
+**验证结果：**
+
+- 本地容器数据库：TEAM 7 条、有效 TEAM 映射 1 条；`inspections` PROCESS 缺失 `teamId` 从 5 条降为 0 条；回填 apply 全阶段 `unresolved/conflicts/concurrentChanges=0`，OPEN 审计为 0。
+- vitest：后端 218/218 个文件、2012/2012 个用例通过。
+- lint：通过；typecheck：3/3 workspace tasks 通过；`check:qms-arch`：0 violations。
+- zsh/bash source 兼容性、TEAM bootstrap 幂等性和公共 TEAM 数据源已实测通过。
+
+**commit:** `556cc731` fix(@qgs/backend): bootstrap canonical teams before backfill；`b1960939` fix(project): preserve canonical team identities in forms；`10a24c50` fix(@qgs/backend): enforce supplier identity backfill integrity；`edf6fab` fix(project): surface team loading failures
+
+**遗留问题：**
+
+- 本地容器库此前已有 `20260713000100_add_manual_quality_loss_context` migration 漂移（`quality_losses.partId` 已存在导致 P3018），本次未擅自标记 migration 已应用或执行破坏性 reset；启动脚本会在该库上继续正确阻断，需按本地数据保留策略执行 migration resolve 或容器数据库重置。
+
 ## [0.17.3](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.2...qgs-v0.17.3) (2026-07-15)
 
 

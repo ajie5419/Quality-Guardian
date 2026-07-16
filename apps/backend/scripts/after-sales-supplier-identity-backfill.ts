@@ -1,7 +1,10 @@
 import type { SupplierIdentity } from './quality-record-supplier-identity-backfill';
 
 export type AfterSalesSupplierIdentityResolution =
-  | { action: 'skip'; reason: 'EXISTING_VALID_ID' }
+  | {
+      action: 'skip';
+      reason: 'EXISTING_VALID_ID' | 'NO_SUPPLIER_IDENTITY_REQUIRED';
+    }
   | {
       action: 'unresolved';
       reason: 'INVALID_EXISTING_ID' | 'NO_IDENTITY_EVIDENCE';
@@ -15,6 +18,7 @@ export type AfterSalesSupplierIdentityResolution =
 export function resolveAfterSalesSupplierIdentity(input: {
   existingSupplier: null | SupplierIdentity;
   existingSupplierId: null | string;
+  existingSupplierName: null | string;
   supplierByName: null | SupplierIdentity;
 }): AfterSalesSupplierIdentityResolution {
   if (input.existingSupplier) {
@@ -29,6 +33,9 @@ export function resolveAfterSalesSupplierIdentity(input: {
       candidate: input.supplierByName,
       reason: 'AFTER_SALES_SUPPLIER_NAME',
     };
+  }
+  if (!input.existingSupplierName) {
+    return { action: 'skip', reason: 'NO_SUPPLIER_IDENTITY_REQUIRED' };
   }
   return { action: 'unresolved', reason: 'NO_IDENTITY_EVIDENCE' };
 }

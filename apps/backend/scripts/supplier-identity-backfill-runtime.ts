@@ -22,6 +22,14 @@ export interface TeamLinkBootstrapResult {
   reactivated: number;
 }
 
+export interface BackfillIntegrityMetric {
+  ambiguous?: number;
+  concurrentChanges?: number;
+  conflicts?: number;
+  name: string;
+  unresolved?: number;
+}
+
 export interface UnresolvedRefInput {
   entityId: string;
   evidence: Record<string, null | number | string>;
@@ -64,6 +72,7 @@ export async function bootstrapExactTeamLinks(
     teams.map((team) => ({ id: team.id, name: team.dictKey })),
   );
   const linkByTeamId = new Map(links.map((link) => [link.identityId, link]));
+  const activeTeamIds = new Set(teams.map((team) => team.id));
   const effectiveLinks = new Map<string, EffectiveTeamLink>();
   const creates: Array<{
     identityId: string;
@@ -74,10 +83,17 @@ export async function bootstrapExactTeamLinks(
     id: string;
     identityNameSnapshot: string;
   }> = [];
+  const resolvedAudits: Array<{ entityId: string; resolvedId: string }> = [];
+  const unresolvedAudits: UnresolvedRefInput[] = [];
   let conflicts = 0;
 
   for (const link of links) {
-    if (link.isDeleted || link.supplier.isDeleted) continue;
+    if (
+      link.isDeleted ||
+      link.supplier.isDeleted ||
+      !activeTeamIds.has(link.identityId)
+    )
+      continue;
     effectiveLinks.set(link.identityId, {
       supplier: { id: link.supplier.id, name: link.supplier.name },
     });
@@ -89,6 +105,16 @@ export async function bootstrapExactTeamLinks(
     const existingLink = linkByTeamId.get(team.id);
     if (existingLink && existingLink.supplierId !== supplier.id) {
       conflicts += 1;
+      unresolvedAudits.push({
+        entityId: team.id,
+        evidence: {
+          candidateSupplierId: supplier.id,
+          linkedSupplierId: existingLink.supplierId,
+        },
+        rawId: existingLink.supplierId,
+        rawName: team.name,
+        reason: 'team_supplier_identity_conflict',
+      });
       continue;
     }
     if (existingLink?.isDeleted) {
@@ -108,6 +134,7 @@ export async function bootstrapExactTeamLinks(
         supplier: { id: supplier.id, name: supplier.name },
       });
     }
+    resolvedAudits.push({ entityId: team.id, resolvedId: supplier.id });
   }
 
   if (mode === 'apply' && (creates.length > 0 || reactivations.length > 0)) {
@@ -130,6 +157,13 @@ export async function bootstrapExactTeamLinks(
       }),
     ]);
   }
+  if (mode === 'apply') {
+    await persistResolutionAudit({
+      entityType: 'supplier_identity_links',
+      resolved: resolvedAudits,
+      unresolved: unresolvedAudits,
+    });
+  }
 
   return {
     ambiguous:
@@ -142,6 +176,26 @@ export async function bootstrapExactTeamLinks(
     effectiveLinks,
     reactivated: reactivations.length,
   };
+}
+
+export function assertBackfillIntegrity(metrics: BackfillIntegrityMetric[]) {
+  const failures: string[] = [];
+  for (const metric of metrics) {
+    const values = {
+      ambiguous: metric.ambiguous,
+      concurrentChanges: metric.concurrentChanges,
+      conflicts: metric.conflicts,
+      unresolved: metric.unresolved,
+    };
+    for (const [name, value] of Object.entries(values)) {
+      if (value && value > 0) failures.push(`${metric.name}.${name}=${value}`);
+    }
+  }
+  if (failures.length > 0) {
+    throw new Error(
+      `Supplier identity backfill integrity check failed: ${failures.join(', ')}`,
+    );
+  }
 }
 
 export async function loadSupplierIdentityContext(
@@ -176,9 +230,10 @@ export async function persistResolutionAudit(params: {
     | 'after_sales'
     | 'inspections'
     | 'qms_inspection_requests'
-    | 'quality_records';
+    | 'quality_records'
+    | 'supplier_identity_links';
   fieldName?: 'supplierId' | 'teamId';
-  resolved: Array<{ entityId: string; resolvedId: string }>;
+  resolved: Array<{ entityId: string; resolvedId: null | string }>;
   unresolved: UnresolvedRefInput[];
 }) {
   const fieldName = params.fieldName || 'supplierId';

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
 import { WelderService } from '~/modules/welder/welder.service';
 import prisma from '~/utils/prisma';
+import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -38,8 +39,9 @@ vi.mock('~/utils/team-resolver', () => ({
   buildTeamContainsWhere: vi.fn(async ({ keyword }) => ({
     team: { contains: keyword },
   })),
-  resolveTeamIdForWrite: vi.fn(async ({ team }) =>
-    team ? `team-${team}` : null,
+  resolveTeamIdForWrite: vi.fn(
+    async ({ explicitTeamId, team }) =>
+      explicitTeamId || (team ? `team-${team}` : null),
   ),
 }));
 
@@ -60,16 +62,21 @@ describe('welderService', () => {
     await WelderService.create({
       name: 'Alice',
       team: 'A',
+      teamId: 'team-1',
       welderCode: 'W-001',
     });
 
     expect(prisma.welders.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         name: 'Alice',
-        teamId: 'team-A',
+        teamId: 'team-1',
         teamCanonicalId: 'team-canon',
         welderCode: 'W-001',
       }),
+    });
+    expect(resolveTeamIdForWrite).toHaveBeenCalledWith({
+      explicitTeamId: 'team-1',
+      team: 'A',
     });
   });
 
@@ -84,15 +91,21 @@ describe('welderService', () => {
     await WelderService.update('welder-1', {
       name: 'Alice',
       team: 'A',
+      teamId: 'team-1',
     });
 
     expect(prisma.welders.update).toHaveBeenCalledWith({
       where: { id: 'welder-1' },
       data: expect.objectContaining({
         name: 'Alice',
-        teamId: 'team-A',
+        teamId: 'team-1',
         teamCanonicalId: 'team-canon',
       }),
+    });
+    expect(resolveTeamIdForWrite).toHaveBeenCalledWith({
+      explicitTeamId: 'team-1',
+      keepExistingWhenNameMissing: true,
+      team: 'A',
     });
   });
 
