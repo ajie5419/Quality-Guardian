@@ -91,6 +91,7 @@ const formState = reactive({
   name: '',
   score: 12,
   team: '',
+  teamId: '',
   welderCode: '',
 });
 
@@ -367,6 +368,7 @@ function resetForm() {
   formState.name = '';
   formState.welderCode = '';
   formState.team = '';
+  formState.teamId = '';
   formState.examDate = undefined;
   formState.examPassed = false;
   formState.employmentStatus = 'ON_DUTY';
@@ -388,6 +390,7 @@ function openEditModal(row: QmsWelderApi.WelderItem) {
   formState.name = identity.displayName;
   formState.welderCode = identity.displayWelderCode;
   formState.team = row.team || '';
+  formState.teamId = row.teamId || '';
   formState.examDate = row.examDate ? dayjs(row.examDate) : undefined;
   formState.examPassed = !!row.examPassed;
   formState.employmentStatus = row.employmentStatus || 'ON_DUTY';
@@ -669,14 +672,22 @@ async function handleImport(file: File) {
   }
 }
 
+function handleTeamChange(
+  value: string | undefined,
+  option?: { label?: unknown },
+) {
+  formState.teamId = String(value || '').trim();
+  formState.team = String(option?.label || '').trim();
+}
+
 async function handleModalOk() {
   try {
     if (!String(formState.name || '').trim()) {
       message.warning('请输入焊工姓名');
       return;
     }
-    if (!String(formState.team || '').trim()) {
-      message.warning('请输入所属班组');
+    if (!String(formState.teamId || '').trim()) {
+      message.warning('Please select a team');
       return;
     }
     saving.value = true;
@@ -690,6 +701,7 @@ async function handleModalOk() {
       name: formState.name,
       score: formState.score,
       team: formState.team,
+      teamId: formState.teamId,
       welderCode: formState.welderCode || null,
     };
 
@@ -1018,10 +1030,15 @@ const [Grid, gridApi] = useVbenVxeGrid({
       </Form.Item>
       <Form.Item
         :label="t('qms.welder.team')"
-        name="team"
+        name="teamId"
         :rules="[{ required: true, message: '请选择所属班组或外协单位' }]"
       >
-        <TeamSelect v-model:value="formState.team" />
+        <TeamSelect
+          v-model:value="formState.teamId"
+          :legacy-name="formState.team"
+          @change="handleTeamChange"
+          @resolved="handleTeamChange"
+        />
       </Form.Item>
       <Form.Item :label="t('qms.welder.examDate')" name="examDate">
         <DatePicker v-model:value="formState.examDate" style="width: 100%" />

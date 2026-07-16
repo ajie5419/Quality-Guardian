@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkOrderRequirementRouteService } from '~/modules/work-order/work-order-requirement-route.service';
+import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 
 vi.mock(
   '~/modules/work-order-requirement/work-order-requirement.service',
@@ -81,6 +82,9 @@ describe('workOrderRequirementRouteService', () => {
       (
         WorkOrderRequirementService.registerAttachmentReferences as any
       ).mockResolvedValue(undefined);
+      vi.mocked(buildGovernedCanonicalWritePairForTable).mockResolvedValue({
+        responsibleTeamId: 'team-1',
+      });
 
       const result = await WorkOrderRequirementRouteService.createRequirements(
         mockEvent(),
@@ -94,6 +98,7 @@ describe('workOrderRequirementRouteService', () => {
             attachments: [],
             responsiblePerson: 'John',
             responsibleTeam: 'Team A',
+            responsibleTeamId: 'team-1',
           },
         ],
         mockUserinfo(),
@@ -104,6 +109,19 @@ describe('workOrderRequirementRouteService', () => {
       expect(
         WorkOrderRequirementService.registerAttachmentReferences,
       ).toHaveBeenCalled();
+      expect(buildGovernedCanonicalWritePairForTable).toHaveBeenCalledWith(
+        'work_order_requirements',
+        expect.objectContaining({
+          responsibleTeam: 'Team A',
+          responsibleTeamId: 'team-1',
+        }),
+      );
+      expect(WorkOrderRequirementService.createMany).toHaveBeenCalledWith([
+        expect.objectContaining({
+          responsibleTeam: 'Team A',
+          responsibleTeamId: 'team-1',
+        }),
+      ]);
     });
   });
 
@@ -117,11 +135,19 @@ describe('workOrderRequirementRouteService', () => {
         workOrderNumber: 'WO-001',
         requirementName: 'Updated',
       });
+      vi.mocked(buildGovernedCanonicalWritePairForTable).mockResolvedValue({
+        responsibleTeamId: 'team-1',
+      });
 
       const result = await WorkOrderRequirementRouteService.updateRequirement(
         mockEvent(),
         'req-1',
-        { confirm: true, requirementName: 'Updated' },
+        {
+          confirm: true,
+          requirementName: 'Updated',
+          responsibleTeam: 'Team A',
+          responsibleTeamId: 'team-1',
+        },
         mockUserinfo(),
       );
 
@@ -131,6 +157,8 @@ describe('workOrderRequirementRouteService', () => {
         expect.objectContaining({
           confirmStatus: 'CONFIRMED',
           confirmer: 'admin',
+          responsibleTeam: 'Team A',
+          responsibleTeamId: 'team-1',
         }),
       );
     });

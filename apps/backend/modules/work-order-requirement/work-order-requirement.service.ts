@@ -68,6 +68,7 @@ export const WorkOrderRequirementService = {
         requirementName: true,
         responsiblePerson: true,
         responsibleTeam: true,
+        responsibleTeamId: true,
         workOrderNumber: true,
       },
     });
@@ -90,6 +91,7 @@ export const WorkOrderRequirementService = {
         process: { select: { name: true } },
         responsiblePerson: true,
         responsibleTeam: true,
+        responsibleTeamId: true,
       },
     });
   },
@@ -216,6 +218,7 @@ export const WorkOrderRequirementService = {
           requirementName: true,
           responsiblePerson: true,
           responsibleTeam: true,
+          responsibleTeamId: true,
           workOrderNumber: true,
           work_order: {
             select: {

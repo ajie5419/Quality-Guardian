@@ -13,6 +13,7 @@ export interface WelderItem {
   name: string;
   score: number;
   team: string;
+  teamId?: null | string;
   updatedAt?: string;
   welderCode?: null | string;
   welding_method?: null | string;
@@ -43,6 +44,19 @@ export interface WelderListResponse {
   total: number;
 }
 
+export interface WelderWritePayload {
+  certificationNo?: null | string;
+  employmentStatus?: 'ON_DUTY' | 'RESIGNED';
+  examDate?: null | string;
+  examPassed?: boolean;
+  name: string;
+  score?: number;
+  team: string;
+  teamId: string;
+  welderCode?: null | string;
+  welding_method?: null | string;
+}
+
 export interface ImportWelderPayload {
   items: Array<Record<string, unknown>>;
 }
@@ -60,11 +74,11 @@ export async function getWelderListPage(params?: WelderListParams) {
   };
 }
 
-export async function createWelder(data: Partial<WelderItem>) {
+export async function createWelder(data: WelderWritePayload) {
   return requestClient.post<WelderItem>(QMS_API.WELDER, data);
 }
 
-export async function updateWelder(id: string, data: Partial<WelderItem>) {
+export async function updateWelder(id: string, data: WelderWritePayload) {
   return requestClient.put<WelderItem>(`${QMS_API.WELDER}/${id}`, data);
 }
 

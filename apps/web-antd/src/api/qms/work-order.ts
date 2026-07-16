@@ -18,6 +18,16 @@ import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
 
+export type WorkOrderRequirementTeamIdentity =
+  | {
+      responsibleTeam: string;
+      responsibleTeamId: string;
+    }
+  | {
+      responsibleTeam?: undefined;
+      responsibleTeamId?: undefined;
+    };
+
 // Re-export shared types
 
 /**
@@ -169,22 +179,24 @@ export async function getWorkOrderRequirements(params: {
       requirementName: string;
       responsiblePerson: string;
       responsibleTeam: string;
+      responsibleTeamId: string;
       workOrderNumber: string;
     }>
   >(QMS_API.WORK_ORDER_REQUIREMENTS, { params });
 }
 
 export async function uploadWorkOrderRequirements(data: {
-  requirements: Array<{
-    attachments?: WorkOrderRequirementAttachment[];
-    items?: unknown[];
-    partName?: string;
-    processName?: string;
-    requirementName: string;
-    responsiblePerson?: string;
-    responsibleTeam?: string;
-    workOrderNumber: string;
-  }>;
+  requirements: Array<
+    WorkOrderRequirementTeamIdentity & {
+      attachments?: WorkOrderRequirementAttachment[];
+      items?: unknown[];
+      partName?: string;
+      processName?: string;
+      requirementName: string;
+      responsiblePerson?: string;
+      workOrderNumber: string;
+    }
+  >;
 }) {
   return requestClient.post<{
     items: Array<{
@@ -267,6 +279,7 @@ export async function getWorkOrderRequirementBoard(params?: {
       requirementName: string;
       responsiblePerson: string;
       responsibleTeam: string;
+      responsibleTeamId: string;
       workOrderNumber: string;
       workOrderStatus: string;
     }>;

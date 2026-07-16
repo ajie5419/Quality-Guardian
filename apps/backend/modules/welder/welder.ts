@@ -47,6 +47,7 @@ export async function buildWelderCreateData(input: Record<string, unknown>) {
   const createData = buildWelderCreateDataCore(input);
   if (!createData) return null;
   const teamId = await resolveTeamIdForWrite({
+    explicitTeamId: String(input.teamId || '').trim() || undefined,
     team: String(createData.team || ''), // governance-allow-direct-name-id
   });
   return sanitizeWelderWriteData({
@@ -59,6 +60,7 @@ export async function buildWelderCreateData(input: Record<string, unknown>) {
 export async function buildWelderUpdateData(input: Record<string, unknown>) {
   const updateData = buildWelderUpdateDataCore(input);
   const teamId = await resolveTeamIdForWrite({
+    explicitTeamId: String(input.teamId || '').trim() || undefined,
     keepExistingWhenNameMissing: true,
     team: String(updateData.team || ''), // governance-allow-direct-name-id
   });
