@@ -30,6 +30,13 @@ export interface BackfillIntegrityMetric {
   unresolved?: number;
 }
 
+export interface OpenAuditDelta {
+  changedKeys: string[];
+  newKeys: string[];
+}
+
+export type OpenAuditSnapshot = Map<string, string>;
+
 export interface UnresolvedRefInput {
   entityId: string;
   evidence: Record<string, null | number | string>;
@@ -178,17 +185,29 @@ export async function bootstrapExactTeamLinks(
   };
 }
 
-export function assertBackfillIntegrity(metrics: BackfillIntegrityMetric[]) {
+export function assertBackfillIntegrity(
+  metrics: BackfillIntegrityMetric[],
+  openAuditDelta?: OpenAuditDelta,
+) {
   const failures: string[] = [];
   for (const metric of metrics) {
     const values = {
       ambiguous: metric.ambiguous,
       concurrentChanges: metric.concurrentChanges,
-      conflicts: metric.conflicts,
-      unresolved: metric.unresolved,
+      ...(openAuditDelta
+        ? {}
+        : { conflicts: metric.conflicts, unresolved: metric.unresolved }),
     };
     for (const [name, value] of Object.entries(values)) {
       if (value && value > 0) failures.push(`${metric.name}.${name}=${value}`);
+    }
+  }
+  if (openAuditDelta) {
+    if (openAuditDelta.newKeys.length > 0) {
+      failures.push(`open-audits.new=${openAuditDelta.newKeys.length}`);
+    }
+    if (openAuditDelta.changedKeys.length > 0) {
+      failures.push(`open-audits.changed=${openAuditDelta.changedKeys.length}`);
     }
   }
   if (failures.length > 0) {
@@ -196,6 +215,58 @@ export function assertBackfillIntegrity(metrics: BackfillIntegrityMetric[]) {
       `Supplier identity backfill integrity check failed: ${failures.join(', ')}`,
     );
   }
+}
+
+function buildOpenAuditKey(item: {
+  entityId: string;
+  entityType: string;
+  fieldName: string;
+}) {
+  return `${item.entityType}:${item.entityId}:${item.fieldName}`;
+}
+
+function buildOpenAuditSignature(item: {
+  evidence: unknown;
+  rawId: null | string;
+  rawName: null | string;
+  reason: string;
+}) {
+  return JSON.stringify([item.reason, item.rawId, item.rawName, item.evidence]);
+}
+
+export function compareOpenAuditSnapshots(
+  before: OpenAuditSnapshot,
+  after: OpenAuditSnapshot,
+): OpenAuditDelta {
+  const changedKeys: string[] = [];
+  const newKeys: string[] = [];
+  for (const [key, signature] of after) {
+    const previous = before.get(key);
+    if (previous === undefined) newKeys.push(key);
+    else if (previous !== signature) changedKeys.push(key);
+  }
+  return { changedKeys, newKeys };
+}
+
+export async function loadOpenAuditSnapshot(): Promise<OpenAuditSnapshot> {
+  const rows = await prisma.unresolved_master_data_refs.findMany({
+    where: { isDeleted: false, status: 'OPEN' },
+    select: {
+      entityId: true,
+      entityType: true,
+      evidence: true,
+      fieldName: true,
+      rawId: true,
+      rawName: true,
+      reason: true,
+    },
+  });
+  return new Map(
+    rows.map((item) => [
+      buildOpenAuditKey(item),
+      buildOpenAuditSignature(item),
+    ]),
+  );
 }
 
 export async function loadSupplierIdentityContext(

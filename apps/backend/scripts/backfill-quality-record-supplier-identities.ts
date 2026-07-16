@@ -19,6 +19,8 @@ import {
 import {
   assertBackfillIntegrity,
   bootstrapExactTeamLinks,
+  compareOpenAuditSnapshots,
+  loadOpenAuditSnapshot,
   loadSupplierIdentityContext,
   persistResolutionAudit,
 } from './supplier-identity-backfill-runtime';
@@ -44,6 +46,8 @@ function addSample(samples: ResolutionSample[], sample: ResolutionSample) {
 async function main() {
   const options = parseBackfillOptions(process.argv.slice(2));
   logger.info(options, 'supplier identity audit/backfill started');
+  const openAuditsBefore =
+    options.mode === 'apply' ? await loadOpenAuditSnapshot() : null;
 
   const teamBootstrap = await bootstrapExactTeamLinks(options.mode);
   logger.info(
@@ -283,7 +287,7 @@ async function main() {
     qualityRecordSummary,
     'supplier identity audit/backfill finished',
   );
-  assertBackfillIntegrity([
+  const integrityMetrics = [
     {
       ambiguous: teamBootstrap.ambiguous,
       conflicts: teamBootstrap.conflicts,
@@ -298,7 +302,19 @@ async function main() {
     { ...inspectionSupplierSummary, name: 'inspection-suppliers' },
     { ...afterSalesSummary, name: 'after-sales' },
     { ...qualityRecordSummary, name: 'quality-records' },
-  ]);
+  ];
+  const openAuditDelta = openAuditsBefore
+    ? compareOpenAuditSnapshots(openAuditsBefore, await loadOpenAuditSnapshot())
+    : undefined;
+  logger.info(
+    {
+      changedOpenAudits: openAuditDelta?.changedKeys.length || 0,
+      newOpenAudits: openAuditDelta?.newKeys.length || 0,
+      openAuditsBefore: openAuditsBefore?.size || 0,
+    },
+    'supplier identity unresolved audit delta finished',
+  );
+  assertBackfillIntegrity(integrityMetrics, openAuditDelta);
 }
 
 async function run() {
