@@ -4,6 +4,7 @@ import prisma from '~/utils/prisma';
 import {
   assertBackfillIntegrity,
   bootstrapExactTeamLinks,
+  compareOpenAuditSnapshots,
 } from './supplier-identity-backfill-runtime';
 
 vi.mock('~/utils/prisma', () => ({
@@ -16,6 +17,7 @@ vi.mock('~/utils/prisma', () => ({
     },
     suppliers: { findMany: vi.fn() },
     unresolved_master_data_refs: {
+      findMany: vi.fn(),
       updateMany: vi.fn(),
       upsert: vi.fn(),
     },
@@ -51,6 +53,46 @@ describe('supplier identity backfill runtime', () => {
         },
       ]),
     ).not.toThrow();
+  });
+
+  it('accepts previously audited conflicts during apply mode', () => {
+    expect(() =>
+      assertBackfillIntegrity(
+        [{ conflicts: 1, name: 'inspections', unresolved: 2 }],
+        { changedKeys: [], newKeys: [] },
+      ),
+    ).not.toThrow();
+  });
+
+  it('rejects new or changed open audits during apply mode', () => {
+    expect(() =>
+      assertBackfillIntegrity(
+        [{ conflicts: 1, name: 'inspections', unresolved: 2 }],
+        {
+          changedKeys: ['inspections:inspection-1:supplierId'],
+          newKeys: ['quality_records:record-1:supplierId'],
+        },
+      ),
+    ).toThrow(
+      'Supplier identity backfill integrity check failed: open-audits.new=1, open-audits.changed=1',
+    );
+  });
+
+  it('compares open audit snapshots by key and material signature', () => {
+    const before = new Map([
+      ['inspections:inspection-1:supplierId', 'same'],
+      ['quality_records:record-1:supplierId', 'old'],
+    ]);
+    const after = new Map([
+      ['inspections:inspection-1:supplierId', 'same'],
+      ['inspections:inspection-2:teamId', 'new'],
+      ['quality_records:record-1:supplierId', 'changed'],
+    ]);
+
+    expect(compareOpenAuditSnapshots(before, after)).toEqual({
+      changedKeys: ['quality_records:record-1:supplierId'],
+      newKeys: ['inspections:inspection-2:teamId'],
+    });
   });
 
   it('persists exact TEAM mapping conflicts for later resolution', async () => {

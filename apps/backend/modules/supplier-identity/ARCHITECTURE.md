@@ -13,6 +13,7 @@ supplier-identity 统一维护跨身份域关联。目前支持 `TEAM -> supplie
 - 无法解析、无效旧 ID 和证据冲突必须写入 `unresolved_master_data_refs`，不得静默覆盖。
 - 迁移工具必须支持有界分批、dry-run/apply、幂等重试和并发写保护。
 - 发布时先执行 Prisma migration，随后连续执行身份回填；回填按 TEAM 映射、报检任务 `teamId/supplierId`、`inspections`、`after_sales`、`quality_records` 的顺序处理。
+- apply 回填在执行前后比较 `OPEN` unresolved 审计快照：历史已知且证据未变化的记录不重复阻断发布，本次新增或证据变化的 OPEN 记录、主数据歧义和并发写入必须阻断；dry-run 未持久化审计，仍按扫描到的 conflict/unresolved 严格失败。
 - 映射新增、修改、删除 API 仅系统管理员可用；当前没有对应的前端管理界面。
 - unresolved 记录当前只有回填审计写入能力，没有人工处置 API/UI；人工处理前不得把 `OPEN` 记录当作已解决。
 
