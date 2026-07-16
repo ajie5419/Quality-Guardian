@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+  SCRIPT_PATH="${BASH_SOURCE[0]}"
+else
+  SCRIPT_PATH="${PWD}/scripts/local/container-common.sh"
+fi
+ROOT_DIR="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
 ENV_FILE="${CONTAINER_ENV_FILE:-$ROOT_DIR/.env.container.local}"
 ENV_EXAMPLE_FILE="$ROOT_DIR/.env.container.example"
 UPLOADS_DIR="${CONTAINER_UPLOADS_DIR:-$ROOT_DIR/uploads/container-local}"

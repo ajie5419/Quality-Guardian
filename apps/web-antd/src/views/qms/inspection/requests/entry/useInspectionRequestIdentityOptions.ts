@@ -10,6 +10,7 @@ import {
   getPublicInspectionRequestSuppliers,
   getPublicInspectionRequestTeams,
 } from '#/api/qms/inspection-request';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import {
   MACHINED_INCOMING_INSPECTION_TYPE,
@@ -28,6 +29,7 @@ export function useInspectionRequestIdentityOptions(options: {
   requestForm: InspectionRequestIdentityForm;
 }) {
   const { isIncomingEntry, requestForm } = options;
+  const { handleApiError } = useErrorHandler();
   const teamLoading = ref(false);
   const teamOptions = ref<SelectProps['options']>([]);
 
@@ -44,7 +46,8 @@ export function useInspectionRequestIdentityOptions(options: {
         keyword: keyword.trim() || undefined,
       });
       teamOptions.value = mapInspectionRequestEntryTeamOptions(list);
-    } catch {
+    } catch (error: unknown) {
+      handleApiError(error, 'Load Inspection Request Teams');
       teamOptions.value = [];
     } finally {
       teamLoading.value = false;
@@ -61,7 +64,8 @@ export function useInspectionRequestIdentityOptions(options: {
             : SUPPLIER_CATEGORY.SUPPLIER,
         keyword: keyword.trim() || undefined,
       });
-    } catch {
+    } catch (error: unknown) {
+      handleApiError(error, 'Load Inspection Request Suppliers');
       teamOptions.value = [];
     } finally {
       teamLoading.value = false;
