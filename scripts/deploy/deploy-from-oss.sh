@@ -196,6 +196,28 @@ tmp_compose="$compose_file.tmp"
 update_compose_images "$compose_file" "$tmp_compose" "$backend_ref" "$frontend_ref"
 mv "$tmp_compose" "$compose_file"
 
+run_backend() {
+  local command="$1"
+  docker compose -f "$compose_file" run --rm backend sh -lc "$command"
+}
+
+PRISMA_CMD="/app/apps/backend/node_modules/.bin/prisma"
+PRISMA_SCHEMA="/app/apps/backend/prisma/schema.prisma"
+TEAM_DICTIONARY_BOOTSTRAP_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/bootstrap-team-dictionaries.ts --apply"
+SUPPLIER_IDENTITY_BACKFILL_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-quality-record-supplier-identities.ts --apply"
+
+echo "[remote] start database dependencies"
+docker compose -f "$compose_file" up -d redis
+
+echo "[remote] run database migrations"
+run_backend "$PRISMA_CMD migrate deploy --schema '$PRISMA_SCHEMA'"
+
+echo "[remote] bootstrap canonical TEAM dictionaries"
+run_backend "$TEAM_DICTIONARY_BOOTSTRAP_CMD"
+
+echo "[remote] backfill supplier identities"
+run_backend "$SUPPLIER_IDENTITY_BACKFILL_CMD"
+
 echo "[remote] restart services"
 docker compose -f "$compose_file" up -d redis backend frontend
 

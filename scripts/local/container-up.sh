@@ -24,6 +24,18 @@ container run --rm \
   "$BACKEND_IMAGE" \
   sh -lc "/app/apps/backend/node_modules/.bin/prisma migrate deploy --schema /app/apps/backend/prisma/schema.prisma"
 
+echo "Bootstrapping canonical TEAM dictionaries..."
+container run --rm \
+  --env-file "$ENV_FILE" \
+  "$BACKEND_IMAGE" \
+  sh -lc "cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/bootstrap-team-dictionaries.ts --apply"
+
+echo "Backfilling supplier identities..."
+container run --rm \
+  --env-file "$ENV_FILE" \
+  "$BACKEND_IMAGE" \
+  sh -lc "cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-quality-record-supplier-identities.ts --apply"
+
 echo "Starting backend: $BACKEND_CONTAINER"
 container run -d \
   --name "$BACKEND_CONTAINER" \

@@ -33,8 +33,8 @@ export WX_SESSION_SECRET="${WX_SESSION_SECRET:-dev-local-wx-session-secret-32-by
 echo "apple/container dependencies are ready."
 echo "MySQL: 127.0.0.1:${MYSQL_PORT}/${MYSQL_DATABASE}"
 echo "Redis: 127.0.0.1:${REDIS_PORT}"
-echo "Synchronizing Prisma schema..."
-pnpm --dir apps/backend exec prisma db push --schema prisma/schema.prisma
+echo "Running database migrations..."
+pnpm --dir apps/backend exec prisma migrate deploy --schema prisma/schema.prisma
 
 USER_COUNT="$(pnpm --dir apps/backend exec node -e "const {PrismaClient}=require('@prisma/client'); const p=new PrismaClient(); p.users.count().then((count)=>{console.log(count);}).finally(()=>p.\$disconnect());")"
 
@@ -42,6 +42,12 @@ if [[ "${CONTAINER_DEV_SEED:-false}" == "true" || "$USER_COUNT" == "0" ]]; then
   echo "Seeding local container database..."
   pnpm --dir apps/backend run db:seed
 fi
+
+echo "Bootstrapping canonical TEAM dictionaries..."
+pnpm --dir apps/backend exec tsx scripts/bootstrap-team-dictionaries.ts --apply
+
+echo "Backfilling supplier identities..."
+pnpm --dir apps/backend exec tsx scripts/backfill-quality-record-supplier-identities.ts --apply
 
 echo "Starting pnpm dev:antd..."
 
