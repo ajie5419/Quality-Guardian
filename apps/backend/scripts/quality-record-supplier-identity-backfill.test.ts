@@ -26,6 +26,7 @@ describe('quality record supplier identity backfill', () => {
       resolveQualityRecordSupplierIdentity({
         existingSupplier: null,
         existingSupplierId: null,
+        existingSupplierName: supplierB.name,
         inspection: {
           category: 'INCOMING',
           processSupplier: null,
@@ -46,6 +47,7 @@ describe('quality record supplier identity backfill', () => {
       resolveQualityRecordSupplierIdentity({
         existingSupplier: null,
         existingSupplierId: null,
+        existingSupplierName: supplierA.name,
         inspection: {
           category: 'PROCESS',
           processSupplier: null,
@@ -65,6 +67,7 @@ describe('quality record supplier identity backfill', () => {
       resolveQualityRecordSupplierIdentity({
         existingSupplier: supplierA,
         existingSupplierId: supplierA.id,
+        existingSupplierName: supplierA.name,
         inspection: {
           category: 'PROCESS',
           processSupplier: supplierB,
@@ -85,6 +88,7 @@ describe('quality record supplier identity backfill', () => {
       resolveQualityRecordSupplierIdentity({
         existingSupplier: null,
         existingSupplierId: 'legacy-id',
+        existingSupplierName: supplierA.name,
         inspection: {
           category: 'INCOMING',
           processSupplier: null,
@@ -105,6 +109,7 @@ describe('quality record supplier identity backfill', () => {
       resolveQualityRecordSupplierIdentity({
         existingSupplier: null,
         existingSupplierId: 'legacy-name-id',
+        existingSupplierName: supplierA.name,
         inspection: null,
         supplierByRecordName: supplierA,
       }),
@@ -120,12 +125,48 @@ describe('quality record supplier identity backfill', () => {
       resolveQualityRecordSupplierIdentity({
         existingSupplier: null,
         existingSupplierId: 'legacy-id',
+        existingSupplierName: null,
         inspection: null,
         supplierByRecordName: null,
       }),
     ).toEqual({
       action: 'unresolved',
       reason: 'INVALID_EXISTING_ID',
+    });
+  });
+
+  it('skips internal process records without supplier evidence', () => {
+    expect(
+      resolveQualityRecordSupplierIdentity({
+        existingSupplier: null,
+        existingSupplierId: null,
+        existingSupplierName: null,
+        inspection: {
+          category: 'PROCESS',
+          processSupplier: null,
+          supplierById: null,
+          supplierByName: null,
+        },
+        supplierByRecordName: null,
+      }),
+    ).toEqual({
+      action: 'skip',
+      reason: 'NO_SUPPLIER_IDENTITY_REQUIRED',
+    });
+  });
+
+  it('skips manual records without supplier evidence', () => {
+    expect(
+      resolveQualityRecordSupplierIdentity({
+        existingSupplier: null,
+        existingSupplierId: null,
+        existingSupplierName: null,
+        inspection: null,
+        supplierByRecordName: null,
+      }),
+    ).toEqual({
+      action: 'skip',
+      reason: 'NO_SUPPLIER_IDENTITY_REQUIRED',
     });
   });
 

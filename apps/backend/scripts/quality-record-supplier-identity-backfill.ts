@@ -12,6 +12,7 @@ export interface SupplierIdentity {
 export interface QualityRecordIdentityInput {
   existingSupplier: null | SupplierIdentity;
   existingSupplierId: null | string;
+  existingSupplierName: null | string;
   inspection: null | {
     category: inspection_category;
     processSupplier: null | SupplierIdentity;
@@ -29,7 +30,7 @@ export type SupplierIdentityResolution =
     }
   | {
       action: 'skip';
-      reason: 'EXISTING_VALID_ID';
+      reason: 'EXISTING_VALID_ID' | 'NO_SUPPLIER_IDENTITY_REQUIRED';
     }
   | {
       action: 'unresolved';
@@ -183,9 +184,15 @@ export function resolveQualityRecordSupplierIdentity(
   }
 
   if (input.inspection?.category === 'PROCESS') {
+    if (!input.existingSupplierId && !input.existingSupplierName) {
+      return { action: 'skip', reason: 'NO_SUPPLIER_IDENTITY_REQUIRED' };
+    }
     return { action: 'unresolved', reason: 'MISSING_PROCESS_TEAM_LINK' };
   }
   if (input.inspection?.category === 'SHIPMENT') {
+    if (!input.existingSupplierId && !input.existingSupplierName) {
+      return { action: 'skip', reason: 'NO_SUPPLIER_IDENTITY_REQUIRED' };
+    }
     return {
       action: 'unresolved',
       reason: 'UNSUPPORTED_INSPECTION_CATEGORY',
@@ -197,6 +204,9 @@ export function resolveQualityRecordSupplierIdentity(
       candidate: input.supplierByRecordName,
       reason: 'QUALITY_RECORD_NAME',
     };
+  }
+  if (!input.existingSupplierId && !input.existingSupplierName) {
+    return { action: 'skip', reason: 'NO_SUPPLIER_IDENTITY_REQUIRED' };
   }
   return {
     action: 'unresolved',

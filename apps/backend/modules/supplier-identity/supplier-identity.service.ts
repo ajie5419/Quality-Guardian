@@ -64,6 +64,24 @@ function teamIdentityConflict() {
 }
 
 export const SupplierIdentityService = {
+  async assertTeamCanBeRetired(teamId: string) {
+    const activeLink = await prisma.supplier_identity_links.findFirst({
+      select: { id: true },
+      where: {
+        identityId: normalizeId(teamId),
+        identityType: 'TEAM',
+        isDeleted: false,
+      },
+    });
+    if (activeLink) {
+      throw new BusinessError(
+        'TEAM_IDENTITY_LINK_ACTIVE',
+        'TEAM must be unlinked from its supplier before it can be disabled or deleted',
+        409,
+      );
+    }
+  },
+
   async create(input: SupplierIdentityInput) {
     try {
       return await prisma.$transaction(async (tx) => {

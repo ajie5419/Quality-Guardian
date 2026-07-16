@@ -24,7 +24,7 @@ export type InspectionIdentityResolution =
     }
   | {
       action: 'skip';
-      reason: 'EXISTING_VALID_ID';
+      reason: 'EXISTING_VALID_ID' | 'NO_SUPPLIER_IDENTITY_REQUIRED';
     }
   | {
       action: 'unresolved';
@@ -87,6 +87,9 @@ export function resolveInspectionSupplierIdentity(
     return { action: 'unresolved', reason: 'MISSING_PROCESS_TEAM' };
   }
   if (!input.processSupplier) {
+    if (!input.existingSupplierId && !input.existingSupplierName) {
+      return { action: 'skip', reason: 'NO_SUPPLIER_IDENTITY_REQUIRED' };
+    }
     return { action: 'unresolved', reason: 'MISSING_PROCESS_TEAM_LINK' };
   }
   if (

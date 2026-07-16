@@ -90,7 +90,10 @@ export async function backfillInspectionSupplierIdentities(
       supplier: { id: string; name: string };
       team: null | TeamIdentity;
     }> = [];
-    const batchResolved: Array<{ entityId: string; resolvedId: string }> = [];
+    const batchResolved: Array<{
+      entityId: string;
+      resolvedId: null | string;
+    }> = [];
     const batchUnresolved: UnresolvedRefInput[] = [];
 
     for (const row of rows) {
@@ -123,9 +126,7 @@ export async function backfillInspectionSupplierIdentities(
 
       if (resolution.action === 'skip') {
         skipped += 1;
-        if (row.supplierId) {
-          batchResolved.push({ entityId: row.id, resolvedId: row.supplierId });
-        }
+        batchResolved.push({ entityId: row.id, resolvedId: row.supplierId });
         continue;
       }
 

@@ -56,6 +56,27 @@ describe('supplier identity service', () => {
     );
   });
 
+  it('rejects retiring a TEAM while an active supplier link exists', async () => {
+    vi.mocked(prisma.supplier_identity_links.findFirst).mockResolvedValue({
+      id: 'link-1',
+    } as never);
+
+    await expect(
+      SupplierIdentityService.assertTeamCanBeRetired('team-1'),
+    ).rejects.toMatchObject({
+      code: 'TEAM_IDENTITY_LINK_ACTIVE',
+      httpStatus: 409,
+    });
+  });
+
+  it('allows retiring a TEAM after its supplier link is removed', async () => {
+    vi.mocked(prisma.supplier_identity_links.findFirst).mockResolvedValue(null);
+
+    await expect(
+      SupplierIdentityService.assertTeamCanBeRetired('team-1'),
+    ).resolves.toBeUndefined();
+  });
+
   it('rejects a supplier ID that conflicts with the TEAM mapping', async () => {
     vi.mocked(prisma.suppliers.findFirst).mockResolvedValue({
       id: 'supplier-1',

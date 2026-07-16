@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DictionaryService } from '~/modules/dictionary/dictionary.service';
+import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
@@ -13,6 +14,12 @@ vi.mock('~/utils/prisma', () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
+  },
+}));
+
+vi.mock('~/modules/supplier-identity', () => ({
+  SupplierIdentityService: {
+    assertTeamCanBeRetired: vi.fn(),
   },
 }));
 
@@ -323,6 +330,59 @@ describe('dictionaryService', () => {
     await DictionaryService.delete('dict-1', 'tester');
 
     expect(redis.del).toHaveBeenCalledWith('qms:dict:options:supplier_status');
+  });
+
+  it('rejects deleting an active TEAM supplier identity', async () => {
+    (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
+      dictType: 'team',
+      id: 'team-1',
+      isSystem: false,
+    });
+    vi.mocked(
+      SupplierIdentityService.assertTeamCanBeRetired,
+    ).mockRejectedValueOnce(
+      new BusinessError(
+        'TEAM_IDENTITY_LINK_ACTIVE',
+        'TEAM must be unlinked first',
+        409,
+      ),
+    );
+
+    await expect(
+      DictionaryService.delete('team-1', 'tester'),
+    ).rejects.toMatchObject({
+      code: 'TEAM_IDENTITY_LINK_ACTIVE',
+      httpStatus: 409,
+    });
+    expect(prisma.dictionaries.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects disabling an active TEAM supplier identity', async () => {
+    (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
+      dictKey: 'Team A',
+      dictType: 'team',
+      id: 'team-1',
+      isSystem: false,
+      sort: 0,
+      status: 1,
+    });
+    vi.mocked(
+      SupplierIdentityService.assertTeamCanBeRetired,
+    ).mockRejectedValueOnce(
+      new BusinessError(
+        'TEAM_IDENTITY_LINK_ACTIVE',
+        'TEAM must be unlinked first',
+        409,
+      ),
+    );
+
+    await expect(
+      DictionaryService.update('team-1', { status: 0 }, 'tester'),
+    ).rejects.toMatchObject({
+      code: 'TEAM_IDENTITY_LINK_ACTIVE',
+      httpStatus: 409,
+    });
+    expect(prisma.dictionaries.update).not.toHaveBeenCalled();
   });
 
   it('rejects delete when dictionary item is missing or system-owned', async () => {
