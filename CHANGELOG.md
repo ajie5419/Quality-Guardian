@@ -25,6 +25,17 @@
 
 ## 执行记录
 
+## [0.17.4](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.3...qgs-v0.17.4) (2026-07-16)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** bootstrap canonical teams before backfill ([556cc73](https://github.com/ajie5419/Quality-Guardian/commit/556cc7311c2b554f33bb5905ed13804cda4460f0))
+* **@qgs/backend:** enforce supplier identity backfill integrity ([10a24c5](https://github.com/ajie5419/Quality-Guardian/commit/10a24c50f6454a4556a478082f1c41ca19a16b91))
+* **project:** preserve canonical team identities in forms ([b196093](https://github.com/ajie5419/Quality-Guardian/commit/b19609391c65803884ed0cd5de7144a0c8d19da0))
+* **project:** restore canonical TEAM identity flows ([aa7a881](https://github.com/ajie5419/Quality-Guardian/commit/aa7a881cc561229bfad279d5471a020afab3e1fc))
+* **project:** surface team loading failures ([edf6fab](https://github.com/ajie5419/Quality-Guardian/commit/edf6fab8b115263fd14cf01a6e5d2788e36ef99a))
+
 ### 2026-07-16 修复：恢复 TEAM 主数据链路与身份契约
 
 **执行内容：**
