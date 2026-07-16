@@ -33,6 +33,26 @@
 * **@qgs/backend:** baseline known identity audits ([ead426b](https://github.com/ajie5419/Quality-Guardian/commit/ead426b69b612e89f726fef734babe35666bb5e1))
 * **@qgs/backend:** baseline known identity audits ([6bc5e10](https://github.com/ajie5419/Quality-Guardian/commit/6bc5e10042a2328e921c778e3601e06d5714382d))
 
+### 2026-07-16 发布：qgs-v0.17.5
+
+**执行内容：**
+
+- 合并 hotfix PR #61 和 release-please PR #62，生成 GitHub Release 与 tag `qgs-v0.17.5`。
+- deploy workflow 完成 backend/frontend 镜像构建与推送，更新生产 ECS，并执行 migration、TEAM bootstrap、身份回填、容器切换和 HTTP 健康检查。
+- 生产历史 OPEN unresolved 继续保留在人工处置队列；本次回填仅在新增或证据变化时阻断发布。
+
+**验证结果：**
+
+- release PR #62 的 Prisma Migration Check、Secret Scan、QMS Architecture Check、Typecheck、Lint 和 Unit Tests 全部通过。
+- deploy run `29477513118` 成功：生产检测到 38 个 migration，无待应用 migration；TEAM bootstrap 为 `candidates=29`、`existing=29`、`created=0`。
+- 身份回填未发生并发变化，审计增量为 `newOpenAudits=0`、`changedOpenAudits=0`；生产 ECS 部署与 HTTP 健康检查通过，未触发回滚。
+
+**commit:** `f23d3a15` Merge pull request #62
+
+**遗留问题：**
+
+- 生产仍有 93 条历史 OPEN 审计，需通过后续人工处置 API/UI 审核并关闭，不应通过回填脚本静默删除。
+
 ### 2026-07-16 修复：区分历史 unresolved 与本次回填异常
 
 **执行内容：**
@@ -52,7 +72,7 @@
 
 **遗留问题：**
 
-- 生产历史 OPEN unresolved 继续保留，等待人工处置 API/UI；hotfix 发布后需复验身份回填审计增量为 0、ECS 健康检查通过。
+- 生产历史 OPEN unresolved 继续保留，等待人工处置 API/UI；`qgs-v0.17.5` 已复验身份回填审计增量为 0，ECS 健康检查通过。
 
 ## [0.17.4](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.3...qgs-v0.17.4) (2026-07-16)
 
