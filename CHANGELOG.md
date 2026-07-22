@@ -25,6 +25,27 @@
 
 ## 执行记录
 
+### 2026-07-22 修复：本地 Apple Container 启动端口检查阻塞
+
+**执行内容：**
+
+- 定位 `pnpm local:container:dev:antd` 停在 Container API 提示后的根因：实际是 `lsof` 阻塞在 macOS `proc_pidfdinfo` 内核调用，Container API、MySQL 和 Redis 均正常。
+- 将 `ensure_host_port_free` 的无超时 `lsof` 扫描替换为 IPv4/IPv6 `nc` 一秒超时探测；端口占用时继续通过 `netstat` 输出监听进程。
+- 清理两组卡住的启动脚本；两个已进入不可中断内核态的 `lsof` 孤儿进程需要等待内核返回或重启 macOS 后回收，新脚本不再依赖它们。
+
+**验证结果：**
+
+- `bash -n scripts/local/container-common.sh` 通过。
+- 空闲端口 `5320` 探测立即通过；临时占用端口 `54321` 在一秒内返回失败并输出监听进程。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 和 `git diff --check` 全部通过。
+- 未运行前端 dev/build/start/serve，遵循仓库约束。
+
+**commit:** `f1439e8` fix(project): bound local container port checks
+
+**遗留问题：**
+
+- 当前两个旧 `lsof` 进程处于 macOS 不可中断内核态；若系统未自行回收，重启 macOS 可彻底清理。
+
 ### 2026-07-22 修复：补齐不合格项、售后质量与调试验收操作
 
 **执行内容：**
