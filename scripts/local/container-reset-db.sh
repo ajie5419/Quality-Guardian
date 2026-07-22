@@ -23,6 +23,12 @@ container run --rm \
   "$BACKEND_IMAGE" \
   sh -lc "cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/bootstrap-team-dictionaries.ts --apply"
 
+echo "Backfilling inspection issue divisions..."
+container run --rm \
+  --env-file "$ENV_FILE" \
+  "$BACKEND_IMAGE" \
+  sh -lc "cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-inspection-issue-divisions.ts --apply"
+
 echo "Backfilling supplier identities..."
 container run --rm \
   --env-file "$ENV_FILE" \
