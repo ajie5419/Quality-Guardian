@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+### 2026-07-22 修复：恢复不合格品项管理员管理权限
+
+**执行内容：**
+
+- 修复不合格品项所有权规则将管理员也限制为创建人的问题；管理员角色采用 `admin`、`super`、`super_admin`、`system_admin` 精确集合，避免通过角色名子串误授权。
+- 后端列表、详情、统计、图表、编辑、单条删除和批量删除统一实时读取 RBAC v2 角色，并继续分别校验 `List`、`View`、`Edit`、`Delete` 权限码；管理员仅豁免 `createdBy` 条件，不豁免权限码和软删除条件。
+- 电脑版、小程序列表、小程序详情及直达编辑页统一使用共享权限规则显示编辑和删除入口；普通用户仍只能查看及管理本人创建的记录。
+- 导入覆盖继续保留原所有权限制，本次未扩大导入权限范围。
+
+**验证结果：**
+
+- 后端定向测试：8/8 个文件、70/70 个用例通过；电脑版与小程序定向测试：2/2 个文件、12/12 个用例通过。
+- 全量后端测试：218/218 个文件、2024/2024 个用例通过。
+- `pnpm lint`、3/3 workspace typecheck、后端 `tsc --noEmit`、`check:qms-arch` 和 `git diff --check` 全部通过。
+- 前端未运行 dev/build/start/serve，遵循仓库前端验证约束。
+
+**commit:** `132bd2a` fix(project): allow admins to manage inspection issues
+
+**遗留问题：**
+
+- 无。
+
 ## [0.17.5](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.4...qgs-v0.17.5) (2026-07-16)
 
 
