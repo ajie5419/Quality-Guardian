@@ -25,6 +25,23 @@
 
 ## 执行记录
 
+## [0.18.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.6...qgs-v0.18.0) (2026-07-22)
+
+
+### Features
+
+* improve inspection, after-sales, and commissioning workflows ([9d6a24d](https://github.com/ajie5419/Quality-Guardian/commit/9d6a24de15f1dfb6a833546233f0f99792fe1e63))
+* **project:** add commissioning issue deletion permission ([9c4a156](https://github.com/ajie5419/Quality-Guardian/commit/9c4a1568bec2f0ba996aafd347b7687f890e62a1))
+* **project:** add inspection issue date range search ([a6aeb31](https://github.com/ajie5419/Quality-Guardian/commit/a6aeb31f2001da11a452d57292a899d2588bc7bc))
+* **project:** expand after-sales issue search ([6830404](https://github.com/ajie5419/Quality-Guardian/commit/6830404389c0af26c7baabaecc8280f7bbad7893))
+
+
+### Bug Fixes
+
+* **deploy:** backfill inspection issue responsibilities ([8cca7b9](https://github.com/ajie5419/Quality-Guardian/commit/8cca7b9e70d50b889b54abae9db79d08d160653d))
+* **project:** bound local container port checks ([f1439e8](https://github.com/ajie5419/Quality-Guardian/commit/f1439e83babe77f41f723459a1044febbff4802d))
+* **project:** preserve inspection issue responsibility identity ([0780f1c](https://github.com/ajie5419/Quality-Guardian/commit/0780f1ce86820719c23a37f937d8ca61693fc4b2))
+
 ### 2026-07-22 修复：本地 Apple Container 启动端口检查阻塞
 
 **执行内容：**
