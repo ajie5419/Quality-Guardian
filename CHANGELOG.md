@@ -25,6 +25,29 @@
 
 ## 执行记录
 
+### 2026-07-22 修复：统一报检不合格项责任归属
+
+**执行内容：**
+
+- 根因修复报检关闭链路的责任单位分流：前端显式提交 `responsibilityType + responsibleDepartmentId + supplierId`，后端按 canonical ID 重建部门和供应商名称，不再把外部公司名称回退写入责任部门。
+- 报检列表和详情批量解析 TEAM→Supplier 并返回 `issueResponsibility`，覆盖普通工序名称但 TEAM 实际属于外部供应商的场景，避免 N+1 查询。
+- 删除关闭弹窗中“名称包含生产/外协”的责任类型推断；显式责任类型决定供应商控件与落库字段，普通内部生产部门不会被误判为外协单位。
+- 新增幂等历史回填，仅对报检 `supplierId`、TEAM→Supplier 映射或关联检验供应商等确定性证据执行 canonical 双写；冲突、证据不足或已有其他有效责任部门时不覆盖并写 OPEN 审计。
+- 将责任归属回填脚本加入后端镜像、维护命令和 GitHub deploy，在 migration、TEAM bootstrap、事业部回填和供应商身份回填之后自动执行；本次无需 Prisma migration。
+
+**验证结果：**
+
+- 共享契约测试：1/1 个文件、14/14 个用例通过；共享包 CJS/ESM/DTS 构建通过。
+- 前端定向测试：3/3 个文件、26/26 个用例通过；未运行 dev/build/start/serve，遵循仓库前端验证约束。
+- 后端定向测试：5/5 个文件、44/44 个用例通过；全量后端测试：220/220 个文件、2064/2064 个用例通过。
+- `pnpm lint`、3/3 workspace typecheck、后端 `tsc --noEmit`、`check:qms-arch` 和 `git diff --check` 全部通过。
+
+**commit:** `0780f1ce` fix(project): preserve inspection issue responsibility identity；`8cca7b9e` fix(deploy): backfill inspection issue responsibilities
+
+**遗留问题：**
+
+- 未读取 `.env`，因此未连接真实数据库执行 apply；生产回填将在后续正式发布时由 deploy workflow 自动运行并输出汇总。
+
 ## [0.17.6](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.5...qgs-v0.17.6) (2026-07-22)
 
 

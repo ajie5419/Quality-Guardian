@@ -33,6 +33,19 @@ inspection 是 QMS 的检验域模块，覆盖检验记录、检验表模板、�
 - `PASS`：创建或更新检验记录，任务状态改为 `CLOSED`，派工任务改为 `COMPLETED`。
 - `FAIL`：创建或关联不合格品项，任务状态改为 `INSPECTING`，派工任务改为 `PROCESSING`，等待问题处理或复检。
 
+### 关闭不合格项责任归属契约
+
+报检任务关闭并创建不合格项时，责任身份必须显式提交，禁止再根据责任单位名称猜测字段归属：
+
+- `responsibilityType=INTERNAL_DEPARTMENT`：提交 `responsibleDepartmentId`，落库 `responsibleDepartmentId + responsibleDepartment`，供应商字段必须为空。
+- `responsibilityType=SUPPLIER`：提交 `responsibleDepartmentId + supplierId`，责任部门和供应商分别按 canonical ID 重建名称；用于进货检验供应商。
+- `responsibilityType=OUTSOURCING_UNIT`：提交 `responsibleDepartmentId + supplierId`，责任部门和外部单位分别按 canonical ID 重建名称；用于 TEAM 已映射供应商或明确外协任务。
+- 报检列表和详情返回解析后的 `issueResponsibility`，前端以该显式类型决定供应商控件和提交字段；“名称包含生产/外协”等关键词不得改写责任类型。
+- 后端以显式类型和 canonical ID 为权威；仅当它们与报检任务已有 `supplierId` 或 TEAM→Supplier 映射直接冲突时拒绝关闭。
+- 旧客户端未提交显式类型时，只允许使用报检工序做兼容推断；旧 `responsibleDepartment` 仅在值本身是有效 canonical 部门 ID 时兼容，供应商名称不得回退写入责任部门。
+
+历史回填只处理存在 `qms_inspection_requests.linkedIssueId` 的关联不合格项，并只接受报检 `supplierId`、TEAM→Supplier 映射或关联检验 `supplierId` 作为确定性外部身份。普通 `PROCESS + teamId` 不等于外协；证据冲突、缺失或已有其他有效责任部门时保留原值并写入 OPEN 审计。回填支持 dry-run/apply、keyset 分批、字段级 CAS 和幂等重试，并在生产 deploy 的 migration 与供应商身份回填之后自动执行。
+
 多工单进货报检：
 
 - 报检任务主表 `qms_inspection_requests.workOrderNumber` 保留第一个工单号，用于兼容现有列表、筛选、通知和工单聚合入口。
