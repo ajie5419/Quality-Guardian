@@ -35,6 +35,28 @@
 * **project:** preserve inspection issue division identity ([ea80359](https://github.com/ajie5419/Quality-Guardian/commit/ea803597f7f8d91a8144db2021aefdf65ea6c146))
 * **project:** restore inspection issue access and division identity ([b8ef092](https://github.com/ajie5419/Quality-Guardian/commit/b8ef092b37a994a608db4988c92c1031ccf67d51))
 
+### 2026-07-22 发布：qgs-v0.17.6
+
+**执行内容：**
+
+- 合并功能 PR #64 和 release-please PR #65，生成 GitHub Release 与 tag `qgs-v0.17.6`。
+- deploy workflow 完成 backend/frontend 镜像构建与推送，更新生产 ECS，并依次执行 migration、事业部历史回填、供应商身份回填、容器切换和 HTTP 健康检查。
+- 事业部回填按确定性证据修复工单和报检关联不合格项；无法唯一解析的数据保留原值并写入 OPEN 审计，没有发生冲突覆盖或并发写入覆盖。
+
+**验证结果：**
+
+- 功能 PR #64 和发布 PR #65 的 Prisma Migration Check、Secret Scan、QMS Architecture Check、Typecheck、Lint 和 Unit Tests 全部通过。
+- deploy run `29889722661` 成功，耗时 6 分 54 秒；生产检测到 38 个 migration，无待应用 migration，ECS 容器切换与 HTTP 健康检查通过。
+- 事业部回填：工单处理 266 条、修复 142 条、无法解析 124 条；报检关联不合格项处理 51 条、修复 46 条、跳过 5 条、无法解析计数 8；两类均为 `conflicts=0`、`concurrentChanges=0`。
+- 供应商身份回填未产生新的或证据变化的 OPEN 审计：`newOpenAudits=0`、`changedOpenAudits=0`。
+
+**commit:** `bd437653` Merge pull request #65
+
+**遗留问题：**
+
+- 事业部回填留下的 124 条工单和不合格项侧 8 个无法解析计数需要通过人工处置流程审核，禁止按名称模糊猜测。
+- deploy workflow 仍提示 `actions/checkout@v4` 的 Node.js 20 运行时已弃用；本次 runner 强制使用 Node.js 24 并成功完成发布。
+
 ### 2026-07-22 修复：恢复报检不合格项事业部身份链路
 
 **执行内容：**
@@ -56,7 +78,7 @@
 
 **遗留问题：**
 
-- 发布后需要核对回填汇总和新增 OPEN 审计数量；重名、冲突或无有效证据的历史事业部会保留原值，等待人工处置，不会被脚本猜测覆盖。
+- 生产回填汇总已核对，确定性数据已完成修复；重名、冲突或无有效证据的历史事业部继续保留原值并等待人工处置。
 
 ### 2026-07-22 修复：恢复不合格品项管理员管理权限
 
