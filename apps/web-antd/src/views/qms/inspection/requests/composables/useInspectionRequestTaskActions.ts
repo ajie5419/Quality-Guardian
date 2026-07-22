@@ -1,4 +1,5 @@
 import type {
+  InspectionIssueResponsibilityType,
   InspectionRequest,
   InspectionRequestAttachment,
 } from '@qgs/shared';
@@ -9,11 +10,14 @@ import type { RouteLocationNormalizedLoaded, Router } from 'vue-router';
 
 import type { UploadFileWithResponse } from '../../issues/types';
 
-import type { SystemDeptApi } from '#/api/system/dept';
+import type { TreeSelectNode } from '#/types';
 
 import { computed, reactive, ref, watch } from 'vue';
 
-import { resolveInspectionRequestIssueResponsibility } from '@qgs/shared';
+import {
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  resolveInspectionRequestIssueResponsibility,
+} from '@qgs/shared';
 import { message, Modal } from 'ant-design-vue';
 import dayjs from 'dayjs';
 
@@ -30,6 +34,7 @@ import {
 
 import { DEFAULT_VALUES } from '../../issues/constants';
 import { normalizeIssuePhotoUrls } from '../../issues/utils/photo-upload';
+import { resolveTreeDepartmentIdentity } from '../inspection-request-responsibility';
 
 type LinkedIssueDraftState = {
   claim: string;
@@ -46,23 +51,17 @@ type LinkedIssueDraftState = {
   qualifiedQuantity: number;
   reportDate: string;
   reportedBy: string;
+  responsibilityType: InspectionIssueResponsibilityType;
   responsibleDepartment: string;
+  responsibleDepartmentId: string;
   responsibleWelder: string;
   rootCause: string;
   severity: string;
   solution: string;
   status: string;
+  supplierId: string;
   supplierName: string;
   unqualifiedQuantity: number;
-};
-
-type DepartmentIdentityNode = {
-  children?: DepartmentIdentityNode[];
-  id?: number | string;
-  label?: string;
-  name?: string;
-  title?: string;
-  value?: number | string;
 };
 
 type DivisionIdentitySource = {
@@ -70,62 +69,17 @@ type DivisionIdentitySource = {
   divisionId?: null | string;
 };
 
-function normalizeDivisionValue(value: unknown) {
-  return String(value ?? '').trim();
-}
-
-function findDepartment(
-  nodes: DepartmentIdentityNode[],
-  matcher: (params: { id: string; name: string }) => boolean,
-): undefined | { id: string; name: string } {
-  for (const node of nodes) {
-    const id = normalizeDivisionValue(node.id ?? node.value);
-    const name = normalizeDivisionValue(node.name ?? node.title ?? node.label);
-    if (matcher({ id, name })) return { id, name };
-    const matchedChild = node.children
-      ? findDepartment(node.children, matcher)
-      : undefined;
-    if (matchedChild) return matchedChild;
-  }
-  return undefined;
-}
-
 export function resolveDivisionIdentity(
-  nodes: DepartmentIdentityNode[],
+  nodes: TreeSelectNode[],
   source: DivisionIdentitySource,
 ): { division: string; divisionId: string } {
-  const explicitId = normalizeDivisionValue(source.divisionId);
-  const legacyValue = normalizeDivisionValue(source.division);
-  const idMatch = explicitId
-    ? findDepartment(nodes, ({ id }) => id === explicitId)
-    : undefined;
-  if (idMatch) {
-    return { division: idMatch.name || legacyValue, divisionId: idMatch.id };
-  }
-
-  const legacyIdMatch = legacyValue
-    ? findDepartment(nodes, ({ id }) => id === legacyValue)
-    : undefined;
-  if (legacyIdMatch) {
-    return {
-      division: legacyIdMatch.name,
-      divisionId: legacyIdMatch.id,
-    };
-  }
-
-  const legacyNameMatch = legacyValue
-    ? findDepartment(nodes, ({ name }) => name === legacyValue)
-    : undefined;
-  if (legacyNameMatch) {
-    return {
-      division: legacyNameMatch.name,
-      divisionId: legacyNameMatch.id,
-    };
-  }
-
+  const identity = resolveTreeDepartmentIdentity(nodes, {
+    department: source.division,
+    departmentId: source.divisionId,
+  });
   return {
-    division: legacyValue,
-    divisionId: explicitId,
+    division: identity.name,
+    divisionId: identity.id,
   };
 }
 
@@ -133,7 +87,7 @@ interface UseInspectionRequestTaskActionsOptions {
   canDelete: Ref<boolean>;
   canDispatch: Ref<boolean>;
   defectSubtypes: Ref<Record<string, Array<{ label: string; value: string }>>>;
-  deptRawData: Ref<SystemDeptApi.Dept[]>;
+  deptTreeData: Ref<TreeSelectNode[]>;
   onAfterMutation: () => Promise<void>;
   buildRequestUrl: (params: Record<string, string>, path?: string) => string;
   getCurrentUserName: () => string;
@@ -204,9 +158,13 @@ export function useInspectionRequestTaskActions(
     reportDate: dayjs().format('YYYY-MM-DD'),
     reportedBy: '',
     responsibleWelder: '',
+    responsibilityType:
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+    responsibleDepartmentId: '',
     rootCause: '',
     solution: '',
     status: 'OPEN',
+    supplierId: '',
     supplierName: '',
     photos: [],
     unqualifiedQuantity: 0,
@@ -284,6 +242,7 @@ export function useInspectionRequestTaskActions(
       [linkedIssueDraft.value.partName, '部件名称'],
       [linkedIssueDraft.value.processName, '工序'],
       [linkedIssueDraft.value.responsibleDepartment, '责任部门'],
+      [linkedIssueDraft.value.responsibleDepartmentId, '责任部门'],
       [linkedIssueDraft.value.defectType, '缺陷分类'],
       [linkedIssueDraft.value.defectSubtype, '二级分类'],
       [linkedIssueDraft.value.severity, '严重程度'],
@@ -426,10 +385,16 @@ export function useInspectionRequestTaskActions(
   }
 
   function openClose(record: InspectionRequest) {
-    const issueResponsibility = resolveInspectionRequestIssueResponsibility({
-      processName: record.processName,
-      team: record.team,
-    });
+    const issueResponsibility =
+      record.issueResponsibility ||
+      resolveInspectionRequestIssueResponsibility({
+        processName: record.processName,
+        team: record.team,
+      });
+    const responsibleDepartment = resolveTreeDepartmentIdentity(
+      options.deptTreeData.value,
+      { department: issueResponsibility.responsibleDepartment },
+    );
     currentRequest.value = record;
     closeAttachmentFileList.value = [];
     closeForm.attachments = [];
@@ -454,14 +419,17 @@ export function useInspectionRequestTaskActions(
       qualifiedQuantity: 0,
       reportDate: dayjs().format('YYYY-MM-DD'),
       reportedBy: record.inspectorName || getCurrentUserName() || '',
+      responsibilityType: issueResponsibility.responsibilityType,
+      responsibleDepartment: responsibleDepartment.name,
+      responsibleDepartmentId: responsibleDepartment.id,
       responsibleWelder: '',
       rootCause: '',
       solution: '',
       status: 'OPEN',
+      supplierId: issueResponsibility.supplierId || record.supplierId || '',
       supplierName: issueResponsibility.supplierName,
       photos: [] as UploadFileWithResponse[],
       unqualifiedQuantity: record.quantity || 1,
-      responsibleDepartment: issueResponsibility.responsibleDepartment,
       severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
     };
 
@@ -483,11 +451,20 @@ export function useInspectionRequestTaskActions(
     submitting.value = true;
     try {
       syncLinkedIssueQuantities();
+      const hasInternalResponsibility =
+        linkedIssueDraft.value.responsibilityType ===
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
       const payloadLinkedIssue = shouldCreateLinkedIssue.value
         ? {
             ...linkedIssueDraft.value,
             photos: normalizeIssuePhotoUrls(linkedIssueDraft.value.photos),
             quantity: linkedIssueDraft.value.unqualifiedQuantity,
+            supplierId: hasInternalResponsibility
+              ? undefined
+              : linkedIssueDraft.value.supplierId || undefined,
+            supplierName: hasInternalResponsibility
+              ? ''
+              : linkedIssueDraft.value.supplierName,
           }
         : undefined;
 

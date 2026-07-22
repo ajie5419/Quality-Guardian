@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { defineComponent, h } from 'vue';
 
+import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import IssueFormFields from './IssueFormFields.vue';
@@ -228,5 +229,19 @@ describe('issue form fields nc number controls', () => {
       'supplierName',
       'Supplier A',
     );
+  });
+
+  it('uses the explicit responsibility type for the supplier category', () => {
+    const wrapper = mount(IssueFormFields, {
+      props: {
+        deptTreeData: [],
+        responsibilityType:
+          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+      },
+    });
+
+    expect(
+      wrapper.findComponent({ name: 'MockSupplierSelect' }).props('category'),
+    ).toBe('Outsourcing');
   });
 });

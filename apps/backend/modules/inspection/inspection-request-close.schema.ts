@@ -1,3 +1,8 @@
+import {
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  normalizeInspectionIssueResponsibilityType,
+} from '@qgs/shared';
+import { z } from 'zod';
 import { BusinessError } from '~/utils/business-error';
 
 import {
@@ -13,6 +18,38 @@ const PREFIX_STATUS_MAP: Record<string, number> = {
   FORBIDDEN: 403,
   INTERNAL: 500,
 };
+
+const linkedIssueResponsibilitySchema = z
+  .object({
+    responsibilityType: z.preprocess(
+      (value) => normalizeInspectionIssueResponsibilityType(value) || value,
+      z.nativeEnum(INSPECTION_ISSUE_RESPONSIBILITY_TYPE).optional(),
+    ),
+    responsibleDepartmentId: z.string().trim().min(1).optional(),
+    supplierId: z.string().trim().min(1).optional(),
+  })
+  .passthrough()
+  .superRefine((value, context) => {
+    if (!value.responsibilityType) return;
+    if (!value.responsibleDepartmentId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: '不合格项责任部门 ID 不能为空',
+        path: ['responsibleDepartmentId'],
+      });
+    }
+    if (
+      value.responsibilityType ===
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
+      value.supplierId
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: '内部责任部门不能同时指定供应商 ID',
+        path: ['supplierId'],
+      });
+    }
+  });
 
 export function failCloseRequest(prefix: string, message: string): never {
   const httpStatus = PREFIX_STATUS_MAP[prefix] ?? 400;
@@ -50,6 +87,15 @@ export function validateCloseRequestBody(body: Record<string, unknown>) {
   if (!body.linkedIssue || typeof body.linkedIssue !== 'object')
     failCloseRequest('VALIDATION', '检验结果为不合格时必须填写不合格项信息');
   const linkedIssue = body.linkedIssue as Record<string, unknown>;
+  const responsibilityResult =
+    linkedIssueResponsibilitySchema.safeParse(linkedIssue);
+  if (!responsibilityResult.success) {
+    failCloseRequest(
+      'VALIDATION',
+      responsibilityResult.error.issues[0]?.message ||
+        '不合格项责任归属参数无效',
+    );
+  }
   const issuePhotos = normalizeIssuePhotoUrls(linkedIssue.photos);
   if (issuePhotos.length === 0)
     failCloseRequest('VALIDATION', '不合格项照片不能为空');

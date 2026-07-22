@@ -56,6 +56,40 @@ describe('supplier identity service', () => {
     );
   });
 
+  it('resolves suppliers for TEAM IDs in one query', async () => {
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
+      {
+        identityId: 'team-1',
+        supplier: { id: 'supplier-1', isDeleted: false, name: 'Supplier A' },
+      },
+      {
+        identityId: 'team-2',
+        supplier: { id: 'supplier-2', isDeleted: false, name: 'Supplier B' },
+      },
+    ] as never);
+
+    await expect(
+      SupplierIdentityService.resolveSuppliersByTeamIds([
+        'team-1',
+        'team-1',
+        'team-2',
+        null,
+      ]),
+    ).resolves.toEqual(
+      new Map([
+        ['team-1', { id: 'supplier-1', name: 'Supplier A' }],
+        ['team-2', { id: 'supplier-2', name: 'Supplier B' }],
+      ]),
+    );
+    expect(prisma.supplier_identity_links.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          identityId: { in: ['team-1', 'team-2'] },
+        }),
+      }),
+    );
+  });
+
   it('rejects retiring a TEAM while an active supplier link exists', async () => {
     vi.mocked(prisma.supplier_identity_links.findFirst).mockResolvedValue({
       id: 'link-1',

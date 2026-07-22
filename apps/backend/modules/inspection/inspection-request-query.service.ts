@@ -1,5 +1,7 @@
 import type { UserSession } from '~/utils/jwt-utils';
 
+import { resolveInspectionRequestIssueResponsibility } from '@qgs/shared';
+import { SupplierIdentityService } from '~/modules/supplier-identity';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import { buildTeamContainsWhere } from '~/utils/team-resolver';
@@ -131,6 +133,35 @@ const requestQueryIncludeWithWorkOrders = {
   workOrders: inspectionRequestWorkOrdersInclude,
 };
 
+type RequestResponsibilitySource = {
+  processName?: null | string;
+  supplierId?: null | string;
+  team?: null | string;
+  teamId?: null | string;
+};
+
+function resolveRequestIssueResponsibility(
+  request: RequestResponsibilitySource,
+  teamSupplierByTeamId: ReadonlyMap<string, { id: string; name: string }>,
+) {
+  return resolveInspectionRequestIssueResponsibility({
+    processName: request.processName,
+    supplierId: request.supplierId,
+    team: request.team,
+    teamSupplier: request.teamId
+      ? teamSupplierByTeamId.get(request.teamId)
+      : null,
+  });
+}
+
+async function resolveRequestTeamSuppliers(
+  requests: ReadonlyArray<RequestResponsibilitySource>,
+) {
+  return SupplierIdentityService.resolveSuppliersByTeamIds(
+    requests.map((request) => request.teamId),
+  );
+}
+
 async function findLinkedIssues(
   items: Array<{
     inspectionId: null | string;
@@ -190,6 +221,10 @@ export const InspectionRequestQueryService = {
     const mappedRequest =
       'workOrders' in request ? request : { ...request, workOrders: [] };
 
+    const teamSupplierByTeamId = await resolveRequestTeamSuppliers([
+      mappedRequest,
+    ]);
+
     const issues = await findLinkedIssues([mappedRequest]);
     const issueById = new Map(issues.map((issue) => [issue.id, issue]));
     const issueByInspectionId = new Map(
@@ -198,7 +233,7 @@ export const InspectionRequestQueryService = {
         .map((issue) => [issue.inspectionId, issue]),
     );
 
-    return mapInspectionRequest({
+    const response = mapInspectionRequest({
       ...mappedRequest,
       qualityRecords: [
         mappedRequest.linkedIssueId
@@ -209,6 +244,13 @@ export const InspectionRequestQueryService = {
           : null,
       ].filter(Boolean),
     });
+    return {
+      ...response,
+      issueResponsibility: resolveRequestIssueResponsibility(
+        response,
+        teamSupplierByTeamId,
+      ),
+    };
   },
 
   async getRequestList(
@@ -241,6 +283,7 @@ export const InspectionRequestQueryService = {
       total = fallbackTotal;
     }
     const issues = await findLinkedIssues(items);
+    const teamSupplierByTeamId = await resolveRequestTeamSuppliers(items);
     const issueById = new Map(issues.map((issue) => [issue.id, issue]));
     const issueByInspectionId = new Map(
       issues
@@ -249,8 +292,8 @@ export const InspectionRequestQueryService = {
     );
 
     return {
-      items: items.map((item) =>
-        mapInspectionRequest({
+      items: items.map((item) => {
+        const response = mapInspectionRequest({
           ...item,
           qualityRecords: [
             item.linkedIssueId ? issueById.get(item.linkedIssueId) : null,
@@ -258,8 +301,15 @@ export const InspectionRequestQueryService = {
               ? issueByInspectionId.get(item.inspectionId)
               : null,
           ].filter(Boolean),
-        }),
-      ),
+        });
+        return {
+          ...response,
+          issueResponsibility: resolveRequestIssueResponsibility(
+            response,
+            teamSupplierByTeamId,
+          ),
+        };
+      }),
       total,
     };
   },

@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import type { InspectionRequest } from '@qgs/shared';
 
-import type { SystemDeptApi } from '#/api/system/dept';
 import type { SystemUserApi } from '#/api/system/user';
 import type { TreeSelectNode } from '#/types';
 
@@ -71,7 +70,6 @@ const {
   requestEntryUrl,
   saveQrBaseUrl,
 } = useInspectionRequestEntryActions({ handleApiError });
-const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const deptTreeData = ref<TreeSelectNode[]>([]);
 
 const { defectOptions, defectSubtypes } = useDefectOptions();
@@ -286,7 +284,7 @@ const {
   canDelete,
   canDispatch,
   defectSubtypes,
-  deptRawData,
+  deptTreeData,
   async onAfterMutation() {
     await Promise.all([loadRequests(), loadRequestStats()]);
   },
@@ -306,7 +304,6 @@ async function loadUsers() {
 
 async function loadDeptData() {
   const data = await getDeptList();
-  deptRawData.value = data;
   deptTreeData.value = convertToTreeSelectData(data);
 }
 

@@ -1,3 +1,5 @@
+import type { InspectionIssueResponsibilityType } from '../../domain-modules/qms/inspection-request';
+
 export type InspectionRequestStatus =
   | 'CANCELLED'
   | 'CLOSED'
@@ -28,6 +30,13 @@ export interface InspectionStationSelection {
   mode: InspectionStationSelectionMode;
 }
 
+export interface InspectionRequestIssueResponsibility {
+  responsibilityType: InspectionIssueResponsibilityType;
+  responsibleDepartment: string;
+  supplierId: null | string;
+  supplierName: string;
+}
+
 export interface InspectionRequest {
   attachments?: InspectionRequestAttachment[];
   closeAttachments?: InspectionRequestAttachment[];
@@ -45,6 +54,7 @@ export interface InspectionRequest {
   inspectionResult?: InspectionRequestInspectionResult;
   inspectorId?: null | string;
   inspectorName?: null | string;
+  issueResponsibility?: InspectionRequestIssueResponsibility;
   linkedIssueId?: null | string;
   linkedIssueNo?: null | string;
   linkedIssueStatus?: null | string;
@@ -126,12 +136,15 @@ export interface CloseInspectionRequestParams {
     quantity?: number;
     reportDate?: string;
     reportedBy?: string;
+    responsibilityType?: InspectionIssueResponsibilityType;
     responsibleDepartment?: string;
+    responsibleDepartmentId?: string;
     responsibleWelder?: string;
     rootCause?: string;
     severity?: string;
     solution?: string;
     status?: string;
+    supplierId?: string;
     supplierName?: string;
     unqualifiedQuantity?: number;
   };

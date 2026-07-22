@@ -198,6 +198,34 @@ export const SupplierIdentityService = {
     return { id: link.supplier.id, name: link.supplier.name };
   },
 
+  async resolveSuppliersByTeamIds(
+    teamIds: ReadonlyArray<null | string | undefined>,
+  ) {
+    const ids = [
+      ...new Set(teamIds.map((teamId) => normalizeId(teamId)).filter(Boolean)),
+    ];
+    if (ids.length === 0) {
+      return new Map<string, { id: string; name: string }>();
+    }
+    const links = await prisma.supplier_identity_links.findMany({
+      where: {
+        identityId: { in: ids },
+        identityType: 'TEAM',
+        isDeleted: false,
+        supplier: { is: { isDeleted: false } },
+      },
+      include: linkInclude,
+    });
+    return new Map(
+      links
+        .filter((link) => !link.supplier.isDeleted)
+        .map((link) => [
+          link.identityId,
+          { id: link.supplier.id, name: link.supplier.name },
+        ]),
+    );
+  },
+
   async resolveTeamById(teamId: null | string | undefined) {
     const id = normalizeId(teamId);
     if (!id) return null;
