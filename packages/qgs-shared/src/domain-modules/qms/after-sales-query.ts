@@ -5,7 +5,11 @@ import { mapAfterSalesStatus } from './after-sales-status';
 export type AfterSalesDateMode = 'month' | 'week' | 'year';
 
 function normalizeQueryText(value: unknown): string | undefined {
-  const normalized = String(value ?? '').trim();
+  const normalized = String(
+    Array.isArray(value) ? (value[0] ?? '') : (value ?? ''),
+  )
+    .trim()
+    .replaceAll(/\s+/g, ' ');
   return normalized || undefined;
 }
 
@@ -15,7 +19,7 @@ function normalizePositiveInteger(value: unknown, fallback: number): number {
 }
 
 function parseLocalDate(value: string): Date | undefined {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   if (!match) return undefined;
   const [, yearText, monthText, dayText] = match;
   const year = Number.parseInt(yearText, 10);
@@ -33,6 +37,26 @@ function parseLocalDate(value: string): Date | undefined {
     return undefined;
   }
   return date;
+}
+
+function parseDateRangeValue(value: unknown): string | undefined {
+  const normalized = normalizeQueryText(value);
+  return normalized && parseLocalDate(normalized) ? normalized : undefined;
+}
+
+export function buildAfterSalesExplicitDateRange(params: {
+  endDate?: string;
+  startDate?: string;
+}) {
+  const start = params.startDate ? parseLocalDate(params.startDate) : undefined;
+  const end = params.endDate ? parseLocalDate(params.endDate) : undefined;
+  if (!start || !end || start > end) {
+    return undefined;
+  }
+
+  const exclusiveEnd = new Date(end);
+  exclusiveEnd.setDate(exclusiveEnd.getDate() + 1);
+  return { end: exclusiveEnd, start };
 }
 
 function getWeekStart(date: Date): Date {
@@ -100,19 +124,25 @@ export function parseAfterSalesListQuery(
 ): AfterSalesParams {
   const yearRaw = normalizeQueryText(query.year);
   const year = yearRaw ? Number.parseInt(yearRaw, 10) : undefined;
+  const status = normalizeQueryText(query.status);
 
   return {
     dateMode: parseAfterSalesDateMode(query.dateMode),
     dateValue: parseAfterSalesDateValue(query.dateValue),
+    defectType: normalizeQueryText(query.defectType),
+    endDate: parseDateRangeValue(query.endDate),
+    handler: normalizeQueryText(query.handler),
     page: normalizePositiveInteger(query.page, 1),
     pageSize: Math.min(normalizePositiveInteger(query.pageSize, 20), 100),
+    productType: normalizeQueryText(query.productType),
     year: Number.isNaN(year ?? Number.NaN) ? undefined : year,
     workOrderNumber: normalizeQueryText(query.workOrderNumber),
     projectName: normalizeQueryText(query.projectName),
-    status: query.status
-      ? mapAfterSalesStatus(normalizeQueryText(query.status))
-      : undefined,
+    responsibleDept: normalizeQueryText(query.responsibleDept),
+    status: status ? mapAfterSalesStatus(status) : undefined,
     supplierBrand: normalizeQueryText(query.supplierBrand),
     supplierBrandId: normalizeQueryText(query.supplierBrandId),
+    startDate: parseDateRangeValue(query.startDate),
+    customerName: normalizeQueryText(query.customerName),
   };
 }

@@ -8,6 +8,8 @@ import type { BaseTreeNode } from '#/types/tree';
 
 import { computed } from 'vue';
 
+import { QMS_DEFECT_OPTIONS, QMS_PRODUCT_OPTIONS } from '@qgs/shared';
+
 import { findNameById } from '#/types';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 import {
@@ -27,6 +29,51 @@ export type AfterSalesGridRow = QmsAfterSalesApi.AfterSalesItem & {
   photos: string[];
   photoThumbUrl: string;
 };
+
+const TEXT_FILTER_FIELDS = [
+  'customerName',
+  'defectType',
+  'handler',
+  'productType',
+  'projectName',
+  'responsibleDept',
+  'supplierBrand',
+  'workOrderNumber',
+] as const;
+
+function normalizeSearchText(value: unknown): string | undefined {
+  const normalized = String(value ?? '')
+    .trim()
+    .replaceAll(/\s+/g, ' ');
+  return normalized || undefined;
+}
+
+function normalizeSearchDateRange(value: unknown): {
+  endDate?: string;
+  startDate?: string;
+} {
+  if (!Array.isArray(value) || value.length !== 2) return {};
+  const startDate = normalizeSearchText(value[0]);
+  const endDate = normalizeSearchText(value[1]);
+  return startDate && endDate ? { endDate, startDate } : {};
+}
+
+export function buildAfterSalesSearchParams(
+  formValues: Record<string, unknown> = {},
+): QmsAfterSalesApi.AfterSalesParams {
+  const params: Record<string, unknown> = { ...formValues };
+  const dateRange = normalizeSearchDateRange(params.dateRange);
+  delete params.dateRange;
+
+  for (const field of TEXT_FILTER_FIELDS) {
+    params[field] = normalizeSearchText(params[field]);
+  }
+
+  return {
+    ...params,
+    ...dateRange,
+  } as QmsAfterSalesApi.AfterSalesParams;
+}
 
 interface UseAfterSalesGridParams {
   canDelete: Ref<boolean>;
@@ -143,7 +190,7 @@ export function useAfterSalesGrid({
             dateMode: currentDateMode.value,
             dateValue: currentDateValue.value,
             year: currentYear.value,
-            ...proxyInfo?.form,
+            ...buildAfterSalesSearchParams(proxyInfo?.form),
           } as QmsAfterSalesApi.AfterSalesParams);
           return normalizeAfterSalesRows(data.items || []);
         }
@@ -407,7 +454,7 @@ export function useAfterSalesGrid({
             page: currentPage,
             pageSize,
             year: currentYear.value,
-            ...formValues,
+            ...buildAfterSalesSearchParams(formValues),
           } as QmsAfterSalesApi.AfterSalesParams);
           const items = normalizeAfterSalesRows(data.items || []);
           onRowsChange?.({ items, total: data.total });
@@ -421,7 +468,7 @@ export function useAfterSalesGrid({
           form?: Record<string, unknown>;
           formValues?: Record<string, unknown>;
         }) => {
-          const filters = form || formValues || {};
+          const filters = buildAfterSalesSearchParams(form || formValues);
           const data = await getAfterSalesListPage({
             dateMode: currentDateMode.value,
             dateValue: currentDateValue.value,
@@ -444,6 +491,12 @@ export function useAfterSalesGrid({
       colProps: { span: 6 },
     },
     {
+      fieldName: 'projectName',
+      label: t('qms.afterSales.form.projectName'),
+      component: 'Input',
+      colProps: { span: 6 },
+    },
+    {
       fieldName: 'customerName',
       label: t('qms.afterSales.form.customerName'),
       component: 'Input',
@@ -457,6 +510,54 @@ export function useAfterSalesGrid({
         options: statusOptionsList,
       },
       colProps: { span: 6 },
+    },
+    {
+      fieldName: 'responsibleDept',
+      label: t('qms.afterSales.form.responsibleDept'),
+      component: 'Input',
+      colProps: { span: 6 },
+    },
+    {
+      fieldName: 'handler',
+      label: t('qms.afterSales.form.handler'),
+      component: 'Input',
+      colProps: { span: 6 },
+    },
+    {
+      fieldName: 'defectType',
+      label: t('qms.afterSales.form.defectType'),
+      component: 'Select',
+      componentProps: {
+        allowClear: true,
+        options: QMS_DEFECT_OPTIONS.map((value) => ({ label: value, value })),
+      },
+      colProps: { span: 6 },
+    },
+    {
+      fieldName: 'productType',
+      label: t('qms.afterSales.form.productType'),
+      component: 'Select',
+      componentProps: {
+        allowClear: true,
+        options: QMS_PRODUCT_OPTIONS.map((value) => ({ label: value, value })),
+      },
+      colProps: { span: 6 },
+    },
+    {
+      fieldName: 'supplierBrand',
+      label: t('qms.afterSales.form.supplierBrand'),
+      component: 'Input',
+      colProps: { span: 6 },
+    },
+    {
+      fieldName: 'dateRange',
+      label: t('qms.afterSales.form.issueDate'),
+      component: 'RangePicker',
+      componentProps: {
+        style: { width: '100%' },
+        valueFormat: 'YYYY-MM-DD',
+      },
+      colProps: { span: 8 },
     },
   ];
 
