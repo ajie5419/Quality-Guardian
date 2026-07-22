@@ -25,6 +25,29 @@
 
 ## 执行记录
 
+### 2026-07-22 修复：补齐不合格项、售后质量与调试验收操作
+
+**执行内容：**
+
+- 不合格项搜索新增报告日期范围，前端列表、查询全部和导出统一传递起止日期；后端使用 Zod 校验日期并按结束日次日排他过滤。
+- 售后质量搜索按实际数据模型补齐工单号、项目名称、客户、责任部门、经办人、缺陷分类、产品类型、供应商和问题日期范围，列表与导出参数统一处理。
+- 调试验收问题台账新增删除按钮和 `QMS:VehicleCommissioning:Delete` 权限；后端强制 RBAC 校验，执行软删除、附件引用和质量损失索引清理，并记录删除审计。
+- 新增调试验收模块架构约束，明确软删除和历史日报快照边界。
+
+**验证结果：**
+
+- 后端全量测试：221/221 个文件、2074/2074 个用例通过。
+- 共享包 CJS/ESM/DTS 构建通过；共享查询测试 7/7 通过。
+- 前端定向测试：2 个文件、11 个用例通过；前端 `vue-tsc --noEmit --skipLibCheck` 通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、后端 `tsc --noEmit` 和 `git diff --check` 全部通过。
+- 未运行前端 dev/build/start/serve，遵循仓库约束。
+
+**commit:** `a6aeb31` feat(project): add inspection issue date range search；`6830404` feat(project): expand after-sales issue search；`9c4a156` feat(project): add commissioning issue deletion permission
+
+**遗留问题：**
+
+- 生产当前仍为 `qgs-v0.17.6`，本次功能提交尚未执行 release/deploy。
+
 ### 2026-07-22 修复：统一报检不合格项责任归属
 
 **执行内容：**
