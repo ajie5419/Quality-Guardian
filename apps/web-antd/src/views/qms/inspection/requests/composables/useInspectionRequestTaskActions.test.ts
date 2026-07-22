@@ -2,7 +2,10 @@ import { ref } from 'vue';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useInspectionRequestTaskActions } from './useInspectionRequestTaskActions';
+import {
+  resolveDivisionIdentity,
+  useInspectionRequestTaskActions,
+} from './useInspectionRequestTaskActions';
 
 const {
   mockCloseInspectionRequest,
@@ -124,6 +127,8 @@ describe('useInspectionRequestTaskActions', () => {
     composable.closeForm.result = 'FAIL';
     composable.linkedIssueDraft.value.ncNumber = 'NC-2026-001';
     composable.linkedIssueDraft.value.description = 'Weld pore';
+    composable.linkedIssueDraft.value.division = 'Vehicle OBU';
+    composable.linkedIssueDraft.value.divisionId = 'dept-vehicle';
     composable.linkedIssueDraft.value.rootCause = 'Parameter drift';
     composable.linkedIssueDraft.value.solution = 'Rework and inspect again';
     composable.linkedIssueDraft.value.photos = [
@@ -148,6 +153,8 @@ describe('useInspectionRequestTaskActions', () => {
           photos: ['/api/uploads/defect.jpg'],
           ncNumber: 'NC-2026-001',
           quantity: 2,
+          division: 'Vehicle OBU',
+          divisionId: 'dept-vehicle',
           responsibleDepartment: 'Assembly Team A',
         }),
         attachments: [],
@@ -221,5 +228,73 @@ describe('useInspectionRequestTaskActions', () => {
 
     expect(mockCloseInspectionRequest).not.toHaveBeenCalled();
     expect(mockMessageWarning).toHaveBeenCalledWith('不合格项照片不能为空');
+  });
+});
+
+describe('resolveDivisionIdentity', () => {
+  const departments = [
+    {
+      id: 'group-1',
+      name: 'Operations',
+      children: [
+        {
+          id: 'dept-vehicle',
+          name: 'Vehicle OBU',
+        },
+      ],
+    },
+  ];
+
+  it('uses divisionId as the canonical department identity', () => {
+    expect(
+      resolveDivisionIdentity(departments, {
+        division: 'Legacy Division',
+        divisionId: 'dept-vehicle',
+      }),
+    ).toEqual({
+      division: 'Vehicle OBU',
+      divisionId: 'dept-vehicle',
+    });
+  });
+
+  it('converts a legacy division ID into ID and name fields', () => {
+    expect(
+      resolveDivisionIdentity(departments, {
+        division: 'dept-vehicle',
+      }),
+    ).toEqual({
+      division: 'Vehicle OBU',
+      divisionId: 'dept-vehicle',
+    });
+  });
+
+  it('resolves TreeSelect nodes used by the close inspection modal', () => {
+    expect(
+      resolveDivisionIdentity(
+        [
+          {
+            title: 'Vehicle OBU',
+            value: 'dept-vehicle',
+          },
+        ],
+        {
+          division: 'dept-vehicle',
+        },
+      ),
+    ).toEqual({
+      division: 'Vehicle OBU',
+      divisionId: 'dept-vehicle',
+    });
+  });
+
+  it('converts a legacy division name into ID and name fields', () => {
+    expect(
+      resolveDivisionIdentity(departments, {
+        division: 'Vehicle OBU',
+      }),
+    ).toEqual({
+      division: 'Vehicle OBU',
+      divisionId: 'dept-vehicle',
+    });
   });
 });

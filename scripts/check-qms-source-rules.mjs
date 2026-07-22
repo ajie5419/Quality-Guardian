@@ -41,6 +41,7 @@ const LEGACY_IDENTITY_IMPORT_ALLOWLIST = new Set([
   'apps/backend/modules/after-sales/after-sales-route.service.ts',
   'apps/backend/modules/inspection/inspection-issue.ts',
   'apps/backend/modules/inspection/inspection-record-import.post.service.ts',
+  'apps/backend/modules/work-order/work-order-import-governance.ts',
   'apps/backend/utils/governed-write.ts',
 ]);
 

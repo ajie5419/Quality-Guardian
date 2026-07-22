@@ -2,19 +2,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MasterDataGovernanceKernel } from './canonical-master-data';
 
-const { queryRawUnsafe } = vi.hoisted(() => ({
-  queryRawUnsafe: vi.fn(),
-}));
+const { queryRawUnsafe, transaction } = vi.hoisted(() => {
+  const queryRawUnsafe = vi.fn();
+  return {
+    queryRawUnsafe,
+    transaction: vi.fn(
+      async (
+        callback: (tx: { $queryRawUnsafe: typeof queryRawUnsafe }) => unknown,
+      ) => callback({ $queryRawUnsafe: queryRawUnsafe }),
+    ),
+  };
+});
 
 vi.mock('~/utils/prisma', () => ({
   default: {
     $queryRawUnsafe: queryRawUnsafe,
+    $transaction: transaction,
   },
 }));
 
 describe('masterDataGovernanceKernel', () => {
   beforeEach(() => {
     queryRawUnsafe.mockReset();
+    transaction.mockClear();
   });
 
   afterEach(() => {
@@ -22,20 +32,22 @@ describe('masterDataGovernanceKernel', () => {
   });
 
   it('accepts an active canonical ID with a matching name', async () => {
-    queryRawUnsafe.mockResolvedValue([{ value: 'Vehicle Division' }]);
+    queryRawUnsafe.mockResolvedValue([{ value: 'Vehicle OBU' }]);
 
     await expect(
       MasterDataGovernanceKernel.resolveCanonicalIdForWrite({
         configKey: 'division',
-        explicitCanonicalId: 'division-1',
-        name: 'Vehicle Division',
+        explicitCanonicalId: 'dept-1',
+        name: 'Vehicle OBU',
       }),
-    ).resolves.toBe('division-1');
+    ).resolves.toBe('dept-1');
 
     expect(queryRawUnsafe).toHaveBeenCalledWith(
-      expect.stringContaining("dictType = 'division'"),
-      'division-1',
+      expect.stringContaining('FROM `departments`'),
+      'dept-1',
     );
+    expect(queryRawUnsafe.mock.calls[0]?.[0]).toContain('isDeleted = 0');
+    expect(queryRawUnsafe.mock.calls[0]?.[0]).toContain('status = 1');
   });
 
   it('rejects a canonical ID outside the configured active identity domain', async () => {
@@ -44,22 +56,22 @@ describe('masterDataGovernanceKernel', () => {
     await expect(
       MasterDataGovernanceKernel.resolveCanonicalIdForWrite({
         configKey: 'division',
-        explicitCanonicalId: 'dept-1',
-        name: 'Vehicle Division',
+        explicitCanonicalId: 'division-1',
+        name: 'Vehicle OBU',
       }),
-    ).rejects.toThrow('INVALID_CANONICAL_ID:division:dept-1');
+    ).rejects.toThrow('INVALID_CANONICAL_ID:division:division-1');
   });
 
   it('rejects a canonical ID and name mismatch', async () => {
-    queryRawUnsafe.mockResolvedValue([{ value: 'Vehicle Division' }]);
+    queryRawUnsafe.mockResolvedValue([{ value: 'Vehicle OBU' }]);
 
     await expect(
       MasterDataGovernanceKernel.resolveCanonicalIdForWrite({
         configKey: 'division',
-        explicitCanonicalId: 'division-1',
+        explicitCanonicalId: 'dept-1',
         name: 'Production Division',
       }),
-    ).rejects.toThrow('CANONICAL_NAME_MISMATCH:division:division-1');
+    ).rejects.toThrow('CANONICAL_NAME_MISMATCH:division:dept-1');
   });
 
   it('keeps explicit null compatible without querying the canonical table', async () => {
@@ -70,6 +82,23 @@ describe('masterDataGovernanceKernel', () => {
       }),
     ).resolves.toBeNull();
     expect(queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it('includes the department source when previewing a division rename', async () => {
+    queryRawUnsafe.mockResolvedValue([{ count: 2 }]);
+
+    await expect(
+      MasterDataGovernanceKernel.rename({
+        configKey: 'division',
+        dryRun: true,
+        newValue: 'New Division',
+        oldValue: 'Old Division',
+      }),
+    ).resolves.toContainEqual({
+      affectedRows: 2,
+      field: 'name',
+      model: 'departments',
+    });
   });
 
   it('aggregates only actionable audit findings', async () => {

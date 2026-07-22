@@ -155,6 +155,7 @@ export const InspectionRequestCloseService = {
             inspectionId,
             linkedIssue,
             request,
+            tx,
             userinfo,
           });
           issueCreateData = built.createData;

@@ -12,7 +12,11 @@ import {
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    inspections: {
+      findUnique: vi.fn(),
+    },
     quality_records: {
+      aggregate: vi.fn(),
       findUnique: vi.fn(),
     },
   },
@@ -116,6 +120,28 @@ describe('inspection-issue processId dual write', () => {
     expect(data.supplierName).toBe('Supplier A');
     expect(data.supplier).toEqual({ connect: { id: 'supplier-1' } });
     expect((data as Record<string, unknown>).supplierId).toBeUndefined();
+  });
+
+  it('inherits canonical division ID and name from the linked work order', async () => {
+    const data = await buildInspectionIssueCreateData(
+      { division: 'stale-division' },
+      {
+        id: 'ISS-2026-DIVISION',
+        inspection: {
+          category: 'PROCESS',
+          id: 'inspection-1',
+          work_order: {
+            division: 'Vehicle OBU',
+            divisionId: 'dept-vehicle',
+          },
+        } as never,
+        serialNumber: 4,
+      },
+    );
+
+    expect(data.division).toBe('Vehicle OBU');
+    expect(data.divisionId).toBe('dept-vehicle');
+    expect(data.inspection).toEqual({ connect: { id: 'inspection-1' } });
   });
 
   it('injects processId into update payload when processName is provided', async () => {

@@ -147,6 +147,7 @@ export interface InspectionIssueCreateDataInput {
           teamId?: null | string;
           work_order?: null | {
             division?: null | string;
+            divisionId?: null | string;
           };
           workOrderNumber?: null | string;
         })
@@ -191,6 +192,9 @@ export function buildInspectionIssueCreateDataCore(
   const division =
     linkedInspection?.work_order?.division ||
     normalizeOptionalInspectionIssueString(input.body.division);
+  const divisionId =
+    linkedInspection?.work_order?.divisionId ||
+    normalizeOptionalInspectionIssueString(input.body.divisionId);
   const quantity =
     normalizeOptionalInspectionIssueNumber(input.body.quantity) ??
     linkedInspection?.quantity ??
@@ -223,6 +227,7 @@ export function buildInspectionIssueCreateDataCore(
     processName,
     partName,
     division,
+    divisionId,
     defectType: normalizeOptionalInspectionIssueString(input.body.defectType),
     defectSubtype: normalizeOptionalInspectionIssueString(
       input.body.defectSubtype,

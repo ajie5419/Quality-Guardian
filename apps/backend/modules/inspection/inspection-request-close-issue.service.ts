@@ -39,11 +39,15 @@ export async function buildCloseLinkedIssueCreateResult(options: {
     work_order?: null | { projectName?: null | string };
     workOrderNumber: string;
   };
+  tx: Prisma.TransactionClient;
   userinfo: UserSession;
 }): Promise<CloseLinkedIssueCreateResult> {
-  const linkedInspection = await findInspectionForIssue(options.inspectionId);
+  const linkedInspection = await findInspectionForIssue(
+    options.inspectionId,
+    options.tx,
+  );
   const newId = createInspectionIssueId();
-  const serialNumber = await getNextInspectionIssueSerialNumber();
+  const serialNumber = await getNextInspectionIssueSerialNumber(options.tx);
   const linkedIssueProcessName = resolveCloseIssueProcessName({
     linkedIssue: options.linkedIssue,
     request: options.request,
@@ -120,6 +124,10 @@ function buildCloseLinkedIssueBody(options: {
       division:
         normalizeInspectionRequestText(options.linkedIssue.division) ||
         options.linkedInspection?.work_order?.division ||
+        undefined,
+      divisionId:
+        normalizeInspectionRequestText(options.linkedIssue.divisionId) ||
+        options.linkedInspection?.work_order?.divisionId ||
         undefined,
     },
   );

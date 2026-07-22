@@ -25,26 +25,53 @@ describe('buildGovernedCanonicalWritePairForTable', () => {
   it('passes an explicit canonical ID and name to the kernel', async () => {
     resolveCanonicalIdForWrite.mockImplementation(
       ({ configKey }: { configKey: string }) =>
-        Promise.resolve(configKey === 'division' ? 'division-1' : undefined),
+        Promise.resolve(configKey === 'division' ? 'dept-1' : undefined),
     );
 
     await expect(
       buildGovernedCanonicalWritePairForTable('work_orders', {
-        division: 'Vehicle Division',
-        divisionId: 'division-1',
+        division: 'Vehicle OBU',
+        divisionId: 'dept-1',
       }),
-    ).resolves.toEqual({ divisionId: 'division-1' });
+    ).resolves.toEqual({ divisionId: 'dept-1' });
 
     expect(resolveCanonicalIdForWrite).toHaveBeenCalledWith({
       configKey: 'division',
-      explicitCanonicalId: 'division-1',
+      explicitCanonicalId: 'dept-1',
       keepExistingWhenNameMissing: true,
-      name: 'Vehicle Division',
+      name: 'Vehicle OBU',
     });
     expect(resolveCanonicalNameById).toHaveBeenCalledWith({
-      canonicalId: 'division-1',
+      canonicalId: 'dept-1',
       configKey: 'division',
       fallbackName: null,
+    });
+  });
+
+  it('rebuilds a legacy division ID submitted in the name field', async () => {
+    resolveCanonicalNameById.mockImplementation(
+      ({ configKey }: { configKey: string }) =>
+        Promise.resolve(configKey === 'division' ? 'Vehicle OBU' : null),
+    );
+    resolveCanonicalIdForWrite.mockImplementation(
+      ({ configKey }: { configKey: string }) =>
+        Promise.resolve(configKey === 'division' ? 'dept-1' : undefined),
+    );
+
+    await expect(
+      buildGovernedCanonicalWritePairForTable('work_orders', {
+        division: 'dept-1',
+      }),
+    ).resolves.toEqual({
+      division: 'Vehicle OBU',
+      divisionId: 'dept-1',
+    });
+
+    expect(resolveCanonicalIdForWrite).toHaveBeenCalledWith({
+      configKey: 'division',
+      explicitCanonicalId: 'dept-1',
+      keepExistingWhenNameMissing: true,
+      name: 'Vehicle OBU',
     });
   });
 
@@ -52,16 +79,18 @@ describe('buildGovernedCanonicalWritePairForTable', () => {
     resolveCanonicalIdForWrite.mockImplementation(
       ({ configKey }: { configKey: string }) =>
         configKey === 'division'
-          ? Promise.reject(new Error('INVALID_CANONICAL_ID:division:dept-1'))
+          ? Promise.reject(
+              new Error('INVALID_CANONICAL_ID:division:division-1'),
+            )
           : Promise.resolve(undefined),
     );
 
     await expect(
       buildGovernedCanonicalWritePairForTable('work_orders', {
-        division: 'Vehicle Division',
-        divisionId: 'dept-1',
+        division: 'Vehicle OBU',
+        divisionId: 'division-1',
       }),
-    ).rejects.toThrow('INVALID_CANONICAL_ID:division:dept-1');
+    ).rejects.toThrow('INVALID_CANONICAL_ID:division:division-1');
   });
 
   it('rejects online supplier names without a canonical ID', async () => {

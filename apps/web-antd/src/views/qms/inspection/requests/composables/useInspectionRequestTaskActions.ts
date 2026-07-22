@@ -36,6 +36,8 @@ type LinkedIssueDraftState = {
   defectSubtype: string;
   defectType: string;
   description: string;
+  division: string;
+  divisionId: string;
   lossAmount: number;
   ncNumber: string;
   partName: string;
@@ -53,6 +55,79 @@ type LinkedIssueDraftState = {
   supplierName: string;
   unqualifiedQuantity: number;
 };
+
+type DepartmentIdentityNode = {
+  children?: DepartmentIdentityNode[];
+  id?: number | string;
+  label?: string;
+  name?: string;
+  title?: string;
+  value?: number | string;
+};
+
+type DivisionIdentitySource = {
+  division?: null | string;
+  divisionId?: null | string;
+};
+
+function normalizeDivisionValue(value: unknown) {
+  return String(value ?? '').trim();
+}
+
+function findDepartment(
+  nodes: DepartmentIdentityNode[],
+  matcher: (params: { id: string; name: string }) => boolean,
+): undefined | { id: string; name: string } {
+  for (const node of nodes) {
+    const id = normalizeDivisionValue(node.id ?? node.value);
+    const name = normalizeDivisionValue(node.name ?? node.title ?? node.label);
+    if (matcher({ id, name })) return { id, name };
+    const matchedChild = node.children
+      ? findDepartment(node.children, matcher)
+      : undefined;
+    if (matchedChild) return matchedChild;
+  }
+  return undefined;
+}
+
+export function resolveDivisionIdentity(
+  nodes: DepartmentIdentityNode[],
+  source: DivisionIdentitySource,
+): { division: string; divisionId: string } {
+  const explicitId = normalizeDivisionValue(source.divisionId);
+  const legacyValue = normalizeDivisionValue(source.division);
+  const idMatch = explicitId
+    ? findDepartment(nodes, ({ id }) => id === explicitId)
+    : undefined;
+  if (idMatch) {
+    return { division: idMatch.name || legacyValue, divisionId: idMatch.id };
+  }
+
+  const legacyIdMatch = legacyValue
+    ? findDepartment(nodes, ({ id }) => id === legacyValue)
+    : undefined;
+  if (legacyIdMatch) {
+    return {
+      division: legacyIdMatch.name,
+      divisionId: legacyIdMatch.id,
+    };
+  }
+
+  const legacyNameMatch = legacyValue
+    ? findDepartment(nodes, ({ name }) => name === legacyValue)
+    : undefined;
+  if (legacyNameMatch) {
+    return {
+      division: legacyNameMatch.name,
+      divisionId: legacyNameMatch.id,
+    };
+  }
+
+  return {
+    division: legacyValue,
+    divisionId: explicitId,
+  };
+}
 
 interface UseInspectionRequestTaskActionsOptions {
   canDelete: Ref<boolean>;
@@ -119,6 +194,8 @@ export function useInspectionRequestTaskActions(
     defectSubtype: DEFAULT_VALUES.DEFAULT_DEFECT_SUBTYPE,
     defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE,
     description: '',
+    division: '',
+    divisionId: '',
     lossAmount: 0,
     ncNumber: '',
     partName: '',
@@ -368,6 +445,8 @@ export function useInspectionRequestTaskActions(
       defectSubtype: DEFAULT_VALUES.DEFAULT_DEFECT_SUBTYPE,
       defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE,
       description: '',
+      division: '',
+      divisionId: '',
       lossAmount: 0,
       ncNumber: '',
       partName: record.componentName || record.partName || '',

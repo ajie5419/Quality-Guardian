@@ -306,7 +306,7 @@ async function maybeRenameSourceEntity(
     }
   }
 
-  if (configKey === 'responsibleDepartment') {
+  if (configKey === 'division' || configKey === 'responsibleDepartment') {
     if (dryRun) {
       const count = await queryExactMatchCount(
         tx,

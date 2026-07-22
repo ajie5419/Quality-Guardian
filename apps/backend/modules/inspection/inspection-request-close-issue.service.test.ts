@@ -1,5 +1,9 @@
+import type { Prisma } from '@prisma/client';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildCloseLinkedIssueCreateResult } from '~/modules/inspection/inspection-request-close-issue.service';
+
+const tx = {} as Prisma.TransactionClient;
 
 const { mockResolveSupplierByTeamId, mockResolveCanonicalProcessName } =
   vi.hoisted(() => ({
@@ -14,7 +18,9 @@ vi.mock('~/modules/supplier-identity', () => ({
 }));
 
 vi.mock('~/utils/governed-write', () => ({
-  buildGovernedWriteFieldsForTable: vi.fn().mockReturnValue({}),
+  buildGovernedWriteFieldsForTable: vi
+    .fn()
+    .mockImplementation((_table, fields) => fields),
 }));
 
 vi.mock('~/utils/process-resolver', () => ({
@@ -29,7 +35,7 @@ vi.mock('~/modules/inspection/inspection-issue', () => ({
   createInspectionIssueId: vi.fn().mockReturnValue('QC-001'),
   findInspectionForIssue: vi.fn().mockResolvedValue({
     id: 'i-1',
-    work_order: { division: 'D1' },
+    work_order: { division: 'Vehicle OBU', divisionId: 'dept-vehicle' },
   }),
   getNextInspectionIssueSerialNumber: vi.fn().mockResolvedValue(1),
 }));
@@ -72,6 +78,7 @@ describe('buildCloseLinkedIssueCreateResult', () => {
         reporter: 'Reporter A',
         workOrderNumber: 'WO-1',
       },
+      tx,
       userinfo: { id: 'user-1', username: 'admin' } as any,
     });
 
@@ -81,11 +88,20 @@ describe('buildCloseLinkedIssueCreateResult', () => {
     const { buildInspectionIssueCreateData } = await import(
       '~/modules/inspection/inspection-issue'
     );
+    const { findInspectionForIssue, getNextInspectionIssueSerialNumber } =
+      await import('~/modules/inspection/inspection-issue');
+    expect(findInspectionForIssue).toHaveBeenCalledWith('i-1', tx);
+    expect(getNextInspectionIssueSerialNumber).toHaveBeenCalledWith(tx);
     expect(buildInspectionIssueCreateData).toHaveBeenCalledWith(
       expect.objectContaining({
+        division: 'Vehicle OBU',
+        divisionId: 'dept-vehicle',
         ncNumber: 'NC-2026-001',
       }),
-      expect.objectContaining({ createdBy: 'user-1' }),
+      expect.objectContaining({
+        createdBy: 'user-1',
+        inspection: expect.objectContaining({ id: 'i-1' }),
+      }),
     );
   });
 
@@ -107,6 +123,7 @@ describe('buildCloseLinkedIssueCreateResult', () => {
         team: 'Final Assembly Team',
         workOrderNumber: 'WO-1',
       },
+      tx,
       userinfo: { id: 'user-1', username: 'admin' } as any,
     });
 
@@ -140,6 +157,7 @@ describe('buildCloseLinkedIssueCreateResult', () => {
         team: 'Final Assembly Team',
         workOrderNumber: 'WO-1',
       },
+      tx,
       userinfo: { id: 'user-1', username: 'admin' } as any,
     });
 
@@ -173,6 +191,7 @@ describe('buildCloseLinkedIssueCreateResult', () => {
         team: 'Supplier A',
         workOrderNumber: 'WO-1',
       },
+      tx,
       userinfo: { id: 'user-1', username: 'admin' } as any,
     });
 
@@ -206,6 +225,7 @@ describe('buildCloseLinkedIssueCreateResult', () => {
         team: 'Outsourcing Plant A',
         workOrderNumber: 'WO-1',
       },
+      tx,
       userinfo: { id: 'user-1', username: 'admin' } as any,
     });
 
@@ -242,6 +262,7 @@ describe('buildCloseLinkedIssueCreateResult', () => {
         teamId: 'team-1',
         workOrderNumber: 'WO-1',
       },
+      tx,
       userinfo: { id: 'user-1', username: 'admin' } as any,
     });
 

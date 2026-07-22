@@ -119,6 +119,20 @@ function formatDepartmentList(
     .join(', ');
 }
 
+export function resolveIssueDivisionName(
+  deptRawData: BaseTreeNode[],
+  issue: Pick<InspectionIssue, 'division' | 'divisionId'>,
+): string {
+  const divisionId = String(issue.divisionId || '').trim();
+  const division = String(issue.division || '').trim();
+  const nameByExplicitId = divisionId
+    ? findNameById(deptRawData, divisionId)
+    : '';
+  if (nameByExplicitId) return nameByExplicitId;
+  const nameByLegacyValue = division ? findNameById(deptRawData, division) : '';
+  return nameByLegacyValue || division || divisionId;
+}
+
 export function useIssueGridOptions({
   canManageIssue,
   currentDateMode,
@@ -256,10 +270,8 @@ export function useIssueGridOptions({
         if (col.field === 'division') {
           return {
             ...col,
-            formatter: ({ cellValue }: { cellValue: string | unknown }) => {
-              if (!cellValue) return '';
-              const name = findNameById(deptRawData.value, cellValue as string);
-              return name || (cellValue as string);
+            formatter: ({ row }: { row: InspectionIssue }) => {
+              return resolveIssueDivisionName(deptRawData.value, row);
             },
           };
         }

@@ -205,14 +205,16 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
     backfillPolicy: 'canonical-id',
     auditPolicy: 'canonical-id-and-orphan',
     source: {
-      type: 'dictionary',
-      dictType: 'division',
+      type: 'table',
+      table: 'departments',
+      valueColumn: 'name',
+      where: 'isDeleted = 0 AND status = 1',
     },
     canonical: {
-      table: 'dictionaries',
+      table: 'departments',
       idColumn: 'id',
-      nameColumn: 'dictKey',
-      activeWhere: "isDeleted = 0 AND status = 1 AND dictType = 'division'",
+      nameColumn: 'name',
+      activeWhere: 'isDeleted = 0 AND status = 1',
     },
     targets: [
       {
