@@ -161,6 +161,26 @@ describe('inspectionIssueListService', () => {
       );
     });
 
+    it('should apply an inclusive report date range in the database query', async () => {
+      (prisma.quality_records.count as any).mockResolvedValue(0);
+      (prisma.quality_records.findMany as any).mockResolvedValue([]);
+
+      await InspectionIssueListService.getIssues({
+        endDate: '2026-07-20',
+        startDate: '2026-07-01',
+        year: 2025,
+      });
+
+      expect(prisma.quality_records.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          date: {
+            gte: new Date(2026, 6, 1),
+            lt: new Date(2026, 6, 21),
+          },
+        }),
+      });
+    });
+
     it('should apply severity filter as array', async () => {
       (prisma.quality_records.count as any).mockResolvedValue(0);
       (prisma.quality_records.findMany as any).mockResolvedValue([]);

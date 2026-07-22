@@ -48,6 +48,7 @@ export type InspectionIssueChartAggregateItem = {
 export async function getInspectionIssues(params?: {
   dateMode?: 'month' | 'week' | 'year';
   dateValue?: string;
+  endDate?: string;
   page?: number;
   pageSize?: number;
   processName?: string;
@@ -56,6 +57,7 @@ export async function getInspectionIssues(params?: {
   responsibleWelder?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  startDate?: string;
   status?: string | string[];
   supplierName?: string;
   workOrderNumber?: string;

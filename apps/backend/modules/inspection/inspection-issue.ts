@@ -12,6 +12,7 @@ import {
   normalizeOptionalInspectionIssueDate as normalizeOptionalInspectionIssueDateRule,
   normalizeOptionalInspectionIssueNumber as normalizeOptionalInspectionIssueNumberRule,
   normalizeOptionalInspectionIssueString as normalizeOptionalInspectionIssueStringRule,
+  parseInspectionIssueDateBoundary as parseInspectionIssueDateBoundaryRule,
   parseInspectionIssueDateMode as parseInspectionIssueDateModeRule,
   parseInspectionIssueDateValue as parseInspectionIssueDateValueRule,
   parseInspectionIssueListQuery as parseInspectionIssueListQueryRule,
@@ -35,6 +36,8 @@ import { resolveIssueSupplierBody } from './inspection-issue-supplier';
 export function buildInspectionIssueDateRange(params: {
   dateMode?: InspectionIssueDateMode;
   dateValue?: string;
+  endDate?: string;
+  startDate?: string;
   year?: number;
 }) {
   return buildInspectionIssueDateRangeRule(params);
@@ -54,6 +57,10 @@ export function normalizeOptionalInspectionIssueString(value: unknown) {
 
 export function parseInspectionIssueDateMode(value: unknown) {
   return parseInspectionIssueDateModeRule(value);
+}
+
+export function parseInspectionIssueDateBoundary(value: unknown) {
+  return parseInspectionIssueDateBoundaryRule(value);
 }
 
 export function parseInspectionIssueDateValue(value: unknown) {

@@ -26,6 +26,16 @@ interface GridFilterItem {
   values?: unknown[];
 }
 
+export function resolveIssueDateRangeQuery(value: unknown): {
+  endDate?: string;
+  startDate?: string;
+} {
+  if (!Array.isArray(value) || value.length !== 2) return {};
+  const startDate = String(value[0] ?? '').trim();
+  const endDate = String(value[1] ?? '').trim();
+  return startDate && endDate ? { endDate, startDate } : {};
+}
+
 export type InspectionGridRow = InspectionIssue & {
   photoExportUrl: string;
   photos: string[];
@@ -190,6 +200,7 @@ export function useIssueGridOptions({
           const { items } = await getInspectionIssues({
             dateMode: currentDateMode.value,
             dateValue: currentDateValue.value,
+            ...resolveIssueDateRangeQuery(formValues?.dateRange),
             year: currentYear.value,
             workOrderNumber:
               (formValues?.workOrderNumber as string) ||
@@ -396,6 +407,7 @@ export function useIssueGridOptions({
           const { items, total } = await getInspectionIssues({
             dateMode: currentDateMode.value,
             dateValue: currentDateValue.value,
+            ...resolveIssueDateRangeQuery(formValues?.dateRange),
             page: page?.currentPage || 1,
             pageSize: page?.pageSize || 20,
             sortBy: sortParam?.field,
@@ -430,6 +442,7 @@ export function useIssueGridOptions({
           const { items } = await getInspectionIssues({
             dateMode: currentDateMode.value,
             dateValue: currentDateValue.value,
+            ...resolveIssueDateRangeQuery(formValues?.dateRange),
             year: currentYear.value,
             workOrderNumber:
               (formValues?.workOrderNumber as string) ||

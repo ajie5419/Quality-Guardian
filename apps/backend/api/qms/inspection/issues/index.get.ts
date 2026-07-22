@@ -1,7 +1,7 @@
 import { INSPECTION_ISSUE_PERMISSION_CODES } from '@qgs/shared';
-import { z } from 'zod';
 import { parseInspectionIssueListQuery } from '~/modules/inspection/inspection-issue';
 import { InspectionIssueAccessService } from '~/modules/inspection/inspection-issue-access.service';
+import { inspectionIssueListQuerySchema } from '~/modules/inspection/inspection-issue.schema';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import {
@@ -15,10 +15,8 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
-const inspectionIssuesQuerySchema = z.object({}).passthrough();
-
 export default defineValidatedHandler(
-  inspectionIssuesQuerySchema,
+  inspectionIssueListQuerySchema,
   async (event, query) => {
     const userinfo = getCurrentUser(event);
     const params = parseInspectionIssueListQuery(query);

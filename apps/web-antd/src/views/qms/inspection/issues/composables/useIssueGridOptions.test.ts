@@ -2,7 +2,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { resolveIssueDivisionName } from './useIssueGridOptions';
+import {
+  resolveIssueDateRangeQuery,
+  resolveIssueDivisionName,
+} from './useIssueGridOptions';
 
 const departments = [
   {
@@ -49,5 +52,19 @@ describe('resolveIssueDivisionName', () => {
         divisionId: 'dept-unknown',
       }),
     ).toBe('dept-unknown');
+  });
+});
+
+describe('resolveIssueDateRangeQuery', () => {
+  it('maps a complete picker value to API date boundaries', () => {
+    expect(resolveIssueDateRangeQuery(['2026-07-01', '2026-07-20'])).toEqual({
+      endDate: '2026-07-20',
+      startDate: '2026-07-01',
+    });
+  });
+
+  it('omits incomplete picker values', () => {
+    expect(resolveIssueDateRangeQuery(['2026-07-01'])).toEqual({});
+    expect(resolveIssueDateRangeQuery(undefined)).toEqual({});
   });
 });

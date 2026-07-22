@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  inspectionIssueListQuerySchema,
   parseInspectionIssueCreateBody,
   parseInspectionIssueUpdateBody,
 } from '~/modules/inspection/inspection-issue.schema';
@@ -21,6 +22,26 @@ const validCreateBody = {
 };
 
 describe('inspection issue schema', () => {
+  it('normalizes and accepts a complete list date range', () => {
+    expect(
+      inspectionIssueListQuerySchema.parse({
+        endDate: ' 2026-07-20 ',
+        startDate: ' 2026-07-01 ',
+      }),
+    ).toMatchObject({
+      endDate: '2026-07-20',
+      startDate: '2026-07-01',
+    });
+  });
+
+  it.each([
+    [{ startDate: '2026-07-01' }, '必须同时提供'],
+    [{ endDate: '2026-07-20', startDate: '2026-02-30' }, '日期格式无效'],
+    [{ endDate: '2026-07-01', startDate: '2026-07-20' }, '不能晚于结束日期'],
+  ])('rejects an invalid list date range', (input, message) => {
+    expect(() => inspectionIssueListQuerySchema.parse(input)).toThrow(message);
+  });
+
   it('accepts the desktop create fields and normalizes an empty NC number', () => {
     const result = parseInspectionIssueCreateBody({
       ...validCreateBody,

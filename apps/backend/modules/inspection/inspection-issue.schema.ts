@@ -2,6 +2,8 @@ import { INSPECTION_ISSUE_FIELD_LIMITS } from '@qgs/shared';
 import { z } from 'zod';
 import { BusinessError } from '~/utils/business-error';
 
+import { parseInspectionIssueDateBoundary } from './inspection-issue';
+
 const shortText = z
   .string()
   .trim()
@@ -26,6 +28,45 @@ const photoSchema = z.union([
     })
     .passthrough(),
 ]);
+
+const optionalListDate = z.preprocess(
+  (value) => {
+    const scalar = Array.isArray(value) ? value[0] : value;
+    const normalized = String(scalar ?? '').trim();
+    return normalized || undefined;
+  },
+  z
+    .string()
+    .refine(
+      (value) => Boolean(parseInspectionIssueDateBoundary(value)),
+      '时间范围日期格式无效',
+    )
+    .optional(),
+);
+
+export const inspectionIssueListQuerySchema = z
+  .object({
+    endDate: optionalListDate,
+    startDate: optionalListDate,
+  })
+  .passthrough()
+  .superRefine((value, context) => {
+    if (Boolean(value.startDate) !== Boolean(value.endDate)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: '开始日期和结束日期必须同时提供',
+        path: ['startDate'],
+      });
+      return;
+    }
+    if (value.startDate && value.endDate && value.startDate > value.endDate) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: '开始日期不能晚于结束日期',
+        path: ['startDate'],
+      });
+    }
+  });
 
 const issueFields = {
   category: shortText.optional(),

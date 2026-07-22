@@ -46,6 +46,13 @@ function parseLocalDate(value: string): Date | undefined {
   return date;
 }
 
+export function parseInspectionIssueDateBoundary(
+  value: unknown,
+): string | undefined {
+  const normalized = normalizeString(value);
+  return normalized && parseLocalDate(normalized) ? normalized : undefined;
+}
+
 function getWeekStart(date: Date) {
   const start = new Date(date);
   start.setHours(0, 0, 0, 0);
@@ -105,8 +112,20 @@ export function parseInspectionIssueDateValue(value: unknown) {
 export function buildInspectionIssueDateRange(params: {
   dateMode?: InspectionIssueDateMode;
   dateValue?: string;
+  endDate?: string;
+  startDate?: string;
   year?: number;
 }) {
+  const customStart = params.startDate
+    ? parseLocalDate(params.startDate)
+    : undefined;
+  const customEnd = params.endDate ? parseLocalDate(params.endDate) : undefined;
+  if (customStart && customEnd && customStart <= customEnd) {
+    const exclusiveEnd = new Date(customEnd);
+    exclusiveEnd.setDate(exclusiveEnd.getDate() + 1);
+    return { end: exclusiveEnd, start: customStart };
+  }
+
   const dateMode = params.dateMode || 'year';
 
   if (dateMode === 'month' && params.dateValue) {
@@ -166,6 +185,7 @@ export function parseInspectionIssueListQuery(query: Record<string, unknown>) {
     dateMode: parseInspectionIssueDateMode(getQueryValue(query, 'dateMode')),
     dateValue: parseInspectionIssueDateValue(getQueryValue(query, 'dateValue')),
     defectType: parseMultiString(getQueryValue(query, 'defectType')),
+    endDate: parseInspectionIssueDateBoundary(getQueryValue(query, 'endDate')),
     page,
     pageSize,
     processName: normalizeString(getQueryValue(query, 'processName')),
@@ -179,6 +199,9 @@ export function parseInspectionIssueListQuery(query: Record<string, unknown>) {
     severity: parseMultiString(getQueryValue(query, 'severity')),
     sortBy: normalizeString(getQueryValue(query, 'sortBy')),
     sortOrder,
+    startDate: parseInspectionIssueDateBoundary(
+      getQueryValue(query, 'startDate'),
+    ),
     status: parseMultiString(getQueryValue(query, 'status')),
     supplierName: normalizeString(getQueryValue(query, 'supplierName')),
     workOrderNumber: normalizeString(getQueryValue(query, 'workOrderNumber')),
