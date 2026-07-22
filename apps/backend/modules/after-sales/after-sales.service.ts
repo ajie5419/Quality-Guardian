@@ -25,7 +25,10 @@ import prisma from '~/utils/prisma';
 import { AfterSalesAnalyticsService } from './after-sales-analytics.service';
 import { AfterSalesIntegrationService } from './after-sales-integration.service';
 import { buildGovernedAfterSalesUpdateData } from './after-sales-payload';
-import { buildAfterSalesDateRange } from './after-sales-query';
+import {
+  buildAfterSalesDateRange,
+  buildAfterSalesExplicitDateRange,
+} from './after-sales-query';
 import { normalizeAfterSalesClaimStatus } from './after-sales-status';
 
 function getResponsibleDepartmentsForResponse(item: {
@@ -39,6 +42,18 @@ function getResponsibleDepartmentsForResponse(item: {
     return responsibleDepartments;
   }
   return item.respDept ? [item.respDept] : [];
+}
+
+function appendAndCondition(
+  where: Prisma.after_salesWhereInput,
+  condition: Prisma.after_salesWhereInput,
+) {
+  const existing = where.AND;
+  if (Array.isArray(existing)) {
+    where.AND = [...existing, condition];
+    return;
+  }
+  where.AND = existing ? [existing, condition] : [condition];
 }
 
 export const AfterSalesService = {
@@ -188,10 +203,17 @@ export const AfterSalesService = {
     const {
       dateMode,
       dateValue,
+      defectType,
+      endDate,
+      handler,
       projectName,
+      productType,
+      responsibleDept,
       status,
       supplierBrand,
       supplierBrandId,
+      startDate,
+      customerName,
       workOrderNumber,
       year,
     } = params;
@@ -201,8 +223,17 @@ export const AfterSalesService = {
     };
 
     // Date Logic
+    const explicitDateRange = buildAfterSalesExplicitDateRange({
+      endDate,
+      startDate,
+    });
     const hasCustomRange = dateMode === 'month' || dateMode === 'week';
-    if (year || hasCustomRange) {
+    if (explicitDateRange) {
+      where.occurDate = {
+        gte: explicitDateRange.start,
+        lt: explicitDateRange.end,
+      };
+    } else if (year || hasCustomRange) {
       const { start, end } = buildAfterSalesDateRange({
         dateMode,
         dateValue,
@@ -222,6 +253,28 @@ export const AfterSalesService = {
     if (projectName && String(projectName).trim() !== '') {
       where.projectName = { contains: String(projectName).trim() };
     }
+    if (customerName && String(customerName).trim() !== '') {
+      where.customerName = { contains: String(customerName).trim() };
+    }
+    if (handler && String(handler).trim() !== '') {
+      where.handler = { contains: String(handler).trim() };
+    }
+    if (productType && String(productType).trim() !== '') {
+      where.productType = { contains: String(productType).trim() };
+    }
+    if (defectType && String(defectType).trim() !== '') {
+      where.defectType = { contains: String(defectType).trim() };
+    }
+    if (responsibleDept && String(responsibleDept).trim() !== '') {
+      const searchTerm = String(responsibleDept).trim();
+      appendAndCondition(where, {
+        OR: [
+          { respDept: { contains: searchTerm } },
+          { respDeptId: { contains: searchTerm } },
+          { responsibleDepartments: { contains: searchTerm } },
+        ],
+      });
+    }
     if (status && String(status).trim() !== '') {
       const claimStatus = normalizeAfterSalesClaimStatus(status);
       if (claimStatus) {
@@ -231,10 +284,13 @@ export const AfterSalesService = {
     if (supplierBrandId && String(supplierBrandId).trim() !== '') {
       where.supplierBrandId = String(supplierBrandId).trim();
     } else if (supplierBrand && String(supplierBrand).trim() !== '') {
-      where.OR = [
-        { supplierBrand: { contains: String(supplierBrand).trim() } },
-        { projectName: { contains: String(supplierBrand).trim() } },
-      ];
+      const searchTerm = String(supplierBrand).trim();
+      appendAndCondition(where, {
+        OR: [
+          { supplierBrand: { contains: searchTerm } },
+          { projectName: { contains: searchTerm } },
+        ],
+      });
     }
 
     if (params.userContext?.userId) {

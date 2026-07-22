@@ -25,6 +25,73 @@
 
 ## 执行记录
 
+### 2026-07-22 修复：本地 Apple Container 启动端口检查阻塞
+
+**执行内容：**
+
+- 定位 `pnpm local:container:dev:antd` 停在 Container API 提示后的根因：实际是 `lsof` 阻塞在 macOS `proc_pidfdinfo` 内核调用，Container API、MySQL 和 Redis 均正常。
+- 将 `ensure_host_port_free` 的无超时 `lsof` 扫描替换为 IPv4/IPv6 `nc` 一秒超时探测；端口占用时继续通过 `netstat` 输出监听进程。
+- 清理两组卡住的启动脚本；两个已进入不可中断内核态的 `lsof` 孤儿进程需要等待内核返回或重启 macOS 后回收，新脚本不再依赖它们。
+
+**验证结果：**
+
+- `bash -n scripts/local/container-common.sh` 通过。
+- 空闲端口 `5320` 探测立即通过；临时占用端口 `54321` 在一秒内返回失败并输出监听进程。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 和 `git diff --check` 全部通过。
+- 未运行前端 dev/build/start/serve，遵循仓库约束。
+
+**commit:** `f1439e8` fix(project): bound local container port checks
+
+**遗留问题：**
+
+- 当前两个旧 `lsof` 进程处于 macOS 不可中断内核态；若系统未自行回收，重启 macOS 可彻底清理。
+
+### 2026-07-22 修复：补齐不合格项、售后质量与调试验收操作
+
+**执行内容：**
+
+- 不合格项搜索新增报告日期范围，前端列表、查询全部和导出统一传递起止日期；后端使用 Zod 校验日期并按结束日次日排他过滤。
+- 售后质量搜索按实际数据模型补齐工单号、项目名称、客户、责任部门、经办人、缺陷分类、产品类型、供应商和问题日期范围，列表与导出参数统一处理。
+- 调试验收问题台账新增删除按钮和 `QMS:VehicleCommissioning:Delete` 权限；后端强制 RBAC 校验，执行软删除、附件引用和质量损失索引清理，并记录删除审计。
+- 新增调试验收模块架构约束，明确软删除和历史日报快照边界。
+
+**验证结果：**
+
+- 后端全量测试：221/221 个文件、2074/2074 个用例通过。
+- 共享包 CJS/ESM/DTS 构建通过；共享查询测试 7/7 通过。
+- 前端定向测试：2 个文件、11 个用例通过；前端 `vue-tsc --noEmit --skipLibCheck` 通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、后端 `tsc --noEmit` 和 `git diff --check` 全部通过。
+- 未运行前端 dev/build/start/serve，遵循仓库约束。
+
+**commit:** `a6aeb31` feat(project): add inspection issue date range search；`6830404` feat(project): expand after-sales issue search；`9c4a156` feat(project): add commissioning issue deletion permission
+
+**遗留问题：**
+
+- 生产当前仍为 `qgs-v0.17.6`，本次功能提交尚未执行 release/deploy。
+
+### 2026-07-22 修复：统一报检不合格项责任归属
+
+**执行内容：**
+
+- 根因修复报检关闭链路的责任单位分流：前端显式提交 `responsibilityType + responsibleDepartmentId + supplierId`，后端按 canonical ID 重建部门和供应商名称，不再把外部公司名称回退写入责任部门。
+- 报检列表和详情批量解析 TEAM→Supplier 并返回 `issueResponsibility`，覆盖普通工序名称但 TEAM 实际属于外部供应商的场景，避免 N+1 查询。
+- 删除关闭弹窗中“名称包含生产/外协”的责任类型推断；显式责任类型决定供应商控件与落库字段，普通内部生产部门不会被误判为外协单位。
+- 新增幂等历史回填，仅对报检 `supplierId`、TEAM→Supplier 映射或关联检验供应商等确定性证据执行 canonical 双写；冲突、证据不足或已有其他有效责任部门时不覆盖并写 OPEN 审计。
+- 将责任归属回填脚本加入后端镜像、维护命令和 GitHub deploy，在 migration、TEAM bootstrap、事业部回填和供应商身份回填之后自动执行；本次无需 Prisma migration。
+
+**验证结果：**
+
+- 共享契约测试：1/1 个文件、14/14 个用例通过；共享包 CJS/ESM/DTS 构建通过。
+- 前端定向测试：3/3 个文件、26/26 个用例通过；未运行 dev/build/start/serve，遵循仓库前端验证约束。
+- 后端定向测试：5/5 个文件、44/44 个用例通过；全量后端测试：220/220 个文件、2064/2064 个用例通过。
+- `pnpm lint`、3/3 workspace typecheck、后端 `tsc --noEmit`、`check:qms-arch` 和 `git diff --check` 全部通过。
+
+**commit:** `0780f1ce` fix(project): preserve inspection issue responsibility identity；`8cca7b9e` fix(deploy): backfill inspection issue responsibilities
+
+**遗留问题：**
+
+- 未读取 `.env`，因此未连接真实数据库执行 apply；生产回填将在后续正式发布时由 deploy workflow 自动运行并输出汇总。
+
 ## [0.17.6](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.5...qgs-v0.17.6) (2026-07-22)
 
 

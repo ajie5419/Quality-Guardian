@@ -82,6 +82,7 @@ vi.mock('~/modules/after-sales/after-sales-payload', () => ({
 }));
 
 vi.mock('~/modules/after-sales/after-sales-query', () => ({
+  buildAfterSalesExplicitDateRange: vi.fn().mockReturnValue(undefined),
   buildAfterSalesDateRange: vi.fn().mockReturnValue({
     end: new Date('2026-12-31'),
     start: new Date('2026-01-01'),
@@ -163,6 +164,69 @@ describe('afterSalesService – adversarial', () => {
       );
       const where = (prisma.after_sales.findMany as any).mock.calls[0][0].where;
       expect(where).not.toHaveProperty('OR');
+    });
+
+    it('applies expanded text filters and explicit date ranges in the database where', async () => {
+      const explicitRange = {
+        end: new Date('2026-08-01T00:00:00.000'),
+        start: new Date('2026-07-01T00:00:00.000'),
+      };
+      const { buildAfterSalesExplicitDateRange } = await import(
+        '~/modules/after-sales/after-sales-query'
+      );
+      vi.mocked(buildAfterSalesExplicitDateRange).mockReturnValue(
+        explicitRange,
+      );
+      (prisma.after_sales.findMany as any).mockResolvedValue([]);
+
+      await AfterSalesService.getList({
+        customerName: 'Customer A',
+        defectType: '制造装配缺陷',
+        endDate: '2026-07-31',
+        handler: 'Handler A',
+        productType: '车辆产品',
+        projectName: 'Project A',
+        responsibleDept: 'Quality',
+        startDate: '2026-07-01',
+        supplierBrand: 'Brand A',
+        workOrderNumber: 'WO-001',
+      });
+
+      expect(prisma.after_sales.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            customerName: { contains: 'Customer A' },
+            defectType: { contains: '制造装配缺陷' },
+            handler: { contains: 'Handler A' },
+            occurDate: {
+              gte: explicitRange.start,
+              lt: explicitRange.end,
+            },
+            productType: { contains: '车辆产品' },
+            projectName: { contains: 'Project A' },
+            workOrderNumber: { contains: 'WO-001' },
+          }),
+        }),
+      );
+      const where = (prisma.after_sales.findMany as any).mock.calls.at(-1)[0]
+        .where;
+      expect(where.AND).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            OR: expect.arrayContaining([
+              { respDept: { contains: 'Quality' } },
+              { respDeptId: { contains: 'Quality' } },
+              { responsibleDepartments: { contains: 'Quality' } },
+            ]),
+          }),
+          expect.objectContaining({
+            OR: expect.arrayContaining([
+              { supplierBrand: { contains: 'Brand A' } },
+              { projectName: { contains: 'Brand A' } },
+            ]),
+          }),
+        ]),
+      );
     });
   });
 

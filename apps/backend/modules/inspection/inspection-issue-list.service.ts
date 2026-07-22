@@ -194,6 +194,7 @@ export const InspectionIssueListService = {
     dateMode?: InspectionIssueDateMode;
     dateValue?: string;
     defectType?: string | string[];
+    endDate?: string;
     page?: number;
     pageSize?: number;
     processName?: string;
@@ -203,6 +204,7 @@ export const InspectionIssueListService = {
     severity?: string | string[];
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    startDate?: string;
     status?: string | string[];
     supplierName?: string;
     userContext?: InspectionIssueUserContext;
@@ -222,6 +224,8 @@ export const InspectionIssueListService = {
     const { start, end } = buildInspectionIssueDateRange({
       dateMode: params.dateMode,
       dateValue: params.dateValue,
+      endDate: params.endDate,
+      startDate: params.startDate,
       year: params.year,
     });
     where.date = {

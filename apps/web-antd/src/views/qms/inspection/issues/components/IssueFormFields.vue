@@ -1,10 +1,16 @@
 <script lang="ts" setup>
+import type { InspectionIssueResponsibilityType } from '@qgs/shared';
+
 import type { StatusOption } from '../constants';
 
 import { computed, onMounted, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
+import {
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  resolveInspectionIssueResponsibilityTypeFromDepartment,
+} from '@qgs/shared';
 import { Button, message, Select, Switch, Tooltip } from 'ant-design-vue';
 
 import { useVbenForm } from '#/adapter/form';
@@ -15,7 +21,6 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
 import { useAiAnalysis } from '../composables/useAiAnalysis';
-import { DEPT_TYPE_KEYWORDS } from '../constants';
 import { getIssueFormSchemaWithStatusOptions } from './issueFormData';
 import IssuePhotoUpload from './IssuePhotoUpload.vue';
 import IssueSimilarCases from './IssueSimilarCases.vue';
@@ -34,6 +39,7 @@ interface Props {
   mode?: IssueFormMode;
   isEditMode?: boolean;
   processOptions?: Array<{ label: string; value: string }>;
+  responsibilityType?: InspectionIssueResponsibilityType;
   statusOptions?: StatusOption[];
 }
 
@@ -43,6 +49,7 @@ const props = withDefaults(defineProps<Props>(), {
   mode: 'standalone',
   isEditMode: false,
   processOptions: () => [],
+  responsibilityType: undefined,
   statusOptions: () => [],
 });
 
@@ -157,28 +164,29 @@ function findDeptTitle(
   return undefined;
 }
 
-const targetUnitCategory = computed(() => {
+const resolvedResponsibilityType = computed(() => {
+  if (props.responsibilityType) return props.responsibilityType;
   const deptId = firstResponsibleDepartment();
+  if (!deptId) {
+    return INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
+  }
   const name = findDeptTitle(props.deptTreeData, deptId) || '';
-  if (name.includes(DEPT_TYPE_KEYWORDS.PURCHASE)) return 'Supplier';
-  if (
-    name.includes(DEPT_TYPE_KEYWORDS.PRODUCTION) ||
-    name.includes('生产') ||
-    name.includes(DEPT_TYPE_KEYWORDS.OUTSOURCED)
-  )
-    return 'Outsourcing';
-  return 'Supplier';
+  return resolveInspectionIssueResponsibilityTypeFromDepartment(name);
+});
+
+const targetUnitCategory = computed(() => {
+  return resolvedResponsibilityType.value ===
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+    ? 'Outsourcing'
+    : 'Supplier';
 });
 
 const shouldShowSupplier = computed(() => {
-  const deptId = firstResponsibleDepartment();
-  if (!deptId) return false;
-  const name = findDeptTitle(props.deptTreeData, deptId) || '';
   return (
-    name.includes(DEPT_TYPE_KEYWORDS.PURCHASE) ||
-    name.includes(DEPT_TYPE_KEYWORDS.PRODUCTION) ||
-    name.includes(DEPT_TYPE_KEYWORDS.OUTSOURCED) ||
-    name.includes('生产')
+    resolvedResponsibilityType.value ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER ||
+    resolvedResponsibilityType.value ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
   );
 });
 

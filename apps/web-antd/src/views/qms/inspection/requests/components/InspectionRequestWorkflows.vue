@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  InspectionIssueResponsibilityType,
   InspectionRequest,
   InspectionRequestAttachment,
 } from '@qgs/shared';
@@ -46,12 +47,15 @@ type LinkedIssueDraft = {
   qualifiedQuantity: number;
   reportDate: string;
   reportedBy: string;
+  responsibilityType: InspectionIssueResponsibilityType;
   responsibleDepartment: string;
+  responsibleDepartmentId: string;
   responsibleWelder: string;
   rootCause: string;
   severity: string;
   solution: string;
   status: string;
+  supplierId: string;
   supplierName: string;
   unqualifiedQuantity: number;
 };

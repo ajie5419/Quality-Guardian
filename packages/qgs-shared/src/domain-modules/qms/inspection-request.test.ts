@@ -4,9 +4,12 @@ import {
   buildInspectionRecordPayloadCore,
   formatInspectionStationSelection,
   INCOMING_INSPECTION_PROCESS_NAME,
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
   INSPECTION_PROCESS_FALLBACK_ITEMS,
   mergeInspectionProcessNames,
+  normalizeInspectionIssueResponsibilityType,
   normalizeInspectionStationSelection,
+  resolveInspectionIssueResponsibilityTypeFromDepartment,
   resolveInspectionRequestIssueResponsibility,
 } from './inspection-request';
 
@@ -148,6 +151,20 @@ describe('inspection station selection', () => {
 });
 
 describe('resolveInspectionRequestIssueResponsibility', () => {
+  it.each([
+    ['采购部', INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER],
+    ['生产 OBU', INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT],
+    ['生产管理部', INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT],
+    ['外协质量组', INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT],
+  ])(
+    'classifies only canonical responsibility department %s',
+    (name, expected) => {
+      expect(resolveInspectionIssueResponsibilityTypeFromDepartment(name)).toBe(
+        expected,
+      );
+    },
+  );
+
   it('maps incoming supplier to supplierName and purchasing department', () => {
     expect(
       resolveInspectionRequestIssueResponsibility({
@@ -155,7 +172,9 @@ describe('resolveInspectionRequestIssueResponsibility', () => {
         team: 'Supplier A',
       }),
     ).toEqual({
+      responsibilityType: 'SUPPLIER',
       responsibleDepartment: '采购部',
+      supplierId: null,
       supplierName: 'Supplier A',
     });
   });
@@ -167,7 +186,9 @@ describe('resolveInspectionRequestIssueResponsibility', () => {
         team: 'Outsourcing Plant A',
       }),
     ).toEqual({
+      responsibilityType: 'OUTSOURCING_UNIT',
       responsibleDepartment: '生产 OBU',
+      supplierId: null,
       supplierName: 'Outsourcing Plant A',
     });
   });
@@ -179,8 +200,32 @@ describe('resolveInspectionRequestIssueResponsibility', () => {
         team: 'Assembly Team A',
       }),
     ).toEqual({
+      responsibilityType: 'INTERNAL_DEPARTMENT',
       responsibleDepartment: 'Assembly Team A',
+      supplierId: null,
       supplierName: '',
     });
+  });
+
+  it('uses canonical TEAM supplier identity for non-outsourcing process names', () => {
+    expect(
+      resolveInspectionRequestIssueResponsibility({
+        processName: 'Welding',
+        team: 'Legacy Team Name',
+        teamSupplier: { id: 'supplier-1', name: 'Supplier A' },
+      }),
+    ).toEqual({
+      responsibilityType: 'OUTSOURCING_UNIT',
+      responsibleDepartment: '生产 OBU',
+      supplierId: 'supplier-1',
+      supplierName: 'Supplier A',
+    });
+  });
+
+  it('normalizes only supported responsibility types', () => {
+    expect(normalizeInspectionIssueResponsibilityType(' supplier ')).toBe(
+      'SUPPLIER',
+    );
+    expect(normalizeInspectionIssueResponsibilityType('unknown')).toBeNull();
   });
 });

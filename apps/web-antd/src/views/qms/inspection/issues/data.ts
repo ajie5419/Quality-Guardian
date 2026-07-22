@@ -82,6 +82,17 @@ export function getIssueSearchFormSchema(
       },
       colProps: { span: 4 },
     },
+    {
+      fieldName: 'dateRange',
+      label: $t('qms.inspection.issues.reportDate'),
+      component: 'RangePicker',
+      componentProps: {
+        allowClear: true,
+        style: { width: '100%' },
+        valueFormat: 'YYYY-MM-DD',
+      },
+      colProps: { span: 8 },
+    },
   ] as unknown as VbenFormSchema[];
 }
 

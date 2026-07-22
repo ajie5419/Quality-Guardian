@@ -6,6 +6,15 @@ export const INSPECTION_REQUEST_STATUS = {
   SUBMITTED: 'SUBMITTED',
 } as const;
 
+export const INSPECTION_ISSUE_RESPONSIBILITY_TYPE = {
+  INTERNAL_DEPARTMENT: 'INTERNAL_DEPARTMENT',
+  OUTSOURCING_UNIT: 'OUTSOURCING_UNIT',
+  SUPPLIER: 'SUPPLIER',
+} as const;
+
+export type InspectionIssueResponsibilityType =
+  (typeof INSPECTION_ISSUE_RESPONSIBILITY_TYPE)[keyof typeof INSPECTION_ISSUE_RESPONSIBILITY_TYPE];
+
 export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
 export const INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT = '采购部';
 export const OUTSOURCING_INSPECTION_PROCESS_KEYWORD = '外协';
@@ -84,31 +93,71 @@ export function isOutsourcingInspectionRequestProcess(value: unknown) {
   );
 }
 
+export function resolveInspectionIssueResponsibilityTypeFromDepartment(
+  value: unknown,
+  fallback: InspectionIssueResponsibilityType = INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+): InspectionIssueResponsibilityType {
+  const department = normalizeInspectionRequestText(value);
+  if (department === INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT) {
+    return INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER;
+  }
+  if (department === OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT) {
+    return INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT;
+  }
+  return department
+    ? INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
+    : fallback;
+}
+
 export function resolveInspectionRequestIssueResponsibility(input: {
   processName?: unknown;
+  supplierId?: unknown;
   team?: unknown;
+  teamSupplier?: null | { id: string; name: string };
 }) {
   const processName = normalizeInspectionRequestText(input.processName);
   const team = normalizeInspectionRequestText(input.team);
+  const supplierId = normalizeInspectionRequestText(input.supplierId) || null;
 
   if (isIncomingInspectionRequestProcess(processName)) {
     return {
+      responsibilityType: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
       responsibleDepartment: INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT,
+      supplierId,
       supplierName: team,
     };
   }
 
-  if (isOutsourcingInspectionRequestProcess(processName)) {
+  if (
+    isOutsourcingInspectionRequestProcess(processName) ||
+    input.teamSupplier
+  ) {
     return {
+      responsibilityType: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
       responsibleDepartment: OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
-      supplierName: team,
+      supplierId: input.teamSupplier?.id || supplierId,
+      supplierName: input.teamSupplier?.name || team,
     };
   }
 
   return {
+    responsibilityType:
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
     responsibleDepartment: team,
+    supplierId: null,
     supplierName: '',
   };
+}
+
+export function normalizeInspectionIssueResponsibilityType(
+  value: unknown,
+): InspectionIssueResponsibilityType | null {
+  const normalized = normalizeInspectionRequestText(value).toUpperCase();
+  return (
+    Object.values(INSPECTION_ISSUE_RESPONSIBILITY_TYPE).find(
+      (item) => item === normalized,
+    ) ?? null
+  );
 }
 
 export function parseInspectionRequestPriority(value: unknown, fallback = 3) {

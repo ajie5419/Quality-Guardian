@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  InspectionIssueResponsibilityType,
   InspectionRequest,
   InspectionRequestAttachment,
 } from '@qgs/shared';
@@ -30,6 +31,10 @@ import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 import IssueFormFields from '../../issues/components/IssueFormFields.vue';
 import { useStatusOptions } from '../../issues/constants';
 import { resolveDivisionIdentity } from '../composables/useInspectionRequestTaskActions';
+import {
+  resolveLinkedIssueResponsibilitySelection,
+  resolveTreeDepartmentIdentity,
+} from '../inspection-request-responsibility';
 
 interface Props {
   open: boolean;
@@ -58,12 +63,15 @@ interface Props {
     qualifiedQuantity: number;
     reportDate: string;
     reportedBy: string;
+    responsibilityType: InspectionIssueResponsibilityType;
     responsibleDepartment: string;
+    responsibleDepartmentId: string;
     responsibleWelder: string;
     rootCause: string;
     severity: string;
     solution: string;
     status: string;
+    supplierId: string;
     supplierName: string;
     unqualifiedQuantity: number;
   };
@@ -146,6 +154,13 @@ function syncFromProps() {
 
 function buildEmbeddedIssueValues() {
   const total = normalizeQuantity(localCloseForm.quantity);
+  const responsibleDepartment = resolveTreeDepartmentIdentity(
+    props.deptTreeData,
+    {
+      department: localLinkedIssueDraft.responsibleDepartment,
+      departmentId: localLinkedIssueDraft.responsibleDepartmentId,
+    },
+  );
   return {
     workOrderNumber: props.currentRequest?.workOrderNumber || '',
     projectName: '',
@@ -155,11 +170,12 @@ function buildEmbeddedIssueValues() {
     quantity: total,
     inspector: localLinkedIssueDraft.reportedBy,
     reportDate: localLinkedIssueDraft.reportDate,
-    responsibleDepartment: localLinkedIssueDraft.responsibleDepartment,
-    responsibleDepartments: localLinkedIssueDraft.responsibleDepartment
-      ? [localLinkedIssueDraft.responsibleDepartment]
+    responsibleDepartment: responsibleDepartment.name,
+    responsibleDepartments: responsibleDepartment.id
+      ? [responsibleDepartment.id]
       : [],
     responsibleWelder: localLinkedIssueDraft.responsibleWelder,
+    supplierId: localLinkedIssueDraft.supplierId,
     supplierName: localLinkedIssueDraft.supplierName,
     status: localLinkedIssueDraft.status,
     severity: localLinkedIssueDraft.severity,
@@ -235,7 +251,7 @@ watch(
   () => props.deptTreeData,
   async () => {
     if (props.open && shouldCreateLinkedIssue.value) {
-      await fillWorkOrderInfo();
+      await applyEmbeddedValues();
     }
   },
 );
@@ -285,19 +301,29 @@ async function collectIssueFromForm() {
   const responsibleDepartment =
     responsibleDepartments[0] ||
     String(values.responsibleDepartment || '') ||
+    localLinkedIssueDraft.responsibleDepartmentId ||
     localLinkedIssueDraft.responsibleDepartment ||
     '';
+  const responsibility = resolveLinkedIssueResponsibilitySelection(
+    props.deptTreeData,
+    {
+      responsibilityType: localLinkedIssueDraft.responsibilityType,
+      responsibleDepartment: localLinkedIssueDraft.responsibleDepartment,
+      responsibleDepartmentId: responsibleDepartment,
+      supplierId: values.supplierId,
+      supplierName: values.supplierName,
+    },
+  );
   const divisionIdentity = resolveDivisionIdentity(props.deptTreeData, {
     division: String(values.division || localLinkedIssueDraft.division || ''),
     divisionId: localLinkedIssueDraft.divisionId,
   });
   Object.assign(localLinkedIssueDraft, {
     ...divisionIdentity,
+    ...responsibility,
     partName: String(values.partName || ''),
     processName: String(values.processName || ''),
-    responsibleDepartment,
     responsibleWelder: String(values.responsibleWelder || ''),
-    supplierName: String(values.supplierName || ''),
     status: String(values.status || 'OPEN'),
     severity: String(values.severity || ''),
     defectType: String(values.defectType || ''),
@@ -427,6 +453,7 @@ async function handleBeforeUpload(file: File) {
           mode="embedded"
           :is-edit-mode="false"
           :dept-tree-data="props.deptTreeData"
+          :responsibility-type="localLinkedIssueDraft.responsibilityType"
           :status-options="statusOptions"
         />
       </div>

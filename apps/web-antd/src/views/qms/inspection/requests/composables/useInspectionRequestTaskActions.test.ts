@@ -56,7 +56,17 @@ describe('useInspectionRequestTaskActions', () => {
       canDelete: ref(true),
       canDispatch: ref(true),
       defectSubtypes: ref({}),
-      deptRawData: ref([]),
+      deptTreeData: ref([
+        {
+          children: [
+            { title: 'Assembly Team A', value: 'dept-assembly' },
+            { title: '采购部', value: 'dept-purchase' },
+            { title: '生产 OBU', value: 'dept-production' },
+          ],
+          title: 'Company',
+          value: 'company',
+        },
+      ]),
       getCurrentUserName: () => 'Inspector A',
       handleApiError: vi.fn(),
       makeQr: vi.fn().mockResolvedValue('qr'),
@@ -156,6 +166,8 @@ describe('useInspectionRequestTaskActions', () => {
           division: 'Vehicle OBU',
           divisionId: 'dept-vehicle',
           responsibleDepartment: 'Assembly Team A',
+          responsibleDepartmentId: 'dept-assembly',
+          responsibilityType: 'INTERNAL_DEPARTMENT',
         }),
         attachments: [],
         hasDocuments: false,
@@ -176,12 +188,16 @@ describe('useInspectionRequestTaskActions', () => {
       partName: 'Bearing',
       processName: '进货检验',
       quantity: 2,
+      supplierId: 'supplier-1',
       team: 'Supplier A',
       workOrderNumber: 'WO-1',
     } as any);
 
     expect(composable.linkedIssueDraft.value).toMatchObject({
+      responsibilityType: 'SUPPLIER',
       responsibleDepartment: '采购部',
+      responsibleDepartmentId: 'dept-purchase',
+      supplierId: 'supplier-1',
       supplierName: 'Supplier A',
     });
   });
@@ -196,14 +212,67 @@ describe('useInspectionRequestTaskActions', () => {
       partName: 'Bearing',
       processName: '外协机加',
       quantity: 2,
+      supplierId: 'supplier-outsourcing-1',
       team: 'Outsourcing Plant A',
       workOrderNumber: 'WO-1',
     } as any);
 
     expect(composable.linkedIssueDraft.value).toMatchObject({
+      responsibilityType: 'OUTSOURCING_UNIT',
       responsibleDepartment: '生产 OBU',
+      responsibleDepartmentId: 'dept-production',
+      supplierId: 'supplier-outsourcing-1',
       supplierName: 'Outsourcing Plant A',
     });
+  });
+
+  it('submits the canonical TEAM supplier responsibility returned by the API', async () => {
+    const composable = createComposable();
+
+    composable.openClose({
+      id: 'request-1',
+      componentName: 'Bearing',
+      inspectorName: 'Inspector A',
+      issueResponsibility: {
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartment: '生产 OBU',
+        supplierId: 'supplier-team-1',
+        supplierName: 'Mapped Outsourcing Plant',
+      },
+      partName: 'Bearing',
+      processName: 'Machining',
+      quantity: 2,
+      team: 'Mapped Outsourcing Plant',
+      teamId: 'team-external-1',
+      workOrderNumber: 'WO-1',
+    } as any);
+    composable.closeForm.result = 'FAIL';
+    composable.linkedIssueDraft.value.description = 'Surface scratch';
+    composable.linkedIssueDraft.value.rootCause = 'Fixture contact';
+    composable.linkedIssueDraft.value.solution = 'Rework and protect fixture';
+    composable.linkedIssueDraft.value.photos = [
+      {
+        name: 'defect.jpg',
+        response: { data: { url: '/api/uploads/defect.jpg' } },
+        status: 'done',
+        uid: 'photo-1',
+      },
+    ] as any;
+
+    await composable.submitClose();
+
+    expect(mockCloseInspectionRequest).toHaveBeenCalledWith(
+      'request-1',
+      expect.objectContaining({
+        linkedIssue: expect.objectContaining({
+          responsibilityType: 'OUTSOURCING_UNIT',
+          responsibleDepartment: '生产 OBU',
+          responsibleDepartmentId: 'dept-production',
+          supplierId: 'supplier-team-1',
+          supplierName: 'Mapped Outsourcing Plant',
+        }),
+      }),
+    );
   });
 
   it('requires issue photos when closing as failed', async () => {
@@ -234,12 +303,12 @@ describe('useInspectionRequestTaskActions', () => {
 describe('resolveDivisionIdentity', () => {
   const departments = [
     {
-      id: 'group-1',
-      name: 'Operations',
+      value: 'group-1',
+      title: 'Operations',
       children: [
         {
-          id: 'dept-vehicle',
-          name: 'Vehicle OBU',
+          value: 'dept-vehicle',
+          title: 'Vehicle OBU',
         },
       ],
     },

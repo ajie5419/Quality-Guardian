@@ -37,11 +37,18 @@ export interface AfterSalesItem {
 }
 
 export interface AfterSalesParams {
+  customerName?: string;
   dateMode?: 'month' | 'week' | 'year';
   dateValue?: string;
+  defectType?: string;
+  endDate?: string;
+  handler?: string;
   page?: number;
   pageSize?: number;
+  productType?: string;
   projectName?: string;
+  responsibleDept?: string;
+  startDate?: string;
   status?: string;
   supplierBrand?: string;
   supplierBrandId?: string;

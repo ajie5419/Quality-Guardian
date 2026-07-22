@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { buildAfterSalesSearchParams } from './composables/useAfterSalesGrid';
 import { mapDictionaryOptionsToAfterSalesStatus } from './constants';
 
 describe('after-sales status dictionary mapping', () => {
@@ -40,5 +41,32 @@ describe('after-sales status dictionary mapping', () => {
     expect(mapDictionaryOptionsToAfterSalesStatus(undefined, fallback)).toEqual(
       fallback,
     );
+  });
+
+  it('normalizes search filters and maps the date range to API fields', () => {
+    expect(
+      buildAfterSalesSearchParams({
+        customerName: '  Customer   A ',
+        dateRange: ['2026-07-01', '2026-07-31'],
+        handler: ' Handler A ',
+        responsibleDept: ' dept-1 ',
+        status: 'IN_PROGRESS',
+      }),
+    ).toMatchObject({
+      customerName: 'Customer A',
+      endDate: '2026-07-31',
+      handler: 'Handler A',
+      responsibleDept: 'dept-1',
+      startDate: '2026-07-01',
+      status: 'IN_PROGRESS',
+    });
+  });
+
+  it('omits incomplete date ranges', () => {
+    const params = buildAfterSalesSearchParams({
+      dateRange: ['2026-07-01'],
+    });
+    expect(params).not.toHaveProperty('startDate');
+    expect(params).not.toHaveProperty('endDate');
   });
 });
