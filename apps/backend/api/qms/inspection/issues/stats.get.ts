@@ -24,17 +24,14 @@ export default defineValidatedHandler(
   async (event, query) => {
     try {
       const userinfo = getCurrentUser(event);
-      await InspectionIssueAccessService.ensurePermission(
+      const userContext = await InspectionIssueAccessService.getAccessContext(
         userinfo,
         INSPECTION_ISSUE_PERMISSION_CODES.LIST,
       );
       const result = await InspectionService.getIssueStats({
         dateMode: parseInspectionIssueDateMode(query.dateMode),
         dateValue: parseInspectionIssueDateValue(query.dateValue),
-        userContext: {
-          roles: userinfo.roles,
-          userId: String(userinfo.id || userinfo.userId || ''),
-        },
+        userContext,
         year: parseOptionalIssueYear(query.year),
       });
       return useResponseSuccess(result);

@@ -74,6 +74,7 @@ export function hasInspectionIssueAdminAccess(roles: unknown): boolean {
 
 export function hasInspectionIssueWriteAccess(params: {
   createdBy: null | string;
+  roles?: unknown;
   userId: unknown;
 }): boolean {
   return domainHasInspectionIssueWriteAccess(params);

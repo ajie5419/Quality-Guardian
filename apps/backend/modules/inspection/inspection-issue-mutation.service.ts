@@ -25,8 +25,12 @@ import {
   createInspectionIssueId,
   findInspectionForIssue,
   getNextInspectionIssueSerialNumber,
+  hasInspectionIssueWriteAccess,
 } from './inspection-issue';
-import { InspectionIssueAccessService } from './inspection-issue-access.service';
+import {
+  applyInspectionIssueWriteOwnership,
+  InspectionIssueAccessService,
+} from './inspection-issue-access.service';
 import { InspectionIssueNumberingService } from './inspection-issue-numbering.service';
 
 const logger = createModuleLogger('InspectionIssueMutation');
@@ -110,12 +114,14 @@ export const InspectionIssueMutationService = {
     body: RequestBody,
     existingNcNumber: null | string,
   ) {
-    await InspectionIssueAccessService.ensurePermission(
+    const userContext = await InspectionIssueAccessService.getAccessContext(
       userinfo,
       INSPECTION_ISSUE_PERMISSION_CODES.EDIT,
     );
-    const userId = String(userinfo.id || userinfo.userId || '');
-    const ownershipWhere = { createdBy: userId, id, isDeleted: false };
+    const ownershipWhere = applyInspectionIssueWriteOwnership(
+      { id, isDeleted: false },
+      userContext,
+    );
     const current = await prisma.quality_records.findUnique({
       where: ownershipWhere,
       select: {
@@ -176,11 +182,10 @@ export const InspectionIssueMutationService = {
     userinfo: UserSession,
     ids: string[],
   ) {
-    await InspectionIssueAccessService.ensurePermission(
+    const userContext = await InspectionIssueAccessService.getAccessContext(
       userinfo,
       INSPECTION_ISSUE_PERMISSION_CODES.DELETE,
     );
-    const userId = String(userinfo.id || userinfo.userId || '');
     const uniqueIds = [...new Set(ids)];
     const existing = await prisma.quality_records.findMany({
       where: { id: { in: uniqueIds }, isDeleted: false },
@@ -193,7 +198,14 @@ export const InspectionIssueMutationService = {
     });
     if (
       existing.length !== uniqueIds.length ||
-      existing.some((item) => item.createdBy !== userId)
+      existing.some(
+        (item) =>
+          !hasInspectionIssueWriteAccess({
+            createdBy: item.createdBy,
+            roles: userContext.roles,
+            userId: userContext.userId,
+          }),
+      )
     ) {
       throw new BusinessError(
         'FORBIDDEN',
@@ -202,11 +214,10 @@ export const InspectionIssueMutationService = {
       );
     }
     const result = await prisma.quality_records.updateMany({
-      where: {
-        createdBy: userId,
-        id: { in: uniqueIds },
-        isDeleted: false,
-      },
+      where: applyInspectionIssueWriteOwnership(
+        { id: { in: uniqueIds }, isDeleted: false },
+        userContext,
+      ),
       data: { isDeleted: true, updatedAt: new Date() },
     });
     if (result.count > 0) {

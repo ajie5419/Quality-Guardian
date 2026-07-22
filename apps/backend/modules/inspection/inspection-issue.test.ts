@@ -339,19 +339,35 @@ describe('inspection issue ownership rules', () => {
     },
   );
 
-  it.each(['quality_supervisor', 'supervisor', 'administrator'])(
-    'does not treat %s as read-all administration',
-    (role) => {
-      expect(hasInspectionIssueAdminAccess([role])).toBe(false);
-    },
-  );
+  it.each([
+    'admin_assistant',
+    'administrator',
+    'non_admin',
+    'not-super',
+    'quality_supervisor',
+    'super_user',
+    'supervisor',
+  ])('does not treat %s as read-all administration', (role) => {
+    expect(hasInspectionIssueAdminAccess([role])).toBe(false);
+  });
 
-  it('allows writes only for the creating user, including for admins', () => {
+  it('allows writes for the creator and administrators', () => {
     expect(
       hasInspectionIssueWriteAccess({ createdBy: 'user-1', userId: 'user-1' }),
     ).toBe(true);
     expect(
-      hasInspectionIssueWriteAccess({ createdBy: 'user-1', userId: 'admin-1' }),
+      hasInspectionIssueWriteAccess({
+        createdBy: 'system',
+        roles: ['admin'],
+        userId: 'admin-1',
+      }),
+    ).toBe(true);
+    expect(
+      hasInspectionIssueWriteAccess({
+        createdBy: 'user-1',
+        roles: ['quality_supervisor'],
+        userId: 'user-2',
+      }),
     ).toBe(false);
   });
 });

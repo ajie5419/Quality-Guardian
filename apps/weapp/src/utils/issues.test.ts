@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  canManageInspectionIssue,
   isInspectionIssueOwner,
   mergeInspectionProcessOptions,
 } from './issues';
@@ -20,6 +21,26 @@ describe('isInspectionIssueOwner', () => {
 
   it('rejects records without an explicit creator', () => {
     expect(isInspectionIssueOwner({}, 'user-1')).toBe(false);
+  });
+});
+
+describe('canManageInspectionIssue', () => {
+  it('allows an administrator to manage historical system records', () => {
+    expect(
+      canManageInspectionIssue(
+        { createdBy: 'system' },
+        { id: 'admin-1', roles: ['super_admin'] },
+      ),
+    ).toBe(true);
+  });
+
+  it('does not grant administrator access to similarly named roles', () => {
+    expect(
+      canManageInspectionIssue(
+        { createdBy: 'user-1' },
+        { id: 'user-2', roles: ['administrator'] },
+      ),
+    ).toBe(false);
   });
 });
 

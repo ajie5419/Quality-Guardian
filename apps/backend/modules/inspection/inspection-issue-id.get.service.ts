@@ -21,17 +21,13 @@ export default defineEventHandler(async (event) => {
   if (typeof id !== 'string') return id;
 
   try {
-    await InspectionIssueAccessService.ensurePermission(
+    const userContext = await InspectionIssueAccessService.getAccessContext(
       userinfo,
       INSPECTION_ISSUE_PERMISSION_CODES.VIEW,
     );
     const issue = await InspectionIssueListService.getIssueById({
       id,
-      userContext: {
-        roles: userinfo.roles,
-        userId: String(userinfo.id || userinfo.userId || ''),
-        username: userinfo.username,
-      },
+      userContext: { ...userContext, username: userinfo.username },
     });
     if (!issue) {
       throw new BusinessError('NOT_FOUND', '不合格品项不存在', 404);

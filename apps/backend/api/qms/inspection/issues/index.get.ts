@@ -23,17 +23,13 @@ export default defineValidatedHandler(
     const userinfo = getCurrentUser(event);
     const params = parseInspectionIssueListQuery(query);
     try {
-      await InspectionIssueAccessService.ensurePermission(
+      const userContext = await InspectionIssueAccessService.getAccessContext(
         userinfo,
         INSPECTION_ISSUE_PERMISSION_CODES.LIST,
       );
       const result = await InspectionService.getIssues({
         ...params,
-        userContext: {
-          roles: userinfo.roles,
-          userId: String(userinfo.id || userinfo.userId || ''),
-          username: userinfo.username,
-        },
+        userContext: { ...userContext, username: userinfo.username },
       });
 
       return useResponseSuccess(result);

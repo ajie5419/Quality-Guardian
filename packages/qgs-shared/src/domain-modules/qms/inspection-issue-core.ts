@@ -44,6 +44,14 @@ export function normalizeOptionalInspectionIssueDate(
   return parsed;
 }
 
+// Ownership bypass must never be inferred from arbitrary role name fragments.
+const INSPECTION_ISSUE_ADMIN_ROLES = new Set([
+  'admin',
+  'super',
+  'super_admin',
+  'system_admin',
+]);
+
 export function hasInspectionIssueAdminAccess(roles: unknown): boolean {
   if (!Array.isArray(roles)) return false;
   return roles.some((role) => {
@@ -51,10 +59,9 @@ export function hasInspectionIssueAdminAccess(roles: unknown): boolean {
       ?.toLowerCase()
       .replaceAll('-', '_')
       .replaceAll(' ', '_');
-    if (!normalizedRole) return false;
     return normalizedRole
-      .split('_')
-      .some((segment) => segment === 'admin' || segment === 'super');
+      ? INSPECTION_ISSUE_ADMIN_ROLES.has(normalizedRole)
+      : false;
   });
 }
 
@@ -64,8 +71,10 @@ export function shouldRestrictInspectionIssueRead(roles: unknown): boolean {
 
 export function hasInspectionIssueWriteAccess(params: {
   createdBy: null | string;
+  roles?: unknown;
   userId: unknown;
 }): boolean {
+  if (hasInspectionIssueAdminAccess(params.roles)) return true;
   const userId = String(params.userId ?? '').trim();
   return Boolean(userId && params.createdBy === userId);
 }

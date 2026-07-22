@@ -29,8 +29,11 @@ export default defineEventHandler(async (event) => {
   }
 
   // Data Ownership Check
+  let userContext: Awaited<
+    ReturnType<typeof InspectionIssueAccessService.getAccessContext>
+  >;
   try {
-    await InspectionIssueAccessService.ensurePermission(
+    userContext = await InspectionIssueAccessService.getAccessContext(
       userinfo,
       INSPECTION_ISSUE_PERMISSION_CODES.DELETE,
     );
@@ -43,7 +46,8 @@ export default defineEventHandler(async (event) => {
     if (
       !hasInspectionIssueWriteAccess({
         createdBy: existingRecord.createdBy,
-        userId: userinfo.id || userinfo.userId,
+        roles: userContext.roles,
+        userId: userContext.userId,
       })
     ) {
       return forbiddenResponse(event, '无权删除：您只能删除自己创建的数据');
@@ -56,7 +60,11 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    await InspectionService.deleteRecord(id, String(userinfo.id));
+    await InspectionService.deleteRecord(
+      id,
+      userContext.userId,
+      userContext.roles,
+    );
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('issues', error, undefined, event);
