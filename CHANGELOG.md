@@ -25,6 +25,16 @@
 
 ## 执行记录
 
+## [0.17.6](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.5...qgs-v0.17.6) (2026-07-22)
+
+
+### Bug Fixes
+
+* **deploy:** backfill inspection issue divisions ([ade45d3](https://github.com/ajie5419/Quality-Guardian/commit/ade45d31ee1b6d9ba422b6d1657028d1a7eefae4))
+* **project:** allow admins to manage inspection issues ([132bd2a](https://github.com/ajie5419/Quality-Guardian/commit/132bd2aaa2f889e0fde5820bd30184cf1783c2bc))
+* **project:** preserve inspection issue division identity ([ea80359](https://github.com/ajie5419/Quality-Guardian/commit/ea803597f7f8d91a8144db2021aefdf65ea6c146))
+* **project:** restore inspection issue access and division identity ([b8ef092](https://github.com/ajie5419/Quality-Guardian/commit/b8ef092b37a994a608db4988c92c1031ccf67d51))
+
 ### 2026-07-22 修复：恢复报检不合格项事业部身份链路
 
 **执行内容：**
