@@ -7,6 +7,7 @@ export const AUDIT_TEMPLATES = {
     'Batch soft deleted {{count}} quality loss records',
   QUALITY_LOSS_SOFT_DELETE: 'Soft deleted quality loss record',
   VEHICLE_COMMISSIONING_ISSUE_CREATE: '创建调试验收问题: {{issue}}',
+  VEHICLE_COMMISSIONING_ISSUE_DELETE: '删除调试验收问题: {{issue}}',
   VEHICLE_COMMISSIONING_ISSUE_UPDATE:
     '更新调试验收问题: {{issue}}, 状态={{status}}',
 } as const;
@@ -19,6 +20,7 @@ type AuditTemplateVariablesMap = {
   QUALITY_LOSS_BATCH_SOFT_DELETE: { count: number };
   QUALITY_LOSS_SOFT_DELETE: Record<string, never>;
   VEHICLE_COMMISSIONING_ISSUE_CREATE: { issue: string };
+  VEHICLE_COMMISSIONING_ISSUE_DELETE: { issue: string };
   VEHICLE_COMMISSIONING_ISSUE_UPDATE: { issue: string; status: string };
 };
 

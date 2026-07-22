@@ -4,6 +4,10 @@ export type VehicleCommissioningIssueStatus =
   | 'OPEN'
   | 'RESOLVED';
 
+export const VEHICLE_COMMISSIONING_PERMISSION_CODES = {
+  DELETE: 'QMS:VehicleCommissioning:Delete',
+} as const;
+
 export interface VehicleCommissioningIssue {
   assignee?: string;
   claimNotes?: string;

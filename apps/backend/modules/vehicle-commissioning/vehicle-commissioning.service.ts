@@ -3,17 +3,19 @@ import type {
   VehicleCommissioningIssue,
   VehicleCommissioningIssueParams,
 } from '@qgs/shared';
+import type { UserSession } from '~/utils/jwt-utils';
 
 import { ISSUE_TRACKING_STATUS, safeNumber } from '@qgs/shared';
 import { nanoid } from 'nanoid';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
+import { FileStorageService } from '~/modules/file-storage';
+import { QualityLossIndexService } from '~/modules/quality-loss';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 
 import { VehicleCommissioningDailyReportService } from './vehicle-commissioning-daily-report.service';
+import { VehicleCommissioningDeleteService } from './vehicle-commissioning-delete.service';
 import { exportVehicleCommissioningIssuesWorkbook } from './vehicle-commissioning-export.service';
 import {
   mapVehicleCommissioningIssueToDto,
@@ -24,7 +26,7 @@ import {
 export const VehicleCommissioningService = {
   async findIssueId(id: string) {
     const row = await prisma.vehicle_commissioning_issues.findFirst({
-      where: { id },
+      where: { id, isDeleted: false },
       select: { id: true },
     });
     return row?.id || null;
@@ -322,6 +324,10 @@ export const VehicleCommissioningService = {
       id: item.id,
       operator: item.users?.realName || item.users?.username || item.userId,
     }));
+  },
+
+  async deleteIssue(id: string, userinfo: UserSession) {
+    return VehicleCommissioningDeleteService.deleteIssue(id, userinfo);
   },
 
   async updateIssue(

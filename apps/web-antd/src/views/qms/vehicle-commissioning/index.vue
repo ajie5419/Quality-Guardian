@@ -29,8 +29,10 @@ const { modalWidth, modalWrapClassName } = useAdaptivePopup();
 
 const {
   claimStatusOptions,
+  canDelete,
   createReport,
   deptTreeData,
+  deleteIssue,
   exportIssuesAsExcel,
   exportReportAsPdf,
   exportReportAsWord,
@@ -199,6 +201,15 @@ const {
                         @click="openEditIssue(record)"
                       >
                         编辑
+                      </Button>
+                      <Button
+                        v-if="canDelete"
+                        danger
+                        size="small"
+                        type="link"
+                        @click="deleteIssue(record)"
+                      >
+                        删除
                       </Button>
                       <Button
                         size="small"

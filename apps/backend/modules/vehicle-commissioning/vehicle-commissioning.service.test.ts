@@ -1,6 +1,11 @@
 import { Buffer } from 'node:buffer';
 
+import { VEHICLE_COMMISSIONING_PERMISSION_CODES } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
+import { RbacService } from '~/modules/rbac/rbac.service';
+import { SystemLogService } from '~/modules/system-log/system-log.service';
 import {
   getVehicleCommissioningSeverityLabel,
   getVehicleCommissioningSeverityRank,
@@ -23,6 +28,7 @@ vi.mock('~/utils/prisma', () => ({
       create: vi.fn(),
       findMany: vi.fn(),
       findFirst: vi.fn(),
+      updateMany: vi.fn(),
       update: vi.fn(),
     },
     $queryRaw: vi.fn(),
@@ -38,6 +44,20 @@ vi.mock('~/utils/governed-write', () => ({
 vi.mock('~/modules/file-storage/file-storage.service', () => ({
   FileStorageService: {
     registerReferencesFromAttachments: vi.fn(),
+    softDeleteReferences: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/quality-loss/quality-loss-index.service', () => ({
+  QualityLossIndexService: {
+    softDeleteSource: vi.fn(),
+    upsertFromCommissioning: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/rbac/rbac.service', () => ({
+  RbacService: {
+    getUserPermissionCodes: vi.fn(),
   },
 }));
 
@@ -103,7 +123,7 @@ describe('vehicleCommissioningService', () => {
       VehicleCommissioningService.findIssueId('issue-1'),
     ).resolves.toBe('issue-1');
     expect(prisma.vehicle_commissioning_issues.findFirst).toHaveBeenCalledWith({
-      where: { id: 'issue-1' },
+      where: { id: 'issue-1', isDeleted: false },
       select: { id: true },
     });
   });
@@ -365,6 +385,68 @@ describe('vehicleCommissioningService', () => {
         operator: 'operator',
       },
     ]);
+  });
+
+  it('rejects issue deletion without the delete permission', async () => {
+    vi.mocked(RbacService.getUserPermissionCodes).mockResolvedValue([]);
+
+    await expect(
+      VehicleCommissioningService.deleteIssue('issue-1', {
+        id: 'user-1',
+        realName: 'Operator',
+        roles: [],
+        username: 'operator',
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
+    expect(
+      prisma.vehicle_commissioning_issues.findFirst,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('soft deletes an issue and its dependent index and file references', async () => {
+    vi.mocked(RbacService.getUserPermissionCodes).mockResolvedValue([
+      VEHICLE_COMMISSIONING_PERMISSION_CODES.DELETE,
+    ]);
+    vi.mocked(prisma.vehicle_commissioning_issues.findFirst).mockResolvedValue({
+      description: 'Brake issue',
+      id: 'issue-1',
+    } as never);
+    vi.mocked(prisma.vehicle_commissioning_issues.updateMany).mockResolvedValue(
+      {
+        count: 1,
+      } as never,
+    );
+
+    await VehicleCommissioningService.deleteIssue('issue-1', {
+      id: 'user-1',
+      realName: 'Operator',
+      roles: [],
+      username: 'operator',
+    });
+
+    expect(prisma.vehicle_commissioning_issues.updateMany).toHaveBeenCalledWith(
+      {
+        where: { id: 'issue-1', isDeleted: false },
+        data: { isDeleted: true, updatedAt: expect.any(Date) },
+      },
+    );
+    expect(FileStorageService.softDeleteReferences).toHaveBeenCalledWith({
+      bizId: 'issue-1',
+      bizType: 'vehicle_commissioning_issue',
+    });
+    expect(QualityLossIndexService.softDeleteSource).toHaveBeenCalledWith(
+      'Commissioning',
+      'issue-1',
+    );
+    expect(SystemLogService.auditLog).toHaveBeenCalledWith(
+      'vehicle-commissioning',
+      'issueDelete',
+      expect.objectContaining({
+        detailsVariables: { issue: 'Brake issue' },
+        targetId: 'issue-1',
+        userId: 'user-1',
+      }),
+    );
   });
 
   it('updates issue and registers changed photos from body', async () => {

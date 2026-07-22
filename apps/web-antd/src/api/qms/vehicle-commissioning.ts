@@ -39,6 +39,12 @@ export async function updateVehicleCommissioningIssue(
   );
 }
 
+export async function deleteVehicleCommissioningIssue(id: string) {
+  return requestClient.delete<null>(
+    `${QMS_API.VEHICLE_COMMISSIONING_ISSUES}/${id}`,
+  );
+}
+
 export async function exportVehicleCommissioningIssues(
   params?: VehicleCommissioningIssueParams,
 ) {

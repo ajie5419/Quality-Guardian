@@ -17,12 +17,13 @@ import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
 } from '@qgs/shared';
-import { message } from 'ant-design-vue';
+import { message, Modal } from 'ant-design-vue';
 import dayjs from 'dayjs';
 
 import {
   createVehicleCommissioningIssue,
   createVehicleCommissioningReport,
+  deleteVehicleCommissioningIssue,
   exportVehicleCommissioningIssues,
   getVehicleCommissioningIssueLogs,
   getVehicleCommissioningIssues,
@@ -31,6 +32,7 @@ import {
   updateVehicleCommissioningIssue,
 } from '#/api/qms/vehicle-commissioning';
 import { getDeptList } from '#/api/system/dept';
+import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { convertToTreeSelectData } from '#/types';
 
 type VehicleCommissioningIssueGroup = {
@@ -59,6 +61,7 @@ type RequiredIssueField = {
 };
 
 export function useVehicleCommissioningPage() {
+  const { canDelete } = useQmsPermissions('QMS:VehicleCommissioning');
   const deptRawData = ref<Dept[]>([]);
   const deptTreeData = ref<TreeSelectNode[]>([]);
   const loadingIssues = ref(false);
@@ -533,6 +536,33 @@ export function useVehicleCommissioningPage() {
     }
   }
 
+  function deleteIssue(row: VehicleCommissioningIssue) {
+    if (!canDelete.value) {
+      message.warning('无删除调试验收问题权限');
+      return;
+    }
+    Modal.confirm({
+      title: '删除问题',
+      content: `确定删除问题“${row.description || row.id}”？`,
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await deleteVehicleCommissioningIssue(row.id);
+          selectedIssueIds.value = selectedIssueIds.value.filter(
+            (id) => id !== row.id,
+          );
+          message.success('问题已删除');
+          await loadIssues();
+        } catch (error) {
+          console.error(error);
+          message.error('删除问题失败');
+        }
+      },
+    });
+  }
+
   async function createReport() {
     const reporters = reportForm.reportersText
       .split(/[\s,，]+/)
@@ -678,8 +708,10 @@ export function useVehicleCommissioningPage() {
 
   return {
     claimStatusOptions,
+    canDelete,
     createReport,
     deptTreeData,
+    deleteIssue,
     exportIssuesAsExcel,
     exportReportAsPdf,
     exportReportAsWord,
