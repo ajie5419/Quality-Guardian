@@ -29,6 +29,7 @@ import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 
 import IssueFormFields from '../../issues/components/IssueFormFields.vue';
 import { useStatusOptions } from '../../issues/constants';
+import { resolveDivisionIdentity } from '../composables/useInspectionRequestTaskActions';
 
 interface Props {
   open: boolean;
@@ -47,6 +48,8 @@ interface Props {
     defectSubtype: string;
     defectType: string;
     description: string;
+    division: string;
+    divisionId: string;
     lossAmount: number;
     ncNumber: string;
     partName: string;
@@ -146,7 +149,7 @@ function buildEmbeddedIssueValues() {
   return {
     workOrderNumber: props.currentRequest?.workOrderNumber || '',
     projectName: '',
-    division: '',
+    division: localLinkedIssueDraft.division,
     partName: localLinkedIssueDraft.partName,
     processName: localLinkedIssueDraft.processName,
     quantity: total,
@@ -187,6 +190,7 @@ async function fillWorkOrderInfo() {
   if (!workOrderNumber || !fields) return;
   try {
     const result = await getWorkOrderListPage({
+      ignoreYearFilter: true,
       workOrderNumber,
       pageSize: 1,
     });
@@ -194,9 +198,14 @@ async function fillWorkOrderInfo() {
       (item) => item.workOrderNumber === workOrderNumber,
     );
     if (!matched) return;
+    const divisionIdentity = resolveDivisionIdentity(props.deptTreeData, {
+      division: matched.division,
+      divisionId: matched.divisionId,
+    });
+    Object.assign(localLinkedIssueDraft, divisionIdentity);
     await fields.setValues({
       projectName: matched.projectName || '',
-      division: matched.division || '',
+      division: divisionIdentity.division,
     });
   } catch (error) {
     console.warn('[close-inspection] failed to load work order info', error);
@@ -221,6 +230,15 @@ watch(shouldCreateLinkedIssue, async (val) => {
     await applyEmbeddedValues();
   }
 });
+
+watch(
+  () => props.deptTreeData,
+  async () => {
+    if (props.open && shouldCreateLinkedIssue.value) {
+      await fillWorkOrderInfo();
+    }
+  },
+);
 
 watch(
   () => localCloseForm.quantity,
@@ -269,7 +287,12 @@ async function collectIssueFromForm() {
     String(values.responsibleDepartment || '') ||
     localLinkedIssueDraft.responsibleDepartment ||
     '';
+  const divisionIdentity = resolveDivisionIdentity(props.deptTreeData, {
+    division: String(values.division || localLinkedIssueDraft.division || ''),
+    divisionId: localLinkedIssueDraft.divisionId,
+  });
   Object.assign(localLinkedIssueDraft, {
+    ...divisionIdentity,
     partName: String(values.partName || ''),
     processName: String(values.processName || ''),
     responsibleDepartment,

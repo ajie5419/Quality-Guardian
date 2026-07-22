@@ -11,9 +11,9 @@ import {
   loadDepartmentNameMap,
 } from '@/utils/departments';
 import {
+  canManageInspectionIssue,
   getIssueSeverityLabel,
   getIssueStatusLabel,
-  isInspectionIssueOwner,
 } from '@/utils/issues';
 import { onLoad, onShow } from '@dcloudio/uni-app';
 import { INSPECTION_ISSUE_PERMISSION_CODES } from '@qgs/shared';
@@ -29,14 +29,14 @@ const canEdit = computed(() =>
   Boolean(
     issue.value &&
       userStore.hasPermission(INSPECTION_ISSUE_PERMISSION_CODES.EDIT) &&
-      isInspectionIssueOwner(issue.value, userStore.userInfo?.id),
+      canManageInspectionIssue(issue.value, userStore.userInfo),
   ),
 );
 const canDelete = computed(() =>
   Boolean(
     issue.value &&
       userStore.hasPermission(INSPECTION_ISSUE_PERMISSION_CODES.DELETE) &&
-      isInspectionIssueOwner(issue.value, userStore.userInfo?.id),
+      canManageInspectionIssue(issue.value, userStore.userInfo),
   ),
 );
 

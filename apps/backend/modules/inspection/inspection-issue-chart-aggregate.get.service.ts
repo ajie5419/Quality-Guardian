@@ -43,7 +43,7 @@ export default defineValidatedHandler(schema, async (event, query) => {
     return internalServerErrorResponse(event, 'Invalid chart aggregate params');
 
   try {
-    await InspectionIssueAccessService.ensurePermission(
+    const userContext = await InspectionIssueAccessService.getAccessContext(
       userinfo,
       INSPECTION_ISSUE_PERMISSION_CODES.LIST,
     );
@@ -64,11 +64,7 @@ export default defineValidatedHandler(schema, async (event, query) => {
       metric: metric as 'count' | 'lossAmount' | 'quantity',
       top: Number.isNaN(top) ? 15 : top,
       year: parseOptionalIssueYear(query.year),
-      userContext: {
-        roles: userinfo.roles,
-        userId: String(userinfo.id || userinfo.userId || ''),
-        username: userinfo.username,
-      },
+      userContext: { ...userContext, username: userinfo.username },
     });
     return useResponseSuccess({ items: result });
   } catch (error) {

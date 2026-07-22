@@ -19,7 +19,10 @@ import {
 import { WorkOrderService } from '~/modules/work-order/work-order.service';
 import { logApiError } from '~/utils/api-logger';
 import { BusinessError } from '~/utils/business-error';
-import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 import {
   isPrismaNotFoundError,
@@ -27,8 +30,18 @@ import {
   isPrismaUniqueConflictError,
 } from '~/utils/prisma-error';
 
+import { buildWorkOrderImportGovernedFields } from './work-order-import-governance';
 import { WorkOrderRequirementRouteService } from './work-order-requirement-route.service';
 import { mapWorkOrderStatus } from './work-order-status';
+
+async function buildWorkOrderGovernedFields(input: Record<string, unknown>) {
+  const governedFields = buildGovernedWriteFieldsForTable('work_orders', input);
+  const canonicalFields = await buildGovernedCanonicalWritePairForTable(
+    'work_orders',
+    input,
+  );
+  return { ...governedFields, ...canonicalFields };
+}
 
 export const WorkOrderRouteService = {
   async batchDelete(event: H3Event, ids: string[], userinfo: UserSession) {
@@ -79,9 +92,11 @@ export const WorkOrderRouteService = {
     const woNum = parseRequiredWorkOrderNumber(body.workOrderNumber);
     if (!woNum || !body.customerName)
       throw new Error('BAD_REQUEST:缺少必填字段');
-    const governedFields = buildGovernedWriteFieldsForTable('work_orders', {
+    const governedFields = await buildWorkOrderGovernedFields({
       customerName: body.customerName,
+      customerNameId: body.customerNameId,
       division: body.division,
+      divisionId: body.divisionId,
     });
     const workOrderData = {
       customerName: body.customerName as string,
@@ -157,20 +172,22 @@ export const WorkOrderRouteService = {
     userinfo: UserSession,
   ) {
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
-    if (body.customerName !== undefined)
+    if (
+      body.customerName !== undefined ||
+      body.customerNameId !== undefined ||
+      body.division !== undefined ||
+      body.divisionId !== undefined
+    ) {
       Object.assign(
         updateData,
-        buildGovernedWriteFieldsForTable('work_orders', {
+        await buildWorkOrderGovernedFields({
           customerName: body.customerName,
-        }),
-      );
-    if (body.division !== undefined)
-      Object.assign(
-        updateData,
-        buildGovernedWriteFieldsForTable('work_orders', {
+          customerNameId: body.customerNameId,
           division: body.division,
+          divisionId: body.divisionId,
         }),
       );
+    }
     if (body.projectName !== undefined)
       updateData.projectName = body.projectName;
     if (body.quantity !== undefined && body.quantity !== null)
@@ -230,6 +247,12 @@ export const WorkOrderRouteService = {
           );
           continue;
         }
+        const governedFields = await buildWorkOrderImportGovernedFields({
+          customerName: item.customerName,
+          customerNameId: item.customerNameId,
+          division: item.division,
+          divisionId: item.divisionId,
+        });
         await prisma.work_orders.upsert({
           where: { workOrderNumber: woNumber },
           update: {
@@ -239,10 +262,7 @@ export const WorkOrderRouteService = {
             projectName: item.projectName
               ? String(item.projectName)
               : undefined,
-            ...buildGovernedWriteFieldsForTable('work_orders', {
-              customerName: item.customerName,
-              division: item.division,
-            }),
+            ...governedFields,
             quantity:
               item.quantity !== undefined && item.quantity !== null
                 ? parseWorkOrderQuantity(item.quantity, 1)
@@ -257,10 +277,7 @@ export const WorkOrderRouteService = {
             workOrderNumber: woNumber,
             customerName: String(item.customerName || '未知客户'),
             projectName: String(item.projectName || ''),
-            ...buildGovernedWriteFieldsForTable('work_orders', {
-              customerName: item.customerName,
-              division: item.division,
-            }),
+            ...governedFields,
             quantity: parseWorkOrderQuantity(item.quantity, 1),
             multiStationEnabled: item.multiStationEnabled === true,
             deliveryDate: parseRequiredDate(item.deliveryDate),

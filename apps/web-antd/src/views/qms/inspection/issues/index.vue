@@ -9,7 +9,11 @@ import { useAccess } from '@vben/access';
 import { useI18n } from '@vben/locales';
 import { useUserStore } from '@vben/stores';
 
-import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
+import {
+  hasInspectionIssueAdminAccess,
+  hasInspectionIssueWriteAccess,
+  QMS_DICTIONARY_TYPE_KEYS,
+} from '@qgs/shared';
 import { Image, Tag } from 'ant-design-vue';
 import dayjs from 'dayjs';
 
@@ -70,22 +74,16 @@ const canAddChart = computed(() =>
 );
 
 const userStore = useUserStore();
-const isAdmin = computed(() => {
-  return (
-    userStore.userRoles?.some((role: string) => {
-      const lowerRole = role.toLowerCase();
-      return lowerRole.includes('admin') || lowerRole.includes('super');
-    }) || false
-  );
-});
+const isAdmin = computed(() =>
+  hasInspectionIssueAdminAccess(userStore.userRoles),
+);
 
 function canManageIssue(issue: InspectionIssue) {
-  const currentUserId = String(userStore.userInfo?.userId || '').trim();
-  return Boolean(
-    currentUserId &&
-      issue.createdBy &&
-      String(issue.createdBy) === currentUserId,
-  );
+  return hasInspectionIssueWriteAccess({
+    createdBy: issue.createdBy || null,
+    roles: userStore.userRoles,
+    userId: userStore.userInfo?.userId,
+  });
 }
 
 const checkedRows = ref<InspectionIssue[]>([]);

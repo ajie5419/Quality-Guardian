@@ -36,6 +36,8 @@ type LinkedIssueDraft = {
   defectSubtype: string;
   defectType: string;
   description: string;
+  division: string;
+  divisionId: string;
   lossAmount: number;
   ncNumber: string;
   partName: string;

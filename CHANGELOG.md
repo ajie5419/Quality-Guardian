@@ -25,6 +25,51 @@
 
 ## 执行记录
 
+### 2026-07-22 修复：恢复报检不合格项事业部身份链路
+
+**执行内容：**
+
+- 将 `division` 的 canonical 主数据源从旧 `division` 字典纠正为启用的 `departments(id, name)`，并补齐部门源实体重命名联动；工单新增、编辑和导入统一写入 `divisionId + division`，历史导入名称解析收口到独立审核 adapter。
+- 修复完成检验弹窗遗漏事业部字段的问题：前端按 canonical ID、历史部门 ID、历史名称依次解析并提交双字段，不合格项列表和详情优先按 `divisionId` 显示部门名称，无法解析的旧值不再被静默隐藏。
+- 修复报检关闭事务边界：新建检验记录后，关联不合格项使用同一事务 client 查询检验记录和生成序号，保证首次 FAIL 关闭即可写入 `inspectionId`，并从关联工单继承 canonical 事业部双字段。
+- 新增事业部历史回填，支持 dry-run/apply、keyset 分批、字段级 CAS、幂等重试和旧 division 字典兼容；冲突不覆盖，无法唯一解析的数据持久化到 `unresolved_master_data_refs`，确定性修复会关闭旧 OPEN 审计。
+- 将回填接入 GitHub deploy、OSS deploy 和 3 条本地容器链路，统一在 Prisma migration 后自动执行；后端镜像构建会验证回填脚本已随镜像发布。
+
+**验证结果：**
+
+- 全量后端测试：219/219 个文件、2040/2040 个用例通过；事业部回填定向测试 10/10 个用例通过。
+- 前端定向测试：2/2 个文件、14/14 个用例通过；共享包 CJS/ESM/DTS 构建通过。
+- `pnpm lint`、3/3 workspace typecheck、后端 `tsc --noEmit`、`check:qms-arch`、架构规则测试和 `git diff --check` 全部通过。
+- 前端未运行 dev/build/start/serve，遵循仓库前端验证约束；未读取 `.env`，因此未在真实数据库执行 apply。
+
+**commit:** `ea803597` fix(project): preserve inspection issue division identity；`ade45d31` fix(deploy): backfill inspection issue divisions
+
+**遗留问题：**
+
+- 发布后需要核对回填汇总和新增 OPEN 审计数量；重名、冲突或无有效证据的历史事业部会保留原值，等待人工处置，不会被脚本猜测覆盖。
+
+### 2026-07-22 修复：恢复不合格品项管理员管理权限
+
+**执行内容：**
+
+- 修复不合格品项所有权规则将管理员也限制为创建人的问题；管理员角色采用 `admin`、`super`、`super_admin`、`system_admin` 精确集合，避免通过角色名子串误授权。
+- 后端列表、详情、统计、图表、编辑、单条删除和批量删除统一实时读取 RBAC v2 角色，并继续分别校验 `List`、`View`、`Edit`、`Delete` 权限码；管理员仅豁免 `createdBy` 条件，不豁免权限码和软删除条件。
+- 电脑版、小程序列表、小程序详情及直达编辑页统一使用共享权限规则显示编辑和删除入口；普通用户仍只能查看及管理本人创建的记录。
+- 导入覆盖继续保留原所有权限制，本次未扩大导入权限范围。
+
+**验证结果：**
+
+- 后端定向测试：8/8 个文件、70/70 个用例通过；电脑版与小程序定向测试：2/2 个文件、12/12 个用例通过。
+- 全量后端测试：218/218 个文件、2024/2024 个用例通过。
+- `pnpm lint`、3/3 workspace typecheck、后端 `tsc --noEmit`、`check:qms-arch` 和 `git diff --check` 全部通过。
+- 前端未运行 dev/build/start/serve，遵循仓库前端验证约束。
+
+**commit:** `132bd2a` fix(project): allow admins to manage inspection issues
+
+**遗留问题：**
+
+- 无。
+
 ## [0.17.5](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.4...qgs-v0.17.5) (2026-07-16)
 
 

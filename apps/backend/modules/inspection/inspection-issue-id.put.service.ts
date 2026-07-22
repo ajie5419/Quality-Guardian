@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
   if (typeof id !== 'string') return id;
   let existingNcNumber: null | string = null;
   try {
-    await InspectionIssueAccessService.ensurePermission(
+    const userContext = await InspectionIssueAccessService.getAccessContext(
       userinfo,
       INSPECTION_ISSUE_PERMISSION_CODES.EDIT,
     );
@@ -39,7 +39,8 @@ export default defineEventHandler(async (event) => {
     if (
       !hasInspectionIssueWriteAccess({
         createdBy: existingRecord.createdBy,
-        userId: userinfo.id || userinfo.userId,
+        roles: userContext.roles,
+        userId: userContext.userId,
       })
     )
       return forbiddenResponse(event, '无权修改：您只能修改自己创建的数据');

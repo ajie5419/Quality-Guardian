@@ -46,6 +46,9 @@ fi
 echo "Bootstrapping canonical TEAM dictionaries..."
 pnpm --dir apps/backend exec tsx scripts/bootstrap-team-dictionaries.ts --apply
 
+echo "Backfilling inspection issue divisions..."
+pnpm --dir apps/backend exec tsx scripts/backfill-inspection-issue-divisions.ts --apply
+
 echo "Backfilling supplier identities..."
 pnpm --dir apps/backend exec tsx scripts/backfill-quality-record-supplier-identities.ts --apply
 

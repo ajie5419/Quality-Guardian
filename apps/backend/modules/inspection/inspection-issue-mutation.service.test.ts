@@ -57,11 +57,38 @@ vi.mock('~/modules/inspection/inspection-issue', () => ({
   createInspectionIssueId: vi.fn().mockReturnValue('ISS-2026-001'),
   findInspectionForIssue: vi.fn().mockResolvedValue(null),
   getNextInspectionIssueSerialNumber: vi.fn().mockResolvedValue(1),
+  hasInspectionIssueWriteAccess: vi.fn(
+    ({
+      createdBy,
+      roles,
+      userId,
+    }: {
+      createdBy: null | string;
+      roles?: unknown;
+      userId: unknown;
+    }) =>
+      (Array.isArray(roles) && roles.includes('admin')) || createdBy === userId,
+  ),
 }));
 
 vi.mock('~/modules/inspection/inspection-issue-access.service', () => ({
+  applyInspectionIssueWriteOwnership: vi.fn(
+    (
+      where: Record<string, unknown>,
+      { roles, userId }: { roles?: unknown; userId: string },
+    ) =>
+      Array.isArray(roles) && roles.includes('admin')
+        ? where
+        : { ...where, createdBy: userId },
+  ),
   InspectionIssueAccessService: {
     ensurePermission: vi.fn(),
+    getAccessContext: vi.fn((userinfo: { id?: unknown; roles?: unknown }) =>
+      Promise.resolve({
+        roles: userinfo.roles,
+        userId: String(userinfo.id || ''),
+      }),
+    ),
   },
 }));
 
@@ -387,26 +414,22 @@ describe('inspectionIssueMutationService', () => {
       );
     });
 
-    it('rejects an admin updating a record created by another user', async () => {
+    it('allows an admin to update a record created by another user', async () => {
       const mockUser = {
         id: 'admin-1',
         username: 'admin',
         roles: ['admin'],
       } as any;
-      (prisma.quality_records.findUnique as any).mockResolvedValue(null);
 
-      await expect(
-        InspectionIssueMutationService.updateIssue(
-          mockUser,
-          'rec-other',
-          {},
-          null,
-        ),
-      ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
+      await InspectionIssueMutationService.updateIssue(
+        mockUser,
+        'rec-other',
+        {},
+        null,
+      );
 
       expect(prisma.quality_records.findUnique).toHaveBeenCalledWith({
         where: {
-          createdBy: 'admin-1',
           id: 'rec-other',
           isDeleted: false,
         },
@@ -418,7 +441,10 @@ describe('inspectionIssueMutationService', () => {
           supplierName: true,
         },
       });
-      expect(prisma.quality_records.update).not.toHaveBeenCalled();
+      expect(prisma.quality_records.update).toHaveBeenCalledWith({
+        where: { id: 'rec-other', isDeleted: false },
+        data: { partName: 'Updated' },
+      });
     });
   });
 
@@ -447,7 +473,7 @@ describe('inspectionIssueMutationService', () => {
 
       expect(result).toBe(2);
       expect(
-        InspectionIssueAccessService.ensurePermission,
+        InspectionIssueAccessService.getAccessContext,
       ).toHaveBeenCalledWith(mockUser, 'QMS:Inspection:Issues:Delete');
       expect(prisma.quality_records.updateMany).toHaveBeenCalledWith({
         where: {
@@ -541,12 +567,12 @@ describe('inspectionIssueMutationService', () => {
 
     it('rejects the whole batch when any record belongs to another user', async () => {
       const mockUser = {
-        id: 'admin-1',
-        username: 'admin',
-        roles: ['admin'],
+        id: 'user-1',
+        username: 'inspector',
+        roles: [],
       } as any;
       (prisma.quality_records.findMany as any).mockResolvedValue([
-        { createdBy: 'admin-1', id: 'rec-1', supplierName: null },
+        { createdBy: 'user-1', id: 'rec-1', supplierName: null },
         { createdBy: 'user-2', id: 'rec-2', supplierName: null },
       ]);
 
@@ -558,6 +584,35 @@ describe('inspectionIssueMutationService', () => {
       ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
 
       expect(prisma.quality_records.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('allows an admin to delete records owned by other users', async () => {
+      const mockUser = {
+        id: 'admin-1',
+        username: 'admin',
+        roles: ['admin'],
+      } as any;
+      (prisma.quality_records.findMany as any).mockResolvedValue([
+        { createdBy: 'system', id: 'rec-1', supplierName: null },
+        { createdBy: 'user-2', id: 'rec-2', supplierName: null },
+      ]);
+      (prisma.quality_records.updateMany as any).mockResolvedValue({
+        count: 2,
+      });
+
+      await InspectionIssueMutationService.batchDeleteIssues(
+        {} as any,
+        mockUser,
+        ['rec-1', 'rec-2'],
+      );
+
+      expect(prisma.quality_records.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ['rec-1', 'rec-2'] },
+          isDeleted: false,
+        },
+        data: { isDeleted: true, updatedAt: expect.any(Date) },
+      });
     });
   });
 

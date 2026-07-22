@@ -15,6 +15,7 @@ vi.mock('~/modules/inspection/inspection.service', () => ({
 vi.mock('~/modules/inspection/inspection-issue-access.service', () => ({
   InspectionIssueAccessService: {
     ensurePermission: vi.fn(),
+    getAccessContext: vi.fn(),
   },
 }));
 
@@ -43,8 +44,15 @@ vi.mock('~/utils/api-logger', () => ({
 }));
 
 describe('inspection-issue-chart-aggregate.get.service', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { InspectionIssueAccessService } = await import(
+      '~/modules/inspection/inspection-issue-access.service'
+    );
+    vi.mocked(InspectionIssueAccessService.getAccessContext).mockResolvedValue({
+      roles: ['admin'],
+      userId: 'u1',
+    });
   });
 
   it('should return chart data on success', async () => {
@@ -82,7 +90,7 @@ describe('inspection-issue-chart-aggregate.get.service', () => {
     expect(useResponseSuccess).toHaveBeenCalledWith({
       items: [{ name: 'Weld', value: 5 }],
     });
-    expect(InspectionIssueAccessService.ensurePermission).toHaveBeenCalledWith(
+    expect(InspectionIssueAccessService.getAccessContext).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'u1' }),
       'QMS:Inspection:Issues:List',
     );

@@ -16,6 +16,7 @@ import {
   extractPhotoUrl,
 } from '#/views/qms/shared/utils/photo-url';
 
+import { resolveIssueDivisionName } from '../composables/useIssueGridOptions';
 import {
   getSeverityColor,
   getSeverityLabel,
@@ -128,7 +129,7 @@ function formatDisplayDate(value: string | undefined) {
       </Descriptions.Item>
 
       <Descriptions.Item label="事业部">
-        {{ formatDept(record.division) }}
+        {{ resolveIssueDivisionName(props.deptData, record) || '-' }}
       </Descriptions.Item>
       <Descriptions.Item
         :label="t('qms.inspection.issues.responsibleDepartment')"

@@ -34,6 +34,7 @@ const issueFields = {
   defectType: requiredText,
   description: requiredLongText,
   division: shortText.optional(),
+  divisionId: shortText.optional(),
   id: shortText.optional(),
   inspectionId: shortText.optional(),
   inspector: shortText.optional(),

@@ -70,7 +70,8 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
 RUN test -x /app/apps/backend/node_modules/.bin/tsx \
-    && test -f /app/apps/backend/scripts/backfill-supplier-score-snapshots.ts
+    && test -f /app/apps/backend/scripts/backfill-supplier-score-snapshots.ts \
+    && test -f /app/apps/backend/scripts/backfill-inspection-issue-divisions.ts
 
 # 9. 不再重新生成 Prisma！也不再重新 npm install！
 # 构建阶段已经生成了，直接复制过来了

@@ -1,5 +1,6 @@
 import {
   CLAIM_STATUS,
+  hasInspectionIssueWriteAccess,
   INSPECTION_ISSUE_CLAIM_OPTIONS,
   INSPECTION_ISSUE_DEFAULT_VALUES,
   INSPECTION_ISSUE_DEFECT_OPTIONS,
@@ -54,6 +55,17 @@ export function isInspectionIssueOwner(
 ) {
   if (!issue.createdBy || !currentUserId) return false;
   return String(issue.createdBy) === String(currentUserId);
+}
+
+export function canManageInspectionIssue(
+  issue: { createdBy?: null | string },
+  user?: null | { id?: null | string; roles?: unknown },
+) {
+  return hasInspectionIssueWriteAccess({
+    createdBy: issue.createdBy || null,
+    roles: user?.roles,
+    userId: user?.id,
+  });
 }
 
 export interface InspectionProcessOption {

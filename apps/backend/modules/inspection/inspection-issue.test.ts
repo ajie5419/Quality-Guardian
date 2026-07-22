@@ -12,7 +12,11 @@ import {
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    inspections: {
+      findUnique: vi.fn(),
+    },
     quality_records: {
+      aggregate: vi.fn(),
       findUnique: vi.fn(),
     },
   },
@@ -116,6 +120,28 @@ describe('inspection-issue processId dual write', () => {
     expect(data.supplierName).toBe('Supplier A');
     expect(data.supplier).toEqual({ connect: { id: 'supplier-1' } });
     expect((data as Record<string, unknown>).supplierId).toBeUndefined();
+  });
+
+  it('inherits canonical division ID and name from the linked work order', async () => {
+    const data = await buildInspectionIssueCreateData(
+      { division: 'stale-division' },
+      {
+        id: 'ISS-2026-DIVISION',
+        inspection: {
+          category: 'PROCESS',
+          id: 'inspection-1',
+          work_order: {
+            division: 'Vehicle OBU',
+            divisionId: 'dept-vehicle',
+          },
+        } as never,
+        serialNumber: 4,
+      },
+    );
+
+    expect(data.division).toBe('Vehicle OBU');
+    expect(data.divisionId).toBe('dept-vehicle');
+    expect(data.inspection).toEqual({ connect: { id: 'inspection-1' } });
   });
 
   it('injects processId into update payload when processName is provided', async () => {
@@ -339,19 +365,35 @@ describe('inspection issue ownership rules', () => {
     },
   );
 
-  it.each(['quality_supervisor', 'supervisor', 'administrator'])(
-    'does not treat %s as read-all administration',
-    (role) => {
-      expect(hasInspectionIssueAdminAccess([role])).toBe(false);
-    },
-  );
+  it.each([
+    'admin_assistant',
+    'administrator',
+    'non_admin',
+    'not-super',
+    'quality_supervisor',
+    'super_user',
+    'supervisor',
+  ])('does not treat %s as read-all administration', (role) => {
+    expect(hasInspectionIssueAdminAccess([role])).toBe(false);
+  });
 
-  it('allows writes only for the creating user, including for admins', () => {
+  it('allows writes for the creator and administrators', () => {
     expect(
       hasInspectionIssueWriteAccess({ createdBy: 'user-1', userId: 'user-1' }),
     ).toBe(true);
     expect(
-      hasInspectionIssueWriteAccess({ createdBy: 'user-1', userId: 'admin-1' }),
+      hasInspectionIssueWriteAccess({
+        createdBy: 'system',
+        roles: ['admin'],
+        userId: 'admin-1',
+      }),
+    ).toBe(true);
+    expect(
+      hasInspectionIssueWriteAccess({
+        createdBy: 'user-1',
+        roles: ['quality_supervisor'],
+        userId: 'user-2',
+      }),
     ).toBe(false);
   });
 });

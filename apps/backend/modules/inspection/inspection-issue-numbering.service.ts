@@ -4,6 +4,8 @@ import { WelderScoreService } from '~/modules/welder/welder-score.service';
 import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 
+import { applyInspectionIssueWriteOwnership } from './inspection-issue-access.service';
+
 export const InspectionIssueNumberingService = {
   async generateNextNcNumber(): Promise<string> {
     const now = new Date();
@@ -41,9 +43,16 @@ export const InspectionIssueNumberingService = {
     const sequenceStr = sequence.toString().padStart(3, '0');
     return `${prefix}${sequenceStr}`;
   },
-  async deleteRecord(id: string, userId: string): Promise<void> {
+  async deleteRecord(
+    id: string,
+    userId: string,
+    roles?: unknown,
+  ): Promise<void> {
     const result = await prisma.quality_records.updateMany({
-      where: { createdBy: userId, id, isDeleted: false },
+      where: applyInspectionIssueWriteOwnership(
+        { id, isDeleted: false },
+        { roles, userId },
+      ),
       data: {
         isDeleted: true,
         updatedAt: new Date(),

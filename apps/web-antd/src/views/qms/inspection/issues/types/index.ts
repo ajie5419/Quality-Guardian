@@ -73,6 +73,7 @@ export interface InspectionIssue {
   severity: 'Critical' | 'Major' | 'Minor' | Severity;
   inspector: string;
   division?: string;
+  divisionId?: string;
   updatedAt?: string;
 }
 

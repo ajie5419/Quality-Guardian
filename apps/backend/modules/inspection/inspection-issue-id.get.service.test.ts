@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('~/modules/inspection/inspection-issue-access.service', () => ({
   InspectionIssueAccessService: {
     ensurePermission: vi.fn(),
+    getAccessContext: vi.fn(),
   },
 }));
 
@@ -21,8 +22,15 @@ vi.mock('~/utils/route-param', () => ({
 }));
 
 describe('inspection-issue-id.get.service', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { InspectionIssueAccessService } = await import(
+      '~/modules/inspection/inspection-issue-access.service'
+    );
+    vi.mocked(InspectionIssueAccessService.getAccessContext).mockResolvedValue({
+      roles: ['quality_inspector'],
+      userId: 'user-1',
+    });
   });
 
   it('checks view permission and passes the request data scope to the query', async () => {
@@ -60,7 +68,7 @@ describe('inspection-issue-id.get.service', () => {
 
     const result = await handler(event);
 
-    expect(InspectionIssueAccessService.ensurePermission).toHaveBeenCalledWith(
+    expect(InspectionIssueAccessService.getAccessContext).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'user-1' }),
       'QMS:Inspection:Issues:View',
     );

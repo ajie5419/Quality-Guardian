@@ -4,6 +4,7 @@ export interface WorkOrderItem {
   customerName: null | string;
   deliveryDate: null | string;
   division?: null | string;
+  divisionId?: null | string;
   effectiveTime?: null | string;
   id: string; // workOrderNumber
   multiStationEnabled?: boolean;

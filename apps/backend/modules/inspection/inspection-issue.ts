@@ -74,6 +74,7 @@ export function hasInspectionIssueAdminAccess(roles: unknown): boolean {
 
 export function hasInspectionIssueWriteAccess(params: {
   createdBy: null | string;
+  roles?: unknown;
   userId: unknown;
 }): boolean {
   return domainHasInspectionIssueWriteAccess(params);
@@ -83,8 +84,10 @@ export function createInspectionIssueId(): string {
   return createInspectionIssueIdRule(new Date(), nanoid(8));
 }
 
-export async function getNextInspectionIssueSerialNumber(): Promise<number> {
-  const result = await prisma.quality_records.aggregate({
+export async function getNextInspectionIssueSerialNumber(
+  client: Pick<Prisma.TransactionClient, 'quality_records'> = prisma,
+): Promise<number> {
+  const result = await client.quality_records.aggregate({
     _max: { serialNumber: true },
   });
   return (result._max.serialNumber || 0) + 1;
@@ -121,18 +124,22 @@ export async function findInspectionIssueAccessRecord(id: string) {
   });
 }
 
-export async function findInspectionForIssue(inspectionId?: string) {
+export async function findInspectionForIssue(
+  inspectionId?: string,
+  client: Pick<Prisma.TransactionClient, 'inspections'> = prisma,
+) {
   const normalizedId = normalizeOptionalInspectionIssueString(inspectionId);
   if (!normalizedId) {
     return null;
   }
 
-  return prisma.inspections.findUnique({
-    where: { id: normalizedId },
+  return client.inspections.findUnique({
+    where: { id: normalizedId, isDeleted: false },
     include: {
       work_order: {
         select: {
           division: true,
+          divisionId: true,
         },
       },
     },

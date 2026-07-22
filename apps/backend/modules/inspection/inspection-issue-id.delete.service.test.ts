@@ -14,6 +14,7 @@ vi.mock('~/modules/inspection/inspection.service', () => ({
 vi.mock('~/modules/inspection/inspection-issue-access.service', () => ({
   InspectionIssueAccessService: {
     ensurePermission: vi.fn(),
+    getAccessContext: vi.fn(),
   },
 }));
 
@@ -42,8 +43,15 @@ vi.mock('~/utils/api-logger', () => ({
 }));
 
 describe('inspection-issue-id.delete.service', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { InspectionIssueAccessService } = await import(
+      '~/modules/inspection/inspection-issue-access.service'
+    );
+    vi.mocked(InspectionIssueAccessService.getAccessContext).mockResolvedValue({
+      roles: [],
+      userId: 'u1',
+    });
   });
 
   it('should return not found when record does not exist', async () => {
@@ -82,11 +90,14 @@ describe('inspection-issue-id.delete.service', () => {
     const { forbiddenResponse } = await import('~/utils/response');
     const { getCurrentUser } = await import('~/utils/current-user');
     const { getRequiredRouterParam } = await import('~/utils/route-param');
+    const { InspectionIssueAccessService } = await import(
+      '~/modules/inspection/inspection-issue-access.service'
+    );
 
     vi.mocked(getCurrentUser).mockReturnValue({
       id: 'u1',
-      username: 'admin',
-      roles: ['admin'],
+      username: 'inspector',
+      roles: ['quality_inspector'],
     } as any);
     vi.mocked(getRequiredRouterParam).mockReturnValue('rec-1' as any);
     vi.mocked(findInspectionIssueAccessRecord).mockResolvedValue({
@@ -95,6 +106,10 @@ describe('inspection-issue-id.delete.service', () => {
       inspectionId: null,
     } as any);
     vi.mocked(hasInspectionIssueWriteAccess).mockReturnValue(false);
+    vi.mocked(InspectionIssueAccessService.getAccessContext).mockResolvedValue({
+      roles: ['quality_inspector'],
+      userId: 'u1',
+    });
 
     const handlerModule = await import(
       '~/modules/inspection/inspection-issue-id.delete.service'
@@ -109,6 +124,7 @@ describe('inspection-issue-id.delete.service', () => {
 
     expect(hasInspectionIssueWriteAccess).toHaveBeenCalledWith({
       createdBy: 'other-user',
+      roles: ['quality_inspector'],
       userId: 'u1',
     });
     expect(forbiddenResponse).toHaveBeenCalledWith(
@@ -154,8 +170,12 @@ describe('inspection-issue-id.delete.service', () => {
 
     await handler(event);
 
-    expect(InspectionService.deleteRecord).toHaveBeenCalledWith('rec-1', 'u1');
-    expect(InspectionIssueAccessService.ensurePermission).toHaveBeenCalledWith(
+    expect(InspectionService.deleteRecord).toHaveBeenCalledWith(
+      'rec-1',
+      'u1',
+      [],
+    );
+    expect(InspectionIssueAccessService.getAccessContext).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'u1' }),
       'QMS:Inspection:Issues:Delete',
     );

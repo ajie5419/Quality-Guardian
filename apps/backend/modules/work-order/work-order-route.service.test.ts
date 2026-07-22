@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import prisma from '~/utils/prisma';
 
+const { mockBuildGovernedCanonicalWritePair } = vi.hoisted(() => ({
+  mockBuildGovernedCanonicalWritePair: vi.fn(),
+}));
+
 vi.mock('~/utils/prisma', () => ({
   default: {
     work_orders: {
@@ -48,6 +52,7 @@ vi.mock('~/modules/work-order/work-order-query', () => ({
 }));
 
 vi.mock('~/utils/governed-write', () => ({
+  buildGovernedCanonicalWritePairForTable: mockBuildGovernedCanonicalWritePair,
   buildGovernedWriteFieldsForTable: (_table: string, fields: any) => fields,
 }));
 
@@ -96,6 +101,7 @@ function mockUserinfo() {
 describe('workOrderRouteService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockBuildGovernedCanonicalWritePair.mockResolvedValue({});
   });
 
   describe('batchDelete', () => {
@@ -190,6 +196,43 @@ describe('workOrderRouteService', () => {
       );
     });
 
+    it('resolves a department ID into division ID and name on create', async () => {
+      mockBuildGovernedCanonicalWritePair.mockResolvedValue({
+        division: 'Vehicle OBU',
+        divisionId: 'dept-vehicle',
+      });
+      (prisma.work_orders.findUnique as any).mockResolvedValue(null);
+      (prisma.work_orders.create as any).mockResolvedValue({
+        createdAt: new Date('2024-01-01'),
+        customerName: 'Customer',
+        division: 'Vehicle OBU',
+        divisionId: 'dept-vehicle',
+        workOrderNumber: 'WO-DIVISION',
+      });
+
+      await WorkOrderRouteService.create(
+        mockEvent(),
+        {
+          customerName: 'Customer',
+          deliveryDate: '2024-06-01',
+          division: 'dept-vehicle',
+          workOrderNumber: 'WO-DIVISION',
+        },
+        mockUserinfo(),
+      );
+
+      expect(mockBuildGovernedCanonicalWritePair).toHaveBeenCalledWith(
+        'work_orders',
+        expect.objectContaining({ division: 'dept-vehicle' }),
+      );
+      expect(prisma.work_orders.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          division: 'Vehicle OBU',
+          divisionId: 'dept-vehicle',
+        }),
+      });
+    });
+
     it('should restore a deleted work order instead of failing on the primary key', async () => {
       (prisma.work_orders.findUnique as any).mockResolvedValue({
         isDeleted: true,
@@ -278,6 +321,32 @@ describe('workOrderRouteService', () => {
       expect(prisma.work_orders.update).toHaveBeenCalled();
     });
 
+    it('resolves a department ID into division ID and name on update', async () => {
+      mockBuildGovernedCanonicalWritePair.mockResolvedValue({
+        division: 'Bridge OBU',
+        divisionId: 'dept-bridge',
+      });
+      (prisma.work_orders.update as any).mockResolvedValue({
+        customerName: 'Customer',
+        workOrderNumber: 'WO-001',
+      });
+
+      await WorkOrderRouteService.update(
+        mockEvent(),
+        'WO-001',
+        { division: 'dept-bridge' },
+        mockUserinfo(),
+      );
+
+      expect(prisma.work_orders.update).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          division: 'Bridge OBU',
+          divisionId: 'dept-bridge',
+        }),
+        where: { workOrderNumber: 'WO-001' },
+      });
+    });
+
     it('should throw when work order not found', async () => {
       const error = new Error('NOT_FOUND');
       (prisma.work_orders.update as any).mockRejectedValue(error);
@@ -308,6 +377,44 @@ describe('workOrderRouteService', () => {
 
       expect(result.successCount).toBe(2);
       expect(result.totalCount).toBe(2);
+    });
+
+    it('resolves canonical division fields for legacy imports', async () => {
+      mockBuildGovernedCanonicalWritePair.mockResolvedValue({
+        division: 'Vehicle OBU',
+        divisionId: 'dept-vehicle',
+      });
+      (prisma.work_orders.upsert as any).mockResolvedValue({});
+
+      await WorkOrderRouteService.importRows(
+        mockEvent(),
+        [
+          {
+            customerName: 'Customer',
+            division: 'dept-vehicle',
+            workOrderNumber: 'WO-IMPORT-DIVISION',
+          },
+        ],
+        mockUserinfo(),
+      );
+
+      expect(mockBuildGovernedCanonicalWritePair).toHaveBeenCalledWith(
+        'work_orders',
+        expect.objectContaining({ division: 'dept-vehicle' }),
+        { mode: 'legacy-import' },
+      );
+      expect(prisma.work_orders.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            division: 'Vehicle OBU',
+            divisionId: 'dept-vehicle',
+          }),
+          update: expect.objectContaining({
+            division: 'Vehicle OBU',
+            divisionId: 'dept-vehicle',
+          }),
+        }),
+      );
     });
 
     it('should handle row errors gracefully', async () => {

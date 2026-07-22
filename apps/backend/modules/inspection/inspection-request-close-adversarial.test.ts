@@ -467,6 +467,12 @@ describe('inspection-request-close adversarial', () => {
       const data = txMock.qms_inspection_requests.update.mock.calls[0][0].data;
       expect(data.unqualifiedQuantity).toBe(5);
       expect(data.qualifiedQuantity).toBe(0);
+      const { buildCloseLinkedIssueCreateResult } = await import(
+        '~/modules/inspection/inspection-request-close-issue.service'
+      );
+      expect(buildCloseLinkedIssueCreateResult).toHaveBeenCalledWith(
+        expect.objectContaining({ tx: txMock }),
+      );
     });
 
     it('fAIL: unqualifiedQuantity = totalQuantity → qualified = 0', async () => {

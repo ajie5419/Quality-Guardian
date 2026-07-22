@@ -37,6 +37,7 @@ describe('inspection issue schema', () => {
       ...validCreateBody,
       claim: 'No',
       division: 'Vehicle Division',
+      divisionId: 'dept-vehicle',
       inspector: 'Inspector Name',
       lossAmount: 12.5,
       ncNumber: 'NC-26KJ-001',
@@ -50,6 +51,7 @@ describe('inspection issue schema', () => {
 
     expect(result).toMatchObject({
       claim: 'No',
+      divisionId: 'dept-vehicle',
       ncNumber: 'NC-26KJ-001',
       responsibleDepartments: ['dept-1', 'dept-2'],
       supplierId: 'supplier-1',

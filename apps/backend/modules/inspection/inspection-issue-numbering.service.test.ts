@@ -142,5 +142,19 @@ describe('inspectionIssueNumberingService', () => {
         InspectionIssueNumberingService.deleteRecord('rec-1', 'user-1'),
       ).rejects.toMatchObject({ code: 'NOT_FOUND', httpStatus: 404 });
     });
+
+    it('allows an admin to soft delete a record without an ownership filter', async () => {
+      await InspectionIssueNumberingService.deleteRecord('rec-1', 'admin-1', [
+        'admin',
+      ]);
+
+      expect(prisma.quality_records.updateMany).toHaveBeenCalledWith({
+        where: { id: 'rec-1', isDeleted: false },
+        data: {
+          isDeleted: true,
+          updatedAt: expect.any(Date),
+        },
+      });
+    });
   });
 });
