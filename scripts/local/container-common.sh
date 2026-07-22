@@ -155,18 +155,20 @@ ensure_host_port_free() {
   local port="$1"
   local purpose="$2"
 
-  if ! command -v lsof >/dev/null 2>&1; then
+  if ! command -v nc >/dev/null 2>&1; then
     return
   fi
 
-  local listeners
-  listeners="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
-  if [[ -z "$listeners" ]]; then
+  # lsof can block indefinitely in proc_pidfdinfo on macOS. A bounded TCP
+  # probe is sufficient here because the dev server only needs the port free.
+  if ! nc -4 -z -w 1 127.0.0.1 "$port" >/dev/null 2>&1 && \
+    ! nc -6 -z -w 1 ::1 "$port" >/dev/null 2>&1; then
     return
   fi
 
   echo "Port $port is already in use, but it is required for $purpose."
-  echo "$listeners"
+  netstat -anv -p tcp 2>/dev/null | awk -v suffix=".$port" \
+    '$4 ~ (suffix "$") && $6 == "LISTEN" { print }' || true
   echo "Stop the old process first, then run this command again."
   exit 1
 }
