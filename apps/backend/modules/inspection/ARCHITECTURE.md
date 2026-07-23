@@ -83,6 +83,7 @@ public 报检禁止：
 - 创建：独立 `inspection-request-create.service.ts`，私有创建和 public 创建共享 schema 与核心写入逻辑。
 - 查询：独立 `inspection-request-query.service.ts`，保持 DB 分页和关联问题批量查询。
 - 派工：独立 `inspection-request-dispatch.service.ts`，保持派工任务与报检任务事务一致。
+- 派工候选人只能是角色值为 `QC` 的启用用户；列表查询和派工写入都必须校验该角色。
 - 删除：独立 `inspection-request-delete.service.ts`，保持软删除、派工取消、附件引用删除和审计。
 - 关闭：`inspection-request-close.service.ts` 保留工作流编排，检验记录、不合格品、附件同步和提交后副作用拆为窄职责 helper/service。
 

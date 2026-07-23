@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 import type { EventHandlerRequest, H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
-import { TASK_DISPATCH_STATUS } from '@qgs/shared';
+import { QMS_ROLE_NAMES, TASK_DISPATCH_STATUS } from '@qgs/shared';
 import { z } from 'zod';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
@@ -79,7 +79,16 @@ export const InspectionRequestDispatchService = {
       }),
       prisma.users.findFirst({
         select: { id: true, wxOpenId: true },
-        where: { OR: [{ id: inspectorId }, { username: inspectorId }] },
+        where: {
+          OR: [{ id: inspectorId }, { username: inspectorId }],
+          isDeleted: false,
+          roles: {
+            isDeleted: false,
+            name: QMS_ROLE_NAMES.INSPECTOR,
+            status: 1,
+          },
+          status: 'ACTIVE',
+        },
       }),
     ]);
     if (!request) throw new BusinessError('NOT_FOUND', '报检任务不存在', 404);

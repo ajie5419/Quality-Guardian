@@ -144,6 +144,15 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
       userinfo,
     );
 
+    expect(prisma.users.findFirst).toHaveBeenCalledWith({
+      select: { id: true, wxOpenId: true },
+      where: {
+        OR: [{ id: 'inspector-1' }, { username: 'inspector-1' }],
+        isDeleted: false,
+        roles: { isDeleted: false, name: 'QC', status: 1 },
+        status: 'ACTIVE',
+      },
+    });
     expect(tx.qms_inspection_requests.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({

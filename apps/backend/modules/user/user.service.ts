@@ -1,7 +1,9 @@
+import type { Prisma } from '@prisma/client';
+
 import { randomBytes } from 'node:crypto';
-import process from 'node:process';
 
 import { createId } from '@paralleldrive/cuid2';
+import { QMS_ROLE_NAMES } from '@qgs/shared';
 import bcrypt from 'bcrypt';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { getDefaultResetPassword } from '~/modules/user/user-security';
@@ -13,6 +15,8 @@ import prisma from '~/utils/prisma';
 export interface UserQueryParams {
   page?: number;
   pageSize?: number;
+  roleName?: string;
+  status?: number;
 }
 
 export interface CreateUserDto {
@@ -77,11 +81,27 @@ export const UserService = {
    * Find all users with pagination
    */
   async findAll(params: UserQueryParams) {
-    const { page = 1, pageSize = 20 } = params;
+    const { page = 1, pageSize = 20, roleName, status } = params;
     const currentPage = Number(page);
-    const currentPageSize = Number(pageSize);
+    const currentPageSize = Math.min(Number(pageSize), 100);
 
-    const where = { isDeleted: false };
+    const where: Prisma.usersWhereInput = {
+      isDeleted: false,
+      ...(status === undefined
+        ? {}
+        : {
+            status: status === 1 ? ('ACTIVE' as const) : ('INACTIVE' as const),
+          }),
+      ...(roleName
+        ? {
+            roles: {
+              isDeleted: false,
+              name: roleName,
+              status: 1,
+            },
+          }
+        : {}),
+    };
 
     const [total, users, workload] = await Promise.all([
       prisma.users.count({ where }),
@@ -280,16 +300,15 @@ export const UserService = {
   },
 
   async findInspectors() {
-    const deptName = process.env.TELEGRAM_INSPECTOR_DEPT || '品质部';
-    const dept = await prisma.departments.findFirst({
-      where: { name: deptName, isDeleted: false },
-      select: { id: true },
-    });
     return prisma.users.findMany({
       where: {
         isDeleted: false,
+        roles: {
+          isDeleted: false,
+          name: QMS_ROLE_NAMES.INSPECTOR,
+          status: 1,
+        },
         status: 'ACTIVE',
-        ...(dept ? { department: dept.id } : {}),
       },
       select: { id: true, realName: true, username: true },
       orderBy: { createdAt: 'desc' },

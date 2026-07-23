@@ -93,6 +93,10 @@ export const QMS_DEFAULT_VALUES = {
   UNKNOWN_WORK_ORDER: 'UNKNOWN',
 };
 
+export const QMS_ROLE_NAMES = {
+  INSPECTOR: 'QC',
+} as const;
+
 export const QMS_STATUS_OPEN_SET = new Set([
   'IN_PROGRESS',
   'OPEN',

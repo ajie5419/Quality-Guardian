@@ -11,6 +11,7 @@ import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useAccessStore, useUserStore } from '@vben/stores';
 
+import { QMS_ROLE_NAMES } from '@qgs/shared';
 import { Card, message } from 'ant-design-vue';
 
 import { getDeptList } from '#/api/system/dept';
@@ -298,7 +299,12 @@ const {
 });
 
 async function loadUsers() {
-  const res = await getUserList({ page: 1, pageSize: 200 });
+  const res = await getUserList({
+    page: 1,
+    pageSize: 100,
+    roleName: QMS_ROLE_NAMES.INSPECTOR,
+    status: 1,
+  });
   users.value = res.items || [];
 }
 

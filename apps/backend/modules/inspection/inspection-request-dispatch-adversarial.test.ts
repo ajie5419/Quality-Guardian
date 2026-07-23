@@ -475,7 +475,12 @@ describe('adversarial: dispatchRequest edge cases', () => {
 
     expect(prisma.users.findFirst).toHaveBeenCalledWith({
       select: { id: true, wxOpenId: true },
-      where: { OR: [{ id: 'john_doe' }, { username: 'john_doe' }] },
+      where: {
+        OR: [{ id: 'john_doe' }, { username: 'john_doe' }],
+        isDeleted: false,
+        roles: { isDeleted: false, name: 'QC', status: 1 },
+        status: 'ACTIVE',
+      },
     });
     expect(tx.qms_task_dispatches.create).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -4,6 +4,7 @@ import type { InspectionRequest } from '@qgs/shared';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import { QMS_ROLE_NAMES } from '@qgs/shared';
 import {
   Button,
   Descriptions,
@@ -45,7 +46,12 @@ async function loadDetail() {
   try {
     const [detail, users] = await Promise.all([
       getInspectionRequest(requestId.value),
-      getUserList({ page: 1, pageSize: 100 }),
+      getUserList({
+        page: 1,
+        pageSize: 100,
+        roleName: QMS_ROLE_NAMES.INSPECTOR,
+        status: 1,
+      }),
     ]);
     task.value = detail;
     inspectors.value = users.items.map((user) => ({

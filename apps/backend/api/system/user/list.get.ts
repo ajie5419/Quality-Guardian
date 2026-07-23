@@ -1,27 +1,34 @@
-import { defineEventHandler, getQuery, setResponseStatus } from 'h3';
+import { z } from 'zod';
 import { UserService } from '~/modules/user/user.service';
 import { logApiError } from '~/utils/api-logger';
+import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import { usePageResponseSuccess, useResponseError } from '~/utils/response';
 
-export default defineEventHandler(async (event) => {
-  try {
-    const { page = 1, pageSize = 20 } = getQuery(event);
-    const result = await UserService.findAll({
-      page: Number(page),
-      pageSize: Number(pageSize),
-    });
-
-    return usePageResponseSuccess(
-      page as string,
-      pageSize as string,
-      result.items,
-      {
-        total: result.total,
-      },
-    );
-  } catch (error) {
-    logApiError('user', error, undefined, event);
-    setResponseStatus(event, 500);
-    return useResponseError('Failed to fetch user list');
-  }
+const userListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+  roleName: z.string().trim().min(1).optional(),
+  status: z.coerce.number().int().min(0).max(1).optional(),
 });
+
+export default defineValidatedHandler(
+  userListQuerySchema,
+  async (event, query) => {
+    try {
+      const result = await UserService.findAll({
+        page: query.page,
+        pageSize: query.pageSize,
+        roleName: query.roleName,
+        status: query.status,
+      });
+
+      return usePageResponseSuccess(query.page, query.pageSize, result.items, {
+        total: result.total,
+      });
+    } catch (error) {
+      logApiError('user', error, undefined, event);
+      setResponseStatus(event, 500);
+      return useResponseError('Failed to fetch user list');
+    }
+  },
+);

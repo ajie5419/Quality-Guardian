@@ -10,10 +10,15 @@ export interface SystemUser extends SharedUser {
   wechatWorkId?: null | string;
 }
 
-export const getUserList = (params?: { page?: number; pageSize?: number }) => {
-  const { page = 1, pageSize = 20 } = params || {};
+export const getUserList = (params?: {
+  page?: number;
+  pageSize?: number;
+  roleName?: string;
+  status?: number;
+}) => {
+  const { page = 1, pageSize = 20, roleName, status } = params || {};
   return requestClient.get<PageResult<SystemUser>>(SYSTEM_API.USER_LIST, {
-    params: { page, pageSize },
+    params: { page, pageSize, roleName, status },
   });
 };
 

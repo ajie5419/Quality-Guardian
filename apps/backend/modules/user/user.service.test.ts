@@ -115,6 +115,30 @@ describe('userService', () => {
       expect(result.items[0].status).toBe(0);
       expect(result.items[0].roles).toEqual([]);
     });
+
+    it('should apply an active role filter to count and list queries', async () => {
+      (prisma.users.count as any).mockResolvedValue(0);
+      (prisma.users.findMany as any).mockResolvedValue([]);
+      (prisma.qms_inspection_requests.groupBy as any).mockResolvedValue([]);
+      (prisma.departments.findMany as any).mockResolvedValue([]);
+
+      await UserService.findAll({
+        page: 1,
+        pageSize: 100,
+        roleName: 'QC',
+        status: 1,
+      });
+
+      const where = {
+        isDeleted: false,
+        roles: { isDeleted: false, name: 'QC', status: 1 },
+        status: 'ACTIVE',
+      };
+      expect(prisma.users.count).toHaveBeenCalledWith({ where });
+      expect(prisma.users.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 100, where }),
+      );
+    });
   });
 
   describe('create', () => {
@@ -276,8 +300,7 @@ describe('userService', () => {
   });
 
   describe('findInspectors', () => {
-    it('should return inspectors from quality department', async () => {
-      (prisma.departments.findFirst as any).mockResolvedValue({ id: 'dept-q' });
+    it('should return active users with the inspector role', async () => {
       (prisma.users.findMany as any).mockResolvedValue([
         { id: 'u1', realName: 'Inspector', username: 'insp' },
       ]);
@@ -286,19 +309,11 @@ describe('userService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].realName).toBe('Inspector');
-    });
-
-    it('should return all active users when dept not found', async () => {
-      (prisma.departments.findFirst as any).mockResolvedValue(null);
-      (prisma.users.findMany as any).mockResolvedValue([]);
-
-      const result = await UserService.findInspectors();
-
-      expect(result).toHaveLength(0);
       expect(prisma.users.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
             isDeleted: false,
+            roles: { isDeleted: false, name: 'QC', status: 1 },
             status: 'ACTIVE',
           },
         }),
