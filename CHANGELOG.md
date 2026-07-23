@@ -25,6 +25,29 @@
 
 ## 执行记录
 
+### 2026-07-23 功能：扩展检验搜索与工单要求跟踪
+
+**执行内容：**
+
+- 进货检验记录新增项目名称、物料名称、检验员和检验日期范围搜索；过程检验新增组件名称和检验日期范围搜索，列表与全量导出共用查询契约。
+- 检验日期范围使用次日排他上界完整包含结束日，并将检验记录分页上限收紧为 100。
+- 不合格项搜索新增供应商/外协单位，分页列表、查询全部和远程导出统一传递 `supplierName`。
+- 复用工单聚合抽屉作为要求跟踪入口，新增要求编辑和软删除；确认完成、撤销确认、编辑和删除统一使用带 Tooltip 与 `aria-label` 的图标按钮。
+- 工单要求写操作增加 RBAC、事业部数据范围、确认状态原子守卫、附件引用同步和业务审计；普通编辑不再重置确认状态，未修改的结构化要求项保持原始数据类型。
+
+**验证结果：**
+
+- 后端全量测试：221/221 个文件、2082/2082 个用例通过。
+- 共享查询定向测试：12/12 通过；前端定向测试：13/13 通过。
+- `pnpm lint`、`pnpm run check:type` （3/3 workspace tasks）、`pnpm run check:qms-arch` 和 `git diff --check` 全部通过。
+- 前端未运行 dev/build/start/serve，遵循仓库约束。
+
+**commit:** `54803f0` feat(project): add issue supplier search；`dc0ac89` feat(project): expand inspection record search；`da2b887` feat(project): add work order requirement actions
+
+**遗留问题：**
+
+- 无。
+
 ## [0.18.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.17.6...qgs-v0.18.0) (2026-07-22)
 
 
