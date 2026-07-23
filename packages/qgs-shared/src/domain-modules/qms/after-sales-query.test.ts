@@ -81,10 +81,12 @@ describe('after-sales list query', () => {
       parseInspectionIssueListQuery({
         endDate: ' 2026-07-20 ',
         startDate: ' 2026-07-01 ',
+        supplierName: ' Supplier   A ',
       }),
     ).toMatchObject({
       endDate: '2026-07-20',
       startDate: '2026-07-01',
+      supplierName: 'Supplier A',
     });
     expect(parseInspectionIssueDateBoundary('2026-02-30')).toBeUndefined();
   });

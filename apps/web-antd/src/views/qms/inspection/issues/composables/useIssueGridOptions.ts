@@ -36,6 +36,36 @@ export function resolveIssueDateRangeQuery(value: unknown): {
   return startDate && endDate ? { endDate, startDate } : {};
 }
 
+type InspectionIssueListQuery = NonNullable<
+  Parameters<typeof getInspectionIssues>[0]
+>;
+
+export function buildIssueSearchQuery(params: {
+  dateMode: 'month' | 'week' | 'year';
+  dateValue: string;
+  defaultProjectName?: string;
+  defaultWorkOrderNumber?: string;
+  formValues: Record<string, unknown>;
+  year: number;
+}): InspectionIssueListQuery {
+  const { formValues } = params;
+  return {
+    dateMode: params.dateMode,
+    dateValue: params.dateValue,
+    ...resolveIssueDateRangeQuery(formValues.dateRange),
+    processName: formValues.processName as string,
+    projectName:
+      (formValues.projectName as string) || params.defaultProjectName,
+    responsibleDepartment: formValues.responsibleDepartment as string,
+    responsibleWelder: formValues.responsibleWelder as string,
+    status: formValues.status as string,
+    supplierName: formValues.supplierName as string,
+    workOrderNumber:
+      (formValues.workOrderNumber as string) || params.defaultWorkOrderNumber,
+    year: params.year,
+  };
+}
+
 export type InspectionGridRow = InspectionIssue & {
   photoExportUrl: string;
   photos: string[];
@@ -198,19 +228,15 @@ export function useIssueGridOptions({
             }
           });
           const { items } = await getInspectionIssues({
-            dateMode: currentDateMode.value,
-            dateValue: currentDateValue.value,
-            ...resolveIssueDateRangeQuery(formValues?.dateRange),
-            year: currentYear.value,
-            workOrderNumber:
-              (formValues?.workOrderNumber as string) ||
-              defaultWorkOrderNumber?.value,
-            projectName:
-              (formValues?.projectName as string) || defaultProjectName?.value,
-            responsibleDepartment: formValues?.responsibleDepartment as string,
-            responsibleWelder: formValues?.responsibleWelder as string,
+            ...buildIssueSearchQuery({
+              dateMode: currentDateMode.value,
+              dateValue: currentDateValue.value,
+              defaultProjectName: defaultProjectName?.value,
+              defaultWorkOrderNumber: defaultWorkOrderNumber?.value,
+              formValues,
+              year: currentYear.value,
+            }),
             status: (filterParams.status?.[0] || formValues?.status) as string,
-            processName: formValues?.processName as string,
             ...(filterParams as Record<string, string | string[] | unknown>),
           });
           return normalizeInspectionRows(filterBySourceIssueId(items || []));
@@ -405,23 +431,20 @@ export function useIssueGridOptions({
           });
 
           const { items, total } = await getInspectionIssues({
-            dateMode: currentDateMode.value,
-            dateValue: currentDateValue.value,
-            ...resolveIssueDateRangeQuery(formValues?.dateRange),
+            ...buildIssueSearchQuery({
+              dateMode: currentDateMode.value,
+              dateValue: currentDateValue.value,
+              defaultProjectName: defaultProjectName?.value,
+              defaultWorkOrderNumber: defaultWorkOrderNumber?.value,
+              formValues,
+              year: currentYear.value,
+            }),
             page: page?.currentPage || 1,
             pageSize: page?.pageSize || 20,
             sortBy: sortParam?.field,
             sortOrder: sortParam?.order,
-            year: currentYear.value,
-            workOrderNumber:
-              (formValues?.workOrderNumber as string) ||
-              defaultWorkOrderNumber?.value,
-            projectName:
-              (formValues?.projectName as string) || defaultProjectName?.value,
-            responsibleDepartment: formValues?.responsibleDepartment as string,
             status: (filterParams.status?.[0] || formValues?.status) as string,
             ...filterParams,
-            processName: formValues?.processName as string,
           });
 
           const filteredItems = filterBySourceIssueId(items || []);
@@ -440,18 +463,14 @@ export function useIssueGridOptions({
         queryAll: async ({ form }: { form: Record<string, unknown> }) => {
           const formValues = form || {};
           const { items } = await getInspectionIssues({
-            dateMode: currentDateMode.value,
-            dateValue: currentDateValue.value,
-            ...resolveIssueDateRangeQuery(formValues?.dateRange),
-            year: currentYear.value,
-            workOrderNumber:
-              (formValues?.workOrderNumber as string) ||
-              defaultWorkOrderNumber?.value,
-            projectName:
-              (formValues?.projectName as string) || defaultProjectName?.value,
-            responsibleDepartment: formValues?.responsibleDepartment as string,
-            status: formValues?.status as string,
-            processName: formValues?.processName as string,
+            ...buildIssueSearchQuery({
+              dateMode: currentDateMode.value,
+              dateValue: currentDateValue.value,
+              defaultProjectName: defaultProjectName?.value,
+              defaultWorkOrderNumber: defaultWorkOrderNumber?.value,
+              formValues,
+              year: currentYear.value,
+            }),
           });
           return { items: filterBySourceIssueId(items || []) };
         },

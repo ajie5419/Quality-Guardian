@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildIssueSearchQuery,
   resolveIssueDateRangeQuery,
   resolveIssueDivisionName,
 } from './useIssueGridOptions';
@@ -66,5 +67,42 @@ describe('resolveIssueDateRangeQuery', () => {
   it('omits incomplete picker values', () => {
     expect(resolveIssueDateRangeQuery(['2026-07-01'])).toEqual({});
     expect(resolveIssueDateRangeQuery(undefined)).toEqual({});
+  });
+});
+
+describe('buildIssueSearchQuery', () => {
+  it('keeps the supplier filter consistent with the other issue filters', () => {
+    expect(
+      buildIssueSearchQuery({
+        dateMode: 'month',
+        dateValue: '2026-07',
+        defaultProjectName: 'Route Project',
+        defaultWorkOrderNumber: 'Route Work Order',
+        formValues: {
+          dateRange: ['2026-07-01', '2026-07-20'],
+          processName: 'Incoming Inspection',
+          projectName: 'Project A',
+          responsibleDepartment: 'Quality',
+          responsibleWelder: 'Welder A',
+          status: 'OPEN',
+          supplierName: 'Supplier A',
+          workOrderNumber: 'WO-001',
+        },
+        year: 2026,
+      }),
+    ).toEqual({
+      dateMode: 'month',
+      dateValue: '2026-07',
+      endDate: '2026-07-20',
+      processName: 'Incoming Inspection',
+      projectName: 'Project A',
+      responsibleDepartment: 'Quality',
+      responsibleWelder: 'Welder A',
+      startDate: '2026-07-01',
+      status: 'OPEN',
+      supplierName: 'Supplier A',
+      workOrderNumber: 'WO-001',
+      year: 2026,
+    });
   });
 });

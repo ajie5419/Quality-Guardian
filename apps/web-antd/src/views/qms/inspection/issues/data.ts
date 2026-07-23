@@ -51,6 +51,12 @@ export function getIssueSearchFormSchema(
       colProps: { span: 6 },
     },
     {
+      fieldName: 'supplierName',
+      label: $t('qms.inspection.issues.responsibleUnit'),
+      component: 'Input',
+      colProps: { span: 6 },
+    },
+    {
       fieldName: 'responsibleDepartment',
       label: $t('qms.inspection.issues.responsibleDepartment'),
       component: 'Input',
