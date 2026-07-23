@@ -40,7 +40,7 @@
 - GitHub Ruleset 核对通过，最新提交的 Lint、Typecheck、QMS Architecture Check、Unit Tests、Secret Scan 和 Prisma Migration Check 全部通过。
 - `pnpm lint`、`pnpm run check:type`（3/3 workspace tasks）、`pnpm run check:qms-arch`、Prettier 和 `git diff --check` 全部通过。
 
-**commit:** `chore(ci): use manual Codex reviews`
+**commit:** `98192bd` chore(ci): use manual Codex reviews
 
 **遗留问题：**
 
