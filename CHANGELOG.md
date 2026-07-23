@@ -25,6 +25,27 @@
 
 ## 执行记录
 
+### 2026-07-23 工程：新增代码审查合并门禁
+
+**执行内容：**
+
+- 将 GitHub Ruleset `back` 更名为 `main-protection`并启用，匹配默认分支，强制 PR、最新 `main`、6 项 GitHub Actions 检查、review thread 解决，且禁止删除和强制推送。
+- 新增独立 Codex PR 审查 workflow，仅 checkout 受信任 base commit，PR head 仅作为 Git object 读取；Action 使用只读权限、`drop-sudo`、固定版本和结构化 JSON 输出。
+- `Code Review` 只在存在 P0/P1 时失败，P2/P3 不阻断合并；fork PR 不携密钥自动运行。
+- 在 `AGENTS.md` 固化权限/数据范围、查询/导出一致性和事务完整性审查规则，并同步 PR 模板、发布流程、硬约束和项目进度。
+
+**验证结果：**
+
+- workflow YAML 和 JSON Schema 解析通过；通过、P2、P1、审查失败、fork 和 draft 六个门禁分支模拟 6/6 通过。
+- 全量测试 305/305 个文件、2636/2636 个用例通过；后端复验 221/221 个文件、2091/2091 个用例通过。
+- `pnpm lint`、`pnpm run check:type`（3/3 workspace tasks）、`pnpm run check:qms-arch`、Prettier 和 `git diff --check` 全部通过。
+
+**commit:** `c23e64b4` chore(ci): add Codex review gate
+
+**遗留问题：**
+
+- 仓库尚未配置 `OPENAI_API_KEY`；在首次 `Code Review` 成功运行前，它不加入 Ruleset required checks，避免锁死所有 PR。
+
 ## [0.19.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.18.0...qgs-v0.19.0) (2026-07-23)
 
 
