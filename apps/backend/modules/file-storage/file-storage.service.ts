@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import type {
   FileAssetItem,
   FileListParams,
@@ -256,7 +257,9 @@ export const FileStorageService = {
     bizId: string;
     bizType: string;
     fieldName?: string;
+    tx?: Prisma.TransactionClient;
   }) {
+    const db = params.tx ?? prisma;
     const attachments = parseAttachmentItems(params.attachments);
     const requestedFileIds: string[] = [];
     const requestedStoredNames: string[] = [];
@@ -271,7 +274,7 @@ export const FileStorageService = {
 
     const [filesById, filesByStoredName] = await Promise.all([
       requestedFileIds.length > 0
-        ? prisma.file_assets.findMany({
+        ? db.file_assets.findMany({
             select: { id: true },
             where: {
               id: { in: [...new Set(requestedFileIds)] },
@@ -280,7 +283,7 @@ export const FileStorageService = {
           })
         : Promise.resolve([]),
       requestedStoredNames.length > 0
-        ? prisma.file_assets.findMany({
+        ? db.file_assets.findMany({
             select: {
               id: true,
               objectKey: true,
@@ -323,7 +326,7 @@ export const FileStorageService = {
       .filter(Boolean);
     const uniqueFileIds = [...new Set(fileIds)];
 
-    await prisma.file_references.deleteMany({
+    await db.file_references.deleteMany({
       where: {
         bizId: params.bizId,
         bizType: params.bizType,
@@ -333,7 +336,7 @@ export const FileStorageService = {
 
     if (uniqueFileIds.length === 0) return { count: 0 };
 
-    const result = await prisma.file_references.createMany({
+    const result = await db.file_references.createMany({
       data: uniqueFileIds.map((fileId, index) => ({
         bizId: params.bizId,
         bizType: params.bizType,
@@ -346,9 +349,14 @@ export const FileStorageService = {
     return result;
   },
 
-  async softDeleteReferences(params: { bizId: string; bizType: string }) {
+  async softDeleteReferences(params: {
+    bizId: string;
+    bizType: string;
+    tx?: Prisma.TransactionClient;
+  }) {
+    const db = params.tx ?? prisma;
     try {
-      const references = await prisma.file_references.findMany({
+      const references = await db.file_references.findMany({
         select: { fileId: true },
         where: {
           bizId: params.bizId,
@@ -357,7 +365,7 @@ export const FileStorageService = {
       });
       const fileIds = [...new Set(references.map((item) => item.fileId))];
 
-      await prisma.file_references.deleteMany({
+      await db.file_references.deleteMany({
         where: {
           bizId: params.bizId,
           bizType: params.bizType,
@@ -365,7 +373,7 @@ export const FileStorageService = {
       });
 
       if (fileIds.length > 0) {
-        await prisma.file_assets.updateMany({
+        await db.file_assets.updateMany({
           data: {
             deletedAt: new Date(),
             status: 'DELETED',
@@ -377,7 +385,7 @@ export const FileStorageService = {
         });
       }
     } catch (error) {
-      if (isPrismaSchemaMismatchError(error)) {
+      if (isPrismaSchemaMismatchError(error) && !params.tx) {
         logApiError('file-reference-soft-delete-schema-missing', error, params);
         return;
       }

@@ -60,6 +60,26 @@ describe('workOrderRequirementService', () => {
     });
   });
 
+  it('passes transaction clients through to attachment references', async () => {
+    const { FileStorageService } = await import('~/modules/file-storage');
+    const tx = {} as any;
+
+    await WorkOrderRequirementService.registerAttachmentReferences({
+      attachments: '["/a.pdf"]',
+      bizId: 'req-1',
+      tx,
+    });
+
+    expect(
+      FileStorageService.registerReferencesFromAttachments,
+    ).toHaveBeenCalledWith({
+      attachments: '["/a.pdf"]',
+      bizId: 'req-1',
+      bizType: 'work_order_requirement',
+      tx,
+    });
+  });
+
   it('creates multiple requirements inside transaction with selected fields', async () => {
     vi.mocked(prisma.work_order_requirements.create)
       .mockResolvedValueOnce({

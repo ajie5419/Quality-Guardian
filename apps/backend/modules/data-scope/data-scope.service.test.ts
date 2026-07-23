@@ -200,14 +200,16 @@ describe('dataScopeService', () => {
     });
   });
 
-  it('keeps base query when self fallback has no department candidates', async () => {
+  it('fails closed for work-order self scope without department candidates', async () => {
     const where = await DataScopeService.buildWorkOrderWhere(
       { isDeleted: false },
       { userId: 'u1', username: 'vben' },
       { scopeType: 'SELF', deptIds: [] },
     );
 
-    expect(where).toEqual({ isDeleted: false });
+    expect(where).toEqual({
+      AND: [{ isDeleted: false }, { division: { in: [] } }],
+    });
   });
 
   it('keeps base query for modules without data-scope config', async () => {

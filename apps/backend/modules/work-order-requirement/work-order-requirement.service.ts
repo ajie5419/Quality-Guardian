@@ -29,11 +29,13 @@ export const WorkOrderRequirementService = {
   async registerAttachmentReferences(params: {
     attachments?: string;
     bizId: string;
+    tx?: Prisma.TransactionClient;
   }) {
     await FileStorageService.registerReferencesFromAttachments({
       attachments: params.attachments,
       bizId: params.bizId,
       bizType: 'work_order_requirement',
+      ...(params.tx ? { tx: params.tx } : {}),
     });
   },
 
@@ -61,9 +63,12 @@ export const WorkOrderRequirementService = {
     );
   },
 
-  async updateActiveById(params: WorkOrderRequirementMutationParams) {
-    return prisma.$transaction(async (tx) => {
-      const result = await tx.work_order_requirements.updateMany({
+  async updateActiveById(
+    params: WorkOrderRequirementMutationParams,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const update = async (db: Prisma.TransactionClient) => {
+      const result = await db.work_order_requirements.updateMany({
         where: {
           id: params.id,
           isDeleted: false,
@@ -76,11 +81,12 @@ export const WorkOrderRequirementService = {
         data: params.data,
       });
       if (result.count === 0) return null;
-      return tx.work_order_requirements.findFirst({
+      return db.work_order_requirements.findFirst({
         where: { id: params.id, isDeleted: false, status: 'active' },
         select: mutationSelect,
       });
-    });
+    };
+    return tx ? update(tx) : prisma.$transaction(update);
   },
 
   async findActiveMutationState(
@@ -98,12 +104,16 @@ export const WorkOrderRequirementService = {
     });
   },
 
-  async softDeleteById(params: {
-    id: string;
-    updatedBy: string;
-    workOrderWhere: Prisma.work_ordersWhereInput;
-  }) {
-    return prisma.work_order_requirements.updateMany({
+  async softDeleteById(
+    params: {
+      id: string;
+      updatedBy: string;
+      workOrderWhere: Prisma.work_ordersWhereInput;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    const db = tx ?? prisma;
+    return db.work_order_requirements.updateMany({
       where: {
         id: params.id,
         isDeleted: false,
@@ -118,10 +128,14 @@ export const WorkOrderRequirementService = {
     });
   },
 
-  async softDeleteAttachmentReferences(id: string) {
+  async softDeleteAttachmentReferences(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ) {
     await FileStorageService.softDeleteReferences({
       bizId: id,
       bizType: 'work_order_requirement',
+      ...(tx ? { tx } : {}),
     });
   },
 

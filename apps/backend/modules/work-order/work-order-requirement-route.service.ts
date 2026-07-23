@@ -56,10 +56,24 @@ async function buildAccessibleWorkOrderWhere(
   event: H3Event,
   userinfo: UserSession,
 ) {
+  const userContext = getUserContext(userinfo);
+  const scope =
+    event.context.dataScope ??
+    (await DataScopeService.getScopeForModule(
+      userContext.userId,
+      'work-order',
+    ));
+  if (scope.scopeType === 'SELF' && scope.deptIds.length === 0) {
+    throw new BusinessError(
+      'FORBIDDEN',
+      'Work order requirement mutations require an assigned data scope',
+      403,
+    );
+  }
   return DataScopeService.buildWorkOrderWhere(
     { isDeleted: false },
-    getUserContext(userinfo),
-    event.context.dataScope,
+    userContext,
+    scope,
   );
 }
 
@@ -90,6 +104,8 @@ async function buildRequirementUpdateData(
     'work_order_requirements',
     {
       ...governedFields,
+      ...(body.partName === null ? { partId: null } : {}),
+      ...(body.processName === null ? { processId: null } : {}),
       responsibleTeamId: body.responsibleTeamId,
     },
   );
@@ -181,16 +197,21 @@ export const WorkOrderRequirementRouteService = {
           403,
         );
       }
-      return WorkOrderRequirementService.createMany(createPayloads, tx);
+      const createdRequirements = await WorkOrderRequirementService.createMany(
+        createPayloads,
+        tx,
+      );
+      await Promise.all(
+        createdRequirements.map((item, index) =>
+          WorkOrderRequirementService.registerAttachmentReferences({
+            attachments: normalized[index]?.attachments,
+            bizId: item.id,
+            tx,
+          }),
+        ),
+      );
+      return createdRequirements;
     });
-    await Promise.all(
-      created.map((item, index) =>
-        WorkOrderRequirementService.registerAttachmentReferences({
-          attachments: normalized[index]?.attachments,
-          bizId: item.id,
-        }),
-      ),
-    );
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
       action: 'CREATE',
@@ -223,11 +244,24 @@ export const WorkOrderRequirementRouteService = {
             confirmStatus: confirm ? 'CONFIRMED' : 'PENDING',
             updatedBy: userinfo.username,
           };
-    const updated = await WorkOrderRequirementService.updateActiveById({
-      data,
-      expectedConfirmStatus: getExpectedConfirmStatus(confirm),
-      id,
-      workOrderWhere,
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await WorkOrderRequirementService.updateActiveById(
+        {
+          data,
+          expectedConfirmStatus: getExpectedConfirmStatus(confirm),
+          id,
+          workOrderWhere,
+        },
+        tx,
+      );
+      if (result && body.attachments !== undefined) {
+        await WorkOrderRequirementService.registerAttachmentReferences({
+          attachments: JSON.stringify(body.attachments),
+          bizId: id,
+          tx,
+        });
+      }
+      return result;
     });
     if (!updated) {
       const current = await WorkOrderRequirementService.findActiveMutationState(
@@ -242,12 +276,6 @@ export const WorkOrderRequirementRouteService = {
         'Requirement confirmation status changed, refresh and try again',
         409,
       );
-    }
-    if (body.attachments !== undefined) {
-      await WorkOrderRequirementService.registerAttachmentReferences({
-        attachments: JSON.stringify(body.attachments),
-        bizId: id,
-      });
     }
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
@@ -269,15 +297,20 @@ export const WorkOrderRequirementRouteService = {
       PERMISSION_CODES.QMS.WORK_ORDER.DELETE,
     );
     const workOrderWhere = await buildAccessibleWorkOrderWhere(event, userinfo);
-    const result = await WorkOrderRequirementService.softDeleteById({
-      id,
-      updatedBy: userinfo.username,
-      workOrderWhere,
+    await prisma.$transaction(async (tx) => {
+      const result = await WorkOrderRequirementService.softDeleteById(
+        {
+          id,
+          updatedBy: userinfo.username,
+          workOrderWhere,
+        },
+        tx,
+      );
+      if (result.count === 0) {
+        throw new BusinessError('NOT_FOUND', 'Requirement not found', 404);
+      }
+      await WorkOrderRequirementService.softDeleteAttachmentReferences(id, tx);
     });
-    if (result.count === 0) {
-      throw new BusinessError('NOT_FOUND', 'Requirement not found', 404);
-    }
-    await WorkOrderRequirementService.softDeleteAttachmentReferences(id);
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
       action: 'DELETE',

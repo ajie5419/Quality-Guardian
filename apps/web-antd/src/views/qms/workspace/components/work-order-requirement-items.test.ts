@@ -28,4 +28,30 @@ describe('work order requirement items', () => {
       }),
     ).toEqual(['Check paint', 'Check labels']);
   });
+
+  it('preserves unchanged structured items during a partial edit', () => {
+    const originalItems = [{ key: 'appearance' }, 'Check dimensions'];
+    const originalText = formatWorkOrderRequirementItems(originalItems);
+
+    expect(
+      resolveWorkOrderRequirementItems({
+        currentText: '{"key":"appearance"}\nCheck dimensions and labels',
+        originalItems,
+        originalText,
+      }),
+    ).toEqual([{ key: 'appearance' }, 'Check dimensions and labels']);
+  });
+
+  it('parses an edited structured item back to its original value type', () => {
+    const originalItems = [{ key: 'appearance' }, 'Check dimensions'];
+    const originalText = formatWorkOrderRequirementItems(originalItems);
+
+    expect(
+      resolveWorkOrderRequirementItems({
+        currentText: '{"key":"surface"}\nCheck dimensions',
+        originalItems,
+        originalText,
+      }),
+    ).toEqual([{ key: 'surface' }, 'Check dimensions']);
+  });
 });

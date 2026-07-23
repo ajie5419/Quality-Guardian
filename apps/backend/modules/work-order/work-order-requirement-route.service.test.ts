@@ -18,6 +18,7 @@ vi.mock('~/modules/rbac', () => ({
 vi.mock('~/modules/data-scope', () => ({
   DataScopeService: {
     buildWorkOrderWhere: vi.fn(async (where) => where),
+    getScopeForModule: vi.fn(async () => ({ deptIds: [], scopeType: 'ALL' })),
   },
 }));
 
@@ -90,7 +91,22 @@ vi.mock('~/modules/work-order/work-order-query', () => ({
 function mockEvent() {
   return {
     path: '/api/test',
-    context: { requestId: 'r1', traceId: 't1' },
+    context: {
+      dataScope: { deptIds: [], scopeType: 'ALL' },
+      requestId: 'r1',
+      traceId: 't1',
+    },
+  } as any;
+}
+
+function mockSelfScopedEvent() {
+  return {
+    path: '/api/test',
+    context: {
+      dataScope: { deptIds: [], scopeType: 'SELF' },
+      requestId: 'r1',
+      traceId: 't1',
+    },
   } as any;
 }
 
@@ -170,6 +186,16 @@ describe('workOrderRequirementRouteService', () => {
         ),
       ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
     });
+
+    it('should reject creation when self scope has no department fallback', async () => {
+      await expect(
+        WorkOrderRequirementRouteService.createRequirements(
+          mockSelfScopedEvent(),
+          [{ requirementName: 'Quality', workOrderNumber: 'WO-001' }],
+          mockUserinfo(),
+        ),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
+    });
   });
 
   describe('updateRequirement', () => {
@@ -205,6 +231,7 @@ describe('workOrderRequirementRouteService', () => {
           expectedConfirmStatus: 'PENDING',
           id: 'req-1',
         }),
+        expect.any(Object),
       );
     });
 
@@ -234,6 +261,7 @@ describe('workOrderRequirementRouteService', () => {
           expectedConfirmStatus: undefined,
           id: 'req-1',
         }),
+        expect.any(Object),
       );
     });
 
@@ -257,6 +285,40 @@ describe('workOrderRequirementRouteService', () => {
         ),
       ).rejects.toMatchObject({ code: 'STATE_CONFLICT', httpStatus: 409 });
     });
+
+    it('should reject edits when self scope has no department fallback', async () => {
+      await expect(
+        WorkOrderRequirementRouteService.updateRequirement(
+          mockSelfScopedEvent(),
+          'req-1',
+          { requirementName: 'Updated' },
+          mockUserinfo(),
+        ),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
+    });
+
+    it('should clear canonical ids when optional names are explicitly cleared', async () => {
+      const { WorkOrderRequirementService } = await import(
+        '~/modules/work-order-requirement/work-order-requirement.service'
+      );
+      (WorkOrderRequirementService.updateActiveById as any).mockResolvedValue({
+        id: 'req-1',
+        workOrderNumber: 'WO-001',
+        requirementName: 'Updated',
+      });
+
+      await WorkOrderRequirementRouteService.updateRequirement(
+        mockEvent(),
+        'req-1',
+        { partName: null, processName: null },
+        mockUserinfo(),
+      );
+
+      expect(buildGovernedCanonicalWritePairForTable).toHaveBeenCalledWith(
+        'work_order_requirements',
+        expect.objectContaining({ partId: null, processId: null }),
+      );
+    });
   });
 
   describe('deleteRequirement', () => {
@@ -276,10 +338,21 @@ describe('workOrderRequirementRouteService', () => {
 
       expect(WorkOrderRequirementService.softDeleteById).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'req-1', updatedBy: 'admin' }),
+        expect.any(Object),
       );
       expect(
         WorkOrderRequirementService.softDeleteAttachmentReferences,
-      ).toHaveBeenCalledWith('req-1');
+      ).toHaveBeenCalledWith('req-1', expect.any(Object));
+    });
+
+    it('should reject deletion when self scope has no department fallback', async () => {
+      await expect(
+        WorkOrderRequirementRouteService.deleteRequirement(
+          mockSelfScopedEvent(),
+          'req-1',
+          mockUserinfo(),
+        ),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
     });
   });
 

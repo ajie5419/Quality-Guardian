@@ -248,6 +248,30 @@ describe('fileStorageService', () => {
     });
   });
 
+  it('uses a provided transaction client for reference synchronization', async () => {
+    const tx = {
+      file_assets: {
+        findMany: vi.fn().mockResolvedValue([{ id: 'file-1' }]),
+      },
+      file_references: {
+        createMany: vi.fn().mockResolvedValue({ count: 1 }),
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+    } as any;
+
+    await FileStorageService.registerReferencesFromAttachments({
+      attachments: [{ fileId: 'file-1' }],
+      bizId: 'biz-1',
+      bizType: 'quality_record',
+      tx,
+    });
+
+    expect(tx.file_assets.findMany).toHaveBeenCalled();
+    expect(tx.file_references.deleteMany).toHaveBeenCalled();
+    expect(tx.file_references.createMany).toHaveBeenCalled();
+    expect(prisma.file_references.deleteMany).not.toHaveBeenCalled();
+  });
+
   it('downloads thumbnail buffer when stored name points to thumb object', async () => {
     const buffer = Buffer.from('thumb');
     const file = {

@@ -230,6 +230,11 @@ export const DataScopeService = {
     user: UserContext,
     resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
   ): Promise<Prisma.work_ordersWhereInput> {
-    return this.buildScopedWhere('work-order', baseWhere, user, resolvedScope);
+    const scope =
+      resolvedScope ?? (await resolveScope(user.userId, 'work-order'));
+    if (scope.scopeType === 'SELF' && scope.deptIds.length === 0) {
+      return { AND: [baseWhere, { division: { in: [] } }] };
+    }
+    return this.buildScopedWhere('work-order', baseWhere, user, scope);
   },
 };
