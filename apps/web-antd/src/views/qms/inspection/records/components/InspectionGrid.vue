@@ -45,7 +45,11 @@ import {
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
 import { getColumns } from '../config';
-import { buildInspectionRecordFilterParams } from './inspection-record-filters';
+import {
+  buildInspectionRecordExportRequestParams,
+  buildInspectionRecordFilterParams,
+  buildInspectionRecordListRequestParams,
+} from './inspection-record-filters';
 
 const props = defineProps<{
   isMobile?: boolean;
@@ -90,15 +94,18 @@ const exportInspectionRecordsAsXlsx =
       if (mode === 'all') {
         const proxyInfo = $grid?.getProxyInfo?.();
         const formValues = (proxyInfo?.form || {}) as Record<string, unknown>;
-        const response = await getInspectionRecordsExport({
-          type: props.type,
-          year: props.year,
-          ...buildFilterParams(formValues),
-        });
-        return filterBySourceInspectionId(response.items || []);
+        const response = await getInspectionRecordsExport(
+          buildInspectionRecordExportRequestParams({
+            filters: buildFilterParams(formValues),
+            sourceInspectionId: props.sourceInspectionId,
+            type: props.type,
+            year: props.year,
+          }),
+        );
+        return response.items || [];
       }
       const tableData = $table.getTableData?.();
-      return filterBySourceInspectionId(tableData?.fullData || []);
+      return tableData?.fullData || [];
     },
   });
 
@@ -217,37 +224,33 @@ const gridOptions = computed(() => ({
         { page }: { page: { currentPage: number; pageSize: number } },
         formValues: Record<string, unknown>,
       ) => {
-        const response = await getInspectionRecords({
-          type: props.type,
-          year: props.year,
-          page: props.sourceInspectionId ? 1 : page.currentPage,
-          pageSize: props.sourceInspectionId ? 100_000 : page.pageSize,
-          ...buildFilterParams(formValues),
-        });
-        if (!props.sourceInspectionId) {
-          return response;
-        }
-
-        const items = filterBySourceInspectionId(response.items || []);
-        return {
-          ...response,
-          items,
-          total: items.length,
-        };
+        return getInspectionRecords(
+          buildInspectionRecordListRequestParams({
+            filters: buildFilterParams(formValues),
+            page: page.currentPage,
+            pageSize: page.pageSize,
+            sourceInspectionId: props.sourceInspectionId,
+            type: props.type,
+            year: props.year,
+          }),
+        );
       },
       queryAll: async ({
         formValues,
       }: {
         formValues: Record<string, unknown>;
       }) => {
-        const res = await getInspectionRecords({
-          type: props.type,
-          year: props.year,
-          page: 1,
-          pageSize: 100_000,
-          ...buildFilterParams(formValues),
-        });
-        return { items: filterBySourceInspectionId(res.items || []) };
+        const res = await getInspectionRecords(
+          buildInspectionRecordListRequestParams({
+            filters: buildFilterParams(formValues),
+            page: 1,
+            pageSize: 100_000,
+            sourceInspectionId: props.sourceInspectionId,
+            type: props.type,
+            year: props.year,
+          }),
+        );
+        return { items: res.items || [] };
       },
     },
   },
@@ -266,14 +269,6 @@ function normalizeIssueStatus(status: unknown) {
     ],
     fallback: ISSUE_TRACKING_STATUS.NO_ISSUE,
   });
-}
-
-function filterBySourceInspectionId(
-  items: QmsInspectionApi.InspectionRecord[] = [],
-) {
-  return props.sourceInspectionId
-    ? items.filter((item) => item.id === props.sourceInspectionId)
-    : items;
 }
 
 function onCheckChange(params: VxeCheckboxChangeParams) {

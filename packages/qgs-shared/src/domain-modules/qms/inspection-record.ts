@@ -88,6 +88,7 @@ export function parseInspectionRecordListQuery(query: Record<string, unknown>) {
     pageSize,
     processName: normalizeString(query.processName),
     projectName: normalizeString(query.projectName),
+    sourceInspectionId: normalizeString(query.sourceInspectionId),
     startDate: parseDateBoundary(query.startDate),
     supplierName: normalizeString(query.supplierName),
     team: normalizeString(query.team),

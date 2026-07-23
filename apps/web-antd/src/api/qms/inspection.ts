@@ -155,6 +155,7 @@ export async function getInspectionRecords(params?: {
   pageSize?: number;
   processName?: string;
   projectName?: string;
+  sourceInspectionId?: string;
   startDate?: string;
   supplierName?: string;
   team?: string;
@@ -179,6 +180,7 @@ export async function getInspectionRecordsExport(params?: {
   materialName?: string;
   processName?: string;
   projectName?: string;
+  sourceInspectionId?: string;
   startDate?: string;
   supplierName?: string;
   team?: string;

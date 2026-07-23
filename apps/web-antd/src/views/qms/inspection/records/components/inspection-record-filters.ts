@@ -22,6 +22,13 @@ export type InspectionRecordFilterState = Omit<
   inspectionDateRange?: [string, string];
 };
 
+type InspectionRecordRequestContext = {
+  filters: InspectionRecordFilterParams;
+  sourceInspectionId?: string;
+  type: string;
+  year: number;
+};
+
 function normalizeFilterText(value: unknown) {
   const text = String(value ?? '').trim();
   return text || undefined;
@@ -71,5 +78,35 @@ export function buildInspectionRecordFilterParams(options: {
     supplierName: resolveText('supplierName'),
     team: resolveText('team'),
     workOrderNumber: resolveText('workOrderNumber'),
+  };
+}
+
+export function buildInspectionRecordListRequestParams(
+  options: InspectionRecordRequestContext & { page: number; pageSize: number },
+) {
+  const sourceInspectionId = normalizeFilterText(options.sourceInspectionId);
+  if (sourceInspectionId) {
+    return { page: 1, pageSize: 1, sourceInspectionId, type: 'ALL' };
+  }
+  return {
+    ...options.filters,
+    page: options.page,
+    pageSize: options.pageSize,
+    type: options.type,
+    year: options.year,
+  };
+}
+
+export function buildInspectionRecordExportRequestParams(
+  options: InspectionRecordRequestContext,
+) {
+  const sourceInspectionId = normalizeFilterText(options.sourceInspectionId);
+  if (sourceInspectionId) {
+    return { sourceInspectionId, type: 'ALL' };
+  }
+  return {
+    ...options.filters,
+    type: options.type,
+    year: options.year,
   };
 }

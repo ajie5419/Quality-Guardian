@@ -160,6 +160,7 @@ export const InspectionRecordQueryService = {
     pageSize?: number;
     processName?: string;
     projectName?: string;
+    sourceInspectionId?: string;
     startDate?: string;
     supplierName?: string;
     team?: string;
@@ -182,6 +183,7 @@ export const InspectionRecordQueryService = {
       materialName,
       processName,
       projectName,
+      sourceInspectionId,
       startDate,
       supplierName,
       team,
@@ -193,46 +195,48 @@ export const InspectionRecordQueryService = {
       isDeleted: false,
     };
 
-    // Category Filter
-    if (type !== 'ALL') {
-      const category = normalizeInspectionCategory(type);
-      if (category) {
-        where.category = category;
+    if (sourceInspectionId) {
+      where.id = sourceInspectionId;
+    } else {
+      if (type !== 'ALL') {
+        const category = normalizeInspectionCategory(type);
+        if (category) {
+          where.category = category;
+        }
       }
-    }
 
-    // Specific Filters
-    if (workOrderNumber) where.workOrderNumber = workOrderNumber;
-    if (supplierName) where.supplierName = { contains: supplierName };
-    if (typeof hasDocuments === 'boolean') where.hasDocuments = hasDocuments;
-    if (processName) where.processName = { contains: processName };
-    if (level1Component) where.level1Component = { contains: level1Component };
-    if (componentName) where.level2Component = { contains: componentName };
-    if (materialName) where.materialName = { contains: materialName };
-    if (team) where.team = { contains: team };
-    if (inspector) where.inspector = { contains: inspector };
-    if (projectName) where.projectName = { contains: projectName };
+      if (workOrderNumber) where.workOrderNumber = workOrderNumber;
+      if (supplierName) where.supplierName = { contains: supplierName };
+      if (typeof hasDocuments === 'boolean') where.hasDocuments = hasDocuments;
+      if (processName) where.processName = { contains: processName };
+      if (level1Component)
+        where.level1Component = { contains: level1Component };
+      if (componentName) where.level2Component = { contains: componentName };
+      if (materialName) where.materialName = { contains: materialName };
+      if (team) where.team = { contains: team };
+      if (inspector) where.inspector = { contains: inspector };
+      if (projectName) where.projectName = { contains: projectName };
 
-    // Keyword Search
-    const keywordOr = buildKeywordOr(keyword, [
-      'workOrderNumber',
-      'projectName',
-      'supplierName',
-      'inspector',
-    ] as const);
-    if (keywordOr) Object.assign(where, keywordOr);
+      const keywordOr = buildKeywordOr(keyword, [
+        'workOrderNumber',
+        'projectName',
+        'supplierName',
+        'inspector',
+      ] as const);
+      if (keywordOr) Object.assign(where, keywordOr);
 
-    const explicitDateRange = buildInspectionRecordDateRange({
-      endDate,
-      startDate,
-    });
-    if (explicitDateRange) {
-      where.inspectionDate = {
-        gte: explicitDateRange.start,
-        lt: explicitDateRange.end,
-      };
-    } else if (year) {
-      where.inspectionDate = buildYearFilter(year);
+      const explicitDateRange = buildInspectionRecordDateRange({
+        endDate,
+        startDate,
+      });
+      if (explicitDateRange) {
+        where.inspectionDate = {
+          gte: explicitDateRange.start,
+          lt: explicitDateRange.end,
+        };
+      } else if (year) {
+        where.inspectionDate = buildYearFilter(year);
+      }
     }
 
     const runQuery = async (withArchiveTask: boolean) => {
@@ -275,10 +279,12 @@ export const InspectionRecordQueryService = {
         ]);
       }
 
-      const { skip, take } = parsePagination({
-        page,
-        pageSize,
-      });
+      const { skip, take } = sourceInspectionId
+        ? { skip: 0, take: 1 }
+        : parsePagination({
+            page,
+            pageSize,
+          });
       return Promise.all([
         prisma.inspections.findMany({
           where,

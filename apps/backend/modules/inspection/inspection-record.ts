@@ -20,6 +20,7 @@ export const inspectionRecordListQuerySchema = z
     pageSize: queryValueSchema.optional(),
     processName: queryValueSchema.optional(),
     projectName: queryValueSchema.optional(),
+    sourceInspectionId: queryValueSchema.optional(),
     startDate: queryValueSchema.optional(),
     supplierName: queryValueSchema.optional(),
     team: queryValueSchema.optional(),

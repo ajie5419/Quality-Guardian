@@ -298,6 +298,31 @@ describe('inspectionRecordQueryService', () => {
         }),
       );
     });
+
+    it('should locate a source record by ID without applying list filters', async () => {
+      (prisma.inspections.findMany as any).mockResolvedValue([]);
+      (prisma.inspections.count as any).mockResolvedValue(0);
+
+      await InspectionRecordQueryService.findAll({
+        keyword: 'unrelated keyword',
+        page: 8,
+        pageSize: 100,
+        sourceInspectionId: 'inspection-101',
+        type: 'INCOMING',
+        year: 2025,
+      });
+
+      expect(prisma.inspections.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: 'inspection-101',
+            isDeleted: false,
+          },
+          skip: 0,
+          take: 1,
+        }),
+      );
+    });
   });
 
   describe('findSupplierHistory', () => {
