@@ -131,6 +131,7 @@ describe('workOrderAggregateService', () => {
       expect(result.summary.completionRate).toBe(100);
       expect(result.requirements).toHaveLength(1);
       expect(result.requirements[0].executed).toBe(true);
+      expect(result.requirements[0].items).toEqual([{ a: 1 }, { a: 2 }]);
     });
 
     it('should handle missing requirement points', async () => {

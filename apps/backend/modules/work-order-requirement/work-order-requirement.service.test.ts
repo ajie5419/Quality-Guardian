@@ -7,8 +7,9 @@ vi.mock('~/utils/prisma', () => ({
     work_order_requirements: {
       count: vi.fn(),
       create: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -17,6 +18,7 @@ vi.mock('~/utils/prisma', () => ({
 vi.mock('~/modules/file-storage', () => ({
   FileStorageService: {
     registerReferencesFromAttachments: vi.fn(),
+    softDeleteReferences: vi.fn(),
   },
 }));
 
@@ -35,6 +37,10 @@ vi.mock('~/utils/process-resolver', () => ({
 describe('workOrderRequirementService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.$transaction).mockImplementation(async (input: any) => {
+      if (typeof input === 'function') return input(prisma);
+      return Promise.all(input);
+    });
   });
 
   it('registers attachment references through file-storage module', async () => {
@@ -55,9 +61,6 @@ describe('workOrderRequirementService', () => {
   });
 
   it('creates multiple requirements inside transaction with selected fields', async () => {
-    vi.mocked(prisma.$transaction).mockImplementation(async (operations: any) =>
-      Promise.all(operations),
-    );
     vi.mocked(prisma.work_order_requirements.create)
       .mockResolvedValueOnce({
         id: 'req-1',
@@ -82,27 +85,76 @@ describe('workOrderRequirementService', () => {
     });
   });
 
-  it('updates requirement by id with confirmation select shape', async () => {
-    vi.mocked(prisma.work_order_requirements.update).mockResolvedValue({
+  it('updates an active requirement with atomic scope and status guards', async () => {
+    vi.mocked(prisma.work_order_requirements.updateMany).mockResolvedValue({
+      count: 1,
+    });
+    vi.mocked(prisma.work_order_requirements.findFirst).mockResolvedValue({
       confirmStatus: 'CONFIRMED',
       id: 'req-1',
     } as never);
 
-    await WorkOrderRequirementService.updateById('req-1', {
-      confirmStatus: 'CONFIRMED',
-    } as any);
-
-    expect(prisma.work_order_requirements.update).toHaveBeenCalledWith({
-      where: { id: 'req-1' },
+    const result = await WorkOrderRequirementService.updateActiveById({
       data: { confirmStatus: 'CONFIRMED' },
-      select: {
-        confirmedAt: true,
-        confirmer: true,
-        confirmStatus: true,
-        id: true,
-        requirementName: true,
-        workOrderNumber: true,
+      expectedConfirmStatus: 'PENDING',
+      id: 'req-1',
+      workOrderWhere: { division: 'Division A' },
+    });
+
+    expect(result).toEqual(expect.objectContaining({ id: 'req-1' }));
+    expect(prisma.work_order_requirements.updateMany).toHaveBeenCalledWith({
+      where: {
+        confirmStatus: 'PENDING',
+        id: 'req-1',
+        isDeleted: false,
+        status: 'active',
+        work_order: { division: 'Division A' },
       },
+      data: { confirmStatus: 'CONFIRMED' },
+    });
+  });
+
+  it('does not read back a requirement when the atomic update loses a race', async () => {
+    vi.mocked(prisma.work_order_requirements.updateMany).mockResolvedValue({
+      count: 0,
+    });
+
+    const result = await WorkOrderRequirementService.updateActiveById({
+      data: { confirmStatus: 'CONFIRMED' },
+      expectedConfirmStatus: 'PENDING',
+      id: 'req-1',
+      workOrderWhere: {},
+    });
+
+    expect(result).toBeNull();
+    expect(prisma.work_order_requirements.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('soft deletes requirement data and attachment references', async () => {
+    const { FileStorageService } = await import('~/modules/file-storage');
+    vi.mocked(prisma.work_order_requirements.updateMany).mockResolvedValue({
+      count: 1,
+    });
+
+    await WorkOrderRequirementService.softDeleteById({
+      id: 'req-1',
+      updatedBy: 'admin',
+      workOrderWhere: { division: 'Division A' },
+    });
+    await WorkOrderRequirementService.softDeleteAttachmentReferences('req-1');
+
+    expect(prisma.work_order_requirements.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'req-1',
+        isDeleted: false,
+        status: 'active',
+        work_order: { division: 'Division A' },
+      },
+      data: { isDeleted: true, status: 'deleted', updatedBy: 'admin' },
+    });
+    expect(FileStorageService.softDeleteReferences).toHaveBeenCalledWith({
+      bizId: 'req-1',
+      bizType: 'work_order_requirement',
     });
   });
 

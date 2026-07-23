@@ -1,13 +1,19 @@
 import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
+import { Prisma } from '@prisma/client';
+import { PERMISSION_CODES } from '@qgs/shared';
+import { DataScopeService } from '~/modules/data-scope';
+import { RbacService } from '~/modules/rbac';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { WorkOrderRequirementService } from '~/modules/work-order-requirement/work-order-requirement.service';
 import { parseWorkOrderListQuery } from '~/modules/work-order/work-order-query';
+import { BusinessError } from '~/utils/business-error';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
 } from '~/utils/governed-write';
+import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import { WorkOrderAggregateService } from './work-order-aggregate.service';
@@ -24,12 +30,94 @@ function parseRequirementItems(raw: unknown): unknown[] {
   }
 }
 
+function getUserContext(userinfo: UserSession) {
+  return {
+    userId: String(userinfo.userId ?? userinfo.id ?? ''),
+    username: userinfo.username,
+  };
+}
+
+async function ensureWorkOrderPermission(
+  userinfo: UserSession,
+  permissionCode: string,
+) {
+  const { userId } = getUserContext(userinfo);
+  const codes = userId ? await RbacService.getUserPermissionCodes(userId) : [];
+  if (!codes.includes(permissionCode) && !codes.includes('*')) {
+    throw new BusinessError(
+      'FORBIDDEN',
+      'You do not have permission to modify work order requirements',
+      403,
+    );
+  }
+}
+
+async function buildAccessibleWorkOrderWhere(
+  event: H3Event,
+  userinfo: UserSession,
+) {
+  return DataScopeService.buildWorkOrderWhere(
+    { isDeleted: false },
+    getUserContext(userinfo),
+    event.context.dataScope,
+  );
+}
+
+function normalizeOptionalText(value: unknown) {
+  if (value === undefined) return undefined;
+  return String(value || '').trim() || null;
+}
+
+function getExpectedConfirmStatus(confirm: boolean | undefined) {
+  if (confirm === undefined) return undefined;
+  return confirm ? 'PENDING' : 'CONFIRMED';
+}
+
+async function buildRequirementUpdateData(
+  body: Record<string, unknown>,
+  username: string,
+) {
+  const governedFields = buildGovernedWriteFieldsForTable(
+    'work_order_requirements',
+    {
+      partName: body.partName,
+      processName: body.processName,
+      requirementName: body.requirementName,
+      responsibleTeam: body.responsibleTeam,
+    },
+  );
+  const canonicalFields = await buildGovernedCanonicalWritePairForTable(
+    'work_order_requirements',
+    {
+      ...governedFields,
+      responsibleTeamId: body.responsibleTeamId,
+    },
+  );
+  return {
+    attachment:
+      body.attachments === undefined
+        ? undefined
+        : JSON.stringify(body.attachments),
+    requirementItems:
+      body.items === undefined ? undefined : JSON.stringify(body.items),
+    requirementName: normalizeOptionalText(body.requirementName),
+    responsiblePerson: normalizeOptionalText(body.responsiblePerson),
+    ...governedFields,
+    ...canonicalFields,
+    updatedBy: username,
+  } satisfies Prisma.work_order_requirementsUpdateManyMutationInput;
+}
+
 export const WorkOrderRequirementRouteService = {
   async createRequirements(
     event: H3Event,
     requirements: Array<Record<string, unknown>>,
     userinfo: UserSession,
   ) {
+    await ensureWorkOrderPermission(
+      userinfo,
+      PERMISSION_CODES.QMS.WORK_ORDER.CREATE,
+    );
     const normalized = requirements.map((item) => ({
       attachments: JSON.stringify(
         Array.isArray(item.attachments) ? item.attachments : [],
@@ -72,8 +160,29 @@ export const WorkOrderRequirementRouteService = {
         )),
       })),
     );
-    const created =
-      await WorkOrderRequirementService.createMany(createPayloads);
+    const workOrderNumbers = [
+      ...new Set(normalized.map((item) => item.workOrderNumber)),
+    ];
+    const accessibleWhere = await buildAccessibleWorkOrderWhere(
+      event,
+      userinfo,
+    );
+    const created = await prisma.$transaction(async (tx) => {
+      const accessibleCount = await tx.work_orders.count({
+        where: {
+          ...accessibleWhere,
+          workOrderNumber: { in: workOrderNumbers },
+        },
+      });
+      if (accessibleCount !== workOrderNumbers.length) {
+        throw new BusinessError(
+          'FORBIDDEN',
+          'One or more work orders are outside your data scope',
+          403,
+        );
+      }
+      return WorkOrderRequirementService.createMany(createPayloads, tx);
+    });
     await Promise.all(
       created.map((item, index) =>
         WorkOrderRequirementService.registerAttachmentReferences({
@@ -98,46 +207,48 @@ export const WorkOrderRequirementRouteService = {
     body: Record<string, unknown>,
     userinfo: UserSession,
   ) {
-    const confirm = Boolean(body.confirm);
-    const governedFields = buildGovernedWriteFieldsForTable(
-      'work_order_requirements',
-      {
-        requirementName:
-          body.requirementName === undefined
-            ? undefined
-            : String(body.requirementName || '').trim() || null,
-        responsibleTeam:
-          body.responsibleTeam === undefined
-            ? undefined
-            : String(body.responsibleTeam || '').trim() || null,
-      },
+    await ensureWorkOrderPermission(
+      userinfo,
+      PERMISSION_CODES.QMS.WORK_ORDER.EDIT,
     );
-    const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
-      'work_order_requirements',
-      {
-        ...governedFields,
-        responsibleTeamId:
-          body.responsibleTeamId === undefined
-            ? undefined
-            : String(body.responsibleTeamId || '').trim() || null,
-      },
-    );
-    const updated = await WorkOrderRequirementService.updateById(id, {
-      confirmedAt: confirm ? new Date() : null,
-      confirmer: confirm ? userinfo.username : null,
-      confirmStatus: confirm ? 'CONFIRMED' : 'PENDING',
-      requirementName:
-        body.requirementName === undefined
-          ? undefined
-          : String(body.requirementName || '').trim(),
-      responsiblePerson:
-        body.responsiblePerson === undefined
-          ? undefined
-          : String(body.responsiblePerson || '').trim() || null,
-      ...governedFields,
-      ...governedCanonicalIds,
-      updatedBy: userinfo.username,
+    const workOrderWhere = await buildAccessibleWorkOrderWhere(event, userinfo);
+    const confirm =
+      typeof body.confirm === 'boolean' ? body.confirm : undefined;
+    const data =
+      confirm === undefined
+        ? await buildRequirementUpdateData(body, userinfo.username)
+        : {
+            confirmedAt: confirm ? new Date() : null,
+            confirmer: confirm ? userinfo.username : null,
+            confirmStatus: confirm ? 'CONFIRMED' : 'PENDING',
+            updatedBy: userinfo.username,
+          };
+    const updated = await WorkOrderRequirementService.updateActiveById({
+      data,
+      expectedConfirmStatus: getExpectedConfirmStatus(confirm),
+      id,
+      workOrderWhere,
     });
+    if (!updated) {
+      const current = await WorkOrderRequirementService.findActiveMutationState(
+        id,
+        workOrderWhere,
+      );
+      if (!current) {
+        throw new BusinessError('NOT_FOUND', 'Requirement not found', 404);
+      }
+      throw new BusinessError(
+        'STATE_CONFLICT',
+        'Requirement confirmation status changed, refresh and try again',
+        409,
+      );
+    }
+    if (body.attachments !== undefined) {
+      await WorkOrderRequirementService.registerAttachmentReferences({
+        attachments: JSON.stringify(body.attachments),
+        bizId: id,
+      });
+    }
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
       action: 'UPDATE',
@@ -151,6 +262,30 @@ export const WorkOrderRequirementRouteService = {
       },
     });
     return updated;
+  },
+  async deleteRequirement(event: H3Event, id: string, userinfo: UserSession) {
+    await ensureWorkOrderPermission(
+      userinfo,
+      PERMISSION_CODES.QMS.WORK_ORDER.DELETE,
+    );
+    const workOrderWhere = await buildAccessibleWorkOrderWhere(event, userinfo);
+    const result = await WorkOrderRequirementService.softDeleteById({
+      id,
+      updatedBy: userinfo.username,
+      workOrderWhere,
+    });
+    if (result.count === 0) {
+      throw new BusinessError('NOT_FOUND', 'Requirement not found', 404);
+    }
+    await WorkOrderRequirementService.softDeleteAttachmentReferences(id);
+    await recordBusinessAuditLog(event, {
+      userId: userinfo.id,
+      action: 'DELETE',
+      targetType: 'work_order_requirement',
+      targetId: id,
+      detailsTemplate: 'Delete work order requirement: {{id}}',
+      detailsVariables: { id },
+    });
   },
   async getRequirements(workOrderNumber: string) {
     const list =

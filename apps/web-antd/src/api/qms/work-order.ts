@@ -217,6 +217,30 @@ export async function confirmWorkOrderRequirement(id: string, confirm = true) {
   }>(`${QMS_API.WORK_ORDER_REQUIREMENTS}/${id}`, { confirm });
 }
 
+export async function updateWorkOrderRequirement(
+  id: string,
+  data: {
+    attachments?: WorkOrderRequirementAttachment[];
+    items?: unknown[];
+    partName?: null | string;
+    processName?: null | string;
+    requirementName?: string;
+    responsiblePerson?: null | string;
+    responsibleTeam?: null | string;
+    responsibleTeamId?: null | string;
+  },
+) {
+  return requestClient.put<{
+    id: string;
+    requirementName: string;
+    workOrderNumber: string;
+  }>(`${QMS_API.WORK_ORDER_REQUIREMENTS}/${id}`, data);
+}
+
+export async function deleteWorkOrderRequirement(id: string) {
+  return requestClient.delete(`${QMS_API.WORK_ORDER_REQUIREMENTS}/${id}`);
+}
+
 export type WorkOrderRequirementBoardFilter =
   | 'all'
   | 'confirmed'

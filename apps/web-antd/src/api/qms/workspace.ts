@@ -119,6 +119,7 @@ export interface WorkspaceWorkOrderAggregateResponse {
       | 'NOT_EXECUTED';
     executor: string;
     id: string;
+    items: unknown[];
     partName: string;
     plannedPoints: number;
     processName: string;

@@ -1,16 +1,48 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { RbacService } from '~/modules/rbac';
 import { WorkOrderRequirementRouteService } from '~/modules/work-order/work-order-requirement-route.service';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
+
+vi.mock('~/modules/rbac', () => ({
+  RbacService: {
+    getUserPermissionCodes: vi
+      .fn()
+      .mockResolvedValue([
+        'QMS:WorkOrder:Create',
+        'QMS:WorkOrder:Delete',
+        'QMS:WorkOrder:Edit',
+      ]),
+  },
+}));
+
+vi.mock('~/modules/data-scope', () => ({
+  DataScopeService: {
+    buildWorkOrderWhere: vi.fn(async (where) => where),
+  },
+}));
+
+vi.mock('~/utils/prisma', () => ({
+  default: {
+    $transaction: vi.fn(async (callback) =>
+      callback({
+        work_orders: { count: vi.fn().mockResolvedValue(1) },
+      }),
+    ),
+  },
+}));
 
 vi.mock(
   '~/modules/work-order-requirement/work-order-requirement.service',
   () => ({
     WorkOrderRequirementService: {
       createMany: vi.fn(),
+      findActiveMutationState: vi.fn(),
       findActiveByWorkOrder: vi.fn(),
       getRequirementBoard: vi.fn(),
       registerAttachmentReferences: vi.fn(),
-      updateById: vi.fn(),
+      softDeleteAttachmentReferences: vi.fn(),
+      softDeleteById: vi.fn(),
+      updateActiveById: vi.fn(),
     },
   }),
 );
@@ -116,12 +148,27 @@ describe('workOrderRequirementRouteService', () => {
           responsibleTeamId: 'team-1',
         }),
       );
-      expect(WorkOrderRequirementService.createMany).toHaveBeenCalledWith([
-        expect.objectContaining({
-          responsibleTeam: 'Team A',
-          responsibleTeamId: 'team-1',
-        }),
-      ]);
+      expect(WorkOrderRequirementService.createMany).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            responsibleTeam: 'Team A',
+            responsibleTeamId: 'team-1',
+          }),
+        ],
+        expect.any(Object),
+      );
+    });
+
+    it('should reject creation without work order create permission', async () => {
+      vi.mocked(RbacService.getUserPermissionCodes).mockResolvedValueOnce([]);
+
+      await expect(
+        WorkOrderRequirementRouteService.createRequirements(
+          mockEvent(),
+          [{ requirementName: 'Quality', workOrderNumber: 'WO-001' }],
+          mockUserinfo(),
+        ),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
     });
   });
 
@@ -130,7 +177,7 @@ describe('workOrderRequirementRouteService', () => {
       const { WorkOrderRequirementService } = await import(
         '~/modules/work-order-requirement/work-order-requirement.service'
       );
-      (WorkOrderRequirementService.updateById as any).mockResolvedValue({
+      (WorkOrderRequirementService.updateActiveById as any).mockResolvedValue({
         id: 'req-1',
         workOrderNumber: 'WO-001',
         requirementName: 'Updated',
@@ -144,21 +191,19 @@ describe('workOrderRequirementRouteService', () => {
         'req-1',
         {
           confirm: true,
-          requirementName: 'Updated',
-          responsibleTeam: 'Team A',
-          responsibleTeamId: 'team-1',
         },
         mockUserinfo(),
       );
 
       expect(result.id).toBe('req-1');
-      expect(WorkOrderRequirementService.updateById).toHaveBeenCalledWith(
-        'req-1',
+      expect(WorkOrderRequirementService.updateActiveById).toHaveBeenCalledWith(
         expect.objectContaining({
-          confirmStatus: 'CONFIRMED',
-          confirmer: 'admin',
-          responsibleTeam: 'Team A',
-          responsibleTeamId: 'team-1',
+          data: expect.objectContaining({
+            confirmStatus: 'CONFIRMED',
+            confirmer: 'admin',
+          }),
+          expectedConfirmStatus: 'PENDING',
+          id: 'req-1',
         }),
       );
     });
@@ -167,7 +212,7 @@ describe('workOrderRequirementRouteService', () => {
       const { WorkOrderRequirementService } = await import(
         '~/modules/work-order-requirement/work-order-requirement.service'
       );
-      (WorkOrderRequirementService.updateById as any).mockResolvedValue({
+      (WorkOrderRequirementService.updateActiveById as any).mockResolvedValue({
         id: 'req-1',
         workOrderNumber: 'WO-001',
         requirementName: 'Updated',
@@ -180,13 +225,61 @@ describe('workOrderRequirementRouteService', () => {
         mockUserinfo(),
       );
 
-      expect(WorkOrderRequirementService.updateById).toHaveBeenCalledWith(
-        'req-1',
+      expect(WorkOrderRequirementService.updateActiveById).toHaveBeenCalledWith(
         expect.objectContaining({
-          confirmStatus: 'PENDING',
-          confirmer: null,
+          data: expect.not.objectContaining({
+            confirmStatus: expect.anything(),
+            confirmer: expect.anything(),
+          }),
+          expectedConfirmStatus: undefined,
+          id: 'req-1',
         }),
       );
+    });
+
+    it('should report a stale confirmation state as a conflict', async () => {
+      const { WorkOrderRequirementService } = await import(
+        '~/modules/work-order-requirement/work-order-requirement.service'
+      );
+      (WorkOrderRequirementService.updateActiveById as any).mockResolvedValue(
+        null,
+      );
+      (
+        WorkOrderRequirementService.findActiveMutationState as any
+      ).mockResolvedValue({ confirmStatus: 'CONFIRMED', id: 'req-1' });
+
+      await expect(
+        WorkOrderRequirementRouteService.updateRequirement(
+          mockEvent(),
+          'req-1',
+          { confirm: true },
+          mockUserinfo(),
+        ),
+      ).rejects.toMatchObject({ code: 'STATE_CONFLICT', httpStatus: 409 });
+    });
+  });
+
+  describe('deleteRequirement', () => {
+    it('should soft delete a scoped requirement and its attachments', async () => {
+      const { WorkOrderRequirementService } = await import(
+        '~/modules/work-order-requirement/work-order-requirement.service'
+      );
+      (WorkOrderRequirementService.softDeleteById as any).mockResolvedValue({
+        count: 1,
+      });
+
+      await WorkOrderRequirementRouteService.deleteRequirement(
+        mockEvent(),
+        'req-1',
+        mockUserinfo(),
+      );
+
+      expect(WorkOrderRequirementService.softDeleteById).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'req-1', updatedBy: 'admin' }),
+      );
+      expect(
+        WorkOrderRequirementService.softDeleteAttachmentReferences,
+      ).toHaveBeenCalledWith('req-1');
     });
   });
 

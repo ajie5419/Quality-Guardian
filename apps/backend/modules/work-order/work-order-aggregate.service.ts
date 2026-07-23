@@ -126,6 +126,7 @@ export const WorkOrderAggregateService = {
           | 'NOT_EXECUTED',
         executor: '-',
         id: item.id,
+        items: parseRequirementItems(item.requirementItems),
         partName,
         plannedPoints,
         processName,

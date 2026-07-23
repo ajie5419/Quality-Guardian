@@ -338,6 +338,13 @@ export const WorkOrderRouteService = {
       userinfo,
     );
   },
+  async deleteRequirement(event: H3Event, id: string, userinfo: UserSession) {
+    return WorkOrderRequirementRouteService.deleteRequirement(
+      event,
+      id,
+      userinfo,
+    );
+  },
   async getRequirements(workOrderNumber: string) {
     return WorkOrderRequirementRouteService.getRequirements(workOrderNumber);
   },

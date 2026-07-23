@@ -9,6 +9,22 @@ import { buildRequirementSummaryMap } from './work-order-requirement-summary';
 type WorkOrderRequirementCreatePayload =
   Prisma.work_order_requirementsUncheckedCreateInput;
 
+type WorkOrderRequirementMutationParams = {
+  data: Prisma.work_order_requirementsUpdateManyMutationInput;
+  expectedConfirmStatus?: 'CONFIRMED' | 'PENDING';
+  id: string;
+  workOrderWhere: Prisma.work_ordersWhereInput;
+};
+
+const mutationSelect = {
+  confirmedAt: true,
+  confirmer: true,
+  confirmStatus: true,
+  id: true,
+  requirementName: true,
+  workOrderNumber: true,
+} satisfies Prisma.work_order_requirementsSelect;
+
 export const WorkOrderRequirementService = {
   async registerAttachmentReferences(params: {
     attachments?: string;
@@ -21,7 +37,20 @@ export const WorkOrderRequirementService = {
     });
   },
 
-  async createMany(payloads: WorkOrderRequirementCreatePayload[]) {
+  async createMany(
+    payloads: WorkOrderRequirementCreatePayload[],
+    tx?: Prisma.TransactionClient,
+  ) {
+    if (tx) {
+      return Promise.all(
+        payloads.map((data) =>
+          tx.work_order_requirements.create({
+            data,
+            select: { id: true, requirementName: true, workOrderNumber: true },
+          }),
+        ),
+      );
+    }
     return prisma.$transaction(
       payloads.map((data) =>
         prisma.work_order_requirements.create({
@@ -32,21 +61,67 @@ export const WorkOrderRequirementService = {
     );
   },
 
-  async updateById(
+  async updateActiveById(params: WorkOrderRequirementMutationParams) {
+    return prisma.$transaction(async (tx) => {
+      const result = await tx.work_order_requirements.updateMany({
+        where: {
+          id: params.id,
+          isDeleted: false,
+          status: 'active',
+          work_order: params.workOrderWhere,
+          ...(params.expectedConfirmStatus
+            ? { confirmStatus: params.expectedConfirmStatus }
+            : {}),
+        },
+        data: params.data,
+      });
+      if (result.count === 0) return null;
+      return tx.work_order_requirements.findFirst({
+        where: { id: params.id, isDeleted: false, status: 'active' },
+        select: mutationSelect,
+      });
+    });
+  },
+
+  async findActiveMutationState(
     id: string,
-    data: Prisma.work_order_requirementsUpdateInput,
+    workOrderWhere: Prisma.work_ordersWhereInput,
   ) {
-    return prisma.work_order_requirements.update({
-      where: { id },
-      data,
-      select: {
-        confirmedAt: true,
-        confirmer: true,
-        confirmStatus: true,
-        id: true,
-        requirementName: true,
-        workOrderNumber: true,
+    return prisma.work_order_requirements.findFirst({
+      where: {
+        id,
+        isDeleted: false,
+        status: 'active',
+        work_order: workOrderWhere,
       },
+      select: { confirmStatus: true, id: true },
+    });
+  },
+
+  async softDeleteById(params: {
+    id: string;
+    updatedBy: string;
+    workOrderWhere: Prisma.work_ordersWhereInput;
+  }) {
+    return prisma.work_order_requirements.updateMany({
+      where: {
+        id: params.id,
+        isDeleted: false,
+        status: 'active',
+        work_order: params.workOrderWhere,
+      },
+      data: {
+        isDeleted: true,
+        status: 'deleted',
+        updatedBy: params.updatedBy,
+      },
+    });
+  },
+
+  async softDeleteAttachmentReferences(id: string) {
+    await FileStorageService.softDeleteReferences({
+      bizId: id,
+      bizType: 'work_order_requirement',
     });
   },
 

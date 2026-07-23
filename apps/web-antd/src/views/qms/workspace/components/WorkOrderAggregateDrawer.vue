@@ -8,6 +8,8 @@ import type {
 
 import { computed, onMounted, ref } from 'vue';
 
+import { IconifyIcon } from '@vben/icons';
+import { useI18n } from '@vben/locales';
 import { useAccessStore } from '@vben/stores';
 
 import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
@@ -24,16 +26,20 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Upload,
 } from 'ant-design-vue';
 
 import {
   confirmWorkOrderRequirement,
+  deleteWorkOrderRequirement,
+  updateWorkOrderRequirement,
   uploadWorkOrderRequirements,
 } from '#/api/qms/work-order';
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
+import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import TeamSelect from '#/views/qms/inspection/records/components/form/TeamSelect.vue';
 import { mapDictionaryOptionsToInspectionProcess } from '#/views/qms/inspection/records/config';
 import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
@@ -43,7 +49,14 @@ import {
   normalizeUploadFile,
 } from '#/views/qms/shared/utils/upload-file';
 
+import {
+  formatWorkOrderRequirementItems,
+  resolveWorkOrderRequirementItems,
+} from './work-order-requirement-items';
+
 type RequirementFilter = 'all' | 'done' | 'overdue' | 'pending';
+type WorkOrderRequirement =
+  WorkspaceWorkOrderAggregateResponse['requirements'][number];
 
 const props = defineProps<{
   aggregateData: null | WorkspaceWorkOrderAggregateResponse;
@@ -61,6 +74,8 @@ const emit = defineEmits<{
 
 const { handleApiError } = useErrorHandler();
 const { isMobile } = useMobileViewport();
+const { t } = useI18n();
+const { canCreate, canDelete, canEdit } = useQmsPermissions('QMS:WorkOrder');
 const { modalWidth, modalWrapClassName } = useAdaptivePopup();
 const accessStore = useAccessStore();
 
@@ -76,7 +91,11 @@ const uploadHeaders = computed(() => ({
 }));
 const activeTab = ref<'progress' | 'requirements'>('requirements');
 const requirementFilter = ref<RequirementFilter>('all');
-const creatingRequirement = ref(false);
+const savingRequirement = ref(false);
+const mutatingRequirementId = ref('');
+const editingRequirementId = ref('');
+const originalRequirementItems = ref<unknown[]>([]);
+const originalRequirementItemsText = ref('');
 const requirementModalVisible = ref(false);
 const requirementForm = ref({
   attachments: [] as UploadFile[],
@@ -101,6 +120,11 @@ const workOrderStatusLabel = computed(() => {
 });
 const drawerWidth = computed(() =>
   isMobile.value ? '100vw' : 'min(100vw, 1100px)',
+);
+const requirementModalTitle = computed(() =>
+  editingRequirementId.value
+    ? t('qms.workOrder.editRequirement')
+    : t('qms.workOrder.createRequirement'),
 );
 
 const summarySentence = computed(() => {
@@ -212,18 +236,41 @@ function formatCoverageProgress(
   return `${Math.min(covered, total)}/${total}`;
 }
 
-function openRequirementModal() {
+function openRequirementModal(record?: WorkOrderRequirement) {
+  editingRequirementId.value = record?.id || '';
+  originalRequirementItems.value = record?.items || [];
+  originalRequirementItemsText.value = formatWorkOrderRequirementItems(
+    originalRequirementItems.value,
+  );
   requirementForm.value = {
-    attachments: [],
-    partName: '',
-    processName: '',
-    requirementItemsText: '',
-    requirementName: '',
-    responsiblePerson: '',
-    responsibleTeam: '',
-    responsibleTeamId: '',
+    attachments: record ? mapAttachmentsToUploadFiles(record) : [],
+    partName: record?.partName || '',
+    processName: record?.processName || '',
+    requirementItemsText: originalRequirementItemsText.value,
+    requirementName: record?.requirementName || '',
+    responsiblePerson: record?.responsiblePerson || '',
+    responsibleTeam: record?.responsibleTeam || '',
+    responsibleTeamId: record?.responsibleTeamId || '',
   };
   requirementModalVisible.value = true;
+}
+
+function mapAttachmentsToUploadFiles(record: WorkOrderRequirement) {
+  return record.attachments.map((file, index) => ({
+    name: file.name || `attachment-${index + 1}`,
+    status: 'done' as const,
+    thumbUrl: file.thumbUrl,
+    type: file.type,
+    uid: `${record.id}-${index}`,
+    url: file.url,
+  }));
+}
+
+function editRequirement(record: Record<string, unknown>) {
+  const requirement = props.aggregateData?.requirements.find(
+    (item) => item.id === String(record.id || ''),
+  );
+  if (requirement) openRequirementModal(requirement);
 }
 
 async function submitRequirement() {
@@ -237,10 +284,11 @@ async function submitRequirement() {
     message.warning('要求名称不能为空');
     return;
   }
-  const items = requirementForm.value.requirementItemsText
-    .split('\n')
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const items = resolveWorkOrderRequirementItems({
+    currentText: requirementForm.value.requirementItemsText,
+    originalItems: originalRequirementItems.value,
+    originalText: originalRequirementItemsText.value,
+  });
   const responsibleTeam = requirementForm.value.responsibleTeam.trim();
   const responsibleTeamId = requirementForm.value.responsibleTeamId.trim();
   const responsibleTeamIdentity =
@@ -248,32 +296,49 @@ async function submitRequirement() {
       ? { responsibleTeam, responsibleTeamId }
       : {};
 
-  creatingRequirement.value = true;
+  savingRequirement.value = true;
   try {
-    await uploadWorkOrderRequirements({
-      requirements: [
-        {
-          attachments: normalizeAttachmentPayload(
-            requirementForm.value.attachments,
-          ),
-          items,
-          partName: requirementForm.value.partName.trim() || undefined,
-          processName: requirementForm.value.processName.trim() || undefined,
-          requirementName,
-          responsiblePerson:
-            requirementForm.value.responsiblePerson.trim() || undefined,
-          ...responsibleTeamIdentity,
-          workOrderNumber,
-        },
-      ],
-    });
-    message.success('要求已新增');
+    if (editingRequirementId.value) {
+      await updateWorkOrderRequirement(editingRequirementId.value, {
+        attachments: normalizeAttachmentPayload(
+          requirementForm.value.attachments,
+        ),
+        items,
+        partName: requirementForm.value.partName.trim() || null,
+        processName: requirementForm.value.processName.trim() || null,
+        requirementName,
+        responsiblePerson:
+          requirementForm.value.responsiblePerson.trim() || null,
+        responsibleTeam: responsibleTeam || null,
+        responsibleTeamId: responsibleTeamId || null,
+      });
+      message.success(t('qms.workOrder.requirementUpdated'));
+    } else {
+      await uploadWorkOrderRequirements({
+        requirements: [
+          {
+            attachments: normalizeAttachmentPayload(
+              requirementForm.value.attachments,
+            ),
+            items,
+            partName: requirementForm.value.partName.trim() || undefined,
+            processName: requirementForm.value.processName.trim() || undefined,
+            requirementName,
+            responsiblePerson:
+              requirementForm.value.responsiblePerson.trim() || undefined,
+            ...responsibleTeamIdentity,
+            workOrderNumber,
+          },
+        ],
+      });
+      message.success(t('qms.workOrder.requirementCreated'));
+    }
     requirementModalVisible.value = false;
     emit('refresh');
   } catch (error) {
-    handleApiError(error, 'Create Work Order Requirement');
+    handleApiError(error, 'Save Work Order Requirement');
   } finally {
-    creatingRequirement.value = false;
+    savingRequirement.value = false;
   }
 }
 
@@ -287,24 +352,59 @@ function handleResponsibleTeamChange(
 
 async function confirmRequirement(id: string) {
   if (!id) return;
+  mutatingRequirementId.value = id;
   try {
     await confirmWorkOrderRequirement(id, true);
-    message.success('已确认完成');
+    message.success(t('qms.workOrder.requirementConfirmed'));
     emit('refresh');
   } catch (error) {
     handleApiError(error, 'Confirm Work Order Requirement');
+  } finally {
+    mutatingRequirementId.value = '';
   }
 }
 
 async function unconfirmRequirement(id: string) {
   if (!id) return;
+  mutatingRequirementId.value = id;
   try {
     await confirmWorkOrderRequirement(id, false);
-    message.success('已撤销确认');
+    message.success(t('qms.workOrder.requirementUnconfirmed'));
     emit('refresh');
   } catch (error) {
     handleApiError(error, 'Unconfirm Work Order Requirement');
+  } finally {
+    mutatingRequirementId.value = '';
   }
+}
+
+function deleteRequirement(record: WorkOrderRequirement) {
+  Modal.confirm({
+    title: t('qms.workOrder.deleteRequirement'),
+    content: t('qms.workOrder.confirmDeleteRequirement', {
+      name: record.requirementName,
+    }),
+    okType: 'danger',
+    onOk: async () => {
+      mutatingRequirementId.value = record.id;
+      try {
+        await deleteWorkOrderRequirement(record.id);
+        message.success(t('qms.workOrder.requirementDeleted'));
+        emit('refresh');
+      } catch (error) {
+        handleApiError(error, 'Delete Work Order Requirement');
+      } finally {
+        mutatingRequirementId.value = '';
+      }
+    },
+  });
+}
+
+function deleteRequirementFromTable(record: Record<string, unknown>) {
+  const requirement = props.aggregateData?.requirements.find(
+    (item) => item.id === String(record.id || ''),
+  );
+  if (requirement) deleteRequirement(requirement);
 }
 
 function normalizeAttachmentPayload(
@@ -342,7 +442,12 @@ onMounted(() => {
   >
     <template #extra>
       <div class="flex items-center gap-2">
-        <Button type="primary" size="small" @click="openRequirementModal">
+        <Button
+          v-if="canCreate"
+          type="primary"
+          size="small"
+          @click="openRequirementModal()"
+        >
           新增要求
         </Button>
         <Button type="link" @click="emit('goWorkOrder')">前往工单管理</Button>
@@ -491,7 +596,7 @@ onMounted(() => {
                 key: 'confirmedAt',
                 width: 180,
               },
-              { title: '操作', key: 'action', width: 110, fixed: 'right' },
+              { title: '操作', key: 'action', width: 132, fixed: 'right' },
             ]"
             :row-key="(record) => record.id"
           >
@@ -533,25 +638,62 @@ onMounted(() => {
                 {{ formatDateTime(record.confirmedAt) }}
               </template>
               <template v-else-if="column.key === 'action'">
-                <Button
-                  v-if="
-                    record.executionStatus !== 'CONFIRMED' &&
-                    record.executionStatus !== 'MANUAL_CONFIRMED'
-                  "
-                  type="link"
-                  size="small"
-                  @click="confirmRequirement(record.id)"
-                >
-                  确认完成
-                </Button>
-                <Button
-                  v-else
-                  type="link"
-                  size="small"
-                  @click="unconfirmRequirement(record.id)"
-                >
-                  撤销确认
-                </Button>
+                <div class="flex items-center justify-center gap-1">
+                  <Tooltip
+                    v-if="
+                      canEdit &&
+                      record.executionStatus !== 'CONFIRMED' &&
+                      record.executionStatus !== 'MANUAL_CONFIRMED'
+                    "
+                    :title="t('qms.workOrder.confirmRequirement')"
+                  >
+                    <Button
+                      type="link"
+                      size="small"
+                      :aria-label="t('qms.workOrder.confirmRequirement')"
+                      :loading="mutatingRequirementId === record.id"
+                      @click="confirmRequirement(record.id)"
+                    >
+                      <IconifyIcon icon="lucide:circle-check" class="size-4" />
+                    </Button>
+                  </Tooltip>
+                  <Tooltip
+                    v-else-if="canEdit"
+                    :title="t('qms.workOrder.unconfirmRequirement')"
+                  >
+                    <Button
+                      type="link"
+                      size="small"
+                      :aria-label="t('qms.workOrder.unconfirmRequirement')"
+                      :loading="mutatingRequirementId === record.id"
+                      @click="unconfirmRequirement(record.id)"
+                    >
+                      <IconifyIcon icon="lucide:rotate-ccw" class="size-4" />
+                    </Button>
+                  </Tooltip>
+                  <Tooltip v-if="canEdit" :title="t('common.edit')">
+                    <Button
+                      type="link"
+                      size="small"
+                      :aria-label="t('common.edit')"
+                      @click="editRequirement(record)"
+                    >
+                      <IconifyIcon icon="lucide:pencil" class="size-4" />
+                    </Button>
+                  </Tooltip>
+                  <Tooltip v-if="canDelete" :title="t('common.delete')">
+                    <Button
+                      type="link"
+                      danger
+                      size="small"
+                      :aria-label="t('common.delete')"
+                      :loading="mutatingRequirementId === record.id"
+                      @click="deleteRequirementFromTable(record)"
+                    >
+                      <IconifyIcon icon="lucide:trash-2" class="size-4" />
+                    </Button>
+                  </Tooltip>
+                </div>
               </template>
             </template>
           </Table>
@@ -656,10 +798,10 @@ onMounted(() => {
 
     <Modal
       v-model:open="requirementModalVisible"
-      title="新增工单要求"
+      :title="requirementModalTitle"
       :width="modalWidth"
       :wrap-class-name="modalWrapClassName"
-      :confirm-loading="creatingRequirement"
+      :confirm-loading="savingRequirement"
       @ok="submitRequirement"
     >
       <Form layout="vertical">

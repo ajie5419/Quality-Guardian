@@ -1,6 +1,7 @@
 import { workOrderRequirementCreateBodySchema } from '~/modules/work-order/work-order-requirement.schema';
 import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import {
@@ -22,8 +23,9 @@ export default defineValidatedHandler(
           userinfo,
         ),
       );
-    } catch (error) {
+    } catch (error: unknown) {
       logApiError('work-order-requirement-create', error, undefined, event);
+      if (isBusinessError(error)) return businessErrorResponse(event, error);
       return internalServerErrorResponse(event, '上传工单要求失败');
     }
   },

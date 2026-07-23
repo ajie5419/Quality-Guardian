@@ -5,16 +5,22 @@ const optionalTeamIdentityFields = {
   responsibleTeamId: z.string().trim().min(1).optional(),
 };
 
+const editableTeamIdentityFields = {
+  responsibleTeam: z.string().trim().min(1).nullable().optional(),
+  responsibleTeamId: z.string().trim().min(1).nullable().optional(),
+};
+
 function validateTeamIdentityPair(
   body: {
-    responsibleTeam?: string;
-    responsibleTeamId?: string;
+    responsibleTeam?: null | string;
+    responsibleTeamId?: null | string;
   },
   context: z.RefinementCtx,
 ) {
   if (
     (body.responsibleTeam === undefined) !==
-    (body.responsibleTeamId === undefined)
+      (body.responsibleTeamId === undefined) ||
+    (body.responsibleTeam === null) !== (body.responsibleTeamId === null)
   ) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
@@ -53,10 +59,25 @@ export const workOrderRequirementCreateBodySchema = z.union([
 
 export const workOrderRequirementUpdateBodySchema = z
   .object({
-    confirm: z.boolean().optional(),
-    requirementName: z.string().optional(),
-    responsiblePerson: z.string().optional(),
-    ...optionalTeamIdentityFields,
+    attachments: z.array(z.record(z.string(), z.unknown())).optional(),
+    items: z.array(z.unknown()).optional(),
+    partName: z.string().trim().min(1).nullable().optional(),
+    processName: z.string().trim().min(1).nullable().optional(),
+    requirementName: z.string().trim().min(1).optional(),
+    responsiblePerson: z.string().trim().min(1).nullable().optional(),
+    ...editableTeamIdentityFields,
   })
   .strict()
-  .superRefine(validateTeamIdentityPair);
+  .superRefine(validateTeamIdentityPair)
+  .refine((body) => Object.keys(body).length > 0, {
+    message: 'At least one editable field is required',
+  });
+
+export const workOrderRequirementConfirmBodySchema = z
+  .object({ confirm: z.boolean() })
+  .strict();
+
+export const workOrderRequirementMutationBodySchema = z.union([
+  workOrderRequirementConfirmBodySchema,
+  workOrderRequirementUpdateBodySchema,
+]);
