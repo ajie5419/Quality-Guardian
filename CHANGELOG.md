@@ -25,6 +25,27 @@
 
 ## 执行记录
 
+### 2026-07-23 工程：配置 main 合并门禁与手动 Codex 审查
+
+**执行内容：**
+
+- 将 GitHub Ruleset `back` 更名为 `main-protection` 并启用，匹配默认分支，强制 PR、最新 `main`、6 项 GitHub Actions 检查、review thread 解决，且禁止删除和强制推送。
+- 确定合并前在 Codex 中手动审查最新分支差异，P0/P1 必须修复；手动审查由 PR 模板记录，不伪装成 GitHub 可验证的 required status。
+- 删除依赖额外 API 密钥的自动 Codex Action，Ruleset 继续只要求 6 项确定性 CI，避免凭据缺失导致 PR 被无关失败锁死。
+- 在 `AGENTS.md` 固化权限/数据范围、查询/导出一致性和事务完整性审查规则，并同步 PR 模板、发布流程、硬约束和项目进度。
+
+**验证结果：**
+
+- 全量测试 305/305 个文件、2636/2636 个用例通过；后端复验 221/221 个文件、2091/2091 个用例通过。
+- GitHub Ruleset 核对通过，最新提交的 Lint、Typecheck、QMS Architecture Check、Unit Tests、Secret Scan 和 Prisma Migration Check 全部通过。
+- `pnpm lint`、`pnpm run check:type`（3/3 workspace tasks）、`pnpm run check:qms-arch`、Prettier 和 `git diff --check` 全部通过。
+
+**commit:** `98192bd` chore(ci): use manual Codex reviews
+
+**遗留问题：**
+
+- 当前仓库只有一名协作者，人工 approval 数量保持为 `0`；增加独立维护者后应将其改为 `1`。
+
 ## [0.19.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.18.0...qgs-v0.19.0) (2026-07-23)
 
 

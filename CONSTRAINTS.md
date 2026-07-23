@@ -33,6 +33,8 @@
 2. **pre-push** — 并行执行 `pnpm run check:type` 与 `pnpm run check:qms-arch`，阻止类型错误和新增架构违规进入远端
 3. **post-merge** — 仅当 `package.json`、`pnpm-lock.yaml` 或 `pnpm-workspace.yaml` 变化时执行 `pnpm install --frozen-lockfile`
 4. **CI** — 执行全量 lint、typecheck、`check:qms-arch:all`、测试、migration 检查和密钥扫描；本地 hook 不能替代 CI
+5. **GitHub Ruleset** — `main` 只能通过 PR 更新，必须基于最新 `main`，必须通过 Lint、Typecheck、QMS Architecture Check、Unit Tests、Secret Scan 和 Prisma Migration Check，且所有 review thread 已解决
+6. **分支保护** — 禁止删除和强制推送 `main`，Ruleset 不允许管理员或自动化绕过
 
 ## 完成定义
 

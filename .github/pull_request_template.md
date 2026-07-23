@@ -21,3 +21,10 @@ Paste key output or screenshots for:
 1. lint
 2. typecheck
 3. qms architecture check
+
+## Merge Gate
+
+- [ ] All required GitHub checks passed on the latest commit
+- [ ] Manual Codex review was completed against the latest `main`
+- [ ] All P0/P1 review findings were fixed
+- [ ] All review conversations were resolved

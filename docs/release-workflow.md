@@ -57,7 +57,9 @@
    gh pr create --base main --head codex/<scope>
    ```
 
-5. 等功能 PR 的 CI 全部通过后，再合并功能 PR。
+5. 等功能 PR 的合并门禁全部通过后，再合并功能 PR。
+
+   合并前必须在 Codex 中基于最新 `main` 手动审查当前分支，并处理全部 P0/P1 问题。GitHub 硬门禁包括：分支已同步最新 `main`，Ruleset 要求的六个确定性检查全部通过，以及所有 review thread 已解决。
 
    ```bash
    gh pr checks <功能PR编号> --watch
@@ -82,7 +84,7 @@
    package.json
    ```
 
-   必须等发布 PR 的检查全部通过：
+   发布 PR 与功能 PR 使用同一套 Ruleset，必须等检查全部通过且 review thread 全部解决：
 
    ```bash
    gh pr checks <发布PR编号> --watch
@@ -129,6 +131,29 @@ git status --short --branch
 ```
 
 ## 当前自动化配置
+
+### main 合并门禁
+
+GitHub Ruleset `main-protection` 处于 `active`，匹配默认分支，且无 bypass actor。
+
+强制规则：
+
+- 只能通过 PR 更新 `main`。
+- 合并前分支必须同步最新 `main`。
+- 必须通过 `Lint`、`Typecheck`、`QMS Architecture Check`、`Unit Tests`、`Secret Scan` 和 `Prisma Migration Check`。
+- 必须解决全部 review thread。
+- 禁止删除和强制推送 `main`。
+- 当前仅有一名协作者，因此人工 approval 数量为 `0`；增加独立维护者后必须改为 `1`。
+
+### Codex 手动代码审查
+
+功能 PR 和发布 PR 合并前，在 Codex 中对相较最新 `main` 的变更执行一次代码审查：
+
+- 只报告本次变更新引入且可操作的问题，重点检查正确性、权限、数据完整性、安全和生产性能。
+- P0/P1 问题必须修复并复审；P2/P3 根据影响决定是否在当前 PR 处理。
+- 修复后重新执行六项确定性 CI，并解决 PR 中的全部 review thread。
+- 手动审查不是 GitHub 可验证的 required status，因此不能替代 `main-protection` 的六项 CI 硬门禁；完成情况由 PR 模板记录。
+- 仓库不运行自动 Codex Action，也不需要配置额外 API 密钥。
 
 ### release-please
 

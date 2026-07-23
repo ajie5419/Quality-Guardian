@@ -81,6 +81,20 @@ pnpm dev
 6. **modules/ 自包含**：每个模块目录包含自己的 service、工具函数、类型，不依赖其他模块的内部文件
 7. **语言规范**：代码、注释、commit message 用英文；对话和文档用中文
 
+## Code Review Rules
+
+### Authorization and data scope
+
+- Flag server-side reads or writes that trust client-side filtering, skip RBAC or ownership checks, or fail open when user, role, department, or division identity is missing. The safe path is explicit server-side authorization with fail-closed behavior.
+
+### Query and export consistency
+
+- Flag filters that are not propagated through the shared schema, paginated list, query-all/export path, and database query. The safe path is bounded database filtering with `pageSize <= 100`; never load all rows for client-side filtering or pagination.
+
+### Transactional integrity
+
+- Flag state-check-then-write flows whose guard is outside the transaction, soft-delete queries missing `isDeleted: false`, or mutations that update business data without atomically maintaining file references and related audit state.
+
 ## 详细文档
 
 - [架构设计](docs/architecture.md) — 后端目标架构与模块化方案
