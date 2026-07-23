@@ -25,5 +25,6 @@ Paste key output or screenshots for:
 ## Merge Gate
 
 - [ ] All required GitHub checks passed on the latest commit
+- [ ] Manual Codex review was completed against the latest `main`
 - [ ] All P0/P1 review findings were fixed
 - [ ] All review conversations were resolved

@@ -2,8 +2,8 @@
 
 ## 当前状态
 
-- 最新变更: 已启用 `main-protection` Ruleset 保护默认分支，并新增只读 Codex PR 审查 workflow；`Code Review` 加入 required checks 前仍需配置 `OPENAI_API_KEY`
-- 测试状态: 全量 305/305 个文件、2636/2636 个用例通过；后端 221/221 个文件、2091/2091 个用例通过；workflow 门禁分支模拟 6/6 通过；类型检查、lint 和 QMS 架构检查通过
+- 最新变更: 已启用 `main-protection` Ruleset 保护默认分支，并将代码审查流程确定为合并前在 Codex 中手动执行；无需配置额外 API 密钥
+- 测试状态: 全量 305/305 个文件、2636/2636 个用例通过；后端 221/221 个文件、2091/2091 个用例通过；类型检查、lint 和 QMS 架构检查通过
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
 - 模块 TS 文件数: 515（含测试）
@@ -31,7 +31,7 @@
 - [x] 后端类型感知 ESLint 完善（Promise 生命周期、异常类型、switch 穷尽性、测试断言与禁用测试约束）
 - [x] Git hooks 完善（pre-commit 自动修复重暂存、pre-push 类型与架构检查、条件化 post-merge 安装）
 - [x] `main` GitHub Ruleset 合并门禁（强制 PR、最新基线、6 项 CI、review thread 解决、禁止删除/强推）
-- [x] Codex PR 审查 workflow（受信 base checkout、PR head 只读、结构化输出、P0/P1 失败）
+- [x] Codex 手动代码审查流程（合并前审查最新差异并处理全部 P0/P1 问题）
 - [x] 报检任务模块重构（状态机文档、创建 schema、查询/创建/派工/删除/关闭服务拆分）
 - [x] 小程序不合格品项模块（列表、详情、新增、编辑、照片、草稿、RBAC，复用电脑版数据与状态）
 - [x] 不合格品项所有权隔离（普通用户仅可查看及管理本人记录，具备对应权限码的管理员可查看、编辑及删除全部记录）
@@ -66,7 +66,6 @@ apps/backend/
 
 ## 待办
 
-- [ ] 在 GitHub Actions secrets 配置 `OPENAI_API_KEY`，完成首次 `Code Review` 成功运行后将它加入 `main-protection` required checks
 - [ ] 完成不合格品项剩余设备验收（真机、实际新增提交、照片上传、分页、草稿、账号切换）；微信开发者工具的权限、列表、详情、编辑、新增页面已验证
 - [ ] 持续补强端到端业务流程验证
 - [x] 核对事业部生产回填汇总（工单修复 142 条，不合格项修复 46 条，无冲突和并发覆盖）

@@ -59,7 +59,7 @@
 
 5. 等功能 PR 的合并门禁全部通过后，再合并功能 PR。
 
-   合并门禁包括：分支已同步最新 `main`，Ruleset 要求的六个确定性检查全部通过，以及所有 review thread 已解决。`Code Review` 检查启用后，P0/P1 问题也必须清零。
+   合并前必须在 Codex 中基于最新 `main` 手动审查当前分支，并处理全部 P0/P1 问题。GitHub 硬门禁包括：分支已同步最新 `main`，Ruleset 要求的六个确定性检查全部通过，以及所有 review thread 已解决。
 
    ```bash
    gh pr checks <功能PR编号> --watch
@@ -145,17 +145,15 @@ GitHub Ruleset `main-protection` 处于 `active`，匹配默认分支，且无 b
 - 禁止删除和强制推送 `main`。
 - 当前仅有一名协作者，因此人工 approval 数量为 `0`；增加独立维护者后必须改为 `1`。
 
-### Codex 代码审查
+### Codex 手动代码审查
 
-配置文件：`.github/workflows/code-review.yml`。
+功能 PR 和发布 PR 合并前，在 Codex 中对相较最新 `main` 的变更执行一次代码审查：
 
-安全和判定策略：
-
-- 只自动审查同仓库 PR；fork PR 必须由维护者迁入同仓库分支。
-- 仅 checkout 受信任的 base commit，PR head 只作为 Git object 读取，不执行 PR 中的代码、脚本、hook 或网络命令。
-- `openai/codex-action` 使用 `:read-only` permission profile 和 `drop-sudo`，Action 与 Codex CLI 均固定版本。
-- 输出必须符合 JSON Schema；P0/P1 使 `Code Review` 失败，P2/P3 仅作非阻断反馈。
-- 仓库配置 `OPENAI_API_KEY` secret 并完成首次成功审查后，再将 `Code Review` 加入 Ruleset 的 required checks。
+- 只报告本次变更新引入且可操作的问题，重点检查正确性、权限、数据完整性、安全和生产性能。
+- P0/P1 问题必须修复并复审；P2/P3 根据影响决定是否在当前 PR 处理。
+- 修复后重新执行六项确定性 CI，并解决 PR 中的全部 review thread。
+- 手动审查不是 GitHub 可验证的 required status，因此不能替代 `main-protection` 的六项 CI 硬门禁；完成情况由 PR 模板记录。
+- 仓库不运行自动 Codex Action，也不需要配置额外 API 密钥。
 
 ### release-please
 
