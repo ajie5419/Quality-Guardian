@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import type { InspectionRequest } from '@qgs/shared';
 
-import type { SystemUserApi } from '#/api/system/user';
 import type { TreeSelectNode } from '#/types';
 
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -11,11 +10,9 @@ import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useAccessStore, useUserStore } from '@vben/stores';
 
-import { QMS_ROLE_NAMES } from '@qgs/shared';
 import { Card, message } from 'ant-design-vue';
 
 import { getDeptList } from '#/api/system/dept';
-import { getUserList } from '#/api/system/user';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { convertToTreeSelectData } from '#/types';
@@ -34,6 +31,7 @@ import InspectionRequestPageHeader from './components/InspectionRequestPageHeade
 import InspectionRequestStatsCards from './components/InspectionRequestStatsCards.vue';
 import InspectionRequestWorkflows from './components/InspectionRequestWorkflows.vue';
 import { useInspectionRequestEntryActions } from './composables/useInspectionRequestEntryActions';
+import { useInspectionRequestInspectorOptions } from './composables/useInspectionRequestInspectorOptions';
 import { useInspectionRequestInspectorTasks } from './composables/useInspectionRequestInspectorTasks';
 import { useInspectionRequestListing } from './composables/useInspectionRequestListing';
 import { useInspectionRequestPresentation } from './composables/useInspectionRequestPresentation';
@@ -51,7 +49,6 @@ const userStore = useUserStore();
 const { hasAccessByCodes, hasAccessByRoles } = useAccess();
 const { handleApiError } = useErrorHandler();
 const { isMobile } = useMobileViewport();
-const users = ref<SystemUserApi.User[]>([]);
 const inspectorStatusOpen = ref(false);
 
 const canConfigQrBase = computed(() => hasAccessByRoles(['super', 'admin']));
@@ -112,13 +109,8 @@ const canUseRequestAction = (action: 'Delete' | 'Dispatch') =>
   hasAccessByCodes([`QMS:Inspection:Requests:${action}`]);
 const canDelete = computed(() => canUseRequestAction('Delete'));
 const canDispatch = computed(() => canUseRequestAction('Dispatch'));
-
-const userOptions = computed(() =>
-  users.value.map((user) => ({
-    label: user.realName || user.username,
-    value: user.id,
-  })),
-);
+const { loadInspectorOptions, userOptions } =
+  useInspectionRequestInspectorOptions();
 
 const uploadHeaders = computed(() => ({
   Authorization: `Bearer ${accessStore.accessToken}`,
@@ -298,16 +290,6 @@ const {
   router,
 });
 
-async function loadUsers() {
-  const res = await getUserList({
-    page: 1,
-    pageSize: 100,
-    roleName: QMS_ROLE_NAMES.INSPECTOR,
-    status: 1,
-  });
-  users.value = res.items || [];
-}
-
 async function loadDeptData() {
   const data = await getDeptList();
   deptTreeData.value = convertToTreeSelectData(data);
@@ -361,7 +343,7 @@ onMounted(async () => {
   await loadRequestEntryConfig();
   await Promise.all([
     loadDeptData(),
-    loadUsers(),
+    loadInspectorOptions(),
     loadRequests(),
     loadRequestStats(),
   ]);
