@@ -25,6 +25,29 @@
 
 ## 执行记录
 
+### 2026-07-23 功能：补齐售后搜索、派单候选和调试验收图标操作
+
+**执行内容：**
+
+- 售后质量搜索新增部件名称，共享查询参数、前端搜索表单和后端数据库模糊查询保持一致，列表与全量导出共用筛选条件。
+- 用户列表新增经 Zod 校验的角色和启用状态筛选；电脑版与移动版报检派单只查询角色值为 `QC` 的启用检验员。
+- 派单写入同步校验目标账号未删除、已启用且为 `QC` 角色，防止绕过前端把任务派给其他人员；Telegram 派单候选也复用同一角色契约。检验员选项加载已抽离到独立 composable，页面降至 485 行。
+- 调试验收问题台账的一级汇总导出以及二级记录编辑、删除、日志改为 Lucide 图标按钮，并补齐 Tooltip 与 `aria-label`。
+
+**验证结果：**
+
+- 后端全量测试：221/221 个文件、2082/2082 个用例通过；模块 TS 文件数保持 515。
+- 售后定向测试：共享查询 7/7、前端搜索构造 5/5、后端查询 18/18 通过；派单与用户服务后端定向测试 42/42、前端检验员选项测试 2/2 通过。
+- 共享包 CJS/ESM/DTS 构建、后端 `tsc --noEmit`、前端 `vue-tsc --noEmit --skipLibCheck`、定向 ESLint 和 `git diff --check` 通过。
+- `pnpm lint`、`pnpm run check:type` 和 `pnpm run check:qms-arch` 通过。
+- 前端未运行 dev/build/start/serve，遵循仓库约束。
+
+**commit:** `4a7dfd4` feat(project): add after-sales part search；`8dc06cf` fix(project): limit inspection dispatch users；`9744512` style(project): iconify commissioning issue actions；`6e99318` refactor(project): extract inspector options
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-07-23 功能：扩展检验搜索与工单要求跟踪
 
 **执行内容：**
