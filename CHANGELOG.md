@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+### 2026-07-23 修复：处理代码审查发现的权限、分页与来源定位问题
+
+**执行内容：**
+
+- 工单要求写操作对 `SELF + 空部门范围` fail-closed，并在新增、编辑、删除时统一执行数据范围校验；清空部件/工序名称同步清空 canonical ID。
+- 工单要求记录与附件引用在同一 Prisma transaction 中更新或删除；结构化要求项部分编辑保留未修改对象及合法 JSON 类型。
+- 用户全量加载改为每页最多 100 条的有界分页；RBAC V2 下检验员优先使用关联角色并在无关联时回退主角色，派单候选和后端写入共用同一检验员资格校验。
+- 检验记录来源 ID 改为服务端权威精确查询，忽略无关列表筛选并固定单条分页，前端列表、查询全部和导出统一传递来源参数。
+
+**验证结果：**
+
+- 后端全量测试：221/221 个文件、2091/2091 个用例通过。
+- 前端定向测试：4 个文件、12/12 个用例通过；前端 `vue-tsc --noEmit --skipLibCheck` 通过。
+- `pnpm lint`、`pnpm run check:type`（3/3 workspace tasks）、`pnpm run check:qms-arch` 和 `git diff --check` 全部通过。
+- 前端未运行 dev/build/start/serve，遵循仓库约束。
+
+**commit:** `1f50d58e` fix(project): protect work order requirement mutations；`0a2eac50` fix(project): bound inspector user loading；`6fa7ddf` fix(project): locate inspection records by source id
+
+**遗留问题：**
+
+- 无。
+
 ### 2026-07-23 功能：补齐售后搜索、派单候选和调试验收图标操作
 
 **执行内容：**
