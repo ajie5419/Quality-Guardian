@@ -28,6 +28,7 @@ import { getRoleList } from '#/api/system/role';
 import {
   createUser,
   deleteUser,
+  getAllUsers,
   getUserList,
   resetPassword,
   updateUser,
@@ -197,12 +198,8 @@ const gridOptions = computed<VxeGridProps>(() => ({
         return res;
       },
       queryAll: async ({ formValues }: any) => {
-        const res = await getUserList({
-          page: 1,
-          pageSize: 100_000,
-          ...formValues,
-        });
-        return { items: res.items || [] };
+        const items = await getAllUsers(formValues);
+        return { items };
       },
     },
   },

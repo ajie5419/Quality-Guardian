@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRequestDispatchService } from '~/modules/inspection/inspection-request-dispatch.service';
-import { WxSubscribeMessageService } from '~/modules/user';
+import { UserService, WxSubscribeMessageService } from '~/modules/user';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -34,6 +34,9 @@ vi.mock('~/modules/system-log/audit-log', () => ({
 }));
 
 vi.mock('~/modules/user', () => ({
+  UserService: {
+    findEligibleInspector: vi.fn(),
+  },
   WxSubscribeMessageService: {
     sendDispatchAssigned: vi.fn(),
   },
@@ -50,6 +53,9 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(prisma.users.findFirst).mockResolvedValue({
+      id: 'admin-1',
+    } as never);
+    vi.mocked(UserService.findEligibleInspector).mockResolvedValue({
       id: 'inspector-1',
       wxOpenId: 'openid-1',
     } as never);
@@ -144,15 +150,9 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
       userinfo,
     );
 
-    expect(prisma.users.findFirst).toHaveBeenCalledWith({
-      select: { id: true, wxOpenId: true },
-      where: {
-        OR: [{ id: 'inspector-1' }, { username: 'inspector-1' }],
-        isDeleted: false,
-        roles: { isDeleted: false, name: 'QC', status: 1 },
-        status: 'ACTIVE',
-      },
-    });
+    expect(UserService.findEligibleInspector).toHaveBeenCalledWith(
+      'inspector-1',
+    );
     expect(tx.qms_inspection_requests.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({

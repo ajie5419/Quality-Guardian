@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRequestDispatchService } from '~/modules/inspection/inspection-request-dispatch.service';
+import { UserService } from '~/modules/user';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -33,6 +34,9 @@ vi.mock('~/modules/system-log/audit-log', () => ({
 }));
 
 vi.mock('~/modules/user', () => ({
+  UserService: {
+    findEligibleInspector: vi.fn(),
+  },
   WxSubscribeMessageService: {
     sendDispatchAssigned: vi.fn(),
   },
@@ -122,7 +126,9 @@ function setupTransactionMocks(
 describe('adversarial: dispatchRequest state machine', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(prisma.users.findFirst).mockResolvedValue(makeInspector());
+    vi.mocked(UserService.findEligibleInspector).mockResolvedValue(
+      makeInspector(),
+    );
   });
 
   it('1. dispatches a SUBMITTED request successfully (baseline)', async () => {
@@ -262,7 +268,9 @@ describe('adversarial: dispatchRequest state machine', () => {
 describe('adversarial: dispatchRequest input validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(prisma.users.findFirst).mockResolvedValue(makeInspector());
+    vi.mocked(UserService.findEligibleInspector).mockResolvedValue(
+      makeInspector(),
+    );
     vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue(
       makeSubmittedRequest(),
     );
@@ -302,7 +310,7 @@ describe('adversarial: dispatchRequest input validation', () => {
   });
 
   it('9. rejects when inspector does not exist in DB', async () => {
-    vi.mocked(prisma.users.findFirst).mockResolvedValue(null as never);
+    vi.mocked(UserService.findEligibleInspector).mockResolvedValue(null);
 
     await expect(
       InspectionRequestDispatchService.dispatchRequest(
@@ -333,7 +341,9 @@ describe('adversarial: dispatchRequest input validation', () => {
 describe('adversarial: dispatchRequest permission checks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(prisma.users.findFirst).mockResolvedValue(makeInspector());
+    vi.mocked(UserService.findEligibleInspector).mockResolvedValue(
+      makeInspector(),
+    );
   });
 
   it('11. rejects when user lacks dispatch permission', async () => {
@@ -402,7 +412,9 @@ describe('adversarial: dispatchRequest edge cases', () => {
     vi.mocked(resolveInspectionRequestCurrentUserId).mockResolvedValue(
       'admin-1',
     );
-    vi.mocked(prisma.users.findFirst).mockResolvedValue(makeInspector());
+    vi.mocked(UserService.findEligibleInspector).mockResolvedValue(
+      makeInspector(),
+    );
     vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue(
       makeSubmittedRequest(),
     );
@@ -460,7 +472,7 @@ describe('adversarial: dispatchRequest edge cases', () => {
   });
 
   it('17. resolves inspectorId via username lookup', async () => {
-    vi.mocked(prisma.users.findFirst).mockResolvedValue({
+    vi.mocked(UserService.findEligibleInspector).mockResolvedValue({
       id: 'inspector-42',
       username: 'john_doe',
     } as never);
@@ -473,15 +485,7 @@ describe('adversarial: dispatchRequest edge cases', () => {
       userinfo,
     );
 
-    expect(prisma.users.findFirst).toHaveBeenCalledWith({
-      select: { id: true, wxOpenId: true },
-      where: {
-        OR: [{ id: 'john_doe' }, { username: 'john_doe' }],
-        isDeleted: false,
-        roles: { isDeleted: false, name: 'QC', status: 1 },
-        status: 'ACTIVE',
-      },
-    });
+    expect(UserService.findEligibleInspector).toHaveBeenCalledWith('john_doe');
     expect(tx.qms_task_dispatches.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ assigneeId: 'inspector-42' }),

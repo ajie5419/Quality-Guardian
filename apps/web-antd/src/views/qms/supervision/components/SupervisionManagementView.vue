@@ -52,7 +52,7 @@ import {
   updateSupervisionProject,
   updateSupervisionReport,
 } from '#/api/qms/supervision';
-import { getUserList } from '#/api/system/user';
+import { getAllUsers } from '#/api/system/user';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import QmsFileUpload from '#/views/qms/shared/components/QmsFileUpload.vue';
 import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
@@ -839,8 +839,7 @@ async function loadPlanTasks(projectId = selectedPlanProjectId.value) {
 }
 
 async function loadUsers() {
-  const data = await getUserList({ page: 1, pageSize: 200 });
-  users.value = data.items || [];
+  users.value = await getAllUsers();
 }
 
 async function refreshAll() {

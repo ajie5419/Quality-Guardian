@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { createId } from '@paralleldrive/cuid2';
 import { QMS_ROLE_NAMES } from '@qgs/shared';
 import bcrypt from 'bcrypt';
-import { RbacService } from '~/modules/rbac/rbac.service';
+import { isRbacReadV2Enabled, RbacService } from '~/modules/rbac';
 import { getDefaultResetPassword } from '~/modules/user/user-security';
 import { BusinessError } from '~/utils/business-error';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
@@ -53,6 +53,33 @@ function normalizeOptionalText(value: string | undefined) {
   return normalized || null;
 }
 
+function buildActiveRoleFilter(roleName: string): Prisma.usersWhereInput {
+  const roleWhere: Prisma.rolesWhereInput = {
+    isDeleted: false,
+    name: roleName,
+    status: 1,
+  };
+  if (!isRbacReadV2Enabled()) return { roles: roleWhere };
+
+  return {
+    OR: [
+      { rbac_user_roles: { some: { role: roleWhere } } },
+      {
+        rbac_user_roles: { none: {} },
+        roles: roleWhere,
+      },
+    ],
+  };
+}
+
+function buildEligibleInspectorWhere(): Prisma.usersWhereInput {
+  return {
+    isDeleted: false,
+    status: 'ACTIVE',
+    ...buildActiveRoleFilter(QMS_ROLE_NAMES.INSPECTOR),
+  };
+}
+
 async function resolveCreateRoleId(roleIds?: string[], roles?: string[]) {
   const roleIdOrName = (roleIds?.[0] || roles?.[0] || '').trim();
   const role = roleIdOrName
@@ -92,15 +119,7 @@ export const UserService = {
         : {
             status: status === 1 ? ('ACTIVE' as const) : ('INACTIVE' as const),
           }),
-      ...(roleName
-        ? {
-            roles: {
-              isDeleted: false,
-              name: roleName,
-              status: 1,
-            },
-          }
-        : {}),
+      ...(roleName ? buildActiveRoleFilter(roleName) : {}),
     };
 
     const [total, users, workload] = await Promise.all([
@@ -301,18 +320,22 @@ export const UserService = {
 
   async findInspectors() {
     return prisma.users.findMany({
-      where: {
-        isDeleted: false,
-        roles: {
-          isDeleted: false,
-          name: QMS_ROLE_NAMES.INSPECTOR,
-          status: 1,
-        },
-        status: 'ACTIVE',
-      },
+      where: buildEligibleInspectorWhere(),
       select: { id: true, realName: true, username: true },
       orderBy: { createdAt: 'desc' },
       take: 100,
+    });
+  },
+
+  async findEligibleInspector(identifier: string) {
+    return prisma.users.findFirst({
+      select: { id: true, wxOpenId: true },
+      where: {
+        AND: [
+          buildEligibleInspectorWhere(),
+          { OR: [{ id: identifier }, { username: identifier }] },
+        ],
+      },
     });
   },
 

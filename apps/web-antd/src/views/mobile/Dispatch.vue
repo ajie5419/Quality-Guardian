@@ -22,7 +22,7 @@ import {
   dispatchInspectionRequest,
   getInspectionRequest,
 } from '#/api/qms/inspection-request';
-import { getUserList } from '#/api/system/user';
+import { getAllUsers } from '#/api/system/user';
 
 const route = useRoute();
 const router = useRouter();
@@ -46,15 +46,13 @@ async function loadDetail() {
   try {
     const [detail, users] = await Promise.all([
       getInspectionRequest(requestId.value),
-      getUserList({
-        page: 1,
-        pageSize: 100,
+      getAllUsers({
         roleName: QMS_ROLE_NAMES.INSPECTOR,
         status: 1,
       }),
     ]);
     task.value = detail;
-    inspectors.value = users.items.map((user) => ({
+    inspectors.value = users.map((user) => ({
       id: user.id,
       label: user.realName || user.username,
     }));

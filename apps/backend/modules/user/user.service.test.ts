@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { isRbacReadV2Enabled } from '~/modules/rbac';
 import { UserService } from '~/modules/user/user.service';
 import prisma from '~/utils/prisma';
 
@@ -43,7 +44,8 @@ vi.mock('~/utils/jwt-utils', () => ({
   generateAccessToken: vi.fn(() => 'generated-token'),
 }));
 
-vi.mock('~/modules/rbac/rbac.service', () => ({
+vi.mock('~/modules/rbac', () => ({
+  isRbacReadV2Enabled: vi.fn(() => false),
   RbacService: {
     saveUserRoles: vi.fn(),
     getUserRoles: vi.fn(),
@@ -62,6 +64,7 @@ vi.mock('~/modules/user/user-security', () => ({
 describe('userService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(isRbacReadV2Enabled).mockReturnValue(false);
   });
 
   describe('findAll', () => {
@@ -209,7 +212,7 @@ describe('userService', () => {
 
   describe('update', () => {
     it('should update user fields and role', async () => {
-      const { RbacService } = await import('~/modules/rbac/rbac.service');
+      const { RbacService } = await import('~/modules/rbac');
       (prisma.roles.findFirst as any).mockResolvedValue({ id: 'role-admin' });
       (prisma.users.update as any).mockResolvedValue({});
 
@@ -260,7 +263,7 @@ describe('userService', () => {
 
   describe('getInfoByTokenPayload', () => {
     it('should return enriched user info', async () => {
-      const { RbacService } = await import('~/modules/rbac/rbac.service');
+      const { RbacService } = await import('~/modules/rbac');
       (prisma.users.findFirst as any).mockResolvedValue({
         id: 'u1',
         realName: 'Admin',
@@ -318,6 +321,60 @@ describe('userService', () => {
           },
         }),
       );
+    });
+
+    it('uses linked roles first and legacy role only when no links exist in RBAC V2', async () => {
+      vi.mocked(isRbacReadV2Enabled).mockReturnValue(true);
+      (prisma.users.findMany as any).mockResolvedValue([]);
+
+      await UserService.findInspectors();
+
+      expect(prisma.users.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            isDeleted: false,
+            status: 'ACTIVE',
+            OR: [
+              {
+                rbac_user_roles: {
+                  some: {
+                    role: { isDeleted: false, name: 'QC', status: 1 },
+                  },
+                },
+              },
+              {
+                rbac_user_roles: { none: {} },
+                roles: { isDeleted: false, name: 'QC', status: 1 },
+              },
+            ],
+          },
+        }),
+      );
+    });
+  });
+
+  describe('findEligibleInspector', () => {
+    it('resolves an inspector by id or username using the shared legacy contract', async () => {
+      (prisma.users.findFirst as any).mockResolvedValue({
+        id: 'u1',
+        wxOpenId: 'wx-1',
+      });
+
+      await UserService.findEligibleInspector('inspector');
+
+      expect(prisma.users.findFirst).toHaveBeenCalledWith({
+        select: { id: true, wxOpenId: true },
+        where: {
+          AND: [
+            {
+              isDeleted: false,
+              status: 'ACTIVE',
+              roles: { isDeleted: false, name: 'QC', status: 1 },
+            },
+            { OR: [{ id: 'inspector' }, { username: 'inspector' }] },
+          ],
+        },
+      });
     });
   });
 

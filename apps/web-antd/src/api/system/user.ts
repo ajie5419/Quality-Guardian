@@ -10,17 +10,44 @@ export interface SystemUser extends SharedUser {
   wechatWorkId?: null | string;
 }
 
-export const getUserList = (params?: {
+export interface UserListParams {
   page?: number;
   pageSize?: number;
   roleName?: string;
   status?: number;
-}) => {
+}
+
+const USER_LIST_PAGE_SIZE = 100;
+
+export const getUserList = (params?: UserListParams) => {
   const { page = 1, pageSize = 20, roleName, status } = params || {};
   return requestClient.get<PageResult<SystemUser>>(SYSTEM_API.USER_LIST, {
     params: { page, pageSize, roleName, status },
   });
 };
+
+export async function getAllUsers(
+  params: Omit<UserListParams, 'page' | 'pageSize'> = {},
+) {
+  const items: SystemUser[] = [];
+  let page = 1;
+  let total = 0;
+
+  do {
+    const result = await getUserList({
+      ...params,
+      page,
+      pageSize: USER_LIST_PAGE_SIZE,
+    });
+    const pageItems = result.items || [];
+    items.push(...pageItems);
+    total = result.total;
+    page += 1;
+    if (pageItems.length === 0) break;
+  } while (items.length < total);
+
+  return items;
+}
 
 export const createUser = (data: Partial<SystemUser>) => {
   return requestClient.post<SystemUser>(SYSTEM_API.USER, data);

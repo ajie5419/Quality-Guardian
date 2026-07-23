@@ -2,11 +2,11 @@ import type { Prisma } from '@prisma/client';
 import type { EventHandlerRequest, H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
-import { QMS_ROLE_NAMES, TASK_DISPATCH_STATUS } from '@qgs/shared';
+import { TASK_DISPATCH_STATUS } from '@qgs/shared';
 import { z } from 'zod';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
-import { WxSubscribeMessageService } from '~/modules/user';
+import { UserService, WxSubscribeMessageService } from '~/modules/user';
 import { BusinessError } from '~/utils/business-error';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
@@ -77,19 +77,7 @@ export const InspectionRequestDispatchService = {
         include: { work_order: { select: { projectName: true } } },
         where: { id, isDeleted: false },
       }),
-      prisma.users.findFirst({
-        select: { id: true, wxOpenId: true },
-        where: {
-          OR: [{ id: inspectorId }, { username: inspectorId }],
-          isDeleted: false,
-          roles: {
-            isDeleted: false,
-            name: QMS_ROLE_NAMES.INSPECTOR,
-            status: 1,
-          },
-          status: 'ACTIVE',
-        },
-      }),
+      UserService.findEligibleInspector(inspectorId),
     ]);
     if (!request) throw new BusinessError('NOT_FOUND', '报检任务不存在', 404);
     if (

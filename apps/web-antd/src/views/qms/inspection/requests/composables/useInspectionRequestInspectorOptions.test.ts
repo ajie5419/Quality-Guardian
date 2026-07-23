@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useInspectionRequestInspectorOptions } from './useInspectionRequestInspectorOptions';
 
-const { getUserList } = vi.hoisted(() => ({
-  getUserList: vi.fn(),
+const { getAllUsers } = vi.hoisted(() => ({
+  getAllUsers: vi.fn(),
 }));
 
-vi.mock('#/api/system/user', () => ({ getUserList }));
+vi.mock('#/api/system/user', () => ({ getAllUsers }));
 
 describe('useInspectionRequestInspectorOptions', () => {
   beforeEach(() => {
@@ -14,27 +14,22 @@ describe('useInspectionRequestInspectorOptions', () => {
   });
 
   it('loads only active inspector-role users', async () => {
-    getUserList.mockResolvedValue({ items: [], total: 0 });
+    getAllUsers.mockResolvedValue([]);
     const { loadInspectorOptions } = useInspectionRequestInspectorOptions();
 
     await loadInspectorOptions();
 
-    expect(getUserList).toHaveBeenCalledWith({
-      page: 1,
-      pageSize: 100,
+    expect(getAllUsers).toHaveBeenCalledWith({
       roleName: 'QC',
       status: 1,
     });
   });
 
   it('maps inspector names with a username fallback', async () => {
-    getUserList.mockResolvedValue({
-      items: [
-        { id: 'user-1', realName: 'Inspector A', username: 'inspector-a' },
-        { id: 'user-2', realName: '', username: 'inspector-b' },
-      ],
-      total: 2,
-    });
+    getAllUsers.mockResolvedValue([
+      { id: 'user-1', realName: 'Inspector A', username: 'inspector-a' },
+      { id: 'user-2', realName: '', username: 'inspector-b' },
+    ]);
     const { loadInspectorOptions, userOptions } =
       useInspectionRequestInspectorOptions();
 

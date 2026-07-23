@@ -4,7 +4,7 @@ import { computed, ref } from 'vue';
 
 import { QMS_ROLE_NAMES } from '@qgs/shared';
 
-import { getUserList } from '#/api/system/user';
+import { getAllUsers } from '#/api/system/user';
 
 export function useInspectionRequestInspectorOptions() {
   const inspectors = ref<SystemUserApi.User[]>([]);
@@ -16,13 +16,10 @@ export function useInspectionRequestInspectorOptions() {
   );
 
   async function loadInspectorOptions() {
-    const result = await getUserList({
-      page: 1,
-      pageSize: 100,
+    inspectors.value = await getAllUsers({
       roleName: QMS_ROLE_NAMES.INSPECTOR,
       status: 1,
     });
-    inspectors.value = result.items || [];
   }
 
   return { loadInspectorOptions, userOptions };
