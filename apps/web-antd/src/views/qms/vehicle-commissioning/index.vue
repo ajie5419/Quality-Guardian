@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { Page } from '@vben/common-ui';
+import { IconifyIcon } from '@vben/icons';
 
 import {
   Button,
@@ -12,6 +13,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
 } from 'ant-design-vue';
 
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
@@ -185,39 +187,51 @@ const {
                   :fixed="isMobile ? undefined : 'right'"
                 >
                   <template #default="{ record }">
-                    <Space v-if="record.isGroup">
+                    <Tooltip v-if="record.isGroup" title="导出">
                       <Button
+                        aria-label="导出"
                         size="small"
                         type="link"
                         @click="exportIssuesAsExcel(record.workOrderNumber)"
                       >
-                        导出
+                        <IconifyIcon
+                          icon="lucide:file-spreadsheet"
+                          class="size-4"
+                        />
                       </Button>
-                    </Space>
+                    </Tooltip>
                     <Space v-else>
-                      <Button
-                        size="small"
-                        type="link"
-                        @click="openEditIssue(record)"
-                      >
-                        编辑
-                      </Button>
-                      <Button
-                        v-if="canDelete"
-                        danger
-                        size="small"
-                        type="link"
-                        @click="deleteIssue(record)"
-                      >
-                        删除
-                      </Button>
-                      <Button
-                        size="small"
-                        type="link"
-                        @click="viewIssueLogs(record)"
-                      >
-                        日志
-                      </Button>
+                      <Tooltip title="编辑">
+                        <Button
+                          aria-label="编辑"
+                          size="small"
+                          type="link"
+                          @click="openEditIssue(record)"
+                        >
+                          <IconifyIcon icon="lucide:pencil" class="size-4" />
+                        </Button>
+                      </Tooltip>
+                      <Tooltip v-if="canDelete" title="删除">
+                        <Button
+                          aria-label="删除"
+                          danger
+                          size="small"
+                          type="link"
+                          @click="deleteIssue(record)"
+                        >
+                          <IconifyIcon icon="lucide:trash-2" class="size-4" />
+                        </Button>
+                      </Tooltip>
+                      <Tooltip title="日志">
+                        <Button
+                          aria-label="日志"
+                          size="small"
+                          type="link"
+                          @click="viewIssueLogs(record)"
+                        >
+                          <IconifyIcon icon="lucide:history" class="size-4" />
+                        </Button>
+                      </Tooltip>
                       <Button
                         v-if="record.status !== 'CLOSED'"
                         size="small"
