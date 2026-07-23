@@ -25,6 +25,24 @@
 
 ## 执行记录
 
+## [0.19.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.18.0...qgs-v0.19.0) (2026-07-23)
+
+
+### Features
+
+* **project:** add after-sales part search ([4a7dfd4](https://github.com/ajie5419/Quality-Guardian/commit/4a7dfd4f820b9f004d575623377ed499689b3a7e))
+* **project:** add issue supplier search ([54803f0](https://github.com/ajie5419/Quality-Guardian/commit/54803f0c75d17a6943b8db606d720468b2bdfd47))
+* **project:** add work order requirement actions ([da2b887](https://github.com/ajie5419/Quality-Guardian/commit/da2b887e8544b454e44f3f0d3dd5d15e012cd517))
+* **project:** expand inspection record search ([dc0ac89](https://github.com/ajie5419/Quality-Guardian/commit/dc0ac890bb26b9dc4f3117561499c5dc767871a6))
+
+
+### Bug Fixes
+
+* **project:** bound inspector user loading ([0a2eac5](https://github.com/ajie5419/Quality-Guardian/commit/0a2eac50bac733ceb9c757d5ed44e375ff6ada9b))
+* **project:** limit inspection dispatch users ([8dc06cf](https://github.com/ajie5419/Quality-Guardian/commit/8dc06cf3dc9ce20bca07d1e3e1ec460b896533ca))
+* **project:** locate inspection records by source id ([6fa7ddf](https://github.com/ajie5419/Quality-Guardian/commit/6fa7ddf03a4bf43d0dbe772925086cc5afe7f2d6))
+* **project:** protect work order requirement mutations ([1f50d58](https://github.com/ajie5419/Quality-Guardian/commit/1f50d58e4daf3b2ccd0c36b2ec584a8cba87c6f7))
+
 ### 2026-07-23 修复：处理代码审查发现的权限、分页与来源定位问题
 
 **执行内容：**
