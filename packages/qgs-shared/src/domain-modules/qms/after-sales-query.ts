@@ -134,6 +134,7 @@ export function parseAfterSalesListQuery(
     handler: normalizeQueryText(query.handler),
     page: normalizePositiveInteger(query.page, 1),
     pageSize: Math.min(normalizePositiveInteger(query.pageSize, 20), 100),
+    partName: normalizeQueryText(query.partName),
     productType: normalizeQueryText(query.productType),
     year: Number.isNaN(year ?? Number.NaN) ? undefined : year,
     workOrderNumber: normalizeQueryText(query.workOrderNumber),

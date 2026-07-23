@@ -45,6 +45,7 @@ export interface AfterSalesParams {
   handler?: string;
   page?: number;
   pageSize?: number;
+  partName?: string;
   productType?: string;
   projectName?: string;
   responsibleDept?: string;

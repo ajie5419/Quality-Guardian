@@ -206,6 +206,7 @@ export const AfterSalesService = {
       defectType,
       endDate,
       handler,
+      partName,
       projectName,
       productType,
       responsibleDept,
@@ -255,6 +256,9 @@ export const AfterSalesService = {
     }
     if (customerName && String(customerName).trim() !== '') {
       where.customerName = { contains: String(customerName).trim() };
+    }
+    if (partName && String(partName).trim() !== '') {
+      where.partName = { contains: String(partName).trim() };
     }
     if (handler && String(handler).trim() !== '') {
       where.handler = { contains: String(handler).trim() };

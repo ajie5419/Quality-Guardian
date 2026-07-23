@@ -34,6 +34,7 @@ const TEXT_FILTER_FIELDS = [
   'customerName',
   'defectType',
   'handler',
+  'partName',
   'productType',
   'projectName',
   'responsibleDept',
@@ -493,6 +494,12 @@ export function useAfterSalesGrid({
     {
       fieldName: 'projectName',
       label: t('qms.afterSales.form.projectName'),
+      component: 'Input',
+      colProps: { span: 6 },
+    },
+    {
+      fieldName: 'partName',
+      label: t('qms.afterSales.form.partName'),
       component: 'Input',
       colProps: { span: 6 },
     },
