@@ -233,6 +233,10 @@
       "activity": "Activity",
       "controlPoint": "CP",
       "itpDataEntry": "ITP Data Entry",
+      "filters": {
+        "endDate": "End Date",
+        "startDate": "Start Date"
+      },
       "tab": {
         "incoming": "Incoming",
         "process": "In-Process",

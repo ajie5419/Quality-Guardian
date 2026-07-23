@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { InspectionRecordFilterState } from './inspection-record-filters';
+
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { QmsInspectionApi } from '#/api/qms/inspection';
 import type { VxeCheckboxChangeParams } from '#/types';
@@ -14,6 +16,7 @@ import {
 } from '@qgs/shared';
 import {
   Button,
+  DatePicker,
   Input,
   message,
   Modal,
@@ -42,23 +45,7 @@ import {
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
 import { getColumns } from '../config';
-
-type InspectionRecordFilterParams = {
-  hasDocuments?: boolean;
-  inspector?: string;
-  keyword?: string;
-  level1Component?: string;
-  processName?: string;
-  supplierName?: string;
-  team?: string;
-  workOrderNumber?: string;
-};
-type InspectionRecordFilterState = Omit<
-  InspectionRecordFilterParams,
-  'hasDocuments'
-> & {
-  hasDocuments?: string;
-};
+import { buildInspectionRecordFilterParams } from './inspection-record-filters';
 
 const props = defineProps<{
   isMobile?: boolean;
@@ -147,49 +134,12 @@ const processedColumns = (type: string) => {
   });
 };
 
-function normalizeFilterText(value: unknown) {
-  const text = String(value ?? '').trim();
-  return text || undefined;
-}
-
-function normalizeHasDocumentsFilter(value: unknown) {
-  if (typeof value === 'boolean') return value;
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-  return undefined;
-}
-
-function buildFilterParams(
-  formValues: Record<string, unknown> = {},
-): InspectionRecordFilterParams {
-  const currentFilters = filters.value;
-  return {
-    hasDocuments: normalizeHasDocumentsFilter(
-      currentFilters.hasDocuments ?? formValues.hasDocuments,
-    ),
-    inspector:
-      normalizeFilterText(currentFilters.inspector) ||
-      normalizeFilterText(formValues.inspector),
-    keyword:
-      normalizeFilterText(currentFilters.keyword) ||
-      normalizeFilterText(formValues.keyword) ||
-      props.keyword,
-    level1Component:
-      normalizeFilterText(currentFilters.level1Component) ||
-      normalizeFilterText(formValues.level1Component),
-    processName:
-      normalizeFilterText(currentFilters.processName) ||
-      normalizeFilterText(formValues.processName),
-    supplierName:
-      normalizeFilterText(currentFilters.supplierName) ||
-      normalizeFilterText(formValues.supplierName),
-    team:
-      normalizeFilterText(currentFilters.team) ||
-      normalizeFilterText(formValues.team),
-    workOrderNumber:
-      normalizeFilterText(currentFilters.workOrderNumber) ||
-      normalizeFilterText(formValues.workOrderNumber),
-  };
+function buildFilterParams(formValues: Record<string, unknown> = {}) {
+  return buildInspectionRecordFilterParams({
+    fallbackKeyword: props.keyword,
+    filters: filters.value,
+    formValues,
+  });
 }
 
 const gridOptions = computed(() => ({
@@ -466,6 +416,18 @@ defineExpose({ reload });
     />
     <template v-if="props.type === 'incoming'">
       <Input
+        v-model:value="filters.projectName"
+        allow-clear
+        :placeholder="t('qms.workOrder.projectName')"
+        @press-enter="applyFilters"
+      />
+      <Input
+        v-model:value="filters.materialName"
+        allow-clear
+        :placeholder="t('qms.inspection.records.form.materialName')"
+        @press-enter="applyFilters"
+      />
+      <Input
         v-model:value="filters.supplierName"
         allow-clear
         :placeholder="t('qms.supplier.name')"
@@ -495,16 +457,34 @@ defineExpose({ reload });
         @press-enter="applyFilters"
       />
       <Input
+        v-model:value="filters.componentName"
+        allow-clear
+        :placeholder="t('qms.inspection.records.form.componentName')"
+        @press-enter="applyFilters"
+      />
+      <Input
         v-model:value="filters.team"
         allow-clear
         :placeholder="t('qms.inspection.records.form.team')"
         @press-enter="applyFilters"
       />
+    </template>
+    <template v-if="props.type === 'incoming' || props.type === 'process'">
       <Input
         v-model:value="filters.inspector"
         allow-clear
-        placeholder="检验员"
+        :placeholder="t('qms.inspection.records.form.inspector')"
         @press-enter="applyFilters"
+      />
+      <DatePicker.RangePicker
+        v-model:value="filters.inspectionDateRange"
+        allow-clear
+        class="w-full xl:col-span-2"
+        :placeholder="[
+          t('qms.inspection.records.filters.startDate'),
+          t('qms.inspection.records.filters.endDate'),
+        ]"
+        value-format="YYYY-MM-DD"
       />
     </template>
     <Space>
@@ -512,13 +492,13 @@ defineExpose({ reload });
         <template #icon>
           <IconifyIcon icon="lucide:search" />
         </template>
-        查询
+        {{ t('common.search') }}
       </Button>
       <Button @click="resetFilters()">
         <template #icon>
           <IconifyIcon icon="lucide:rotate-ccw" />
         </template>
-        重置
+        {{ t('common.reset') }}
       </Button>
     </Space>
   </div>

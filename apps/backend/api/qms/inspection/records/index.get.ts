@@ -1,5 +1,7 @@
-import { z } from 'zod';
-import { parseInspectionRecordListQuery } from '~/modules/inspection/inspection-record';
+import {
+  inspectionRecordListQuerySchema,
+  parseInspectionRecordListQuery,
+} from '~/modules/inspection/inspection-record';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiError } from '~/utils/api-logger';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
@@ -9,8 +11,6 @@ import {
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
-
-const inspectionRecordListQuerySchema = z.object({}).passthrough();
 
 export default defineValidatedHandler(
   inspectionRecordListQuerySchema,

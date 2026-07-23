@@ -4,7 +4,11 @@ import type {
 } from './inspection-record-types';
 
 import { Prisma } from '@prisma/client';
-import { formatDate, normalizeInspectionStationSelection } from '@qgs/shared';
+import {
+  buildInspectionRecordDateRange,
+  formatDate,
+  normalizeInspectionStationSelection,
+} from '@qgs/shared';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
@@ -144,15 +148,19 @@ export const InspectionRecordQueryService = {
     };
   },
   async findAll(params: {
+    componentName?: string;
+    endDate?: string;
     forExport?: boolean;
     hasDocuments?: boolean;
     inspector?: string;
     keyword?: string;
     level1Component?: string;
+    materialName?: string;
     page?: number;
     pageSize?: number;
     processName?: string;
     projectName?: string;
+    startDate?: string;
     supplierName?: string;
     team?: string;
     type?: string;
@@ -166,11 +174,15 @@ export const InspectionRecordQueryService = {
       forExport = false,
       year,
       hasDocuments,
+      componentName,
+      endDate,
       inspector,
       keyword,
       level1Component,
+      materialName,
       processName,
       projectName,
+      startDate,
       supplierName,
       team,
       workOrderNumber,
@@ -195,6 +207,8 @@ export const InspectionRecordQueryService = {
     if (typeof hasDocuments === 'boolean') where.hasDocuments = hasDocuments;
     if (processName) where.processName = { contains: processName };
     if (level1Component) where.level1Component = { contains: level1Component };
+    if (componentName) where.level2Component = { contains: componentName };
+    if (materialName) where.materialName = { contains: materialName };
     if (team) where.team = { contains: team };
     if (inspector) where.inspector = { contains: inspector };
     if (projectName) where.projectName = { contains: projectName };
@@ -208,8 +222,16 @@ export const InspectionRecordQueryService = {
     ] as const);
     if (keywordOr) Object.assign(where, keywordOr);
 
-    // Date Range (Year)
-    if (year) {
+    const explicitDateRange = buildInspectionRecordDateRange({
+      endDate,
+      startDate,
+    });
+    if (explicitDateRange) {
+      where.inspectionDate = {
+        gte: explicitDateRange.start,
+        lt: explicitDateRange.end,
+      };
+    } else if (year) {
       where.inspectionDate = buildYearFilter(year);
     }
 

@@ -34,6 +34,7 @@ vi.mock('~/utils/query-helpers', () => ({
 }));
 
 vi.mock('@qgs/shared', () => ({
+  buildInspectionRecordDateRange: vi.fn().mockReturnValue(undefined),
   formatDate: vi.fn((d: any) => (d ? '2024-01-15' : null)),
   normalizeInspectionStationSelection: vi.fn().mockReturnValue(null),
 }));
@@ -241,10 +242,13 @@ describe('inspectionRecordQueryService', () => {
       (prisma.inspections.count as any).mockResolvedValue(0);
 
       await InspectionRecordQueryService.findAll({
+        componentName: 'Gearbox',
         hasDocuments: false,
         inspector: 'Inspector A',
         level1Component: 'Frame',
+        materialName: 'Bearing',
         processName: 'Welding',
+        projectName: 'Project A',
         supplierName: 'Supplier A',
         team: 'Team A',
         workOrderNumber: 'WO-001',
@@ -256,10 +260,40 @@ describe('inspectionRecordQueryService', () => {
             hasDocuments: false,
             inspector: { contains: 'Inspector A' },
             level1Component: { contains: 'Frame' },
+            level2Component: { contains: 'Gearbox' },
+            materialName: { contains: 'Bearing' },
             processName: { contains: 'Welding' },
+            projectName: { contains: 'Project A' },
             supplierName: { contains: 'Supplier A' },
             team: { contains: 'Team A' },
             workOrderNumber: 'WO-001',
+          }),
+        }),
+      );
+    });
+
+    it('should apply an inclusive inspection date range before the year filter', async () => {
+      const { buildInspectionRecordDateRange } = await import('@qgs/shared');
+      vi.mocked(buildInspectionRecordDateRange).mockReturnValueOnce({
+        end: new Date(2026, 6, 21),
+        start: new Date(2026, 6, 1),
+      });
+      (prisma.inspections.findMany as any).mockResolvedValue([]);
+      (prisma.inspections.count as any).mockResolvedValue(0);
+
+      await InspectionRecordQueryService.findAll({
+        endDate: '2026-07-20',
+        startDate: '2026-07-01',
+        year: 2025,
+      });
+
+      expect(prisma.inspections.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            inspectionDate: {
+              gte: new Date(2026, 6, 1),
+              lt: new Date(2026, 6, 21),
+            },
           }),
         }),
       );

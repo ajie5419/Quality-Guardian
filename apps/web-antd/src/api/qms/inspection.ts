@@ -144,14 +144,18 @@ export async function importInspectionIssues(
 // --- Inspection Records APIs ---
 
 export async function getInspectionRecords(params?: {
+  componentName?: string;
+  endDate?: string;
   hasDocuments?: boolean;
   inspector?: string;
   keyword?: string;
   level1Component?: string;
+  materialName?: string;
   page?: number;
   pageSize?: number;
   processName?: string;
   projectName?: string;
+  startDate?: string;
   supplierName?: string;
   team?: string;
   type?: string;
@@ -166,12 +170,16 @@ export async function getInspectionRecords(params?: {
 }
 
 export async function getInspectionRecordsExport(params?: {
+  componentName?: string;
+  endDate?: string;
   hasDocuments?: boolean;
   inspector?: string;
   keyword?: string;
   level1Component?: string;
+  materialName?: string;
   processName?: string;
   projectName?: string;
+  startDate?: string;
   supplierName?: string;
   team?: string;
   type?: string;

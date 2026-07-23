@@ -463,6 +463,10 @@
       "activity": "检验活动",
       "controlPoint": "控制点",
       "itpDataEntry": "ITP 实测数据录入",
+      "filters": {
+        "endDate": "结束日期",
+        "startDate": "开始日期"
+      },
       "tab": {
         "incoming": "进货检验",
         "process": "过程检验",
