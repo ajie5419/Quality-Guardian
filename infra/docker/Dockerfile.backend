@@ -70,6 +70,7 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
 RUN test -x /app/apps/backend/node_modules/.bin/tsx \
+    && test -f /app/apps/backend/scripts/backfill-role-page-permissions.ts \
     && test -f /app/apps/backend/scripts/backfill-supplier-score-snapshots.ts \
     && test -f /app/apps/backend/scripts/backfill-inspection-issue-divisions.ts \
     && test -f /app/apps/backend/scripts/backfill-inspection-issue-responsibilities.ts

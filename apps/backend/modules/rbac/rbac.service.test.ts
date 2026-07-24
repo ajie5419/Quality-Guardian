@@ -8,8 +8,8 @@ vi.mock('~/modules/rbac/rbac-config', () => ({
   isRbacSuperMergeAllCodesEnabled: () => true,
 }));
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
+vi.mock('~/utils/prisma', () => {
+  const client = {
     menus: {
       create: vi.fn(),
       findFirst: vi.fn(),
@@ -40,15 +40,32 @@ vi.mock('~/utils/prisma', () => ({
       findFirst: vi.fn(),
       update: vi.fn(),
     },
-    $transaction: vi.fn(async (ops: Promise<any>[]) => Promise.all(ops)),
-  },
-}));
+  };
+  return {
+    default: {
+      ...client,
+      $transaction: vi.fn((input: unknown) =>
+        typeof input === 'function'
+          ? input(client)
+          : Promise.all(input as Promise<unknown>[]),
+      ),
+    },
+  };
+});
 
 describe('rbacService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (prisma.menus.findFirst as any).mockResolvedValue(null);
     (prisma.menus.create as any).mockResolvedValue({ id: 'created-menu' });
+    (prisma.menus.findMany as any).mockResolvedValue(
+      ['A:List', 'B:List', 'QMS:Inspection:List'].map((authCode) => ({
+        authCode,
+        id: `menu-${authCode}`,
+        parentId: '0',
+        type: 'menu',
+      })),
+    );
   });
 
   it('should write role permissions only to v2 relations', async () => {

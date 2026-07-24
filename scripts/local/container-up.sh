@@ -24,6 +24,12 @@ container run --rm \
   "$BACKEND_IMAGE" \
   sh -lc "/app/apps/backend/node_modules/.bin/prisma migrate deploy --schema /app/apps/backend/prisma/schema.prisma"
 
+echo "Backfilling role page permissions..."
+container run --rm \
+  --env-file "$ENV_FILE" \
+  "$BACKEND_IMAGE" \
+  sh -lc "cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-role-page-permissions.ts --apply"
+
 echo "Bootstrapping canonical TEAM dictionaries..."
 container run --rm \
   --env-file "$ENV_FILE" \

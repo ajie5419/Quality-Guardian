@@ -19,6 +19,7 @@ interface Menu {
 }
 
 type RolePermissionTreeNode = {
+  checkable: boolean;
   children?: RolePermissionTreeNode[];
   key: string;
   menuId: string;
@@ -72,22 +73,11 @@ function menuParentId(menu: { parentId?: null | number | string }) {
     : String(menu.parentId);
 }
 
-function collectMenuAuthCodes(menu: Menu): string[] {
-  const codes: string[] = [];
-  if (menu.authCode) codes.push(menu.authCode);
-  if (menu.children) {
-    for (const child of menu.children) {
-      codes.push(...collectMenuAuthCodes(child));
-    }
-  }
-  return codes;
-}
-
 function hasMenuAccess(menu: Menu, userCodesSet: Set<string>) {
   const meta = parseMenuMeta(menu.meta);
   if (meta.publicAccess === true) return true;
-  if (!menu.authCode && menu.type !== 'menu') return true;
-  return collectMenuAuthCodes(menu).some((code) => userCodesSet.has(code));
+  if (!menu.authCode) return menu.type !== 'menu';
+  return userCodesSet.has(menu.authCode);
 }
 
 function filterMenus(
@@ -286,6 +276,7 @@ export const RbacMenuService = {
         .filter((menu) => menuParentId(menu) === String(parentId))
         .map((menu) => {
           const node: RolePermissionTreeNode = {
+            checkable: Boolean(menu.authCode),
             title: `${getTypeLabel(menu.type)} ${getTitle(menu.meta)}`,
             key: menu.authCode || `MENU_${String(menu.id)}`,
             menuId: String(menu.id),

@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { RolePermissionTreeNode } from './permission-tree';
+
 import type { VxeGridProps } from '#/adapter/vxe-table';
 import type { SystemRoleApi } from '#/api/system/role';
 
@@ -35,6 +37,11 @@ import {
 } from '#/api/system/role';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
+import {
+  addRequiredPagePermissions,
+  reconcileRolePermissionSelection,
+} from './permission-tree';
+
 const { t } = useI18n();
 const { hasAccessByCodes, hasAccessByRoles } = useAccess();
 const { handleApiError } = useErrorHandler();
@@ -70,7 +77,7 @@ const formState = reactive({
 });
 
 // All available permission codes organized as tree structure
-const allPermissions = ref<any[]>([]);
+const allPermissions = ref<RolePermissionTreeNode[]>([]);
 
 async function fetchPermissionTree() {
   try {
@@ -262,7 +269,10 @@ async function handlePermissions(row: SystemRoleApi.Role) {
   currentId.value = row.id;
   currentRoleName.value = row.name;
   // Load current permissions for this role
-  checkedKeys.value = row.permissions || [];
+  checkedKeys.value = addRequiredPagePermissions(
+    allPermissions.value,
+    row.permissions || [],
+  );
   selectedDataScopeModule.value = 'supplier';
   void Promise.all(
     (
@@ -276,6 +286,21 @@ async function handlePermissions(row: SystemRoleApi.Role) {
     ).map((module) => fetchRoleDataScope(row.id, module)),
   );
   isPermDrawerVisible.value = true;
+}
+
+function handlePermissionCheck(
+  value:
+    | (number | string)[]
+    | { checked: (number | string)[]; halfChecked: (number | string)[] },
+  info: { checked: boolean; node: { key: number | string } },
+) {
+  const keys = Array.isArray(value) ? value : value.checked;
+  checkedKeys.value = reconcileRolePermissionSelection({
+    changedKey: String(info.node.key),
+    checked: info.checked,
+    checkedKeys: keys.map(String),
+    tree: allPermissions.value,
+  });
 }
 
 async function handleSavePermissions() {
@@ -415,12 +440,14 @@ async function handleSubmit() {
         <span class="text-gray-500">勾选该角色可访问的功能权限：</span>
       </div>
       <Tree
-        v-model:checked-keys="checkedKeys"
+        :checked-keys="checkedKeys"
         v-model:expanded-keys="expandedKeys"
+        :check-strictly="true"
         :tree-data="allPermissions"
         checkable
         :selectable="false"
         :default-expand-all="true"
+        @check="handlePermissionCheck"
       />
       <div class="mt-6 border-t pt-4">
         <div class="mb-3 text-gray-500">数据权限（标准 RBAC 数据范围）</div>

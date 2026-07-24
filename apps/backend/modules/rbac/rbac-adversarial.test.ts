@@ -10,13 +10,12 @@ import {
   uniqueNonEmpty,
 } from './rbac-role.service';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    $transaction: vi.fn((ops: unknown[]) => Promise.all(ops)),
+vi.mock('~/utils/prisma', () => {
+  const client = {
     menus: {
       create: vi.fn(),
       findFirst: vi.fn(),
-      findMany: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
       update: vi.fn(),
     },
     rbac_permissions: {
@@ -47,8 +46,18 @@ vi.mock('~/utils/prisma', () => ({
       findFirst: vi.fn(),
       upsert: vi.fn(),
     },
-  },
-}));
+  };
+  return {
+    default: {
+      ...client,
+      $transaction: vi.fn((input: unknown) =>
+        typeof input === 'function'
+          ? input(client)
+          : Promise.all(input as Promise<unknown>[]),
+      ),
+    },
+  };
+});
 
 vi.mock('~/utils/redis', () => ({
   redis: { delByPattern: vi.fn(), get: vi.fn(), set: vi.fn() },
@@ -72,6 +81,26 @@ vi.mock('@paralleldrive/cuid2', () => ({
 }));
 
 const mockPrisma = vi.mocked(prisma) as any;
+
+beforeEach(() => {
+  mockPrisma.menus.findMany.mockResolvedValue(
+    [
+      'perm:a',
+      'perm:b',
+      'new:perm',
+      'a:x',
+      'b:y',
+      'qms:read',
+      ':edge',
+      'nocolon',
+    ].map((authCode) => ({
+      authCode,
+      id: `menu-${authCode}`,
+      parentId: '0',
+      type: 'menu',
+    })),
+  );
+});
 
 // ═══════════════════════════════════════════════
 // RBAC — Pure Helper Tests
@@ -298,11 +327,14 @@ describe('rbacRoleService.updateRole', () => {
     expect(mockPrisma.rbac_role_permissions.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('treats non-array permissions as empty', async () => {
-    await RbacRoleService.updateRole('role-1', {
-      permissions: null as unknown as string[],
-    });
-    expect(mockPrisma.rbac_role_permissions.deleteMany).toHaveBeenCalled();
+  it('rejects non-array permissions without clearing existing grants', async () => {
+    await expect(
+      RbacRoleService.updateRole('role-1', {
+        permissions: null,
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_ROLE_INPUT', httpStatus: 400 });
+    expect(mockPrisma.roles.update).not.toHaveBeenCalled();
+    expect(mockPrisma.rbac_role_permissions.deleteMany).not.toHaveBeenCalled();
   });
 });
 
@@ -2027,8 +2059,12 @@ describe('rbacRoleService.saveRolePermissions — deep adversarial', () => {
 
     await RbacRoleService.saveRolePermissions('r1', ['new:perm']);
 
-    const txCall = mockPrisma.$transaction.mock.calls[0][0];
-    expect(txCall).toHaveLength(2);
+    expect(mockPrisma.$transaction).toHaveBeenCalledOnce();
+    expect(
+      mockPrisma.rbac_role_permissions.deleteMany.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      mockPrisma.rbac_role_permissions.createMany.mock.invocationCallOrder[0],
+    );
   });
 
   it('uses skipDuplicates in createMany', async () => {
@@ -2199,11 +2235,12 @@ describe('rbacRoleService.updateRole — deep adversarial', () => {
     expect(mockPrisma.rbac_role_permissions.deleteMany).toHaveBeenCalled();
   });
 
-  it('calls saveRolePermissions when permissions is non-array', async () => {
-    await RbacRoleService.updateRole('r1', {
-      permissions: null as unknown as string[],
-    });
-    expect(mockPrisma.rbac_role_permissions.deleteMany).toHaveBeenCalled();
+  it('rejects non-array permissions before updating the role', async () => {
+    await expect(
+      RbacRoleService.updateRole('r1', { permissions: null }),
+    ).rejects.toMatchObject({ code: 'INVALID_ROLE_INPUT', httpStatus: 400 });
+    expect(mockPrisma.roles.update).not.toHaveBeenCalled();
+    expect(mockPrisma.rbac_role_permissions.deleteMany).not.toHaveBeenCalled();
   });
 
   it('only updates name field when only value is provided', async () => {

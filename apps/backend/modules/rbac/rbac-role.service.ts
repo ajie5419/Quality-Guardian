@@ -1,13 +1,41 @@
+import type { Prisma } from '@prisma/client';
+
 import { createId } from '@paralleldrive/cuid2';
+import { z } from 'zod';
 import {
   isRbacReadV2Enabled,
   isRbacSuperMergeAllCodesEnabled,
 } from '~/modules/rbac/rbac-config';
+import { findMissingPagePermissions } from '~/modules/rbac/rbac-permission-hierarchy';
+import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
 const INVISIBLE_PERMISSION_CHARS = /[\u200B-\u200D\uFEFF]/g;
 const SUPER_ROLE_KEYWORDS = ['super', 'admin'] as const;
+const roleInputFields = {
+  description: z.string().trim().max(191).optional(),
+  name: z.string().trim().min(1).max(191).optional(),
+  permissions: z.array(z.string().trim().min(1).max(191)).max(1000).optional(),
+  remark: z.string().trim().max(191).optional(),
+  status: z.number().int().min(0).max(1).optional(),
+  value: z.string().trim().min(1).max(191).optional(),
+};
+const createRoleInputSchema = z
+  .object(roleInputFields)
+  .refine((data) => Boolean(data.value || data.name), {
+    message: 'Role name or value is required',
+  });
+const updateRoleInputSchema = z
+  .object(roleInputFields)
+  .refine((data) => Object.keys(data).length > 0, {
+    message: 'At least one role field is required',
+  });
+
+type RolePermissionClient = Pick<
+  Prisma.TransactionClient,
+  'rbac_permissions' | 'rbac_role_permissions'
+>;
 
 export function uniqueNonEmpty(values: string[]) {
   return [
@@ -34,6 +62,117 @@ export function parseStringArrayJson(raw: null | string) {
 function isSuperRoleName(name: string) {
   const normalized = name.toLowerCase();
   return SUPER_ROLE_KEYWORDS.some((keyword) => normalized.includes(keyword));
+}
+
+async function validateRolePermissionCodes(codes: string[]) {
+  const uniqueCodes = uniqueNonEmpty(codes);
+  const placeholderCode = uniqueCodes.find((code) => code.startsWith('MENU_'));
+  if (placeholderCode) {
+    throw new BusinessError(
+      'INVALID_PERMISSION_CODE',
+      `Permission ${placeholderCode} is a menu placeholder and cannot be assigned`,
+      400,
+    );
+  }
+  if (uniqueCodes.length === 0) return uniqueCodes;
+
+  const menus = await prisma.menus.findMany({
+    where: { isDeleted: false, status: 1 },
+    select: {
+      authCode: true,
+      id: true,
+      parentId: true,
+      type: true,
+    },
+  });
+  const declaredCodes = new Set<string>();
+  for (const menu of menus) {
+    if (menu.authCode) declaredCodes.add(menu.authCode);
+  }
+  const unknownCode = uniqueCodes.find((code) => !declaredCodes.has(code));
+  if (unknownCode) {
+    throw new BusinessError(
+      'INVALID_PERMISSION_CODE',
+      `Permission ${unknownCode} is not declared by an active menu`,
+      400,
+    );
+  }
+  const firstMissingPermission = findMissingPagePermissions(
+    uniqueCodes,
+    menus,
+  )[0];
+  if (firstMissingPermission) {
+    throw new BusinessError(
+      'INVALID_PERMISSION_HIERARCHY',
+      `Permission ${firstMissingPermission.permission} requires page permission ${firstMissingPermission.pagePermission}`,
+      400,
+    );
+  }
+  return uniqueCodes;
+}
+
+function parseRoleInput<T>(schema: z.ZodType<T>, data: unknown): T {
+  const parsed = schema.safeParse(data);
+  if (!parsed.success) {
+    throw new BusinessError(
+      'INVALID_ROLE_INPUT',
+      parsed.error.issues[0]?.message || 'Invalid role payload',
+      400,
+    );
+  }
+  return parsed.data;
+}
+
+export function parseCreateRoleInput(input: unknown) {
+  return parseRoleInput(createRoleInputSchema, input);
+}
+
+export function parseUpdateRoleInput(input: unknown) {
+  return parseRoleInput(updateRoleInputSchema, input);
+}
+
+async function persistRolePermissions(
+  client: RolePermissionClient,
+  roleId: string,
+  uniqueCodes: string[],
+) {
+  const existingPermissions = await client.rbac_permissions.findMany({
+    where: { code: { in: uniqueCodes } },
+    select: { code: true, id: true },
+  });
+  const existingCodes = new Set(existingPermissions.map((row) => row.code));
+
+  const missingCodes = uniqueCodes.filter((code) => !existingCodes.has(code));
+  if (missingCodes.length > 0) {
+    await client.rbac_permissions.createMany({
+      data: missingCodes.map((code) => ({
+        id: `rbac-perm-${createId()}`,
+        code,
+        name: code,
+        module: code.split(':')[0] || 'QMS',
+        isDeleted: false,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  const allPermissions = await client.rbac_permissions.findMany({
+    where: { code: { in: uniqueCodes } },
+    select: { id: true },
+  });
+  const permissionIds = allPermissions.map((row) => row.id);
+
+  await client.rbac_role_permissions.deleteMany({ where: { roleId } });
+  if (permissionIds.length > 0) {
+    await client.rbac_role_permissions.createMany({
+      data: permissionIds.map((permissionId) => ({
+        id: `rbac-rp-${createId()}`,
+        roleId,
+        permissionId,
+      })),
+      skipDuplicates: true,
+    });
+  }
 }
 
 export const RbacRoleService = {
@@ -72,63 +211,55 @@ export const RbacRoleService = {
     };
   },
 
-  async createRole(data: {
-    description?: string;
-    name?: string;
-    permissions?: string[];
-    remark?: string;
-    status?: number;
-    value?: string;
-  }) {
-    const permissions = Array.isArray(data.permissions) ? data.permissions : [];
-    await redis.delByPattern('qms:menu:*');
-    const newRole = await prisma.roles.create({
-      data: {
-        id: `role-${createId()}`,
-        name: String(data.value || data.name || ''),
-        description: data.remark || data.description || data.name,
-        status: data.status ?? 1,
-        isSystem: false,
-        isDeleted: false,
-      },
+  async createRole(input: unknown) {
+    const data = parseCreateRoleInput(input);
+    const permissions = data.permissions ?? [];
+    const validatedPermissions = await validateRolePermissionCodes(permissions);
+    const newRole = await prisma.$transaction(async (tx) => {
+      const role = await tx.roles.create({
+        data: {
+          id: `role-${createId()}`,
+          name: String(data.value || data.name || ''),
+          description: data.remark || data.description || data.name,
+          status: data.status ?? 1,
+          isSystem: false,
+          isDeleted: false,
+        },
+      });
+      await persistRolePermissions(tx, role.id, validatedPermissions);
+      return role;
     });
-    await this.saveRolePermissions(newRole.id, permissions);
-    return { ...newRole, permissions };
+    await redis.delByPattern('qms:menu:*');
+    return { ...newRole, permissions: validatedPermissions };
   },
 
-  async updateRole(
-    id: string,
-    data: {
-      description?: string;
-      name?: string;
-      permissions?: string[];
-      remark?: string;
-      status?: number;
-      value?: string;
-    },
-  ) {
+  async updateRole(id: string, input: unknown) {
+    const data = parseUpdateRoleInput(input);
+    const validatedPermissions =
+      data.permissions === undefined
+        ? undefined
+        : await validateRolePermissionCodes(data.permissions);
     const updateData: Record<string, unknown> = {
       description: data.name || data.remark || data.description,
       updatedAt: new Date(),
     };
     if (data.value) updateData.name = data.value;
     if (data.status !== undefined) updateData.status = data.status;
+    await prisma.$transaction(async (tx) => {
+      const role = await tx.roles.update({ where: { id }, data: updateData });
+      if (validatedPermissions !== undefined) {
+        await persistRolePermissions(tx, role.id, validatedPermissions);
+      }
+    });
     await redis.delByPattern('qms:menu:*');
-    const role = await prisma.roles.update({ where: { id }, data: updateData });
-    if (data.permissions !== undefined) {
-      await this.saveRolePermissions(
-        role.id,
-        Array.isArray(data.permissions) ? data.permissions : [],
-      );
-    }
   },
 
   async softDeleteRole(id: string) {
-    await redis.delByPattern('qms:menu:*');
     await prisma.roles.update({
       where: { id },
       data: { isDeleted: true, updatedAt: new Date() },
     });
+    await redis.delByPattern('qms:menu:*');
   },
 
   async getUserRoles(userId: string) {
@@ -230,49 +361,10 @@ export const RbacRoleService = {
   },
 
   async saveRolePermissions(roleId: string, codes: string[]) {
-    const uniqueCodes = uniqueNonEmpty(codes);
-
-    const existingPermissions = await prisma.rbac_permissions.findMany({
-      where: { code: { in: uniqueCodes } },
-      select: { code: true, id: true },
-    });
-    const existingCodes = new Set(existingPermissions.map((row) => row.code));
-
-    const missingCodes = uniqueCodes.filter((code) => !existingCodes.has(code));
-    if (missingCodes.length > 0) {
-      await prisma.rbac_permissions.createMany({
-        data: missingCodes.map((code) => ({
-          id: `rbac-perm-${createId()}`,
-          code,
-          name: code,
-          module: code.split(':')[0] || 'QMS',
-          isDeleted: false,
-        })),
-        skipDuplicates: true,
-      });
-    }
-
-    const allPermissions = await prisma.rbac_permissions.findMany({
-      where: { code: { in: uniqueCodes } },
-      select: { id: true },
-    });
-    const permissionIds = allPermissions.map((row) => row.id);
-
-    await prisma.$transaction([
-      prisma.rbac_role_permissions.deleteMany({ where: { roleId } }),
-      ...(permissionIds.length > 0
-        ? [
-            prisma.rbac_role_permissions.createMany({
-              data: permissionIds.map((permissionId) => ({
-                id: `rbac-rp-${createId()}`,
-                roleId,
-                permissionId,
-              })),
-              skipDuplicates: true,
-            }),
-          ]
-        : []),
-    ]);
+    const uniqueCodes = await validateRolePermissionCodes(codes);
+    await prisma.$transaction((tx) =>
+      persistRolePermissions(tx, roleId, uniqueCodes),
+    );
   },
 
   async saveUserRoles(userId: string, roleIds: string[]) {

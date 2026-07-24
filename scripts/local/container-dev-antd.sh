@@ -43,6 +43,9 @@ if [[ "${CONTAINER_DEV_SEED:-false}" == "true" || "$USER_COUNT" == "0" ]]; then
   pnpm --dir apps/backend run db:seed
 fi
 
+echo "Backfilling role page permissions..."
+pnpm --dir apps/backend exec tsx scripts/backfill-role-page-permissions.ts --apply
+
 echo "Bootstrapping canonical TEAM dictionaries..."
 pnpm --dir apps/backend exec tsx scripts/bootstrap-team-dictionaries.ts --apply
 

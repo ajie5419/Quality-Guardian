@@ -25,6 +25,53 @@
 
 ## 执行记录
 
+### 2026-07-24 Fix: permission-aware initial route
+
+**Execution:**
+
+- Added a permission-aware initial route resolver that preserves valid redirects and otherwise selects the first visible, enabled, registered leaf menu.
+- Updated the access guard to apply the same fallback after dynamic route generation, when reopening the login page with an active session, and when an authenticated user revisits the unavailable default dashboard.
+- Added a core `/403` route for accounts with no accessible page instead of showing a misleading 404.
+- Kept the global default dashboard unchanged; restricted roles are redirected according to their own menu permissions.
+
+**Verification:**
+
+- `rtk vitest run --dom apps/web-antd/src/router/accessible-redirect.test.ts`: 1 file / 4 tests passed.
+- `pnpm --dir apps/web-antd typecheck`: passed.
+- `pnpm lint`, `pnpm run check:type` (3/3 workspace tasks), `pnpm run check:qms-arch`, and `git diff --check`: passed.
+- Browser verification with the restricted `ajie` account: opening `/` and `/qms/dashboard` both redirected to `/qms/inspection/issues`; the page displayed one permitted record with no 404, permission error, or console error.
+- Frontend dev/build/start/serve commands were not started or restarted, as required by repository constraints.
+
+**commit:** `086a27e` fix(@qgs/web-antd): redirect users to accessible home page
+
+**Remaining issues:**
+
+- None.
+
+### 2026-07-24 修复：统一页面与按钮权限层级
+
+**执行内容：**
+
+- 菜单可见性改为严格校验页面自身权限码，修复仅有按钮权限时页面可见、接口却因缺少 `QMS:Inspection:Issues:List` 拒绝访问的不一致。
+- 角色权限树改为页面与按钮独立选择；选择按钮时自动补所属页面，取消页面时同步移除后代按钮，并剔除目录占位码及已下线权限码。
+- 角色创建与更新增加 Zod 输入校验、启用菜单权限码校验和页面/按钮层级校验；角色基本信息与权限关系在同一 Prisma transaction 中提交，失败时整体回滚。
+- 新增通用、幂等的角色页面权限回填：应用模式先同步模块菜单，再按 200 个角色一批扫描全部启用页面/按钮关系，为所有存量 child-only 角色补齐页面权限并清理菜单缓存。
+- 回填入口已加入后端镜像存在性检查、GitHub 部署、OSS 部署及本地容器启动/重置流程；未在 Prisma migration 中写入业务数据。
+
+**验证结果：**
+
+- 后端全量测试：223/223 个文件、2110/2110 个用例通过；RBAC 定向测试：6 个文件、248/248 个用例通过。
+- 前端权限树测试：1 个文件、7/7 个用例通过；Shell 部署脚本语法检查通过。
+- `pnpm lint`、`pnpm run check:type`（3/3 workspace tasks）、`pnpm run check:qms-arch` 和 `git diff --check` 通过。
+- 本地未配置 `DATABASE_URL`，因此未连接真实数据库执行回填；回填逻辑通过分页、跨模块、dry-run、apply、幂等和无候选测试覆盖。
+- 前端未运行 dev/build/start/serve，遵循仓库约束。
+
+**commit:** `b0f6f73` fix(project): enforce page permission hierarchy
+
+**遗留问题：**
+
+- 无。
+
 ## [0.19.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.18.0...qgs-v0.19.0) (2026-07-23)
 
 

@@ -5,6 +5,9 @@ import { preferences } from '@vben/preferences';
 
 import { $t } from '#/locales';
 
+import { ACCESS_DENIED_PATH } from '../accessible-redirect';
+
+const AccessDeniedPage = () => import('#/views/_core/fallback/forbidden.vue');
 const BasicLayout = () => import('#/layouts/basic.vue');
 const AuthPageLayout = () => import('#/layouts/auth.vue');
 const MetrologyBorrowEntryPage = () =>
@@ -71,6 +74,17 @@ const coreRoutes: RouteRecordRaw[] = [
         },
       },
     ],
+  },
+  {
+    component: AccessDeniedPage,
+    meta: {
+      hideInBreadcrumb: true,
+      hideInMenu: true,
+      hideInTab: true,
+      title: '403',
+    },
+    name: 'AccessDenied',
+    path: ACCESS_DENIED_PATH,
   },
   {
     name: 'PublicMetrologyBorrowEntry',

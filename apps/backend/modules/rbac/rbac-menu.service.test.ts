@@ -93,6 +93,62 @@ describe('rbacMenuService', () => {
       expect(redis.set).toHaveBeenCalled();
     });
 
+    it('hides a page when the user only has one of its button permissions', async () => {
+      vi.mocked(prisma.menus.findMany).mockResolvedValue([
+        {
+          authCode: 'QMS:Inspection:Issues:List',
+          id: 'issues',
+          meta: JSON.stringify({ title: 'Inspection Issues' }),
+          name: 'QMSInspectionIssues',
+          parentId: '0',
+          type: 'menu',
+        },
+        {
+          authCode: 'QMS:Inspection:Issues:View',
+          id: 'issues-view',
+          meta: JSON.stringify({ title: 'View' }),
+          name: 'QMSInspectionIssuesView',
+          parentId: 'issues',
+          type: 'button',
+        },
+      ] as never);
+      vi.mocked(RbacRoleService.getUserPermissionCodes).mockResolvedValue([
+        'QMS:Inspection:Issues:View',
+      ]);
+      vi.mocked(RbacRoleService.getUserRoles).mockResolvedValue([
+        { name: 'operator' },
+      ] as never);
+
+      await RbacMenuService.getMenuTreeForUser({ id: 'u1' });
+
+      expect(useResponseSuccess).toHaveBeenCalledWith([]);
+    });
+
+    it('shows a page when the user has the page permission', async () => {
+      vi.mocked(prisma.menus.findMany).mockResolvedValue([
+        {
+          authCode: 'QMS:Inspection:Issues:List',
+          id: 'issues',
+          meta: JSON.stringify({ title: 'Inspection Issues' }),
+          name: 'QMSInspectionIssues',
+          parentId: '0',
+          type: 'menu',
+        },
+      ] as never);
+      vi.mocked(RbacRoleService.getUserPermissionCodes).mockResolvedValue([
+        'QMS:Inspection:Issues:List',
+      ]);
+      vi.mocked(RbacRoleService.getUserRoles).mockResolvedValue([
+        { name: 'operator' },
+      ] as never);
+
+      await RbacMenuService.getMenuTreeForUser({ id: 'u1' });
+
+      expect(useResponseSuccess).toHaveBeenCalledWith([
+        expect.objectContaining({ name: 'QMSInspectionIssues' }),
+      ]);
+    });
+
     it('should skip auth check for super user', async () => {
       (redis.get as any).mockResolvedValueOnce(null);
       (prisma.menus.findMany as any).mockResolvedValue([
@@ -449,8 +505,10 @@ describe('rbacMenuService', () => {
 
       expect(tree).toHaveLength(1);
       expect(tree[0].title).toContain('Root');
+      expect(tree[0].checkable).toBe(false);
       expect(tree[0].children).toHaveLength(1);
       expect(tree[0].children?.[0].key).toBe('QMS:Test:List');
+      expect(tree[0].children?.[0].checkable).toBe(true);
     });
 
     it('should use MENU_ prefix when authCode is null', async () => {

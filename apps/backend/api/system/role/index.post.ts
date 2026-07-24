@@ -1,7 +1,11 @@
 import { defineEventHandler, readBody } from 'h3';
-import { RbacService } from '~/modules/rbac/rbac.service';
+import { parseCreateRoleInput, RbacService } from '~/modules/rbac';
 import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
+import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaUniqueConflictError } from '~/utils/prisma-error';
 import {
@@ -19,10 +23,12 @@ export default defineEventHandler(async (event) => {
 
   try {
     return useResponseSuccess(
-      await RbacService.createRole(await readBody(event)),
+      await RbacService.createRole(parseCreateRoleInput(await readBody(event))),
     );
   } catch (error) {
     logApiError('role', error, undefined, event);
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) return businessErrorResponse(event, businessError);
     // Check for unique constraint violation
     if (isPrismaUniqueConflictError(error)) {
       return conflictResponse(event, '角色值已存在');
