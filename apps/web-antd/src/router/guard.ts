@@ -10,6 +10,11 @@ import { useAuthStore } from '#/store';
 import { normalizeHashRedirectPath } from '#/utils/router-redirect';
 
 import { generateAccess } from './access';
+import { resolveInitialAccessPath } from './accessible-redirect';
+
+function isRegisteredRoute(router: Router, path: string) {
+  return router.resolve(path).name !== 'FallbackNotFound';
+}
 
 /**
  * 通用守卫配置
@@ -55,18 +60,27 @@ function setupAccessGuard(router: Router) {
       return true;
     }
 
+    const isAuthenticatedLogin =
+      to.path === LOGIN_PATH && Boolean(accessStore.accessToken);
+
     // 基本路由，这些路由不需要进入权限拦截
-    if (coreRouteNames.includes(to.name as string)) {
-      if (to.path === LOGIN_PATH && accessStore.accessToken) {
-        return normalizeHashRedirectPath(
-          decodeURIComponent(
-            (to.query?.redirect as string) ||
-              userStore.userInfo?.homePath ||
-              preferences.app.defaultHomePath,
-          ),
-        );
-      }
+    if (coreRouteNames.includes(to.name as string) && !isAuthenticatedLogin) {
       return true;
+    }
+
+    if (isAuthenticatedLogin && accessStore.isAccessChecked) {
+      const preferredPath = normalizeHashRedirectPath(
+        decodeURIComponent(
+          (to.query?.redirect as string) ||
+            userStore.userInfo?.homePath ||
+            preferences.app.defaultHomePath,
+        ),
+      );
+      return resolveInitialAccessPath(
+        preferredPath,
+        accessStore.accessMenus,
+        (path) => isRegisteredRoute(router, path),
+      );
     }
 
     // accessToken 检查
@@ -94,6 +108,16 @@ function setupAccessGuard(router: Router) {
 
     // 是否已经生成过动态路由
     if (accessStore.isAccessChecked) {
+      if (
+        to.name === 'FallbackNotFound' &&
+        to.path === preferences.app.defaultHomePath
+      ) {
+        return resolveInitialAccessPath(
+          to.fullPath,
+          accessStore.accessMenus,
+          (path) => isRegisteredRoute(router, path),
+        );
+      }
       return true;
     }
 
@@ -114,13 +138,18 @@ function setupAccessGuard(router: Router) {
     accessStore.setAccessMenus(accessibleMenus);
     accessStore.setAccessRoutes(accessibleRoutes);
     accessStore.setIsAccessChecked(true);
-    const redirectPath = normalizeHashRedirectPath(
+    const preferredPath = normalizeHashRedirectPath(
       decodeURIComponent(
         (to.query.redirect ??
           (to.path === LOGIN_PATH
             ? userInfo.homePath || preferences.app.defaultHomePath
             : to.fullPath)) as string,
       ),
+    );
+    const redirectPath = resolveInitialAccessPath(
+      preferredPath,
+      accessibleMenus,
+      (path) => isRegisteredRoute(router, path),
     );
 
     return {
