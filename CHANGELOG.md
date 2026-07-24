@@ -25,6 +25,15 @@
 
 ## 执行记录
 
+## [0.19.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.19.0...qgs-v0.19.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* **@qgs/web-antd:** redirect users to accessible home page ([086a27e](https://github.com/ajie5419/Quality-Guardian/commit/086a27e7689895977be9193786560965bd9ed9b2))
+* **project:** enforce page permission hierarchy ([b0f6f73](https://github.com/ajie5419/Quality-Guardian/commit/b0f6f7374530eb3e1289b8dfc7c8627efa9b33ac))
+* **project:** restore role page access and login routing ([1b6a89d](https://github.com/ajie5419/Quality-Guardian/commit/1b6a89de92efa14c4d9a51c179799bce5aa2c80d))
+
 ### 2026-07-24 Fix: permission-aware initial route
 
 **Execution:**
