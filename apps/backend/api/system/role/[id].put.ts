@@ -1,7 +1,11 @@
 import { defineEventHandler, readBody } from 'h3';
-import { RbacService } from '~/modules/rbac/rbac.service';
+import { parseUpdateRoleInput, RbacService } from '~/modules/rbac';
 import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
+import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import {
   isPrismaNotFoundError,
@@ -23,15 +27,18 @@ export default defineEventHandler(async (event) => {
   }
 
   const id = getRequiredRouterParam(event, 'id', '缺少角色ID');
-  if (typeof id !== 'string') {
-    return id;
-  }
+  if (typeof id !== 'string') return id;
 
   try {
-    await RbacService.updateRole(id, await readBody(event));
+    await RbacService.updateRole(
+      id,
+      parseUpdateRoleInput(await readBody(event)),
+    );
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('role', error, undefined, event);
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) return businessErrorResponse(event, businessError);
     if (isPrismaUniqueConstraintError(error)) {
       return conflictResponse(event, '角色值已存在');
     }

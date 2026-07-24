@@ -203,6 +203,7 @@ run_backend() {
 
 PRISMA_CMD="/app/apps/backend/node_modules/.bin/prisma"
 PRISMA_SCHEMA="/app/apps/backend/prisma/schema.prisma"
+ROLE_PAGE_PERMISSION_BACKFILL_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-role-page-permissions.ts --apply"
 TEAM_DICTIONARY_BOOTSTRAP_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/bootstrap-team-dictionaries.ts --apply"
 INSPECTION_ISSUE_DIVISION_BACKFILL_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-inspection-issue-divisions.ts --apply"
 SUPPLIER_IDENTITY_BACKFILL_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-quality-record-supplier-identities.ts --apply"
@@ -212,6 +213,9 @@ docker compose -f "$compose_file" up -d redis
 
 echo "[remote] run database migrations"
 run_backend "$PRISMA_CMD migrate deploy --schema '$PRISMA_SCHEMA'"
+
+echo "[remote] backfill role page permissions"
+run_backend "$ROLE_PAGE_PERMISSION_BACKFILL_CMD"
 
 echo "[remote] bootstrap canonical TEAM dictionaries"
 run_backend "$TEAM_DICTIONARY_BOOTSTRAP_CMD"

@@ -3,8 +3,8 @@ import { RbacRoleService } from '~/modules/rbac/rbac-role.service';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
+vi.mock('~/utils/prisma', () => {
+  const client = {
     rbac_permissions: {
       createMany: vi.fn(),
       findMany: vi.fn(),
@@ -37,9 +37,18 @@ vi.mock('~/utils/prisma', () => ({
     menus: {
       findMany: vi.fn(),
     },
-    $transaction: vi.fn(async (ops: Promise<any>[]) => Promise.all(ops)),
-  },
-}));
+  };
+  return {
+    default: {
+      ...client,
+      $transaction: vi.fn((input: unknown) =>
+        typeof input === 'function'
+          ? input(client)
+          : Promise.all(input as Promise<unknown>[]),
+      ),
+    },
+  };
+});
 
 vi.mock('~/utils/redis', () => ({
   redis: {
@@ -59,6 +68,14 @@ vi.mock('@paralleldrive/cuid2', () => ({
 describe('rbacRoleService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.menus.findMany).mockResolvedValue([
+      {
+        authCode: 'QMS:Test:List',
+        id: 'qms-test-list',
+        parentId: 'qms',
+        type: 'menu',
+      },
+    ] as never);
   });
 
   describe('listRoles', () => {
@@ -149,6 +166,32 @@ describe('rbacRoleService', () => {
 
       expect(result.permissions).toEqual([]);
     });
+
+    it('does not create a role when the permission hierarchy is invalid', async () => {
+      vi.mocked(prisma.menus.findMany).mockResolvedValue([
+        {
+          authCode: 'QMS:Inspection:Issues:List',
+          id: 'issues',
+          parentId: 'inspection',
+          type: 'menu',
+        },
+        {
+          authCode: 'QMS:Inspection:Issues:Edit',
+          id: 'issues-edit',
+          parentId: 'issues',
+          type: 'button',
+        },
+      ] as never);
+
+      await expect(
+        RbacRoleService.createRole({
+          name: 'operator',
+          permissions: ['QMS:Inspection:Issues:Edit'],
+        }),
+      ).rejects.toMatchObject({ code: 'INVALID_PERMISSION_HIERARCHY' });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.roles.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('updateRole', () => {
@@ -175,6 +218,24 @@ describe('rbacRoleService', () => {
       });
 
       expect(prisma.roles.update).toHaveBeenCalled();
+    });
+
+    it('does not update a role when the permission code is undeclared', async () => {
+      await expect(
+        RbacRoleService.updateRole('r1', {
+          permissions: ['Unknown:Permission'],
+        }),
+      ).rejects.toMatchObject({ code: 'INVALID_PERMISSION_CODE' });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.roles.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects malformed permissions instead of clearing the role', async () => {
+      await expect(
+        RbacRoleService.updateRole('r1', { permissions: null }),
+      ).rejects.toMatchObject({ code: 'INVALID_ROLE_INPUT', httpStatus: 400 });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.rbac_role_permissions.deleteMany).not.toHaveBeenCalled();
     });
   });
 
@@ -352,6 +413,86 @@ describe('rbacRoleService', () => {
       ]);
 
       expect(prisma.rbac_role_permissions.deleteMany).toHaveBeenCalled();
+    });
+
+    it('rejects button permissions without the owning page permission', async () => {
+      vi.mocked(prisma.menus.findMany).mockResolvedValue([
+        {
+          authCode: 'QMS:Inspection:Issues:List',
+          id: 'issues',
+          parentId: 'inspection',
+          type: 'menu',
+        },
+        {
+          authCode: 'QMS:Inspection:Issues:Edit',
+          id: 'issues-edit',
+          parentId: 'issues',
+          type: 'button',
+        },
+      ] as never);
+
+      await expect(
+        RbacRoleService.saveRolePermissions('r1', [
+          'QMS:Inspection:Issues:Edit',
+        ]),
+      ).rejects.toMatchObject({
+        code: 'INVALID_PERMISSION_HIERARCHY',
+        httpStatus: 400,
+      });
+      expect(prisma.rbac_role_permissions.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects synthetic catalog placeholder permissions', async () => {
+      await expect(
+        RbacRoleService.saveRolePermissions('r1', ['MENU_catalog']),
+      ).rejects.toMatchObject({
+        code: 'INVALID_PERMISSION_CODE',
+        httpStatus: 400,
+      });
+      expect(prisma.menus.findMany).not.toHaveBeenCalled();
+      expect(prisma.rbac_role_permissions.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('saves independent page and button permissions without sibling grants', async () => {
+      vi.mocked(prisma.menus.findMany).mockResolvedValue([
+        {
+          authCode: 'QMS:Inspection:Issues:List',
+          id: 'issues',
+          parentId: 'inspection',
+          type: 'menu',
+        },
+        {
+          authCode: 'QMS:Inspection:Issues:View',
+          id: 'issues-view',
+          parentId: 'issues',
+          type: 'button',
+        },
+        {
+          authCode: 'QMS:Inspection:Issues:Edit',
+          id: 'issues-edit',
+          parentId: 'issues',
+          type: 'button',
+        },
+      ] as never);
+      vi.mocked(prisma.rbac_permissions.findMany)
+        .mockResolvedValueOnce([
+          { code: 'QMS:Inspection:Issues:List', id: 'list' },
+          { code: 'QMS:Inspection:Issues:View', id: 'view' },
+        ] as never)
+        .mockResolvedValueOnce([{ id: 'list' }, { id: 'view' }] as never);
+
+      await RbacRoleService.saveRolePermissions('r1', [
+        'QMS:Inspection:Issues:List',
+        'QMS:Inspection:Issues:View',
+      ]);
+
+      expect(prisma.rbac_role_permissions.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({ permissionId: 'list', roleId: 'r1' }),
+          expect.objectContaining({ permissionId: 'view', roleId: 'r1' }),
+        ],
+        skipDuplicates: true,
+      });
     });
   });
 
