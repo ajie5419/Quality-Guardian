@@ -2,8 +2,8 @@
 
 ## 当前状态
 
-- 最新变更: 已统一页面与按钮权限层级，修复不合格品项入口可见但缺少 `QMS:Inspection:Issues:List` 的权限不一致，并接入通用历史角色回填；生产当前仍为 `qgs-v0.17.6`
-- 测试状态: 本次后端 223/223 个文件、2110/2110 个用例通过；前端权限树 7/7 个用例通过；类型检查和 QMS 架构检查通过
+- 最新变更: Permission-aware initial routing now redirects restricted users from an unavailable default dashboard to their first accessible leaf page; accounts with no accessible page receive `/403` instead of 404. Production remains on `qgs-v0.17.6`.
+- 测试状态: Route fallback tests 4/4 passed; full lint, typecheck (3/3 workspace tasks), QMS architecture check, and browser verification with the restricted `ajie` account passed.
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
 - 模块 TS 文件数: 517（含测试）
@@ -34,6 +34,7 @@
 - [x] 小程序不合格品项模块（列表、详情、新增、编辑、照片、草稿、RBAC，复用电脑版数据与状态）
 - [x] 不合格品项所有权隔离（普通用户仅可查看及管理本人记录，具备对应权限码的管理员可查看、编辑及删除全部记录）
 - [x] 页面与按钮权限层级统一（菜单严格校验页面权限、角色授权层级校验、原子保存、通用存量回填与发布链路）
+- [x] Permission-aware login landing page fallback for restricted roles, including a dedicated no-access 403 route
 - [x] 报检不合格项事业部身份修复（部门 canonical 双写、事务内检验关联、历史回填、unresolved 审计与发布链路）
 - [x] 报检不合格项责任归属修复（显式责任类型、部门/供应商 canonical 双写、历史回填、冲突审计与发布链路）
 - [x] 不合格项列表增加报告日期范围搜索（列表、查询全部和导出参数一致，结束日完整包含）

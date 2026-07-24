@@ -25,6 +25,29 @@
 
 ## 执行记录
 
+### 2026-07-24 Fix: permission-aware initial route
+
+**Execution:**
+
+- Added a permission-aware initial route resolver that preserves valid redirects and otherwise selects the first visible, enabled, registered leaf menu.
+- Updated the access guard to apply the same fallback after dynamic route generation, when reopening the login page with an active session, and when an authenticated user revisits the unavailable default dashboard.
+- Added a core `/403` route for accounts with no accessible page instead of showing a misleading 404.
+- Kept the global default dashboard unchanged; restricted roles are redirected according to their own menu permissions.
+
+**Verification:**
+
+- `rtk vitest run --dom apps/web-antd/src/router/accessible-redirect.test.ts`: 1 file / 4 tests passed.
+- `pnpm --dir apps/web-antd typecheck`: passed.
+- `pnpm lint`, `pnpm run check:type` (3/3 workspace tasks), `pnpm run check:qms-arch`, and `git diff --check`: passed.
+- Browser verification with the restricted `ajie` account: opening `/` and `/qms/dashboard` both redirected to `/qms/inspection/issues`; the page displayed one permitted record with no 404, permission error, or console error.
+- Frontend dev/build/start/serve commands were not started or restarted, as required by repository constraints.
+
+**commit:** `086a27e` fix(@qgs/web-antd): redirect users to accessible home page
+
+**Remaining issues:**
+
+- None.
+
 ### 2026-07-24 修复：统一页面与按钮权限层级
 
 **执行内容：**
