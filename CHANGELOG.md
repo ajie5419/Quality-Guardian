@@ -65,6 +65,25 @@
 
 - ID-based dashboard aggregation and architecture regression guards are committed in subsequent phases below.
 
+### 2026-07-27 Phase 2.1: preserve mapped TEAM category during backfill
+
+**Execution:**
+
+- Corrected inspection-request category reconciliation so a canonical `teamId` identifies the process domain even when the TEAM also resolves to a `supplierId`.
+- Kept the legacy process-name comparison confined to rows without either canonical identity ID and resolved any obsolete conflict audit after a successful category update.
+- Added release-maintenance regression coverage for supplier-linked TEAM requests and removed the obsolete conflict counter from its result.
+
+**Verification:**
+
+- Category backfill and inspection statistics tests: 26/26 passed.
+- Backend and frontend TypeScript checks passed.
+
+**commit:** `fix(deploy): preserve mapped TEAM request categories`
+
+**Remaining issues:**
+
+- ID-based dashboard aggregation and architecture regression guards are committed in subsequent phases below.
+
 ## [0.19.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.19.0...qgs-v0.19.1) (2026-07-24)
 
 

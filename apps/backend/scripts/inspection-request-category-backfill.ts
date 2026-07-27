@@ -10,8 +10,8 @@ export interface InspectionRequestCategoryBackfillOptions {
 }
 
 interface CategoryCandidate {
-  category: 'INCOMING' | 'PROCESS' | null;
-  reason: null | string;
+  category: 'INCOMING' | 'PROCESS';
+  reason: null;
 }
 
 interface CategoryRow {
@@ -48,11 +48,10 @@ export function parseInspectionRequestCategoryBackfillOptions(args: string[]) {
 export function resolveInspectionRequestCategory(
   row: CategoryRow,
 ): CategoryCandidate {
-  if (row.supplierId && row.teamId) {
-    return { category: null, reason: AUDIT_REASON };
-  }
-  if (row.supplierId) return { category: 'INCOMING', reason: null };
+  // A process request may also carry the supplier linked to its TEAM, so TEAM
+  // identity is the stronger category signal when both canonical IDs exist.
   if (row.teamId) return { category: 'PROCESS', reason: null };
+  if (row.supplierId) return { category: 'INCOMING', reason: null };
 
   // This exact-name fallback is restricted to the one-time legacy adapter.
   // Online writes and statistics use the persisted category exclusively.
@@ -84,49 +83,11 @@ async function resolveCategoryAudits(entityIds: string[]) {
   });
 }
 
-async function persistConflictAudit(row: CategoryRow) {
-  await prisma.unresolved_master_data_refs.upsert({
-    where: {
-      entityType_entityId_fieldName: {
-        entityId: row.id,
-        entityType: AUDIT_TYPE,
-        fieldName: AUDIT_FIELD,
-      },
-    },
-    create: {
-      entityId: row.id,
-      entityType: AUDIT_TYPE,
-      evidence: { supplierId: row.supplierId, teamId: row.teamId },
-      fieldName: AUDIT_FIELD,
-      rawId: `supplier:${row.supplierId};team:${row.teamId}`,
-      rawName: row.processName,
-      reason: AUDIT_REASON,
-    },
-    update: {
-      evidence: { supplierId: row.supplierId, teamId: row.teamId },
-      isDeleted: false,
-      rawId: `supplier:${row.supplierId};team:${row.teamId}`,
-      rawName: row.processName,
-      reason: AUDIT_REASON,
-      resolutionNote: null,
-      resolvedAt: null,
-      resolvedId: null,
-      status: 'OPEN',
-    },
-  });
-}
-
 async function applyBatch(rows: CategoryRow[]) {
   const resolvedIds: string[] = [];
-  let conflicts = 0;
   let updated = 0;
   for (const row of rows) {
     const candidate = resolveInspectionRequestCategory(row);
-    if (!candidate.category) {
-      conflicts += 1;
-      await persistConflictAudit(row);
-      continue;
-    }
     const result = await prisma.qms_inspection_requests.updateMany({
       where: { category: null, id: row.id, isDeleted: false },
       data: { category: candidate.category },
@@ -135,7 +96,7 @@ async function applyBatch(rows: CategoryRow[]) {
     if (result.count === 1) resolvedIds.push(row.id);
   }
   await resolveCategoryAudits(resolvedIds);
-  return { conflicts, updated };
+  return updated;
 }
 
 export async function backfillInspectionRequestCategories(
@@ -144,7 +105,6 @@ export async function backfillInspectionRequestCategories(
   let cursor = '';
   let scanned = 0;
   let updated = 0;
-  let conflicts = 0;
   while (true) {
     const rows = await prisma.qms_inspection_requests.findMany({
       where: {
@@ -165,16 +125,10 @@ export async function backfillInspectionRequestCategories(
     scanned += rows.length;
     cursor = rows[rows.length - 1]?.id || cursor;
     if (options.mode === 'apply') {
-      const result = await applyBatch(rows);
-      conflicts += result.conflicts;
-      updated += result.updated;
-    } else {
-      conflicts += rows.filter(
-        (row) => !resolveInspectionRequestCategory(row).category,
-      ).length;
+      updated += await applyBatch(rows);
     }
   }
-  const summary = { conflicts, mode: options.mode, scanned, updated };
+  const summary = { mode: options.mode, scanned, updated };
   logger.info(summary, 'inspection request category backfill finished');
   return summary;
 }

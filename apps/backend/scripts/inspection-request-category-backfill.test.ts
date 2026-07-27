@@ -58,7 +58,7 @@ describe('inspection request category backfill', () => {
     ).toEqual({ category: 'INCOMING', reason: null });
   });
 
-  it('leaves conflicting identity domains unresolved', () => {
+  it('classifies a supplier-linked TEAM request as process', () => {
     expect(
       resolveInspectionRequestCategory({
         id: 'request-1',
@@ -66,10 +66,7 @@ describe('inspection request category backfill', () => {
         supplierId: 'supplier-1',
         teamId: 'team-1',
       }),
-    ).toEqual({
-      category: null,
-      reason: 'conflicting_inspection_request_identity_domains',
-    });
+    ).toEqual({ category: 'PROCESS', reason: null });
   });
 
   it('parses bounded execution options', () => {
@@ -90,7 +87,7 @@ describe('inspection request category backfill', () => {
         {
           id: 'request-1',
           processName: 'Process inspection',
-          supplierId: null,
+          supplierId: 'supplier-1',
           teamId: 'team-1',
         },
       ] as never)
@@ -99,7 +96,6 @@ describe('inspection request category backfill', () => {
     await expect(
       backfillInspectionRequestCategories({ batchSize: 100, mode: 'dry-run' }),
     ).resolves.toEqual({
-      conflicts: 0,
       mode: 'dry-run',
       scanned: 1,
       updated: 0,
@@ -131,5 +127,9 @@ describe('inspection request category backfill', () => {
       backfillInspectionRequestCategories({ batchSize: 100, mode: 'apply' }),
     ).resolves.toMatchObject({ scanned: 0, updated: 0 });
     expect(prisma.qms_inspection_requests.updateMany).toHaveBeenCalledTimes(1);
+    expect(prisma.qms_inspection_requests.updateMany).toHaveBeenCalledWith({
+      data: { category: 'PROCESS' },
+      where: { category: null, id: 'request-1', isDeleted: false },
+    });
   });
 });
