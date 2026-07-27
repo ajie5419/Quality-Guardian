@@ -158,13 +158,9 @@ jobs:
 
             PRISMA_CMD="/app/apps/backend/node_modules/.bin/prisma"
             PRISMA_SCHEMA="/app/apps/backend/prisma/schema.prisma"
-            ROLE_PAGE_PERMISSION_BACKFILL_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-role-page-permissions.ts --apply"
-            TEAM_DICTIONARY_BOOTSTRAP_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/bootstrap-team-dictionaries.ts --apply"
-            INSPECTION_ISSUE_DIVISION_BACKFILL_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-inspection-issue-divisions.ts --apply"
-            INSPECTION_ISSUE_RESPONSIBILITY_BACKFILL_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-inspection-issue-responsibilities.ts --apply"
+            RELEASE_MAINTENANCE_CMD="cd /app/apps/backend && sh scripts/run-release-maintenance.sh"
             SUPPLIER_SCORE_BACKFILL_CMD="cd /app/apps/backend && SUPPLIER_SCORE_BACKFILL_MODE=missing /app/apps/backend/node_modules/.bin/tsx scripts/backfill-supplier-score-snapshots.ts"
             SUPPLIER_SCORE_BACKFILL_CONTAINER="qms-supplier-score-backfill"
-            SUPPLIER_IDENTITY_BACKFILL_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-quality-record-supplier-identities.ts --apply"
             QUALITY_LOSS_BACKFILL_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-quality-loss-index.ts"
             QUALITY_LOSS_BACKFILL_CONTAINER="qms-quality-loss-backfill"
 
@@ -182,12 +178,9 @@ jobs:
 
             run_with_timeout 300 docker compose -f "$COMPOSE_FILE" pull backend frontend
             run_with_timeout 120 docker compose -f "$COMPOSE_FILE" up -d redis
+            run_with_timeout 120 docker compose -f "$COMPOSE_FILE" stop backend || true
             deploy_prisma_migrations
-            run_backend 300 "$ROLE_PAGE_PERMISSION_BACKFILL_CMD"
-            run_backend 300 "$TEAM_DICTIONARY_BOOTSTRAP_CMD"
-            run_backend 300 "$INSPECTION_ISSUE_DIVISION_BACKFILL_CMD"
-            run_backend 300 "$SUPPLIER_IDENTITY_BACKFILL_CMD"
-            run_backend 300 "$INSPECTION_ISSUE_RESPONSIBILITY_BACKFILL_CMD"
+            run_backend 600 "$RELEASE_MAINTENANCE_CMD"
             run_with_timeout 180 docker compose -f "$COMPOSE_FILE" up -d backend frontend
 
             ok=0

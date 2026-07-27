@@ -45,6 +45,26 @@
 
 - Source reconciliation, ordered release maintenance, and ID-based dashboard statistics are committed in subsequent phases below.
 
+### 2026-07-27 Phase 2: replace name bootstrap with source reconciliation
+
+**Execution:**
+
+- Removed the legacy name-based TEAM bootstrap and replaced it with stable department/supplier source links plus persistent ambiguity audits.
+- Near-name matches are discovery signals only; they never trigger an automatic merge. Confirmed merges require explicit source and target IDs through the maintenance-only CLI.
+- Added one ordered release-maintenance runner shared by GitHub, OSS, and local container workflows; production deployment stops backend writes before migration and identity maintenance.
+- Added an idempotent inspection-request category backfill after supplier identity backfill, with conflicts persisted for manual resolution.
+
+**Verification:**
+
+- Reconciliation and category-backfill tests: 16/16 passed.
+- Backend TypeScript check and all deployment shell syntax checks passed.
+
+**commit:** `fix(deploy): reconcile TEAM identities during maintenance`
+
+**Remaining issues:**
+
+- ID-based dashboard aggregation and architecture regression guards are committed in subsequent phases below.
+
 ## [0.19.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.19.0...qgs-v0.19.1) (2026-07-24)
 
 
