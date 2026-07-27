@@ -182,6 +182,24 @@ export const SupplierIdentityService = {
     return supplier;
   },
 
+  async resolveNamesByIds(
+    supplierIds: ReadonlyArray<null | string | undefined>,
+  ) {
+    const ids = [
+      ...new Set(
+        supplierIds
+          .map((supplierId) => normalizeId(supplierId))
+          .filter(Boolean),
+      ),
+    ];
+    if (ids.length === 0) return new Map<string, string>();
+    const suppliers = await prisma.suppliers.findMany({
+      select: { id: true, name: true },
+      where: { id: { in: ids }, isDeleted: false },
+    });
+    return new Map(suppliers.map((supplier) => [supplier.id, supplier.name]));
+  },
+
   async resolveSupplierByTeamId(teamId: null | string | undefined) {
     const id = normalizeId(teamId);
     if (!id) return null;

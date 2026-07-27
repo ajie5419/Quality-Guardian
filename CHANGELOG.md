@@ -25,6 +25,26 @@
 
 ## 执行记录
 
+### 2026-07-27 Phase 1: establish canonical TEAM identity ownership
+
+**Execution:**
+
+- Added the dedicated TEAM domain, system-admin CRUD, normalized collision keys, source links, aliases, and atomic maintenance-only merge support.
+- Blocked TEAM mutations through the generic dictionary service and made generic TEAM reads bypass the 24-hour dictionary cache.
+- Added DDL-only Prisma migrations for TEAM identity governance and the nullable inspection-request category foundation.
+
+**Verification:**
+
+- Prisma format, validate, and client generation passed.
+- Backend TypeScript check passed.
+- TEAM merge/reconciliation tests: 18/18 passed; dictionary tests: 21/21 passed.
+
+**commit:** `feat(@qgs/backend): establish canonical TEAM identities`
+
+**Remaining issues:**
+
+- Source reconciliation, ordered release maintenance, and ID-based dashboard statistics are committed in subsequent phases below.
+
 ## [0.19.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.19.0...qgs-v0.19.1) (2026-07-24)
 
 

@@ -28,6 +28,7 @@ import { supplierModule } from '~/modules/supplier/supplier.module';
 import { systemLogModule } from '~/modules/system-log/system-log.module';
 import { systemModule } from '~/modules/system/system.module';
 import { taskDispatchModule } from '~/modules/task-dispatch/task-dispatch.module';
+import { teamModule } from '~/modules/team/team.module';
 import { userModule } from '~/modules/user/user.module';
 import { vehicleCommissioningModule } from '~/modules/vehicle-commissioning/vehicle-commissioning.module';
 import { welderModule } from '~/modules/welder/welder.module';
@@ -57,6 +58,7 @@ const MODULE_DECLARATIONS: ModuleDeclaration[] = [
   systemModule,
   systemLogModule,
   taskDispatchModule,
+  teamModule,
   userModule,
   vehicleCommissioningModule,
   welderModule,

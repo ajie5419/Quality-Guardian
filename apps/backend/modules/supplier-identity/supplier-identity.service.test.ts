@@ -19,7 +19,7 @@ vi.mock('~/utils/prisma', () => ({
       update: vi.fn(),
       upsert: vi.fn(),
     },
-    suppliers: { findFirst: vi.fn() },
+    suppliers: { findFirst: vi.fn(), findMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -88,6 +88,34 @@ describe('supplier identity service', () => {
         }),
       }),
     );
+  });
+
+  it('resolves canonical supplier names by unique IDs in one query', async () => {
+    vi.mocked(prisma.suppliers.findMany).mockResolvedValue([
+      { id: 'supplier-1', name: 'Supplier A' },
+      { id: 'supplier-2', name: 'Supplier B' },
+    ] as never);
+
+    await expect(
+      SupplierIdentityService.resolveNamesByIds([
+        'supplier-1',
+        'supplier-1',
+        'supplier-2',
+        null,
+      ]),
+    ).resolves.toEqual(
+      new Map([
+        ['supplier-1', 'Supplier A'],
+        ['supplier-2', 'Supplier B'],
+      ]),
+    );
+    expect(prisma.suppliers.findMany).toHaveBeenCalledWith({
+      select: { id: true, name: true },
+      where: {
+        id: { in: ['supplier-1', 'supplier-2'] },
+        isDeleted: false,
+      },
+    });
   });
 
   it('rejects retiring a TEAM while an active supplier link exists', async () => {
