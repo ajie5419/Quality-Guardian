@@ -44,6 +44,17 @@ const LEGACY_IDENTITY_IMPORT_ALLOWLIST = new Set([
   'apps/backend/modules/work-order/work-order-import-governance.ts',
   'apps/backend/utils/governed-write.ts',
 ]);
+const INSPECTION_REQUEST_STATS_FILE =
+  'apps/backend/modules/inspection/inspection-request-stats.service.ts';
+const INSPECTION_STATS_NAME_FIELDS = new Set([
+  'processName',
+  'supplierName',
+  'team',
+]);
+const DICTIONARY_SERVICE_FILE =
+  'apps/backend/modules/dictionary/dictionary.service.ts';
+const GUARDED_DICTIONARY_MUTATIONS = new Set(['create', 'delete', 'update']);
+const TEAM_MUTATION_GUARD = 'ensureGenericMutationAllowed';
 
 function parseArguments(argv) {
   const options = {
@@ -268,6 +279,34 @@ function isDateNowCall(node) {
     node.expression.expression.text === 'Date' &&
     node.expression.name.text === 'now'
   );
+}
+
+function getElementAccessName(node) {
+  if (
+    !ts.isElementAccessExpression(node) ||
+    !ts.isStringLiteral(node.argumentExpression)
+  ) {
+    return '';
+  }
+  return node.argumentExpression.text;
+}
+
+function containsNamedCall(node, functionName) {
+  let found = false;
+  function visit(current) {
+    if (found) return;
+    if (
+      ts.isCallExpression(current) &&
+      ts.isIdentifier(current.expression) &&
+      current.expression.text === functionName
+    ) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(current, visit);
+  }
+  visit(node);
+  return found;
 }
 
 function isIdGenerationTarget(node) {
@@ -675,6 +714,50 @@ function analyzeIdentityFile(rootDir, filePath) {
     }
   }
 
+  function inspectInspectionStatsIdentityRead(node) {
+    if (repoPath !== INSPECTION_REQUEST_STATS_FILE) return;
+    const fieldName = ts.isPropertyAccessExpression(node)
+      ? node.name.text
+      : getElementAccessName(node);
+    if (!INSPECTION_STATS_NAME_FIELDS.has(fieldName)) return;
+    addFinding(
+      'B-ID6',
+      node,
+      `Inspection request statistics must aggregate by canonical IDs instead of ${fieldName} snapshots.`,
+      `inspection-stats-name-read-${fieldName}`,
+    );
+  }
+
+  function inspectDictionaryMutationGuard(node) {
+    if (
+      repoPath !== DICTIONARY_SERVICE_FILE ||
+      !ts.isVariableDeclaration(node) ||
+      !ts.isIdentifier(node.name) ||
+      node.name.text !== 'DictionaryService' ||
+      !node.initializer ||
+      !ts.isObjectLiteralExpression(node.initializer)
+    ) {
+      return;
+    }
+    for (const member of node.initializer.properties) {
+      if (!ts.isMethodDeclaration(member)) continue;
+      const methodName = getPropertyNameText(member.name);
+      if (
+        !GUARDED_DICTIONARY_MUTATIONS.has(methodName) ||
+        !member.body ||
+        containsNamedCall(member.body, TEAM_MUTATION_GUARD)
+      ) {
+        continue;
+      }
+      addFinding(
+        'B-ID7',
+        member,
+        `DictionaryService.${methodName} must call ${TEAM_MUTATION_GUARD} before writing.`,
+        `dictionary-${methodName}-without-team-guard`,
+      );
+    }
+  }
+
   function visit(node) {
     if (
       ts.isStringLiteral(node) &&
@@ -706,6 +789,8 @@ function analyzeIdentityFile(rootDir, filePath) {
     inspectChangedEvent(node);
     inspectControlledSupplierWrite(node);
     inspectNameBasedScoringIdentity(node);
+    inspectInspectionStatsIdentityRead(node);
+    inspectDictionaryMutationGuard(node);
     ts.forEachChild(node, visit);
   }
 

@@ -60,6 +60,8 @@ Rules:
   B-ID3: controlled supplier writes must pair supplierName with supplierId
   B-ID4: supplier scoring queries and mappings must use canonical IDs
   B-ID5: legacy name-to-ID resolution is restricted to reviewed import adapters
+  B-ID6: inspection request statistics must aggregate identities by canonical IDs
+  B-ID7: TEAM writes must use the dedicated identity service; legacy bootstrap is forbidden
   B-SEC1: raw SQL must not combine $queryRawUnsafe with template strings
   B-MAP1: new module/route/view directories must update code_map.md (changed mode only)
   B-TEST1: backend tests must not live in centralized __tests__/tests/test directories
@@ -447,6 +449,19 @@ check_b_sec1() {
   grep_rule "B-SEC1" "Do not combine queryRawUnsafe with template strings." '\$queryRawUnsafe.*`' "${REPO_TS_TARGETS[@]}"
 }
 
+check_b_id7() {
+  local file=''
+  local seen='|'
+  for file in \
+    "$BACKEND_DIR"/scripts/*team*bootstrap*.ts \
+    "$BACKEND_DIR"/scripts/*bootstrap*team*.ts; do
+    [[ -f "$file" ]] || continue
+    [[ "$seen" == *"|$file|"* ]] && continue
+    seen="${seen}${file}|"
+    report_violation "B-ID7" "$(to_repo_path "$file"):1" "Legacy TEAM bootstrap must not be restored; use TEAM identity reconciliation."
+  done
+}
+
 # B-MAP1: new business module / top-level route / view directories require code_map.md update.
 # Only meaningful in --changed mode (need a base ref to compare directory listings).
 check_b_map1() {
@@ -556,6 +571,7 @@ check_b_s3
 check_b_s5
 check_backend_source_rules
 check_b_sec1
+check_b_id7
 check_b_map1
 check_b_test1
 check_b_test2

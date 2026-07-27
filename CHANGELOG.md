@@ -106,6 +106,26 @@
 
 - Architecture regression guards and identity-governance documentation are committed in subsequent phases below.
 
+### 2026-07-27 Phase 4: guard canonical TEAM identity contracts
+
+**Execution:**
+
+- Added AST-backed checks that reject reads of `team`, `supplierName`, or `processName` as identity inputs in inspection-request statistics.
+- Required every generic dictionary create, update, and delete entry point to invoke the TEAM mutation guard.
+- Rejected any TEAM/bootstrap script naming pattern instead of relying on two historical file names, preventing the deleted name-based bootstrap from returning under a trivial rename.
+
+**Verification:**
+
+- Architecture rule tests: 7/7 passed.
+- Changed-scope QMS architecture check passed with 0 new violations.
+- Shell syntax check passed on macOS-compatible Bash syntax.
+
+**commit:** `chore(project): guard master data identity contracts`
+
+**Remaining issues:**
+
+- Identity-governance documentation is committed in the next phase.
+
 ## [0.19.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.19.0...qgs-v0.19.1) (2026-07-24)
 
 

@@ -309,4 +309,86 @@ tx.inspections.upsert({
       rmSync(rootDir, { force: true, recursive: true });
     }
   });
+
+  it('blocks name-based inspection statistics and unguarded TEAM mutations', () => {
+    const rootDir = createFixture({
+      'apps/backend/modules/dictionary/dictionary.service.ts': `
+function ensureGenericMutationAllowed(dictType: string) {
+  void dictType;
+}
+
+export const DictionaryService = {
+  async create(data: { dictType: string }) {
+    ensureGenericMutationAllowed(data.dictType);
+  },
+  async delete() {},
+  async update() {},
+};
+`,
+      'apps/backend/modules/inspection/inspection-request-stats.service.ts': `
+export function collectStats(items: Array<{ supplierName: string; team: string }>) {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    counts.set(item.team, (counts.get(item.supplierName) || 0) + 1);
+    counts.set(item.processName, 1);
+  }
+  return counts;
+}
+`,
+      'apps/backend/scripts/legacy-team-bootstrap.ts': `
+export function bootstrapTeams() {}
+`,
+    });
+
+    try {
+      const result = runCheck(rootDir);
+      expect(result.status).toBe(1);
+      expect(result.output).toContain('[B-ID6]');
+      expect(result.output).toContain('[B-ID7]');
+      expect(result.output).toContain('DictionaryService.delete');
+      expect(result.output).toContain('DictionaryService.update');
+      expect(result.output).toContain('legacy-team-bootstrap.ts');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
+
+  it('allows ID-based inspection statistics and guarded dictionary mutations', () => {
+    const rootDir = createFixture({
+      'apps/backend/modules/dictionary/dictionary.service.ts': `
+function ensureGenericMutationAllowed(dictType: string) {
+  void dictType;
+}
+
+export const DictionaryService = {
+  async create(data: { dictType: string }) {
+    ensureGenericMutationAllowed(data.dictType);
+  },
+  async delete(existing: { dictType: string }) {
+    ensureGenericMutationAllowed(existing.dictType);
+  },
+  async update(existing: { dictType: string }) {
+    ensureGenericMutationAllowed(existing.dictType);
+  },
+};
+`,
+      'apps/backend/modules/inspection/inspection-request-stats.service.ts': `
+export function collectStats(items: Array<{ supplierId: string; teamId: string }>) {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    counts.set(item.teamId, (counts.get(item.supplierId) || 0) + 1);
+  }
+  return counts;
+}
+`,
+    });
+
+    try {
+      const result = runCheck(rootDir);
+      expect(result.status).toBe(0);
+      expect(result.output).toContain('QMS architecture check passed.');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
 });
