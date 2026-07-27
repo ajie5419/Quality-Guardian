@@ -1,5 +1,21 @@
-import { INCOMING_INSPECTION_PROCESS_NAME } from '~/modules/inspection/inspection-request';
+import type { ReinspectionCounts } from './inspection-request-stats-identity';
+
+import { SupplierIdentityService } from '~/modules/supplier-identity';
+import { TeamIdentityService } from '~/modules/team';
 import prisma from '~/utils/prisma';
+
+import {
+  collectIdentityIds,
+  createIdentityCountRows,
+  createInspectorHistoryRows,
+  createReinspectionRows,
+  isIncomingInspectionRequest,
+  normalizeIdentityId,
+  UNRESOLVED_IDENTITY_KEY,
+  UNRESOLVED_INSPECTOR_NAME,
+  UNRESOLVED_SUPPLIER_NAME,
+  UNRESOLVED_TEAM_NAME,
+} from './inspection-request-stats-identity';
 
 const INSPECTION_EXECUTION_CODES = new Set(['QMS:Inspection:Requests:Close']);
 
@@ -97,8 +113,19 @@ export const InspectionRequestStatsService = {
       activeUsers,
     ] = await Promise.all([
       prisma.qms_inspection_requests.findMany({
-        include: {
+        select: {
+          category: true,
+          closedAt: true,
+          dispatchedAt: true,
+          inspectionResult: true,
           inspector: { select: { id: true, realName: true, username: true } },
+          inspectorId: true,
+          linkedIssueId: true,
+          linkedIssueNo: true,
+          status: true,
+          submittedAt: true,
+          supplierId: true,
+          teamId: true,
         },
         where: {
           OR: [
@@ -109,8 +136,11 @@ export const InspectionRequestStatsService = {
         },
       }),
       prisma.qms_inspection_requests.findMany({
-        include: {
+        select: {
+          dispatchedAt: true,
           inspector: { select: { id: true, realName: true, username: true } },
+          inspectorId: true,
+          submittedAt: true,
         },
         where: {
           inspectorId: { not: null },
@@ -155,6 +185,14 @@ export const InspectionRequestStatsService = {
           },
         },
       }),
+    ]);
+    const [supplierNamesById, teamNamesById] = await Promise.all([
+      SupplierIdentityService.resolveNamesByIds(
+        collectIdentityIds(periodRequests.map((item) => item.supplierId)),
+      ),
+      TeamIdentityService.resolveNamesByIds(
+        collectIdentityIds(periodRequests.map((item) => item.teamId)),
+      ),
     ]);
     const now = new Date();
     const inspectorStatusMap = new Map<
@@ -205,14 +243,16 @@ export const InspectionRequestStatsService = {
           user.id,
         ),
       );
-    const resolveInspectorKey = (item: (typeof periodRequests)[number]) =>
-      item.inspectorId ||
-      item.inspector?.username ||
+    type InspectorRequest =
+      | (typeof activeInspectorRequests)[number]
+      | (typeof periodRequests)[number];
+    const resolveInspectorKey = (item: InspectorRequest) =>
+      normalizeIdentityId(item.inspectorId) || UNRESOLVED_IDENTITY_KEY;
+    const resolveInspectorName = (item: InspectorRequest) =>
       item.inspector?.realName ||
-      'unknown';
-    const resolveInspectorName = (item: (typeof periodRequests)[number]) =>
-      item.inspector?.realName || item.inspector?.username || '未记录检验员';
-    const getInspectorStatus = (item: (typeof periodRequests)[number]) => {
+      item.inspector?.username ||
+      UNRESOLVED_INSPECTOR_NAME;
+    const getInspectorStatus = (item: InspectorRequest) => {
       const key = resolveInspectorKey(item);
       const existing = inspectorStatusMap.get(key);
       if (existing) return existing;
@@ -245,7 +285,7 @@ export const InspectionRequestStatsService = {
       }
     }
     const inspectorStatus = [...inspectorStatusMap.values()]
-      .filter((item) => item.inspector !== '未记录检验员')
+      .filter((item) => item.inspector !== UNRESOLVED_INSPECTOR_NAME)
       .sort((a, b) => {
         if (a.status === b.status) {
           return (
@@ -259,32 +299,13 @@ export const InspectionRequestStatsService = {
     const supplierMap = new Map<string, number>();
     const inspectorMap = new Map<string, number>();
     const historyTeamMap = new Map<string, number>();
-    const teamReinspectionMap = new Map<
-      string,
-      {
-        inspectedCount: number;
-        reinspectionCount: number;
-        reinspectionRate: number;
-        submittedCount: number;
-        team: string;
-      }
-    >();
-    const supplierReinspectionMap = new Map<
-      string,
-      {
-        inspectedCount: number;
-        reinspectionCount: number;
-        reinspectionRate: number;
-        submittedCount: number;
-        team: string;
-      }
-    >();
+    const teamReinspectionMap = new Map<string, ReinspectionCounts>();
+    const supplierReinspectionMap = new Map<string, ReinspectionCounts>();
     const historyInspectorMap = new Map<
       string,
       {
         averageTaskMinutes: number;
         completedTaskCount: number;
-        inspector: string;
         totalTaskMinutes: number;
       }
     >();
@@ -316,28 +337,31 @@ export const InspectionRequestStatsService = {
         const date = formatShanghaiDate(item.submittedAt);
         const daily = dailyTrendMap.get(date);
         if (daily) daily.submittedCount += 1;
-        const isIncoming =
-          item.processName === INCOMING_INSPECTION_PROCESS_NAME;
+        const isIncoming = isIncomingInspectionRequest(item);
         if (isIncoming) {
           todaySubmittedIncomingCount += 1;
         } else {
           todaySubmittedProcessCount += 1;
         }
-        const team = String(item.team || '未填写班组').trim();
+        const identityId = normalizeIdentityId(
+          isIncoming ? item.supplierId : item.teamId,
+        );
+        const identityKey = identityId || UNRESOLVED_IDENTITY_KEY;
         const countMap = isIncoming ? supplierMap : teamMap;
-        countMap.set(team, (countMap.get(team) || 0) + 1);
+        countMap.set(identityKey, (countMap.get(identityKey) || 0) + 1);
         if (!isIncoming) {
-          historyTeamMap.set(team, (historyTeamMap.get(team) || 0) + 1);
+          historyTeamMap.set(
+            identityKey,
+            (historyTeamMap.get(identityKey) || 0) + 1,
+          );
         }
         const reinspectionMap = isIncoming
           ? supplierReinspectionMap
           : teamReinspectionMap;
-        const reinspectionStat = reinspectionMap.get(team) || {
+        const reinspectionStat = reinspectionMap.get(identityKey) || {
           inspectedCount: 0,
           reinspectionCount: 0,
-          reinspectionRate: 0,
           submittedCount: 0,
-          team,
         };
         reinspectionStat.submittedCount += 1;
         const hasReinspection =
@@ -346,15 +370,7 @@ export const InspectionRequestStatsService = {
         const hasInspectionResult = item.status === 'CLOSED' || hasReinspection;
         if (hasInspectionResult) reinspectionStat.inspectedCount += 1;
         if (hasReinspection) reinspectionStat.reinspectionCount += 1;
-        reinspectionStat.reinspectionRate =
-          reinspectionStat.inspectedCount > 0
-            ? Math.round(
-                (reinspectionStat.reinspectionCount /
-                  reinspectionStat.inspectedCount) *
-                  1000,
-              ) / 10
-            : 0;
-        reinspectionMap.set(team, reinspectionStat);
+        reinspectionMap.set(identityKey, reinspectionStat);
       }
       if (
         item.closedAt &&
@@ -363,8 +379,7 @@ export const InspectionRequestStatsService = {
         item.status === 'CLOSED'
       ) {
         todayClosedCount += 1;
-        const closedIsIncoming =
-          item.processName === INCOMING_INSPECTION_PROCESS_NAME;
+        const closedIsIncoming = isIncomingInspectionRequest(item);
         if (closedIsIncoming) {
           todayClosedIncomingCount += 1;
         } else {
@@ -373,15 +388,15 @@ export const InspectionRequestStatsService = {
         const date = formatShanghaiDate(item.closedAt);
         const daily = dailyTrendMap.get(date);
         if (daily) daily.closedCount += 1;
-        const inspector =
-          item.inspector?.realName ||
-          item.inspector?.username ||
-          '未记录检验员';
-        inspectorMap.set(inspector, (inspectorMap.get(inspector) || 0) + 1);
-        const existing = historyInspectorMap.get(inspector) || {
+        const inspectorId = normalizeIdentityId(item.inspectorId);
+        const inspectorKey = inspectorId || UNRESOLVED_IDENTITY_KEY;
+        inspectorMap.set(
+          inspectorKey,
+          (inspectorMap.get(inspectorKey) || 0) + 1,
+        );
+        const existing = historyInspectorMap.get(inspectorKey) || {
           averageTaskMinutes: 0,
           completedTaskCount: 0,
-          inspector,
           totalTaskMinutes: 0,
         };
         const taskMinutes = durationMinutes(
@@ -393,43 +408,79 @@ export const InspectionRequestStatsService = {
         existing.averageTaskMinutes = Math.round(
           existing.totalTaskMinutes / existing.completedTaskCount,
         );
-        historyInspectorMap.set(inspector, existing);
+        historyInspectorMap.set(inspectorKey, existing);
       }
     }
+    const inspectorNamesById = new Map(
+      periodRequests.flatMap((item) => {
+        const inspectorId = normalizeIdentityId(item.inspectorId);
+        return inspectorId
+          ? [[inspectorId, resolveInspectorName(item)] as const]
+          : [];
+      }),
+    );
+    const teamRows = createIdentityCountRows(
+      teamMap,
+      teamNamesById,
+      UNRESOLVED_TEAM_NAME,
+    );
+    const supplierRows = createIdentityCountRows(
+      supplierMap,
+      supplierNamesById,
+      UNRESOLVED_SUPPLIER_NAME,
+    );
+    const inspectorRows = createIdentityCountRows(
+      inspectorMap,
+      inspectorNamesById,
+      UNRESOLVED_INSPECTOR_NAME,
+    );
     return {
-      byInspector: [...inspectorMap.entries()]
-        .map(([inspector, count]) => ({ count, inspector }))
-        .sort((a, b) => b.count - a.count),
-      bySupplier: [...supplierMap.entries()]
-        .map(([team, count]) => ({ count, team }))
-        .sort((a, b) => b.count - a.count),
-      byTeam: [...teamMap.entries()]
-        .map(([team, count]) => ({ count, team }))
-        .sort((a, b) => b.count - a.count),
+      byInspector: inspectorRows.map(({ count, id, name }) => ({
+        count,
+        inspector: name,
+        inspectorId: id,
+      })),
+      bySupplier: supplierRows.map(({ count, id, name }) => ({
+        count,
+        supplierId: id,
+        team: name,
+      })),
+      byTeam: teamRows.map(({ count, id, name }) => ({
+        count,
+        team: name,
+        teamId: id,
+      })),
       dailyTrend: [...dailyTrendMap.values()],
-      historyByInspector: [...historyInspectorMap.values()]
-        .filter((item) => item.inspector !== '未记录检验员')
-        .sort((a, b) => b.completedTaskCount - a.completedTaskCount),
-      historyByTeam: [...historyTeamMap.entries()]
-        .map(([team, count]) => ({ count, team }))
-        .sort((a, b) => b.count - a.count),
+      historyByInspector: createInspectorHistoryRows(
+        historyInspectorMap,
+        inspectorNamesById,
+      ),
+      historyByTeam: createIdentityCountRows(
+        historyTeamMap,
+        teamNamesById,
+        UNRESOLVED_TEAM_NAME,
+      ).map(({ count, id, name }) => ({ count, team: name, teamId: id })),
       inspectorStatus,
       pendingDispatchCount,
       pendingInspectionCount,
-      reinspectionRateBySupplier: [...supplierReinspectionMap.values()].sort(
-        (a, b) =>
-          b.reinspectionRate - a.reinspectionRate ||
-          b.reinspectionCount - a.reinspectionCount ||
-          b.inspectedCount - a.inspectedCount ||
-          b.submittedCount - a.submittedCount,
-      ),
-      reinspectionRateByTeam: [...teamReinspectionMap.values()].sort(
-        (a, b) =>
-          b.reinspectionRate - a.reinspectionRate ||
-          b.reinspectionCount - a.reinspectionCount ||
-          b.inspectedCount - a.inspectedCount ||
-          b.submittedCount - a.submittedCount,
-      ),
+      reinspectionRateBySupplier: createReinspectionRows(
+        supplierReinspectionMap,
+        supplierNamesById,
+        UNRESOLVED_SUPPLIER_NAME,
+      ).map(({ id, name, ...stat }) => ({
+        ...stat,
+        supplierId: id,
+        team: name,
+      })),
+      reinspectionRateByTeam: createReinspectionRows(
+        teamReinspectionMap,
+        teamNamesById,
+        UNRESOLVED_TEAM_NAME,
+      ).map(({ id, name, ...stat }) => ({
+        ...stat,
+        team: name,
+        teamId: id,
+      })),
       todayClosedCount,
       todayClosedIncomingCount,
       todayClosedProcessCount,

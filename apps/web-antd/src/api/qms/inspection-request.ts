@@ -14,9 +14,17 @@ import { publicRequestClient, requestClient } from '#/api/request';
 import { QMS_API } from './constants';
 
 export interface InspectionRequestStats {
-  byInspector: Array<{ count: number; inspector: string }>;
-  bySupplier: Array<{ count: number; team: string }>;
-  byTeam: Array<{ count: number; team: string }>;
+  byInspector: Array<{
+    count: number;
+    inspector: string;
+    inspectorId: null | string;
+  }>;
+  bySupplier: Array<{
+    count: number;
+    supplierId: null | string;
+    team: string;
+  }>;
+  byTeam: Array<{ count: number; team: string; teamId: null | string }>;
   dailyTrend: Array<{
     closedCount: number;
     date: string;
@@ -26,8 +34,13 @@ export interface InspectionRequestStats {
     averageTaskMinutes: number;
     completedTaskCount: number;
     inspector: string;
+    inspectorId: null | string;
   }>;
-  historyByTeam: Array<{ count: number; team: string }>;
+  historyByTeam: Array<{
+    count: number;
+    team: string;
+    teamId: null | string;
+  }>;
   inspectorStatus: Array<{
     activeTaskCount: number;
     averageTaskMinutes: number;
@@ -44,6 +57,7 @@ export interface InspectionRequestStats {
     reinspectionCount: number;
     reinspectionRate: number;
     submittedCount: number;
+    supplierId: null | string;
     team: string;
   }>;
   reinspectionRateByTeam: Array<{
@@ -52,6 +66,7 @@ export interface InspectionRequestStats {
     reinspectionRate: number;
     submittedCount: number;
     team: string;
+    teamId: null | string;
   }>;
   todayClosedCount: number;
   todayClosedIncomingCount: number;

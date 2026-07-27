@@ -10,14 +10,23 @@ import {
 import { INCOMING_INSPECTION_PROCESS_NAME } from '../constants';
 
 interface InspectionRequestStatsState {
-  byInspector: Array<{ count: number; inspector: string }>;
-  byTeam: Array<{ count: number; team: string }>;
+  byInspector: Array<{
+    count: number;
+    inspector: string;
+    inspectorId: null | string;
+  }>;
+  byTeam: Array<{ count: number; team: string; teamId: null | string }>;
   historyByInspector: Array<{
     averageTaskMinutes: number;
     completedTaskCount: number;
     inspector: string;
+    inspectorId: null | string;
   }>;
-  historyByTeam: Array<{ count: number; team: string }>;
+  historyByTeam: Array<{
+    count: number;
+    team: string;
+    teamId: null | string;
+  }>;
   inspectorStatus: Array<{
     activeTaskCount: number;
     averageTaskMinutes: number;

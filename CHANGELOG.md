@@ -84,6 +84,28 @@
 
 - ID-based dashboard aggregation and architecture regression guards are committed in subsequent phases below.
 
+### 2026-07-27 Phase 3: aggregate inspection statistics by canonical identity
+
+**Execution:**
+
+- Persisted `category=INCOMING|PROCESS` on every new inspection request so identity scope is independent of mutable process names.
+- Replaced TEAM, supplier, and inspector name-based aggregation with stable `teamId`, `supplierId`, and `inspectorId` keys; canonical names are resolved only after aggregation for display.
+- Preserved separate rows for distinct IDs even when their current display names match, combined renamed snapshots only when they share one ID, and exposed missing or invalid IDs as explicit unresolved buckets.
+- Updated dashboard and request-list contracts plus Vue keys to carry stable identity IDs through every ranking and history view.
+
+**Verification:**
+
+- Inspection request creation and statistics tests: 26/26 passed.
+- Backend TypeScript check passed.
+- Frontend Vue TypeScript check passed.
+- Changed-scope QMS architecture check passed with 0 new violations.
+
+**commit:** `fix(project): aggregate inspection stats by canonical identity`
+
+**Remaining issues:**
+
+- Architecture regression guards and identity-governance documentation are committed in subsequent phases below.
+
 ## [0.19.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.19.0...qgs-v0.19.1) (2026-07-24)
 
 

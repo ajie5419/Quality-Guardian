@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { isIncomingInspectionRequestProcess } from '~/modules/inspection/inspection-request';
 import { InspectionRequestCreateService } from '~/modules/inspection/inspection-request-create.service';
 import prisma from '~/utils/prisma';
 
@@ -89,6 +90,7 @@ const mockRequest = {
 describe('inspectionRequestCreateService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(isIncomingInspectionRequestProcess).mockReturnValue(false);
   });
 
   it('should create a request and return mapped result', async () => {
@@ -113,6 +115,49 @@ describe('inspectionRequestCreateService', () => {
     expect(result).toBeDefined();
     expect(result.id).toBe('req-1');
     expect(prisma.$transaction).toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      body: {
+        partName: 'Bearing',
+        processName: 'Welding',
+        teamId: 'team-1',
+        workOrderNumber: 'WO-001',
+      },
+      category: 'PROCESS',
+      incoming: false,
+    },
+    {
+      body: {
+        partName: 'Bearing',
+        processName: 'Incoming inspection',
+        supplierId: 'supplier-1',
+        workOrderNumber: 'WO-001',
+      },
+      category: 'INCOMING',
+      incoming: true,
+    },
+  ])('persists $category category on creation', async (scenario) => {
+    vi.mocked(isIncomingInspectionRequestProcess).mockReturnValue(
+      scenario.incoming,
+    );
+    const create = vi.fn().mockResolvedValue(mockRequest);
+    (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+      callback({ qms_inspection_requests: { create } }),
+    );
+
+    await InspectionRequestCreateService.createRequest(
+      {} as any,
+      { id: 'user-1', username: 'admin' } as any,
+      scenario.body,
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ category: scenario.category }),
+      }),
+    );
   });
 
   it('should not audit log when isPublic is true', async () => {

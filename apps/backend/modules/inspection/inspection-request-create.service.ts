@@ -57,6 +57,7 @@ export const InspectionRequestCreateService = {
                 ? JSON.stringify(payload.attachments)
                 : null,
             componentName: payload.componentName || null,
+            category: payload.category,
             mutualCheckResult: normalizeInspectionRequestCheckResult(
               body.mutualCheckResult,
             ),
@@ -173,6 +174,7 @@ async function buildCreateRequestPayload(body: RequestBody) {
 
   return {
     attachments,
+    category: isIncoming ? ('INCOMING' as const) : ('PROCESS' as const),
     componentName,
     governedCanonicalIds: await buildGovernedCanonicalWritePairForTable(
       'qms_inspection_requests',

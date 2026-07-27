@@ -73,9 +73,21 @@ const historyStatsOptions: Array<{
 ];
 
 const requestStats = ref({
-  byInspector: [] as Array<{ count: number; inspector: string }>,
-  bySupplier: [] as Array<{ count: number; team: string }>,
-  byTeam: [] as Array<{ count: number; team: string }>,
+  byInspector: [] as Array<{
+    count: number;
+    inspector: string;
+    inspectorId: null | string;
+  }>,
+  bySupplier: [] as Array<{
+    count: number;
+    supplierId: null | string;
+    team: string;
+  }>,
+  byTeam: [] as Array<{
+    count: number;
+    team: string;
+    teamId: null | string;
+  }>,
   dailyTrend: [] as Array<{
     closedCount: number;
     date: string;
@@ -85,8 +97,13 @@ const requestStats = ref({
     averageTaskMinutes: number;
     completedTaskCount: number;
     inspector: string;
+    inspectorId: null | string;
   }>,
-  historyByTeam: [] as Array<{ count: number; team: string }>,
+  historyByTeam: [] as Array<{
+    count: number;
+    team: string;
+    teamId: null | string;
+  }>,
   inspectorStatus: [] as Array<{
     activeTaskCount: number;
     averageTaskMinutes: number;
@@ -102,6 +119,7 @@ const requestStats = ref({
     reinspectionCount: number;
     reinspectionRate: number;
     submittedCount: number;
+    supplierId: null | string;
     team: string;
   }>,
   reinspectionRateByTeam: [] as Array<{
@@ -110,6 +128,7 @@ const requestStats = ref({
     reinspectionRate: number;
     submittedCount: number;
     team: string;
+    teamId: null | string;
   }>,
   todayClosedCount: 0,
   todayClosedIncomingCount: 0,

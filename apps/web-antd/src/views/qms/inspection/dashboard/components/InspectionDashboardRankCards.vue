@@ -1,16 +1,33 @@
 <script lang="ts" setup>
 import { Button, Card } from 'ant-design-vue';
 
-interface ReinspectionStat {
+interface TeamReinspectionStat {
   inspectedCount: number;
   reinspectionCount: number;
   reinspectionRate: number;
   submittedCount: number;
   team: string;
+  teamId: null | string;
 }
 
 interface TeamStat {
   count: number;
+  team: string;
+  teamId: null | string;
+}
+
+interface SupplierReinspectionStat {
+  inspectedCount: number;
+  reinspectionCount: number;
+  reinspectionRate: number;
+  submittedCount: number;
+  supplierId: null | string;
+  team: string;
+}
+
+interface SupplierStat {
+  count: number;
+  supplierId: null | string;
   team: string;
 }
 
@@ -21,9 +38,9 @@ defineProps<{
   supplierReinspectionStatsTotal: number;
   supplierStatsTotal: number;
   teamStatsTotal: number;
-  topReinspectionStats: ReinspectionStat[];
-  topSupplierReinspectionStats: ReinspectionStat[];
-  topSupplierStats: TeamStat[];
+  topReinspectionStats: TeamReinspectionStat[];
+  topSupplierReinspectionStats: SupplierReinspectionStat[];
+  topSupplierStats: SupplierStat[];
   topTeamStats: TeamStat[];
 }>();
 
@@ -58,7 +75,11 @@ const emit = defineEmits<{
         </div>
       </div>
       <div v-if="topTeamStats.length > 0" class="space-y-3">
-        <div v-for="item in topTeamStats" :key="item.team" class="space-y-1">
+        <div
+          v-for="item in topTeamStats"
+          :key="item.teamId || 'unresolved-team'"
+          class="space-y-1"
+        >
           <div class="flex items-start justify-between gap-3 text-sm">
             <span class="break-words text-gray-800">
               {{ item.team || '未填写' }}
@@ -104,7 +125,7 @@ const emit = defineEmits<{
       <div v-if="topSupplierStats.length > 0" class="space-y-3">
         <div
           v-for="item in topSupplierStats"
-          :key="item.team"
+          :key="item.supplierId || 'unresolved-supplier'"
           class="space-y-1"
         >
           <div class="flex items-start justify-between gap-3 text-sm">
@@ -156,7 +177,7 @@ const emit = defineEmits<{
       <div v-if="topReinspectionStats.length > 0" class="space-y-2">
         <div
           v-for="(item, index) in topReinspectionStats"
-          :key="item.team"
+          :key="item.teamId || 'unresolved-team-reinspection'"
           class="rounded bg-gray-50 px-3 py-2"
         >
           <div class="flex items-start justify-between gap-3">
@@ -213,7 +234,7 @@ const emit = defineEmits<{
       <div v-if="topSupplierReinspectionStats.length > 0" class="space-y-2">
         <div
           v-for="(item, index) in topSupplierReinspectionStats"
-          :key="item.team"
+          :key="item.supplierId || 'unresolved-supplier-reinspection'"
           class="rounded bg-gray-50 px-3 py-2"
         >
           <div class="flex items-start justify-between gap-3">
