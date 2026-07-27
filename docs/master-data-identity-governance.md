@@ -14,7 +14,7 @@
 
 ## 当前落地范围
 
-本次交付是 **supplier identity governance wave**，不是全项目主数据一次性切换。已完成的在线 ID-first 范围包括供应商画像、供应商评分、检验记录、不合格项、售后评分及 `TEAM -> supplier` 显式映射；这些消费者不再用名称等值关联或名称 `OR` 回退。检验和不合格项写入已要求相应供应商/TEAM ID，售后评分和查询已按供应商 ID 聚合。
+当前已完成 **supplier identity governance wave** 和 **TEAM identity governance wave**，不是全项目主数据一次性切换。已完成的在线 ID-first 范围包括供应商画像、供应商评分、检验记录、不合格项、售后评分、报检统计及 `TEAM -> supplier` 显式映射；这些消费者不再用名称等值关联或名称 `OR` 回退。TEAM 由独立模块管理稳定 ID、别名、来源和合并审计；改名不改变身份，近似名称不会触发自动合并。
 
 after-sales、supervision 的在线供应商写入也已要求显式 ID，服务端重建名称快照；名称解析只允许存在于审核过的 import/backfill 入口。其他尚未迁移的受控主数据仍按各自治理阶段推进，因此当前系统不能宣称全项目已经达到 `ID_ONLY`。
 
@@ -73,6 +73,20 @@ after-sales、supervision 的在线供应商写入也已要求显式 ID，服务
 
 过程检验依旧使用 `teamId`，供应商画像通过映射获得其 TEAM ID 集合后查询。在线查询发现映射缺失时返回无结果，不使用供应商名称与队伍名称比较；存量回填发现缺失映射时写入 `unresolved_master_data_refs`，等待后续人工处置。
 
+### TEAM identity ownership
+
+- TEAM canonical IDs are `dictionaries.id` values owned by `modules/team`; `dictKey` is only the current display name.
+- `team_identity_sources` maps stable department, supplier, or manual source IDs to TEAM IDs. Source IDs, not source names, drive reconciliation.
+- `team_identity_aliases` preserves canonical and historical names. Aliases support audit and collision detection, not online joins.
+- `team_identity_name_keys` prevents normalized near-duplicate names from being created accidentally, but a collision never authorizes an automatic merge.
+- Confirmed duplicate IDs are merged only in maintenance mode through an explicit source-ID/target-ID command and one audited transaction.
+
+### Inspection-request statistics
+
+`qms_inspection_requests.category` selects the identity domain and is persisted by all new writes. `INCOMING` aggregates by `supplierId`; `PROCESS` aggregates by `teamId`; inspector statistics aggregate by `inspectorId`. Names are hydrated only after aggregation.
+
+For legacy rows whose category has not yet been backfilled, a TEAM ID takes precedence over a supplier ID because a supplier-linked process TEAM may legitimately carry both IDs. This compatibility rule contains no name comparison. Rows with missing or invalid IDs stay visible as unresolved identity buckets and are never folded into a named entity.
+
 ## 存量迁移
 
 迁移按以下顺序执行：
@@ -107,6 +121,8 @@ after-sales、supervision 的在线供应商写入也已要求显式 ID，服务
 - `B-ID3`：阻断 `inspections`、`quality_records` 的 Prisma 写入只写 `supplierName` 而不写 `supplierId`。
 - `B-ID4`：阻断供应商画像售后查询和评分聚合重新使用名称关联，以及按名称推导 TEAM ID。
 - `B-ID5`：阻断未审核业务代码启用 legacy 名称转 ID 模式，只允许精确文件级 import adapter 白名单。
+- `B-ID6`：阻断报检统计读取 TEAM、供应商或工序名称快照作为身份输入。
+- `B-ID7`：阻断通用字典写入绕过 TEAM guard，并禁止恢复 TEAM 名称 bootstrap。
 
 门禁尚未覆盖所有表和所有主数据类型。后续 wave 必须同步扩大 AST 规则和测试，不能仅修改文档就宣称某个模块已达到 `ID-required`。
 

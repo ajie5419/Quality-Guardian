@@ -2,12 +2,12 @@
 
 ## 当前状态
 
-- 最新变更: Permission-aware initial routing now redirects restricted users from an unavailable default dashboard to their first accessible leaf page; accounts with no accessible page receive `/403` instead of 404. Production remains on `qgs-v0.17.6`.
-- 测试状态: Route fallback tests 4/4 passed; full lint, typecheck (3/3 workspace tasks), QMS architecture check, and browser verification with the restricted `ajie` account passed.
+- 最新变更: Canonical TEAM identity ownership, source reconciliation, maintenance-only merge, and ID-based inspection-request statistics are complete. Production remains on `qgs-v0.19.1` until the release workflow applies migrations and ordered maintenance.
+- 测试状态: Backend full suite 228/228 files and 2154/2154 tests passed; TEAM/category/statistics targeted tests and architecture-rule tests passed.
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
-- 模块 TS 文件数: 517（含测试）
-- 当前版本: `0.17.6`（生产部署成功）
+- 模块 TS 文件数: 528（含测试）
+- 当前版本: `0.19.1`
 
 ## 已完成
 
@@ -50,6 +50,8 @@
 - [x] supplier identity governance wave（供应商画像、评分、检验、不合格项、售后评分、TEAM 映射、存量回填与 unresolved 审计）
 - [x] 供应商画像数据源契约修复（历史项目完整聚合、检验批次合格率、手工工程问题归属、V3 快照重算）
 - [x] 新增供应商同名软删除档案恢复（保留原 ID、并发 CAS、RESTORE 审计、业务冲突分级）
+- [x] TEAM 主数据身份治理（独立模块、稳定来源、别名、合并审计、通用字典写保护）
+- [x] 报检任务统计按 `category + teamId/supplierId/inspectorId` 聚合，名称只用于最终展示
 - [ ] 后端业务模块逐功能测试覆盖补齐（进行中）
 
 ## 当前架构
@@ -58,7 +60,7 @@
 apps/backend/
 ├── api/          # 路由薄层（≤50 行）
 ├── middleware/   # 认证、数据权限、日志
-├── modules/      # 业务逻辑（25 个模块，517 个 TS 文件）
+├── modules/      # 业务逻辑（26 个模块，528 个 TS 文件）
 ├── prisma/       # Schema + Migrations
 ├── routes/       # catch-all 404
 └── utils/        # 基础设施（24 个文件）
@@ -75,11 +77,12 @@ apps/backend/
 - [ ] 为 `unresolved_master_data_refs` 增加人工处置 API/UI，并为 `supplier_identity_links` 增加管理 UI
 - [ ] 为 supervision 等尚未覆盖的存量供应商引用补齐回填、unresolved 审计和生产指标核对
 - [ ] 将其他受控主数据从 `DUAL_WRITE/legacy` 逐 wave 推进到在线 `ID-required`
+- [ ] 通过发布流程部署 TEAM identity migrations，执行有序 reconciliation/category backfill，并核对生产报检排行总数与 unresolved 审计
 - [ ] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制
 
 ## 基线数据（用于异常检测）
 
-- 模块 TS 文件数: 517（含测试）
+- 模块 TS 文件数: 528（含测试）
 - utils TS 文件数: 41
 - 测试文件数: 200（modules 内）；后端总计 223
 - 导出入口基线: 约 610；已完成 343，剩余 267

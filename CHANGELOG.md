@@ -126,6 +126,29 @@
 
 - Identity-governance documentation is committed in the next phase.
 
+### 2026-07-27 Phase 5: document and verify TEAM identity governance
+
+**Execution:**
+
+- Added the TEAM module architecture contract covering ownership, source reconciliation, rename behavior, explicit maintenance merge, unresolved identities, and prohibited name-based flows.
+- Extended inspection architecture with the persisted category and ID-based statistics contract.
+- Updated project-wide master-data governance and progress records to include the completed TEAM wave and the production release-maintenance requirement.
+
+**Verification:**
+
+- Backend full suite: 228/228 test files and 2154/2154 tests passed.
+- Full repository lint passed with 0 errors and 0 warnings.
+- Workspace typecheck passed: 3/3 tasks.
+- Full QMS architecture check passed with 0 new violations.
+- Prisma migration check and changed-file whitespace check passed.
+- Module size remained bounded at 26 modules and 528 TypeScript files.
+
+**commit:** `docs(project): document TEAM identity governance`
+
+**Remaining issues:**
+
+- Production still requires the normal release workflow to apply migrations, reconciliation, category backfill, and post-deploy count verification.
+
 ## [0.19.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.19.0...qgs-v0.19.1) (2026-07-24)
 
 

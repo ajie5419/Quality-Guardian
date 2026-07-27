@@ -74,6 +74,24 @@ public 报检禁止：
 - 读取检验员、派工、审计、数据权限相关接口。
 - 绕过 create service 的字段校验和工单存在性校验。
 
+## Inspection-request category and statistics identity
+
+Every new inspection request persists an explicit category:
+
+- `INCOMING` uses `supplierId` as its statistics identity.
+- `PROCESS` uses `teamId` as its statistics identity.
+
+`processName` is a mutable display snapshot and must not decide the online statistics domain. Release maintenance backfills legacy null categories after supplier and TEAM reconciliation. For the compatibility-only null-category path, `teamId` takes precedence because a process TEAM may also have a linked `supplierId`; a supplier ID is treated as incoming only when no TEAM ID exists. The historical incoming process name is used only by the one-time backfill when both IDs are absent.
+
+Request statistics aggregate by `teamId`, `supplierId`, and `inspectorId`. Canonical names are batch-resolved after aggregation and never participate in a map key, join, or category branch. Therefore:
+
+- snapshots with different names and the same ID form one row under the current canonical name;
+- different IDs remain separate even when their current names are equal;
+- missing IDs form one explicit unresolved bucket per identity domain;
+- invalid non-empty IDs remain distinguishable as unresolved rows containing the original ID.
+
+Dashboard API contracts and Vue row keys carry the same stable IDs. A display name must never be used as a component key for TEAM, supplier, or inspector rankings.
+
 ## 报检任务重构边界
 
 报检任务后续重构必须保持外部 API 行为兼容，优先处理结构和类型安全，不在同一阶段修改业务语义。
