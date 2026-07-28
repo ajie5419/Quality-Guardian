@@ -42,7 +42,7 @@
 - 相关后端测试：`3/3` 文件、`37/37` 测试通过。
 - `prisma validate`、migration 门禁和 shell 语法检查通过。
 
-**commit:** 待本次提交补充
+**commit:** `475cd93` `fix(@qgs/backend): shorten quality classification indexes`
 
 **遗留问题：**
 
