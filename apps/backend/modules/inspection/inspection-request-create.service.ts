@@ -216,7 +216,7 @@ async function buildCreateRequestPayload(
   const componentName = skipsComponentName
     ? ''
     : normalizeInspectionRequestText(body.componentName);
-  if (!skipsComponentName && !componentName) {
+  if (identityContract === 'V2' && !skipsComponentName && !componentName) {
     throw new BusinessError(
       'COMPONENT_NAME_REQUIRED',
       'componentName is required for non-assembly process inspection requests',
