@@ -16,6 +16,8 @@ model inspections {
   projectId              String?
   supplierName           String?
   supplierId             String?
+  partName               String?
+  partId                 String?
   materialName           String?
   materialNameId         String?
   incomingType           String?
@@ -60,6 +62,7 @@ model inspections {
   @@index([processId])
   @@index([teamId])
   @@index([supplierId])
+  @@index([partId])
   @@index([projectId])
   @@index([materialNameId])
   @@index([incomingTypeId])
@@ -351,19 +354,20 @@ model team_identity_merges {
 }
 
 model processes {
-  id                        String                      @id @default(cuid())
-  name                      String                      @unique
+  id                        String                           @id @default(cuid())
+  name                      String                           @unique
   code                      String?
-  sort                      Int                         @default(0)
-  status                    Int                         @default(1)
-  isDeleted                 Boolean                     @default(false)
-  createdAt                 DateTime                    @default(now())
-  updatedAt                 DateTime                    @updatedAt
+  sort                      Int                              @default(0)
+  status                    Int                              @default(1)
+  isDeleted                 Boolean                          @default(false)
+  createdAt                 DateTime                         @default(now())
+  updatedAt                 DateTime                         @updatedAt
   inspections               inspections[]
   quality_records           quality_records[]
   work_order_requirements   work_order_requirements[]
   qms_inspection_requests   qms_inspection_requests[]
   inspection_form_templates inspection_form_templates[]
+  project_bom_requirements  project_bom_required_processes[]
 
   @@index([name])
   @@index([status])
@@ -491,24 +495,41 @@ model data_permission_policies {
 }
 
 model project_boms {
-  id                 String      @id
-  work_order_number  String
-  part_name          String
-  partId             String?
-  part_number        String?
-  material           String?
-  required_processes String?     @db.LongText
-  quantity           Int         @default(1)
-  unit               String      @default("pcs")
-  remarks            String?     @db.Text
-  created_by         String?
-  created_at         DateTime    @default(now())
-  updated_at         DateTime    @updatedAt
-  work_orders        work_orders @relation(fields: [work_order_number], references: [workOrderNumber], onUpdate: Cascade)
+  id                  String                           @id
+  work_order_number   String
+  part_name           String
+  partId              String?
+  part_number         String?
+  material            String?
+  required_processes  String?                          @db.LongText
+  quantity            Int                              @default(1)
+  unit                String                           @default("pcs")
+  remarks             String?                          @db.Text
+  created_by          String?
+  created_at          DateTime                         @default(now())
+  updated_at          DateTime                         @updatedAt
+  work_orders         work_orders                      @relation(fields: [work_order_number], references: [workOrderNumber], onUpdate: Cascade)
+  processRequirements project_bom_required_processes[]
 
   @@index([work_order_number])
   @@index([part_number])
   @@index([partId])
+}
+
+model project_bom_required_processes {
+  id          String       @id @default(cuid())
+  bomId       String
+  processId   String?
+  processName String
+  position    Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  bom         project_boms @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  process     processes?   @relation(fields: [processId], references: [id], onDelete: SetNull)
+
+  @@unique([bomId, processId])
+  @@index([bomId])
+  @@index([processId])
 }
 
 model bom_projects {
@@ -1536,9 +1557,12 @@ model quality_loss_index {
   status          String   @db.VarChar(32)
   lossType        String?
   projectName     String?
+  projectId       String?
   workOrderNumber String?
   respDept        String?
+  respDeptId      String?
   partName        String?
+  partId          String?
   description     String?  @db.Text
   supplierBrandId String?
   createdBy       String?
@@ -1551,6 +1575,9 @@ model quality_loss_index {
   @@index([workOrderNumber])
   @@index([createdBy])
   @@index([respDept])
+  @@index([respDeptId])
+  @@index([projectId])
+  @@index([partId])
   @@index([supplierBrandId])
   @@index([isDeleted, occurDate])
 }
