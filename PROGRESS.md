@@ -2,11 +2,11 @@
 
 ## 当前状态
 
-- 最新变更: Canonical identity writes are now enforced across inspection requests and work-order requirements; TEAM merge/reconciliation preserves historical snapshots and records ambiguity; process ordering, quality-loss rebuild scheduling, and generic canonical backfill are transactionally and operationally consistent. Production remains on `qgs-v0.19.1` and was not accessed or modified.
-- 测试状态: Backend full suite `234/234` files and `2225/2225` tests passed; Web full DOM suite `47/47` files and `239/239` tests passed; shared identity contract suite `2/2` files and `17/17` tests passed.
+- 最新变更: 不合格项缺陷分类、售后产品类型和售后缺陷分类已统一为系统设置中的开放二级分类树；Web、小程序、统计报表、导入和报检关闭链路均改用 canonical ID，并补齐发布初始化与历史回填。生产环境未访问、未修改。
+- 测试状态: Backend full suite `236/236` files and `2243/2243` tests passed；Web full DOM suite `47/47` files and `241/241` tests passed。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
-- 模块 TS 文件数: 544（含测试）
+- 模块 TS 文件数: 552（含测试）
 - 当前版本: `0.19.1`
 
 ## 已完成
@@ -60,6 +60,7 @@
 - [x] Historical process identity bootstrap and work-order requirement `processId` backfill, including empty-only seeding and ordered release maintenance
 - [x] 全局工序主数据与报检显示配置解耦（过程报检/进货检验独立开关、稳定 ID、全局复用、无名称或工单要求兜底）
 - [x] 受控名称 `Map` 键架构门禁 `B-ID9`
+- [x] 质量二级分类开放配置（不合格项缺陷、售后产品、售后缺陷），含 Web/小程序接入、canonical ID 统计、发布初始化和历史回填
 - [ ] 后端业务模块逐功能测试覆盖补齐（进行中）
 
 ## 当前架构
@@ -68,7 +69,7 @@
 apps/backend/
 ├── api/          # 路由薄层（≤50 行）
 ├── middleware/   # 认证、数据权限、日志
-├── modules/      # 业务逻辑（27 个模块，544 个 TS 文件）
+├── modules/      # 业务逻辑（28 个模块，552 个 TS 文件）
 ├── prisma/       # Schema + Migrations
 ├── routes/       # catch-all 404
 └── utils/        # 基础设施（24 个文件）
@@ -89,12 +90,13 @@ apps/backend/
 - [ ] 继续核对尚未登记的动态字段和名称分支路径
 - [ ] 通过发布流程部署 TEAM identity migrations，执行有序 reconciliation/category backfill，并核对生产报检排行总数与 unresolved 审计
 - [ ] Deliver the process identity bootstrap and inspection-request option migration through the release workflow, then verify production counts without manual database edits
+- [ ] 通过发布流程部署质量分类 migration 和有序维护脚本，核对三套初始分类、历史回填数量及 unresolved 审计
 - [ ] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制
 
 ## 基线数据（用于异常检测）
 
-- 模块 TS 文件数: 544（含测试）
+- 模块 TS 文件数: 552（含测试）
 - utils TS 文件数: 41
-- 测试文件数: 207（modules 内）；后端总计 234
+- 测试文件数: 208（modules 内）；后端总计 236
 - 导出入口基线: 约 610；已完成 343，剩余 267
 - 顶层目录: api/ middleware/ modules/ prisma/ routes/ utils/

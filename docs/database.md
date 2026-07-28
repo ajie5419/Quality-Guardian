@@ -34,6 +34,21 @@ model xxx {
 4. 禁止手动改 migration 文件内容（会破坏 checksum）
 5. 禁止在 migration 中写业务数据操作（用单独脚本）
 
+## 质量分类主数据
+
+三套二级分类树由 `quality-classification` 模块统一管理：
+
+| Scope | 一级表 | 二级表 | 业务引用 |
+| --- | --- | --- | --- |
+| `INSPECTION_ISSUE_DEFECT` | `quality_classification_categories` | `quality_classification_subcategories` | `quality_records.defectCategoryId/defectSubcategoryId` |
+| `AFTER_SALES_PRODUCT` | 同上 | 同上 | `after_sales.productCategoryId/productSubcategoryId` |
+| `AFTER_SALES_DEFECT` | 同上 | 同上 | `after_sales.defectCategoryId/defectSubcategoryId` |
+
+- `code` 是稳定语义标识，创建后不可修改；名称是可在系统设置中调整的显示快照。
+- 在线写入必须提交一级、二级 ID，并由模块校验 scope、父子关系、启停和软删除状态。
+- migration 只创建结构；`scripts/backfill-quality-classifications.ts --apply` 负责幂等初始化和历史 ID 回填。
+- 历史回填只接受一级、二级名称的精确匹配；缺失、无法匹配或已有 ID 冲突写入 `unresolved_master_data_refs`。
+
 ## 查询规范
 
 1. 通过 `~/utils/prisma` 导入 client，不要自己实例化

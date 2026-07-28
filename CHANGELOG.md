@@ -25,6 +25,43 @@
 
 ## 执行记录
 
+### 2026-07-28 质量二级分类开放配置
+
+**执行内容：**
+
+- 新增 `quality-classification` 模块、一级/二级分类表、管理 API、业务选项 API、系统菜单和权限，系统设置提供不合格项缺陷、售后产品、售后缺陷三个独立配置页。
+- 不合格项、检验记录联动创建、报检关闭、售后新增编辑、Web 筛选、小程序录入、统计图表、周报月报和车辆故障率全部改用分类 ID；名称只保留为历史显示快照。
+- 售后导入采用唯一精确名称解析；在线新增、编辑必须提交合法的一级/二级 ID，不再使用名称默认值或硬编码选项兜底。
+- 新增 Prisma migration，保留旧字段兼容迁移；发布维护按稳定编码幂等初始化三套分类，并以 compare-and-set 分批回填历史 ID。
+- 无法解析、名称缺失或已有 ID 冲突的历史记录写入 `unresolved_master_data_refs`，不静默猜测或覆盖。
+- 小程序不合格项和报检结果页改为动态二级联动；删除前端与共享包中的在线硬编码分类常量。
+- 拆分不合格项分类规范化和关系转换逻辑，`inspection-issue.ts` 从 516 行降至 490 行，满足模块文件上限。
+- 未启动前端 dev/build 服务；未访问或修改生产环境。
+
+**验证结果：**
+
+- Backend full suite：`236/236` 文件、`2243/2243` 测试通过。
+- Web full DOM suite：`47/47` 文件、`241/241` 测试通过。
+- `pnpm lint`：通过，0 error / 0 warning。
+- `pnpm run check:type`：通过，3/3 workspace tasks；小程序沿用项目既有 skip。
+- `pnpm run check:qms-arch`：通过，0 violations。
+- `pnpm run check:prisma-migration`：通过。
+
+**commits：**
+
+- `96e879b` `feat(@qgs/web-antd): add quality classification settings`
+- `7a2fa1e` `feat(@qgs/backend): add quality classification master data`
+- `97cee16` `feat(@qgs/web-antd): add quality classification options`
+- `2034b79` `feat(project): use managed inspection defect classifications`
+- `1f9895c` `feat(project): use managed after-sales classifications`
+- `ad857b6` `feat(@qgs/weapp): load managed defect classifications`
+- `decb868` `feat(@qgs/backend): migrate quality classification identities`
+- `4c61830` `refactor(project): isolate inspection issue classification`
+
+**遗留问题：**
+
+- 需要通过正式发布流程执行 migration 与 release maintenance，并在生产环境核对初始化、回填和 unresolved 审计数量。
+
 ### 2026-07-28 Phase 14: enforce canonical identity contracts and safe maintenance
 
 **Execution:**
