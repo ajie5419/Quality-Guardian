@@ -372,25 +372,43 @@ model team_identity_merge_participants {
   @@index([mergeId])
 }
 
+// @module process-master
 model processes {
-  id                        String                           @id @default(cuid())
-  name                      String                           @unique
+  id                        String                               @id @default(cuid())
+  name                      String                               @unique
   code                      String?
-  inspectionRequestCategory String                           @default("PROCESS") @db.VarChar(20)
-  sort                      Int                              @default(0)
-  status                    Int                              @default(1)
-  isDeleted                 Boolean                          @default(false)
-  createdAt                 DateTime                         @default(now())
-  updatedAt                 DateTime                         @updatedAt
+  inspectionRequestCategory String                               @default("PROCESS") @db.VarChar(20)
+  sort                      Int                                  @default(0)
+  status                    Int                                  @default(1)
+  isDeleted                 Boolean                              @default(false)
+  createdAt                 DateTime                             @default(now())
+  updatedAt                 DateTime                             @updatedAt
   inspections               inspections[]
   quality_records           quality_records[]
   work_order_requirements   work_order_requirements[]
   qms_inspection_requests   qms_inspection_requests[]
   inspection_form_templates inspection_form_templates[]
   project_bom_requirements  project_bom_required_processes[]
+  inspectionRequestOptions  inspection_request_process_options[]
 
   @@index([name])
   @@index([status])
+}
+
+// @module process-master
+model inspection_request_process_options {
+  id        String              @id @default(cuid())
+  processId String
+  category  inspection_category
+  sort      Int                 @default(0)
+  isEnabled Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  process   processes           @relation(fields: [processId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([category, processId])
+  @@index([category, isEnabled, sort])
+  @@index([processId, isEnabled])
 }
 
 model dfmea_projects {

@@ -19,6 +19,7 @@ import { inspectionModule } from '~/modules/inspection/inspection.module';
 import { knowledgeModule } from '~/modules/knowledge/knowledge.module';
 import { metrologyModule } from '~/modules/metrology/metrology.module';
 import { planningModule } from '~/modules/planning/planning.module';
+import { processMasterModule } from '~/modules/process-master/process-master.module';
 import { qualityLossModule } from '~/modules/quality-loss/quality-loss.module';
 import { rbacModule } from '~/modules/rbac/rbac.module';
 import { reportModule } from '~/modules/report/report.module';
@@ -49,6 +50,7 @@ const MODULE_DECLARATIONS: ModuleDeclaration[] = [
   knowledgeModule,
   metrologyModule,
   planningModule,
+  processMasterModule,
   qualityLossModule,
   rbacModule,
   reportModule,

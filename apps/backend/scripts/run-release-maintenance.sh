@@ -13,5 +13,6 @@ cd "$BACKEND_DIR"
 "$TSX_BIN" scripts/backfill-quality-record-supplier-identities.ts --apply
 "$TSX_BIN" scripts/backfill-identity-relations.ts
 "$TSX_BIN" scripts/backfill-inspection-request-categories.ts --apply
+"$TSX_BIN" scripts/backfill-inspection-request-process-options.ts --apply
 "$TSX_BIN" scripts/backfill-inspection-issue-responsibilities.ts --apply
 "$TSX_BIN" scripts/backfill-quality-loss-index.ts

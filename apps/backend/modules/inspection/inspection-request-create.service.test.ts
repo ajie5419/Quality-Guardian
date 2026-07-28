@@ -1,14 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isIncomingInspectionRequestProcess } from '~/modules/inspection/inspection-request';
 import { InspectionRequestCreateService } from '~/modules/inspection/inspection-request-create.service';
+import { ProcessMasterService } from '~/modules/process-master';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
     $transaction: vi.fn(),
-    processes: {
-      findFirst: vi.fn(),
-    },
+  },
+}));
+
+vi.mock('~/modules/process-master', () => ({
+  ProcessMasterService: {
+    assertInspectionRequestOption: vi.fn(),
   },
 }));
 
@@ -104,19 +108,20 @@ describe('inspectionRequestCreateService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(isIncomingInspectionRequestProcess).mockReturnValue(false);
-    vi.mocked(prisma.processes.findFirst).mockResolvedValue({
+    vi.mocked(
+      ProcessMasterService.assertInspectionRequestOption,
+    ).mockResolvedValue({
       id: 'process-1',
-      inspectionRequestCategory: 'PROCESS',
       name: 'Canonical Process',
-    } as never);
+    });
   });
 
-  it('rejects a V2 process whose configured category differs from the request', async () => {
-    vi.mocked(prisma.processes.findFirst).mockResolvedValue({
-      id: 'process-1',
-      inspectionRequestCategory: 'INCOMING',
-      name: 'Incoming Process',
-    } as never);
+  it('rejects a V2 process that is hidden for the requested category', async () => {
+    vi.mocked(
+      ProcessMasterService.assertInspectionRequestOption,
+    ).mockRejectedValue(
+      new Error('The selected process is not enabled for this category'),
+    );
 
     await expect(
       InspectionRequestCreateService.createRequest(
@@ -133,7 +138,7 @@ describe('inspectionRequestCreateService', () => {
         false,
         'V2',
       ),
-    ).rejects.toMatchObject({ code: 'PROCESS_CATEGORY_MISMATCH' });
+    ).rejects.toThrow('not enabled');
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 

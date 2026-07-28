@@ -1,14 +1,11 @@
 import { SUPPLIER_CATEGORY } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionPublicQueryService } from '~/modules/inspection/inspection-public-query.service';
-import { WorkOrderRequirementService } from '~/modules/work-order-requirement';
+import { ProcessMasterService } from '~/modules/process-master';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
-    processes: {
-      findMany: vi.fn(),
-    },
     project_boms: {
       findMany: vi.fn(),
     },
@@ -31,9 +28,9 @@ vi.mock('~/modules/supplier-identity', () => ({
   },
 }));
 
-vi.mock('~/modules/work-order-requirement', () => ({
-  WorkOrderRequirementService: {
-    findActiveInspectionProcessIdentities: vi.fn(),
+vi.mock('~/modules/process-master', () => ({
+  ProcessMasterService: {
+    listInspectionRequestOptions: vi.fn(),
   },
 }));
 
@@ -95,18 +92,19 @@ describe('inspection public query service', () => {
     ]);
   });
 
-  it('returns only selected work order processes plus incoming processes', async () => {
+  it('returns the independently configured inspection processes', async () => {
     vi.mocked(
-      WorkOrderRequirementService.findActiveInspectionProcessIdentities,
+      ProcessMasterService.listInspectionRequestOptions,
     ).mockResolvedValue([
-      { processId: 'process-1', processName: 'Canonical Welding' },
-      { processId: 'process-1', processName: 'Canonical Welding' },
-      { processId: 'process-3', processName: 'Canonical Welding' },
-    ]);
-    (prisma.processes.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
       {
-        id: 'process-2',
-        name: 'Receipt verification',
+        category: 'PROCESS',
+        processId: 'process-1',
+        processName: 'Canonical Welding',
+      },
+      {
+        category: 'INCOMING',
+        processId: 'process-1',
+        processName: 'Canonical Welding',
       },
     ]);
 
@@ -119,28 +117,14 @@ describe('inspection public query service', () => {
         processName: 'Canonical Welding',
       },
       {
-        category: 'PROCESS',
-        processId: 'process-3',
-        processName: 'Canonical Welding',
-      },
-      {
         category: 'INCOMING',
-        processId: 'process-2',
-        processName: 'Receipt verification',
+        processId: 'process-1',
+        processName: 'Canonical Welding',
       },
     ]);
     expect(
-      WorkOrderRequirementService.findActiveInspectionProcessIdentities,
-    ).toHaveBeenCalledWith('WO-1');
-    expect(prisma.processes.findMany).toHaveBeenCalledWith({
-      where: {
-        inspectionRequestCategory: 'INCOMING',
-        isDeleted: false,
-        status: 1,
-      },
-      orderBy: [{ sort: 'asc' }, { name: 'asc' }],
-      select: { id: true, name: true },
-    });
+      ProcessMasterService.listInspectionRequestOptions,
+    ).toHaveBeenCalledOnce();
   });
 
   it('returns BOM part identities without replacing them with BOM row IDs', async () => {

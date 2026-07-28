@@ -6,6 +6,7 @@ import { redis } from '~/utils/redis';
 
 const DICT_CACHE_KEY_PREFIX = 'qms:dict';
 const DICT_OPTIONS_TTL_SECONDS = 3600 * 24;
+const INSPECTION_PROCESS_DICTIONARY_TYPE = 'inspection_process_name';
 const TEAM_DICTIONARY_TYPE = 'team';
 const SUPPORTED_DICT_TYPES = new Set<string>(
   QMS_DICTIONARY_TYPES as readonly string[],
@@ -63,6 +64,13 @@ function ensureGenericMutationAllowed(dictType: string) {
     throw new BusinessError(
       'TEAM_REQUIRES_DEDICATED_API',
       'TEAM identities must be managed through the dedicated TEAM API',
+      409,
+    );
+  }
+  if (dictType === INSPECTION_PROCESS_DICTIONARY_TYPE) {
+    throw new BusinessError(
+      'PROCESS_REQUIRES_DEDICATED_API',
+      'Inspection processes must be managed through the dedicated process API',
       409,
     );
   }

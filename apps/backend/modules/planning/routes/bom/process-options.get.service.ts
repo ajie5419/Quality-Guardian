@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3';
 
+import { ProcessMasterService } from '~/modules/process-master';
 import { logApiError } from '~/utils/api-logger';
-import prisma from '~/utils/prisma';
 import {
   internalServerErrorResponse,
   useResponseSuccess,
@@ -9,11 +9,7 @@ import {
 
 export async function bom_process_options_get(event: H3Event) {
   try {
-    const processes = await prisma.processes.findMany({
-      where: { isDeleted: false, status: 1 },
-      orderBy: [{ sort: 'asc' }, { name: 'asc' }],
-      select: { id: true, name: true },
-    });
+    const processes = await ProcessMasterService.listActiveOptions();
     return useResponseSuccess(
       processes.map((process) => ({
         label: process.name,

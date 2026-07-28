@@ -17,6 +17,7 @@
 - **knowledge/** — 质量知识库：文档分类与知识条目
 - **metrology/** — 计量器具全生命周期：台账、借用归还、检定计划、到期提醒
 - **planning/** — 质量策划：BOM、DFMEA、ITP、项目文档管理
+- **process-master/** — 全局工序主数据与报检场景配置
 - **quality-loss/** — 质量损失记录与分析：金额、缺陷分级、供应商关联、趋势。读路径走物化表 `quality_loss_index`（见 `docs/after-sales-quality-loss.md`）
 - **rbac/** — 角色权限控制：角色分配与菜单/按钮授权
 - **report/** — 质量报表生成与路由（多维度报表输出）

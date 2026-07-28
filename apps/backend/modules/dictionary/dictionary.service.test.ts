@@ -114,6 +114,23 @@ describe('dictionaryService', () => {
     expect(prisma.dictionaries.create).not.toHaveBeenCalled();
   });
 
+  it('rejects creating processes through the generic dictionary service', async () => {
+    await expect(
+      DictionaryService.create(
+        {
+          dictKey: 'Welding',
+          dictType: 'inspection_process_name',
+          dictValue: 'Welding',
+        },
+        'tester',
+      ),
+    ).rejects.toMatchObject({
+      code: 'PROCESS_REQUIRES_DEDICATED_API',
+      httpStatus: 409,
+    });
+    expect(prisma.dictionaries.create).not.toHaveBeenCalled();
+  });
+
   it('rejects duplicate dict key in same dictType when creating', async () => {
     (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
       id: 'existing-id',
@@ -388,6 +405,25 @@ describe('dictionaryService', () => {
       DictionaryService.update('team-1', { status: 0 }, 'tester'),
     ).rejects.toMatchObject({
       code: 'TEAM_REQUIRES_DEDICATED_API',
+      httpStatus: 409,
+    });
+    expect(prisma.dictionaries.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects updating processes through the generic dictionary service', async () => {
+    (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
+      dictKey: 'Welding',
+      dictType: 'inspection_process_name',
+      id: 'process-dict-1',
+      isSystem: false,
+      sort: 0,
+      status: 1,
+    });
+
+    await expect(
+      DictionaryService.update('process-dict-1', { status: 0 }, 'tester'),
+    ).rejects.toMatchObject({
+      code: 'PROCESS_REQUIRES_DEDICATED_API',
       httpStatus: 409,
     });
     expect(prisma.dictionaries.update).not.toHaveBeenCalled();

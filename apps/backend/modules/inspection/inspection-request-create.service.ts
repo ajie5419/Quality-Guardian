@@ -2,6 +2,7 @@ import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { ProcessMasterService } from '~/modules/process-master';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { WxSubscribeMessageService } from '~/modules/user';
@@ -153,22 +154,11 @@ async function resolveV2ProcessIdentity(
   processId: string,
   category: 'INCOMING' | 'PROCESS',
 ) {
-  const processIdentity = await prisma.processes.findFirst({
-    where: { id: processId, isDeleted: false, status: 1 },
-    select: { id: true, inspectionRequestCategory: true, name: true },
-  });
-  if (!processIdentity) {
-    throw new BusinessError(
-      'INVALID_CANONICAL_ID',
-      'processName identity does not exist or is inactive',
+  const processIdentity =
+    await ProcessMasterService.assertInspectionRequestOption(
+      processId,
+      category,
     );
-  }
-  if (processIdentity.inspectionRequestCategory !== category) {
-    throw new BusinessError(
-      'PROCESS_CATEGORY_MISMATCH',
-      'processId is not valid for the requested inspection category',
-    );
-  }
   return processIdentity.name;
 }
 
