@@ -25,6 +25,31 @@
 
 ## 执行记录
 
+### 2026-07-28 Phase 11: restore work-order-scoped inspection process options
+
+**Execution:**
+
+- Restored process-inspection options to the active `work_order_requirements` of the selected work order instead of exposing every active process master row.
+- Added a work-order-requirement domain query that rejects deleted, inactive, and non-`PROCESS` process relations before returning canonical IDs and names.
+- Kept incoming-inspection options independent of work-order requirements and selected them through `inspectionRequestCategory=INCOMING`, never through a process name.
+- Deduplicated repeated requirements by canonical `processId`; equal names with different IDs remain distinct options.
+- Made public-entry process loading failures visible and cleared stale process identities after an error.
+- Documented the process-option source contract. No database, migration, backfill, or production data was accessed or modified.
+
+**Verification:**
+
+- Backend focused suite: `2/2` test files and `29/29` tests passed.
+- Web request-entry suite: `2/2` test files and `6/6` tests passed.
+- Backend full suite: `232/232` test files and `2201/2201` tests passed.
+- Full repository lint passed with zero errors; workspace typecheck passed `3/3` tasks.
+- Changed-scope QMS architecture check reported `0 violations across 0 rules`; `git diff --check` passed.
+
+**Commit:** `8b974ac` `fix(project): restore work-order process options`
+
+**Remaining issues:**
+
+- Deployment must continue to apply the existing `processes.inspectionRequestCategory` migration before starting the new application version. This fix intentionally does not hide a missing migration with name-based compatibility logic.
+
 ### 2026-07-28 Phase 10: complete system-wide canonical identity governance
 
 **Execution:**
