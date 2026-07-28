@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import { defineComponent, h } from 'vue';
+import { defineComponent, h, ref } from 'vue';
 
 import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -66,6 +66,14 @@ vi.mock('#/api/qms/welder', () => ({
 
 vi.mock('#/hooks/useErrorHandler', () => ({
   useErrorHandler: () => ({ handleApiError: mockHandleApiError }),
+}));
+
+vi.mock('../../../shared/composables/useQualityClassificationOptions', () => ({
+  useQualityClassificationOptions: () => ({
+    loadOptions: vi.fn(),
+    loading: ref(false),
+    options: ref([]),
+  }),
 }));
 
 vi.mock('../composables/useAiAnalysis', () => ({

@@ -32,6 +32,23 @@ vi.mock('~/modules/supplier-identity', () => ({
   },
 }));
 
+vi.mock('~/modules/quality-classification', () => ({
+  QualityClassificationService: {
+    assertSelection: vi.fn().mockResolvedValue({
+      category: {
+        code: 'MANUFACTURING_DEFECT',
+        id: 'defect-category',
+        name: '制造缺陷',
+      },
+      subcategory: {
+        code: 'MACHINING_ACCURACY',
+        id: 'defect-subcategory',
+        name: '加工精度缺陷',
+      },
+    }),
+  },
+}));
+
 vi.mock('~/utils/governed-write', async () => {
   const actual = await vi.importActual<typeof import('~/utils/governed-write')>(
     '~/utils/governed-write',

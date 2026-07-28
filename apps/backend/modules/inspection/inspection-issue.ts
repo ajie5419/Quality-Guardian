@@ -20,10 +20,8 @@ import {
   parseInspectionIssueDateValue as parseInspectionIssueDateValueRule,
   parseInspectionIssueListQuery as parseInspectionIssueListQueryRule,
   parseOptionalIssueYear as parseOptionalIssueYearRule,
-  QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 import { nanoid } from 'nanoid';
-import { QualityClassificationService } from '~/modules/quality-classification';
 import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
 import {
   parseResponsibleDepartments,
@@ -36,7 +34,11 @@ import {
 import prisma from '~/utils/prisma';
 import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 
-import { resolveIssueSupplierBody } from './inspection-issue-supplier';
+import {
+  resolveInspectionIssueCreateBody,
+  resolveInspectionIssueUpdateBody,
+} from './inspection-issue-classification';
+import { normalizeInspectorRelationForIssueUpdate } from './inspection-issue-relations';
 
 export function buildInspectionIssueDateRange(params: {
   dateMode?: InspectionIssueDateMode;
@@ -168,22 +170,8 @@ export async function buildInspectionIssueCreateData(
     serialNumber: number;
   },
 ) {
-  const supplierBody = (await resolveIssueSupplierBody(
-    body,
-    options.inspection,
-    true,
-  )) as Record<string, unknown>;
-  const classification = await QualityClassificationService.assertSelection(
-    QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
-    normalizeOptionalInspectionIssueString(supplierBody.defectCategoryId) || '',
-    normalizeOptionalInspectionIssueString(supplierBody.defectSubcategoryId) ||
-      '',
-  );
-  const canonicalBody = {
-    ...supplierBody,
-    defectSubtype: classification.subcategory.name,
-    defectType: classification.category.name,
-  };
+  const { body: canonicalBody, classification } =
+    await resolveInspectionIssueCreateBody(body, options.inspection);
   const createData = buildInspectionIssueCreateDataCore({
     body: canonicalBody,
     createdBy: options.createdBy,
@@ -401,23 +389,6 @@ function normalizeWorkOrderRelationForIssueUpdate(
   };
 }
 
-function normalizeInspectorRelationForIssueUpdate(
-  updateData: Prisma.quality_recordsUpdateInput,
-): Prisma.quality_recordsUpdateInput {
-  const raw = updateData as Record<string, unknown>;
-  if (!('inspector' in raw)) {
-    return updateData;
-  }
-  const { inspector, ...rest } = raw;
-  const username = normalizeOptionalInspectionIssueString(inspector);
-  return {
-    ...rest,
-    users_quality_records_inspectorTousers: username
-      ? { connect: { username } }
-      : { disconnect: true },
-  } as Prisma.quality_recordsUpdateInput;
-}
-
 export async function buildInspectionIssueUpdateData(
   body: Record<string, unknown>,
   existingNcNumber: null | string,
@@ -427,31 +398,8 @@ export async function buildInspectionIssueUpdateData(
     teamId?: null | string;
   },
 ) {
-  const supplierBody = (await resolveIssueSupplierBody(
-    body,
-    inspection,
-    false,
-  )) as Record<string, unknown>;
-  const hasClassificationInput =
-    supplierBody.defectCategoryId !== undefined ||
-    supplierBody.defectSubcategoryId !== undefined;
-  const classification = hasClassificationInput
-    ? await QualityClassificationService.assertSelection(
-        QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
-        normalizeOptionalInspectionIssueString(supplierBody.defectCategoryId) ||
-          '',
-        normalizeOptionalInspectionIssueString(
-          supplierBody.defectSubcategoryId,
-        ) || '',
-      )
-    : undefined;
-  const canonicalBody = classification
-    ? {
-        ...supplierBody,
-        defectSubtype: classification.subcategory.name,
-        defectType: classification.category.name,
-      }
-    : supplierBody;
+  const { body: canonicalBody, classification } =
+    await resolveInspectionIssueUpdateBody(body, inspection);
   const updateData = buildInspectionIssueUpdateDataCore(
     canonicalBody,
     existingNcNumber,

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionService } from '~/modules/inspection/inspection.service';
-import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/modules/supplier-identity', () => ({
@@ -64,6 +64,12 @@ vi.mock('~/utils/canonical-master-data', async () => {
     },
   };
 });
+
+vi.mock('~/modules/quality-classification', () => ({
+  QualityClassificationService: {
+    resolveCategoryNamesByIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
 
 describe('inspectionService', () => {
   beforeEach(() => {
@@ -170,11 +176,11 @@ describe('inspectionService', () => {
       });
       (prisma.quality_records.count as any).mockResolvedValue(1);
       (prisma.quality_records.groupBy as any).mockResolvedValueOnce([
-        { defectTypeId: 'defect-minor', _count: { id: 1 } },
-        { defectTypeId: 'defect-major', _count: { id: 1 } },
+        { defectCategoryId: 'defect-minor', _count: { id: 1 } },
+        { defectCategoryId: 'defect-major', _count: { id: 1 } },
       ]);
       (
-        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+        QualityClassificationService.resolveCategoryNamesByIds as any
       ).mockResolvedValue(
         new Map([
           ['defect-major', 'Major'],
