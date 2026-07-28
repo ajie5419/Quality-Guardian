@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionReportingService } from '~/modules/inspection/inspection-reporting.service';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
@@ -39,11 +40,20 @@ vi.mock('~/utils/canonical-master-data', () => ({
   },
 }));
 
+vi.mock('~/modules/quality-classification', () => ({
+  QualityClassificationService: {
+    resolveCategoryNamesByIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
 describe('inspectionReportingService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (
       MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+    ).mockResolvedValue(new Map());
+    (
+      QualityClassificationService.resolveCategoryNamesByIds as any
     ).mockResolvedValue(new Map());
     (prisma.quality_records.findUnique as any).mockResolvedValue(null);
   });
@@ -471,7 +481,7 @@ describe('inspectionReportingService', () => {
   describe('getReportDefectRows', () => {
     it('should return defect type rows', async () => {
       (prisma.quality_records.findMany as any).mockResolvedValue([
-        { defectType: 'A', defectTypeId: 'dt-1' },
+        { defectType: 'A', defectCategoryId: 'dt-1' },
       ]);
 
       const result = await InspectionReportingService.getReportDefectRows({
@@ -610,11 +620,11 @@ describe('inspectionReportingService', () => {
         });
       (prisma.quality_records.count as any).mockResolvedValue(8);
       (prisma.quality_records.groupBy as any).mockResolvedValue([
-        { defectTypeId: 'defect-a', _count: { id: 3 } },
-        { defectTypeId: null, _count: { id: 1 } },
+        { defectCategoryId: 'defect-a', _count: { id: 3 } },
+        { defectCategoryId: null, _count: { id: 1 } },
       ]);
       (
-        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+        QualityClassificationService.resolveCategoryNamesByIds as any
       ).mockResolvedValue(new Map([['defect-a', 'A']]));
 
       const result = await InspectionReportingService.getStatsForDashboard({

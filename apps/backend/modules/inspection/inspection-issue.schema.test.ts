@@ -6,7 +6,9 @@ import {
 } from '~/modules/inspection/inspection-issue.schema';
 
 const validCreateBody = {
+  defectCategoryId: 'defect-category-1',
   defectSubtype: '焊接缺陷',
+  defectSubcategoryId: 'defect-subcategory-1',
   defectType: '制造缺陷',
   description: '发现焊缝气孔',
   partName: 'Frame',

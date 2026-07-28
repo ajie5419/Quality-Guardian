@@ -1,5 +1,8 @@
 <script lang="ts" setup>
-import type { InspectionIssueResponsibilityType } from '@qgs/shared';
+import type {
+  InspectionIssueResponsibilityType,
+  QualityClassificationCategory,
+} from '@qgs/shared';
 
 import type { StatusOption } from '../constants';
 
@@ -9,6 +12,7 @@ import { useI18n } from '@vben/locales';
 
 import {
   INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  QUALITY_CLASSIFICATION_SCOPES,
   resolveInspectionIssueResponsibilityTypeFromDepartment,
 } from '@qgs/shared';
 import { Button, message, Select, Switch, Tooltip } from 'ant-design-vue';
@@ -20,6 +24,7 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
+import { useQualityClassificationOptions } from '../../../shared/composables/useQualityClassificationOptions';
 import { useAiAnalysis } from '../composables/useAiAnalysis';
 import { getIssueFormSchemaWithStatusOptions } from './issueFormData';
 import IssuePhotoUpload from './IssuePhotoUpload.vue';
@@ -63,7 +68,8 @@ const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 
 type IssueFormValues = Partial<{
-  defectType: string;
+  defectCategoryId: string;
+  defectSubcategoryId: string;
   description: string;
   division: string;
   inspector: string;
@@ -85,6 +91,25 @@ const formValues = ref<IssueFormValues>({});
 type WelderOption = { label: string; searchText: string; value: string };
 const welderOptions = ref<WelderOption[]>([]);
 const welderLoading = ref(false);
+const {
+  loadOptions: loadClassificationOptions,
+  options: classificationOptions,
+} = useQualityClassificationOptions(QUALITY_CLASSIFICATION_SCOPES[0]);
+
+function mapCategoryOptions(items: QualityClassificationCategory[]) {
+  return items.map((item) => ({ label: item.name, value: item.id }));
+}
+
+function mapSubcategoryOptions(categoryId?: string) {
+  return (
+    classificationOptions.value
+      .find((item) => item.id === categoryId)
+      ?.subcategories.map((item) => ({
+        label: item.name,
+        value: item.id,
+      })) || []
+  );
+}
 
 function isHeaderLikeWelderRecord(params: { code?: string; name?: string }) {
   const name = String(params.name || '')
@@ -280,6 +305,23 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => formValues.value.defectCategoryId,
+  (categoryId, previousCategoryId) => {
+    const subcategoryId = formValues.value.defectSubcategoryId;
+    if (
+      categoryId === previousCategoryId ||
+      !subcategoryId ||
+      mapSubcategoryOptions(categoryId).some(
+        (item) => item.value === subcategoryId,
+      )
+    ) {
+      return;
+    }
+    formApi.setFieldValue('defectSubcategoryId', undefined);
+  },
+);
+
 const EMBEDDED_LOCKED_FIELDS = [
   'workOrderNumber',
   'projectName',
@@ -318,6 +360,34 @@ const {
 } = useAiAnalysis({ formState: formValues });
 
 onMounted(async () => {
+  try {
+    await loadClassificationOptions();
+    formApi.updateSchema([
+      {
+        fieldName: 'defectCategoryId',
+        componentProps: {
+          allowClear: true,
+          options: mapCategoryOptions(classificationOptions.value),
+          showSearch: true,
+        },
+      },
+      {
+        fieldName: 'defectSubcategoryId',
+        dependencies: {
+          triggerFields: ['defectCategoryId'],
+          componentProps: (values: Record<string, unknown>) => ({
+            allowClear: true,
+            options: mapSubcategoryOptions(
+              String(values.defectCategoryId || ''),
+            ),
+            showSearch: true,
+          }),
+        },
+      },
+    ]);
+  } catch (error) {
+    handleApiError(error, 'Load Inspection Issue Classifications');
+  }
   try {
     welderLoading.value = true;
     const result = await getWelderListPage({

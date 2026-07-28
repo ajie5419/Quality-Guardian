@@ -79,8 +79,6 @@ function buildInitialData() {
     inspector,
     claim: DEFAULT_VALUES.DEFAULT_CLAIM,
     photos: [],
-    defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE,
-    defectSubtype: DEFAULT_VALUES.DEFAULT_DEFECT_SUBTYPE,
     severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
   };
 }

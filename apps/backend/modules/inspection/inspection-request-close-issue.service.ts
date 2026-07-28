@@ -140,12 +140,6 @@ function buildCloseLinkedIssueBody(options: {
   const governedIssueFields = buildGovernedWriteFieldsForTable(
     'quality_records',
     {
-      defectSubtype: normalizeInspectionRequestText(
-        options.linkedIssue.defectSubtype,
-      ),
-      defectType:
-        normalizeInspectionRequestText(options.linkedIssue.defectType) ||
-        '制造缺陷',
       division:
         normalizeInspectionRequestText(options.linkedIssue.division) ||
         options.linkedInspection?.work_order?.division ||
@@ -159,6 +153,12 @@ function buildCloseLinkedIssueBody(options: {
   return {
     claim: normalizeInspectionRequestText(options.linkedIssue.claim) || 'No',
     ...governedIssueFields,
+    defectCategoryId: normalizeInspectionRequestText(
+      options.linkedIssue.defectCategoryId,
+    ),
+    defectSubcategoryId: normalizeInspectionRequestText(
+      options.linkedIssue.defectSubcategoryId,
+    ),
     description: normalizeInspectionRequestText(
       options.linkedIssue.description,
     ),

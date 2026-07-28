@@ -6,6 +6,8 @@ export interface InspectionIssue {
   claim: string; // 索赔
   createdBy?: null | string; // Creator user ID
   date: string; // 发现日期 (from Prisma date field)
+  defectCategoryId?: null | string;
+  defectSubcategoryId?: null | string;
   defectSubtype?: string;
   defectType?: string;
   description: string;

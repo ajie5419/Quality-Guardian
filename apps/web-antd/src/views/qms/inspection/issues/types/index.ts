@@ -57,6 +57,8 @@ export interface InspectionIssue {
   processName?: string;
   description: string;
   quantity: number;
+  defectCategoryId?: null | string;
+  defectSubcategoryId?: null | string;
   defectType?: string;
   defectSubtype?: string;
   rootCause?: string;

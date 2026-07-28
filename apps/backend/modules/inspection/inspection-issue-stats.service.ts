@@ -11,7 +11,9 @@ import {
   createIdentityAggregateItem,
   createResolvedAggregateItem,
   formatDate,
+  QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -67,8 +69,6 @@ type InspectionIssueChartMetric = 'count' | 'lossAmount' | 'quantity';
 const CONTROLLED_DIMENSION_CONFIG_KEYS: Partial<
   Record<InspectionIssueChartDimension, string>
 > = {
-  defectSubtype: 'defectSubtype',
-  defectType: 'defectType',
   division: 'division',
   projectName: 'projectName',
   responsibleDepartment: 'responsibleDepartment',
@@ -116,23 +116,23 @@ export const InspectionIssueStatsService = {
 
       // 2. Defect Type Distribution
       const typeStats = await prisma.quality_records.groupBy({
-        by: ['defectTypeId'],
+        by: ['defectCategoryId'],
         where,
         _count: { id: true },
         orderBy: { _count: { id: 'desc' } },
       });
       const defectTypeNames =
-        await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-          configKey: 'defectType',
-          canonicalIds: typeStats.map((item) => item.defectTypeId),
-        });
+        await QualityClassificationService.resolveCategoryNamesByIds(
+          QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+          typeStats.map((item) => item.defectCategoryId),
+        );
 
       const pieData: PieDataItem[] = typeStats.map((s) =>
         createIdentityAggregateItem({
-          canonicalName: s.defectTypeId
-            ? defectTypeNames.get(s.defectTypeId)
+          canonicalName: s.defectCategoryId
+            ? defectTypeNames.get(s.defectCategoryId)
             : null,
-          id: s.defectTypeId,
+          id: s.defectCategoryId,
           value: s._count.id,
         }),
       );
@@ -203,8 +203,8 @@ export const InspectionIssueStatsService = {
       where,
       select: {
         date: true,
-        defectSubtypeId: true, // governance-allow-direct-name-id
-        defectTypeId: true, // governance-allow-direct-name-id
+        defectCategoryId: true,
+        defectSubcategoryId: true,
         divisionId: true, // governance-allow-direct-name-id
         isClaim: true,
         lossAmount: true,
@@ -219,6 +219,8 @@ export const InspectionIssueStatsService = {
 
     const controlledConfigKey =
       CONTROLLED_DIMENSION_CONFIG_KEYS[params.dimension];
+    const classificationDimension =
+      params.dimension === 'defectType' || params.dimension === 'defectSubtype';
     const aggregateMap = new Map<
       string,
       { id: null | string; name: string; value: number }
@@ -232,11 +234,11 @@ export const InspectionIssueStatsService = {
           break;
         }
         case 'defectSubtype': {
-          canonicalId = row.defectSubtypeId;
+          canonicalId = row.defectSubcategoryId;
           break;
         }
         case 'defectType': {
-          canonicalId = row.defectTypeId;
+          canonicalId = row.defectCategoryId;
           break;
         }
         case 'division': {
@@ -277,7 +279,7 @@ export const InspectionIssueStatsService = {
       }
       const normalizedId = String(canonicalId || '').trim() || null;
       let key = `value:${name}`;
-      if (controlledConfigKey) {
+      if (controlledConfigKey || classificationDimension) {
         key = normalizedId ? `id:${normalizedId}` : 'missing:';
       }
       const current = aggregateMap.get(key);
@@ -289,17 +291,32 @@ export const InspectionIssueStatsService = {
     }
 
     const aggregateRows = [...aggregateMap.values()];
-    const canonicalNames = controlledConfigKey
-      ? await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+    const canonicalIds = aggregateRows.map((item) => item.id);
+    let canonicalNames = new Map<string, null | string>();
+    if (params.dimension === 'defectType') {
+      canonicalNames =
+        await QualityClassificationService.resolveCategoryNamesByIds(
+          QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+          canonicalIds,
+        );
+    } else if (params.dimension === 'defectSubtype') {
+      canonicalNames =
+        await QualityClassificationService.resolveSubcategoryNamesByIds(
+          QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+          canonicalIds,
+        );
+    } else if (controlledConfigKey) {
+      canonicalNames =
+        await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
           configKey: controlledConfigKey,
-          canonicalIds: aggregateRows.map((item) => item.id),
-        })
-      : new Map<string, null | string>();
+          canonicalIds,
+        });
+    }
     const top = Number(params.top) > 0 ? Number(params.top) : 15;
     return aggregateRows
       .map((item) => {
         const value = Math.round(item.value * 100) / 100;
-        return controlledConfigKey
+        return controlledConfigKey || classificationDimension
           ? createIdentityAggregateItem({
               canonicalName: item.id ? canonicalNames.get(item.id) : null,
               id: item.id,

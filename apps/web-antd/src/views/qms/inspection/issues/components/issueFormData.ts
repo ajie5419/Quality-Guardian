@@ -1,3 +1,5 @@
+import type { QualityClassificationCategory } from '@qgs/shared';
+
 import type { StatusOption } from '../constants';
 
 import type { VbenFormSchema } from '#/adapter/form';
@@ -7,16 +9,15 @@ import { useI18n } from '@vben/locales';
 import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
 import {
   useClaimOptions,
-  useDefectOptions,
   useSeverityOptions,
   useStatusOptions,
 } from '../constants';
 
 export function getIssueFormSchema(
   processOptionsOverride?: Array<{ label: string; value: string }>,
+  classificationOptions: QualityClassificationCategory[] = [],
 ): VbenFormSchema[] {
   const { t } = useI18n();
-  const { defectOptions, defectSubtypes } = useDefectOptions();
   const { statusOptions: fallbackStatusOptions } = useStatusOptions();
   const { severityOptions } = useSeverityOptions();
   const { claimOptions } = useClaimOptions();
@@ -185,25 +186,38 @@ export function getIssueFormSchema(
       },
     },
     {
-      fieldName: 'defectType',
+      fieldName: 'defectCategoryId',
       label: t('qms.inspection.issues.defectType'),
       component: 'Select',
       rules: 'selectRequired',
       componentProps: {
-        options: defectOptions.value,
+        options: classificationOptions.map((item) => ({
+          label: item.name,
+          value: item.id,
+        })),
+        allowClear: true,
+        showSearch: true,
       },
     },
     {
-      fieldName: 'defectSubtype',
+      fieldName: 'defectSubcategoryId',
       label: t('qms.inspection.issues.defectSubtype'),
       component: 'Select',
       rules: 'selectRequired',
       dependencies: {
-        triggerFields: ['defectType'],
+        triggerFields: ['defectCategoryId'],
         componentProps: (values: Record<string, unknown>) => {
-          const type = values.defectType;
+          const categoryId = String(values.defectCategoryId || '');
+          const category = classificationOptions.find(
+            (item) => item.id === categoryId,
+          );
           return {
-            options: type ? defectSubtypes.value[type as string] || [] : [],
+            options: (category?.subcategories || []).map((item) => ({
+              label: item.name,
+              value: item.id,
+            })),
+            allowClear: true,
+            showSearch: true,
           };
         },
       },
@@ -271,8 +285,9 @@ export function getIssueFormSchema(
 export function getIssueFormSchemaWithStatusOptions(
   options?: StatusOption[],
   processOptions?: Array<{ label: string; value: string }>,
+  classificationOptions: QualityClassificationCategory[] = [],
 ): VbenFormSchema[] {
-  const schema = getIssueFormSchema(processOptions);
+  const schema = getIssueFormSchema(processOptions, classificationOptions);
   const target = schema.find((item) => item.fieldName === 'status');
   if (target) {
     target.componentProps = {

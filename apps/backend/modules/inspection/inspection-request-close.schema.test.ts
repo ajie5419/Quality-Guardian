@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { validateCloseRequestBody } from './inspection-request-close.schema';
 
 const VALID_LINKED_ISSUE = {
-  defectSubtype: 'crack',
-  defectType: 'surface',
+  defectCategoryId: 'category-surface',
+  defectSubcategoryId: 'subcategory-crack',
   description: 'defect',
   partName: 'Bearing',
   processName: 'Welding',

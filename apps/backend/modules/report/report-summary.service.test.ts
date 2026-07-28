@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { ReportQueryValidationError } from '~/modules/report/report-query-validation-error';
 import { ReportSummaryService } from '~/modules/report/report-summary.service';
 
@@ -32,6 +33,12 @@ vi.mock('~/modules/after-sales', () => ({
 vi.mock('~/modules/quality-loss', () => ({
   QualityLossService: {
     getReportPeriodMetrics: vi.fn().mockResolvedValue({ manualLoss: 0 }),
+  },
+}));
+
+vi.mock('~/modules/quality-classification', () => ({
+  QualityClassificationService: {
+    resolveCategoryNamesByIds: vi.fn().mockResolvedValue(new Map()),
   },
 }));
 
@@ -158,17 +165,14 @@ describe('reportSummaryService', () => {
 
   it('aggregates defects by canonical ID without using legacy names as identity', async () => {
     const { InspectionService } = await import('~/modules/inspection');
-    const { MasterDataGovernanceKernel } = await import(
-      '~/utils/canonical-master-data'
-    );
     vi.mocked(InspectionService.getReportDefectRows).mockResolvedValueOnce([
-      { defectType: 'Old Crack', defectTypeId: 'defect-1' },
-      { defectType: 'Renamed Crack', defectTypeId: 'defect-1' },
-      { defectType: 'Legacy Guess', defectTypeId: 'invalid-id' },
-      { defectType: 'Legacy Missing', defectTypeId: null },
+      { defectType: 'Old Crack', defectCategoryId: 'defect-1' },
+      { defectType: 'Renamed Crack', defectCategoryId: 'defect-1' },
+      { defectType: 'Legacy Guess', defectCategoryId: 'invalid-id' },
+      { defectType: 'Legacy Missing', defectCategoryId: null },
     ] as any);
     vi.mocked(
-      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
+      QualityClassificationService.resolveCategoryNamesByIds,
     ).mockResolvedValueOnce(new Map([['defect-1', 'Crack']]));
 
     const result = await ReportSummaryService.getSummary(

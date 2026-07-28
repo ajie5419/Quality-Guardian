@@ -34,8 +34,8 @@ type CloseForm = {
 
 type LinkedIssueDraft = {
   claim: string;
-  defectSubtype: string;
-  defectType: string;
+  defectCategoryId: string;
+  defectSubcategoryId: string;
   description: string;
   division: string;
   divisionId: string;
@@ -78,7 +78,6 @@ interface Props {
   closeQr: string;
   closeQrOpen: boolean;
   currentRequest?: InspectionRequest;
-  defectOptions: Array<{ label: string; value: string }>;
   deptTreeData: TreeSelectNode[];
   detailDrawerProps: Omit<DispatchDetailDrawerProps, 'open'>;
   dispatchDetailOpen: boolean;
@@ -93,7 +92,6 @@ interface Props {
   inspectorStatusOpen: boolean;
   inspectorStatusTaskLoading: boolean;
   inspectorStatusTasks: InspectionRequest[];
-  linkedDefectSubtypeOptions: Array<{ label: string; value: string }>;
   linkedIssueDraft: LinkedIssueDraft;
   minutesText: (value?: number) => string;
   severityOptions: Array<{ label: string; value: string }>;

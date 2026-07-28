@@ -1,4 +1,6 @@
 import { Prisma } from '@prisma/client';
+import { QUALITY_CLASSIFICATION_SCOPE } from '@qgs/shared';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { eventBus } from '~/utils/event-bus';
@@ -381,7 +383,7 @@ export const InspectionReportingService = {
   async getReportDefectRows(params: { end: Date; start: Date }) {
     return prisma.quality_records.findMany({
       where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
-      select: { defectType: true, defectTypeId: true },
+      select: { defectCategoryId: true, defectType: true },
     });
   },
 
@@ -475,16 +477,16 @@ export const InspectionReportingService = {
           where: { ...baseWhere, date: { gte: params.weekStart } },
         }),
         prisma.quality_records.groupBy({
-          by: ['defectTypeId'],
+          by: ['defectCategoryId'],
           where: { ...baseWhere, date: { gte: params.yearStart } },
           _count: { id: true },
         }),
       ]);
     const defectTypeNames =
-      await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-        configKey: 'defectType',
-        canonicalIds: yearTypeStats.map((item) => item.defectTypeId),
-      });
+      await QualityClassificationService.resolveCategoryNamesByIds(
+        QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+        yearTypeStats.map((item) => item.defectCategoryId),
+      );
 
     return {
       totalCount: yearAggregate._count.id || 0,
@@ -492,7 +494,7 @@ export const InspectionReportingService = {
       totalLoss: Number(yearAggregate._sum.lossAmount || 0),
       weeklyLoss: Number(weekAggregate._sum.lossAmount || 0),
       issueDistribution: yearTypeStats.map((item) => ({
-        type: getCanonicalDisplayName(item.defectTypeId, defectTypeNames),
+        type: getCanonicalDisplayName(item.defectCategoryId, defectTypeNames),
         value: item._count.id,
       })),
     };

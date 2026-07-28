@@ -7,6 +7,7 @@ import { computed, ref, watch } from 'vue';
 
 import { useUserStore } from '@vben/stores';
 
+import { QUALITY_CLASSIFICATION_SCOPES } from '@qgs/shared';
 import { Input, InputNumber, message, Select } from 'ant-design-vue';
 import dayjs from 'dayjs';
 
@@ -18,11 +19,11 @@ import BomItemSelect from '#/views/qms/shared/components/BomItemSelect.vue';
 import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
 import { useProcessMasterOptions } from '../../../shared/composables/useProcessMasterOptions';
+import { useQualityClassificationOptions } from '../../../shared/composables/useQualityClassificationOptions';
 import IssuePhotoUpload from '../../issues/components/IssuePhotoUpload.vue';
 import {
   DEFAULT_VALUES,
   useClaimOptions,
-  useDefectOptions,
   useSeverityOptions,
 } from '../../issues/constants';
 import { mapDictionaryOptionsToInspectionProcess } from '../config';
@@ -42,6 +43,8 @@ const props = defineProps<{
 
 interface LinkedIssueDraft {
   claim: string;
+  defectCategoryId: string;
+  defectSubcategoryId: string;
   defectSubtype: string;
   defectType: string;
   description: string;
@@ -65,14 +68,19 @@ interface LinkedIssueDraft {
 
 const userStore = useUserStore();
 const { handleApiError } = useErrorHandler();
-const { defectOptions, defectSubtypes } = useDefectOptions();
 const { severityOptions } = useSeverityOptions();
 const { claimOptions } = useClaimOptions();
+const {
+  loadOptions: loadDefectClassifications,
+  options: defectClassifications,
+} = useQualityClassificationOptions(QUALITY_CLASSIFICATION_SCOPES[0]);
 
 const linkedIssueDraft = ref<LinkedIssueDraft>({
   claim: DEFAULT_VALUES.DEFAULT_CLAIM,
-  defectSubtype: DEFAULT_VALUES.DEFAULT_DEFECT_SUBTYPE,
-  defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE,
+  defectCategoryId: '',
+  defectSubcategoryId: '',
+  defectSubtype: '',
+  defectType: '',
   description: '',
   lossAmount: 0,
   partName: '',
@@ -92,9 +100,20 @@ const linkedIssueDraft = ref<LinkedIssueDraft>({
   severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
 });
 const linkedDefectSubtypeOptions = computed(() => {
-  const defectType = linkedIssueDraft.value.defectType;
-  return defectSubtypes.value[defectType] || [];
+  const category = defectClassifications.value.find(
+    (item) => item.id === linkedIssueDraft.value.defectCategoryId,
+  );
+  return (category?.subcategories || []).map((item) => ({
+    label: item.name,
+    value: item.id,
+  }));
 });
+const defectOptions = computed(() =>
+  defectClassifications.value.map((item) => ({
+    label: item.name,
+    value: item.id,
+  })),
+);
 const shouldCreateLinkedIssue = computed(
   () => String(activeValues.value.result || '').toUpperCase() === 'FAIL',
 );
@@ -313,8 +332,10 @@ watch(
     }
     linkedIssueDraft.value = {
       claim: DEFAULT_VALUES.DEFAULT_CLAIM,
-      defectSubtype: DEFAULT_VALUES.DEFAULT_DEFECT_SUBTYPE,
-      defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE,
+      defectCategoryId: '',
+      defectSubcategoryId: '',
+      defectSubtype: '',
+      defectType: '',
       description: '',
       lossAmount: 0,
       partName: deriveIssuePartName(activeValues.value),
@@ -340,7 +361,11 @@ watch(
   { immediate: true },
 );
 
-void Promise.all([loadWelderOptions(), loadInspectionProcessOptions()]);
+void Promise.all([
+  loadWelderOptions(),
+  loadInspectionProcessOptions(),
+  loadDefectClassifications(),
+]);
 
 defineExpose({
   getValues: async () => {
@@ -434,11 +459,11 @@ defineExpose({
         message.warning('请填写责任部门');
         throw new Error('Issue responsible department required');
       }
-      if (!linkedIssueDraft.value.defectType.trim()) {
+      if (!linkedIssueDraft.value.defectCategoryId.trim()) {
         message.warning('请选择缺陷分类');
         throw new Error('Issue defect type required');
       }
-      if (!linkedIssueDraft.value.defectSubtype.trim()) {
+      if (!linkedIssueDraft.value.defectSubcategoryId.trim()) {
         message.warning('请选择二级分类');
         throw new Error('Issue defect subtype required');
       }
@@ -557,12 +582,12 @@ defineExpose({
       <div>
         <div class="mb-1 text-gray-600">缺陷分类</div>
         <Select
-          v-model:value="linkedIssueDraft.defectType"
+          v-model:value="linkedIssueDraft.defectCategoryId"
           :options="defectOptions"
           class="w-full"
           @change="
             () => {
-              linkedIssueDraft.defectSubtype =
+              linkedIssueDraft.defectSubcategoryId =
                 linkedDefectSubtypeOptions[0]?.value || '';
             }
           "
@@ -571,7 +596,7 @@ defineExpose({
       <div>
         <div class="mb-1 text-gray-600">二级分类</div>
         <Select
-          v-model:value="linkedIssueDraft.defectSubtype"
+          v-model:value="linkedIssueDraft.defectSubcategoryId"
           :options="linkedDefectSubtypeOptions"
           class="w-full"
         />

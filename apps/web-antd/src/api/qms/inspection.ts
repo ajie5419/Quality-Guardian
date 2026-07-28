@@ -52,6 +52,7 @@ export type InspectionIssueChartAggregateItem = IdentityAggregateItem;
 export async function getInspectionIssues(params?: {
   dateMode?: 'month' | 'week' | 'year';
   dateValue?: string;
+  defectCategoryId?: string | string[];
   endDate?: string;
   page?: number;
   pageSize?: number;

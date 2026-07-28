@@ -1,5 +1,8 @@
 import type { Prisma } from '@prisma/client';
-import type { InspectionIssueDateMode } from '@qgs/shared';
+import type {
+  InspectionIssueDateMode,
+  QualityClassificationSelection,
+} from '@qgs/shared';
 
 import {
   buildInspectionIssueCreateDataCore,
@@ -17,8 +20,10 @@ import {
   parseInspectionIssueDateValue as parseInspectionIssueDateValueRule,
   parseInspectionIssueListQuery as parseInspectionIssueListQueryRule,
   parseOptionalIssueYear as parseOptionalIssueYearRule,
+  QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 import { nanoid } from 'nanoid';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
 import {
   parseResponsibleDepartments,
@@ -163,13 +168,24 @@ export async function buildInspectionIssueCreateData(
     serialNumber: number;
   },
 ) {
-  const supplierBody = await resolveIssueSupplierBody(
+  const supplierBody = (await resolveIssueSupplierBody(
     body,
     options.inspection,
     true,
+  )) as Record<string, unknown>;
+  const classification = await QualityClassificationService.assertSelection(
+    QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+    normalizeOptionalInspectionIssueString(supplierBody.defectCategoryId) || '',
+    normalizeOptionalInspectionIssueString(supplierBody.defectSubcategoryId) ||
+      '',
   );
+  const canonicalBody = {
+    ...supplierBody,
+    defectSubtype: classification.subcategory.name,
+    defectType: classification.category.name,
+  };
   const createData = buildInspectionIssueCreateDataCore({
-    body: supplierBody,
+    body: canonicalBody,
     createdBy: options.createdBy,
     inspection: options.inspection,
     inspectorUsername: options.inspectorUsername,
@@ -178,7 +194,8 @@ export async function buildInspectionIssueCreateData(
     uuid: options.id,
   }) as Prisma.quality_recordsCreateInput;
   return attachProcessIdToIssueCreateData(
-    attachResponsibleDepartmentsToIssueCreateData(body, createData),
+    attachResponsibleDepartmentsToIssueCreateData(canonicalBody, createData),
+    classification,
   );
 }
 
@@ -233,6 +250,7 @@ function attachResponsibleDepartmentsToIssueUpdateData(
 
 async function attachProcessIdToIssueCreateData(
   createData: Prisma.quality_recordsCreateInput,
+  classification: QualityClassificationSelection,
 ) {
   const processName = normalizeOptionalInspectionIssueString(
     createData.processName,
@@ -261,6 +279,8 @@ async function attachProcessIdToIssueCreateData(
     ...createDataWithoutSupplierId,
     ...governedFields,
     ...governedCanonicalIds,
+    defectCategory: { connect: { id: classification.category.id } },
+    defectSubcategory: { connect: { id: classification.subcategory.id } },
     ...(supplierId ? { supplier: { connect: { id: supplierId } } } : {}),
   } as Prisma.quality_recordsCreateInput;
   if (!processId) {
@@ -279,6 +299,7 @@ async function attachProcessIdToIssueCreateData(
 async function attachProcessIdToIssueUpdateData(
   body: Record<string, unknown>,
   updateData: Prisma.quality_recordsUpdateInput,
+  classification?: QualityClassificationSelection,
 ) {
   const { updateData: workOrderUpdateData, workOrderNumber } =
     normalizeWorkOrderRelationForIssueUpdate(updateData);
@@ -307,6 +328,14 @@ async function attachProcessIdToIssueUpdateData(
     ...updateDataWithoutSupplierId,
     ...governedFields,
     ...governedCanonicalIds,
+    ...(classification
+      ? {
+          defectCategory: { connect: { id: classification.category.id } },
+          defectSubcategory: {
+            connect: { id: classification.subcategory.id },
+          },
+        }
+      : {}),
     ...(hasSupplierInput
       ? {
           supplier: supplierId
@@ -398,15 +427,40 @@ export async function buildInspectionIssueUpdateData(
     teamId?: null | string;
   },
 ) {
-  const supplierBody = await resolveIssueSupplierBody(body, inspection, false);
+  const supplierBody = (await resolveIssueSupplierBody(
+    body,
+    inspection,
+    false,
+  )) as Record<string, unknown>;
+  const hasClassificationInput =
+    supplierBody.defectCategoryId !== undefined ||
+    supplierBody.defectSubcategoryId !== undefined;
+  const classification = hasClassificationInput
+    ? await QualityClassificationService.assertSelection(
+        QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+        normalizeOptionalInspectionIssueString(supplierBody.defectCategoryId) ||
+          '',
+        normalizeOptionalInspectionIssueString(
+          supplierBody.defectSubcategoryId,
+        ) || '',
+      )
+    : undefined;
+  const canonicalBody = classification
+    ? {
+        ...supplierBody,
+        defectSubtype: classification.subcategory.name,
+        defectType: classification.category.name,
+      }
+    : supplierBody;
   const updateData = buildInspectionIssueUpdateDataCore(
-    supplierBody,
+    canonicalBody,
     existingNcNumber,
     (value) => toQualityRecordStatus(value),
   ) as Prisma.quality_recordsUpdateInput;
   const withRelations = await attachProcessIdToIssueUpdateData(
-    supplierBody,
-    attachResponsibleDepartmentsToIssueUpdateData(supplierBody, updateData),
+    canonicalBody,
+    attachResponsibleDepartmentsToIssueUpdateData(canonicalBody, updateData),
+    classification,
   );
   return normalizeInspectorRelationForIssueUpdate(withRelations);
 }

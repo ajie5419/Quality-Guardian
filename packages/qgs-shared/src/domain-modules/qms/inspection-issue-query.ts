@@ -184,7 +184,9 @@ export function parseInspectionIssueListQuery(query: Record<string, unknown>) {
   return {
     dateMode: parseInspectionIssueDateMode(getQueryValue(query, 'dateMode')),
     dateValue: parseInspectionIssueDateValue(getQueryValue(query, 'dateValue')),
-    defectType: parseMultiString(getQueryValue(query, 'defectType')),
+    defectCategoryId: parseMultiString(
+      getQueryValue(query, 'defectCategoryId'),
+    ),
     endDate: parseInspectionIssueDateBoundary(getQueryValue(query, 'endDate')),
     page,
     pageSize,

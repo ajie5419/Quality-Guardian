@@ -13,6 +13,7 @@ import {
   hasInspectionIssueAdminAccess,
   hasInspectionIssueWriteAccess,
   QMS_DICTIONARY_TYPE_KEYS,
+  QUALITY_CLASSIFICATION_SCOPES,
 } from '@qgs/shared';
 import { Image, Tag } from 'ant-design-vue';
 import dayjs from 'dayjs';
@@ -29,6 +30,7 @@ import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import { useDictionaryOptions } from '../../shared/composables/useDictionaryOptions';
 import { useProcessMasterOptions } from '../../shared/composables/useProcessMasterOptions';
+import { useQualityClassificationOptions } from '../../shared/composables/useQualityClassificationOptions';
 import { mapDictionaryOptionsToInspectionProcess } from '../records/config';
 import IssueChartDashboard from './components/IssueChartDashboard.vue';
 import IssueDetailDrawer from './components/IssueDetailDrawer.vue';
@@ -112,6 +114,10 @@ const {
 } = useProcessMasterOptions({
   mapOptions: (options) => mapDictionaryOptionsToInspectionProcess(options),
 });
+const {
+  options: issueDefectCategories,
+  loadOptions: loadIssueDefectCategories,
+} = useQualityClassificationOptions(QUALITY_CLASSIFICATION_SCOPES[0]);
 
 function refreshIssueSearchSchema() {
   gridApi.setState({
@@ -264,6 +270,7 @@ const { gridOptions } = useIssueGridOptions({
   canEdit,
   canImport,
   canSettle,
+  defectCategories: issueDefectCategories,
   issueStatusOptions,
   currentYear: currentFilterYear,
   defaultProjectName: routeProjectName,
@@ -302,7 +309,15 @@ const [Grid, gridApi] = useVbenVxeGrid({
 });
 
 gridApiProxyRef.value = gridApi;
-void Promise.all([loadIssueStatusOptions(), loadIssueProcessOptions()]);
+void Promise.all([
+  loadIssueStatusOptions(),
+  loadIssueProcessOptions(),
+  loadIssueDefectCategories().then(() => {
+    gridApi.setGridOptions({
+      columns: gridOptions.value?.columns || [],
+    });
+  }),
+]);
 
 const { showCharts, loadPreferences, handleSaveSystemDefault } =
   useIssueChartPreferences();

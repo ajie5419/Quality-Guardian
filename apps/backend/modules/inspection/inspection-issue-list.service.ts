@@ -193,7 +193,7 @@ export const InspectionIssueListService = {
   async getIssues(params: {
     dateMode?: InspectionIssueDateMode;
     dateValue?: string;
-    defectType?: string | string[];
+    defectCategoryId?: string | string[];
     endDate?: string;
     page?: number;
     pageSize?: number;
@@ -255,10 +255,10 @@ export const InspectionIssueListService = {
         : params.severity;
     }
 
-    if (params.defectType) {
-      where.defectType = Array.isArray(params.defectType)
-        ? { in: params.defectType }
-        : params.defectType;
+    if (params.defectCategoryId) {
+      where.defectCategoryId = Array.isArray(params.defectCategoryId)
+        ? { in: params.defectCategoryId }
+        : params.defectCategoryId;
     }
 
     if (params.status) {

@@ -2,19 +2,20 @@ import {
   createIdentityAggregateItem,
   parseReportPeriodType,
   QMS_DEFAULT_VALUES,
+  QUALITY_CLASSIFICATION_SCOPE,
   resolveReportPeriodRange,
   resolveReportShortLabel,
   shiftReportAnchorDate,
 } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { QualityLossService } from '~/modules/quality-loss';
 import {
   createPassRateTargetResolver,
   getNetPassRateSummaryByRange,
   getPassRateDrillDownByRange,
 } from '~/modules/report/pass-rate';
-import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 
 import { ReportDailySummaryService } from './report-daily-summary.service';
 import { ReportQueryValidationError } from './report-query-validation-error';
@@ -193,14 +194,14 @@ async function fetchDefectDistribution(start: Date, end: Date) {
   const rows = await InspectionService.getReportDefectRows({ start, end });
   const countByDefectTypeId = new Map<null | string, number>();
   for (const row of rows) {
-    const id = String(row.defectTypeId || '').trim() || null;
+    const id = String(row.defectCategoryId || '').trim() || null;
     countByDefectTypeId.set(id, (countByDefectTypeId.get(id) || 0) + 1);
   }
   const defectTypeNameById =
-    await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-      configKey: 'defectType',
-      canonicalIds: [...countByDefectTypeId.keys()],
-    });
+    await QualityClassificationService.resolveCategoryNamesByIds(
+      QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+      [...countByDefectTypeId.keys()],
+    );
   return [...countByDefectTypeId.entries()]
     .map(([id, value]) =>
       createIdentityAggregateItem({

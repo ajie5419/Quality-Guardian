@@ -125,6 +125,8 @@ export interface CloseInspectionRequestParams {
   inspector?: string;
   linkedIssue?: {
     claim?: string;
+    defectCategoryId?: string;
+    defectSubcategoryId?: string;
     defectSubtype?: string;
     defectType?: string;
     description?: string;
