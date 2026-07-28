@@ -38,6 +38,7 @@ const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
 const processOptions = ref<Array<{ label: string; value: string }>>([]);
+const requiredProcessSelectionTouched = ref(false);
 
 const formState = reactive<
   Partial<QmsPlanningApi.BomItem> & { workOrderNumber?: string }
@@ -81,6 +82,7 @@ watch(
   () => props.open,
   (val) => {
     if (val) {
+      requiredProcessSelectionTouched.value = false;
       Object.assign(formState, {
         partName: props.initialData.partName || '',
         partNumber: props.initialData.partNumber || '',
@@ -105,12 +107,20 @@ async function handleOk() {
     const processNameById = new Map(
       processOptions.value.map((option) => [option.value, option.label]),
     );
-    const payload = {
-      ...formState,
-      requiredProcesses: (formState.requiredProcessIds || []).map(
+    const {
+      requiredProcessIds,
+      requiredProcesses: _snapshot,
+      ...basePayload
+    } = formState;
+    const replacesProcessIdentities =
+      !props.isEditMode || requiredProcessSelectionTouched.value;
+    const payload: Partial<QmsPlanningApi.BomItem> = { ...basePayload };
+    if (replacesProcessIdentities) {
+      payload.requiredProcessIds = requiredProcessIds || [];
+      payload.requiredProcesses = (requiredProcessIds || []).map(
         (processId) => processNameById.get(processId) || '',
-      ),
-    };
+      );
+    }
     if (props.isEditMode && props.currentId) {
       await updateBom(props.currentId, payload as QmsPlanningApi.BomItem);
       message.success(t('common.saveSuccess'));
@@ -198,6 +208,7 @@ onMounted(async () => {
               allow-clear
               :options="processOptions"
               placeholder="请选择所需检验工序"
+              @change="requiredProcessSelectionTouched = true"
             />
           </Form.Item>
         </Col>

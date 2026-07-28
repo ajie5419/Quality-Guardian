@@ -65,7 +65,11 @@ const workOrderOptions = ref<
 const workOrderProcessesLoading = ref(false);
 const { compressImage } = useImageCompress();
 const workOrderProcesses = ref<
-  Array<{ processId: string; processName: string }>
+  Array<{
+    category: 'INCOMING' | 'PROCESS';
+    processId: string;
+    processName: string;
+  }>
 >([]);
 
 const requestForm = reactive({
@@ -104,7 +108,10 @@ const {
 } = useInspectionRequestIdentityOptions({ isIncomingEntry, requestForm });
 
 const processOptions = computed(() =>
-  buildInspectionRequestEntryProcessOptions(workOrderProcesses.value),
+  buildInspectionRequestEntryProcessOptions(
+    workOrderProcesses.value,
+    isIncomingEntry.value ? 'INCOMING' : 'PROCESS',
+  ),
 );
 
 const isAssemblyProcess = computed(() =>
@@ -265,9 +272,7 @@ async function loadWorkOrderProcessOptions(workOrderNumber: string) {
 
     workOrderProcesses.value = list || [];
     const selected = isIncomingEntry.value
-      ? workOrderProcesses.value.find(
-          (item) => item.processName === INCOMING_INSPECTION_PROCESS_NAME,
-        )
+      ? workOrderProcesses.value.find((item) => item.category === 'INCOMING')
       : workOrderProcesses.value.find(
           (item) => item.processId === requestForm.processId,
         );

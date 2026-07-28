@@ -6,7 +6,7 @@ import prisma from '~/utils/prisma';
 vi.mock('~/utils/prisma', () => ({
   default: {
     processes: {
-      findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
     project_boms: {
       findMany: vi.fn(),
@@ -15,9 +15,6 @@ vi.mock('~/utils/prisma', () => ({
       findMany: vi.fn(),
     },
     qms_inspection_requests: {
-      findMany: vi.fn(),
-    },
-    work_order_requirements: {
       findMany: vi.fn(),
     },
   },
@@ -91,25 +88,39 @@ describe('inspection public query service', () => {
     ]);
   });
 
-  it('returns canonical process IDs and names', async () => {
-    (
-      prisma.work_order_requirements.findMany as ReturnType<typeof vi.fn>
-    ).mockResolvedValue([
+  it('returns every active canonical process with its request category', async () => {
+    (prisma.processes.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
       {
-        process: { name: 'Canonical Welding' },
-        processId: 'process-1',
-        processName: 'Historical Welding',
+        id: 'process-1',
+        inspectionRequestCategory: 'PROCESS',
+        name: 'Canonical Welding',
+      },
+      {
+        id: 'process-2',
+        inspectionRequestCategory: 'INCOMING',
+        name: 'Receipt verification',
       },
     ]);
-    (prisma.processes.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(
-      null,
-    );
 
     await expect(
       InspectionPublicQueryService.getPublicProcesses('WO-1'),
     ).resolves.toEqual([
-      { processId: 'process-1', processName: 'Canonical Welding' },
+      {
+        category: 'PROCESS',
+        processId: 'process-1',
+        processName: 'Canonical Welding',
+      },
+      {
+        category: 'INCOMING',
+        processId: 'process-2',
+        processName: 'Receipt verification',
+      },
     ]);
+    expect(prisma.processes.findMany).toHaveBeenCalledWith({
+      where: { isDeleted: false, status: 1 },
+      orderBy: [{ sort: 'asc' }, { name: 'asc' }],
+      select: { id: true, inspectionRequestCategory: true, name: true },
+    });
   });
 
   it('returns BOM part identities without replacing them with BOM row IDs', async () => {
@@ -265,7 +276,7 @@ describe('getTodayIncomingInspections', () => {
     expect(result.truncated).toBe(true);
   });
 
-  it('calls findMany with correct where clause including processName and OR status branches', async () => {
+  it('queries incoming category first and falls back only for null legacy rows', async () => {
     (
       prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
     ).mockResolvedValue([]);
@@ -274,28 +285,31 @@ describe('getTodayIncomingInspections', () => {
 
     expect(prisma.qms_inspection_requests.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
+        where: {
+          AND: [
+            {
+              OR: [
+                { category: 'INCOMING' },
+                { category: null, processName: '进货检验' },
+              ],
+            },
+            {
+              OR: [
+                {
+                  status: { in: ['SUBMITTED', 'DISPATCHED', 'INSPECTING'] },
+                },
+                {
+                  status: 'CLOSED',
+                  closedAt: {
+                    gte: expect.any(Date),
+                    lt: expect.any(Date),
+                  },
+                },
+              ],
+            },
+          ],
           isDeleted: false,
-          processName: '进货检验',
-          OR: expect.arrayContaining([
-            expect.objectContaining({
-              status: expect.objectContaining({
-                in: expect.arrayContaining([
-                  'SUBMITTED',
-                  'DISPATCHED',
-                  'INSPECTING',
-                ]),
-              }),
-            }),
-            expect.objectContaining({
-              status: 'CLOSED',
-              closedAt: expect.objectContaining({
-                gte: expect.any(Date),
-                lt: expect.any(Date),
-              }),
-            }),
-          ]),
-        }),
+        },
       }),
     );
   });

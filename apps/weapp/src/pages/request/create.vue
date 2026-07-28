@@ -4,6 +4,7 @@ import { computed, reactive, ref } from 'vue';
 import {
   getBomParts,
   getProcesses,
+  getSuppliers,
   getTeams,
   searchWorkOrders,
   submitInspectionRequest,
@@ -11,6 +12,7 @@ import {
 import { buildResourceUrl, uploadFile } from '@/api/request';
 import { useUserStore } from '@/stores/user';
 import { onLoad } from '@dcloudio/uni-app';
+import { isInspectionRequestAssemblyProcess } from '@qgs/shared';
 
 interface WorkOrderItem {
   workOrderNumber: string;
@@ -26,6 +28,7 @@ interface BomPartItem {
 }
 
 interface ProcessItem {
+  category: 'INCOMING' | 'PROCESS';
   processId: string;
   processName: string;
 }
@@ -42,6 +45,7 @@ interface AttachmentItem {
 }
 
 interface FormState {
+  category: '' | 'INCOMING' | 'PROCESS';
   workOrderNumber: string;
   processId: string;
   processName: string;
@@ -53,17 +57,17 @@ interface FormState {
   teamId: string;
   reporter: string;
   selfCheckResult: string;
+  supplierId: string;
   mutualCheckResult: string;
   requestInfo: string;
   attachments: AttachmentItem[];
 }
 
 const CHECK_RESULT_OPTIONS = ['PASS', 'FAIL', 'NA'];
-const OPTIONAL_COMPONENT_PROCESSES = new Set(['装配', '进货检验']);
-
 const userStore = useUserStore();
 
 const form = reactive<FormState>({
+  category: '',
   workOrderNumber: '',
   processId: '',
   processName: '',
@@ -75,6 +79,7 @@ const form = reactive<FormState>({
   teamId: '',
   reporter: '',
   selfCheckResult: '',
+  supplierId: '',
   mutualCheckResult: '',
   requestInfo: '',
   attachments: [],
@@ -117,10 +122,21 @@ const processLabels = computed(() =>
   processList.value.map((item) => item.processName),
 );
 const teamLabels = computed(() => teamList.value.map((t) => t.label));
+const isIncoming = computed(() => form.category === 'INCOMING');
+const selectedResponsibleIdentityId = computed(() =>
+  isIncoming.value ? form.supplierId : form.teamId,
+);
+const selectedResponsibleIdentityLabel = computed(
+  () =>
+    teamList.value.find(
+      (item) => item.value === selectedResponsibleIdentityId.value,
+    )?.label || '',
+);
 
 // Whether componentName is required
 const componentRequired = computed(
-  () => !OPTIONAL_COMPONENT_PROCESSES.has(form.processName),
+  () =>
+    !isIncoming.value && !isInspectionRequestAssemblyProcess(form.processName),
 );
 
 const submitting = ref(false);
@@ -136,8 +152,21 @@ onLoad(async () => {
 
 async function loadTeams() {
   const res = await getTeams();
+  if (form.category && form.category !== 'PROCESS') return;
   if (res.code === 0 && Array.isArray(res.data)) {
     teamList.value = res.data;
+  }
+}
+
+async function loadSuppliers() {
+  const res = await getSuppliers();
+  if (form.category !== 'INCOMING') return;
+  if (res.code === 0 && Array.isArray(res.data)) {
+    teamList.value = res.data.map((item) => ({
+      group: 'supplier',
+      label: item.label,
+      value: item.value,
+    }));
   }
 }
 
@@ -188,9 +217,13 @@ async function selectWorkOrder(item: WorkOrderItem) {
   // Clear downstream selections
   form.processName = '';
   form.processId = '';
+  form.category = '';
   form.componentName = '';
   form.partName = '';
   form.partId = '';
+  form.supplierId = '';
+  form.teamId = '';
+  form.team = '';
   processIndex.value = -1;
   bomPartIndex.value = -1;
   processList.value = [];
@@ -211,15 +244,22 @@ async function selectWorkOrder(item: WorkOrderItem) {
 
 function onProcessChange(e: { detail: { value: string } }) {
   const idx = Number(e.detail.value);
+  const process = processList.value[idx];
   processIndex.value = idx;
-  form.processId = processList.value[idx]?.processId ?? '';
-  form.processName = processList.value[idx]?.processName ?? '';
+  form.category = process?.category ?? '';
+  form.processId = process?.processId ?? '';
+  form.processName = process?.processName ?? '';
   errors.processName = false;
   // Reset component/part when process changes
   form.componentName = '';
   form.partId = '';
   form.partName = '';
+  form.supplierId = '';
+  form.teamId = '';
+  form.team = '';
+  teamIndex.value = -1;
   bomPartIndex.value = -1;
+  void (form.category === 'INCOMING' ? loadSuppliers() : loadTeams());
 }
 
 function onBomPartChange(e: { detail: { value: string } }) {
@@ -237,7 +277,9 @@ function onBomPartChange(e: { detail: { value: string } }) {
 function onTeamChange(e: { detail: { value: string } }) {
   const idx = Number(e.detail.value);
   teamIndex.value = idx;
-  form.teamId = teamList.value[idx]?.value ?? '';
+  const identityId = teamList.value[idx]?.value ?? '';
+  form.supplierId = isIncoming.value ? identityId : '';
+  form.teamId = isIncoming.value ? '' : identityId;
   form.team = teamList.value[idx]?.label ?? '';
   errors.team = false;
 }
@@ -301,11 +343,11 @@ function handleRemovePhoto(index: number) {
 
 function validate(): boolean {
   errors.workOrderNumber = !form.workOrderNumber;
-  errors.processName = !form.processId || !form.processName;
+  errors.processName = !form.category || !form.processId || !form.processName;
   errors.componentName =
     !form.partId || (componentRequired.value && !form.componentName);
   errors.reporter = !form.reporter.trim();
-  errors.team = !form.teamId;
+  errors.team = isIncoming.value ? !form.supplierId : !form.teamId;
   errors.attachments = form.attachments.length === 0;
   return (
     !errors.workOrderNumber &&
@@ -327,14 +369,15 @@ async function handleSubmit() {
   uni.showLoading({ title: '提交中...' });
   try {
     const payload: Record<string, unknown> = {
-      category: 'PROCESS',
+      category: form.category,
       workOrderNumber: form.workOrderNumber,
       partId: form.partId,
       processId: form.processId,
       reporter: form.reporter.trim(),
-      teamId: form.teamId,
       attachments: form.attachments,
     };
+    if (isIncoming.value) payload.supplierId = form.supplierId;
+    else payload.teamId = form.teamId;
     if (form.quantity !== null) payload.quantity = form.quantity;
     if (form.componentName) payload.componentName = form.componentName;
     if (form.selfCheckResult) payload.selfCheckResult = form.selfCheckResult;
@@ -477,11 +520,11 @@ async function handleSubmit() {
           />
         </view>
 
-        <!-- 班组 -->
+        <!-- Responsible identity -->
         <view class="form-item" :class="{ error: errors.team }">
           <view class="label-wrap">
             <text class="required-star">*</text>
-            <text class="label">班组</text>
+            <text class="label">{{ isIncoming ? '供应商' : '班组' }}</text>
           </view>
           <picker
             class="picker"
@@ -497,8 +540,8 @@ async function handleSubmit() {
                 :class="{ 'picker-placeholder': !form.team }"
               >
                 {{
-                  teamList.find((t) => t.value === form.team)?.label ||
-                  '请选择班组'
+                  selectedResponsibleIdentityLabel ||
+                  (isIncoming ? '请选择供应商' : '请选择班组')
                 }}
               </text>
               <text class="picker-arrow">›</text>

@@ -140,7 +140,11 @@ export async function getPublicInspectionRequestProcesses(params: {
   workOrderNumber: string;
 }) {
   return publicRequestClient.get<
-    Array<{ processId: string; processName: string }>
+    Array<{
+      category: 'INCOMING' | 'PROCESS';
+      processId: string;
+      processName: string;
+    }>
   >(QMS_API.PUBLIC_INSPECTION_REQUEST_PROCESSES, { params });
 }
 

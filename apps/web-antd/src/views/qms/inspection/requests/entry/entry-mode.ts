@@ -88,13 +88,19 @@ export function mapInspectionRequestEntryBomPartOptions(
 }
 
 export function buildInspectionRequestEntryProcessOptions(
-  workOrderProcesses: Array<{ processId: string; processName: string }>,
+  workOrderProcesses: Array<{
+    category: 'INCOMING' | 'PROCESS';
+    processId: string;
+    processName: string;
+  }>,
+  category: 'INCOMING' | 'PROCESS',
 ) {
   const map = new Map<
     string,
     { label: string; processName: string; value: string }
   >();
   for (const item of workOrderProcesses) {
+    if (item.category !== category) continue;
     const processId = String(item.processId || '').trim();
     const processName = String(item.processName || '').trim();
     if (!processId || !processName) continue;

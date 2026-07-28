@@ -376,6 +376,7 @@ model processes {
   id                        String                           @id @default(cuid())
   name                      String                           @unique
   code                      String?
+  inspectionRequestCategory String                           @default("PROCESS") @db.VarChar(20)
   sort                      Int                              @default(0)
   status                    Int                              @default(1)
   isDeleted                 Boolean                          @default(false)

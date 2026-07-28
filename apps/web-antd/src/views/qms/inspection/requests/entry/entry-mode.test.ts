@@ -46,14 +46,52 @@ describe('inspection request entry identity options', () => {
 
   it('uses process master IDs and does not synthesize name values', () => {
     expect(
-      buildInspectionRequestEntryProcessOptions([
-        { processId: 'process-1', processName: 'Welding' },
-      ]),
+      buildInspectionRequestEntryProcessOptions(
+        [
+          {
+            category: 'PROCESS',
+            processId: 'process-1',
+            processName: 'Welding',
+          },
+          {
+            category: 'INCOMING',
+            processId: 'process-2',
+            processName: 'Renamed receipt verification',
+          },
+        ],
+        'PROCESS',
+      ),
     ).toEqual([
       {
         label: 'Welding',
         processName: 'Welding',
         value: 'process-1',
+      },
+    ]);
+  });
+
+  it('filters process options by explicit request category', () => {
+    expect(
+      buildInspectionRequestEntryProcessOptions(
+        [
+          {
+            category: 'PROCESS',
+            processId: 'process-1',
+            processName: 'Welding',
+          },
+          {
+            category: 'INCOMING',
+            processId: 'process-2',
+            processName: 'Renamed receipt verification',
+          },
+        ],
+        'INCOMING',
+      ),
+    ).toEqual([
+      {
+        label: 'Renamed receipt verification',
+        processName: 'Renamed receipt verification',
+        value: 'process-2',
       },
     ]);
   });

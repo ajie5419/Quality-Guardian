@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 
 import { resolveBomImportProcessIdentities } from './bom-import-governance';
-import { resolveBomRequiredProcessIdentities } from './bom-process-identities';
+import {
+  hasBomRequiredProcessIdentityUpdate,
+  resolveBomRequiredProcessIdentities,
+} from './bom-process-identities';
 
 vi.mock('~/utils/canonical-master-data', () => ({
   MasterDataGovernanceKernel: {
@@ -20,6 +23,13 @@ describe('bOM process identities', () => {
     await expect(
       resolveBomRequiredProcessIdentities({ requiredProcesses: ['Welding'] }),
     ).rejects.toMatchObject({ code: 'CANONICAL_ID_REQUIRED' });
+  });
+
+  it('distinguishes an omitted identity update from an explicit clear', () => {
+    expect(hasBomRequiredProcessIdentityUpdate({ quantity: 2 })).toBe(false);
+    expect(
+      hasBomRequiredProcessIdentityUpdate({ requiredProcessIds: [] }),
+    ).toBe(true);
   });
 
   it('hydrates canonical names from online IDs', async () => {

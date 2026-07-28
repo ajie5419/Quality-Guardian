@@ -6,6 +6,7 @@ import {
   projectBomItemSelect,
 } from '~/modules/planning/bom';
 import {
+  hasBomRequiredProcessIdentityUpdate,
   replaceBomRequiredProcessIdentities,
   resolveBomRequiredProcessIdentities,
 } from '~/modules/planning/bom-process-identities';
@@ -28,11 +29,25 @@ export async function bom_id_put(event: H3Event) {
 
   try {
     const body = await readBody(event);
-    const processIdentities = await resolveBomRequiredProcessIdentities(body);
-    const mutablePayload = buildProjectBomMutableData({
+    const replacesProcessIdentities = hasBomRequiredProcessIdentityUpdate(body);
+    const processIdentities = replacesProcessIdentities
+      ? await resolveBomRequiredProcessIdentities(body)
+      : null;
+    const builtMutablePayload = buildProjectBomMutableData({
       ...body,
-      requiredProcesses: processIdentities.map((item) => item.processName),
+      ...(processIdentities
+        ? {
+            requiredProcesses: processIdentities.map(
+              (item) => item.processName,
+            ),
+          }
+        : {}),
     });
+    const { required_processes: _preservedSnapshot, ...mutableFields } =
+      builtMutablePayload;
+    const mutablePayload = replacesProcessIdentities
+      ? builtMutablePayload
+      : mutableFields;
     const governedBomPayload = buildGovernedWriteFieldsForTable(
       'project_boms',
       mutablePayload,
@@ -51,7 +66,9 @@ export async function bom_id_put(event: H3Event) {
         },
         select: { id: true },
       });
-      await replaceBomRequiredProcessIdentities(tx, id, processIdentities);
+      if (processIdentities) {
+        await replaceBomRequiredProcessIdentities(tx, id, processIdentities);
+      }
       return tx.project_boms.findUniqueOrThrow({
         where: { id },
         select: projectBomItemSelect,

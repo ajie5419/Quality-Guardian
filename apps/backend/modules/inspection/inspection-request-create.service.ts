@@ -131,7 +131,7 @@ export const InspectionRequestCreateService = {
 };
 
 async function resolveV2CanonicalIdentity(
-  configKey: 'partName' | 'processName',
+  configKey: 'partName',
   canonicalId: string,
 ) {
   const canonicalName =
@@ -147,6 +147,29 @@ async function resolveV2CanonicalIdentity(
     );
   }
   return canonicalName;
+}
+
+async function resolveV2ProcessIdentity(
+  processId: string,
+  category: 'INCOMING' | 'PROCESS',
+) {
+  const processIdentity = await prisma.processes.findFirst({
+    where: { id: processId, isDeleted: false, status: 1 },
+    select: { id: true, inspectionRequestCategory: true, name: true },
+  });
+  if (!processIdentity) {
+    throw new BusinessError(
+      'INVALID_CANONICAL_ID',
+      'processName identity does not exist or is inactive',
+    );
+  }
+  if (processIdentity.inspectionRequestCategory !== category) {
+    throw new BusinessError(
+      'PROCESS_CATEGORY_MISMATCH',
+      'processId is not valid for the requested inspection category',
+    );
+  }
+  return processIdentity.name;
 }
 
 function normalizeV2Category(value: unknown): 'INCOMING' | 'PROCESS' {
@@ -185,16 +208,20 @@ async function buildCreateRequestPayload(
     identityContract === 'V2'
       ? await Promise.all([
           resolveV2CanonicalIdentity('partName', partId),
-          resolveV2CanonicalIdentity('processName', processId),
+          resolveV2ProcessIdentity(processId, category),
         ])
       : [legacyPartName, legacyProcessName];
   const skipsComponentName =
-    category === 'INCOMING' ||
-    (identityContract === 'V1' &&
-      isInspectionRequestAssemblyProcess(processName));
+    category === 'INCOMING' || isInspectionRequestAssemblyProcess(processName);
   const componentName = skipsComponentName
     ? ''
     : normalizeInspectionRequestText(body.componentName);
+  if (!skipsComponentName && !componentName) {
+    throw new BusinessError(
+      'COMPONENT_NAME_REQUIRED',
+      'componentName is required for non-assembly process inspection requests',
+    );
+  }
   const reporter = normalizeInspectionRequestText(body.reporter);
   const isIncoming = category === 'INCOMING';
   const supplier = isIncoming

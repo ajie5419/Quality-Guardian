@@ -9,6 +9,10 @@ import {
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    processes: {
+      count: vi.fn(),
+      updateMany: vi.fn(),
+    },
     qms_inspection_requests: {
       findMany: vi.fn(),
       updateMany: vi.fn(),
@@ -27,6 +31,7 @@ vi.mock('~/utils/logger', () => ({
 describe('inspection request category backfill', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.processes.count).mockResolvedValue(0);
   });
   it('uses canonical identity IDs before legacy process text', () => {
     expect(
@@ -97,11 +102,32 @@ describe('inspection request category backfill', () => {
       backfillInspectionRequestCategories({ batchSize: 100, mode: 'dry-run' }),
     ).resolves.toEqual({
       mode: 'dry-run',
+      processScanned: 0,
+      processUpdated: 0,
       scanned: 1,
       updated: 0,
     });
+    expect(prisma.processes.updateMany).not.toHaveBeenCalled();
     expect(prisma.qms_inspection_requests.updateMany).not.toHaveBeenCalled();
     expect(prisma.unresolved_master_data_refs.upsert).not.toHaveBeenCalled();
+  });
+
+  it('classifies the legacy incoming process in release maintenance', async () => {
+    vi.mocked(prisma.processes.count).mockResolvedValue(1);
+    vi.mocked(prisma.processes.updateMany).mockResolvedValue({ count: 1 });
+    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([]);
+
+    await expect(
+      backfillInspectionRequestCategories({ batchSize: 100, mode: 'apply' }),
+    ).resolves.toMatchObject({ processScanned: 1, processUpdated: 1 });
+    expect(prisma.processes.updateMany).toHaveBeenCalledWith({
+      data: { inspectionRequestCategory: 'INCOMING' },
+      where: {
+        inspectionRequestCategory: 'PROCESS',
+        isDeleted: false,
+        name: '进货检验',
+      },
+    });
   });
 
   it('is idempotent after an applied row no longer matches the null category query', async () => {

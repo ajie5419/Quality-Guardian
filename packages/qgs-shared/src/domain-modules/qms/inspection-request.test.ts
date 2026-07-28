@@ -128,6 +128,40 @@ describe('buildInspectionRecordPayloadCore', () => {
     ]);
     expect(payload.hasSelfCheckDocuments).toBe(true);
   });
+
+  it('uses the persisted category before a renamed process snapshot', () => {
+    const incoming = buildInspectionRecordPayloadCore({
+      body: { result: 'PASS' },
+      request: {
+        category: 'INCOMING',
+        mutualCheckResult: 'PASS',
+        partName: 'Bearing',
+        processName: 'Renamed receipt verification',
+        reporter: 'Reporter A',
+        selfCheckResult: 'PASS',
+        supplierId: 'supplier-1',
+        team: 'Supplier A',
+        workOrderNumber: 'WO-001',
+      },
+    });
+    const process = buildInspectionRecordPayloadCore({
+      body: { result: 'PASS' },
+      request: {
+        category: 'PROCESS',
+        mutualCheckResult: 'PASS',
+        partName: 'Bearing',
+        processName: INCOMING_INSPECTION_PROCESS_NAME,
+        reporter: 'Reporter A',
+        selfCheckResult: 'PASS',
+        team: 'Team A',
+        teamId: 'team-1',
+        workOrderNumber: 'WO-001',
+      },
+    });
+
+    expect(incoming.category).toBe('INCOMING');
+    expect(process.category).toBe('PROCESS');
+  });
 });
 
 describe('inspection station selection', () => {

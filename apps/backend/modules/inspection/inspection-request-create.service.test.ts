@@ -6,6 +6,9 @@ import prisma from '~/utils/prisma';
 vi.mock('~/utils/prisma', () => ({
   default: {
     $transaction: vi.fn(),
+    processes: {
+      findFirst: vi.fn(),
+    },
   },
 }));
 
@@ -101,6 +104,37 @@ describe('inspectionRequestCreateService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(isIncomingInspectionRequestProcess).mockReturnValue(false);
+    vi.mocked(prisma.processes.findFirst).mockResolvedValue({
+      id: 'process-1',
+      inspectionRequestCategory: 'PROCESS',
+      name: 'Canonical Process',
+    } as never);
+  });
+
+  it('rejects a V2 process whose configured category differs from the request', async () => {
+    vi.mocked(prisma.processes.findFirst).mockResolvedValue({
+      id: 'process-1',
+      inspectionRequestCategory: 'INCOMING',
+      name: 'Incoming Process',
+    } as never);
+
+    await expect(
+      InspectionRequestCreateService.createRequest(
+        {} as any,
+        { id: 'user-1', username: 'admin' } as any,
+        {
+          category: 'PROCESS',
+          componentName: 'Component A',
+          partId: 'part-1',
+          processId: 'process-1',
+          teamId: 'team-1',
+          workOrderNumber: 'WO-001',
+        },
+        false,
+        'V2',
+      ),
+    ).rejects.toMatchObject({ code: 'PROCESS_CATEGORY_MISMATCH' });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('should create a request and return mapped result', async () => {
@@ -116,6 +150,7 @@ describe('inspectionRequestCreateService', () => {
       {} as any,
       { id: 'user-1', username: 'admin' } as any,
       {
+        componentName: 'Component A',
         partName: 'Bearing',
         processName: 'Welding',
         workOrderNumber: 'WO-001',
@@ -147,6 +182,7 @@ describe('inspectionRequestCreateService', () => {
       { id: 'user-1', username: 'admin' } as any,
       {
         category: 'PROCESS',
+        componentName: 'Component A',
         partId: 'part-1',
         processId: 'process-1',
         teamId: 'team-1',
@@ -172,6 +208,7 @@ describe('inspectionRequestCreateService', () => {
   it.each([
     {
       body: {
+        componentName: 'Component A',
         partName: 'Bearing',
         processName: 'Welding',
         teamId: 'team-1',
@@ -212,6 +249,25 @@ describe('inspectionRequestCreateService', () => {
     );
   });
 
+  it('rejects V2 non-assembly process requests without a component', async () => {
+    await expect(
+      InspectionRequestCreateService.createRequest(
+        {} as any,
+        { id: 'user-1', username: 'admin' } as any,
+        {
+          category: 'PROCESS',
+          partId: 'part-1',
+          processId: 'process-1',
+          teamId: 'team-1',
+          workOrderNumber: 'WO-001',
+        },
+        false,
+        'V2',
+      ),
+    ).rejects.toMatchObject({ code: 'COMPONENT_NAME_REQUIRED' });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('should not audit log when isPublic is true', async () => {
     const { recordBusinessAuditLog } = await import(
       '~/modules/system-log/audit-log'
@@ -227,7 +283,11 @@ describe('inspectionRequestCreateService', () => {
     await InspectionRequestCreateService.createRequest(
       {} as any,
       { id: 'user-1', username: 'admin' } as any,
-      { partName: 'Bearing', processName: 'Welding' },
+      {
+        componentName: 'Component A',
+        partName: 'Bearing',
+        processName: 'Welding',
+      },
       true,
     );
 
@@ -249,7 +309,11 @@ describe('inspectionRequestCreateService', () => {
     await InspectionRequestCreateService.createRequest(
       {} as any,
       { id: 'user-1', username: 'admin' } as any,
-      { partName: 'Bearing', processName: 'Welding' },
+      {
+        componentName: 'Component A',
+        partName: 'Bearing',
+        processName: 'Welding',
+      },
     );
 
     expect(publishInspectionRequestCreated).toHaveBeenCalledWith(
@@ -270,7 +334,11 @@ describe('inspectionRequestCreateService', () => {
     await InspectionRequestCreateService.createRequest(
       {} as any,
       { id: 'user-1', username: 'admin' } as any,
-      { partName: 'Bearing', processName: 'Welding' },
+      {
+        componentName: 'Component A',
+        partName: 'Bearing',
+        processName: 'Welding',
+      },
     );
 
     expect(

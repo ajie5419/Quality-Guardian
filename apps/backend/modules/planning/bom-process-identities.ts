@@ -12,6 +12,15 @@ function normalizeList(value: unknown) {
   );
 }
 
+export function hasBomRequiredProcessIdentityUpdate(
+  input: Record<string, unknown>,
+) {
+  return (
+    Object.prototype.hasOwnProperty.call(input, 'requiredProcessIds') ||
+    Object.prototype.hasOwnProperty.call(input, 'requiredProcesses')
+  );
+}
+
 export async function resolveBomRequiredProcessIdentities(
   input: Record<string, unknown>,
 ): Promise<RequiredProcessIdentity[]> {

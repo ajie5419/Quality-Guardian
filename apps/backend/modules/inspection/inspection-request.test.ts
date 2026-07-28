@@ -56,6 +56,34 @@ describe('inspection request helpers', () => {
     );
   });
 
+  it('keeps the persisted incoming category after the process is renamed', async () => {
+    await buildInspectionRecordFromRequest(
+      {
+        category: 'INCOMING',
+        componentName: '',
+        mutualCheckResult: 'PASS',
+        partName: 'Bearing',
+        process: { name: 'Renamed receipt verification' },
+        processName: INCOMING_INSPECTION_PROCESS_NAME,
+        reporter: 'Reporter A',
+        selfCheckResult: 'PASS',
+        supplierId: 'supplier-1',
+        team: 'Supplier A',
+        work_order: { projectName: 'Project A' },
+        workOrderNumber: 'WO-001',
+      },
+      { result: 'PASS' },
+    );
+
+    expect(InspectionService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'INCOMING',
+        supplierId: 'supplier-1',
+      }),
+      undefined,
+    );
+  });
+
   it('honors an explicit hasDocuments choice over attachment count', async () => {
     await buildInspectionRecordFromRequest(
       {

@@ -4,7 +4,6 @@ import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { parseWorkOrderListQuery } from '~/modules/work-order/work-order-query';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import { buildKeywordOr } from '~/utils/query-helpers';
 
 const logger = createModuleLogger('inspection-public-query');
@@ -68,43 +67,16 @@ function toItem(record: {
 }
 
 export const InspectionPublicQueryService = {
-  async getPublicProcesses(workOrderNumber: string) {
-    const [requirements, incomingProcess] = await Promise.all([
-      prisma.work_order_requirements.findMany({
-        where: {
-          isDeleted: false,
-          processId: { not: null },
-          status: 'active',
-          workOrderNumber,
-        },
-        orderBy: [{ updatedAt: 'desc' }],
-        select: {
-          processId: true,
-          process: { select: { name: true } },
-          processName: true,
-        },
-      }),
-      prisma.processes.findFirst({
-        where: {
-          isDeleted: false,
-          name: INCOMING_INSPECTION_PROCESS_NAME,
-          status: 1,
-        },
-        select: { id: true, name: true },
-      }),
-    ]);
-    const identities = new Map<string, string>();
-    for (const item of requirements) {
-      const processId = String(item.processId || '').trim();
-      const processName = resolveCanonicalProcessName(item);
-      if (processId && processName) identities.set(processId, processName);
-    }
-    if (incomingProcess) {
-      identities.set(incomingProcess.id, incomingProcess.name);
-    }
-    return [...identities].map(([processId, processName]) => ({
-      processId,
-      processName,
+  async getPublicProcesses(_workOrderNumber: string) {
+    const processes = await prisma.processes.findMany({
+      where: { isDeleted: false, status: 1 },
+      orderBy: [{ sort: 'asc' }, { name: 'asc' }],
+      select: { id: true, inspectionRequestCategory: true, name: true },
+    });
+    return processes.map((item) => ({
+      category: item.inspectionRequestCategory,
+      processId: item.id,
+      processName: item.name,
     }));
   },
 
@@ -235,23 +207,35 @@ export const InspectionPublicQueryService = {
     const TAKE_LIMIT = 200;
     const records = await prisma.qms_inspection_requests.findMany({
       where: {
-        isDeleted: false,
-        processName: INCOMING_INSPECTION_PROCESS_NAME,
-        OR: [
+        AND: [
           {
-            status: {
-              in: [
-                INSPECTION_REQUEST_STATUS.SUBMITTED,
-                INSPECTION_REQUEST_STATUS.DISPATCHED,
-                INSPECTION_REQUEST_STATUS.INSPECTING,
-              ],
-            },
+            OR: [
+              { category: 'INCOMING' },
+              {
+                category: null,
+                processName: INCOMING_INSPECTION_PROCESS_NAME,
+              },
+            ],
           },
           {
-            status: INSPECTION_REQUEST_STATUS.CLOSED,
-            closedAt: { gte: start, lt: end },
+            OR: [
+              {
+                status: {
+                  in: [
+                    INSPECTION_REQUEST_STATUS.SUBMITTED,
+                    INSPECTION_REQUEST_STATUS.DISPATCHED,
+                    INSPECTION_REQUEST_STATUS.INSPECTING,
+                  ],
+                },
+              },
+              {
+                status: INSPECTION_REQUEST_STATUS.CLOSED,
+                closedAt: { gte: start, lt: end },
+              },
+            ],
           },
         ],
+        isDeleted: false,
       },
       orderBy: { submittedAt: 'desc' },
       take: TAKE_LIMIT,

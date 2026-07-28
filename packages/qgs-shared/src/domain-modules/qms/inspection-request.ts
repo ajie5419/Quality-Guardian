@@ -87,6 +87,15 @@ export function isIncomingInspectionRequestProcess(value: unknown) {
   );
 }
 
+export function isIncomingInspectionRequestCategory(input: {
+  category?: unknown;
+  processName?: unknown;
+}) {
+  const category = normalizeInspectionRequestText(input.category).toUpperCase();
+  if (category) return category === 'INCOMING';
+  return isIncomingInspectionRequestProcess(input.processName);
+}
+
 export function isOutsourcingInspectionRequestProcess(value: unknown) {
   return normalizeInspectionRequestText(value).includes(
     OUTSOURCING_INSPECTION_PROCESS_KEYWORD,
@@ -443,6 +452,7 @@ export interface InspectionRecordPayloadInput {
   body: Record<string, unknown>;
   request: {
     attachments?: unknown;
+    category?: null | string;
     closeRemark?: null | string;
     componentName?: null | string;
     mutualCheckResult: string;
@@ -480,9 +490,7 @@ export function buildInspectionRecordPayloadCore(
   const componentName = normalizeInspectionRequestText(
     input.request.componentName,
   );
-  const isIncoming = isIncomingInspectionRequestProcess(
-    input.request.processName,
-  );
+  const isIncoming = isIncomingInspectionRequestCategory(input.request);
   const requestInfo = isIncoming
     ? parseIncomingRequestInfo(input.request.requestInfo)
     : {

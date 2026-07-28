@@ -26,6 +26,26 @@ const AUDIT_REASON = 'conflicting_inspection_request_identity_domains';
 const AUDIT_TYPE = 'qms_inspection_requests';
 const logger = createModuleLogger('inspection-request-category-backfill');
 
+async function backfillIncomingProcessCategory(
+  mode: InspectionRequestCategoryBackfillMode,
+) {
+  const where = {
+    inspectionRequestCategory: 'PROCESS',
+    isDeleted: false,
+    name: INCOMING_INSPECTION_PROCESS_NAME,
+  };
+  const scanned = await prisma.processes.count({ where });
+  let updated = 0;
+  if (mode === 'apply' && scanned > 0) {
+    const result = await prisma.processes.updateMany({
+      where,
+      data: { inspectionRequestCategory: 'INCOMING' },
+    });
+    updated = result.count;
+  }
+  return { scanned, updated };
+}
+
 export function parseInspectionRequestCategoryBackfillOptions(args: string[]) {
   let batchSize = 200;
   let mode: InspectionRequestCategoryBackfillMode = 'dry-run';
@@ -102,6 +122,7 @@ async function applyBatch(rows: CategoryRow[]) {
 export async function backfillInspectionRequestCategories(
   options: InspectionRequestCategoryBackfillOptions,
 ) {
+  const processCategory = await backfillIncomingProcessCategory(options.mode);
   let cursor = '';
   let scanned = 0;
   let updated = 0;
@@ -128,7 +149,13 @@ export async function backfillInspectionRequestCategories(
       updated += await applyBatch(rows);
     }
   }
-  const summary = { mode: options.mode, scanned, updated };
+  const summary = {
+    mode: options.mode,
+    processScanned: processCategory.scanned,
+    processUpdated: processCategory.updated,
+    scanned,
+    updated,
+  };
   logger.info(summary, 'inspection request category backfill finished');
   return summary;
 }

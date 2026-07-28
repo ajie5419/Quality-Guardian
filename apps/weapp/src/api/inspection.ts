@@ -122,10 +122,24 @@ export function searchWorkOrders(keyword: string) {
 
 // Get processes for a given work order
 export function getProcesses(workOrderNumber: string) {
-  return request<Array<{ processId: string; processName: string }>>({
+  return request<
+    Array<{
+      category: 'INCOMING' | 'PROCESS';
+      processId: string;
+      processName: string;
+    }>
+  >({
     url: '/api/qms/inspection/requests/processes',
     method: 'GET',
     data: { workOrderNumber },
+  });
+}
+
+export function getSuppliers(keyword?: string) {
+  return request<Array<{ label: string; value: string }>>({
+    url: '/api/qms/public/inspection/requests/suppliers',
+    method: 'GET',
+    data: keyword ? { keyword } : {},
   });
 }
 

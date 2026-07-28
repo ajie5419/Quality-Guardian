@@ -96,6 +96,7 @@ Dashboard API contracts and Vue row keys carry the same stable IDs. A display na
 
 - V2 创建契约显式提交 `category + partId + processId`；客户端不提交部件和工序名称作为业务事实。
 - 后端按 ID 校验启用的 `master_parts/processes` 记录，并重建 `partName/processName` 快照；无效 ID 直接拒绝。
+- `processes.inspectionRequestCategory` 定义工序适用的报检类别；Web 和小程序使用该字段提交 `category`，工序改名不得改变报检类别。
 - BOM 部件选项返回 `project_boms.partId`；BOM 行 `id` 只是 BOM 记录主键，不是部件身份。
 - 工序选项返回 `processes.id`；工序字典 `dictionaries.id` 与工序主数据不是同一 ID 空间。
 - Web 和微信小程序均使用 V2。V1 旧路由只作发布迁移适配；待生产 V1 写流量归零后必须删除。
