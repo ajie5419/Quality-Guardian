@@ -9,6 +9,7 @@ import {
   QMS_DEFAULT_VALUES,
   QMS_STATUS_OPEN_SET,
 } from '@qgs/shared';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
@@ -123,12 +124,15 @@ function buildTrendData(input: {
 }
 
 function formatStatsResponse(input: {
-  defectStats: Array<{ _count: { id: number }; defectType: null | string }>;
-  deptStats: Array<{ _count: { id: number }; respDept: null | string }>;
+  defectNames: Map<string, null | string>;
+  defectStats: Array<{ _count: { id: number }; defectTypeId: null | string }>;
+  deptNames: Map<string, null | string>;
+  deptStats: Array<{ _count: { id: number }; respDeptId: null | string }>;
   kpi: { avgTime: number; cost: number; open: number; total: number };
+  supplierNames: Map<string, null | string>;
   supplierStats: Array<{
     _count: { id: number };
-    supplierBrand: null | string;
+    supplierBrandId: null | string;
   }>;
   trend: {
     category: string[];
@@ -141,15 +145,23 @@ function formatStatsResponse(input: {
     kpi: input.kpi,
     trend: input.trend,
     defectDistribution: input.defectStats.map((s) => ({
-      name: s.defectType || QMS_DEFAULT_VALUES.UNCLASSIFIED,
+      name:
+        (s.defectTypeId && input.defectNames.get(s.defectTypeId)) ||
+        QMS_DEFAULT_VALUES.UNCLASSIFIED,
       value: s._count.id,
     })),
     supplierRanking: {
-      categories: input.supplierStats.map((s) => s.supplierBrand || 'Unknown'),
+      categories: input.supplierStats.map(
+        (s) =>
+          (s.supplierBrandId && input.supplierNames.get(s.supplierBrandId)) ||
+          'Unknown',
+      ),
       data: input.supplierStats.map((s) => s._count.id),
     },
     deptDistribution: input.deptStats.map((s) => ({
-      name: s.respDept || QMS_DEFAULT_VALUES.UNASSIGNED,
+      name:
+        (s.respDeptId && input.deptNames.get(s.respDeptId)) ||
+        QMS_DEFAULT_VALUES.UNASSIGNED,
       value: s._count.id,
     })),
   } as AfterSalesStats;
@@ -227,22 +239,37 @@ export const AfterSalesAnalyticsService = {
 
       const [defectStats, supplierStats, deptStats] = await Promise.all([
         prisma.after_sales.groupBy({
-          by: ['defectType'],
+          by: ['defectTypeId'],
           where: baseWhere,
           _count: { id: true },
         }),
         prisma.after_sales.groupBy({
-          by: ['supplierBrand'],
+          by: ['supplierBrandId'],
           where: baseWhere,
           _count: { id: true },
           orderBy: { _count: { id: 'desc' } },
           take: 5,
         }),
         prisma.after_sales.groupBy({
-          by: ['respDept'],
+          by: ['respDeptId'],
           where: baseWhere,
           _count: { id: true },
           orderBy: { _count: { id: 'desc' } },
+        }),
+      ]);
+
+      const [defectNames, supplierNames, deptNames] = await Promise.all([
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+          canonicalIds: defectStats.map((item) => item.defectTypeId),
+          configKey: 'defectType',
+        }),
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+          canonicalIds: supplierStats.map((item) => item.supplierBrandId),
+          configKey: 'supplierBrand',
+        }),
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+          canonicalIds: deptStats.map((item) => item.respDeptId),
+          configKey: 'responsibleDepartment',
         }),
       ]);
 
@@ -279,9 +306,12 @@ export const AfterSalesAnalyticsService = {
           `;
 
       return formatStatsResponse({
+        defectNames,
         defectStats,
+        deptNames,
         deptStats,
         kpi: buildKpiSummary({ kpiAggregate, openCount, resolvedStats }),
+        supplierNames,
         supplierStats,
         trend: buildTrendData({
           isYearMode,

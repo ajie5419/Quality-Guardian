@@ -391,4 +391,42 @@ export function collectStats(items: Array<{ supplierId: string; teamId: string }
       rmSync(rootDir, { force: true, recursive: true });
     }
   });
+
+  it('derives controlled aggregation rules from the master-data registry', () => {
+    const rootDir = createFixture({
+      'apps/backend/utils/master-data-fields.ts': `
+const MASTER_DATA_FIELDS = [{
+  key: 'defectType',
+  targets: [{
+    table: 'quality_records',
+    nameColumn: 'defectType',
+    idColumn: 'defectTypeId',
+    nullable: true,
+  }],
+}];
+`,
+      'apps/backend/modules/inspection/bad-stats.service.ts': `
+prisma.quality_records.groupBy({
+  by: ['defectType'],
+  where: { isDeleted: false },
+});
+`,
+      'apps/backend/modules/inspection/good-stats.service.ts': `
+prisma.quality_records.groupBy({
+  by: ['defectTypeId'],
+  where: { isDeleted: false },
+});
+`,
+    });
+
+    try {
+      const result = runCheck(rootDir);
+      expect(result.status).toBe(1);
+      expect(result.output).toContain('[B-ID8]');
+      expect(result.output).toContain('group by defectTypeId');
+      expect(result.output).not.toContain('good-stats.service.ts');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
 });

@@ -59,6 +59,25 @@ type InspectionIssueChartDimension =
 
 type InspectionIssueChartMetric = 'count' | 'lossAmount' | 'quantity';
 
+const CONTROLLED_DIMENSION_CONFIG_KEYS: Partial<
+  Record<InspectionIssueChartDimension, string>
+> = {
+  defectSubtype: 'defectSubtype',
+  defectType: 'defectType',
+  division: 'division',
+  projectName: 'projectName',
+  responsibleDepartment: 'responsibleDepartment',
+  supplierName: 'supplierName',
+};
+
+function getCanonicalDisplayName(
+  canonicalId: null | string,
+  canonicalNames: Map<string, null | string>,
+) {
+  if (!canonicalId) return 'Unknown';
+  return canonicalNames.get(canonicalId) || `Unknown (${canonicalId})`;
+}
+
 export const InspectionIssueStatsService = {
   async getIssueStats(params: {
     dateMode?: InspectionIssueDateMode;
@@ -100,14 +119,19 @@ export const InspectionIssueStatsService = {
 
       // 2. Defect Type Distribution
       const typeStats = await prisma.quality_records.groupBy({
-        by: ['defectType'],
+        by: ['defectTypeId'],
         where,
         _count: { id: true },
         orderBy: { _count: { id: 'desc' } },
       });
+      const defectTypeNames =
+        await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+          configKey: 'defectType',
+          canonicalIds: typeStats.map((item) => item.defectTypeId),
+        });
 
       const pieData: PieDataItem[] = typeStats.map((s) => ({
-        name: s.defectType || 'Unknown',
+        name: getCanonicalDisplayName(s.defectTypeId, defectTypeNames),
         value: s._count.id,
       }));
       let cumulativeCount = 0;
@@ -177,79 +201,66 @@ export const InspectionIssueStatsService = {
         date: true,
         defectSubtypeId: true, // governance-allow-direct-name-id
         defectTypeId: true, // governance-allow-direct-name-id
-        defectSubtype: true,
-        defectType: true,
-        division: true,
+        divisionId: true, // governance-allow-direct-name-id
         isClaim: true,
         lossAmount: true,
-        projectName: true,
+        projectId: true, // governance-allow-direct-name-id
         quantity: true,
-        responsibleDepartment: true,
+        responsibleDepartmentId: true, // governance-allow-direct-name-id
         severity: true,
         status: true,
-        supplierName: true,
+        supplierId: true, // governance-allow-direct-name-id
       },
     });
 
-    const [defectTypeNameById, defectSubtypeNameById] = await Promise.all([
-      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-        configKey: 'defectType',
-        canonicalIds: rows.map((item) => item.defectTypeId),
-      }),
-      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-        configKey: 'defectSubtype',
-        canonicalIds: rows.map((item) => item.defectSubtypeId),
-      }),
-    ]);
-
-    const aggregateMap = new Map<string, number>();
+    const controlledConfigKey =
+      CONTROLLED_DIMENSION_CONFIG_KEYS[params.dimension];
+    const aggregateMap = new Map<
+      string,
+      { id: null | string; name: string; value: number }
+    >();
     for (const row of rows) {
-      let key = '未分类';
+      let canonicalId: null | string = null;
+      let name = '未分类';
       switch (params.dimension) {
         case 'claim': {
-          key = row.isClaim ? 'Yes' : 'No';
+          name = row.isClaim ? 'Yes' : 'No';
           break;
         }
         case 'defectSubtype': {
-          key =
-            defectSubtypeNameById.get(String(row.defectSubtypeId || '')) ||
-            row.defectSubtype ||
-            '未分类';
+          canonicalId = row.defectSubtypeId;
           break;
         }
         case 'defectType': {
-          key =
-            defectTypeNameById.get(String(row.defectTypeId || '')) ||
-            row.defectType ||
-            '未分类';
+          canonicalId = row.defectTypeId;
           break;
         }
         case 'division': {
-          key = row.division || '未分类';
+          canonicalId = row.divisionId;
           break;
         }
         case 'projectName': {
-          key = row.projectName || '未分类';
+          canonicalId = row.projectId;
           break;
         }
         case 'reportMonth': {
-          key = formatDate(row.date).slice(0, 7);
+          name = formatDate(row.date).slice(0, 7);
           break;
         }
         case 'responsibleDepartment': {
-          key = row.responsibleDepartment || '未分类';
+          canonicalId = row.responsibleDepartmentId;
           break;
         }
         case 'severity': {
-          key = row.severity || '未分类';
+          name = row.severity || '未分类';
           break;
         }
         case 'status': {
-          key = row.status || '未分类';
+          name = row.status || '未分类';
           break;
         }
         case 'supplierName': {
-          key = row.supplierName || '未分类';
+          canonicalId = row.supplierId;
           break;
         }
       }
@@ -260,14 +271,33 @@ export const InspectionIssueStatsService = {
       } else if (params.metric === 'quantity') {
         value = Number(row.quantity || 0);
       }
-      aggregateMap.set(key, (aggregateMap.get(key) || 0) + value);
+      const normalizedId = String(canonicalId || '').trim() || null;
+      let key = `value:${name}`;
+      if (controlledConfigKey) {
+        key = normalizedId ? `id:${normalizedId}` : 'missing:';
+      }
+      const current = aggregateMap.get(key);
+      aggregateMap.set(key, {
+        id: normalizedId,
+        name,
+        value: (current?.value || 0) + value,
+      });
     }
 
+    const aggregateRows = [...aggregateMap.values()];
+    const canonicalNames = controlledConfigKey
+      ? await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+          configKey: controlledConfigKey,
+          canonicalIds: aggregateRows.map((item) => item.id),
+        })
+      : new Map<string, null | string>();
     const top = Number(params.top) > 0 ? Number(params.top) : 15;
-    return [...aggregateMap.entries()]
-      .map(([name, value]) => ({
-        name,
-        value: Math.round(value * 100) / 100,
+    return aggregateRows
+      .map((item) => ({
+        name: controlledConfigKey
+          ? getCanonicalDisplayName(item.id, canonicalNames)
+          : item.name,
+        value: Math.round(item.value * 100) / 100,
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, top);

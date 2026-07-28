@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionService } from '~/modules/inspection/inspection.service';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/modules/supplier-identity', () => ({
@@ -50,6 +51,19 @@ vi.mock('~/utils/prisma', () => ({
     ),
   },
 }));
+
+vi.mock('~/utils/canonical-master-data', async () => {
+  const actual = await vi.importActual<
+    typeof import('~/utils/canonical-master-data')
+  >('~/utils/canonical-master-data');
+  return {
+    ...actual,
+    MasterDataGovernanceKernel: {
+      ...actual.MasterDataGovernanceKernel,
+      resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
+    },
+  };
+});
 
 describe('inspectionService', () => {
   beforeEach(() => {
@@ -156,9 +170,17 @@ describe('inspectionService', () => {
       });
       (prisma.quality_records.count as any).mockResolvedValue(1);
       (prisma.quality_records.groupBy as any).mockResolvedValueOnce([
-        { defectType: 'Minor', _count: { id: 1 } },
-        { defectType: 'Major', _count: { id: 1 } },
+        { defectTypeId: 'defect-minor', _count: { id: 1 } },
+        { defectTypeId: 'defect-major', _count: { id: 1 } },
       ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(
+        new Map([
+          ['defect-major', 'Major'],
+          ['defect-minor', 'Minor'],
+        ]),
+      );
       (prisma.$queryRaw as any).mockResolvedValueOnce([
         { amount: 300, month: 1 },
       ]);

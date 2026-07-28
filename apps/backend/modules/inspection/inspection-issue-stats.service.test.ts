@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionIssueStatsService } from '~/modules/inspection/inspection-issue-stats.service';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -38,7 +39,7 @@ vi.mock('@qgs/shared', async () => {
 
 function mockIssueGroupBy(
   options: {
-    typeRows?: Array<{ _count: { id: number }; defectType: null | string }>;
+    typeRows?: Array<{ _count: { id: number }; defectTypeId: null | string }>;
   } = {},
 ) {
   (prisma.quality_records.groupBy as any).mockResolvedValue(
@@ -49,6 +50,9 @@ function mockIssueGroupBy(
 describe('inspectionIssueStatsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+    ).mockResolvedValue(new Map());
     mockIssueGroupBy();
     (prisma.$queryRaw as any).mockResolvedValue([]);
   });
@@ -95,7 +99,7 @@ describe('inspectionIssueStatsService', () => {
       expect(stats.closedRate).toBe(30);
     });
 
-    it('should build pie data from groupBy results', async () => {
+    it('should group the default pie by canonical ID across name snapshots', async () => {
       (prisma.quality_records.aggregate as any).mockResolvedValue({
         _count: { id: 3 },
         _sum: { lossAmount: 0 },
@@ -103,10 +107,13 @@ describe('inspectionIssueStatsService', () => {
       (prisma.quality_records.count as any).mockResolvedValue(0);
       mockIssueGroupBy({
         typeRows: [
-          { defectType: '焊接缺陷', _count: { id: 2 } },
-          { defectType: null, _count: { id: 1 } },
+          { defectTypeId: 'defect-1', _count: { id: 2 } },
+          { defectTypeId: null, _count: { id: 1 } },
         ],
       });
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(new Map([['defect-1', '焊接缺陷']]));
       (prisma.$queryRaw as any).mockResolvedValue([]);
 
       const stats = await InspectionIssueStatsService.getIssueStats({
@@ -121,6 +128,9 @@ describe('inspectionIssueStatsService', () => {
         name: 'Unknown',
         value: 1,
       });
+      expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({ by: ['defectTypeId'] }),
+      );
     });
 
     it('should build pareto with cumulative percentages', async () => {
@@ -131,10 +141,18 @@ describe('inspectionIssueStatsService', () => {
       (prisma.quality_records.count as any).mockResolvedValue(0);
       mockIssueGroupBy({
         typeRows: [
-          { defectType: 'A', _count: { id: 3 } },
-          { defectType: 'B', _count: { id: 1 } },
+          { defectTypeId: 'defect-a', _count: { id: 3 } },
+          { defectTypeId: 'defect-b', _count: { id: 1 } },
         ],
       });
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(
+        new Map([
+          ['defect-a', 'A'],
+          ['defect-b', 'B'],
+        ]),
+      );
       (prisma.$queryRaw as any).mockResolvedValue([]);
 
       const stats = await InspectionIssueStatsService.getIssueStats({
@@ -145,6 +163,63 @@ describe('inspectionIssueStatsService', () => {
       expect(stats.pareto[0].cumulativePercent).toBe(75);
       expect(stats.pareto[1].percent).toBe(25);
       expect(stats.pareto[1].cumulativePercent).toBe(100);
+    });
+
+    it('should keep different canonical IDs separate when names match', async () => {
+      (prisma.quality_records.aggregate as any).mockResolvedValue({
+        _count: { id: 3 },
+        _sum: { lossAmount: 0 },
+      });
+      (prisma.quality_records.count as any).mockResolvedValue(0);
+      mockIssueGroupBy({
+        typeRows: [
+          { defectTypeId: 'defect-a', _count: { id: 2 } },
+          { defectTypeId: 'defect-b', _count: { id: 1 } },
+        ],
+      });
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(
+        new Map([
+          ['defect-a', 'Same name'],
+          ['defect-b', 'Same name'],
+        ]),
+      );
+
+      const stats = await InspectionIssueStatsService.getIssueStats({
+        year: 2024,
+      });
+
+      expect(stats.pieData).toEqual([
+        { name: 'Same name', value: 2 },
+        { name: 'Same name', value: 1 },
+      ]);
+      expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({ by: ['defectTypeId'] }),
+      );
+    });
+
+    it('should expose missing and invalid canonical IDs without name fallback', async () => {
+      (prisma.quality_records.aggregate as any).mockResolvedValue({
+        _count: { id: 2 },
+        _sum: { lossAmount: 0 },
+      });
+      (prisma.quality_records.count as any).mockResolvedValue(0);
+      mockIssueGroupBy({
+        typeRows: [
+          { defectTypeId: null, _count: { id: 1 } },
+          { defectTypeId: 'deleted-defect', _count: { id: 1 } },
+        ],
+      });
+
+      const stats = await InspectionIssueStatsService.getIssueStats({
+        year: 2024,
+      });
+
+      expect(stats.pieData).toEqual([
+        { name: 'Unknown', value: 1 },
+        { name: 'Unknown (deleted-defect)', value: 1 },
+      ]);
     });
 
     it('should build trend data for month mode', async () => {
@@ -266,9 +341,9 @@ describe('inspectionIssueStatsService', () => {
         {
           date: new Date('2024-01-15'),
           defectSubtypeId: null,
-          defectTypeId: null,
+          defectTypeId: 'defect-welding',
           defectSubtype: '气孔',
-          defectType: '焊接缺陷',
+          defectType: '历史焊接缺陷名称',
           division: '车辆',
           isClaim: false,
           lossAmount: 100,
@@ -282,7 +357,7 @@ describe('inspectionIssueStatsService', () => {
         {
           date: new Date('2024-01-20'),
           defectSubtypeId: null,
-          defectTypeId: null,
+          defectTypeId: 'defect-welding',
           defectSubtype: '裂纹',
           defectType: '焊接缺陷',
           division: '车辆',
@@ -296,6 +371,9 @@ describe('inspectionIssueStatsService', () => {
           supplierName: '供应商B',
         },
       ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(new Map([['defect-welding', '焊接缺陷']]));
 
       const result = await InspectionIssueStatsService.getIssueChartAggregation(
         {
@@ -313,7 +391,7 @@ describe('inspectionIssueStatsService', () => {
         {
           date: new Date('2024-01-15'),
           defectSubtypeId: null,
-          defectTypeId: null,
+          defectTypeId: 'defect-a',
           defectSubtype: '',
           defectType: '',
           division: '',
@@ -327,6 +405,9 @@ describe('inspectionIssueStatsService', () => {
           supplierName: '',
         },
       ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(new Map([['defect-a', 'A']]));
 
       const result = await InspectionIssueStatsService.getIssueChartAggregation(
         {
@@ -344,7 +425,7 @@ describe('inspectionIssueStatsService', () => {
         {
           date: new Date('2024-01-15'),
           defectSubtypeId: null,
-          defectTypeId: null,
+          defectTypeId: 'defect-b',
           defectSubtype: '',
           defectType: '',
           division: '',
@@ -358,6 +439,9 @@ describe('inspectionIssueStatsService', () => {
           supplierName: '',
         },
       ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(new Map([['defect-b', 'B']]));
 
       const result = await InspectionIssueStatsService.getIssueChartAggregation(
         {
@@ -375,7 +459,7 @@ describe('inspectionIssueStatsService', () => {
         {
           date: new Date('2024-01-15'),
           defectSubtypeId: null,
-          defectTypeId: null,
+          defectTypeId: 'defect-a',
           defectSubtype: '',
           defectType: 'A',
           division: '',
@@ -389,6 +473,9 @@ describe('inspectionIssueStatsService', () => {
           supplierName: '',
         },
       ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(new Map([['defect-a', 'A']]));
 
       const result = await InspectionIssueStatsService.getIssueChartAggregation(
         {
@@ -406,7 +493,7 @@ describe('inspectionIssueStatsService', () => {
         {
           date: new Date('2024-01-15'),
           defectSubtypeId: null,
-          defectTypeId: null,
+          defectTypeId: 'defect-b',
           defectSubtype: '',
           defectType: 'B',
           division: '',
@@ -420,6 +507,9 @@ describe('inspectionIssueStatsService', () => {
           supplierName: '',
         },
       ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(new Map([['defect-b', 'B']]));
 
       const result = await InspectionIssueStatsService.getIssueChartAggregation(
         {
@@ -436,7 +526,7 @@ describe('inspectionIssueStatsService', () => {
       const rows = Array.from({ length: 20 }, (_, i) => ({
         date: new Date('2024-01-15'),
         defectSubtypeId: null,
-        defectTypeId: null,
+        defectTypeId: `defect-${i}`,
         defectSubtype: '',
         defectType: `Type-${i}`,
         division: '',
@@ -450,6 +540,11 @@ describe('inspectionIssueStatsService', () => {
         supplierName: '',
       }));
       (prisma.quality_records.findMany as any).mockResolvedValue(rows);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(
+        new Map(rows.map((_, index) => [`defect-${index}`, `Type-${index}`])),
+      );
 
       const result = await InspectionIssueStatsService.getIssueChartAggregation(
         {
@@ -467,7 +562,7 @@ describe('inspectionIssueStatsService', () => {
       const rows = Array.from({ length: 20 }, (_, i) => ({
         date: new Date('2024-01-15'),
         defectSubtypeId: null,
-        defectTypeId: null,
+        defectTypeId: `defect-${i}`,
         defectSubtype: '',
         defectType: `Type-${i}`,
         division: '',
@@ -481,6 +576,11 @@ describe('inspectionIssueStatsService', () => {
         supplierName: '',
       }));
       (prisma.quality_records.findMany as any).mockResolvedValue(rows);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(
+        new Map(rows.map((_, index) => [`defect-${index}`, `Type-${index}`])),
+      );
 
       const result = await InspectionIssueStatsService.getIssueChartAggregation(
         {
@@ -521,7 +621,7 @@ describe('inspectionIssueStatsService', () => {
         },
       );
 
-      expect(result).toEqual([{ name: '未分类', value: 1 }]);
+      expect(result).toEqual([{ name: 'Unknown', value: 1 }]);
     });
   });
 });

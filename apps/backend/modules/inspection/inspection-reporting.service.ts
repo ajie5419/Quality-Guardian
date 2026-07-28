@@ -1,9 +1,18 @@
 import { Prisma } from '@prisma/client';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 import { buildSupplierEngineeringIssueWhere } from './inspection-supplier-profile';
+
+function getCanonicalDisplayName(
+  canonicalId: null | string,
+  canonicalNames: Map<string, null | string>,
+) {
+  if (!canonicalId) return 'Unknown';
+  return canonicalNames.get(canonicalId) || `Unknown (${canonicalId})`;
+}
 
 export const InspectionReportingService = {
   async findIssueIdBySerialNumber(serialNumber: number) {
@@ -179,14 +188,7 @@ export const InspectionReportingService = {
       engineeringTotalStats,
     ] = await Promise.all([
       prisma.inspections.groupBy({
-        by: [
-          'category',
-          'supplierId',
-          'supplierName',
-          'teamId',
-          'team',
-          'result',
-        ],
+        by: ['category', 'supplierId', 'teamId', 'result'],
         where: {
           OR: inspectionSourceOr,
           isDeleted: false,
@@ -196,13 +198,13 @@ export const InspectionReportingService = {
         _sum: { quantity: true },
       }),
       prisma.quality_records.groupBy({
-        by: ['supplierId', 'supplierName'],
+        by: ['supplierId'],
         where: recentEngineeringWhere,
         _sum: { lossAmount: true, quantity: true },
         _count: { id: true },
       }),
       prisma.quality_records.groupBy({
-        by: ['supplierId', 'supplierName', 'status'],
+        by: ['supplierId', 'status'],
         where: recentEngineeringWhere,
         _count: { id: true },
       }),
@@ -218,7 +220,7 @@ export const InspectionReportingService = {
         orderBy: { date: 'desc' },
       }),
       prisma.quality_records.groupBy({
-        by: ['supplierId', 'supplierName'],
+        by: ['supplierId'],
         where: allEngineeringWhere,
         _count: { id: true },
       }),
@@ -384,19 +386,28 @@ export const InspectionReportingService = {
   },
 
   async getReportTopRiskProjects(params: { end: Date; start: Date }) {
-    return prisma.quality_records.groupBy({
-      by: ['projectName'],
+    const rows = await prisma.quality_records.groupBy({
+      by: ['projectId'],
       where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
       _count: true,
       _sum: { lossAmount: true },
       orderBy: { _sum: { lossAmount: 'desc' } },
       take: 5,
     });
+    const canonicalNames =
+      await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        configKey: 'projectName',
+        canonicalIds: rows.map((item) => item.projectId),
+      });
+    return rows.map((item) => ({
+      ...item,
+      projectName: getCanonicalDisplayName(item.projectId, canonicalNames),
+    }));
   },
 
   async getReportSupplierPerformance(params: { end: Date; start: Date }) {
-    return prisma.quality_records.groupBy({
-      by: ['supplierName'],
+    const rows = await prisma.quality_records.groupBy({
+      by: ['supplierId'],
       where: {
         date: { gte: params.start, lte: params.end },
         isDeleted: false,
@@ -404,6 +415,15 @@ export const InspectionReportingService = {
       },
       _count: true,
     });
+    const canonicalNames =
+      await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        configKey: 'supplierName',
+        canonicalIds: rows.map((item) => item.supplierId),
+      });
+    return rows.map((item) => ({
+      ...item,
+      supplierName: getCanonicalDisplayName(item.supplierId, canonicalNames),
+    }));
   },
 
   async getReportMajorEvents(params: { end: Date; start: Date }) {
@@ -455,11 +475,16 @@ export const InspectionReportingService = {
           where: { ...baseWhere, date: { gte: params.weekStart } },
         }),
         prisma.quality_records.groupBy({
-          by: ['defectType'],
+          by: ['defectTypeId'],
           where: { ...baseWhere, date: { gte: params.yearStart } },
           _count: { id: true },
         }),
       ]);
+    const defectTypeNames =
+      await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        configKey: 'defectType',
+        canonicalIds: yearTypeStats.map((item) => item.defectTypeId),
+      });
 
     return {
       totalCount: yearAggregate._count.id || 0,
@@ -467,7 +492,7 @@ export const InspectionReportingService = {
       totalLoss: Number(yearAggregate._sum.lossAmount || 0),
       weeklyLoss: Number(weekAggregate._sum.lossAmount || 0),
       issueDistribution: yearTypeStats.map((item) => ({
-        type: item.defectType || 'Unknown',
+        type: getCanonicalDisplayName(item.defectTypeId, defectTypeNames),
         value: item._count.id,
       })),
     };

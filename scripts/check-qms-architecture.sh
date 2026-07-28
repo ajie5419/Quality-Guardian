@@ -62,6 +62,7 @@ Rules:
   B-ID5: legacy name-to-ID resolution is restricted to reviewed import adapters
   B-ID6: inspection request statistics must aggregate identities by canonical IDs
   B-ID7: TEAM writes must use the dedicated identity service; legacy bootstrap is forbidden
+  B-ID8: controlled master-data statistics must group by canonical IDs
   B-SEC1: raw SQL must not combine $queryRawUnsafe with template strings
   B-MAP1: new module/route/view directories must update code_map.md (changed mode only)
   B-TEST1: backend tests must not live in centralized __tests__/tests/test directories

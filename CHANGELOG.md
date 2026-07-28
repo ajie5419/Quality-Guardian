@@ -149,6 +149,30 @@
 
 - Production still requires the normal release workflow to apply migrations, reconciliation, category backfill, and post-deploy count verification.
 
+### 2026-07-28 Phase 6: eliminate registered name-based statistics
+
+**Execution:**
+
+- Added registry-driven architecture rule `B-ID8`; it reads controlled `table + nameColumn + idColumn` pairs from `master-data-fields.ts` through the TypeScript AST and rejects Prisma `groupBy` calls that use display-name snapshots.
+- Migrated after-sales defect, supplier, department, and supplier-scoring aggregations to canonical IDs, then batch-resolved current display names.
+- Migrated inspection and issue report aggregations for supplier, TEAM, project, defect type, defect subtype, division, and responsible department to canonical IDs.
+- Preserved legacy rows with missing IDs as explicit unresolved buckets, kept invalid non-empty IDs distinguishable, and prevented different IDs with the same display name from being merged.
+
+**Verification:**
+
+- Architecture-rule tests: 8/8 passed.
+- After-sales analytics and integration tests: 21/21 passed.
+- Inspection reporting and issue-statistics tests: 50/50 passed.
+- Backend full suite: 228/228 test files and 2157/2157 tests passed.
+- Backend TypeScript check, targeted ESLint, full QMS architecture check, and whitespace check passed.
+
+**commit:** This commit
+
+**Remaining issues:**
+
+- Public chart contracts still need stable IDs and resolution status on every controlled bucket; the next phase migrates API/shared/frontend contracts.
+- Dynamic name joins, online write policies, unresolved resolution workflow, TEAM merge concurrency, and final database constraints remain governed by subsequent phases.
+
 ## [0.19.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.19.0...qgs-v0.19.1) (2026-07-24)
 
 

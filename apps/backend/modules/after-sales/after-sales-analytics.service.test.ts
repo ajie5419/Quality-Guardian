@@ -1,3 +1,4 @@
+import { QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('h3', () => ({
@@ -16,6 +17,15 @@ vi.mock('~/utils/prisma', () => ({
       update: vi.fn(),
     },
     $queryRaw: vi.fn(),
+  },
+}));
+
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNamesByIds: vi.fn(
+      async ({ canonicalIds }: { canonicalIds: Array<null | string> }) =>
+        new Map(canonicalIds.filter(Boolean).map((id) => [id, null])),
+    ),
   },
 }));
 
@@ -144,13 +154,25 @@ describe('after-sales-analytics.service', () => {
       ]);
     (prisma.after_sales.groupBy as any)
       .mockResolvedValueOnce([
-        { defectType: 'Mechanical', _count: { id: 6 } },
-        { defectType: 'Electrical', _count: { id: 4 } },
+        { defectTypeId: 'defect-1', _count: { id: 6 } },
+        { defectTypeId: 'defect-2', _count: { id: 4 } },
       ])
       .mockResolvedValueOnce([
-        { supplierBrand: 'Supplier A', _count: { id: 5 } },
+        { supplierBrandId: 'supplier-1', _count: { id: 5 } },
       ])
-      .mockResolvedValueOnce([{ respDept: 'QA', _count: { id: 7 } }]);
+      .mockResolvedValueOnce([{ respDeptId: 'dept-1', _count: { id: 7 } }]);
+    const { MasterDataGovernanceKernel } = await import(
+      '~/utils/canonical-master-data'
+    );
+    (MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any)
+      .mockResolvedValueOnce(
+        new Map([
+          ['defect-1', 'Mechanical'],
+          ['defect-2', 'Electrical'],
+        ]),
+      )
+      .mockResolvedValueOnce(new Map([['supplier-1', 'Supplier A']]))
+      .mockResolvedValueOnce(new Map([['dept-1', 'QA']]));
 
     const stats = await AfterSalesAnalyticsService.getStats({ year: 2026 });
 
@@ -161,6 +183,88 @@ describe('after-sales-analytics.service', () => {
     expect(stats.defectDistribution).toHaveLength(2);
     expect(stats.supplierRanking.categories).toEqual(['Supplier A']);
     expect(stats.deptDistribution).toHaveLength(1);
+    expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ by: ['defectTypeId'] }),
+    );
+    expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ by: ['supplierBrandId'] }),
+    );
+    expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ by: ['respDeptId'] }),
+    );
+  });
+
+  it('should keep canonical identities distinct and handle unresolved IDs', async () => {
+    const { AfterSalesAnalyticsService } = await import(
+      '~/modules/after-sales/after-sales-analytics.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+    const { MasterDataGovernanceKernel } = await import(
+      '~/utils/canonical-master-data'
+    );
+
+    (prisma.after_sales.aggregate as any).mockResolvedValue({
+      _count: { id: 8 },
+      _sum: { laborTravelCost: 0, materialCost: 0 },
+    });
+    (prisma.after_sales.count as any).mockResolvedValue(0);
+    (prisma.$queryRaw as any)
+      .mockResolvedValueOnce([{ avgDays: 0 }])
+      .mockResolvedValueOnce([]);
+    (prisma.after_sales.groupBy as any)
+      .mockResolvedValueOnce([
+        { defectTypeId: 'defect-a', _count: { id: 3 } },
+        { defectTypeId: 'defect-b', _count: { id: 2 } },
+        { defectTypeId: null, _count: { id: 1 } },
+        { defectTypeId: 'invalid-defect', _count: { id: 2 } },
+      ])
+      .mockResolvedValueOnce([
+        { supplierBrandId: 'supplier-a', _count: { id: 4 } },
+        { supplierBrandId: 'supplier-b', _count: { id: 2 } },
+        { supplierBrandId: null, _count: { id: 1 } },
+        { supplierBrandId: 'invalid-supplier', _count: { id: 1 } },
+      ])
+      .mockResolvedValueOnce([
+        { respDeptId: null, _count: { id: 1 } },
+        { respDeptId: 'invalid-dept', _count: { id: 1 } },
+      ]);
+    (MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any)
+      .mockResolvedValueOnce(
+        new Map([
+          ['defect-a', 'Shared defect'],
+          ['defect-b', 'Shared defect'],
+          ['invalid-defect', null],
+        ]),
+      )
+      .mockResolvedValueOnce(
+        new Map([
+          ['invalid-supplier', null],
+          ['supplier-a', 'Shared supplier'],
+          ['supplier-b', 'Shared supplier'],
+        ]),
+      )
+      .mockResolvedValueOnce(new Map([['invalid-dept', null]]));
+
+    const stats = await AfterSalesAnalyticsService.getStats({ year: 2026 });
+
+    expect(stats.defectDistribution).toEqual([
+      { name: 'Shared defect', value: 3 },
+      { name: 'Shared defect', value: 2 },
+      { name: QMS_DEFAULT_VALUES.UNCLASSIFIED, value: 1 },
+      { name: QMS_DEFAULT_VALUES.UNCLASSIFIED, value: 2 },
+    ]);
+    expect(stats.supplierRanking).toEqual({
+      categories: ['Shared supplier', 'Shared supplier', 'Unknown', 'Unknown'],
+      data: [4, 2, 1, 1],
+    });
+    expect(stats.deptDistribution).toEqual([
+      { name: QMS_DEFAULT_VALUES.UNASSIGNED, value: 1 },
+      { name: QMS_DEFAULT_VALUES.UNASSIGNED, value: 1 },
+    ]);
   });
 
   it('should return empty stats when query fails', async () => {

@@ -123,7 +123,7 @@ export const AfterSalesIntegrationService = {
 
     const [stats, statusStats, records] = await Promise.all([
       prisma.after_sales.groupBy({
-        by: ['supplierBrandId', 'supplierBrand'],
+        by: ['supplierBrandId'],
         where: {
           ...supplierWhere,
           isDeleted: false,
@@ -133,7 +133,7 @@ export const AfterSalesIntegrationService = {
         _count: { id: true },
       }),
       prisma.after_sales.groupBy({
-        by: ['supplierBrandId', 'supplierBrand', 'claimStatus'],
+        by: ['supplierBrandId', 'claimStatus'],
         where: {
           ...supplierWhere,
           isDeleted: false,

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionReportingService } from '~/modules/inspection/inspection-reporting.service';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -32,9 +33,18 @@ vi.mock('~/modules/quality-loss/quality-loss-status', () => ({
   toQualityRecordStatus: vi.fn().mockReturnValue('OPEN'),
 }));
 
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
 describe('inspectionReportingService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+    ).mockResolvedValue(new Map());
     (prisma.quality_records.findUnique as any).mockResolvedValue(null);
   });
 
@@ -243,6 +253,15 @@ describe('inspectionReportingService', () => {
       expect(result).toHaveProperty('engineeringStatusStats');
       expect(result).toHaveProperty('engineeringTotalStats');
       expect(result).toHaveProperty('records');
+      expect(
+        (prisma.quality_records.groupBy as any).mock.calls[0][0].by,
+      ).toEqual(['supplierId']);
+      expect(
+        (prisma.quality_records.groupBy as any).mock.calls[1][0].by,
+      ).toEqual(['supplierId', 'status']);
+      expect(
+        (prisma.quality_records.groupBy as any).mock.calls[2][0].by,
+      ).toEqual(['supplierId']);
     });
 
     it('should not fall back to supplier names when IDs are empty', async () => {
@@ -291,14 +310,7 @@ describe('inspectionReportingService', () => {
 
       expect(prisma.inspections.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({
-          by: [
-            'category',
-            'supplierId',
-            'supplierName',
-            'teamId',
-            'team',
-            'result',
-          ],
+          by: ['category', 'supplierId', 'teamId', 'result'],
           where: expect.objectContaining({
             OR: [
               {
@@ -474,8 +486,11 @@ describe('inspectionReportingService', () => {
   describe('getReportTopRiskProjects', () => {
     it('should return top 5 risk projects', async () => {
       (prisma.quality_records.groupBy as any).mockResolvedValue([
-        { projectName: 'P1', _count: 5, _sum: { lossAmount: 1000 } },
+        { projectId: 'project-1', _count: 5, _sum: { lossAmount: 1000 } },
       ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(new Map([['project-1', 'P1']]));
 
       const result = await InspectionReportingService.getReportTopRiskProjects({
         end: new Date('2024-06-30'),
@@ -483,8 +498,9 @@ describe('inspectionReportingService', () => {
       });
 
       expect(result).toHaveLength(1);
+      expect(result[0].projectName).toBe('P1');
       expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 5 }),
+        expect.objectContaining({ by: ['projectId'], take: 5 }),
       );
     });
   });
@@ -492,8 +508,11 @@ describe('inspectionReportingService', () => {
   describe('getReportSupplierPerformance', () => {
     it('should return supplier performance grouped data', async () => {
       (prisma.quality_records.groupBy as any).mockResolvedValue([
-        { supplierName: 'Supplier A', _count: 3 },
+        { supplierId: 'supplier-1', _count: 3 },
       ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(new Map([['supplier-1', 'Supplier A']]));
 
       const result =
         await InspectionReportingService.getReportSupplierPerformance({
@@ -502,6 +521,13 @@ describe('inspectionReportingService', () => {
         });
 
       expect(result).toHaveLength(1);
+      expect(result[0].supplierName).toBe('Supplier A');
+      expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: ['supplierId'],
+          where: expect.objectContaining({ supplierName: { not: null } }),
+        }),
+      );
     });
   });
 
@@ -584,9 +610,12 @@ describe('inspectionReportingService', () => {
         });
       (prisma.quality_records.count as any).mockResolvedValue(8);
       (prisma.quality_records.groupBy as any).mockResolvedValue([
-        { defectType: 'A', _count: { id: 3 } },
-        { defectType: null, _count: { id: 1 } },
+        { defectTypeId: 'defect-a', _count: { id: 3 } },
+        { defectTypeId: null, _count: { id: 1 } },
       ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(new Map([['defect-a', 'A']]));
 
       const result = await InspectionReportingService.getStatsForDashboard({
         weekStart: new Date('2024-06-01'),

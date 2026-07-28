@@ -16,7 +16,7 @@
 
 当前已完成 **supplier identity governance wave** 和 **TEAM identity governance wave**，不是全项目主数据一次性切换。已完成的在线 ID-first 范围包括供应商画像、供应商评分、检验记录、不合格项、售后评分、报检统计及 `TEAM -> supplier` 显式映射；这些消费者不再用名称等值关联或名称 `OR` 回退。TEAM 由独立模块管理稳定 ID、别名、来源和合并审计；改名不改变身份，近似名称不会触发自动合并。
 
-after-sales、supervision 的在线供应商写入也已要求显式 ID，服务端重建名称快照；名称解析只允许存在于审核过的 import/backfill 入口。其他尚未迁移的受控主数据仍按各自治理阶段推进，因此当前系统不能宣称全项目已经达到 `ID_ONLY`。
+after-sales、supervision 的在线供应商写入也已要求显式 ID，服务端重建名称快照；名称解析只允许存在于审核过的 import/backfill 入口。售后、检验、不合格品、报表和供应商评分中已登记的受控维度已改为按 canonical ID 聚合，名称仅在聚合后批量解析。其他尚未迁移的在线写入、权限和跨表关联仍按各自治理阶段推进，因此当前系统不能宣称全项目已经达到 `ID_ONLY`。
 
 ## 核心规则
 
@@ -123,8 +123,9 @@ For legacy rows whose category has not yet been backfilled, a TEAM ID takes prec
 - `B-ID5`：阻断未审核业务代码启用 legacy 名称转 ID 模式，只允许精确文件级 import adapter 白名单。
 - `B-ID6`：阻断报检统计读取 TEAM、供应商或工序名称快照作为身份输入。
 - `B-ID7`：阻断通用字典写入绕过 TEAM guard，并禁止恢复 TEAM 名称 bootstrap。
+- `B-ID8`：从主数据注册表自动提取 `table + nameColumn + idColumn`，阻断 Prisma 统计对受控名称字段执行 `groupBy`，要求按 canonical ID 聚合后再解析展示名称。
 
-门禁尚未覆盖所有表和所有主数据类型。后续 wave 必须同步扩大 AST 规则和测试，不能仅修改文档就宣称某个模块已达到 `ID-required`。
+门禁尚未覆盖动态字段映射、通用 `Map` 键、模糊关联、名称驱动业务分支以及所有在线写入。后续 wave 必须同步扩大 AST 规则和测试，不能仅修改文档就宣称某个模块已达到 `ID-required`。
 
 白名单必须指向完整文件路径和具体语句，附带原因标记。禁止用目录级或通配符白名单回避治理。
 

@@ -2,8 +2,8 @@
 
 ## 当前状态
 
-- 最新变更: Canonical TEAM identity ownership, source reconciliation, maintenance-only merge, and ID-based inspection-request statistics are complete. Production remains on `qgs-v0.19.1` until the release workflow applies migrations and ordered maintenance.
-- 测试状态: Backend full suite 228/228 files and 2154/2154 tests passed; TEAM/category/statistics targeted tests and architecture-rule tests passed.
+- 最新变更: Canonical TEAM identity ownership and registry-driven ID aggregation governance are complete for registered after-sales, inspection, issue, report, and supplier-scoring statistics. Production remains on `qgs-v0.19.1` until the release workflow applies migrations and ordered maintenance.
+- 测试状态: Backend full suite 228/228 files and 2157/2157 tests passed; the latest identity-aggregation and architecture-rule targeted tests passed 79/79.
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
 - 模块 TS 文件数: 528（含测试）
@@ -52,6 +52,7 @@
 - [x] 新增供应商同名软删除档案恢复（保留原 ID、并发 CAS、RESTORE 审计、业务冲突分级）
 - [x] TEAM 主数据身份治理（独立模块、稳定来源、别名、合并审计、通用字典写保护）
 - [x] 报检任务统计按 `category + teamId/supplierId/inspectorId` 聚合，名称只用于最终展示
+- [x] 受控主数据统计门禁与首波全库迁移（售后、检验、不合格品、报表、供应商评分）
 - [ ] 后端业务模块逐功能测试覆盖补齐（进行中）
 
 ## 当前架构

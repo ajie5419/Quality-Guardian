@@ -219,13 +219,17 @@ describe('after-sales-integration.service', () => {
     (prisma.after_sales.groupBy as any)
       .mockResolvedValueOnce([
         {
-          supplierBrand: 'A',
+          supplierBrandId: 'supplier-1',
           _sum: { materialCost: 100, laborTravelCost: 50 },
           _count: { id: 3 },
         },
       ])
       .mockResolvedValueOnce([
-        { supplierBrand: 'A', claimStatus: 'OPEN', _count: { id: 2 } },
+        {
+          supplierBrandId: 'supplier-1',
+          claimStatus: 'OPEN',
+          _count: { id: 2 },
+        },
       ]);
     (prisma.after_sales.findMany as any).mockResolvedValue([
       {
@@ -245,10 +249,16 @@ describe('after-sales-integration.service', () => {
     expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        by: ['supplierBrandId', 'supplierBrand'],
+        by: ['supplierBrandId'],
         where: expect.objectContaining({
           supplierBrandId: { in: ['supplier-1'] },
         }),
+      }),
+    );
+    expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        by: ['supplierBrandId', 'claimStatus'],
       }),
     );
     expect(prisma.after_sales.findMany).toHaveBeenCalledWith(

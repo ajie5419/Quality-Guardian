@@ -55,6 +55,7 @@ const DICTIONARY_SERVICE_FILE =
   'apps/backend/modules/dictionary/dictionary.service.ts';
 const GUARDED_DICTIONARY_MUTATIONS = new Set(['create', 'delete', 'update']);
 const TEAM_MUTATION_GUARD = 'ensureGenericMutationAllowed';
+const MASTER_DATA_FIELDS_FILE = 'apps/backend/utils/master-data-fields.ts';
 
 function parseArguments(argv) {
   const options = {
@@ -222,6 +223,69 @@ function getPropertyInitializer(property) {
   return undefined;
 }
 
+function getStringPropertyValue(object, propertyName) {
+  const initializer = getPropertyInitializer(
+    getObjectProperty(object, propertyName),
+  );
+  if (!initializer) return '';
+  const value = unwrapExpression(initializer);
+  return ts.isStringLiteral(value) || ts.isNoSubstitutionTemplateLiteral(value)
+    ? value.text
+    : '';
+}
+
+/**
+ * The backend registry is the source of truth for controlled name/ID pairs.
+ * Reading it through the TypeScript AST keeps architecture rules aligned with
+ * the runtime governance configuration without a second handwritten list.
+ */
+function loadGovernedIdentityTargets(rootDir) {
+  const registryPath = path.join(rootDir, MASTER_DATA_FIELDS_FILE);
+  let sourceText = '';
+  try {
+    sourceText = readFileSync(registryPath, 'utf8');
+  } catch (error) {
+    if (error && typeof error === 'object' && error.code === 'ENOENT') {
+      return new Map();
+    }
+    throw error;
+  }
+
+  const sourceFile = ts.createSourceFile(
+    registryPath,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const fieldsInitializer = findVariableInitializer(
+    sourceFile,
+    'MASTER_DATA_FIELDS',
+  );
+  if (!fieldsInitializer) return new Map();
+
+  const targetsByModel = new Map();
+  for (const field of resolveObjectLiterals(sourceFile, fieldsInitializer)) {
+    const targetsInitializer = getPropertyInitializer(
+      getObjectProperty(field, 'targets'),
+    );
+    if (!targetsInitializer) continue;
+    for (const target of resolveObjectLiterals(
+      sourceFile,
+      targetsInitializer,
+    )) {
+      const model = getStringPropertyValue(target, 'table');
+      const nameField = getStringPropertyValue(target, 'nameColumn');
+      const idField = getStringPropertyValue(target, 'idColumn');
+      if (!model || !nameField || !idField) continue;
+      const modelTargets = targetsByModel.get(model) ?? new Map();
+      modelTargets.set(nameField, idField);
+      targetsByModel.set(model, modelTargets);
+    }
+  }
+  return targetsByModel;
+}
+
 function isDefinitelyEmptyArray(expression) {
   if (!expression) return false;
   const unwrapped = unwrapExpression(expression);
@@ -246,6 +310,18 @@ function getPrismaWriteTarget(node) {
     return undefined;
   }
   return { method: node.expression.name.text, model: delegate.name.text };
+}
+
+function getPrismaCallModel(node, methodName) {
+  if (
+    !ts.isCallExpression(node) ||
+    !ts.isPropertyAccessExpression(node.expression) ||
+    node.expression.name.text !== methodName
+  ) {
+    return '';
+  }
+  const delegate = node.expression.expression;
+  return ts.isPropertyAccessExpression(delegate) ? delegate.name.text : '';
 }
 
 function isEventEmitCall(node) {
@@ -550,7 +626,7 @@ function analyzeFile(rootDir, filePath) {
   return findings;
 }
 
-function analyzeIdentityFile(rootDir, filePath) {
+function analyzeIdentityFile(rootDir, filePath, governedIdentityTargets) {
   const rawSourceText = readFileSync(filePath, 'utf8');
   const repoPath = path.relative(rootDir, filePath).split(path.sep).join('/');
   if (TEST_FILE_PATTERN.test(repoPath)) return [];
@@ -758,6 +834,33 @@ function analyzeIdentityFile(rootDir, filePath) {
     }
   }
 
+  function inspectGovernedNameGroupBy(node) {
+    const model = getPrismaCallModel(node, 'groupBy');
+    const modelTargets = governedIdentityTargets.get(model);
+    if (!modelTargets || node.arguments.length === 0) return;
+    const options = resolveObjectLiteral(sourceFile, node.arguments[0]);
+    if (!options) return;
+    const byInitializer = getPropertyInitializer(
+      getObjectProperty(options, 'by'),
+    );
+    if (!byInitializer) return;
+    const byFields = unwrapExpression(byInitializer);
+    if (!ts.isArrayLiteralExpression(byFields)) return;
+
+    for (const element of byFields.elements) {
+      const field = unwrapExpression(element);
+      if (!ts.isStringLiteral(field)) continue;
+      const idField = modelTargets.get(field.text);
+      if (!idField) continue;
+      addFinding(
+        'B-ID8',
+        field,
+        `${model}.${field.text} is a display snapshot; group by ${idField} and hydrate the name after aggregation.`,
+        `${model}-group-by-${field.text}`,
+      );
+    }
+  }
+
   function visit(node) {
     if (
       ts.isStringLiteral(node) &&
@@ -791,6 +894,7 @@ function analyzeIdentityFile(rootDir, filePath) {
     inspectNameBasedScoringIdentity(node);
     inspectInspectionStatsIdentityRead(node);
     inspectDictionaryMutationGuard(node);
+    inspectGovernedNameGroupBy(node);
     ts.forEachChild(node, visit);
   }
 
@@ -821,6 +925,7 @@ function main() {
   const options = parseArguments(process.argv.slice(2));
   const rootDir = path.resolve(options.root);
   const baseline = loadBaseline(options.baseline);
+  const governedIdentityTargets = loadGovernedIdentityTargets(rootDir);
   const files = readFileSync(options.filesFrom, 'utf8')
     .split(/\r?\n/u)
     .filter(Boolean)
@@ -834,7 +939,7 @@ function main() {
   const findings = [
     ...files.flatMap((filePath) => analyzeFile(rootDir, filePath)),
     ...identityFiles.flatMap((filePath) =>
-      analyzeIdentityFile(rootDir, filePath),
+      analyzeIdentityFile(rootDir, filePath, governedIdentityTargets),
     ),
   ];
 
