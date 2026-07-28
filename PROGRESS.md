@@ -2,11 +2,11 @@
 
 ## 当前状态
 
-- 最新变更: 工单看板、报告缺陷分布和车辆缺陷排行已清除名称聚合，受控图表从数据库聚合到前端渲染均携带稳定身份。生产环境仍保持 `qgs-v0.19.1`，等待发布流程执行 migration 和有序维护。
-- 测试状态: 后端全量 228/228 个测试文件、2160/2160 个用例通过；工单、报告和车辆身份定向测试 29/29 通过。
+- 最新变更: 质量损失、检验部件、工单聚合和 BOM 工序已切换到 canonical ID；报检 Web/小程序和工单要求已使用 V2 ID-required 写契约。生产环境仍保持 `qgs-v0.19.1`，未连接或修改生产数据。
+- 测试状态: 后端全量 `230/230` 个测试文件、`2176/2176` 个用例通过；本轮定向测试全部通过。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
-- 模块 TS 文件数: 528（含测试）
+- 模块 TS 文件数: 533（含测试）
 - 当前版本: `0.19.1`
 
 ## 已完成
@@ -55,6 +55,9 @@
 - [x] 受控主数据统计门禁与首波全库迁移（售后、检验、不合格品、报表、供应商评分）
 - [x] 售后与不合格品动态图表统一携带 canonical ID、名称和解析状态，前端不再按名称或部门树二次归并
 - [x] 工单看板、周报/月报缺陷分布和车辆缺陷排行按 canonical ID 聚合并透传身份状态
+- [x] 质量损失索引、检验部件、工单要求/聚合和 BOM 所需工序身份治理
+- [x] 报检 Web/小程序与工单要求 V2 ID-required 写契约
+- [x] 受控名称 `Map` 键架构门禁 `B-ID9`
 - [ ] 后端业务模块逐功能测试覆盖补齐（进行中）
 
 ## 当前架构
@@ -63,7 +66,7 @@
 apps/backend/
 ├── api/          # 路由薄层（≤50 行）
 ├── middleware/   # 认证、数据权限、日志
-├── modules/      # 业务逻辑（26 个模块，528 个 TS 文件）
+├── modules/      # 业务逻辑（26 个模块，533 个 TS 文件）
 ├── prisma/       # Schema + Migrations
 ├── routes/       # catch-all 404
 └── utils/        # 基础设施（24 个文件）
@@ -80,14 +83,15 @@ apps/backend/
 - [ ] 为 `unresolved_master_data_refs` 增加人工处置 API/UI，并为 `supplier_identity_links` 增加管理 UI
 - [ ] 为 supervision 等尚未覆盖的存量供应商引用补齐回填、unresolved 审计和生产指标核对
 - [ ] 将其他受控主数据从 `DUAL_WRITE/legacy` 逐 wave 推进到在线 `ID-required`
-- [ ] 增加受控名称 `Map` 聚合门禁，并继续核对尚未登记的内存统计路径
+- [ ] 按生产 V1/V2 流量和 `missing_id_count` 指标删除报检/工单要求 V1 迁移协议
+- [ ] 继续核对尚未登记的动态字段和名称分支路径
 - [ ] 通过发布流程部署 TEAM identity migrations，执行有序 reconciliation/category backfill，并核对生产报检排行总数与 unresolved 审计
 - [ ] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制
 
 ## 基线数据（用于异常检测）
 
-- 模块 TS 文件数: 528（含测试）
+- 模块 TS 文件数: 533（含测试）
 - utils TS 文件数: 41
-- 测试文件数: 200（modules 内）；后端总计 223
+- 测试文件数: 204（modules 内）；后端总计 230
 - 导出入口基线: 约 610；已完成 343，剩余 267
 - 顶层目录: api/ middleware/ modules/ prisma/ routes/ utils/

@@ -92,6 +92,16 @@ Request statistics aggregate by `teamId`, `supplierId`, and `inspectorId`. Canon
 
 Dashboard API contracts and Vue row keys carry the same stable IDs. A display name must never be used as a component key for TEAM, supplier, or inspector rankings.
 
+## 报检创建身份契约
+
+- V2 创建契约显式提交 `category + partId + processId`；客户端不提交部件和工序名称作为业务事实。
+- 后端按 ID 校验启用的 `master_parts/processes` 记录，并重建 `partName/processName` 快照；无效 ID 直接拒绝。
+- BOM 部件选项返回 `project_boms.partId`；BOM 行 `id` 只是 BOM 记录主键，不是部件身份。
+- 工序选项返回 `processes.id`；工序字典 `dictionaries.id` 与工序主数据不是同一 ID 空间。
+- Web 和微信小程序均使用 V2。V1 旧路由只作发布迁移适配；待生产 V1 写流量归零后必须删除。
+
+`inspections.partId/partName` 是检验记录的正式部件身份。`level1Component/level2Component/materialName` 是历史业务快照，不得再用于部件关联或聚合。回填优先继承关联报检的确定 ID；冲突、重名、无匹配进入 `unresolved_master_data_refs`，不猜测。回填只补 ID，已有历史名称快照不被覆盖。
+
 ## 报检任务重构边界
 
 报检任务后续重构必须保持外部 API 行为兼容，优先处理结构和类型安全，不在同一阶段修改业务语义。

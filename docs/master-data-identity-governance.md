@@ -14,7 +14,7 @@
 
 ## 当前落地范围
 
-当前已完成 **supplier identity governance wave** 和 **TEAM identity governance wave**，不是全项目主数据一次性切换。已完成的在线 ID-first 范围包括供应商画像、供应商评分、检验记录、不合格项、售后评分、报检统计及 `TEAM -> supplier` 显式映射；这些消费者不再用名称等值关联或名称 `OR` 回退。TEAM 由独立模块管理稳定 ID、别名、来源和合并审计；改名不改变身份，近似名称不会触发自动合并。
+当前已完成 supplier、TEAM、报检统计、质量损失索引、检验部件、工单聚合和 BOM 所需工序的身份治理。报检创建和工单要求已提供 V2 ID-required 写契约，Web/小程序均使用 V2；V1 仅作发布迁移协议，不属于最终架构。
 
 after-sales、supervision 的在线供应商写入也已要求显式 ID，服务端重建名称快照；名称解析只允许存在于审核过的 import/backfill 入口。售后、检验、不合格品、报表、工单看板和供应商评分中已登记的受控维度已改为按 canonical ID 聚合，名称仅在聚合后批量解析。售后、不合格品、工单看板、周报/月报缺陷分布和车辆缺陷排行的 API 类型与前端图表统一携带身份聚合契约，前端不再通过部门树或名称重新判断身份。其他尚未迁移的在线写入、权限和跨表关联仍按各自治理阶段推进，因此当前系统不能宣称全项目已经达到 `ID_ONLY`。
 
@@ -93,7 +93,7 @@ For legacy rows whose category has not yet been backfilled, a TEAM ID takes prec
 
 本阶段覆盖的售后、不合格品、工单看板、周报/月报缺陷分布和车辆缺陷排行统一携带共享身份契约。聚合键必须是 canonical ID；名称只在聚合完成后解析，不能作为下游身份输入。工单质保排行同时保留事业部 ID 和项目 ID，禁止先把两个 ID 解析成名称后再去重。月份、状态和索赔值等非主数据维度也携带稳定值 ID，使图表消费者只处理一种契约。
 
-历史数据继续参与检索和总量统计。缺少 canonical ID 的记录进入该身份域的 `MISSING` 桶；无法解析的非空 ID 进入保留原始 ID 的 `INVALID` 桶。两类记录都不能被静默归入某个已命名实体，并继续接受 unresolved 数据审计。
+历史数据继续参与检索和总量统计。缺少 canonical ID 的记录进入该身份域的 `MISSING` 桶；无法解析的非空 ID 进入保留原始 ID 的 `INVALID` 桶。两类记录都不能被静默归入某个已命名实体，并继续接受 unresolved 数据审计。回填只补稳定 ID，不覆盖已有历史名称快照。因此旧名称仍可用于关键字检索和历史证据展示，聚合归属则仅看 ID。
 
 ## 存量迁移
 
@@ -132,10 +132,18 @@ For legacy rows whose category has not yet been backfilled, a TEAM ID takes prec
 - `B-ID6`：阻断报检统计读取 TEAM、供应商或工序名称快照作为身份输入。
 - `B-ID7`：阻断通用字典写入绕过 TEAM guard，并禁止恢复 TEAM 名称 bootstrap。
 - `B-ID8`：从主数据注册表自动提取 `table + nameColumn + idColumn`，阻断 Prisma 统计对受控名称字段执行 `groupBy`，要求按 canonical ID 聚合后再解析展示名称。
+- `B-ID9`：阻断受控名称作为 `Map.get/set/has` 的身份键；经审查的 legacy import adapter 只能使用精确文件白名单。
 
-门禁尚未覆盖动态字段映射、通用 `Map` 键、模糊关联、名称驱动业务分支以及所有在线写入。后续 wave 必须同步扩大 AST 规则和测试，不能仅修改文档就宣称某个模块已达到 `ID-required`。
+门禁尚未覆盖动态字段映射、模糊关联、名称驱动业务分支以及所有在线写入。后续 wave 必须同步扩大 AST 规则和测试，不能仅修改文档就宣称某个模块已达到 `ID-required`。
 
 白名单必须指向完整文件路径和具体语句，附带原因标记。禁止用目录级或通配符白名单回避治理。
+
+## 无中断发布顺序
+
+1. 先部署 additive migration、ID 选项接口、V2 写契约和幂等回填，V1 保持可用。
+2. 发布 Web 静态资源和微信小程序 V2，监控 V1/V2 写流量、`missing_id_count` 和 unresolved 计数。
+3. 待 V1 写流量归零且新写入 `missing_id_count = 0`，删除 V1 路由和名称解析分支。
+4. 再将字段治理阶段标记为 `ID_ONLY`。未达到指标不允许提前切换。
 
 ## 运行指标
 

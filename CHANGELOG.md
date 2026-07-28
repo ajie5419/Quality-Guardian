@@ -25,6 +25,34 @@
 
 ## 执行记录
 
+### 2026-07-28 Phase 9: govern part, process and quality-loss identities
+
+**执行内容：**
+
+- 质量损失索引补齐 `projectId/partId/respDeptId`，部门图表改为按 ID 聚合。
+- 检验记录新增正式 `partId/partName`，报检关闭、手工创建和更新统一 canonical 双写。
+- 工单要求和检验只按 `partId + processId` 匹配；`MISSING` 按源记录隔离，`INVALID` 保留原 ID，未归属检验点不误抵扣完成率。
+- BOM 所需工序改为 `project_bom_required_processes` 正式关系，旧 JSON 只作历史快照。
+- 报检 Web/小程序和工单要求界面切换到 V2 ID-required 契约，服务端按 ID 重建名称；V1 仅用于无中断发布迁移。
+- 新增幂等关系回填并接入 release maintenance；回填优先确定关联证据，不覆盖已有历史名称快照。
+- 新增 `B-ID9` AST 门禁，阻断受控名称再次作为 `Map.get/set/has` 身份键。
+
+**验证结果：**
+
+- 共享契约 build：通过。
+- 后端 TypeScript 与前端 Vue TypeScript：通过。
+- 定向测试：报检 V2 `38/38`、前端报检 `5/5`、工单要求/聚合 `24/24`、关系回填与质量损失 `58/58`。
+- 全库 QMS 架构门禁：`0 violations across 0 rules`。
+- 后端全量测试：`230/230` 个文件、`2176/2176` 个用例通过。
+- 全量 lint 通过（0 error）；workspace typecheck `3/3` 通过；Prisma migration 检查通过。
+
+**commit:** `b7ad4a18` / `2b6db069` / `a4304bf9` / `e53dc930` / `b90adeed` / `6411c7d5` / `69b4fcde` / `d7b1b240`
+
+**遗留问题：**
+
+- 生产必须按“additive migration 和回填 → 发布 V2 Web/小程序 → 观测 V1 零流量 → 删除 V1”的顺序执行，不允许直接中断旧客户端。
+- `unresolved_master_data_refs` 人工处置界面和 TEAM 合并并发一致性仍是后续独立治理波次。
+
 ### 2026-07-27 Phase 1: establish canonical TEAM identity ownership
 
 **Execution:**
