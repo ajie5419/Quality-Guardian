@@ -25,6 +25,36 @@
 
 ## 执行记录
 
+### 2026-07-28 Phase 10: complete system-wide canonical identity governance
+
+**Execution:**
+
+- Replaced mutable-name identity decisions with canonical IDs across TEAM maintenance, inspection-request categories, BOM process relations, quality-loss department writes, charts, reports, Web, and WeChat clients.
+- Added a durable TEAM merge state machine with participant locks, leases, compare-and-set batches, cumulative counts, resumable failures, deterministic lock ordering, and soft-deleted supplier-link history.
+- Restricted legacy TEAM bootstrap claims to one independently verifiable source and routed TEAM administration through the dedicated identity API.
+- Added `processes.inspectionRequestCategory`; the DDL-only migration defaults existing processes to `PROCESS`, while ordered release maintenance idempotently classifies the legacy incoming process and backfills historical request categories.
+- Enforced V2 `processId + category` consistency on the server. V1 remains a deployment compatibility contract and does not inherit new V2-only component validation.
+- Preserved BOM process relations when an edit omits process fields and replaced them only after an explicit selection change or clear.
+- Made quality-loss create and update validate an active department ID and rebuild `respDeptId + respDept` in the same transaction. Historical snapshots remain searchable and unresolved rows remain visible.
+- Carried `id + resolutionStatus + displayName` through ECharts data, legends, Vue keys, quality-loss charts, and monthly reports so equal display names never become identity keys.
+- Removed the duplicate post-health-check quality-loss backfill. Release maintenance remains the single synchronous source of truth while backend writes are stopped.
+- No production database or production records were accessed or modified during this implementation.
+
+**Verification:**
+
+- Backend full suite: `232/232` test files and `2200/2200` tests passed.
+- Focused Web chart and request-entry suite: `4/4` test files and `32/32` tests passed.
+- Shared inspection-request contract: `15/15` tests passed.
+- Full repository lint passed with zero errors; workspace typecheck passed `3/3` tasks.
+- Prisma format and validation passed; changed-scope QMS architecture check reported `0 violations across 0 rules`.
+- `git diff --check` passed and the worktree was clean before documentation updates.
+
+**Commits:** `c635ed47`, `21a13a6b`, `6a3cf228`, `fee9085c`, `4fce415c`, `fa9e3a18`, `e2393f3`
+
+**Remaining issues:**
+
+- No remaining code issue in this governance scope. Production rollout must use the existing release workflow so migrations and idempotent maintenance execute during the write-stop window; manual database edits are not permitted.
+
 ### 2026-07-28 Phase 9: govern part, process and quality-loss identities
 
 **执行内容：**
