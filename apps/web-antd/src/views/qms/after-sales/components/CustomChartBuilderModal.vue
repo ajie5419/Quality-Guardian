@@ -3,8 +3,6 @@ import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import type { ChartConfig } from '../composables/useChartAggregation';
 
-import type { DeptTreeNode } from '#/types';
-
 import { reactive, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
@@ -30,7 +28,6 @@ import { CHART_DIMENSIONS, CHART_METRICS } from '../constants';
 const props = defineProps<{
   dateMode?: 'month' | 'week' | 'year';
   dateValue?: string;
-  deptData?: DeptTreeNode[];
   initialConfig?: ChartConfig;
   open: boolean;
   year?: number;
@@ -106,17 +103,11 @@ watch(
     if (props.open) {
       // 简单防抖或直接调用
       setTimeout(() => {
-        renderCustomChart(
-          renderEcharts,
-          { id: 'preview', ...formState },
-          t,
-          {
-            dateMode: props.dateMode,
-            dateValue: props.dateValue,
-            year: props.year,
-          },
-          props.deptData,
-        );
+        renderCustomChart(renderEcharts, { id: 'preview', ...formState }, t, {
+          dateMode: props.dateMode,
+          dateValue: props.dateValue,
+          year: props.year,
+        });
       }, 100);
     }
   },

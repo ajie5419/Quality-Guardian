@@ -23,15 +23,6 @@ vi.mock('#/components/Qms/ChartBuilder/composables/useChartCore', () => ({
   buildChartOptionFromAggregated: mockBuildChartOptionFromAggregated,
 }));
 
-vi.mock('#/types', () => ({
-  findNameById: (data: any[], id: string) => {
-    for (const item of data) {
-      if (item.id === id) return item.name;
-    }
-    return '';
-  },
-}));
-
 beforeEach(() => {
   vi.resetAllMocks();
 });
@@ -62,7 +53,14 @@ describe('iSSUE_CHART_METRICS', () => {
 describe('getIssueChartOption', () => {
   it('calls API with correct params and builds chart option', async () => {
     mockGetInspectionIssueChartAggregate.mockResolvedValueOnce({
-      items: [{ name: 'A', value: 10 }],
+      items: [
+        {
+          id: 'defect-a',
+          name: 'A',
+          resolutionStatus: 'RESOLVED',
+          value: 10,
+        },
+      ],
     });
     mockBuildChartOptionFromAggregated.mockReturnValueOnce({ series: [] });
 
@@ -84,7 +82,14 @@ describe('getIssueChartOption', () => {
       year: 2026,
     });
     expect(mockBuildChartOptionFromAggregated).toHaveBeenCalledWith(
-      [{ name: 'A', value: 10 }],
+      [
+        {
+          id: 'defect-a',
+          name: 'A',
+          resolutionStatus: 'RESOLVED',
+          value: 10,
+        },
+      ],
       {
         dimension: 'defectType',
         metric: 'count',
@@ -97,13 +102,18 @@ describe('getIssueChartOption', () => {
     expect(result).toEqual({ series: [] });
   });
 
-  it('normalizes division dimension rows via findNameById', async () => {
+  it('passes canonical identity rows through without client-side resolution', async () => {
     mockGetInspectionIssueChartAggregate.mockResolvedValueOnce({
-      items: [{ name: 'd1', value: 5 }],
+      items: [
+        {
+          id: 'division-1',
+          name: 'Quality division',
+          resolutionStatus: 'RESOLVED',
+          value: 5,
+        },
+      ],
     });
     mockBuildChartOptionFromAggregated.mockReturnValueOnce({});
-
-    const deptData = [{ id: 'd1', name: '质量部', children: [] }];
 
     await getIssueChartOption(
       {
@@ -114,60 +124,17 @@ describe('getIssueChartOption', () => {
         chartType: 'bar',
       },
       {},
-      deptData,
     );
 
-    const normalizedRows =
-      mockBuildChartOptionFromAggregated.mock.calls[0]?.[0];
-    expect(normalizedRows?.[0]?.name).toBe('质量部');
-  });
-
-  it('normalizes responsibleDepartment dimension rows', async () => {
-    mockGetInspectionIssueChartAggregate.mockResolvedValueOnce({
-      items: [{ name: 'd2', value: 3 }],
-    });
-    mockBuildChartOptionFromAggregated.mockReturnValueOnce({});
-
-    const deptData = [{ id: 'd2', name: '生产部', children: [] }];
-
-    await getIssueChartOption(
+    const rows = mockBuildChartOptionFromAggregated.mock.calls[0]?.[0];
+    expect(rows).toEqual([
       {
-        dimension: 'responsibleDepartment',
-        metric: 'count',
-        id: '3',
-        title: 't',
-        chartType: 'bar',
+        id: 'division-1',
+        name: 'Quality division',
+        resolutionStatus: 'RESOLVED',
+        value: 5,
       },
-      {},
-      deptData,
-    );
-
-    const normalizedRows =
-      mockBuildChartOptionFromAggregated.mock.calls[0]?.[0];
-    expect(normalizedRows?.[0]?.name).toBe('生产部');
-  });
-
-  it('does not normalize non-department dimensions', async () => {
-    mockGetInspectionIssueChartAggregate.mockResolvedValueOnce({
-      items: [{ name: 'raw-id', value: 1 }],
-    });
-    mockBuildChartOptionFromAggregated.mockReturnValueOnce({});
-
-    await getIssueChartOption(
-      {
-        dimension: 'status',
-        metric: 'count',
-        id: '4',
-        title: 't',
-        chartType: 'bar',
-      },
-      {},
-      [{ id: 'raw-id', name: 'Dept', children: [] }],
-    );
-
-    const normalizedRows =
-      mockBuildChartOptionFromAggregated.mock.calls[0]?.[0];
-    expect(normalizedRows?.[0]?.name).toBe('raw-id');
+    ]);
   });
 
   it('handles missing items as empty array', async () => {

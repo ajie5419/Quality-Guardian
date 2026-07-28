@@ -166,12 +166,37 @@
 - Backend full suite: 228/228 test files and 2157/2157 tests passed.
 - Backend TypeScript check, targeted ESLint, full QMS architecture check, and whitespace check passed.
 
-**commit:** This commit
+**commit:** `5d6cfe3a` fix(project): aggregate governed statistics by identity
 
 **Remaining issues:**
 
 - Public chart contracts still need stable IDs and resolution status on every controlled bucket; the next phase migrates API/shared/frontend contracts.
 - Dynamic name joins, online write policies, unresolved resolution workflow, TEAM merge concurrency, and final database constraints remain governed by subsequent phases.
+
+### 2026-07-28 Phase 7：图表全链路传递稳定身份
+
+**执行内容：**
+
+- 新增共享 `IdentityAggregateItem` 契约，统一携带稳定 ID、canonical 展示名称、数值和明确的 `RESOLVED/MISSING/INVALID` 状态。
+- 售后静态/动态图表以及不合格品饼图、Pareto 和自定义图表统一切换到同一身份契约。
+- 所有本阶段受控动态维度改为按注册的 canonical ID 聚合，聚合完成后才解析当前名称。
+- 删除前端部门树补名和所有图表侧 ID-to-name 猜测；图表组件直接渲染后端身份契约，不再按展示名称二次归并。
+- 历史缺失 ID 和无效 ID 记录继续以 unresolved 桶参与统计；不同 ID 即使 canonical 名称相同也保持分离。
+
+**验证结果：**
+
+- 身份与图表定向测试：9/9 个测试文件、69/69 个用例通过。
+- 后端全量测试：228/228 个测试文件、2157/2157 个用例通过。
+- 全仓类型检查：3/3 个任务通过。
+- QMS 变更范围架构门禁通过，新增违规为 0。
+- 全仓 lint 通过，0 error、0 warning。
+
+**commit:** This commit
+
+**遗留问题：**
+
+- 剩余内存统计还需迁移，并增加禁止名称 `Map` 键的架构门禁。
+- 在线写入策略、unresolved 处置闭环、TEAM 合并并发一致性和最终数据库约束由后续阶段继续治理。
 
 ## [0.19.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.19.0...qgs-v0.19.1) (2026-07-24)
 

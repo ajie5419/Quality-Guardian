@@ -1,3 +1,4 @@
+import { QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('~/utils/prisma', () => ({
@@ -15,24 +16,10 @@ vi.mock('~/modules/data-scope/data-scope.service', () => ({
   },
 }));
 
-vi.mock('~/modules/dept/dept.service', () => ({
-  DeptService: {
-    findAll: vi.fn(),
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
   },
-}));
-
-vi.mock('~/modules/dept/dept-tree', () => ({
-  flattenDeptTree: vi.fn((tree: any[]) => {
-    const result: any[] = [];
-    const walk = (nodes: any[]) => {
-      for (const node of nodes) {
-        result.push(node);
-        if (node.children) walk(node.children);
-      }
-    };
-    walk(tree);
-    return result;
-  }),
 }));
 
 describe('after-sales-chart-aggregation.service', () => {
@@ -46,11 +33,22 @@ describe('after-sales-chart-aggregation.service', () => {
     );
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
+    const { MasterDataGovernanceKernel } = await import(
+      '~/utils/canonical-master-data'
+    );
 
     (prisma.after_sales.groupBy as any).mockResolvedValue([
-      { defectType: 'Mechanical', _count: { id: 10 } },
-      { defectType: 'Electrical', _count: { id: 5 } },
+      { defectTypeId: 'defect-mechanical', _count: { id: 10 } },
+      { defectTypeId: 'defect-electrical', _count: { id: 5 } },
     ]);
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
+    ).mockResolvedValue(
+      new Map([
+        ['defect-electrical', 'Electrical'],
+        ['defect-mechanical', 'Mechanical'],
+      ]),
+    );
 
     const result = await AfterSalesChartAggregationService.getChartAggregation({
       dimension: 'defectType',
@@ -59,33 +57,52 @@ describe('after-sales-chart-aggregation.service', () => {
     });
 
     expect(result).toEqual([
-      { name: 'Mechanical', value: 10 },
-      { name: 'Electrical', value: 5 },
+      {
+        id: 'defect-mechanical',
+        name: 'Mechanical',
+        resolutionStatus: 'RESOLVED',
+        value: 10,
+      },
+      {
+        id: 'defect-electrical',
+        name: 'Electrical',
+        resolutionStatus: 'RESOLVED',
+        value: 5,
+      },
     ]);
+    expect(prisma.after_sales.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({ by: ['defectTypeId'] }),
+    );
   });
 
   it('should aggregate by responsibleDept with totalLoss metric and resolve dept names', async () => {
     const { AfterSalesChartAggregationService } = await import(
       '~/modules/after-sales/after-sales-chart-aggregation.service'
     );
-    const { DeptService } = await import('~/modules/dept/dept.service');
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
+    const { MasterDataGovernanceKernel } = await import(
+      '~/utils/canonical-master-data'
+    );
 
     (prisma.after_sales.groupBy as any).mockResolvedValue([
       {
-        respDept: 'dept-1',
+        respDeptId: 'dept-1',
         _sum: { materialCost: 100, laborTravelCost: 25 },
       },
       {
-        respDept: 'dept-2',
+        respDeptId: 'dept-2',
         _sum: { materialCost: 20, laborTravelCost: 5 },
       },
     ]);
-    vi.mocked(DeptService.findAll).mockResolvedValue([
-      { id: 'dept-1', name: 'Quality', children: [] },
-      { id: 'dept-2', name: 'Service', children: [] },
-    ] as never);
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
+    ).mockResolvedValue(
+      new Map([
+        ['dept-1', 'Quality'],
+        ['dept-2', 'Service'],
+      ]),
+    );
 
     const result = await AfterSalesChartAggregationService.getChartAggregation({
       dimension: 'responsibleDept',
@@ -95,9 +112,22 @@ describe('after-sales-chart-aggregation.service', () => {
     });
 
     expect(result).toEqual([
-      { name: 'Quality', value: 125 },
-      { name: 'Service', value: 25 },
+      {
+        id: 'dept-1',
+        name: 'Quality',
+        resolutionStatus: 'RESOLVED',
+        value: 125,
+      },
+      {
+        id: 'dept-2',
+        name: 'Service',
+        resolutionStatus: 'RESOLVED',
+        value: 25,
+      },
     ]);
+    expect(prisma.after_sales.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({ by: ['respDeptId'] }),
+    );
   });
 
   it('should aggregate reportMonth with totalLoss metric', async () => {
@@ -130,7 +160,14 @@ describe('after-sales-chart-aggregation.service', () => {
       year: 2026,
     });
 
-    expect(result).toEqual([{ name: '2026-01', value: 120 }]);
+    expect(result).toEqual([
+      {
+        id: '2026-01',
+        name: '2026-01',
+        resolutionStatus: 'RESOLVED',
+        value: 120,
+      },
+    ]);
   });
 
   it('should limit results to top N items sorted by value desc', async () => {
@@ -139,12 +176,24 @@ describe('after-sales-chart-aggregation.service', () => {
     );
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
+    const { MasterDataGovernanceKernel } = await import(
+      '~/utils/canonical-master-data'
+    );
 
     (prisma.after_sales.groupBy as any).mockResolvedValue([
-      { defectType: 'A', _count: { id: 3 } },
-      { defectType: 'B', _count: { id: 10 } },
-      { defectType: 'C', _count: { id: 7 } },
+      { defectTypeId: 'defect-a', _count: { id: 3 } },
+      { defectTypeId: 'defect-b', _count: { id: 10 } },
+      { defectTypeId: 'defect-c', _count: { id: 7 } },
     ]);
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
+    ).mockResolvedValue(
+      new Map([
+        ['defect-a', 'A'],
+        ['defect-b', 'B'],
+        ['defect-c', 'C'],
+      ]),
+    );
 
     const result = await AfterSalesChartAggregationService.getChartAggregation({
       dimension: 'defectType',
@@ -154,8 +203,18 @@ describe('after-sales-chart-aggregation.service', () => {
     });
 
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({ name: 'B', value: 10 });
-    expect(result[1]).toEqual({ name: 'C', value: 7 });
+    expect(result[0]).toEqual({
+      id: 'defect-b',
+      name: 'B',
+      resolutionStatus: 'RESOLVED',
+      value: 10,
+    });
+    expect(result[1]).toEqual({
+      id: 'defect-c',
+      name: 'C',
+      resolutionStatus: 'RESOLVED',
+      value: 7,
+    });
   });
 
   it('should handle null field values as UNCLASSIFIED', async () => {
@@ -166,7 +225,7 @@ describe('after-sales-chart-aggregation.service', () => {
     const prisma = prismaModule.default;
 
     (prisma.after_sales.groupBy as any).mockResolvedValue([
-      { defectType: null, _count: { id: 4 } },
+      { defectTypeId: null, _count: { id: 4 } },
     ]);
 
     const result = await AfterSalesChartAggregationService.getChartAggregation({
@@ -175,7 +234,11 @@ describe('after-sales-chart-aggregation.service', () => {
       year: 2026,
     });
 
-    expect(result[0].name).toBeTruthy();
-    expect(result[0].value).toBe(4);
+    expect(result[0]).toEqual({
+      id: null,
+      name: QMS_DEFAULT_VALUES.UNCLASSIFIED,
+      resolutionStatus: 'MISSING',
+      value: 4,
+    });
   });
 });

@@ -192,8 +192,18 @@ describe('inspectionService', () => {
       expect(stats.closedCount).toBe(1);
       expect(stats.totalLoss).toBe(300);
       expect(stats.closedRate).toBe(50);
-      expect(stats.pieData).toContainEqual({ name: 'Minor', value: 1 });
-      expect(stats.pieData).toContainEqual({ name: 'Major', value: 1 });
+      expect(stats.pieData).toContainEqual({
+        id: 'defect-minor',
+        name: 'Minor',
+        resolutionStatus: 'RESOLVED',
+        value: 1,
+      });
+      expect(stats.pieData).toContainEqual({
+        id: 'defect-major',
+        name: 'Major',
+        resolutionStatus: 'RESOLVED',
+        value: 1,
+      });
       expect(stats.trendData).toContainEqual({ period: '2024-01', value: 300 });
     });
   });

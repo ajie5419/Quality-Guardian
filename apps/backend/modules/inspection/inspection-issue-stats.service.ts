@@ -1,8 +1,17 @@
+import type {
+  IdentityAggregateItem,
+  IdentityResolutionStatus,
+} from '@qgs/shared';
+
 import type { InspectionIssueDateMode } from './inspection-issue';
 import type { InspectionIssueUserContext } from './inspection-issue-access.service';
 
 import { Prisma } from '@prisma/client';
-import { formatDate } from '@qgs/shared';
+import {
+  createIdentityAggregateItem,
+  createResolvedAggregateItem,
+  formatDate,
+} from '@qgs/shared';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -12,15 +21,14 @@ import { applyInspectionIssueReadOwnership } from './inspection-issue-access.ser
 
 const logger = createModuleLogger('InspectionService');
 
-interface PieDataItem {
-  name: string;
-  value: number;
-}
+type PieDataItem = IdentityAggregateItem;
 
 interface ParetoDataItem {
   cumulativePercent: number;
+  id: null | string;
   label: string;
   percent: number;
+  resolutionStatus: IdentityResolutionStatus;
   value: number;
 }
 
@@ -40,10 +48,7 @@ interface IssueStats {
   trendData: TrendDataItem[];
 }
 
-type InspectionIssueChartAggregateItem = {
-  name: string;
-  value: number;
-};
+type InspectionIssueChartAggregateItem = IdentityAggregateItem;
 
 type InspectionIssueChartDimension =
   | 'claim'
@@ -69,14 +74,6 @@ const CONTROLLED_DIMENSION_CONFIG_KEYS: Partial<
   responsibleDepartment: 'responsibleDepartment',
   supplierName: 'supplierName',
 };
-
-function getCanonicalDisplayName(
-  canonicalId: null | string,
-  canonicalNames: Map<string, null | string>,
-) {
-  if (!canonicalId) return 'Unknown';
-  return canonicalNames.get(canonicalId) || `Unknown (${canonicalId})`;
-}
 
 export const InspectionIssueStatsService = {
   async getIssueStats(params: {
@@ -130,15 +127,22 @@ export const InspectionIssueStatsService = {
           canonicalIds: typeStats.map((item) => item.defectTypeId),
         });
 
-      const pieData: PieDataItem[] = typeStats.map((s) => ({
-        name: getCanonicalDisplayName(s.defectTypeId, defectTypeNames),
-        value: s._count.id,
-      }));
+      const pieData: PieDataItem[] = typeStats.map((s) =>
+        createIdentityAggregateItem({
+          canonicalName: s.defectTypeId
+            ? defectTypeNames.get(s.defectTypeId)
+            : null,
+          id: s.defectTypeId,
+          value: s._count.id,
+        }),
+      );
       let cumulativeCount = 0;
       const pareto: ParetoDataItem[] = pieData.map((item) => {
         cumulativeCount += item.value;
         return {
+          id: item.id,
           label: item.name,
+          resolutionStatus: item.resolutionStatus,
           value: item.value,
           percent:
             totalCount > 0 ? Math.round((item.value / totalCount) * 100) : 0,
@@ -293,12 +297,19 @@ export const InspectionIssueStatsService = {
       : new Map<string, null | string>();
     const top = Number(params.top) > 0 ? Number(params.top) : 15;
     return aggregateRows
-      .map((item) => ({
-        name: controlledConfigKey
-          ? getCanonicalDisplayName(item.id, canonicalNames)
-          : item.name,
-        value: Math.round(item.value * 100) / 100,
-      }))
+      .map((item) => {
+        const value = Math.round(item.value * 100) / 100;
+        return controlledConfigKey
+          ? createIdentityAggregateItem({
+              canonicalName: item.id ? canonicalNames.get(item.id) : null,
+              id: item.id,
+              value,
+            })
+          : createResolvedAggregateItem({
+              id: item.name,
+              value,
+            });
+      })
       .sort((a, b) => b.value - a.value)
       .slice(0, top);
   },

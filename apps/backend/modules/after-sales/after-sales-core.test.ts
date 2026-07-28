@@ -8,9 +8,9 @@ import {
 } from '~/modules/after-sales/after-sales-status';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
-import { DeptService } from '~/modules/dept/dept.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
@@ -54,9 +54,9 @@ vi.mock('~/utils/event-bus', () => ({
   eventBus: { emit: vi.fn() },
 }));
 
-vi.mock('~/modules/dept/dept.service', () => ({
-  DeptService: {
-    findAll: vi.fn(),
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
   },
 }));
 
@@ -267,18 +267,22 @@ describe('after-sales core helpers and services', () => {
   it('builds chart aggregation from grouped rows, department names, report months, and scoped queries', async () => {
     (prisma.after_sales.groupBy as any).mockResolvedValue([
       {
-        respDept: 'dept-1',
+        respDeptId: 'dept-1',
         _sum: { materialCost: 100, laborTravelCost: 25 },
       },
       {
-        respDept: 'dept-2',
+        respDeptId: 'dept-2',
         _sum: { materialCost: 20, laborTravelCost: 5 },
       },
     ] as never);
-    vi.mocked(DeptService.findAll).mockResolvedValue([
-      { id: 'dept-1', name: 'Quality', children: [] },
-      { id: 'dept-2', name: 'Service', children: [] },
-    ] as never);
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
+    ).mockResolvedValue(
+      new Map([
+        ['dept-1', 'Quality'],
+        ['dept-2', 'Service'],
+      ]),
+    );
 
     const grouped = await AfterSalesChartAggregationService.getChartAggregation(
       {
@@ -290,7 +294,14 @@ describe('after-sales core helpers and services', () => {
       },
     );
 
-    expect(grouped).toEqual([{ name: 'Quality', value: 125 }]);
+    expect(grouped).toEqual([
+      {
+        id: 'dept-1',
+        name: 'Quality',
+        resolutionStatus: 'RESOLVED',
+        value: 125,
+      },
+    ]);
     expect(DataScopeService.buildAfterSalesWhere).toHaveBeenCalled();
 
     vi.mocked(prisma.after_sales.findMany).mockResolvedValue([
@@ -316,7 +327,14 @@ describe('after-sales core helpers and services', () => {
         metric: 'totalLoss',
         year: 2026,
       }),
-    ).resolves.toEqual([{ name: '2026-01', value: 120 }]);
+    ).resolves.toEqual([
+      {
+        id: '2026-01',
+        name: '2026-01',
+        resolutionStatus: 'RESOLVED',
+        value: 120,
+      },
+    ]);
   });
 
   it('returns empty stats response when analytics query fails', async () => {

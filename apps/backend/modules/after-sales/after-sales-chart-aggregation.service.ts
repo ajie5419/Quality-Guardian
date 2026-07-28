@@ -8,33 +8,53 @@ import type {
 import type { AfterSalesDateMode } from './after-sales-query';
 
 import { Prisma } from '@prisma/client';
-import { formatDate, QMS_DEFAULT_VALUES } from '@qgs/shared';
+import {
+  createIdentityAggregateItem,
+  createResolvedAggregateItem,
+  formatDate,
+  QMS_DEFAULT_VALUES,
+} from '@qgs/shared';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
-import { flattenDeptTree } from '~/modules/dept/dept-tree';
-import { DeptService } from '~/modules/dept/dept.service';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
 import { buildAfterSalesDateRange } from './after-sales-query';
 
-const CHART_DB_FIELD_MAP: Record<
+const CHART_DIMENSION_CONFIG: Record<
   Exclude<AfterSalesChartDimension, 'reportMonth'>,
-  | 'claimStatus'
-  | 'defectSubtype'
-  | 'defectType'
-  | 'productSubtype'
-  | 'productType'
-  | 'respDept'
-  | 'severity'
-  | 'supplierBrand'
+  {
+    field:
+      | 'claimStatus'
+      | 'defectSubtypeId'
+      | 'defectTypeId'
+      | 'productSubtypeId'
+      | 'productTypeId'
+      | 'respDeptId'
+      | 'severity'
+      | 'supplierBrandId';
+    governanceKey?: string;
+  }
 > = {
-  defectSubtype: 'defectSubtype',
-  defectType: 'defectType',
-  productSubtype: 'productSubtype',
-  productType: 'productType',
-  responsibleDept: 'respDept',
-  severity: 'severity',
-  status: 'claimStatus',
-  supplierBrand: 'supplierBrand',
+  defectSubtype: {
+    field: 'defectSubtypeId',
+    governanceKey: 'defectSubtype',
+  },
+  defectType: { field: 'defectTypeId', governanceKey: 'defectType' },
+  productSubtype: {
+    field: 'productSubtypeId',
+    governanceKey: 'productSubtype',
+  },
+  productType: { field: 'productTypeId', governanceKey: 'productType' },
+  responsibleDept: {
+    field: 'respDeptId',
+    governanceKey: 'responsibleDepartment',
+  },
+  severity: { field: 'severity' },
+  status: { field: 'claimStatus' },
+  supplierBrand: {
+    field: 'supplierBrandId',
+    governanceKey: 'supplierBrand',
+  },
 };
 
 function getMetricValueFromRow(
@@ -103,13 +123,6 @@ function getMetricValueFromGroupedItem(
   }
 }
 
-async function buildDeptNameMap() {
-  const deptTree = await DeptService.findAll().catch(() => []);
-  const deptMap = new Map<string, string>();
-  for (const node of flattenDeptTree(deptTree)) deptMap.set(node.id, node.name);
-  return deptMap;
-}
-
 export const AfterSalesChartAggregationService = {
   async getChartAggregation(params: {
     dataScope?: ResolvedDataScope;
@@ -148,7 +161,8 @@ export const AfterSalesChartAggregationService = {
       return this.getReportMonthAggregation(where, metric, limit);
     }
 
-    const byField = CHART_DB_FIELD_MAP[dimension];
+    const dimensionConfig = CHART_DIMENSION_CONFIG[dimension];
+    const byField = dimensionConfig.field;
     const metricConfig: Record<
       AfterSalesChartMetric,
       {
@@ -175,20 +189,33 @@ export const AfterSalesChartAggregationService = {
       ...(conf.count ? { _count: { id: true } } : {}),
       ...(conf.sumFields.length > 0 ? { _sum: sumPayload } : {}),
     });
-    const deptNameMap =
-      dimension === 'responsibleDept' ? await buildDeptNameMap() : null;
+    const canonicalNames = dimensionConfig.governanceKey
+      ? await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+          canonicalIds: grouped.map((item) => {
+            const source = item as Record<string, unknown>;
+            return source[byField] ? String(source[byField]) : null;
+          }),
+          configKey: dimensionConfig.governanceKey,
+        })
+      : new Map<string, null | string>();
 
     return grouped
       .map((item) => {
         const source = item as Record<string, unknown>;
-        const rawName = String(
-          source[byField] || QMS_DEFAULT_VALUES.UNCLASSIFIED,
-        );
+        const rawId = source[byField] ? String(source[byField]) : null;
         const value = getMetricValueFromGroupedItem(metric, source);
-        return {
-          name: deptNameMap?.get(rawName) || rawName,
-          value: Number(value.toFixed(2)),
-        };
+        const roundedValue = Number(value.toFixed(2));
+        return dimensionConfig.governanceKey
+          ? createIdentityAggregateItem({
+              canonicalName: rawId ? canonicalNames.get(rawId) : null,
+              id: rawId,
+              missingName: QMS_DEFAULT_VALUES.UNCLASSIFIED,
+              value: roundedValue,
+            })
+          : createResolvedAggregateItem({
+              id: rawId || QMS_DEFAULT_VALUES.UNCLASSIFIED,
+              value: roundedValue,
+            });
       })
       .sort((a, b) => b.value - a.value)
       .slice(0, limit);
@@ -218,8 +245,10 @@ export const AfterSalesChartAggregationService = {
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(0, limit)
       .map(([name, value]) => ({
-        name,
-        value: Number(value.toFixed(2)),
+        ...createResolvedAggregateItem({
+          id: name,
+          value: Number(value.toFixed(2)),
+        }),
       }));
   },
 };

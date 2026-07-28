@@ -1,3 +1,5 @@
+import type { IdentityAggregateItem } from '../../domain-modules/qms/identity-aggregate';
+
 export interface AfterSalesItem {
   closeDate: string; // 问题关闭日期
   createdAt: string; // 创建日期
@@ -58,18 +60,15 @@ export interface AfterSalesParams {
 }
 
 export interface AfterSalesStats {
-  defectDistribution: { name: string; value: number }[];
-  deptDistribution: { name: string; value: number }[];
+  defectDistribution: IdentityAggregateItem[];
+  deptDistribution: IdentityAggregateItem[];
   kpi: {
     avgTime: number;
     cost: number;
     open: number;
     total: number;
   };
-  supplierRanking: {
-    categories: string[];
-    data: number[];
-  };
+  supplierRanking: IdentityAggregateItem[];
   trend: {
     category: string[];
     closed: number[];

@@ -1,17 +1,12 @@
 <script lang="ts" setup>
 import type { ChartConfig } from '../composables/useChartAggregation';
 
-import type { DeptTreeNode } from '#/types';
-
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, onUnmounted, ref } from 'vue';
 
 import { useAccess } from '@vben/access';
 import { useI18n } from '@vben/locales';
 
 import { Button, Card, message, Modal } from 'ant-design-vue';
-
-import { getDeptList } from '#/api/system/dept';
-import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { CHART_DIMENSIONS, CHART_METRICS } from '../constants';
 import CustomChartBuilderModal from './CustomChartBuilderModal.vue';
@@ -30,29 +25,14 @@ const customCharts = defineModel<ChartConfig[]>('charts', {
 
 const { hasAccessByCodes } = useAccess();
 const { t } = useI18n();
-const { handleApiError } = useErrorHandler();
 const canEdit = computed(() => hasAccessByCodes(['QMS:AfterSales:ChartEdit']));
 const canDelete = computed(() =>
   hasAccessByCodes(['QMS:AfterSales:ChartDelete']),
 );
 
-const loading = ref(false);
-const deptList = ref<DeptTreeNode[]>([]);
-
 // Custom Charts
 const isBuilderOpen = ref(false);
 const editingChart = ref<ChartConfig | undefined>(undefined);
-
-async function fetchData() {
-  loading.value = true;
-  try {
-    deptList.value = await getDeptList();
-  } catch (error) {
-    handleApiError(error, 'Load After Sales Charts Data');
-  } finally {
-    loading.value = false;
-  }
-}
 
 // 拖拽逻辑 (Drag & Drop)
 const draggedItemIndex = ref<null | number>(null);
@@ -188,13 +168,6 @@ function handleRemoveCustomChart(id: string) {
   });
 }
 
-// Watch for year or refreshKey changes
-watch(
-  () => [props.year, props.dateMode, props.dateValue, props.refreshKey],
-  () => fetchData(),
-  { immediate: true },
-);
-
 defineExpose({
   handleAddCustomChart,
 });
@@ -255,8 +228,7 @@ defineExpose({
               :date-mode="props.dateMode"
               :date-value="props.dateValue"
               :year="props.year"
-              :loading="loading"
-              :dept-data="deptList"
+              :refresh-key="props.refreshKey"
             />
           </div>
 
@@ -286,7 +258,6 @@ defineExpose({
       :date-mode="props.dateMode"
       :date-value="props.dateValue"
       :year="props.year"
-      :dept-data="deptList"
       :dimension-options="CHART_DIMENSIONS"
       :metric-options="CHART_METRICS"
       @save="handleSaveCustomChart"

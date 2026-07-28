@@ -2,6 +2,7 @@ import type {
   AfterSalesItem,
   AfterSalesParams,
   AfterSalesStats,
+  IdentityAggregateItem,
 } from '@qgs/shared';
 
 import type { QmsImportSummary, QmsListResponse } from '#/api/qms/types';
@@ -63,10 +64,7 @@ export type AfterSalesChartMetric =
   | 'runningHours'
   | 'totalLoss';
 
-export type AfterSalesChartAggregateItem = {
-  name: string;
-  value: number;
-};
+export type AfterSalesChartAggregateItem = IdentityAggregateItem;
 
 export async function getAfterSalesChartAggregate(params: {
   dateMode?: 'month' | 'week' | 'year';

@@ -16,7 +16,7 @@
 
 当前已完成 **supplier identity governance wave** 和 **TEAM identity governance wave**，不是全项目主数据一次性切换。已完成的在线 ID-first 范围包括供应商画像、供应商评分、检验记录、不合格项、售后评分、报检统计及 `TEAM -> supplier` 显式映射；这些消费者不再用名称等值关联或名称 `OR` 回退。TEAM 由独立模块管理稳定 ID、别名、来源和合并审计；改名不改变身份，近似名称不会触发自动合并。
 
-after-sales、supervision 的在线供应商写入也已要求显式 ID，服务端重建名称快照；名称解析只允许存在于审核过的 import/backfill 入口。售后、检验、不合格品、报表和供应商评分中已登记的受控维度已改为按 canonical ID 聚合，名称仅在聚合后批量解析。其他尚未迁移的在线写入、权限和跨表关联仍按各自治理阶段推进，因此当前系统不能宣称全项目已经达到 `ID_ONLY`。
+after-sales、supervision 的在线供应商写入也已要求显式 ID，服务端重建名称快照；名称解析只允许存在于审核过的 import/backfill 入口。售后、检验、不合格品、报表和供应商评分中已登记的受控维度已改为按 canonical ID 聚合，名称仅在聚合后批量解析。售后与不合格品的静态统计、动态图表、API 类型和前端图表统一使用身份聚合契约，前端不再通过部门树或名称重新判断身份。其他尚未迁移的在线写入、权限和跨表关联仍按各自治理阶段推进，因此当前系统不能宣称全项目已经达到 `ID_ONLY`。
 
 ## 核心规则
 
@@ -56,6 +56,8 @@ after-sales、supervision 的在线供应商写入也已要求显式 ID，服务
 - 提供 ID 时必须验证存在、身份类型、启用状态和 ID/名称一致性。
 - 已达到 `ID-required` 阶段的受控字段，仅提供名称而没有 ID 的在线写入必须被拒绝。导入和迁移入口必须显式白名单并产生审计；仍处于 `DUAL_WRITE/legacy` 的模块不得新增名称依赖，并必须登记退出计划。
 - 聚合查询、画像、评分、权限范围和历史项目使用 ID，不使用名称 `OR` 回退。
+- 受控统计桶统一返回 `id + name + value + resolutionStatus`；`RESOLVED` 表示 ID 已解析，`MISSING` 表示历史记录缺少 ID，`INVALID` 表示保留了无法解析的非空 ID。
+- 下游和前端必须以 `id` 作为身份与渲染键，不得再次按 `name` 合并、映射或猜测归属。
 
 ### 事件
 
@@ -86,6 +88,12 @@ after-sales、supervision 的在线供应商写入也已要求显式 ID，服务
 `qms_inspection_requests.category` selects the identity domain and is persisted by all new writes. `INCOMING` aggregates by `supplierId`; `PROCESS` aggregates by `teamId`; inspector statistics aggregate by `inspectorId`. Names are hydrated only after aggregation.
 
 For legacy rows whose category has not yet been backfilled, a TEAM ID takes precedence over a supplier ID because a supplier-linked process TEAM may legitimately carry both IDs. This compatibility rule contains no name comparison. Rows with missing or invalid IDs stay visible as unresolved identity buckets and are never folded into a named entity.
+
+### 图表身份契约
+
+本阶段覆盖的售后与不合格品受控图表维度统一使用共享 `IdentityAggregateItem` 契约。聚合键必须是 canonical ID；名称只在聚合完成后解析，不能作为下游身份输入。月份、状态和索赔值等非主数据维度也携带稳定值 ID，使图表消费者只处理一种契约。
+
+历史数据继续参与检索和总量统计。缺少 canonical ID 的记录进入该身份域的 `MISSING` 桶；无法解析的非空 ID 进入保留原始 ID 的 `INVALID` 桶。两类记录都不能被静默归入某个已命名实体，并继续接受 unresolved 数据审计。
 
 ## 存量迁移
 

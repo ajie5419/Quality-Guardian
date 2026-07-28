@@ -70,7 +70,12 @@ describe('inspection-issue-chart-aggregate.get.service', () => {
       username: 'admin',
     } as any);
     vi.mocked(InspectionService.getIssueChartAggregation).mockResolvedValue([
-      { name: 'Weld', value: 5 },
+      {
+        id: 'defect-weld',
+        name: 'Weld',
+        resolutionStatus: 'RESOLVED',
+        value: 5,
+      },
     ]);
 
     const handlerModule = await import(
@@ -88,7 +93,14 @@ describe('inspection-issue-chart-aggregate.get.service', () => {
     });
 
     expect(useResponseSuccess).toHaveBeenCalledWith({
-      items: [{ name: 'Weld', value: 5 }],
+      items: [
+        {
+          id: 'defect-weld',
+          name: 'Weld',
+          resolutionStatus: 'RESOLVED',
+          value: 5,
+        },
+      ],
     });
     expect(InspectionIssueAccessService.getAccessContext).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'u1' }),

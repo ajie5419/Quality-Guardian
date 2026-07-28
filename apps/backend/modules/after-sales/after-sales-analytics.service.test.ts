@@ -181,7 +181,14 @@ describe('after-sales-analytics.service', () => {
     expect(stats.kpi.cost).toBe(1500);
     expect(stats.kpi.avgTime).toBe(5.5);
     expect(stats.defectDistribution).toHaveLength(2);
-    expect(stats.supplierRanking.categories).toEqual(['Supplier A']);
+    expect(stats.supplierRanking).toEqual([
+      {
+        id: 'supplier-1',
+        name: 'Supplier A',
+        resolutionStatus: 'RESOLVED',
+        value: 5,
+      },
+    ]);
     expect(stats.deptDistribution).toHaveLength(1);
     expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
       1,
@@ -252,18 +259,70 @@ describe('after-sales-analytics.service', () => {
     const stats = await AfterSalesAnalyticsService.getStats({ year: 2026 });
 
     expect(stats.defectDistribution).toEqual([
-      { name: 'Shared defect', value: 3 },
-      { name: 'Shared defect', value: 2 },
-      { name: QMS_DEFAULT_VALUES.UNCLASSIFIED, value: 1 },
-      { name: QMS_DEFAULT_VALUES.UNCLASSIFIED, value: 2 },
+      {
+        id: 'defect-a',
+        name: 'Shared defect',
+        resolutionStatus: 'RESOLVED',
+        value: 3,
+      },
+      {
+        id: 'defect-b',
+        name: 'Shared defect',
+        resolutionStatus: 'RESOLVED',
+        value: 2,
+      },
+      {
+        id: null,
+        name: QMS_DEFAULT_VALUES.UNCLASSIFIED,
+        resolutionStatus: 'MISSING',
+        value: 1,
+      },
+      {
+        id: 'invalid-defect',
+        name: 'Unknown (invalid-defect)',
+        resolutionStatus: 'INVALID',
+        value: 2,
+      },
     ]);
-    expect(stats.supplierRanking).toEqual({
-      categories: ['Shared supplier', 'Shared supplier', 'Unknown', 'Unknown'],
-      data: [4, 2, 1, 1],
-    });
+    expect(stats.supplierRanking).toEqual([
+      {
+        id: 'supplier-a',
+        name: 'Shared supplier',
+        resolutionStatus: 'RESOLVED',
+        value: 4,
+      },
+      {
+        id: 'supplier-b',
+        name: 'Shared supplier',
+        resolutionStatus: 'RESOLVED',
+        value: 2,
+      },
+      {
+        id: null,
+        name: 'Unknown',
+        resolutionStatus: 'MISSING',
+        value: 1,
+      },
+      {
+        id: 'invalid-supplier',
+        name: 'Unknown (invalid-supplier)',
+        resolutionStatus: 'INVALID',
+        value: 1,
+      },
+    ]);
     expect(stats.deptDistribution).toEqual([
-      { name: QMS_DEFAULT_VALUES.UNASSIGNED, value: 1 },
-      { name: QMS_DEFAULT_VALUES.UNASSIGNED, value: 1 },
+      {
+        id: null,
+        name: QMS_DEFAULT_VALUES.UNASSIGNED,
+        resolutionStatus: 'MISSING',
+        value: 1,
+      },
+      {
+        id: 'invalid-dept',
+        name: 'Unknown (invalid-dept)',
+        resolutionStatus: 'INVALID',
+        value: 1,
+      },
     ]);
   });
 
@@ -282,7 +341,7 @@ describe('after-sales-analytics.service', () => {
 
     expect(stats.kpi).toEqual({ avgTime: 0, cost: 0, open: 0, total: 0 });
     expect(stats.defectDistribution).toEqual([]);
-    expect(stats.supplierRanking).toEqual({ categories: [], data: [] });
+    expect(stats.supplierRanking).toEqual([]);
     expect(stats.deptDistribution).toEqual([]);
   });
 

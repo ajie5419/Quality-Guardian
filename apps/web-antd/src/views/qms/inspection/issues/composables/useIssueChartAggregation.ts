@@ -1,4 +1,5 @@
 import type {
+  InspectionIssueChartAggregateItem,
   InspectionIssueChartDimension,
   InspectionIssueChartMetric,
 } from '#/api/qms/inspection';
@@ -6,11 +7,9 @@ import type {
   ChartConfig,
   ChartOptionItem,
 } from '#/components/Qms/ChartBuilder/types';
-import type { DeptTreeNode } from '#/types';
 
 import { getInspectionIssueChartAggregate } from '#/api/qms/inspection';
 import { buildChartOptionFromAggregated } from '#/components/Qms/ChartBuilder/composables/useChartCore';
-import { findNameById } from '#/types';
 
 export const ISSUE_CHART_DIMENSIONS: ChartOptionItem[] = [
   { label: '报告月份', value: 'reportMonth' },
@@ -37,27 +36,9 @@ type ChartFilterParams = {
   year?: number;
 };
 
-function normalizeChartRows(
-  rows: Array<{ name: string; value: number }>,
-  config: ChartConfig,
-  deptData?: DeptTreeNode[],
-) {
-  if (
-    config.dimension !== 'division' &&
-    config.dimension !== 'responsibleDepartment'
-  ) {
-    return rows;
-  }
-  return rows.map((row) => ({
-    ...row,
-    name: findNameById(deptData || [], row.name) || row.name,
-  }));
-}
-
 export async function getIssueChartOption(
   config: ChartConfig,
   filters: ChartFilterParams,
-  deptData?: DeptTreeNode[],
 ) {
   const response = await getInspectionIssueChartAggregate({
     ...filters,
@@ -65,7 +46,7 @@ export async function getIssueChartOption(
     metric: config.metric as InspectionIssueChartMetric,
     top: 15,
   });
-  const rows = normalizeChartRows(response.items || [], config, deptData);
+  const rows: InspectionIssueChartAggregateItem[] = response.items || [];
   return buildChartOptionFromAggregated(rows, config, ISSUE_CHART_METRICS);
 }
 
@@ -73,10 +54,9 @@ export async function renderCustomChart<TOption>(
   renderFn: (option: TOption, clear?: boolean) => unknown,
   config: ChartConfig,
   filters: ChartFilterParams,
-  deptData?: DeptTreeNode[],
 ) {
   if (!renderFn) return;
-  const option = await getIssueChartOption(config, filters, deptData);
+  const option = await getIssueChartOption(config, filters);
   if (option) {
     renderFn(option as TOption);
   }

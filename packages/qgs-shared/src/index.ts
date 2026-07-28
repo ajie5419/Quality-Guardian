@@ -6,6 +6,7 @@ export * from './domain-modules/qms/ai-json';
 export * from './domain-modules/qms/bom';
 export * from './domain-modules/qms/dfmea';
 export * from './domain-modules/qms/id-list';
+export * from './domain-modules/qms/identity-aggregate';
 export * from './domain-modules/qms/import-report';
 export * from './domain-modules/qms/inspection-archive';
 export * from './domain-modules/qms/inspection-form';

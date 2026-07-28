@@ -1,10 +1,11 @@
-import type { AfterSalesStats } from '@qgs/shared';
+import type { AfterSalesStats, IdentityAggregateItem } from '@qgs/shared';
 import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
 import type { AfterSalesDateMode } from './after-sales-query';
 
 import { Prisma } from '@prisma/client';
 import {
+  createIdentityAggregateItem,
   formatDate,
   QMS_DEFAULT_VALUES,
   QMS_STATUS_OPEN_SET,
@@ -19,10 +20,7 @@ import { normalizeAfterSalesClaimStatus } from './after-sales-status';
 
 const logger = createModuleLogger('AfterSalesAnalyticsService');
 
-export type AfterSalesChartAggregateItem = {
-  name: string;
-  value: number;
-};
+export type AfterSalesChartAggregateItem = IdentityAggregateItem;
 
 export type AfterSalesChartDimension =
   | 'defectSubtype'
@@ -144,27 +142,34 @@ function formatStatsResponse(input: {
   return {
     kpi: input.kpi,
     trend: input.trend,
-    defectDistribution: input.defectStats.map((s) => ({
-      name:
-        (s.defectTypeId && input.defectNames.get(s.defectTypeId)) ||
-        QMS_DEFAULT_VALUES.UNCLASSIFIED,
-      value: s._count.id,
-    })),
-    supplierRanking: {
-      categories: input.supplierStats.map(
-        (s) =>
+    defectDistribution: input.defectStats.map((s) =>
+      createIdentityAggregateItem({
+        canonicalName:
+          (s.defectTypeId && input.defectNames.get(s.defectTypeId)) || null,
+        id: s.defectTypeId,
+        missingName: QMS_DEFAULT_VALUES.UNCLASSIFIED,
+        value: s._count.id,
+      }),
+    ),
+    supplierRanking: input.supplierStats.map((s) =>
+      createIdentityAggregateItem({
+        canonicalName:
           (s.supplierBrandId && input.supplierNames.get(s.supplierBrandId)) ||
-          'Unknown',
-      ),
-      data: input.supplierStats.map((s) => s._count.id),
-    },
-    deptDistribution: input.deptStats.map((s) => ({
-      name:
-        (s.respDeptId && input.deptNames.get(s.respDeptId)) ||
-        QMS_DEFAULT_VALUES.UNASSIGNED,
-      value: s._count.id,
-    })),
-  } as AfterSalesStats;
+          null,
+        id: s.supplierBrandId,
+        value: s._count.id,
+      }),
+    ),
+    deptDistribution: input.deptStats.map((s) =>
+      createIdentityAggregateItem({
+        canonicalName:
+          (s.respDeptId && input.deptNames.get(s.respDeptId)) || null,
+        id: s.respDeptId,
+        missingName: QMS_DEFAULT_VALUES.UNASSIGNED,
+        value: s._count.id,
+      }),
+    ),
+  };
 }
 
 function buildAfterSalesMonths(params: {
@@ -332,7 +337,7 @@ export const AfterSalesAnalyticsService = {
           costs: emptyMonthly(),
         },
         defectDistribution: [],
-        supplierRanking: { categories: [], data: [] },
+        supplierRanking: [],
         deptDistribution: [],
       };
     }

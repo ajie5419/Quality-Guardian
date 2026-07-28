@@ -121,11 +121,15 @@ describe('inspectionIssueStatsService', () => {
       });
 
       expect(stats.pieData).toContainEqual({
+        id: 'defect-1',
         name: '焊接缺陷',
+        resolutionStatus: 'RESOLVED',
         value: 2,
       });
       expect(stats.pieData).toContainEqual({
+        id: null,
         name: 'Unknown',
+        resolutionStatus: 'MISSING',
         value: 1,
       });
       expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
@@ -191,8 +195,18 @@ describe('inspectionIssueStatsService', () => {
       });
 
       expect(stats.pieData).toEqual([
-        { name: 'Same name', value: 2 },
-        { name: 'Same name', value: 1 },
+        {
+          id: 'defect-a',
+          name: 'Same name',
+          resolutionStatus: 'RESOLVED',
+          value: 2,
+        },
+        {
+          id: 'defect-b',
+          name: 'Same name',
+          resolutionStatus: 'RESOLVED',
+          value: 1,
+        },
       ]);
       expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({ by: ['defectTypeId'] }),
@@ -217,8 +231,18 @@ describe('inspectionIssueStatsService', () => {
       });
 
       expect(stats.pieData).toEqual([
-        { name: 'Unknown', value: 1 },
-        { name: 'Unknown (deleted-defect)', value: 1 },
+        {
+          id: null,
+          name: 'Unknown',
+          resolutionStatus: 'MISSING',
+          value: 1,
+        },
+        {
+          id: 'deleted-defect',
+          name: 'Unknown (deleted-defect)',
+          resolutionStatus: 'INVALID',
+          value: 1,
+        },
       ]);
     });
 
@@ -383,7 +407,14 @@ describe('inspectionIssueStatsService', () => {
         },
       );
 
-      expect(result).toEqual([{ name: '焊接缺陷', value: 2 }]);
+      expect(result).toEqual([
+        {
+          id: 'defect-welding',
+          name: '焊接缺陷',
+          resolutionStatus: 'RESOLVED',
+          value: 2,
+        },
+      ]);
     });
 
     it('should aggregate by status dimension', async () => {
@@ -417,7 +448,14 @@ describe('inspectionIssueStatsService', () => {
         },
       );
 
-      expect(result).toEqual([{ name: 'OPEN', value: 1 }]);
+      expect(result).toEqual([
+        {
+          id: 'OPEN',
+          name: 'OPEN',
+          resolutionStatus: 'RESOLVED',
+          value: 1,
+        },
+      ]);
     });
 
     it('should aggregate by claim dimension', async () => {
@@ -451,7 +489,14 @@ describe('inspectionIssueStatsService', () => {
         },
       );
 
-      expect(result).toEqual([{ name: 'Yes', value: 1 }]);
+      expect(result).toEqual([
+        {
+          id: 'Yes',
+          name: 'Yes',
+          resolutionStatus: 'RESOLVED',
+          value: 1,
+        },
+      ]);
     });
 
     it('should use lossAmount metric', async () => {
@@ -485,7 +530,14 @@ describe('inspectionIssueStatsService', () => {
         },
       );
 
-      expect(result).toEqual([{ name: 'A', value: 150 }]);
+      expect(result).toEqual([
+        {
+          id: 'defect-a',
+          name: 'A',
+          resolutionStatus: 'RESOLVED',
+          value: 150,
+        },
+      ]);
     });
 
     it('should use quantity metric', async () => {
@@ -519,7 +571,14 @@ describe('inspectionIssueStatsService', () => {
         },
       );
 
-      expect(result).toEqual([{ name: 'B', value: 10 }]);
+      expect(result).toEqual([
+        {
+          id: 'defect-b',
+          name: 'B',
+          resolutionStatus: 'RESOLVED',
+          value: 10,
+        },
+      ]);
     });
 
     it('should limit results by top parameter', async () => {
@@ -621,7 +680,14 @@ describe('inspectionIssueStatsService', () => {
         },
       );
 
-      expect(result).toEqual([{ name: 'Unknown', value: 1 }]);
+      expect(result).toEqual([
+        {
+          id: null,
+          name: 'Unknown',
+          resolutionStatus: 'MISSING',
+          value: 1,
+        },
+      ]);
     });
   });
 });

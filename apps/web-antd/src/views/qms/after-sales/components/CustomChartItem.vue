@@ -3,9 +3,7 @@ import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import type { ChartConfig } from '../composables/useChartAggregation';
 
-import type { DeptTreeNode } from '#/types';
-
-import { onMounted, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
@@ -18,8 +16,7 @@ const props = defineProps<{
   config: ChartConfig;
   dateMode?: 'month' | 'week' | 'year';
   dateValue?: string;
-  deptData?: DeptTreeNode[];
-  loading?: boolean;
+  refreshKey?: number;
   year?: number;
 }>();
 
@@ -29,43 +26,29 @@ const { t } = useI18n();
 
 // 渲染图表
 async function render() {
-  await renderCustomChart(
-    renderEcharts,
-    props.config,
-    t,
-    {
-      dateMode: props.dateMode,
-      dateValue: props.dateValue,
-      year: props.year,
-    },
-    props.deptData,
-  );
+  await renderCustomChart(renderEcharts, props.config, t, {
+    dateMode: props.dateMode,
+    dateValue: props.dateValue,
+    year: props.year,
+  });
 }
 
 // 监听数据或配置变化
 watch(
   [
     () => props.config,
-    () => props.loading,
-    () => props.deptData,
     () => props.dateMode,
     () => props.dateValue,
+    () => props.refreshKey,
     () => props.year,
   ],
-  ([_, loading]) => {
-    if (!loading) {
-      // 稍微延迟以确保容器已渲染
-      setTimeout(() => {
-        void render();
-      }, 50);
-    }
+  () => {
+    setTimeout(() => {
+      void render();
+    }, 50);
   },
   { deep: true, immediate: true },
 );
-
-onMounted(() => {
-  render();
-});
 
 tryOnUnmounted(() => {
   if (!chartRef.value) return;

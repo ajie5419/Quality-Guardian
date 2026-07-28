@@ -80,7 +80,9 @@ describe('afterSalesService', () => {
       expect(stats.trend.issues[0]).toBe(10);
       expect(stats.trend.costs[0]).toBe(1500);
       expect(stats.defectDistribution).toContainEqual({
+        id: 'defect-minor',
         name: 'Minor',
+        resolutionStatus: 'RESOLVED',
         value: 10,
       });
     });

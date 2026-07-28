@@ -1,4 +1,9 @@
-import type { InspectionIssue, InspectionRecord } from '@qgs/shared';
+import type {
+  IdentityAggregateItem,
+  IdentityResolutionStatus,
+  InspectionIssue,
+  InspectionRecord,
+} from '@qgs/shared';
 
 import type { QmsImportSummary } from '#/api/qms/types';
 
@@ -14,11 +19,13 @@ export interface InspectionIssueStats {
   openCount: number;
   pareto: Array<{
     cumulativePercent: number;
+    id: null | string;
     label: string;
     percent: number;
+    resolutionStatus: IdentityResolutionStatus;
     value: number;
   }>;
-  pieData: Array<{ name: string; value: number }>;
+  pieData: IdentityAggregateItem[];
   totalCount: number;
   totalLoss: number;
   trendData: Array<{ period: string; value: number }>;
@@ -38,10 +45,7 @@ export type InspectionIssueChartDimension =
 
 export type InspectionIssueChartMetric = 'count' | 'lossAmount' | 'quantity';
 
-export type InspectionIssueChartAggregateItem = {
-  name: string;
-  value: number;
-};
+export type InspectionIssueChartAggregateItem = IdentityAggregateItem;
 
 // Re-export types for backward compatibility (optional, can be removed if views are updated)
 
