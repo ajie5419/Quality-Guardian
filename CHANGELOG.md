@@ -25,6 +25,34 @@
 
 ## 执行记录
 
+### 2026-07-28 Phase 14: enforce canonical identity contracts and safe maintenance
+
+**Execution:**
+
+- Retired both legacy private and public inspection-request write endpoints with `410 INSPECTION_REQUEST_V2_REQUIRED`; name-only request creation can no longer bypass canonical identity validation.
+- Required `identityContractVersion=2` plus `partId/processId` for work-order requirement creation and editing, removing the remaining name-only write path.
+- Corrected TEAM merge semantics so canonical IDs migrate without overwriting historical team-name snapshots in inspection requests, inspections, welder records, or work-order requirements.
+- Extended TEAM reconciliation to persist ambiguities for inactive same-name identities and historical name-key collisions before publication, preventing unique-key conflicts and silent identity claims.
+- Synchronized process sort updates with `inspection_request_process_options.sort` in the same transaction, keeping system settings and request-entry ordering consistent.
+- Cleared both canonical IDs and display-name query parameters after a successful repeated inspection request, preventing stale identity prefill.
+- Moved the full quality-loss rebuild out of the online maintenance window and restored it as a detached idempotent post-health-check task.
+- Hardened generic canonical backfill with soft-delete filtering, compare-and-set `ID IS NULL` writes, write confirmation, and row-level `unresolved_master_data_refs` records.
+- No production database or production record was accessed or modified.
+
+**Verification:**
+
+- Backend full suite: `234/234` files and `2225/2225` tests passed.
+- Web full DOM suite: `47/47` files and `239/239` tests passed.
+- Shared identity contract suite: `2/2` files and `17/17` tests passed.
+- Full repository lint, workspace typecheck (`3/3` tasks), and changed-scope QMS architecture check passed.
+- Local browser verification at `WO-468624` confirmed multiple configured process options, successful process selection, and multiple internal-team, department, and outsourcing options without submitting business data.
+
+**Commits:** `73a3d343`, `a93991b8`, `7558d8ad`, `45d38a44`
+
+**Remaining issues:**
+
+- Production remains on `qgs-v0.19.1`. Delivery must use the normal migration and ordered release-maintenance workflow; manual production database edits are not permitted.
+
 ### 2026-07-28 Phase 13: separate global processes from inspection-request visibility
 
 **Execution:**

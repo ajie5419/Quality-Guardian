@@ -2,8 +2,8 @@
 
 ## 当前状态
 
-- 最新变更: Global process identity and inspection-request visibility are now separate concerns. `processes` is the reusable identity source, while `inspection_request_process_options` independently configures `PROCESS` and `INCOMING` entry options. Work-order requirements no longer filter request-entry processes. Production remains on `qgs-v0.19.1` and was not accessed or modified.
-- 测试状态: Backend full suite `234/234` files and `2217/2217` tests passed; Web full suite `47/47` files and `238/238` tests passed; shared focused suite `14/14` passed.
+- 最新变更: Canonical identity writes are now enforced across inspection requests and work-order requirements; TEAM merge/reconciliation preserves historical snapshots and records ambiguity; process ordering, quality-loss rebuild scheduling, and generic canonical backfill are transactionally and operationally consistent. Production remains on `qgs-v0.19.1` and was not accessed or modified.
+- 测试状态: Backend full suite `234/234` files and `2225/2225` tests passed; Web full DOM suite `47/47` files and `239/239` tests passed; shared identity contract suite `2/2` files and `17/17` tests passed.
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
 - 模块 TS 文件数: 544（含测试）
