@@ -165,6 +165,34 @@ export const WorkOrderRequirementService = {
     });
   },
 
+  async findActiveInspectionProcessIdentities(workOrderNumber: string) {
+    const rows = await prisma.work_order_requirements.findMany({
+      where: {
+        isDeleted: false,
+        processId: { not: null },
+        status: 'active',
+        workOrderNumber,
+        process: {
+          is: {
+            inspectionRequestCategory: 'PROCESS',
+            isDeleted: false,
+            status: 1,
+          },
+        },
+      },
+      orderBy: [{ updatedAt: 'desc' }],
+      select: {
+        process: { select: { id: true, name: true } },
+      },
+    });
+
+    return rows.flatMap((item) =>
+      item.process
+        ? [{ processId: item.process.id, processName: item.process.name }]
+        : [],
+    );
+  },
+
   async findActiveForAggregate(workOrderNumber: string) {
     return prisma.work_order_requirements.findMany({
       where: { isDeleted: false, status: 'active', workOrderNumber },

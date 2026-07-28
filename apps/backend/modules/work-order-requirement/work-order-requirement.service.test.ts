@@ -192,6 +192,36 @@ describe('workOrderRequirementService', () => {
     });
   });
 
+  it('lists active process identities scoped to the selected work order', async () => {
+    vi.mocked(prisma.work_order_requirements.findMany).mockResolvedValue([
+      { process: { id: 'process-1', name: 'Welding' } },
+      { process: null },
+    ] as never);
+
+    await expect(
+      WorkOrderRequirementService.findActiveInspectionProcessIdentities('WO-1'),
+    ).resolves.toEqual([{ processId: 'process-1', processName: 'Welding' }]);
+    expect(prisma.work_order_requirements.findMany).toHaveBeenCalledWith({
+      where: {
+        isDeleted: false,
+        processId: { not: null },
+        status: 'active',
+        workOrderNumber: 'WO-1',
+        process: {
+          is: {
+            inspectionRequestCategory: 'PROCESS',
+            isDeleted: false,
+            status: 1,
+          },
+        },
+      },
+      orderBy: [{ updatedAt: 'desc' }],
+      select: {
+        process: { select: { id: true, name: true } },
+      },
+    });
+  });
+
   it('finds active aggregate requirements with reduced select fields', async () => {
     await WorkOrderRequirementService.findActiveForAggregate('WO-1');
 

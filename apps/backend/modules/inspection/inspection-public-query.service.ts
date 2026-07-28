@@ -1,6 +1,7 @@
 import { INSPECTION_REQUEST_STATUS, SUPPLIER_CATEGORY } from '@qgs/shared';
 import { INCOMING_INSPECTION_PROCESS_NAME } from '~/modules/inspection/inspection-request';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
+import { WorkOrderRequirementService } from '~/modules/work-order-requirement';
 import { parseWorkOrderListQuery } from '~/modules/work-order/work-order-query';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -67,17 +68,40 @@ function toItem(record: {
 }
 
 export const InspectionPublicQueryService = {
-  async getPublicProcesses(_workOrderNumber: string) {
-    const processes = await prisma.processes.findMany({
-      where: { isDeleted: false, status: 1 },
-      orderBy: [{ sort: 'asc' }, { name: 'asc' }],
-      select: { id: true, inspectionRequestCategory: true, name: true },
-    });
-    return processes.map((item) => ({
-      category: item.inspectionRequestCategory,
-      processId: item.id,
-      processName: item.name,
-    }));
+  async getPublicProcesses(workOrderNumber: string) {
+    const [processRequirements, incomingProcesses] = await Promise.all([
+      WorkOrderRequirementService.findActiveInspectionProcessIdentities(
+        workOrderNumber,
+      ),
+      prisma.processes.findMany({
+        where: {
+          inspectionRequestCategory: 'INCOMING',
+          isDeleted: false,
+          status: 1,
+        },
+        orderBy: [{ sort: 'asc' }, { name: 'asc' }],
+        select: { id: true, name: true },
+      }),
+    ]);
+    const identities = new Map<
+      string,
+      {
+        category: 'INCOMING' | 'PROCESS';
+        processId: string;
+        processName: string;
+      }
+    >();
+    for (const item of processRequirements) {
+      identities.set(item.processId, { category: 'PROCESS', ...item });
+    }
+    for (const item of incomingProcesses) {
+      identities.set(item.id, {
+        category: 'INCOMING',
+        processId: item.id,
+        processName: item.name,
+      });
+    }
+    return [...identities.values()];
   },
 
   async getPublicBomParts(workOrderNumber: string) {

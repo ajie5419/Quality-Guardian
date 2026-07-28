@@ -18,6 +18,7 @@ import {
   getPublicInspectionRequestWorkOrders,
 } from '#/api/qms/inspection-request';
 import { useImageCompress } from '#/composables/useImageCompress';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import {
   applyUploadResponse,
   normalizeUploadFileList,
@@ -64,6 +65,7 @@ const workOrderOptions = ref<
 >([]);
 const workOrderProcessesLoading = ref(false);
 const { compressImage } = useImageCompress();
+const { handleApiError } = useErrorHandler();
 const workOrderProcesses = ref<
   Array<{
     category: 'INCOMING' | 'PROCESS';
@@ -285,8 +287,16 @@ async function loadWorkOrderProcessOptions(workOrderNumber: string) {
         ? INCOMING_INSPECTION_PROCESS_NAME
         : '';
     }
-  } catch {
+  } catch (error: unknown) {
+    if (requestForm.workOrderNumber.trim() !== normalized) return;
+
+    handleApiError(error, 'Load Inspection Request Processes');
     workOrderProcesses.value = [];
+    requestForm.processId = '';
+    requestForm.processName = isIncomingEntry.value
+      ? INCOMING_INSPECTION_PROCESS_NAME
+      : '';
+    message.error('工序加载失败，请稍后重试');
   } finally {
     if (requestForm.workOrderNumber.trim() === normalized) {
       workOrderProcessesLoading.value = false;

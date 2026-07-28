@@ -1,6 +1,7 @@
 import { SUPPLIER_CATEGORY } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionPublicQueryService } from '~/modules/inspection/inspection-public-query.service';
+import { WorkOrderRequirementService } from '~/modules/work-order-requirement';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -27,6 +28,12 @@ vi.mock('~/modules/supplier-identity', () => ({
       .mockResolvedValue([
         { group: 'internal', label: 'Team A', value: 'team-1' },
       ]),
+  },
+}));
+
+vi.mock('~/modules/work-order-requirement', () => ({
+  WorkOrderRequirementService: {
+    findActiveInspectionProcessIdentities: vi.fn(),
   },
 }));
 
@@ -88,16 +95,17 @@ describe('inspection public query service', () => {
     ]);
   });
 
-  it('returns every active canonical process with its request category', async () => {
+  it('returns only selected work order processes plus incoming processes', async () => {
+    vi.mocked(
+      WorkOrderRequirementService.findActiveInspectionProcessIdentities,
+    ).mockResolvedValue([
+      { processId: 'process-1', processName: 'Canonical Welding' },
+      { processId: 'process-1', processName: 'Canonical Welding' },
+      { processId: 'process-3', processName: 'Canonical Welding' },
+    ]);
     (prisma.processes.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
       {
-        id: 'process-1',
-        inspectionRequestCategory: 'PROCESS',
-        name: 'Canonical Welding',
-      },
-      {
         id: 'process-2',
-        inspectionRequestCategory: 'INCOMING',
         name: 'Receipt verification',
       },
     ]);
@@ -111,15 +119,27 @@ describe('inspection public query service', () => {
         processName: 'Canonical Welding',
       },
       {
+        category: 'PROCESS',
+        processId: 'process-3',
+        processName: 'Canonical Welding',
+      },
+      {
         category: 'INCOMING',
         processId: 'process-2',
         processName: 'Receipt verification',
       },
     ]);
+    expect(
+      WorkOrderRequirementService.findActiveInspectionProcessIdentities,
+    ).toHaveBeenCalledWith('WO-1');
     expect(prisma.processes.findMany).toHaveBeenCalledWith({
-      where: { isDeleted: false, status: 1 },
+      where: {
+        inspectionRequestCategory: 'INCOMING',
+        isDeleted: false,
+        status: 1,
+      },
       orderBy: [{ sort: 'asc' }, { name: 'asc' }],
-      select: { id: true, inspectionRequestCategory: true, name: true },
+      select: { id: true, name: true },
     });
   });
 

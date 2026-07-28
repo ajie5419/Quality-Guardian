@@ -68,6 +68,12 @@ public 报检允许：
 - 查询允许公开展示的工单、工序和班组选项。
 - 提交报检任务。
 
+Process options must preserve these source boundaries:
+
+- `PROCESS` returns only active canonical processes referenced by active `work_order_requirements` for the selected work order. Unrelated process master rows must not be exposed.
+- `INCOMING` returns active process master rows with `inspectionRequestCategory=INCOMING`, independent of process names and work-order requirements.
+- Process names are display values only. Category filtering, deduplication, and submission use `inspectionRequestCategory + processId`.
+
 public 报检禁止：
 
 - 读取受保护的系统字典接口。
