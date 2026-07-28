@@ -32,6 +32,7 @@ export * from './domain-modules/qms/planning-project';
 export * from './domain-modules/qms/prisma-error';
 export * from './domain-modules/qms/project-documents';
 export * from './domain-modules/qms/public-metrology-borrow';
+export * from './domain-modules/qms/quality-classification';
 export * from './domain-modules/qms/quality-loss-payload';
 export * from './domain-modules/qms/quality-loss-query';
 export * from './domain-modules/qms/quality-loss-status';

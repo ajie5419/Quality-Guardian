@@ -120,7 +120,7 @@ model reports {
 }
 
 model after_sales {
-  id                     String                  @id
+  id                     String                                @id
   serialNumber           Int
   occurDate              DateTime
   claimStatus            after_sales_claimStatus
@@ -129,37 +129,37 @@ model after_sales {
   productType            String?
   shipDate               DateTime?
   warrantyStatus         String?
-  issueDescription       String?                 @db.Text
+  issueDescription       String?                               @db.Text
   quantity               Int
   feedbackDept           String?
   feedbackDeptId         String?
-  solution               String?                 @db.Text
-  actualSolution         String?                 @db.Text
-  actualClaim            Decimal                 @default(0.00) @db.Decimal(10, 2)
+  solution               String?                               @db.Text
+  actualSolution         String?                               @db.Text
+  actualClaim            Decimal                               @default(0.00) @db.Decimal(10, 2)
   respDept               String?
-  responsibleDepartments String?                 @db.Text // @module after-sales - JSON array
+  responsibleDepartments String?                               @db.Text // @module after-sales - JSON array
   respDeptId             String?
   supplierBrand          String?
   supplierBrandId        String?
-  photos                 String?                 @db.LongText
-  isClaim                Boolean                 @default(false)
-  remarks                String?                 @db.Text
+  photos                 String?                               @db.LongText
+  isClaim                Boolean                               @default(false)
+  remarks                String?                               @db.Text
   failureType            String?
   failureTypeId          String?
   failureCause           String?
   failureCauseId         String?
   linkedEngineeringId    String?
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  version                Int                     @default(1)
-  isDeleted              Boolean                 @default(false)
+  createdAt              DateTime                              @default(now())
+  updatedAt              DateTime                              @updatedAt
+  version                Int                                   @default(1)
+  isDeleted              Boolean                               @default(false)
   workOrderNumber        String
   customerName           String?
   location               String?
   factoryDate            DateTime?
   handler                String?
-  materialCost           Decimal?                @default(0.00) @db.Decimal(10, 2)
-  laborTravelCost        Decimal?                @default(0.00) @db.Decimal(10, 2)
+  materialCost           Decimal?                              @default(0.00) @db.Decimal(10, 2)
+  laborTravelCost        Decimal?                              @default(0.00) @db.Decimal(10, 2)
   closeDate              DateTime?
   defectType             String?
   defectSubtype          String?
@@ -169,6 +169,10 @@ model after_sales {
   productSubtype         String?
   productSubtypeId       String?
   productTypeId          String?
+  productCategoryId      String?
+  productSubcategoryId   String?
+  defectCategoryId       String?
+  defectSubcategoryId    String?
   runningHours           Decimal?
   division               String?
   divisionId             String?
@@ -176,7 +180,11 @@ model after_sales {
   partName               String?
   partId                 String?
   createdBy              String?
-  work_orders            work_orders             @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+  work_orders            work_orders                           @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+  productCategory        quality_classification_categories?    @relation("after_sales_product_category", fields: [productCategoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  productSubcategory     quality_classification_subcategories? @relation("after_sales_product_subcategory", fields: [productSubcategoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  defectCategory         quality_classification_categories?    @relation("after_sales_defect_category", fields: [defectCategoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  defectSubcategory      quality_classification_subcategories? @relation("after_sales_defect_subcategory", fields: [defectSubcategoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([claimStatus])
   @@index([occurDate])
@@ -200,6 +208,10 @@ model after_sales {
   @@index([partId])
   @@index([productTypeId])
   @@index([productSubtypeId])
+  @@index([productCategoryId])
+  @@index([productSubcategoryId])
+  @@index([defectCategoryId])
+  @@index([defectSubcategoryId])
   @@index([failureTypeId])
   @@index([failureCauseId])
   @@index([createdBy])
@@ -409,6 +421,54 @@ model inspection_request_process_options {
   @@unique([category, processId])
   @@index([category, isEnabled, sort])
   @@index([processId, isEnabled])
+}
+
+enum quality_classification_scope {
+  INSPECTION_ISSUE_DEFECT
+  AFTER_SALES_PRODUCT
+  AFTER_SALES_DEFECT
+}
+
+// @module quality-classification
+model quality_classification_categories {
+  id                       String                                 @id @default(cuid())
+  scope                    quality_classification_scope
+  code                     String
+  name                     String
+  sort                     Int                                    @default(0)
+  status                   Int                                    @default(1)
+  isDeleted                Boolean                                @default(false)
+  createdAt                DateTime                               @default(now())
+  updatedAt                DateTime                               @updatedAt
+  subcategories            quality_classification_subcategories[]
+  afterSalesProductRecords after_sales[]                          @relation("after_sales_product_category")
+  afterSalesDefectRecords  after_sales[]                          @relation("after_sales_defect_category")
+  inspectionIssueRecords   quality_records[]                      @relation("quality_records_defect_category")
+
+  @@unique([scope, code])
+  @@unique([scope, name])
+  @@index([scope, isDeleted, status, sort])
+}
+
+// @module quality-classification
+model quality_classification_subcategories {
+  id                       String                            @id @default(cuid())
+  categoryId               String
+  code                     String
+  name                     String
+  sort                     Int                               @default(0)
+  status                   Int                               @default(1)
+  isDeleted                Boolean                           @default(false)
+  createdAt                DateTime                          @default(now())
+  updatedAt                DateTime                          @updatedAt
+  category                 quality_classification_categories @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  afterSalesProductRecords after_sales[]                     @relation("after_sales_product_subcategory")
+  afterSalesDefectRecords  after_sales[]                     @relation("after_sales_defect_subcategory")
+  inspectionIssueRecords   quality_records[]                 @relation("quality_records_defect_subcategory")
+
+  @@unique([categoryId, code])
+  @@unique([categoryId, name])
+  @@index([categoryId, isDeleted, status, sort])
 }
 
 model dfmea_projects {
@@ -649,43 +709,43 @@ model itp_items {
 }
 
 model quality_records {
-  id                                      String                      @id
-  serialNumber                            Int                         @unique
+  id                                      String                                @id
+  serialNumber                            Int                                   @unique
   date                                    DateTime
   status                                  quality_records_status
   partName                                String
   partId                                  String?
-  description                             String?                     @db.Text
+  description                             String?                               @db.Text
   quantity                                Int
-  lossHours                               Decimal                     @default(0.00) @db.Decimal(10, 2)
-  lossAmount                              Decimal                     @default(0.00) @db.Decimal(10, 2)
+  lossHours                               Decimal                               @default(0.00) @db.Decimal(10, 2)
+  lossAmount                              Decimal                               @default(0.00) @db.Decimal(10, 2)
   projectName                             String?
   projectId                               String?
   division                                String?
   divisionId                              String?
   responsibleDepartment                   String
-  responsibleDepartments                  String?                     @db.Text // @module inspection - JSON array
+  responsibleDepartments                  String?                               @db.Text // @module inspection - JSON array
   responsibleDepartmentId                 String?
   responsibleBU                           String?
   inspector                               String?
-  analysis                                String?                     @db.Text
-  solution                                String?                     @db.Text
-  issuePhoto                              String?                     @db.Text
-  rectificationPhoto                      String?                     @db.Text
-  isClaim                                 Boolean                     @default(false)
-  nonConformanceNumber                    String?                     @unique
+  analysis                                String?                               @db.Text
+  solution                                String?                               @db.Text
+  issuePhoto                              String?                               @db.Text
+  rectificationPhoto                      String?                               @db.Text
+  isClaim                                 Boolean                               @default(false)
+  nonConformanceNumber                    String?                               @unique
   lastEditor                              String?
   sourceAfterSalesId                      String?
-  createdAt                               DateTime                    @default(now())
-  updatedAt                               DateTime                    @updatedAt
-  version                                 Int                         @default(1)
-  isDeleted                               Boolean                     @default(false)
+  createdAt                               DateTime                              @default(now())
+  updatedAt                               DateTime                              @updatedAt
+  version                                 Int                                   @default(1)
+  isDeleted                               Boolean                               @default(false)
   inspectionId                            String?
   workOrderNumber                         String?
-  claimNotes                              String?                     @db.Text
-  claimStatus                             quality_records_claimStatus @default(OPEN)
-  recoveredAmount                         Decimal                     @default(0.00) @db.Decimal(10, 2)
-  hourlyRate                              Decimal                     @default(0.00) @db.Decimal(10, 2)
+  claimNotes                              String?                               @db.Text
+  claimStatus                             quality_records_claimStatus           @default(OPEN)
+  recoveredAmount                         Decimal                               @default(0.00) @db.Decimal(10, 2)
+  hourlyRate                              Decimal                               @default(0.00) @db.Decimal(10, 2)
   supplierName                            String?
   supplierId                              String?
   category                                String?
@@ -694,19 +754,23 @@ model quality_records {
   processId                               String?
   defectTypeId                            String?
   defectSubtypeId                         String?
+  defectCategoryId                        String?
+  defectSubcategoryId                     String?
   defectType                              String?
   defectSubtype                           String?
   responsibleWelder                       String?
-  rootCause                               String?                     @db.Text
+  rootCause                               String?                               @db.Text
   rootCauseId                             String?
   severity                                String?
   createdBy                               String?
-  users_quality_records_inspectorTousers  users?                      @relation("quality_records_inspectorTousers", fields: [inspector], references: [username])
-  users_quality_records_lastEditorTousers users?                      @relation("quality_records_lastEditorTousers", fields: [lastEditor], references: [username])
-  inspection                              inspections?                @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
-  process                                 processes?                  @relation(fields: [processId], references: [id], onDelete: SetNull)
-  supplier                                suppliers?                  @relation("quality_records_supplier", fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  work_orders                             work_orders?                @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+  users_quality_records_inspectorTousers  users?                                @relation("quality_records_inspectorTousers", fields: [inspector], references: [username])
+  users_quality_records_lastEditorTousers users?                                @relation("quality_records_lastEditorTousers", fields: [lastEditor], references: [username])
+  inspection                              inspections?                          @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  process                                 processes?                            @relation(fields: [processId], references: [id], onDelete: SetNull)
+  defectCategory                          quality_classification_categories?    @relation("quality_records_defect_category", fields: [defectCategoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  defectSubcategory                       quality_classification_subcategories? @relation("quality_records_defect_subcategory", fields: [defectSubcategoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  supplier                                suppliers?                            @relation("quality_records_supplier", fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  work_orders                             work_orders?                          @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([createdAt])
   @@index([date])
@@ -729,6 +793,8 @@ model quality_records {
   @@index([defectType])
   @@index([defectTypeId])
   @@index([defectSubtypeId])
+  @@index([defectCategoryId])
+  @@index([defectSubcategoryId])
   @@index([processName])
   @@index([processId])
   @@index([rootCauseId])

@@ -25,5 +25,27 @@ export const systemModule: ModuleDeclaration = {
         },
       ],
     },
+    {
+      key: 'system-quality-classifications',
+      parentPath: '/system',
+      path: '/system/quality-classifications',
+      name: 'SystemQualityClassifications',
+      component: 'system/quality-classifications/index',
+      authCode: 'System:QualityClassification:List',
+      order: 7,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:category',
+        title: '质量分类设置',
+      },
+      buttons: [
+        {
+          authCode: 'System:QualityClassification:Edit',
+          name: 'SystemQualityClassificationsEdit',
+          order: 1,
+          title: '修改分类',
+        },
+      ],
+    },
   ],
 };

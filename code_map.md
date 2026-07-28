@@ -18,6 +18,7 @@
 - **metrology/** — 计量器具全生命周期：台账、借用归还、检定计划、到期提醒
 - **planning/** — 质量策划：BOM、DFMEA、ITP、项目文档管理
 - **process-master/** — 全局工序主数据与报检场景配置
+- **quality-classification/** — 质量分类树主数据维护
 - **quality-loss/** — 质量损失记录与分析：金额、缺陷分级、供应商关联、趋势。读路径走物化表 `quality_loss_index`（见 `docs/after-sales-quality-loss.md`）
 - **rbac/** — 角色权限控制：角色分配与菜单/按钮授权
 - **report/** — 质量报表生成与路由（多维度报表输出）
@@ -43,7 +44,7 @@
 - **files/** — 通用文件上传与下载代理
 - **menu/** — 动态菜单树查询（依据用户权限）
 - **qms/** — QMS 业务路由聚合入口
-- **system/** — 系统级管理接口（用户、角色、部门、字典、TEAM 身份）
+- **system/** — 系统级管理接口（用户、角色、部门、字典、TEAM 身份、质量分类）
 - **telegram/** — Telegram Bot 通知推送
 - **uploads/** — 文件上传端点
 - **webhook/** — 外部系统回调接收
