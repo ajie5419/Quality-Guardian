@@ -8,8 +8,10 @@ import { computed, ref, toRef, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
-import { Form, Modal } from 'ant-design-vue';
+import { QUALITY_CLASSIFICATION_SCOPE } from '@qgs/shared';
+import { Form, message, Modal } from 'ant-design-vue';
 
+import { useQualityClassificationOptions } from '../../shared/composables/useQualityClassificationOptions';
 import { useAfterSalesForm } from '../composables/useAfterSalesForm';
 import { useStatusOptions } from '../constants';
 import AfterSalesBasicInfo from './AfterSalesBasicInfo.vue';
@@ -42,6 +44,16 @@ const formRef = ref();
 
 const openRef = toRef(props, 'open');
 const isEditModeRef = toRef(props, 'isEditMode');
+const {
+  loadOptions: loadProductOptions,
+  options: productClassificationOptions,
+} = useQualityClassificationOptions(
+  QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
+);
+const { loadOptions: loadDefectOptions, options: defectClassificationOptions } =
+  useQualityClassificationOptions(
+    QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+  );
 
 const {
   formState,
@@ -55,8 +67,10 @@ const {
   handleWorkOrderChange,
   checkIsPurchasingDept,
 } = useAfterSalesForm({
+  defectOptions: defectClassificationOptions,
   open: openRef,
   isEditMode: isEditModeRef,
+  productOptions: productClassificationOptions,
   onSuccess: () => emit('success'),
   onClose: () => emit('update:open', false),
 });
@@ -70,9 +84,14 @@ const isPurchasingDept = computed(() =>
 watch(
   () => props.open,
   (val) => {
-    if (val && props.isEditMode && props.initialData) {
-      initFromData(props.initialData);
-    }
+    if (!val) return;
+    void Promise.all([loadProductOptions(), loadDefectOptions()])
+      .then(() => {
+        if (props.isEditMode && props.initialData) {
+          initFromData(props.initialData);
+        }
+      })
+      .catch(() => message.error(t('common.dataLoadFailed')));
   },
 );
 
@@ -126,12 +145,14 @@ function onWorkOrderChange(val: number | string, item?: WorkOrderItem) {
 
           <AfterSalesProductInfo
             v-model:form-state="formState"
+            :product-categories="productClassificationOptions"
             :product-subtypes="currentProductSubtypes"
             @product-type-change="handleProductTypeChange"
           />
 
           <AfterSalesIssueDetails
             v-model:form-state="formState"
+            :defect-categories="defectClassificationOptions"
             :defect-subtypes="currentDefectSubtypes"
             @defect-type-change="handleDefectTypeChange"
           />

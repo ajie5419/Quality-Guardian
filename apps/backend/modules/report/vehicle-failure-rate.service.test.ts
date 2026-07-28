@@ -20,11 +20,28 @@ vi.mock('~/modules/work-order', () => ({
   },
 }));
 
-vi.mock('~/utils/canonical-master-data', () => ({
-  MasterDataGovernanceKernel: {
-    resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
-  },
-}));
+vi.mock('~/modules/quality-classification', () => {
+  const listForManagement = vi.fn().mockResolvedValue([]);
+  return {
+    QualityClassificationService: {
+      findActiveCategoryByCode: vi.fn().mockResolvedValue({
+        code: 'VEHICLE_PRODUCT',
+        id: 'vehicle-product',
+        name: 'Vehicle Product',
+      }),
+      listForManagement,
+      resolveCategoryNamesByIds: vi.fn(async () => {
+        const categories = await listForManagement();
+        return new Map(
+          categories.map((item: { id: string; name: string }) => [
+            item.id,
+            item.name,
+          ]),
+        );
+      }),
+    },
+  };
+});
 
 vi.mock('~/modules/report/vehicle-failure-rate-manual.service', () => ({
   getVehicleFailureManualData: vi.fn().mockResolvedValue({}),
@@ -77,31 +94,45 @@ describe('vehicleFailureRateService', () => {
 
   it('returns ranking based on failure records', async () => {
     const { AfterSalesAPI } = await import('~/modules/after-sales');
-    const { MasterDataGovernanceKernel } = await import(
-      '~/utils/canonical-master-data'
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
     );
     vi.mocked(
-      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
-    ).mockResolvedValueOnce(
-      new Map([
-        ['dt-1', 'Crack'],
-        ['dt-2', 'Rust'],
-      ]),
-    );
+      QualityClassificationService.listForManagement,
+    ).mockResolvedValueOnce([
+      {
+        code: 'CRACK',
+        id: 'dt-1',
+        name: 'Crack',
+        scope: 'AFTER_SALES_DEFECT',
+        sort: 0,
+        status: 1,
+        subcategories: [],
+      },
+      {
+        code: 'RUST',
+        id: 'dt-2',
+        name: 'Rust',
+        scope: 'AFTER_SALES_DEFECT',
+        sort: 1,
+        status: 1,
+        subcategories: [],
+      },
+    ]);
     (AfterSalesAPI.getVehicleFailureRecords as any).mockResolvedValue([
       {
         defectType: 'Crack',
-        defectTypeId: 'dt-1',
+        defectCategoryId: 'dt-1',
         occurDate: new Date('2026-01-10'),
       },
       {
         defectType: 'Crack',
-        defectTypeId: 'dt-1',
+        defectCategoryId: 'dt-1',
         occurDate: new Date('2026-02-15'),
       },
       {
         defectType: 'Rust',
-        defectTypeId: 'dt-2',
+        defectCategoryId: 'dt-2',
         occurDate: new Date('2026-01-20'),
       },
     ]);
@@ -117,32 +148,40 @@ describe('vehicleFailureRateService', () => {
 
   it('keeps same-name IDs separate and preserves unresolved ID buckets', async () => {
     const { AfterSalesAPI } = await import('~/modules/after-sales');
-    const { MasterDataGovernanceKernel } = await import(
-      '~/utils/canonical-master-data'
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
     );
     (AfterSalesAPI.getVehicleFailureRecords as any).mockResolvedValue([
-      { defectType: 'Old Name', defectTypeId: 'dt-1', occurDate: new Date() },
-      { defectType: 'Same', defectTypeId: 'dt-2', occurDate: new Date() },
-      { defectType: 'Same', defectTypeId: 'dt-3', occurDate: new Date() },
       {
+        defectCategoryId: 'dt-1',
+        defectType: 'Old Name',
+        occurDate: new Date(),
+      },
+      { defectCategoryId: 'dt-2', defectType: 'Same', occurDate: new Date() },
+      { defectCategoryId: 'dt-3', defectType: 'Same', occurDate: new Date() },
+      {
+        defectCategoryId: 'bad-id',
         defectType: 'Must Not Be Used',
-        defectTypeId: 'bad-id',
         occurDate: new Date(),
       },
       {
+        defectCategoryId: null,
         defectType: 'Must Not Be Used',
-        defectTypeId: null,
         occurDate: new Date(),
       },
     ]);
     vi.mocked(
-      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
+      QualityClassificationService.listForManagement,
     ).mockResolvedValueOnce(
-      new Map([
-        ['dt-1', 'Current Name'],
-        ['dt-2', 'Same'],
-        ['dt-3', 'Same'],
-      ]),
+      ['dt-1', 'dt-2', 'dt-3'].map((id, index) => ({
+        code: id.toUpperCase(),
+        id,
+        name: index === 0 ? 'Current Name' : 'Same',
+        scope: 'AFTER_SALES_DEFECT' as const,
+        sort: index,
+        status: 1 as const,
+        subcategories: [],
+      })),
     );
 
     const result =
@@ -247,8 +286,8 @@ describe('vehicleFailureRateService', () => {
   it('ranking limits to top 10 defect types', async () => {
     const { AfterSalesAPI } = await import('~/modules/after-sales');
     const manyRecords = Array.from({ length: 15 }, (_, i) => ({
+      defectCategoryId: `dt-${i}`,
       defectType: `Defect ${String(i).padStart(2, '0')}`,
-      defectTypeId: `dt-${i}`,
       occurDate: new Date('2026-01-01'),
     }));
     (AfterSalesAPI.getVehicleFailureRecords as any).mockResolvedValue(

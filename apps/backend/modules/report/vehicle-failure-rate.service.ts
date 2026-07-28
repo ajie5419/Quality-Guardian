@@ -1,9 +1,13 @@
-import { createIdentityAggregateItem, QMS_DEFAULT_VALUES } from '@qgs/shared';
+import {
+  createIdentityAggregateItem,
+  QMS_DEFAULT_VALUES,
+  QUALITY_CLASSIFICATION_SCOPE,
+} from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept/dept.service';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { WorkOrderService } from '~/modules/work-order';
 import { addYearsToDate } from '~/modules/work-order/work-order-query';
-import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 
 import {
   getVehicleFailureManualData,
@@ -11,7 +15,7 @@ import {
   saveVehicleFailureManualPayload,
 } from './vehicle-failure-rate-manual.service';
 
-const VEHICLE_PRODUCT_TYPE = '车辆产品';
+const VEHICLE_PRODUCT_CODE = 'VEHICLE_PRODUCT';
 
 interface MonthWindow {
   currentEnd: Date;
@@ -52,6 +56,11 @@ export const VehicleFailureRateService = {
   async getVehicleFailureRate(month?: string) {
     const endMonth = parseEndMonth(month);
     const vehicleDeptIds = await getVehicleDeptIds();
+    const vehicleProduct =
+      await QualityClassificationService.findActiveCategoryByCode(
+        QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
+        VEHICLE_PRODUCT_CODE,
+      );
     const windows = getMonthWindows(endMonth);
     const manualData = await getVehicleFailureManualData();
     const manualWarrantyData = await getVehicleFailureManualWarrantyData();
@@ -61,11 +70,13 @@ export const VehicleFailureRateService = {
       endMonth,
       manualData,
       vehicleDeptIds,
+      vehicleProduct?.id || null,
     );
     const monthlyCounts = await loadMonthlyCounts(
       years,
       endMonth.getMonth(),
       vehicleDeptIds,
+      vehicleProduct?.id || null,
     );
     const monthlyWarrantyCounts = await loadMonthlyWarrantyCounts(
       years,
@@ -119,6 +130,7 @@ export const VehicleFailureRateService = {
           windows[0].currentStart,
           rankingWindow.currentEnd,
           vehicleDeptIds,
+          vehicleProduct?.id || null,
         )
       : [];
 
@@ -135,24 +147,29 @@ export const VehicleFailureRateService = {
   },
 };
 
-async function buildRanking(start: Date, end: Date, vehicleDeptIds: string[]) {
+async function buildRanking(
+  start: Date,
+  end: Date,
+  vehicleDeptIds: string[],
+  productCategoryId: null | string,
+) {
   const records = await AfterSalesAPI.getVehicleFailureRecords({
     end,
-    productType: VEHICLE_PRODUCT_TYPE,
+    productCategoryId,
     start,
     vehicleDeptIds,
   });
   const total = records.length;
   const counts = new Map<null | string, number>();
   for (const record of records) {
-    const id = String(record.defectTypeId || '').trim() || null;
+    const id = String(record.defectCategoryId || '').trim() || null;
     counts.set(id, (counts.get(id) || 0) + 1);
   }
   const defectTypeNameById =
-    await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-      configKey: 'defectType',
-      canonicalIds: [...counts.keys()],
-    });
+    await QualityClassificationService.resolveCategoryNamesByIds(
+      QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+      [...counts.keys()].filter(Boolean),
+    );
   return [...counts.entries()]
     .map(([id, count]) => {
       const identity = createIdentityAggregateItem({
@@ -176,6 +193,7 @@ async function loadMonthlyCounts(
   years: number[],
   endMonthIndex: number,
   vehicleDeptIds: string[],
+  productCategoryId: null | string,
 ) {
   if (years.length === 0) return new Map<string, number>();
   const startYear = Math.min(...years);
@@ -184,7 +202,7 @@ async function loadMonthlyCounts(
   const end = new Date(endYear, endMonthIndex + 1, 0, 23, 59, 59, 999);
   const records = await AfterSalesAPI.getVehicleFailureRecords({
     end,
-    productType: VEHICLE_PRODUCT_TYPE,
+    productCategoryId,
     start,
     vehicleDeptIds,
   });
@@ -354,10 +372,11 @@ async function getDisplayYears(
   endMonth: Date,
   manualData: Record<string, number>,
   vehicleDeptIds: string[],
+  productCategoryId: null | string,
 ) {
   const earliestAutoDate = await AfterSalesAPI.findEarliestVehicleFailureDate({
     end: endMonth,
-    productType: VEHICLE_PRODUCT_TYPE,
+    productCategoryId,
     vehicleDeptIds,
   });
   const manualYears = Object.keys(manualData)

@@ -372,12 +372,16 @@ describe('after-sales-integration.service', () => {
     const prisma = prismaModule.default;
 
     (prisma.after_sales.findMany as any).mockResolvedValue([
-      { defectType: 'Engine', defectTypeId: 'dt-1', occurDate: new Date() },
+      {
+        defectCategoryId: 'dt-1',
+        defectType: 'Engine',
+        occurDate: new Date(),
+      },
     ]);
 
     const result = await AfterSalesIntegrationService.getVehicleFailureRecords({
       end: new Date('2026-01-31'),
-      productType: 'Vehicle',
+      productCategoryId: 'vehicle-product',
       start: new Date('2026-01-01'),
       vehicleDeptIds: ['dept-1'],
     });
@@ -399,7 +403,7 @@ describe('after-sales-integration.service', () => {
     const result =
       await AfterSalesIntegrationService.findEarliestVehicleFailureDate({
         end: new Date('2026-01-31'),
-        productType: 'Vehicle',
+        productCategoryId: 'vehicle-product',
         vehicleDeptIds: [],
       });
 
@@ -418,7 +422,7 @@ describe('after-sales-integration.service', () => {
     const result =
       await AfterSalesIntegrationService.findEarliestVehicleFailureDate({
         end: new Date('2026-01-31'),
-        productType: 'Vehicle',
+        productCategoryId: 'vehicle-product',
         vehicleDeptIds: [],
       });
 

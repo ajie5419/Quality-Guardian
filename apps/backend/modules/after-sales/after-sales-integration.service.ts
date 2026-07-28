@@ -173,17 +173,23 @@ export const AfterSalesIntegrationService = {
 
   async getVehicleFailureRecords(params: {
     end: Date;
-    productType: string;
+    productCategoryId: null | string;
     start: Date;
     vehicleDeptIds: string[];
   }) {
     return prisma.after_sales.findMany({
-      select: { defectType: true, defectTypeId: true, occurDate: true },
+      select: {
+        defectCategoryId: true,
+        defectType: true,
+        occurDate: true,
+      },
       where: {
         isDeleted: false,
         occurDate: { gte: params.start, lte: params.end },
         OR: [
-          { productType: params.productType },
+          ...(params.productCategoryId
+            ? [{ productCategoryId: params.productCategoryId }]
+            : []),
           {
             work_orders: {
               ...buildAfterSalesVehicleDivisionWhere(params.vehicleDeptIds),
@@ -197,7 +203,7 @@ export const AfterSalesIntegrationService = {
 
   async findEarliestVehicleFailureDate(params: {
     end: Date;
-    productType: string;
+    productCategoryId: null | string;
     vehicleDeptIds: string[];
   }) {
     const row = await prisma.after_sales.findFirst({
@@ -207,7 +213,9 @@ export const AfterSalesIntegrationService = {
         isDeleted: false,
         occurDate: { lte: params.end },
         OR: [
-          { productType: params.productType },
+          ...(params.productCategoryId
+            ? [{ productCategoryId: params.productCategoryId }]
+            : []),
           {
             work_orders: {
               ...buildAfterSalesVehicleDivisionWhere(params.vehicleDeptIds),

@@ -142,16 +142,16 @@ export const CHART_METRICS = [
 
 export function createInitialFormState() {
   return {
-    defectSubtype: '焊接缺陷',
-    defectType: '制造装配缺陷',
+    defectCategoryId: undefined,
+    defectSubcategoryId: undefined,
     division: '',
     isClaim: false,
     issueDate: new Date().toISOString().split('T')[0],
     laborTravelCost: 0,
     materialCost: 0,
     partName: '',
-    productSubtype: '平板车',
-    productType: '车辆产品',
+    productCategoryId: undefined,
+    productSubcategoryId: undefined,
     quantity: 1,
     runningHours: 0,
     severity: 'P2 级',
@@ -163,10 +163,4 @@ export function createInitialFormState() {
   };
 }
 
-export {
-  QMS_DEFECT_OPTIONS as DEFECT_OPTIONS,
-  QMS_DEFECT_SUBTYPES as DEFECT_SUBTYPES,
-  QMS_PRODUCT_OPTIONS as PRODUCT_OPTIONS,
-  QMS_PRODUCT_SUBTYPES as PRODUCT_SUBTYPES,
-  QMS_SEVERITY_OPTIONS as SEVERITY_OPTIONS,
-} from '@qgs/shared';
+export { QMS_SEVERITY_OPTIONS as SEVERITY_OPTIONS } from '@qgs/shared';

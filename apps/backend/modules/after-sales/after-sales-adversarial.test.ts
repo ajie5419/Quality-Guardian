@@ -166,6 +166,33 @@ describe('afterSalesService – adversarial', () => {
       expect(where).not.toHaveProperty('OR');
     });
 
+    it('filters all quality classifications by exact scoped IDs', async () => {
+      (prisma.after_sales.findMany as any).mockResolvedValue([]);
+
+      await AfterSalesService.getList({
+        defectCategoryId: 'defect-category',
+        defectSubcategoryId: 'defect-subcategory',
+        defectType: 'Stale Defect Name',
+        productCategoryId: 'product-category',
+        productSubcategoryId: 'product-subcategory',
+        productType: 'Stale Product Name',
+      });
+
+      expect(prisma.after_sales.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            defectCategoryId: 'defect-category',
+            defectSubcategoryId: 'defect-subcategory',
+            productCategoryId: 'product-category',
+            productSubcategoryId: 'product-subcategory',
+          }),
+        }),
+      );
+      const where = (prisma.after_sales.findMany as any).mock.calls[0][0].where;
+      expect(where).not.toHaveProperty('defectType');
+      expect(where).not.toHaveProperty('productType');
+    });
+
     it('applies expanded text filters and explicit date ranges in the database where', async () => {
       const explicitRange = {
         end: new Date('2026-08-01T00:00:00.000'),

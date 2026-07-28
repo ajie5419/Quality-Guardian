@@ -24,4 +24,12 @@
 - 通用列表仍允许名称关键字搜索，这是搜索能力，不得作为供应商画像、评分或跨表关联回退。
 - unresolved 记录当前只有回填审计写入能力，没有人工处置 API/UI；事件总线为单进程异步实现，失败仅记录日志且无持久化重试。
 
+## 质量分类契约
+
+- `productCategoryId`、`productSubcategoryId` 引用 `AFTER_SALES_PRODUCT` 分类域；`productType`、`productSubtype` 仅保存历史名称快照。
+- `defectCategoryId`、`defectSubcategoryId` 引用 `AFTER_SALES_DEFECT` 分类域；`defectType`、`defectSubtype` 仅保存历史名称快照。
+- 在线新增和更新必须提交四个分类 ID。服务端通过 `QualityClassificationService` 校验两组父子关系，并按 ID 重建全部名称快照，不信任调用方提交的名称。
+- 批量导入允许用一级、二级名称解析，但只能在对应分类域和父分类内精确匹配；缺失或父子不匹配时返回逐行错误。
+- 列表筛选、统计、动态图表和车辆故障率使用新的分类域 ID。旧 `productTypeId`、`productSubtypeId`、`defectTypeId`、`defectSubtypeId` 仅为迁移兼容保留，不再作为新统计的身份键。
+
 通用规则见 `docs/master-data-identity-governance.md`。

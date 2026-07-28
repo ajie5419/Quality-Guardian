@@ -60,6 +60,14 @@ vi.mock('~/utils/canonical-master-data', () => ({
   },
 }));
 
+vi.mock('~/modules/quality-classification', () => ({
+  QualityClassificationService: {
+    assertSelection: vi.fn(),
+    listForManagement: vi.fn().mockResolvedValue([]),
+    resolveActiveSelectionByNames: vi.fn(),
+  },
+}));
+
 vi.mock(
   '~/modules/after-sales/after-sales-payload',
   async (importOriginal) => ({
@@ -142,13 +150,13 @@ describe('after-sales core helpers and services', () => {
     });
     await AfterSalesService.getVehicleFailureRecords({
       end: new Date('2026-01-31T00:00:00.000Z'),
-      productType: 'Vehicle',
+      productCategoryId: 'vehicle-product',
       start: new Date('2026-01-01T00:00:00.000Z'),
       vehicleDeptIds: ['dept-1'],
     });
     await AfterSalesService.findEarliestVehicleFailureDate({
       end: new Date('2026-01-31T00:00:00.000Z'),
-      productType: 'Vehicle',
+      productCategoryId: 'vehicle-product',
       vehicleDeptIds: [],
     });
     await AfterSalesService.getReportPeriodMetrics({

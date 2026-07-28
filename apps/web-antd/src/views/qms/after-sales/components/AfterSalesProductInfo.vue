@@ -1,4 +1,9 @@
 <script lang="ts" setup>
+import type {
+  QualityClassificationCategory,
+  QualityClassificationSubcategory,
+} from '@qgs/shared';
+
 import type { AfterSalesFormState } from '#/types';
 
 import { useI18n } from '@vben/locales';
@@ -12,10 +17,9 @@ import {
   SelectOption,
 } from 'ant-design-vue';
 
-import { PRODUCT_OPTIONS } from '../constants';
-
 defineProps<{
-  productSubtypes: string[];
+  productCategories: QualityClassificationCategory[];
+  productSubtypes: QualityClassificationSubcategory[];
 }>();
 
 const emit = defineEmits<{
@@ -52,32 +56,40 @@ const { t } = useI18n();
         </FormItem>
       </div>
       <div class="grid grid-cols-2 gap-2">
-        <FormItem :label="t('qms.afterSales.form.productType')" class="mb-0">
+        <FormItem
+          :label="t('qms.afterSales.form.productType')"
+          class="mb-0"
+          name="productCategoryId"
+        >
           <Select
-            v-model:value="formState.productType"
+            v-model:value="formState.productCategoryId"
             @change="emit('productTypeChange')"
             :placeholder="t('qms.afterSales.placeholder.selectType')"
           >
             <SelectOption
-              v-for="opt in PRODUCT_OPTIONS"
-              :key="opt"
-              :value="opt"
+              v-for="opt in productCategories"
+              :key="opt.id"
+              :value="opt.id"
             >
-              {{ opt }}
+              {{ opt.name }}
             </SelectOption>
           </Select>
         </FormItem>
-        <FormItem :label="t('qms.afterSales.form.productSubtype')" class="mb-0">
+        <FormItem
+          :label="t('qms.afterSales.form.productSubtype')"
+          class="mb-0"
+          name="productSubcategoryId"
+        >
           <Select
-            v-model:value="formState.productSubtype"
+            v-model:value="formState.productSubcategoryId"
             :placeholder="t('qms.afterSales.placeholder.selectSubtype')"
           >
             <SelectOption
               v-for="opt in productSubtypes"
-              :key="opt"
-              :value="opt"
+              :key="opt.id"
+              :value="opt.id"
             >
-              {{ opt }}
+              {{ opt.name }}
             </SelectOption>
           </Select>
         </FormItem>

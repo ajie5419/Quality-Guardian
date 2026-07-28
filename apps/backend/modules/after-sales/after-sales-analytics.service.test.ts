@@ -29,6 +29,24 @@ vi.mock('~/utils/canonical-master-data', () => ({
   },
 }));
 
+vi.mock('~/modules/quality-classification', () => {
+  const listForManagement = vi.fn().mockResolvedValue([]);
+  return {
+    QualityClassificationService: {
+      listForManagement,
+      resolveCategoryNamesByIds: vi.fn(async () => {
+        const categories = await listForManagement();
+        return new Map(
+          categories.map((item: { id: string; name: string }) => [
+            item.id,
+            item.name,
+          ]),
+        );
+      }),
+    },
+  };
+});
+
 vi.mock('~/modules/data-scope/data-scope.service', () => ({
   DataScopeService: {
     buildAfterSalesWhere: vi.fn(async (where: any) => where),
@@ -154,8 +172,8 @@ describe('after-sales-analytics.service', () => {
       ]);
     (prisma.after_sales.groupBy as any)
       .mockResolvedValueOnce([
-        { defectTypeId: 'defect-1', _count: { id: 6 } },
-        { defectTypeId: 'defect-2', _count: { id: 4 } },
+        { defectCategoryId: 'defect-1', _count: { id: 6 } },
+        { defectCategoryId: 'defect-2', _count: { id: 4 } },
       ])
       .mockResolvedValueOnce([
         { supplierBrandId: 'supplier-1', _count: { id: 5 } },
@@ -164,13 +182,32 @@ describe('after-sales-analytics.service', () => {
     const { MasterDataGovernanceKernel } = await import(
       '~/utils/canonical-master-data'
     );
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
+    );
+    vi.mocked(
+      QualityClassificationService.listForManagement,
+    ).mockResolvedValueOnce([
+      {
+        code: 'MECHANICAL',
+        id: 'defect-1',
+        name: 'Mechanical',
+        scope: 'AFTER_SALES_DEFECT',
+        sort: 0,
+        status: 1,
+        subcategories: [],
+      },
+      {
+        code: 'ELECTRICAL',
+        id: 'defect-2',
+        name: 'Electrical',
+        scope: 'AFTER_SALES_DEFECT',
+        sort: 1,
+        status: 1,
+        subcategories: [],
+      },
+    ]);
     (MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any)
-      .mockResolvedValueOnce(
-        new Map([
-          ['defect-1', 'Mechanical'],
-          ['defect-2', 'Electrical'],
-        ]),
-      )
       .mockResolvedValueOnce(new Map([['supplier-1', 'Supplier A']]))
       .mockResolvedValueOnce(new Map([['dept-1', 'QA']]));
 
@@ -192,7 +229,7 @@ describe('after-sales-analytics.service', () => {
     expect(stats.deptDistribution).toHaveLength(1);
     expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ by: ['defectTypeId'] }),
+      expect.objectContaining({ by: ['defectCategoryId'] }),
     );
     expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
       2,
@@ -213,6 +250,9 @@ describe('after-sales-analytics.service', () => {
     const { MasterDataGovernanceKernel } = await import(
       '~/utils/canonical-master-data'
     );
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
+    );
 
     (prisma.after_sales.aggregate as any).mockResolvedValue({
       _count: { id: 8 },
@@ -224,10 +264,10 @@ describe('after-sales-analytics.service', () => {
       .mockResolvedValueOnce([]);
     (prisma.after_sales.groupBy as any)
       .mockResolvedValueOnce([
-        { defectTypeId: 'defect-a', _count: { id: 3 } },
-        { defectTypeId: 'defect-b', _count: { id: 2 } },
-        { defectTypeId: null, _count: { id: 1 } },
-        { defectTypeId: 'invalid-defect', _count: { id: 2 } },
+        { defectCategoryId: 'defect-a', _count: { id: 3 } },
+        { defectCategoryId: 'defect-b', _count: { id: 2 } },
+        { defectCategoryId: null, _count: { id: 1 } },
+        { defectCategoryId: 'invalid-defect', _count: { id: 2 } },
       ])
       .mockResolvedValueOnce([
         { supplierBrandId: 'supplier-a', _count: { id: 4 } },
@@ -239,14 +279,29 @@ describe('after-sales-analytics.service', () => {
         { respDeptId: null, _count: { id: 1 } },
         { respDeptId: 'invalid-dept', _count: { id: 1 } },
       ]);
+    vi.mocked(
+      QualityClassificationService.listForManagement,
+    ).mockResolvedValueOnce([
+      {
+        code: 'DEFECT_A',
+        id: 'defect-a',
+        name: 'Shared defect',
+        scope: 'AFTER_SALES_DEFECT',
+        sort: 0,
+        status: 1,
+        subcategories: [],
+      },
+      {
+        code: 'DEFECT_B',
+        id: 'defect-b',
+        name: 'Shared defect',
+        scope: 'AFTER_SALES_DEFECT',
+        sort: 1,
+        status: 1,
+        subcategories: [],
+      },
+    ]);
     (MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any)
-      .mockResolvedValueOnce(
-        new Map([
-          ['defect-a', 'Shared defect'],
-          ['defect-b', 'Shared defect'],
-          ['invalid-defect', null],
-        ]),
-      )
       .mockResolvedValueOnce(
         new Map([
           ['invalid-supplier', null],

@@ -9,6 +9,7 @@ import {
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { parseRequiredWorkOrderNumber } from '~/modules/work-order/work-order-query';
+import { isBusinessError } from '~/utils/business-error';
 import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
@@ -108,6 +109,7 @@ export const AfterSalesRouteService = {
             createdBy,
             defaultWorkOrderNumber: woNumber,
             id: createAfterSalesId(),
+            classificationMode: 'import',
             identityMode: 'legacy-import',
             serialNumber,
           }),
@@ -122,13 +124,22 @@ export const AfterSalesRouteService = {
         successCount++;
       } catch (error) {
         const message = toImportErrorMessage(error);
+        const classificationError =
+          isBusinessError(error) &&
+          (error.code.startsWith('QUALITY_CLASSIFICATION_') ||
+            error.code === 'AFTER_SALES_CLASSIFICATION_REQUIRED');
         rowErrors.push(
           buildImportRowError({
-            field: inferImportErrorField(message),
+            field: classificationError
+              ? 'qualityClassification'
+              : inferImportErrorField(message),
             item,
             keyField: 'workOrderNumber',
             reason: message,
             row: index + 1,
+            suggestion: classificationError
+              ? 'Provide an active category and matching subcategory for both product and defect classifications'
+              : undefined,
           }),
         );
       }

@@ -2,6 +2,7 @@ import type {
   AfterSalesItem,
   AfterSalesParams,
   AfterSalesStats,
+  AfterSalesWritePayload,
   IdentityAggregateItem,
 } from '@qgs/shared';
 
@@ -83,13 +84,13 @@ export async function getAfterSalesChartAggregate(params: {
 /**
  * Create After-sales record
  */
-export async function createAfterSales(data: Partial<AfterSalesItem>) {
+export async function createAfterSales(data: AfterSalesWritePayload) {
   return requestClient.post<AfterSalesItem>('/qms/after-sales', data);
 }
 
 export async function updateAfterSales(
   id: string,
-  data: Partial<AfterSalesItem>,
+  data: AfterSalesWritePayload,
 ) {
   return requestClient.put<AfterSalesItem>(`/qms/after-sales/${id}`, data);
 }

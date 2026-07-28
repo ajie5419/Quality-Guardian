@@ -1,3 +1,5 @@
+import type { QualityClassificationCategory } from '@qgs/shared';
+
 import type { ComputedRef, Ref } from 'vue';
 
 import type { StatusOption } from '../constants';
@@ -7,8 +9,6 @@ import type { QmsAfterSalesApi } from '#/api/qms/after-sales';
 import type { BaseTreeNode } from '#/types/tree';
 
 import { computed } from 'vue';
-
-import { QMS_DEFECT_OPTIONS, QMS_PRODUCT_OPTIONS } from '@qgs/shared';
 
 import { findNameById } from '#/types';
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
@@ -32,10 +32,12 @@ export type AfterSalesGridRow = QmsAfterSalesApi.AfterSalesItem & {
 
 const TEXT_FILTER_FIELDS = [
   'customerName',
-  'defectType',
+  'defectCategoryId',
+  'defectSubcategoryId',
   'handler',
   'partName',
-  'productType',
+  'productCategoryId',
+  'productSubcategoryId',
   'projectName',
   'responsibleDept',
   'supplierBrand',
@@ -85,6 +87,7 @@ interface UseAfterSalesGridParams {
   currentDateMode: Ref<'month' | 'week' | 'year'>;
   currentDateValue: ComputedRef<string> | Ref<string>;
   currentYear: ComputedRef<number> | Ref<number>;
+  defectOptions: Ref<QualityClassificationCategory[]>;
   statusOptions: Ref<StatusOption[]>;
   deptRawData: Ref<BaseTreeNode[]>;
   getAfterSalesListPage: (
@@ -98,6 +101,7 @@ interface UseAfterSalesGridParams {
     items: AfterSalesGridRow[];
     total: number;
   }) => void;
+  productOptions: Ref<QualityClassificationCategory[]>;
   t: (key: string, params?: Record<string, any>) => string;
 }
 
@@ -159,6 +163,7 @@ export function useAfterSalesGrid({
   currentDateMode,
   currentDateValue,
   currentYear,
+  defectOptions,
   statusOptions,
   deptRawData,
   getAfterSalesListPage,
@@ -167,6 +172,7 @@ export function useAfterSalesGrid({
   handleImport,
   handleSettleToKnowledge,
   onRowsChange,
+  productOptions,
   t,
 }: UseAfterSalesGridParams) {
   const statusOptionsList = computed(() =>
@@ -174,6 +180,12 @@ export function useAfterSalesGrid({
       label: opt.label,
       value: opt.value,
     })),
+  );
+  const defectCategoryOptions = computed(() =>
+    defectOptions.value.map((item) => ({ label: item.name, value: item.id })),
+  );
+  const productCategoryOptions = computed(() =>
+    productOptions.value.map((item) => ({ label: item.name, value: item.id })),
   );
 
   const exportAfterSalesAsXlsx =
@@ -531,22 +543,80 @@ export function useAfterSalesGrid({
       colProps: { span: 6 },
     },
     {
-      fieldName: 'defectType',
+      fieldName: 'defectCategoryId',
       label: t('qms.afterSales.form.defectType'),
       component: 'Select',
       componentProps: {
         allowClear: true,
-        options: QMS_DEFECT_OPTIONS.map((value) => ({ label: value, value })),
+        options: defectCategoryOptions,
       },
       colProps: { span: 6 },
     },
     {
-      fieldName: 'productType',
+      fieldName: 'defectSubcategoryId',
+      label: t('qms.afterSales.form.defectSubtype'),
+      component: 'Select',
+      dependencies: {
+        triggerFields: ['defectCategoryId'],
+        componentProps: (values: Record<string, unknown>) => ({
+          allowClear: true,
+          options: (
+            defectOptions.value.find(
+              (item) => item.id === String(values.defectCategoryId || ''),
+            )?.subcategories || []
+          ).map((item) => ({ label: item.name, value: item.id })),
+        }),
+        trigger: (values, actions) => {
+          const category = defectOptions.value.find(
+            (item) => item.id === String(values.defectCategoryId || ''),
+          );
+          const selected = String(values.defectSubcategoryId || '');
+          if (
+            selected &&
+            !category?.subcategories.some((item) => item.id === selected)
+          ) {
+            actions.setFieldValue('defectSubcategoryId', undefined);
+          }
+        },
+      },
+      colProps: { span: 6 },
+    },
+    {
+      fieldName: 'productCategoryId',
       label: t('qms.afterSales.form.productType'),
       component: 'Select',
       componentProps: {
         allowClear: true,
-        options: QMS_PRODUCT_OPTIONS.map((value) => ({ label: value, value })),
+        options: productCategoryOptions,
+      },
+      colProps: { span: 6 },
+    },
+    {
+      fieldName: 'productSubcategoryId',
+      label: t('qms.afterSales.form.productSubtype'),
+      component: 'Select',
+      dependencies: {
+        triggerFields: ['productCategoryId'],
+        componentProps: (values: Record<string, unknown>) => ({
+          allowClear: true,
+          options: (
+            productOptions.value.find(
+              (item) => item.id === String(values.productCategoryId || ''),
+            )?.subcategories || []
+          ).map((item) => ({ label: item.name, value: item.id })),
+        }),
+        trigger: (values, actions) => {
+          const category = productOptions.value.find(
+            (item) => item.id === String(values.productCategoryId || ''),
+          );
+          const selected = String(values.productSubcategoryId || '');
+          if (
+            selected &&
+            !category?.subcategories.some((item) => item.id === selected)
+          ) {
+            actions.setFieldValue('productSubcategoryId', undefined);
+          }
+        },
       },
       colProps: { span: 6 },
     },

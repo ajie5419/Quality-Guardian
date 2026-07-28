@@ -23,6 +23,22 @@ describe('after-sales list query', () => {
     });
   });
 
+  it('normalizes all quality classification ID filters', () => {
+    expect(
+      parseAfterSalesListQuery({
+        defectCategoryId: ' defect-primary ',
+        defectSubcategoryId: ' defect-secondary ',
+        productCategoryId: ' product-primary ',
+        productSubcategoryId: ' product-secondary ',
+      }),
+    ).toMatchObject({
+      defectCategoryId: 'defect-primary',
+      defectSubcategoryId: 'defect-secondary',
+      productCategoryId: 'product-primary',
+      productSubcategoryId: 'product-secondary',
+    });
+  });
+
   it('normalizes the expanded search filters and a valid date range', () => {
     expect(
       parseAfterSalesListQuery({

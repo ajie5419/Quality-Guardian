@@ -9,7 +9,9 @@ import {
   formatDate,
   QMS_DEFAULT_VALUES,
   QMS_STATUS_OPEN_SET,
+  QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -123,7 +125,10 @@ function buildTrendData(input: {
 
 function formatStatsResponse(input: {
   defectNames: Map<string, null | string>;
-  defectStats: Array<{ _count: { id: number }; defectTypeId: null | string }>;
+  defectStats: Array<{
+    _count: { id: number };
+    defectCategoryId: null | string;
+  }>;
   deptNames: Map<string, null | string>;
   deptStats: Array<{ _count: { id: number }; respDeptId: null | string }>;
   kpi: { avgTime: number; cost: number; open: number; total: number };
@@ -145,8 +150,9 @@ function formatStatsResponse(input: {
     defectDistribution: input.defectStats.map((s) =>
       createIdentityAggregateItem({
         canonicalName:
-          (s.defectTypeId && input.defectNames.get(s.defectTypeId)) || null,
-        id: s.defectTypeId,
+          (s.defectCategoryId && input.defectNames.get(s.defectCategoryId)) ||
+          null,
+        id: s.defectCategoryId,
         missingName: QMS_DEFAULT_VALUES.UNCLASSIFIED,
         value: s._count.id,
       }),
@@ -244,7 +250,7 @@ export const AfterSalesAnalyticsService = {
 
       const [defectStats, supplierStats, deptStats] = await Promise.all([
         prisma.after_sales.groupBy({
-          by: ['defectTypeId'],
+          by: ['defectCategoryId'],
           where: baseWhere,
           _count: { id: true },
         }),
@@ -264,10 +270,10 @@ export const AfterSalesAnalyticsService = {
       ]);
 
       const [defectNames, supplierNames, deptNames] = await Promise.all([
-        MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-          canonicalIds: defectStats.map((item) => item.defectTypeId),
-          configKey: 'defectType',
-        }),
+        QualityClassificationService.resolveCategoryNamesByIds(
+          QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+          defectStats.map((item) => item.defectCategoryId).filter(Boolean),
+        ),
         MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
           canonicalIds: supplierStats.map((item) => item.supplierBrandId),
           configKey: 'supplierBrand',

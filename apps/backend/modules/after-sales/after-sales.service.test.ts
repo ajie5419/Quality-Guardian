@@ -27,6 +27,34 @@ vi.mock('~/utils/canonical-master-data', () => ({
   },
 }));
 
+vi.mock('~/modules/quality-classification', () => {
+  const listForManagement = vi.fn().mockResolvedValue([
+    {
+      code: 'MINOR',
+      id: 'defect-minor',
+      name: 'Minor',
+      scope: 'AFTER_SALES_DEFECT',
+      sort: 0,
+      status: 1,
+      subcategories: [],
+    },
+  ]);
+  return {
+    QualityClassificationService: {
+      listForManagement,
+      resolveCategoryNamesByIds: vi.fn(async () => {
+        const categories = await listForManagement();
+        return new Map(
+          categories.map((item: { id: string; name: string }) => [
+            item.id,
+            item.name,
+          ]),
+        );
+      }),
+    },
+  };
+});
+
 describe('afterSalesService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -52,9 +80,9 @@ describe('afterSalesService', () => {
         return Promise.resolve([]);
       });
       (prisma.after_sales.groupBy as any).mockImplementation(({ by }: any) => {
-        if (by.includes('defectTypeId'))
+        if (by.includes('defectCategoryId'))
           return Promise.resolve([
-            { defectTypeId: 'defect-minor', _count: { id: 10 } },
+            { defectCategoryId: 'defect-minor', _count: { id: 10 } },
           ]);
         if (by.includes('supplierBrandId'))
           return Promise.resolve([
@@ -67,7 +95,6 @@ describe('afterSalesService', () => {
         return Promise.resolve([]);
       });
       (MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any)
-        .mockResolvedValueOnce(new Map([['defect-minor', 'Minor']]))
         .mockResolvedValueOnce(new Map([['supplier-a', 'Brand A']]))
         .mockResolvedValueOnce(new Map([['dept-quality', 'Quality']]));
 

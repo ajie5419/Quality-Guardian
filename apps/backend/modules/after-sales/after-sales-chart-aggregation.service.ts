@@ -13,8 +13,10 @@ import {
   createResolvedAggregateItem,
   formatDate,
   QMS_DEFAULT_VALUES,
+  QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
@@ -23,12 +25,18 @@ import { buildAfterSalesDateRange } from './after-sales-query';
 const CHART_DIMENSION_CONFIG: Record<
   Exclude<AfterSalesChartDimension, 'reportMonth'>,
   {
+    classification?: {
+      level: 'category' | 'subcategory';
+      scope:
+        | typeof QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT
+        | typeof QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT;
+    };
     field:
       | 'claimStatus'
-      | 'defectSubtypeId'
-      | 'defectTypeId'
-      | 'productSubtypeId'
-      | 'productTypeId'
+      | 'defectCategoryId'
+      | 'defectSubcategoryId'
+      | 'productCategoryId'
+      | 'productSubcategoryId'
       | 'respDeptId'
       | 'severity'
       | 'supplierBrandId';
@@ -36,15 +44,33 @@ const CHART_DIMENSION_CONFIG: Record<
   }
 > = {
   defectSubtype: {
-    field: 'defectSubtypeId',
-    governanceKey: 'defectSubtype',
+    field: 'defectSubcategoryId',
+    classification: {
+      level: 'subcategory',
+      scope: QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+    },
   },
-  defectType: { field: 'defectTypeId', governanceKey: 'defectType' },
+  defectType: {
+    field: 'defectCategoryId',
+    classification: {
+      level: 'category',
+      scope: QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+    },
+  },
   productSubtype: {
-    field: 'productSubtypeId',
-    governanceKey: 'productSubtype',
+    field: 'productSubcategoryId',
+    classification: {
+      level: 'subcategory',
+      scope: QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
+    },
   },
-  productType: { field: 'productTypeId', governanceKey: 'productType' },
+  productType: {
+    field: 'productCategoryId',
+    classification: {
+      level: 'category',
+      scope: QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
+    },
+  },
   responsibleDept: {
     field: 'respDeptId',
     governanceKey: 'responsibleDepartment',
@@ -189,7 +215,7 @@ export const AfterSalesChartAggregationService = {
       ...(conf.count ? { _count: { id: true } } : {}),
       ...(conf.sumFields.length > 0 ? { _sum: sumPayload } : {}),
     });
-    const canonicalNames = dimensionConfig.governanceKey
+    let canonicalNames = dimensionConfig.governanceKey
       ? await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
           canonicalIds: grouped.map((item) => {
             const source = item as Record<string, unknown>;
@@ -198,6 +224,24 @@ export const AfterSalesChartAggregationService = {
           configKey: dimensionConfig.governanceKey,
         })
       : new Map<string, null | string>();
+    if (dimensionConfig.classification) {
+      const ids = grouped
+        .map((item) => {
+          const source = item as Record<string, unknown>;
+          return source[byField] ? String(source[byField]) : null;
+        })
+        .filter(Boolean);
+      canonicalNames =
+        dimensionConfig.classification.level === 'category'
+          ? await QualityClassificationService.resolveCategoryNamesByIds(
+              dimensionConfig.classification.scope,
+              ids,
+            )
+          : await QualityClassificationService.resolveSubcategoryNamesByIds(
+              dimensionConfig.classification.scope,
+              ids,
+            );
+    }
 
     return grouped
       .map((item) => {
@@ -205,7 +249,7 @@ export const AfterSalesChartAggregationService = {
         const rawId = source[byField] ? String(source[byField]) : null;
         const value = getMetricValueFromGroupedItem(metric, source);
         const roundedValue = Number(value.toFixed(2));
-        return dimensionConfig.governanceKey
+        return dimensionConfig.governanceKey || dimensionConfig.classification
           ? createIdentityAggregateItem({
               canonicalName: rawId ? canonicalNames.get(rawId) : null,
               id: rawId,

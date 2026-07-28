@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildAfterSalesSearchParams } from './composables/useAfterSalesGrid';
-import { mapDictionaryOptionsToAfterSalesStatus } from './constants';
+import {
+  createInitialFormState,
+  mapDictionaryOptionsToAfterSalesStatus,
+} from './constants';
 
 describe('after-sales status dictionary mapping', () => {
   it('preserves fallback color when dictionary key matches', () => {
@@ -70,5 +73,30 @@ describe('after-sales status dictionary mapping', () => {
     });
     expect(params).not.toHaveProperty('startDate');
     expect(params).not.toHaveProperty('endDate');
+  });
+
+  it('keeps exact classification IDs in search parameters', () => {
+    expect(
+      buildAfterSalesSearchParams({
+        defectCategoryId: ' defect-category ',
+        defectSubcategoryId: ' defect-subcategory ',
+        productCategoryId: ' product-category ',
+        productSubcategoryId: ' product-subcategory ',
+      }),
+    ).toMatchObject({
+      defectCategoryId: 'defect-category',
+      defectSubcategoryId: 'defect-subcategory',
+      productCategoryId: 'product-category',
+      productSubcategoryId: 'product-subcategory',
+    });
+  });
+
+  it('does not hard-code quality classification defaults', () => {
+    expect(createInitialFormState()).toMatchObject({
+      defectCategoryId: undefined,
+      defectSubcategoryId: undefined,
+      productCategoryId: undefined,
+      productSubcategoryId: undefined,
+    });
   });
 });

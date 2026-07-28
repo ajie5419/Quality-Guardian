@@ -102,7 +102,7 @@ export const AfterSalesService = {
 
   async getVehicleFailureRecords(params: {
     end: Date;
-    productType: string;
+    productCategoryId: null | string;
     start: Date;
     vehicleDeptIds: string[];
   }) {
@@ -111,7 +111,7 @@ export const AfterSalesService = {
 
   async findEarliestVehicleFailureDate(params: {
     end: Date;
-    productType: string;
+    productCategoryId: null | string;
     vehicleDeptIds: string[];
   }) {
     return AfterSalesIntegrationService.findEarliestVehicleFailureDate(params);
@@ -203,11 +203,15 @@ export const AfterSalesService = {
     const {
       dateMode,
       dateValue,
+      defectCategoryId,
+      defectSubcategoryId,
       defectType,
       endDate,
       handler,
       partName,
       projectName,
+      productCategoryId,
+      productSubcategoryId,
       productType,
       responsibleDept,
       status,
@@ -263,11 +267,21 @@ export const AfterSalesService = {
     if (handler && String(handler).trim() !== '') {
       where.handler = { contains: String(handler).trim() };
     }
-    if (productType && String(productType).trim() !== '') {
+    if (productCategoryId && String(productCategoryId).trim() !== '') {
+      where.productCategoryId = String(productCategoryId).trim();
+    } else if (productType && String(productType).trim() !== '') {
       where.productType = { contains: String(productType).trim() };
     }
-    if (defectType && String(defectType).trim() !== '') {
+    if (productSubcategoryId && String(productSubcategoryId).trim() !== '') {
+      where.productSubcategoryId = String(productSubcategoryId).trim();
+    }
+    if (defectCategoryId && String(defectCategoryId).trim() !== '') {
+      where.defectCategoryId = String(defectCategoryId).trim();
+    } else if (defectType && String(defectType).trim() !== '') {
       where.defectType = { contains: String(defectType).trim() };
+    }
+    if (defectSubcategoryId && String(defectSubcategoryId).trim() !== '') {
+      where.defectSubcategoryId = String(defectSubcategoryId).trim();
     }
     if (responsibleDept && String(responsibleDept).trim() !== '') {
       const searchTerm = String(responsibleDept).trim();
@@ -336,8 +350,12 @@ export const AfterSalesService = {
         laborTravelCost,
         qualityLoss: materialCost + laborTravelCost,
         photos: tryParsePhotos(item.photos as string),
+        defectCategoryId: item.defectCategoryId || undefined,
+        defectSubcategoryId: item.defectSubcategoryId || undefined,
         productType: item.productType || '',
         productSubtype: item.productSubtype || '',
+        productCategoryId: item.productCategoryId || undefined,
+        productSubcategoryId: item.productSubcategoryId || undefined,
         division: item.division || '',
         partName: item.partName || '',
         supplierBrand: item.supplierBrand || '',
