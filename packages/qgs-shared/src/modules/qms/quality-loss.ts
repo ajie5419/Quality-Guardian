@@ -1,3 +1,5 @@
+import type { IdentityAggregateItem } from '../../domain-modules/qms/identity-aggregate';
+
 export interface QualityLossItem {
   actualClaim: number;
   amount: number;
@@ -12,6 +14,8 @@ export interface QualityLossItem {
   projectId?: null | string;
   projectName: null | string;
   responsibleDepartment: null | string;
+  responsibleDepartmentId?: null | string;
+  responsibleDepartmentResolutionStatus?: 'INVALID' | 'MISSING' | 'RESOLVED';
   status: string;
   type?: string;
   workOrderNumber: null | string;
@@ -47,7 +51,7 @@ export interface QualityLossDashboardSummary {
 }
 
 export interface QualityLossCharts {
-  deptDistribution: Array<{ name: string; value: number }>;
+  deptDistribution: IdentityAggregateItem[];
   trend: Array<{
     claimAmount: number;
     period: number;

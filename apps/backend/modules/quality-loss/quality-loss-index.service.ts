@@ -26,11 +26,14 @@ interface AfterSalesInput {
   laborTravelCost?: null | number | Prisma.Decimal;
   materialCost?: null | number | Prisma.Decimal;
   occurDate: Date;
+  partId?: null | string;
   partName?: null | string;
   productSubtype?: null | string;
   productType?: null | string;
   projectName: null | string;
+  projectId?: null | string;
   respDept: null | string;
+  respDeptId?: null | string;
   supplierBrandId?: null | string;
   workOrderNumber: null | string;
 }
@@ -42,10 +45,13 @@ interface InternalInput {
   id: string;
   isDeleted: boolean;
   lossAmount?: null | number | Prisma.Decimal;
+  partId?: null | string;
   partName?: null | string;
+  projectId?: null | string;
   projectName: null | string;
   recoveredAmount?: null | number | Prisma.Decimal;
   responsibleDepartment: null | string;
+  responsibleDepartmentId?: null | string;
   status: null | string;
   workOrderNumber: null | string;
 }
@@ -60,10 +66,13 @@ interface CommissioningInput {
   isClaim?: boolean;
   isDeleted: boolean;
   lossAmount?: null | number | Prisma.Decimal;
+  partId?: null | string;
   partName?: null | string;
+  projectId?: null | string;
   projectName: null | string;
   recoveredAmount?: null | number | Prisma.Decimal;
   responsibleDepartment: null | string;
+  responsibleDepartmentId?: null | string;
   workOrderNumber: null | string;
 }
 
@@ -75,9 +84,12 @@ interface ManualInput {
   id: string;
   isDeleted: boolean;
   occurDate: Date;
+  partId?: null | string;
   partName: null | string;
+  projectId?: null | string;
   projectName: null | string;
   respDept: null | string;
+  respDeptId?: null | string;
   status: null | string;
   type: null | string;
   workOrderNumber: null | string;
@@ -135,9 +147,12 @@ export const QualityLossIndexService = {
       amount,
       actualClaim: num(row.actualClaim),
       status: row.claimStatus || 'OPEN',
+      projectId: row.projectId ?? null,
       projectName: row.projectName,
       workOrderNumber: row.workOrderNumber,
       respDept: row.respDept,
+      respDeptId: row.respDeptId ?? null,
+      partId: row.partId ?? null,
       partName: row.partName || row.productSubtype || row.productType || null,
       description: row.issueDescription || null,
       supplierBrandId: row.supplierBrandId ?? null,
@@ -162,9 +177,12 @@ export const QualityLossIndexService = {
       amount,
       actualClaim: num(row.recoveredAmount),
       status: row.status || 'OPEN',
+      projectId: row.projectId ?? null,
       projectName: row.projectName,
       workOrderNumber: row.workOrderNumber,
       respDept: row.responsibleDepartment,
+      respDeptId: row.responsibleDepartmentId ?? null,
+      partId: row.partId ?? null,
       partName: row.partName || null,
       description: row.description || null,
       supplierBrandId: null,
@@ -190,9 +208,12 @@ export const QualityLossIndexService = {
       amount,
       actualClaim: num(row.recoveredAmount),
       status: row.claimStatus || 'OPEN',
+      projectId: row.projectId ?? null,
       projectName: row.projectName,
       workOrderNumber: row.workOrderNumber,
       respDept: row.responsibleDepartment,
+      respDeptId: row.responsibleDepartmentId ?? null,
+      partId: row.partId ?? null,
       partName: row.partName || null,
       description: row.claimNotes || row.description || null,
       supplierBrandId: null,
@@ -218,9 +239,12 @@ export const QualityLossIndexService = {
       actualClaim: num(row.actualClaim),
       status: row.status || 'Pending',
       lossType: row.type,
+      projectId: row.projectId ?? null,
       projectName: row.projectName,
       workOrderNumber: row.workOrderNumber,
       respDept: row.respDept,
+      respDeptId: row.respDeptId ?? null,
+      partId: row.partId ?? null,
       partName: row.partName,
       description: row.description || null,
       supplierBrandId: null,
@@ -291,10 +315,13 @@ export const QualityLossIndexService = {
           id: row.id,
           isDeleted: row.isDeleted,
           lossAmount: row.lossAmount,
+          partId: row.partId,
           partName: row.partName,
+          projectId: row.projectId,
           projectName: row.projectName,
           recoveredAmount: row.recoveredAmount,
           responsibleDepartment: row.responsibleDepartment,
+          responsibleDepartmentId: row.responsibleDepartmentId,
           status: row.status,
           workOrderNumber: row.workOrderNumber,
         });
@@ -352,9 +379,15 @@ export const QualityLossIndexService = {
           id: row.id,
           isDeleted: row.isDeleted,
           occurDate: row.occurDate,
+          partId: row.partId,
+          partName: row.partName,
+          projectId: row.projectId,
+          projectName: row.projectName,
           respDept: row.respDept,
+          respDeptId: row.respDeptId,
           status: row.status,
           type: row.type,
+          workOrderNumber: row.workOrderNumber,
         });
       }
       processed += rows.length;

@@ -36,11 +36,8 @@ export const QualityLossDataScopeService = {
             userContext.userId,
             'supplier',
           );
-    const deptCandidates = await DataScopeService.getDeptCandidates(
-      deptSource.deptIds,
-    );
     return items.filter((item) =>
-      deptCandidates.includes(String(item.responsibleDepartment || '')),
+      deptSource.deptIds.includes(String(item.responsibleDepartmentId || '')),
     );
   },
 

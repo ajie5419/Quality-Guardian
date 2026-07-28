@@ -28,6 +28,14 @@ vi.mock('~/modules/dept/dept-tree', () => ({
   flattenDeptTree: () => [],
 }));
 
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNamesByIds: vi
+      .fn()
+      .mockResolvedValue(new Map([['dept-qa', 'Quality']])),
+  },
+}));
+
 vi.mock('~/utils/logger', () => ({
   createModuleLogger: () => ({
     error: vi.fn(),
@@ -63,6 +71,7 @@ function indexRow(overrides: Partial<Record<string, unknown>> = {}) {
     partName: 'Bolt',
     projectName: 'P',
     respDept: 'QA',
+    respDeptId: 'dept-qa',
     source: 'External',
     sourcePk: 'as-1',
     status: 'OPEN',
@@ -102,6 +111,13 @@ describe('qualityLossService', () => {
         'External',
         'Internal',
       ]);
+      expect(result.items[0]).toEqual(
+        expect.objectContaining({
+          responsibleDepartment: 'Quality',
+          responsibleDepartmentId: 'dept-qa',
+          responsibleDepartmentResolutionStatus: 'RESOLVED',
+        }),
+      );
     });
 
     it('applies lossSource filter to where clause', async () => {

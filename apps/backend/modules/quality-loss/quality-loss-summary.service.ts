@@ -71,14 +71,34 @@ export const QualityLossSummaryService = {
       return new Date(time).getFullYear() === targetYear;
     });
 
-    const deptMap = new Map<string, number>();
+    const deptMap = new Map<
+      null | string,
+      {
+        name: string;
+        resolutionStatus: 'INVALID' | 'MISSING' | 'RESOLVED';
+        value: number;
+      }
+    >();
     for (const item of filteredByYear) {
-      const name = String(item.responsibleDepartment || '未指定部门');
+      const id = String(item.responsibleDepartmentId || '').trim() || null;
       const amount = Number(item.amount) || 0;
-      deptMap.set(name, (deptMap.get(name) || 0) + amount);
+      const current = deptMap.get(id) || {
+        name: String(item.responsibleDepartment || ''),
+        resolutionStatus:
+          item.responsibleDepartmentResolutionStatus ||
+          (id ? 'INVALID' : 'MISSING'),
+        value: 0,
+      };
+      current.value += amount;
+      deptMap.set(id, current);
     }
     const deptDistribution = [...deptMap.entries()]
-      .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
+      .map(([id, item]) => ({
+        id,
+        name: item.name,
+        resolutionStatus: item.resolutionStatus,
+        value: Number(item.value.toFixed(2)),
+      }))
       .sort((a, b) => b.value - a.value);
 
     const trendMap = new Map<

@@ -10,12 +10,12 @@ import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service'
 import type { QualityLossQueryParams, TrendRow } from './quality-loss-format';
 
 import { Prisma } from '@prisma/client';
+import { createIdentityAggregateItem, QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
-import { flattenDeptTree } from '~/modules/dept/dept-tree';
-import { DeptService } from '~/modules/dept/dept.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { parsePagination } from '~/utils/query-helpers';
@@ -49,29 +49,26 @@ async function resolveTrendRows(
   }
 }
 
-async function getDeptNameMapper() {
-  const deptTree =
-    (await DeptService.findAll().catch((error: unknown) => {
-      logger.warn(
-        { err: error },
-        'DeptService.findAll failed, fallback to raw dept id',
-      );
-      return [];
-    })) || [];
-  const deptMap = new Map<string, string>();
-  for (const node of flattenDeptTree(deptTree)) deptMap.set(node.id, node.name);
-  return (id: null | string | undefined) => {
-    if (!id) return null;
-    return deptMap.get(id) || id;
-  };
-}
-
 async function applyDeptNames(items: QualityLossItem[]) {
-  const getDeptName = await getDeptNameMapper();
-  return items.map((item) => ({
-    ...item,
-    responsibleDepartment: getDeptName(item.responsibleDepartment),
-  }));
+  const names = await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+    canonicalIds: items.map((item) => item.responsibleDepartmentId),
+    configKey: 'responsibleDepartment',
+  });
+  return items.map((item) => {
+    const identity = createIdentityAggregateItem({
+      canonicalName: item.responsibleDepartmentId
+        ? names.get(item.responsibleDepartmentId)
+        : null,
+      id: item.responsibleDepartmentId,
+      missingName: QMS_DEFAULT_VALUES.UNASSIGNED,
+      value: 0,
+    });
+    return {
+      ...item,
+      responsibleDepartment: identity.name,
+      responsibleDepartmentResolutionStatus: identity.resolutionStatus,
+    };
+  });
 }
 
 async function buildScopedIndexWhere(

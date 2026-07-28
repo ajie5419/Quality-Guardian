@@ -4,7 +4,6 @@ import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 vi.mock('~/modules/data-scope/data-scope.service', () => ({
   DataScopeService: {
     buildQualityLossWhere: vi.fn(),
-    getDeptCandidates: vi.fn(),
     getScopeForModule: vi.fn(),
   },
 }));
@@ -54,20 +53,31 @@ describe('quality-loss-data-scope.service', () => {
       deptIds: ['d1'],
       scopeType: 'DEPT',
     } as never);
-    vi.mocked(DataScopeService.getDeptCandidates).mockResolvedValue([
-      'QA',
-    ] as never);
-
     const items = [
-      { amount: 1, responsibleDepartment: 'QA' },
-      { amount: 2, responsibleDepartment: 'ENG' },
+      {
+        amount: 1,
+        responsibleDepartment: 'QA',
+        responsibleDepartmentId: 'd1',
+      },
+      {
+        amount: 2,
+        responsibleDepartment: 'ENG',
+        responsibleDepartmentId: 'd2',
+      },
+      { amount: 3, responsibleDepartment: 'QA' },
     ] as any[];
 
     const result = await QualityLossDataScopeService.apply(items, {
       userId: 'u-1',
     });
 
-    expect(result).toEqual([{ amount: 1, responsibleDepartment: 'QA' }]);
+    expect(result).toEqual([
+      {
+        amount: 1,
+        responsibleDepartment: 'QA',
+        responsibleDepartmentId: 'd1',
+      },
+    ]);
   });
 
   it('should fallback to supplier scope for CUSTOM type', async () => {
@@ -78,20 +88,30 @@ describe('quality-loss-data-scope.service', () => {
     vi.mocked(DataScopeService.getScopeForModule)
       .mockResolvedValueOnce({ deptIds: ['d1'], scopeType: 'CUSTOM' } as never)
       .mockResolvedValueOnce({ deptIds: ['d2'], scopeType: 'DEPT' } as never);
-    vi.mocked(DataScopeService.getDeptCandidates).mockResolvedValue([
-      'ENG',
-    ] as never);
-
     const items = [
-      { amount: 1, responsibleDepartment: 'QA' },
-      { amount: 2, responsibleDepartment: 'ENG' },
+      {
+        amount: 1,
+        responsibleDepartment: 'QA',
+        responsibleDepartmentId: 'd1',
+      },
+      {
+        amount: 2,
+        responsibleDepartment: 'ENG',
+        responsibleDepartmentId: 'd2',
+      },
     ] as any[];
 
     const result = await QualityLossDataScopeService.apply(items, {
       userId: 'u-1',
     });
 
-    expect(result).toEqual([{ amount: 2, responsibleDepartment: 'ENG' }]);
+    expect(result).toEqual([
+      {
+        amount: 2,
+        responsibleDepartment: 'ENG',
+        responsibleDepartmentId: 'd2',
+      },
+    ]);
   });
 
   it('should sort filtered items via sortFilteredByScope', async () => {
@@ -103,14 +123,17 @@ describe('quality-loss-data-scope.service', () => {
       deptIds: ['d1'],
       scopeType: 'DEPT',
     } as never);
-    vi.mocked(DataScopeService.getDeptCandidates).mockResolvedValue([
-      'QA',
-      'ENG',
-    ] as never);
-
     const items = [
-      { amount: 2, responsibleDepartment: 'ENG' },
-      { amount: 1, responsibleDepartment: 'QA' },
+      {
+        amount: 2,
+        responsibleDepartment: 'ENG',
+        responsibleDepartmentId: 'd1',
+      },
+      {
+        amount: 1,
+        responsibleDepartment: 'QA',
+        responsibleDepartmentId: 'd1',
+      },
     ] as any[];
 
     const result = await QualityLossDataScopeService.sortFilteredByScope(
@@ -120,8 +143,16 @@ describe('quality-loss-data-scope.service', () => {
     );
 
     expect(result).toEqual([
-      { amount: 1, responsibleDepartment: 'QA' },
-      { amount: 2, responsibleDepartment: 'ENG' },
+      {
+        amount: 1,
+        responsibleDepartment: 'QA',
+        responsibleDepartmentId: 'd1',
+      },
+      {
+        amount: 2,
+        responsibleDepartment: 'ENG',
+        responsibleDepartmentId: 'd1',
+      },
     ]);
   });
 

@@ -75,7 +75,10 @@ function refreshCharts() {
         emphasis: {
           label: { show: true, fontSize: '16', fontWeight: 'bold' },
         },
-        data: props.chartData.deptDistribution,
+        data: props.chartData.deptDistribution.map((item) => ({
+          name: item.name,
+          value: item.value,
+        })),
       },
     ],
   });
