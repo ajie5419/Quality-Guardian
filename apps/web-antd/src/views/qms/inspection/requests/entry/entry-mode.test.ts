@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapInspectionRequestEntryTeamOptions } from './entry-mode';
+import {
+  buildInspectionRequestEntryProcessOptions,
+  mapInspectionRequestEntryBomPartOptions,
+  mapInspectionRequestEntryTeamOptions,
+} from './entry-mode';
 
 describe('inspection request entry identity options', () => {
   it('keeps canonical TEAM IDs as selector values', () => {
@@ -17,6 +21,39 @@ describe('inspection request entry identity options', () => {
       {
         label: '外协加工单位',
         options: [{ label: 'Resident Team', value: 'team-2' }],
+      },
+    ]);
+  });
+
+  it('uses canonical part IDs instead of names or BOM row IDs', () => {
+    expect(
+      mapInspectionRequestEntryBomPartOptions([
+        {
+          partId: 'part-1',
+          partName: 'Frame',
+          partNumber: 'P-001',
+        },
+        { partId: null, partName: 'Legacy', partNumber: 'P-002' },
+      ]),
+    ).toEqual([
+      {
+        label: 'Frame (P-001)',
+        partName: 'Frame',
+        value: 'part-1',
+      },
+    ]);
+  });
+
+  it('uses process master IDs and does not synthesize name values', () => {
+    expect(
+      buildInspectionRequestEntryProcessOptions([
+        { processId: 'process-1', processName: 'Welding' },
+      ]),
+    ).toEqual([
+      {
+        label: 'Welding',
+        processName: 'Welding',
+        value: 'process-1',
       },
     ]);
   });

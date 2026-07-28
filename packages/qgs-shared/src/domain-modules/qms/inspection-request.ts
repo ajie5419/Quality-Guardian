@@ -446,6 +446,7 @@ export interface InspectionRecordPayloadInput {
     closeRemark?: null | string;
     componentName?: null | string;
     mutualCheckResult: string;
+    partId?: null | string;
     partName: string;
     processName: string;
     quantity?: number;
@@ -528,6 +529,8 @@ export function buildInspectionRecordPayloadCore(
           ],
     projectName:
       input.request.work_order?.projectName || input.request.workOrderNumber,
+    partId: normalizeInspectionRequestText(input.request.partId),
+    partName: input.request.partName,
     quantity,
     qualifiedQuantity:
       typeof input.body.qualifiedQuantity === 'string' ||

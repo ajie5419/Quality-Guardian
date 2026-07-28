@@ -59,8 +59,10 @@ export interface InspectionRequest {
   linkedIssueNo?: null | string;
   linkedIssueStatus?: null | string;
   mutualCheckResult: InspectionRequestCheckResult;
+  partId?: null | string;
   partName: string;
   priority: number;
+  processId?: null | string;
   processName: string;
   qualifiedQuantity?: null | number;
   quantity: number;
@@ -82,10 +84,11 @@ export interface InspectionRequest {
 
 export interface CreateInspectionRequestParams {
   attachments: InspectionRequestAttachment[];
+  category: 'INCOMING' | 'PROCESS';
   componentName?: string;
   mutualCheckResult?: InspectionRequestCheckResult;
-  partName: string;
-  processName: string;
+  partId: string;
+  processId: string;
   quantity: number;
   reporter: string;
   requestInfo?: string;

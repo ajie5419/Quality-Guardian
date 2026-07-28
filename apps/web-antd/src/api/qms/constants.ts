@@ -27,8 +27,10 @@ export const QMS_API = {
   INSPECTION_RECORDS: '/qms/inspection/records',
   INSPECTION_RECORDS_BATCH_DELETE: '/qms/inspection/records/batch-delete',
   INSPECTION_REQUESTS: '/qms/inspection/requests',
+  INSPECTION_REQUESTS_V2: '/qms/inspection/requests/v2',
   INSPECTION_REQUESTS_STATS: '/qms/inspection/requests/stats',
   PUBLIC_INSPECTION_REQUESTS: '/qms/public/inspection/requests',
+  PUBLIC_INSPECTION_REQUESTS_V2: '/qms/public/inspection/requests/v2',
   PUBLIC_INSPECTION_REQUEST_PROCESSES:
     '/qms/public/inspection/requests/processes',
   PUBLIC_INSPECTION_REQUEST_PROCESS_DICTIONARY_OPTIONS:

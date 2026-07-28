@@ -57,6 +57,16 @@ vi.mock('~/utils/governed-write', () => ({
   buildGovernedWriteFieldsForTable: (_table: string, fields: any) => fields,
 }));
 
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNameById: vi.fn(({ configKey }: { configKey: string }) =>
+      Promise.resolve(
+        configKey === 'partName' ? 'Canonical Part' : 'Canonical Process',
+      ),
+    ),
+  },
+}));
+
 vi.mock('~/utils/process-resolver', () => ({
   resolveCanonicalProcessName: (item: any) => item.processName || '',
 }));
@@ -185,6 +195,45 @@ describe('workOrderRequirementRouteService', () => {
           mockUserinfo(),
         ),
       ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
+    });
+
+    it('rebuilds V2 names from canonical IDs', async () => {
+      const { WorkOrderRequirementService } = await import(
+        '~/modules/work-order-requirement/work-order-requirement.service'
+      );
+      (WorkOrderRequirementService.createMany as any).mockResolvedValue([
+        { id: 'new-1', workOrderNumber: 'WO-001', requirementName: 'Req1' },
+      ]);
+      vi.mocked(buildGovernedCanonicalWritePairForTable).mockResolvedValue({
+        partId: 'part-1',
+        processId: 'process-1',
+      });
+
+      await WorkOrderRequirementRouteService.createRequirements(
+        mockEvent(),
+        [
+          {
+            identityContractVersion: 2,
+            partId: 'part-1',
+            processId: 'process-1',
+            requirementName: 'Quality',
+            workOrderNumber: 'WO-001',
+          },
+        ],
+        mockUserinfo(),
+      );
+
+      expect(WorkOrderRequirementService.createMany).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            partId: 'part-1',
+            partName: 'Canonical Part',
+            processId: 'process-1',
+            processName: 'Canonical Process',
+          }),
+        ],
+        expect.any(Object),
+      );
     });
 
     it('should reject creation when self scope has no department fallback', async () => {

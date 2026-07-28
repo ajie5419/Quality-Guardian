@@ -69,16 +69,43 @@ function toItem(record: {
 
 export const InspectionPublicQueryService = {
   async getPublicProcesses(workOrderNumber: string) {
-    const list = await prisma.work_order_requirements.findMany({
-      where: { isDeleted: false, status: 'active', workOrderNumber },
-      orderBy: [{ updatedAt: 'desc' }],
-      select: { process: { select: { name: true } }, processName: true },
-    });
-    return [
-      ...new Set(
-        list.map((item) => resolveCanonicalProcessName(item)).filter(Boolean),
-      ),
-    ].map((processName) => ({ processName }));
+    const [requirements, incomingProcess] = await Promise.all([
+      prisma.work_order_requirements.findMany({
+        where: {
+          isDeleted: false,
+          processId: { not: null },
+          status: 'active',
+          workOrderNumber,
+        },
+        orderBy: [{ updatedAt: 'desc' }],
+        select: {
+          processId: true,
+          process: { select: { name: true } },
+          processName: true,
+        },
+      }),
+      prisma.processes.findFirst({
+        where: {
+          isDeleted: false,
+          name: INCOMING_INSPECTION_PROCESS_NAME,
+          status: 1,
+        },
+        select: { id: true, name: true },
+      }),
+    ]);
+    const identities = new Map<string, string>();
+    for (const item of requirements) {
+      const processId = String(item.processId || '').trim();
+      const processName = resolveCanonicalProcessName(item);
+      if (processId && processName) identities.set(processId, processName);
+    }
+    if (incomingProcess) {
+      identities.set(incomingProcess.id, incomingProcess.name);
+    }
+    return [...identities].map(([processId, processName]) => ({
+      processId,
+      processName,
+    }));
   },
 
   async getPublicBomParts(workOrderNumber: string) {
@@ -87,6 +114,7 @@ export const InspectionPublicQueryService = {
       orderBy: [{ part_number: 'asc' }, { created_at: 'desc' }],
       select: {
         id: true,
+        partId: true,
         part_name: true,
         part_number: true,
         work_order_number: true,
@@ -94,6 +122,7 @@ export const InspectionPublicQueryService = {
     });
     return list.map((item) => ({
       id: item.id,
+      partId: item.partId,
       partName: item.part_name,
       partNumber: item.part_number,
       workOrderNumber: item.work_order_number,
@@ -160,8 +189,7 @@ export const InspectionPublicQueryService = {
     const divisionIds = [
       ...new Set(
         items
-          .flatMap((item) => [item.division, item.divisionId])
-          .map((item) => String(item || '').trim())
+          .map((item) => String(item.divisionId || '').trim())
           .filter((item) => item.startsWith('dept-')),
       ),
     ];
@@ -178,7 +206,6 @@ export const InspectionPublicQueryService = {
     return {
       items: items.map((item) => {
         const division =
-          departmentNameById.get(String(item.division || '')) ||
           departmentNameById.get(String(item.divisionId || '')) ||
           item.division ||
           null;

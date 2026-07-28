@@ -189,8 +189,11 @@ export async function uploadWorkOrderRequirements(data: {
   requirements: Array<
     WorkOrderRequirementTeamIdentity & {
       attachments?: WorkOrderRequirementAttachment[];
+      identityContractVersion?: 2;
       items?: unknown[];
+      partId?: string;
       partName?: string;
+      processId?: string;
       processName?: string;
       requirementName: string;
       responsiblePerson?: string;
@@ -221,8 +224,11 @@ export async function updateWorkOrderRequirement(
   id: string,
   data: {
     attachments?: WorkOrderRequirementAttachment[];
+    identityContractVersion?: 2;
     items?: unknown[];
+    partId?: null | string;
     partName?: null | string;
+    processId?: null | string;
     processName?: null | string;
     requirementName?: string;
     responsiblePerson?: null | string;

@@ -20,8 +20,14 @@ interface WorkOrderItem {
 
 interface BomPartItem {
   id: string;
+  partId?: null | string;
   partName: string;
   partNumber: string;
+}
+
+interface ProcessItem {
+  processId: string;
+  processName: string;
 }
 
 interface TeamItem {
@@ -37,11 +43,14 @@ interface AttachmentItem {
 
 interface FormState {
   workOrderNumber: string;
+  processId: string;
   processName: string;
   componentName: string;
+  partId: string;
   partName: string;
   quantity: null | number;
   team: string;
+  teamId: string;
   reporter: string;
   selfCheckResult: string;
   mutualCheckResult: string;
@@ -56,11 +65,14 @@ const userStore = useUserStore();
 
 const form = reactive<FormState>({
   workOrderNumber: '',
+  processId: '',
   processName: '',
   componentName: '',
+  partId: '',
   partName: '',
   quantity: null,
   team: '',
+  teamId: '',
   reporter: '',
   selfCheckResult: '',
   mutualCheckResult: '',
@@ -86,7 +98,7 @@ const searchingWorkOrder = ref(false);
 let searchTimer: null | ReturnType<typeof setTimeout> = null;
 
 // Cascade data
-const processList = ref<string[]>([]);
+const processList = ref<ProcessItem[]>([]);
 const bomPartList = ref<BomPartItem[]>([]);
 const teamList = ref<TeamItem[]>([]);
 
@@ -100,6 +112,9 @@ const mutualCheckIndex = ref(-1);
 // Derived picker range labels
 const bomPartLabels = computed(() =>
   bomPartList.value.map((p) => `${p.partName} (${p.partNumber})`),
+);
+const processLabels = computed(() =>
+  processList.value.map((item) => item.processName),
 );
 const teamLabels = computed(() => teamList.value.map((t) => t.label));
 
@@ -172,8 +187,10 @@ async function selectWorkOrder(item: WorkOrderItem) {
 
   // Clear downstream selections
   form.processName = '';
+  form.processId = '';
   form.componentName = '';
   form.partName = '';
+  form.partId = '';
   processIndex.value = -1;
   bomPartIndex.value = -1;
   processList.value = [];
@@ -185,7 +202,7 @@ async function selectWorkOrder(item: WorkOrderItem) {
     getBomParts(item.workOrderNumber),
   ]);
   if (procRes.code === 0 && Array.isArray(procRes.data)) {
-    processList.value = procRes.data.map((p) => p.processName);
+    processList.value = procRes.data;
   }
   if (partsRes.code === 0 && Array.isArray(partsRes.data)) {
     bomPartList.value = partsRes.data;
@@ -195,10 +212,12 @@ async function selectWorkOrder(item: WorkOrderItem) {
 function onProcessChange(e: { detail: { value: string } }) {
   const idx = Number(e.detail.value);
   processIndex.value = idx;
-  form.processName = processList.value[idx] ?? '';
+  form.processId = processList.value[idx]?.processId ?? '';
+  form.processName = processList.value[idx]?.processName ?? '';
   errors.processName = false;
   // Reset component/part when process changes
   form.componentName = '';
+  form.partId = '';
   form.partName = '';
   bomPartIndex.value = -1;
 }
@@ -208,6 +227,7 @@ function onBomPartChange(e: { detail: { value: string } }) {
   bomPartIndex.value = idx;
   const part = bomPartList.value[idx];
   if (part) {
+    form.partId = part.partId ?? '';
     form.componentName = part.partName;
     form.partName = part.partName;
     errors.componentName = false;
@@ -217,7 +237,8 @@ function onBomPartChange(e: { detail: { value: string } }) {
 function onTeamChange(e: { detail: { value: string } }) {
   const idx = Number(e.detail.value);
   teamIndex.value = idx;
-  form.team = teamList.value[idx]?.value ?? '';
+  form.teamId = teamList.value[idx]?.value ?? '';
+  form.team = teamList.value[idx]?.label ?? '';
   errors.team = false;
 }
 
@@ -280,10 +301,11 @@ function handleRemovePhoto(index: number) {
 
 function validate(): boolean {
   errors.workOrderNumber = !form.workOrderNumber;
-  errors.processName = !form.processName;
-  errors.componentName = componentRequired.value && !form.componentName;
+  errors.processName = !form.processId || !form.processName;
+  errors.componentName =
+    !form.partId || (componentRequired.value && !form.componentName);
   errors.reporter = !form.reporter.trim();
-  errors.team = !form.team;
+  errors.team = !form.teamId;
   errors.attachments = form.attachments.length === 0;
   return (
     !errors.workOrderNumber &&
@@ -305,15 +327,16 @@ async function handleSubmit() {
   uni.showLoading({ title: '提交中...' });
   try {
     const payload: Record<string, unknown> = {
+      category: 'PROCESS',
       workOrderNumber: form.workOrderNumber,
-      processName: form.processName,
+      partId: form.partId,
+      processId: form.processId,
       reporter: form.reporter.trim(),
-      team: form.team,
+      teamId: form.teamId,
       attachments: form.attachments,
     };
     if (form.quantity !== null) payload.quantity = form.quantity;
     if (form.componentName) payload.componentName = form.componentName;
-    if (form.partName) payload.partName = form.partName;
     if (form.selfCheckResult) payload.selfCheckResult = form.selfCheckResult;
     if (form.mutualCheckResult)
       payload.mutualCheckResult = form.mutualCheckResult;
@@ -382,7 +405,7 @@ async function handleSubmit() {
           <picker
             class="picker"
             mode="selector"
-            :range="processList"
+            :range="processLabels"
             :value="processIndex"
             :disabled="processList.length === 0"
             @change="onProcessChange"

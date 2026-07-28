@@ -122,7 +122,7 @@ export async function createInspectionRequest(
   data: CreateInspectionRequestParams,
 ) {
   return requestClient.post<InspectionRequest>(
-    QMS_API.INSPECTION_REQUESTS,
+    QMS_API.INSPECTION_REQUESTS_V2,
     data,
   );
 }
@@ -131,7 +131,7 @@ export async function createPublicInspectionRequest(
   data: CreateInspectionRequestParams,
 ) {
   return publicRequestClient.post<InspectionRequest>(
-    QMS_API.PUBLIC_INSPECTION_REQUESTS,
+    QMS_API.PUBLIC_INSPECTION_REQUESTS_V2,
     data,
   );
 }
@@ -139,10 +139,9 @@ export async function createPublicInspectionRequest(
 export async function getPublicInspectionRequestProcesses(params: {
   workOrderNumber: string;
 }) {
-  return publicRequestClient.get<Array<{ processName: string }>>(
-    QMS_API.PUBLIC_INSPECTION_REQUEST_PROCESSES,
-    { params },
-  );
+  return publicRequestClient.get<
+    Array<{ processId: string; processName: string }>
+  >(QMS_API.PUBLIC_INSPECTION_REQUEST_PROCESSES, { params });
 }
 
 export async function getPublicInspectionRequestProcessDictionaryOptions() {
@@ -153,6 +152,7 @@ export async function getPublicInspectionRequestProcessDictionaryOptions() {
 
 export interface PublicInspectionRequestBomPart {
   id: string;
+  partId?: null | string;
   partName: string;
   partNumber?: null | string;
   workOrderNumber: string;

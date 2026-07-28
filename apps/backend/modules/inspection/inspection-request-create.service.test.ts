@@ -43,6 +43,16 @@ vi.mock('~/utils/governed-write', () => ({
   buildGovernedWriteFieldsForTable: vi.fn().mockReturnValue({}),
 }));
 
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNameById: vi.fn(({ configKey }: { configKey: string }) =>
+      Promise.resolve(
+        configKey === 'partName' ? 'Canonical Part' : 'Canonical Process',
+      ),
+    ),
+  },
+}));
+
 vi.mock('~/utils/process-resolver', () => ({
   resolveCanonicalProcessName: vi.fn().mockReturnValue(''),
   resolveProcessIdForWrite: vi.fn().mockResolvedValue('process-1'),
@@ -115,6 +125,48 @@ describe('inspectionRequestCreateService', () => {
     expect(result).toBeDefined();
     expect(result.id).toBe('req-1');
     expect(prisma.$transaction).toHaveBeenCalled();
+  });
+
+  it('uses V2 IDs to rebuild canonical names', async () => {
+    const { buildGovernedCanonicalWritePairForTable } = await import(
+      '~/utils/governed-write'
+    );
+    vi.mocked(buildGovernedCanonicalWritePairForTable).mockResolvedValueOnce({
+      partId: 'part-1',
+      partName: 'Canonical Part',
+      processId: 'process-1',
+      processName: 'Canonical Process',
+    });
+    const create = vi.fn().mockResolvedValue(mockRequest);
+    (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+      callback({ qms_inspection_requests: { create } }),
+    );
+
+    await InspectionRequestCreateService.createRequest(
+      {} as any,
+      { id: 'user-1', username: 'admin' } as any,
+      {
+        category: 'PROCESS',
+        partId: 'part-1',
+        processId: 'process-1',
+        teamId: 'team-1',
+        workOrderNumber: 'WO-001',
+      },
+      false,
+      'V2',
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          category: 'PROCESS',
+          partId: 'part-1',
+          partName: 'Canonical Part',
+          processId: 'process-1',
+          processName: 'Canonical Process',
+        }),
+      }),
+    );
   });
 
   it.each([

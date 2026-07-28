@@ -5,10 +5,19 @@ import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    processes: {
+      findFirst: vi.fn(),
+    },
+    project_boms: {
+      findMany: vi.fn(),
+    },
     suppliers: {
       findMany: vi.fn(),
     },
     qms_inspection_requests: {
+      findMany: vi.fn(),
+    },
+    work_order_requirements: {
       findMany: vi.fn(),
     },
   },
@@ -79,6 +88,53 @@ describe('inspection public query service', () => {
       InspectionPublicQueryService.getPublicTeams('Team'),
     ).resolves.toEqual([
       { group: 'internal', label: 'Team A', value: 'team-1' },
+    ]);
+  });
+
+  it('returns canonical process IDs and names', async () => {
+    (
+      prisma.work_order_requirements.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      {
+        process: { name: 'Canonical Welding' },
+        processId: 'process-1',
+        processName: 'Historical Welding',
+      },
+    ]);
+    (prisma.processes.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(
+      null,
+    );
+
+    await expect(
+      InspectionPublicQueryService.getPublicProcesses('WO-1'),
+    ).resolves.toEqual([
+      { processId: 'process-1', processName: 'Canonical Welding' },
+    ]);
+  });
+
+  it('returns BOM part identities without replacing them with BOM row IDs', async () => {
+    (
+      prisma.project_boms.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      {
+        id: 'bom-1',
+        partId: 'part-1',
+        part_name: 'Frame',
+        part_number: 'P-001',
+        work_order_number: 'WO-1',
+      },
+    ]);
+
+    await expect(
+      InspectionPublicQueryService.getPublicBomParts('WO-1'),
+    ).resolves.toEqual([
+      {
+        id: 'bom-1',
+        partId: 'part-1',
+        partName: 'Frame',
+        partNumber: 'P-001',
+        workOrderNumber: 'WO-1',
+      },
     ]);
   });
 });

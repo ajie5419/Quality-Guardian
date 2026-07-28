@@ -72,4 +72,23 @@ describe('work order requirement schemas', () => {
       }).success,
     ).toBe(false);
   });
+
+  it('accepts V2 canonical IDs and rejects client-controlled names', () => {
+    expect(
+      workOrderRequirementCreateBodySchema.safeParse({
+        identityContractVersion: 2,
+        partId: 'part-1',
+        processId: 'process-1',
+        requirementName: 'Visual inspection',
+        workOrderNumber: 'WO-001',
+      }).success,
+    ).toBe(true);
+    expect(
+      workOrderRequirementUpdateBodySchema.safeParse({
+        identityContractVersion: 2,
+        partId: 'part-1',
+        partName: 'Client snapshot',
+      }).success,
+    ).toBe(false);
+  });
 });

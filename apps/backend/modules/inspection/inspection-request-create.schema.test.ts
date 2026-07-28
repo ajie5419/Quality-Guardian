@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   INCOMING_INSPECTION_PROCESS_NAME,
   inspectionRequestCreateBodySchema,
+  inspectionRequestCreateV2BodySchema,
   validateInspectionRequestCreateBody,
+  validateInspectionRequestCreateV2Body,
 } from './inspection-request-create.schema';
 
 function buildValidPayload() {
@@ -26,6 +28,28 @@ function buildValidPayload() {
 }
 
 describe('inspection request create schema', () => {
+  it('accepts V2 identity input without client-controlled names', () => {
+    const parsed = inspectionRequestCreateV2BodySchema.parse({
+      ...buildValidPayload(),
+      category: 'PROCESS',
+      partId: 'part-1',
+      partName: undefined,
+      processId: 'process-1',
+      processName: undefined,
+    });
+
+    expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
+  });
+
+  it('rejects a V2 request without canonical IDs', () => {
+    expect(() =>
+      inspectionRequestCreateV2BodySchema.parse({
+        ...buildValidPayload(),
+        category: 'PROCESS',
+      }),
+    ).toThrow();
+  });
+
   it('accepts the current create payload shape', () => {
     const parsed = inspectionRequestCreateBodySchema.parse(buildValidPayload());
     const validation = validateInspectionRequestCreateBody(parsed);

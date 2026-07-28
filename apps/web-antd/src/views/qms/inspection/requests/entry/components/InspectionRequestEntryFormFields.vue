@@ -28,12 +28,16 @@ type StationSelection = {
 
 const props = defineProps<{
   beforeUpload: (file: File) => Promise<File>;
-  bomPartOptions: Array<{ label: string; value: string }>;
+  bomPartOptions: Array<{ label: string; partName: string; value: string }>;
   bomPartsLoading: boolean;
   checkResultOptions: Array<{ label: string; value: string }>;
   entryCopy: EntryCopy;
   isIncomingEntry: boolean;
-  processOptions: Array<{ label: string; value: string }>;
+  processOptions: Array<{
+    label: string;
+    processName: string;
+    value: string;
+  }>;
   requiresComponentName: boolean;
   requiresStationSelection: boolean;
   stationQuantity: number;
@@ -62,7 +66,9 @@ const form = defineModel<{
   componentName: string;
   incomingType: string;
   mutualCheckResult: InspectionRequestCheckResult;
+  partId: string;
   partName: string;
+  processId: string;
   processName: string;
   quantity: number;
   reporter: string;
@@ -129,6 +135,28 @@ function handleResponsibleUnitChange(
   form.value.supplierId = '';
   form.value.teamId = identityId;
 }
+
+function handlePartIdentityChange(
+  value: SelectProps['value'],
+  option: unknown,
+) {
+  form.value.partId = typeof value === 'string' ? value : '';
+  form.value.partName =
+    option && typeof option === 'object' && 'partName' in option
+      ? String((option as { partName?: unknown }).partName || '').trim()
+      : '';
+}
+
+function handleProcessIdentityChange(
+  value: SelectProps['value'],
+  option: unknown,
+) {
+  form.value.processId = typeof value === 'string' ? value : '';
+  form.value.processName =
+    option && typeof option === 'object' && 'processName' in option
+      ? String((option as { processName?: unknown }).processName || '').trim()
+      : '';
+}
 </script>
 
 <template>
@@ -163,13 +191,14 @@ function handleResponsibleUnitChange(
     required
   >
     <Select
-      v-model:value="form.processName"
+      :value="form.processId"
       :options="props.processOptions"
       :loading="props.workOrderProcessesLoading"
       class="w-full"
       placeholder="请选择工序"
       show-search
       allow-clear
+      @change="handleProcessIdentityChange"
     />
   </Form.Item>
   <Form.Item v-if="props.isIncomingEntry" label="进货类型" required>
@@ -182,16 +211,8 @@ function handleResponsibleUnitChange(
     />
   </Form.Item>
   <Form.Item :label="props.entryCopy.partLabel" required>
-    <Input
-      v-if="props.isIncomingEntry"
-      v-model:value="form.partName"
-      class="w-full"
-      :placeholder="props.entryCopy.partPlaceholder"
-      allow-clear
-    />
     <Select
-      v-else
-      v-model:value="form.partName"
+      :value="form.partId"
       :options="props.bomPartOptions"
       :loading="props.bomPartsLoading"
       :disabled="!form.workOrderNumber"
@@ -199,6 +220,7 @@ function handleResponsibleUnitChange(
       :placeholder="props.entryCopy.partPlaceholder"
       show-search
       allow-clear
+      @change="handlePartIdentityChange"
     />
   </Form.Item>
   <Form.Item

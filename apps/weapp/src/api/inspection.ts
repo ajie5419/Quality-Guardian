@@ -97,7 +97,7 @@ export function closeInspectionRequest(
 // Submit a new inspection request
 export function submitInspectionRequest(data: Record<string, unknown>) {
   return request<unknown>({
-    url: '/api/qms/inspection/requests',
+    url: '/api/qms/inspection/requests/v2',
     method: 'POST',
     data,
   });
@@ -122,7 +122,7 @@ export function searchWorkOrders(keyword: string) {
 
 // Get processes for a given work order
 export function getProcesses(workOrderNumber: string) {
-  return request<Array<{ processName: string }>>({
+  return request<Array<{ processId: string; processName: string }>>({
     url: '/api/qms/inspection/requests/processes',
     method: 'GET',
     data: { workOrderNumber },
@@ -139,7 +139,14 @@ export function getProcessDictionaryOptions() {
 
 // Get BOM parts for a given work order
 export function getBomParts(workOrderNumber: string) {
-  return request<Array<{ id: string; partName: string; partNumber: string }>>({
+  return request<
+    Array<{
+      id: string;
+      partId?: null | string;
+      partName: string;
+      partNumber: string;
+    }>
+  >({
     url: '/api/qms/inspection/requests/bom-parts',
     method: 'GET',
     data: { workOrderNumber },

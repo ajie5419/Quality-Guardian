@@ -10,6 +10,26 @@ const editableTeamIdentityFields = {
   responsibleTeamId: z.string().trim().min(1).nullable().optional(),
 };
 
+function rejectV2ClientNames(
+  body: {
+    identityContractVersion?: number;
+    partName?: null | string;
+    processName?: null | string;
+  },
+  context: z.RefinementCtx,
+) {
+  if (
+    body.identityContractVersion === 2 &&
+    (body.partName !== undefined || body.processName !== undefined)
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'V2 identity writes accept partId/processId, not names',
+      path: ['identityContractVersion'],
+    });
+  }
+}
+
 function validateTeamIdentityPair(
   body: {
     responsibleTeam?: null | string;
@@ -37,8 +57,11 @@ function validateTeamIdentityPair(
 export const workOrderRequirementPayloadSchema = z
   .object({
     attachments: z.array(z.record(z.string(), z.unknown())).optional(),
+    identityContractVersion: z.literal(2).optional(),
     items: z.array(z.unknown()).optional(),
+    partId: z.string().trim().min(1).optional(),
     partName: z.string().trim().min(1).optional(),
+    processId: z.string().trim().min(1).optional(),
     processName: z.string().trim().min(1).optional(),
     requirementName: z.string().trim().min(1),
     responsiblePerson: z.string().trim().min(1).optional(),
@@ -46,7 +69,8 @@ export const workOrderRequirementPayloadSchema = z
     workOrderNumber: z.string().trim().min(1),
   })
   .strict()
-  .superRefine(validateTeamIdentityPair);
+  .superRefine(validateTeamIdentityPair)
+  .superRefine(rejectV2ClientNames);
 
 export const workOrderRequirementCreateBodySchema = z.union([
   workOrderRequirementPayloadSchema,
@@ -60,8 +84,11 @@ export const workOrderRequirementCreateBodySchema = z.union([
 export const workOrderRequirementUpdateBodySchema = z
   .object({
     attachments: z.array(z.record(z.string(), z.unknown())).optional(),
+    identityContractVersion: z.literal(2).optional(),
     items: z.array(z.unknown()).optional(),
+    partId: z.string().trim().min(1).nullable().optional(),
     partName: z.string().trim().min(1).nullable().optional(),
+    processId: z.string().trim().min(1).nullable().optional(),
     processName: z.string().trim().min(1).nullable().optional(),
     requirementName: z.string().trim().min(1).optional(),
     responsiblePerson: z.string().trim().min(1).nullable().optional(),
@@ -69,6 +96,7 @@ export const workOrderRequirementUpdateBodySchema = z
   })
   .strict()
   .superRefine(validateTeamIdentityPair)
+  .superRefine(rejectV2ClientNames)
   .refine((body) => Object.keys(body).length > 0, {
     message: 'At least one editable field is required',
   });
