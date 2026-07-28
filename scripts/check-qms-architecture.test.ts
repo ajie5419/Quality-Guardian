@@ -429,4 +429,62 @@ prisma.quality_records.groupBy({
       rmSync(rootDir, { force: true, recursive: true });
     }
   });
+
+  it('blocks direct and locally aliased governed names as Map keys', () => {
+    const rootDir = createFixture({
+      'apps/backend/utils/master-data-fields.ts': `
+const MASTER_DATA_FIELDS = [{
+  key: 'defectType',
+  targets: [{
+    table: 'quality_records',
+    nameColumn: 'defectType',
+    idColumn: 'defectTypeId',
+    nullable: true,
+  }],
+}];
+`,
+      'apps/backend/modules/report/bad-map-stats.service.ts': `
+export function collect(rows: Array<{ defectType: string }>) {
+  const direct = new Map<string, number>();
+  const indirect = new Map<string, number>();
+  for (const row of rows) {
+    direct.set(row.defectType, (direct.get(row.defectType) || 0) + 1);
+    const key = row.defectType;
+    indirect.set(key, (indirect.get(key) || 0) + 1);
+  }
+  return { direct, indirect };
+}
+`,
+      'apps/backend/modules/report/good-map-stats.service.ts': `
+export function collect(rows: Array<{
+  defectTypeId: string;
+  filename: string;
+  month: string;
+  status: string;
+}>) {
+  const identityCounts = new Map<string, number>();
+  const monthCounts = new Map<string, number>();
+  const statusCounts = new Map<string, number>();
+  const files = new Map<string, string>();
+  for (const row of rows) {
+    identityCounts.set(row.defectTypeId, 1);
+    monthCounts.set(row.month, 1);
+    statusCounts.set(row.status, 1);
+    files.set(row.filename, row.filename);
+  }
+  return { files, identityCounts, monthCounts, statusCounts };
+}
+`,
+    });
+
+    try {
+      const result = runCheck(rootDir);
+      expect(result.status).toBe(1);
+      expect(result.output).toContain('[B-ID9]');
+      expect(result.output).toContain('display snapshot');
+      expect(result.output).not.toContain('good-map-stats.service.ts');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
 });
