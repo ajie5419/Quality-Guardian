@@ -1,6 +1,13 @@
+import type { WorkspaceWorkOrderAggregateResponse } from '@qgs/shared';
+
 import { requestClient } from '#/api/request';
 
 import { QMS_API } from './constants';
+
+export type {
+  WorkOrderRequirementAttachment,
+  WorkspaceWorkOrderAggregateResponse,
+} from '@qgs/shared';
 
 export interface WorkspaceProjectItem {
   color: string;
@@ -41,117 +48,6 @@ export interface WorkspaceDataResponse {
   };
   todoItems: WorkspaceTodoItem[];
   trendItems: WorkspaceTrendItem[];
-}
-
-export interface WorkOrderRequirementAttachment {
-  name?: string;
-  thumbUrl?: string;
-  type?: string;
-  url: string;
-}
-
-export interface WorkspaceWorkOrderAggregateResponse {
-  byPart: Array<{
-    completionRate: number;
-    inspectedPoints: number;
-    missingPoints: number;
-    partName: string;
-    plannedPoints: number;
-  }>;
-  byProcess: Array<{
-    completionRate: number;
-    inspectedPoints: number;
-    missingPoints: number;
-    plannedPoints: number;
-    processName: string;
-  }>;
-  inspectionWorksToday: Array<{
-    inspector: string;
-    partName: string;
-    processName: string;
-    quantity: number;
-    result: string;
-    workOrderNumber: string;
-  }>;
-  productionProgress: {
-    outsourced: Array<{
-      date: string;
-      id: string;
-      materialName: string;
-    }>;
-    process: Array<{
-      coveredQuantity: number;
-      date: string;
-      id: string;
-      latestDate: string;
-      partName: string;
-      processes: Array<{
-        completedQuantity: number;
-        latestDate: string;
-        processName: string;
-        status: 'COMPLETE' | 'PARTIAL';
-        totalQuantity: number;
-      }>;
-      teams: string[];
-      totalQuantity: number;
-    }>;
-  };
-  missingDetails: Array<{
-    inspectedPoints: number;
-    missingPoints: number;
-    partName: string;
-    plannedPoints: number;
-    processName: string;
-    status: 'NOT_STARTED' | 'PARTIAL';
-  }>;
-  requirements: Array<{
-    attachments: WorkOrderRequirementAttachment[];
-    confirmedAt?: null | string;
-    confirmer: string;
-    confirmStatus: string;
-    createdAt: string;
-    executed: boolean;
-    executedPoints: number;
-    executionStatus:
-      | 'CONFIRMED'
-      | 'EXECUTED_PENDING_CONFIRM'
-      | 'MANUAL_CONFIRMED'
-      | 'NOT_EXECUTED';
-    executor: string;
-    id: string;
-    items: unknown[];
-    partName: string;
-    plannedPoints: number;
-    processName: string;
-    requirementName: string;
-    responsiblePerson: string;
-    responsibleTeam: string;
-    responsibleTeamId: string;
-    status: 'EXECUTED' | 'NOT_EXECUTED';
-    workOrderNumber: string;
-  }>;
-  summary: {
-    checkedParts: number;
-    completionRate: number;
-    confirmedRequirements: number;
-    executedRequirements: number;
-    inspectedPoints: number;
-    missingPoints: number;
-    overdueUnconfirmedRequirements: number;
-    pendingConfirmRequirements: number;
-    pendingRequirements: number;
-    plannedPoints: number;
-    plannedRequirements: number;
-    totalParts: number;
-  };
-  workOrder: {
-    customerName: string;
-    division: string;
-    projectName: string;
-    quantity: number;
-    status: string;
-    workOrderNumber: string;
-  };
 }
 
 export async function getWorkspaceData() {
