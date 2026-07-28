@@ -72,7 +72,7 @@ describe('team identity merge references', () => {
     tx.team_identity_aliases.findFirst.mockResolvedValue(null);
   });
 
-  it('moves every TEAM association and canonical name snapshot', async () => {
+  it('moves every TEAM association without rewriting name snapshots', async () => {
     tx.team_identity_aliases.findFirst
       .mockResolvedValueOnce({
         aliasKind: 'HISTORICAL',
@@ -98,11 +98,22 @@ describe('team identity merge references', () => {
 
     expect(tx.qms_inspection_requests.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ['request-1'] }, teamId: merge.sourceTeamId },
-      data: { team: merge.targetName, teamId: merge.targetTeamId },
+      data: { teamId: merge.targetTeamId },
     });
     expect(tx.inspections.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ['inspection-1'] }, teamId: merge.sourceTeamId },
-      data: { team: merge.targetName, teamId: merge.targetTeamId },
+      data: { teamId: merge.targetTeamId },
+    });
+    expect(tx.welders.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['welder-1'] }, teamId: merge.sourceTeamId },
+      data: { teamId: merge.targetTeamId },
+    });
+    expect(tx.work_order_requirements.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['requirement-1'] },
+        responsibleTeamId: merge.sourceTeamId,
+      },
+      data: { responsibleTeamId: merge.targetTeamId },
     });
     expect(tx.team_identity_aliases.update).toHaveBeenCalledWith({
       where: { id: 'alias-source' },

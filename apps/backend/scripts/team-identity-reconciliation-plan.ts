@@ -40,6 +40,7 @@ export function chooseTeamForSource(
   teams: ReconciliationTeam[],
   sources: ReconciliationSource[],
   legacyClaims: ReadonlyMap<string, string[]>,
+  nameKeyOwners: ReadonlyMap<string, ReadonlyArray<string>> = new Map(),
 ) {
   const activeTeams = teams.filter((team) => team.status === 1);
   const activeIds = new Set(activeTeams.map((team) => team.id));
@@ -60,17 +61,26 @@ export function chooseTeamForSource(
   if (claimedIds.length > 1) {
     return { action: 'ambiguous' as const, teamIds: claimedIds };
   }
+  const candidateNameKey = buildTeamIdentityNameKey(candidate.name);
   const exact = activeTeams.filter((team) => team.name === candidate.name);
   const normalized = activeTeams.filter(
-    (team) =>
-      buildTeamIdentityNameKey(team.name) ===
-      buildTeamIdentityNameKey(candidate.name),
+    (team) => buildTeamIdentityNameKey(team.name) === candidateNameKey,
   );
   const candidates = exact.length > 0 ? exact : normalized;
-  if (candidates.length > 0) {
+  const collisionTeamIds = new Set(nameKeyOwners.get(candidateNameKey) || []);
+  for (const team of candidates) collisionTeamIds.add(team.id);
+  for (const team of teams) {
+    if (
+      team.status !== 1 &&
+      buildTeamIdentityNameKey(team.name) === candidateNameKey
+    ) {
+      collisionTeamIds.add(team.id);
+    }
+  }
+  if (collisionTeamIds.size > 0) {
     return {
       action: 'ambiguous' as const,
-      teamIds: candidates.map((team) => team.id).sort(),
+      teamIds: [...collisionTeamIds].sort(),
     };
   }
   return { action: 'create' as const };

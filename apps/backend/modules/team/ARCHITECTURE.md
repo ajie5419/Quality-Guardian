@@ -48,7 +48,7 @@ Reconciliation trusts only stable source IDs:
 - supplier ID whose inspection policy uses TEAM identity -> TEAM ID;
 - a legacy remark only when `managedBy=system:team-dictionary-bootstrap` and every source has a valid `department:<id>` or `supplier:<id>` shape.
 
-An existing source link wins. A unique trusted legacy source claim may restore a source link. Otherwise reconciliation creates a new TEAM or persists an ambiguity audit. Exact or normalized name similarity alone never establishes identity ownership.
+An existing source link wins. A unique trusted legacy source claim may restore a source link. Otherwise reconciliation creates a new TEAM or persists an ambiguity audit. Exact or normalized name similarity alone never establishes identity ownership. A retired TEAM with the same normalized name and an existing historical name-key owner are ambiguity evidence, so reconciliation records them instead of attempting a conflicting create.
 
 The deleted name bootstrap must not return. It collapsed source identities into mutable names and could neither distinguish duplicate names nor preserve rename history.
 
@@ -60,7 +60,7 @@ The maintenance runner uses a durable, resumable state machine:
 
 1. validates both TEAM IDs and supplier-link compatibility, claims unique participant locks, and quarantines the source in one transaction;
 2. claims a `RUNNING` execution lease with an attempt token, allowing an expired or failed attempt to be resumed without allowing an older attempt to overwrite newer state;
-3. migrates inspection requests, inspections, welders, work-order requirements, supplier links, aliases, name keys, and source links in independently committed groups;
+3. migrates canonical IDs for inspection requests, inspections, welders, and work-order requirements without rewriting their name snapshots, then migrates supplier links, aliases, name keys, and source links in independently committed groups;
 4. stores cumulative reference counts in the same transaction as each group, so retries count previously committed and newly migrated rows exactly once;
 5. verifies that no source references remain, retires the source, completes the audit, and releases participant locks in one transaction.
 

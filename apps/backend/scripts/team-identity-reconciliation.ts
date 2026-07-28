@@ -182,7 +182,7 @@ async function loadSourceCandidates() {
 }
 
 async function loadReconciliationState() {
-  const [teams, sources, supplierLinks] = await Promise.all([
+  const [teams, sources, supplierLinks, nameKeys] = await Promise.all([
     prisma.dictionaries.findMany({
       where: { dictType: TEAM_DICT_TYPE, isDeleted: false },
       select: { dictKey: true, id: true, remark: true, status: true },
@@ -192,8 +192,18 @@ async function loadReconciliationState() {
       where: { identityType: 'TEAM', isDeleted: false },
       select: { identityId: true },
     }),
+    prisma.team_identity_name_keys.findMany({
+      select: { nameKey: true, teamId: true },
+    }),
   ]);
+  const nameKeyOwners = new Map<string, string[]>();
+  for (const nameKey of nameKeys) {
+    const owners = nameKeyOwners.get(nameKey.nameKey) || [];
+    owners.push(nameKey.teamId);
+    nameKeyOwners.set(nameKey.nameKey, owners);
+  }
   return {
+    nameKeyOwners,
     sourceRows: sources,
     supplierLinkedTeamIds: new Set(
       supplierLinks.map((link) => link.identityId),
@@ -326,6 +336,7 @@ async function reconcileSources(
       state.teams,
       state.sourceRows,
       claims,
+      state.nameKeyOwners,
     );
     if (resolution.action === 'ambiguous') {
       audits.push(sourceAmbiguityAudit(candidate, resolution.teamIds));

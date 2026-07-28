@@ -91,6 +91,29 @@ describe('team identity reconciliation planning', () => {
     ).toEqual({ action: 'ambiguous', teamIds: ['team-exact'] });
   });
 
+  it('audits an unlinked retired identity instead of recreating its name', () => {
+    expect(
+      chooseTeamForSource(
+        source,
+        [{ id: 'team-retired', name: 'StructureBU2', status: 0 }],
+        [],
+        new Map(),
+      ),
+    ).toEqual({ action: 'ambiguous', teamIds: ['team-retired'] });
+  });
+
+  it('audits a historical name-key owner instead of creating a collision', () => {
+    expect(
+      chooseTeamForSource(
+        source,
+        [{ id: 'team-renamed', name: 'Structure BU Three', status: 1 }],
+        [],
+        new Map(),
+        new Map([['structurebu2', ['team-renamed']]]),
+      ),
+    ).toEqual({ action: 'ambiguous', teamIds: ['team-renamed'] });
+  });
+
   it('requires explicit review even when only one duplicate has evidence', () => {
     const result = findAmbiguousTeamGroups(
       [

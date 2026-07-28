@@ -107,7 +107,7 @@ async function migrateInspectionRequests(
       if (ids.length === 0) return { scanned: 0, updated: 0 };
       const result = await tx.qms_inspection_requests.updateMany({
         where: { id: { in: ids }, teamId: merge.sourceTeamId },
-        data: { team: merge.targetName, teamId: merge.targetTeamId },
+        data: { teamId: merge.targetTeamId },
       });
       assertBatchApplied(ids.length, result.count);
       await resolveBatchAudits(
@@ -139,7 +139,7 @@ async function migrateInspections(
       if (ids.length === 0) return { scanned: 0, updated: 0 };
       const result = await tx.inspections.updateMany({
         where: { id: { in: ids }, teamId: merge.sourceTeamId },
-        data: { team: merge.targetName, teamId: merge.targetTeamId },
+        data: { teamId: merge.targetTeamId },
       });
       assertBatchApplied(ids.length, result.count);
       await resolveBatchAudits(tx, 'inspections', 'teamId', ids, merge);
@@ -165,7 +165,7 @@ async function migrateWelders(
       if (ids.length === 0) return { scanned: 0, updated: 0 };
       const result = await tx.welders.updateMany({
         where: { id: { in: ids }, teamId: merge.sourceTeamId },
-        data: { team: merge.targetName, teamId: merge.targetTeamId },
+        data: { teamId: merge.targetTeamId },
       });
       assertBatchApplied(ids.length, result.count);
       await resolveBatchAudits(tx, 'welders', 'teamId', ids, merge);
@@ -195,7 +195,6 @@ async function migrateWorkOrderRequirements(
           responsibleTeamId: merge.sourceTeamId,
         },
         data: {
-          responsibleTeam: merge.targetName,
           responsibleTeamId: merge.targetTeamId,
         },
       });
