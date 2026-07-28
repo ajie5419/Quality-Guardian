@@ -1,3 +1,5 @@
+import type { IdentityAggregateItem } from '../../domain-modules/qms/identity-aggregate';
+
 export interface DashboardOverview {
   fieldIssues?: { open: number; total: number };
   openIssues: number;
@@ -114,7 +116,7 @@ export interface QualityLossTrendResponse {
 /**
  * Vehicle Ranking Item
  */
-export interface VehicleRankingItem {
+export interface VehicleRankingItem extends IdentityAggregateItem {
   count: number;
   defectType: string;
   percentage: number;

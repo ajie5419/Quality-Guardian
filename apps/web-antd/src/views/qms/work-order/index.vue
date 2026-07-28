@@ -210,8 +210,7 @@ watch([currentYear, currentDateMode, currentDate], resetMobilePage);
           <WorkOrderCharts
             v-if="showDashboard"
             :stats-data="workOrderStats"
-            :dept-data="deptRawData"
-            :loading="isStatsLoading || isDeptLoading"
+            :loading="isStatsLoading"
           />
           <WorkOrderRequirementSummaryCards
             :overview="overview"

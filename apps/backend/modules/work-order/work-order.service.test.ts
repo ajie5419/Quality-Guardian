@@ -23,6 +23,12 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
 describe('workOrderService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -134,22 +140,33 @@ describe('workOrderService', () => {
   });
 
   describe('getDashboardStats', () => {
-    it('should merge warranty ranking by division', async () => {
+    it('should aggregate warranty ranking by division and project IDs', async () => {
       vi.useFakeTimers();
       try {
+        const { MasterDataGovernanceKernel } = await import(
+          '~/utils/canonical-master-data'
+        );
         vi.setSystemTime(new Date('2026-04-29T00:00:00.000Z'));
+        vi.mocked(MasterDataGovernanceKernel.resolveCanonicalNamesByIds)
+          .mockResolvedValueOnce(new Map([['dept-1', 'Vehicle SOBU']]))
+          .mockResolvedValueOnce(
+            new Map([
+              ['project-1', '70t Segment Carrier'],
+              ['project-2', '786'],
+            ]),
+          );
         (prisma.work_orders.findMany as any).mockResolvedValueOnce([
           {
             deliveryDate: new Date('2025-09-01T00:00:00.000Z'),
-            division: '车辆 SOBU',
-            projectName: '70t 管片车',
+            divisionId: 'dept-1',
+            projectId: 'project-1',
             quantity: 1,
             status: 'COMPLETED',
           },
           {
             deliveryDate: new Date('2025-10-01T00:00:00.000Z'),
-            division: '车辆 SOBU',
-            projectName: '786',
+            divisionId: 'dept-1',
+            projectId: 'project-2',
             quantity: 1,
             status: 'OPEN',
           },
@@ -159,14 +176,91 @@ describe('workOrderService', () => {
 
         expect(result.rankings).toHaveLength(1);
         expect(result.rankings[0]).toEqual({
-          division: '车辆 SOBU',
-          productName: '70t 管片车、786',
-          productNames: ['70t 管片车', '786'],
+          division: {
+            id: 'dept-1',
+            name: 'Vehicle SOBU',
+            resolutionStatus: 'RESOLVED',
+            value: 2,
+          },
+          projects: [
+            {
+              id: 'project-1',
+              name: '70t Segment Carrier',
+              resolutionStatus: 'RESOLVED',
+              value: 1,
+            },
+            {
+              id: 'project-2',
+              name: '786',
+              resolutionStatus: 'RESOLVED',
+              value: 1,
+            },
+          ],
           warrantyCount: 2,
         });
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it('should keep equal canonical names separate when IDs differ', async () => {
+      const { MasterDataGovernanceKernel } = await import(
+        '~/utils/canonical-master-data'
+      );
+      vi.mocked(MasterDataGovernanceKernel.resolveCanonicalNamesByIds)
+        .mockResolvedValueOnce(
+          new Map([
+            ['dept-1', 'Assembly'],
+            ['dept-2', 'Assembly'],
+          ]),
+        )
+        .mockResolvedValueOnce(new Map());
+      (prisma.work_orders.findMany as any).mockResolvedValueOnce([
+        {
+          deliveryDate: null,
+          divisionId: 'dept-1',
+          projectId: null,
+          quantity: 1,
+          status: 'OPEN',
+        },
+        {
+          deliveryDate: null,
+          divisionId: 'dept-2',
+          projectId: null,
+          quantity: 1,
+          status: 'OPEN',
+        },
+        {
+          deliveryDate: null,
+          divisionId: null,
+          projectId: null,
+          quantity: 1,
+          status: 'OPEN',
+        },
+      ]);
+
+      const result = await WorkOrderService.getDashboardStats({});
+
+      expect(result.pieData).toEqual([
+        {
+          id: 'dept-1',
+          name: 'Assembly',
+          resolutionStatus: 'RESOLVED',
+          value: 1,
+        },
+        {
+          id: 'dept-2',
+          name: 'Assembly',
+          resolutionStatus: 'RESOLVED',
+          value: 1,
+        },
+        {
+          id: null,
+          name: '未分配',
+          resolutionStatus: 'MISSING',
+          value: 1,
+        },
+      ]);
     });
   });
 });

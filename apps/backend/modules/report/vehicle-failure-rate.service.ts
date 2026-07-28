@@ -1,3 +1,4 @@
+import { createIdentityAggregateItem, QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept/dept.service';
 import { WorkOrderService } from '~/modules/work-order';
@@ -142,25 +143,31 @@ async function buildRanking(start: Date, end: Date, vehicleDeptIds: string[]) {
     vehicleDeptIds,
   });
   const total = records.length;
+  const counts = new Map<null | string, number>();
+  for (const record of records) {
+    const id = String(record.defectTypeId || '').trim() || null;
+    counts.set(id, (counts.get(id) || 0) + 1);
+  }
   const defectTypeNameById =
     await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
       configKey: 'defectType',
-      canonicalIds: records.map((item) => item.defectTypeId),
+      canonicalIds: [...counts.keys()],
     });
-  const counts = new Map<string, number>();
-  for (const record of records) {
-    const defectType =
-      defectTypeNameById.get(String(record.defectTypeId || '')) ||
-      record.defectType?.trim() ||
-      '未分类';
-    counts.set(defectType, (counts.get(defectType) || 0) + 1);
-  }
   return [...counts.entries()]
-    .map(([defectType, count]) => ({
-      count,
-      defectType,
-      percentage: total > 0 ? Number(((count / total) * 100).toFixed(1)) : 0,
-    }))
+    .map(([id, count]) => {
+      const identity = createIdentityAggregateItem({
+        canonicalName: id ? defectTypeNameById.get(id) : null,
+        id,
+        missingName: QMS_DEFAULT_VALUES.UNCLASSIFIED,
+        value: count,
+      });
+      return {
+        ...identity,
+        count,
+        defectType: identity.name,
+        percentage: total > 0 ? Number(((count / total) * 100).toFixed(1)) : 0,
+      };
+    })
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 }

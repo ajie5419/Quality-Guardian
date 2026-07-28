@@ -2,8 +2,8 @@
 
 ## 当前状态
 
-- 最新变更: TEAM canonical 身份、注册表驱动的 ID 聚合，以及售后/不合格品图表全链路身份契约已经完成。生产环境仍保持 `qgs-v0.19.1`，等待发布流程执行 migration 和有序维护。
-- 测试状态: 后端全量 228/228 个测试文件、2157/2157 个用例通过；最新身份与图表定向测试 69/69 通过。
+- 最新变更: 工单看板、报告缺陷分布和车辆缺陷排行已清除名称聚合，受控图表从数据库聚合到前端渲染均携带稳定身份。生产环境仍保持 `qgs-v0.19.1`，等待发布流程执行 migration 和有序维护。
+- 测试状态: 后端全量 228/228 个测试文件、2160/2160 个用例通过；工单、报告和车辆身份定向测试 29/29 通过。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
 - 模块 TS 文件数: 528（含测试）
@@ -54,6 +54,7 @@
 - [x] 报检任务统计按 `category + teamId/supplierId/inspectorId` 聚合，名称只用于最终展示
 - [x] 受控主数据统计门禁与首波全库迁移（售后、检验、不合格品、报表、供应商评分）
 - [x] 售后与不合格品动态图表统一携带 canonical ID、名称和解析状态，前端不再按名称或部门树二次归并
+- [x] 工单看板、周报/月报缺陷分布和车辆缺陷排行按 canonical ID 聚合并透传身份状态
 - [ ] 后端业务模块逐功能测试覆盖补齐（进行中）
 
 ## 当前架构
@@ -79,7 +80,7 @@ apps/backend/
 - [ ] 为 `unresolved_master_data_refs` 增加人工处置 API/UI，并为 `supplier_identity_links` 增加管理 UI
 - [ ] 为 supervision 等尚未覆盖的存量供应商引用补齐回填、unresolved 审计和生产指标核对
 - [ ] 将其他受控主数据从 `DUAL_WRITE/legacy` 逐 wave 推进到在线 `ID-required`
-- [ ] 迁移并门禁工单、报告等剩余按名称建立 `Map` 的内存统计路径
+- [ ] 增加受控名称 `Map` 聚合门禁，并继续核对尚未登记的内存统计路径
 - [ ] 通过发布流程部署 TEAM identity migrations，执行有序 reconciliation/category backfill，并核对生产报检排行总数与 unresolved 审计
 - [ ] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制
 

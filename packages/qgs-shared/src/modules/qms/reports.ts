@@ -1,3 +1,5 @@
+import type { IdentityAggregateItem } from '../../domain-modules/qms/identity-aggregate';
+
 export interface ReportItem {
   author: null | string;
   date: string;
@@ -85,7 +87,7 @@ export interface SaveDailySummaryResult {
 }
 
 export interface QualityReportSummary {
-  defects: Array<{ name: string; value: number }>;
+  defects: IdentityAggregateItem[];
   historyLabels?: string[];
   majorEvents: Array<{
     date: string;

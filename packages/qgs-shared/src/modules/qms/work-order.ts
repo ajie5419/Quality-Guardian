@@ -1,3 +1,5 @@
+import type { IdentityAggregateItem } from '../../domain-modules/qms/identity-aggregate';
+
 export interface WorkOrderItem {
   confirmedRequirements?: number;
   createTime: null | string;
@@ -54,12 +56,11 @@ export type WorkOrderPageResult = WorkOrderListResult;
 export interface WorkOrderDashboardStats {
   completed: number;
   inProgress: number;
-  pieData: Array<{ name: string; value: number }>;
+  pieData: IdentityAggregateItem[];
   progressPercent: number;
   rankings: Array<{
-    division: string;
-    productName: string;
-    productNames: string[];
+    division: IdentityAggregateItem;
+    projects: IdentityAggregateItem[];
     warrantyCount: number;
   }>;
   total: number;

@@ -1,9 +1,10 @@
 <script lang="ts" setup>
-import type { WorkOrderDashboardStats } from '@qgs/shared';
+import type {
+  IdentityAggregateItem,
+  WorkOrderDashboardStats,
+} from '@qgs/shared';
 
 import type { EchartsUIType } from '@vben/plugins/echarts';
-
-import type { SystemDeptApi } from '#/api/system/dept';
 
 import { computed, nextTick, ref, shallowRef, watch } from 'vue';
 
@@ -20,26 +21,14 @@ import {
   Statistic,
 } from 'ant-design-vue';
 
-import { findNameById } from '#/types';
-
 import { CHART_COLORS, getStableColor } from '../constants';
 
 const props = defineProps<{
-  deptData: SystemDeptApi.Dept[];
   loading?: boolean;
   statsData: null | WorkOrderDashboardStats;
 }>();
 
 const { t } = useI18n();
-
-function normalizeDivisionKey(value: string) {
-  return value.replaceAll(/\s+/g, '').toUpperCase();
-}
-
-function formatDivisionName(value: string) {
-  const compact = value.replaceAll(/\s+/g, '');
-  return compact.replace(/(SOBU|OBU|BU)$/i, ' $1').trim();
-}
 
 const dashboardStats = computed(() => {
   const source = props.statsData;
@@ -47,88 +36,23 @@ const dashboardStats = computed(() => {
     return {
       completed: 0,
       inProgress: 0,
-      pieData: [] as Array<{ color: string; name: string; value: number }>,
+      pieData: [] as Array<IdentityAggregateItem & { color: string }>,
       progressPercent: 0,
-      rankings: [] as Array<{
-        division: string;
-        productName: string;
-        productNames?: string[];
-        warrantyCount: number;
-      }>,
+      rankings: [] as WorkOrderDashboardStats['rankings'],
       total: 0,
     };
   }
 
-  const pieMap = new Map<string, { name: string; value: number }>();
-  for (const item of source.pieData || []) {
-    const rawName = String(item.name || t('qms.common.other')).trim();
-    const displayName = formatDivisionName(
-      findNameById(props.deptData, rawName) || rawName,
-    );
-    const key = normalizeDivisionKey(displayName);
-    const existing = pieMap.get(key);
-    pieMap.set(key, {
-      name: existing?.name || displayName,
-      value: (existing?.value || 0) + Number(item.value || 0),
-    });
-  }
-
-  const pieData = [...pieMap.values()]
-    .map(({ name, value }) => ({
-      name,
-      value,
-      color: getStableColor(name),
+  const pieData = (source.pieData || [])
+    .map((item) => ({
+      ...item,
+      color: getStableColor(item.id || item.resolutionStatus),
     }))
     .sort((a, b) => b.value - a.value);
-
-  const rankingMap = new Map<
-    string,
-    {
-      division: string;
-      productNames: Set<string>;
-      warrantyCount: number;
-    }
-  >();
-  for (const item of source.rankings || []) {
-    const rawDivision = String(item.division || t('qms.common.other')).trim();
-    const productNames =
-      Array.isArray(item.productNames) && item.productNames.length > 0
-        ? item.productNames
-        : [item.productName || '未知产品'];
-    const division = formatDivisionName(
-      findNameById(props.deptData, rawDivision) || rawDivision,
-    );
-    const key = normalizeDivisionKey(division);
-    const existing = rankingMap.get(key);
-    const names = existing?.productNames || new Set<string>();
-    productNames.forEach((name) => {
-      const normalizedName = String(name || '').trim();
-      if (normalizedName) names.add(normalizedName);
-    });
-    rankingMap.set(key, {
-      division: existing?.division || division,
-      productNames: names,
-      warrantyCount:
-        (existing?.warrantyCount || 0) + Number(item.warrantyCount || 0),
-    });
-  }
-
-  const rankings = [...rankingMap.values()]
-    .map((item) => {
-      const productNames = [...item.productNames].sort();
-      return {
-        division: item.division,
-        productName: productNames.join('、') || '未知产品',
-        productNames,
-        warrantyCount: item.warrantyCount,
-      };
-    })
-    .sort((a, b) => b.warrantyCount - a.warrantyCount);
 
   return {
     ...source,
     pieData,
-    rankings,
   };
 });
 
@@ -229,7 +153,7 @@ watch(
             >
               <div
                 v-for="item in dashboardStats.pieData"
-                :key="item.name"
+                :key="item.id || item.resolutionStatus"
                 class="flex shrink-0 cursor-default items-center justify-between rounded px-1 py-0.5 text-xs transition-colors hover:bg-gray-50"
               >
                 <div class="flex min-w-0 items-center gap-2 overflow-hidden">
@@ -263,7 +187,7 @@ watch(
             <div class="space-y-1.5 py-1">
               <div
                 v-for="(rank, idx) in dashboardStats.rankings"
-                :key="rank.division"
+                :key="rank.division.id || rank.division.resolutionStatus"
                 class="group flex items-center justify-between rounded-lg border-b border-gray-50 p-2.5 transition-all hover:bg-blue-50/30"
               >
                 <div class="flex items-center gap-4">
@@ -280,10 +204,10 @@ watch(
                   </div>
                   <div class="flex flex-col">
                     <span class="text-sm font-bold text-gray-700">{{
-                      rank.division
+                      rank.division.name
                     }}</span>
                     <span class="text-xs text-gray-500">
-                      {{ rank.productName }}
+                      {{ rank.projects.map((item) => item.name).join('、') }}
                     </span>
                   </div>
                 </div>

@@ -191,12 +191,37 @@
 - QMS 变更范围架构门禁通过，新增违规为 0。
 - 全仓 lint 通过，0 error、0 warning。
 
-**commit:** This commit
+**commit:** `84a5991c` fix(project): carry identity through chart contracts
 
 **遗留问题：**
 
 - 剩余内存统计还需迁移，并增加禁止名称 `Map` 键的架构门禁。
 - 在线写入策略、unresolved 处置闭环、TEAM 合并并发一致性和最终数据库约束由后续阶段继续治理。
+
+### 2026-07-28 Phase 8：清除工单与报告剩余名称聚合
+
+**执行内容：**
+
+- 工单看板改为按 `divisionId` 聚合事业部，并在质保排行内部按 `projectId` 聚合项目；名称只在聚合完成后批量解析。
+- 工单看板共享契约携带事业部和项目的完整身份项，前端删除部门树补名、名称标准化和名称二次归并，Vue key 改为稳定 ID。
+- 周报/月报缺陷分布和车辆故障率缺陷排行改为按 `defectTypeId` 聚合，删除历史名称回退。
+- 报告和车辆图表契约补齐稳定 ID 与 `RESOLVED/MISSING/INVALID` 状态；同 ID 的改名快照合并，不同 ID 同名保持分离。
+- 历史缺失 ID 与无效非空 ID 继续参与总量和排行计算，分别进入明确的 `MISSING` 与 `INVALID` 桶。
+
+**验证结果：**
+
+- 工单、报告和车辆故障率定向测试：3/3 个测试文件、29/29 个用例通过。
+- 后端与前端类型检查通过，0 error。
+- 后端全量测试：228/228 个测试文件、2160/2160 个用例通过。
+- 全仓 lint 通过，0 error、0 warning；全仓类型检查 3/3 个任务通过。
+- QMS 变更范围架构门禁通过，新增违规为 0。
+
+**commit:** This commit
+
+**遗留问题：**
+
+- 下一阶段增加受控名称 `Map` 键 AST 门禁，防止相同实现回归。
+- 质量损失索引的责任部门仍需补齐 ID；在线写入、unresolved 人工处置和 TEAM 合并并发一致性继续按独立阶段治理。
 
 ## [0.19.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.19.0...qgs-v0.19.1) (2026-07-24)
 

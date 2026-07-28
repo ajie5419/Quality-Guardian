@@ -156,6 +156,48 @@ describe('reportSummaryService', () => {
     expect(result.defects).toEqual([]);
   });
 
+  it('aggregates defects by canonical ID without using legacy names as identity', async () => {
+    const { InspectionService } = await import('~/modules/inspection');
+    const { MasterDataGovernanceKernel } = await import(
+      '~/utils/canonical-master-data'
+    );
+    vi.mocked(InspectionService.getReportDefectRows).mockResolvedValueOnce([
+      { defectType: 'Old Crack', defectTypeId: 'defect-1' },
+      { defectType: 'Renamed Crack', defectTypeId: 'defect-1' },
+      { defectType: 'Legacy Guess', defectTypeId: 'invalid-id' },
+      { defectType: 'Legacy Missing', defectTypeId: null },
+    ] as any);
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
+    ).mockResolvedValueOnce(new Map([['defect-1', 'Crack']]));
+
+    const result = await ReportSummaryService.getSummary(
+      'monthly',
+      new Date('2026-03-15'),
+    );
+
+    expect(result.defects).toEqual([
+      {
+        id: 'defect-1',
+        name: 'Crack',
+        resolutionStatus: 'RESOLVED',
+        value: 2,
+      },
+      {
+        id: 'invalid-id',
+        name: 'Unknown (invalid-id)',
+        resolutionStatus: 'INVALID',
+        value: 1,
+      },
+      {
+        id: null,
+        name: '未分类',
+        resolutionStatus: 'MISSING',
+        value: 1,
+      },
+    ]);
+  });
+
   it('returns empty majorEvents when no events exist', async () => {
     const result = await ReportSummaryService.getSummary(
       'monthly',

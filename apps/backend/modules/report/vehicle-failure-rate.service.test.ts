@@ -77,6 +77,17 @@ describe('vehicleFailureRateService', () => {
 
   it('returns ranking based on failure records', async () => {
     const { AfterSalesAPI } = await import('~/modules/after-sales');
+    const { MasterDataGovernanceKernel } = await import(
+      '~/utils/canonical-master-data'
+    );
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
+    ).mockResolvedValueOnce(
+      new Map([
+        ['dt-1', 'Crack'],
+        ['dt-2', 'Rust'],
+      ]),
+    );
     (AfterSalesAPI.getVehicleFailureRecords as any).mockResolvedValue([
       {
         defectType: 'Crack',
@@ -102,6 +113,73 @@ describe('vehicleFailureRateService', () => {
     expect(result.ranking[0].defectType).toBeDefined();
     expect(result.ranking[0].count).toBeGreaterThan(0);
     expect(result.ranking[0].percentage).toBeGreaterThan(0);
+  });
+
+  it('keeps same-name IDs separate and preserves unresolved ID buckets', async () => {
+    const { AfterSalesAPI } = await import('~/modules/after-sales');
+    const { MasterDataGovernanceKernel } = await import(
+      '~/utils/canonical-master-data'
+    );
+    (AfterSalesAPI.getVehicleFailureRecords as any).mockResolvedValue([
+      { defectType: 'Old Name', defectTypeId: 'dt-1', occurDate: new Date() },
+      { defectType: 'Same', defectTypeId: 'dt-2', occurDate: new Date() },
+      { defectType: 'Same', defectTypeId: 'dt-3', occurDate: new Date() },
+      {
+        defectType: 'Must Not Be Used',
+        defectTypeId: 'bad-id',
+        occurDate: new Date(),
+      },
+      {
+        defectType: 'Must Not Be Used',
+        defectTypeId: null,
+        occurDate: new Date(),
+      },
+    ]);
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
+    ).mockResolvedValueOnce(
+      new Map([
+        ['dt-1', 'Current Name'],
+        ['dt-2', 'Same'],
+        ['dt-3', 'Same'],
+      ]),
+    );
+
+    const result =
+      await VehicleFailureRateService.getVehicleFailureRate('2026-06');
+
+    expect(result.ranking).toEqual([
+      expect.objectContaining({
+        count: 1,
+        defectType: 'Current Name',
+        id: 'dt-1',
+        resolutionStatus: 'RESOLVED',
+      }),
+      expect.objectContaining({
+        count: 1,
+        defectType: 'Same',
+        id: 'dt-2',
+        resolutionStatus: 'RESOLVED',
+      }),
+      expect.objectContaining({
+        count: 1,
+        defectType: 'Same',
+        id: 'dt-3',
+        resolutionStatus: 'RESOLVED',
+      }),
+      expect.objectContaining({
+        count: 1,
+        defectType: 'Unknown (bad-id)',
+        id: 'bad-id',
+        resolutionStatus: 'INVALID',
+      }),
+      expect.objectContaining({
+        count: 1,
+        defectType: '未分类',
+        id: null,
+        resolutionStatus: 'MISSING',
+      }),
+    ]);
   });
 
   it('manual data overrides automatic monthly counts in year series', async () => {

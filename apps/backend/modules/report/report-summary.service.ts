@@ -1,5 +1,7 @@
 import {
+  createIdentityAggregateItem,
   parseReportPeriodType,
+  QMS_DEFAULT_VALUES,
   resolveReportPeriodRange,
   resolveReportShortLabel,
   shiftReportAnchorDate,
@@ -95,10 +97,7 @@ export const ReportSummaryService = {
         },
       ],
       historyLabels: periods.map((p) => formatDateShort(p.start, type)),
-      defects: defects.map((d) => ({
-        name: d.defectType || '未分类',
-        value: d._count,
-      })),
+      defects,
       processPassRates,
       topProjects: topRiskProjects.map((p) => ({
         name: p.projectName || '未知项目',
@@ -192,27 +191,26 @@ async function fetchProcessPassRates(start: Date, end: Date) {
 
 async function fetchDefectDistribution(start: Date, end: Date) {
   const rows = await InspectionService.getReportDefectRows({ start, end });
+  const countByDefectTypeId = new Map<null | string, number>();
+  for (const row of rows) {
+    const id = String(row.defectTypeId || '').trim() || null;
+    countByDefectTypeId.set(id, (countByDefectTypeId.get(id) || 0) + 1);
+  }
   const defectTypeNameById =
     await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
       configKey: 'defectType',
-      canonicalIds: rows.map((item) => item.defectTypeId),
+      canonicalIds: [...countByDefectTypeId.keys()],
     });
-  const countByDefectType = new Map<string, number>();
-  for (const row of rows) {
-    const key =
-      defectTypeNameById.get(String(row.defectTypeId || '')) ||
-      String(row.defectType || '').trim() ||
-      '未分类';
-    countByDefectType.set(key, (countByDefectType.get(key) || 0) + 1);
-  }
-  return [...countByDefectType.entries()]
-    .map(([defectType, count]) => ({
-      defectType,
-      _count: {
-        defectType: count,
-      },
-    }))
-    .sort((a, b) => b._count.defectType - a._count.defectType)
+  return [...countByDefectTypeId.entries()]
+    .map(([id, value]) =>
+      createIdentityAggregateItem({
+        canonicalName: id ? defectTypeNameById.get(id) : null,
+        id,
+        missingName: QMS_DEFAULT_VALUES.UNCLASSIFIED,
+        value,
+      }),
+    )
+    .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 }
 
