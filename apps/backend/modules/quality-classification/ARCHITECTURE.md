@@ -46,3 +46,11 @@ The legacy `*TypeId` and `*SubtypeId` columns remain during migration compatibil
 - `resolveActiveSelectionByNames(scope, categoryName, subcategoryName)` is a strict import adapter. It never guesses or falls back across scopes.
 
 Management routes require `System:QualityClassification:List` or `System:QualityClassification:Edit`. All inputs use Zod, deletion is soft, and the migration contains structure only; initial identities belong in idempotent release maintenance.
+
+## 上线初始化与历史回填
+
+- `scripts/backfill-quality-classifications.ts --apply` 先按稳定编码补齐三套初始分类，再分批处理历史业务数据；已存在的分类不会被重命名、启用或恢复，因此后续系统设置中的人工调整不会被发布流程覆盖。
+- 历史回填只接受“一级名称 + 二级名称”的唯一精确匹配，并通过 compare-and-set 只补空 ID。已有 ID 与名称证据冲突时不覆盖。
+- 缺少名称、无法匹配和已有 ID 冲突统一写入 `unresolved_master_data_refs`，保留原始名称与 ID 证据，供后续人工处理。
+- 发布维护脚本 `scripts/run-release-maintenance.sh` 在数据库 migration 之后、应用切流之前执行该任务；本地容器初始化复用同一顺序。
+- `AFTER_SALES_PRODUCT:VEHICLE_PRODUCT` 是车辆故障率报表使用的稳定语义编码，报表不得再依赖“车辆产品”显示名称。

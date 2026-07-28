@@ -24,6 +24,7 @@
     "maintenance:team-merge": "TEAM_IDENTITY_MAINTENANCE_MODE=1 tsx scripts/merge-team-identities.ts",
     "maintenance:inspection-request-categories": "tsx scripts/backfill-inspection-request-categories.ts",
     "maintenance:inspection-request-process-options": "tsx scripts/backfill-inspection-request-process-options.ts",
+    "maintenance:quality-classifications": "tsx scripts/backfill-quality-classifications.ts",
     "maintenance:inspection-issue-divisions": "tsx scripts/backfill-inspection-issue-divisions.ts",
     "maintenance:inspection-issue-responsibilities": "tsx scripts/backfill-inspection-issue-responsibilities.ts",
     "maintenance:role-page-permissions": "tsx scripts/backfill-role-page-permissions.ts",

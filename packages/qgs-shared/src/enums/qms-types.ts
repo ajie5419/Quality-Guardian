@@ -42,17 +42,6 @@ export const ISSUE_DEPT_TYPE = {
 export type IssueDeptType =
   (typeof ISSUE_DEPT_TYPE)[keyof typeof ISSUE_DEPT_TYPE];
 
-export const ISSUE_DEFECT_TYPE = {
-  DESIGN: '设计缺陷',
-  MANUFACTURING: '制造缺陷',
-  OTHER: '其他缺陷',
-  PART: '零部件缺陷',
-  PROCESS: '工艺缺陷',
-} as const;
-
-export type IssueDefectType =
-  (typeof ISSUE_DEFECT_TYPE)[keyof typeof ISSUE_DEFECT_TYPE];
-
 export const SUPPLIER_CATEGORY = {
   OUTSOURCING: 'Outsourcing',
   PRODUCTION: 'ProductionUnit',
@@ -122,8 +111,6 @@ export const INSPECTION_ISSUE_CLAIM_OPTIONS = [
 
 export const INSPECTION_ISSUE_DEFAULT_VALUES = {
   DEFAULT_CLAIM: CLAIM_STATUS.NO,
-  DEFAULT_DEFECT_SUBTYPE: '加工精度缺陷',
-  DEFAULT_DEFECT_TYPE: '制造缺陷',
   DEFAULT_QUANTITY: 1,
   DEFAULT_SEVERITY: ISSUE_SEVERITY.MINOR,
   DEFAULT_STATUS: InspectionIssueStatusEnum.OPEN,

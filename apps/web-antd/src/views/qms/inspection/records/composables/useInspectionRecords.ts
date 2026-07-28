@@ -22,6 +22,8 @@ interface GridRefLike {
 
 interface LinkedIssuePayload {
   claim?: string;
+  defectCategoryId?: string;
+  defectSubcategoryId?: string;
   defectSubtype?: string;
   defectType?: string;
   description?: string;
@@ -45,6 +47,8 @@ interface LinkedIssuePayload {
 
 type InspectionIssueCreatePayload = {
   claim?: string;
+  defectCategoryId?: string;
+  defectSubcategoryId?: string;
   defectSubtype?: string;
   defectType?: string;
   description?: string;
@@ -119,8 +123,10 @@ export function useInspectionRecords() {
         try {
           const issuePayload: InspectionIssueCreatePayload = {
             claim: linkedIssue.claim || 'No',
+            defectCategoryId: linkedIssue.defectCategoryId,
+            defectSubcategoryId: linkedIssue.defectSubcategoryId,
             defectSubtype: linkedIssue.defectSubtype,
-            defectType: linkedIssue.defectType || '制造缺陷',
+            defectType: linkedIssue.defectType,
             description: linkedIssue.description,
             inspectionId,
             lossAmount: Number(linkedIssue.lossAmount || 0),
