@@ -148,6 +148,31 @@ describe('inspection request category backfill', () => {
     expect(categoryBackfillIndex).toBeGreaterThan(identityBackfillIndex);
   });
 
+  it('runs quality loss index rebuild detached after the healthcheck', () => {
+    const maintenanceScript = readFileSync(
+      'scripts/run-release-maintenance.sh',
+      'utf8',
+    );
+    const deployWorkflow = readFileSync(
+      '../../.github/workflows/deploy.yml',
+      'utf8',
+    );
+    const healthcheckIndex = deployWorkflow.indexOf('if [ "$ok" -ne 1 ]');
+    const qualityLossContainerIndex = deployWorkflow.indexOf(
+      'docker rm -f "$QUALITY_LOSS_BACKFILL_CONTAINER"',
+    );
+    const detachedRunIndex = deployWorkflow.indexOf(
+      'run --rm -d --name "$QUALITY_LOSS_BACKFILL_CONTAINER"',
+    );
+
+    expect(maintenanceScript).not.toContain(
+      'scripts/backfill-quality-loss-index.ts',
+    );
+    expect(healthcheckIndex).toBeGreaterThan(-1);
+    expect(qualityLossContainerIndex).toBeGreaterThan(healthcheckIndex);
+    expect(detachedRunIndex).toBeGreaterThan(qualityLossContainerIndex);
+  });
+
   it('is idempotent after an applied row no longer matches the null category query', async () => {
     vi.mocked(prisma.qms_inspection_requests.findMany)
       .mockResolvedValueOnce([

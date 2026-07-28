@@ -161,6 +161,8 @@ jobs:
             RELEASE_MAINTENANCE_CMD="cd /app/apps/backend && sh scripts/run-release-maintenance.sh"
             SUPPLIER_SCORE_BACKFILL_CMD="cd /app/apps/backend && SUPPLIER_SCORE_BACKFILL_MODE=missing /app/apps/backend/node_modules/.bin/tsx scripts/backfill-supplier-score-snapshots.ts"
             SUPPLIER_SCORE_BACKFILL_CONTAINER="qms-supplier-score-backfill"
+            QUALITY_LOSS_BACKFILL_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-quality-loss-index.ts"
+            QUALITY_LOSS_BACKFILL_CONTAINER="qms-quality-loss-backfill"
 
             echo "docker disk usage before cleanup"
             docker system df || true
@@ -197,6 +199,9 @@ jobs:
 
             docker rm -f "$SUPPLIER_SCORE_BACKFILL_CONTAINER" >/dev/null 2>&1 || true
             docker compose -f "$COMPOSE_FILE" run --rm -d --name "$SUPPLIER_SCORE_BACKFILL_CONTAINER" backend sh -lc "$SUPPLIER_SCORE_BACKFILL_CMD"
+
+            docker rm -f "$QUALITY_LOSS_BACKFILL_CONTAINER" >/dev/null 2>&1 || true
+            docker compose -f "$COMPOSE_FILE" run --rm -d --name "$QUALITY_LOSS_BACKFILL_CONTAINER" backend sh -lc "$QUALITY_LOSS_BACKFILL_CMD"
 
             trap - ERR
             rm -f "$COMPOSE_FILE.bak"

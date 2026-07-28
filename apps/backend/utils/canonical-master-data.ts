@@ -591,11 +591,133 @@ async function countCanonicalRows(canonical: MasterDataCanonicalRelation) {
   return toAffectedRows(rows[0]?.count);
 }
 
+async function persistUnresolvedCanonicalRefs(params: {
+  configKey: string;
+  rows: Array<{ rowKey: string; value: string }>;
+  target: MasterDataTarget;
+}) {
+  const fieldName = params.target.idColumn;
+  if (!fieldName || params.rows.length === 0) return;
+  const canonicalTable = getFieldOrThrow(params.configKey).canonical?.table;
+  if (!canonicalTable) {
+    throw new Error(`CANONICAL_RELATION_REQUIRED:${params.configKey}`);
+  }
+  const evidence = {
+    canonicalTable,
+    configKey: params.configKey,
+    targetNameColumn: params.target.nameColumn,
+  };
+  const batchSize = 50;
+  for (let offset = 0; offset < params.rows.length; offset += batchSize) {
+    const batch = params.rows.slice(offset, offset + batchSize);
+    await Promise.all(
+      batch.map((row) =>
+        prisma.unresolved_master_data_refs.upsert({
+          where: {
+            entityType_entityId_fieldName: {
+              entityId: row.rowKey,
+              entityType: params.target.table,
+              fieldName,
+            },
+          },
+          create: {
+            entityId: row.rowKey,
+            entityType: params.target.table,
+            evidence,
+            fieldName,
+            rawId: null,
+            rawName: row.value,
+            reason: 'NO_EXACT_CANONICAL_MATCH',
+          },
+          update: {
+            evidence,
+            isDeleted: false,
+            rawId: null,
+            rawName: row.value,
+            reason: 'NO_EXACT_CANONICAL_MATCH',
+            resolutionNote: null,
+            resolvedAt: null,
+            resolvedId: null,
+            status: 'OPEN',
+          },
+        }),
+      ),
+    );
+  }
+}
+
+async function resolveCanonicalRefs(params: {
+  pairs: Array<{ canonicalId: string; rowKey: string }>;
+  target: MasterDataTarget;
+}) {
+  const fieldName = params.target.idColumn;
+  if (!fieldName || params.pairs.length === 0) return;
+  const tableName = quoteIdentifier(params.target.table);
+  const primaryKeyColumn = await getSinglePrimaryKeyColumn(params.target.table);
+  if (!primaryKeyColumn) {
+    throw new Error(`UNSUPPORTED_PRIMARY_KEY:${params.target.table}`);
+  }
+  const rowKeyColumn = quoteIdentifier(primaryKeyColumn);
+  const canonicalIdColumn = quoteIdentifier(fieldName);
+  const placeholders = params.pairs.map(() => '?').join(', ');
+  const persistedRows = await prisma.$queryRawUnsafe<
+    Array<{ canonicalId: null | string; rowKey: string }>
+  >(
+    `SELECT ${rowKeyColumn} AS rowKey, ${canonicalIdColumn} AS canonicalId
+     FROM ${tableName}
+     WHERE ${rowKeyColumn} IN (${placeholders})`,
+    ...params.pairs.map((pair) => pair.rowKey),
+  );
+  const expectedIdByRowKey = new Map(
+    params.pairs.map((pair) => [pair.rowKey, pair.canonicalId]),
+  );
+  const confirmedPairs = persistedRows.filter(
+    (row) => expectedIdByRowKey.get(row.rowKey) === row.canonicalId,
+  );
+  const batchSize = 50;
+  for (let offset = 0; offset < confirmedPairs.length; offset += batchSize) {
+    const batch = confirmedPairs.slice(offset, offset + batchSize);
+    const openAudits = await prisma.unresolved_master_data_refs.findMany({
+      where: {
+        entityId: { in: batch.map((pair) => pair.rowKey) },
+        entityType: params.target.table,
+        fieldName,
+        isDeleted: false,
+        status: 'OPEN',
+      },
+      select: { entityId: true },
+    });
+    const openEntityIds = new Set(openAudits.map((audit) => audit.entityId));
+    await Promise.all(
+      batch
+        .filter((pair) => openEntityIds.has(pair.rowKey))
+        .map((pair) =>
+          prisma.unresolved_master_data_refs.updateMany({
+            where: {
+              entityId: pair.rowKey,
+              entityType: params.target.table,
+              fieldName,
+              isDeleted: false,
+              status: 'OPEN',
+            },
+            data: {
+              resolutionNote: 'Resolved by deterministic canonical ID backfill',
+              resolvedAt: new Date(),
+              resolvedId: pair.canonicalId,
+              status: 'RESOLVED',
+            },
+          }),
+        ),
+    );
+  }
+}
+
 async function backfillTargetCanonicalIds(
   target: MasterDataTarget,
   resolvedIdMap: Map<string, string>,
   options: {
     batchSize: number;
+    configKey: string;
     maxBatches?: number;
     maxRows?: number;
     startAfterId?: null | string;
@@ -621,6 +743,7 @@ async function backfillTargetCanonicalIds(
   const rowKeyColumn = quoteIdentifier(primaryKeyColumn);
   const nameColumn = quoteIdentifier(target.nameColumn);
   const canonicalIdColumn = quoteIdentifier(target.idColumn);
+  const activeRowWhere = await buildActiveRowWhereSql(target.table);
   const batchSize = Math.max(1, Number(options.batchSize || 1000));
   const maxRows = Math.max(0, Number(options.maxRows || 0));
   const maxBatches = Math.max(0, Number(options.maxBatches || 0));
@@ -649,6 +772,7 @@ async function backfillTargetCanonicalIds(
        WHERE ${canonicalIdColumn} IS NULL
          AND ${nameColumn} IS NOT NULL
          AND TRIM(${nameColumn}) <> ''
+         AND ${activeRowWhere}
          AND (? IS NULL OR ${rowKeyColumn} > ?)
        ORDER BY ${rowKeyColumn} ASC
        LIMIT ?`,
@@ -672,9 +796,17 @@ async function backfillTargetCanonicalIds(
       .filter((row): row is { canonicalId: string; rowKey: string } =>
         Boolean(row.canonicalId),
       );
+    const unresolved = rows.filter(
+      (row) => !resolvedIdMap.has(normalizeValue(row.value)),
+    );
+    unresolvedRows += unresolved.length;
+    await persistUnresolvedCanonicalRefs({
+      configKey: options.configKey,
+      rows: unresolved,
+      target,
+    });
 
     if (pairs.length === 0) {
-      unresolvedRows += rows.length;
       if (rows.length < limit) {
         exhausted = true;
         break;
@@ -695,10 +827,12 @@ async function backfillTargetCanonicalIds(
     const affectedRows = await prisma.$executeRawUnsafe(
       `UPDATE ${tableName}
        SET ${canonicalIdColumn} = CASE ${rowKeyColumn} ${caseWhenSql} ELSE ${canonicalIdColumn} END
-       WHERE ${rowKeyColumn} IN (${placeholders})`,
+       WHERE ${canonicalIdColumn} IS NULL
+         AND ${rowKeyColumn} IN (${placeholders})`,
       ...params,
     );
     updatedRows += toAffectedRows(affectedRows);
+    await resolveCanonicalRefs({ pairs, target });
     if (rows.length < limit) {
       exhausted = true;
       break;
@@ -1117,6 +1251,7 @@ export const MasterDataGovernanceKernel = {
       if (!target.idColumn) continue;
       const progress = await backfillTargetCanonicalIds(target, resolvedIdMap, {
         batchSize,
+        configKey: options.configKey,
         maxBatches: options.maxBatchesPerTable,
         maxRows: options.maxRowsPerTable,
         startAfterId: options.startAfterIdsByTable?.[target.table],

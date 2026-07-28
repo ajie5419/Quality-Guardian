@@ -5,7 +5,14 @@ import {
   MasterDataGovernanceKernel,
 } from './canonical-master-data';
 
-const { executeRawUnsafe, queryRawUnsafe, transaction } = vi.hoisted(() => {
+const {
+  executeRawUnsafe,
+  queryRawUnsafe,
+  transaction,
+  unresolvedFindMany,
+  unresolvedUpdateMany,
+  unresolvedUpsert,
+} = vi.hoisted(() => {
   const queryRawUnsafe = vi.fn();
   return {
     executeRawUnsafe: vi.fn(),
@@ -15,6 +22,9 @@ const { executeRawUnsafe, queryRawUnsafe, transaction } = vi.hoisted(() => {
         callback: (tx: { $queryRawUnsafe: typeof queryRawUnsafe }) => unknown,
       ) => callback({ $queryRawUnsafe: queryRawUnsafe }),
     ),
+    unresolvedFindMany: vi.fn(),
+    unresolvedUpdateMany: vi.fn(),
+    unresolvedUpsert: vi.fn(),
   };
 });
 
@@ -23,6 +33,11 @@ vi.mock('~/utils/prisma', () => ({
     $executeRawUnsafe: executeRawUnsafe,
     $queryRawUnsafe: queryRawUnsafe,
     $transaction: transaction,
+    unresolved_master_data_refs: {
+      findMany: unresolvedFindMany,
+      updateMany: unresolvedUpdateMany,
+      upsert: unresolvedUpsert,
+    },
   },
 }));
 
@@ -35,6 +50,9 @@ describe('masterDataGovernanceKernel', () => {
     queryRawUnsafe.mockReset();
     executeRawUnsafe.mockReset();
     transaction.mockClear();
+    unresolvedFindMany.mockReset();
+    unresolvedUpdateMany.mockReset();
+    unresolvedUpsert.mockReset();
   });
 
   afterEach(() => {
@@ -156,6 +174,87 @@ describe('masterDataGovernanceKernel', () => {
       ),
     ).resolves.toEqual(['Welding']);
     expect(queryRawUnsafe.mock.calls[1]?.[0]).toContain('`processId` IS NULL');
+  });
+
+  it('persists every unresolved canonical target in a mixed batch', async () => {
+    __masterDataGovernanceTestHooks.resetCaches();
+    queryRawUnsafe
+      .mockResolvedValueOnce([{ columnName: 'id' }])
+      .mockResolvedValueOnce([
+        { columnName: 'id' },
+        { columnName: 'isDeleted' },
+      ])
+      .mockResolvedValueOnce([
+        { rowKey: 'requirement-1', value: 'Unknown process' },
+        { rowKey: 'requirement-2', value: 'Welding' },
+      ])
+      .mockResolvedValueOnce([
+        { canonicalId: 'process-1', rowKey: 'requirement-2' },
+      ]);
+    executeRawUnsafe.mockResolvedValue(1);
+    unresolvedFindMany.mockResolvedValue([{ entityId: 'requirement-2' }]);
+    unresolvedUpdateMany.mockResolvedValue({ count: 1 });
+    unresolvedUpsert.mockResolvedValue({ id: 'audit-1' });
+
+    await expect(
+      __masterDataGovernanceTestHooks.backfillTargetCanonicalIds(
+        {
+          idColumn: 'processId',
+          nameColumn: 'processName',
+          nullable: true,
+          table: 'work_order_requirements',
+        },
+        new Map([['Welding', 'process-1']]),
+        { batchSize: 100, configKey: 'processName' },
+      ),
+    ).resolves.toMatchObject({
+      exhausted: true,
+      scannedRows: 2,
+      unresolvedRows: 1,
+      updatedRows: 1,
+    });
+
+    expect(unresolvedUpsert).toHaveBeenCalledWith({
+      where: {
+        entityType_entityId_fieldName: {
+          entityId: 'requirement-1',
+          entityType: 'work_order_requirements',
+          fieldName: 'processId',
+        },
+      },
+      create: expect.objectContaining({
+        entityId: 'requirement-1',
+        entityType: 'work_order_requirements',
+        fieldName: 'processId',
+        rawId: null,
+        rawName: 'Unknown process',
+        reason: 'NO_EXACT_CANONICAL_MATCH',
+      }),
+      update: expect.objectContaining({
+        isDeleted: false,
+        rawName: 'Unknown process',
+        status: 'OPEN',
+      }),
+    });
+    expect(queryRawUnsafe.mock.calls[2]?.[0]).toContain('`isDeleted` = 0');
+    expect(executeRawUnsafe.mock.calls[0]?.[0]).toContain(
+      '`processId` IS NULL',
+    );
+    expect(unresolvedUpdateMany).toHaveBeenCalledWith({
+      where: {
+        entityId: 'requirement-2',
+        entityType: 'work_order_requirements',
+        fieldName: 'processId',
+        isDeleted: false,
+        status: 'OPEN',
+      },
+      data: {
+        resolutionNote: 'Resolved by deterministic canonical ID backfill',
+        resolvedAt: expect.any(Date),
+        resolvedId: 'process-1',
+        status: 'RESOLVED',
+      },
+    });
   });
 
   it('rejects a canonical ID and name mismatch', async () => {
