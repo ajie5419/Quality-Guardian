@@ -21,7 +21,7 @@ The canonical ID is `dictionaries.id` for rows whose `dictType` is `team`. `dict
 ## Identity invariants
 
 - Business rows, statistics, events, and mappings use TEAM IDs. Names are display snapshots only.
-- Name keys normalize Unicode compatibility forms, case, whitespace, punctuation, and separators to detect collisions. A collision blocks online create or rename; it does not select a merge target.
+- Name keys normalize Unicode compatibility forms, case, whitespace, punctuation, and separators to detect collisions. Active aliases are unique by `teamId + nameKey`; a collision blocks online create or rename and never selects a merge target.
 - Renaming keeps the same TEAM ID, stores the previous name as a historical alias, and promotes the new canonical alias.
 - Near-name groups are ambiguity signals only. Reconciliation persists them for review and never merges them automatically.
 - Generic dictionary create, update, and delete endpoints reject `dictType=team`. TEAM mutations go through `TeamIdentityService`.
@@ -56,15 +56,17 @@ The deleted name bootstrap must not return. It collapsed source identities into 
 
 Confirmed duplicates are merged only through `merge-team-identities.ts` with `TEAM_IDENTITY_MAINTENANCE_MODE=1`, backend writes stopped, explicit source and target IDs, an operator, and a reason.
 
-One database transaction:
+The maintenance runner uses a durable, resumable state machine:
 
-1. validates both TEAM IDs and supplier-link compatibility;
-2. creates an idempotent pending audit and quarantines the source;
-3. migrates inspection requests, inspections, welders, work-order requirements, supplier links, aliases, name keys, and source links in bounded batches;
-4. verifies that no source references remain;
-5. retires the source and completes the audit with reference counts.
+1. validates both TEAM IDs and supplier-link compatibility, claims unique participant locks, and quarantines the source in one transaction;
+2. claims a `RUNNING` execution lease with an attempt token, allowing an expired or failed attempt to be resumed without allowing an older attempt to overwrite newer state;
+3. migrates inspection requests, inspections, welders, work-order requirements, supplier links, aliases, name keys, and source links in independently committed groups;
+4. stores cumulative reference counts in the same transaction as each group, so retries count previously committed and newly migrated rows exactly once;
+5. verifies that no source references remain, retires the source, completes the audit, and releases participant locks in one transaction.
 
-Any error rolls back the merge. There is no online merge API because concurrent business writes would make the reference move non-atomic at the application boundary.
+Each reference batch uses a compare-and-set predicate and aborts when its applied row count differs from the scanned row count. Supplier-link migration classifies active and soft-deleted source/target states and re-reads after a unique-key race. There is no online merge API because merge execution still requires maintenance mode with application writes stopped.
+
+TEAM option reads bypass Redis, so TEAM mutations do not depend on distributed cache invalidation for correctness. Generic dictionary options retain their existing cache behavior for non-TEAM dictionary types.
 
 ## Statistics contract
 

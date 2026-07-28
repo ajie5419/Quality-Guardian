@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
-import { redis } from '~/utils/redis';
 
 import { TeamIdentityService } from './team-identity.service';
 
@@ -54,10 +53,6 @@ vi.mock('~/utils/prisma-error', () => ({
   isPrismaUniqueConstraintError: vi.fn(),
 }));
 
-vi.mock('~/utils/redis', () => ({
-  redis: { del: vi.fn() },
-}));
-
 const activeTeam = {
   createdAt: new Date('2026-07-01T00:00:00.000Z'),
   createdBy: 'admin',
@@ -86,7 +81,6 @@ describe('teamIdentityService', () => {
       null,
     );
     vi.mocked(mocks.tx.dictionaries.findMany).mockResolvedValue([]);
-    vi.mocked(redis.del).mockResolvedValue(undefined);
   });
 
   it('creates the dictionary identity, canonical alias, and manual source atomically', async () => {
@@ -126,7 +120,6 @@ describe('teamIdentityService', () => {
         teamId: 'team-1',
       }),
     });
-    expect(redis.del).toHaveBeenCalledWith('qms:dict:options:team');
   });
 
   it('blocks a normalized collision with a legacy TEAM row', async () => {
@@ -183,9 +176,17 @@ describe('teamIdentityService', () => {
     );
 
     expect(result.name).toBe('Structure BU Two');
+    expect(SupplierIdentityService.lockTeamForMutation).toHaveBeenCalledWith(
+      activeTeam.id,
+      mocks.tx,
+    );
     expect(mocks.tx.team_identity_aliases.update).toHaveBeenCalledWith({
       where: { id: 'alias-old' },
-      data: { alias: 'Structure BU2', aliasKind: 'HISTORICAL' },
+      data: {
+        alias: 'Structure BU2',
+        aliasKind: 'HISTORICAL',
+        nameKey: 'structurebu2',
+      },
     });
     expect(mocks.tx.team_identity_aliases.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -193,6 +194,49 @@ describe('teamIdentityService', () => {
         aliasKind: 'CANONICAL',
       }),
     });
+  });
+
+  it('allows a display-only rename that keeps the same normalized name key', async () => {
+    const renamedTeam = {
+      ...activeTeam,
+      dictKey: 'StructureBU2',
+      dictValue: 'StructureBU2',
+    };
+    vi.mocked(mocks.tx.dictionaries.findFirst)
+      .mockResolvedValueOnce(activeTeam)
+      .mockResolvedValueOnce(renamedTeam);
+    vi.mocked(mocks.tx.dictionaries.updateMany).mockResolvedValue({ count: 1 });
+    vi.mocked(mocks.tx.team_identity_name_keys.findUnique).mockResolvedValue({
+      teamId: activeTeam.id,
+    } as never);
+    vi.mocked(mocks.tx.team_identity_aliases.findFirst).mockResolvedValue({
+      alias: activeTeam.dictKey,
+      aliasKind: 'HISTORICAL',
+      createdAt: activeTeam.createdAt,
+      createdBy: 'admin',
+      id: 'alias-canonical',
+      isDeleted: false,
+      nameKey: 'structurebu2',
+      teamId: activeTeam.id,
+      updatedAt: activeTeam.updatedAt,
+    });
+
+    await expect(
+      TeamIdentityService.update(
+        activeTeam.id,
+        { name: 'StructureBU2' },
+        'admin',
+      ),
+    ).resolves.toMatchObject({ name: 'StructureBU2' });
+    expect(mocks.tx.team_identity_aliases.update).toHaveBeenCalledWith({
+      where: { id: 'alias-canonical' },
+      data: {
+        alias: 'StructureBU2',
+        aliasKind: 'CANONICAL',
+        nameKey: 'structurebu2',
+      },
+    });
+    expect(mocks.tx.team_identity_aliases.create).not.toHaveBeenCalled();
   });
 
   it('rejects a concurrent update without writing aliases', async () => {

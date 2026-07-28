@@ -119,12 +119,12 @@ async function upsertOwnedAlias(
 ) {
   const nameKey = buildTeamIdentityNameKey(alias);
   const existing = await client.team_identity_aliases.findFirst({
-    where: { alias, isDeleted: false, teamId },
+    where: { isDeleted: false, nameKey, teamId },
   });
   if (existing) {
     await client.team_identity_aliases.update({
       where: { id: existing.id },
-      data: { alias, aliasKind },
+      data: { alias, aliasKind, nameKey },
     });
     return;
   }

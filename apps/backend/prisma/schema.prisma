@@ -257,24 +257,25 @@ model departments {
 }
 
 model dictionaries {
-  id                         String                    @id @default(cuid())
+  id                         String                             @id @default(cuid())
   dictType                   String
   dictKey                    String
   dictValue                  String
-  sort                       Int                       @default(0)
-  status                     Int                       @default(1)
-  remark                     String?                   @db.Text
-  isSystem                   Boolean                   @default(false)
-  isDeleted                  Boolean                   @default(false)
+  sort                       Int                                @default(0)
+  status                     Int                                @default(1)
+  remark                     String?                            @db.Text
+  isSystem                   Boolean                            @default(false)
+  isDeleted                  Boolean                            @default(false)
   createdBy                  String?
   updatedBy                  String?
-  createdAt                  DateTime                  @default(now())
-  updatedAt                  DateTime                  @updatedAt
+  createdAt                  DateTime                           @default(now())
+  updatedAt                  DateTime                           @updatedAt
   teamIdentityAliases        team_identity_aliases[]
   teamIdentityNameKeys       team_identity_name_keys[]
   teamIdentitySources        team_identity_sources[]
-  teamIdentityMergesAsSource team_identity_merges[]    @relation("TeamIdentityMergeSource")
-  teamIdentityMergesAsTarget team_identity_merges[]    @relation("TeamIdentityMergeTarget")
+  teamIdentityMergesAsSource team_identity_merges[]             @relation("TeamIdentityMergeSource")
+  teamIdentityMergesAsTarget team_identity_merges[]             @relation("TeamIdentityMergeTarget")
+  teamIdentityMergeLocks     team_identity_merge_participants[]
 
   @@unique([dictType, dictKey, isDeleted])
   @@index([dictType])
@@ -295,7 +296,7 @@ model team_identity_aliases {
   updatedAt DateTime                 @updatedAt
   team      dictionaries             @relation(fields: [teamId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  @@unique([teamId, alias, isDeleted])
+  @@unique([teamId, nameKey, isDeleted])
   @@index([teamId, aliasKind, isDeleted])
   @@index([nameKey, isDeleted])
   @@index([alias])
@@ -332,25 +333,43 @@ model team_identity_sources {
 
 // @module team
 model team_identity_merges {
-  id                 String                     @id @default(cuid())
-  idempotencyKey     String                     @unique
+  id                 String                             @id @default(cuid())
+  idempotencyKey     String                             @unique
   sourceTeamId       String
   targetTeamId       String
   sourceNameSnapshot String
   targetNameSnapshot String
-  status             team_identity_merge_status @default(PENDING)
+  status             team_identity_merge_status         @default(PENDING)
+  attemptToken       String?
+  leaseUntil         DateTime?
+  failureCount       Int                                @default(0)
+  lastError          String?                            @db.Text
   referenceCounts    Json?
-  reason             String?                    @db.Text
+  reason             String?                            @db.Text
   operator           String
   completedAt        DateTime?
-  isDeleted          Boolean                    @default(false)
-  createdAt          DateTime                   @default(now())
-  updatedAt          DateTime                   @updatedAt
-  sourceTeam         dictionaries               @relation("TeamIdentityMergeSource", fields: [sourceTeamId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  targetTeam         dictionaries               @relation("TeamIdentityMergeTarget", fields: [targetTeamId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  isDeleted          Boolean                            @default(false)
+  createdAt          DateTime                           @default(now())
+  updatedAt          DateTime                           @updatedAt
+  sourceTeam         dictionaries                       @relation("TeamIdentityMergeSource", fields: [sourceTeamId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  targetTeam         dictionaries                       @relation("TeamIdentityMergeTarget", fields: [targetTeamId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  participants       team_identity_merge_participants[]
 
   @@index([sourceTeamId, status, isDeleted])
   @@index([targetTeamId, status, isDeleted])
+  @@index([status, leaseUntil, isDeleted])
+}
+
+// @module team
+model team_identity_merge_participants {
+  teamId    String               @id
+  mergeId   String
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  team      dictionaries         @relation(fields: [teamId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  merge     team_identity_merges @relation(fields: [mergeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([mergeId])
 }
 
 model processes {
@@ -1741,6 +1760,7 @@ enum team_identity_source_type {
 
 enum team_identity_merge_status {
   PENDING
+  RUNNING
   COMPLETED
   FAILED
   CANCELLED

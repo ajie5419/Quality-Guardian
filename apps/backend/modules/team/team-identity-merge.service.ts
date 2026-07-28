@@ -1,5 +1,7 @@
 import type { Prisma } from '@prisma/client';
 
+import type { TeamIdentityReferenceGroup } from './team-identity-merge-references';
+import type { TeamMergeAttempt } from './team-identity-merge-state';
 import type { TeamIdentityMergeInput } from './team-identity.schema';
 
 import process from 'node:process';
@@ -11,29 +13,23 @@ import prisma from '~/utils/prisma';
 
 import {
   countTeamReferences,
-  createEmptyReferenceCounts,
-  migrateTeamReferences,
+  migrateTeamReferenceGroup,
+  TEAM_IDENTITY_REFERENCE_GROUPS,
 } from './team-identity-merge-references';
+import {
+  acquireTeamMerge,
+  addReferenceCounts,
+  markMergeAttemptFailed,
+  parseReferenceCounts,
+  renewMergeLease,
+} from './team-identity-merge-state';
 import { normalizeDisplayName, normalizeOperator } from './team-identity-write';
 
-const TEAM_DICT_TYPE = 'team';
-const ACTIVE_STATUS = 1;
+const QUARANTINED_STATUS = 2;
 const RETIRED_STATUS = 0;
 const DEFAULT_BATCH_SIZE = 200;
 const MAINTENANCE_MODE_ENV = 'TEAM_IDENTITY_MAINTENANCE_MODE';
 const logger = createModuleLogger('TeamIdentityMergeService');
-
-function parseReferenceCounts(value: null | Prisma.JsonValue) {
-  if (!value || Array.isArray(value) || typeof value !== 'object') {
-    return createEmptyReferenceCounts();
-  }
-  const counts = createEmptyReferenceCounts();
-  for (const key of Object.keys(counts) as Array<keyof typeof counts>) {
-    const count = value[key];
-    counts[key] = typeof count === 'number' ? count : 0;
-  }
-  return counts;
-}
 
 function normalizeMergeInput(input: TeamIdentityMergeInput, operator: string) {
   const sourceTeamId = normalizeDisplayName(input.sourceTeamId);
@@ -62,214 +58,151 @@ function assertMaintenanceMode() {
   }
 }
 
-async function loadMergeTeams(
-  tx: Prisma.TransactionClient,
-  sourceTeamId: string,
-  targetTeamId: string,
+async function migrateReferenceGroup(
+  attempt: TeamMergeAttempt,
+  group: TeamIdentityReferenceGroup,
 ) {
-  const teams = await tx.dictionaries.findMany({
-    where: {
-      id: { in: [sourceTeamId, targetTeamId] },
-      dictType: TEAM_DICT_TYPE,
-      isDeleted: false,
-    },
-    select: { dictKey: true, id: true, isSystem: true, status: true },
+  while (true) {
+    const delta = await prisma.$transaction(
+      async (tx) => {
+        await renewMergeLease(tx, attempt);
+        const migrated = await migrateTeamReferenceGroup(
+          tx,
+          attempt,
+          group,
+          DEFAULT_BATCH_SIZE,
+          attempt.operator,
+        );
+        await addReferenceCounts(tx, attempt, migrated);
+        return migrated;
+      },
+      { timeout: 30_000 },
+    );
+    if (
+      group === 'identityMetadata' ||
+      Object.values(delta).every((count) => count === 0)
+    ) {
+      return;
+    }
+  }
+}
+
+async function loadFinalCounts(
+  tx: Prisma.TransactionClient,
+  attempt: TeamMergeAttempt,
+) {
+  const audit = await tx.team_identity_merges.findUnique({
+    where: { id: attempt.auditId },
+    select: { referenceCounts: true },
   });
-  const source = teams.find((team) => team.id === sourceTeamId);
-  const target = teams.find((team) => team.id === targetTeamId);
-  if (!source || source.status !== ACTIVE_STATUS) {
+  if (!audit) {
     throw new BusinessError(
-      'TEAM_SOURCE_NOT_FOUND',
-      'Source TEAM is not active',
+      'TEAM_MERGE_NOT_FOUND',
+      'TEAM merge not found',
       404,
     );
   }
-  if (!target || target.status !== ACTIVE_STATUS) {
-    throw new BusinessError(
-      'TEAM_TARGET_NOT_FOUND',
-      'Target TEAM is not active',
-      404,
-    );
-  }
-  if (source.isSystem) {
-    throw new BusinessError('SYSTEM_TEAM', 'System TEAM cannot be merged', 403);
-  }
-  return { source, target };
+  return parseReferenceCounts(audit.referenceCounts);
 }
 
-async function assertNoMergeParticipantConflict(
+async function completeAudit(
   tx: Prisma.TransactionClient,
-  sourceTeamId: string,
-  targetTeamId: string,
+  attempt: TeamMergeAttempt,
+  counts: ReturnType<typeof parseReferenceCounts>,
 ) {
-  const conflict = await tx.team_identity_merges.findFirst({
+  const completed = await tx.team_identity_merges.updateMany({
     where: {
-      isDeleted: false,
-      status: team_identity_merge_status.PENDING,
-      OR: [
-        { sourceTeamId: { in: [sourceTeamId, targetTeamId] } },
-        { targetTeamId: { in: [sourceTeamId, targetTeamId] } },
-      ],
+      attemptToken: attempt.attemptToken,
+      id: attempt.auditId,
+      status: team_identity_merge_status.RUNNING,
     },
-    select: { id: true },
+    data: {
+      attemptToken: null,
+      completedAt: new Date(),
+      lastError: null,
+      leaseUntil: null,
+      referenceCounts: { ...counts },
+      status: team_identity_merge_status.COMPLETED,
+    },
   });
-  if (conflict) {
+  if (completed.count !== 1) {
     throw new BusinessError(
-      'TEAM_MERGE_PARTICIPANT_CONFLICT',
-      'A TEAM identity is already part of another pending merge',
+      'TEAM_MERGE_LEASE_LOST',
+      'TEAM merge lease was lost',
       409,
     );
   }
-}
-
-async function lockMergeParticipants(
-  tx: Prisma.TransactionClient,
-  teamIds: string[],
-) {
-  for (const teamId of [...new Set(teamIds)].sort()) {
-    await tx.$queryRaw`
-      SELECT id
-      FROM dictionaries
-      WHERE id = ${teamId} AND dictType = 'team'
-      FOR UPDATE
-    `;
-  }
-}
-
-async function assertSupplierLinksCompatible(
-  tx: Prisma.TransactionClient,
-  sourceTeamId: string,
-  targetTeamId: string,
-) {
-  const links = await tx.supplier_identity_links.findMany({
-    where: {
-      identityId: { in: [sourceTeamId, targetTeamId] },
-      identityType: 'TEAM',
-      isDeleted: false,
-    },
-    select: { identityId: true, supplierId: true },
+  await tx.team_identity_merge_participants.deleteMany({
+    where: { mergeId: attempt.auditId },
   });
-  const source = links.find((link) => link.identityId === sourceTeamId);
-  const target = links.find((link) => link.identityId === targetTeamId);
-  if (source && target && source.supplierId !== target.supplierId) {
-    throw new BusinessError(
-      'TEAM_MERGE_SUPPLIER_CONFLICT',
-      'Source and target TEAM identities belong to different suppliers',
-      409,
-    );
-  }
 }
 
-function completedMerge(previous: {
-  id: string;
-  referenceCounts: null | Prisma.JsonValue;
-  targetTeamId: string;
-}) {
-  return {
-    auditId: previous.id,
-    counts: parseReferenceCounts(previous.referenceCounts),
-    targetTeamId: previous.targetTeamId,
-  };
-}
-
-async function executeMerge(input: ReturnType<typeof normalizeMergeInput>) {
+async function finalizeMerge(attempt: TeamMergeAttempt) {
   return prisma.$transaction(
     async (tx) => {
-      const idempotencyKey = `team-merge:${input.sourceTeamId}`;
-      const previous = await tx.team_identity_merges.findUnique({
-        where: { idempotencyKey },
-      });
-      if (previous) {
-        if (previous.targetTeamId !== input.targetTeamId) {
-          throw new BusinessError(
-            'TEAM_ALREADY_MERGED',
-            'Source TEAM already has a different merge target',
-            409,
-          );
-        }
-        if (previous.status === team_identity_merge_status.COMPLETED) {
-          return completedMerge(previous);
-        }
-        throw new BusinessError(
-          'TEAM_MERGE_PENDING',
-          'Source TEAM already has an incomplete merge audit',
-          409,
-        );
-      }
-      await lockMergeParticipants(tx, [input.sourceTeamId, input.targetTeamId]);
-      await assertNoMergeParticipantConflict(
-        tx,
-        input.sourceTeamId,
-        input.targetTeamId,
-      );
-      const { source, target } = await loadMergeTeams(
-        tx,
-        input.sourceTeamId,
-        input.targetTeamId,
-      );
-      await assertSupplierLinksCompatible(tx, source.id, target.id);
-      const audit = await tx.team_identity_merges.create({
-        data: {
-          idempotencyKey,
-          operator: input.operator,
-          reason: input.reason,
-          sourceNameSnapshot: source.dictKey,
-          sourceTeamId: source.id,
-          targetNameSnapshot: target.dictKey,
-          targetTeamId: target.id,
-        },
-      });
-      const quarantined = await tx.dictionaries.updateMany({
-        where: {
-          id: source.id,
-          isDeleted: false,
-          status: ACTIVE_STATUS,
-        },
-        data: { status: 2, updatedBy: input.operator },
-      });
-      if (quarantined.count !== 1) {
-        throw new BusinessError(
-          'TEAM_MERGE_CONCURRENT_UPDATE',
-          'Source TEAM merge state changed',
-          409,
-        );
-      }
-      const merge = {
-        auditId: audit.id,
-        sourceName: source.dictKey,
-        sourceTeamId: source.id,
-        targetName: target.dictKey,
-        targetTeamId: target.id,
-      };
-      const counts = await migrateTeamReferences(
-        tx,
-        merge,
-        DEFAULT_BATCH_SIZE,
-        input.operator,
-      );
-      if ((await countTeamReferences(tx, source.id)) !== 0) {
+      await renewMergeLease(tx, attempt);
+      if ((await countTeamReferences(tx, attempt.sourceTeamId)) !== 0) {
         throw new BusinessError(
           'TEAM_MERGE_INCOMPLETE',
           'Source TEAM still has references',
           409,
         );
       }
-      await tx.dictionaries.update({
-        where: { id: source.id },
-        data: { status: RETIRED_STATUS, updatedBy: input.operator },
-      });
-      await tx.team_identity_merges.update({
-        where: { id: audit.id },
-        data: {
-          completedAt: new Date(),
-          referenceCounts: { ...counts },
-          status: team_identity_merge_status.COMPLETED,
+      const retired = await tx.dictionaries.updateMany({
+        where: {
+          id: attempt.sourceTeamId,
+          isDeleted: false,
+          status: QUARANTINED_STATUS,
         },
+        data: { status: RETIRED_STATUS, updatedBy: attempt.operator },
       });
-      return { auditId: audit.id, counts, targetTeamId: target.id };
+      if (retired.count !== 1) {
+        throw new BusinessError(
+          'TEAM_MERGE_CONCURRENT_UPDATE',
+          'Source TEAM merge state changed',
+          409,
+        );
+      }
+      const counts = await loadFinalCounts(tx, attempt);
+      await completeAudit(tx, attempt, counts);
+      return {
+        auditId: attempt.auditId,
+        counts,
+        targetTeamId: attempt.targetTeamId,
+      };
     },
-    { timeout: 120_000 },
+    { timeout: 30_000 },
   );
+}
+
+async function recordAttemptFailure(attempt: TeamMergeAttempt, error: unknown) {
+  try {
+    await markMergeAttemptFailed(attempt, error);
+  } catch (failureError: unknown) {
+    logger.error(
+      { err: failureError, auditId: attempt.auditId },
+      'failed to persist TEAM merge attempt failure',
+    );
+  }
+}
+
+async function executeMerge(input: ReturnType<typeof normalizeMergeInput>) {
+  const acquisition = await acquireTeamMerge(input);
+  if (acquisition.kind === 'completed') return acquisition.result;
+  const { attempt } = acquisition;
+  try {
+    for (const group of TEAM_IDENTITY_REFERENCE_GROUPS) {
+      await migrateReferenceGroup(attempt, group);
+    }
+    return await finalizeMerge(attempt);
+  } catch (error: unknown) {
+    logger.error(
+      { err: error, auditId: attempt.auditId },
+      'TEAM merge execution attempt failed',
+    );
+    await recordAttemptFailure(attempt, error);
+    throw error;
+  }
 }
 
 export const TeamIdentityMergeService = {

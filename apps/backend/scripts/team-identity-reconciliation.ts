@@ -139,10 +139,19 @@ export function buildLegacySourceClaims(
 ) {
   const claims = new Map<string, string[]>();
   for (const team of teams) {
-    for (const source of parseLegacySources(team.remark, team.id)) {
-      const normalized = source
-        .replace(/^department:/u, 'DEPARTMENT:')
-        .replace(/^supplier:/u, 'SUPPLIER:');
+    const sources = [
+      ...new Set(
+        parseLegacySources(team.remark, team.id).map((source) =>
+          source
+            .replace(/^department:/u, 'DEPARTMENT:')
+            .replace(/^supplier:/u, 'SUPPLIER:'),
+        ),
+      ),
+    ];
+    // A multi-source bootstrap remark only proves that names were coalesced;
+    // it cannot prove that the source identities are the same TEAM.
+    if (sources.length !== 1) continue;
+    for (const normalized of sources) {
       const ids = claims.get(normalized) || [];
       ids.push(team.id);
       claims.set(normalized, ids);

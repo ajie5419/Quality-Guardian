@@ -33,7 +33,21 @@ describe('team identity reconciliation', () => {
     ]);
   });
 
-  it('reads source IDs from the legacy bootstrap remark', () => {
+  it('reads a single independently attributable legacy source', () => {
+    expect(
+      buildLegacySourceClaims([
+        {
+          id: 'team-1',
+          remark: JSON.stringify({
+            managedBy: 'system:team-dictionary-bootstrap',
+            sources: ['department:department-1'],
+          }),
+        },
+      ]),
+    ).toEqual(new Map([['DEPARTMENT:department-1', ['team-1']]]));
+  });
+
+  it('rejects legacy remarks that coalesced multiple source identities', () => {
     expect(
       buildLegacySourceClaims([
         {
@@ -44,12 +58,7 @@ describe('team identity reconciliation', () => {
           }),
         },
       ]),
-    ).toEqual(
-      new Map([
-        ['DEPARTMENT:department-1', ['team-1']],
-        ['SUPPLIER:supplier-1', ['team-1']],
-      ]),
-    );
+    ).toEqual(new Map());
   });
 
   it('rejects untrusted or malformed legacy source claims', () => {

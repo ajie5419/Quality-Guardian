@@ -6,13 +6,11 @@ const tx = {
   inspections: { findMany: vi.fn(), updateMany: vi.fn() },
   qms_inspection_requests: { findMany: vi.fn(), updateMany: vi.fn() },
   supplier_identity_links: {
-    delete: vi.fn(),
     findMany: vi.fn(),
     update: vi.fn(),
   },
   team_identity_aliases: {
     create: vi.fn(),
-    delete: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
     update: vi.fn(),
@@ -37,18 +35,14 @@ describe('team identity merge references', () => {
     vi.clearAllMocks();
     tx.qms_inspection_requests.findMany
       .mockResolvedValueOnce([{ id: 'request-1' }])
-      .mockResolvedValueOnce([{ id: 'request-1' }])
       .mockResolvedValueOnce([]);
     tx.inspections.findMany
-      .mockResolvedValueOnce([{ id: 'inspection-1' }])
       .mockResolvedValueOnce([{ id: 'inspection-1' }])
       .mockResolvedValueOnce([]);
     tx.welders.findMany
       .mockResolvedValueOnce([{ id: 'welder-1' }])
-      .mockResolvedValueOnce([{ id: 'welder-1' }])
       .mockResolvedValueOnce([]);
     tx.work_order_requirements.findMany
-      .mockResolvedValueOnce([{ id: 'requirement-1' }])
       .mockResolvedValueOnce([{ id: 'requirement-1' }])
       .mockResolvedValueOnce([]);
     tx.qms_inspection_requests.updateMany.mockResolvedValue({ count: 1 });
@@ -68,8 +62,10 @@ describe('team identity merge references', () => {
     tx.team_identity_aliases.findMany.mockResolvedValue([
       {
         alias: merge.sourceName,
+        aliasKind: 'CANONICAL',
         id: 'alias-source',
         isDeleted: false,
+        nameKey: 'structurebu2',
         teamId: merge.sourceTeamId,
       },
     ]);
@@ -77,6 +73,16 @@ describe('team identity merge references', () => {
   });
 
   it('moves every TEAM association and canonical name snapshot', async () => {
+    tx.team_identity_aliases.findFirst
+      .mockResolvedValueOnce({
+        aliasKind: 'HISTORICAL',
+        id: 'alias-source',
+      })
+      .mockResolvedValueOnce({
+        aliasKind: 'CANONICAL',
+        id: 'alias-source',
+      });
+
     await expect(
       migrateTeamReferences(tx as never, merge, 200, 'admin'),
     ).resolves.toEqual({
@@ -102,33 +108,46 @@ describe('team identity merge references', () => {
       where: { id: 'alias-source' },
       data: { aliasKind: 'HISTORICAL', teamId: merge.targetTeamId },
     });
-    expect(tx.team_identity_aliases.create).toHaveBeenCalledTimes(2);
+    expect(tx.team_identity_aliases.create).not.toHaveBeenCalled();
   });
 
-  it('removes a source alias when the target already owns the same alias', async () => {
+  it('deduplicates aliases by normalized name key and keeps canonical precedence', async () => {
     tx.team_identity_aliases.findMany.mockResolvedValueOnce([
       {
-        alias: 'Shared alias',
+        alias: merge.sourceName,
+        aliasKind: 'CANONICAL',
         id: 'alias-source',
         isDeleted: false,
+        nameKey: 'structurebu2',
         teamId: merge.sourceTeamId,
       },
       {
-        alias: 'Shared alias',
+        alias: merge.targetName,
+        aliasKind: 'CANONICAL',
         id: 'alias-target',
         isDeleted: false,
+        nameKey: 'structurebu2',
         teamId: merge.targetTeamId,
       },
     ]);
+    tx.team_identity_aliases.findFirst.mockResolvedValue({
+      aliasKind: 'CANONICAL',
+      id: 'alias-target',
+    });
 
     await migrateTeamReferences(tx as never, merge, 200, 'admin');
 
-    expect(tx.team_identity_aliases.delete).toHaveBeenCalledWith({
+    expect(tx.team_identity_aliases.update).toHaveBeenCalledWith({
       where: { id: 'alias-source' },
+      data: { isDeleted: true },
     });
     expect(tx.team_identity_aliases.update).not.toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'alias-source' } }),
+      expect.objectContaining({
+        data: expect.objectContaining({ aliasKind: 'HISTORICAL' }),
+        where: { id: 'alias-target' },
+      }),
     );
+    expect(tx.team_identity_aliases.create).not.toHaveBeenCalled();
   });
 
   it('restores a deleted target supplier link from the active source link', async () => {
@@ -157,5 +176,19 @@ describe('team identity merge references', () => {
         supplierId: 'supplier-source',
       },
     });
+  });
+
+  it('rolls back the batch when a welder CAS update loses a row', async () => {
+    tx.welders.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      migrateTeamReferences(tx as never, merge, 200, 'admin'),
+    ).rejects.toMatchObject({ code: 'TEAM_MERGE_REFERENCE_CONFLICT' });
+
+    expect(tx.unresolved_master_data_refs.updateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ entityType: 'welders' }),
+      }),
+    );
   });
 });

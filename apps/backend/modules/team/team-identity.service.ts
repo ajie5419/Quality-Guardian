@@ -11,7 +11,6 @@ import { BusinessError } from '~/utils/business-error';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
-import { redis } from '~/utils/redis';
 
 import {
   createTeamIdentity,
@@ -25,7 +24,6 @@ import {
 const TEAM_DICT_TYPE = 'team';
 const ACTIVE_STATUS = 1;
 const RETIRED_STATUS = 0;
-const TEAM_OPTIONS_CACHE_KEY = 'qms:dict:options:team';
 const logger = createModuleLogger('TeamIdentityService');
 
 export interface TeamIdentity {
@@ -55,14 +53,6 @@ function toTeamIdentity(team: {
     sort: team.sort,
     status: team.status,
   };
-}
-
-async function invalidateTeamOptionsCache() {
-  try {
-    await redis.del(TEAM_OPTIONS_CACHE_KEY);
-  } catch (error: unknown) {
-    logger.error({ err: error }, 'failed to invalidate TEAM options cache');
-  }
 }
 
 async function findTeamNamesByIds(ids: string[]) {
@@ -196,7 +186,6 @@ export const TeamIdentityService = {
       const team = await prisma.$transaction((client) =>
         createTeamIdentity(client, input, normalized),
       );
-      await invalidateTeamOptionsCache();
       return toTeamIdentity(team);
     } catch (error: unknown) {
       logger.error(
@@ -216,10 +205,10 @@ export const TeamIdentityService = {
     const id = String(teamId || '').trim();
     const actor = normalizeOperator(operator);
     try {
-      const team = await prisma.$transaction((client) =>
-        updateTeamIdentity(client, id, input, actor),
-      );
-      await invalidateTeamOptionsCache();
+      const team = await prisma.$transaction(async (client) => {
+        await SupplierIdentityService.lockTeamForMutation(id, client);
+        return updateTeamIdentity(client, id, input, actor);
+      });
       return toTeamIdentity(team);
     } catch (error: unknown) {
       logger.error({ err: error, teamId: id }, 'failed to update TEAM');
@@ -233,7 +222,6 @@ export const TeamIdentityService = {
     const actor = normalizeOperator(operator);
     try {
       await prisma.$transaction((tx) => retireActiveTeam(tx, id, actor));
-      await invalidateTeamOptionsCache();
     } catch (error: unknown) {
       logger.error({ err: error, teamId: id }, 'failed to retire TEAM');
       throw error;

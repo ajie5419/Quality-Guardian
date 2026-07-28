@@ -3,11 +3,26 @@ import prisma from '~/utils/prisma';
 
 import {
   countTeamReferences,
-  migrateTeamReferences,
+  migrateTeamReferenceGroup,
 } from './team-identity-merge-references';
+import {
+  acquireTeamMerge,
+  addReferenceCounts,
+  markMergeAttemptFailed,
+  renewMergeLease,
+} from './team-identity-merge-state';
 import { TeamIdentityMergeService } from './team-identity-merge.service';
 
 const mocks = vi.hoisted(() => ({
+  attempt: {
+    attemptToken: 'attempt-1',
+    auditId: 'merge-1',
+    operator: 'admin',
+    sourceName: 'Structure BU2',
+    sourceTeamId: 'team-source',
+    targetName: 'StructureBU2',
+    targetTeamId: 'team-target',
+  },
   counts: {
     inspections: 3,
     inspectionRequests: 4,
@@ -20,18 +35,11 @@ const mocks = vi.hoisted(() => ({
   },
   loggerError: vi.fn(),
   tx: {
-    $queryRaw: vi.fn(),
-    dictionaries: {
-      findMany: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    supplier_identity_links: { findMany: vi.fn() },
+    dictionaries: { updateMany: vi.fn() },
+    team_identity_merge_participants: { deleteMany: vi.fn() },
     team_identity_merges: {
-      create: vi.fn(),
-      findFirst: vi.fn(),
       findUnique: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -46,22 +54,23 @@ vi.mock('~/utils/logger', () => ({
 
 vi.mock('./team-identity-merge-references', () => ({
   countTeamReferences: vi.fn(),
-  createEmptyReferenceCounts: () => ({ ...mocks.counts }),
-  migrateTeamReferences: vi.fn(),
+  migrateTeamReferenceGroup: vi.fn(),
+  TEAM_IDENTITY_REFERENCE_GROUPS: [
+    'inspectionRequests',
+    'inspections',
+    'welders',
+    'workOrderRequirements',
+    'identityMetadata',
+  ],
 }));
 
-const sourceTeam = {
-  dictKey: 'Structure BU2',
-  id: 'team-source',
-  isSystem: false,
-  status: 1,
-};
-const targetTeam = {
-  dictKey: 'StructureBU2',
-  id: 'team-target',
-  isSystem: false,
-  status: 1,
-};
+vi.mock('./team-identity-merge-state', () => ({
+  acquireTeamMerge: vi.fn(),
+  addReferenceCounts: vi.fn(),
+  markMergeAttemptFailed: vi.fn(),
+  parseReferenceCounts: (value: unknown) => value,
+  renewMergeLease: vi.fn(),
+}));
 
 describe('teamIdentityMergeService', () => {
   beforeEach(() => {
@@ -70,15 +79,25 @@ describe('teamIdentityMergeService', () => {
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
       callback(mocks.tx),
     );
-    mocks.tx.team_identity_merges.findUnique.mockResolvedValue(null);
-    mocks.tx.$queryRaw.mockResolvedValue([]);
-    mocks.tx.team_identity_merges.findFirst.mockResolvedValue(null);
-    mocks.tx.team_identity_merges.create.mockResolvedValue({ id: 'merge-1' });
-    mocks.tx.dictionaries.findMany.mockResolvedValue([sourceTeam, targetTeam]);
-    mocks.tx.dictionaries.updateMany.mockResolvedValue({ count: 1 });
-    mocks.tx.supplier_identity_links.findMany.mockResolvedValue([]);
-    vi.mocked(migrateTeamReferences).mockResolvedValue(mocks.counts);
+    vi.mocked(acquireTeamMerge).mockResolvedValue({
+      attempt: mocks.attempt,
+      kind: 'acquired',
+    });
+    const migratedGroups = new Set<string>();
+    vi.mocked(migrateTeamReferenceGroup).mockImplementation(
+      async (_tx, _merge, group) => {
+        if (migratedGroups.has(group)) return {};
+        migratedGroups.add(group);
+        if (group === 'identityMetadata') return { teamAliases: 1 };
+        return { [group]: 1 };
+      },
+    );
     vi.mocked(countTeamReferences).mockResolvedValue(0);
+    mocks.tx.dictionaries.updateMany.mockResolvedValue({ count: 1 });
+    mocks.tx.team_identity_merges.findUnique.mockResolvedValue({
+      referenceCounts: mocks.counts,
+    });
+    mocks.tx.team_identity_merges.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it('rejects merge execution outside maintenance mode', async () => {
@@ -88,115 +107,81 @@ describe('teamIdentityMergeService', () => {
       TeamIdentityMergeService.merge(
         {
           reason: 'Duplicate',
-          sourceTeamId: sourceTeam.id,
-          targetTeamId: targetTeam.id,
+          sourceTeamId: mocks.attempt.sourceTeamId,
+          targetTeamId: mocks.attempt.targetTeamId,
         },
         'admin',
       ),
     ).rejects.toMatchObject({ code: 'TEAM_MERGE_REQUIRES_MAINTENANCE' });
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(acquireTeamMerge).not.toHaveBeenCalled();
   });
 
-  it('migrates and retires the source in one maintenance transaction', async () => {
+  it('persists each reference group before completing the merge', async () => {
     await expect(
       TeamIdentityMergeService.merge(
         {
           reason: 'Confirmed duplicate',
-          sourceTeamId: sourceTeam.id,
-          targetTeamId: targetTeam.id,
+          sourceTeamId: mocks.attempt.sourceTeamId,
+          targetTeamId: mocks.attempt.targetTeamId,
         },
         'admin',
       ),
     ).resolves.toEqual({
       auditId: 'merge-1',
       counts: mocks.counts,
-      targetTeamId: targetTeam.id,
+      targetTeamId: mocks.attempt.targetTeamId,
     });
 
-    expect(migrateTeamReferences).toHaveBeenCalledWith(
+    expect(migrateTeamReferenceGroup).toHaveBeenCalledTimes(9);
+    expect(addReferenceCounts).toHaveBeenCalledTimes(9);
+    expect(renewMergeLease).toHaveBeenCalledTimes(10);
+    expect(countTeamReferences).toHaveBeenCalledWith(
       mocks.tx,
-      expect.objectContaining({
-        auditId: 'merge-1',
-        sourceTeamId: sourceTeam.id,
-        targetTeamId: targetTeam.id,
-      }),
-      200,
-      'admin',
+      mocks.attempt.sourceTeamId,
     );
-    expect(mocks.tx.$queryRaw).toHaveBeenCalledTimes(2);
-    expect(countTeamReferences).toHaveBeenCalledWith(mocks.tx, sourceTeam.id);
-    expect(mocks.tx.dictionaries.update).toHaveBeenCalledWith({
-      where: { id: sourceTeam.id },
-      data: { status: 0, updatedBy: 'admin' },
-    });
-    expect(mocks.tx.team_identity_merges.update).toHaveBeenCalledWith({
-      where: { id: 'merge-1' },
-      data: {
-        completedAt: expect.any(Date),
-        referenceCounts: mocks.counts,
-        status: 'COMPLETED',
+    expect(
+      mocks.tx.team_identity_merge_participants.deleteMany,
+    ).toHaveBeenCalledWith({ where: { mergeId: mocks.attempt.auditId } });
+  });
+
+  it('returns a completed merge without running migration groups', async () => {
+    vi.mocked(acquireTeamMerge).mockResolvedValue({
+      kind: 'completed',
+      result: {
+        auditId: 'merge-1',
+        counts: mocks.counts,
+        targetTeamId: mocks.attempt.targetTeamId,
       },
-    });
-  });
-
-  it('rejects identities linked to different active suppliers', async () => {
-    mocks.tx.supplier_identity_links.findMany.mockResolvedValue([
-      { identityId: sourceTeam.id, supplierId: 'supplier-1' },
-      { identityId: targetTeam.id, supplierId: 'supplier-2' },
-    ]);
-
-    await expect(
-      TeamIdentityMergeService.merge(
-        {
-          reason: 'Duplicate',
-          sourceTeamId: sourceTeam.id,
-          targetTeamId: targetTeam.id,
-        },
-        'admin',
-      ),
-    ).rejects.toMatchObject({ code: 'TEAM_MERGE_SUPPLIER_CONFLICT' });
-    expect(migrateTeamReferences).not.toHaveBeenCalled();
-  });
-
-  it('returns a completed merge without migrating references again', async () => {
-    mocks.tx.team_identity_merges.findUnique.mockResolvedValue({
-      id: 'merge-1',
-      referenceCounts: mocks.counts,
-      status: 'COMPLETED',
-      targetTeamId: targetTeam.id,
     });
 
     await expect(
       TeamIdentityMergeService.merge(
         {
           reason: 'Retry',
-          sourceTeamId: sourceTeam.id,
-          targetTeamId: targetTeam.id,
+          sourceTeamId: mocks.attempt.sourceTeamId,
+          targetTeamId: mocks.attempt.targetTeamId,
         },
         'admin',
       ),
-    ).resolves.toEqual({
-      auditId: 'merge-1',
-      counts: mocks.counts,
-      targetTeamId: targetTeam.id,
-    });
-    expect(migrateTeamReferences).not.toHaveBeenCalled();
+    ).resolves.toMatchObject({ auditId: 'merge-1' });
+    expect(migrateTeamReferenceGroup).not.toHaveBeenCalled();
   });
 
-  it('rejects overlapping pending merge participants', async () => {
-    mocks.tx.team_identity_merges.findFirst.mockResolvedValue({
-      id: 'merge-other',
-    });
+  it('marks only the active attempt failed when a group aborts', async () => {
+    const failure = new Error('migration failed');
+    vi.mocked(migrateTeamReferenceGroup).mockRejectedValueOnce(failure);
 
     await expect(
       TeamIdentityMergeService.merge(
         {
           reason: 'Duplicate',
-          sourceTeamId: sourceTeam.id,
-          targetTeamId: targetTeam.id,
+          sourceTeamId: mocks.attempt.sourceTeamId,
+          targetTeamId: mocks.attempt.targetTeamId,
         },
         'admin',
       ),
-    ).rejects.toMatchObject({ code: 'TEAM_MERGE_PARTICIPANT_CONFLICT' });
+    ).rejects.toThrow('migration failed');
+
+    expect(markMergeAttemptFailed).toHaveBeenCalledWith(mocks.attempt, failure);
   });
 });

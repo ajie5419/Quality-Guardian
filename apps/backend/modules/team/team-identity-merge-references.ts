@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { team_identity_alias_kind } from '@prisma/client';
 import { BusinessError } from '~/utils/business-error';
 
+import { migrateSupplierLinks } from './team-identity-merge-supplier';
 import { buildTeamIdentityNameKey } from './team-identity-write';
 
 export interface TeamIdentityMergeContext {
@@ -24,7 +25,16 @@ export interface TeamIdentityReferenceCounts {
   workOrderRequirements: number;
 }
 
-type BatchResult = { scanned: number; updated: number };
+export const TEAM_IDENTITY_REFERENCE_GROUPS = [
+  'inspectionRequests',
+  'inspections',
+  'welders',
+  'workOrderRequirements',
+  'identityMetadata',
+] as const;
+
+export type TeamIdentityReferenceGroup =
+  (typeof TEAM_IDENTITY_REFERENCE_GROUPS)[number];
 
 export function createEmptyReferenceCounts(): TeamIdentityReferenceCounts {
   return {
@@ -63,12 +73,20 @@ async function resolveBatchAudits(
   });
 }
 
-async function migrateBatches(runBatch: () => Promise<BatchResult>) {
-  let updated = 0;
-  while (true) {
-    const batch = await runBatch();
-    if (batch.scanned === 0) return updated;
-    updated += batch.updated;
+async function migrateSingleBatch(
+  runBatch: () => Promise<{ scanned: number; updated: number }>,
+) {
+  const batch = await runBatch();
+  return batch.updated;
+}
+
+function assertBatchApplied(scanned: number, updated: number) {
+  if (updated !== scanned) {
+    throw new BusinessError(
+      'TEAM_MERGE_REFERENCE_CONFLICT',
+      'A TEAM reference changed during merge execution',
+      409,
+    );
   }
 }
 
@@ -77,7 +95,7 @@ async function migrateInspectionRequests(
   merge: TeamIdentityMergeContext,
   batchSize: number,
 ) {
-  return migrateBatches(() =>
+  return migrateSingleBatch(() =>
     (async () => {
       const rows = await tx.qms_inspection_requests.findMany({
         where: { teamId: merge.sourceTeamId },
@@ -91,15 +109,12 @@ async function migrateInspectionRequests(
         where: { id: { in: ids }, teamId: merge.sourceTeamId },
         data: { team: merge.targetName, teamId: merge.targetTeamId },
       });
-      const applied = await tx.qms_inspection_requests.findMany({
-        where: { id: { in: ids }, teamId: merge.targetTeamId },
-        select: { id: true },
-      });
+      assertBatchApplied(ids.length, result.count);
       await resolveBatchAudits(
         tx,
         'qms_inspection_requests',
         'teamId',
-        applied.map((row) => row.id),
+        ids,
         merge,
       );
       return { scanned: ids.length, updated: result.count };
@@ -112,7 +127,7 @@ async function migrateInspections(
   merge: TeamIdentityMergeContext,
   batchSize: number,
 ) {
-  return migrateBatches(() =>
+  return migrateSingleBatch(() =>
     (async () => {
       const rows = await tx.inspections.findMany({
         where: { teamId: merge.sourceTeamId },
@@ -126,17 +141,8 @@ async function migrateInspections(
         where: { id: { in: ids }, teamId: merge.sourceTeamId },
         data: { team: merge.targetName, teamId: merge.targetTeamId },
       });
-      const applied = await tx.inspections.findMany({
-        where: { id: { in: ids }, teamId: merge.targetTeamId },
-        select: { id: true },
-      });
-      await resolveBatchAudits(
-        tx,
-        'inspections',
-        'teamId',
-        applied.map((row) => row.id),
-        merge,
-      );
+      assertBatchApplied(ids.length, result.count);
+      await resolveBatchAudits(tx, 'inspections', 'teamId', ids, merge);
       return { scanned: ids.length, updated: result.count };
     })(),
   );
@@ -147,7 +153,7 @@ async function migrateWelders(
   merge: TeamIdentityMergeContext,
   batchSize: number,
 ) {
-  return migrateBatches(() =>
+  return migrateSingleBatch(() =>
     (async () => {
       const rows = await tx.welders.findMany({
         where: { teamId: merge.sourceTeamId },
@@ -161,17 +167,8 @@ async function migrateWelders(
         where: { id: { in: ids }, teamId: merge.sourceTeamId },
         data: { team: merge.targetName, teamId: merge.targetTeamId },
       });
-      const applied = await tx.welders.findMany({
-        where: { id: { in: ids }, teamId: merge.targetTeamId },
-        select: { id: true },
-      });
-      await resolveBatchAudits(
-        tx,
-        'welders',
-        'teamId',
-        applied.map((row) => row.id),
-        merge,
-      );
+      assertBatchApplied(ids.length, result.count);
+      await resolveBatchAudits(tx, 'welders', 'teamId', ids, merge);
       return { scanned: ids.length, updated: result.count };
     })(),
   );
@@ -182,7 +179,7 @@ async function migrateWorkOrderRequirements(
   merge: TeamIdentityMergeContext,
   batchSize: number,
 ) {
-  return migrateBatches(() =>
+  return migrateSingleBatch(() =>
     (async () => {
       const rows = await tx.work_order_requirements.findMany({
         where: { responsibleTeamId: merge.sourceTeamId },
@@ -202,18 +199,12 @@ async function migrateWorkOrderRequirements(
           responsibleTeamId: merge.targetTeamId,
         },
       });
-      const applied = await tx.work_order_requirements.findMany({
-        where: {
-          id: { in: ids },
-          responsibleTeamId: merge.targetTeamId,
-        },
-        select: { id: true },
-      });
+      assertBatchApplied(ids.length, result.count);
       await resolveBatchAudits(
         tx,
         'work_order_requirements',
         'responsibleTeamId',
-        applied.map((row) => row.id),
+        ids,
         merge,
       );
       return { scanned: ids.length, updated: result.count };
@@ -230,12 +221,21 @@ async function upsertMergeAlias(
 ) {
   const nameKey = buildTeamIdentityNameKey(alias);
   const existing = await tx.team_identity_aliases.findFirst({
-    where: { alias, isDeleted: false, teamId: merge.targetTeamId },
+    where: { isDeleted: false, nameKey, teamId: merge.targetTeamId },
   });
   if (existing) {
+    let canonicalUpdate: Partial<{
+      alias: string;
+      aliasKind: team_identity_alias_kind;
+    }> = {};
+    if (aliasKind === team_identity_alias_kind.CANONICAL) {
+      canonicalUpdate = { alias, aliasKind };
+    } else if (existing.aliasKind !== team_identity_alias_kind.CANONICAL) {
+      canonicalUpdate = { aliasKind };
+    }
     return tx.team_identity_aliases.update({
       where: { id: existing.id },
-      data: { aliasKind, isDeleted: false, nameKey },
+      data: { ...canonicalUpdate, isDeleted: false, nameKey },
     });
   }
   return tx.team_identity_aliases.create({
@@ -247,54 +247,6 @@ async function upsertMergeAlias(
       teamId: merge.targetTeamId,
     },
   });
-}
-
-async function migrateSupplierLinks(
-  tx: Prisma.TransactionClient,
-  merge: TeamIdentityMergeContext,
-) {
-  const links = await tx.supplier_identity_links.findMany({
-    where: {
-      identityId: { in: [merge.sourceTeamId, merge.targetTeamId] },
-      identityType: 'TEAM',
-    },
-  });
-  const source = links.find((link) => link.identityId === merge.sourceTeamId);
-  const target = links.find((link) => link.identityId === merge.targetTeamId);
-  if (!source) return 0;
-  if (target) {
-    if (
-      !source.isDeleted &&
-      !target.isDeleted &&
-      source.supplierId !== target.supplierId
-    ) {
-      throw new BusinessError(
-        'TEAM_MERGE_SUPPLIER_CONFLICT',
-        'TEAM supplier links conflict',
-        409,
-      );
-    }
-    await tx.supplier_identity_links.delete({ where: { id: source.id } });
-    if (!source.isDeleted) {
-      await tx.supplier_identity_links.update({
-        where: { id: target.id },
-        data: {
-          identityNameSnapshot: merge.targetName,
-          isDeleted: false,
-          supplierId: source.supplierId,
-        },
-      });
-    }
-    return 1;
-  }
-  await tx.supplier_identity_links.update({
-    where: { id: source.id },
-    data: {
-      identityId: merge.targetTeamId,
-      identityNameSnapshot: merge.targetName,
-    },
-  });
-  return 1;
 }
 
 async function migrateAliases(
@@ -310,14 +262,17 @@ async function migrateAliases(
   const sourceAliases = aliases.filter(
     (alias) => alias.teamId === merge.sourceTeamId,
   );
-  const targetAliasNames = new Set(
+  const targetAliasKeys = new Set(
     aliases
       .filter((alias) => alias.teamId === merge.targetTeamId)
-      .map((alias) => alias.alias),
+      .map((alias) => alias.nameKey),
   );
   for (const alias of sourceAliases) {
-    if (targetAliasNames.has(alias.alias)) {
-      await tx.team_identity_aliases.delete({ where: { id: alias.id } });
+    if (targetAliasKeys.has(alias.nameKey)) {
+      await tx.team_identity_aliases.update({
+        where: { id: alias.id },
+        data: { isDeleted: true },
+      });
       continue;
     }
     await tx.team_identity_aliases.update({
@@ -327,7 +282,7 @@ async function migrateAliases(
         teamId: merge.targetTeamId,
       },
     });
-    targetAliasNames.add(alias.alias);
+    targetAliasKeys.add(alias.nameKey);
   }
   return sourceAliases.length;
 }
@@ -376,20 +331,65 @@ export async function migrateTeamReferences(
   operator: string,
 ) {
   const counts = createEmptyReferenceCounts();
-  counts.inspectionRequests = await migrateInspectionRequests(
-    tx,
-    merge,
-    batchSize,
-  );
-  counts.inspections = await migrateInspections(tx, merge, batchSize);
-  counts.welders = await migrateWelders(tx, merge, batchSize);
-  counts.workOrderRequirements = await migrateWorkOrderRequirements(
-    tx,
-    merge,
-    batchSize,
-  );
-  Object.assign(counts, await migrateIdentityMetadata(tx, merge, operator));
+  for (const group of TEAM_IDENTITY_REFERENCE_GROUPS) {
+    while (true) {
+      const delta = await migrateTeamReferenceGroup(
+        tx,
+        merge,
+        group,
+        batchSize,
+        operator,
+      );
+      for (const key of Object.keys(delta) as Array<keyof typeof counts>) {
+        counts[key] += delta[key] ?? 0;
+      }
+      if (
+        group === 'identityMetadata' ||
+        Object.values(delta).every((count) => count === 0)
+      ) {
+        break;
+      }
+    }
+  }
   return counts;
+}
+
+export async function migrateTeamReferenceGroup(
+  tx: Prisma.TransactionClient,
+  merge: TeamIdentityMergeContext,
+  group: TeamIdentityReferenceGroup,
+  batchSize: number,
+  operator: string,
+): Promise<Partial<TeamIdentityReferenceCounts>> {
+  switch (group) {
+    case 'identityMetadata': {
+      return migrateIdentityMetadata(tx, merge, operator);
+    }
+    case 'inspectionRequests': {
+      return {
+        inspectionRequests: await migrateInspectionRequests(
+          tx,
+          merge,
+          batchSize,
+        ),
+      };
+    }
+    case 'inspections': {
+      return { inspections: await migrateInspections(tx, merge, batchSize) };
+    }
+    case 'welders': {
+      return { welders: await migrateWelders(tx, merge, batchSize) };
+    }
+    case 'workOrderRequirements': {
+      return {
+        workOrderRequirements: await migrateWorkOrderRequirements(
+          tx,
+          merge,
+          batchSize,
+        ),
+      };
+    }
+  }
 }
 
 export async function countTeamReferences(
@@ -404,9 +404,11 @@ export async function countTeamReferences(
       where: { responsibleTeamId: sourceTeamId },
     }),
     tx.supplier_identity_links.count({
-      where: { identityId: sourceTeamId },
+      where: { identityId: sourceTeamId, isDeleted: false },
     }),
-    tx.team_identity_aliases.count({ where: { teamId: sourceTeamId } }),
+    tx.team_identity_aliases.count({
+      where: { isDeleted: false, teamId: sourceTeamId },
+    }),
     tx.team_identity_name_keys.count({ where: { teamId: sourceTeamId } }),
     tx.team_identity_sources.count({ where: { teamId: sourceTeamId } }),
   ]);

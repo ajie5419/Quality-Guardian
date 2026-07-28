@@ -18,7 +18,10 @@ function normalizeId(value: unknown) {
 
 async function lockTeamForMutation(
   teamId: string,
-  client: Pick<Prisma.TransactionClient, '$queryRaw'>,
+  client: Pick<
+    Prisma.TransactionClient,
+    '$queryRaw' | 'team_identity_merge_participants'
+  >,
 ) {
   await client.$queryRaw`
     SELECT id
@@ -26,6 +29,26 @@ async function lockTeamForMutation(
     WHERE id = ${teamId} AND dictType = 'team'
     FOR UPDATE
   `;
+  const mergeLock = await client.team_identity_merge_participants.findUnique({
+    where: { teamId },
+    select: { mergeId: true },
+  });
+  if (mergeLock) {
+    throw new BusinessError(
+      'TEAM_MERGE_PARTICIPANT_LOCKED',
+      'TEAM is locked by an identity merge',
+      409,
+    );
+  }
+}
+
+async function lockTeamsForMutation(
+  teamIds: string[],
+  client: Prisma.TransactionClient,
+) {
+  for (const teamId of [...new Set(teamIds)].sort()) {
+    await lockTeamForMutation(teamId, client);
+  }
 }
 
 async function validateLinkInput(
@@ -154,20 +177,35 @@ export const SupplierIdentityService = {
   lockTeamForMutation,
 
   async delete(id: string) {
-    const existing = await prisma.supplier_identity_links.findFirst({
-      select: { id: true },
-      where: { id, isDeleted: false },
-    });
-    if (!existing) {
-      throw new BusinessError(
-        'NOT_FOUND',
-        'Supplier identity link not found',
-        404,
-      );
-    }
-    return prisma.supplier_identity_links.update({
-      where: { id },
-      data: { isDeleted: true },
+    return prisma.$transaction(async (tx) => {
+      const existing = await tx.supplier_identity_links.findFirst({
+        select: { id: true, identityId: true },
+        where: { id, isDeleted: false },
+      });
+      if (!existing) {
+        throw new BusinessError(
+          'NOT_FOUND',
+          'Supplier identity link not found',
+          404,
+        );
+      }
+      await lockTeamForMutation(existing.identityId, tx);
+      const deleted = await tx.supplier_identity_links.updateMany({
+        where: {
+          id,
+          identityId: existing.identityId,
+          isDeleted: false,
+        },
+        data: { isDeleted: true },
+      });
+      if (deleted.count !== 1) {
+        throw new BusinessError(
+          'TEAM_IDENTITY_CONCURRENT_UPDATE',
+          'Supplier identity link changed concurrently',
+          409,
+        );
+      }
+      return tx.supplier_identity_links.findUnique({ where: { id } });
     });
   },
 
@@ -372,9 +410,8 @@ export const SupplierIdentityService = {
   async update(id: string, input: SupplierIdentityInput) {
     try {
       return await prisma.$transaction(async (tx) => {
-        const { supplier, team } = await validateLinkInput(input, tx);
         const current = await tx.supplier_identity_links.findFirst({
-          select: { id: true },
+          select: { id: true, identityId: true },
           where: { id, isDeleted: false },
         });
         if (!current) {
@@ -384,6 +421,24 @@ export const SupplierIdentityService = {
             404,
           );
         }
+        const requestedTeamId = normalizeId(input.teamId);
+        await lockTeamsForMutation([current.identityId, requestedTeamId], tx);
+        const lockedCurrent = await tx.supplier_identity_links.findFirst({
+          select: { id: true },
+          where: {
+            id,
+            identityId: current.identityId,
+            isDeleted: false,
+          },
+        });
+        if (!lockedCurrent) {
+          throw new BusinessError(
+            'TEAM_IDENTITY_CONCURRENT_UPDATE',
+            'Supplier identity link changed concurrently',
+            409,
+          );
+        }
+        const { supplier, team } = await validateLinkInput(input, tx);
         const conflict = await tx.supplier_identity_links.findFirst({
           select: { id: true },
           where: {
