@@ -101,6 +101,7 @@ export const InspectionRecordCreateService = {
             {
               incomingType: data.incomingType,
               materialName: data.materialName,
+              partName: data.partName,
               processName: data.processName,
               projectName: data.projectName,
               supplierName: data.supplierName,
@@ -110,6 +111,7 @@ export const InspectionRecordCreateService = {
           const governedCanonicalIds =
             await buildGovernedCanonicalWritePairForTable('inspections', {
               ...governedFields,
+              partId: data.partId,
               supplierId: data.supplierId,
             });
           const governedSupplierId =

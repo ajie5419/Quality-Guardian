@@ -44,6 +44,8 @@ export const InspectionRecordUpdateService = {
         select: {
           category: true,
           incomingType: true,
+          partId: true,
+          partName: true,
           processId: true,
           processName: true,
           supplierName: true,
@@ -98,6 +100,7 @@ export const InspectionRecordUpdateService = {
       const governedFields = buildGovernedWriteFieldsForTable('inspections', {
         incomingType: data.incomingType,
         materialName: data.materialName,
+        partName: data.partName,
         processName: data.processName,
         projectName: data.projectName,
         supplierName: data.supplierName,
@@ -106,6 +109,7 @@ export const InspectionRecordUpdateService = {
       const governedCanonicalIds =
         await buildGovernedCanonicalWritePairForTable('inspections', {
           ...governedFields,
+          partId: data.partId,
           supplierId: data.supplierId,
         });
       const governedSupplierId =
