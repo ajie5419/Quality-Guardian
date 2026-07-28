@@ -31,6 +31,7 @@ import {
   buildIncomingInspectionRequestInfo,
   buildInspectionRequestEntryProcessOptions,
   buildInspectionRequestEntryRequiredMessage,
+  buildInspectionRequestPostSubmitQuery,
   getInspectionRequestEntryCopy,
   INCOMING_INSPECTION_PROCESS_NAME,
   inspectionRequestEntryCheckResultOptions,
@@ -372,12 +373,7 @@ async function submitRequest() {
       `${entryCopy.value.submitSuccessPrefix}：${created.requestNo}`,
     );
     resetRequestForm();
-    const nextQuery = { ...route.query };
-    delete nextQuery.partName;
-    delete nextQuery.componentName;
-    delete nextQuery.processName;
-    delete nextQuery.reporter;
-    delete nextQuery.team;
+    const nextQuery = buildInspectionRequestPostSubmitQuery(route.query);
     void router.replace({ path: route.path, query: nextQuery });
   } finally {
     submitting.value = false;

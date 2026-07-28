@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildInspectionRequestEntryProcessOptions,
+  buildInspectionRequestPostSubmitQuery,
   mapInspectionRequestEntryBomPartOptions,
   mapInspectionRequestEntryTeamOptions,
 } from './entry-mode';
@@ -94,5 +95,20 @@ describe('inspection request entry identity options', () => {
         value: 'process-2',
       },
     ]);
+  });
+
+  it('clears identity prefill pairs after a successful submission', () => {
+    expect(
+      buildInspectionRequestPostSubmitQuery({
+        componentName: 'Component A',
+        partId: 'part-1',
+        partName: 'Frame',
+        processId: 'process-1',
+        processName: 'Welding',
+        reporter: 'Operator',
+        team: 'Team A',
+        workOrderNumber: 'WO-001',
+      }),
+    ).toEqual({ workOrderNumber: 'WO-001' });
   });
 });

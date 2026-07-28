@@ -1,3 +1,5 @@
+import type { LocationQuery, LocationQueryRaw } from 'vue-router';
+
 export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
 
 export const inspectionRequestEntryCheckResultOptions = [
@@ -37,6 +39,20 @@ type BomPartOptionSource = {
 
 export function isIncomingInspectionEntryPath(path: string) {
   return path.includes('/incoming-entry');
+}
+
+export function buildInspectionRequestPostSubmitQuery(
+  query: LocationQuery,
+): LocationQueryRaw {
+  const nextQuery: LocationQueryRaw = { ...query };
+  delete nextQuery.componentName;
+  delete nextQuery.partId;
+  delete nextQuery.partName;
+  delete nextQuery.processId;
+  delete nextQuery.processName;
+  delete nextQuery.reporter;
+  delete nextQuery.team;
+  return nextQuery;
 }
 
 export function mapInspectionRequestEntryWorkOrderOptions(
