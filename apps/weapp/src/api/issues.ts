@@ -1,4 +1,8 @@
-import type { InspectionIssue } from '@qgs/shared';
+import type {
+  InspectionIssue,
+  QualityClassificationCategory,
+  QualityClassificationScope,
+} from '@qgs/shared';
 
 import { request } from './request';
 
@@ -13,7 +17,7 @@ export interface InspectionIssueRecord extends InspectionIssue {
 export interface InspectionIssueListParams {
   dateMode?: 'month' | 'week' | 'year';
   dateValue?: string;
-  defectType?: string | string[];
+  defectCategoryId?: string | string[];
   page?: number;
   pageSize?: number;
   processName?: string;
@@ -99,5 +103,15 @@ export function getIssueSuppliers(category: 'Outsourcing' | 'Supplier') {
     url: '/api/qms/supplier',
     method: 'GET',
     data: { category, page: 1, pageSize: 200 },
+  });
+}
+
+export function getQualityClassificationOptions(
+  scope: QualityClassificationScope,
+) {
+  return request<QualityClassificationCategory[]>({
+    url: '/api/qms/common/quality-classification-options',
+    method: 'GET',
+    data: { scope },
   });
 }

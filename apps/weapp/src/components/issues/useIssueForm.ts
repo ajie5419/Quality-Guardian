@@ -4,6 +4,7 @@ import type {
   InspectionIssueRecord,
   IssueOption,
 } from '@/api/issues';
+import type { QualityClassificationCategory } from '@qgs/shared';
 
 import { computed, reactive, ref, watch } from 'vue';
 
@@ -17,14 +18,13 @@ import {
   createInspectionIssue,
   getIssueSuppliers,
   getIssueWelders,
+  getQualityClassificationOptions,
   updateInspectionIssue,
 } from '@/api/issues';
 import { useUserStore } from '@/stores/user';
 import {
   ISSUE_CLAIM_OPTIONS,
   ISSUE_DEFAULTS,
-  ISSUE_DEFECT_SUBTYPES,
-  ISSUE_DEFECT_TYPES,
   ISSUE_SEVERITY_OPTIONS,
   ISSUE_STATUS_OPTIONS,
   mergeInspectionProcessOptions,
@@ -32,6 +32,7 @@ import {
 import {
   INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS,
   mergeInspectionProcessNames,
+  QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 
 export interface IssueFormProps {
@@ -86,6 +87,7 @@ export function useIssueForm(
   const processReferenceOptions = ref<IssueOption[]>([]);
   const processOptions = ref<IssueOption[]>([]);
   const departments = ref<FlatDepartment[]>([]);
+  const classificationCategories = ref<QualityClassificationCategory[]>([]);
   const supplierOptions = ref<IssueOption[]>([]);
   const welderOptions = ref<IssueOption[]>([]);
   let searchTimer: null | ReturnType<typeof setTimeout> = null;
@@ -93,8 +95,10 @@ export function useIssueForm(
   function createInitialState() {
     return {
       claim: ISSUE_DEFAULTS.DEFAULT_CLAIM,
-      defectSubtype: ISSUE_DEFAULTS.DEFAULT_DEFECT_SUBTYPE,
-      defectType: ISSUE_DEFAULTS.DEFAULT_DEFECT_TYPE,
+      defectCategoryId: '',
+      defectSubcategoryId: '',
+      defectSubtype: '',
+      defectType: '',
       description: '',
       division: '',
       inspector:
@@ -124,8 +128,22 @@ export function useIssueForm(
       ? `inspectionIssueDraft:${userStore.userInfo?.id || 'anonymous'}:edit:${props.initialData.id}`
       : `inspectionIssueDraft:${userStore.userInfo?.id || 'anonymous'}:create`,
   );
-  const defectSubtypeOptions = computed(
-    () => ISSUE_DEFECT_SUBTYPES[form.defectType] ?? ['其他'],
+  const defectTypeOptions = computed<IssueOption[]>(() =>
+    classificationCategories.value.map((item) => ({
+      label: item.name,
+      value: item.id,
+    })),
+  );
+  const selectedDefectCategory = computed(() =>
+    classificationCategories.value.find(
+      (item) => item.id === form.defectCategoryId,
+    ),
+  );
+  const defectSubtypeOptions = computed<IssueOption[]>(() =>
+    (selectedDefectCategory.value?.subcategories || []).map((item) => ({
+      label: item.name,
+      value: item.id,
+    })),
   );
   const selectedDepartmentNames = computed(() =>
     form.responsibleDepartments
@@ -191,9 +209,10 @@ export function useIssueForm(
     Object.assign(form, {
       ...data,
       claim: data.claim || ISSUE_DEFAULTS.DEFAULT_CLAIM,
-      defectSubtype:
-        data.defectSubtype || ISSUE_DEFAULTS.DEFAULT_DEFECT_SUBTYPE,
-      defectType: data.defectType || ISSUE_DEFAULTS.DEFAULT_DEFECT_TYPE,
+      defectCategoryId: data.defectCategoryId || '',
+      defectSubcategoryId: data.defectSubcategoryId || '',
+      defectSubtype: data.defectSubtype || '',
+      defectType: data.defectType || '',
       lossAmount: Number(data.lossAmount || 0),
       photos: Array.isArray(data.photos) ? [...data.photos] : [],
       processName: data.processName || '',
@@ -224,18 +243,35 @@ export function useIssueForm(
   }
 
   async function loadReferenceData() {
-    const [departmentResult, processResult, welderResult] =
-      await Promise.allSettled([
-        getDepartments(),
-        getProcessDictionaryOptions(),
-        getIssueWelders(),
-      ]);
+    const [
+      classificationResult,
+      departmentResult,
+      processResult,
+      welderResult,
+    ] = await Promise.allSettled([
+      getQualityClassificationOptions(
+        QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+      ),
+      getDepartments(),
+      getProcessDictionaryOptions(),
+      getIssueWelders(),
+    ]);
+    const classificationRes =
+      classificationResult.status === 'fulfilled'
+        ? classificationResult.value
+        : null;
     const departmentRes =
       departmentResult.status === 'fulfilled' ? departmentResult.value : null;
     const welderRes =
       welderResult.status === 'fulfilled' ? welderResult.value : null;
     const processRes =
       processResult.status === 'fulfilled' ? processResult.value : null;
+    if (
+      classificationRes?.code === 0 &&
+      Array.isArray(classificationRes.data)
+    ) {
+      classificationCategories.value = classificationRes.data;
+    }
     if (departmentRes?.code === 0 && Array.isArray(departmentRes.data)) {
       departments.value = flattenDepartments(departmentRes.data);
     }
@@ -362,13 +398,19 @@ export function useIssueForm(
   }
 
   function onDefectTypeChange(event: { detail: { value: string } }) {
-    form.defectType = ISSUE_DEFECT_TYPES[Number(event.detail.value)] || '';
-    form.defectSubtype = ISSUE_DEFECT_SUBTYPES[form.defectType]?.[0] || '其他';
+    const category = classificationCategories.value[Number(event.detail.value)];
+    const subcategory = category?.subcategories[0];
+    form.defectCategoryId = category?.id || '';
+    form.defectType = category?.name || '';
+    form.defectSubcategoryId = subcategory?.id || '';
+    form.defectSubtype = subcategory?.name || '';
   }
 
   function onDefectSubtypeChange(event: { detail: { value: string } }) {
-    form.defectSubtype =
-      defectSubtypeOptions.value[Number(event.detail.value)] || '';
+    const subcategory =
+      selectedDefectCategory.value?.subcategories[Number(event.detail.value)];
+    form.defectSubcategoryId = subcategory?.id || '';
+    form.defectSubtype = subcategory?.name || '';
   }
 
   async function onDepartmentChange(event: { detail: { value: string[] } }) {
@@ -416,8 +458,8 @@ export function useIssueForm(
     if (
       !form.status ||
       !form.severity ||
-      !form.defectType ||
-      !form.defectSubtype
+      !form.defectCategoryId ||
+      !form.defectSubcategoryId
     )
       return '请填写状态、严重程度和缺陷分类';
     return '';
@@ -516,9 +558,9 @@ export function useIssueForm(
     currentStep,
     departments,
     defectSubtypeOptions,
+    defectTypeOptions,
     form,
     ISSUE_CLAIM_OPTIONS,
-    ISSUE_DEFECT_TYPES,
     ISSUE_SEVERITY_OPTIONS,
     ISSUE_STATUS_OPTIONS,
     onClaimChange,

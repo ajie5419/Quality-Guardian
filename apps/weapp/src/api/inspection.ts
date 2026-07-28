@@ -1,3 +1,5 @@
+import type { CloseInspectionRequestParams } from '@qgs/shared';
+
 import { request } from './request';
 
 export interface DepartmentNode {
@@ -75,15 +77,7 @@ export function dispatchInspectionRequest(
 // Close/complete an inspection request
 export function closeInspectionRequest(
   id: string,
-  data: {
-    attachments?: Array<{ name: string; url: string }>;
-    closeRemark?: string;
-    hasDocuments: boolean;
-    qualifiedQuantity: number;
-    quantity: number;
-    result: 'FAIL' | 'PASS';
-    unqualifiedQuantity: number;
-  },
+  data: CloseInspectionRequestParams,
 ) {
   return request<unknown>({
     url: `/api/qms/inspection/requests/${id}/close`,
