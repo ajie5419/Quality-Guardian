@@ -7,7 +7,6 @@ import { computed, ref, watch } from 'vue';
 
 import { useUserStore } from '@vben/stores';
 
-import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import { Input, InputNumber, message, Select } from 'ant-design-vue';
 import dayjs from 'dayjs';
 
@@ -18,8 +17,7 @@ import BomItemSelect from '#/views/qms/shared/components/BomItemSelect.vue';
 
 import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
-import { useDictionaryOptions } from '../../../shared/composables/useDictionaryOptions';
-import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
+import { useProcessMasterOptions } from '../../../shared/composables/useProcessMasterOptions';
 import IssuePhotoUpload from '../../issues/components/IssuePhotoUpload.vue';
 import {
   DEFAULT_VALUES,
@@ -108,11 +106,8 @@ const welderLoading = ref(false);
 const {
   options: processOptions,
   loadOptions: loadInspectionProcessDictionaryOptions,
-} = useDictionaryOptions({
-  dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
-  fallbackOptions: cloneInspectionProcessFallbackOptions(),
-  mapOptions: (options, fallbackOptions) =>
-    mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
+} = useProcessMasterOptions({
+  mapOptions: (options) => mapDictionaryOptionsToInspectionProcess(options),
 });
 
 const [Form, formApi] = useVbenForm({

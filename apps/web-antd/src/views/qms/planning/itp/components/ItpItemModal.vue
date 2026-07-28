@@ -7,7 +7,6 @@ import { computed, reactive, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
-import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Button,
   Form,
@@ -22,8 +21,7 @@ import {
 import { createItp, updateItp } from '#/api/qms/planning';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { mapDictionaryOptionsToInspectionProcess } from '#/views/qms/inspection/records/config';
-import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
-import { cloneInspectionProcessFallbackOptions } from '#/views/qms/shared/constants/inspection-process-fallback';
+import { useProcessMasterOptions } from '#/views/qms/shared/composables/useProcessMasterOptions';
 
 import { CONTROL_POINT_MAP } from '../../constants';
 
@@ -46,11 +44,8 @@ const confirmLoading = ref(false);
 const formRef = ref();
 
 const { options: processOptions, loadOptions: loadInspectionProcessOptions } =
-  useDictionaryOptions({
-    dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
-    fallbackOptions: cloneInspectionProcessFallbackOptions(),
-    mapOptions: (options, fallbackOptions) =>
-      mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
+  useProcessMasterOptions({
+    mapOptions: (options) => mapDictionaryOptionsToInspectionProcess(options),
   });
 
 const controlPointOptions = computed(() =>

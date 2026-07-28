@@ -1,5 +1,3 @@
-import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
-
 import { request } from './request';
 
 export interface DepartmentNode {
@@ -145,9 +143,8 @@ export function getSuppliers(keyword?: string) {
 
 export function getProcessDictionaryOptions() {
   return request<DictionaryOptionItem[]>({
-    url: '/api/system/dictionary/options',
+    url: '/api/qms/public/inspection/requests/process-dictionary-options',
     method: 'GET',
-    data: { dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName },
   });
 }
 

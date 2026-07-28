@@ -7,7 +7,6 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 
 import { useAccessStore } from '@vben/stores';
 
-import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Button,
   Input,
@@ -22,7 +21,7 @@ import {
 import { parseExcelWorkbookFromArrayBuffer } from '#/utils/excel-sheet';
 import { mapDictionaryOptionsToInspectionProcess } from '#/views/qms/inspection/records/config';
 import WorkOrderSelect from '#/views/qms/shared/components/WorkOrderSelect.vue';
-import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
+import { useProcessMasterOptions } from '#/views/qms/shared/composables/useProcessMasterOptions';
 
 import {
   autoBuildFormFieldsFromRows,
@@ -99,32 +98,9 @@ const formState = reactive<TemplatePayload>({
 
 const isEdit = computed(() => Boolean(props.current?.id));
 
-const fallbackOptions = [
-  { label: '原材料', value: '原材料' },
-  { label: '外购件', value: '外购件' },
-  { label: '辅材', value: '辅材' },
-  { label: '机加成品件', value: '机加成品件' },
-  { label: '下料', value: '下料' },
-  { label: '组对', value: '组对' },
-  { label: '焊接', value: '焊接' },
-  { label: '焊后尺寸', value: '焊后尺寸' },
-  { label: '外观', value: '外观' },
-  { label: '整体拼装', value: '整体拼装' },
-  { label: '组拼', value: '组拼' },
-  { label: '组焊', value: '组焊' },
-  { label: '涂装', value: '涂装' },
-  { label: '喷漆', value: '喷漆' },
-  { label: '组装', value: '组装' },
-  { label: '装配', value: '装配' },
-  { label: '打砂', value: '打砂' },
-  { label: '发货检验', value: '发货检验' },
-];
 const { options: processOptions, loadOptions: loadInspectionProcessOptions } =
-  useDictionaryOptions({
-    dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
-    fallbackOptions,
-    mapOptions: (options, fallbackOptions) =>
-      mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
+  useProcessMasterOptions({
+    mapOptions: (options) => mapDictionaryOptionsToInspectionProcess(options),
   });
 
 const uploadHeaders = computed(() => ({

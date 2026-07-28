@@ -4,7 +4,6 @@ import type { VbenFormSchema } from '#/adapter/form';
 
 import { useI18n } from '@vben/locales';
 
-import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
 import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
 import {
   useClaimOptions,
@@ -89,11 +88,7 @@ export function getIssueFormSchema(
       rules: 'selectRequired',
       componentProps: {
         options:
-          processOptionsOverride ||
-          mapDictionaryOptionsToInspectionProcess(
-            undefined,
-            cloneInspectionProcessFallbackOptions(),
-          ),
+          processOptionsOverride || mapDictionaryOptionsToInspectionProcess([]),
         allowClear: true,
         showSearch: true,
       },

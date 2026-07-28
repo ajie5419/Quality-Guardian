@@ -87,7 +87,7 @@ export const ProcessMasterService = {
     return prisma.processes.findMany({
       where: { isDeleted: false, status: 1 },
       orderBy: [{ sort: 'asc' }, { name: 'asc' }],
-      select: { id: true, name: true },
+      select: { id: true, name: true, sort: true },
     });
   },
 
@@ -249,12 +249,12 @@ export const ProcessMasterService = {
       ...new Set([...incomingProcessIds, ...processProcessIds]),
     ];
     const validCount = await prisma.processes.count({
-      where: { id: { in: selectedIds }, isDeleted: false, status: 1 },
+      where: { id: { in: selectedIds }, isDeleted: false },
     });
     if (validCount !== selectedIds.length) {
       throw new BusinessError(
         'INVALID_PROCESS_SELECTION',
-        'Every selected process must be active',
+        'Every selected process must exist',
         400,
       );
     }

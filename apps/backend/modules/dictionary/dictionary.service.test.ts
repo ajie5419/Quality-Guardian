@@ -114,7 +114,7 @@ describe('dictionaryService', () => {
     expect(prisma.dictionaries.create).not.toHaveBeenCalled();
   });
 
-  it('rejects creating processes through the generic dictionary service', async () => {
+  it('rejects the retired process dictionary type', async () => {
     await expect(
       DictionaryService.create(
         {
@@ -124,10 +124,7 @@ describe('dictionaryService', () => {
         },
         'tester',
       ),
-    ).rejects.toMatchObject({
-      code: 'PROCESS_REQUIRES_DEDICATED_API',
-      httpStatus: 409,
-    });
+    ).rejects.toMatchObject({ code: 'VALIDATION' });
     expect(prisma.dictionaries.create).not.toHaveBeenCalled();
   });
 
@@ -410,7 +407,7 @@ describe('dictionaryService', () => {
     expect(prisma.dictionaries.update).not.toHaveBeenCalled();
   });
 
-  it('rejects updating processes through the generic dictionary service', async () => {
+  it('rejects updating retired process dictionary rows', async () => {
     (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
       dictKey: 'Welding',
       dictType: 'inspection_process_name',
@@ -422,10 +419,7 @@ describe('dictionaryService', () => {
 
     await expect(
       DictionaryService.update('process-dict-1', { status: 0 }, 'tester'),
-    ).rejects.toMatchObject({
-      code: 'PROCESS_REQUIRES_DEDICATED_API',
-      httpStatus: 409,
-    });
+    ).rejects.toMatchObject({ code: 'VALIDATION', httpStatus: 400 });
     expect(prisma.dictionaries.update).not.toHaveBeenCalled();
   });
 

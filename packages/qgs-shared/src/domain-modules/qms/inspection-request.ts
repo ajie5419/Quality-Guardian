@@ -19,25 +19,6 @@ export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
 export const INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT = '采购部';
 export const OUTSOURCING_INSPECTION_PROCESS_KEYWORD = '外协';
 export const OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT = '生产 OBU';
-export const INSPECTION_PROCESS_FALLBACK_ITEMS = [
-  { labelKey: 'outsourced', value: '外购件' },
-  { labelKey: 'rawMaterial', value: '原材料' },
-  { labelKey: 'auxiliary', value: '辅材' },
-  { labelKey: 'machined', value: '机加成品件' },
-  { labelKey: 'cutting', value: '下料' },
-  { labelKey: 'assembly', value: '组对' },
-  { labelKey: 'welding', value: '焊接' },
-  { labelKey: 'flawDetection', value: '探伤' },
-  { labelKey: 'weldSize', value: '焊后尺寸' },
-  { labelKey: 'appearance', value: '外观' },
-  { labelKey: 'overallAssembly', value: '整体拼装' },
-  { labelKey: 'assembling', value: '组装' },
-  { labelKey: 'mounting', value: '装配' },
-  { labelKey: 'grouping', value: '组拼' },
-  { labelKey: 'sandblasting', value: '打砂' },
-  { labelKey: 'painting', value: '喷漆' },
-] as const;
-
 const CHECK_RESULT_SET = new Set(['FAIL', 'NA', 'PASS']);
 const REQUEST_STATUS_SET = new Set<string>(
   Object.values(INSPECTION_REQUEST_STATUS),

@@ -7,8 +7,6 @@ import { InspectionIssueStatusEnum } from '@qgs/shared';
 
 import { $t } from '#/locales';
 
-import { cloneInspectionProcessFallbackOptions } from '../../shared/constants/inspection-process-fallback';
-
 export function getIssueSearchFormSchema(
   statusOptions: StatusOption[] = [
     {
@@ -27,7 +25,7 @@ export function getIssueSearchFormSchema(
       color: 'green',
     },
   ],
-  processOptions = cloneInspectionProcessFallbackOptions(),
+  processOptions: Array<{ label: string; value: string }> = [],
 ): VbenFormSchema[] {
   const statusSearchOptions = [
     { label: $t('common.all'), value: '' },

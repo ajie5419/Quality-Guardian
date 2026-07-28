@@ -17,13 +17,8 @@ export default defineEventHandler(async (event) => {
         sort: item.sort,
       })),
     );
-  } catch (error) {
-    logApiError(
-      'public-inspection-request-process-dictionary-options',
-      error,
-      undefined,
-      event,
-    );
-    return internalServerErrorResponse(event, '获取工序字典选项失败');
+  } catch (error: unknown) {
+    logApiError('process-master-options', error, undefined, event);
+    return internalServerErrorResponse(event, 'Failed to load processes');
   }
 });

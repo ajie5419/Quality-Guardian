@@ -5,8 +5,6 @@ import { $t } from '@vben/locales';
 
 import { Modal } from 'ant-design-vue';
 
-import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
-
 export function buildTeamIdentityFields(
   value: string | undefined,
   option?: { label?: unknown },
@@ -39,7 +37,7 @@ export const getFormSchema = (
         }
         return item;
       })
-    : cloneInspectionProcessFallbackOptions();
+    : [];
 
   const schema: VbenFormSchema[] = [
     {

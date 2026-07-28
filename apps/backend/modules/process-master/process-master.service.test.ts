@@ -35,6 +35,21 @@ describe('process master service', () => {
     vi.clearAllMocks();
   });
 
+  it('lists active global options for other modules', async () => {
+    vi.mocked(prisma.processes.findMany).mockResolvedValue([
+      { id: 'process-1', name: 'Welding', sort: 3 },
+    ] as never);
+
+    await expect(ProcessMasterService.listActiveOptions()).resolves.toEqual([
+      { id: 'process-1', name: 'Welding', sort: 3 },
+    ]);
+    expect(prisma.processes.findMany).toHaveBeenCalledWith({
+      where: { isDeleted: false, status: 1 },
+      orderBy: [{ sort: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true, sort: true },
+    });
+  });
+
   it('lists the same global process in both inspection categories', async () => {
     vi.mocked(prisma.processes.findMany).mockResolvedValue([
       {

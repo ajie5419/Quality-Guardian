@@ -52,10 +52,11 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
     readStrategy: 'canonical-first',
     backfillPolicy: 'canonical-id',
     auditPolicy: 'canonical-id-and-orphan',
-    canonicalSeedPolicy: 'empty-only',
     source: {
-      type: 'dictionary',
-      dictType: 'inspection_process_name',
+      table: 'processes',
+      type: 'table',
+      valueColumn: 'name',
+      where: 'isDeleted = 0 AND status = 1',
     },
     canonical: {
       table: 'processes',

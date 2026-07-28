@@ -31,7 +31,6 @@ import {
 } from '@/utils/issues';
 import {
   INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS,
-  INSPECTION_PROCESS_FALLBACK_ITEMS,
   mergeInspectionProcessNames,
 } from '@qgs/shared';
 
@@ -84,11 +83,8 @@ export function useIssueForm(
   const showDepartments = ref(false);
   const ready = ref(false);
   const workOrderResults = ref<WorkOrderItem[]>([]);
-  const fallbackProcessOptions = INSPECTION_PROCESS_FALLBACK_ITEMS.map(
-    (item) => ({ label: item.value, value: item.value }),
-  );
-  const processReferenceOptions = ref([...fallbackProcessOptions]);
-  const processOptions = ref([...fallbackProcessOptions]);
+  const processReferenceOptions = ref<IssueOption[]>([]);
+  const processOptions = ref<IssueOption[]>([]);
   const departments = ref<FlatDepartment[]>([]);
   const supplierOptions = ref<IssueOption[]>([]);
   const welderOptions = ref<IssueOption[]>([]);

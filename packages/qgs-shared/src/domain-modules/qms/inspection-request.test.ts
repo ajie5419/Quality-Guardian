@@ -5,7 +5,6 @@ import {
   formatInspectionStationSelection,
   INCOMING_INSPECTION_PROCESS_NAME,
   INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
-  INSPECTION_PROCESS_FALLBACK_ITEMS,
   mergeInspectionProcessNames,
   normalizeInspectionIssueResponsibilityType,
   normalizeInspectionStationSelection,
@@ -14,53 +13,10 @@ import {
 } from './inspection-request';
 
 describe('inspection process options', () => {
-  it('provides the desktop fallback process values', () => {
-    expect(INSPECTION_PROCESS_FALLBACK_ITEMS.map((item) => item.value)).toEqual(
-      [
-        '外购件',
-        '原材料',
-        '辅材',
-        '机加成品件',
-        '下料',
-        '组对',
-        '焊接',
-        '探伤',
-        '焊后尺寸',
-        '外观',
-        '整体拼装',
-        '组装',
-        '装配',
-        '组拼',
-        '打砂',
-        '喷漆',
-      ],
-    );
-  });
-
-  it('prioritizes work-order processes and removes duplicates', () => {
+  it('preserves source order and removes duplicates', () => {
     expect(
-      mergeInspectionProcessNames(
-        ['下料', ' 焊接 ', ''],
-        INSPECTION_PROCESS_FALLBACK_ITEMS.map((item) => item.value),
-      ),
-    ).toEqual([
-      '下料',
-      '焊接',
-      '外购件',
-      '原材料',
-      '辅材',
-      '机加成品件',
-      '组对',
-      '探伤',
-      '焊后尺寸',
-      '外观',
-      '整体拼装',
-      '组装',
-      '装配',
-      '组拼',
-      '打砂',
-      '喷漆',
-    ]);
+      mergeInspectionProcessNames(['下料', ' 焊接 ', ''], ['焊接', '组对']),
+    ).toEqual(['下料', '焊接', '组对']);
   });
 });
 

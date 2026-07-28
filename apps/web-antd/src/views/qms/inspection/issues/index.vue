@@ -28,7 +28,7 @@ import { findNameById } from '#/types';
 import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import { useDictionaryOptions } from '../../shared/composables/useDictionaryOptions';
-import { cloneInspectionProcessFallbackOptions } from '../../shared/constants/inspection-process-fallback';
+import { useProcessMasterOptions } from '../../shared/composables/useProcessMasterOptions';
 import { mapDictionaryOptionsToInspectionProcess } from '../records/config';
 import IssueChartDashboard from './components/IssueChartDashboard.vue';
 import IssueDetailDrawer from './components/IssueDetailDrawer.vue';
@@ -109,11 +109,8 @@ const {
 const {
   options: issueProcessOptions,
   loadOptions: loadIssueProcessDictionaryOptions,
-} = useDictionaryOptions({
-  dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
-  fallbackOptions: cloneInspectionProcessFallbackOptions(),
-  mapOptions: (options, fallbackOptions) =>
-    mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
+} = useProcessMasterOptions({
+  mapOptions: (options) => mapDictionaryOptionsToInspectionProcess(options),
 });
 
 function refreshIssueSearchSchema() {
