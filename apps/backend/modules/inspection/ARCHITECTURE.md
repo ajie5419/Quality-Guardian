@@ -74,6 +74,8 @@ Process options must preserve these source boundaries:
 - `INCOMING` returns active process master rows with `inspectionRequestCategory=INCOMING`, independent of process names and work-order requirements.
 - Process names are display values only. Category filtering, deduplication, and submission use `inspectionRequestCategory + processId`.
 
+Release maintenance must establish process identities before classifying inspection-request categories. The legacy-name bootstrap is permitted only when the `processes` identity space has never been initialized and only from active target rows whose `processId` is null. Once any canonical process exists, historical name snapshots can never create another process identity; unresolved rows remain audited instead. This prevents a rename from recreating the old display name as a second process.
+
 public 报检禁止：
 
 - 读取受保护的系统字典接口。

@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MasterDataGovernanceKernel } from './canonical-master-data';
+import {
+  __masterDataGovernanceTestHooks,
+  MasterDataGovernanceKernel,
+} from './canonical-master-data';
 
-const { queryRawUnsafe, transaction } = vi.hoisted(() => {
+const { executeRawUnsafe, queryRawUnsafe, transaction } = vi.hoisted(() => {
   const queryRawUnsafe = vi.fn();
   return {
+    executeRawUnsafe: vi.fn(),
     queryRawUnsafe,
     transaction: vi.fn(
       async (
@@ -16,14 +20,20 @@ const { queryRawUnsafe, transaction } = vi.hoisted(() => {
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    $executeRawUnsafe: executeRawUnsafe,
     $queryRawUnsafe: queryRawUnsafe,
     $transaction: transaction,
   },
 }));
 
+vi.mock('@paralleldrive/cuid2', () => ({
+  createId: () => 'process-cuid',
+}));
+
 describe('masterDataGovernanceKernel', () => {
   beforeEach(() => {
     queryRawUnsafe.mockReset();
+    executeRawUnsafe.mockReset();
     transaction.mockClear();
   });
 
@@ -60,6 +70,92 @@ describe('masterDataGovernanceKernel', () => {
         name: 'Vehicle OBU',
       }),
     ).rejects.toThrow('INVALID_CANONICAL_ID:division:division-1');
+  });
+
+  it('requires process identities to be enabled', async () => {
+    queryRawUnsafe.mockResolvedValue([{ value: 'Welding' }]);
+
+    await expect(
+      MasterDataGovernanceKernel.resolveCanonicalIdForWrite({
+        configKey: 'processName',
+        explicitCanonicalId: 'process-1',
+        name: 'Welding',
+      }),
+    ).resolves.toBe('process-1');
+
+    expect(queryRawUnsafe.mock.calls[0]?.[0]).toContain('isDeleted = 0');
+    expect(queryRawUnsafe.mock.calls[0]?.[0]).toContain('status = 1');
+  });
+
+  it('creates bootstrapped process identities with cuid IDs', async () => {
+    executeRawUnsafe.mockResolvedValue(1);
+
+    await expect(
+      __masterDataGovernanceTestHooks.seedCanonicalByNames(
+        {
+          activeWhere: 'isDeleted = 0 AND status = 1',
+          idColumn: 'id',
+          nameColumn: 'name',
+          table: 'processes',
+        },
+        ['Welding'],
+      ),
+    ).resolves.toBe(1);
+    expect(executeRawUnsafe).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT IGNORE INTO processes'),
+      'process-cuid',
+      'Welding',
+      0,
+    );
+  });
+
+  it('never recreates historical names after canonical initialization', async () => {
+    queryRawUnsafe.mockResolvedValue([{ count: 1 }]);
+
+    await expect(
+      MasterDataGovernanceKernel.bootstrapCanonicalFromTargetNames(
+        'processName',
+      ),
+    ).resolves.toEqual({
+      candidateCanonicalRows: 0,
+      canonicalRowsBeforeBootstrap: 1,
+      seededCanonicalRows: 0,
+      status: 'already-initialized',
+    });
+    expect(queryRawUnsafe).toHaveBeenCalledTimes(1);
+    expect(executeRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it('never recreates legacy dictionary names after process initialization', async () => {
+    queryRawUnsafe.mockResolvedValue([{ count: 1 }]);
+
+    await expect(
+      MasterDataGovernanceKernel.seedCanonicalFromSource('processName'),
+    ).resolves.toEqual({ seededCanonicalRows: 0 });
+    expect(queryRawUnsafe).toHaveBeenCalledTimes(1);
+    expect(executeRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it('bootstraps only names from rows without canonical IDs', async () => {
+    queryRawUnsafe
+      .mockResolvedValueOnce([
+        { columnName: 'isDeleted' },
+        { columnName: 'processId' },
+        { columnName: 'processName' },
+      ])
+      .mockResolvedValueOnce([{ value: 'Welding' }]);
+
+    await expect(
+      __masterDataGovernanceTestHooks.readDistinctMissingCanonicalIdTargetNames(
+        {
+          idColumn: 'processId',
+          nameColumn: 'processName',
+          nullable: true,
+          table: 'work_order_requirements',
+        },
+      ),
+    ).resolves.toEqual(['Welding']);
+    expect(queryRawUnsafe.mock.calls[1]?.[0]).toContain('`processId` IS NULL');
   });
 
   it('rejects a canonical ID and name mismatch', async () => {

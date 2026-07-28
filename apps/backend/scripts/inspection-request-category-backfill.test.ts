@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '~/utils/prisma';
 
@@ -128,6 +130,22 @@ describe('inspection request category backfill', () => {
         name: '进货检验',
       },
     });
+  });
+
+  it('runs identity bootstrap before process category classification', () => {
+    const maintenanceScript = readFileSync(
+      'scripts/run-release-maintenance.sh',
+      'utf8',
+    );
+    const identityBackfillIndex = maintenanceScript.indexOf(
+      'scripts/backfill-identity-relations.ts',
+    );
+    const categoryBackfillIndex = maintenanceScript.indexOf(
+      'scripts/backfill-inspection-request-categories.ts',
+    );
+
+    expect(identityBackfillIndex).toBeGreaterThan(-1);
+    expect(categoryBackfillIndex).toBeGreaterThan(identityBackfillIndex);
   });
 
   it('is idempotent after an applied row no longer matches the null category query', async () => {

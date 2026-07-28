@@ -245,3 +245,69 @@ export async function backfillBomRequiredProcessIdentities(
   }
   return { processed, updated };
 }
+
+export async function backfillWorkOrderRequirementProcessIdentities(
+  options: BackfillOptions = {},
+) {
+  const batchSize = options.batchSize ?? 200;
+  let cursor: string | undefined;
+  let processed = 0;
+  let unresolved = 0;
+  let updated = 0;
+  while (true) {
+    const rows = await prisma.work_order_requirements.findMany({
+      where: {
+        isDeleted: false,
+        processId: null,
+        processName: { not: null },
+      },
+      orderBy: { id: 'asc' },
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      take: batchSize,
+      select: { id: true, processName: true },
+    });
+    if (rows.length === 0) break;
+    const names = rows.map((row) => String(row.processName || '').trim());
+    const ids = await MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
+      configKey: 'processName',
+      names,
+    });
+    for (const row of rows) {
+      const processName = String(row.processName || '').trim();
+      const processId = String(ids.get(processName) || '').trim();
+      if (!processId) {
+        unresolved += 1;
+        await recordUnresolved({
+          entityId: row.id,
+          entityType: 'work_order_requirements',
+          fieldName: 'processId',
+          rawName: processName || null,
+          reason: 'NO_ACTIVE_CANONICAL_MATCH',
+        });
+        continue;
+      }
+      const result = await prisma.work_order_requirements.updateMany({
+        where: {
+          id: row.id,
+          isDeleted: false,
+          processId: null,
+          processName: row.processName,
+        },
+        data: { processId },
+      });
+      updated += result.count;
+      if (result.count > 0) {
+        await resolveUnresolved(
+          'work_order_requirements',
+          row.id,
+          'processId',
+          processId,
+        );
+      }
+    }
+    processed += rows.length;
+    cursor = rows.at(-1)?.id;
+    if (rows.length < batchSize) break;
+  }
+  return { processed, unresolved, updated };
+}

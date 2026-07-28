@@ -4,8 +4,7 @@ import type {
   MasterDataTarget,
 } from './master-data-fields';
 
-import { randomUUID } from 'node:crypto';
-
+import { createId } from '@paralleldrive/cuid2';
 import prisma from '~/utils/prisma';
 
 import {
@@ -469,6 +468,7 @@ async function seedCanonicalByNames(
   canonical: MasterDataCanonicalRelation,
   names: string[],
 ) {
+  let insertedRows = 0;
   if (
     canonical.table === 'master_projects' ||
     canonical.table === 'master_parts'
@@ -476,34 +476,38 @@ async function seedCanonicalByNames(
     const table = quoteIdentifier(canonical.table);
     const nameColumn = quoteIdentifier(canonical.nameColumn);
     for (const [sort, name] of names.entries()) {
-      await prisma.$executeRawUnsafe(
-        `INSERT IGNORE INTO ${table} (
+      insertedRows += toAffectedRows(
+        await prisma.$executeRawUnsafe(
+          `INSERT IGNORE INTO ${table} (
          id, ${nameColumn}, sort, status, isDeleted, createdAt, updatedAt
        ) VALUES (?, ?, ?, 1, 0, NOW(3), NOW(3))`,
-        randomUUID(),
-        name,
-        sort,
+          createId(),
+          name,
+          sort,
+        ),
       );
     }
-    return;
+    return insertedRows;
   }
 
   if (canonical.table === 'processes') {
     for (const [sort, name] of names.entries()) {
-      await prisma.$executeRawUnsafe(
-        `INSERT IGNORE INTO processes (
+      insertedRows += toAffectedRows(
+        await prisma.$executeRawUnsafe(
+          `INSERT IGNORE INTO processes (
          id, name, code, sort, status, isDeleted, createdAt, updatedAt
        ) VALUES (?, ?, NULL, ?, 1, 0, NOW(3), NOW(3))`,
-        randomUUID(),
-        name,
-        sort,
+          createId(),
+          name,
+          sort,
+        ),
       );
     }
-    return;
+    return insertedRows;
   }
 
   if (canonical.table !== 'dictionaries') {
-    return;
+    return insertedRows;
   }
 
   const field = listMasterDataGovernanceFields().find(
@@ -514,30 +518,36 @@ async function seedCanonicalByNames(
       item.source.type === 'dictionary',
   );
   if (!field || field.source.type !== 'dictionary') {
-    return;
+    return insertedRows;
   }
 
   for (const [sort, name] of names.entries()) {
-    await prisma.$executeRawUnsafe(
-      `INSERT IGNORE INTO dictionaries (
+    insertedRows += toAffectedRows(
+      await prisma.$executeRawUnsafe(
+        `INSERT IGNORE INTO dictionaries (
          id, dictType, dictKey, dictValue, sort, status, isDeleted, createdAt, updatedAt
        ) VALUES (?, ?, ?, ?, ?, 1, 0, NOW(3), NOW(3))`,
-      randomUUID(),
-      field.source.dictType,
-      name,
-      name,
-      sort,
+        createId(),
+        field.source.dictType,
+        name,
+        name,
+        sort,
+      ),
     );
   }
+  return insertedRows;
 }
 
 async function readDistinctTargetNames(target: MasterDataTarget) {
   const tableName = quoteIdentifier(target.table);
   const nameColumn = quoteIdentifier(target.nameColumn);
+  const activeRowWhere = await buildActiveRowWhereSql(target.table);
   const rows = await prisma.$queryRawUnsafe<Array<{ value: null | string }>>(
     `SELECT DISTINCT ${nameColumn} AS value
      FROM ${tableName}
-     WHERE ${nameColumn} IS NOT NULL AND TRIM(${nameColumn}) <> ''`,
+     WHERE ${nameColumn} IS NOT NULL
+       AND TRIM(${nameColumn}) <> ''
+       AND ${activeRowWhere}`,
   );
   const valueSet = new Set<string>();
   for (const row of rows) {
@@ -547,6 +557,38 @@ async function readDistinctTargetNames(target: MasterDataTarget) {
     }
   }
   return [...valueSet];
+}
+
+async function readDistinctMissingCanonicalIdTargetNames(
+  target: MasterDataTarget,
+) {
+  if (!target.idColumn) return [];
+  const tableName = quoteIdentifier(target.table);
+  const nameColumn = quoteIdentifier(target.nameColumn);
+  const idColumn = quoteIdentifier(target.idColumn);
+  const activeRowWhere = await buildActiveRowWhereSql(target.table);
+  const rows = await prisma.$queryRawUnsafe<Array<{ value: null | string }>>(
+    `SELECT DISTINCT ${nameColumn} AS value
+     FROM ${tableName}
+     WHERE ${nameColumn} IS NOT NULL
+       AND TRIM(${nameColumn}) <> ''
+       AND ${idColumn} IS NULL
+       AND ${activeRowWhere}`,
+  );
+  const valueSet = new Set<string>();
+  for (const row of rows) {
+    const value = normalizeValue(row.value);
+    if (value) valueSet.add(value);
+  }
+  return [...valueSet];
+}
+
+async function countCanonicalRows(canonical: MasterDataCanonicalRelation) {
+  const tableName = quoteIdentifier(canonical.table);
+  const rows = await prisma.$queryRawUnsafe<
+    Array<{ count: bigint | number | string }>
+  >(`SELECT COUNT(*) AS count FROM ${tableName}`);
+  return toAffectedRows(rows[0]?.count);
 }
 
 async function backfillTargetCanonicalIds(
@@ -677,6 +719,9 @@ async function backfillTargetCanonicalIds(
 export const __masterDataGovernanceTestHooks = {
   backfillTargetCanonicalIds,
   buildActiveRowWhereSql,
+  countCanonicalRows,
+  readDistinctMissingCanonicalIdTargetNames,
+  seedCanonicalByNames,
   resetCaches() {
     TABLE_COLUMN_CACHE.clear();
     TABLE_PRIMARY_KEY_CACHE.clear();
@@ -1254,13 +1299,62 @@ export const MasterDataGovernanceKernel = {
     if (!field.canonical) {
       return { seededCanonicalRows: 0 };
     }
+    if (
+      field.canonicalSeedPolicy === 'empty-only' &&
+      (await countCanonicalRows(field.canonical)) > 0
+    ) {
+      return { seededCanonicalRows: 0 };
+    }
     const sourceValues = await fetchSourceValues(field);
     const values = [...sourceValues].sort((a, b) =>
       a.localeCompare(b, 'zh-CN'),
     );
-    await seedCanonicalByNames(field.canonical, values);
+    const seededCanonicalRows = await seedCanonicalByNames(
+      field.canonical,
+      values,
+    );
     return {
-      seededCanonicalRows: values.length,
+      seededCanonicalRows,
+    };
+  },
+
+  async bootstrapCanonicalFromTargetNames(configKey: string) {
+    const field = getFieldOrThrow(configKey);
+    if (!field.canonical) {
+      return {
+        candidateCanonicalRows: 0,
+        canonicalRowsBeforeBootstrap: 0,
+        seededCanonicalRows: 0,
+        status: 'not-applicable' as const,
+      };
+    }
+    const canonicalRowsBeforeBootstrap = await countCanonicalRows(
+      field.canonical,
+    );
+    if (canonicalRowsBeforeBootstrap > 0) {
+      return {
+        candidateCanonicalRows: 0,
+        canonicalRowsBeforeBootstrap,
+        seededCanonicalRows: 0,
+        status: 'already-initialized' as const,
+      };
+    }
+    const names = new Set<string>();
+    for (const target of field.targets) {
+      if (!target.idColumn) continue;
+      const values = await readDistinctMissingCanonicalIdTargetNames(target);
+      for (const value of values) names.add(value);
+    }
+    const values = [...names].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+    const seededCanonicalRows = await seedCanonicalByNames(
+      field.canonical,
+      values,
+    );
+    return {
+      candidateCanonicalRows: values.length,
+      canonicalRowsBeforeBootstrap,
+      seededCanonicalRows,
+      status: 'bootstrapped' as const,
     };
   },
 

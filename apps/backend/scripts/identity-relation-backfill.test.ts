@@ -5,6 +5,7 @@ import prisma from '~/utils/prisma';
 import {
   backfillBomRequiredProcessIdentities,
   backfillInspectionPartIdentities,
+  backfillWorkOrderRequirementProcessIdentities,
 } from './identity-relation-backfill';
 
 vi.mock('~/utils/canonical-master-data', () => ({
@@ -23,6 +24,7 @@ vi.mock('~/utils/prisma', () => ({
       createMany: vi.fn(),
     },
     project_boms: { findMany: vi.fn() },
+    work_order_requirements: { findMany: vi.fn(), updateMany: vi.fn() },
     unresolved_master_data_refs: {
       updateMany: vi.fn(),
       upsert: vi.fn(),
@@ -173,5 +175,55 @@ describe('identity relation backfill', () => {
         },
       ],
     });
+  });
+
+  it('backfills work order requirement process IDs without changing snapshots', async () => {
+    vi.mocked(prisma.work_order_requirements.findMany).mockResolvedValue([
+      { id: 'requirement-1', processName: 'Welding' },
+    ] as never);
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalIdsByNames,
+    ).mockResolvedValue(new Map([['Welding', 'process-1']]));
+    vi.mocked(prisma.work_order_requirements.updateMany).mockResolvedValue({
+      count: 1,
+    });
+
+    await expect(
+      backfillWorkOrderRequirementProcessIdentities({ batchSize: 10 }),
+    ).resolves.toEqual({ processed: 1, unresolved: 0, updated: 1 });
+    expect(prisma.work_order_requirements.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'requirement-1',
+        isDeleted: false,
+        processId: null,
+        processName: 'Welding',
+      },
+      data: { processId: 'process-1' },
+    });
+  });
+
+  it('audits work order process snapshots without an active canonical match', async () => {
+    vi.mocked(prisma.work_order_requirements.findMany).mockResolvedValue([
+      { id: 'requirement-1', processName: 'Unknown process' },
+    ] as never);
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalIdsByNames,
+    ).mockResolvedValue(new Map([['Unknown process', null]]));
+
+    await expect(
+      backfillWorkOrderRequirementProcessIdentities({ batchSize: 10 }),
+    ).resolves.toEqual({ processed: 1, unresolved: 1, updated: 0 });
+    expect(prisma.work_order_requirements.updateMany).not.toHaveBeenCalled();
+    expect(prisma.unresolved_master_data_refs.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          entityId: 'requirement-1',
+          entityType: 'work_order_requirements',
+          fieldName: 'processId',
+          rawName: 'Unknown process',
+          reason: 'NO_ACTIVE_CANONICAL_MATCH',
+        }),
+      }),
+    );
   });
 });

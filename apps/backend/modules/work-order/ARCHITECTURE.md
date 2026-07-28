@@ -11,6 +11,8 @@ work-order 负责工单主数据、工单要求、聚合看板和进度查询。
 - `identityContractVersion=2` 禁止客户端同时提交部件/工序名称，避免改名窗口产生 ID/名称冲突。
 - 旧页面的 V1 name-only 写入仅用于发布迁移；新页面不得调用，生产流量归零后删除。
 
+Historical requirements keep their original `processName` snapshots. Ordered release maintenance bootstraps an empty process identity space once, then fills only null `processId` values with compare-and-set updates. Existing IDs and names are never overwritten; missing or ambiguous matches are written to `unresolved_master_data_refs`.
+
 ## 聚合身份契约
 
 - 要求和检验只在 `partId + processId` 同时相等时匹配。

@@ -32,6 +32,7 @@ export interface MasterDataTarget {
 export interface MasterDataGovernanceField {
   auditPolicy: 'canonical-id-and-orphan' | 'orphan-only';
   backfillPolicy: 'canonical-id' | 'none';
+  canonicalSeedPolicy?: 'always' | 'empty-only';
   key: string;
   onlineWritePolicy?: 'id-required';
   readStrategy: 'canonical-first' | 'name-only';
@@ -51,6 +52,7 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
     readStrategy: 'canonical-first',
     backfillPolicy: 'canonical-id',
     auditPolicy: 'canonical-id-and-orphan',
+    canonicalSeedPolicy: 'empty-only',
     source: {
       type: 'dictionary',
       dictType: 'inspection_process_name',
@@ -59,7 +61,7 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
       table: 'processes',
       idColumn: 'id',
       nameColumn: 'name',
-      activeWhere: 'isDeleted = 0',
+      activeWhere: 'isDeleted = 0 AND status = 1',
     },
     targets: [
       {

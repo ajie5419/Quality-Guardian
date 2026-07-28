@@ -106,6 +106,8 @@ For legacy rows whose category has not yet been backfilled, a TEAM ID takes prec
 5. 回填成功后将对应未解析记录标记为 `RESOLVED`，保留完整追溯。
 6. migration 和回填在生产发布中连续自动执行，不依赖人工进容器操作。
 
+Canonical bootstrap is an initialization operation, not an ongoing name resolver. It may create identities from legacy snapshots only when the canonical table has zero rows and only for target rows whose canonical ID is null. After initialization, old snapshots produced by rename history must never create new identities; they are resolved through existing IDs or retained as unresolved evidence.
+
 当前身份回填覆盖 TEAM 映射、`qms_inspection_requests` 的 `teamId/supplierId`、`inspections`、`after_sales` 和 `quality_records`；其他表按后续治理 wave 单独评估，不得把未迁移表的名称解析结果当作本 wave 完成证明。
 
 ## 分阶段退出名称依赖

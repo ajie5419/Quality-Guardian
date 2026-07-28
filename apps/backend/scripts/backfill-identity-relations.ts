@@ -7,6 +7,7 @@ import prisma from '~/utils/prisma';
 import {
   backfillBomRequiredProcessIdentities,
   backfillInspectionPartIdentities,
+  backfillWorkOrderRequirementProcessIdentities,
 } from './identity-relation-backfill';
 
 const logger = createModuleLogger('identity-relation-backfill');
@@ -18,6 +19,12 @@ async function main() {
     runAudit: false,
     runBackfill: false,
   });
+  const processBootstrap =
+    await MasterDataGovernanceKernel.bootstrapCanonicalFromTargetNames(
+      'processName',
+    );
+  const workOrderProcesses =
+    await backfillWorkOrderRequirementProcessIdentities();
   const inspections = await backfillInspectionPartIdentities();
   const bomProcesses = await backfillBomRequiredProcessIdentities();
   const governance = await MasterDataGovernanceKernel.runGovernanceByFields({
@@ -27,7 +34,14 @@ async function main() {
     runSeed: false,
   });
   logger.info(
-    { bomProcesses, governance, inspections, seed },
+    {
+      bomProcesses,
+      governance,
+      inspections,
+      processBootstrap,
+      seed,
+      workOrderProcesses,
+    },
     'identity relation backfill completed',
   );
 }
