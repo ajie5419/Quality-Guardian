@@ -8,26 +8,22 @@ import { getQuery } from 'h3';
 import {
   mapProjectBomItem,
   normalizeBomText,
-  parseBomRequiredProcesses,
   projectBomItemSelect,
 } from '~/modules/planning/bom';
 import { logApiError } from '~/utils/api-logger';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
-import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import {
   internalServerErrorResponse,
   useListResponseSuccess,
 } from '~/utils/response';
 
-function normalizeCompareText(value: unknown) {
-  return String(value || '')
-    .trim()
-    .toLowerCase();
-}
-
-function buildInspectionKey(partName: unknown, processName: unknown) {
-  return `${normalizeCompareText(partName)}::${normalizeCompareText(processName)}`;
+function buildInspectionKey(partId: unknown, processId: unknown) {
+  const normalizedPartId = String(partId || '').trim();
+  const normalizedProcessId = String(processId || '').trim();
+  return normalizedPartId && normalizedProcessId
+    ? JSON.stringify([normalizedPartId, normalizedProcessId])
+    : null;
 }
 
 async function attachInspectionProgress(items: ProjectBomItemRow[]) {
@@ -43,15 +39,8 @@ async function attachInspectionProgress(items: ProjectBomItemRow[]) {
       workOrderNumber: { in: workOrderNumbers },
     },
     select: {
-      level1Component: true,
-      level2Component: true,
-      materialName: true,
-      process: {
-        select: {
-          name: true,
-        },
-      },
-      processName: true,
+      partId: true,
+      processId: true,
       qualifiedQuantity: true,
       quantity: true,
       workOrderNumber: true,
@@ -60,54 +49,57 @@ async function attachInspectionProgress(items: ProjectBomItemRow[]) {
 
   const completedQuantityMap = new Map<string, number>();
   for (const inspection of inspections) {
-    const partCandidates = [
-      inspection.materialName,
-      inspection.level2Component,
-      inspection.level1Component,
-    ].filter(Boolean);
+    const identityKey = buildInspectionKey(
+      inspection.partId,
+      inspection.processId,
+    );
+    if (!identityKey) continue;
     const quantity = Number(
       inspection.qualifiedQuantity || inspection.quantity || 0,
     );
-    for (const partName of partCandidates) {
-      const key = `${inspection.workOrderNumber}::${buildInspectionKey(
-        partName,
-        resolveCanonicalProcessName(inspection),
-      )}`;
-      completedQuantityMap.set(
-        key,
-        (completedQuantityMap.get(key) || 0) + quantity,
-      );
-    }
+    const key = `${inspection.workOrderNumber}::${identityKey}`;
+    completedQuantityMap.set(
+      key,
+      (completedQuantityMap.get(key) || 0) + quantity,
+    );
   }
 
   return items.map((item) => {
-    const requiredProcesses = parseBomRequiredProcesses(
-      item.required_processes,
-    );
-    const inspectionProgress: BomInspectionProgress[] = requiredProcesses.map(
-      (processName) => {
+    const inspectionProgress: BomInspectionProgress[] =
+      item.processRequirements.map((requirement) => {
+        const processId = String(requirement.processId || '').trim() || null;
+        const processName =
+          String(requirement.process?.name || '').trim() ||
+          requirement.processName;
+        const identityKey = buildInspectionKey(item.partId, processId);
         const completedQuantity =
-          completedQuantityMap.get(
-            `${item.work_order_number}::${buildInspectionKey(
-              item.part_name,
-              processName,
-            )}`,
-          ) || 0;
+          (identityKey
+            ? completedQuantityMap.get(
+                `${item.work_order_number}::${identityKey}`,
+              )
+            : 0) || 0;
         const requiredQuantity = Number(item.quantity || 0);
         const remainingQuantity = Math.max(
           requiredQuantity - completedQuantity,
           0,
         );
+        let processResolutionStatus: BomInspectionProgress['processResolutionStatus'];
+        if (requirement.process) {
+          processResolutionStatus = 'RESOLVED';
+        } else {
+          processResolutionStatus = processId ? 'INVALID' : 'MISSING';
+        }
         return {
           completed:
             requiredQuantity > 0 && completedQuantity >= requiredQuantity,
           completedQuantity,
+          processId,
           processName,
+          processResolutionStatus,
           remainingQuantity,
           requiredQuantity,
         };
-      },
-    );
+      });
     return { ...item, inspectionProgress };
   });
 }

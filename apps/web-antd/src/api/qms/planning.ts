@@ -308,6 +308,12 @@ export async function getBomListPage(params?: { projectId?: string }) {
   });
 }
 
+export async function getBomProcessOptions() {
+  return requestClient.get<Array<{ label: string; value: string }>>(
+    '/qms/planning/bom/process-options',
+  );
+}
+
 export async function createBom(data: Partial<BomItem>) {
   return requestClient.post<BomItem>('/qms/planning/bom', data);
 }

@@ -7,7 +7,6 @@ import { onMounted, reactive, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
-import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Col,
   Form,
@@ -19,11 +18,8 @@ import {
   Select,
 } from 'ant-design-vue';
 
-import { createBom, updateBom } from '#/api/qms/planning';
+import { createBom, getBomProcessOptions, updateBom } from '#/api/qms/planning';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
-import { mapDictionaryOptionsToInspectionProcess } from '#/views/qms/inspection/records/config';
-import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
-import { cloneInspectionProcessFallbackOptions } from '#/views/qms/shared/constants/inspection-process-fallback';
 
 const props = defineProps<{
   currentId: null | string;
@@ -41,13 +37,7 @@ const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const confirmLoading = ref(false);
 const formRef = ref();
-const { options: processOptions, loadOptions: loadInspectionProcessOptions } =
-  useDictionaryOptions({
-    dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
-    fallbackOptions: cloneInspectionProcessFallbackOptions(),
-    mapOptions: (options, fallbackOptions) =>
-      mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
-  });
+const processOptions = ref<Array<{ label: string; value: string }>>([]);
 
 const formState = reactive<
   Partial<QmsPlanningApi.BomItem> & { workOrderNumber?: string }
@@ -55,6 +45,7 @@ const formState = reactive<
   partName: '',
   partNumber: '',
   quantity: 1,
+  requiredProcessIds: [],
   requiredProcesses: [],
   remarks: '',
   unit: 'PCS',
@@ -94,6 +85,7 @@ watch(
         partName: props.initialData.partName || '',
         partNumber: props.initialData.partNumber || '',
         quantity: props.initialData.quantity || 1,
+        requiredProcessIds: props.initialData.requiredProcessIds || [],
         requiredProcesses: props.initialData.requiredProcesses || [],
         remarks: props.initialData.remarks || '',
         unit: props.initialData.unit || 'PCS',
@@ -110,7 +102,15 @@ async function handleOk() {
     await formRef.value?.validate();
     confirmLoading.value = true;
 
-    const payload = { ...formState };
+    const processNameById = new Map(
+      processOptions.value.map((option) => [option.value, option.label]),
+    );
+    const payload = {
+      ...formState,
+      requiredProcesses: (formState.requiredProcessIds || []).map(
+        (processId) => processNameById.get(processId) || '',
+      ),
+    };
     if (props.isEditMode && props.currentId) {
       await updateBom(props.currentId, payload as QmsPlanningApi.BomItem);
       message.success(t('common.saveSuccess'));
@@ -132,8 +132,8 @@ async function handleOk() {
   }
 }
 
-onMounted(() => {
-  void loadInspectionProcessOptions();
+onMounted(async () => {
+  processOptions.value = await getBomProcessOptions();
 });
 </script>
 
@@ -191,9 +191,9 @@ onMounted(() => {
           </Form.Item>
         </Col>
         <Col :span="12">
-          <Form.Item label="所需检验工序" name="requiredProcesses">
+          <Form.Item label="所需检验工序" name="requiredProcessIds">
             <Select
-              v-model:value="formState.requiredProcesses"
+              v-model:value="formState.requiredProcessIds"
               mode="multiple"
               allow-clear
               :options="processOptions"

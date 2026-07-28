@@ -10,8 +10,12 @@ import {
   buildProjectBomCreateData,
   normalizeBomText,
 } from '~/modules/planning/bom';
+import {
+  buildBomImportGovernedFields,
+  resolveBomImportProcessIdentities,
+} from '~/modules/planning/bom-import-governance';
+import { replaceBomRequiredProcessIdentities } from '~/modules/planning/bom-process-identities';
 import { logApiError } from '~/utils/api-logger';
-import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 
@@ -43,20 +47,36 @@ export async function bom_import_post(event: H3Event) {
 
     const rowErrors = [];
     const createResults = await Promise.allSettled(
-      normalizedItems.map((item) => {
+      normalizedItems.map(async (item) => {
+        const processIdentities = await resolveBomImportProcessIdentities(item);
         const createPayload = buildProjectBomCreateData(
           bomProject.workOrderNumber,
-          item,
-        );
-        const governedBomPayload = buildGovernedWriteFieldsForTable(
-          'project_boms',
-          createPayload,
-        );
-        return prisma.project_boms.create({
-          data: {
-            ...createPayload,
-            ...governedBomPayload,
+          {
+            ...item,
+            requiredProcesses: processIdentities.map(
+              (identity) => identity.processName,
+            ),
           },
+        );
+        const {
+          canonicalFields: canonicalBomPayload,
+          governedFields: governedBomPayload,
+        } = await buildBomImportGovernedFields(createPayload);
+        return prisma.$transaction(async (tx) => {
+          const created = await tx.project_boms.create({
+            data: {
+              ...createPayload,
+              ...governedBomPayload,
+              ...canonicalBomPayload,
+            },
+            select: { id: true },
+          });
+          await replaceBomRequiredProcessIdentities(
+            tx,
+            created.id,
+            processIdentities,
+          );
+          return created;
         });
       }),
     );

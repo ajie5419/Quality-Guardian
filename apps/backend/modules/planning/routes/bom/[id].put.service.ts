@@ -5,8 +5,15 @@ import {
   mapProjectBomItem,
   projectBomItemSelect,
 } from '~/modules/planning/bom';
+import {
+  replaceBomRequiredProcessIdentities,
+  resolveBomRequiredProcessIdentities,
+} from '~/modules/planning/bom-process-identities';
 import { logApiError } from '~/utils/api-logger';
-import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/governed-write';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
@@ -21,18 +28,37 @@ export async function bom_id_put(event: H3Event) {
 
   try {
     const body = await readBody(event);
-    const mutablePayload = buildProjectBomMutableData(body);
+    const processIdentities = await resolveBomRequiredProcessIdentities(
+      body,
+      'online',
+    );
+    const mutablePayload = buildProjectBomMutableData({
+      ...body,
+      requiredProcesses: processIdentities.map((item) => item.processName),
+    });
     const governedBomPayload = buildGovernedWriteFieldsForTable(
       'project_boms',
       mutablePayload,
     );
-    const updated = await prisma.project_boms.update({
-      where: { id },
-      data: {
-        ...mutablePayload,
-        ...governedBomPayload,
-      },
-      select: projectBomItemSelect,
+    const canonicalBomPayload = await buildGovernedCanonicalWritePairForTable(
+      'project_boms',
+      { ...governedBomPayload, partId: body.partId },
+    );
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.project_boms.update({
+        where: { id },
+        data: {
+          ...mutablePayload,
+          ...governedBomPayload,
+          ...canonicalBomPayload,
+        },
+        select: { id: true },
+      });
+      await replaceBomRequiredProcessIdentities(tx, id, processIdentities);
+      return tx.project_boms.findUniqueOrThrow({
+        where: { id },
+        select: projectBomItemSelect,
+      });
     });
 
     return useResponseSuccess(mapProjectBomItem(updated));
