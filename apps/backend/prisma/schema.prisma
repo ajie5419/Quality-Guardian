@@ -447,7 +447,7 @@ model quality_classification_categories {
 
   @@unique([scope, code])
   @@unique([scope, name])
-  @@index([scope, isDeleted, status, sort])
+  @@index([scope, isDeleted, status, sort], map: "quality_class_category_scope_state_sort_idx")
 }
 
 // @module quality-classification
@@ -468,7 +468,7 @@ model quality_classification_subcategories {
 
   @@unique([categoryId, code])
   @@unique([categoryId, name])
-  @@index([categoryId, isDeleted, status, sort])
+  @@index([categoryId, isDeleted, status, sort], map: "quality_class_subcategory_parent_state_sort_idx")
 }
 
 model dfmea_projects {

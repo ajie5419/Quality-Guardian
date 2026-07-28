@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# Guard against schema/migration drift like commit 7478f9b6, where
-# schema.prisma was edited but no migration was generated to match.
+# Guard against invalid Prisma migrations and schema/migration drift like
+# commit 7478f9b6, where schema.prisma was edited but no migration was
+# generated to match.
 #
-# Rule: if schema.prisma changed in this diff range, at least one new file
-# under prisma/migrations/ must also have changed. Otherwise fail.
+# Rules:
+#   1. MySQL identifiers in migration SQL must not exceed 64 characters.
+#   2. If schema.prisma changed in this diff range, at least one new file
+#      under prisma/migrations/ must also have changed.
 #
 # Usage: bash scripts/check-prisma-migration.sh [BASE_REF]
 #   BASE_REF defaults to origin/main (CI) or main (local).
@@ -19,6 +22,30 @@ if [[ -z "$BASE_REF" ]]; then
   else
     BASE_REF="main"
   fi
+fi
+
+LONG_IDENTIFIERS="$(
+  while IFS= read -r migration_file; do
+    LC_ALL=C awk -F '`' -v file="$migration_file" '
+      {
+        for (field = 2; field <= NF; field += 2) {
+          if (length($field) > 64) {
+            printf "%s:%d: %d characters: %s\n",
+              file, NR, length($field), $field
+          }
+        }
+      }
+    ' "$migration_file"
+  done < <(rg --files "$MIGRATIONS_DIR" -g 'migration.sql' | sort)
+)"
+
+if [[ -n "$LONG_IDENTIFIERS" ]]; then
+  cat >&2 <<'MSG'
+[prisma-check] FAILED: migration SQL contains MySQL identifiers longer than
+64 characters. Add explicit short names, such as Prisma index `map` values.
+MSG
+  printf '%s\n' "$LONG_IDENTIFIERS" >&2
+  exit 1
 fi
 
 # Merge-base so we only look at what THIS branch changed.

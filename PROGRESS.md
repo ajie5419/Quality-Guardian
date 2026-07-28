@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 最新变更: 不合格项缺陷分类、售后产品类型和售后缺陷分类已统一为系统设置中的开放二级分类树；Web、小程序、统计报表、导入和报检关闭链路均改用 canonical ID，并补齐发布初始化与历史回填。生产环境未访问、未修改。
+- 最新变更: 已修复质量分类 migration 中超过 MySQL 64 字符上限的复合索引名，增加 migration 标识符长度门禁，并在本地 Apple Container 数据库完成迁移、分类初始化与历史回填。生产环境未访问、未修改。
 - 测试状态: Backend full suite `236/236` files and `2243/2243` tests passed；Web full DOM suite `47/47` files and `241/241` tests passed。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
@@ -61,6 +61,7 @@
 - [x] 全局工序主数据与报检显示配置解耦（过程报检/进货检验独立开关、稳定 ID、全局复用、无名称或工单要求兜底）
 - [x] 受控名称 `Map` 键架构门禁 `B-ID9`
 - [x] 质量二级分类开放配置（不合格项缺陷、售后产品、售后缺陷），含 Web/小程序接入、canonical ID 统计、发布初始化和历史回填
+- [x] 质量分类 migration 的 MySQL 长索引名修复、自动化门禁与本地容器数据库恢复
 - [ ] 后端业务模块逐功能测试覆盖补齐（进行中）
 
 ## 当前架构

@@ -25,6 +25,30 @@
 
 ## 执行记录
 
+### 2026-07-29 质量分类 migration 的 MySQL 索引名修复
+
+**执行内容：**
+
+- 定位本地 `quality_guard_container` 的质量分类 migration 失败原因：两个 Prisma 自动生成的复合索引名超过 MySQL 64 字符上限，导致新分类表和业务外键字段均未创建。
+- 为两个复合索引增加稳定短名称，并同步修正尚未进入生产的 migration。
+- 扩展 Prisma migration 门禁，扫描全部 migration SQL 中的反引号标识符，阻止超过 64 字符的 MySQL 标识符再次进入发布流程。
+- 在本地 Apple Container 数据库将失败 migration 标记回滚后重新部署成功，并执行质量分类初始化和历史回填；创建 14 个一级分类、67 个二级分类，售后更新 4 个分类引用，不合格项更新 3 个分类引用，保留 1 条无法精确匹配的 unresolved 记录。
+- 未访问或修改生产环境。
+
+**验证结果：**
+
+- `prisma migrate status`：本地 `quality_guard_container` 的 46 条 migration 全部最新。
+- 真实 Prisma 查询：成功读取 11 条不合格项记录及新增分类外键，分类数量为 14/67。
+- 相关后端测试：`3/3` 文件、`37/37` 测试通过。
+- `prisma validate`、migration 门禁和 shell 语法检查通过。
+
+**commit:** 待本次提交补充
+
+**遗留问题：**
+
+- 生产环境仍须通过正式发布流程执行修正后的 migration 与有序维护脚本，禁止手工改表。
+- 本地历史数据有 1 条不合格项分类无法精确解析，已保留在 `unresolved_master_data_refs` 等待人工处置。
+
 ### 2026-07-28 质量二级分类开放配置
 
 **执行内容：**

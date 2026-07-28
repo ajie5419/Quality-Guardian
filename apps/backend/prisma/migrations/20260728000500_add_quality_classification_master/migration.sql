@@ -15,7 +15,7 @@ CREATE TABLE `quality_classification_categories` (
 
   UNIQUE INDEX `quality_classification_categories_scope_code_key`(`scope`, `code`),
   UNIQUE INDEX `quality_classification_categories_scope_name_key`(`scope`, `name`),
-  INDEX `quality_classification_categories_scope_isDeleted_status_sort_idx`(`scope`, `isDeleted`, `status`, `sort`),
+  INDEX `quality_class_category_scope_state_sort_idx`(`scope`, `isDeleted`, `status`, `sort`),
   PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -32,7 +32,7 @@ CREATE TABLE `quality_classification_subcategories` (
 
   UNIQUE INDEX `quality_classification_subcategories_categoryId_code_key`(`categoryId`, `code`),
   UNIQUE INDEX `quality_classification_subcategories_categoryId_name_key`(`categoryId`, `name`),
-  INDEX `quality_classification_subcategories_categoryId_isDeleted_status_sort_idx`(`categoryId`, `isDeleted`, `status`, `sort`),
+  INDEX `quality_class_subcategory_parent_state_sort_idx`(`categoryId`, `isDeleted`, `status`, `sort`),
   PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
