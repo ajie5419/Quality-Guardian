@@ -1,8 +1,19 @@
 import { requestClient } from '#/api/request';
 
 export namespace InspectionSettingsApi {
+  export type ProcessCategory = 'INCOMING' | 'PROCESS';
+
   export interface ManualCreateSetting {
     enabled: boolean;
+  }
+
+  export interface ProcessItem {
+    categories: ProcessCategory[];
+    code: null | string;
+    id: string;
+    name: string;
+    sort: number;
+    status: number;
   }
 }
 
@@ -22,4 +33,48 @@ export async function updateInspectionManualCreateSettingApi(data: {
   enabled: boolean;
 }) {
   return requestClient.post('/system/settings/inspection-manual-create', data);
+}
+
+export function getInspectionProcessesApi() {
+  return requestClient.get<InspectionSettingsApi.ProcessItem[]>(
+    '/system/inspection-processes',
+  );
+}
+
+export function createInspectionProcessApi(data: {
+  categories: InspectionSettingsApi.ProcessCategory[];
+  code?: null | string;
+  name: string;
+  sort?: number;
+}) {
+  return requestClient.post<InspectionSettingsApi.ProcessItem>(
+    '/system/inspection-processes',
+    data,
+  );
+}
+
+export function updateInspectionProcessApi(
+  id: string,
+  data: {
+    code?: null | string;
+    name?: string;
+    sort?: number;
+    status?: 0 | 1;
+  },
+) {
+  return requestClient.put<InspectionSettingsApi.ProcessItem>(
+    `/system/inspection-processes/${id}`,
+    data,
+  );
+}
+
+export function deleteInspectionProcessApi(id: string) {
+  return requestClient.delete(`/system/inspection-processes/${id}`);
+}
+
+export function updateInspectionProcessSelectionApi(data: {
+  incomingProcessIds: string[];
+  processProcessIds: string[];
+}) {
+  return requestClient.put('/system/inspection-processes/selection', data);
 }

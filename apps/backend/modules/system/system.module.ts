@@ -14,7 +14,7 @@ export const systemModule: ModuleDeclaration = {
       type: 'menu',
       meta: {
         icon: 'carbon:settings-adjust',
-        title: '检验记录设置',
+        title: '报检与检验设置',
       },
       buttons: [
         {
