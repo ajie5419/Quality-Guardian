@@ -11,6 +11,7 @@ describe('work order requirement schemas', () => {
     const result = workOrderRequirementCreateBodySchema.parse({
       requirements: [
         {
+          identityContractVersion: 2,
           requirementName: 'Visual inspection',
           responsibleTeam: 'Assembly Team',
           responsibleTeamId: 'team-1',
@@ -32,6 +33,7 @@ describe('work order requirement schemas', () => {
   it('rejects create and update payloads with incomplete team identity', () => {
     expect(
       workOrderRequirementCreateBodySchema.safeParse({
+        identityContractVersion: 2,
         requirementName: 'Visual inspection',
         responsibleTeam: 'Assembly Team',
         workOrderNumber: 'WO-001',
@@ -39,6 +41,7 @@ describe('work order requirement schemas', () => {
     ).toBe(false);
     expect(
       workOrderRequirementUpdateBodySchema.safeParse({
+        identityContractVersion: 2,
         responsibleTeamId: 'team-1',
       }).success,
     ).toBe(false);
@@ -51,6 +54,7 @@ describe('work order requirement schemas', () => {
     expect(
       workOrderRequirementMutationBodySchema.parse({
         attachments: [],
+        identityContractVersion: 2,
         items: ['Point A'],
         requirementName: 'Visual inspection',
         responsibleTeam: null,
@@ -84,10 +88,41 @@ describe('work order requirement schemas', () => {
       }).success,
     ).toBe(true);
     expect(
+      workOrderRequirementCreateBodySchema.safeParse({
+        identityContractVersion: 2,
+        partId: 'part-1',
+        partName: 'Client snapshot',
+        requirementName: 'Visual inspection',
+        workOrderNumber: 'WO-001',
+      }).success,
+    ).toBe(false);
+    expect(
       workOrderRequirementUpdateBodySchema.safeParse({
         identityContractVersion: 2,
         partId: 'part-1',
         partName: 'Client snapshot',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires the V2 identity contract for create and edit writes', () => {
+    expect(
+      workOrderRequirementCreateBodySchema.safeParse({
+        requirementName: 'Visual inspection',
+        workOrderNumber: 'WO-001',
+      }).success,
+    ).toBe(false);
+    expect(
+      workOrderRequirementUpdateBodySchema.safeParse({
+        requirementName: 'Visual inspection',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an edit containing only the contract marker', () => {
+    expect(
+      workOrderRequirementUpdateBodySchema.safeParse({
+        identityContractVersion: 2,
       }).success,
     ).toBe(false);
   });

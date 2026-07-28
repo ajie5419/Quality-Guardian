@@ -226,17 +226,26 @@ export const ProcessMasterService = {
     }
     const name = input.name?.trim();
     if (name) await assertNameAvailable(name, id);
-    return prisma.processes.update({
-      where: { id },
-      data: {
-        ...(input.code === undefined
-          ? {}
-          : { code: normalizeOptionalText(input.code) }),
-        ...(name ? { name } : {}),
-        ...(input.sort === undefined ? {} : { sort: input.sort }),
-        ...(input.status === undefined ? {} : { status: input.status }),
-      },
-      select: { code: true, id: true, name: true, sort: true, status: true },
+    return prisma.$transaction(async (tx) => {
+      const process = await tx.processes.update({
+        where: { id },
+        data: {
+          ...(input.code === undefined
+            ? {}
+            : { code: normalizeOptionalText(input.code) }),
+          ...(name ? { name } : {}),
+          ...(input.sort === undefined ? {} : { sort: input.sort }),
+          ...(input.status === undefined ? {} : { status: input.status }),
+        },
+        select: { code: true, id: true, name: true, sort: true, status: true },
+      });
+      if (input.sort !== undefined) {
+        await tx.inspection_request_process_options.updateMany({
+          where: { processId: id },
+          data: { sort: input.sort },
+        });
+      }
+      return process;
     });
   },
 

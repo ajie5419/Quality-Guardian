@@ -34,6 +34,8 @@ The two selections are independent. A process may be enabled for both categories
 
 Saving selections is transactional. Submission uses the same `category + processId + isEnabled` rule as option loading, preventing hidden options from being submitted through a crafted request.
 
+Updating the global process sort synchronizes both category option rows in the same transaction. Category selection saves may still establish category-specific ordering explicitly.
+
 ## Deployment and history
 
 The Prisma migration creates only the option table and foreign key. Ordered release maintenance then adds missing option rows with `createMany + skipDuplicates` before the new application starts.

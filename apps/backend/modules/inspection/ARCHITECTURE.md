@@ -109,7 +109,7 @@ Dashboard API contracts and Vue row keys carry the same stable IDs. A display na
 - `inspection_request_process_options` defines whether a process is available in each request category; Web and WeChat clients submit the selected stable `processId` with the explicit category.
 - BOM 部件选项返回 `project_boms.partId`；BOM 行 `id` 只是 BOM 记录主键，不是部件身份。
 - 工序选项返回 `processes.id`；工序字典 `dictionaries.id` 与工序主数据不是同一 ID 空间。
-- Web 和微信小程序均使用 V2。V1 旧路由只作发布迁移适配；待生产 V1 写流量归零后必须删除。
+- Web 和微信小程序均使用 V2。V1 旧路由只返回 `410 INSPECTION_REQUEST_V2_REQUIRED`，不得再进入创建服务或接受 name-only 写入。
 
 `inspections.partId/partName` 是检验记录的正式部件身份。`level1Component/level2Component/materialName` 是历史业务快照，不得再用于部件关联或聚合。回填优先继承关联报检的确定 ID；冲突、重名、无匹配进入 `unresolved_master_data_refs`，不猜测。回填只补 ID，已有历史名称快照不被覆盖。
 

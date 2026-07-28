@@ -1,149 +1,100 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { badRequestResponse, useResponseSuccess } from '~/utils/response';
+
+import { InspectionRequestCreateService } from './inspection-request-create.service';
+import handler, {
+  publicInspectionRequestCreateV2Handler,
+} from './public-inspection-request-create.post.service';
 
 vi.mock('h3', () => ({
-  defineEventHandler: vi.fn((fn: any) => fn),
-  readBody: vi.fn(),
+  defineEventHandler: (fn: (...args: unknown[]) => unknown) => fn,
+  readBody: vi.fn().mockResolvedValue({}),
+  setResponseStatus: vi.fn(),
 }));
 
-vi.mock('~/modules/inspection/inspection-request-create.schema', () => ({
-  inspectionRequestCreateBodySchema: {
-    parse: vi.fn((v: any) => v),
-  },
-  validateInspectionRequestCreateBody: vi.fn(),
-}));
-
-vi.mock('~/modules/inspection/inspection-request-create.service', () => ({
-  InspectionRequestCreateService: {
-    createRequest: vi.fn().mockResolvedValue({ id: 'req-1' }),
-  },
-}));
-
-vi.mock('~/utils/api-logger', () => ({
-  logApiError: vi.fn(),
-}));
+vi.mock('~/utils/business-error', () => {
+  class MockBusinessError extends Error {
+    constructor(
+      public code: string,
+      message: string,
+      public httpStatus: number,
+    ) {
+      super(message);
+    }
+  }
+  return {
+    BusinessError: MockBusinessError,
+    businessErrorResponse: vi.fn((_event, error: MockBusinessError) => ({
+      code: error.code,
+      message: error.message,
+      statusCode: error.httpStatus,
+    })),
+    isBusinessError: vi.fn(
+      (error: unknown) => error instanceof MockBusinessError,
+    ),
+  };
+});
 
 vi.mock('~/utils/response', () => ({
-  badRequestResponse: vi.fn().mockReturnValue({ _success: false }),
-  internalServerErrorResponse: vi.fn().mockReturnValue({ _success: false }),
-  useResponseSuccess: vi.fn().mockImplementation((data: any) => ({
-    _success: true,
-    data,
-  })),
+  badRequestResponse: vi.fn().mockReturnValue({ statusCode: 400 }),
+  internalServerErrorResponse: vi.fn().mockReturnValue({ statusCode: 500 }),
+  useResponseSuccess: vi.fn((data: unknown) => ({ data, statusCode: 200 })),
 }));
 
-describe('public-inspection-request-create.post.service', () => {
+vi.mock('~/utils/api-logger', () => ({ logApiError: vi.fn() }));
+
+vi.mock('./inspection-request-create.schema', () => ({
+  inspectionRequestCreateV2BodySchema: { parse: vi.fn((body) => body) },
+  validateInspectionRequestCreateV2Body: vi
+    .fn()
+    .mockReturnValue({ isValid: true }),
+}));
+
+vi.mock('./inspection-request-create.service', () => ({
+  InspectionRequestCreateService: { createRequest: vi.fn() },
+}));
+
+describe('public inspection request create handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should return success when request is valid', async () => {
-    const { validateInspectionRequestCreateBody } = await import(
-      '~/modules/inspection/inspection-request-create.schema'
-    );
-    const { InspectionRequestCreateService } = await import(
-      '~/modules/inspection/inspection-request-create.service'
-    );
-    const { useResponseSuccess } = await import('~/utils/response');
+  it('retires the public name-only legacy write path', async () => {
+    await expect(handler({} as never)).resolves.toMatchObject({
+      code: 'INSPECTION_REQUEST_V2_REQUIRED',
+      statusCode: 410,
+    });
+    expect(InspectionRequestCreateService.createRequest).not.toHaveBeenCalled();
+  });
 
-    vi.mocked(validateInspectionRequestCreateBody).mockReturnValue({
-      isValid: true,
-    } as any);
+  it('creates public requests through the ID-first V2 contract', async () => {
     vi.mocked(InspectionRequestCreateService.createRequest).mockResolvedValue({
-      id: 'req-1',
-    } as any);
+      id: 'request-1',
+    } as never);
 
-    const handlerModule = await import(
-      '~/modules/inspection/public-inspection-request-create.post.service'
+    await publicInspectionRequestCreateV2Handler({} as never);
+
+    expect(InspectionRequestCreateService.createRequest).toHaveBeenCalledWith(
+      expect.anything(),
+      null,
+      {},
+      true,
+      'V2',
     );
-    const handler = handlerModule.default;
-    const event = {} as any;
-
-    const result = await handler(event);
-
-    expect(useResponseSuccess).toHaveBeenCalledWith({ id: 'req-1' });
-    expect(result).toEqual({ _success: true, data: { id: 'req-1' } });
+    expect(useResponseSuccess).toHaveBeenCalledWith({ id: 'request-1' });
   });
 
-  it('should return bad request when validation fails', async () => {
-    const { validateInspectionRequestCreateBody } = await import(
-      '~/modules/inspection/inspection-request-create.schema'
+  it('rejects incomplete public V2 payloads before creation', async () => {
+    const { validateInspectionRequestCreateV2Body } = await import(
+      './inspection-request-create.schema'
     );
-    const { badRequestResponse } = await import('~/utils/response');
-
-    vi.mocked(validateInspectionRequestCreateBody).mockReturnValue({
+    vi.mocked(validateInspectionRequestCreateV2Body).mockReturnValue({
       isValid: false,
-    } as any);
+    } as never);
 
-    const handlerModule = await import(
-      '~/modules/inspection/public-inspection-request-create.post.service'
-    );
-    const handler = handlerModule.default;
-    const event = {} as any;
+    await publicInspectionRequestCreateV2Handler({} as never);
 
-    await handler(event);
-
-    expect(badRequestResponse).toHaveBeenCalledWith(
-      event,
-      '工单号、工序、一级部件名称、组件名称、班组、报检人、自检记录不能为空',
-    );
-  });
-
-  it('should return bad request when service throws BAD_REQUEST', async () => {
-    const { validateInspectionRequestCreateBody } = await import(
-      '~/modules/inspection/inspection-request-create.schema'
-    );
-    const { InspectionRequestCreateService } = await import(
-      '~/modules/inspection/inspection-request-create.service'
-    );
-    const { badRequestResponse } = await import('~/utils/response');
-
-    vi.mocked(validateInspectionRequestCreateBody).mockReturnValue({
-      isValid: true,
-    } as any);
-    vi.mocked(InspectionRequestCreateService.createRequest).mockRejectedValue(
-      new Error('BAD_REQUEST:missing field'),
-    );
-
-    const handlerModule = await import(
-      '~/modules/inspection/public-inspection-request-create.post.service'
-    );
-    const handler = handlerModule.default;
-    const event = {} as any;
-
-    await handler(event);
-
-    expect(badRequestResponse).toHaveBeenCalledWith(event, 'missing field');
-  });
-
-  it('should return internal server error on unexpected error', async () => {
-    const { validateInspectionRequestCreateBody } = await import(
-      '~/modules/inspection/inspection-request-create.schema'
-    );
-    const { InspectionRequestCreateService } = await import(
-      '~/modules/inspection/inspection-request-create.service'
-    );
-    const { internalServerErrorResponse } = await import('~/utils/response');
-    const { logApiError } = await import('~/utils/api-logger');
-
-    vi.mocked(validateInspectionRequestCreateBody).mockReturnValue({
-      isValid: true,
-    } as any);
-    vi.mocked(InspectionRequestCreateService.createRequest).mockRejectedValue(
-      new Error('db error'),
-    );
-
-    const handlerModule = await import(
-      '~/modules/inspection/public-inspection-request-create.post.service'
-    );
-    const handler = handlerModule.default;
-    const event = {} as any;
-
-    await handler(event);
-
-    expect(logApiError).toHaveBeenCalled();
-    expect(internalServerErrorResponse).toHaveBeenCalledWith(
-      event,
-      '创建报检任务失败',
-    );
+    expect(badRequestResponse).toHaveBeenCalledOnce();
+    expect(InspectionRequestCreateService.createRequest).not.toHaveBeenCalled();
   });
 });

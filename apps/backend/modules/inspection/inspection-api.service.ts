@@ -26,6 +26,7 @@ export const InspectionApiService = {
       userinfo,
       body,
       isPublic,
+      'V2',
     );
   },
   async dispatchRequest(

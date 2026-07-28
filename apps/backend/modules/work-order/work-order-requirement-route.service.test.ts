@@ -148,8 +148,9 @@ describe('workOrderRequirementRouteService', () => {
         mockEvent(),
         [
           {
-            partName: 'Frame',
-            processName: 'Welding',
+            identityContractVersion: 2,
+            partId: 'part-1',
+            processId: 'process-1',
             requirementName: 'Quality',
             workOrderNumber: 'WO-001',
             items: [{ a: 1 }],
@@ -197,6 +198,19 @@ describe('workOrderRequirementRouteService', () => {
       ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
     });
 
+    it('should reject name-only creation through a direct service call', async () => {
+      await expect(
+        WorkOrderRequirementRouteService.createRequirements(
+          mockEvent(),
+          [{ requirementName: 'Quality', workOrderNumber: 'WO-001' }],
+          mockUserinfo(),
+        ),
+      ).rejects.toMatchObject({
+        code: 'IDENTITY_CONTRACT_V2_REQUIRED',
+        httpStatus: 400,
+      });
+    });
+
     it('rebuilds V2 names from canonical IDs', async () => {
       const { WorkOrderRequirementService } = await import(
         '~/modules/work-order-requirement/work-order-requirement.service'
@@ -240,7 +254,13 @@ describe('workOrderRequirementRouteService', () => {
       await expect(
         WorkOrderRequirementRouteService.createRequirements(
           mockSelfScopedEvent(),
-          [{ requirementName: 'Quality', workOrderNumber: 'WO-001' }],
+          [
+            {
+              identityContractVersion: 2,
+              requirementName: 'Quality',
+              workOrderNumber: 'WO-001',
+            },
+          ],
           mockUserinfo(),
         ),
       ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
@@ -297,7 +317,7 @@ describe('workOrderRequirementRouteService', () => {
       await WorkOrderRequirementRouteService.updateRequirement(
         mockEvent(),
         'req-1',
-        { requirementName: 'Updated' },
+        { identityContractVersion: 2, requirementName: 'Updated' },
         mockUserinfo(),
       );
 
@@ -312,6 +332,20 @@ describe('workOrderRequirementRouteService', () => {
         }),
         expect.any(Object),
       );
+    });
+
+    it('should reject name-only edits through a direct service call', async () => {
+      await expect(
+        WorkOrderRequirementRouteService.updateRequirement(
+          mockEvent(),
+          'req-1',
+          { requirementName: 'Updated' },
+          mockUserinfo(),
+        ),
+      ).rejects.toMatchObject({
+        code: 'IDENTITY_CONTRACT_V2_REQUIRED',
+        httpStatus: 400,
+      });
     });
 
     it('should report a stale confirmation state as a conflict', async () => {
@@ -340,13 +374,13 @@ describe('workOrderRequirementRouteService', () => {
         WorkOrderRequirementRouteService.updateRequirement(
           mockSelfScopedEvent(),
           'req-1',
-          { requirementName: 'Updated' },
+          { identityContractVersion: 2, requirementName: 'Updated' },
           mockUserinfo(),
         ),
       ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
     });
 
-    it('should clear canonical ids when optional names are explicitly cleared', async () => {
+    it('should clear canonical identities by ID', async () => {
       const { WorkOrderRequirementService } = await import(
         '~/modules/work-order-requirement/work-order-requirement.service'
       );
@@ -359,7 +393,11 @@ describe('workOrderRequirementRouteService', () => {
       await WorkOrderRequirementRouteService.updateRequirement(
         mockEvent(),
         'req-1',
-        { partName: null, processName: null },
+        {
+          identityContractVersion: 2,
+          partId: null,
+          processId: null,
+        },
         mockUserinfo(),
       );
 

@@ -14,14 +14,11 @@ import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
 } from '~/utils/governed-write';
-import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import { WorkOrderAggregateService } from './work-order-aggregate.service';
 import { parseRequirementAttachments } from './work-order-requirement-attachments';
-
-const logger = createModuleLogger('work-order-requirement-route');
 
 function parseRequirementItems(raw: unknown): unknown[] {
   if (Array.isArray(raw)) return raw;
@@ -112,22 +109,30 @@ async function resolveV2Identity(
   return { id, name };
 }
 
+function assertV2IdentityContract(body: Record<string, unknown>) {
+  if (body.identityContractVersion !== 2) {
+    throw new BusinessError(
+      'IDENTITY_CONTRACT_V2_REQUIRED',
+      'identityContractVersion=2 is required for work order requirement writes',
+      400,
+    );
+  }
+}
+
 async function buildRequirementUpdateData(
   body: Record<string, unknown>,
   username: string,
 ) {
-  const isV2 = body.identityContractVersion === 2;
-  const [partIdentity, processIdentity] = isV2
-    ? await Promise.all([
-        resolveV2Identity('partName', body.partId),
-        resolveV2Identity('processName', body.processId),
-      ])
-    : [undefined, undefined];
+  assertV2IdentityContract(body);
+  const [partIdentity, processIdentity] = await Promise.all([
+    resolveV2Identity('partName', body.partId),
+    resolveV2Identity('processName', body.processId),
+  ]);
   const governedFields = buildGovernedWriteFieldsForTable(
     'work_order_requirements',
     {
-      partName: isV2 ? partIdentity?.name : body.partName,
-      processName: isV2 ? processIdentity?.name : body.processName,
+      partName: partIdentity?.name,
+      processName: processIdentity?.name,
       requirementName: body.requirementName,
       responsibleTeam: body.responsibleTeam,
     },
@@ -136,10 +141,8 @@ async function buildRequirementUpdateData(
     'work_order_requirements',
     {
       ...governedFields,
-      ...(isV2 && partIdentity ? { partId: partIdentity.id } : {}),
-      ...(isV2 && processIdentity ? { processId: processIdentity.id } : {}),
-      ...(body.partName === null ? { partId: null } : {}),
-      ...(body.processName === null ? { processId: null } : {}),
+      ...(partIdentity ? { partId: partIdentity.id } : {}),
+      ...(processIdentity ? { processId: processIdentity.id } : {}),
       responsibleTeamId: body.responsibleTeamId,
     },
   );
@@ -164,24 +167,19 @@ export const WorkOrderRequirementRouteService = {
     requirements: Array<Record<string, unknown>>,
     userinfo: UserSession,
   ) {
-    if (requirements.some((item) => item.identityContractVersion !== 2)) {
-      logger.warn('legacy work order requirement identity contract used');
-    }
     await ensureWorkOrderPermission(
       userinfo,
       PERMISSION_CODES.QMS.WORK_ORDER.CREATE,
     );
+    requirements.forEach((item) => assertV2IdentityContract(item));
     const normalized = requirements.map((item) => ({
       attachments: JSON.stringify(
         Array.isArray(item.attachments) ? item.attachments : [],
       ),
       items: Array.isArray(item.items) ? item.items : [],
-      identityContractVersion:
-        item.identityContractVersion === 2 ? 2 : undefined,
+      identityContractVersion: 2,
       partId: String(item.partId || '').trim() || null,
-      partName: String(item.partName || '').trim() || null,
       processId: String(item.processId || '').trim() || null,
-      processName: String(item.processName || '').trim() || null,
       requirementName: String(item.requirementName || '').trim(),
       responsiblePerson: String(item.responsiblePerson || '').trim() || null,
       responsibleTeam: String(item.responsibleTeam || '').trim() || null,
@@ -190,18 +188,15 @@ export const WorkOrderRequirementRouteService = {
     }));
     const createPayloads = await Promise.all(
       normalized.map(async (item) => {
-        const isV2 = item.identityContractVersion === 2;
-        const [partIdentity, processIdentity] = isV2
-          ? await Promise.all([
-              resolveV2Identity('partName', item.partId),
-              resolveV2Identity('processName', item.processId),
-            ])
-          : [undefined, undefined];
+        const [partIdentity, processIdentity] = await Promise.all([
+          resolveV2Identity('partName', item.partId),
+          resolveV2Identity('processName', item.processId),
+        ]);
         const governedFields = buildGovernedWriteFieldsForTable(
           'work_order_requirements',
           {
-            partName: isV2 ? partIdentity?.name : item.partName,
-            processName: isV2 ? processIdentity?.name : item.processName,
+            partName: partIdentity?.name,
+            processName: processIdentity?.name,
             requirementName: item.requirementName,
             responsibleTeam: item.responsibleTeam,
           },
@@ -221,10 +216,8 @@ export const WorkOrderRequirementRouteService = {
             'work_order_requirements',
             {
               ...governedFields,
-              ...(isV2 && partIdentity ? { partId: partIdentity.id } : {}),
-              ...(isV2 && processIdentity
-                ? { processId: processIdentity.id }
-                : {}),
+              ...(partIdentity ? { partId: partIdentity.id } : {}),
+              ...(processIdentity ? { processId: processIdentity.id } : {}),
               responsibleTeamId: item.responsibleTeamId,
             },
           )),
@@ -283,9 +276,6 @@ export const WorkOrderRequirementRouteService = {
     body: Record<string, unknown>,
     userinfo: UserSession,
   ) {
-    if (body.identityContractVersion !== 2 && body.confirm === undefined) {
-      logger.warn('legacy work order requirement identity contract used');
-    }
     await ensureWorkOrderPermission(
       userinfo,
       PERMISSION_CODES.QMS.WORK_ORDER.EDIT,

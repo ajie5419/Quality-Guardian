@@ -162,4 +162,45 @@ describe('process master service', () => {
       ),
     ).rejects.toMatchObject({ code: 'INSPECTION_PROCESS_NOT_AVAILABLE' });
   });
+
+  it('keeps inspection option ordering aligned when process sort changes', async () => {
+    vi.mocked(prisma.processes.findFirst).mockResolvedValue({
+      id: 'process-1',
+    } as never);
+    vi.mocked(prisma.processes.update).mockResolvedValue({
+      code: 'WELD',
+      id: 'process-1',
+      name: 'Welding',
+      sort: 8,
+      status: 1,
+    } as never);
+
+    await ProcessMasterService.update('process-1', { sort: 8 });
+
+    expect(
+      prisma.inspection_request_process_options.updateMany,
+    ).toHaveBeenCalledWith({
+      where: { processId: 'process-1' },
+      data: { sort: 8 },
+    });
+  });
+
+  it('does not rewrite inspection option ordering for unrelated updates', async () => {
+    vi.mocked(prisma.processes.findFirst).mockResolvedValue({
+      id: 'process-1',
+    } as never);
+    vi.mocked(prisma.processes.update).mockResolvedValue({
+      code: 'WELD',
+      id: 'process-1',
+      name: 'Welding',
+      sort: 1,
+      status: 0,
+    } as never);
+
+    await ProcessMasterService.update('process-1', { status: 0 });
+
+    expect(
+      prisma.inspection_request_process_options.updateMany,
+    ).not.toHaveBeenCalled();
+  });
 });
