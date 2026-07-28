@@ -13,7 +13,8 @@ describe('quality-loss update utils', () => {
       actualClaim: '12.5',
       amount: '100',
       date: '2026-01-03',
-      responsibleDepartment: ' QA ',
+      responsibleDepartment: 'Historical QA',
+      responsibleDepartmentId: ' dept-qa ',
       status: 'completed',
       type: '  Material ',
     });
@@ -23,7 +24,8 @@ describe('quality-loss update utils', () => {
       expect(parsed.actualClaim).toBe(12.5);
       expect(parsed.amount).toBe(100);
       expect(parsed.occurDate).toBeInstanceOf(Date);
-      expect(parsed.respDept).toBe('QA');
+      expect(parsed.respDeptId).toBe('dept-qa');
+      expect(parsed).not.toHaveProperty('respDept');
       expect(parsed.status).toBe('Confirmed');
       expect(parsed.type).toBe('Material');
     }

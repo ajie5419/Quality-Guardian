@@ -25,6 +25,7 @@ describe('quality-loss payload utils', () => {
         projectId: 'project-1',
         projectName: '1000t 架桥机',
         responsibleDepartment: 'QA',
+        responsibleDepartmentId: 'dept-qa',
         status: 'completed',
         type: 'Process',
         workOrderNumber: 'WO-468624',
@@ -37,6 +38,7 @@ describe('quality-loss payload utils', () => {
     expect(data.actualClaim).toBe(0);
     expect(data.status).toBe('Confirmed');
     expect(data.respDept).toBe('QA');
+    expect(data.respDeptId).toBe('dept-qa');
     expect(data.type).toBe('Process');
     expect(data).toEqual(
       expect.objectContaining({

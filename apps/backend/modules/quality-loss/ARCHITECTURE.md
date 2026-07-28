@@ -19,6 +19,7 @@
 - 各源写入后调用 `QualityLossIndexService` 幂等 upsert；部署流程运行 `backfill-quality-loss-index.ts` 重建索引。
 - 历史手工记录无法可靠反推工单和部件，回填时保留空值，禁止根据损失类型猜测部件。
 - 部门图表按 `respDeptId` 聚合后再解析 canonical 名称。缺失 ID 和无效 ID 保持显式未解析状态，不回退名称归并。
+- 在线创建和编辑只接受 `responsibleDepartmentId`；后端在同一事务内根据启用部门重建 `respDeptId + respDept`。缺失 ID 时保留历史名称快照，无效 ID 拒绝写入。
 
 ## 对外入口
 

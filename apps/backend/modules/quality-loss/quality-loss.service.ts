@@ -65,7 +65,8 @@ async function applyDeptNames(items: QualityLossItem[]) {
     });
     return {
       ...item,
-      responsibleDepartment: identity.name,
+      responsibleDepartmentCanonicalName:
+        identity.resolutionStatus === 'RESOLVED' ? identity.name : null,
       responsibleDepartmentResolutionStatus: identity.resolutionStatus,
     };
   });

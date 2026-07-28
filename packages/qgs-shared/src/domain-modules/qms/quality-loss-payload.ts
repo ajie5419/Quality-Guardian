@@ -51,6 +51,8 @@ export function buildQualityLossCreateData(
     projectId: (body.projectId as null | string | undefined) || null,
     projectName: (body.projectName as null | string | undefined) || null,
     respDept: (body.responsibleDepartment as null | string | undefined) || null,
+    respDeptId:
+      (body.responsibleDepartmentId as null | string | undefined) || null,
     status:
       parseQualityLossStatus(body.status as string | undefined) || 'Pending',
     type: String(body.type || ''),

@@ -230,7 +230,7 @@ const insightRows = computed(() => {
         <div class="space-y-4">
           <div
             v-for="d in reportData.defects"
-            :key="d.name"
+            :key="d.id || d.resolutionStatus"
             class="flex items-center gap-4"
           >
             <div class="w-24 truncate text-right text-xs text-gray-500">

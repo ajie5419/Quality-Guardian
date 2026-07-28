@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { resolveQualityLossDepartmentWrite } from '~/modules/quality-loss/quality-loss-department-write';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { resolveManualQualityLossContext } from '~/modules/quality-loss/quality-loss-manual-context';
 import {
@@ -21,6 +22,7 @@ import {
 const bodySchema = z
   .object({
     partName: z.string().trim().min(1),
+    responsibleDepartmentId: z.string().trim().min(1),
     type: z.string().trim().min(1),
     workOrderNumber: z.string().trim().min(1),
   })
@@ -40,12 +42,19 @@ export default defineEventHandler(async (event) => {
 
     const lossId = createQualityLossId();
 
-    const newItem = await prisma.quality_losses.create({
-      data: await buildQualityLossCreateDataWithCanonical(
-        { ...body, ...context },
-        lossId,
-        { createdBy: String(userinfo.id || '') || undefined },
-      ),
+    const createData = await buildQualityLossCreateDataWithCanonical(
+      { ...body, ...context },
+      lossId,
+      { createdBy: String(userinfo.id || '') || undefined },
+    );
+    const newItem = await prisma.$transaction(async (tx) => {
+      const departmentWrite = await resolveQualityLossDepartmentWrite(
+        tx,
+        body.responsibleDepartmentId,
+      );
+      return tx.quality_losses.create({
+        data: { ...createData, ...departmentWrite },
+      });
     });
 
     await SystemLogService.auditLog('quality-loss', 'create', {

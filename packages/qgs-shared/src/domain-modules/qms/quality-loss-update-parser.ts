@@ -18,7 +18,7 @@ export type QualityLossUpdateParseResult =
       actualClaim?: number;
       amount?: number;
       occurDate?: Date;
-      respDept?: string;
+      respDeptId?: string;
       status?: ReturnType<typeof normalizeQualityLossStatus>;
       type?: string;
       valid: true;
@@ -94,14 +94,14 @@ export function parseQualityLossUpdateBody(
     ? normalizeQualityLossStatus(statusText)
     : undefined;
   const type = normalizeQualityLossUpdateText(body.type) || undefined;
-  const respDept =
-    normalizeQualityLossUpdateText(body.responsibleDepartment) || undefined;
+  const respDeptId =
+    normalizeQualityLossUpdateText(body.responsibleDepartmentId) || undefined;
 
   return {
     actualClaim: actualClaim.value,
     amount: amount.value,
     occurDate: occurDate.value,
-    respDept,
+    respDeptId,
     status,
     type,
     valid: true,

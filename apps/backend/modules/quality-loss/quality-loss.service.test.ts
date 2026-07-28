@@ -113,9 +113,27 @@ describe('qualityLossService', () => {
       ]);
       expect(result.items[0]).toEqual(
         expect.objectContaining({
-          responsibleDepartment: 'Quality',
+          responsibleDepartment: 'QA',
+          responsibleDepartmentCanonicalName: 'Quality',
           responsibleDepartmentId: 'dept-qa',
           responsibleDepartmentResolutionStatus: 'RESOLVED',
+        }),
+      );
+    });
+
+    it('preserves unresolved historical department snapshots', async () => {
+      (prisma.quality_loss_index.findMany as any).mockResolvedValue([
+        indexRow({ respDept: 'Legacy Quality', respDeptId: null }),
+      ]);
+      (prisma.quality_loss_index.count as any).mockResolvedValue(1);
+
+      const result = await QualityLossService.getAllLosses();
+
+      expect(result.items[0]).toEqual(
+        expect.objectContaining({
+          responsibleDepartment: 'Legacy Quality',
+          responsibleDepartmentCanonicalName: null,
+          responsibleDepartmentResolutionStatus: 'MISSING',
         }),
       );
     });

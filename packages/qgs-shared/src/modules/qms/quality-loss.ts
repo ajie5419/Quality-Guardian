@@ -14,6 +14,7 @@ export interface QualityLossItem {
   projectId?: null | string;
   projectName: null | string;
   responsibleDepartment: null | string;
+  responsibleDepartmentCanonicalName?: null | string;
   responsibleDepartmentId?: null | string;
   responsibleDepartmentResolutionStatus?: 'INVALID' | 'MISSING' | 'RESOLVED';
   status: string;
