@@ -209,7 +209,7 @@ echo "[remote] start database dependencies"
 docker compose -f "$compose_file" up -d redis
 
 echo "[remote] stop application writes before identity maintenance"
-docker compose -f "$compose_file" stop backend || true
+docker compose -f "$compose_file" stop backend
 
 echo "[remote] run database migrations"
 run_backend "$PRISMA_CMD migrate deploy --schema '$PRISMA_SCHEMA'"

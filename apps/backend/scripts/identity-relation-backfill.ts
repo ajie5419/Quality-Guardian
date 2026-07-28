@@ -85,7 +85,7 @@ export async function backfillInspectionPartIdentities(
   let updated = 0;
   while (true) {
     const rows = await prisma.inspections.findMany({
-      where: { isDeleted: false, OR: [{ partId: null }, { partName: null }] },
+      where: { isDeleted: false, partId: null },
       orderBy: { id: 'asc' },
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       take: batchSize,

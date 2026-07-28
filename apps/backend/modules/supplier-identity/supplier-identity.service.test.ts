@@ -9,6 +9,7 @@ const { isPrismaUniqueConstraintError } = vi.hoisted(() => ({
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    $queryRaw: vi.fn(),
     dictionaries: { findFirst: vi.fn(), findMany: vi.fn() },
     supplier_identity_links: {
       count: vi.fn(),
@@ -38,6 +39,7 @@ describe('supplier identity service', () => {
     vi.mocked(prisma.$transaction).mockImplementation((callback) =>
       callback(prisma as never),
     );
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([]);
   });
 
   it('resolves a supplier through an active TEAM link', async () => {
@@ -172,6 +174,7 @@ describe('supplier identity service', () => {
       }),
     ).rejects.toMatchObject({ code: 'INVALID_TEAM_ID' });
     expect(prisma.supplier_identity_links.upsert).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
 
   it('does not overwrite an active TEAM link owned by another supplier', async () => {

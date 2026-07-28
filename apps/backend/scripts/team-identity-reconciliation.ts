@@ -310,6 +310,7 @@ async function reconcileSources(
   const claims = buildLegacySourceClaims(state.teamRows);
   let created = 0;
   let linked = 0;
+  let retired = 0;
   for (const candidate of candidates) {
     const resolution = chooseTeamForSource(
       candidate,
@@ -319,6 +320,10 @@ async function reconcileSources(
     );
     if (resolution.action === 'ambiguous') {
       audits.push(sourceAmbiguityAudit(candidate, resolution.teamIds));
+      continue;
+    }
+    if (resolution.action === 'retired') {
+      retired += 1;
       continue;
     }
     let teamId = resolution.action === 'link' ? resolution.teamId : '';
@@ -335,7 +340,7 @@ async function reconcileSources(
     linked += 1;
     updateInMemorySource(state.sourceRows, candidate, teamId);
   }
-  return { audits, created, linked };
+  return { audits, created, linked, retired };
 }
 
 function mergeAmbiguityAudits(
@@ -473,6 +478,7 @@ export async function reconcileTeamIdentities(
     created: sourceResult.created,
     linked: sourceResult.linked,
     mode: options.mode,
+    retired: sourceResult.retired,
   };
   logger.info(summary, 'TEAM identity reconciliation finished');
   return summary;

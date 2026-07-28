@@ -178,7 +178,7 @@ jobs:
 
             run_with_timeout 300 docker compose -f "$COMPOSE_FILE" pull backend frontend
             run_with_timeout 120 docker compose -f "$COMPOSE_FILE" up -d redis
-            run_with_timeout 120 docker compose -f "$COMPOSE_FILE" stop backend || true
+            run_with_timeout 120 docker compose -f "$COMPOSE_FILE" stop backend
             deploy_prisma_migrations
             run_backend 600 "$RELEASE_MAINTENANCE_CMD"
             run_with_timeout 180 docker compose -f "$COMPOSE_FILE" up -d backend frontend

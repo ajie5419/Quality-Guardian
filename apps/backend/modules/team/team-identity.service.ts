@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 import type {
   TeamIdentityCreateInput,
   TeamIdentityListQuery,
@@ -79,8 +81,13 @@ async function findTeamNamesByIds(ids: string[]) {
   return names;
 }
 
-async function retireActiveTeam(id: string, operator: string) {
-  const existing = await prisma.dictionaries.findFirst({
+async function retireActiveTeam(
+  client: Prisma.TransactionClient,
+  id: string,
+  operator: string,
+) {
+  await SupplierIdentityService.lockTeamForMutation(id, client);
+  const existing = await client.dictionaries.findFirst({
     where: {
       id,
       dictType: TEAM_DICT_TYPE,
@@ -102,8 +109,8 @@ async function retireActiveTeam(id: string, operator: string) {
       403,
     );
   }
-  await SupplierIdentityService.assertTeamCanBeRetired(id);
-  const result = await prisma.dictionaries.updateMany({
+  await SupplierIdentityService.assertTeamCanBeRetired(id, client);
+  const result = await client.dictionaries.updateMany({
     where: {
       id,
       updatedAt: existing.updatedAt,
@@ -225,7 +232,7 @@ export const TeamIdentityService = {
     const id = String(teamId || '').trim();
     const actor = normalizeOperator(operator);
     try {
-      await retireActiveTeam(id, actor);
+      await prisma.$transaction((tx) => retireActiveTeam(tx, id, actor));
       await invalidateTeamOptionsCache();
     } catch (error: unknown) {
       logger.error({ err: error, teamId: id }, 'failed to retire TEAM');

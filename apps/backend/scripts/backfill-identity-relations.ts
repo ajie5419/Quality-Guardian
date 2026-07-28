@@ -12,15 +12,22 @@ import {
 const logger = createModuleLogger('identity-relation-backfill');
 
 async function main() {
+  const seed = await MasterDataGovernanceKernel.runGovernanceByFields({
+    configKeys: ['partName', 'processName'],
+    failOnAuditError: false,
+    runAudit: false,
+    runBackfill: false,
+  });
+  const inspections = await backfillInspectionPartIdentities();
+  const bomProcesses = await backfillBomRequiredProcessIdentities();
   const governance = await MasterDataGovernanceKernel.runGovernanceByFields({
     configKeys: ['partName', 'processName'],
     failOnAuditError: false,
     runAudit: false,
+    runSeed: false,
   });
-  const inspections = await backfillInspectionPartIdentities();
-  const bomProcesses = await backfillBomRequiredProcessIdentities();
   logger.info(
-    { bomProcesses, governance, inspections },
+    { bomProcesses, governance, inspections, seed },
     'identity relation backfill completed',
   );
 }

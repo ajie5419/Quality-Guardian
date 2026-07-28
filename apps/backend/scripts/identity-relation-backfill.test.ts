@@ -74,6 +74,9 @@ describe('identity relation backfill', () => {
       },
       data: { partId: 'part-1', partName: 'Current Part' },
     });
+    expect(prisma.inspections.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isDeleted: false, partId: null } }),
+    );
   });
 
   it('records conflicting linked request identities without guessing', async () => {

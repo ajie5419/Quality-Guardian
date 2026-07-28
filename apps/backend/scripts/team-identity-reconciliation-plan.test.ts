@@ -34,6 +34,24 @@ describe('team identity reconciliation planning', () => {
     ).toEqual({ action: 'link', teamId: 'team-linked' });
   });
 
+  it('preserves a stable source that was explicitly retired', () => {
+    expect(
+      chooseTeamForSource(
+        source,
+        [{ id: 'team-retired', name: 'StructureBU2', status: 0 }],
+        [
+          {
+            isDeleted: false,
+            sourceId: source.sourceId,
+            sourceType: source.sourceType,
+            teamId: 'team-retired',
+          },
+        ],
+        new Map(),
+      ),
+    ).toEqual({ action: 'retired', teamId: 'team-retired' });
+  });
+
   it('converts a unique legacy bootstrap claim into source evidence', () => {
     expect(
       chooseTeamForSource(

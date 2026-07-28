@@ -16,6 +16,18 @@ function normalizeId(value: unknown) {
   return String(value || '').trim();
 }
 
+async function lockTeamForMutation(
+  teamId: string,
+  client: Pick<Prisma.TransactionClient, '$queryRaw'>,
+) {
+  await client.$queryRaw`
+    SELECT id
+    FROM dictionaries
+    WHERE id = ${teamId} AND dictType = 'team'
+    FOR UPDATE
+  `;
+}
+
 async function validateLinkInput(
   input: SupplierIdentityInput,
   client: Pick<Prisma.TransactionClient, 'dictionaries' | 'suppliers'>,
@@ -64,8 +76,11 @@ function teamIdentityConflict() {
 }
 
 export const SupplierIdentityService = {
-  async assertTeamCanBeRetired(teamId: string) {
-    const activeLink = await prisma.supplier_identity_links.findFirst({
+  async assertTeamCanBeRetired(
+    teamId: string,
+    client: Pick<Prisma.TransactionClient, 'supplier_identity_links'> = prisma,
+  ) {
+    const activeLink = await client.supplier_identity_links.findFirst({
       select: { id: true },
       where: {
         identityId: normalizeId(teamId),
@@ -85,6 +100,8 @@ export const SupplierIdentityService = {
   async create(input: SupplierIdentityInput) {
     try {
       return await prisma.$transaction(async (tx) => {
+        const teamId = normalizeId(input.teamId);
+        await lockTeamForMutation(teamId, tx);
         const { supplier, team } = await validateLinkInput(input, tx);
         const existing = await tx.supplier_identity_links.findUnique({
           where: {
@@ -133,6 +150,8 @@ export const SupplierIdentityService = {
       throw error;
     }
   },
+
+  lockTeamForMutation,
 
   async delete(id: string) {
     const existing = await prisma.supplier_identity_links.findFirst({

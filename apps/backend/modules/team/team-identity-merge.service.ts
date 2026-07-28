@@ -122,6 +122,20 @@ async function assertNoMergeParticipantConflict(
   }
 }
 
+async function lockMergeParticipants(
+  tx: Prisma.TransactionClient,
+  teamIds: string[],
+) {
+  for (const teamId of [...new Set(teamIds)].sort()) {
+    await tx.$queryRaw`
+      SELECT id
+      FROM dictionaries
+      WHERE id = ${teamId} AND dictType = 'team'
+      FOR UPDATE
+    `;
+  }
+}
+
 async function assertSupplierLinksCompatible(
   tx: Prisma.TransactionClient,
   sourceTeamId: string,
@@ -182,6 +196,7 @@ async function executeMerge(input: ReturnType<typeof normalizeMergeInput>) {
           409,
         );
       }
+      await lockMergeParticipants(tx, [input.sourceTeamId, input.targetTeamId]);
       await assertNoMergeParticipantConflict(
         tx,
         input.sourceTeamId,

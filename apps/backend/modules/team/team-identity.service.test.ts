@@ -9,6 +9,7 @@ import { TeamIdentityService } from './team-identity.service';
 const mocks = vi.hoisted(() => ({
   loggerError: vi.fn(),
   tx: {
+    $queryRaw: vi.fn(),
     dictionaries: {
       create: vi.fn(),
       findFirst: vi.fn(),
@@ -32,7 +33,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('~/modules/supplier-identity', () => ({
-  SupplierIdentityService: { assertTeamCanBeRetired: vi.fn() },
+  SupplierIdentityService: {
+    assertTeamCanBeRetired: vi.fn(),
+    lockTeamForMutation: vi.fn(),
+  },
 }));
 
 vi.mock('~/utils/logger', () => ({
@@ -254,8 +258,13 @@ describe('teamIdentityService', () => {
 
     await TeamIdentityService.retire(activeTeam.id, 'admin');
 
+    expect(SupplierIdentityService.lockTeamForMutation).toHaveBeenCalledWith(
+      activeTeam.id,
+      mocks.tx,
+    );
     expect(SupplierIdentityService.assertTeamCanBeRetired).toHaveBeenCalledWith(
       activeTeam.id,
+      mocks.tx,
     );
     expect(mocks.tx.dictionaries.updateMany).toHaveBeenCalledWith({
       where: {

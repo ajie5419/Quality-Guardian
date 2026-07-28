@@ -46,8 +46,10 @@ export function chooseTeamForSource(
   const linked = sources.find(
     (source) => !source.isDeleted && sourceKey(source) === sourceKey(candidate),
   );
-  if (linked && activeIds.has(linked.teamId)) {
-    return { action: 'link' as const, teamId: linked.teamId };
+  if (linked) {
+    return activeIds.has(linked.teamId)
+      ? { action: 'link' as const, teamId: linked.teamId }
+      : { action: 'retired' as const, teamId: linked.teamId };
   }
   const claimedIds = (legacyClaims.get(sourceKey(candidate)) || []).filter(
     (teamId) => activeIds.has(teamId),

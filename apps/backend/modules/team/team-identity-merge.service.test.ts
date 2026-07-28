@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   },
   loggerError: vi.fn(),
   tx: {
+    $queryRaw: vi.fn(),
     dictionaries: {
       findMany: vi.fn(),
       update: vi.fn(),
@@ -70,6 +71,7 @@ describe('teamIdentityMergeService', () => {
       callback(mocks.tx),
     );
     mocks.tx.team_identity_merges.findUnique.mockResolvedValue(null);
+    mocks.tx.$queryRaw.mockResolvedValue([]);
     mocks.tx.team_identity_merges.findFirst.mockResolvedValue(null);
     mocks.tx.team_identity_merges.create.mockResolvedValue({ id: 'merge-1' });
     mocks.tx.dictionaries.findMany.mockResolvedValue([sourceTeam, targetTeam]);
@@ -121,6 +123,7 @@ describe('teamIdentityMergeService', () => {
       200,
       'admin',
     );
+    expect(mocks.tx.$queryRaw).toHaveBeenCalledTimes(2);
     expect(countTeamReferences).toHaveBeenCalledWith(mocks.tx, sourceTeam.id);
     expect(mocks.tx.dictionaries.update).toHaveBeenCalledWith({
       where: { id: sourceTeam.id },
