@@ -46,7 +46,7 @@
 - 后端全量测试：`230/230` 个文件、`2176/2176` 个用例通过。
 - 全量 lint 通过（0 error）；workspace typecheck `3/3` 通过；Prisma migration 检查通过。
 
-**commit:** `b7ad4a18` / `2b6db069` / `a4304bf9` / `e53dc930` / `b90adeed` / `6411c7d5` / `69b4fcde` / `d7b1b240`
+**commit:** `b7ad4a18` / `2b6db069` / `a4304bf9` / `e53dc930` / `b90adeed` / `6411c7d5` / `69b4fcde` / `d7b1b240` / `75851ce`
 
 **遗留问题：**
 
