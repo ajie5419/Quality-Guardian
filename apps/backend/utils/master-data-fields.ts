@@ -879,6 +879,12 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
         nullable: true,
       },
       {
+        table: 'quality_loss_index',
+        nameColumn: 'respDept',
+        idColumn: 'respDeptId',
+        nullable: true,
+      },
+      {
         table: 'metrology_borrow_records',
         nameColumn: 'borrowerDepartment',
         idColumn: 'borrowerDepartmentId',
@@ -936,6 +942,12 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
       },
       {
         table: 'quality_losses',
+        nameColumn: 'projectName',
+        idColumn: 'projectId',
+        nullable: true,
+      },
+      {
+        table: 'quality_loss_index',
         nameColumn: 'projectName',
         idColumn: 'projectId',
         nullable: true,
@@ -1305,7 +1317,19 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
         nullable: false,
       },
       {
+        table: 'inspections',
+        nameColumn: 'partName',
+        idColumn: 'partId',
+        nullable: true,
+      },
+      {
         table: 'quality_losses',
+        nameColumn: 'partName',
+        idColumn: 'partId',
+        nullable: true,
+      },
+      {
+        table: 'quality_loss_index',
         nameColumn: 'partName',
         idColumn: 'partId',
         nullable: true,
