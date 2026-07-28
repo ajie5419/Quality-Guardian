@@ -28,10 +28,7 @@ export async function bom_id_put(event: H3Event) {
 
   try {
     const body = await readBody(event);
-    const processIdentities = await resolveBomRequiredProcessIdentities(
-      body,
-      'online',
-    );
+    const processIdentities = await resolveBomRequiredProcessIdentities(body);
     const mutablePayload = buildProjectBomMutableData({
       ...body,
       requiredProcesses: processIdentities.map((item) => item.processName),

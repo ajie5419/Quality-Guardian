@@ -71,10 +71,7 @@ export async function bom_index_post(event: H3Event) {
       return internalServerErrorResponse(event, 'BOM 项目状态异常');
     }
 
-    const processIdentities = await resolveBomRequiredProcessIdentities(
-      body,
-      'online',
-    );
+    const processIdentities = await resolveBomRequiredProcessIdentities(body);
     const newItemPayload = buildProjectBomCreateData(workOrderNumber, {
       ...body,
       requiredProcesses: processIdentities.map((item) => item.processName),

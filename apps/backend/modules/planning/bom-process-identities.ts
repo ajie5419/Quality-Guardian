@@ -14,45 +14,27 @@ function normalizeList(value: unknown) {
 
 export async function resolveBomRequiredProcessIdentities(
   input: Record<string, unknown>,
-  mode: 'legacy-import' | 'online',
 ): Promise<RequiredProcessIdentity[]> {
   const processIds = normalizeList(input.requiredProcessIds);
   const legacyNames = normalizeList(input.requiredProcesses);
   if (processIds.length === 0 && legacyNames.length === 0) return [];
-  if (mode === 'online' && processIds.length === 0) {
+  if (processIds.length === 0) {
     throw new BusinessError(
       'CANONICAL_ID_REQUIRED',
       'requiredProcessIds are required when requiredProcesses are provided',
     );
   }
 
-  if (processIds.length > 0) {
-    const names = await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-      canonicalIds: processIds,
-      configKey: 'processName',
-    });
-    return processIds.map((processId) => {
-      const processName = String(names.get(processId) || '').trim();
-      if (!processName) {
-        throw new BusinessError(
-          'INVALID_CANONICAL_ID',
-          `Unknown process identity: ${processId}`,
-        );
-      }
-      return { processId, processName };
-    });
-  }
-
-  const ids = await MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
+  const names = await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+    canonicalIds: processIds,
     configKey: 'processName',
-    names: legacyNames,
   });
-  return legacyNames.map((processName) => {
-    const processId = String(ids.get(processName) || '').trim();
-    if (!processId) {
+  return processIds.map((processId) => {
+    const processName = String(names.get(processId) || '').trim();
+    if (!processName) {
       throw new BusinessError(
-        'UNRESOLVED_CANONICAL_REFERENCE',
-        `Process name cannot be resolved uniquely: ${processName}`,
+        'INVALID_CANONICAL_ID',
+        `Unknown process identity: ${processId}`,
       );
     }
     return { processId, processName };
