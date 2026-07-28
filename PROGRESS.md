@@ -2,8 +2,8 @@
 
 ## 当前状态
 
-- 最新变更: 报检入口过程工序恢复为所选工单有效工序要求，进货工序继续按显式类别读取；加载失败不再伪装成正常空数据。生产环境仍保持 `qgs-v0.19.1`，未连接或修改生产数据。
-- 测试状态: 后端全量 `232/232` 个测试文件、`2201/2201` 个用例通过；本轮前后端定向测试全部通过。
+- 最新变更: Historical process identities now bootstrap once from null-ID legacy rows, work-order requirements receive canonical `processId` values through idempotent CAS backfill, and release maintenance establishes identities before category classification. Initialized process identity spaces never create IDs from old names. Production remains on `qgs-v0.19.1` and was not accessed or modified.
+- 测试状态: Backend full suite `232/232` files and `2209/2209` tests passed; focused backend and Web request-entry suites passed.
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
 - 模块 TS 文件数: 538（含测试）
@@ -58,6 +58,7 @@
 - [x] 质量损失索引、检验部件、工单要求/聚合和 BOM 所需工序身份治理
 - [x] 报检 Web/小程序与工单要求 V2 ID-required 写契约
 - [x] 报检入口工序选项恢复工单范围查询并按 canonical `processId` 去重
+- [x] Historical process identity bootstrap and work-order requirement `processId` backfill, including empty-only seeding and ordered release maintenance
 - [x] 受控名称 `Map` 键架构门禁 `B-ID9`
 - [ ] 后端业务模块逐功能测试覆盖补齐（进行中）
 
@@ -87,6 +88,7 @@ apps/backend/
 - [ ] 按生产 V1/V2 流量和 `missing_id_count` 指标删除报检/工单要求 V1 迁移协议
 - [ ] 继续核对尚未登记的动态字段和名称分支路径
 - [ ] 通过发布流程部署 TEAM identity migrations，执行有序 reconciliation/category backfill，并核对生产报检排行总数与 unresolved 审计
+- [ ] Deliver the historical process bootstrap through the release workflow and verify production process, requirement, category, and unresolved counts without manual database edits
 - [ ] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制
 
 ## 基线数据（用于异常检测）

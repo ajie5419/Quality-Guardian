@@ -25,6 +25,32 @@
 
 ## 执行记录
 
+### 2026-07-28 Phase 12: bootstrap historical process identities safely
+
+**Execution:**
+
+- Closed the migration gap that left historical `work_order_requirements.processId` null when the new `processes` table and relation columns were added.
+- Added a one-time canonical process bootstrap from active legacy rows that still lack `processId`. The bootstrap runs only while the canonical process table has zero rows; initialized environments never recreate identities from old name snapshots or legacy dictionary names.
+- Backfilled historical work-order requirement process IDs with keyset batches and compare-and-set writes. Existing IDs and historical `processName` snapshots are preserved; unresolved names are recorded in `unresolved_master_data_refs`.
+- Required active process identities to satisfy `isDeleted=0 AND status=1`, generated bootstrap IDs with cuid, and reported actual inserted row counts.
+- Reordered release maintenance so identity bootstrap and relation backfill run before inspection-request category classification, with a regression test that locks the dependency order.
+- Applied the idempotent maintenance only to the local Apple Container database. Initial local results were `7` canonical process rows inserted and `1/1` work-order requirement process identity updated with `0` unresolved rows; the incoming-process category update changed `1` row. A repeated run performed zero process, category, or requirement updates. No production database or production record was accessed or modified.
+
+**Verification:**
+
+- Backend focused suite: `4/4` test files and `41/41` tests passed.
+- Backend full suite: `232/232` test files and `2209/2209` tests passed.
+- Web request-entry suite: `2/2` test files and `6/6` tests passed.
+- Full repository lint passed; workspace typecheck passed `3/3` tasks; changed-scope QMS architecture check reported `0 violations across 0 rules`.
+- Release-maintenance shell syntax and `git diff --check` passed.
+- Local API returned canonical `PROCESS / 组对` and `INCOMING / 进货检验` identities for `WO-468624`. Browser verification confirmed that the process-entry dropdown displays `组对`.
+
+**Commit:** `8554f32` `fix(project): bootstrap historical process identities`
+
+**Remaining issues:**
+
+- Production remains unchanged at `qgs-v0.19.1`. The new bootstrap must be delivered only through the normal write-stop migration and ordered release-maintenance workflow; manual production database edits are not permitted.
+
 ### 2026-07-28 Phase 11: restore work-order-scoped inspection process options
 
 **Execution:**
