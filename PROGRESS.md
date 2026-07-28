@@ -2,11 +2,11 @@
 
 ## 当前状态
 
-- 最新变更: Historical process identities now bootstrap once from null-ID legacy rows, work-order requirements receive canonical `processId` values through idempotent CAS backfill, and release maintenance establishes identities before category classification. Initialized process identity spaces never create IDs from old names. Production remains on `qgs-v0.19.1` and was not accessed or modified.
-- 测试状态: Backend full suite `232/232` files and `2209/2209` tests passed; focused backend and Web request-entry suites passed.
+- 最新变更: Global process identity and inspection-request visibility are now separate concerns. `processes` is the reusable identity source, while `inspection_request_process_options` independently configures `PROCESS` and `INCOMING` entry options. Work-order requirements no longer filter request-entry processes. Production remains on `qgs-v0.19.1` and was not accessed or modified.
+- 测试状态: Backend full suite `234/234` files and `2217/2217` tests passed; Web full suite `47/47` files and `238/238` tests passed; shared focused suite `14/14` passed.
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
-- 模块 TS 文件数: 538（含测试）
+- 模块 TS 文件数: 544（含测试）
 - 当前版本: `0.19.1`
 
 ## 已完成
@@ -57,8 +57,8 @@
 - [x] 工单看板、周报/月报缺陷分布和车辆缺陷排行按 canonical ID 聚合并透传身份状态
 - [x] 质量损失索引、检验部件、工单要求/聚合和 BOM 所需工序身份治理
 - [x] 报检 Web/小程序与工单要求 V2 ID-required 写契约
-- [x] 报检入口工序选项恢复工单范围查询并按 canonical `processId` 去重
 - [x] Historical process identity bootstrap and work-order requirement `processId` backfill, including empty-only seeding and ordered release maintenance
+- [x] 全局工序主数据与报检显示配置解耦（过程报检/进货检验独立开关、稳定 ID、全局复用、无名称或工单要求兜底）
 - [x] 受控名称 `Map` 键架构门禁 `B-ID9`
 - [ ] 后端业务模块逐功能测试覆盖补齐（进行中）
 
@@ -68,7 +68,7 @@
 apps/backend/
 ├── api/          # 路由薄层（≤50 行）
 ├── middleware/   # 认证、数据权限、日志
-├── modules/      # 业务逻辑（26 个模块，538 个 TS 文件）
+├── modules/      # 业务逻辑（27 个模块，544 个 TS 文件）
 ├── prisma/       # Schema + Migrations
 ├── routes/       # catch-all 404
 └── utils/        # 基础设施（24 个文件）
@@ -88,13 +88,13 @@ apps/backend/
 - [ ] 按生产 V1/V2 流量和 `missing_id_count` 指标删除报检/工单要求 V1 迁移协议
 - [ ] 继续核对尚未登记的动态字段和名称分支路径
 - [ ] 通过发布流程部署 TEAM identity migrations，执行有序 reconciliation/category backfill，并核对生产报检排行总数与 unresolved 审计
-- [ ] Deliver the historical process bootstrap through the release workflow and verify production process, requirement, category, and unresolved counts without manual database edits
+- [ ] Deliver the process identity bootstrap and inspection-request option migration through the release workflow, then verify production counts without manual database edits
 - [ ] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制
 
 ## 基线数据（用于异常检测）
 
-- 模块 TS 文件数: 538（含测试）
+- 模块 TS 文件数: 544（含测试）
 - utils TS 文件数: 41
-- 测试文件数: 206（modules 内）；后端总计 232
+- 测试文件数: 207（modules 内）；后端总计 234
 - 导出入口基线: 约 610；已完成 343，剩余 267
 - 顶层目录: api/ middleware/ modules/ prisma/ routes/ utils/

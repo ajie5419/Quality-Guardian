@@ -25,6 +25,33 @@
 
 ## 执行记录
 
+### 2026-07-28 Phase 13: separate global processes from inspection-request visibility
+
+**Execution:**
+
+- Established `processes` as the single reusable process identity source for inspection requests, inspection records, nonconformance items, ITP, inspection templates, BOM configuration, Web, and WeChat clients.
+- Added `inspection_request_process_options` as a normalized `category + processId` configuration table. `PROCESS` and `INCOMING` visibility can now be managed independently, including enabling the same process in both categories.
+- Removed `work_order_requirements` from request-entry option selection. Work-order requirements remain business requirements and no longer act as a process whitelist.
+- Added system management APIs and `/system/inspection-settings` controls for process creation, editing, activation, soft deletion, and transactional request-category selection.
+- Enforced the same configured `category + processId` rule during V2 request submission, preventing hidden options from being submitted through crafted payloads.
+- Retired the editable `inspection_process_name` dictionary path and removed hard-coded Web/shared fallbacks. A soft-deleted process restored by name keeps its original stable ID.
+- Added additive Prisma migration and idempotent release maintenance. The bootstrap creates only missing option rows and never overwrites administrator choices or historical business data.
+- Applied migration and maintenance only to the local Apple Container database. Seven existing processes produced fourteen option rows. Read-only verification returned six process-inspection options and one incoming-inspection option. Production was not accessed or modified.
+
+**Verification:**
+
+- Backend full suite: `234/234` files and `2217/2217` tests passed.
+- Web full suite: `47/47` files and `238/238` tests passed.
+- Shared focused suite: `14/14` tests passed.
+- Full repository lint, workspace typecheck, and changed-scope QMS architecture check passed.
+- Browser E2E could not be rerun after local initialization because the pre-existing `5320/5666` development services were no longer running; project policy prohibits starting frontend development servers during this task.
+
+**Commits:** `5df94489`, `66c4b3fa`, `83d8cd30`
+
+**Remaining issues:**
+
+- Production rollout must use the normal write-stop release workflow so migration and ordered maintenance finish before the new application starts. Manual production database edits are not permitted.
+
 ### 2026-07-28 Phase 12: bootstrap historical process identities safely
 
 **Execution:**

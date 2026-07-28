@@ -68,13 +68,15 @@ public 报检允许：
 - 查询允许公开展示的工单、工序和班组选项。
 - 提交报检任务。
 
-Process options must preserve these source boundaries:
+Process options preserve these source boundaries:
 
-- `PROCESS` returns only active canonical processes referenced by active `work_order_requirements` for the selected work order. Unrelated process master rows must not be exposed.
-- `INCOMING` returns active process master rows with `inspectionRequestCategory=INCOMING`, independent of process names and work-order requirements.
-- Process names are display values only. Category filtering, deduplication, and submission use `inspectionRequestCategory + processId`.
+- `processes` is the only global process identity source. Process names are mutable display values and never act as IDs.
+- `inspection_request_process_options` independently controls which active processes appear for `PROCESS` and `INCOMING` requests. The same process may appear in either, both, or neither category.
+- `work_order_requirements` records work-order quality requirements. It never filters or authorizes process options in either request-entry mode.
+- An empty configured selection returns an empty list. Public queries and submission validation never fall back to hard-coded names, legacy dictionaries, or work-order requirements.
+- V2 submission validates the exact `category + processId` option before creating a request, so a hidden or disabled option cannot be submitted by constructing a request manually.
 
-Release maintenance must establish process identities before classifying inspection-request categories. The legacy-name bootstrap is permitted only when the `processes` identity space has never been initialized and only from active target rows whose `processId` is null. Once any canonical process exists, historical name snapshots can never create another process identity; unresolved rows remain audited instead. This prevents a rename from recreating the old display name as a second process.
+Release maintenance must establish process identities before creating missing request-option rows. The option bootstrap is additive and idempotent: it creates two rows per existing process with `createMany + skipDuplicates`, preserving administrator choices on repeated deployments. Historical business rows and their display snapshots are not rewritten.
 
 public 报检禁止：
 
@@ -104,7 +106,7 @@ Dashboard API contracts and Vue row keys carry the same stable IDs. A display na
 
 - V2 创建契约显式提交 `category + partId + processId`；客户端不提交部件和工序名称作为业务事实。
 - 后端按 ID 校验启用的 `master_parts/processes` 记录，并重建 `partName/processName` 快照；无效 ID 直接拒绝。
-- `processes.inspectionRequestCategory` 定义工序适用的报检类别；Web 和小程序使用该字段提交 `category`，工序改名不得改变报检类别。
+- `inspection_request_process_options` defines whether a process is available in each request category; Web and WeChat clients submit the selected stable `processId` with the explicit category.
 - BOM 部件选项返回 `project_boms.partId`；BOM 行 `id` 只是 BOM 记录主键，不是部件身份。
 - 工序选项返回 `processes.id`；工序字典 `dictionaries.id` 与工序主数据不是同一 ID 空间。
 - Web 和微信小程序均使用 V2。V1 旧路由只作发布迁移适配；待生产 V1 写流量归零后必须删除。
