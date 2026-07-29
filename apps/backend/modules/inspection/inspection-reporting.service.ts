@@ -1,5 +1,8 @@
 import { Prisma } from '@prisma/client';
-import { QUALITY_CLASSIFICATION_SCOPE } from '@qgs/shared';
+import {
+  createIdentityAggregateItem,
+  QUALITY_CLASSIFICATION_SCOPE,
+} from '@qgs/shared';
 import { QualityClassificationService } from '~/modules/quality-classification';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
@@ -12,8 +15,11 @@ function getCanonicalDisplayName(
   canonicalId: null | string,
   canonicalNames: Map<string, null | string>,
 ) {
-  if (!canonicalId) return 'Unknown';
-  return canonicalNames.get(canonicalId) || `Unknown (${canonicalId})`;
+  return createIdentityAggregateItem({
+    canonicalName: canonicalId ? canonicalNames.get(canonicalId) : null,
+    id: canonicalId,
+    value: 0,
+  }).name;
 }
 
 export const InspectionReportingService = {

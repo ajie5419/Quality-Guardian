@@ -166,6 +166,49 @@ describe('quality-loss core services', () => {
     expect(weekCharts.trend).toHaveLength(53);
   });
 
+  it('keeps distinct unresolved department snapshots in separate buckets', () => {
+    const charts = QualityLossSummaryService.getYearlyCharts(
+      [
+        {
+          actualClaim: 0,
+          amount: 10,
+          date: '2026-01-01',
+          responsibleDepartment: 'Legacy A',
+          responsibleDepartmentCanonicalName: '数据待治理：Legacy A',
+          responsibleDepartmentId: null,
+          responsibleDepartmentResolutionReason: 'MISSING_REQUIRED',
+          responsibleDepartmentResolutionStatus: 'MISSING',
+          status: 'Pending',
+        },
+        {
+          actualClaim: 0,
+          amount: 20,
+          date: '2026-01-02',
+          responsibleDepartment: 'Legacy B',
+          responsibleDepartmentCanonicalName: '数据待治理：Legacy B',
+          responsibleDepartmentId: null,
+          responsibleDepartmentResolutionReason: 'MISSING_REQUIRED',
+          responsibleDepartmentResolutionStatus: 'MISSING',
+          status: 'Pending',
+        },
+      ] as any,
+      { year: 2026 } as any,
+    );
+
+    expect(charts.deptDistribution).toEqual([
+      expect.objectContaining({
+        name: '数据待治理：Legacy B',
+        rawName: 'Legacy B',
+        value: 20,
+      }),
+      expect.objectContaining({
+        name: '数据待治理：Legacy A',
+        rawName: 'Legacy A',
+        value: 10,
+      }),
+    ]);
+  });
+
   it('applies data scope and sorts scoped items', async () => {
     const items = [
       {

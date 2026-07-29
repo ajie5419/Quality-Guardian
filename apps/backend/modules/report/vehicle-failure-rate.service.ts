@@ -1,6 +1,5 @@
 import {
   createIdentityAggregateItem,
-  QMS_DEFAULT_VALUES,
   QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
@@ -160,22 +159,32 @@ async function buildRanking(
     vehicleDeptIds,
   });
   const total = records.length;
-  const counts = new Map<null | string, number>();
+  const groups = new Map<
+    string,
+    { count: number; id: null | string; rawName: null | string }
+  >();
   for (const record of records) {
     const id = String(record.defectCategoryId || '').trim() || null;
-    counts.set(id, (counts.get(id) || 0) + 1);
+    const rawName = String(record.defectType || '').trim() || null;
+    const key = id ? `id:${id}` : `missing:${rawName || ''}`;
+    const current = groups.get(key);
+    groups.set(key, {
+      count: (current?.count || 0) + 1,
+      id,
+      rawName: current?.rawName || rawName,
+    });
   }
   const defectTypeNameById =
     await QualityClassificationService.resolveCategoryNamesByIds(
       QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
-      [...counts.keys()].filter(Boolean),
+      [...groups.values()].map((item) => item.id).filter(Boolean),
     );
-  return [...counts.entries()]
-    .map(([id, count]) => {
+  return [...groups.values()]
+    .map(({ count, id, rawName }) => {
       const identity = createIdentityAggregateItem({
         canonicalName: id ? defectTypeNameById.get(id) : null,
         id,
-        missingName: QMS_DEFAULT_VALUES.UNCLASSIFIED,
+        rawName,
         value: count,
       });
       return {

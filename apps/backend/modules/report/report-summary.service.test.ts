@@ -189,14 +189,16 @@ describe('reportSummaryService', () => {
       },
       {
         id: 'invalid-id',
-        name: '主数据已失效',
+        name: '主数据已失效：Legacy Guess',
+        rawName: 'Legacy Guess',
         resolutionReason: 'INVALID_REFERENCE',
         resolutionStatus: 'INVALID',
         value: 1,
       },
       {
         id: null,
-        name: '未分类',
+        name: '数据待治理：Legacy Missing',
+        rawName: 'Legacy Missing',
         resolutionReason: 'MISSING_REQUIRED',
         resolutionStatus: 'MISSING',
         value: 1,

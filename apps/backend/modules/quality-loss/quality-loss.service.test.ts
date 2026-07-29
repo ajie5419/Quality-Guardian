@@ -132,7 +132,8 @@ describe('qualityLossService', () => {
       expect(result.items[0]).toEqual(
         expect.objectContaining({
           responsibleDepartment: 'Legacy Quality',
-          responsibleDepartmentCanonicalName: null,
+          responsibleDepartmentCanonicalName: '数据待治理：Legacy Quality',
+          responsibleDepartmentResolutionReason: 'MISSING_REQUIRED',
           responsibleDepartmentResolutionStatus: 'MISSING',
         }),
       );

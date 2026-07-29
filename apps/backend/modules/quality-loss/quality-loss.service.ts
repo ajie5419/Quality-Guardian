@@ -10,7 +10,7 @@ import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service'
 import type { QualityLossQueryParams, TrendRow } from './quality-loss-format';
 
 import { Prisma } from '@prisma/client';
-import { createIdentityAggregateItem, QMS_DEFAULT_VALUES } from '@qgs/shared';
+import { createIdentityAggregateItem } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
@@ -60,13 +60,13 @@ async function applyDeptNames(items: QualityLossItem[]) {
         ? names.get(item.responsibleDepartmentId)
         : null,
       id: item.responsibleDepartmentId,
-      missingName: QMS_DEFAULT_VALUES.UNASSIGNED,
+      rawName: item.responsibleDepartment,
       value: 0,
     });
     return {
       ...item,
-      responsibleDepartmentCanonicalName:
-        identity.resolutionStatus === 'RESOLVED' ? identity.name : null,
+      responsibleDepartmentCanonicalName: identity.name,
+      responsibleDepartmentResolutionReason: identity.resolutionReason,
       responsibleDepartmentResolutionStatus: identity.resolutionStatus,
     };
   });

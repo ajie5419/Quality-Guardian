@@ -72,30 +72,51 @@ export const QualityLossSummaryService = {
     });
 
     const deptMap = new Map<
-      null | string,
+      string,
       {
+        id: null | string;
         name: string;
+        rawName: null | string;
+        resolutionReason?: QualityLossItem['responsibleDepartmentResolutionReason'];
         resolutionStatus: 'INVALID' | 'MISSING' | 'RESOLVED';
         value: number;
       }
     >();
     for (const item of filteredByYear) {
       const id = String(item.responsibleDepartmentId || '').trim() || null;
+      const rawName = String(item.responsibleDepartment || '').trim() || null;
       const amount = Number(item.amount) || 0;
-      const current = deptMap.get(id) || {
-        name: String(item.responsibleDepartment || ''),
+      const resolutionReason =
+        item.responsibleDepartmentResolutionReason ||
+        (id ? 'INVALID_REFERENCE' : 'MISSING_REQUIRED');
+      const key = id
+        ? `id:${id}`
+        : `missing:${resolutionReason}:${rawName || ''}`;
+      const current = deptMap.get(key) || {
+        id,
+        name:
+          item.responsibleDepartmentCanonicalName ||
+          String(item.responsibleDepartment || ''),
+        rawName,
+        resolutionReason,
         resolutionStatus:
           item.responsibleDepartmentResolutionStatus ||
           (id ? 'INVALID' : 'MISSING'),
         value: 0,
       };
       current.value += amount;
-      deptMap.set(id, current);
+      deptMap.set(key, current);
     }
-    const deptDistribution = [...deptMap.entries()]
-      .map(([id, item]) => ({
-        id,
+    const deptDistribution = [...deptMap.values()]
+      .map((item) => ({
+        id: item.id,
         name: item.name,
+        ...(item.rawName && item.resolutionStatus !== 'RESOLVED'
+          ? { rawName: item.rawName }
+          : {}),
+        ...(item.resolutionStatus === 'RESOLVED'
+          ? {}
+          : { resolutionReason: item.resolutionReason }),
         resolutionStatus: item.resolutionStatus,
         value: Number(item.value.toFixed(2)),
       }))

@@ -1,8 +1,15 @@
-import type { IdentityResolutionStatus } from '@qgs/shared';
+import type {
+  IdentityResolutionReason,
+  IdentityResolutionStatus,
+} from '@qgs/shared';
+
+import { createIdentityAggregateItem } from '@qgs/shared';
 
 export type AggregateIdentity = {
   id: null | string;
   name: string;
+  rawName?: null | string;
+  resolutionReason?: IdentityResolutionReason;
   resolutionStatus: IdentityResolutionStatus;
 };
 
@@ -39,22 +46,15 @@ export function resolveAggregateIdentity(params: {
   snapshot: unknown;
 }): AggregateIdentity {
   const id = String(params.id || '').trim() || null;
-  if (!id) {
-    return {
-      id: null,
-      name: normalizeAggregateLabel(params.snapshot),
-      resolutionStatus: 'MISSING',
-    };
-  }
-  const canonicalName = String(params.canonicalNames.get(id) || '').trim();
-  if (!canonicalName) {
-    return {
-      id,
-      name: `Unknown (${id})`,
-      resolutionStatus: 'INVALID',
-    };
-  }
-  return { id, name: canonicalName, resolutionStatus: 'RESOLVED' };
+  const snapshot = String(params.snapshot || '').trim() || null;
+  const identity = createIdentityAggregateItem({
+    canonicalName: id ? params.canonicalNames.get(id) : null,
+    id,
+    rawName: snapshot,
+    value: 0,
+  });
+  const { value: _value, ...result } = identity;
+  return result;
 }
 
 export function mapAggregateDimensionStats(

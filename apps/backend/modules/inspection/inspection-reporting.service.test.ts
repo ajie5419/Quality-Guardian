@@ -641,7 +641,7 @@ describe('inspectionReportingService', () => {
         value: 3,
       });
       expect(result.issueDistribution).toContainEqual({
-        type: 'Unknown',
+        type: '数据待治理',
         value: 1,
       });
     });

@@ -16,6 +16,11 @@ export interface QualityLossItem {
   responsibleDepartment: null | string;
   responsibleDepartmentCanonicalName?: null | string;
   responsibleDepartmentId?: null | string;
+  responsibleDepartmentResolutionReason?:
+    | 'CONFLICTED'
+    | 'INVALID_REFERENCE'
+    | 'MISSING_REQUIRED'
+    | 'NOT_APPLICABLE';
   responsibleDepartmentResolutionStatus?: 'INVALID' | 'MISSING' | 'RESOLVED';
   status: string;
   type?: string;

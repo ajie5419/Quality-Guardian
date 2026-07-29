@@ -1,7 +1,6 @@
 import {
   createIdentityAggregateItem,
   parseReportPeriodType,
-  QMS_DEFAULT_VALUES,
   QUALITY_CLASSIFICATION_SCOPE,
   resolveReportPeriodRange,
   resolveReportShortLabel,
@@ -192,22 +191,32 @@ async function fetchProcessPassRates(start: Date, end: Date) {
 
 async function fetchDefectDistribution(start: Date, end: Date) {
   const rows = await InspectionService.getReportDefectRows({ start, end });
-  const countByDefectTypeId = new Map<null | string, number>();
+  const groups = new Map<
+    string,
+    { id: null | string; rawName: null | string; value: number }
+  >();
   for (const row of rows) {
     const id = String(row.defectCategoryId || '').trim() || null;
-    countByDefectTypeId.set(id, (countByDefectTypeId.get(id) || 0) + 1);
+    const rawName = String(row.defectType || '').trim() || null;
+    const key = id ? `id:${id}` : `missing:${rawName || ''}`;
+    const current = groups.get(key);
+    groups.set(key, {
+      id,
+      rawName: current?.rawName || rawName,
+      value: (current?.value || 0) + 1,
+    });
   }
   const defectTypeNameById =
     await QualityClassificationService.resolveCategoryNamesByIds(
       QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
-      [...countByDefectTypeId.keys()],
+      [...groups.values()].map((item) => item.id),
     );
-  return [...countByDefectTypeId.entries()]
-    .map(([id, value]) =>
+  return [...groups.values()]
+    .map(({ id, rawName, value }) =>
       createIdentityAggregateItem({
         canonicalName: id ? defectTypeNameById.get(id) : null,
         id,
-        missingName: QMS_DEFAULT_VALUES.UNCLASSIFIED,
+        rawName,
         value,
       }),
     )
