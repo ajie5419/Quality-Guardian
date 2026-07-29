@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { basename, dirname, resolve } from 'node:path';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '~/utils/prisma';
@@ -198,15 +199,24 @@ describe('reporting identity backfill', () => {
   });
 
   it('backfills source tables before the detached quality loss index rebuild', () => {
+    const cwd = process.cwd();
+    const backendRoot =
+      basename(cwd) === 'backend' && basename(dirname(cwd)) === 'apps'
+        ? cwd
+        : resolve(cwd, 'apps/backend');
+    const repositoryRoot = resolve(backendRoot, '../..');
     const wrapper = readFileSync(
-      'scripts/backfill-identity-relations.ts',
+      resolve(backendRoot, 'scripts/backfill-identity-relations.ts'),
       'utf8',
     );
     const maintenance = readFileSync(
-      'scripts/run-release-maintenance.sh',
+      resolve(backendRoot, 'scripts/run-release-maintenance.sh'),
       'utf8',
     );
-    const deploy = readFileSync('../../.github/workflows/deploy.yml', 'utf8');
+    const deploy = readFileSync(
+      resolve(repositoryRoot, '.github/workflows/deploy.yml'),
+      'utf8',
+    );
 
     expect(wrapper).toContain(
       "bootstrapCanonicalFromTargetNames(\n      'projectName'",

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { basename, dirname, resolve } from 'node:path';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '~/utils/prisma';
@@ -29,6 +30,13 @@ vi.mock('~/utils/prisma', () => ({
 vi.mock('~/utils/logger', () => ({
   createModuleLogger: () => ({ info: vi.fn() }),
 }));
+
+function getBackendRoot() {
+  const cwd = process.cwd();
+  return basename(cwd) === 'backend' && basename(dirname(cwd)) === 'apps'
+    ? cwd
+    : resolve(cwd, 'apps/backend');
+}
 
 describe('inspection request category backfill', () => {
   beforeEach(() => {
@@ -133,8 +141,9 @@ describe('inspection request category backfill', () => {
   });
 
   it('runs identity bootstrap before process category classification', () => {
+    const backendRoot = getBackendRoot();
     const maintenanceScript = readFileSync(
-      'scripts/run-release-maintenance.sh',
+      resolve(backendRoot, 'scripts/run-release-maintenance.sh'),
       'utf8',
     );
     const identityBackfillIndex = maintenanceScript.indexOf(
@@ -149,12 +158,14 @@ describe('inspection request category backfill', () => {
   });
 
   it('runs quality loss index rebuild detached after the healthcheck', () => {
+    const backendRoot = getBackendRoot();
+    const repositoryRoot = resolve(backendRoot, '../..');
     const maintenanceScript = readFileSync(
-      'scripts/run-release-maintenance.sh',
+      resolve(backendRoot, 'scripts/run-release-maintenance.sh'),
       'utf8',
     );
     const deployWorkflow = readFileSync(
-      '../../.github/workflows/deploy.yml',
+      resolve(repositoryRoot, '.github/workflows/deploy.yml'),
       'utf8',
     );
     const healthcheckIndex = deployWorkflow.indexOf('if [ "$ok" -ne 1 ]');
