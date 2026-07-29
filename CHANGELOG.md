@@ -25,6 +25,14 @@
 
 ## 执行记录
 
+## [0.20.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.20.0...qgs-v0.20.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* align deploy command timeout with release maintenance ([4089dd1](https://github.com/ajie5419/Quality-Guardian/commit/4089dd19cb9872322891c253b3f5c6f6991dc420))
+* **project:** align deploy timeout with maintenance budget ([d0d7cd1](https://github.com/ajie5419/Quality-Guardian/commit/d0d7cd12c868b6f98bca71bd05e36e3c043a3165))
+
 ## [0.20.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.19.1...qgs-v0.20.0) (2026-07-29)
 
 
