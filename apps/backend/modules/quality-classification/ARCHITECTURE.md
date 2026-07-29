@@ -53,4 +53,4 @@ Management routes require `System:QualityClassification:List` or `System:Quality
 - 历史回填只接受“一级名称 + 二级名称”的唯一精确匹配，并通过 compare-and-set 只补空 ID。已有 ID 与名称证据冲突时不覆盖。
 - 缺少名称、无法匹配和已有 ID 冲突统一写入 `unresolved_master_data_refs`，保留原始名称与 ID 证据，供后续人工处理。
 - 发布维护脚本 `scripts/run-release-maintenance.sh` 在数据库 migration 之后、应用切流之前执行该任务；本地容器初始化复用同一顺序。
-- `AFTER_SALES_PRODUCT:VEHICLE_PRODUCT` 是车辆故障率报表使用的稳定语义编码，报表不得再依赖“车辆产品”显示名称。
+- `AFTER_SALES_PRODUCT:VEHICLE_PRODUCT` 是车辆故障率报表使用的稳定语义编码。报表主路径按该编码解析 canonical ID；仅对尚未回填 ID 的存量记录使用模块声明的不可变历史名称快照精确匹配，不使用可变显示名称作为新数据身份键。

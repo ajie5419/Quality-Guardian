@@ -3,6 +3,7 @@ export {
   QUALITY_CLASSIFICATION_EDIT_PERMISSION,
   QUALITY_CLASSIFICATION_LIST_PERMISSION,
 } from './quality-classification-access';
+export { VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY } from './quality-classification-identities';
 export {
   qualityClassificationCategoryCreateSchema,
   qualityClassificationCategoryUpdateSchema,

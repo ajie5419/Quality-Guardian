@@ -4,7 +4,10 @@ import {
 } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept/dept.service';
-import { QualityClassificationService } from '~/modules/quality-classification';
+import {
+  QualityClassificationService,
+  VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY,
+} from '~/modules/quality-classification';
 import { WorkOrderService } from '~/modules/work-order';
 import { addYearsToDate } from '~/modules/work-order/work-order-query';
 
@@ -13,8 +16,6 @@ import {
   getVehicleFailureManualWarrantyData,
   saveVehicleFailureManualPayload,
 } from './vehicle-failure-rate-manual.service';
-
-const VEHICLE_PRODUCT_CODE = 'VEHICLE_PRODUCT';
 
 interface MonthWindow {
   currentEnd: Date;
@@ -58,8 +59,11 @@ export const VehicleFailureRateService = {
     const vehicleProduct =
       await QualityClassificationService.findHistoricalCategoryByCode(
         QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
-        VEHICLE_PRODUCT_CODE,
+        VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY.code,
       );
+    const productTypeSnapshots = getVehicleProductTypeSnapshots(
+      vehicleProduct?.name,
+    );
     const windows = getMonthWindows(endMonth);
     const manualData = await getVehicleFailureManualData();
     const manualWarrantyData = await getVehicleFailureManualWarrantyData();
@@ -70,12 +74,14 @@ export const VehicleFailureRateService = {
       manualData,
       vehicleDeptIds,
       vehicleProduct?.id || null,
+      productTypeSnapshots,
     );
     const monthlyCounts = await loadMonthlyCounts(
       years,
       endMonth.getMonth(),
       vehicleDeptIds,
       vehicleProduct?.id || null,
+      productTypeSnapshots,
     );
     const monthlyWarrantyCounts = await loadMonthlyWarrantyCounts(
       years,
@@ -130,6 +136,7 @@ export const VehicleFailureRateService = {
           rankingWindow.currentEnd,
           vehicleDeptIds,
           vehicleProduct?.id || null,
+          productTypeSnapshots,
         )
       : [];
 
@@ -151,10 +158,12 @@ async function buildRanking(
   end: Date,
   vehicleDeptIds: string[],
   productCategoryId: null | string,
+  productTypeSnapshots: string[],
 ) {
   const records = await AfterSalesAPI.getVehicleFailureRecords({
     end,
     productCategoryId,
+    productTypeSnapshots,
     start,
     vehicleDeptIds,
   });
@@ -203,6 +212,7 @@ async function loadMonthlyCounts(
   endMonthIndex: number,
   vehicleDeptIds: string[],
   productCategoryId: null | string,
+  productTypeSnapshots: string[],
 ) {
   if (years.length === 0) return new Map<string, number>();
   const startYear = Math.min(...years);
@@ -212,6 +222,7 @@ async function loadMonthlyCounts(
   const records = await AfterSalesAPI.getVehicleFailureRecords({
     end,
     productCategoryId,
+    productTypeSnapshots,
     start,
     vehicleDeptIds,
   });
@@ -382,10 +393,12 @@ async function getDisplayYears(
   manualData: Record<string, number>,
   vehicleDeptIds: string[],
   productCategoryId: null | string,
+  productTypeSnapshots: string[],
 ) {
   const earliestAutoDate = await AfterSalesAPI.findEarliestVehicleFailureDate({
     end: endMonth,
     productCategoryId,
+    productTypeSnapshots,
     vehicleDeptIds,
   });
   const manualYears = Object.keys(manualData)
@@ -402,6 +415,16 @@ async function getDisplayYears(
     { length: selectedYear - startYear + 1 },
     (_, index) => startYear + index,
   );
+}
+
+function getVehicleProductTypeSnapshots(currentName?: null | string) {
+  return [
+    ...new Set(
+      [...VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY.historicalNames, currentName]
+        .map((name) => name?.trim() || '')
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function getMonthWindows(endMonth: Date): MonthWindow[] {

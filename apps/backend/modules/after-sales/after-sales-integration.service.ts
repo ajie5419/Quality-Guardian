@@ -26,6 +26,32 @@ function buildAfterSalesVehicleDivisionWhere(vehicleDeptIds: string[]) {
   };
 }
 
+function buildVehicleFailureSourceWhere(params: {
+  productCategoryId: null | string;
+  productTypeSnapshots: string[];
+  vehicleDeptIds: string[];
+}): Prisma.after_salesWhereInput {
+  const productCategoryId = params.productCategoryId?.trim();
+  const productTypeSnapshots = [
+    ...new Set(params.productTypeSnapshots.map((name) => name.trim())),
+  ].filter(Boolean);
+
+  return {
+    OR: [
+      ...(productCategoryId ? [{ productCategoryId }] : []),
+      ...(productTypeSnapshots.length > 0
+        ? [{ productType: { in: productTypeSnapshots } }]
+        : []),
+      {
+        work_orders: {
+          ...buildAfterSalesVehicleDivisionWhere(params.vehicleDeptIds),
+          isDeleted: false,
+        },
+      },
+    ],
+  };
+}
+
 export const AfterSalesIntegrationService = {
   async findIdBySerialNumber(serialNumber: number) {
     const row = await prisma.after_sales.findFirst({
@@ -174,6 +200,7 @@ export const AfterSalesIntegrationService = {
   async getVehicleFailureRecords(params: {
     end: Date;
     productCategoryId: null | string;
+    productTypeSnapshots: string[];
     start: Date;
     vehicleDeptIds: string[];
   }) {
@@ -186,17 +213,7 @@ export const AfterSalesIntegrationService = {
       where: {
         isDeleted: false,
         occurDate: { gte: params.start, lte: params.end },
-        OR: [
-          ...(params.productCategoryId
-            ? [{ productCategoryId: params.productCategoryId }]
-            : []),
-          {
-            work_orders: {
-              ...buildAfterSalesVehicleDivisionWhere(params.vehicleDeptIds),
-              isDeleted: false,
-            },
-          },
-        ],
+        ...buildVehicleFailureSourceWhere(params),
       },
     });
   },
@@ -204,6 +221,7 @@ export const AfterSalesIntegrationService = {
   async findEarliestVehicleFailureDate(params: {
     end: Date;
     productCategoryId: null | string;
+    productTypeSnapshots: string[];
     vehicleDeptIds: string[];
   }) {
     const row = await prisma.after_sales.findFirst({
@@ -212,17 +230,7 @@ export const AfterSalesIntegrationService = {
       where: {
         isDeleted: false,
         occurDate: { lte: params.end },
-        OR: [
-          ...(params.productCategoryId
-            ? [{ productCategoryId: params.productCategoryId }]
-            : []),
-          {
-            work_orders: {
-              ...buildAfterSalesVehicleDivisionWhere(params.vehicleDeptIds),
-              isDeleted: false,
-            },
-          },
-        ],
+        ...buildVehicleFailureSourceWhere(params),
       },
     });
     return row?.occurDate || null;

@@ -31,6 +31,6 @@
 - `defectCategoryId`、`defectSubcategoryId` 引用 `AFTER_SALES_DEFECT` 分类域；`defectType`、`defectSubtype` 仅保存历史名称快照。
 - 在线新增和更新必须提交四个分类 ID。服务端通过 `QualityClassificationService` 校验两组父子关系，并按 ID 重建全部名称快照，不信任调用方提交的名称。
 - 批量导入允许用一级、二级名称解析，但只能在对应分类域和父分类内精确匹配；缺失或父子不匹配时返回逐行错误。
-- 列表筛选、统计、动态图表和车辆故障率使用新的分类域 ID。旧 `productTypeId`、`productSubtypeId`、`defectTypeId`、`defectSubtypeId` 仅为迁移兼容保留，不再作为新统计的身份键。
+- 列表筛选、统计和动态图表使用新的分类域 ID。车辆故障率以产品分类 ID 为主路径，并对尚未回填 ID 的存量记录精确匹配已声明的历史产品名称快照；旧 `productTypeId`、`productSubtypeId`、`defectTypeId`、`defectSubtypeId` 仅为迁移兼容保留，不再作为新统计的身份键。
 
 通用规则见 `docs/master-data-identity-governance.md`。

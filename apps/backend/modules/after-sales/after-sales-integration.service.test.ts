@@ -382,11 +382,26 @@ describe('after-sales-integration.service', () => {
     const result = await AfterSalesIntegrationService.getVehicleFailureRecords({
       end: new Date('2026-01-31'),
       productCategoryId: 'vehicle-product',
+      productTypeSnapshots: ['车辆产品', 'Vehicle Product', '车辆产品', ''],
       start: new Date('2026-01-01'),
       vehicleDeptIds: ['dept-1'],
     });
 
     expect(result).toHaveLength(1);
+    expect(prisma.after_sales.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            { productCategoryId: 'vehicle-product' },
+            {
+              productType: {
+                in: ['车辆产品', 'Vehicle Product'],
+              },
+            },
+          ]),
+        }),
+      }),
+    );
   });
 
   it('should find earliest vehicle failure date', async () => {
@@ -404,10 +419,21 @@ describe('after-sales-integration.service', () => {
       await AfterSalesIntegrationService.findEarliestVehicleFailureDate({
         end: new Date('2026-01-31'),
         productCategoryId: 'vehicle-product',
+        productTypeSnapshots: ['车辆产品'],
         vehicleDeptIds: [],
       });
 
     expect(result).toEqual(new Date('2026-01-05'));
+    expect(prisma.after_sales.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            { productCategoryId: 'vehicle-product' },
+            { productType: { in: ['车辆产品'] } },
+          ]),
+        }),
+      }),
+    );
   });
 
   it('should return null when no vehicle failure records exist', async () => {
@@ -423,6 +449,7 @@ describe('after-sales-integration.service', () => {
       await AfterSalesIntegrationService.findEarliestVehicleFailureDate({
         end: new Date('2026-01-31'),
         productCategoryId: 'vehicle-product',
+        productTypeSnapshots: ['车辆产品'],
         vehicleDeptIds: [],
       });
 

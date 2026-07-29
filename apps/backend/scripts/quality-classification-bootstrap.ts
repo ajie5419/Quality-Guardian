@@ -2,6 +2,7 @@ import type { QualityClassificationScope } from '@qgs/shared';
 
 import { createId } from '@paralleldrive/cuid2';
 import { QUALITY_CLASSIFICATION_SCOPE } from '@qgs/shared';
+import { VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY } from '~/modules/quality-classification';
 import prisma from '~/utils/prisma';
 
 interface ClassificationSeed {
@@ -73,8 +74,8 @@ export const QUALITY_CLASSIFICATION_SEEDS: ClassificationSeed[] = [
     subcategories: subcategories([['OTHER', '其他']]),
   },
   {
-    code: 'VEHICLE_PRODUCT',
-    name: '车辆产品',
+    code: VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY.code,
+    name: VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY.historicalNames[0],
     scope: QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
     subcategories: subcategories([
       ['FLATBED_TRUCK', '平板车'],

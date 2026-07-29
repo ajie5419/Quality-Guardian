@@ -103,6 +103,7 @@ export const AfterSalesService = {
   async getVehicleFailureRecords(params: {
     end: Date;
     productCategoryId: null | string;
+    productTypeSnapshots: string[];
     start: Date;
     vehicleDeptIds: string[];
   }) {
@@ -112,6 +113,7 @@ export const AfterSalesService = {
   async findEarliestVehicleFailureDate(params: {
     end: Date;
     productCategoryId: null | string;
+    productTypeSnapshots: string[];
     vehicleDeptIds: string[];
   }) {
     return AfterSalesIntegrationService.findEarliestVehicleFailureDate(params);

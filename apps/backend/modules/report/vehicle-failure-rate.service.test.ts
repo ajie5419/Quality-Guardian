@@ -40,6 +40,10 @@ vi.mock('~/modules/quality-classification', () => {
         );
       }),
     },
+    VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY: {
+      code: 'VEHICLE_PRODUCT',
+      historicalNames: ['车辆产品'],
+    },
   };
 });
 
@@ -65,6 +69,25 @@ describe('vehicleFailureRateService', () => {
     expect(result.ranking).toEqual([]);
     expect(result.trend).toBeInstanceOf(Array);
     expect(result.yearSeries).toBeInstanceOf(Array);
+  });
+
+  it('queries vehicle failures by canonical ID and historical snapshots', async () => {
+    const { AfterSalesAPI } = await import('~/modules/after-sales');
+
+    await VehicleFailureRateService.getVehicleFailureRate('2026-03');
+
+    expect(AfterSalesAPI.getVehicleFailureRecords).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productCategoryId: 'vehicle-product',
+        productTypeSnapshots: ['车辆产品', 'Vehicle Product'],
+      }),
+    );
+    expect(AfterSalesAPI.findEarliestVehicleFailureDate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productCategoryId: 'vehicle-product',
+        productTypeSnapshots: ['车辆产品', 'Vehicle Product'],
+      }),
+    );
   });
 
   it('parses month parameter correctly', async () => {
