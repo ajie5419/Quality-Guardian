@@ -111,6 +111,22 @@ describe('reporting identity backfill', () => {
     });
   });
 
+  it('uses a non-empty filter for required after-sales project names', async () => {
+    vi.mocked(prisma.master_projects.findMany).mockResolvedValue([]);
+
+    await backfillReportingProjectIdentities({ batchSize: 10 });
+
+    expect(prisma.after_sales.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          isDeleted: false,
+          projectId: null,
+          projectName: { not: '' },
+        },
+      }),
+    );
+  });
+
   it('repairs a department ID stored in the legacy name column', async () => {
     vi.mocked(prisma.departments.findMany).mockResolvedValue([
       { id: 'dept-1', name: 'Quality' },
@@ -137,6 +153,22 @@ describe('reporting identity backfill', () => {
       },
       data: { respDept: 'Quality', respDeptId: 'dept-1' },
     });
+  });
+
+  it('uses a non-empty filter for required quality-record department names', async () => {
+    vi.mocked(prisma.departments.findMany).mockResolvedValue([]);
+
+    await backfillQualityLossSourceDepartmentIdentities({ batchSize: 10 });
+
+    expect(prisma.quality_records.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          isDeleted: false,
+          responsibleDepartment: { not: '' },
+          responsibleDepartmentId: null,
+        },
+      }),
+    );
   });
 
   it('audits duplicate department names without guessing', async () => {

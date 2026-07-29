@@ -303,7 +303,7 @@ function projectTargets(): IdentityTarget[] {
           where: {
             isDeleted: false,
             projectId: null,
-            projectName: { not: null },
+            projectName: { not: '' },
           },
           orderBy: { id: 'asc' },
           ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -468,7 +468,7 @@ function departmentTargets(): IdentityTarget[] {
         prisma.quality_records.findMany({
           where: {
             isDeleted: false,
-            responsibleDepartment: { not: null },
+            responsibleDepartment: { not: '' },
             responsibleDepartmentId: null,
           },
           orderBy: { id: 'asc' },
