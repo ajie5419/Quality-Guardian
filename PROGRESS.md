@@ -2,8 +2,8 @@
 
 ## 当前状态
 
-- 最新变更: 已修复质量分类 migration 中超过 MySQL 64 字符上限的复合索引名，增加 migration 标识符长度门禁，并在本地 Apple Container 数据库完成迁移、分类初始化与历史回填。生产环境未访问、未修改。
-- 测试状态: Backend full suite `236/236` files and `2243/2243` tests passed；Web full DOM suite `47/47` files and `241/241` tests passed。
+- 最新变更: 已修复班组、工序、项目、责任部门和质量分类治理对质量概览、统计图表、质量损失及周报的影响；补齐报表身份回填、合格率 ID 绑定和治理审计计数，并在本地 Apple Container 数据库完成真实数据验证。生产环境未访问、未修改。
+- 测试状态: 全仓单元测试 `327/327` files and `2834/2834` tests passed；Backend full suite `238/238` files and `2261/2261` tests passed。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
 - 模块 TS 文件数: 552（含测试）
@@ -62,6 +62,7 @@
 - [x] 受控名称 `Map` 键架构门禁 `B-ID9`
 - [x] 质量二级分类开放配置（不合格项缺陷、售后产品、售后缺陷），含 Web/小程序接入、canonical ID 统计、发布初始化和历史回填
 - [x] 质量分类 migration 的 MySQL 长索引名修复、自动化门禁与本地容器数据库恢复
+- [x] 主数据治理后的质量统计与报表修复（概览、过程合格率、售后、质量损失、周报、项目排行及历史身份回填）
 - [ ] 后端业务模块逐功能测试覆盖补齐（进行中）
 
 ## 当前架构
@@ -89,6 +90,7 @@ apps/backend/
 - [ ] 将其他受控主数据从 `DUAL_WRITE/legacy` 逐 wave 推进到在线 `ID-required`
 - [ ] 按生产 V1/V2 流量和 `missing_id_count` 指标删除报检/工单要求 V1 迁移协议
 - [ ] 继续核对尚未登记的动态字段和名称分支路径
+- [ ] 治理售后反馈部门、检验归档、BOM 项目和文档项目剩余的 18 条缺失身份及反馈部门孤儿引用
 - [ ] 通过发布流程部署 TEAM identity migrations，执行有序 reconciliation/category backfill，并核对生产报检排行总数与 unresolved 审计
 - [ ] Deliver the process identity bootstrap and inspection-request option migration through the release workflow, then verify production counts without manual database edits
 - [ ] 通过发布流程部署质量分类 migration 和有序维护脚本，核对三套初始分类、历史回填数量及 unresolved 审计

@@ -25,28 +25,44 @@
 
 ## 执行记录
 
-### 2026-07-29 报表项目与质量损失责任部门身份回填
+### 2026-07-29 主数据治理后的质量统计与报表修复
 
 **执行内容：**
 
+- 修复主数据治理审计将 Prisma `Decimal` 计数误判为 `0` 的问题，确保缺失、孤儿和不一致身份计数可信。
+- 周报改为按责任部门、产品类型和缺陷分类 canonical ID 解析当前名称；无法解析时统一显示“未分配”，不再回退到过期名称快照。
+- 过程合格率九宫格优先使用 `QMS_PASS_RATE_BUCKET_IDENTITIES` 中的工序和班组 ID 绑定，保留历史名称兼容分支；发布维护会输出可直接配置的环境变量建议值。
 - 在既有发布维护入口增加项目 canonical 空表初始化，并回填工单、检验、不合格项、售后、手工损失和调试验收源记录的 `projectId`。
 - 回填售后、手工损失、不合格项和调试验收源记录的责任部门 ID；兼容历史名称快照及误存到名称列的有效部门 ID。
 - 唯一精确匹配才执行带旧值条件的并发安全更新；同名歧义和无匹配写入 `unresolved_master_data_refs`。
 - 保持 `quality_loss_index` 的物化索引边界：先修复四类源表，再由发布后的既有索引重建任务同步，未直接修改索引。
+- 修复回填脚本对 Prisma 必填字符串字段使用 `not: null` 导致的运行时校验错误，并使维护脚本测试可从仓库根目录或后端目录稳定运行。
+- 在本地 Apple Container 数据库执行幂等回填、合格率绑定初始化和质量损失索引重建；未访问或修改生产环境。
 
 **验证结果：**
 
-- 定向 Vitest：`3/3` 文件、`20/20` 测试通过。
+- 全仓单元测试：`327/327` 文件、`2834/2834` 测试通过。
+- Backend full suite：`238/238` 文件、`2261/2261` 测试通过。
 - `pnpm lint`：通过，0 error / 0 warning。
 - `pnpm run check:type`：通过，3/3 workspace tasks。
 - `pnpm run check:qms-arch`：通过，0 violations。
+- 本地数据核对：检验、不合格项、售后、质量损失、调试验收范围内带项目名称但缺少 `projectId` 的目标记录清零；售后和质量损失责任部门缺失 ID 的目标记录清零。
+- 本地统计冒烟：质量概览现场/过程问题为 `3/5`，质量损失总额 `8200`；售后责任部门分布 `3/3` 已解析；质量损失部门分布 `2/2` 已解析；项目问题数为 `3/2`；过程合格率为 `100%/0%/100%`。
 
-**commit:** 本次提交
+**commits：**
+
+- `c0798edc` `fix(@qgs/backend): handle decimal governance counts`
+- `b7ff0d61` `fix(@qgs/backend): resolve weekly report identities`
+- `18fefeba` `fix(@qgs/backend): bind pass rate buckets to identities`
+- `d2b53396` `fix(@qgs/backend): backfill reporting identities`
+- `247d3558` `fix(@qgs/backend): query required reporting fields safely`
+- `878a6473` `test(@qgs/backend): resolve maintenance fixtures from workspace`
 
 **遗留问题：**
 
 - 生产环境未访问、未修改；生产数据将在正式发布时由幂等维护链路处理。
-- 无法唯一解析的历史项目或部门需通过 unresolved 审计后人工处置。
+- 当前全量治理审计仍有 `18` 条不在本次统计归属修复范围内的缺失身份：售后反馈部门 `2` 条、检验归档项目 `12` 条、BOM 项目 `2` 条、文档项目 `2` 条；另有售后反馈部门原始 ID 孤儿记录，需后续专项治理。
+- 过程合格率初始化识别到 `2` 个工序和 `3` 个班组可直接绑定；其余 `6` 个工序和 `4` 个班组不属于九个业务统计桶，继续走历史名称兼容分支。
 
 ### 2026-07-29 质量分类 migration 的 MySQL 索引名修复
 
