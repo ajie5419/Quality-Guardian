@@ -25,6 +25,14 @@
 
 ## 执行记录
 
+## [0.20.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.20.1...qgs-v0.20.2) (2026-07-29)
+
+
+### Bug Fixes
+
+* isolate and coalesce supplier score workers ([48d3e76](https://github.com/ajie5419/Quality-Guardian/commit/48d3e76f7981da73cb1bf98c0cd968e4a6134df1))
+* **project:** isolate supplier score release reconciliation ([5f746b9](https://github.com/ajie5419/Quality-Guardian/commit/5f746b98636b2eb29a752a2177b67c2c377a2392))
+
 ### 2026-07-29 供应商评分发布维护竞态与任务放大修复
 
 **执行内容：**
