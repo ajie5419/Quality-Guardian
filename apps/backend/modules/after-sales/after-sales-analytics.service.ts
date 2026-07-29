@@ -2,6 +2,7 @@ import type { AfterSalesStats, IdentityAggregateItem } from '@qgs/shared';
 import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
 import type { AfterSalesDateMode } from './after-sales-query';
+import type { AfterSalesStatisticsIdentity } from './after-sales-statistics-identity';
 
 import { Prisma } from '@prisma/client';
 import {
@@ -18,6 +19,11 @@ import prisma from '~/utils/prisma';
 
 import { AfterSalesChartAggregationService } from './after-sales-chart-aggregation.service';
 import { buildAfterSalesDateRange } from './after-sales-query';
+import {
+  getAfterSalesStatisticsIdentityKey,
+  getAfterSalesStatisticsSnapshotFields,
+  resolveAfterSalesStatisticsIdentity,
+} from './after-sales-statistics-identity';
 import { normalizeAfterSalesClaimStatus } from './after-sales-status';
 
 const logger = createModuleLogger('AfterSalesAnalyticsService');
@@ -123,18 +129,84 @@ function buildTrendData(input: {
   };
 }
 
+type CountGroup = { _count: { id: number } };
+
+function mergeIdentityCountGroups<T extends CountGroup>(
+  rows: T[],
+  resolveIdentity: (row: T) => AfterSalesStatisticsIdentity,
+) {
+  const groups = new Map<
+    string,
+    { identity: AfterSalesStatisticsIdentity; value: number }
+  >();
+  for (const row of rows) {
+    const identity = resolveIdentity(row);
+    const key = getAfterSalesStatisticsIdentityKey(identity);
+    const current = groups.get(key);
+    groups.set(key, {
+      identity,
+      value: (current?.value || 0) + row._count.id,
+    });
+  }
+  return [...groups.values()];
+}
+
+function requireStatisticsIdentity(
+  dimension: 'defectType' | 'responsibleDept' | 'supplierBrand',
+  row: Parameters<typeof resolveAfterSalesStatisticsIdentity>[1],
+) {
+  const identity = resolveAfterSalesStatisticsIdentity(dimension, row);
+  if (!identity) {
+    throw new TypeError(`Missing statistics identity for ${dimension}`);
+  }
+  if (!identity.id && !identity.rawName && !identity.missingName) {
+    return {
+      ...identity,
+      missingName:
+        dimension === 'defectType'
+          ? QMS_DEFAULT_VALUES.UNCLASSIFIED
+          : QMS_DEFAULT_VALUES.UNASSIGNED,
+    };
+  }
+  return identity;
+}
+
+function toIdentityItems(
+  groups: ReturnType<typeof mergeIdentityCountGroups>,
+  canonicalNames: Map<string, null | string>,
+) {
+  return groups
+    .map(({ identity, value }) =>
+      createIdentityAggregateItem({
+        canonicalName: identity.id ? canonicalNames.get(identity.id) : null,
+        id: identity.id,
+        missingName: identity.missingName,
+        rawName: identity.rawName,
+        resolutionReason: identity.resolutionReason,
+        value,
+      }),
+    )
+    .sort((a, b) => b.value - a.value);
+}
+
 function formatStatsResponse(input: {
   defectNames: Map<string, null | string>;
   defectStats: Array<{
     _count: { id: number };
     defectCategoryId: null | string;
+    defectType: null | string;
   }>;
   deptNames: Map<string, null | string>;
-  deptStats: Array<{ _count: { id: number }; respDeptId: null | string }>;
+  deptStats: Array<{
+    _count: { id: number };
+    respDept: null | string;
+    respDeptId: null | string;
+  }>;
   kpi: { avgTime: number; cost: number; open: number; total: number };
   supplierNames: Map<string, null | string>;
   supplierStats: Array<{
     _count: { id: number };
+    supplierBrand: null | string;
     supplierBrandId: null | string;
   }>;
   trend: {
@@ -147,35 +219,23 @@ function formatStatsResponse(input: {
   return {
     kpi: input.kpi,
     trend: input.trend,
-    defectDistribution: input.defectStats.map((s) =>
-      createIdentityAggregateItem({
-        canonicalName:
-          (s.defectCategoryId && input.defectNames.get(s.defectCategoryId)) ||
-          null,
-        id: s.defectCategoryId,
-        missingName: QMS_DEFAULT_VALUES.UNCLASSIFIED,
-        value: s._count.id,
-      }),
+    defectDistribution: toIdentityItems(
+      mergeIdentityCountGroups(input.defectStats, (row) =>
+        requireStatisticsIdentity('defectType', row),
+      ),
+      input.defectNames,
     ),
-    supplierRanking: input.supplierStats.map((s) =>
-      createIdentityAggregateItem({
-        canonicalName:
-          (s.supplierBrandId && input.supplierNames.get(s.supplierBrandId)) ||
-          null,
-        id: s.supplierBrandId,
-        missingName: '未关联供应商',
-        resolutionReason: s.supplierBrandId ? undefined : 'NOT_APPLICABLE',
-        value: s._count.id,
-      }),
-    ),
-    deptDistribution: input.deptStats.map((s) =>
-      createIdentityAggregateItem({
-        canonicalName:
-          (s.respDeptId && input.deptNames.get(s.respDeptId)) || null,
-        id: s.respDeptId,
-        missingName: QMS_DEFAULT_VALUES.UNASSIGNED,
-        value: s._count.id,
-      }),
+    supplierRanking: toIdentityItems(
+      mergeIdentityCountGroups(input.supplierStats, (row) =>
+        requireStatisticsIdentity('supplierBrand', row),
+      ),
+      input.supplierNames,
+    ).slice(0, 5),
+    deptDistribution: toIdentityItems(
+      mergeIdentityCountGroups(input.deptStats, (row) =>
+        requireStatisticsIdentity('responsibleDept', row),
+      ),
+      input.deptNames,
     ),
   };
 }
@@ -252,22 +312,28 @@ export const AfterSalesAnalyticsService = {
 
       const [defectStats, supplierStats, deptStats] = await Promise.all([
         prisma.after_sales.groupBy({
-          by: ['defectCategoryId'],
+          by: [
+            'defectCategoryId',
+            ...getAfterSalesStatisticsSnapshotFields('defectType'),
+          ],
           where: baseWhere,
           _count: { id: true },
         }),
         prisma.after_sales.groupBy({
-          by: ['supplierBrandId'],
+          by: [
+            'supplierBrandId',
+            ...getAfterSalesStatisticsSnapshotFields('supplierBrand'),
+          ],
           where: baseWhere,
           _count: { id: true },
-          orderBy: { _count: { id: 'desc' } },
-          take: 5,
         }),
         prisma.after_sales.groupBy({
-          by: ['respDeptId'],
+          by: [
+            'respDeptId',
+            ...getAfterSalesStatisticsSnapshotFields('responsibleDept'),
+          ],
           where: baseWhere,
           _count: { id: true },
-          orderBy: { _count: { id: 'desc' } },
         }),
       ]);
 

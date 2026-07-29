@@ -1,4 +1,3 @@
-import { QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('h3', () => ({
@@ -172,13 +171,27 @@ describe('after-sales-analytics.service', () => {
       ]);
     (prisma.after_sales.groupBy as any)
       .mockResolvedValueOnce([
-        { defectCategoryId: 'defect-1', _count: { id: 6 } },
-        { defectCategoryId: 'defect-2', _count: { id: 4 } },
+        {
+          defectCategoryId: 'defect-1',
+          defectType: 'Old mechanical',
+          _count: { id: 6 },
+        },
+        {
+          defectCategoryId: 'defect-2',
+          defectType: 'Old electrical',
+          _count: { id: 4 },
+        },
       ])
       .mockResolvedValueOnce([
-        { supplierBrandId: 'supplier-1', _count: { id: 5 } },
+        {
+          supplierBrand: 'Old supplier',
+          supplierBrandId: 'supplier-1',
+          _count: { id: 5 },
+        },
       ])
-      .mockResolvedValueOnce([{ respDeptId: 'dept-1', _count: { id: 7 } }]);
+      .mockResolvedValueOnce([
+        { respDept: 'Old QA', respDeptId: 'dept-1', _count: { id: 7 } },
+      ]);
     const { MasterDataGovernanceKernel } = await import(
       '~/utils/canonical-master-data'
     );
@@ -229,15 +242,15 @@ describe('after-sales-analytics.service', () => {
     expect(stats.deptDistribution).toHaveLength(1);
     expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ by: ['defectCategoryId'] }),
+      expect.objectContaining({ by: ['defectCategoryId', 'defectType'] }),
     );
     expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ by: ['supplierBrandId'] }),
+      expect.objectContaining({ by: ['supplierBrandId', 'supplierBrand'] }),
     );
     expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
       3,
-      expect.objectContaining({ by: ['respDeptId'] }),
+      expect.objectContaining({ by: ['respDeptId', 'respDept'] }),
     );
   });
 
@@ -264,20 +277,62 @@ describe('after-sales-analytics.service', () => {
       .mockResolvedValueOnce([]);
     (prisma.after_sales.groupBy as any)
       .mockResolvedValueOnce([
-        { defectCategoryId: 'defect-a', _count: { id: 3 } },
-        { defectCategoryId: 'defect-b', _count: { id: 2 } },
-        { defectCategoryId: null, _count: { id: 1 } },
-        { defectCategoryId: 'invalid-defect', _count: { id: 2 } },
+        {
+          defectCategoryId: 'defect-a',
+          defectType: 'Old A',
+          _count: { id: 2 },
+        },
+        {
+          defectCategoryId: 'defect-a',
+          defectType: 'Renamed A',
+          _count: { id: 1 },
+        },
+        {
+          defectCategoryId: 'defect-b',
+          defectType: 'Old B',
+          _count: { id: 2 },
+        },
+        {
+          defectCategoryId: null,
+          defectType: 'Legacy defect',
+          _count: { id: 1 },
+        },
+        {
+          defectCategoryId: 'invalid-defect',
+          defectType: 'Invalid legacy defect',
+          _count: { id: 2 },
+        },
       ])
       .mockResolvedValueOnce([
-        { supplierBrandId: 'supplier-a', _count: { id: 4 } },
-        { supplierBrandId: 'supplier-b', _count: { id: 2 } },
-        { supplierBrandId: null, _count: { id: 1 } },
-        { supplierBrandId: 'invalid-supplier', _count: { id: 1 } },
+        {
+          supplierBrand: 'Old A',
+          supplierBrandId: 'supplier-a',
+          _count: { id: 4 },
+        },
+        {
+          supplierBrand: 'Old B',
+          supplierBrandId: 'supplier-b',
+          _count: { id: 2 },
+        },
+        { supplierBrand: null, supplierBrandId: null, _count: { id: 1 } },
+        {
+          supplierBrand: 'Legacy supplier',
+          supplierBrandId: null,
+          _count: { id: 1 },
+        },
+        {
+          supplierBrand: 'Invalid supplier',
+          supplierBrandId: 'invalid-supplier',
+          _count: { id: 1 },
+        },
       ])
       .mockResolvedValueOnce([
-        { respDeptId: null, _count: { id: 1 } },
-        { respDeptId: 'invalid-dept', _count: { id: 1 } },
+        { respDept: 'Legacy dept', respDeptId: null, _count: { id: 1 } },
+        {
+          respDept: 'Invalid dept',
+          respDeptId: 'invalid-dept',
+          _count: { id: 1 },
+        },
       ]);
     vi.mocked(
       QualityClassificationService.listForManagement,
@@ -327,18 +382,20 @@ describe('after-sales-analytics.service', () => {
         value: 2,
       },
       {
-        id: null,
-        name: QMS_DEFAULT_VALUES.UNCLASSIFIED,
-        resolutionReason: 'MISSING_REQUIRED',
-        resolutionStatus: 'MISSING',
-        value: 1,
-      },
-      {
         id: 'invalid-defect',
-        name: '主数据已失效',
+        name: '主数据已失效：Invalid legacy defect',
+        rawName: 'Invalid legacy defect',
         resolutionReason: 'INVALID_REFERENCE',
         resolutionStatus: 'INVALID',
         value: 2,
+      },
+      {
+        id: null,
+        name: '数据待治理：Legacy defect',
+        rawName: 'Legacy defect',
+        resolutionReason: 'MISSING_REQUIRED',
+        resolutionStatus: 'MISSING',
+        value: 1,
       },
     ]);
     expect(stats.supplierRanking).toEqual([
@@ -362,8 +419,17 @@ describe('after-sales-analytics.service', () => {
         value: 1,
       },
       {
+        id: null,
+        name: '数据待治理：Legacy supplier',
+        rawName: 'Legacy supplier',
+        resolutionReason: 'MISSING_REQUIRED',
+        resolutionStatus: 'MISSING',
+        value: 1,
+      },
+      {
         id: 'invalid-supplier',
-        name: '主数据已失效',
+        name: '主数据已失效：Invalid supplier',
+        rawName: 'Invalid supplier',
         resolutionReason: 'INVALID_REFERENCE',
         resolutionStatus: 'INVALID',
         value: 1,
@@ -372,14 +438,16 @@ describe('after-sales-analytics.service', () => {
     expect(stats.deptDistribution).toEqual([
       {
         id: null,
-        name: QMS_DEFAULT_VALUES.UNASSIGNED,
+        name: '数据待治理：Legacy dept',
+        rawName: 'Legacy dept',
         resolutionReason: 'MISSING_REQUIRED',
         resolutionStatus: 'MISSING',
         value: 1,
       },
       {
         id: 'invalid-dept',
-        name: '主数据已失效',
+        name: '主数据已失效：Invalid dept',
+        rawName: 'Invalid dept',
         resolutionReason: 'INVALID_REFERENCE',
         resolutionStatus: 'INVALID',
         value: 1,

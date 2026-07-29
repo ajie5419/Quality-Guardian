@@ -253,6 +253,57 @@ describe('after-sales payload governance helpers', () => {
     });
   });
 
+  it('allows legacy rows to update non-classification fields without IDs', async () => {
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
+    );
+    vi.mocked(QualityClassificationService.assertSelection).mockClear();
+
+    await expect(
+      buildGovernedAfterSalesUpdateData({
+        customerName: 'Updated customer',
+        defectType: 'Legacy defect snapshot',
+        productType: 'Legacy product snapshot',
+      }),
+    ).resolves.toMatchObject({
+      data: {
+        customerName: 'Updated customer',
+      },
+    });
+    const result = await buildGovernedAfterSalesUpdateData({
+      customerName: 'Updated again',
+      defectType: 'Must not overwrite snapshot',
+    });
+
+    expect(result.data).not.toHaveProperty('defectType');
+    expect(result.data).not.toHaveProperty('productType');
+    expect(QualityClassificationService.assertSelection).not.toHaveBeenCalled();
+  });
+
+  it('requires a complete ID pair when one classification is changed', async () => {
+    await expect(
+      buildGovernedAfterSalesUpdateData({
+        defectCategoryId: 'defect-category',
+      }),
+    ).rejects.toMatchObject({
+      code: 'AFTER_SALES_CLASSIFICATION_REQUIRED',
+    });
+
+    await expect(
+      buildGovernedAfterSalesUpdateData({
+        defectCategoryId: 'defect-category',
+        defectSubcategoryId: 'defect-subcategory',
+      }),
+    ).resolves.toMatchObject({
+      data: {
+        defectCategoryId: 'defect-category',
+        defectSubcategoryId: 'defect-subcategory',
+        defectSubtype: 'Defect Subcategory',
+        defectType: 'Defect',
+      },
+    });
+  });
+
   it('serializes responsibleDepartments and keeps legacy fields on update', async () => {
     await expect(
       buildGovernedAfterSalesUpdateData(

@@ -119,19 +119,61 @@ async function resolveAfterSalesClassifications(
   return { defect, product };
 }
 
+async function resolveAfterSalesClassificationUpdates(
+  body: Record<string, unknown>,
+) {
+  const hasProductInput =
+    body.productCategoryId !== undefined ||
+    body.productSubcategoryId !== undefined;
+  const hasDefectInput =
+    body.defectCategoryId !== undefined ||
+    body.defectSubcategoryId !== undefined;
+  const [product, defect] = await Promise.all([
+    hasProductInput
+      ? resolveSelection(body, {
+          categoryIdField: 'productCategoryId',
+          categoryNameField: 'productType',
+          mode: 'online',
+          scope: QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
+          subcategoryIdField: 'productSubcategoryId',
+          subcategoryNameField: 'productSubtype',
+        })
+      : undefined,
+    hasDefectInput
+      ? resolveSelection(body, {
+          categoryIdField: 'defectCategoryId',
+          categoryNameField: 'defectType',
+          mode: 'online',
+          scope: QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+          subcategoryIdField: 'defectSubcategoryId',
+          subcategoryNameField: 'defectSubtype',
+        })
+      : undefined,
+  ]);
+  return { defect, product };
+}
+
 function buildClassificationData(input: {
-  defect: QualityClassificationSelection;
-  product: QualityClassificationSelection;
+  defect?: QualityClassificationSelection;
+  product?: QualityClassificationSelection;
 }) {
   return {
-    defectCategoryId: input.defect.category.id,
-    defectSubcategoryId: input.defect.subcategory.id,
-    defectSubtype: input.defect.subcategory.name,
-    defectType: input.defect.category.name,
-    productCategoryId: input.product.category.id,
-    productSubcategoryId: input.product.subcategory.id,
-    productSubtype: input.product.subcategory.name,
-    productType: input.product.category.name,
+    ...(input.defect
+      ? {
+          defectCategoryId: input.defect.category.id,
+          defectSubcategoryId: input.defect.subcategory.id,
+          defectSubtype: input.defect.subcategory.name,
+          defectType: input.defect.category.name,
+        }
+      : {}),
+    ...(input.product
+      ? {
+          productCategoryId: input.product.category.id,
+          productSubcategoryId: input.product.subcategory.id,
+          productSubtype: input.product.subcategory.name,
+          productType: input.product.category.name,
+        }
+      : {}),
   };
 }
 
@@ -214,18 +256,17 @@ export async function buildGovernedAfterSalesUpdateData(
   data: Prisma.after_salesUncheckedUpdateInput;
 }> {
   assertAfterSalesPayloadBuilders();
-  const classifications = await resolveAfterSalesClassifications(
-    body,
-    'online',
-  );
+  const classifications = await resolveAfterSalesClassificationUpdates(body);
   const result = buildAfterSalesUpdateData(body) as unknown as {
     costsChanged: boolean;
     data: Prisma.after_salesUncheckedUpdateInput;
   };
-  const data = attachResponsibleDepartmentsToAfterSalesData(body, result.data);
+  const data = withoutLegacyClassificationNames(
+    attachResponsibleDepartmentsToAfterSalesData(body, result.data),
+  ) as Prisma.after_salesUncheckedUpdateInput;
   const canonicalFields = await buildGovernedCanonicalWritePairForTable(
     'after_sales',
-    withoutLegacyClassificationNames(data),
+    data,
   );
   if (Object.hasOwn(data, 'supplierBrand') && !data.supplierBrand) {
     canonicalFields.supplierBrandId = null;
