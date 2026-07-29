@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DictionaryService } from '~/modules/dictionary/dictionary.service';
-import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
@@ -14,12 +13,6 @@ vi.mock('~/utils/prisma', () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
-  },
-}));
-
-vi.mock('~/modules/supplier-identity', () => ({
-  SupplierIdentityService: {
-    assertTeamCanBeRetired: vi.fn(),
   },
 }));
 
@@ -100,6 +93,38 @@ describe('dictionaryService', () => {
     } satisfies Partial<BusinessError>);
 
     expect(prisma.dictionaries.findFirst).not.toHaveBeenCalled();
+    expect(prisma.dictionaries.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects creating TEAM identities through the generic dictionary service', async () => {
+    await expect(
+      DictionaryService.create(
+        {
+          dictKey: 'Team A',
+          dictType: 'team',
+          dictValue: 'Team A',
+        },
+        'tester',
+      ),
+    ).rejects.toMatchObject({
+      code: 'TEAM_REQUIRES_DEDICATED_API',
+      httpStatus: 409,
+    });
+    expect(prisma.dictionaries.findFirst).not.toHaveBeenCalled();
+    expect(prisma.dictionaries.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects the retired process dictionary type', async () => {
+    await expect(
+      DictionaryService.create(
+        {
+          dictKey: 'Welding',
+          dictType: 'inspection_process_name',
+          dictValue: 'Welding',
+        },
+        'tester',
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION' });
     expect(prisma.dictionaries.create).not.toHaveBeenCalled();
   });
 
@@ -202,6 +227,21 @@ describe('dictionaryService', () => {
       dbItems,
       86_400,
     );
+  });
+
+  it('always reads TEAM options from the canonical store', async () => {
+    const teams = [
+      { dictKey: 'Team A', dictValue: 'Team A', id: 'team-1', sort: 1 },
+    ];
+    (redis.get as any).mockResolvedValueOnce([
+      { dictKey: 'Stale team', id: 'team-old' },
+    ]);
+    (prisma.dictionaries.findMany as any).mockResolvedValueOnce(teams);
+
+    await expect(DictionaryService.getOptions('team')).resolves.toEqual(teams);
+
+    expect(redis.get).not.toHaveBeenCalled();
+    expect(redis.set).not.toHaveBeenCalled();
   });
 
   it('rejects blank and unsupported option dictType', async () => {
@@ -332,32 +372,23 @@ describe('dictionaryService', () => {
     expect(redis.del).toHaveBeenCalledWith('qms:dict:options:supplier_status');
   });
 
-  it('rejects deleting an active TEAM supplier identity', async () => {
+  it('rejects deleting TEAM identities through the generic dictionary service', async () => {
     (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
       dictType: 'team',
       id: 'team-1',
       isSystem: false,
     });
-    vi.mocked(
-      SupplierIdentityService.assertTeamCanBeRetired,
-    ).mockRejectedValueOnce(
-      new BusinessError(
-        'TEAM_IDENTITY_LINK_ACTIVE',
-        'TEAM must be unlinked first',
-        409,
-      ),
-    );
 
     await expect(
       DictionaryService.delete('team-1', 'tester'),
     ).rejects.toMatchObject({
-      code: 'TEAM_IDENTITY_LINK_ACTIVE',
+      code: 'TEAM_REQUIRES_DEDICATED_API',
       httpStatus: 409,
     });
     expect(prisma.dictionaries.update).not.toHaveBeenCalled();
   });
 
-  it('rejects disabling an active TEAM supplier identity', async () => {
+  it('rejects updating TEAM identities through the generic dictionary service', async () => {
     (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
       dictKey: 'Team A',
       dictType: 'team',
@@ -366,22 +397,29 @@ describe('dictionaryService', () => {
       sort: 0,
       status: 1,
     });
-    vi.mocked(
-      SupplierIdentityService.assertTeamCanBeRetired,
-    ).mockRejectedValueOnce(
-      new BusinessError(
-        'TEAM_IDENTITY_LINK_ACTIVE',
-        'TEAM must be unlinked first',
-        409,
-      ),
-    );
 
     await expect(
       DictionaryService.update('team-1', { status: 0 }, 'tester'),
     ).rejects.toMatchObject({
-      code: 'TEAM_IDENTITY_LINK_ACTIVE',
+      code: 'TEAM_REQUIRES_DEDICATED_API',
       httpStatus: 409,
     });
+    expect(prisma.dictionaries.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects updating retired process dictionary rows', async () => {
+    (prisma.dictionaries.findFirst as any).mockResolvedValueOnce({
+      dictKey: 'Welding',
+      dictType: 'inspection_process_name',
+      id: 'process-dict-1',
+      isSystem: false,
+      sort: 0,
+      status: 1,
+    });
+
+    await expect(
+      DictionaryService.update('process-dict-1', { status: 0 }, 'tester'),
+    ).rejects.toMatchObject({ code: 'VALIDATION', httpStatus: 400 });
     expect(prisma.dictionaries.update).not.toHaveBeenCalled();
   });
 

@@ -1,9 +1,27 @@
+import type { IdentityAggregateItem } from '@qgs/shared';
+
 import type { ECOption as EChartsOption } from '@vben/plugins/echarts';
 
 import type { ChartConfig, ChartOptionItem } from '../types';
 
+interface IdentityChartDatum extends IdentityAggregateItem {
+  displayName: string;
+  identityKey: string;
+}
+
+interface EChartsIdentityDatum {
+  displayName: string;
+  id?: string;
+  identityKey: string;
+  name: string;
+  resolutionStatus: IdentityAggregateItem['resolutionStatus'];
+  value: number;
+}
+
+const TIME_DIMENSIONS = new Set(['reportMonth']);
+
 export function buildChartOptionFromAggregated(
-  data: Array<{ name: string; value: number }>,
+  data: IdentityAggregateItem[],
   config: ChartConfig,
   metricOptions: ChartOptionItem[],
 ): EChartsOption | null {
@@ -11,19 +29,35 @@ export function buildChartOptionFromAggregated(
     return null;
   }
   const normalized = data
-    .map((item) => ({
-      name: String(item.name || 'Unknown'),
-      value: Number(item.value || 0),
-    }))
+    .map((item) => normalizeIdentityDatum(item))
     .sort((a, b) => compareChartRows(a, b, config));
   return generateChartOption(normalized, config, metricOptions);
 }
 
-const TIME_DIMENSIONS = new Set(['reportMonth']);
+function normalizeIdentityDatum(
+  item: IdentityAggregateItem,
+): IdentityChartDatum {
+  const displayName = String(item.name || '数据待治理');
+  const identityKey = item.id
+    ? `${item.resolutionStatus}:${item.id}`
+    : [
+        item.resolutionStatus,
+        item.resolutionReason || 'MISSING_REQUIRED',
+        String(item.rawName || '').trim() || displayName,
+      ].join(':');
+  return {
+    displayName,
+    id: item.id,
+    identityKey,
+    name: displayName,
+    resolutionStatus: item.resolutionStatus,
+    value: Number(item.value || 0),
+  };
+}
 
 function compareChartRows(
-  a: { name: string; value: number },
-  b: { name: string; value: number },
+  a: IdentityChartDatum,
+  b: IdentityChartDatum,
   config: ChartConfig,
 ) {
   if (TIME_DIMENSIONS.has(config.dimension)) {
@@ -55,7 +89,6 @@ function parseTimeLabel(value: string) {
   return Number.isNaN(dateValue) ? Number.MAX_SAFE_INTEGER : dateValue;
 }
 
-// Modern color palette
 const COLOR_PALETTE = [
   '#3b82f6',
   '#06b6d4',
@@ -69,22 +102,39 @@ const COLOR_PALETTE = [
   '#f97316',
 ];
 
-/**
- * Generate ECharts Option
- */
+function toEChartsDatum(item: IdentityChartDatum): EChartsIdentityDatum {
+  return {
+    displayName: item.displayName,
+    ...(item.id ? { id: item.id } : {}),
+    identityKey: item.identityKey,
+    name: item.identityKey,
+    resolutionStatus: item.resolutionStatus,
+    value: item.value,
+  };
+}
+
 function generateChartOption(
-  data: { name: string; value: number }[],
+  data: IdentityChartDatum[],
   config: ChartConfig,
   metricOptions: ChartOptionItem[],
-): any {
+): EChartsOption {
   const metricLabel =
     metricOptions.find((m) => m.value === config.metric)?.label ||
     config.metric;
+  const datumByKey = new Map(data.map((item) => [item.identityKey, item]));
+  const getDisplayName = (identityKey: string) =>
+    datumByKey.get(identityKey)?.displayName || identityKey;
+  const truncateDisplayName = (identityKey: string) => {
+    const displayName = getDisplayName(identityKey);
+    return displayName.length > 10
+      ? `${displayName.slice(0, 10)}...`
+      : displayName;
+  };
 
   const commonGrid = {
     left: 20,
     right: 20,
-    bottom: 30, // 增加底部边距，防止旋转的 X 轴标签被截断
+    bottom: 30,
     top: 40,
     containLabel: true,
   };
@@ -93,34 +143,33 @@ function generateChartOption(
     interval: 0,
     rotate: data.length > 5 ? 30 : 0,
     color: '#6b7280',
-    formatter: (value: string) => {
-      // 超过 10 个字符截断，防止 X 轴标签过长导致显示不全
-      return value.length > 10 ? `${value.slice(0, 10)}...` : value;
-    },
+    formatter: truncateDisplayName,
   };
 
-  const formatCategoryTooltip = (params: any) => {
+  const formatCategoryTooltip = (params: unknown) => {
     const items = Array.isArray(params) ? params : [params];
-    const first = items[0] || {};
-    const category =
-      first.axisValueLabel || first.axisValue || first.name || '';
-    const lines = category ? [String(category)] : [];
+    const first = (items[0] || {}) as Record<string, unknown>;
+    const identityKey = String(
+      first.axisValue || first.name || first.axisValueLabel || '',
+    );
+    const category = getDisplayName(identityKey);
+    const lines = category ? [category] : [];
 
-    for (const item of items) {
-      const marker = item.marker || '';
-      const name = item.seriesName || metricLabel;
-      const value = Array.isArray(item.value)
-        ? item.value[item.value.length - 1]
-        : item.value;
-      lines.push(`${marker}${name}: ${value}`);
+    for (const rawItem of items) {
+      const item = rawItem as Record<string, unknown>;
+      const marker = String(item.marker || '');
+      const name = String(item.seriesName || metricLabel);
+      const itemData = item.data as Record<string, unknown> | undefined;
+      const value = itemData?.value ?? item.value;
+      lines.push(`${marker}${name}: ${String(value ?? '')}`);
     }
 
     return lines.join('<br/>');
   };
 
   const commonTooltip = {
-    trigger: 'axis',
-    axisPointer: { type: 'line' },
+    trigger: 'axis' as const,
+    axisPointer: { type: 'line' as const },
     formatter: formatCategoryTooltip,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderColor: '#e5e7eb',
@@ -132,24 +181,27 @@ function generateChartOption(
   };
 
   const commonAxis = {
-    axisLine: { show: false }, // Hide axis line
-    axisTick: { show: false }, // Hide ticks
+    axisLine: { show: false },
+    axisTick: { show: false },
     axisLabel: { color: '#6b7280', fontSize: 12 },
     splitLine: {
       show: true,
-      lineStyle: { type: 'dashed', color: '#f3f4f6' },
+      lineStyle: { type: 'dashed' as const, color: '#f3f4f6' },
     },
   };
+  const seriesData = data.map((item) => toEChartsDatum(item));
 
-  // Bar Chart
   if (config.chartType === 'bar') {
     return {
-      tooltip: { ...commonTooltip, axisPointer: { type: 'shadow' } },
+      tooltip: {
+        ...commonTooltip,
+        axisPointer: { type: 'shadow' as const },
+      },
       grid: commonGrid,
       color: COLOR_PALETTE,
       xAxis: {
         type: 'category',
-        data: data.map((d) => d.name),
+        data: data.map((item) => item.identityKey),
         axisLabel: commonAxisLabel,
         axisTick: { show: false },
         axisLine: { lineStyle: { color: '#e5e7eb' } },
@@ -168,10 +220,10 @@ function generateChartOption(
         {
           name: metricLabel,
           type: 'bar',
-          data: data.map((d) => d.value),
-          barMaxWidth: 40, // Prevent overly wide bars
+          data: seriesData,
+          barMaxWidth: 40,
           itemStyle: {
-            borderRadius: [4, 4, 0, 0], // Top rounded corners
+            borderRadius: [4, 4, 0, 0],
             color: {
               type: 'linear',
               x: 0,
@@ -179,8 +231,8 @@ function generateChartOption(
               x2: 0,
               y2: 1,
               colorStops: [
-                { offset: 0, color: '#60a5fa' }, // Light Blue
-                { offset: 1, color: '#2563eb' }, // Dark Blue
+                { offset: 0, color: '#60a5fa' },
+                { offset: 1, color: '#2563eb' },
               ],
             },
           },
@@ -195,7 +247,6 @@ function generateChartOption(
     };
   }
 
-  // Line Chart
   if (config.chartType === 'line') {
     return {
       tooltip: commonTooltip,
@@ -204,7 +255,7 @@ function generateChartOption(
       xAxis: {
         type: 'category',
         boundaryGap: false,
-        data: data.map((d) => d.name),
+        data: data.map((item) => item.identityKey),
         axisLabel: commonAxisLabel,
         axisTick: { show: false },
         axisLine: { lineStyle: { color: '#e5e7eb' } },
@@ -226,9 +277,9 @@ function generateChartOption(
           smooth: true,
           symbol: 'circle',
           symbolSize: 6,
-          showSymbol: false, // Only show on hover
+          showSymbol: false,
           lineStyle: { width: 3, color: '#3b82f6' },
-          data: data.map((d) => d.value),
+          data: seriesData,
           areaStyle: {
             color: {
               type: 'linear',
@@ -248,62 +299,69 @@ function generateChartOption(
     };
   }
 
-  // Pie/Ring Chart
-  if (config.chartType === 'pie' || config.chartType === 'ring') {
-    const isRing = config.chartType === 'ring';
-    return {
-      tooltip: {
-        trigger: 'item',
-        formatter: '{b}: {c} ({d}%)',
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderColor: '#e5e7eb',
-        textStyle: { color: '#374151' },
-        extraCssText: commonTooltip.extraCssText,
+  const isRing = config.chartType === 'ring';
+  return {
+    tooltip: {
+      trigger: 'item',
+      formatter: (params: unknown) => {
+        const item = params as {
+          data?: Partial<EChartsIdentityDatum>;
+          percent?: number;
+        };
+        const displayName = String(item.data?.displayName || '数据待治理');
+        return `${displayName}: ${String(item.data?.value ?? '')} (${Number(item.percent || 0)}%)`;
       },
-      color: COLOR_PALETTE,
-      legend: {
-        orient: 'vertical',
-        right: 10,
-        top: 'middle',
-        type: 'scroll',
-        icon: 'circle',
-        itemWidth: 8,
-        itemHeight: 8,
-        textStyle: { color: '#6b7280' },
-      },
-      series: [
-        {
-          name: metricLabel,
-          type: 'pie',
-          radius: isRing ? ['50%', '75%'] : ['0%', '75%'],
-          center: ['40%', '50%'], // Shift left to make room for legend
-          data,
-          itemStyle: {
-            borderRadius: 5,
-            borderColor: '#fff',
-            borderWidth: 2,
-          },
-          label: {
-            show: false, // Cleaner look, rely on tooltip and legend
-            position: 'center',
-          },
-          emphasis: {
-            label: {
-              show: isRing, // Only show center label for Ring chart on hover
-              fontSize: 16,
-              fontWeight: 'bold',
-              color: '#374151',
-            },
-            itemStyle: {
-              shadowBlur: 10,
-              shadowOffsetX: 0,
-              shadowColor: 'rgba(0, 0, 0, 0.2)',
-            },
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      borderColor: '#e5e7eb',
+      textStyle: { color: '#374151' },
+      extraCssText: commonTooltip.extraCssText,
+    },
+    color: COLOR_PALETTE,
+    legend: {
+      orient: 'vertical',
+      right: 10,
+      top: 'middle',
+      type: 'scroll',
+      icon: 'circle',
+      itemWidth: 8,
+      itemHeight: 8,
+      formatter: getDisplayName,
+      textStyle: { color: '#6b7280' },
+    },
+    series: [
+      {
+        name: metricLabel,
+        type: 'pie',
+        radius: isRing ? ['50%', '75%'] : ['0%', '75%'],
+        center: ['40%', '50%'],
+        data: seriesData,
+        itemStyle: {
+          borderRadius: 5,
+          borderColor: '#fff',
+          borderWidth: 2,
+        },
+        label: {
+          show: false,
+          position: 'center',
+          formatter: (params: unknown) => {
+            const item = params as { data?: Partial<EChartsIdentityDatum> };
+            return String(item.data?.displayName || '数据待治理');
           },
         },
-      ],
-    };
-  }
-
-  return {};
+        emphasis: {
+          label: {
+            show: isRing,
+            fontSize: 16,
+            fontWeight: 'bold',
+            color: '#374151',
+          },
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.2)',
+          },
+        },
+      },
+    ],
+  };
 }

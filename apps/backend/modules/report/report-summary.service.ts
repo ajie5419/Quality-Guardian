@@ -1,18 +1,20 @@
 import {
+  createIdentityAggregateItem,
   parseReportPeriodType,
+  QUALITY_CLASSIFICATION_SCOPE,
   resolveReportPeriodRange,
   resolveReportShortLabel,
   shiftReportAnchorDate,
 } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { InspectionService } from '~/modules/inspection';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { QualityLossService } from '~/modules/quality-loss';
 import {
   createPassRateTargetResolver,
   getNetPassRateSummaryByRange,
   getPassRateDrillDownByRange,
 } from '~/modules/report/pass-rate';
-import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 
 import { ReportDailySummaryService } from './report-daily-summary.service';
 import { ReportQueryValidationError } from './report-query-validation-error';
@@ -95,10 +97,7 @@ export const ReportSummaryService = {
         },
       ],
       historyLabels: periods.map((p) => formatDateShort(p.start, type)),
-      defects: defects.map((d) => ({
-        name: d.defectType || '未分类',
-        value: d._count,
-      })),
+      defects,
       processPassRates,
       topProjects: topRiskProjects.map((p) => ({
         name: p.projectName || '未知项目',
@@ -192,27 +191,36 @@ async function fetchProcessPassRates(start: Date, end: Date) {
 
 async function fetchDefectDistribution(start: Date, end: Date) {
   const rows = await InspectionService.getReportDefectRows({ start, end });
-  const defectTypeNameById =
-    await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-      configKey: 'defectType',
-      canonicalIds: rows.map((item) => item.defectTypeId),
-    });
-  const countByDefectType = new Map<string, number>();
+  const groups = new Map<
+    string,
+    { id: null | string; rawName: null | string; value: number }
+  >();
   for (const row of rows) {
-    const key =
-      defectTypeNameById.get(String(row.defectTypeId || '')) ||
-      String(row.defectType || '').trim() ||
-      '未分类';
-    countByDefectType.set(key, (countByDefectType.get(key) || 0) + 1);
+    const id = String(row.defectCategoryId || '').trim() || null;
+    const rawName = String(row.defectType || '').trim() || null;
+    const key = id ? `id:${id}` : `missing:${rawName || ''}`;
+    const current = groups.get(key);
+    groups.set(key, {
+      id,
+      rawName: current?.rawName || rawName,
+      value: (current?.value || 0) + 1,
+    });
   }
-  return [...countByDefectType.entries()]
-    .map(([defectType, count]) => ({
-      defectType,
-      _count: {
-        defectType: count,
-      },
-    }))
-    .sort((a, b) => b._count.defectType - a._count.defectType)
+  const defectTypeNameById =
+    await QualityClassificationService.resolveCategoryNamesByIds(
+      QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+      [...groups.values()].map((item) => item.id),
+    );
+  return [...groups.values()]
+    .map(({ id, rawName, value }) =>
+      createIdentityAggregateItem({
+        canonicalName: id ? defectTypeNameById.get(id) : null,
+        id,
+        rawName,
+        value,
+      }),
+    )
+    .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 }
 

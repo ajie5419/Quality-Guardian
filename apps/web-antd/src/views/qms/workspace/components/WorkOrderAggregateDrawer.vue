@@ -12,7 +12,6 @@ import { IconifyIcon } from '@vben/icons';
 import { useI18n } from '@vben/locales';
 import { useAccessStore } from '@vben/stores';
 
-import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import {
   Alert,
   Button,
@@ -30,6 +29,8 @@ import {
   Upload,
 } from 'ant-design-vue';
 
+import { getPublicInspectionRequestBomParts } from '#/api/qms/inspection-request';
+import { getBomProcessOptions } from '#/api/qms/planning';
 import {
   confirmWorkOrderRequirement,
   deleteWorkOrderRequirement,
@@ -41,9 +42,6 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import TeamSelect from '#/views/qms/inspection/records/components/form/TeamSelect.vue';
-import { mapDictionaryOptionsToInspectionProcess } from '#/views/qms/inspection/records/config';
-import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
-import { cloneInspectionProcessFallbackOptions } from '#/views/qms/shared/constants/inspection-process-fallback';
 import {
   applyUploadResponse,
   normalizeUploadFile,
@@ -79,13 +77,9 @@ const { canCreate, canDelete, canEdit } = useQmsPermissions('QMS:WorkOrder');
 const { modalWidth, modalWrapClassName } = useAdaptivePopup();
 const accessStore = useAccessStore();
 
-const { options: processOptions, loadOptions: loadInspectionProcessOptions } =
-  useDictionaryOptions({
-    dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
-    fallbackOptions: cloneInspectionProcessFallbackOptions(),
-    mapOptions: (options, fallbackOptions) =>
-      mapDictionaryOptionsToInspectionProcess(options, fallbackOptions),
-  });
+const processIdentityOptions = ref<Array<{ label: string; value: string }>>([]);
+const partIdentityOptions = ref<Array<{ label: string; value: string }>>([]);
+const partIdentityLoading = ref(false);
 const uploadHeaders = computed(() => ({
   Authorization: `Bearer ${accessStore.accessToken}`,
 }));
@@ -94,13 +88,15 @@ const requirementFilter = ref<RequirementFilter>('all');
 const savingRequirement = ref(false);
 const mutatingRequirementId = ref('');
 const editingRequirementId = ref('');
+const originalPartId = ref('');
+const originalProcessId = ref('');
 const originalRequirementItems = ref<unknown[]>([]);
 const originalRequirementItemsText = ref('');
 const requirementModalVisible = ref(false);
 const requirementForm = ref({
   attachments: [] as UploadFile[],
-  partName: '',
-  processName: '',
+  partId: '',
+  processId: '',
   requirementItemsText: '',
   requirementName: '',
   responsiblePerson: '',
@@ -236,23 +232,53 @@ function formatCoverageProgress(
   return `${Math.min(covered, total)}/${total}`;
 }
 
-function openRequirementModal(record?: WorkOrderRequirement) {
+async function openRequirementModal(record?: WorkOrderRequirement) {
   editingRequirementId.value = record?.id || '';
+  originalPartId.value = record?.partId || '';
+  originalProcessId.value = record?.processId || '';
   originalRequirementItems.value = record?.items || [];
   originalRequirementItemsText.value = formatWorkOrderRequirementItems(
     originalRequirementItems.value,
   );
   requirementForm.value = {
     attachments: record ? mapAttachmentsToUploadFiles(record) : [],
-    partName: record?.partName || '',
-    processName: record?.processName || '',
+    partId: originalPartId.value,
+    processId: originalProcessId.value,
     requirementItemsText: originalRequirementItemsText.value,
     requirementName: record?.requirementName || '',
     responsiblePerson: record?.responsiblePerson || '',
     responsibleTeam: record?.responsibleTeam || '',
     responsibleTeamId: record?.responsibleTeamId || '',
   };
+  await loadRequirementPartOptions();
   requirementModalVisible.value = true;
+}
+
+async function loadRequirementPartOptions() {
+  const workOrderNumber = props.workOrderNumber.trim();
+  if (!workOrderNumber) {
+    partIdentityOptions.value = [];
+    return;
+  }
+  partIdentityLoading.value = true;
+  try {
+    const parts = await getPublicInspectionRequestBomParts({ workOrderNumber });
+    const identities = new Map<string, string>();
+    for (const part of parts) {
+      const partId = String(part.partId || '').trim();
+      const partName = String(part.partName || '').trim();
+      if (partId && partName) identities.set(partId, partName);
+    }
+    partIdentityOptions.value = [...identities].map(([value, label]) => ({
+      label,
+      value,
+    }));
+  } catch (error) {
+    partIdentityOptions.value = [];
+    handleApiError(error, 'Load Work Order Part Identities');
+  } finally {
+    partIdentityLoading.value = false;
+  }
 }
 
 function mapAttachmentsToUploadFiles(record: WorkOrderRequirement) {
@@ -270,7 +296,7 @@ function editRequirement(record: Record<string, unknown>) {
   const requirement = props.aggregateData?.requirements.find(
     (item) => item.id === String(record.id || ''),
   );
-  if (requirement) openRequirementModal(requirement);
+  if (requirement) void openRequirementModal(requirement);
 }
 
 async function submitRequirement() {
@@ -299,13 +325,21 @@ async function submitRequirement() {
   savingRequirement.value = true;
   try {
     if (editingRequirementId.value) {
+      const identityUpdates = {
+        ...(requirementForm.value.partId === originalPartId.value
+          ? {}
+          : { partId: requirementForm.value.partId || null }),
+        ...(requirementForm.value.processId === originalProcessId.value
+          ? {}
+          : { processId: requirementForm.value.processId || null }),
+      };
       await updateWorkOrderRequirement(editingRequirementId.value, {
         attachments: normalizeAttachmentPayload(
           requirementForm.value.attachments,
         ),
+        identityContractVersion: 2,
+        ...identityUpdates,
         items,
-        partName: requirementForm.value.partName.trim() || null,
-        processName: requirementForm.value.processName.trim() || null,
         requirementName,
         responsiblePerson:
           requirementForm.value.responsiblePerson.trim() || null,
@@ -320,9 +354,10 @@ async function submitRequirement() {
             attachments: normalizeAttachmentPayload(
               requirementForm.value.attachments,
             ),
+            identityContractVersion: 2,
             items,
-            partName: requirementForm.value.partName.trim() || undefined,
-            processName: requirementForm.value.processName.trim() || undefined,
+            partId: requirementForm.value.partId || undefined,
+            processId: requirementForm.value.processId || undefined,
             requirementName,
             responsiblePerson:
               requirementForm.value.responsiblePerson.trim() || undefined,
@@ -429,7 +464,14 @@ function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
 }
 
 onMounted(() => {
-  void loadInspectionProcessOptions();
+  void getBomProcessOptions()
+    .then((options) => {
+      processIdentityOptions.value = options;
+    })
+    .catch((error: unknown) => {
+      processIdentityOptions.value = [];
+      handleApiError(error, 'Load Process Identities');
+    });
 });
 </script>
 
@@ -755,7 +797,7 @@ onMounted(() => {
                   <div class="process-tag-list">
                     <Tag
                       v-for="process in record.processes"
-                      :key="`${record.id}-${process.processName}`"
+                      :key="`${record.id}-${process.processId || process.processResolutionStatus}`"
                       :color="getProcessProgressColor(process.status)"
                     >
                       {{
@@ -777,11 +819,11 @@ onMounted(() => {
                 <template v-else-if="column.key === 'teams'">
                   <div v-if="record.teams?.length" class="team-tag-list">
                     <Tag
-                      v-for="team in record.teams"
-                      :key="`${record.id}-${team}`"
+                      v-for="(team, teamIndex) in record.teams"
+                      :key="`${record.id}-${team.id || `${team.resolutionStatus}-${teamIndex}`}`"
                       color="blue"
                     >
-                      {{ team }}
+                      {{ team.name }}
                     </Tag>
                   </div>
                   <span v-else class="text-gray-400">-</span>
@@ -812,15 +854,19 @@ onMounted(() => {
           />
         </Form.Item>
         <Form.Item label="部件名称">
-          <Input
-            v-model:value="requirementForm.partName"
-            placeholder="例如：底盘总成"
+          <Select
+            v-model:value="requirementForm.partId"
+            :options="partIdentityOptions"
+            :loading="partIdentityLoading"
+            placeholder="请选择BOM部件"
+            show-search
+            allow-clear
           />
         </Form.Item>
         <Form.Item label="工序">
           <Select
-            v-model:value="requirementForm.processName"
-            :options="processOptions"
+            v-model:value="requirementForm.processId"
+            :options="processIdentityOptions"
             placeholder="请选择工序"
             show-search
             allow-clear

@@ -1,5 +1,4 @@
-import { cloneInspectionProcessFallbackOptions } from '../../../shared/constants/inspection-process-fallback';
-import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
+import type { LocationQuery, LocationQueryRaw } from 'vue-router';
 
 export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
 
@@ -33,12 +32,27 @@ type TeamOptionSource = {
 };
 
 type BomPartOptionSource = {
+  partId?: null | string;
   partName: string;
   partNumber?: null | string;
 };
 
 export function isIncomingInspectionEntryPath(path: string) {
   return path.includes('/incoming-entry');
+}
+
+export function buildInspectionRequestPostSubmitQuery(
+  query: LocationQuery,
+): LocationQueryRaw {
+  const nextQuery: LocationQueryRaw = { ...query };
+  delete nextQuery.componentName;
+  delete nextQuery.partId;
+  delete nextQuery.partName;
+  delete nextQuery.processId;
+  delete nextQuery.processName;
+  delete nextQuery.reporter;
+  delete nextQuery.team;
+  return nextQuery;
 }
 
 export function mapInspectionRequestEntryWorkOrderOptions(
@@ -76,30 +90,42 @@ export function mapInspectionRequestEntryBomPartOptions(
 ) {
   const parts = new Map<string, BomPartOptionSource>();
   for (const item of items || []) {
+    const partId = String(item.partId || '').trim();
     const partName = String(item.partName || '').trim();
-    if (partName) parts.set(partName, item);
+    if (partId && partName) parts.set(partId, item);
   }
-  return [...parts.values()].map((item) => ({
+  return [...parts].map(([partId, item]) => ({
     label: item.partNumber
       ? `${item.partName} (${item.partNumber})`
       : item.partName,
-    value: item.partName,
+    partName: item.partName,
+    value: partId,
   }));
 }
 
 export function buildInspectionRequestEntryProcessOptions(
-  dictionaryOptions: Array<{ label: string; value: string }>,
-  workOrderOptions: Array<{ label: string; value: string }>,
+  workOrderProcesses: Array<{
+    category: 'INCOMING' | 'PROCESS';
+    processId: string;
+    processName: string;
+  }>,
+  category: 'INCOMING' | 'PROCESS',
 ) {
-  const map = new Map<string, { label: string; value: string }>();
-  for (const option of mapDictionaryOptionsToInspectionProcess(
-    undefined,
-    cloneInspectionProcessFallbackOptions(),
-  )) {
-    map.set(option.value, option);
+  const map = new Map<
+    string,
+    { label: string; processName: string; value: string }
+  >();
+  for (const item of workOrderProcesses) {
+    if (item.category !== category) continue;
+    const processId = String(item.processId || '').trim();
+    const processName = String(item.processName || '').trim();
+    if (!processId || !processName) continue;
+    map.set(processId, {
+      label: processName,
+      processName,
+      value: processId,
+    });
   }
-  for (const option of dictionaryOptions) map.set(option.value, option);
-  for (const option of workOrderOptions) map.set(option.value, option);
   return [...map.values()];
 }
 
@@ -111,7 +137,7 @@ export function getInspectionRequestEntryCopy(isIncoming: boolean) {
         attachmentUploadName: '来料资料',
         componentLabel: '组件名称',
         partLabel: '物料名称',
-        partPlaceholder: '请输入物料名称',
+        partPlaceholder: '请选择BOM物料',
         processLabel: '检验类型',
         shellTitle: '进货检验扫码报检',
         submitSuccessPrefix: '进货检验任务已提交',

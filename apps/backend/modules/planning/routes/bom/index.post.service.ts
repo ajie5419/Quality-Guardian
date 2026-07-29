@@ -8,11 +8,18 @@ import {
   projectBomItemSelect,
 } from '~/modules/planning/bom';
 import {
+  replaceBomRequiredProcessIdentities,
+  resolveBomRequiredProcessIdentities,
+} from '~/modules/planning/bom-process-identities';
+import {
   applyGovernedProjectNameByTable,
   upsertPlanningProjectByWorkOrder,
 } from '~/modules/planning/planning-project';
 import { logApiError } from '~/utils/api-logger';
-import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
+import {
+  buildGovernedCanonicalWritePairForTable,
+  buildGovernedWriteFieldsForTable,
+} from '~/utils/governed-write';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 
@@ -64,17 +71,37 @@ export async function bom_index_post(event: H3Event) {
       return internalServerErrorResponse(event, 'BOM 项目状态异常');
     }
 
-    const newItemPayload = buildProjectBomCreateData(workOrderNumber, body);
+    const processIdentities = await resolveBomRequiredProcessIdentities(body);
+    const newItemPayload = buildProjectBomCreateData(workOrderNumber, {
+      ...body,
+      requiredProcesses: processIdentities.map((item) => item.processName),
+    });
     const governedBomPayload = buildGovernedWriteFieldsForTable(
       'project_boms',
       newItemPayload,
     );
-    const newItem = await prisma.project_boms.create({
-      data: {
-        ...newItemPayload,
-        ...governedBomPayload,
-      },
-      select: projectBomItemSelect,
+    const canonicalBomPayload = await buildGovernedCanonicalWritePairForTable(
+      'project_boms',
+      { ...governedBomPayload, partId: body.partId },
+    );
+    const newItem = await prisma.$transaction(async (tx) => {
+      const created = await tx.project_boms.create({
+        data: {
+          ...newItemPayload,
+          ...governedBomPayload,
+          ...canonicalBomPayload,
+        },
+        select: { id: true },
+      });
+      await replaceBomRequiredProcessIdentities(
+        tx,
+        created.id,
+        processIdentities,
+      );
+      return tx.project_boms.findUniqueOrThrow({
+        where: { id: created.id },
+        select: projectBomItemSelect,
+      });
     });
 
     return useResponseSuccess({

@@ -61,6 +61,10 @@ export function buildAfterSalesCreateData(
     normalizeNumber(body.laborTravelCost, { fallback: 0 }) || 0;
 
   const supplierBrandId = normalizeString(body.supplierBrandId);
+  const productCategoryId = normalizeString(body.productCategoryId);
+  const productSubcategoryId = normalizeString(body.productSubcategoryId);
+  const defectCategoryId = normalizeString(body.defectCategoryId);
+  const defectSubcategoryId = normalizeString(body.defectSubcategoryId);
 
   return {
     id: options.id,
@@ -76,6 +80,8 @@ export function buildAfterSalesCreateData(
     location: normalizeString(body.location),
     productType: normalizeString(body.productType),
     productSubtype: normalizeString(body.productSubtype),
+    productCategoryId: productCategoryId || null,
+    productSubcategoryId: productSubcategoryId || null,
     factoryDate: normalizeDate(body.factoryDate) || null,
     closeDate: normalizeDate(body.closeDate) || null,
     warrantyStatus: normalizeString(body.warrantyStatus),
@@ -87,6 +93,8 @@ export function buildAfterSalesCreateData(
     laborTravelCost,
     defectType: normalizeString(body.defectType),
     defectSubtype: normalizeString(body.defectSubtype),
+    defectCategoryId: defectCategoryId || null,
+    defectSubcategoryId: defectSubcategoryId || null,
     failureType: normalizeString(body.failureType),
     failureCause: normalizeString(body.failureCause),
     severity: normalizeString(body.severity),
@@ -161,6 +169,17 @@ export function buildAfterSalesUpdateData(body: AfterSalesBody): {
 
   if (body.supplierBrandId !== undefined) {
     data.supplierBrandId = normalizeString(body.supplierBrandId) || null;
+  }
+
+  for (const field of [
+    'productCategoryId',
+    'productSubcategoryId',
+    'defectCategoryId',
+    'defectSubcategoryId',
+  ]) {
+    if (body[field] !== undefined) {
+      data[field] = normalizeString(body[field]) || null;
+    }
   }
 
   if (body.isClaim !== undefined) {

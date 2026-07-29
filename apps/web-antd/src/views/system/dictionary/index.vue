@@ -28,6 +28,11 @@ import {
   getDictionaryList,
   updateDictionary,
 } from '#/api/system/dictionary';
+import {
+  createTeamIdentity,
+  retireTeamIdentity,
+  updateTeamIdentity,
+} from '#/api/system/team';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useDictionaryTypeOptions } from '#/views/system/dictionary/composables/useDictionaryTypeOptions';
 
@@ -65,7 +70,6 @@ const dictTypeLabelMap = computed(
       dictTypeOptions.value.map((item) => [String(item.value), item.label]),
     ),
 );
-
 const formState = reactive({
   dictType: '',
   dictKey: '',
@@ -74,6 +78,7 @@ const formState = reactive({
   sort: 0,
   status: 1,
 });
+const isTeamType = computed(() => formState.dictType.trim() === 'team');
 
 const gridOptions = computed<VxeGridProps>(() => ({
   columns: [
@@ -213,7 +218,9 @@ function handleDelete(row: DictionaryItem) {
     content: `${t('common.confirmDelete')} "${row.dictType}/${row.dictKey}" ?`,
     onOk: async () => {
       try {
-        await deleteDictionary(row.id);
+        await (row.dictType === 'team'
+          ? retireTeamIdentity(row.id)
+          : deleteDictionary(row.id));
         message.success(t('common.deleteSuccess'));
         gridApi.reload();
       } catch (error) {
@@ -228,7 +235,7 @@ async function handleSubmit() {
     message.warning(t('common.pleaseCompleteInfo'));
     return;
   }
-  if (!formState.dictValue.trim()) {
+  if (!isTeamType.value && !formState.dictValue.trim()) {
     message.warning(t('common.pleaseInput'));
     return;
   }
@@ -247,7 +254,21 @@ async function handleSubmit() {
   };
 
   try {
-    if (isEditMode.value && currentId.value) {
+    if (isTeamType.value && isEditMode.value && currentId.value) {
+      await updateTeamIdentity(currentId.value, {
+        name: formState.dictKey,
+        remark: formState.remark || null,
+        sort: Number(formState.sort || 0),
+      });
+      message.success(t('common.updateSuccess'));
+    } else if (isTeamType.value) {
+      await createTeamIdentity({
+        name: formState.dictKey,
+        remark: formState.remark || null,
+        sort: Number(formState.sort || 0),
+      });
+      message.success(t('common.addSuccess'));
+    } else if (isEditMode.value && currentId.value) {
       await updateDictionary(currentId.value, payload);
       message.success(t('common.updateSuccess'));
     } else {
@@ -314,7 +335,11 @@ onMounted(() => {
             />
           </FormItem>
 
-          <FormItem :label="t('sys.dictionary.dictValue')" required>
+          <FormItem
+            v-if="!isTeamType"
+            :label="t('sys.dictionary.dictValue')"
+            required
+          >
             <Input
               v-model:value="formState.dictValue"
               :placeholder="t('sys.dictionary.dictValuePlaceholder')"
@@ -330,7 +355,7 @@ onMounted(() => {
           </FormItem>
 
           <FormItem :label="t('common.status')">
-            <Select v-model:value="formState.status">
+            <Select v-model:value="formState.status" :disabled="isTeamType">
               <SelectOption :value="1">{{ t('common.enabled') }}</SelectOption>
               <SelectOption :value="0">{{ t('common.disabled') }}</SelectOption>
             </Select>

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionService } from '~/modules/inspection/inspection.service';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/modules/supplier-identity', () => ({
@@ -48,6 +49,25 @@ vi.mock('~/utils/prisma', () => ({
         },
       }),
     ),
+  },
+}));
+
+vi.mock('~/utils/canonical-master-data', async () => {
+  const actual = await vi.importActual<
+    typeof import('~/utils/canonical-master-data')
+  >('~/utils/canonical-master-data');
+  return {
+    ...actual,
+    MasterDataGovernanceKernel: {
+      ...actual.MasterDataGovernanceKernel,
+      resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
+    },
+  };
+});
+
+vi.mock('~/modules/quality-classification', () => ({
+  QualityClassificationService: {
+    resolveCategoryNamesByIds: vi.fn().mockResolvedValue(new Map()),
   },
 }));
 
@@ -156,9 +176,17 @@ describe('inspectionService', () => {
       });
       (prisma.quality_records.count as any).mockResolvedValue(1);
       (prisma.quality_records.groupBy as any).mockResolvedValueOnce([
-        { defectType: 'Minor', _count: { id: 1 } },
-        { defectType: 'Major', _count: { id: 1 } },
+        { defectCategoryId: 'defect-minor', _count: { id: 1 } },
+        { defectCategoryId: 'defect-major', _count: { id: 1 } },
       ]);
+      (
+        QualityClassificationService.resolveCategoryNamesByIds as any
+      ).mockResolvedValue(
+        new Map([
+          ['defect-major', 'Major'],
+          ['defect-minor', 'Minor'],
+        ]),
+      );
       (prisma.$queryRaw as any).mockResolvedValueOnce([
         { amount: 300, month: 1 },
       ]);
@@ -170,8 +198,18 @@ describe('inspectionService', () => {
       expect(stats.closedCount).toBe(1);
       expect(stats.totalLoss).toBe(300);
       expect(stats.closedRate).toBe(50);
-      expect(stats.pieData).toContainEqual({ name: 'Minor', value: 1 });
-      expect(stats.pieData).toContainEqual({ name: 'Major', value: 1 });
+      expect(stats.pieData).toContainEqual({
+        id: 'defect-minor',
+        name: 'Minor',
+        resolutionStatus: 'RESOLVED',
+        value: 1,
+      });
+      expect(stats.pieData).toContainEqual({
+        id: 'defect-major',
+        name: 'Major',
+        resolutionStatus: 'RESOLVED',
+        value: 1,
+      });
       expect(stats.trendData).toContainEqual({ period: '2024-01', value: 300 });
     });
   });

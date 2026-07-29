@@ -2,6 +2,8 @@ import type {
   AfterSalesItem,
   AfterSalesParams,
   AfterSalesStats,
+  AfterSalesWritePayload,
+  IdentityAggregateItem,
 } from '@qgs/shared';
 
 import type { QmsImportSummary, QmsListResponse } from '#/api/qms/types';
@@ -63,10 +65,7 @@ export type AfterSalesChartMetric =
   | 'runningHours'
   | 'totalLoss';
 
-export type AfterSalesChartAggregateItem = {
-  name: string;
-  value: number;
-};
+export type AfterSalesChartAggregateItem = IdentityAggregateItem;
 
 export async function getAfterSalesChartAggregate(params: {
   dateMode?: 'month' | 'week' | 'year';
@@ -85,13 +84,13 @@ export async function getAfterSalesChartAggregate(params: {
 /**
  * Create After-sales record
  */
-export async function createAfterSales(data: Partial<AfterSalesItem>) {
+export async function createAfterSales(data: AfterSalesWritePayload) {
   return requestClient.post<AfterSalesItem>('/qms/after-sales', data);
 }
 
 export async function updateAfterSales(
   id: string,
-  data: Partial<AfterSalesItem>,
+  data: AfterSalesWritePayload,
 ) {
   return requestClient.put<AfterSalesItem>(`/qms/after-sales/${id}`, data);
 }

@@ -1,20 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '~/utils/prisma';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    after_sales: {
-      aggregate: vi.fn(),
-      count: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      groupBy: vi.fn(),
-      update: vi.fn(),
+vi.mock('~/utils/prisma', () => {
+  const afterSales = {
+    aggregate: vi.fn(),
+    count: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    groupBy: vi.fn(),
+    update: vi.fn(),
+  };
+  const transactionClient = {
+    after_sales: afterSales,
+    metric_refresh_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    $queryRaw: vi.fn(),
-  },
-}));
+  };
+  return {
+    default: {
+      ...transactionClient,
+      $queryRaw: vi.fn(),
+      $transaction: vi.fn((callback) => callback(transactionClient)),
+    },
+  };
+});
 
 vi.mock('~/modules/quality-loss/quality-loss-status', () => ({
   toAfterSalesClaimStatus: vi.fn((status: string) => {
@@ -66,7 +76,9 @@ describe('after-sales-integration.service', () => {
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
 
-    (prisma.after_sales.update as any).mockResolvedValue({});
+    (prisma.after_sales.update as any).mockResolvedValue({
+      supplierBrandId: null,
+    });
 
     await AfterSalesIntegrationService.updateQualityLossFields({
       actualClaim: 50,
@@ -219,13 +231,17 @@ describe('after-sales-integration.service', () => {
     (prisma.after_sales.groupBy as any)
       .mockResolvedValueOnce([
         {
-          supplierBrand: 'A',
+          supplierBrandId: 'supplier-1',
           _sum: { materialCost: 100, laborTravelCost: 50 },
           _count: { id: 3 },
         },
       ])
       .mockResolvedValueOnce([
-        { supplierBrand: 'A', claimStatus: 'OPEN', _count: { id: 2 } },
+        {
+          supplierBrandId: 'supplier-1',
+          claimStatus: 'OPEN',
+          _count: { id: 2 },
+        },
       ]);
     (prisma.after_sales.findMany as any).mockResolvedValue([
       {
@@ -245,10 +261,16 @@ describe('after-sales-integration.service', () => {
     expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        by: ['supplierBrandId', 'supplierBrand'],
+        by: ['supplierBrandId'],
         where: expect.objectContaining({
           supplierBrandId: { in: ['supplier-1'] },
         }),
+      }),
+    );
+    expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        by: ['supplierBrandId', 'claimStatus'],
       }),
     );
     expect(prisma.after_sales.findMany).toHaveBeenCalledWith(
@@ -362,17 +384,36 @@ describe('after-sales-integration.service', () => {
     const prisma = prismaModule.default;
 
     (prisma.after_sales.findMany as any).mockResolvedValue([
-      { defectType: 'Engine', defectTypeId: 'dt-1', occurDate: new Date() },
+      {
+        defectCategoryId: 'dt-1',
+        defectType: 'Engine',
+        occurDate: new Date(),
+      },
     ]);
 
     const result = await AfterSalesIntegrationService.getVehicleFailureRecords({
       end: new Date('2026-01-31'),
-      productType: 'Vehicle',
+      productCategoryId: 'vehicle-product',
+      productTypeSnapshots: ['车辆产品', 'Vehicle Product', '车辆产品', ''],
       start: new Date('2026-01-01'),
       vehicleDeptIds: ['dept-1'],
     });
 
     expect(result).toHaveLength(1);
+    expect(prisma.after_sales.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            { productCategoryId: 'vehicle-product' },
+            {
+              productType: {
+                in: ['车辆产品', 'Vehicle Product'],
+              },
+            },
+          ]),
+        }),
+      }),
+    );
   });
 
   it('should find earliest vehicle failure date', async () => {
@@ -389,11 +430,22 @@ describe('after-sales-integration.service', () => {
     const result =
       await AfterSalesIntegrationService.findEarliestVehicleFailureDate({
         end: new Date('2026-01-31'),
-        productType: 'Vehicle',
+        productCategoryId: 'vehicle-product',
+        productTypeSnapshots: ['车辆产品'],
         vehicleDeptIds: [],
       });
 
     expect(result).toEqual(new Date('2026-01-05'));
+    expect(prisma.after_sales.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            { productCategoryId: 'vehicle-product' },
+            { productType: { in: ['车辆产品'] } },
+          ]),
+        }),
+      }),
+    );
   });
 
   it('should return null when no vehicle failure records exist', async () => {
@@ -408,7 +460,8 @@ describe('after-sales-integration.service', () => {
     const result =
       await AfterSalesIntegrationService.findEarliestVehicleFailureDate({
         end: new Date('2026-01-31'),
-        productType: 'Vehicle',
+        productCategoryId: 'vehicle-product',
+        productTypeSnapshots: ['车辆产品'],
         vehicleDeptIds: [],
       });
 

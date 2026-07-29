@@ -24,29 +24,11 @@ container run --rm \
   "$BACKEND_IMAGE" \
   sh -lc "/app/apps/backend/node_modules/.bin/prisma migrate deploy --schema /app/apps/backend/prisma/schema.prisma"
 
-echo "Backfilling role page permissions..."
+echo "Running ordered release maintenance..."
 container run --rm \
   --env-file "$ENV_FILE" \
   "$BACKEND_IMAGE" \
-  sh -lc "cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-role-page-permissions.ts --apply"
-
-echo "Bootstrapping canonical TEAM dictionaries..."
-container run --rm \
-  --env-file "$ENV_FILE" \
-  "$BACKEND_IMAGE" \
-  sh -lc "cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/bootstrap-team-dictionaries.ts --apply"
-
-echo "Backfilling inspection issue divisions..."
-container run --rm \
-  --env-file "$ENV_FILE" \
-  "$BACKEND_IMAGE" \
-  sh -lc "cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-inspection-issue-divisions.ts --apply"
-
-echo "Backfilling supplier identities..."
-container run --rm \
-  --env-file "$ENV_FILE" \
-  "$BACKEND_IMAGE" \
-  sh -lc "cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-quality-record-supplier-identities.ts --apply"
+  sh -lc "cd /app/apps/backend && sh scripts/run-release-maintenance.sh"
 
 echo "Starting backend: $BACKEND_CONTAINER"
 container run -d \

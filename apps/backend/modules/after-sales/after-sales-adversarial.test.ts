@@ -3,19 +3,29 @@ import prisma from '~/utils/prisma';
 
 import { AfterSalesService } from './after-sales.service';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    after_sales: {
-      aggregate: vi.fn(),
-      count: vi.fn(),
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      groupBy: vi.fn(),
-      update: vi.fn(),
+vi.mock('~/utils/prisma', () => {
+  const afterSales = {
+    aggregate: vi.fn(),
+    count: vi.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    groupBy: vi.fn(),
+    update: vi.fn(),
+  };
+  const transactionClient = {
+    after_sales: afterSales,
+    metric_refresh_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-  },
-}));
+  };
+  return {
+    default: {
+      ...transactionClient,
+      $transaction: vi.fn((callback) => callback(transactionClient)),
+    },
+  };
+});
 
 vi.mock('~/modules/file-storage/file-storage.service', () => ({
   FileStorageService: {
@@ -164,6 +174,33 @@ describe('afterSalesService – adversarial', () => {
       );
       const where = (prisma.after_sales.findMany as any).mock.calls[0][0].where;
       expect(where).not.toHaveProperty('OR');
+    });
+
+    it('filters all quality classifications by exact scoped IDs', async () => {
+      (prisma.after_sales.findMany as any).mockResolvedValue([]);
+
+      await AfterSalesService.getList({
+        defectCategoryId: 'defect-category',
+        defectSubcategoryId: 'defect-subcategory',
+        defectType: 'Stale Defect Name',
+        productCategoryId: 'product-category',
+        productSubcategoryId: 'product-subcategory',
+        productType: 'Stale Product Name',
+      });
+
+      expect(prisma.after_sales.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            defectCategoryId: 'defect-category',
+            defectSubcategoryId: 'defect-subcategory',
+            productCategoryId: 'product-category',
+            productSubcategoryId: 'product-subcategory',
+          }),
+        }),
+      );
+      const where = (prisma.after_sales.findMany as any).mock.calls[0][0].where;
+      expect(where).not.toHaveProperty('defectType');
+      expect(where).not.toHaveProperty('productType');
     });
 
     it('applies expanded text filters and explicit date ranges in the database where', async () => {

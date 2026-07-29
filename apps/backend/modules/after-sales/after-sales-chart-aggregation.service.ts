@@ -6,35 +6,87 @@ import type {
   AfterSalesChartMetric,
 } from './after-sales-analytics.service';
 import type { AfterSalesDateMode } from './after-sales-query';
+import type { AfterSalesStatisticsIdentity } from './after-sales-statistics-identity';
 
 import { Prisma } from '@prisma/client';
-import { formatDate, QMS_DEFAULT_VALUES } from '@qgs/shared';
+import {
+  createIdentityAggregateItem,
+  createResolvedAggregateItem,
+  formatDate,
+  QMS_DEFAULT_VALUES,
+  QUALITY_CLASSIFICATION_SCOPE,
+} from '@qgs/shared';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
-import { flattenDeptTree } from '~/modules/dept/dept-tree';
-import { DeptService } from '~/modules/dept/dept.service';
+import { QualityClassificationService } from '~/modules/quality-classification';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
 import { buildAfterSalesDateRange } from './after-sales-query';
+import {
+  getAfterSalesStatisticsIdentityKey,
+  getAfterSalesStatisticsSnapshotFields,
+  resolveAfterSalesStatisticsIdentity,
+} from './after-sales-statistics-identity';
 
-const CHART_DB_FIELD_MAP: Record<
+const CHART_DIMENSION_CONFIG: Record<
   Exclude<AfterSalesChartDimension, 'reportMonth'>,
-  | 'claimStatus'
-  | 'defectSubtype'
-  | 'defectType'
-  | 'productSubtype'
-  | 'productType'
-  | 'respDept'
-  | 'severity'
-  | 'supplierBrand'
+  {
+    classification?: {
+      level: 'category' | 'subcategory';
+      scope:
+        | typeof QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT
+        | typeof QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT;
+    };
+    field:
+      | 'claimStatus'
+      | 'defectCategoryId'
+      | 'defectSubcategoryId'
+      | 'productCategoryId'
+      | 'productSubcategoryId'
+      | 'respDeptId'
+      | 'severity'
+      | 'supplierBrandId';
+    governanceKey?: string;
+  }
 > = {
-  defectSubtype: 'defectSubtype',
-  defectType: 'defectType',
-  productSubtype: 'productSubtype',
-  productType: 'productType',
-  responsibleDept: 'respDept',
-  severity: 'severity',
-  status: 'claimStatus',
-  supplierBrand: 'supplierBrand',
+  defectSubtype: {
+    field: 'defectSubcategoryId',
+    classification: {
+      level: 'subcategory',
+      scope: QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+    },
+  },
+  defectType: {
+    field: 'defectCategoryId',
+    classification: {
+      level: 'category',
+      scope: QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+    },
+  },
+  productSubtype: {
+    field: 'productSubcategoryId',
+    classification: {
+      level: 'subcategory',
+      scope: QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
+    },
+  },
+  productType: {
+    field: 'productCategoryId',
+    classification: {
+      level: 'category',
+      scope: QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
+    },
+  },
+  responsibleDept: {
+    field: 'respDeptId',
+    governanceKey: 'responsibleDepartment',
+  },
+  severity: { field: 'severity' },
+  status: { field: 'claimStatus' },
+  supplierBrand: {
+    field: 'supplierBrandId',
+    governanceKey: 'supplierBrand',
+  },
 };
 
 function getMetricValueFromRow(
@@ -103,13 +155,6 @@ function getMetricValueFromGroupedItem(
   }
 }
 
-async function buildDeptNameMap() {
-  const deptTree = await DeptService.findAll().catch(() => []);
-  const deptMap = new Map<string, string>();
-  for (const node of flattenDeptTree(deptTree)) deptMap.set(node.id, node.name);
-  return deptMap;
-}
-
 export const AfterSalesChartAggregationService = {
   async getChartAggregation(params: {
     dataScope?: ResolvedDataScope;
@@ -148,7 +193,8 @@ export const AfterSalesChartAggregationService = {
       return this.getReportMonthAggregation(where, metric, limit);
     }
 
-    const byField = CHART_DB_FIELD_MAP[dimension];
+    const dimensionConfig = CHART_DIMENSION_CONFIG[dimension];
+    const byField = dimensionConfig.field;
     const metricConfig: Record<
       AfterSalesChartMetric,
       {
@@ -169,26 +215,79 @@ export const AfterSalesChartAggregationService = {
     const sumPayload: Record<string, true> = {};
     for (const field of conf.sumFields) sumPayload[field] = true;
 
+    const snapshotFields = getAfterSalesStatisticsSnapshotFields(dimension);
     const grouped = await prisma.after_sales.groupBy({
-      by: [byField],
+      by: [byField, ...snapshotFields],
       where,
       ...(conf.count ? { _count: { id: true } } : {}),
       ...(conf.sumFields.length > 0 ? { _sum: sumPayload } : {}),
     });
-    const deptNameMap =
-      dimension === 'responsibleDept' ? await buildDeptNameMap() : null;
+    const aggregateMap = new Map<
+      string,
+      {
+        identity: AfterSalesStatisticsIdentity | null;
+        rawId: null | string;
+        value: number;
+      }
+    >();
+    for (const item of grouped) {
+      const source = item as Record<string, unknown>;
+      const identity = resolveAfterSalesStatisticsIdentity(dimension, source);
+      const rawId = source[byField] ? String(source[byField]) : null;
+      const key = identity
+        ? getAfterSalesStatisticsIdentityKey(identity)
+        : rawId || '';
+      const current = aggregateMap.get(key);
+      aggregateMap.set(key, {
+        identity,
+        rawId,
+        value:
+          (current?.value || 0) + getMetricValueFromGroupedItem(metric, source),
+      });
+    }
+    const aggregateRows = [...aggregateMap.values()];
 
-    return grouped
+    let canonicalNames = dimensionConfig.governanceKey
+      ? await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+          canonicalIds: aggregateRows.map(
+            (item) => item.identity?.id || item.rawId,
+          ),
+          configKey: dimensionConfig.governanceKey,
+        })
+      : new Map<string, null | string>();
+    if (dimensionConfig.classification) {
+      const ids = aggregateRows
+        .map((item) => item.identity?.id || item.rawId)
+        .filter(Boolean);
+      canonicalNames =
+        dimensionConfig.classification.level === 'category'
+          ? await QualityClassificationService.resolveCategoryNamesByIds(
+              dimensionConfig.classification.scope,
+              ids,
+            )
+          : await QualityClassificationService.resolveSubcategoryNamesByIds(
+              dimensionConfig.classification.scope,
+              ids,
+            );
+    }
+
+    return aggregateRows
       .map((item) => {
-        const source = item as Record<string, unknown>;
-        const rawName = String(
-          source[byField] || QMS_DEFAULT_VALUES.UNCLASSIFIED,
-        );
-        const value = getMetricValueFromGroupedItem(metric, source);
-        return {
-          name: deptNameMap?.get(rawName) || rawName,
-          value: Number(value.toFixed(2)),
-        };
+        const rawId = item.identity?.id || item.rawId;
+        const roundedValue = Number(item.value.toFixed(2));
+        return dimensionConfig.governanceKey || dimensionConfig.classification
+          ? createIdentityAggregateItem({
+              canonicalName: rawId ? canonicalNames.get(rawId) : null,
+              id: rawId,
+              missingName: item.identity?.missingName,
+              rawName: item.identity?.rawName,
+              resolutionReason: item.identity?.resolutionReason,
+              value: roundedValue,
+            })
+          : createResolvedAggregateItem({
+              id: rawId || QMS_DEFAULT_VALUES.UNCLASSIFIED,
+              value: roundedValue,
+            });
       })
       .sort((a, b) => b.value - a.value)
       .slice(0, limit);
@@ -218,8 +317,10 @@ export const AfterSalesChartAggregationService = {
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(0, limit)
       .map(([name, value]) => ({
-        name,
-        value: Number(value.toFixed(2)),
+        ...createResolvedAggregateItem({
+          id: name,
+          value: Number(value.toFixed(2)),
+        }),
       }));
   },
 };

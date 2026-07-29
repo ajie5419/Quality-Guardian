@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import type { DepartmentNode } from '@/api/inspection';
+import type {
+  CloseInspectionRequestParams,
+  QualityClassificationCategory,
+} from '@qgs/shared';
 
 import { computed, ref, watch } from 'vue';
 
@@ -8,9 +12,10 @@ import {
   getDepartments,
   getInspectionRequest,
 } from '@/api/inspection';
+import { getQualityClassificationOptions } from '@/api/issues';
 import { buildResourceUrl, uploadFile } from '@/api/request';
-import { ISSUE_DEFECT_SUBTYPES, ISSUE_DEFECT_TYPES } from '@/utils/issues';
 import { onLoad } from '@dcloudio/uni-app';
+import { QUALITY_CLASSIFICATION_SCOPE } from '@qgs/shared';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -36,6 +41,7 @@ const task = ref<null | TaskDetail>(null);
 const loading = ref(false);
 const submitting = ref(false);
 const departments = ref<Array<{ id: string; name: string }>>([]);
+const classificationCategories = ref<QualityClassificationCategory[]>([]);
 
 // Step: 1-indexed; only meaningful when result === 'FAIL'
 const currentStep = ref(1);
@@ -49,10 +55,13 @@ const attachments = ref<Attachment[]>([]);
 const closeRemark = ref('');
 
 // ── Step 2 fields ─────────────────────────────────────────────────────────────
-const defectType = ref('制造缺陷');
-const defectSubtype = ref('焊接缺陷');
+const defectCategoryId = ref('');
+const defectSubcategoryId = ref('');
+const defectType = ref('');
+const defectSubtype = ref('');
 const severity = ref('Minor-轻微');
 const responsibleDepartment = ref('');
+const responsibleDepartmentId = ref('');
 
 // ── Step 3 fields ─────────────────────────────────────────────────────────────
 const description = ref('');
@@ -65,19 +74,27 @@ const lossAmount = ref(0);
 const isFail = computed(() => result.value === 'FAIL');
 const totalSteps = computed(() => (isFail.value ? 3 : 1));
 
-const currentSubtypeOptions = computed(
-  () => ISSUE_DEFECT_SUBTYPES[defectType.value] ?? ['其他'],
+const defectTypeOptions = computed(() =>
+  classificationCategories.value.map((item) => ({
+    label: item.name,
+    value: item.id,
+  })),
+);
+const selectedDefectCategory = computed(() =>
+  classificationCategories.value.find(
+    (item) => item.id === defectCategoryId.value,
+  ),
+);
+const currentSubtypeOptions = computed(() =>
+  (selectedDefectCategory.value?.subcategories || []).map((item) => ({
+    label: item.name,
+    value: item.id,
+  })),
 );
 
 const departmentNames = computed(() => departments.value.map((d) => d.name));
 
 // ─── Watchers ────────────────────────────────────────────────────────────────
-
-// Reset subtype when defect type changes
-watch(defectType, (newType) => {
-  const opts = ISSUE_DEFECT_SUBTYPES[newType] ?? ['其他'];
-  defectSubtype.value = opts[0] ?? '其他';
-});
 
 // When switching back to PASS, go back to step 1
 watch(result, (val) => {
@@ -116,11 +133,25 @@ async function fetchDepartments() {
     if (res.code === 0 && Array.isArray(res.data)) {
       departments.value = flattenDepartments(res.data);
       if (departments.value.length > 0) {
-        responsibleDepartment.value = departments.value[0]?.name ?? '';
+        responsibleDepartment.value = departments.value[0]?.name || '';
+        responsibleDepartmentId.value = departments.value[0]?.id || '';
       }
     }
   } catch {
     // Non-fatal: leave departments empty, user can still submit
+  }
+}
+
+async function fetchClassifications() {
+  try {
+    const res = await getQualityClassificationOptions(
+      QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+    );
+    if (res.code === 0 && Array.isArray(res.data)) {
+      classificationCategories.value = res.data;
+    }
+  } catch {
+    classificationCategories.value = [];
   }
 }
 
@@ -174,13 +205,19 @@ function choosePhoto() {
 // ─── Picker handlers ──────────────────────────────────────────────────────────
 
 function onDefectTypeChange(e: { detail: { value: string } }) {
-  defectType.value =
-    ISSUE_DEFECT_TYPES[Number(e.detail.value)] ?? ISSUE_DEFECT_TYPES[0];
+  const category = classificationCategories.value[Number(e.detail.value)];
+  const subcategory = category?.subcategories[0];
+  defectCategoryId.value = category?.id || '';
+  defectType.value = category?.name || '';
+  defectSubcategoryId.value = subcategory?.id || '';
+  defectSubtype.value = subcategory?.name || '';
 }
 
 function onDefectSubtypeChange(e: { detail: { value: string } }) {
-  const opts = currentSubtypeOptions.value;
-  defectSubtype.value = opts[Number(e.detail.value)] ?? opts[0];
+  const subcategory =
+    selectedDefectCategory.value?.subcategories[Number(e.detail.value)];
+  defectSubcategoryId.value = subcategory?.id || '';
+  defectSubtype.value = subcategory?.name || '';
 }
 
 function onSeverityChange(e: { detail: { value: string } }) {
@@ -189,8 +226,9 @@ function onSeverityChange(e: { detail: { value: string } }) {
 }
 
 function onDepartmentChange(e: { detail: { value: string } }) {
-  responsibleDepartment.value =
-    departmentNames.value[Number(e.detail.value)] ?? '';
+  const department = departments.value[Number(e.detail.value)];
+  responsibleDepartment.value = department?.name || '';
+  responsibleDepartmentId.value = department?.id || '';
 }
 
 // ─── Step navigation ──────────────────────────────────────────────────────────
@@ -208,7 +246,11 @@ function validateStep1(): boolean {
 }
 
 function validateStep2(): boolean {
-  if (!responsibleDepartment.value) {
+  if (!defectCategoryId.value || !defectSubcategoryId.value) {
+    uni.showToast({ title: '请选择缺陷分类和二级分类', icon: 'none' });
+    return false;
+  }
+  if (!responsibleDepartment.value || !responsibleDepartmentId.value) {
     uni.showToast({ title: '请选择责任部门', icon: 'none' });
     return false;
   }
@@ -247,7 +289,7 @@ async function submitResult() {
   if (!task.value || submitting.value) return;
 
   if (isFail.value) {
-    if (!validateStep3()) return;
+    if (!validateStep1() || !validateStep2() || !validateStep3()) return;
   } else {
     if (!validateStep1()) return;
   }
@@ -258,7 +300,7 @@ async function submitResult() {
   const qty = quantity.value;
   const unqualified = isFail.value ? unqualifiedQuantity.value : 0;
 
-  const payload: Record<string, unknown> = {
+  const payload: CloseInspectionRequestParams = {
     result: result.value,
     attachments: attachments.value,
     quantity: qty,
@@ -274,8 +316,10 @@ async function submitResult() {
       partName: task.value.partName,
       processName: task.value.processName,
       responsibleDepartment: responsibleDepartment.value,
-      defectType: defectType.value,
-      defectSubtype: defectSubtype.value,
+      responsibleDepartmentId: responsibleDepartmentId.value,
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      defectCategoryId: defectCategoryId.value,
+      defectSubcategoryId: defectSubcategoryId.value,
       severity: severityCode,
       status: 'OPEN',
       description: description.value,
@@ -288,10 +332,7 @@ async function submitResult() {
   }
 
   try {
-    const res = await closeInspectionRequest(
-      taskId.value,
-      payload as Parameters<typeof closeInspectionRequest>[1],
-    );
+    const res = await closeInspectionRequest(taskId.value, payload);
     uni.hideLoading();
     if (res.code === 0) {
       uni.showToast({ title: '提交成功', icon: 'success' });
@@ -315,6 +356,7 @@ onLoad((options) => {
   taskId.value = options?.id ?? '';
   fetchDetail();
   fetchDepartments();
+  fetchClassifications();
 });
 </script>
 
@@ -484,12 +526,17 @@ onLoad((options) => {
         <view class="card">
           <view class="field-label required">缺陷分类</view>
           <picker
-            :value="ISSUE_DEFECT_TYPES.indexOf(defectType)"
-            :range="ISSUE_DEFECT_TYPES"
+            :value="
+              defectTypeOptions.findIndex(
+                (item) => item.value === defectCategoryId,
+              )
+            "
+            :range="defectTypeOptions"
+            range-key="label"
             @change="onDefectTypeChange"
           >
             <view class="picker-val">
-              <text>{{ defectType }}</text>
+              <text>{{ defectType || '请选择缺陷分类' }}</text>
               <text class="picker-arrow">›</text>
             </view>
           </picker>
@@ -499,12 +546,17 @@ onLoad((options) => {
         <view class="card">
           <view class="field-label required">二级分类</view>
           <picker
-            :value="currentSubtypeOptions.indexOf(defectSubtype)"
+            :value="
+              currentSubtypeOptions.findIndex(
+                (item) => item.value === defectSubcategoryId,
+              )
+            "
             :range="currentSubtypeOptions"
+            range-key="label"
             @change="onDefectSubtypeChange"
           >
             <view class="picker-val">
-              <text>{{ defectSubtype }}</text>
+              <text>{{ defectSubtype || '请选择二级分类' }}</text>
               <text class="picker-arrow">›</text>
             </view>
           </picker>

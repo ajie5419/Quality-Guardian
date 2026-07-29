@@ -1,4 +1,9 @@
 <script lang="ts" setup>
+import type {
+  QualityClassificationCategory,
+  QualityClassificationSubcategory,
+} from '@qgs/shared';
+
 import type { AfterSalesFormState } from '#/types';
 
 import { createIconifyIcon } from '@vben/icons';
@@ -14,14 +19,11 @@ import {
   Tooltip,
 } from 'ant-design-vue';
 
-import {
-  DEFECT_OPTIONS,
-  SEVERITY_OPTIONS,
-  SEVERITY_TOOLTIPS,
-} from '../constants';
+import { SEVERITY_OPTIONS, SEVERITY_TOOLTIPS } from '../constants';
 
 defineProps<{
-  defectSubtypes: string[];
+  defectCategories: QualityClassificationCategory[];
+  defectSubtypes: QualityClassificationSubcategory[];
 }>();
 
 const emit = defineEmits<{
@@ -95,21 +97,33 @@ const HelpIcon = createIconifyIcon('lucide:circle-help');
         <FormItem
           :label="t('qms.afterSales.form.defectType')"
           class="mb-0"
-          name="defectType"
+          name="defectCategoryId"
         >
           <Select
-            v-model:value="formState.defectType"
+            v-model:value="formState.defectCategoryId"
             @change="emit('defectTypeChange')"
           >
-            <SelectOption v-for="opt in DEFECT_OPTIONS" :key="opt" :value="opt">
-              {{ opt }}
+            <SelectOption
+              v-for="opt in defectCategories"
+              :key="opt.id"
+              :value="opt.id"
+            >
+              {{ opt.name }}
             </SelectOption>
           </Select>
         </FormItem>
-        <FormItem :label="t('qms.afterSales.form.defectSubtype')" class="mb-0">
-          <Select v-model:value="formState.defectSubtype">
-            <SelectOption v-for="opt in defectSubtypes" :key="opt" :value="opt">
-              {{ opt }}
+        <FormItem
+          :label="t('qms.afterSales.form.defectSubtype')"
+          class="mb-0"
+          name="defectSubcategoryId"
+        >
+          <Select v-model:value="formState.defectSubcategoryId">
+            <SelectOption
+              v-for="opt in defectSubtypes"
+              :key="opt.id"
+              :value="opt.id"
+            >
+              {{ opt.name }}
             </SelectOption>
           </Select>
         </FormItem>

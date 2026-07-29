@@ -14,7 +14,7 @@ export const systemModule: ModuleDeclaration = {
       type: 'menu',
       meta: {
         icon: 'carbon:settings-adjust',
-        title: '检验记录设置',
+        title: '报检与检验设置',
       },
       buttons: [
         {
@@ -22,6 +22,50 @@ export const systemModule: ModuleDeclaration = {
           name: 'SystemInspectionSettingsEdit',
           order: 1,
           title: '修改配置',
+        },
+      ],
+    },
+    {
+      key: 'system-quality-classifications',
+      parentPath: '/system',
+      path: '/system/quality-classifications',
+      name: 'SystemQualityClassifications',
+      component: 'system/quality-classifications/index',
+      authCode: 'System:QualityClassification:List',
+      order: 7,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:category',
+        title: '质量分类设置',
+      },
+      buttons: [
+        {
+          authCode: 'System:QualityClassification:Edit',
+          name: 'SystemQualityClassificationsEdit',
+          order: 1,
+          title: '修改分类',
+        },
+      ],
+    },
+    {
+      key: 'system-master-data-governance',
+      parentPath: '/system',
+      path: '/system/master-data-governance',
+      name: 'SystemMasterDataGovernance',
+      component: 'system/master-data-governance/index',
+      authCode: 'System:MasterDataGovernance:List',
+      order: 8,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:data-check',
+        title: '主数据治理',
+      },
+      buttons: [
+        {
+          authCode: 'System:MasterDataGovernance:Edit',
+          name: 'SystemMasterDataGovernanceEdit',
+          order: 1,
+          title: '处置治理项',
         },
       ],
     },

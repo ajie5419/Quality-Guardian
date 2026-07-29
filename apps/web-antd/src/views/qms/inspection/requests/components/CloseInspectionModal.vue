@@ -50,8 +50,8 @@ interface Props {
   };
   linkedIssueDraft: {
     claim: string;
-    defectSubtype: string;
-    defectType: string;
+    defectCategoryId: string;
+    defectSubcategoryId: string;
     description: string;
     division: string;
     divisionId: string;
@@ -179,8 +179,8 @@ function buildEmbeddedIssueValues() {
     supplierName: localLinkedIssueDraft.supplierName,
     status: localLinkedIssueDraft.status,
     severity: localLinkedIssueDraft.severity,
-    defectType: localLinkedIssueDraft.defectType,
-    defectSubtype: localLinkedIssueDraft.defectSubtype,
+    defectCategoryId: localLinkedIssueDraft.defectCategoryId,
+    defectSubcategoryId: localLinkedIssueDraft.defectSubcategoryId,
     lossAmount: localLinkedIssueDraft.lossAmount,
     ncNumber: localLinkedIssueDraft.ncNumber,
     claim: localLinkedIssueDraft.claim,
@@ -326,8 +326,8 @@ async function collectIssueFromForm() {
     responsibleWelder: String(values.responsibleWelder || ''),
     status: String(values.status || 'OPEN'),
     severity: String(values.severity || ''),
-    defectType: String(values.defectType || ''),
-    defectSubtype: String(values.defectSubtype || ''),
+    defectCategoryId: String(values.defectCategoryId || ''),
+    defectSubcategoryId: String(values.defectSubcategoryId || ''),
     lossAmount: Number(values.lossAmount) || 0,
     ncNumber: String(values.ncNumber || ''),
     claim: String(values.claim || ''),

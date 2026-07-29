@@ -25,6 +25,14 @@ export const projectBomItemSelect = {
   quantity: true,
   remarks: true,
   required_processes: true,
+  processRequirements: {
+    orderBy: { position: 'asc' },
+    select: {
+      processId: true,
+      processName: true,
+      process: { select: { name: true } },
+    },
+  },
   unit: true,
   work_order_number: true,
 } as const;

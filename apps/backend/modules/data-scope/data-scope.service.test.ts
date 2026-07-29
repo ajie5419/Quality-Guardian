@@ -260,7 +260,7 @@ describe('dataScopeService', () => {
     expect(where).toEqual({ isDeleted: false });
   });
 
-  it('quality-loss DEPT scope filters by respDept candidates', async () => {
+  it('quality-loss DEPT scope filters by canonical department IDs', async () => {
     (prisma.departments.findMany as any).mockResolvedValueOnce([
       { name: 'QA' },
     ]);
@@ -272,7 +272,7 @@ describe('dataScopeService', () => {
     );
 
     expect(where).toEqual({
-      AND: [{ isDeleted: false }, { respDept: { in: ['dept-qa', 'QA'] } }],
+      AND: [{ isDeleted: false }, { respDeptId: { in: ['dept-qa'] } }],
     });
   });
 });

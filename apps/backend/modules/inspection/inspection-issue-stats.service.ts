@@ -1,26 +1,42 @@
+import type {
+  IdentityAggregateItem,
+  IdentityResolutionStatus,
+} from '@qgs/shared';
+
 import type { InspectionIssueDateMode } from './inspection-issue';
 import type { InspectionIssueUserContext } from './inspection-issue-access.service';
+import type { InspectionIssueStatisticsIdentity } from './inspection-issue-statistics-identity';
 
 import { Prisma } from '@prisma/client';
-import { formatDate } from '@qgs/shared';
+import {
+  createIdentityAggregateItem,
+  createResolvedAggregateItem,
+  formatDate,
+  QUALITY_CLASSIFICATION_SCOPE,
+} from '@qgs/shared';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
 import { buildInspectionIssueDateRange } from './inspection-issue';
 import { applyInspectionIssueReadOwnership } from './inspection-issue-access.service';
+import {
+  getInspectionIssueStatisticsIdentityKey,
+  getInspectionIssueStatisticsSnapshotFields,
+  resolveInspectionIssueStatisticsIdentity,
+} from './inspection-issue-statistics-identity';
 
 const logger = createModuleLogger('InspectionService');
 
-interface PieDataItem {
-  name: string;
-  value: number;
-}
+type PieDataItem = IdentityAggregateItem;
 
 interface ParetoDataItem {
   cumulativePercent: number;
+  id: null | string;
   label: string;
   percent: number;
+  resolutionStatus: IdentityResolutionStatus;
   value: number;
 }
 
@@ -40,10 +56,7 @@ interface IssueStats {
   trendData: TrendDataItem[];
 }
 
-type InspectionIssueChartAggregateItem = {
-  name: string;
-  value: number;
-};
+type InspectionIssueChartAggregateItem = IdentityAggregateItem;
 
 type InspectionIssueChartDimension =
   | 'claim'
@@ -58,6 +71,15 @@ type InspectionIssueChartDimension =
   | 'supplierName';
 
 type InspectionIssueChartMetric = 'count' | 'lossAmount' | 'quantity';
+
+const CONTROLLED_DIMENSION_CONFIG_KEYS: Partial<
+  Record<InspectionIssueChartDimension, string>
+> = {
+  division: 'division',
+  projectName: 'projectName',
+  responsibleDepartment: 'responsibleDepartment',
+  supplierName: 'supplierName',
+};
 
 export const InspectionIssueStatsService = {
   async getIssueStats(params: {
@@ -100,21 +122,55 @@ export const InspectionIssueStatsService = {
 
       // 2. Defect Type Distribution
       const typeStats = await prisma.quality_records.groupBy({
-        by: ['defectType'],
+        by: [
+          'defectCategoryId',
+          ...getInspectionIssueStatisticsSnapshotFields('defectType'),
+        ],
         where,
         _count: { id: true },
-        orderBy: { _count: { id: 'desc' } },
       });
+      const defectTypeNames =
+        await QualityClassificationService.resolveCategoryNamesByIds(
+          QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+          typeStats.map((item) => item.defectCategoryId),
+        );
 
-      const pieData: PieDataItem[] = typeStats.map((s) => ({
-        name: s.defectType || 'Unknown',
-        value: s._count.id,
-      }));
+      const typeGroups = new Map<
+        string,
+        { identity: InspectionIssueStatisticsIdentity; value: number }
+      >();
+      for (const row of typeStats) {
+        const identity = resolveInspectionIssueStatisticsIdentity(
+          'defectType',
+          row,
+        );
+        if (!identity) continue;
+        const key = getInspectionIssueStatisticsIdentityKey(identity);
+        const current = typeGroups.get(key);
+        typeGroups.set(key, {
+          identity,
+          value: (current?.value || 0) + row._count.id,
+        });
+      }
+      const pieData: PieDataItem[] = [...typeGroups.values()]
+        .map(({ identity, value }) =>
+          createIdentityAggregateItem({
+            canonicalName: identity.id
+              ? defectTypeNames.get(identity.id)
+              : null,
+            id: identity.id,
+            rawName: identity.rawName,
+            value,
+          }),
+        )
+        .sort((a, b) => b.value - a.value);
       let cumulativeCount = 0;
       const pareto: ParetoDataItem[] = pieData.map((item) => {
         cumulativeCount += item.value;
         return {
+          id: item.id,
           label: item.name,
+          resolutionStatus: item.resolutionStatus,
           value: item.value,
           percent:
             totalCount > 0 ? Math.round((item.value / totalCount) * 100) : 0,
@@ -175,81 +231,84 @@ export const InspectionIssueStatsService = {
       where,
       select: {
         date: true,
-        defectSubtypeId: true, // governance-allow-direct-name-id
-        defectTypeId: true, // governance-allow-direct-name-id
+        defectCategoryId: true,
+        defectSubcategoryId: true,
         defectSubtype: true,
         defectType: true,
         division: true,
+        divisionId: true, // governance-allow-direct-name-id
         isClaim: true,
         lossAmount: true,
+        projectId: true, // governance-allow-direct-name-id
         projectName: true,
         quantity: true,
         responsibleDepartment: true,
+        responsibleDepartmentId: true, // governance-allow-direct-name-id
         severity: true,
         status: true,
+        supplierId: true, // governance-allow-direct-name-id
         supplierName: true,
       },
     });
 
-    const [defectTypeNameById, defectSubtypeNameById] = await Promise.all([
-      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-        configKey: 'defectType',
-        canonicalIds: rows.map((item) => item.defectTypeId),
-      }),
-      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-        configKey: 'defectSubtype',
-        canonicalIds: rows.map((item) => item.defectSubtypeId),
-      }),
-    ]);
-
-    const aggregateMap = new Map<string, number>();
+    const controlledConfigKey =
+      CONTROLLED_DIMENSION_CONFIG_KEYS[params.dimension];
+    const classificationDimension =
+      params.dimension === 'defectType' || params.dimension === 'defectSubtype';
+    const aggregateMap = new Map<
+      string,
+      {
+        identity: InspectionIssueStatisticsIdentity | null;
+        name: string;
+        value: number;
+      }
+    >();
     for (const row of rows) {
-      let key = '未分类';
+      let canonicalId: null | string = null;
+      let name = '未分类';
+      const identity = resolveInspectionIssueStatisticsIdentity(
+        params.dimension,
+        row,
+      );
       switch (params.dimension) {
         case 'claim': {
-          key = row.isClaim ? 'Yes' : 'No';
+          name = row.isClaim ? 'Yes' : 'No';
           break;
         }
         case 'defectSubtype': {
-          key =
-            defectSubtypeNameById.get(String(row.defectSubtypeId || '')) ||
-            row.defectSubtype ||
-            '未分类';
+          canonicalId = row.defectSubcategoryId;
           break;
         }
         case 'defectType': {
-          key =
-            defectTypeNameById.get(String(row.defectTypeId || '')) ||
-            row.defectType ||
-            '未分类';
+          canonicalId = row.defectCategoryId;
           break;
         }
         case 'division': {
-          key = row.division || '未分类';
+          canonicalId = row.divisionId;
           break;
         }
         case 'projectName': {
-          key = row.projectName || '未分类';
+          canonicalId = row.projectId;
           break;
         }
         case 'reportMonth': {
-          key = formatDate(row.date).slice(0, 7);
+          name = formatDate(row.date).slice(0, 7);
           break;
         }
         case 'responsibleDepartment': {
-          key = row.responsibleDepartment || '未分类';
+          canonicalId = row.responsibleDepartmentId;
           break;
         }
         case 'severity': {
-          key = row.severity || '未分类';
+          name = row.severity || '未分类';
           break;
         }
         case 'status': {
-          key = row.status || '未分类';
+          name = row.status || '未分类';
           break;
         }
         case 'supplierName': {
-          key = row.supplierName || '未分类';
+          canonicalId = row.supplierId;
           break;
         }
       }
@@ -260,15 +319,67 @@ export const InspectionIssueStatsService = {
       } else if (params.metric === 'quantity') {
         value = Number(row.quantity || 0);
       }
-      aggregateMap.set(key, (aggregateMap.get(key) || 0) + value);
+      const normalizedId = String(canonicalId || '').trim() || null;
+      let key = `value:${name}`;
+      if (controlledConfigKey || classificationDimension) {
+        if (identity) {
+          key = getInspectionIssueStatisticsIdentityKey(identity);
+        } else {
+          key = normalizedId
+            ? `id:${normalizedId}`
+            : 'missing:MISSING_REQUIRED:';
+        }
+      }
+      const current = aggregateMap.get(key);
+      aggregateMap.set(key, {
+        identity,
+        name,
+        value: (current?.value || 0) + value,
+      });
     }
 
+    const aggregateRows = [...aggregateMap.values()];
+    const canonicalIds = aggregateRows.map((item) => item.identity?.id || null);
+    let canonicalNames = new Map<string, null | string>();
+    if (params.dimension === 'defectType') {
+      canonicalNames =
+        await QualityClassificationService.resolveCategoryNamesByIds(
+          QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+          canonicalIds,
+        );
+    } else if (params.dimension === 'defectSubtype') {
+      canonicalNames =
+        await QualityClassificationService.resolveSubcategoryNamesByIds(
+          QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+          canonicalIds,
+        );
+    } else if (controlledConfigKey) {
+      canonicalNames =
+        await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+          configKey: controlledConfigKey,
+          canonicalIds,
+        });
+    }
     const top = Number(params.top) > 0 ? Number(params.top) : 15;
-    return [...aggregateMap.entries()]
-      .map(([name, value]) => ({
-        name,
-        value: Math.round(value * 100) / 100,
-      }))
+    return aggregateRows
+      .map((item) => {
+        const value = Math.round(item.value * 100) / 100;
+        return controlledConfigKey || classificationDimension
+          ? createIdentityAggregateItem({
+              canonicalName: item.identity?.id
+                ? canonicalNames.get(item.identity.id)
+                : null,
+              id: item.identity?.id,
+              missingName: item.identity?.missingName,
+              rawName: item.identity?.rawName,
+              resolutionReason: item.identity?.resolutionReason,
+              value,
+            })
+          : createResolvedAggregateItem({
+              id: item.name,
+              value,
+            });
+      })
       .sort((a, b) => b.value - a.value)
       .slice(0, top);
   },

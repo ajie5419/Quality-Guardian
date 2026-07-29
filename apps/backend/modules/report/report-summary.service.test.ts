@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { ReportQueryValidationError } from '~/modules/report/report-query-validation-error';
 import { ReportSummaryService } from '~/modules/report/report-summary.service';
 
@@ -32,6 +33,12 @@ vi.mock('~/modules/after-sales', () => ({
 vi.mock('~/modules/quality-loss', () => ({
   QualityLossService: {
     getReportPeriodMetrics: vi.fn().mockResolvedValue({ manualLoss: 0 }),
+  },
+}));
+
+vi.mock('~/modules/quality-classification', () => ({
+  QualityClassificationService: {
+    resolveCategoryNamesByIds: vi.fn().mockResolvedValue(new Map()),
   },
 }));
 
@@ -154,6 +161,49 @@ describe('reportSummaryService', () => {
     );
 
     expect(result.defects).toEqual([]);
+  });
+
+  it('aggregates defects by canonical ID without using legacy names as identity', async () => {
+    const { InspectionService } = await import('~/modules/inspection');
+    vi.mocked(InspectionService.getReportDefectRows).mockResolvedValueOnce([
+      { defectType: 'Old Crack', defectCategoryId: 'defect-1' },
+      { defectType: 'Renamed Crack', defectCategoryId: 'defect-1' },
+      { defectType: 'Legacy Guess', defectCategoryId: 'invalid-id' },
+      { defectType: 'Legacy Missing', defectCategoryId: null },
+    ] as any);
+    vi.mocked(
+      QualityClassificationService.resolveCategoryNamesByIds,
+    ).mockResolvedValueOnce(new Map([['defect-1', 'Crack']]));
+
+    const result = await ReportSummaryService.getSummary(
+      'monthly',
+      new Date('2026-03-15'),
+    );
+
+    expect(result.defects).toEqual([
+      {
+        id: 'defect-1',
+        name: 'Crack',
+        resolutionStatus: 'RESOLVED',
+        value: 2,
+      },
+      {
+        id: 'invalid-id',
+        name: '主数据已失效：Legacy Guess',
+        rawName: 'Legacy Guess',
+        resolutionReason: 'INVALID_REFERENCE',
+        resolutionStatus: 'INVALID',
+        value: 1,
+      },
+      {
+        id: null,
+        name: '数据待治理：Legacy Missing',
+        rawName: 'Legacy Missing',
+        resolutionReason: 'MISSING_REQUIRED',
+        resolutionStatus: 'MISSING',
+        value: 1,
+      },
+    ]);
   });
 
   it('returns empty majorEvents when no events exist', async () => {

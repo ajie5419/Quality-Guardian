@@ -19,6 +19,7 @@ import { BusinessError, isBusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 
+import { resolveQualityLossDepartmentWrite } from './quality-loss-department-write';
 import { parseQualityLossUpdateBody } from './quality-loss-update';
 
 type QualityLossUpdateTarget =
@@ -271,8 +272,14 @@ export const QualityLossRouteUpdateService = {
           const manualContext = hasManualContext
             ? await resolveManualQualityLossContext(params.body)
             : null;
-          const updated = await prisma.$transaction(async (tx) =>
-            tx.quality_losses.update({
+          const updated = await prisma.$transaction(async (tx) => {
+            const departmentWrite = parsedBody.respDeptId
+              ? await resolveQualityLossDepartmentWrite(
+                  tx,
+                  parsedBody.respDeptId,
+                )
+              : {};
+            return tx.quality_losses.update({
               where: target.where,
               data: {
                 ...(parsedBody.occurDate
@@ -285,9 +292,7 @@ export const QualityLossRouteUpdateService = {
                 ...(parsedBody.actualClaim === undefined
                   ? {}
                   : { actualClaim: parsedBody.actualClaim }),
-                ...(parsedBody.respDept === undefined
-                  ? {}
-                  : { respDept: parsedBody.respDept }),
+                ...departmentWrite,
                 ...(params.body.description === undefined
                   ? {}
                   : { description: params.body.description }),
@@ -295,8 +300,8 @@ export const QualityLossRouteUpdateService = {
                 ...manualContext,
                 updatedAt: new Date(),
               },
-            }),
-          );
+            });
+          });
           await QualityLossIndexService.upsertFromManual(updated);
         }
       }

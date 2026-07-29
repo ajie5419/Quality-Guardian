@@ -16,6 +16,7 @@ import { useUserStore } from '@vben/stores';
 import {
   AFTER_SALES_IMPORT_STATUS_MAP,
   QMS_DICTIONARY_TYPE_KEYS,
+  QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 import { Image, message, Modal, Tag } from 'ant-design-vue';
 import dayjs from 'dayjs';
@@ -40,6 +41,7 @@ import { findNameById } from '#/types';
 import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
 import { useDictionaryOptions } from '../shared/composables/useDictionaryOptions';
+import { useQualityClassificationOptions } from '../shared/composables/useQualityClassificationOptions';
 import AfterSalesCharts from './components/AfterSalesCharts.vue';
 import AfterSalesDetailDrawer from './components/AfterSalesDetailDrawer.vue';
 import AfterSalesMobileList from './components/AfterSalesMobileList.vue';
@@ -107,11 +109,27 @@ const {
   mapOptions: (options, fallbackOptions) =>
     mapDictionaryOptionsToAfterSalesStatus(options, fallbackOptions),
 });
+const {
+  loadOptions: loadProductClassificationOptions,
+  options: productClassificationOptions,
+} = useQualityClassificationOptions(
+  QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
+);
+const {
+  loadOptions: loadDefectClassificationOptions,
+  options: defectClassificationOptions,
+} = useQualityClassificationOptions(
+  QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+);
 
 async function loadData() {
   try {
-    await loadDeptData();
-    await loadPreferences();
+    await Promise.all([
+      loadDeptData(),
+      loadPreferences(),
+      loadProductClassificationOptions(),
+      loadDefectClassificationOptions(),
+    ]);
   } catch (error) {
     handleApiError(error, 'Load After Sales Base Data');
     message.error(t('common.dataLoadFailed'));
@@ -348,6 +366,7 @@ const { gridOptions, formSchema } = useAfterSalesGrid({
   currentDateMode,
   currentDateValue,
   currentYear: currentFilterYear,
+  defectOptions: defectClassificationOptions,
   statusOptions: afterSalesStatusOptions,
   deptRawData,
   getAfterSalesListPage,
@@ -356,6 +375,7 @@ const { gridOptions, formSchema } = useAfterSalesGrid({
   handleImport,
   handleSettleToKnowledge,
   onRowsChange: syncMobileRows,
+  productOptions: productClassificationOptions,
   t,
 });
 

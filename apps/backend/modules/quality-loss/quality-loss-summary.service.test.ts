@@ -98,14 +98,18 @@ describe('quality-loss core services', () => {
         actualClaim: 20,
         amount: 100,
         date: '2026-01-05',
-        responsibleDepartment: 'QA',
+        responsibleDepartment: 'Quality',
+        responsibleDepartmentId: 'dept-qa',
+        responsibleDepartmentResolutionStatus: 'RESOLVED',
         status: 'Pending',
       },
       {
         actualClaim: 50,
         amount: 50,
         date: '2026-02-10',
-        responsibleDepartment: 'QA',
+        responsibleDepartment: 'Quality',
+        responsibleDepartmentId: 'dept-qa',
+        responsibleDepartmentResolutionStatus: 'RESOLVED',
         status: 'Confirmed',
       },
       {
@@ -113,6 +117,8 @@ describe('quality-loss core services', () => {
         amount: 25,
         date: 'bad',
         responsibleDepartment: '',
+        responsibleDepartmentId: null,
+        responsibleDepartmentResolutionStatus: 'MISSING',
         status: 'Resolved',
       },
     ] as any[];
@@ -132,7 +138,12 @@ describe('quality-loss core services', () => {
       granularity: 'month',
       year: 2026,
     } as any);
-    expect(monthCharts.deptDistribution[0]).toEqual({ name: 'QA', value: 150 });
+    expect(monthCharts.deptDistribution[0]).toEqual({
+      id: 'dept-qa',
+      name: 'Quality',
+      resolutionStatus: 'RESOLVED',
+      value: 150,
+    });
     expect(monthCharts.trend[0]).toEqual(
       expect.objectContaining({
         period: 1,
@@ -155,10 +166,61 @@ describe('quality-loss core services', () => {
     expect(weekCharts.trend).toHaveLength(53);
   });
 
+  it('keeps distinct unresolved department snapshots in separate buckets', () => {
+    const charts = QualityLossSummaryService.getYearlyCharts(
+      [
+        {
+          actualClaim: 0,
+          amount: 10,
+          date: '2026-01-01',
+          responsibleDepartment: 'Legacy A',
+          responsibleDepartmentCanonicalName: '数据待治理：Legacy A',
+          responsibleDepartmentId: null,
+          responsibleDepartmentResolutionReason: 'MISSING_REQUIRED',
+          responsibleDepartmentResolutionStatus: 'MISSING',
+          status: 'Pending',
+        },
+        {
+          actualClaim: 0,
+          amount: 20,
+          date: '2026-01-02',
+          responsibleDepartment: 'Legacy B',
+          responsibleDepartmentCanonicalName: '数据待治理：Legacy B',
+          responsibleDepartmentId: null,
+          responsibleDepartmentResolutionReason: 'MISSING_REQUIRED',
+          responsibleDepartmentResolutionStatus: 'MISSING',
+          status: 'Pending',
+        },
+      ] as any,
+      { year: 2026 } as any,
+    );
+
+    expect(charts.deptDistribution).toEqual([
+      expect.objectContaining({
+        name: '数据待治理：Legacy B',
+        rawName: 'Legacy B',
+        value: 20,
+      }),
+      expect.objectContaining({
+        name: '数据待治理：Legacy A',
+        rawName: 'Legacy A',
+        value: 10,
+      }),
+    ]);
+  });
+
   it('applies data scope and sorts scoped items', async () => {
     const items = [
-      { amount: 1, responsibleDepartment: 'QA' },
-      { amount: 2, responsibleDepartment: 'ENG' },
+      {
+        amount: 1,
+        responsibleDepartment: 'Quality',
+        responsibleDepartmentId: 'dept-qa',
+      },
+      {
+        amount: 2,
+        responsibleDepartment: 'Quality',
+        responsibleDepartmentId: 'dept-eng',
+      },
     ] as any[];
 
     await expect(QualityLossDataScopeService.apply(items)).resolves.toEqual(
@@ -167,21 +229,21 @@ describe('quality-loss core services', () => {
 
     vi.mocked(DataScopeService.getScopeForModule)
       .mockResolvedValueOnce({ scopeType: 'ALL' } as never)
-      .mockResolvedValueOnce({ deptIds: ['d1'], scopeType: 'DEPT' } as never);
+      .mockResolvedValue({
+        deptIds: ['dept-qa'],
+        scopeType: 'DEPT',
+      } as never);
     await expect(
       QualityLossDataScopeService.apply(items, { userId: 'u-1' }),
     ).resolves.toEqual(items);
 
-    vi.mocked(DataScopeService.getDeptCandidates).mockResolvedValue([
-      'QA',
-    ] as never);
     await expect(
       QualityLossDataScopeService.sortFilteredByScope(
         items,
         (input) => [...input].sort((a, b) => b.amount - a.amount),
         { userId: 'u-1' },
       ),
-    ).resolves.toEqual([{ amount: 1, responsibleDepartment: 'QA' }]);
+    ).resolves.toEqual([items[0]]);
   });
 
   it('deletes manual records, batch deletes normalized ids, and returns drill-down data', async () => {

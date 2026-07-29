@@ -1,41 +1,74 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionReportingService } from '~/modules/inspection/inspection-reporting.service';
+import { QualityClassificationService } from '~/modules/quality-classification';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    $queryRaw: vi.fn(),
-    inspections: {
-      count: vi.fn(),
-      findMany: vi.fn(),
-      groupBy: vi.fn(),
+vi.mock('~/utils/prisma', () => {
+  const qualityRecords = {
+    aggregate: vi.fn(),
+    count: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    groupBy: vi.fn(),
+    update: vi.fn(),
+  };
+  const transactionClient = {
+    metric_refresh_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    inspection_archive_tasks: {
-      findMany: vi.fn(),
+    quality_records: qualityRecords,
+  };
+  return {
+    default: {
+      $queryRaw: vi.fn(),
+      $transaction: vi.fn((callback) => callback(transactionClient)),
+      inspections: {
+        count: vi.fn(),
+        findMany: vi.fn(),
+        groupBy: vi.fn(),
+      },
+      inspection_archive_tasks: {
+        findMany: vi.fn(),
+      },
+      inspection_form_templates: {
+        findMany: vi.fn(),
+      },
+      quality_records: qualityRecords,
     },
-    inspection_form_templates: {
-      findMany: vi.fn(),
-    },
-    quality_records: {
-      aggregate: vi.fn(),
-      count: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      groupBy: vi.fn(),
-      update: vi.fn(),
-    },
-  },
-}));
+  };
+});
 
 vi.mock('~/modules/quality-loss/quality-loss-status', () => ({
   toQualityRecordStatus: vi.fn().mockReturnValue('OPEN'),
 }));
 
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
+vi.mock('~/modules/quality-classification', () => ({
+  QualityClassificationService: {
+    resolveCategoryNamesByIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
 describe('inspectionReportingService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+    ).mockResolvedValue(new Map());
+    (
+      QualityClassificationService.resolveCategoryNamesByIds as any
+    ).mockResolvedValue(new Map());
     (prisma.quality_records.findUnique as any).mockResolvedValue(null);
+    (prisma.quality_records.update as any).mockResolvedValue({
+      supplierId: null,
+    });
   });
 
   describe('findIssueIdBySerialNumber', () => {
@@ -243,6 +276,15 @@ describe('inspectionReportingService', () => {
       expect(result).toHaveProperty('engineeringStatusStats');
       expect(result).toHaveProperty('engineeringTotalStats');
       expect(result).toHaveProperty('records');
+      expect(
+        (prisma.quality_records.groupBy as any).mock.calls[0][0].by,
+      ).toEqual(['supplierId']);
+      expect(
+        (prisma.quality_records.groupBy as any).mock.calls[1][0].by,
+      ).toEqual(['supplierId', 'status']);
+      expect(
+        (prisma.quality_records.groupBy as any).mock.calls[2][0].by,
+      ).toEqual(['supplierId']);
     });
 
     it('should not fall back to supplier names when IDs are empty', async () => {
@@ -291,14 +333,7 @@ describe('inspectionReportingService', () => {
 
       expect(prisma.inspections.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({
-          by: [
-            'category',
-            'supplierId',
-            'supplierName',
-            'teamId',
-            'team',
-            'result',
-          ],
+          by: ['category', 'supplierId', 'teamId', 'result'],
           where: expect.objectContaining({
             OR: [
               {
@@ -459,7 +494,7 @@ describe('inspectionReportingService', () => {
   describe('getReportDefectRows', () => {
     it('should return defect type rows', async () => {
       (prisma.quality_records.findMany as any).mockResolvedValue([
-        { defectType: 'A', defectTypeId: 'dt-1' },
+        { defectType: 'A', defectCategoryId: 'dt-1' },
       ]);
 
       const result = await InspectionReportingService.getReportDefectRows({
@@ -474,17 +509,40 @@ describe('inspectionReportingService', () => {
   describe('getReportTopRiskProjects', () => {
     it('should return top 5 risk projects', async () => {
       (prisma.quality_records.groupBy as any).mockResolvedValue([
-        { projectName: 'P1', _count: 5, _sum: { lossAmount: 1000 } },
+        {
+          projectId: 'project-1',
+          projectName: 'Old P1',
+          _count: 3,
+          _sum: { lossAmount: 700 },
+        },
+        {
+          projectId: 'project-1',
+          projectName: 'Renamed P1',
+          _count: 2,
+          _sum: { lossAmount: 300 },
+        },
+        {
+          projectId: null,
+          projectName: 'Legacy Project',
+          _count: 1,
+          _sum: { lossAmount: 200 },
+        },
       ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(new Map([['project-1', 'P1']]));
 
       const result = await InspectionReportingService.getReportTopRiskProjects({
         end: new Date('2024-06-30'),
         start: new Date('2024-06-01'),
       });
 
-      expect(result).toHaveLength(1);
+      expect(result).toHaveLength(2);
+      expect(result[0].projectName).toBe('P1');
+      expect(result[0]._count).toBe(5);
+      expect(result[1].projectName).toBe('数据待治理：Legacy Project');
       expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 5 }),
+        expect.objectContaining({ by: ['projectId', 'projectName'] }),
       );
     });
   });
@@ -492,8 +550,20 @@ describe('inspectionReportingService', () => {
   describe('getReportSupplierPerformance', () => {
     it('should return supplier performance grouped data', async () => {
       (prisma.quality_records.groupBy as any).mockResolvedValue([
-        { supplierName: 'Supplier A', _count: 3 },
+        {
+          supplierId: 'supplier-1',
+          supplierName: 'Old Supplier',
+          _count: 3,
+        },
+        {
+          supplierId: null,
+          supplierName: 'Legacy Supplier',
+          _count: 2,
+        },
       ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(new Map([['supplier-1', 'Supplier A']]));
 
       const result =
         await InspectionReportingService.getReportSupplierPerformance({
@@ -501,7 +571,15 @@ describe('inspectionReportingService', () => {
           start: new Date('2024-06-01'),
         });
 
-      expect(result).toHaveLength(1);
+      expect(result).toHaveLength(2);
+      expect(result[0].supplierName).toBe('Supplier A');
+      expect(result[1].supplierName).toBe('数据待治理：Legacy Supplier');
+      expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: ['supplierId', 'supplierName'],
+          where: expect.objectContaining({ supplierName: { not: null } }),
+        }),
+      );
     });
   });
 
@@ -584,9 +662,25 @@ describe('inspectionReportingService', () => {
         });
       (prisma.quality_records.count as any).mockResolvedValue(8);
       (prisma.quality_records.groupBy as any).mockResolvedValue([
-        { defectType: 'A', _count: { id: 3 } },
-        { defectType: null, _count: { id: 1 } },
+        {
+          defectCategoryId: 'defect-a',
+          defectType: 'Old A',
+          _count: { id: 2 },
+        },
+        {
+          defectCategoryId: 'defect-a',
+          defectType: 'Renamed A',
+          _count: { id: 1 },
+        },
+        {
+          defectCategoryId: null,
+          defectType: 'Legacy Defect',
+          _count: { id: 1 },
+        },
       ]);
+      (
+        QualityClassificationService.resolveCategoryNamesByIds as any
+      ).mockResolvedValue(new Map([['defect-a', 'A']]));
 
       const result = await InspectionReportingService.getStatsForDashboard({
         weekStart: new Date('2024-06-01'),
@@ -602,7 +696,7 @@ describe('inspectionReportingService', () => {
         value: 3,
       });
       expect(result.issueDistribution).toContainEqual({
-        type: 'Unknown',
+        type: '数据待治理：Legacy Defect',
         value: 1,
       });
     });

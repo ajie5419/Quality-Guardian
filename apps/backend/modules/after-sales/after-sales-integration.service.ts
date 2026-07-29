@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
-import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 function buildAfterSalesVehicleDivisionWhere(vehicleDeptIds: string[]) {
@@ -26,6 +26,32 @@ function buildAfterSalesVehicleDivisionWhere(vehicleDeptIds: string[]) {
   };
 }
 
+function buildVehicleFailureSourceWhere(params: {
+  productCategoryId: null | string;
+  productTypeSnapshots: string[];
+  vehicleDeptIds: string[];
+}): Prisma.after_salesWhereInput {
+  const productCategoryId = params.productCategoryId?.trim();
+  const productTypeSnapshots = [
+    ...new Set(params.productTypeSnapshots.map((name) => name.trim())),
+  ].filter(Boolean);
+
+  return {
+    OR: [
+      ...(productCategoryId ? [{ productCategoryId }] : []),
+      ...(productTypeSnapshots.length > 0
+        ? [{ productType: { in: productTypeSnapshots } }]
+        : []),
+      {
+        work_orders: {
+          ...buildAfterSalesVehicleDivisionWhere(params.vehicleDeptIds),
+          isDeleted: false,
+        },
+      },
+    ],
+  };
+}
+
 export const AfterSalesIntegrationService = {
   async findIdBySerialNumber(serialNumber: number) {
     const row = await prisma.after_sales.findFirst({
@@ -36,22 +62,26 @@ export const AfterSalesIntegrationService = {
   },
 
   async updateQualityLossFields(params: { actualClaim?: number; id: string }) {
-    const current = await prisma.after_sales.findUnique({
-      where: { id: params.id },
-      select: { supplierBrand: true, supplierBrandId: true },
-    });
-    const updated = await prisma.after_sales.update({
-      where: { id: params.id },
-      data: {
-        actualClaim: params.actualClaim,
-        updatedAt: new Date(),
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const current = await tx.after_sales.findUnique({
+        where: { id: params.id },
+        select: { supplierBrandId: true },
+      });
+      const updated = await tx.after_sales.update({
+        where: { id: params.id },
+        data: {
+          actualClaim: params.actualClaim,
+          updatedAt: new Date(),
+        },
+      });
+      await MetricRefreshQueue.enqueueSupplierScores(
+        tx,
+        [current?.supplierBrandId, updated.supplierBrandId],
+        'after-sales.quality-loss-updated',
+      );
+      return updated;
     });
     await QualityLossIndexService.upsertFromAfterSales(updated);
-    eventBus.emit('after_sales.changed', {
-      supplierBrands: [current?.supplierBrand],
-      supplierIds: [current?.supplierBrandId],
-    });
   },
 
   async getQualityLossTrendRows(params: {
@@ -123,7 +153,7 @@ export const AfterSalesIntegrationService = {
 
     const [stats, statusStats, records] = await Promise.all([
       prisma.after_sales.groupBy({
-        by: ['supplierBrandId', 'supplierBrand'],
+        by: ['supplierBrandId'],
         where: {
           ...supplierWhere,
           isDeleted: false,
@@ -133,7 +163,7 @@ export const AfterSalesIntegrationService = {
         _count: { id: true },
       }),
       prisma.after_sales.groupBy({
-        by: ['supplierBrandId', 'supplierBrand', 'claimStatus'],
+        by: ['supplierBrandId', 'claimStatus'],
         where: {
           ...supplierWhere,
           isDeleted: false,
@@ -173,31 +203,29 @@ export const AfterSalesIntegrationService = {
 
   async getVehicleFailureRecords(params: {
     end: Date;
-    productType: string;
+    productCategoryId: null | string;
+    productTypeSnapshots: string[];
     start: Date;
     vehicleDeptIds: string[];
   }) {
     return prisma.after_sales.findMany({
-      select: { defectType: true, defectTypeId: true, occurDate: true },
+      select: {
+        defectCategoryId: true,
+        defectType: true,
+        occurDate: true,
+      },
       where: {
         isDeleted: false,
         occurDate: { gte: params.start, lte: params.end },
-        OR: [
-          { productType: params.productType },
-          {
-            work_orders: {
-              ...buildAfterSalesVehicleDivisionWhere(params.vehicleDeptIds),
-              isDeleted: false,
-            },
-          },
-        ],
+        ...buildVehicleFailureSourceWhere(params),
       },
     });
   },
 
   async findEarliestVehicleFailureDate(params: {
     end: Date;
-    productType: string;
+    productCategoryId: null | string;
+    productTypeSnapshots: string[];
     vehicleDeptIds: string[];
   }) {
     const row = await prisma.after_sales.findFirst({
@@ -206,15 +234,7 @@ export const AfterSalesIntegrationService = {
       where: {
         isDeleted: false,
         occurDate: { lte: params.end },
-        OR: [
-          { productType: params.productType },
-          {
-            work_orders: {
-              ...buildAfterSalesVehicleDivisionWhere(params.vehicleDeptIds),
-              isDeleted: false,
-            },
-          },
-        ],
+        ...buildVehicleFailureSourceWhere(params),
       },
     });
     return row?.occurDate || null;

@@ -23,9 +23,12 @@ const inspectionRequestAttachmentSchema = z.object({
 
 export const inspectionRequestCreateBodySchema = z.object({
   attachments: z.array(inspectionRequestAttachmentSchema).optional(),
+  category: z.enum(['INCOMING', 'PROCESS']).optional(),
   componentName: z.string().optional(),
   mutualCheckResult: z.string().optional(),
+  partId: z.string().trim().optional(),
   partName: z.string().optional(),
+  processId: z.string().trim().optional(),
   processName: z.string().optional(),
   quantity: z.union([z.number(), z.string()]).optional(),
   reporter: z.string().optional(),
@@ -44,6 +47,13 @@ export const inspectionRequestCreateBodySchema = z.object({
   workOrderNumbers: z.array(z.string()).optional(),
 });
 
+export const inspectionRequestCreateV2BodySchema =
+  inspectionRequestCreateBodySchema.extend({
+    category: z.enum(['INCOMING', 'PROCESS']),
+    partId: z.string().trim().min(1),
+    processId: z.string().trim().min(1),
+  });
+
 export type InspectionRequestCreateBody = z.infer<
   typeof inspectionRequestCreateBodySchema
 >;
@@ -57,7 +67,9 @@ export function validateInspectionRequestCreateBody(
     workOrderNumbers[0] ||
     '';
   const partName = normalizeInspectionRequestText(body.partName);
+  const partId = normalizeInspectionRequestText(body.partId);
   const processName = normalizeInspectionRequestText(body.processName);
+  const processId = normalizeInspectionRequestText(body.processId);
   const skipsComponentName =
     isInspectionRequestAssemblyProcess(processName) ||
     isIncomingInspectionRequestProcess(processName);
@@ -86,12 +98,41 @@ export function validateInspectionRequestCreateBody(
       Boolean(reporter) &&
       attachments.length > 0,
     partName,
+    partId,
     processName,
+    processId,
     reporter,
     supplierId,
     team,
     teamId,
     workOrderNumber,
+    workOrderNumbers,
+  };
+}
+
+export function validateInspectionRequestCreateV2Body(
+  body: z.infer<typeof inspectionRequestCreateV2BodySchema>,
+) {
+  const workOrderNumbers = normalizeInspectionRequestWorkOrderNumbers(body);
+  const attachments = normalizeInspectionRequestAttachments(body.attachments);
+  const isIncoming = body.category === 'INCOMING';
+  return {
+    attachments,
+    isValid:
+      workOrderNumbers.length > 0 &&
+      Boolean(normalizeInspectionRequestText(body.partId)) &&
+      Boolean(normalizeInspectionRequestText(body.processId)) &&
+      Boolean(normalizeInspectionRequestText(body.reporter)) &&
+      Boolean(
+        normalizeInspectionRequestText(
+          isIncoming ? body.supplierId : body.teamId,
+        ),
+      ) &&
+      attachments.length > 0,
+    workOrderNumber:
+      normalizeInspectionRequestText(body.workOrderNumber) ||
+      workOrderNumbers[0] ||
+      '',
     workOrderNumbers,
   };
 }

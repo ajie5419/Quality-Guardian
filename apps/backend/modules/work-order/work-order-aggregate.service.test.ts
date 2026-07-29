@@ -10,6 +10,25 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNamesByIds: vi.fn(({ configKey }) => {
+      let values: Array<[string, string]>;
+      if (configKey === 'partName') {
+        values = [
+          ['part-frame', 'Frame'],
+          ['part-frame-2', 'Frame'],
+        ];
+      } else if (configKey === 'processName') {
+        values = [['process-welding', 'Welding']];
+      } else {
+        values = [['team-a', 'Team A']];
+      }
+      return Promise.resolve(new Map(values));
+    }),
+  },
+}));
+
 vi.mock(
   '~/modules/work-order-requirement/work-order-requirement.service',
   () => ({
@@ -88,7 +107,9 @@ describe('workOrderAggregateService', () => {
       ).mockResolvedValue([
         {
           id: 'req-1',
+          partId: 'part-frame',
           partName: 'Frame',
+          processId: 'process-welding',
           processName: 'Welding',
           requirementItems: '[{"a":1},{"a":2}]',
           requirementName: 'Weld Quality',
@@ -106,9 +127,12 @@ describe('workOrderAggregateService', () => {
       ).mockResolvedValue([
         {
           id: 'insp-1',
+          partId: 'part-frame',
+          partName: 'Old Frame Name',
           level1Component: 'Frame',
           level2Component: null,
           processName: 'Welding',
+          processId: 'process-welding',
           items: [{}, {}],
           inspector: 'Inspector1',
           inspectionDate: new Date('2024-06-01'),
@@ -116,6 +140,7 @@ describe('workOrderAggregateService', () => {
           result: 'PASS',
           category: 'PROCESS',
           team: 'Team A',
+          teamId: 'team-a',
           workOrderNumber: 'WO-001',
           incomingType: '',
           materialName: '',
@@ -131,7 +156,72 @@ describe('workOrderAggregateService', () => {
       expect(result.summary.completionRate).toBe(100);
       expect(result.requirements).toHaveLength(1);
       expect(result.requirements[0].executed).toBe(true);
+      expect(result.requirements[0]).toEqual(
+        expect.objectContaining({
+          partId: 'part-frame',
+          partName: 'Frame',
+          partResolutionStatus: 'RESOLVED',
+          processId: 'process-welding',
+          processName: 'Welding',
+          processResolutionStatus: 'RESOLVED',
+        }),
+      );
       expect(result.requirements[0].items).toEqual([{ a: 1 }, { a: 2 }]);
+    });
+
+    it('does not match missing identities by display snapshot', async () => {
+      (prisma.work_orders.findFirst as any).mockResolvedValue(null);
+      const { WorkOrderRequirementService } = await import(
+        '~/modules/work-order-requirement/work-order-requirement.service'
+      );
+      const { InspectionService } = await import('~/modules/inspection');
+      (
+        WorkOrderRequirementService.findActiveForAggregate as any
+      ).mockResolvedValue([
+        {
+          attachment: null,
+          confirmStatus: 'PENDING',
+          createdAt: new Date('2024-01-01'),
+          id: 'req-missing',
+          partId: null,
+          partName: 'Same Name',
+          processId: null,
+          processName: 'Same Process',
+          requirementItems: '[{}]',
+          requirementName: 'Quality',
+        },
+      ]);
+      (
+        InspectionService.getWorkOrderAggregateInspections as any
+      ).mockResolvedValue([
+        {
+          category: 'PROCESS',
+          id: 'inspection-missing',
+          incomingType: '',
+          inspectionDate: new Date('2024-01-02'),
+          inspector: 'Inspector',
+          items: [{}],
+          partId: null,
+          partName: 'Same Name',
+          processId: null,
+          processName: 'Same Process',
+          quantity: 1,
+          teamId: null,
+        },
+      ]);
+
+      const result =
+        await WorkOrderAggregateService.getWorkOrderAggregate('WO-001');
+
+      expect(result.summary.inspectedPoints).toBe(0);
+      expect(result.summary.completionRate).toBe(0);
+      expect(result.requirements[0]).toEqual(
+        expect.objectContaining({
+          executed: false,
+          partResolutionStatus: 'MISSING',
+          processResolutionStatus: 'MISSING',
+        }),
+      );
     });
 
     it('should handle missing requirement points', async () => {

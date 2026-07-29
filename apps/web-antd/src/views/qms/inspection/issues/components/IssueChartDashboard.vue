@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { ChartConfig } from '#/components/Qms/ChartBuilder/types';
 
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, onUnmounted, ref } from 'vue';
 
 import { useAccess } from '@vben/access';
 import { useI18n } from '@vben/locales';
@@ -9,14 +9,11 @@ import { useI18n } from '@vben/locales';
 import { useStorage } from '@vueuse/core';
 import { Button, Card, message, Modal } from 'ant-design-vue';
 
-import { getDeptList } from '#/api/system/dept';
-import { useErrorHandler } from '#/hooks/useErrorHandler';
-
 import { UI_CONSTANTS } from '../constants';
 import IssueCustomChartBuilderModal from './IssueCustomChartBuilderModal.vue';
 import IssueCustomChartItem from './IssueCustomChartItem.vue';
 
-const props = defineProps<{
+defineProps<{
   dateMode?: 'month' | 'week' | 'year';
   dateValue?: string;
   year?: number;
@@ -24,7 +21,6 @@ const props = defineProps<{
 
 const { t } = useI18n();
 const { hasAccessByCodes } = useAccess();
-const { handleApiError } = useErrorHandler();
 
 const canEdit = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Issues:ChartEdit']),
@@ -33,27 +29,12 @@ const canDelete = computed(() =>
   hasAccessByCodes(['QMS:Inspection:Issues:ChartDelete']),
 );
 
-const loading = ref(false);
-const deptList = ref<import('#/api/system/dept').SystemDeptApi.Dept[]>([]);
-
 // Custom Charts
 const isBuilderOpen = ref(false);
 const editingChart = ref<ChartConfig | undefined>(undefined);
 
 // Persistent storage for chart configuration
 const customCharts = useStorage<ChartConfig[]>('qms-issues-custom-charts', []);
-
-async function fetchData() {
-  loading.value = true;
-  try {
-    const deptRes = await getDeptList();
-    deptList.value = deptRes;
-  } catch (error) {
-    handleApiError(error, 'Fetch Issue Chart Dashboard Data');
-  } finally {
-    loading.value = false;
-  }
-}
 
 // Drag & Drop Logic
 const draggedItemIndex = ref<null | number>(null);
@@ -189,12 +170,6 @@ function handleRemoveCustomChart(id: string) {
   });
 }
 
-watch(
-  () => [props.year, props.dateMode, props.dateValue],
-  () => fetchData(),
-  { immediate: true },
-);
-
 defineExpose({
   handleAddCustomChart,
 });
@@ -256,8 +231,6 @@ defineExpose({
               :config="chart"
               :date-mode="dateMode"
               :date-value="dateValue"
-              :dept-data="deptList"
-              :loading="loading"
               :year="year"
             />
           </div>
@@ -286,7 +259,6 @@ defineExpose({
       v-model:open="isBuilderOpen"
       :date-mode="dateMode"
       :date-value="dateValue"
-      :dept-data="deptList"
       :initial-config="editingChart"
       :year="year"
       @save="handleSaveCustomChart"

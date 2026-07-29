@@ -20,11 +20,135 @@ vi.mock('~/utils/governed-write', () => ({
   ),
 }));
 
+vi.mock('~/modules/quality-classification', () => ({
+  QualityClassificationService: {
+    assertSelection: vi.fn(
+      async (scope: string, categoryId: string, subcategoryId: string) => {
+        const prefix = scope === 'AFTER_SALES_PRODUCT' ? 'Product' : 'Defect';
+        return {
+          category: {
+            code: `${prefix}_CATEGORY`,
+            id: categoryId,
+            name: prefix,
+          },
+          subcategory: {
+            code: `${prefix}_SUBCATEGORY`,
+            id: subcategoryId,
+            name: `${prefix} Subcategory`,
+          },
+        };
+      },
+    ),
+    resolveActiveSelectionByNames: vi.fn(
+      async (scope: string, categoryName: string, subcategoryName: string) => ({
+        category: {
+          code: 'IMPORTED_CATEGORY',
+          id: `${scope}:category`,
+          name: categoryName,
+        },
+        subcategory: {
+          code: 'IMPORTED_SUBCATEGORY',
+          id: `${scope}:subcategory`,
+          name: subcategoryName,
+        },
+      }),
+    ),
+  },
+}));
+
+const classificationIds = {
+  defectCategoryId: 'defect-category',
+  defectSubcategoryId: 'defect-subcategory',
+  productCategoryId: 'product-category',
+  productSubcategoryId: 'product-subcategory',
+};
+
+function classified(body: Record<string, unknown>) {
+  return { ...body, ...classificationIds };
+}
+
 describe('after-sales payload governance helpers', () => {
-  it('builds governed create payload without runtime reference error', async () => {
+  it('rejects online name-only classification writes', async () => {
     await expect(
       buildGovernedAfterSalesCreateData(
         {
+          defectSubtype: 'Defect Subcategory',
+          defectType: 'Defect',
+          productSubtype: 'Product Subcategory',
+          productType: 'Product',
+          workOrderNumber: 'WO-808512',
+        },
+        {
+          defaultWorkOrderNumber: 'UNKNOWN',
+          id: 'AS-UT-NAME-ONLY',
+          serialNumber: 1,
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: 'AFTER_SALES_CLASSIFICATION_REQUIRED',
+    });
+  });
+
+  it('rebuilds online classification snapshots from validated IDs', async () => {
+    await expect(
+      buildGovernedAfterSalesCreateData(
+        classified({
+          defectSubtype: 'Spoofed Defect Subcategory',
+          defectType: 'Spoofed Defect',
+          productSubtype: 'Spoofed Product Subcategory',
+          productType: 'Spoofed Product',
+          workOrderNumber: 'WO-808512',
+        }),
+        {
+          defaultWorkOrderNumber: 'UNKNOWN',
+          id: 'AS-UT-CANONICAL',
+          serialNumber: 2,
+        },
+      ),
+    ).resolves.toMatchObject({
+      defectSubtype: 'Defect Subcategory',
+      defectType: 'Defect',
+      productSubtype: 'Product Subcategory',
+      productType: 'Product',
+      ...classificationIds,
+    });
+  });
+
+  it('resolves import classifications by scoped parent and child names', async () => {
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
+    );
+    await expect(
+      buildGovernedAfterSalesCreateData(
+        {
+          defectSubtype: 'Imported Defect Subcategory',
+          defectType: 'Imported Defect',
+          productSubtype: 'Imported Product Subcategory',
+          productType: 'Imported Product',
+          workOrderNumber: 'WO-IMPORT',
+        },
+        {
+          classificationMode: 'import',
+          defaultWorkOrderNumber: 'UNKNOWN',
+          id: 'AS-UT-IMPORT',
+          serialNumber: 3,
+        },
+      ),
+    ).resolves.toMatchObject({
+      defectSubtype: 'Imported Defect Subcategory',
+      defectType: 'Imported Defect',
+      productSubtype: 'Imported Product Subcategory',
+      productType: 'Imported Product',
+    });
+    expect(
+      QualityClassificationService.resolveActiveSelectionByNames,
+    ).toHaveBeenCalledTimes(2);
+  });
+
+  it('builds governed create payload without runtime reference error', async () => {
+    await expect(
+      buildGovernedAfterSalesCreateData(
+        classified({
           customerName: 'ACME',
           defectSubtype: '平板车',
           defectType: '焊接缺陷',
@@ -32,7 +156,7 @@ describe('after-sales payload governance helpers', () => {
           projectName: '阿斯蒂芬',
           responsibleDepartment: '生产 OBU',
           workOrderNumber: 'WO-808512',
-        },
+        }),
         {
           defaultWorkOrderNumber: 'UNKNOWN',
           id: 'AS-UT-001',
@@ -48,12 +172,12 @@ describe('after-sales payload governance helpers', () => {
   it('serializes responsibleDepartments and keeps legacy fields on create', async () => {
     await expect(
       buildGovernedAfterSalesCreateData(
-        {
+        classified({
           projectName: 'Project',
           responsibleDept: '质量部',
           responsibleDepartments: ['售后部', '技术部'],
           workOrderNumber: 'WO-808512',
-        },
+        }),
         {
           defaultWorkOrderNumber: 'UNKNOWN',
           id: 'AS-UT-002',
@@ -70,10 +194,10 @@ describe('after-sales payload governance helpers', () => {
   it('writes canonical supplier ID on create', async () => {
     await expect(
       buildGovernedAfterSalesCreateData(
-        {
+        classified({
           supplierBrand: 'Supplier A',
           workOrderNumber: 'WO-808512',
-        },
+        }),
         {
           defaultWorkOrderNumber: 'UNKNOWN',
           id: 'AS-UT-003',
@@ -89,11 +213,11 @@ describe('after-sales payload governance helpers', () => {
   it('preserves explicit supplier ID for canonical validation on create', async () => {
     await expect(
       buildGovernedAfterSalesCreateData(
-        {
+        classified({
           supplierBrand: 'Supplier A',
           supplierBrandId: 'supplier-1',
           workOrderNumber: 'WO-808512',
-        },
+        }),
         {
           defaultWorkOrderNumber: 'UNKNOWN',
           id: 'AS-UT-004',
@@ -115,24 +239,79 @@ describe('after-sales payload governance helpers', () => {
 
   it('builds governed update payload without runtime reference error', async () => {
     await expect(
-      buildGovernedAfterSalesUpdateData({
-        customerName: 'ACME',
-        defectSubtype: '平板车',
-        defectType: '焊接缺陷',
-        responsibleDepartment: '生产 OBU',
-      }),
+      buildGovernedAfterSalesUpdateData(
+        classified({
+          customerName: 'ACME',
+          defectSubtype: '平板车',
+          defectType: '焊接缺陷',
+          responsibleDepartment: '生产 OBU',
+        }),
+      ),
     ).resolves.toMatchObject({
       costsChanged: false,
       data: expect.any(Object),
     });
   });
 
-  it('serializes responsibleDepartments and keeps legacy fields on update', async () => {
+  it('allows legacy rows to update non-classification fields without IDs', async () => {
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
+    );
+    vi.mocked(QualityClassificationService.assertSelection).mockClear();
+
     await expect(
       buildGovernedAfterSalesUpdateData({
-        responsibleDept: '质量部',
-        responsibleDepartments: ['生产部', '工艺部'],
+        customerName: 'Updated customer',
+        defectType: 'Legacy defect snapshot',
+        productType: 'Legacy product snapshot',
       }),
+    ).resolves.toMatchObject({
+      data: {
+        customerName: 'Updated customer',
+      },
+    });
+    const result = await buildGovernedAfterSalesUpdateData({
+      customerName: 'Updated again',
+      defectType: 'Must not overwrite snapshot',
+    });
+
+    expect(result.data).not.toHaveProperty('defectType');
+    expect(result.data).not.toHaveProperty('productType');
+    expect(QualityClassificationService.assertSelection).not.toHaveBeenCalled();
+  });
+
+  it('requires a complete ID pair when one classification is changed', async () => {
+    await expect(
+      buildGovernedAfterSalesUpdateData({
+        defectCategoryId: 'defect-category',
+      }),
+    ).rejects.toMatchObject({
+      code: 'AFTER_SALES_CLASSIFICATION_REQUIRED',
+    });
+
+    await expect(
+      buildGovernedAfterSalesUpdateData({
+        defectCategoryId: 'defect-category',
+        defectSubcategoryId: 'defect-subcategory',
+      }),
+    ).resolves.toMatchObject({
+      data: {
+        defectCategoryId: 'defect-category',
+        defectSubcategoryId: 'defect-subcategory',
+        defectSubtype: 'Defect Subcategory',
+        defectType: 'Defect',
+      },
+    });
+  });
+
+  it('serializes responsibleDepartments and keeps legacy fields on update', async () => {
+    await expect(
+      buildGovernedAfterSalesUpdateData(
+        classified({
+          responsibleDept: '质量部',
+          responsibleDepartments: ['生产部', '工艺部'],
+        }),
+      ),
     ).resolves.toMatchObject({
       costsChanged: false,
       data: {
@@ -145,7 +324,9 @@ describe('after-sales payload governance helpers', () => {
 
   it('updates and clears canonical supplier ID with supplier name', async () => {
     await expect(
-      buildGovernedAfterSalesUpdateData({ supplierBrand: 'Supplier B' }),
+      buildGovernedAfterSalesUpdateData(
+        classified({ supplierBrand: 'Supplier B' }),
+      ),
     ).resolves.toMatchObject({
       data: {
         supplierBrand: 'Supplier B',
@@ -153,7 +334,7 @@ describe('after-sales payload governance helpers', () => {
       },
     });
     await expect(
-      buildGovernedAfterSalesUpdateData({ supplierBrand: '' }),
+      buildGovernedAfterSalesUpdateData(classified({ supplierBrand: '' })),
     ).resolves.toMatchObject({
       data: {
         supplierBrand: null,
@@ -164,10 +345,12 @@ describe('after-sales payload governance helpers', () => {
 
   it('preserves explicit supplier ID for canonical validation on update', async () => {
     await expect(
-      buildGovernedAfterSalesUpdateData({
-        supplierBrand: 'Supplier B',
-        supplierBrandId: 'supplier-2',
-      }),
+      buildGovernedAfterSalesUpdateData(
+        classified({
+          supplierBrand: 'Supplier B',
+          supplierBrandId: 'supplier-2',
+        }),
+      ),
     ).resolves.toMatchObject({
       data: {
         supplierBrand: 'Supplier B',

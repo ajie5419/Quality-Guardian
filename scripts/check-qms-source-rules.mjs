@@ -41,9 +41,24 @@ const LEGACY_IDENTITY_IMPORT_ALLOWLIST = new Set([
   'apps/backend/modules/after-sales/after-sales-route.service.ts',
   'apps/backend/modules/inspection/inspection-issue.ts',
   'apps/backend/modules/inspection/inspection-record-import.post.service.ts',
+  'apps/backend/modules/planning/bom-import-governance.ts',
   'apps/backend/modules/work-order/work-order-import-governance.ts',
   'apps/backend/utils/governed-write.ts',
 ]);
+const INSPECTION_REQUEST_STATS_FILE =
+  'apps/backend/modules/inspection/inspection-request-stats.service.ts';
+const INSPECTION_STATS_NAME_FIELDS = new Set([
+  'processName',
+  'supplierName',
+  'team',
+]);
+const DICTIONARY_SERVICE_FILE =
+  'apps/backend/modules/dictionary/dictionary.service.ts';
+const GUARDED_DICTIONARY_MUTATIONS = new Set(['create', 'delete', 'update']);
+const TEAM_MUTATION_GUARD = 'ensureGenericMutationAllowed';
+const MASTER_DATA_FIELDS_FILE = 'apps/backend/utils/master-data-fields.ts';
+const MAP_KEY_METHODS = new Set(['get', 'has', 'set']);
+const AMBIGUOUS_GOVERNED_NAME_FIELDS = new Set(['category', 'name', 'type']);
 
 function parseArguments(argv) {
   const options = {
@@ -211,6 +226,77 @@ function getPropertyInitializer(property) {
   return undefined;
 }
 
+function getStringPropertyValue(object, propertyName) {
+  const initializer = getPropertyInitializer(
+    getObjectProperty(object, propertyName),
+  );
+  if (!initializer) return '';
+  const value = unwrapExpression(initializer);
+  return ts.isStringLiteral(value) || ts.isNoSubstitutionTemplateLiteral(value)
+    ? value.text
+    : '';
+}
+
+/**
+ * The backend registry is the source of truth for controlled name/ID pairs.
+ * Reading it through the TypeScript AST keeps architecture rules aligned with
+ * the runtime governance configuration without a second handwritten list.
+ */
+function loadGovernedIdentityTargets(rootDir) {
+  const registryPath = path.join(rootDir, MASTER_DATA_FIELDS_FILE);
+  let sourceText = '';
+  try {
+    sourceText = readFileSync(registryPath, 'utf8');
+  } catch (error) {
+    if (error && typeof error === 'object' && error.code === 'ENOENT') {
+      return new Map();
+    }
+    throw error;
+  }
+
+  const sourceFile = ts.createSourceFile(
+    registryPath,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const fieldsInitializer = findVariableInitializer(
+    sourceFile,
+    'MASTER_DATA_FIELDS',
+  );
+  if (!fieldsInitializer) return new Map();
+
+  const targetsByModel = new Map();
+  for (const field of resolveObjectLiterals(sourceFile, fieldsInitializer)) {
+    const targetsInitializer = getPropertyInitializer(
+      getObjectProperty(field, 'targets'),
+    );
+    if (!targetsInitializer) continue;
+    for (const target of resolveObjectLiterals(
+      sourceFile,
+      targetsInitializer,
+    )) {
+      const model = getStringPropertyValue(target, 'table');
+      const nameField = getStringPropertyValue(target, 'nameColumn');
+      const idField = getStringPropertyValue(target, 'idColumn');
+      if (!model || !nameField || !idField) continue;
+      const modelTargets = targetsByModel.get(model) ?? new Map();
+      modelTargets.set(nameField, idField);
+      targetsByModel.set(model, modelTargets);
+    }
+  }
+  return targetsByModel;
+}
+
+function getGovernedNameFields(governedIdentityTargets) {
+  return new Set(
+    [...governedIdentityTargets.values()]
+      .flatMap((modelTargets) => [...modelTargets.keys()])
+      .filter((field) => !AMBIGUOUS_GOVERNED_NAME_FIELDS.has(field)),
+  );
+}
+
 function isDefinitelyEmptyArray(expression) {
   if (!expression) return false;
   const unwrapped = unwrapExpression(expression);
@@ -235,6 +321,18 @@ function getPrismaWriteTarget(node) {
     return undefined;
   }
   return { method: node.expression.name.text, model: delegate.name.text };
+}
+
+function getPrismaCallModel(node, methodName) {
+  if (
+    !ts.isCallExpression(node) ||
+    !ts.isPropertyAccessExpression(node.expression) ||
+    node.expression.name.text !== methodName
+  ) {
+    return '';
+  }
+  const delegate = node.expression.expression;
+  return ts.isPropertyAccessExpression(delegate) ? delegate.name.text : '';
 }
 
 function isEventEmitCall(node) {
@@ -268,6 +366,34 @@ function isDateNowCall(node) {
     node.expression.expression.text === 'Date' &&
     node.expression.name.text === 'now'
   );
+}
+
+function getElementAccessName(node) {
+  if (
+    !ts.isElementAccessExpression(node) ||
+    !ts.isStringLiteral(node.argumentExpression)
+  ) {
+    return '';
+  }
+  return node.argumentExpression.text;
+}
+
+function containsNamedCall(node, functionName) {
+  let found = false;
+  function visit(current) {
+    if (found) return;
+    if (
+      ts.isCallExpression(current) &&
+      ts.isIdentifier(current.expression) &&
+      current.expression.text === functionName
+    ) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(current, visit);
+  }
+  visit(node);
+  return found;
 }
 
 function isIdGenerationTarget(node) {
@@ -511,7 +637,7 @@ function analyzeFile(rootDir, filePath) {
   return findings;
 }
 
-function analyzeIdentityFile(rootDir, filePath) {
+function analyzeIdentityFile(rootDir, filePath, governedIdentityTargets) {
   const rawSourceText = readFileSync(filePath, 'utf8');
   const repoPath = path.relative(rootDir, filePath).split(path.sep).join('/');
   if (TEST_FILE_PATTERN.test(repoPath)) return [];
@@ -525,6 +651,7 @@ function analyzeIdentityFile(rootDir, filePath) {
     getScriptKind(filePath),
   );
   const findings = [];
+  const governedNameFields = getGovernedNameFields(governedIdentityTargets);
 
   function addFinding(rule, node, message, key) {
     const position = sourceFile.getLineAndCharacterOfPosition(
@@ -675,6 +802,148 @@ function analyzeIdentityFile(rootDir, filePath) {
     }
   }
 
+  function inspectInspectionStatsIdentityRead(node) {
+    if (repoPath !== INSPECTION_REQUEST_STATS_FILE) return;
+    const fieldName = ts.isPropertyAccessExpression(node)
+      ? node.name.text
+      : getElementAccessName(node);
+    if (!INSPECTION_STATS_NAME_FIELDS.has(fieldName)) return;
+    addFinding(
+      'B-ID6',
+      node,
+      `Inspection request statistics must aggregate by canonical IDs instead of ${fieldName} snapshots.`,
+      `inspection-stats-name-read-${fieldName}`,
+    );
+  }
+
+  function inspectDictionaryMutationGuard(node) {
+    if (
+      repoPath !== DICTIONARY_SERVICE_FILE ||
+      !ts.isVariableDeclaration(node) ||
+      !ts.isIdentifier(node.name) ||
+      node.name.text !== 'DictionaryService' ||
+      !node.initializer ||
+      !ts.isObjectLiteralExpression(node.initializer)
+    ) {
+      return;
+    }
+    for (const member of node.initializer.properties) {
+      if (!ts.isMethodDeclaration(member)) continue;
+      const methodName = getPropertyNameText(member.name);
+      if (
+        !GUARDED_DICTIONARY_MUTATIONS.has(methodName) ||
+        !member.body ||
+        containsNamedCall(member.body, TEAM_MUTATION_GUARD)
+      ) {
+        continue;
+      }
+      addFinding(
+        'B-ID7',
+        member,
+        `DictionaryService.${methodName} must call ${TEAM_MUTATION_GUARD} before writing.`,
+        `dictionary-${methodName}-without-team-guard`,
+      );
+    }
+  }
+
+  function inspectGovernedNameGroupBy(node) {
+    const model = getPrismaCallModel(node, 'groupBy');
+    const modelTargets = governedIdentityTargets.get(model);
+    if (!modelTargets || node.arguments.length === 0) return;
+    const options = resolveObjectLiteral(sourceFile, node.arguments[0]);
+    if (!options) return;
+    const byInitializer = getPropertyInitializer(
+      getObjectProperty(options, 'by'),
+    );
+    if (!byInitializer) return;
+    const byFields = unwrapExpression(byInitializer);
+    if (!ts.isArrayLiteralExpression(byFields)) return;
+
+    for (const element of byFields.elements) {
+      const field = unwrapExpression(element);
+      if (!ts.isStringLiteral(field)) continue;
+      const idField = modelTargets.get(field.text);
+      if (!idField) continue;
+      addFinding(
+        'B-ID8',
+        field,
+        `${model}.${field.text} is a display snapshot; group by ${idField} and hydrate the name after aggregation.`,
+        `${model}-group-by-${field.text}`,
+      );
+    }
+  }
+
+  function isMapExpression(expression, seenNames = new Set()) {
+    const unwrapped = unwrapExpression(expression);
+    if (
+      ts.isNewExpression(unwrapped) &&
+      ts.isIdentifier(unwrapped.expression) &&
+      unwrapped.expression.text === 'Map'
+    ) {
+      return true;
+    }
+    if (!ts.isIdentifier(unwrapped) || seenNames.has(unwrapped.text)) {
+      return false;
+    }
+    const initializer = findVariableInitializer(sourceFile, unwrapped.text);
+    return initializer
+      ? isMapExpression(initializer, new Set(seenNames).add(unwrapped.text))
+      : false;
+  }
+
+  function expressionReadsGovernedName(expression, seenNames = new Set()) {
+    const unwrapped = unwrapExpression(expression);
+    const fieldName = ts.isPropertyAccessExpression(unwrapped)
+      ? unwrapped.name.text
+      : getElementAccessName(unwrapped);
+    if (governedNameFields.has(fieldName)) return fieldName;
+    if (
+      ts.isPropertyAccessExpression(unwrapped) ||
+      ts.isElementAccessExpression(unwrapped)
+    ) {
+      return '';
+    }
+
+    if (ts.isIdentifier(unwrapped) && !seenNames.has(unwrapped.text)) {
+      const initializer = findVariableInitializer(sourceFile, unwrapped.text);
+      if (initializer) {
+        const field = expressionReadsGovernedName(
+          initializer,
+          new Set(seenNames).add(unwrapped.text),
+        );
+        if (field) return field;
+      }
+    }
+
+    let matchedField = '';
+    ts.forEachChild(unwrapped, (child) => {
+      if (matchedField) return;
+      matchedField = expressionReadsGovernedName(child, seenNames);
+    });
+    return matchedField;
+  }
+
+  function inspectGovernedNameMapKey(node) {
+    if (
+      !repoPath.startsWith('apps/backend/modules/') ||
+      !ts.isCallExpression(node) ||
+      !ts.isPropertyAccessExpression(node.expression) ||
+      !MAP_KEY_METHODS.has(node.expression.name.text) ||
+      node.arguments.length === 0 ||
+      !isMapExpression(node.expression.expression)
+    ) {
+      return;
+    }
+    const fieldName = expressionReadsGovernedName(node.arguments[0]);
+    if (!fieldName) return;
+    addFinding(
+      'B-ID9',
+      node.arguments[0],
+      `${fieldName} is a display snapshot; Map identity keys must use the registered canonical ID field.`,
+      `map-key-from-governed-name-${fieldName}`,
+    );
+  }
+
   function visit(node) {
     if (
       ts.isStringLiteral(node) &&
@@ -706,6 +975,10 @@ function analyzeIdentityFile(rootDir, filePath) {
     inspectChangedEvent(node);
     inspectControlledSupplierWrite(node);
     inspectNameBasedScoringIdentity(node);
+    inspectInspectionStatsIdentityRead(node);
+    inspectDictionaryMutationGuard(node);
+    inspectGovernedNameGroupBy(node);
+    inspectGovernedNameMapKey(node);
     ts.forEachChild(node, visit);
   }
 
@@ -736,6 +1009,7 @@ function main() {
   const options = parseArguments(process.argv.slice(2));
   const rootDir = path.resolve(options.root);
   const baseline = loadBaseline(options.baseline);
+  const governedIdentityTargets = loadGovernedIdentityTargets(rootDir);
   const files = readFileSync(options.filesFrom, 'utf8')
     .split(/\r?\n/u)
     .filter(Boolean)
@@ -749,7 +1023,7 @@ function main() {
   const findings = [
     ...files.flatMap((filePath) => analyzeFile(rootDir, filePath)),
     ...identityFiles.flatMap((filePath) =>
-      analyzeIdentityFile(rootDir, filePath),
+      analyzeIdentityFile(rootDir, filePath, governedIdentityTargets),
     ),
   ];
 

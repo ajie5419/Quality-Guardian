@@ -55,13 +55,16 @@ interface ProjectBomInput {
   quantity?: unknown;
   remarks?: unknown;
   requiredProcesses?: unknown;
+  requiredProcessIds?: unknown;
   unit?: unknown;
 }
 
 interface BomInspectionProgress {
   completed: boolean;
   completedQuantity: number;
+  processId: null | string;
   processName: string;
+  processResolutionStatus: 'INVALID' | 'MISSING' | 'RESOLVED';
   remainingQuantity: number;
   requiredQuantity: number;
 }
@@ -130,12 +133,18 @@ export function mapProjectBomItem(item: {
   part_name: string;
   part_number: null | string;
   partId?: null | string;
+  processRequirements?: Array<{
+    process?: null | { name: string };
+    processId: null | string;
+    processName: string;
+  }>;
   quantity: number;
   remarks: null | string;
   required_processes?: null | string;
   unit: string;
   work_order_number: string;
 }) {
+  const processRequirements = item.processRequirements || [];
   return {
     id: item.id,
     inspectionProgress: item.inspectionProgress || [],
@@ -144,7 +153,15 @@ export function mapProjectBomItem(item: {
     partName: item.part_name,
     partNumber: item.part_number,
     quantity: item.quantity,
-    requiredProcesses: parseBomRequiredProcesses(item.required_processes),
+    requiredProcessIds: processRequirements.flatMap((process) =>
+      process.processId ? [process.processId] : [],
+    ),
+    requiredProcesses:
+      processRequirements.length > 0
+        ? processRequirements.map(
+            (process) => process.process?.name || process.processName,
+          )
+        : parseBomRequiredProcesses(item.required_processes),
     remarks: item.remarks,
     unit: item.unit,
   };

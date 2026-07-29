@@ -5,7 +5,7 @@ import { AUDIT_TEMPLATES } from '@qgs/shared';
 export const qualityLossModule: ModuleDeclaration = {
   name: 'quality-loss',
   dataScope: {
-    deptFields: ['respDept'],
+    deptFields: ['respDeptId'],
     selfFields: ['createdBy'],
     selfFallsBackToDept: true,
   },

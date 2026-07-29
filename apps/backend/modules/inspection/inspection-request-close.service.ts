@@ -4,8 +4,8 @@ import type { UserSession } from '~/utils/jwt-utils';
 
 import type { CloseInspectionRecordLink } from './inspection-request-close-records.service';
 
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
-import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 import { isInspectionSerialNumberConflict } from './inspection-record-types';
@@ -254,6 +254,26 @@ export const InspectionRequestCloseService = {
             where: { id: record.dispatchTaskId },
           });
         }
+        const changedInspectionIdentities = await tx.inspections.findMany({
+          select: {
+            supplierId: true,
+            teamId: true,
+          },
+          where: {
+            id: { in: inspectionLinks.map((item) => item.inspectionId) },
+            isDeleted: false,
+          },
+        });
+        await MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities(
+          tx,
+          {
+            supplierIds: changedInspectionIdentities.map(
+              (item) => item.supplierId,
+            ),
+            teamIds: changedInspectionIdentities.map((item) => item.teamId),
+          },
+          'inspection-request.closed',
+        );
         return {
           closedLinkedIssueCount,
           inspectionId,
@@ -272,27 +292,6 @@ export const InspectionRequestCloseService = {
       issueAuditVariables,
       record: updated,
     } = await retryOnSerialNumberConflict(runCloseTransaction, 3);
-
-    const changedInspectionIdentities = await prisma.inspections.findMany({
-      select: {
-        supplierId: true,
-        supplierName: true,
-        team: true,
-        teamId: true,
-      },
-      where: {
-        id: { in: inspectionLinks.map((item) => item.inspectionId) },
-        isDeleted: false,
-      },
-    });
-    eventBus.emit('inspection_record.changed', {
-      supplierIds: changedInspectionIdentities.map((item) => item.supplierId),
-      supplierNames: changedInspectionIdentities.map(
-        (item) => item.supplierName,
-      ),
-      teamIds: changedInspectionIdentities.map((item) => item.teamId),
-      teamNames: changedInspectionIdentities.map((item) => item.team),
-    });
 
     await syncCloseAttachments({
       closeAttachments,

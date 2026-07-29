@@ -1,5 +1,8 @@
 import type { Prisma } from '@prisma/client';
-import type { InspectionIssueDateMode } from '@qgs/shared';
+import type {
+  InspectionIssueDateMode,
+  QualityClassificationSelection,
+} from '@qgs/shared';
 
 import {
   buildInspectionIssueCreateDataCore,
@@ -31,7 +34,11 @@ import {
 import prisma from '~/utils/prisma';
 import { resolveProcessIdForWrite } from '~/utils/process-resolver';
 
-import { resolveIssueSupplierBody } from './inspection-issue-supplier';
+import {
+  resolveInspectionIssueCreateBody,
+  resolveInspectionIssueUpdateBody,
+} from './inspection-issue-classification';
+import { normalizeInspectorRelationForIssueUpdate } from './inspection-issue-relations';
 
 export function buildInspectionIssueDateRange(params: {
   dateMode?: InspectionIssueDateMode;
@@ -163,13 +170,10 @@ export async function buildInspectionIssueCreateData(
     serialNumber: number;
   },
 ) {
-  const supplierBody = await resolveIssueSupplierBody(
-    body,
-    options.inspection,
-    true,
-  );
+  const { body: canonicalBody, classification } =
+    await resolveInspectionIssueCreateBody(body, options.inspection);
   const createData = buildInspectionIssueCreateDataCore({
-    body: supplierBody,
+    body: canonicalBody,
     createdBy: options.createdBy,
     inspection: options.inspection,
     inspectorUsername: options.inspectorUsername,
@@ -178,7 +182,8 @@ export async function buildInspectionIssueCreateData(
     uuid: options.id,
   }) as Prisma.quality_recordsCreateInput;
   return attachProcessIdToIssueCreateData(
-    attachResponsibleDepartmentsToIssueCreateData(body, createData),
+    attachResponsibleDepartmentsToIssueCreateData(canonicalBody, createData),
+    classification,
   );
 }
 
@@ -233,6 +238,7 @@ function attachResponsibleDepartmentsToIssueUpdateData(
 
 async function attachProcessIdToIssueCreateData(
   createData: Prisma.quality_recordsCreateInput,
+  classification: QualityClassificationSelection,
 ) {
   const processName = normalizeOptionalInspectionIssueString(
     createData.processName,
@@ -261,6 +267,8 @@ async function attachProcessIdToIssueCreateData(
     ...createDataWithoutSupplierId,
     ...governedFields,
     ...governedCanonicalIds,
+    defectCategory: { connect: { id: classification.category.id } },
+    defectSubcategory: { connect: { id: classification.subcategory.id } },
     ...(supplierId ? { supplier: { connect: { id: supplierId } } } : {}),
   } as Prisma.quality_recordsCreateInput;
   if (!processId) {
@@ -279,6 +287,7 @@ async function attachProcessIdToIssueCreateData(
 async function attachProcessIdToIssueUpdateData(
   body: Record<string, unknown>,
   updateData: Prisma.quality_recordsUpdateInput,
+  classification?: QualityClassificationSelection,
 ) {
   const { updateData: workOrderUpdateData, workOrderNumber } =
     normalizeWorkOrderRelationForIssueUpdate(updateData);
@@ -307,6 +316,14 @@ async function attachProcessIdToIssueUpdateData(
     ...updateDataWithoutSupplierId,
     ...governedFields,
     ...governedCanonicalIds,
+    ...(classification
+      ? {
+          defectCategory: { connect: { id: classification.category.id } },
+          defectSubcategory: {
+            connect: { id: classification.subcategory.id },
+          },
+        }
+      : {}),
     ...(hasSupplierInput
       ? {
           supplier: supplierId
@@ -372,23 +389,6 @@ function normalizeWorkOrderRelationForIssueUpdate(
   };
 }
 
-function normalizeInspectorRelationForIssueUpdate(
-  updateData: Prisma.quality_recordsUpdateInput,
-): Prisma.quality_recordsUpdateInput {
-  const raw = updateData as Record<string, unknown>;
-  if (!('inspector' in raw)) {
-    return updateData;
-  }
-  const { inspector, ...rest } = raw;
-  const username = normalizeOptionalInspectionIssueString(inspector);
-  return {
-    ...rest,
-    users_quality_records_inspectorTousers: username
-      ? { connect: { username } }
-      : { disconnect: true },
-  } as Prisma.quality_recordsUpdateInput;
-}
-
 export async function buildInspectionIssueUpdateData(
   body: Record<string, unknown>,
   existingNcNumber: null | string,
@@ -398,15 +398,17 @@ export async function buildInspectionIssueUpdateData(
     teamId?: null | string;
   },
 ) {
-  const supplierBody = await resolveIssueSupplierBody(body, inspection, false);
+  const { body: canonicalBody, classification } =
+    await resolveInspectionIssueUpdateBody(body, inspection);
   const updateData = buildInspectionIssueUpdateDataCore(
-    supplierBody,
+    canonicalBody,
     existingNcNumber,
     (value) => toQualityRecordStatus(value),
   ) as Prisma.quality_recordsUpdateInput;
   const withRelations = await attachProcessIdToIssueUpdateData(
-    supplierBody,
-    attachResponsibleDepartmentsToIssueUpdateData(supplierBody, updateData),
+    canonicalBody,
+    attachResponsibleDepartmentsToIssueUpdateData(canonicalBody, updateData),
+    classification,
   );
   return normalizeInspectorRelationForIssueUpdate(withRelations);
 }

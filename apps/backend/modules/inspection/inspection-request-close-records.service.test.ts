@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '~/utils/prisma';
 
+import { InspectionRecordCreateService } from './inspection-record-create.service';
 import { createCloseInspectionRecords } from './inspection-request-close-records.service';
-import { InspectionService } from './inspection.service';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -12,8 +12,8 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-vi.mock('./inspection.service', () => ({
-  InspectionService: {
+vi.mock('./inspection-record-create.service', () => ({
+  InspectionRecordCreateService: {
     create: vi.fn(),
   },
 }));
@@ -28,7 +28,7 @@ describe('createCloseInspectionRecords', () => {
       { projectName: 'Project 1', workOrderNumber: 'WO-001' },
       { projectName: 'Project 2', workOrderNumber: 'WO-002' },
     ] as any);
-    vi.mocked(InspectionService.create)
+    vi.mocked(InspectionRecordCreateService.create)
       .mockResolvedValueOnce({ id: 'inspection-1' } as any)
       .mockResolvedValueOnce({ id: 'inspection-2' } as any);
 
@@ -75,7 +75,7 @@ describe('createCloseInspectionRecords', () => {
         workOrderNumber: 'WO-002',
       },
     ]);
-    expect(InspectionService.create).toHaveBeenNthCalledWith(
+    expect(InspectionRecordCreateService.create).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
         hasSelfCheckDocuments: true,
@@ -92,7 +92,7 @@ describe('createCloseInspectionRecords', () => {
       }),
       undefined,
     );
-    expect(InspectionService.create).toHaveBeenNthCalledWith(
+    expect(InspectionRecordCreateService.create).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         projectName: 'Project 2',
@@ -112,7 +112,7 @@ describe('createCloseInspectionRecords', () => {
           ]),
       },
     } as any;
-    vi.mocked(InspectionService.create).mockResolvedValueOnce({
+    vi.mocked(InspectionRecordCreateService.create).mockResolvedValueOnce({
       id: 'inspection-1',
     } as any);
 
@@ -145,7 +145,7 @@ describe('createCloseInspectionRecords', () => {
 
     expect(tx.work_orders.findMany).toHaveBeenCalled();
     expect(prisma.work_orders.findMany).not.toHaveBeenCalled();
-    expect(InspectionService.create).toHaveBeenCalledWith(
+    expect(InspectionRecordCreateService.create).toHaveBeenCalledWith(
       expect.anything(),
       tx,
     );

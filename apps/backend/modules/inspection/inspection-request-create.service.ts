@@ -2,20 +2,20 @@ import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { ProcessMasterService } from '~/modules/process-master';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { WxSubscribeMessageService } from '~/modules/user';
 import { BusinessError } from '~/utils/business-error';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
 } from '~/utils/governed-write';
+import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
-import {
-  resolveCanonicalProcessName,
-  resolveProcessIdForWrite,
-} from '~/utils/process-resolver';
+import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import { notifyTelegramNewRequest } from '~/utils/telegram-bot';
 
 import {
@@ -37,6 +37,7 @@ import {
 } from './inspection-request-work-orders';
 
 type RequestBody = Record<string, unknown>;
+const logger = createModuleLogger('inspection-request-create');
 
 export const InspectionRequestCreateService = {
   async createRequest(
@@ -44,8 +45,15 @@ export const InspectionRequestCreateService = {
     userinfo: null | UserSession,
     body: RequestBody,
     isPublic = false,
+    identityContract: 'V1' | 'V2' = 'V1',
   ) {
-    const payload = await buildCreateRequestPayload(body);
+    if (identityContract === 'V1') {
+      logger.warn(
+        { isPublic },
+        'legacy inspection request identity contract used',
+      );
+    }
+    const payload = await buildCreateRequestPayload(body, identityContract);
     await assertWorkOrdersExist(prisma, payload.workOrderNumbers);
 
     const created = await retryOnRequestNoConflict(() =>
@@ -57,9 +65,11 @@ export const InspectionRequestCreateService = {
                 ? JSON.stringify(payload.attachments)
                 : null,
             componentName: payload.componentName || null,
+            category: payload.category,
             mutualCheckResult: normalizeInspectionRequestCheckResult(
               body.mutualCheckResult,
             ),
+            partId: payload.partId,
             partName: payload.partName,
             processId: payload.processId,
             supplierId: payload.supplierId,
@@ -121,22 +131,89 @@ export const InspectionRequestCreateService = {
   },
 };
 
-async function buildCreateRequestPayload(body: RequestBody) {
+async function resolveV2CanonicalIdentity(
+  configKey: 'partName',
+  canonicalId: string,
+) {
+  const canonicalName =
+    await MasterDataGovernanceKernel.resolveCanonicalNameById({
+      canonicalId,
+      configKey,
+      fallbackName: null,
+    });
+  if (!canonicalName) {
+    throw new BusinessError(
+      'INVALID_CANONICAL_ID',
+      `${configKey} identity does not exist or is inactive`,
+    );
+  }
+  return canonicalName;
+}
+
+async function resolveV2ProcessIdentity(
+  processId: string,
+  category: 'INCOMING' | 'PROCESS',
+) {
+  const processIdentity =
+    await ProcessMasterService.assertInspectionRequestOption(
+      processId,
+      category,
+    );
+  return processIdentity.name;
+}
+
+function normalizeV2Category(value: unknown): 'INCOMING' | 'PROCESS' {
+  const category = normalizeInspectionRequestText(value).toUpperCase();
+  if (category !== 'INCOMING' && category !== 'PROCESS') {
+    throw new BusinessError(
+      'INVALID_INSPECTION_CATEGORY',
+      'category must be INCOMING or PROCESS',
+    );
+  }
+  return category;
+}
+
+async function buildCreateRequestPayload(
+  body: RequestBody,
+  identityContract: 'V1' | 'V2',
+) {
   const workOrderNumbers = normalizeInspectionRequestWorkOrderNumbers(body);
   const workOrderNumber =
     normalizeInspectionRequestText(body.workOrderNumber) ||
     workOrderNumbers[0] ||
     '';
-  const partName = normalizeInspectionRequestText(body.partName);
-  const processName = normalizeInspectionRequestText(body.processName);
+  const partId = normalizeInspectionRequestText(body.partId);
+  const processId = normalizeInspectionRequestText(body.processId);
+  const legacyPartName = normalizeInspectionRequestText(body.partName);
+  const legacyProcessName = normalizeInspectionRequestText(body.processName);
+  let category: 'INCOMING' | 'PROCESS';
+  if (identityContract === 'V2') {
+    category = normalizeV2Category(body.category);
+  } else {
+    category = isIncomingInspectionRequestProcess(legacyProcessName)
+      ? 'INCOMING'
+      : 'PROCESS';
+  }
+  const [partName, processName] =
+    identityContract === 'V2'
+      ? await Promise.all([
+          resolveV2CanonicalIdentity('partName', partId),
+          resolveV2ProcessIdentity(processId, category),
+        ])
+      : [legacyPartName, legacyProcessName];
   const skipsComponentName =
-    isInspectionRequestAssemblyProcess(processName) ||
-    isIncomingInspectionRequestProcess(processName);
+    category === 'INCOMING' || isInspectionRequestAssemblyProcess(processName);
   const componentName = skipsComponentName
     ? ''
     : normalizeInspectionRequestText(body.componentName);
+  if (identityContract === 'V2' && !skipsComponentName && !componentName) {
+    throw new BusinessError(
+      'COMPONENT_NAME_REQUIRED',
+      'componentName is required for non-assembly process inspection requests',
+    );
+  }
   const reporter = normalizeInspectionRequestText(body.reporter);
-  const isIncoming = isIncomingInspectionRequestProcess(processName);
+  const isIncoming = category === 'INCOMING';
   const supplier = isIncoming
     ? await SupplierIdentityService.resolveSupplierById(
         normalizeInspectionRequestText(body.supplierId),
@@ -168,22 +245,41 @@ async function buildCreateRequestPayload(body: RequestBody) {
   const attachments = normalizeInspectionRequestAttachments(body.attachments);
   const governedFields = buildGovernedWriteFieldsForTable(
     'qms_inspection_requests',
-    { componentName: componentName || null, team },
+    {
+      componentName: componentName || null,
+      partName,
+      processName,
+      team,
+    },
   );
+  const governedCanonicalIds = await buildGovernedCanonicalWritePairForTable(
+    'qms_inspection_requests',
+    {
+      ...governedFields,
+      ...(identityContract === 'V2' ? { partId, processId } : {}),
+      ...(isIncoming ? {} : { teamId: teamIdentity?.id }),
+    },
+  );
+  if (
+    identityContract === 'V2' &&
+    (!governedCanonicalIds.partId || !governedCanonicalIds.processId)
+  ) {
+    throw new BusinessError(
+      'INSPECTION_REQUEST_IDENTITY_REQUIRED',
+      'partId and processId must resolve to active canonical identities',
+    );
+  }
 
   return {
     attachments,
+    category,
     componentName,
-    governedCanonicalIds: await buildGovernedCanonicalWritePairForTable(
-      'qms_inspection_requests',
-      isIncoming
-        ? { componentName: governedFields.componentName }
-        : { ...governedFields, teamId: teamIdentity?.id },
-    ),
+    governedCanonicalIds,
     governedFields,
-    partName,
-    processId: await resolveProcessIdForWrite({ processName }),
-    processName,
+    partId: governedCanonicalIds.partId || null,
+    partName: governedCanonicalIds.partName || partName,
+    processId: governedCanonicalIds.processId || null,
+    processName: governedCanonicalIds.processName || processName,
     quantity,
     reporter,
     stationSelection,

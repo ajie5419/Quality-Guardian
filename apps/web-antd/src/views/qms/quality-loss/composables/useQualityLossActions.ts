@@ -46,6 +46,7 @@ export function useQualityLossActions(
       date: new Date().toISOString().split('T')[0],
       description: '',
       responsibleDepartment: undefined,
+      responsibleDepartmentId: null,
       status: 'PENDING',
       type: 'Scrap',
       lossSource: LossSource.MANUAL,

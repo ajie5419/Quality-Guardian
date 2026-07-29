@@ -5,7 +5,6 @@ import type { QmsQualityLossApi } from '#/api/qms/quality-loss';
 
 import { computed } from 'vue';
 
-import { findNameById } from '#/types';
 import { resolveQmsStatusUi } from '#/views/qms/shared/utils/status-ui';
 
 import { LossSource } from '../types';
@@ -93,7 +92,6 @@ export function useQualityLossGrid(params: {
     canDelete,
     canEdit,
     canExport,
-    deptRawData,
     exportQualityLossAsXlsx,
     getQualityLossList,
     handleClaim,
@@ -177,10 +175,8 @@ export function useQualityLossGrid(params: {
         field: 'responsibleDepartment',
         title: t('qms.inspection.issues.responsibleDepartment'),
         width: 140,
-        formatter: ({ cellValue }) => {
-          if (!cellValue) return '';
-          return findNameById(deptRawData.value, cellValue) || cellValue;
-        },
+        formatter: ({ cellValue, row }) =>
+          row.responsibleDepartmentCanonicalName || cellValue || '',
       },
       {
         field: 'status',

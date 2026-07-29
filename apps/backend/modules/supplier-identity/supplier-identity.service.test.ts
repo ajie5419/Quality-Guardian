@@ -9,6 +9,7 @@ const { isPrismaUniqueConstraintError } = vi.hoisted(() => ({
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    $queryRaw: vi.fn(),
     dictionaries: { findFirst: vi.fn(), findMany: vi.fn() },
     supplier_identity_links: {
       count: vi.fn(),
@@ -17,9 +18,11 @@ vi.mock('~/utils/prisma', () => ({
       findMany: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       upsert: vi.fn(),
     },
-    suppliers: { findFirst: vi.fn() },
+    team_identity_merge_participants: { findUnique: vi.fn() },
+    suppliers: { findFirst: vi.fn(), findMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -38,6 +41,10 @@ describe('supplier identity service', () => {
     vi.mocked(prisma.$transaction).mockImplementation((callback) =>
       callback(prisma as never),
     );
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([]);
+    vi.mocked(
+      prisma.team_identity_merge_participants.findUnique,
+    ).mockResolvedValue(null);
   });
 
   it('resolves a supplier through an active TEAM link', async () => {
@@ -88,6 +95,34 @@ describe('supplier identity service', () => {
         }),
       }),
     );
+  });
+
+  it('resolves canonical supplier names by unique IDs in one query', async () => {
+    vi.mocked(prisma.suppliers.findMany).mockResolvedValue([
+      { id: 'supplier-1', name: 'Supplier A' },
+      { id: 'supplier-2', name: 'Supplier B' },
+    ] as never);
+
+    await expect(
+      SupplierIdentityService.resolveNamesByIds([
+        'supplier-1',
+        'supplier-1',
+        'supplier-2',
+        null,
+      ]),
+    ).resolves.toEqual(
+      new Map([
+        ['supplier-1', 'Supplier A'],
+        ['supplier-2', 'Supplier B'],
+      ]),
+    );
+    expect(prisma.suppliers.findMany).toHaveBeenCalledWith({
+      select: { id: true, name: true },
+      where: {
+        id: { in: ['supplier-1', 'supplier-2'] },
+        isDeleted: false,
+      },
+    });
   });
 
   it('rejects retiring a TEAM while an active supplier link exists', async () => {
@@ -144,6 +179,7 @@ describe('supplier identity service', () => {
       }),
     ).rejects.toMatchObject({ code: 'INVALID_TEAM_ID' });
     expect(prisma.supplier_identity_links.upsert).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
 
   it('does not overwrite an active TEAM link owned by another supplier', async () => {
@@ -168,6 +204,20 @@ describe('supplier identity service', () => {
       }),
     ).rejects.toMatchObject({ code: 'TEAM_IDENTITY_CONFLICT' });
     expect(prisma.supplier_identity_links.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks supplier link mutations while TEAM participates in a merge', async () => {
+    vi.mocked(
+      prisma.team_identity_merge_participants.findUnique,
+    ).mockResolvedValue({ mergeId: 'merge-1' } as never);
+
+    await expect(
+      SupplierIdentityService.create({
+        supplierId: 'supplier-1',
+        teamId: 'team-1',
+      }),
+    ).rejects.toMatchObject({ code: 'TEAM_MERGE_PARTICIPANT_LOCKED' });
+    expect(prisma.dictionaries.findFirst).not.toHaveBeenCalled();
   });
 
   it('normalizes a concurrent unique-key race to a TEAM conflict', async () => {

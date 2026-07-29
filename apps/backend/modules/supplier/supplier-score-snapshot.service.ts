@@ -27,21 +27,10 @@ type SupplierSnapshotInput = Pick<
 >;
 
 const SUPPLIER_SNAPSHOT_CHUNK_SIZE = 50;
-const CURRENT_SCORING_MODELS = [
-  'IN_HOUSE_OUTSOURCING_V3',
-  'SUPPLIER_V3',
+export const CURRENT_SUPPLIER_SCORING_MODELS = [
+  'IN_HOUSE_OUTSOURCING_V4',
+  'SUPPLIER_V4',
 ] as const;
-
-interface SupplierScoreRefreshOptions {
-  batchSize?: number;
-  maxBatches?: number;
-}
-
-function uniqueSupplierNames(names: Array<null | string | undefined>) {
-  return [
-    ...new Set(names.map((name) => String(name || '').trim()).filter(Boolean)),
-  ];
-}
 
 async function buildSupplierStatsMap(suppliers: SupplierSnapshotInput[]) {
   const statsMap = new Map<string, SupplierStats>();
@@ -276,7 +265,7 @@ function toSnapshotData(
     finalRating: String(scored.level || scored.rating || 'A'),
     finalStatus: String(scored.status || 'Qualified'),
     isWarning: Boolean(scored.isWarning),
-    scoringModel: `${String(scored.scoringModel || 'SUPPLIER')}_V3`,
+    scoringModel: `${String(scored.scoringModel || 'SUPPLIER')}_V4`,
     stabilityScore: Number(scored.stabilityScore ?? 100),
     warningReasons: scored.warningReasons,
     calculatedAt: new Date(),
@@ -329,65 +318,5 @@ export const SupplierScoreSnapshotService = {
       where: { id: { in: ids }, isDeleted: false },
     });
     return this.refreshSuppliers(suppliers);
-  },
-
-  async refreshBySupplierNames(names: string[]) {
-    const supplierNames = uniqueSupplierNames(names);
-    if (supplierNames.length === 0) return;
-    const suppliers = await prisma.suppliers.findMany({
-      where: { name: { in: supplierNames }, isDeleted: false },
-    });
-    return this.refreshSuppliers(suppliers);
-  },
-
-  async refreshAll(options: SupplierScoreRefreshOptions = {}) {
-    const batchSize = options.batchSize || SUPPLIER_SNAPSHOT_CHUNK_SIZE;
-    let batches = 0;
-    let cursor: string | undefined;
-    let processed = 0;
-    for (;;) {
-      const suppliers = await prisma.suppliers.findMany({
-        where: { isDeleted: false },
-        orderBy: { id: 'asc' },
-        take: batchSize,
-        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      });
-      if (suppliers.length === 0) break;
-      const result = await this.refreshSuppliers(suppliers);
-      processed += result.processed;
-      batches += 1;
-      cursor = suppliers.at(-1)?.id;
-      if (options.maxBatches && batches >= options.maxBatches) break;
-    }
-    return { batches, processed };
-  },
-
-  async refreshMissing(options: SupplierScoreRefreshOptions = {}) {
-    const batchSize = options.batchSize || SUPPLIER_SNAPSHOT_CHUNK_SIZE;
-    let batches = 0;
-    let processed = 0;
-    for (;;) {
-      const suppliers = await prisma.suppliers.findMany({
-        where: {
-          isDeleted: false,
-          OR: [
-            { scoreSnapshot: { is: null } },
-            {
-              scoreSnapshot: {
-                is: { scoringModel: { notIn: [...CURRENT_SCORING_MODELS] } },
-              },
-            },
-          ],
-        },
-        orderBy: { id: 'asc' },
-        take: batchSize,
-      });
-      if (suppliers.length === 0) break;
-      const result = await this.refreshSuppliers(suppliers);
-      processed += result.processed;
-      batches += 1;
-      if (options.maxBatches && batches >= options.maxBatches) break;
-    }
-    return { batches, processed };
   },
 };

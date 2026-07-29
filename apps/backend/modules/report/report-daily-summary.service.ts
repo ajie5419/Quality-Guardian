@@ -1,4 +1,5 @@
 import {
+  createIdentityAggregateItem,
   mapInspectionArchiveStatusLabel,
   parseDailySummaryContent,
 } from '@qgs/shared';
@@ -8,6 +9,7 @@ import {
   resolveInspectionFormProcessCandidates,
 } from '~/modules/inspection/inspection-form';
 import { VehicleCommissioningDailyReportStorageService } from '~/modules/vehicle-commissioning/daily-report-storage.service';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
@@ -64,6 +66,11 @@ export const ReportDailySummaryService = {
       start: startDate,
       username: queryUser,
     });
+    const departmentNames =
+      await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        canonicalIds: issues.map((item) => item.responsibleDepartmentId),
+        configKey: 'responsibleDepartment',
+      });
     interface ProcessItem {
       partNames: Set<string>;
       process: string;
@@ -147,12 +154,20 @@ export const ReportDailySummaryService = {
     const formattedIssues = issues.map((item, index) => {
       const created = new Date(item.createdAt);
       const isToday = created >= startDate && created <= endDate;
+      const department = createIdentityAggregateItem({
+        canonicalName: item.responsibleDepartmentId
+          ? departmentNames.get(item.responsibleDepartmentId)
+          : null,
+        id: item.responsibleDepartmentId,
+        rawName: item.responsibleDepartment,
+        value: 0,
+      });
       return {
-        dept: item.responsibleDepartment,
+        dept: department.name,
         description: item.description,
         isToday,
         partName: item.partName,
-        projectName: item.projectName || item.work_orders?.projectName || '',
+        projectName: item.work_orders?.projectName || item.projectName || '',
         seq: index + 1,
         solution: item.solution || '待定',
         status: item.status,

@@ -20,11 +20,32 @@ vi.mock('~/modules/work-order', () => ({
   },
 }));
 
-vi.mock('~/utils/canonical-master-data', () => ({
-  MasterDataGovernanceKernel: {
-    resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
-  },
-}));
+vi.mock('~/modules/quality-classification', () => {
+  const listForManagement = vi.fn().mockResolvedValue([]);
+  return {
+    QualityClassificationService: {
+      findHistoricalCategoryByCode: vi.fn().mockResolvedValue({
+        code: 'VEHICLE_PRODUCT',
+        id: 'vehicle-product',
+        name: 'Vehicle Product',
+      }),
+      listForManagement,
+      resolveCategoryNamesByIds: vi.fn(async () => {
+        const categories = await listForManagement();
+        return new Map(
+          categories.map((item: { id: string; name: string }) => [
+            item.id,
+            item.name,
+          ]),
+        );
+      }),
+    },
+    VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY: {
+      code: 'VEHICLE_PRODUCT',
+      historicalNames: ['车辆产品'],
+    },
+  };
+});
 
 vi.mock('~/modules/report/vehicle-failure-rate-manual.service', () => ({
   getVehicleFailureManualData: vi.fn().mockResolvedValue({}),
@@ -48,6 +69,25 @@ describe('vehicleFailureRateService', () => {
     expect(result.ranking).toEqual([]);
     expect(result.trend).toBeInstanceOf(Array);
     expect(result.yearSeries).toBeInstanceOf(Array);
+  });
+
+  it('queries vehicle failures by canonical ID and historical snapshots', async () => {
+    const { AfterSalesAPI } = await import('~/modules/after-sales');
+
+    await VehicleFailureRateService.getVehicleFailureRate('2026-03');
+
+    expect(AfterSalesAPI.getVehicleFailureRecords).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productCategoryId: 'vehicle-product',
+        productTypeSnapshots: ['车辆产品', 'Vehicle Product'],
+      }),
+    );
+    expect(AfterSalesAPI.findEarliestVehicleFailureDate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productCategoryId: 'vehicle-product',
+        productTypeSnapshots: ['车辆产品', 'Vehicle Product'],
+      }),
+    );
   });
 
   it('parses month parameter correctly', async () => {
@@ -77,20 +117,45 @@ describe('vehicleFailureRateService', () => {
 
   it('returns ranking based on failure records', async () => {
     const { AfterSalesAPI } = await import('~/modules/after-sales');
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
+    );
+    vi.mocked(
+      QualityClassificationService.listForManagement,
+    ).mockResolvedValueOnce([
+      {
+        code: 'CRACK',
+        id: 'dt-1',
+        name: 'Crack',
+        scope: 'AFTER_SALES_DEFECT',
+        sort: 0,
+        status: 1,
+        subcategories: [],
+      },
+      {
+        code: 'RUST',
+        id: 'dt-2',
+        name: 'Rust',
+        scope: 'AFTER_SALES_DEFECT',
+        sort: 1,
+        status: 1,
+        subcategories: [],
+      },
+    ]);
     (AfterSalesAPI.getVehicleFailureRecords as any).mockResolvedValue([
       {
         defectType: 'Crack',
-        defectTypeId: 'dt-1',
+        defectCategoryId: 'dt-1',
         occurDate: new Date('2026-01-10'),
       },
       {
         defectType: 'Crack',
-        defectTypeId: 'dt-1',
+        defectCategoryId: 'dt-1',
         occurDate: new Date('2026-02-15'),
       },
       {
         defectType: 'Rust',
-        defectTypeId: 'dt-2',
+        defectCategoryId: 'dt-2',
         occurDate: new Date('2026-01-20'),
       },
     ]);
@@ -102,6 +167,85 @@ describe('vehicleFailureRateService', () => {
     expect(result.ranking[0].defectType).toBeDefined();
     expect(result.ranking[0].count).toBeGreaterThan(0);
     expect(result.ranking[0].percentage).toBeGreaterThan(0);
+  });
+
+  it('keeps same-name IDs separate and preserves unresolved ID buckets', async () => {
+    const { AfterSalesAPI } = await import('~/modules/after-sales');
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
+    );
+    (AfterSalesAPI.getVehicleFailureRecords as any).mockResolvedValue([
+      {
+        defectCategoryId: 'dt-1',
+        defectType: 'Old Name',
+        occurDate: new Date(),
+      },
+      { defectCategoryId: 'dt-2', defectType: 'Same', occurDate: new Date() },
+      { defectCategoryId: 'dt-3', defectType: 'Same', occurDate: new Date() },
+      {
+        defectCategoryId: 'bad-id',
+        defectType: 'Must Not Be Used',
+        occurDate: new Date(),
+      },
+      {
+        defectCategoryId: null,
+        defectType: 'Must Not Be Used',
+        occurDate: new Date(),
+      },
+    ]);
+    vi.mocked(
+      QualityClassificationService.listForManagement,
+    ).mockResolvedValueOnce(
+      ['dt-1', 'dt-2', 'dt-3'].map((id, index) => ({
+        code: id.toUpperCase(),
+        id,
+        name: index === 0 ? 'Current Name' : 'Same',
+        scope: 'AFTER_SALES_DEFECT' as const,
+        sort: index,
+        status: 1 as const,
+        subcategories: [],
+      })),
+    );
+
+    const result =
+      await VehicleFailureRateService.getVehicleFailureRate('2026-06');
+
+    expect(result.ranking).toEqual([
+      expect.objectContaining({
+        count: 1,
+        defectType: 'Current Name',
+        id: 'dt-1',
+        resolutionStatus: 'RESOLVED',
+      }),
+      expect.objectContaining({
+        count: 1,
+        defectType: 'Same',
+        id: 'dt-2',
+        resolutionStatus: 'RESOLVED',
+      }),
+      expect.objectContaining({
+        count: 1,
+        defectType: 'Same',
+        id: 'dt-3',
+        resolutionStatus: 'RESOLVED',
+      }),
+      expect.objectContaining({
+        count: 1,
+        defectType: '主数据已失效：Must Not Be Used',
+        id: 'bad-id',
+        rawName: 'Must Not Be Used',
+        resolutionReason: 'INVALID_REFERENCE',
+        resolutionStatus: 'INVALID',
+      }),
+      expect.objectContaining({
+        count: 1,
+        defectType: '数据待治理：Must Not Be Used',
+        id: null,
+        rawName: 'Must Not Be Used',
+        resolutionReason: 'MISSING_REQUIRED',
+        resolutionStatus: 'MISSING',
+      }),
+    ]);
   });
 
   it('manual data overrides automatic monthly counts in year series', async () => {
@@ -169,8 +313,8 @@ describe('vehicleFailureRateService', () => {
   it('ranking limits to top 10 defect types', async () => {
     const { AfterSalesAPI } = await import('~/modules/after-sales');
     const manyRecords = Array.from({ length: 15 }, (_, i) => ({
+      defectCategoryId: `dt-${i}`,
       defectType: `Defect ${String(i).padStart(2, '0')}`,
-      defectTypeId: `dt-${i}`,
       occurDate: new Date('2026-01-01'),
     }));
     (AfterSalesAPI.getVehicleFailureRecords as any).mockResolvedValue(

@@ -176,9 +176,12 @@ interface IndexRowLike {
   indexedAt: Date;
   lossType: null | string;
   occurDate: Date;
+  partId?: null | string;
   partName: null | string;
+  projectId?: null | string;
   projectName: null | string;
   respDept: null | string;
+  respDeptId?: null | string;
   source: string;
   sourcePk: string;
   status: string;
@@ -192,6 +195,7 @@ export function formatIndexRow(row: IndexRowLike): QualityLossItem {
     date: formatDateString(row.occurDate),
     amount: safeNumber(row.amount),
     actualClaim: safeNumber(row.actualClaim),
+    responsibleDepartmentId: row.respDeptId ?? null,
     responsibleDepartment: row.respDept,
     description: row.description || undefined,
     status: normalizeQualityLossStatus(row.status),
@@ -199,7 +203,9 @@ export function formatIndexRow(row: IndexRowLike): QualityLossItem {
     lossSource: row.source,
     workOrderNumber: row.workOrderNumber,
     projectName: row.projectName,
+    projectId: row.projectId ?? null,
     partName: row.partName,
+    partId: row.partId ?? null,
     createdAt: row.indexedAt.toISOString(),
   };
 }

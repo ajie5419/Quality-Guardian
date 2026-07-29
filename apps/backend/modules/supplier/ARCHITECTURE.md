@@ -6,9 +6,12 @@
 
 ## 文件结构
 
-- `supplier.service.ts` — 供应商写入、导入、列表查询与统计入口
+- `supplier.service.ts` — 供应商列表查询与统计入口
+- `supplier-mutation.service.ts` — 供应商新增、修改、删除和导入
 - `supplier-history-projects.get.service.ts` — 供应商画像历史使用项目路由服务
 - `supplier-score-snapshot.service.ts` — 生成和刷新供应商评分快照
+- `supplier-score-worker.service.ts` — 消费持久化指标任务并幂等重算快照
+- `supplier-score-reconciliation.service.ts` — 发布期建立版本覆盖任务、同步消费并执行清零门禁
 - `supplier-scoring.ts` — 评分纯计算逻辑
 - `supplier-query.ts` — 入参解析、导入归一化与主数据写入组装
 
@@ -17,8 +20,8 @@
 - `SupplierService.findAll(params)` — 供应商/外协列表 + 快照字段排序 + 统计
 - `SupplierService.getHistoryProjects(id)` — 按供应商 ID 或 TEAM 映射读取画像历史使用项目
 - `SupplierService.getInspectionHistory(id, params)` — 按供应商类型读取规范化检验履历
-- `SupplierScoreSnapshotService.refreshBySupplierNames(names)` — legacy maintenance 兼容入口；禁止接入在线事件和画像请求，后续治理 wave 应删除
-- `SupplierScoreSnapshotService.refreshAll()` — 全量 backfill 历史评分指标
+- `SupplierScoreSnapshotService.refreshBySupplierIds(ids)` — 仅按供应商主键幂等重算快照
+- `SupplierScoreReconciliationService.reconcileForRelease()` — 发布期校准当前评分模型并要求任务清零
 - `SupplierQueryParams` — 查询参数类型
 
 ## 调用方
@@ -43,8 +46,9 @@
 - 检验来源由共享 `resolveSupplierInspectionPolicy()` 唯一决定：普通供应商和外部加工读取 `INCOMING + supplierId`；驻厂队伍和外部服务读取 `PROCESS + teamId`，再通过 `supplier_identity_links` 映射到供应商。名称只保留为快照或搜索条件，评分、画像和前端不得自行复制判断或名称回退。
 - 画像检验履历必须通过 `SupplierService.getInspectionHistory()` 返回统一 `partName` 和服务端分页；禁止前端用关键字拼接通用检验列表。
 - 画像历史使用项目必须通过 `InspectionService.getSupplierHistoryProjects()` 直接按报检任务自身的 `supplierId/teamId` 聚合，合并主工单与 `qms_inspection_request_work_orders` 多工单明细，并执行服务端分页；不得依赖任务是否已生成检验记录，禁止按供应商名称查询，也禁止前端基于当前页结果拼接。
-- 检验记录创建、编辑、删除和报检关闭事务提交后必须发布 `inspection_record.changed`，刷新关联快照。
-- 历史数据快照回填必须随生产 Docker image 发布；deploy workflow 的 `missing` 模式同时刷新无快照和非当前评分模型版本的记录，保证规则升级后已有快照重算。
+- 检验记录、不合格项、售后记录、供应商档案和 TEAM 映射的写事务必须同步追加 `metric_refresh_jobs`；源数据和刷新任务必须同成同败。
+- 评分 Worker 只按任务中的 `supplierId` 重算，成功后确认任务，失败时持久化错误并重试；禁止使用名称匹配、进程内事件或请求后 fire-and-forget 刷新。
+- 发布维护在应用停止写入期间执行 `reconcile-supplier-score-snapshots.ts`：为无 V4 快照或旧模型快照建立显式 ID 任务，同步消费所有线上遗留任务，任务数不为零则发布失败。
 - `engineeringIssueCount` 展示全部历史工程问题；评分扣分、损失和连续问题仍使用最近 12 个月窗口，禁止用评分窗口数量冒充实际总数。
 - 无有效检验批次时 API 合格率返回 `null`，页面显示 `-`；真实 0% 必须保留为 0%。`NA` 不进入分母，`CONDITIONAL` 进入分母但不计为 PASS。
 - 进货合格率只使用规范检验批次结论：分母为最近 12 个月非 `NA` 批次，分子为 `PASS` 批次；`FAIL` 和 `CONDITIONAL` 均按失败批次扣分。无批次身份的手工工程问题只进入工程问题数量、损失和评分，不得伪造为检验批次。
@@ -58,12 +62,12 @@
 - 供应商档案主键 `suppliers.id` 是供应商域唯一身份；`nameId` 只属于名称字典命名空间。
 - 普通供应商和外部加工的画像、评分、质量问题和历史项目按 `supplierId` 读取。
 - 驻厂队伍和外部服务通过 `SupplierIdentityService.teamIdsForSupplier()` 获得 TEAM ID 集合后读取，缺失映射时不回退名称。
-- 名称只用于展示、关键字搜索和事件诊断，不得作为供应商画像聚合键。
+- 名称只用于展示、关键字搜索和迁移审计，不得作为供应商画像聚合键。
 - 跨身份域映射、回填、审计与阶段准入见 `docs/master-data-identity-governance.md`。
 
 ## 供应商身份治理 wave 状态
 
 - 画像历史项目、检验履历、评分聚合和售后评分已按供应商 ID 查询；TEAM 数据先经过 `supplier_identity_links` 映射，再按 TEAM ID 查询过程检验。
-- 检验、不合格项和售后变更事件只用 ID 驱动快照刷新。`EventEmitter` 当前为单进程、fire-and-forget；监听器失败只记录日志，没有持久化队列或自动重试。
-- `refreshBySupplierNames()` 仅用于受控 legacy maintenance，不是在线兼容策略；after-sales 和 supervision 在线供应商写入已要求 ID，名称解析只允许存在于审核过的 import/backfill 入口。
+- 检验、不合格项、售后、供应商档案和 TEAM 映射变更只用 ID 驱动持久化刷新任务；任务具有租约抢占、失败重试和发布清零门禁，不再存在 `EventEmitter` 或按名称刷新入口。
+- after-sales 和 supervision 在线供应商写入已要求 ID；名称解析只允许存在于审核过的 import/backfill 入口。
 - 本 wave 不代表部门、项目、工序等其他主数据已完成全项目 `ID_ONLY`；未解析审计和 TEAM 映射管理也尚无前端处置界面。

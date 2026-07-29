@@ -2,7 +2,6 @@
 import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import type { ChartConfig } from '#/components/Qms/ChartBuilder/types';
-import type { DeptTreeNode } from '#/types';
 
 import { reactive, ref, watch } from 'vue';
 
@@ -30,7 +29,6 @@ import {
 const props = defineProps<{
   dateMode?: 'month' | 'week' | 'year';
   dateValue?: string;
-  deptData?: DeptTreeNode[];
   initialConfig?: ChartConfig;
   open: boolean;
   year?: number;
@@ -108,7 +106,6 @@ watch(
             dateValue: props.dateValue,
             year: props.year,
           },
-          props.deptData,
         );
       }, 100);
     }

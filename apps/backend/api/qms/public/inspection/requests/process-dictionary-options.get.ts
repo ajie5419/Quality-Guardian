@@ -1,6 +1,5 @@
-import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
 import { defineEventHandler } from 'h3';
-import { DictionaryService } from '~/modules/dictionary/dictionary.service';
+import { ProcessMasterService } from '~/modules/process-master';
 import { logApiError } from '~/utils/api-logger';
 import {
   internalServerErrorResponse,
@@ -9,10 +8,15 @@ import {
 
 export default defineEventHandler(async (event) => {
   try {
-    const items = await DictionaryService.getOptions(
-      QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName,
+    const items = await ProcessMasterService.listActiveOptions();
+    return useResponseSuccess(
+      items.map((item) => ({
+        dictKey: item.name,
+        dictValue: item.name,
+        id: item.id,
+        sort: item.sort,
+      })),
     );
-    return useResponseSuccess(items);
   } catch (error) {
     logApiError(
       'public-inspection-request-process-dictionary-options',

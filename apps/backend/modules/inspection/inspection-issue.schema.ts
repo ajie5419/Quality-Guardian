@@ -71,8 +71,10 @@ export const inspectionIssueListQuerySchema = z
 const issueFields = {
   category: shortText.optional(),
   claim: z.union([z.enum(['No', 'Yes']), z.boolean()]).optional(),
-  defectSubtype: requiredText,
-  defectType: requiredText,
+  defectCategoryId: requiredText,
+  defectSubcategoryId: requiredText,
+  defectSubtype: shortText.optional(),
+  defectType: shortText.optional(),
   description: requiredLongText,
   division: shortText.optional(),
   divisionId: shortText.optional(),
@@ -128,6 +130,18 @@ const updateSchema = z
   .object(issueFields)
   .partial()
   .strict()
+  .refine(
+    (value) =>
+      (value.defectCategoryId === undefined &&
+        value.defectSubcategoryId === undefined &&
+        value.defectType === undefined &&
+        value.defectSubtype === undefined) ||
+      (Boolean(value.defectCategoryId) && Boolean(value.defectSubcategoryId)),
+    {
+      message: '缺陷分类和二级分类必须同时提供',
+      path: ['defectCategoryId'],
+    },
+  )
   .refine(
     (value) =>
       Object.entries(value).some(

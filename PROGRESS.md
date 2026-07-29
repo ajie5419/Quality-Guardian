@@ -2,12 +2,12 @@
 
 ## 当前状态
 
-- 最新变更: Permission-aware initial routing now redirects restricted users from an unavailable default dashboard to their first accessible leaf page; accounts with no accessible page receive `/403` instead of 404. Production remains on `qgs-v0.17.6`.
-- 测试状态: Route fallback tests 4/4 passed; full lint, typecheck (3/3 workspace tasks), QMS architecture check, and browser verification with the restricted `ajie` account passed.
+- 最新变更: 车辆故障率统计恢复产品分类 ID 缺失历史记录的严格快照兼容，月度数量、最早年份和缺陷排名统一按 canonical ID、已声明历史产品名称和车辆事业部识别；新数据仍强制使用分类 ID。生产环境未访问、未修改。
+- 测试状态: 全仓单元测试 `334/334` files and `2860/2860` tests passed；Backend full suite `245/245` files and `2286/2286` tests passed。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
-- 模块 TS 文件数: 517（含测试）
-- 当前版本: `0.17.6`（生产部署成功）
+- 模块 TS 文件数: 570（含测试）
+- 当前版本: `0.19.1`
 
 ## 已完成
 
@@ -50,6 +50,23 @@
 - [x] supplier identity governance wave（供应商画像、评分、检验、不合格项、售后评分、TEAM 映射、存量回填与 unresolved 审计）
 - [x] 供应商画像数据源契约修复（历史项目完整聚合、检验批次合格率、手工工程问题归属、V3 快照重算）
 - [x] 新增供应商同名软删除档案恢复（保留原 ID、并发 CAS、RESTORE 审计、业务冲突分级）
+- [x] TEAM 主数据身份治理（独立模块、稳定来源、别名、合并审计、通用字典写保护）
+- [x] 报检任务统计按 `category + teamId/supplierId/inspectorId` 聚合，名称只用于最终展示
+- [x] 受控主数据统计门禁与首波全库迁移（售后、检验、不合格品、报表、供应商评分）
+- [x] 售后与不合格品动态图表统一携带 canonical ID、名称和解析状态，前端不再按名称或部门树二次归并
+- [x] 工单看板、周报/月报缺陷分布和车辆缺陷排行按 canonical ID 聚合并透传身份状态
+- [x] 质量损失索引、检验部件、工单要求/聚合和 BOM 所需工序身份治理
+- [x] 报检 Web/小程序与工单要求 V2 ID-required 写契约
+- [x] Historical process identity bootstrap and work-order requirement `processId` backfill, including empty-only seeding and ordered release maintenance
+- [x] 全局工序主数据与报检显示配置解耦（过程报检/进货检验独立开关、稳定 ID、全局复用、无名称或工单要求兜底）
+- [x] 受控名称 `Map` 键架构门禁 `B-ID9`
+- [x] 质量二级分类开放配置（不合格项缺陷、售后产品、售后缺陷），含 Web/小程序接入、canonical ID 统计、发布初始化和历史回填
+- [x] 质量分类 migration 的 MySQL 长索引名修复、自动化门禁与本地容器数据库恢复
+- [x] 主数据治理后的质量统计与报表修复（概览、过程合格率、售后、质量损失、周报、项目排行及历史身份回填）
+- [x] 统计身份状态统一（已解析、待治理、主数据失效、不适用），保留原始证据并消除业务图表中的 `Unknown`
+- [x] 系统设置主数据治理清单与分类处置闭环（不合格项缺陷、售后产品、售后缺陷）
+- [x] 历史统计兼容与 ID 写入契约加固（旧数据按快照保留、新数据按 ID 写入、治理并发 CAS）
+- [x] 车辆故障率历史产品快照兼容（ID 主路径、精确历史快照和事业部兜底）
 - [ ] 后端业务模块逐功能测试覆盖补齐（进行中）
 
 ## 当前架构
@@ -58,7 +75,7 @@
 apps/backend/
 ├── api/          # 路由薄层（≤50 行）
 ├── middleware/   # 认证、数据权限、日志
-├── modules/      # 业务逻辑（25 个模块，517 个 TS 文件）
+├── modules/      # 业务逻辑（28 个模块，570 个 TS 文件）
 ├── prisma/       # Schema + Migrations
 ├── routes/       # catch-all 404
 └── utils/        # 基础设施（24 个文件）
@@ -72,15 +89,22 @@ apps/backend/
 - [ ] 人工处置事业部回填遗留的 124 条工单和不合格项侧 8 个无法解析计数
 - [x] 完成 supplier identity wave 的 PR、release-please、部署、migration、回填和健康检查
 - [ ] 使用已登录业务账号验收秦皇岛吉兴机械制造有限公司供应商画像的 7 月 8 日不合格项、手工工程问题、进货合格率和完整历史项目
-- [ ] 为 `unresolved_master_data_refs` 增加人工处置 API/UI，并为 `supplier_identity_links` 增加管理 UI
+- [ ] 为 `supplier_identity_links` 增加管理 UI
+- [ ] 在本地管理员登录态或容器恢复后，通过主数据治理页处置 `ISS-2026-_O7D0ZBC` 的缺陷分类审计；当前保持 `OPEN`，未绕过认证或直接改库
 - [ ] 为 supervision 等尚未覆盖的存量供应商引用补齐回填、unresolved 审计和生产指标核对
 - [ ] 将其他受控主数据从 `DUAL_WRITE/legacy` 逐 wave 推进到在线 `ID-required`
+- [ ] 按生产 V1/V2 流量和 `missing_id_count` 指标删除报检/工单要求 V1 迁移协议
+- [ ] 继续核对尚未登记的动态字段和名称分支路径
+- [ ] 治理售后反馈部门、检验归档、BOM 项目和文档项目剩余的 18 条缺失身份及反馈部门孤儿引用
+- [ ] 通过发布流程部署 TEAM identity migrations，执行有序 reconciliation/category backfill，并核对生产报检排行总数与 unresolved 审计
+- [ ] Deliver the process identity bootstrap and inspection-request option migration through the release workflow, then verify production counts without manual database edits
+- [ ] 通过发布流程部署质量分类 migration 和有序维护脚本，核对三套初始分类、历史回填数量及 unresolved 审计
 - [ ] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制
 
 ## 基线数据（用于异常检测）
 
-- 模块 TS 文件数: 517（含测试）
-- utils TS 文件数: 41
-- 测试文件数: 200（modules 内）；后端总计 223
+- 模块 TS 文件数: 570（含测试）
+- utils TS 文件数: 44
+- 后端测试文件数: 245
 - 导出入口基线: 约 610；已完成 343，剩余 267
 - 顶层目录: api/ middleware/ modules/ prisma/ routes/ utils/

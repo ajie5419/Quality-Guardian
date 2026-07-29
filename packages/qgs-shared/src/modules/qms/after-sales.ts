@@ -1,7 +1,11 @@
+import type { IdentityAggregateItem } from '../../domain-modules/qms/identity-aggregate';
+
 export interface AfterSalesItem {
   closeDate: string; // 问题关闭日期
   createdAt: string; // 创建日期
   customerName: string; // 客户名称
+  defectCategoryId?: string; // Defect primary classification
+  defectSubcategoryId?: string; // Defect secondary classification
   defectSubtype?: string; // 缺陷二级分类
   defectType: string; // 缺陷分类
   division?: string; // 事业部
@@ -18,6 +22,8 @@ export interface AfterSalesItem {
   partName?: string; // 部件名称
   photos?: string[]; // 现场照片
   photoThumbUrl?: string; // 缩略图地址（列表展示）
+  productCategoryId?: string; // Product primary classification
+  productSubcategoryId?: string; // Product secondary classification
   productSubtype?: string; // 产品二级分类
   productType?: string; // 产品类型
   projectName: string; // 项目名称
@@ -40,12 +46,16 @@ export interface AfterSalesParams {
   customerName?: string;
   dateMode?: 'month' | 'week' | 'year';
   dateValue?: string;
+  defectCategoryId?: string;
+  defectSubcategoryId?: string;
   defectType?: string;
   endDate?: string;
   handler?: string;
   page?: number;
   pageSize?: number;
   partName?: string;
+  productCategoryId?: string;
+  productSubcategoryId?: string;
   productType?: string;
   projectName?: string;
   responsibleDept?: string;
@@ -57,19 +67,29 @@ export interface AfterSalesParams {
   year?: number;
 }
 
+export type AfterSalesWritePayload = Omit<
+  Partial<AfterSalesItem>,
+  | 'defectCategoryId'
+  | 'defectSubcategoryId'
+  | 'productCategoryId'
+  | 'productSubcategoryId'
+> & {
+  defectCategoryId: string;
+  defectSubcategoryId: string;
+  productCategoryId: string;
+  productSubcategoryId: string;
+};
+
 export interface AfterSalesStats {
-  defectDistribution: { name: string; value: number }[];
-  deptDistribution: { name: string; value: number }[];
+  defectDistribution: IdentityAggregateItem[];
+  deptDistribution: IdentityAggregateItem[];
   kpi: {
     avgTime: number;
     cost: number;
     open: number;
     total: number;
   };
-  supplierRanking: {
-    categories: string[];
-    data: number[];
-  };
+  supplierRanking: IdentityAggregateItem[];
   trend: {
     category: string[];
     closed: number[];

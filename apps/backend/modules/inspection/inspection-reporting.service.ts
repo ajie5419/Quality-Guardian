@@ -1,8 +1,9 @@
 import { Prisma } from '@prisma/client';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
-import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
+import { InspectionReportStatisticsService } from './inspection-report-statistics.service';
 import { buildSupplierEngineeringIssueWhere } from './inspection-supplier-profile';
 
 export const InspectionReportingService = {
@@ -14,22 +15,26 @@ export const InspectionReportingService = {
     return row?.id || null;
   },
   async updateQualityLossFields(params: { actualClaim?: number; id: string }) {
-    const current = await prisma.quality_records.findUnique({
-      where: { id: params.id },
-      select: { supplierId: true, supplierName: true },
-    });
-    const updated = await prisma.quality_records.update({
-      where: { id: params.id },
-      data: {
-        recoveredAmount: params.actualClaim,
-        updatedAt: new Date(),
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const current = await tx.quality_records.findUnique({
+        where: { id: params.id },
+        select: { supplierId: true },
+      });
+      const updated = await tx.quality_records.update({
+        where: { id: params.id },
+        data: {
+          recoveredAmount: params.actualClaim,
+          updatedAt: new Date(),
+        },
+      });
+      await MetricRefreshQueue.enqueueSupplierScores(
+        tx,
+        [current?.supplierId, updated.supplierId],
+        'inspection-issue.quality-loss-updated',
+      );
+      return updated;
     });
     await QualityLossIndexService.upsertFromInternal(updated);
-    eventBus.emit('inspection_issue.changed', {
-      supplierIds: [current?.supplierId],
-      supplierNames: [current?.supplierName],
-    });
   },
 
   async getQualityLossTrendRows(params: {
@@ -179,14 +184,7 @@ export const InspectionReportingService = {
       engineeringTotalStats,
     ] = await Promise.all([
       prisma.inspections.groupBy({
-        by: [
-          'category',
-          'supplierId',
-          'supplierName',
-          'teamId',
-          'team',
-          'result',
-        ],
+        by: ['category', 'supplierId', 'teamId', 'result'],
         where: {
           OR: inspectionSourceOr,
           isDeleted: false,
@@ -196,13 +194,13 @@ export const InspectionReportingService = {
         _sum: { quantity: true },
       }),
       prisma.quality_records.groupBy({
-        by: ['supplierId', 'supplierName'],
+        by: ['supplierId'],
         where: recentEngineeringWhere,
         _sum: { lossAmount: true, quantity: true },
         _count: { id: true },
       }),
       prisma.quality_records.groupBy({
-        by: ['supplierId', 'supplierName', 'status'],
+        by: ['supplierId', 'status'],
         where: recentEngineeringWhere,
         _count: { id: true },
       }),
@@ -218,7 +216,7 @@ export const InspectionReportingService = {
         orderBy: { date: 'desc' },
       }),
       prisma.quality_records.groupBy({
-        by: ['supplierId', 'supplierName'],
+        by: ['supplierId'],
         where: allEngineeringWhere,
         _count: { id: true },
       }),
@@ -379,31 +377,16 @@ export const InspectionReportingService = {
   async getReportDefectRows(params: { end: Date; start: Date }) {
     return prisma.quality_records.findMany({
       where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
-      select: { defectType: true, defectTypeId: true },
+      select: { defectCategoryId: true, defectType: true },
     });
   },
 
   async getReportTopRiskProjects(params: { end: Date; start: Date }) {
-    return prisma.quality_records.groupBy({
-      by: ['projectName'],
-      where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
-      _count: true,
-      _sum: { lossAmount: true },
-      orderBy: { _sum: { lossAmount: 'desc' } },
-      take: 5,
-    });
+    return InspectionReportStatisticsService.getTopRiskProjects(params);
   },
 
   async getReportSupplierPerformance(params: { end: Date; start: Date }) {
-    return prisma.quality_records.groupBy({
-      by: ['supplierName'],
-      where: {
-        date: { gte: params.start, lte: params.end },
-        isDeleted: false,
-        supplierName: { not: null },
-      },
-      _count: true,
-    });
+    return InspectionReportStatisticsService.getSupplierPerformance(params);
   },
 
   async getReportMajorEvents(params: { end: Date; start: Date }) {
@@ -454,11 +437,9 @@ export const InspectionReportingService = {
         prisma.quality_records.count({
           where: { ...baseWhere, date: { gte: params.weekStart } },
         }),
-        prisma.quality_records.groupBy({
-          by: ['defectType'],
-          where: { ...baseWhere, date: { gte: params.yearStart } },
-          _count: { id: true },
-        }),
+        InspectionReportStatisticsService.getDefectDistribution(
+          params.yearStart,
+        ),
       ]);
 
     return {
@@ -466,10 +447,7 @@ export const InspectionReportingService = {
       weeklyCount: weekCount || 0,
       totalLoss: Number(yearAggregate._sum.lossAmount || 0),
       weeklyLoss: Number(weekAggregate._sum.lossAmount || 0),
-      issueDistribution: yearTypeStats.map((item) => ({
-        type: item.defectType || 'Unknown',
-        value: item._count.id,
-      })),
+      issueDistribution: yearTypeStats,
     };
   },
 };

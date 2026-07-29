@@ -72,7 +72,11 @@ vi.mock('~/modules/quality-loss/quality-loss-update', () => ({
       actualClaim: body.actualClaim,
       amount: body.amount,
       occurDate: body.occurDate,
-      respDept: body.respDept,
+      respDeptId:
+        typeof body.responsibleDepartmentId === 'string' &&
+        body.responsibleDepartmentId.trim()
+          ? body.responsibleDepartmentId.trim()
+          : undefined,
       status: body.status,
       type: body.type,
     };
@@ -199,6 +203,112 @@ describe('quality-loss-route-update.service', () => {
         }),
       }),
     );
+  });
+
+  it('rebuilds the department snapshot from canonical ID in the update transaction', async () => {
+    const { QualityLossRouteUpdateService } = await import(
+      '~/modules/quality-loss/quality-loss-route-update.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+    const update = vi.fn().mockResolvedValue({
+      id: 'manual-1',
+      respDept: 'Current Quality',
+      respDeptId: 'dept-qa',
+    });
+    const findFirst = vi.fn().mockResolvedValue({
+      id: 'dept-qa',
+      name: 'Current Quality',
+    });
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({
+        departments: { findFirst },
+        quality_losses: { update },
+      }),
+    );
+
+    const result = await QualityLossRouteUpdateService.updateByRouteId({
+      body: {
+        lossSource: 'Manual',
+        responsibleDepartment: 'Historical Quality',
+        responsibleDepartmentId: 'dept-qa',
+      },
+      id: 'QL-2026-001',
+      userId: 'user-1',
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: 'dept-qa', isDeleted: false, status: 1 },
+      select: { id: true, name: true },
+    });
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          respDept: 'Current Quality',
+          respDeptId: 'dept-qa',
+        }),
+      }),
+    );
+  });
+
+  it('preserves the historical department snapshot when no valid ID is submitted', async () => {
+    const { QualityLossRouteUpdateService } = await import(
+      '~/modules/quality-loss/quality-loss-route-update.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+    const update = vi.fn().mockResolvedValue({ id: 'manual-1' });
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({ quality_losses: { update } }),
+    );
+
+    await QualityLossRouteUpdateService.updateByRouteId({
+      body: {
+        amount: 100,
+        lossSource: 'Manual',
+        responsibleDepartment: 'Historical Quality',
+        responsibleDepartmentId: null,
+      },
+      id: 'QL-2026-001',
+      userId: 'user-1',
+    });
+
+    const data = update.mock.calls[0]?.[0]?.data;
+    expect(data).not.toHaveProperty('respDept');
+    expect(data).not.toHaveProperty('respDeptId');
+  });
+
+  it('rejects an inactive or unknown department ID without updating the row', async () => {
+    const { QualityLossRouteUpdateService } = await import(
+      '~/modules/quality-loss/quality-loss-route-update.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+    const update = vi.fn();
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({
+        departments: { findFirst: vi.fn().mockResolvedValue(null) },
+        quality_losses: { update },
+      }),
+    );
+
+    const result = await QualityLossRouteUpdateService.updateByRouteId({
+      body: {
+        lossSource: 'Manual',
+        responsibleDepartmentId: 'dept-missing',
+      },
+      id: 'QL-2026-001',
+      userId: 'user-1',
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        code: 'BAD_REQUEST',
+        ok: false,
+      }),
+    );
+    expect(update).not.toHaveBeenCalled();
   });
 
   it('should update external record via AfterSalesService', async () => {

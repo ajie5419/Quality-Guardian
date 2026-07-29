@@ -17,9 +17,10 @@ import {
   parseInspectionRequestQuantity as parseInspectionRequestQuantityRule,
   serializeInspectionStationSelection as serializeInspectionStationSelectionRule,
 } from '@qgs/shared';
-import { InspectionService } from '~/modules/inspection/inspection.service';
 import { resolveTaskDispatchCurrentUserId } from '~/modules/task-dispatch/task-dispatch-rules';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
+
+import { InspectionRecordCreateService } from './inspection-record-create.service';
 
 export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
 
@@ -90,6 +91,7 @@ export function buildInspectionRecordPayloadCore(input: {
   body: Record<string, unknown>;
   request: {
     attachments?: unknown;
+    category?: null | string;
     closeRemark?: null | string;
     componentName?: null | string;
     mutualCheckResult: string;
@@ -107,63 +109,7 @@ export function buildInspectionRecordPayloadCore(input: {
     workOrderNumber: string;
   };
 }) {
-  const payload = buildInspectionRecordPayloadCoreRule(input);
-  if (!isIncomingInspectionRequestProcess(input.request.processName)) {
-    return payload;
-  }
-  if (payload.category === 'INCOMING') {
-    return payload;
-  }
-
-  const requestInfo = parseIncomingInspectionRequestInfo(
-    input.request.requestInfo,
-  );
-  return {
-    category: 'INCOMING' as const,
-    documents: payload.documents,
-    hasDocuments: payload.hasDocuments,
-    hasSelfCheckDocuments: payload.hasSelfCheckDocuments,
-    inspectionDate: payload.inspectionDate,
-    inspector: payload.inspector,
-    incomingType: requestInfo.incomingType || INCOMING_INSPECTION_PROCESS_NAME,
-    items: Array.isArray(input.body.inspectionItems)
-      ? input.body.inspectionItems
-      : [
-          {
-            acceptanceCriteria: '来料外观、数量和资料符合进货检验要求。',
-            checkItem: `${INCOMING_INSPECTION_PROCESS_NAME} ${input.request.partName}`,
-            measuredValue: payload.result === 'FAIL' ? 'FAIL' : 'PASS',
-            remarks: requestInfo.notes,
-            result: payload.result,
-            standardValue: 'PASS',
-          },
-        ],
-    materialName: input.request.partName,
-    projectName: payload.projectName,
-    qualifiedQuantity: payload.qualifiedQuantity,
-    quantity: payload.quantity,
-    remarks: requestInfo.notes || payload.remarks,
-    result: payload.result,
-    selfCheckDocuments: payload.selfCheckDocuments,
-    stationSelection: payload.stationSelection,
-    supplierName: normalizeInspectionRequestText(input.request.team),
-    unqualifiedQuantity: payload.unqualifiedQuantity,
-    workOrderNumber: payload.workOrderNumber,
-  };
-}
-
-function parseIncomingInspectionRequestInfo(value?: null | string) {
-  const raw = normalizeInspectionRequestText(value);
-  if (!raw) return { incomingType: '', notes: '' };
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return {
-      incomingType: normalizeInspectionRequestText(parsed.incomingType),
-      notes: normalizeInspectionRequestText(parsed.notes),
-    };
-  } catch {
-    return { incomingType: '', notes: raw };
-  }
+  return buildInspectionRecordPayloadCoreRule(input);
 }
 
 export async function generateInspectionRequestNo(
@@ -209,6 +155,7 @@ export async function resolveInspectionRequestCurrentUserId(
 export async function buildInspectionRecordFromRequest(
   request: {
     attachments?: unknown;
+    category?: null | string;
     closeRemark?: null | string;
     componentName?: null | string;
     mutualCheckResult: string;
@@ -230,7 +177,7 @@ export async function buildInspectionRecordFromRequest(
   override?: { projectName?: null | string; workOrderNumber?: string },
   client?: Prisma.TransactionClient,
 ) {
-  return InspectionService.create(
+  return InspectionRecordCreateService.create(
     buildInspectionRecordPayloadCore({
       body,
       request: {

@@ -4,8 +4,7 @@ import type {
   MasterDataTarget,
 } from './master-data-fields';
 
-import { randomUUID } from 'node:crypto';
-
+import { createId } from '@paralleldrive/cuid2';
 import prisma from '~/utils/prisma';
 
 import {
@@ -13,9 +12,16 @@ import {
   listMasterDataGovernanceFields,
 } from './master-data-fields';
 
-type CountRow = { count: bigint | number | string };
+type DatabaseCount =
+  | bigint
+  | null
+  | number
+  | string
+  | undefined
+  | { toString(): string };
+type CountRow = { count: DatabaseCount };
 type DistinctValueRow = { value: null | string };
-type ValueCountRow = { count: bigint | number | string; value: null | string };
+type ValueCountRow = { count: DatabaseCount; value: null | string };
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
@@ -187,15 +193,18 @@ async function buildActiveRowWhereSql(tableName: string, alias = '') {
   return '1 = 1';
 }
 
-function toAffectedRows(value: bigint | number | string | undefined) {
+function toAffectedRows(value: DatabaseCount) {
   if (typeof value === 'bigint') {
     return Number(value);
   }
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : 0;
   }
-  if (typeof value === 'string' && value.length > 0) {
-    const parsed = Number(value);
+  if (
+    (typeof value === 'string' && value.length > 0) ||
+    (typeof value === 'object' && value !== null)
+  ) {
+    const parsed = Number(value.toString());
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
@@ -469,6 +478,7 @@ async function seedCanonicalByNames(
   canonical: MasterDataCanonicalRelation,
   names: string[],
 ) {
+  let insertedRows = 0;
   if (
     canonical.table === 'master_projects' ||
     canonical.table === 'master_parts'
@@ -476,34 +486,38 @@ async function seedCanonicalByNames(
     const table = quoteIdentifier(canonical.table);
     const nameColumn = quoteIdentifier(canonical.nameColumn);
     for (const [sort, name] of names.entries()) {
-      await prisma.$executeRawUnsafe(
-        `INSERT IGNORE INTO ${table} (
+      insertedRows += toAffectedRows(
+        await prisma.$executeRawUnsafe(
+          `INSERT IGNORE INTO ${table} (
          id, ${nameColumn}, sort, status, isDeleted, createdAt, updatedAt
        ) VALUES (?, ?, ?, 1, 0, NOW(3), NOW(3))`,
-        randomUUID(),
-        name,
-        sort,
+          createId(),
+          name,
+          sort,
+        ),
       );
     }
-    return;
+    return insertedRows;
   }
 
   if (canonical.table === 'processes') {
     for (const [sort, name] of names.entries()) {
-      await prisma.$executeRawUnsafe(
-        `INSERT IGNORE INTO processes (
+      insertedRows += toAffectedRows(
+        await prisma.$executeRawUnsafe(
+          `INSERT IGNORE INTO processes (
          id, name, code, sort, status, isDeleted, createdAt, updatedAt
        ) VALUES (?, ?, NULL, ?, 1, 0, NOW(3), NOW(3))`,
-        randomUUID(),
-        name,
-        sort,
+          createId(),
+          name,
+          sort,
+        ),
       );
     }
-    return;
+    return insertedRows;
   }
 
   if (canonical.table !== 'dictionaries') {
-    return;
+    return insertedRows;
   }
 
   const field = listMasterDataGovernanceFields().find(
@@ -514,30 +528,36 @@ async function seedCanonicalByNames(
       item.source.type === 'dictionary',
   );
   if (!field || field.source.type !== 'dictionary') {
-    return;
+    return insertedRows;
   }
 
   for (const [sort, name] of names.entries()) {
-    await prisma.$executeRawUnsafe(
-      `INSERT IGNORE INTO dictionaries (
+    insertedRows += toAffectedRows(
+      await prisma.$executeRawUnsafe(
+        `INSERT IGNORE INTO dictionaries (
          id, dictType, dictKey, dictValue, sort, status, isDeleted, createdAt, updatedAt
        ) VALUES (?, ?, ?, ?, ?, 1, 0, NOW(3), NOW(3))`,
-      randomUUID(),
-      field.source.dictType,
-      name,
-      name,
-      sort,
+        createId(),
+        field.source.dictType,
+        name,
+        name,
+        sort,
+      ),
     );
   }
+  return insertedRows;
 }
 
 async function readDistinctTargetNames(target: MasterDataTarget) {
   const tableName = quoteIdentifier(target.table);
   const nameColumn = quoteIdentifier(target.nameColumn);
+  const activeRowWhere = await buildActiveRowWhereSql(target.table);
   const rows = await prisma.$queryRawUnsafe<Array<{ value: null | string }>>(
     `SELECT DISTINCT ${nameColumn} AS value
      FROM ${tableName}
-     WHERE ${nameColumn} IS NOT NULL AND TRIM(${nameColumn}) <> ''`,
+     WHERE ${nameColumn} IS NOT NULL
+       AND TRIM(${nameColumn}) <> ''
+       AND ${activeRowWhere}`,
   );
   const valueSet = new Set<string>();
   for (const row of rows) {
@@ -549,11 +569,165 @@ async function readDistinctTargetNames(target: MasterDataTarget) {
   return [...valueSet];
 }
 
+async function readDistinctMissingCanonicalIdTargetNames(
+  target: MasterDataTarget,
+) {
+  if (!target.idColumn) return [];
+  const tableName = quoteIdentifier(target.table);
+  const nameColumn = quoteIdentifier(target.nameColumn);
+  const idColumn = quoteIdentifier(target.idColumn);
+  const activeRowWhere = await buildActiveRowWhereSql(target.table);
+  const rows = await prisma.$queryRawUnsafe<Array<{ value: null | string }>>(
+    `SELECT DISTINCT ${nameColumn} AS value
+     FROM ${tableName}
+     WHERE ${nameColumn} IS NOT NULL
+       AND TRIM(${nameColumn}) <> ''
+       AND ${idColumn} IS NULL
+       AND ${activeRowWhere}`,
+  );
+  const valueSet = new Set<string>();
+  for (const row of rows) {
+    const value = normalizeValue(row.value);
+    if (value) valueSet.add(value);
+  }
+  return [...valueSet];
+}
+
+async function countCanonicalRows(canonical: MasterDataCanonicalRelation) {
+  const tableName = quoteIdentifier(canonical.table);
+  const rows = await prisma.$queryRawUnsafe<CountRow[]>(
+    `SELECT COUNT(*) AS count FROM ${tableName}`,
+  );
+  return toAffectedRows(rows[0]?.count);
+}
+
+async function persistUnresolvedCanonicalRefs(params: {
+  configKey: string;
+  rows: Array<{ rowKey: string; value: string }>;
+  target: MasterDataTarget;
+}) {
+  const fieldName = params.target.idColumn;
+  if (!fieldName || params.rows.length === 0) return;
+  const canonicalTable = getFieldOrThrow(params.configKey).canonical?.table;
+  if (!canonicalTable) {
+    throw new Error(`CANONICAL_RELATION_REQUIRED:${params.configKey}`);
+  }
+  const evidence = {
+    canonicalTable,
+    configKey: params.configKey,
+    targetNameColumn: params.target.nameColumn,
+  };
+  const batchSize = 50;
+  for (let offset = 0; offset < params.rows.length; offset += batchSize) {
+    const batch = params.rows.slice(offset, offset + batchSize);
+    await Promise.all(
+      batch.map((row) =>
+        prisma.unresolved_master_data_refs.upsert({
+          where: {
+            entityType_entityId_fieldName: {
+              entityId: row.rowKey,
+              entityType: params.target.table,
+              fieldName,
+            },
+          },
+          create: {
+            entityId: row.rowKey,
+            entityType: params.target.table,
+            evidence,
+            fieldName,
+            rawId: null,
+            rawName: row.value,
+            reason: 'NO_EXACT_CANONICAL_MATCH',
+          },
+          update: {
+            evidence,
+            isDeleted: false,
+            rawId: null,
+            rawName: row.value,
+            reason: 'NO_EXACT_CANONICAL_MATCH',
+            resolutionNote: null,
+            resolvedAt: null,
+            resolvedId: null,
+            status: 'OPEN',
+          },
+        }),
+      ),
+    );
+  }
+}
+
+async function resolveCanonicalRefs(params: {
+  pairs: Array<{ canonicalId: string; rowKey: string }>;
+  target: MasterDataTarget;
+}) {
+  const fieldName = params.target.idColumn;
+  if (!fieldName || params.pairs.length === 0) return;
+  const tableName = quoteIdentifier(params.target.table);
+  const primaryKeyColumn = await getSinglePrimaryKeyColumn(params.target.table);
+  if (!primaryKeyColumn) {
+    throw new Error(`UNSUPPORTED_PRIMARY_KEY:${params.target.table}`);
+  }
+  const rowKeyColumn = quoteIdentifier(primaryKeyColumn);
+  const canonicalIdColumn = quoteIdentifier(fieldName);
+  const placeholders = params.pairs.map(() => '?').join(', ');
+  const persistedRows = await prisma.$queryRawUnsafe<
+    Array<{ canonicalId: null | string; rowKey: string }>
+  >(
+    `SELECT ${rowKeyColumn} AS rowKey, ${canonicalIdColumn} AS canonicalId
+     FROM ${tableName}
+     WHERE ${rowKeyColumn} IN (${placeholders})`,
+    ...params.pairs.map((pair) => pair.rowKey),
+  );
+  const expectedIdByRowKey = new Map(
+    params.pairs.map((pair) => [pair.rowKey, pair.canonicalId]),
+  );
+  const confirmedPairs = persistedRows.filter(
+    (row) => expectedIdByRowKey.get(row.rowKey) === row.canonicalId,
+  );
+  const batchSize = 50;
+  for (let offset = 0; offset < confirmedPairs.length; offset += batchSize) {
+    const batch = confirmedPairs.slice(offset, offset + batchSize);
+    const openAudits = await prisma.unresolved_master_data_refs.findMany({
+      where: {
+        entityId: { in: batch.map((pair) => pair.rowKey) },
+        entityType: params.target.table,
+        fieldName,
+        isDeleted: false,
+        status: 'OPEN',
+      },
+      select: { entityId: true },
+    });
+    const openEntityIds = new Set(openAudits.map((audit) => audit.entityId));
+    await Promise.all(
+      batch
+        .filter((pair) => openEntityIds.has(pair.rowKey))
+        .map((pair) =>
+          prisma.unresolved_master_data_refs.updateMany({
+            where: {
+              entityId: pair.rowKey,
+              entityType: params.target.table,
+              fieldName,
+              isDeleted: false,
+              status: 'OPEN',
+            },
+            data: {
+              resolutionNote: 'Resolved by deterministic canonical ID backfill',
+              resolvedAt: new Date(),
+              resolvedId: pair.canonicalId,
+              status: 'RESOLVED',
+            },
+          }),
+        ),
+    );
+  }
+}
+
 async function backfillTargetCanonicalIds(
   target: MasterDataTarget,
   resolvedIdMap: Map<string, string>,
   options: {
     batchSize: number;
+    configKey: string;
     maxBatches?: number;
     maxRows?: number;
     startAfterId?: null | string;
@@ -579,6 +753,7 @@ async function backfillTargetCanonicalIds(
   const rowKeyColumn = quoteIdentifier(primaryKeyColumn);
   const nameColumn = quoteIdentifier(target.nameColumn);
   const canonicalIdColumn = quoteIdentifier(target.idColumn);
+  const activeRowWhere = await buildActiveRowWhereSql(target.table);
   const batchSize = Math.max(1, Number(options.batchSize || 1000));
   const maxRows = Math.max(0, Number(options.maxRows || 0));
   const maxBatches = Math.max(0, Number(options.maxBatches || 0));
@@ -607,6 +782,7 @@ async function backfillTargetCanonicalIds(
        WHERE ${canonicalIdColumn} IS NULL
          AND ${nameColumn} IS NOT NULL
          AND TRIM(${nameColumn}) <> ''
+         AND ${activeRowWhere}
          AND (? IS NULL OR ${rowKeyColumn} > ?)
        ORDER BY ${rowKeyColumn} ASC
        LIMIT ?`,
@@ -630,9 +806,17 @@ async function backfillTargetCanonicalIds(
       .filter((row): row is { canonicalId: string; rowKey: string } =>
         Boolean(row.canonicalId),
       );
+    const unresolved = rows.filter(
+      (row) => !resolvedIdMap.has(normalizeValue(row.value)),
+    );
+    unresolvedRows += unresolved.length;
+    await persistUnresolvedCanonicalRefs({
+      configKey: options.configKey,
+      rows: unresolved,
+      target,
+    });
 
     if (pairs.length === 0) {
-      unresolvedRows += rows.length;
       if (rows.length < limit) {
         exhausted = true;
         break;
@@ -653,10 +837,12 @@ async function backfillTargetCanonicalIds(
     const affectedRows = await prisma.$executeRawUnsafe(
       `UPDATE ${tableName}
        SET ${canonicalIdColumn} = CASE ${rowKeyColumn} ${caseWhenSql} ELSE ${canonicalIdColumn} END
-       WHERE ${rowKeyColumn} IN (${placeholders})`,
+       WHERE ${canonicalIdColumn} IS NULL
+         AND ${rowKeyColumn} IN (${placeholders})`,
       ...params,
     );
     updatedRows += toAffectedRows(affectedRows);
+    await resolveCanonicalRefs({ pairs, target });
     if (rows.length < limit) {
       exhausted = true;
       break;
@@ -677,6 +863,10 @@ async function backfillTargetCanonicalIds(
 export const __masterDataGovernanceTestHooks = {
   backfillTargetCanonicalIds,
   buildActiveRowWhereSql,
+  countCanonicalRows,
+  readDistinctMissingCanonicalIdTargetNames,
+  seedCanonicalByNames,
+  toAffectedRows,
   resetCaches() {
     TABLE_COLUMN_CACHE.clear();
     TABLE_PRIMARY_KEY_CACHE.clear();
@@ -1072,6 +1262,7 @@ export const MasterDataGovernanceKernel = {
       if (!target.idColumn) continue;
       const progress = await backfillTargetCanonicalIds(target, resolvedIdMap, {
         batchSize,
+        configKey: options.configKey,
         maxBatches: options.maxBatchesPerTable,
         maxRows: options.maxRowsPerTable,
         startAfterId: options.startAfterIdsByTable?.[target.table],
@@ -1100,8 +1291,8 @@ export const MasterDataGovernanceKernel = {
       const activeRowWhere = await buildActiveRowWhereSql(target.table);
       const rows = await prisma.$queryRawUnsafe<
         Array<{
-          missingCanonicalId: bigint | number | string;
-          totalWithName: bigint | number | string;
+          missingCanonicalId: DatabaseCount;
+          totalWithName: DatabaseCount;
         }>
       >(
         `SELECT
@@ -1147,8 +1338,8 @@ export const MasterDataGovernanceKernel = {
       const activeRowWhere = await buildActiveRowWhereSql(target.table, 't');
       const rows = await prisma.$queryRawUnsafe<
         Array<{
-          invalidCanonicalId: bigint | number | string;
-          mismatchedCanonicalName: bigint | number | string;
+          invalidCanonicalId: DatabaseCount;
+          mismatchedCanonicalName: DatabaseCount;
         }>
       >(
         `SELECT
@@ -1254,13 +1445,62 @@ export const MasterDataGovernanceKernel = {
     if (!field.canonical) {
       return { seededCanonicalRows: 0 };
     }
+    if (
+      field.canonicalSeedPolicy === 'empty-only' &&
+      (await countCanonicalRows(field.canonical)) > 0
+    ) {
+      return { seededCanonicalRows: 0 };
+    }
     const sourceValues = await fetchSourceValues(field);
     const values = [...sourceValues].sort((a, b) =>
       a.localeCompare(b, 'zh-CN'),
     );
-    await seedCanonicalByNames(field.canonical, values);
+    const seededCanonicalRows = await seedCanonicalByNames(
+      field.canonical,
+      values,
+    );
     return {
-      seededCanonicalRows: values.length,
+      seededCanonicalRows,
+    };
+  },
+
+  async bootstrapCanonicalFromTargetNames(configKey: string) {
+    const field = getFieldOrThrow(configKey);
+    if (!field.canonical) {
+      return {
+        candidateCanonicalRows: 0,
+        canonicalRowsBeforeBootstrap: 0,
+        seededCanonicalRows: 0,
+        status: 'not-applicable' as const,
+      };
+    }
+    const canonicalRowsBeforeBootstrap = await countCanonicalRows(
+      field.canonical,
+    );
+    if (canonicalRowsBeforeBootstrap > 0) {
+      return {
+        candidateCanonicalRows: 0,
+        canonicalRowsBeforeBootstrap,
+        seededCanonicalRows: 0,
+        status: 'already-initialized' as const,
+      };
+    }
+    const names = new Set<string>();
+    for (const target of field.targets) {
+      if (!target.idColumn) continue;
+      const values = await readDistinctMissingCanonicalIdTargetNames(target);
+      for (const value of values) names.add(value);
+    }
+    const values = [...names].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+    const seededCanonicalRows = await seedCanonicalByNames(
+      field.canonical,
+      values,
+    );
+    return {
+      candidateCanonicalRows: values.length,
+      canonicalRowsBeforeBootstrap,
+      seededCanonicalRows,
+      status: 'bootstrapped' as const,
     };
   },
 

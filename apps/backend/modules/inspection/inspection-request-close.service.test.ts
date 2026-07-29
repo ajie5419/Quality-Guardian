@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRequestCloseService } from '~/modules/inspection/inspection-request-close.service';
-import { eventBus } from '~/utils/event-bus';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -79,6 +79,12 @@ vi.mock('~/modules/system-log/audit-log', () => ({
   recordBusinessAuditLog: vi.fn(),
 }));
 
+vi.mock('~/modules/metric-refresh', () => ({
+  MetricRefreshQueue: {
+    enqueueSupplierScoresForInspectionIdentities: vi.fn(),
+  },
+}));
+
 const mockRequest = {
   attachments: JSON.stringify([
     { name: 'self.pdf', url: 'http://example.com/self.pdf' },
@@ -120,7 +126,6 @@ describe('inspectionRequestCloseService', () => {
   });
 
   it('should close request with PASS result', async () => {
-    const eventEmit = vi.spyOn(eventBus, 'emit');
     (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
       mockRequest,
     );
@@ -138,6 +143,14 @@ describe('inspectionRequestCloseService', () => {
         },
         qms_task_dispatches: {
           updateMany: vi.fn(),
+        },
+        inspections: {
+          findMany: vi.fn().mockResolvedValue([
+            {
+              supplierId: 'supplier-1',
+              teamId: 'team-1',
+            },
+          ]),
         },
       }),
     );
@@ -157,12 +170,16 @@ describe('inspectionRequestCloseService', () => {
     expect(result).toBeDefined();
     expect(prisma.qms_inspection_requests.findFirst).toHaveBeenCalled();
     expect(prisma.$transaction).toHaveBeenCalled();
-    expect(eventEmit).toHaveBeenCalledWith('inspection_record.changed', {
-      supplierIds: ['supplier-1'],
-      supplierNames: ['Resident Team'],
-      teamIds: ['team-1'],
-      teamNames: ['Resident Team'],
-    });
+    expect(
+      MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities,
+    ).toHaveBeenCalledWith(
+      expect.any(Object),
+      {
+        supplierIds: ['supplier-1'],
+        teamIds: ['team-1'],
+      },
+      'inspection-request.closed',
+    );
     const { syncCloseAttachments } = await import(
       '~/modules/inspection/inspection-request-close-effects.service'
     );

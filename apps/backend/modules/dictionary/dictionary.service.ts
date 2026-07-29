@@ -1,5 +1,4 @@
 import { QMS_DICTIONARY_TYPES } from '@qgs/shared';
-import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 import { buildKeywordOr } from '~/utils/query-helpers';
@@ -7,6 +6,8 @@ import { redis } from '~/utils/redis';
 
 const DICT_CACHE_KEY_PREFIX = 'qms:dict';
 const DICT_OPTIONS_TTL_SECONDS = 3600 * 24;
+const INSPECTION_PROCESS_DICTIONARY_TYPE = 'inspection_process_name';
+const TEAM_DICTIONARY_TYPE = 'team';
 const SUPPORTED_DICT_TYPES = new Set<string>(
   QMS_DICTIONARY_TYPES as readonly string[],
 );
@@ -58,6 +59,23 @@ function ensureSupportedDictType(dictType: string) {
   }
 }
 
+function ensureGenericMutationAllowed(dictType: string) {
+  if (dictType === TEAM_DICTIONARY_TYPE) {
+    throw new BusinessError(
+      'TEAM_REQUIRES_DEDICATED_API',
+      'TEAM identities must be managed through the dedicated TEAM API',
+      409,
+    );
+  }
+  if (dictType === INSPECTION_PROCESS_DICTIONARY_TYPE) {
+    throw new BusinessError(
+      'PROCESS_REQUIRES_DEDICATED_API',
+      'Inspection processes must be managed through the dedicated process API',
+      409,
+    );
+  }
+}
+
 async function invalidateDictCache(dictType?: string) {
   if (dictType) {
     await redis.del(buildDictOptionsCacheKey(dictType));
@@ -86,6 +104,7 @@ export const DictionaryService = {
       throw new BusinessError('VALIDATION', '字典值不能为空');
     }
     ensureSupportedDictType(dictType);
+    ensureGenericMutationAllowed(dictType);
 
     const duplicate = await prisma.dictionaries.findFirst({
       where: {
@@ -125,16 +144,13 @@ export const DictionaryService = {
     if (!existing) {
       throw new BusinessError('NOT_FOUND', '字典项不存在', 404);
     }
+    ensureGenericMutationAllowed(existing.dictType);
     if (existing.isSystem) {
       throw new BusinessError(
         'FORBIDDEN_SYSTEM_DICT',
         '系统内置字典项不允许删除',
       );
     }
-    if (existing.dictType === 'team') {
-      await SupplierIdentityService.assertTeamCanBeRetired(existing.id);
-    }
-
     await prisma.dictionaries.update({
       where: { id },
       data: {
@@ -154,9 +170,9 @@ export const DictionaryService = {
     ensureSupportedDictType(normalizedType);
 
     const cacheKey = buildDictOptionsCacheKey(normalizedType);
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      return cached;
+    if (normalizedType !== TEAM_DICTIONARY_TYPE) {
+      const cached = await redis.get(cacheKey);
+      if (cached) return cached;
     }
 
     const items = await prisma.dictionaries.findMany({
@@ -174,7 +190,9 @@ export const DictionaryService = {
       },
     });
 
-    await redis.set(cacheKey, items, DICT_OPTIONS_TTL_SECONDS);
+    if (normalizedType !== TEAM_DICTIONARY_TYPE) {
+      await redis.set(cacheKey, items, DICT_OPTIONS_TTL_SECONDS);
+    }
     return items;
   },
 
@@ -229,6 +247,7 @@ export const DictionaryService = {
       throw new BusinessError('NOT_FOUND', '字典项不存在', 404);
     }
     ensureSupportedDictType(existing.dictType);
+    ensureGenericMutationAllowed(existing.dictType);
 
     const dictKey =
       data.dictKey === undefined ? undefined : normalizeDictText(data.dictKey);
@@ -250,15 +269,6 @@ export const DictionaryService = {
         '系统内置字典项不允许禁用',
       );
     }
-    if (
-      existing.dictType === 'team' &&
-      existing.status !== 0 &&
-      data.status !== undefined &&
-      normalizeStatus(data.status, existing.status) === 0
-    ) {
-      await SupplierIdentityService.assertTeamCanBeRetired(existing.id);
-    }
-
     if (dictKey !== undefined && dictKey !== existing.dictKey) {
       const duplicate = await prisma.dictionaries.findFirst({
         where: {

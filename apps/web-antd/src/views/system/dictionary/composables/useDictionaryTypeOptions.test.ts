@@ -38,6 +38,7 @@ describe('useDictionaryTypeOptions', () => {
 
     expect(handleApiError).toHaveBeenCalledTimes(1);
     expect(options.value.length).toBeGreaterThan(0);
-    expect(optionSet.value.has('inspection_process_name')).toBe(true);
+    expect(optionSet.value.has('supplier_status')).toBe(true);
+    expect(optionSet.value.has('inspection_process_name')).toBe(false);
   });
 });

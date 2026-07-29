@@ -18,11 +18,7 @@ import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { convertToTreeSelectData } from '#/types';
 import QmsPageShell from '#/views/qms/shared/components/QmsPageShell.vue';
 
-import {
-  useClaimOptions,
-  useDefectOptions,
-  useSeverityOptions,
-} from '../issues/constants';
+import { useClaimOptions, useSeverityOptions } from '../issues/constants';
 import InspectionRequestEntryModal from './components/InspectionRequestEntryModal.vue';
 import InspectionRequestFilterBar from './components/InspectionRequestFilterBar.vue';
 import InspectionRequestInspectorStatus from './components/InspectionRequestInspectorStatus.vue';
@@ -70,7 +66,6 @@ const {
 } = useInspectionRequestEntryActions({ handleApiError });
 const deptTreeData = ref<TreeSelectNode[]>([]);
 
-const { defectOptions, defectSubtypes } = useDefectOptions();
 const { severityOptions } = useSeverityOptions();
 const { claimOptions } = useClaimOptions();
 
@@ -258,7 +253,6 @@ const {
   dispatchDetailOpen,
   dispatchForm,
   dispatchOpen,
-  linkedDefectSubtypeOptions,
   linkedIssueDraft,
   submitting,
   closeRouteDispatchDetail,
@@ -276,7 +270,6 @@ const {
 } = useInspectionRequestTaskActions({
   canDelete,
   canDispatch,
-  defectSubtypes,
   deptTreeData,
   async onAfterMutation() {
     await Promise.all([loadRequests(), loadRequestStats()]);
@@ -448,7 +441,6 @@ watch(
       :close-qr="closeQr"
       :close-qr-open="closeQrOpen"
       :current-request="currentRequest"
-      :defect-options="defectOptions"
       :dept-tree-data="deptTreeData"
       :detail-drawer-props="detailDrawerProps"
       :dispatch-detail-open="dispatchDetailOpen"
@@ -460,7 +452,6 @@ watch(
       :inspector-status-open="inspectorStatusOpen"
       :inspector-status-task-loading="inspectorStatusTaskLoading"
       :inspector-status-tasks="inspectorStatusTasks"
-      :linked-defect-subtype-options="linkedDefectSubtypeOptions"
       :linked-issue-draft="linkedIssueDraft"
       :minutes-text="minutesText"
       :severity-options="severityOptions"

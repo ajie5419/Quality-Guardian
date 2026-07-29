@@ -71,14 +71,55 @@ export const QualityLossSummaryService = {
       return new Date(time).getFullYear() === targetYear;
     });
 
-    const deptMap = new Map<string, number>();
+    const deptMap = new Map<
+      string,
+      {
+        id: null | string;
+        name: string;
+        rawName: null | string;
+        resolutionReason?: QualityLossItem['responsibleDepartmentResolutionReason'];
+        resolutionStatus: 'INVALID' | 'MISSING' | 'RESOLVED';
+        value: number;
+      }
+    >();
     for (const item of filteredByYear) {
-      const name = String(item.responsibleDepartment || '未指定部门');
+      const id = String(item.responsibleDepartmentId || '').trim() || null;
+      const rawName = String(item.responsibleDepartment || '').trim() || null;
       const amount = Number(item.amount) || 0;
-      deptMap.set(name, (deptMap.get(name) || 0) + amount);
+      const resolutionReason =
+        item.responsibleDepartmentResolutionReason ||
+        (id ? 'INVALID_REFERENCE' : 'MISSING_REQUIRED');
+      const key = id
+        ? `id:${id}`
+        : `missing:${resolutionReason}:${rawName || ''}`;
+      const current = deptMap.get(key) || {
+        id,
+        name:
+          item.responsibleDepartmentCanonicalName ||
+          String(item.responsibleDepartment || ''),
+        rawName,
+        resolutionReason,
+        resolutionStatus:
+          item.responsibleDepartmentResolutionStatus ||
+          (id ? 'INVALID' : 'MISSING'),
+        value: 0,
+      };
+      current.value += amount;
+      deptMap.set(key, current);
     }
-    const deptDistribution = [...deptMap.entries()]
-      .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
+    const deptDistribution = [...deptMap.values()]
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        ...(item.rawName && item.resolutionStatus !== 'RESOLVED'
+          ? { rawName: item.rawName }
+          : {}),
+        ...(item.resolutionStatus === 'RESOLVED'
+          ? {}
+          : { resolutionReason: item.resolutionReason }),
+        resolutionStatus: item.resolutionStatus,
+        value: Number(item.value.toFixed(2)),
+      }))
       .sort((a, b) => b.value - a.value);
 
     const trendMap = new Map<

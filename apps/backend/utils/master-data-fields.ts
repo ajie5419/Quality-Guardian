@@ -32,6 +32,7 @@ export interface MasterDataTarget {
 export interface MasterDataGovernanceField {
   auditPolicy: 'canonical-id-and-orphan' | 'orphan-only';
   backfillPolicy: 'canonical-id' | 'none';
+  canonicalSeedPolicy?: 'always' | 'empty-only';
   key: string;
   onlineWritePolicy?: 'id-required';
   readStrategy: 'canonical-first' | 'name-only';
@@ -52,14 +53,16 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
     backfillPolicy: 'canonical-id',
     auditPolicy: 'canonical-id-and-orphan',
     source: {
-      type: 'dictionary',
-      dictType: 'inspection_process_name',
+      table: 'processes',
+      type: 'table',
+      valueColumn: 'name',
+      where: 'isDeleted = 0 AND status = 1',
     },
     canonical: {
       table: 'processes',
       idColumn: 'id',
       nameColumn: 'name',
-      activeWhere: 'isDeleted = 0',
+      activeWhere: 'isDeleted = 0 AND status = 1',
     },
     targets: [
       {
@@ -879,6 +882,12 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
         nullable: true,
       },
       {
+        table: 'quality_loss_index',
+        nameColumn: 'respDept',
+        idColumn: 'respDeptId',
+        nullable: true,
+      },
+      {
         table: 'metrology_borrow_records',
         nameColumn: 'borrowerDepartment',
         idColumn: 'borrowerDepartmentId',
@@ -936,6 +945,12 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
       },
       {
         table: 'quality_losses',
+        nameColumn: 'projectName',
+        idColumn: 'projectId',
+        nullable: true,
+      },
+      {
+        table: 'quality_loss_index',
         nameColumn: 'projectName',
         idColumn: 'projectId',
         nullable: true,
@@ -1305,7 +1320,19 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
         nullable: false,
       },
       {
+        table: 'inspections',
+        nameColumn: 'partName',
+        idColumn: 'partId',
+        nullable: true,
+      },
+      {
         table: 'quality_losses',
+        nameColumn: 'partName',
+        idColumn: 'partId',
+        nullable: true,
+      },
+      {
+        table: 'quality_loss_index',
         nameColumn: 'partName',
         idColumn: 'partId',
         nullable: true,

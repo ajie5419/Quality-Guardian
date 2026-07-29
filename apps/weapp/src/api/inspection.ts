@@ -1,4 +1,4 @@
-import { QMS_DICTIONARY_TYPE_KEYS } from '@qgs/shared';
+import type { CloseInspectionRequestParams } from '@qgs/shared';
 
 import { request } from './request';
 
@@ -77,15 +77,7 @@ export function dispatchInspectionRequest(
 // Close/complete an inspection request
 export function closeInspectionRequest(
   id: string,
-  data: {
-    attachments?: Array<{ name: string; url: string }>;
-    closeRemark?: string;
-    hasDocuments: boolean;
-    qualifiedQuantity: number;
-    quantity: number;
-    result: 'FAIL' | 'PASS';
-    unqualifiedQuantity: number;
-  },
+  data: CloseInspectionRequestParams,
 ) {
   return request<unknown>({
     url: `/api/qms/inspection/requests/${id}/close`,
@@ -97,7 +89,7 @@ export function closeInspectionRequest(
 // Submit a new inspection request
 export function submitInspectionRequest(data: Record<string, unknown>) {
   return request<unknown>({
-    url: '/api/qms/inspection/requests',
+    url: '/api/qms/inspection/requests/v2',
     method: 'POST',
     data,
   });
@@ -122,24 +114,44 @@ export function searchWorkOrders(keyword: string) {
 
 // Get processes for a given work order
 export function getProcesses(workOrderNumber: string) {
-  return request<Array<{ processName: string }>>({
+  return request<
+    Array<{
+      category: 'INCOMING' | 'PROCESS';
+      processId: string;
+      processName: string;
+    }>
+  >({
     url: '/api/qms/inspection/requests/processes',
     method: 'GET',
     data: { workOrderNumber },
   });
 }
 
+export function getSuppliers(keyword?: string) {
+  return request<Array<{ label: string; value: string }>>({
+    url: '/api/qms/public/inspection/requests/suppliers',
+    method: 'GET',
+    data: keyword ? { keyword } : {},
+  });
+}
+
 export function getProcessDictionaryOptions() {
   return request<DictionaryOptionItem[]>({
-    url: '/api/system/dictionary/options',
+    url: '/api/qms/public/inspection/requests/process-dictionary-options',
     method: 'GET',
-    data: { dictType: QMS_DICTIONARY_TYPE_KEYS.inspectionProcessName },
   });
 }
 
 // Get BOM parts for a given work order
 export function getBomParts(workOrderNumber: string) {
-  return request<Array<{ id: string; partName: string; partNumber: string }>>({
+  return request<
+    Array<{
+      id: string;
+      partId?: null | string;
+      partName: string;
+      partNumber: string;
+    }>
+  >({
     url: '/api/qms/inspection/requests/bom-parts',
     method: 'GET',
     data: { workOrderNumber },

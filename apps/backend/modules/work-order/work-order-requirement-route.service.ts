@@ -9,6 +9,7 @@ import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { WorkOrderRequirementService } from '~/modules/work-order-requirement/work-order-requirement.service';
 import { parseWorkOrderListQuery } from '~/modules/work-order/work-order-query';
 import { BusinessError } from '~/utils/business-error';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
@@ -87,15 +88,51 @@ function getExpectedConfirmStatus(confirm: boolean | undefined) {
   return confirm ? 'PENDING' : 'CONFIRMED';
 }
 
+async function resolveV2Identity(
+  configKey: 'partName' | 'processName',
+  canonicalId: unknown,
+) {
+  if (canonicalId === undefined) return undefined;
+  const id = String(canonicalId || '').trim();
+  if (!id) return { id: null, name: null };
+  const name = await MasterDataGovernanceKernel.resolveCanonicalNameById({
+    canonicalId: id,
+    configKey,
+    fallbackName: null,
+  });
+  if (!name) {
+    throw new BusinessError(
+      'INVALID_CANONICAL_ID',
+      `${configKey} identity does not exist or is inactive`,
+    );
+  }
+  return { id, name };
+}
+
+function assertV2IdentityContract(body: Record<string, unknown>) {
+  if (body.identityContractVersion !== 2) {
+    throw new BusinessError(
+      'IDENTITY_CONTRACT_V2_REQUIRED',
+      'identityContractVersion=2 is required for work order requirement writes',
+      400,
+    );
+  }
+}
+
 async function buildRequirementUpdateData(
   body: Record<string, unknown>,
   username: string,
 ) {
+  assertV2IdentityContract(body);
+  const [partIdentity, processIdentity] = await Promise.all([
+    resolveV2Identity('partName', body.partId),
+    resolveV2Identity('processName', body.processId),
+  ]);
   const governedFields = buildGovernedWriteFieldsForTable(
     'work_order_requirements',
     {
-      partName: body.partName,
-      processName: body.processName,
+      partName: partIdentity?.name,
+      processName: processIdentity?.name,
       requirementName: body.requirementName,
       responsibleTeam: body.responsibleTeam,
     },
@@ -104,8 +141,8 @@ async function buildRequirementUpdateData(
     'work_order_requirements',
     {
       ...governedFields,
-      ...(body.partName === null ? { partId: null } : {}),
-      ...(body.processName === null ? { processId: null } : {}),
+      ...(partIdentity ? { partId: partIdentity.id } : {}),
+      ...(processIdentity ? { processId: processIdentity.id } : {}),
       responsibleTeamId: body.responsibleTeamId,
     },
   );
@@ -134,13 +171,15 @@ export const WorkOrderRequirementRouteService = {
       userinfo,
       PERMISSION_CODES.QMS.WORK_ORDER.CREATE,
     );
+    requirements.forEach((item) => assertV2IdentityContract(item));
     const normalized = requirements.map((item) => ({
       attachments: JSON.stringify(
         Array.isArray(item.attachments) ? item.attachments : [],
       ),
       items: Array.isArray(item.items) ? item.items : [],
-      partName: String(item.partName || '').trim() || null,
-      processName: String(item.processName || '').trim() || null,
+      identityContractVersion: 2,
+      partId: String(item.partId || '').trim() || null,
+      processId: String(item.processId || '').trim() || null,
       requirementName: String(item.requirementName || '').trim(),
       responsiblePerson: String(item.responsiblePerson || '').trim() || null,
       responsibleTeam: String(item.responsibleTeam || '').trim() || null,
@@ -148,33 +187,42 @@ export const WorkOrderRequirementRouteService = {
       workOrderNumber: String(item.workOrderNumber || '').trim(),
     }));
     const createPayloads = await Promise.all(
-      normalized.map(async (item) => ({
-        attachment: item.attachments,
-        createdBy: userinfo.username,
-        requirementItems: JSON.stringify(item.items || []),
-        requirementName: item.requirementName,
-        responsiblePerson: item.responsiblePerson,
-        responsibleTeam: item.responsibleTeam,
-        status: 'active',
-        updatedBy: userinfo.username,
-        workOrderNumber: item.workOrderNumber,
-        ...buildGovernedWriteFieldsForTable('work_order_requirements', {
-          partName: item.partName,
-          processName: item.processName,
-          requirementName: item.requirementName,
-          responsibleTeam: item.responsibleTeam,
-        }),
-        ...(await buildGovernedCanonicalWritePairForTable(
+      normalized.map(async (item) => {
+        const [partIdentity, processIdentity] = await Promise.all([
+          resolveV2Identity('partName', item.partId),
+          resolveV2Identity('processName', item.processId),
+        ]);
+        const governedFields = buildGovernedWriteFieldsForTable(
           'work_order_requirements',
           {
-            partName: item.partName,
-            processName: item.processName,
+            partName: partIdentity?.name,
+            processName: processIdentity?.name,
             requirementName: item.requirementName,
             responsibleTeam: item.responsibleTeam,
-            responsibleTeamId: item.responsibleTeamId,
           },
-        )),
-      })),
+        );
+        return {
+          attachment: item.attachments,
+          createdBy: userinfo.username,
+          requirementItems: JSON.stringify(item.items || []),
+          requirementName: item.requirementName,
+          responsiblePerson: item.responsiblePerson,
+          responsibleTeam: item.responsibleTeam,
+          status: 'active',
+          updatedBy: userinfo.username,
+          workOrderNumber: item.workOrderNumber,
+          ...governedFields,
+          ...(await buildGovernedCanonicalWritePairForTable(
+            'work_order_requirements',
+            {
+              ...governedFields,
+              ...(partIdentity ? { partId: partIdentity.id } : {}),
+              ...(processIdentity ? { processId: processIdentity.id } : {}),
+              responsibleTeamId: item.responsibleTeamId,
+            },
+          )),
+        };
+      }),
     );
     const workOrderNumbers = [
       ...new Set(normalized.map((item) => item.workOrderNumber)),
@@ -331,7 +379,9 @@ export const WorkOrderRequirementRouteService = {
       createdAt: item.createdAt,
       id: item.id,
       items: parseRequirementItems(item.requirementItems),
+      partId: item.partId,
       partName: item.partName || '',
+      processId: item.processId,
       processName: resolveCanonicalProcessName(item) || '',
       requirementName: item.requirementName || '',
       responsiblePerson: item.responsiblePerson || '',
@@ -372,7 +422,9 @@ export const WorkOrderRequirementRouteService = {
         customerName: item.work_order?.customerName || '',
         division: item.work_order?.division || '',
         id: item.id,
+        partId: item.partId,
         partName: item.partName || '',
+        processId: item.processId,
         processName: item.processName || '',
         projectName: item.work_order?.projectName || '',
         requirementName: item.requirementName || '',

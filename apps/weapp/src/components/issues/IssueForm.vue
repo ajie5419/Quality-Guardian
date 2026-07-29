@@ -21,9 +21,9 @@ const {
   currentStep,
   departments,
   defectSubtypeOptions,
+  defectTypeOptions,
   form,
   ISSUE_CLAIM_OPTIONS,
-  ISSUE_DEFECT_TYPES,
   ISSUE_SEVERITY_OPTIONS,
   ISSUE_STATUS_OPTIONS,
   onClaimChange,
@@ -245,14 +245,26 @@ onMounted(initialize);
         </view>
         <view class="field">
           <text class="label required">缺陷分类</text>
-          <picker :range="ISSUE_DEFECT_TYPES" @change="onDefectTypeChange">
-            <view class="picker-value">{{ form.defectType }}</view>
+          <picker
+            :range="defectTypeOptions"
+            range-key="label"
+            @change="onDefectTypeChange"
+          >
+            <view class="picker-value">{{
+              form.defectType || '请选择缺陷分类'
+            }}</view>
           </picker>
         </view>
         <view class="field">
           <text class="label required">缺陷子类</text>
-          <picker :range="defectSubtypeOptions" @change="onDefectSubtypeChange">
-            <view class="picker-value">{{ form.defectSubtype }}</view>
+          <picker
+            :range="defectSubtypeOptions"
+            range-key="label"
+            @change="onDefectSubtypeChange"
+          >
+            <view class="picker-value">{{
+              form.defectSubtype || '请选择二级分类'
+            }}</view>
           </picker>
         </view>
         <view class="field">

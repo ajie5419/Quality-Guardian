@@ -1,10 +1,14 @@
 import { SUPPLIER_CATEGORY } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionPublicQueryService } from '~/modules/inspection/inspection-public-query.service';
+import { ProcessMasterService } from '~/modules/process-master';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    project_boms: {
+      findMany: vi.fn(),
+    },
     suppliers: {
       findMany: vi.fn(),
     },
@@ -21,6 +25,12 @@ vi.mock('~/modules/supplier-identity', () => ({
       .mockResolvedValue([
         { group: 'internal', label: 'Team A', value: 'team-1' },
       ]),
+  },
+}));
+
+vi.mock('~/modules/process-master', () => ({
+  ProcessMasterService: {
+    listInspectionRequestOptions: vi.fn(),
   },
 }));
 
@@ -79,6 +89,67 @@ describe('inspection public query service', () => {
       InspectionPublicQueryService.getPublicTeams('Team'),
     ).resolves.toEqual([
       { group: 'internal', label: 'Team A', value: 'team-1' },
+    ]);
+  });
+
+  it('returns the independently configured inspection processes', async () => {
+    vi.mocked(
+      ProcessMasterService.listInspectionRequestOptions,
+    ).mockResolvedValue([
+      {
+        category: 'PROCESS',
+        processId: 'process-1',
+        processName: 'Canonical Welding',
+      },
+      {
+        category: 'INCOMING',
+        processId: 'process-1',
+        processName: 'Canonical Welding',
+      },
+    ]);
+
+    await expect(
+      InspectionPublicQueryService.getPublicProcesses('WO-1'),
+    ).resolves.toEqual([
+      {
+        category: 'PROCESS',
+        processId: 'process-1',
+        processName: 'Canonical Welding',
+      },
+      {
+        category: 'INCOMING',
+        processId: 'process-1',
+        processName: 'Canonical Welding',
+      },
+    ]);
+    expect(
+      ProcessMasterService.listInspectionRequestOptions,
+    ).toHaveBeenCalledOnce();
+  });
+
+  it('returns BOM part identities without replacing them with BOM row IDs', async () => {
+    (
+      prisma.project_boms.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      {
+        id: 'bom-1',
+        partId: 'part-1',
+        part_name: 'Frame',
+        part_number: 'P-001',
+        work_order_number: 'WO-1',
+      },
+    ]);
+
+    await expect(
+      InspectionPublicQueryService.getPublicBomParts('WO-1'),
+    ).resolves.toEqual([
+      {
+        id: 'bom-1',
+        partId: 'part-1',
+        partName: 'Frame',
+        partNumber: 'P-001',
+        workOrderNumber: 'WO-1',
+      },
     ]);
   });
 });
@@ -209,7 +280,7 @@ describe('getTodayIncomingInspections', () => {
     expect(result.truncated).toBe(true);
   });
 
-  it('calls findMany with correct where clause including processName and OR status branches', async () => {
+  it('queries incoming category first and falls back only for null legacy rows', async () => {
     (
       prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
     ).mockResolvedValue([]);
@@ -218,28 +289,31 @@ describe('getTodayIncomingInspections', () => {
 
     expect(prisma.qms_inspection_requests.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
+        where: {
+          AND: [
+            {
+              OR: [
+                { category: 'INCOMING' },
+                { category: null, processName: '进货检验' },
+              ],
+            },
+            {
+              OR: [
+                {
+                  status: { in: ['SUBMITTED', 'DISPATCHED', 'INSPECTING'] },
+                },
+                {
+                  status: 'CLOSED',
+                  closedAt: {
+                    gte: expect.any(Date),
+                    lt: expect.any(Date),
+                  },
+                },
+              ],
+            },
+          ],
           isDeleted: false,
-          processName: '进货检验',
-          OR: expect.arrayContaining([
-            expect.objectContaining({
-              status: expect.objectContaining({
-                in: expect.arrayContaining([
-                  'SUBMITTED',
-                  'DISPATCHED',
-                  'INSPECTING',
-                ]),
-              }),
-            }),
-            expect.objectContaining({
-              status: 'CLOSED',
-              closedAt: expect.objectContaining({
-                gte: expect.any(Date),
-                lt: expect.any(Date),
-              }),
-            }),
-          ]),
-        }),
+        },
       }),
     );
   });

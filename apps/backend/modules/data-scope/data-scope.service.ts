@@ -105,6 +105,10 @@ function buildFieldFilter(
   return { OR: filters };
 }
 
+function isIdentityField(field: string) {
+  return field === 'id' || field.endsWith('Id') || field.endsWith('_id');
+}
+
 function combineWhere<T extends ScopedWhere>(
   baseWhere: T,
   filter: Record<string, unknown>,
@@ -153,7 +157,9 @@ export const DataScopeService = {
 
       return combineWhere(
         baseWhere,
-        buildFieldFilter(config.deptFields, () => ({ in: deptCandidates })),
+        buildFieldFilter(config.deptFields, (field) => ({
+          in: isIdentityField(field) ? deptIds : deptCandidates,
+        })),
       );
     }
 
@@ -165,7 +171,9 @@ export const DataScopeService = {
 
       return combineWhere(
         baseWhere,
-        buildFieldFilter(config.deptFields, () => ({ in: deptCandidates })),
+        buildFieldFilter(config.deptFields, (field) => ({
+          in: isIdentityField(field) ? deptIds : deptCandidates,
+        })),
       );
     }
 

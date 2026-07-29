@@ -7,12 +7,11 @@ import { getTargetPassRate as getTargetPassRateByStd } from '~/modules/inspectio
 import {
   buildCanonicalProcessPassRateTargets,
   getIssueQuantity,
-  mapInspectionToPassRateBucket,
+  mapIdentityToPassRateBucket,
   normalizeInspectionQuantitySummary,
+  parsePassRateIdentityBindings,
   parsePassRateTargets,
   resolveIssueIncomingBucket,
-  resolveIssuePassRateCategory,
-  resolveIssueProcessBucket,
   roundPercent,
 } from '~/modules/report/pass-rate-process';
 import { createModuleLogger } from '~/utils/logger';
@@ -43,11 +42,15 @@ type IssuePassRateRow = {
   incomingType: null | string;
   inspectionCategory: null | string;
   inspectionIncomingType: null | string;
+  inspectionProcessId: null | string;
   inspectionProcessName: null | string;
   inspectionTeam: null | string;
+  inspectionTeamId: null | string;
+  processId: null | string;
   processName: null | string;
   quantity: number;
   responsibleDepartment: string;
+  responsibleDepartmentId: null | string;
 };
 
 const GLOBAL_DEFAULT_TARGET = 99.85;
@@ -63,14 +66,40 @@ async function getInspectionPassRateRows(start: Date, end: Date) {
           name: true,
         },
       },
+      processId: true,
       processName: true,
       quantity: true,
       qualifiedQuantity: true,
       unqualifiedQuantity: true,
       result: true,
       team: true,
+      teamId: true,
     },
   });
+}
+
+async function createPassRateBucketResolver() {
+  const setting = await prisma.system_settings.findUnique({
+    where: { key: 'QMS_PASS_RATE_BUCKET_IDENTITIES' },
+    select: { value: true },
+  });
+  let bindings = parsePassRateIdentityBindings({});
+  if (setting?.value) {
+    try {
+      bindings = parsePassRateIdentityBindings(JSON.parse(setting.value));
+    } catch (error) {
+      logger.error(
+        { err: error, settingKey: 'QMS_PASS_RATE_BUCKET_IDENTITIES' },
+        'Failed to parse pass rate identity bindings; using legacy fallback',
+      );
+    }
+  }
+  return (input: {
+    processId?: null | string;
+    processName: null | string;
+    team: null | string;
+    teamId?: null | string;
+  }) => mapIdentityToPassRateBucket(input, bindings);
 }
 
 export async function createPassRateTargetResolver() {
@@ -178,9 +207,11 @@ async function getIssuePassRateRows(start: Date, end: Date) {
           name: true,
         },
       },
+      processId: true,
       processName: true,
       quantity: true,
       responsibleDepartment: true,
+      responsibleDepartmentId: true,
       inspection: {
         select: {
           category: true,
@@ -190,8 +221,10 @@ async function getIssuePassRateRows(start: Date, end: Date) {
               name: true,
             },
           },
+          processId: true,
           processName: true,
           team: true,
+          teamId: true,
         },
       },
     },
@@ -202,15 +235,46 @@ async function getIssuePassRateRows(start: Date, end: Date) {
     incomingType: null,
     inspectionCategory: item.inspection?.category || null,
     inspectionIncomingType: item.inspection?.incomingType || null,
+    inspectionProcessId: item.inspection?.processId || null,
     inspectionProcessName: resolveCanonicalProcessName({
       process: item.inspection?.process,
       processName: item.inspection?.processName,
     }),
     inspectionTeam: item.inspection?.team || null,
+    inspectionTeamId: item.inspection?.teamId || null,
+    processId: item.processId,
     processName: resolveCanonicalProcessName(item),
     quantity: item.quantity,
     responsibleDepartment: item.responsibleDepartment,
+    responsibleDepartmentId: item.responsibleDepartmentId,
   }));
+}
+
+function resolveIssueProcessBucketByIdentity(
+  item: IssuePassRateRow,
+  resolveBucket: Awaited<ReturnType<typeof createPassRateBucketResolver>>,
+) {
+  return resolveBucket({
+    processId: item.inspectionProcessId || item.processId,
+    processName: item.inspectionProcessName || item.processName,
+    team: item.inspectionTeam || item.responsibleDepartment,
+    teamId: item.inspectionTeamId || item.responsibleDepartmentId,
+  });
+}
+
+function resolveIssueCategoryByIdentity(
+  item: IssuePassRateRow,
+  processBucket: string | undefined,
+) {
+  const linkedCategory = String(item.inspectionCategory || '')
+    .trim()
+    .toUpperCase();
+  if (linkedCategory === 'PROCESS' || linkedCategory === 'INCOMING') {
+    return linkedCategory;
+  }
+  if (resolveIssueIncomingBucket(item)) return 'INCOMING';
+  if (processBucket) return 'PROCESS';
+  return undefined;
 }
 
 export async function getPassRateDrillDownByRange(
@@ -223,6 +287,7 @@ export async function getPassRateDrillDownByRange(
   const inspections = await getInspectionPassRateRows(start, end);
   const issueRows =
     source === 'issue' ? await getIssuePassRateRows(start, end) : [];
+  const resolveBucket = await createPassRateBucketResolver();
 
   const processStats: Record<
     string,
@@ -232,9 +297,11 @@ export async function getPassRateDrillDownByRange(
   for (const item of inspections.filter(
     (record) => record.category === 'PROCESS',
   )) {
-    const mappedName = mapInspectionToPassRateBucket({
+    const mappedName = resolveBucket({
+      processId: item.processId,
       processName: resolveCanonicalProcessName(item),
       team: item.team,
+      teamId: item.teamId,
     });
     if (!mappedName) continue;
 
@@ -257,8 +324,9 @@ export async function getPassRateDrillDownByRange(
 
   for (const item of issueRows) {
     const issueBucketInput = item as IssuePassRateBucketInput;
-    if (resolveIssuePassRateCategory(issueBucketInput) !== 'PROCESS') continue;
-    const mappedName = resolveIssueProcessBucket(issueBucketInput);
+    const mappedName = resolveIssueProcessBucketByIdentity(item, resolveBucket);
+    if (resolveIssueCategoryByIdentity(item, mappedName) !== 'PROCESS')
+      continue;
     if (!mappedName || !processStats[mappedName]) continue;
     processStats[mappedName].unqualifiedCount +=
       getIssueQuantity(issueBucketInput);
@@ -315,7 +383,12 @@ export async function getPassRateDrillDownByRange(
 
   for (const item of issueRows) {
     const issueBucketInput = item as IssuePassRateBucketInput;
-    if (resolveIssuePassRateCategory(issueBucketInput) !== 'INCOMING') continue;
+    const processBucket = resolveIssueProcessBucketByIdentity(
+      item,
+      resolveBucket,
+    );
+    if (resolveIssueCategoryByIdentity(item, processBucket) !== 'INCOMING')
+      continue;
     const bucketName = String(
       resolveIssueIncomingBucket(issueBucketInput) ||
         item.inspectionIncomingType ||

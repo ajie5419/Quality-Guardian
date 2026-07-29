@@ -3,6 +3,23 @@ import prisma from '~/utils/prisma';
 
 import { InspectionRequestStatsService } from './inspection-request-stats.service';
 
+const identityMocks = vi.hoisted(() => ({
+  resolveSupplierNamesByIds: vi.fn(),
+  resolveTeamNamesByIds: vi.fn(),
+}));
+
+vi.mock('~/modules/supplier-identity', () => ({
+  SupplierIdentityService: {
+    resolveNamesByIds: identityMocks.resolveSupplierNamesByIds,
+  },
+}));
+
+vi.mock('~/modules/team', () => ({
+  TeamIdentityService: {
+    resolveNamesByIds: identityMocks.resolveTeamNamesByIds,
+  },
+}));
+
 vi.mock('~/utils/prisma', () => ({
   default: {
     qms_inspection_requests: {
@@ -17,8 +34,14 @@ vi.mock('~/utils/prisma', () => ({
 
 function makeRequest(overrides: Record<string, unknown> = {}) {
   const now = new Date('2026-06-01T10:00:00+08:00');
+  const processName = String(overrides.processName || '过程检验');
   return {
     attachments: null,
+    category:
+      overrides.category ||
+      (processName === '进货检验'
+        ? ('INCOMING' as const)
+        : ('PROCESS' as const)),
     closedAt: null,
     componentId: null,
     componentName: null,
@@ -38,7 +61,7 @@ function makeRequest(overrides: Record<string, unknown> = {}) {
     partName: 'part',
     priority: 3,
     processId: null,
-    processName: '过程检验',
+    processName,
     quantity: 1,
     reporter: 'user1',
     requestNo: 'R001',
@@ -50,8 +73,9 @@ function makeRequest(overrides: Record<string, unknown> = {}) {
     dispatchRemark: null,
     status: 'SUBMITTED',
     submittedAt: now,
+    supplierId: null,
     team: '班组A',
-    teamId: null,
+    teamId: 'team-a',
     createdAt: now,
     updatedAt: now,
     workOrderNumber: 'WO1',
@@ -66,11 +90,28 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     );
     vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
     vi.mocked(prisma.users.findMany).mockResolvedValue([]);
+    identityMocks.resolveSupplierNamesByIds.mockResolvedValue(
+      new Map([
+        ['supplier-x', '供应商X'],
+        ['supplier-y', '供应商Y'],
+      ]),
+    );
+    identityMocks.resolveTeamNamesByIds.mockResolvedValue(
+      new Map([
+        ['team-a', '班组A'],
+        ['team-b', '班组B'],
+      ]),
+    );
   }
 
   it('excludes incoming inspection records from byTeam', async () => {
     const requests = [
-      makeRequest({ id: 'r1', processName: '进货检验', team: '供应商X' }),
+      makeRequest({
+        id: 'r1',
+        processName: '进货检验',
+        supplierId: 'supplier-x',
+        team: '供应商X',
+      }),
       makeRequest({ id: 'r2', processName: '过程检验', team: '班组A' }),
     ];
     setupMocks(requests);
@@ -80,14 +121,26 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       endDate: '2026-06-01',
     });
 
-    expect(result.byTeam).toEqual([{ count: 1, team: '班组A' }]);
+    expect(result.byTeam).toEqual([
+      { count: 1, team: '班组A', teamId: 'team-a' },
+    ]);
     expect(result.byTeam.find((t) => t.team === '供应商X')).toBeUndefined();
   });
 
   it('places incoming inspection records in bySupplier', async () => {
     const requests = [
-      makeRequest({ id: 'r1', processName: '进货检验', team: '供应商X' }),
-      makeRequest({ id: 'r2', processName: '进货检验', team: '供应商X' }),
+      makeRequest({
+        id: 'r1',
+        processName: '进货检验',
+        supplierId: 'supplier-x',
+        team: '供应商X',
+      }),
+      makeRequest({
+        id: 'r2',
+        processName: '进货检验',
+        supplierId: 'supplier-x',
+        team: '供应商X',
+      }),
       makeRequest({ id: 'r3', processName: '过程检验', team: '班组A' }),
     ];
     setupMocks(requests);
@@ -97,7 +150,32 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       endDate: '2026-06-01',
     });
 
-    expect(result.bySupplier).toEqual([{ count: 2, team: '供应商X' }]);
+    expect(result.bySupplier).toEqual([
+      { count: 2, supplierId: 'supplier-x', team: '供应商X' },
+    ]);
+  });
+
+  it('keeps incoming identity scope after the process display name changes', async () => {
+    const requests = [
+      makeRequest({
+        category: 'INCOMING',
+        id: 'r1',
+        processName: 'Renamed incoming inspection',
+        supplierId: 'supplier-x',
+        teamId: null,
+      }),
+    ];
+    setupMocks(requests);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.bySupplier).toEqual([
+      { count: 1, supplierId: 'supplier-x', team: '供应商X' },
+    ]);
+    expect(result.byTeam).toEqual([]);
   });
 
   it('returns inspector id in inspector status rows', async () => {
@@ -157,6 +235,7 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     expect(result.reinspectionRateByTeam[0]).toMatchObject({
       reinspectionRate: 50,
       team: '班组A',
+      teamId: 'team-a',
     });
   });
 
@@ -165,6 +244,7 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       makeRequest({
         id: 'r1',
         processName: '进货检验',
+        supplierId: 'supplier-y',
         status: 'CLOSED',
         team: '供应商Y',
         inspectionResult: 'FAIL',
@@ -172,6 +252,7 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       makeRequest({
         id: 'r2',
         processName: '进货检验',
+        supplierId: 'supplier-y',
         status: 'CLOSED',
         team: '供应商Y',
       }),
@@ -186,6 +267,7 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     expect(result.reinspectionRateBySupplier).toHaveLength(1);
     expect(result.reinspectionRateBySupplier[0]).toMatchObject({
       reinspectionRate: 50,
+      supplierId: 'supplier-y',
       team: '供应商Y',
     });
   });
@@ -208,7 +290,12 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
 
   it('excludes incoming records from historyByTeam', async () => {
     const requests = [
-      makeRequest({ id: 'r1', processName: '进货检验', team: '供应商X' }),
+      makeRequest({
+        id: 'r1',
+        processName: '进货检验',
+        supplierId: 'supplier-x',
+        team: '供应商X',
+      }),
       makeRequest({ id: 'r2', processName: '过程检验', team: '班组A' }),
     ];
     setupMocks(requests);
@@ -218,10 +305,251 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       endDate: '2026-06-01',
     });
 
-    expect(result.historyByTeam).toEqual([{ count: 1, team: '班组A' }]);
+    expect(result.historyByTeam).toEqual([
+      { count: 1, team: '班组A', teamId: 'team-a' },
+    ]);
     expect(
       result.historyByTeam.find((t) => t.team === '供应商X'),
     ).toBeUndefined();
+  });
+
+  it('keeps internal-space variants separate when they have different team ids', async () => {
+    const requests = [
+      makeRequest({ id: 'r1', team: '结构 BU2', teamId: 'team-spaced' }),
+      makeRequest({ id: 'r2', team: '结构BU2', teamId: 'team-compact' }),
+    ];
+    setupMocks(requests);
+    identityMocks.resolveTeamNamesByIds.mockResolvedValue(
+      new Map([
+        ['team-compact', '结构BU2'],
+        ['team-spaced', '结构 BU2'],
+      ]),
+    );
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.byTeam).toEqual([
+      { count: 1, team: '结构 BU2', teamId: 'team-spaced' },
+      { count: 1, team: '结构BU2', teamId: 'team-compact' },
+    ]);
+  });
+
+  it('merges different team snapshots with the same id under its canonical name', async () => {
+    const requests = [
+      makeRequest({ id: 'r1', team: '结构 BU2', teamId: 'team-structure' }),
+      makeRequest({ id: 'r2', team: '结构BU2', teamId: 'team-structure' }),
+    ];
+    setupMocks(requests);
+    identityMocks.resolveTeamNamesByIds.mockResolvedValue(
+      new Map([['team-structure', '结构 BU2']]),
+    );
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.byTeam).toEqual([
+      { count: 2, team: '结构 BU2', teamId: 'team-structure' },
+    ]);
+    expect(result.historyByTeam).toEqual(result.byTeam);
+    expect(result.reinspectionRateByTeam).toEqual([
+      expect.objectContaining({
+        submittedCount: 2,
+        team: '结构 BU2',
+        teamId: 'team-structure',
+      }),
+    ]);
+  });
+
+  it('does not merge different team ids that share the same canonical name', async () => {
+    const requests = [
+      makeRequest({ id: 'r1', teamId: 'team-1' }),
+      makeRequest({ id: 'r2', teamId: 'team-2' }),
+    ];
+    setupMocks(requests);
+    identityMocks.resolveTeamNamesByIds.mockResolvedValue(
+      new Map([
+        ['team-1', '装配 BU'],
+        ['team-2', '装配 BU'],
+      ]),
+    );
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.byTeam).toEqual([
+      { count: 1, team: '装配 BU', teamId: 'team-1' },
+      { count: 1, team: '装配 BU', teamId: 'team-2' },
+    ]);
+  });
+
+  it('places missing team ids in one unresolved bucket without guessing by name', async () => {
+    const requests = [
+      makeRequest({ id: 'r1', team: '结构 BU2', teamId: null }),
+      makeRequest({ id: 'r2', team: '结构BU2', teamId: null }),
+    ];
+    setupMocks(requests);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.byTeam).toEqual([
+      { count: 2, team: 'Unresolved team', teamId: null },
+    ]);
+    expect(identityMocks.resolveTeamNamesByIds).toHaveBeenCalledWith([]);
+  });
+
+  it('keeps unresolved non-empty TEAM ids distinguishable', async () => {
+    const requests = [
+      makeRequest({ id: 'r1', teamId: 'team-missing-1' }),
+      makeRequest({ id: 'r2', teamId: 'team-missing-2' }),
+    ];
+    setupMocks(requests);
+    identityMocks.resolveTeamNamesByIds.mockResolvedValue(new Map());
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      endDate: '2026-06-01',
+      startDate: '2026-06-01',
+    });
+
+    expect(result.byTeam).toEqual([
+      {
+        count: 1,
+        team: 'Unresolved team (team-missing-1)',
+        teamId: 'team-missing-1',
+      },
+      {
+        count: 1,
+        team: 'Unresolved team (team-missing-2)',
+        teamId: 'team-missing-2',
+      },
+    ]);
+  });
+
+  it('groups incoming requests without supplier ids in one unresolved bucket', async () => {
+    const requests = [
+      makeRequest({ category: 'INCOMING', id: 'r1', supplierId: null }),
+      makeRequest({ category: 'INCOMING', id: 'r2', supplierId: null }),
+    ];
+    setupMocks(requests);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      endDate: '2026-06-01',
+      startDate: '2026-06-01',
+    });
+
+    expect(result.bySupplier).toEqual([
+      { count: 2, supplierId: null, team: 'Unresolved supplier' },
+    ]);
+  });
+
+  it('keeps a legacy supplier-linked TEAM request in the process domain', async () => {
+    const requests = [
+      makeRequest({
+        category: null,
+        id: 'r1',
+        supplierId: 'supplier-x',
+        teamId: 'team-a',
+      }),
+    ];
+    setupMocks(requests);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      endDate: '2026-06-01',
+      startDate: '2026-06-01',
+    });
+
+    expect(result.byTeam).toEqual([
+      { count: 1, team: '班组A', teamId: 'team-a' },
+    ]);
+    expect(result.bySupplier).toEqual([]);
+  });
+
+  it('groups suppliers by supplier id and uses canonical names', async () => {
+    const requests = [
+      makeRequest({
+        id: 'r1',
+        processName: '进货检验',
+        supplierId: 'supplier-1',
+        team: 'Legacy supplier name',
+      }),
+      makeRequest({
+        id: 'r2',
+        processName: '进货检验',
+        supplierId: 'supplier-1',
+        team: 'Different snapshot',
+      }),
+    ];
+    setupMocks(requests);
+    identityMocks.resolveSupplierNamesByIds.mockResolvedValue(
+      new Map([['supplier-1', 'Canonical supplier']]),
+    );
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.bySupplier).toEqual([
+      {
+        count: 2,
+        supplierId: 'supplier-1',
+        team: 'Canonical supplier',
+      },
+    ]);
+    expect(result.reinspectionRateBySupplier[0]).toMatchObject({
+      supplierId: 'supplier-1',
+      team: 'Canonical supplier',
+    });
+  });
+
+  it('keeps inspectors with the same name separate by inspector id', async () => {
+    const closedAt = new Date('2026-06-01T14:00:00+08:00');
+    const requests = [
+      makeRequest({
+        closedAt,
+        id: 'r1',
+        inspector: { id: 'inspector-1', realName: '张三', username: 'one' },
+        inspectorId: 'inspector-1',
+        status: 'CLOSED',
+      }),
+      makeRequest({
+        closedAt,
+        id: 'r2',
+        inspector: { id: 'inspector-2', realName: '张三', username: 'two' },
+        inspectorId: 'inspector-2',
+        status: 'CLOSED',
+      }),
+    ];
+    setupMocks(requests);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.byInspector).toEqual([
+      { count: 1, inspector: '张三', inspectorId: 'inspector-1' },
+      { count: 1, inspector: '张三', inspectorId: 'inspector-2' },
+    ]);
+    expect(result.historyByInspector).toEqual([
+      expect.objectContaining({
+        inspector: '张三',
+        inspectorId: 'inspector-1',
+      }),
+      expect.objectContaining({
+        inspector: '张三',
+        inspectorId: 'inspector-2',
+      }),
+    ]);
   });
 
   it('returns category counts for submitted requests', async () => {
@@ -278,5 +606,22 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     expect(result.todayClosedIncomingCount).toBe(1);
     expect(result.todayClosedProcessCount).toBe(2);
     expect(result.todayClosedCount).toBe(3);
+  });
+
+  it('loads only fields required by the statistics calculation', async () => {
+    setupMocks([]);
+
+    await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    const [periodQuery, activeInspectorQuery] = vi.mocked(
+      prisma.qms_inspection_requests.findMany,
+    ).mock.calls;
+    expect(periodQuery?.[0]).toHaveProperty('select');
+    expect(periodQuery?.[0]).not.toHaveProperty('include');
+    expect(activeInspectorQuery?.[0]).toHaveProperty('select');
+    expect(activeInspectorQuery?.[0]).not.toHaveProperty('include');
   });
 });

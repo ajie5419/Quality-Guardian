@@ -17,18 +17,36 @@ interface InspectorStat {
   averageTaskMinutes: number;
   completedTaskCount: number;
   inspector: string;
+  inspectorId: null | string;
 }
 
-interface ReinspectionStat {
+interface TeamReinspectionStat {
   inspectedCount: number;
   reinspectionCount: number;
   reinspectionRate: number;
   submittedCount: number;
   team: string;
+  teamId: null | string;
 }
 
 interface TeamStat {
   count: number;
+  team: string;
+  teamId: null | string;
+}
+
+interface SupplierReinspectionStat {
+  inspectedCount: number;
+  reinspectionCount: number;
+  reinspectionRate: number;
+  submittedCount: number;
+  supplierId: null | string;
+  team: string;
+}
+
+interface SupplierStat {
+  count: number;
+  supplierId: null | string;
   team: string;
 }
 
@@ -36,9 +54,9 @@ const props = defineProps<{
   inspectorStats: InspectorStat[];
   open: boolean;
   rangeLabel: string;
-  reinspectionStats: ReinspectionStat[];
-  supplierReinspectionStats: ReinspectionStat[];
-  supplierStats: TeamStat[];
+  reinspectionStats: TeamReinspectionStat[];
+  supplierReinspectionStats: SupplierReinspectionStat[];
+  supplierStats: SupplierStat[];
   teamStats: TeamStat[];
   type: DetailType;
 }>();
@@ -89,6 +107,7 @@ const teamRows = computed(() =>
     .sort((a, b) => b.count - a.count)
     .map((item, index) => ({
       count: item.count,
+      identityKey: item.teamId || 'unresolved-team',
       rank: index + 1,
       share:
         teamTotal.value > 0
@@ -109,6 +128,7 @@ const reinspectionRows = computed(() =>
       return b.submittedCount - a.submittedCount;
     })
     .map((item, index) => ({
+      identityKey: item.teamId || 'unresolved-team-reinspection',
       inspectedCount: item.inspectedCount,
       rank: index + 1,
       reinspectionCount: item.reinspectionCount,
@@ -130,6 +150,7 @@ const supplierRows = computed(() =>
     .sort((a, b) => b.count - a.count)
     .map((item, index) => ({
       count: item.count,
+      identityKey: item.supplierId || 'unresolved-supplier',
       rank: index + 1,
       share:
         supplierTotal.value > 0
@@ -150,6 +171,7 @@ const supplierReinspectionRows = computed(() =>
       return b.submittedCount - a.submittedCount;
     })
     .map((item, index) => ({
+      identityKey: item.supplierId || 'unresolved-supplier-reinspection',
       inspectedCount: item.inspectedCount,
       rank: index + 1,
       reinspectionCount: item.reinspectionCount,
@@ -172,6 +194,7 @@ const inspectorRows = computed(() =>
     .map((item, index) => ({
       averageTaskMinutes: minutesText(item.averageTaskMinutes),
       completedTaskCount: item.completedTaskCount,
+      identityKey: item.inspectorId || 'unresolved-inspector',
       inspector: item.inspector || '未记录',
       rank: index + 1,
     }))
@@ -235,7 +258,7 @@ watch(
       v-if="props.type === 'team' || props.type === 'supplier'"
       :data-source="props.type === 'supplier' ? supplierRows : teamRows"
       :pagination="pagination"
-      row-key="rank"
+      row-key="identityKey"
       :scroll="teamTableScroll"
       size="small"
     >
@@ -258,7 +281,7 @@ watch(
           : reinspectionRows
       "
       :pagination="pagination"
-      row-key="rank"
+      row-key="identityKey"
       :scroll="reinspectionTableScroll"
       size="small"
     >
@@ -277,7 +300,7 @@ watch(
       v-else
       :data-source="inspectorRows"
       :pagination="pagination"
-      row-key="rank"
+      row-key="identityKey"
       :scroll="inspectorTableScroll"
       size="small"
     >

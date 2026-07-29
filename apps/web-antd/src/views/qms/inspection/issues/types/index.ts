@@ -7,7 +7,6 @@ import type { UploadFile } from 'ant-design-vue';
 import {
   CLAIM_STATUS,
   InspectionIssueStatusEnum,
-  ISSUE_DEFECT_TYPE,
   ISSUE_DEPT_TYPE,
   ISSUE_SEVERITY,
 } from '@qgs/shared';
@@ -37,12 +36,6 @@ export const DeptType = ISSUE_DEPT_TYPE;
 export type DeptType = (typeof DeptType)[keyof typeof DeptType];
 
 /**
- * 缺陷类型
- */
-export const DefectType = ISSUE_DEFECT_TYPE;
-export type DefectType = (typeof DefectType)[keyof typeof DefectType];
-
-/**
  * 质量问题实体
  */
 export interface InspectionIssue {
@@ -57,6 +50,8 @@ export interface InspectionIssue {
   processName?: string;
   description: string;
   quantity: number;
+  defectCategoryId?: null | string;
+  defectSubcategoryId?: null | string;
   defectType?: string;
   defectSubtype?: string;
   rootCause?: string;

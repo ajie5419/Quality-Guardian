@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRecordDeleteService } from '~/modules/inspection/inspection-record-delete.service';
-import { eventBus } from '~/utils/event-bus';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -9,8 +9,10 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-vi.mock('~/utils/event-bus', () => ({
-  eventBus: { emit: vi.fn() },
+vi.mock('~/modules/metric-refresh', () => ({
+  MetricRefreshQueue: {
+    enqueueSupplierScoresForInspectionIdentities: vi.fn(),
+  },
 }));
 
 vi.mock('~/modules/file-storage/file-storage.service', () => ({
@@ -94,12 +96,16 @@ describe('inspectionRecordDeleteService', () => {
         bizId: 'i-1',
         bizType: 'inspection_record',
       });
-      expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
-        supplierIds: ['supplier-1'],
-        supplierNames: ['Supplier A'],
-        teamIds: ['team-1'],
-        teamNames: [null],
-      });
+      expect(
+        MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities,
+      ).toHaveBeenCalledWith(
+        expect.any(Object),
+        {
+          supplierIds: ['supplier-1'],
+          teamIds: ['team-1'],
+        },
+        'inspection.deleted',
+      );
     });
 
     it('should handle missing inspection gracefully', async () => {
@@ -119,12 +125,16 @@ describe('inspectionRecordDeleteService', () => {
       const result = await InspectionRecordDeleteService.delete('i-1');
 
       expect(result).toEqual({ id: 'i-1' });
-      expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
-        supplierIds: [undefined],
-        supplierNames: [undefined],
-        teamIds: [undefined],
-        teamNames: [undefined],
-      });
+      expect(
+        MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities,
+      ).toHaveBeenCalledWith(
+        expect.any(Object),
+        {
+          supplierIds: [undefined],
+          teamIds: [undefined],
+        },
+        'inspection.deleted',
+      );
     });
   });
 
@@ -179,12 +189,16 @@ describe('inspectionRecordDeleteService', () => {
         data: { isDeleted: true },
       });
       expect(FileStorageService.softDeleteReferences).toHaveBeenCalled();
-      expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
-        supplierIds: ['supplier-1'],
-        supplierNames: [null],
-        teamIds: ['team-1'],
-        teamNames: ['Outsourcing Team A'],
-      });
+      expect(
+        MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities,
+      ).toHaveBeenCalledWith(
+        expect.any(Object),
+        {
+          supplierIds: ['supplier-1'],
+          teamIds: ['team-1'],
+        },
+        'inspection.batch-deleted',
+      );
     });
 
     it('should handle empty ids array', async () => {
@@ -220,7 +234,9 @@ describe('inspectionRecordDeleteService', () => {
         InspectionRecordDeleteService.batchDelete(['i-1']),
       ).rejects.toBe(failure);
 
-      expect(eventBus.emit).not.toHaveBeenCalled();
+      expect(
+        MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities,
+      ).not.toHaveBeenCalled();
     });
   });
 });

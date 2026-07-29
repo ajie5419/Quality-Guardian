@@ -9,9 +9,11 @@ import type {
 import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
 import { Prisma } from '@prisma/client';
+import { createIdentityAggregateItem, QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { WorkOrderRequirementService } from '~/modules/work-order-requirement';
 import { addYearsToDate } from '~/modules/work-order/work-order-query';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import {
@@ -360,21 +362,20 @@ export const WorkOrderService = {
     params: Omit<WorkOrderListParams, 'page' | 'pageSize'>,
   ): Promise<WorkOrderDashboardStats> {
     const whereCondition = await buildWorkOrderWhereCondition(params);
-    // governance-allow-direct-canonical-read: dashboard stats reads project labels only.
     const summary = await prisma.work_orders.findMany({
       where: whereCondition,
       select: {
         status: true,
-        division: true,
+        divisionId: true,
         quantity: true,
-        projectName: true,
+        projectId: true,
         deliveryDate: true,
       },
     });
-    const divisionProjectMap = new Map<string, number>();
+    const divisionProjectMap = new Map<null | string, number>();
     const divisionWarrantyMap = new Map<
-      string,
-      { productNames: Set<string>; warrantyCount: number }
+      null | string,
+      { projects: Map<null | string, number>; warrantyCount: number }
     >();
     let total = 0;
     let completed = 0;
@@ -386,39 +387,73 @@ export const WorkOrderService = {
       if (normalizedStatus === 'COMPLETED') completed += 1;
       if (normalizedStatus === 'IN_PROGRESS') inProgress += 1;
 
-      const division = String(item.division || '其他').trim() || '其他';
-      const productName =
-        String(item.projectName || '未命名产品').trim() || '未命名产品';
+      const divisionId = String(item.divisionId || '').trim() || null;
+      const projectId = String(item.projectId || '').trim() || null;
       const quantity = Number(item.quantity) || 0;
       divisionProjectMap.set(
-        division,
-        (divisionProjectMap.get(division) || 0) + 1,
+        divisionId,
+        (divisionProjectMap.get(divisionId) || 0) + 1,
       );
       if (getWarrantyStatus(item.deliveryDate) === '是') {
-        const current = divisionWarrantyMap.get(division) || {
-          productNames: new Set<string>(),
+        const current = divisionWarrantyMap.get(divisionId) || {
+          projects: new Map<null | string, number>(),
           warrantyCount: 0,
         };
-        current.productNames.add(productName);
+        current.projects.set(
+          projectId,
+          (current.projects.get(projectId) || 0) + quantity,
+        );
         current.warrantyCount += quantity;
-        divisionWarrantyMap.set(division, current);
+        divisionWarrantyMap.set(divisionId, current);
       }
     }
 
+    const [divisionNames, projectNames] = await Promise.all([
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        canonicalIds: [
+          ...divisionProjectMap.keys(),
+          ...divisionWarrantyMap.keys(),
+        ],
+        configKey: 'division',
+      }),
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        canonicalIds: [...divisionWarrantyMap.values()].flatMap((item) => [
+          ...item.projects.keys(),
+        ]),
+        configKey: 'projectName',
+      }),
+    ]);
+
     const pieData = [...divisionProjectMap.entries()]
-      .map(([name, value]) => ({ name, value }))
+      .map(([id, value]) =>
+        createIdentityAggregateItem({
+          canonicalName: id ? divisionNames.get(id) : null,
+          id,
+          missingName: QMS_DEFAULT_VALUES.UNASSIGNED,
+          value,
+        }),
+      )
       .sort((a, b) => b.value - a.value);
 
     const rankings = [...divisionWarrantyMap.entries()]
-      .map(([division, value]) => {
-        const productNames = [...value.productNames].sort();
-        return {
-          division: division || '其他',
-          productName: productNames.join('、') || '未命名产品',
-          productNames,
-          warrantyCount: value.warrantyCount,
-        };
-      })
+      .map(([divisionId, value]) => ({
+        division: createIdentityAggregateItem({
+          canonicalName: divisionId ? divisionNames.get(divisionId) : null,
+          id: divisionId,
+          missingName: QMS_DEFAULT_VALUES.UNASSIGNED,
+          value: value.warrantyCount,
+        }),
+        projects: [...value.projects.entries()]
+          .map(([projectId, quantity]) =>
+            createIdentityAggregateItem({
+              canonicalName: projectId ? projectNames.get(projectId) : null,
+              id: projectId,
+              value: quantity,
+            }),
+          )
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        warrantyCount: value.warrantyCount,
+      }))
       .sort((a, b) => b.warrantyCount - a.warrantyCount);
 
     return {

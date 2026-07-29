@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { InspectionService } from '~/modules/inspection/inspection.service';
+import { InspectionRecordCreateService } from '~/modules/inspection/inspection-record-create.service';
 
 import {
   buildInspectionRecordFromRequest,
   INCOMING_INSPECTION_PROCESS_NAME,
 } from './inspection-request';
 
-vi.mock('~/modules/inspection/inspection.service', () => ({
-  InspectionService: {
+vi.mock('~/modules/inspection/inspection-record-create.service', () => ({
+  InspectionRecordCreateService: {
     create: vi.fn(),
   },
 }));
@@ -15,9 +15,9 @@ vi.mock('~/modules/inspection/inspection.service', () => ({
 describe('inspection request helpers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (InspectionService.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+    vi.mocked(InspectionRecordCreateService.create).mockResolvedValue({
       id: 'inspection-1',
-    });
+    } as never);
   });
 
   it('keeps incoming requests as incoming records when process relation is missing', async () => {
@@ -45,12 +45,40 @@ describe('inspection request helpers', () => {
       },
     );
 
-    expect(InspectionService.create).toHaveBeenCalledWith(
+    expect(InspectionRecordCreateService.create).toHaveBeenCalledWith(
       expect.objectContaining({
         category: 'INCOMING',
         incomingType: '外购件',
         materialName: 'Bearing',
         supplierName: 'Supplier A',
+      }),
+      undefined,
+    );
+  });
+
+  it('keeps the persisted incoming category after the process is renamed', async () => {
+    await buildInspectionRecordFromRequest(
+      {
+        category: 'INCOMING',
+        componentName: '',
+        mutualCheckResult: 'PASS',
+        partName: 'Bearing',
+        process: { name: 'Renamed receipt verification' },
+        processName: INCOMING_INSPECTION_PROCESS_NAME,
+        reporter: 'Reporter A',
+        selfCheckResult: 'PASS',
+        supplierId: 'supplier-1',
+        team: 'Supplier A',
+        work_order: { projectName: 'Project A' },
+        workOrderNumber: 'WO-001',
+      },
+      { result: 'PASS' },
+    );
+
+    expect(InspectionRecordCreateService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'INCOMING',
+        supplierId: 'supplier-1',
       }),
       undefined,
     );
@@ -86,7 +114,7 @@ describe('inspection request helpers', () => {
       },
     );
 
-    expect(InspectionService.create).toHaveBeenCalledWith(
+    expect(InspectionRecordCreateService.create).toHaveBeenCalledWith(
       expect.objectContaining({ hasDocuments: false }),
       undefined,
     );
@@ -121,14 +149,14 @@ describe('inspection request helpers', () => {
       },
     );
 
-    expect(InspectionService.create).toHaveBeenCalledWith(
+    expect(InspectionRecordCreateService.create).toHaveBeenCalledWith(
       expect.objectContaining({
         hasDocuments: true,
         hasSelfCheckDocuments: true,
       }),
       undefined,
     );
-    const payload = (InspectionService.create as ReturnType<typeof vi.fn>).mock
+    const payload = vi.mocked(InspectionRecordCreateService.create).mock
       .calls[0][0];
     expect(JSON.parse(String(payload.selfCheckDocuments))).toEqual([
       expect.objectContaining({

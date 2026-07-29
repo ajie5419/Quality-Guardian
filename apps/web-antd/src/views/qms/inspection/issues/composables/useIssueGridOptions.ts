@@ -1,3 +1,5 @@
+import type { QualityClassificationCategory } from '@qgs/shared';
+
 import type { ComputedRef, Ref } from 'vue';
 
 import type { StatusOption } from '../constants';
@@ -80,6 +82,7 @@ interface UseIssueGridOptionsParams {
   canEdit: Ref<boolean>;
   canImport: Ref<boolean>;
   canSettle: ComputedRef<boolean>;
+  defectCategories: Ref<QualityClassificationCategory[]>;
   issueStatusOptions: Ref<StatusOption[]>;
   currentYear: ComputedRef<number> | Ref<number>;
   defaultProjectName?: ComputedRef<string> | Ref<string>;
@@ -181,6 +184,7 @@ export function useIssueGridOptions({
   canEdit,
   canImport,
   canSettle,
+  defectCategories,
   issueStatusOptions,
   currentYear,
   defaultProjectName,
@@ -224,7 +228,9 @@ export function useIssueGridOptions({
           (proxyInfo?.filter || []).forEach((item: GridFilterItem) => {
             const values = item.values;
             if (values && values.length > 0) {
-              filterParams[item.field] = values;
+              filterParams[
+                item.field === 'defectType' ? 'defectCategoryId' : item.field
+              ] = values;
             }
           });
           const { items } = await getInspectionIssues({
@@ -294,14 +300,10 @@ export function useIssueGridOptions({
         if (col.field === 'defectType') {
           return {
             ...col,
-            filters: [
-              { label: '外观问题', value: '外观问题' },
-              { label: '尺寸问题', value: '尺寸问题' },
-              { label: '功能问题', value: '功能问题' },
-              { label: '材料问题', value: '材料问题' },
-              { label: '包装问题', value: '包装问题' },
-              { label: '其他', value: '其他' },
-            ],
+            filters: defectCategories.value.map((item) => ({
+              label: item.name,
+              value: item.id,
+            })),
           };
         }
         if (col.field === 'division') {
@@ -426,7 +428,9 @@ export function useIssueGridOptions({
           filters?.forEach((item) => {
             const values = item.values;
             if (values && values.length > 0) {
-              filterParams[item.field] = values;
+              filterParams[
+                item.field === 'defectType' ? 'defectCategoryId' : item.field
+              ] = values;
             }
           });
 

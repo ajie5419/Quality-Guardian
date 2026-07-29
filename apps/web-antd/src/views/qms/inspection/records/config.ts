@@ -6,8 +6,6 @@ import {
   INSPECTION_RECORD_TYPE,
 } from '@qgs/shared';
 
-import { cloneInspectionProcessFallbackOptions } from '../../shared/constants/inspection-process-fallback';
-
 export const INSPECTION_TYPES = INSPECTION_RECORD_TYPE;
 
 export const INSPECTION_TABS = [
@@ -15,9 +13,6 @@ export const INSPECTION_TABS = [
   { label: '过程检验', value: 'process' },
   { label: '发货检验', value: 'shipment' },
 ];
-
-export const getProcessOptions = (_t: (key: string) => string) =>
-  cloneInspectionProcessFallbackOptions();
 
 export function mapDictionaryOptionsToInspectionProcess(
   options: DictionaryOptionItem[] | undefined,

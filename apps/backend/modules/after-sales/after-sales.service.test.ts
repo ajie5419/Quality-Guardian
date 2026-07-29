@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
 // Mock prisma
@@ -14,6 +15,45 @@ vi.mock('~/utils/prisma', () => ({
     $queryRaw: vi.fn(),
   },
 }));
+
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNamesByIds: vi
+      .fn()
+      .mockImplementation(
+        async ({ canonicalIds }: { canonicalIds: Array<null | string> }) =>
+          new Map(canonicalIds.filter(Boolean).map((id) => [id, null])),
+      ),
+  },
+}));
+
+vi.mock('~/modules/quality-classification', () => {
+  const listForManagement = vi.fn().mockResolvedValue([
+    {
+      code: 'MINOR',
+      id: 'defect-minor',
+      name: 'Minor',
+      scope: 'AFTER_SALES_DEFECT',
+      sort: 0,
+      status: 1,
+      subcategories: [],
+    },
+  ]);
+  return {
+    QualityClassificationService: {
+      listForManagement,
+      resolveCategoryNamesByIds: vi.fn(async () => {
+        const categories = await listForManagement();
+        return new Map(
+          categories.map((item: { id: string; name: string }) => [
+            item.id,
+            item.name,
+          ]),
+        );
+      }),
+    },
+  };
+});
 
 describe('afterSalesService', () => {
   beforeEach(() => {
@@ -40,16 +80,23 @@ describe('afterSalesService', () => {
         return Promise.resolve([]);
       });
       (prisma.after_sales.groupBy as any).mockImplementation(({ by }: any) => {
-        if (by.includes('defectType'))
-          return Promise.resolve([{ defectType: 'Minor', _count: { id: 10 } }]);
-        if (by.includes('supplierBrand'))
+        if (by.includes('defectCategoryId'))
           return Promise.resolve([
-            { supplierBrand: 'Brand A', _count: { id: 10 } },
+            { defectCategoryId: 'defect-minor', _count: { id: 10 } },
           ]);
-        if (by.includes('respDept'))
-          return Promise.resolve([{ respDept: 'Quality', _count: { id: 10 } }]);
+        if (by.includes('supplierBrandId'))
+          return Promise.resolve([
+            { supplierBrandId: 'supplier-a', _count: { id: 10 } },
+          ]);
+        if (by.includes('respDeptId'))
+          return Promise.resolve([
+            { respDeptId: 'dept-quality', _count: { id: 10 } },
+          ]);
         return Promise.resolve([]);
       });
+      (MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any)
+        .mockResolvedValueOnce(new Map([['supplier-a', 'Brand A']]))
+        .mockResolvedValueOnce(new Map([['dept-quality', 'Quality']]));
 
       const stats = await AfterSalesService.getStats({ year: 2024 });
 
@@ -60,7 +107,9 @@ describe('afterSalesService', () => {
       expect(stats.trend.issues[0]).toBe(10);
       expect(stats.trend.costs[0]).toBe(1500);
       expect(stats.defectDistribution).toContainEqual({
+        id: 'defect-minor',
         name: 'Minor',
+        resolutionStatus: 'RESOLVED',
         value: 10,
       });
     });

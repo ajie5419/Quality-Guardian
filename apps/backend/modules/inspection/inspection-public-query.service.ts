@@ -1,10 +1,10 @@
 import { INSPECTION_REQUEST_STATUS, SUPPLIER_CATEGORY } from '@qgs/shared';
 import { INCOMING_INSPECTION_PROCESS_NAME } from '~/modules/inspection/inspection-request';
+import { ProcessMasterService } from '~/modules/process-master';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { parseWorkOrderListQuery } from '~/modules/work-order/work-order-query';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import { buildKeywordOr } from '~/utils/query-helpers';
 
 const logger = createModuleLogger('inspection-public-query');
@@ -68,17 +68,8 @@ function toItem(record: {
 }
 
 export const InspectionPublicQueryService = {
-  async getPublicProcesses(workOrderNumber: string) {
-    const list = await prisma.work_order_requirements.findMany({
-      where: { isDeleted: false, status: 'active', workOrderNumber },
-      orderBy: [{ updatedAt: 'desc' }],
-      select: { process: { select: { name: true } }, processName: true },
-    });
-    return [
-      ...new Set(
-        list.map((item) => resolveCanonicalProcessName(item)).filter(Boolean),
-      ),
-    ].map((processName) => ({ processName }));
+  async getPublicProcesses(_workOrderNumber: string) {
+    return ProcessMasterService.listInspectionRequestOptions();
   },
 
   async getPublicBomParts(workOrderNumber: string) {
@@ -87,6 +78,7 @@ export const InspectionPublicQueryService = {
       orderBy: [{ part_number: 'asc' }, { created_at: 'desc' }],
       select: {
         id: true,
+        partId: true,
         part_name: true,
         part_number: true,
         work_order_number: true,
@@ -94,6 +86,7 @@ export const InspectionPublicQueryService = {
     });
     return list.map((item) => ({
       id: item.id,
+      partId: item.partId,
       partName: item.part_name,
       partNumber: item.part_number,
       workOrderNumber: item.work_order_number,
@@ -160,8 +153,7 @@ export const InspectionPublicQueryService = {
     const divisionIds = [
       ...new Set(
         items
-          .flatMap((item) => [item.division, item.divisionId])
-          .map((item) => String(item || '').trim())
+          .map((item) => String(item.divisionId || '').trim())
           .filter((item) => item.startsWith('dept-')),
       ),
     ];
@@ -178,7 +170,6 @@ export const InspectionPublicQueryService = {
     return {
       items: items.map((item) => {
         const division =
-          departmentNameById.get(String(item.division || '')) ||
           departmentNameById.get(String(item.divisionId || '')) ||
           item.division ||
           null;
@@ -208,23 +199,35 @@ export const InspectionPublicQueryService = {
     const TAKE_LIMIT = 200;
     const records = await prisma.qms_inspection_requests.findMany({
       where: {
-        isDeleted: false,
-        processName: INCOMING_INSPECTION_PROCESS_NAME,
-        OR: [
+        AND: [
           {
-            status: {
-              in: [
-                INSPECTION_REQUEST_STATUS.SUBMITTED,
-                INSPECTION_REQUEST_STATUS.DISPATCHED,
-                INSPECTION_REQUEST_STATUS.INSPECTING,
-              ],
-            },
+            OR: [
+              { category: 'INCOMING' },
+              {
+                category: null,
+                processName: INCOMING_INSPECTION_PROCESS_NAME,
+              },
+            ],
           },
           {
-            status: INSPECTION_REQUEST_STATUS.CLOSED,
-            closedAt: { gte: start, lt: end },
+            OR: [
+              {
+                status: {
+                  in: [
+                    INSPECTION_REQUEST_STATUS.SUBMITTED,
+                    INSPECTION_REQUEST_STATUS.DISPATCHED,
+                    INSPECTION_REQUEST_STATUS.INSPECTING,
+                  ],
+                },
+              },
+              {
+                status: INSPECTION_REQUEST_STATUS.CLOSED,
+                closedAt: { gte: start, lt: end },
+              },
+            ],
           },
         ],
+        isDeleted: false,
       },
       orderBy: { submittedAt: 'desc' },
       take: TAKE_LIMIT,

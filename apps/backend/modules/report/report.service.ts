@@ -1,13 +1,17 @@
 import type { IssueItem, WeeklyReportData } from '@qgs/shared';
 
 import {
+  createIdentityAggregateItem,
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
+  QMS_DEFAULT_VALUES,
+  QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept';
 import { flattenDeptTree } from '~/modules/dept/dept-tree';
 import { InspectionService } from '~/modules/inspection';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { QualityLossService } from '~/modules/quality-loss';
 import { createModuleLogger } from '~/utils/logger';
 
@@ -46,18 +50,66 @@ function mapTrackingProgress(status?: null | string): string {
 }
 
 async function createDepartmentNameResolver(): Promise<
-  (id: null | string) => string
+  (id: null | string, rawName?: null | string) => string
 > {
   try {
     const deptTree = await DeptService.findAll();
     const deptMap = new Map<string, string>();
     for (const node of flattenDeptTree(deptTree))
       deptMap.set(node.id, node.name);
-    return (id: null | string) => (id ? deptMap.get(id) || id : '-');
+    return (id: null | string, rawName?: null | string) =>
+      createIdentityAggregateItem({
+        canonicalName: id ? deptMap.get(id) : null,
+        id,
+        missingName: rawName ? undefined : QMS_DEFAULT_VALUES.UNASSIGNED,
+        rawName,
+        value: 0,
+      }).name;
   } catch (error) {
     logger.warn({ err: error }, 'Failed to resolve department map');
-    return (id: null | string) => id || '-';
+    return (id: null | string, rawName?: null | string) =>
+      createIdentityAggregateItem({
+        id,
+        missingName: rawName ? undefined : QMS_DEFAULT_VALUES.UNASSIGNED,
+        rawName,
+        value: 0,
+      }).name;
   }
+}
+
+function resolveGovernedDisplayName(
+  id: null | string,
+  canonicalNames: Map<string, null | string>,
+  rawName?: null | string,
+) {
+  if (!id && !rawName) return null;
+  return createIdentityAggregateItem({
+    canonicalName: id ? canonicalNames.get(id) : null,
+    id,
+    rawName,
+    value: 0,
+  }).name;
+}
+
+async function resolveAfterSalesClassificationNames(
+  rows: Awaited<ReturnType<typeof AfterSalesAPI.getWeeklyReportIssues>>,
+) {
+  const [productCategories, defectCategories, defectSubcategories] =
+    await Promise.all([
+      QualityClassificationService.resolveCategoryNamesByIds(
+        QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
+        rows.map((item) => item.productCategoryId || ''),
+      ),
+      QualityClassificationService.resolveCategoryNamesByIds(
+        QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+        rows.map((item) => item.defectCategoryId || ''),
+      ),
+      QualityClassificationService.resolveSubcategoryNamesByIds(
+        QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+        rows.map((item) => item.defectSubcategoryId || ''),
+      ),
+    ]);
+  return { defectCategories, defectSubcategories, productCategories };
 }
 
 export const ReportService = {
@@ -99,7 +151,10 @@ export const ReportService = {
         start,
       });
 
-      const getDeptName = await createDepartmentNameResolver();
+      const [getDeptName, afterSalesClassificationNames] = await Promise.all([
+        createDepartmentNameResolver(),
+        resolveAfterSalesClassificationNames(externalIssuesRaw),
+      ]);
 
       // Transform Data
       const trackingIssues = await Promise.all(
@@ -109,7 +164,7 @@ export const ReportService = {
           description: item.description || '暂无描述',
           progress: mapTrackingProgress(item.status),
           completionTime: formatDate(item.updatedAt),
-          respDept: getDeptName(item.respDept),
+          respDept: getDeptName(item.respDeptId, item.respDept),
           remarks: '',
         })),
       );
@@ -131,7 +186,10 @@ export const ReportService = {
           return {
             product: item.projectName || '-',
             description: item.description || '-',
-            respDept: getDeptName(item.responsibleDepartment),
+            respDept: getDeptName(
+              item.responsibleDepartmentId,
+              item.responsibleDepartment,
+            ),
             level,
             cause: item.rootCause || item.analysis || '-',
             measures: item.solution || '-',
@@ -159,16 +217,31 @@ export const ReportService = {
           }
 
           let cause = item.failureCause || '-';
-          if (cause === '-' && (item.defectType || item.defectSubtype)) {
-            cause = [item.defectType, item.defectSubtype]
+          const defectCategoryName = resolveGovernedDisplayName(
+            item.defectCategoryId,
+            afterSalesClassificationNames.defectCategories,
+            item.defectType,
+          );
+          const defectSubcategoryName = resolveGovernedDisplayName(
+            item.defectSubcategoryId,
+            afterSalesClassificationNames.defectSubcategories,
+            item.defectSubtype,
+          );
+          if (cause === '-' && (defectCategoryName || defectSubcategoryName)) {
+            cause = [defectCategoryName, defectSubcategoryName]
               .filter(Boolean)
               .join(' - ');
           }
+          const productCategoryName = resolveGovernedDisplayName(
+            item.productCategoryId,
+            afterSalesClassificationNames.productCategories,
+            item.productType,
+          );
 
           return {
-            product: item.projectName || item.productType || '-',
+            product: item.projectName || productCategoryName || '-',
             description: item.issueDescription || '-',
-            respDept: getDeptName(item.respDept),
+            respDept: getDeptName(item.respDeptId, item.respDept),
             level,
             cause,
             measures: item.solution || item.actualSolution || '-',

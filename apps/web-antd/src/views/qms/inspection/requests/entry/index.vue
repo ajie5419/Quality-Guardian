@@ -14,17 +14,16 @@ import { QMS_UPLOAD_ACTIONS } from '#/api/qms/constants';
 import {
   createPublicInspectionRequest,
   getPublicInspectionRequestBomParts,
-  getPublicInspectionRequestProcessDictionaryOptions,
   getPublicInspectionRequestProcesses,
   getPublicInspectionRequestWorkOrders,
 } from '#/api/qms/inspection-request';
 import { useImageCompress } from '#/composables/useImageCompress';
+import { useErrorHandler } from '#/hooks/useErrorHandler';
 import {
   applyUploadResponse,
   normalizeUploadFileList,
 } from '#/views/qms/shared/utils/upload-file';
 
-import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
 import InspectionRequestEntryFormFields from './components/InspectionRequestEntryFormFields.vue';
 import InspectionRequestEntryShell from './components/InspectionRequestEntryShell.vue';
 import InspectionRequestEntrySubmitBar from './components/InspectionRequestEntrySubmitBar.vue';
@@ -32,6 +31,7 @@ import {
   buildIncomingInspectionRequestInfo,
   buildInspectionRequestEntryProcessOptions,
   buildInspectionRequestEntryRequiredMessage,
+  buildInspectionRequestPostSubmitQuery,
   getInspectionRequestEntryCopy,
   INCOMING_INSPECTION_PROCESS_NAME,
   inspectionRequestEntryCheckResultOptions,
@@ -51,7 +51,9 @@ const router = useRouter();
 const submitting = ref(false);
 const attachmentFileList = ref<UploadFile[]>([]);
 const bomPartsLoading = ref(false);
-const bomPartOptions = ref<Array<{ label: string; value: string }>>([]);
+const bomPartOptions = ref<
+  Array<{ label: string; partName: string; value: string }>
+>([]);
 const workOrderLoading = ref(false);
 const workOrderOptions = ref<
   Array<{
@@ -64,19 +66,23 @@ const workOrderOptions = ref<
 >([]);
 const workOrderProcessesLoading = ref(false);
 const { compressImage } = useImageCompress();
-const workOrderProcessOptions = ref<Array<{ label: string; value: string }>>(
-  [],
-);
-const dictionaryProcessOptions = ref<Array<{ label: string; value: string }>>(
-  [],
-);
+const { handleApiError } = useErrorHandler();
+const workOrderProcesses = ref<
+  Array<{
+    category: 'INCOMING' | 'PROCESS';
+    processId: string;
+    processName: string;
+  }>
+>([]);
 
 const requestForm = reactive({
   attachments: [] as InspectionRequestAttachment[],
   componentName: '',
   incomingType: '',
   mutualCheckResult: 'PASS' as InspectionRequestCheckResult,
+  partId: '',
   partName: '',
+  processId: '',
   processName: '',
   quantity: 1,
   reporter: '',
@@ -106,8 +112,8 @@ const {
 
 const processOptions = computed(() =>
   buildInspectionRequestEntryProcessOptions(
-    dictionaryProcessOptions.value,
-    workOrderProcessOptions.value,
+    workOrderProcesses.value,
+    isIncomingEntry.value ? 'INCOMING' : 'PROCESS',
   ),
 );
 
@@ -130,7 +136,9 @@ function applyRoutePrefill() {
   const workOrderNumber = String(route.query.workOrderNumber || '');
   requestForm.workOrderNumber = workOrderNumber;
   requestForm.workOrderNumbers = workOrderNumber ? [workOrderNumber] : [];
+  requestForm.partId = String(route.query.partId || '');
   requestForm.partName = String(route.query.partName || '');
+  requestForm.processId = String(route.query.processId || '');
   requestForm.componentName = String(route.query.componentName || '');
   requestForm.processName = isIncomingEntry.value
     ? INCOMING_INSPECTION_PROCESS_NAME
@@ -145,7 +153,9 @@ function resetRequestForm() {
   requestForm.attachments = [];
   requestForm.componentName = '';
   requestForm.incomingType = '';
+  requestForm.partId = '';
   requestForm.partName = '';
+  requestForm.processId = '';
   requestForm.processName = isIncomingEntry.value
     ? INCOMING_INSPECTION_PROCESS_NAME
     : '';
@@ -212,15 +222,10 @@ async function handleBeforeUpload(file: File) {
 }
 
 async function loadBomPartOptions(workOrderNumber: string) {
-  if (isIncomingEntry.value) {
-    bomPartOptions.value = [];
-    bomPartsLoading.value = false;
-    return;
-  }
-
   const normalized = (workOrderNumber || '').trim();
   if (!normalized) {
     bomPartOptions.value = [];
+    requestForm.partId = '';
     requestForm.partName = '';
     return;
   }
@@ -235,9 +240,10 @@ async function loadBomPartOptions(workOrderNumber: string) {
     bomPartOptions.value = mapInspectionRequestEntryBomPartOptions(list || []);
 
     if (
-      requestForm.partName &&
-      !bomPartOptions.value.some((item) => item.value === requestForm.partName)
+      requestForm.partId &&
+      !bomPartOptions.value.some((item) => item.value === requestForm.partId)
     ) {
+      requestForm.partId = '';
       requestForm.partName = '';
     }
   } catch {
@@ -250,19 +256,13 @@ async function loadBomPartOptions(workOrderNumber: string) {
 }
 
 async function loadWorkOrderProcessOptions(workOrderNumber: string) {
-  if (isIncomingEntry.value) {
-    workOrderProcessOptions.value = [
-      {
-        label: INCOMING_INSPECTION_PROCESS_NAME,
-        value: INCOMING_INSPECTION_PROCESS_NAME,
-      },
-    ];
-    return;
-  }
-
   const normalized = workOrderNumber.trim();
   if (!normalized) {
-    workOrderProcessOptions.value = [];
+    workOrderProcesses.value = [];
+    requestForm.processId = '';
+    requestForm.processName = isIncomingEntry.value
+      ? INCOMING_INSPECTION_PROCESS_NAME
+      : '';
     return;
   }
 
@@ -273,33 +273,35 @@ async function loadWorkOrderProcessOptions(workOrderNumber: string) {
     });
     if (requestForm.workOrderNumber.trim() !== normalized) return;
 
-    const processNames = new Set<string>();
-    for (const item of list || []) {
-      const processName = String(item.processName || '').trim();
-      if (processName) processNames.add(processName);
+    workOrderProcesses.value = list || [];
+    const selected = isIncomingEntry.value
+      ? workOrderProcesses.value.find((item) => item.category === 'INCOMING')
+      : workOrderProcesses.value.find(
+          (item) => item.processId === requestForm.processId,
+        );
+    if (selected) {
+      requestForm.processId = selected.processId;
+      requestForm.processName = selected.processName;
+    } else {
+      requestForm.processId = '';
+      requestForm.processName = isIncomingEntry.value
+        ? INCOMING_INSPECTION_PROCESS_NAME
+        : '';
     }
-    workOrderProcessOptions.value = [...processNames].map((processName) => ({
-      label: processName,
-      value: processName,
-    }));
-  } catch {
-    workOrderProcessOptions.value = [];
+  } catch (error: unknown) {
+    if (requestForm.workOrderNumber.trim() !== normalized) return;
+
+    handleApiError(error, 'Load Inspection Request Processes');
+    workOrderProcesses.value = [];
+    requestForm.processId = '';
+    requestForm.processName = isIncomingEntry.value
+      ? INCOMING_INSPECTION_PROCESS_NAME
+      : '';
+    message.error('工序加载失败，请稍后重试');
   } finally {
     if (requestForm.workOrderNumber.trim() === normalized) {
       workOrderProcessesLoading.value = false;
     }
-  }
-}
-
-async function loadPublicInspectionProcessDictionaryOptions() {
-  try {
-    const options = await getPublicInspectionRequestProcessDictionaryOptions();
-    dictionaryProcessOptions.value = mapDictionaryOptionsToInspectionProcess(
-      options,
-      [],
-    );
-  } catch {
-    dictionaryProcessOptions.value = [];
   }
 }
 
@@ -310,7 +312,9 @@ async function submitRequest() {
     !requestForm.workOrderNumber ||
     requestForm.workOrderNumbers.length === 0 ||
     (isIncomingEntry.value && !requestForm.incomingType) ||
+    !requestForm.partId ||
     !requestForm.partName ||
+    !requestForm.processId ||
     !requestForm.processName ||
     (requiresComponentName.value && !requestForm.componentName) ||
     !requestForm.quantity ||
@@ -339,20 +343,27 @@ async function submitRequest() {
   submitting.value = true;
   try {
     const created = await createPublicInspectionRequest({
-      ...requestForm,
+      attachments: requestForm.attachments,
+      category: isIncomingEntry.value ? 'INCOMING' : 'PROCESS',
       componentName: requiresComponentName.value
         ? requestForm.componentName
         : '',
-      processName: isIncomingEntry.value
-        ? INCOMING_INSPECTION_PROCESS_NAME
-        : requestForm.processName,
+      mutualCheckResult: requestForm.mutualCheckResult,
+      partId: requestForm.partId,
+      processId: requestForm.processId,
+      quantity: requestForm.quantity,
+      reporter: requestForm.reporter,
       requestInfo: isIncomingEntry.value
         ? buildIncomingInspectionRequestInfo({
             incomingType: requestForm.incomingType,
             notes: requestForm.requestInfo,
           })
         : requestForm.requestInfo,
+      selfCheckResult: requestForm.selfCheckResult,
       stationSelection: requestForm.stationSelection || undefined,
+      supplierId: requestForm.supplierId || undefined,
+      team: requestForm.team,
+      teamId: requestForm.teamId || undefined,
       workOrderNumber: requestForm.workOrderNumber,
       workOrderNumbers: isIncomingEntry.value
         ? requestForm.workOrderNumbers
@@ -362,12 +373,7 @@ async function submitRequest() {
       `${entryCopy.value.submitSuccessPrefix}：${created.requestNo}`,
     );
     resetRequestForm();
-    const nextQuery = { ...route.query };
-    delete nextQuery.partName;
-    delete nextQuery.componentName;
-    delete nextQuery.processName;
-    delete nextQuery.reporter;
-    delete nextQuery.team;
+    const nextQuery = buildInspectionRequestPostSubmitQuery(route.query);
     void router.replace({ path: route.path, query: nextQuery });
   } finally {
     submitting.value = false;
@@ -376,7 +382,6 @@ async function submitRequest() {
 
 onMounted(() => {
   applyRoutePrefill();
-  void loadPublicInspectionProcessDictionaryOptions();
   void loadWorkOrderOptions(requestForm.workOrderNumber);
   void loadResponsibleUnitOptions(requestForm.team);
 });
@@ -391,10 +396,6 @@ watch(
 watch(
   () => requestForm.workOrderNumber,
   (workOrderNumber) => {
-    if (isIncomingEntry.value) {
-      void loadWorkOrderProcessOptions(workOrderNumber);
-      return;
-    }
     void Promise.all([
       loadBomPartOptions(workOrderNumber),
       loadWorkOrderProcessOptions(workOrderNumber),

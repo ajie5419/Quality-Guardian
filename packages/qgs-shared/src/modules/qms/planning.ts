@@ -86,6 +86,7 @@ export interface BomItem {
   quantity: number;
   remarks?: string;
   requiredProcesses: string[];
+  requiredProcessIds?: string[];
   unit: string;
   version: string;
 }
@@ -93,7 +94,9 @@ export interface BomItem {
 export interface BomInspectionProgress {
   completed: boolean;
   completedQuantity: number;
+  processId: null | string;
   processName: string;
+  processResolutionStatus: 'INVALID' | 'MISSING' | 'RESOLVED';
   remainingQuantity: number;
   requiredQuantity: number;
 }

@@ -28,8 +28,11 @@ describe('qualityLossIndexService', () => {
         laborTravelCost: 0,
         materialCost: 0,
         occurDate: new Date('2026-06-18T00:00:00.000Z'),
+        partId: 'part-1',
         projectName: 'P',
+        projectId: 'project-1',
         respDept: 'QA',
+        respDeptId: 'dept-qa',
         workOrderNumber: 'WO-1',
       });
 
@@ -40,6 +43,9 @@ describe('qualityLossIndexService', () => {
         actualClaim: 0,
         createdBy: 'u-1',
         id: 'EXT-as-1',
+        partId: 'part-1',
+        projectId: 'project-1',
+        respDeptId: 'dept-qa',
         source: 'External',
         sourcePk: 'as-1',
         status: 'OPEN',
@@ -118,6 +124,7 @@ describe('qualityLossIndexService', () => {
         projectName: 'P',
         recoveredAmount: 50,
         responsibleDepartment: 'QA',
+        responsibleDepartmentId: 'dept-qa',
         status: 'OPEN',
         workOrderNumber: 'WO-1',
       });
@@ -125,6 +132,7 @@ describe('qualityLossIndexService', () => {
       expect(call.create.id).toBe('INT-qr-1');
       expect(call.create.amount).toBe(200);
       expect(call.create.actualClaim).toBe(50);
+      expect(call.create.respDeptId).toBe('dept-qa');
     });
 
     it('soft-deletes when lossAmount is zero', async () => {
@@ -174,7 +182,9 @@ describe('qualityLossIndexService', () => {
         occurDate: new Date('2026-06-18T00:00:00.000Z'),
         partName: '主梁',
         projectName: '1000t 架桥机',
+        projectId: 'project-1',
         respDept: 'QA',
+        respDeptId: 'dept-qa',
         status: 'Pending',
         type: 'Scrap',
         workOrderNumber: 'WO-468624',
@@ -186,6 +196,8 @@ describe('qualityLossIndexService', () => {
         expect.objectContaining({
           partName: '主梁',
           projectName: '1000t 架桥机',
+          projectId: 'project-1',
+          respDeptId: 'dept-qa',
           lossType: 'Scrap',
           workOrderNumber: 'WO-468624',
         }),

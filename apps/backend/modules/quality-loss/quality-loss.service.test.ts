@@ -28,6 +28,14 @@ vi.mock('~/modules/dept/dept-tree', () => ({
   flattenDeptTree: () => [],
 }));
 
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNamesByIds: vi
+      .fn()
+      .mockResolvedValue(new Map([['dept-qa', 'Quality']])),
+  },
+}));
+
 vi.mock('~/utils/logger', () => ({
   createModuleLogger: () => ({
     error: vi.fn(),
@@ -63,6 +71,7 @@ function indexRow(overrides: Partial<Record<string, unknown>> = {}) {
     partName: 'Bolt',
     projectName: 'P',
     respDept: 'QA',
+    respDeptId: 'dept-qa',
     source: 'External',
     sourcePk: 'as-1',
     status: 'OPEN',
@@ -102,6 +111,32 @@ describe('qualityLossService', () => {
         'External',
         'Internal',
       ]);
+      expect(result.items[0]).toEqual(
+        expect.objectContaining({
+          responsibleDepartment: 'QA',
+          responsibleDepartmentCanonicalName: 'Quality',
+          responsibleDepartmentId: 'dept-qa',
+          responsibleDepartmentResolutionStatus: 'RESOLVED',
+        }),
+      );
+    });
+
+    it('preserves unresolved historical department snapshots', async () => {
+      (prisma.quality_loss_index.findMany as any).mockResolvedValue([
+        indexRow({ respDept: 'Legacy Quality', respDeptId: null }),
+      ]);
+      (prisma.quality_loss_index.count as any).mockResolvedValue(1);
+
+      const result = await QualityLossService.getAllLosses();
+
+      expect(result.items[0]).toEqual(
+        expect.objectContaining({
+          responsibleDepartment: 'Legacy Quality',
+          responsibleDepartmentCanonicalName: '数据待治理：Legacy Quality',
+          responsibleDepartmentResolutionReason: 'MISSING_REQUIRED',
+          responsibleDepartmentResolutionStatus: 'MISSING',
+        }),
+      );
     });
 
     it('applies lossSource filter to where clause', async () => {

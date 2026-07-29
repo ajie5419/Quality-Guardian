@@ -324,7 +324,7 @@ async function main() {
       meta: { title: '删除' },
     },
 
-    // --- 检验记录设置 ---
+    // --- 报检与检验设置 ---
     {
       id: 19,
       parentId: 10,
@@ -333,7 +333,7 @@ async function main() {
       component: 'system/inspection-settings/index',
       type: 'menu',
       authCode: 'System:InspectionSettings:List',
-      meta: { title: '检验记录设置', icon: 'carbon:settings-adjust' },
+      meta: { title: '报检与检验设置', icon: 'carbon:settings-adjust' },
     },
     {
       id: 1900,

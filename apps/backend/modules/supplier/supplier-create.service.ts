@@ -1,4 +1,4 @@
-import type { suppliers } from '@prisma/client';
+import type { Prisma, suppliers } from '@prisma/client';
 
 import {
   buildSupplierCreateDataWithCanonical,
@@ -17,6 +17,8 @@ export interface SupplierCreateOutcome {
   action: 'CREATE' | 'RESTORE';
   supplier: suppliers;
 }
+
+type SupplierCreateClient = Pick<Prisma.TransactionClient, 'suppliers'>;
 
 function isSupplierNameUniqueConflict(error: unknown): boolean {
   if (!isPrismaUniqueConstraintError(error)) return false;
@@ -48,12 +50,13 @@ async function restoreDeletedSupplier(
   name: string,
   payload: Record<string, unknown>,
   originalError: Error,
+  client: SupplierCreateClient,
 ): Promise<SupplierCreateOutcome> {
-  const existing = await prisma.suppliers.findUnique({ where: { name } });
+  const existing = await client.suppliers.findUnique({ where: { name } });
   if (!existing) throw originalError;
   if (!existing.isDeleted) throw supplierNameConflict();
 
-  const restored = await prisma.suppliers.updateMany({
+  const restored = await client.suppliers.updateMany({
     where: { id: existing.id, isDeleted: true, name },
     data: {
       ...(await buildSupplierUpdateDataWithCanonical(payload)),
@@ -61,14 +64,14 @@ async function restoreDeletedSupplier(
     },
   });
   if (restored.count === 0) {
-    const current = await prisma.suppliers.findUnique({ where: { name } });
+    const current = await client.suppliers.findUnique({ where: { name } });
     if (current && !current.isDeleted) throw supplierNameConflict();
     throw originalError;
   }
 
   return {
     action: 'RESTORE',
-    supplier: await prisma.suppliers.findUniqueOrThrow({
+    supplier: await client.suppliers.findUniqueOrThrow({
       where: { id: existing.id },
     }),
   };
@@ -76,6 +79,7 @@ async function restoreDeletedSupplier(
 
 export async function createSupplierRecord(
   payload: Record<string, unknown>,
+  client: SupplierCreateClient = prisma,
 ): Promise<null | SupplierCreateOutcome> {
   const createData = await buildSupplierCreateDataWithCanonical(payload);
   if (!createData) return null;
@@ -83,7 +87,7 @@ export async function createSupplierRecord(
   try {
     return {
       action: 'CREATE',
-      supplier: await prisma.suppliers.create({ data: createData }),
+      supplier: await client.suppliers.create({ data: createData }),
     };
   } catch (error: unknown) {
     const originalError = toError(error);
@@ -91,6 +95,11 @@ export async function createSupplierRecord(
       logger.error(originalError, 'createSupplierRecord failed');
       throw originalError;
     }
-    return restoreDeletedSupplier(createData.name, payload, originalError);
+    return restoreDeletedSupplier(
+      createData.name,
+      payload,
+      originalError,
+      client,
+    );
   }
 }

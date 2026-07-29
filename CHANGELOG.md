@@ -25,6 +25,590 @@
 
 ## 执行记录
 
+### 2026-07-29 供应商与外协评分一致性最终重构
+
+**执行内容：**
+
+- 新增数据库持久化 `metric_refresh_jobs` 及 Prisma migration，建立任务追加、租约抢占、完成确认、失败重试和发布清零能力。
+- 检验记录、不合格项、售后记录、质量损失、供应商档案和 TEAM 映射的写路径，统一在源数据事务内按 canonical supplier ID 追加评分任务；删除进程内 `EventEmitter`、提交后 fire-and-forget 刷新和按名称刷新入口。
+- 新增幂等供应商评分 Worker，按供应商 ID 聚合 `inspections`、`quality_records`、`after_sales` 和 TEAM 显式映射，成功后确认任务，失败时保留错误和重试时间。
+- 评分模型升级为 V4。发布维护在应用停止写入期间为无 V4 快照或旧模型快照建立明确 ID 任务，同步消费所有线上遗留任务；任务未清零即终止发布。
+- 删除健康检查后的异步快照补数容器和旧 `backfill-supplier-score-snapshots.ts`，替换为发布前同步 `reconcile-supplier-score-snapshots.ts`。
+- 拆分供应商写服务，删除检验模块三层无业务逻辑的转发门面并消除隐性加载循环。
+- 更新 supplier、inspection、after-sales、metric-refresh 及主数据身份治理架构文档；未启动前端 dev/build 服务，未访问或修改生产环境。
+
+**验证结果：**
+
+- 全仓单元测试：`332/332` 文件、`2852/2852` 测试通过。
+- Backend full suite：`243/243` 文件、`2278/2278` 测试通过。
+- `pnpm lint`：通过，格式和 ESLint 均无错误。
+- `pnpm run check:type`：通过，3/3 workspace tasks。
+- `pnpm run check:qms-arch`：通过，0 violations。
+- `prisma validate`：通过。
+- 发布维护脚本与部署脚本 shell 语法检查：通过。
+
+**commits：**
+
+- `4f1bc272` `refactor: add durable metric refresh queue`
+- `d4015f43` `refactor: make supplier score refresh durable`
+- `4f8489dc` `refactor: enforce supplier score reconciliation gate`
+
+**遗留问题：**
+
+- 生产数据库未在本次会话中访问；migration 与 V4 历史快照校准将在正常发布维护阶段执行，并由任务清零门禁决定是否允许启动新版本。
+
+### 2026-07-29 车辆故障率历史产品快照兼容修复
+
+**执行内容：**
+
+- 车辆故障统计查询同时按产品分类 canonical ID、已声明的历史产品名称快照和车辆事业部识别数据，恢复尚未完成分类 ID 回填的历史车辆售后记录。
+- 将车辆产品稳定编码和不可变历史名称集中到质量分类模块，初始化脚本与报表复用同一身份声明，避免查询层硬编码业务名称。
+- 月度数量、最早统计年份和缺陷排名共用同一查询条件；新增 Prisma 条件断言，覆盖历史快照去重与精确匹配。
+- 新数据写入契约不变，仍必须提交有效的产品和缺陷父子分类 ID；名称仅作为历史快照使用。
+- 未启动前端 dev/build 服务；未访问或修改生产环境。
+
+**验证结果：**
+
+- 全仓单元测试：`334/334` 文件、`2860/2860` 测试通过。
+- Backend full suite：`245/245` 文件、`2286/2286` 测试通过。
+- 定向测试：`4/4` 文件、`41/41` 测试通过。
+- `pnpm lint`：通过，0 error / 0 warning。
+- `pnpm run check:type`：通过，3/3 workspace tasks。
+- `pnpm run check:qms-arch`：通过，0 violations。
+
+**commit:** `867fa0c` `fix(@qgs/backend): retain legacy vehicle failure records`
+
+**遗留问题：**
+
+- 生产环境未访问、未修改；无法唯一映射分类 ID 的其他历史记录仍需通过主数据治理页面人工处置。
+
+### 2026-07-29 历史统计兼容与 ID 写入契约加固
+
+**执行内容：**
+
+- 售后质量概览、不合格项统计和检验质量概览改为“canonical ID 优先、历史名称快照兜底”：同一 ID 的改名前后数据合并，无 ID 的旧数据按原始名称保留并标记待治理。
+- 项目风险、供应商排行、周报、日报和车辆故障率补齐历史身份兼容；已停用的车辆产品分类仍用于历史报表过滤，避免旧记录退出统计。
+- 售后旧记录允许只修改非分类字段；新建记录及分类变更继续要求完整父子分类 ID，名称快照只由服务端根据 ID 写入。
+- 主数据治理页只提供启用的父子分类；治理处置在同一事务内完成分类校验、条件更新和审计关闭，并在并发编辑发生时拒绝覆盖。
+- 核对质量损失统计已使用 ID 聚合和历史部门快照兜底，无需重复改造。
+- 未启动前端 dev/build 服务；未访问或修改生产环境。
+
+**验证结果：**
+
+- 全仓单元测试：`334/334` 文件、`2859/2859` 测试通过。
+- Backend full suite：`245/245` 文件、`2284/2284` 测试通过。
+- `pnpm lint`：通过，0 error / 0 warning。
+- `pnpm run check:type`：通过，3/3 workspace tasks。
+- `pnpm run check:qms-arch`：通过，0 violations。
+
+**commits：**
+
+- `2cc39688` `fix(@qgs/backend): preserve legacy after-sales statistics`
+- `e46a4cdf` `fix(@qgs/backend): retain legacy inspection aggregates`
+- `9e45ceaf` `fix(@qgs/backend): preserve legacy report identities`
+- `0beb64f9` `fix(project): harden classification governance writes`
+- `71eead15` `fix(@qgs/backend): hydrate daily report identities`
+
+**遗留问题：**
+
+- 生产环境未访问、未修改；现有 unresolved 分类记录仍需管理员在系统设置的主数据治理页人工选择正确父子分类。
+
+### 2026-07-29 统计身份重构与主数据治理闭环
+
+**执行内容：**
+
+- 建立统一统计身份契约，区分 `RESOLVED`、`MISSING`、`INVALID`，并以 `MISSING_REQUIRED`、`INVALID_REFERENCE`、`NOT_APPLICABLE`、`CONFLICTED` 解释原因。
+- 不合格项和售后动态图表按 canonical ID 聚合；缺少 ID 时按治理原因与原始快照分桶，同一 ID 的改名前后快照重新合并。
+- 售后无供应商记录明确标记为“不涉及/未关联供应商”，不再与真正缺失的供应商身份混合。
+- 统一质量概览、日报周报、车辆故障率、质量损失和工单聚合的身份显示，消除业务统计中的 `Unknown`；质量损失不同历史部门快照不再错误合并。
+- 系统设置新增主数据治理清单、分页筛选、权限和分类处置页面；不合格项缺陷分类、售后产品分类和售后缺陷分类支持选择 canonical 父子分类。
+- 处置服务由业务所属模块校验分类，并在同一事务内更新业务 ID、名称快照和 unresolved 审计；使用 `OPEN` compare-and-set 防止重复处置和并发覆盖。
+- 未启动前端 dev/build 服务；未访问或修改生产环境。
+
+**验证结果：**
+
+- 全仓单元测试：`334/334` 文件、`2852/2852` 测试通过。
+- Backend full suite：`245/245` 文件、`2278/2278` 测试通过。
+- `pnpm lint`：通过，0 error / 0 warning。
+- `pnpm run check:type`：通过，3/3 workspace tasks。
+- `pnpm run check:qms-arch`：通过，0 violations。
+- 浏览器验证：本地 `5666` 前端可访问，但浏览器无登录态；未绕过认证提交治理操作。
+
+**commits：**
+
+- `73c2e322` `refactor(project): define governed statistics identities`
+- `72876374` `refactor(project): expose governed issue statistics`
+- `b887e8bc` `refactor(@qgs/backend): govern after-sales statistics`
+- `c5636b53` `refactor(project): unify governed reporting identities`
+- `14a98bd2` `feat(project): add master data governance workflow`
+
+**遗留问题：**
+
+- 本机容器运行时当前不可用，浏览器也没有管理员登录态，因此本地 `ISS-2026-_O7D0ZBC` 分类审计仍保持 `OPEN`。治理入口已完成，恢复本地容器或管理员登录后应通过该入口选择正确父子分类，禁止直接改库或虚假结案。
+- 当前治理页只对三类质量分类提供在线处置；其他 unresolved 类型继续只读展示，待各业务模块提供可校验、事务化的修复能力。
+
+### 2026-07-29 主数据治理后的质量统计与报表修复
+
+**执行内容：**
+
+- 修复主数据治理审计将 Prisma `Decimal` 计数误判为 `0` 的问题，确保缺失、孤儿和不一致身份计数可信。
+- 周报改为按责任部门、产品类型和缺陷分类 canonical ID 解析当前名称；无法解析时统一显示“未分配”，不再回退到过期名称快照。
+- 过程合格率九宫格优先使用 `QMS_PASS_RATE_BUCKET_IDENTITIES` 中的工序和班组 ID 绑定，保留历史名称兼容分支；发布维护会输出可直接配置的环境变量建议值。
+- 在既有发布维护入口增加项目 canonical 空表初始化，并回填工单、检验、不合格项、售后、手工损失和调试验收源记录的 `projectId`。
+- 回填售后、手工损失、不合格项和调试验收源记录的责任部门 ID；兼容历史名称快照及误存到名称列的有效部门 ID。
+- 唯一精确匹配才执行带旧值条件的并发安全更新；同名歧义和无匹配写入 `unresolved_master_data_refs`。
+- 保持 `quality_loss_index` 的物化索引边界：先修复四类源表，再由发布后的既有索引重建任务同步，未直接修改索引。
+- 修复回填脚本对 Prisma 必填字符串字段使用 `not: null` 导致的运行时校验错误，并使维护脚本测试可从仓库根目录或后端目录稳定运行。
+- 在本地 Apple Container 数据库执行幂等回填、合格率绑定初始化和质量损失索引重建；未访问或修改生产环境。
+
+**验证结果：**
+
+- 全仓单元测试：`327/327` 文件、`2834/2834` 测试通过。
+- Backend full suite：`238/238` 文件、`2261/2261` 测试通过。
+- `pnpm lint`：通过，0 error / 0 warning。
+- `pnpm run check:type`：通过，3/3 workspace tasks。
+- `pnpm run check:qms-arch`：通过，0 violations。
+- 本地数据核对：检验、不合格项、售后、质量损失、调试验收范围内带项目名称但缺少 `projectId` 的目标记录清零；售后和质量损失责任部门缺失 ID 的目标记录清零。
+- 本地统计冒烟：质量概览现场/过程问题为 `3/5`，质量损失总额 `8200`；售后责任部门分布 `3/3` 已解析；质量损失部门分布 `2/2` 已解析；项目问题数为 `3/2`；过程合格率为 `100%/0%/100%`。
+
+**commits：**
+
+- `c0798edc` `fix(@qgs/backend): handle decimal governance counts`
+- `b7ff0d61` `fix(@qgs/backend): resolve weekly report identities`
+- `18fefeba` `fix(@qgs/backend): bind pass rate buckets to identities`
+- `d2b53396` `fix(@qgs/backend): backfill reporting identities`
+- `247d3558` `fix(@qgs/backend): query required reporting fields safely`
+- `878a6473` `test(@qgs/backend): resolve maintenance fixtures from workspace`
+
+**遗留问题：**
+
+- 生产环境未访问、未修改；生产数据将在正式发布时由幂等维护链路处理。
+- 当前全量治理审计仍有 `18` 条不在本次统计归属修复范围内的缺失身份：售后反馈部门 `2` 条、检验归档项目 `12` 条、BOM 项目 `2` 条、文档项目 `2` 条；另有售后反馈部门原始 ID 孤儿记录，需后续专项治理。
+- 过程合格率初始化识别到 `2` 个工序和 `3` 个班组可直接绑定；其余 `6` 个工序和 `4` 个班组不属于九个业务统计桶，继续走历史名称兼容分支。
+
+### 2026-07-29 质量分类 migration 的 MySQL 索引名修复
+
+**执行内容：**
+
+- 定位本地 `quality_guard_container` 的质量分类 migration 失败原因：两个 Prisma 自动生成的复合索引名超过 MySQL 64 字符上限，导致新分类表和业务外键字段均未创建。
+- 为两个复合索引增加稳定短名称，并同步修正尚未进入生产的 migration。
+- 扩展 Prisma migration 门禁，扫描全部 migration SQL 中的反引号标识符，阻止超过 64 字符的 MySQL 标识符再次进入发布流程。
+- 在本地 Apple Container 数据库将失败 migration 标记回滚后重新部署成功，并执行质量分类初始化和历史回填；创建 14 个一级分类、67 个二级分类，售后更新 4 个分类引用，不合格项更新 3 个分类引用，保留 1 条无法精确匹配的 unresolved 记录。
+- 未访问或修改生产环境。
+
+**验证结果：**
+
+- `prisma migrate status`：本地 `quality_guard_container` 的 46 条 migration 全部最新。
+- 真实 Prisma 查询：成功读取 11 条不合格项记录及新增分类外键，分类数量为 14/67。
+- 相关后端测试：`3/3` 文件、`37/37` 测试通过。
+- `prisma validate`、migration 门禁和 shell 语法检查通过。
+
+**commit:** `475cd93` `fix(@qgs/backend): shorten quality classification indexes`
+
+**遗留问题：**
+
+- 生产环境仍须通过正式发布流程执行修正后的 migration 与有序维护脚本，禁止手工改表。
+- 本地历史数据有 1 条不合格项分类无法精确解析，已保留在 `unresolved_master_data_refs` 等待人工处置。
+
+### 2026-07-28 质量二级分类开放配置
+
+**执行内容：**
+
+- 新增 `quality-classification` 模块、一级/二级分类表、管理 API、业务选项 API、系统菜单和权限，系统设置提供不合格项缺陷、售后产品、售后缺陷三个独立配置页。
+- 不合格项、检验记录联动创建、报检关闭、售后新增编辑、Web 筛选、小程序录入、统计图表、周报月报和车辆故障率全部改用分类 ID；名称只保留为历史显示快照。
+- 售后导入采用唯一精确名称解析；在线新增、编辑必须提交合法的一级/二级 ID，不再使用名称默认值或硬编码选项兜底。
+- 新增 Prisma migration，保留旧字段兼容迁移；发布维护按稳定编码幂等初始化三套分类，并以 compare-and-set 分批回填历史 ID。
+- 无法解析、名称缺失或已有 ID 冲突的历史记录写入 `unresolved_master_data_refs`，不静默猜测或覆盖。
+- 小程序不合格项和报检结果页改为动态二级联动；删除前端与共享包中的在线硬编码分类常量。
+- 拆分不合格项分类规范化和关系转换逻辑，`inspection-issue.ts` 从 516 行降至 490 行，满足模块文件上限。
+- 未启动前端 dev/build 服务；未访问或修改生产环境。
+
+**验证结果：**
+
+- Backend full suite：`236/236` 文件、`2243/2243` 测试通过。
+- Web full DOM suite：`47/47` 文件、`241/241` 测试通过。
+- `pnpm lint`：通过，0 error / 0 warning。
+- `pnpm run check:type`：通过，3/3 workspace tasks；小程序沿用项目既有 skip。
+- `pnpm run check:qms-arch`：通过，0 violations。
+- `pnpm run check:prisma-migration`：通过。
+
+**commits：**
+
+- `96e879b` `feat(@qgs/web-antd): add quality classification settings`
+- `7a2fa1e` `feat(@qgs/backend): add quality classification master data`
+- `97cee16` `feat(@qgs/web-antd): add quality classification options`
+- `2034b79` `feat(project): use managed inspection defect classifications`
+- `1f9895c` `feat(project): use managed after-sales classifications`
+- `ad857b6` `feat(@qgs/weapp): load managed defect classifications`
+- `decb868` `feat(@qgs/backend): migrate quality classification identities`
+- `4c61830` `refactor(project): isolate inspection issue classification`
+
+**遗留问题：**
+
+- 需要通过正式发布流程执行 migration 与 release maintenance，并在生产环境核对初始化、回填和 unresolved 审计数量。
+
+### 2026-07-28 Phase 14: enforce canonical identity contracts and safe maintenance
+
+**Execution:**
+
+- Retired both legacy private and public inspection-request write endpoints with `410 INSPECTION_REQUEST_V2_REQUIRED`; name-only request creation can no longer bypass canonical identity validation.
+- Required `identityContractVersion=2` plus `partId/processId` for work-order requirement creation and editing, removing the remaining name-only write path.
+- Corrected TEAM merge semantics so canonical IDs migrate without overwriting historical team-name snapshots in inspection requests, inspections, welder records, or work-order requirements.
+- Extended TEAM reconciliation to persist ambiguities for inactive same-name identities and historical name-key collisions before publication, preventing unique-key conflicts and silent identity claims.
+- Synchronized process sort updates with `inspection_request_process_options.sort` in the same transaction, keeping system settings and request-entry ordering consistent.
+- Cleared both canonical IDs and display-name query parameters after a successful repeated inspection request, preventing stale identity prefill.
+- Moved the full quality-loss rebuild out of the online maintenance window and restored it as a detached idempotent post-health-check task.
+- Hardened generic canonical backfill with soft-delete filtering, compare-and-set `ID IS NULL` writes, write confirmation, and row-level `unresolved_master_data_refs` records.
+- No production database or production record was accessed or modified.
+
+**Verification:**
+
+- Backend full suite: `234/234` files and `2225/2225` tests passed.
+- Web full DOM suite: `47/47` files and `239/239` tests passed.
+- Shared identity contract suite: `2/2` files and `17/17` tests passed.
+- Full repository lint, workspace typecheck (`3/3` tasks), and changed-scope QMS architecture check passed.
+- Local browser verification at `WO-468624` confirmed multiple configured process options, successful process selection, and multiple internal-team, department, and outsourcing options without submitting business data.
+
+**Commits:** `73a3d343`, `a93991b8`, `7558d8ad`, `45d38a44`
+
+**Remaining issues:**
+
+- Production remains on `qgs-v0.19.1`. Delivery must use the normal migration and ordered release-maintenance workflow; manual production database edits are not permitted.
+
+### 2026-07-28 Phase 13: separate global processes from inspection-request visibility
+
+**Execution:**
+
+- Established `processes` as the single reusable process identity source for inspection requests, inspection records, nonconformance items, ITP, inspection templates, BOM configuration, Web, and WeChat clients.
+- Added `inspection_request_process_options` as a normalized `category + processId` configuration table. `PROCESS` and `INCOMING` visibility can now be managed independently, including enabling the same process in both categories.
+- Removed `work_order_requirements` from request-entry option selection. Work-order requirements remain business requirements and no longer act as a process whitelist.
+- Added system management APIs and `/system/inspection-settings` controls for process creation, editing, activation, soft deletion, and transactional request-category selection.
+- Enforced the same configured `category + processId` rule during V2 request submission, preventing hidden options from being submitted through crafted payloads.
+- Retired the editable `inspection_process_name` dictionary path and removed hard-coded Web/shared fallbacks. A soft-deleted process restored by name keeps its original stable ID.
+- Added additive Prisma migration and idempotent release maintenance. The bootstrap creates only missing option rows and never overwrites administrator choices or historical business data.
+- Applied migration and maintenance only to the local Apple Container database. Seven existing processes produced fourteen option rows. Read-only verification returned six process-inspection options and one incoming-inspection option. Production was not accessed or modified.
+
+**Verification:**
+
+- Backend full suite: `234/234` files and `2217/2217` tests passed.
+- Web full suite: `47/47` files and `238/238` tests passed.
+- Shared focused suite: `14/14` tests passed.
+- Full repository lint, workspace typecheck, and changed-scope QMS architecture check passed.
+- Browser E2E could not be rerun after local initialization because the pre-existing `5320/5666` development services were no longer running; project policy prohibits starting frontend development servers during this task.
+
+**Commits:** `5df94489`, `66c4b3fa`, `83d8cd30`
+
+**Remaining issues:**
+
+- Production rollout must use the normal write-stop release workflow so migration and ordered maintenance finish before the new application starts. Manual production database edits are not permitted.
+
+### 2026-07-28 Phase 12: bootstrap historical process identities safely
+
+**Execution:**
+
+- Closed the migration gap that left historical `work_order_requirements.processId` null when the new `processes` table and relation columns were added.
+- Added a one-time canonical process bootstrap from active legacy rows that still lack `processId`. The bootstrap runs only while the canonical process table has zero rows; initialized environments never recreate identities from old name snapshots or legacy dictionary names.
+- Backfilled historical work-order requirement process IDs with keyset batches and compare-and-set writes. Existing IDs and historical `processName` snapshots are preserved; unresolved names are recorded in `unresolved_master_data_refs`.
+- Required active process identities to satisfy `isDeleted=0 AND status=1`, generated bootstrap IDs with cuid, and reported actual inserted row counts.
+- Reordered release maintenance so identity bootstrap and relation backfill run before inspection-request category classification, with a regression test that locks the dependency order.
+- Applied the idempotent maintenance only to the local Apple Container database. Initial local results were `7` canonical process rows inserted and `1/1` work-order requirement process identity updated with `0` unresolved rows; the incoming-process category update changed `1` row. A repeated run performed zero process, category, or requirement updates. No production database or production record was accessed or modified.
+
+**Verification:**
+
+- Backend focused suite: `4/4` test files and `41/41` tests passed.
+- Backend full suite: `232/232` test files and `2209/2209` tests passed.
+- Web request-entry suite: `2/2` test files and `6/6` tests passed.
+- Full repository lint passed; workspace typecheck passed `3/3` tasks; changed-scope QMS architecture check reported `0 violations across 0 rules`.
+- Release-maintenance shell syntax and `git diff --check` passed.
+- Local API returned canonical `PROCESS / 组对` and `INCOMING / 进货检验` identities for `WO-468624`. Browser verification confirmed that the process-entry dropdown displays `组对`.
+
+**Commit:** `8554f32` `fix(project): bootstrap historical process identities`
+
+**Remaining issues:**
+
+- Production remains unchanged at `qgs-v0.19.1`. The new bootstrap must be delivered only through the normal write-stop migration and ordered release-maintenance workflow; manual production database edits are not permitted.
+
+### 2026-07-28 Phase 11: restore work-order-scoped inspection process options
+
+**Execution:**
+
+- Restored process-inspection options to the active `work_order_requirements` of the selected work order instead of exposing every active process master row.
+- Added a work-order-requirement domain query that rejects deleted, inactive, and non-`PROCESS` process relations before returning canonical IDs and names.
+- Kept incoming-inspection options independent of work-order requirements and selected them through `inspectionRequestCategory=INCOMING`, never through a process name.
+- Deduplicated repeated requirements by canonical `processId`; equal names with different IDs remain distinct options.
+- Made public-entry process loading failures visible and cleared stale process identities after an error.
+- Documented the process-option source contract. No database, migration, backfill, or production data was accessed or modified.
+
+**Verification:**
+
+- Backend focused suite: `2/2` test files and `29/29` tests passed.
+- Web request-entry suite: `2/2` test files and `6/6` tests passed.
+- Backend full suite: `232/232` test files and `2201/2201` tests passed.
+- Full repository lint passed with zero errors; workspace typecheck passed `3/3` tasks.
+- Changed-scope QMS architecture check reported `0 violations across 0 rules`; `git diff --check` passed.
+
+**Commit:** `8b974ac` `fix(project): restore work-order process options`
+
+**Remaining issues:**
+
+- Deployment must continue to apply the existing `processes.inspectionRequestCategory` migration before starting the new application version. This fix intentionally does not hide a missing migration with name-based compatibility logic.
+
+### 2026-07-28 Phase 10: complete system-wide canonical identity governance
+
+**Execution:**
+
+- Replaced mutable-name identity decisions with canonical IDs across TEAM maintenance, inspection-request categories, BOM process relations, quality-loss department writes, charts, reports, Web, and WeChat clients.
+- Added a durable TEAM merge state machine with participant locks, leases, compare-and-set batches, cumulative counts, resumable failures, deterministic lock ordering, and soft-deleted supplier-link history.
+- Restricted legacy TEAM bootstrap claims to one independently verifiable source and routed TEAM administration through the dedicated identity API.
+- Added `processes.inspectionRequestCategory`; the DDL-only migration defaults existing processes to `PROCESS`, while ordered release maintenance idempotently classifies the legacy incoming process and backfills historical request categories.
+- Enforced V2 `processId + category` consistency on the server. V1 remains a deployment compatibility contract and does not inherit new V2-only component validation.
+- Preserved BOM process relations when an edit omits process fields and replaced them only after an explicit selection change or clear.
+- Made quality-loss create and update validate an active department ID and rebuild `respDeptId + respDept` in the same transaction. Historical snapshots remain searchable and unresolved rows remain visible.
+- Carried `id + resolutionStatus + displayName` through ECharts data, legends, Vue keys, quality-loss charts, and monthly reports so equal display names never become identity keys.
+- Removed the duplicate post-health-check quality-loss backfill. Release maintenance remains the single synchronous source of truth while backend writes are stopped.
+- No production database or production records were accessed or modified during this implementation.
+
+**Verification:**
+
+- Backend full suite: `232/232` test files and `2200/2200` tests passed.
+- Focused Web chart and request-entry suite: `4/4` test files and `32/32` tests passed.
+- Shared inspection-request contract: `15/15` tests passed.
+- Full repository lint passed with zero errors; workspace typecheck passed `3/3` tasks.
+- Prisma format and validation passed; changed-scope QMS architecture check reported `0 violations across 0 rules`.
+- `git diff --check` passed and the worktree was clean before documentation updates.
+
+**Commits:** `c635ed47`, `21a13a6b`, `6a3cf228`, `fee9085c`, `4fce415c`, `fa9e3a18`, `e2393f3`
+
+**Remaining issues:**
+
+- No remaining code issue in this governance scope. Production rollout must use the existing release workflow so migrations and idempotent maintenance execute during the write-stop window; manual database edits are not permitted.
+
+### 2026-07-28 Phase 9: govern part, process and quality-loss identities
+
+**执行内容：**
+
+- 质量损失索引补齐 `projectId/partId/respDeptId`，部门图表改为按 ID 聚合。
+- 检验记录新增正式 `partId/partName`，报检关闭、手工创建和更新统一 canonical 双写。
+- 工单要求和检验只按 `partId + processId` 匹配；`MISSING` 按源记录隔离，`INVALID` 保留原 ID，未归属检验点不误抵扣完成率。
+- BOM 所需工序改为 `project_bom_required_processes` 正式关系，旧 JSON 只作历史快照。
+- 报检 Web/小程序和工单要求界面切换到 V2 ID-required 契约，服务端按 ID 重建名称；V1 仅用于无中断发布迁移。
+- 新增幂等关系回填并接入 release maintenance；回填优先确定关联证据，不覆盖已有历史名称快照。
+- 新增 `B-ID9` AST 门禁，阻断受控名称再次作为 `Map.get/set/has` 身份键。
+
+**验证结果：**
+
+- 共享契约 build：通过。
+- 后端 TypeScript 与前端 Vue TypeScript：通过。
+- 定向测试：报检 V2 `38/38`、前端报检 `5/5`、工单要求/聚合 `24/24`、关系回填与质量损失 `58/58`。
+- 全库 QMS 架构门禁：`0 violations across 0 rules`。
+- 后端全量测试：`230/230` 个文件、`2176/2176` 个用例通过。
+- 全量 lint 通过（0 error）；workspace typecheck `3/3` 通过；Prisma migration 检查通过。
+
+**commit:** `b7ad4a18` / `2b6db069` / `a4304bf9` / `e53dc930` / `b90adeed` / `6411c7d5` / `69b4fcde` / `d7b1b240` / `75851ce`
+
+**遗留问题：**
+
+- 生产必须按“additive migration 和回填 → 发布 V2 Web/小程序 → 观测 V1 零流量 → 删除 V1”的顺序执行，不允许直接中断旧客户端。
+- `unresolved_master_data_refs` 人工处置界面和 TEAM 合并并发一致性仍是后续独立治理波次。
+
+### 2026-07-27 Phase 1: establish canonical TEAM identity ownership
+
+**Execution:**
+
+- Added the dedicated TEAM domain, system-admin CRUD, normalized collision keys, source links, aliases, and atomic maintenance-only merge support.
+- Blocked TEAM mutations through the generic dictionary service and made generic TEAM reads bypass the 24-hour dictionary cache.
+- Added DDL-only Prisma migrations for TEAM identity governance and the nullable inspection-request category foundation.
+
+**Verification:**
+
+- Prisma format, validate, and client generation passed.
+- Backend TypeScript check passed.
+- TEAM merge/reconciliation tests: 18/18 passed; dictionary tests: 21/21 passed.
+
+**commit:** `feat(@qgs/backend): establish canonical TEAM identities`
+
+**Remaining issues:**
+
+- Source reconciliation, ordered release maintenance, and ID-based dashboard statistics are committed in subsequent phases below.
+
+### 2026-07-27 Phase 2: replace name bootstrap with source reconciliation
+
+**Execution:**
+
+- Removed the legacy name-based TEAM bootstrap and replaced it with stable department/supplier source links plus persistent ambiguity audits.
+- Near-name matches are discovery signals only; they never trigger an automatic merge. Confirmed merges require explicit source and target IDs through the maintenance-only CLI.
+- Added one ordered release-maintenance runner shared by GitHub, OSS, and local container workflows; production deployment stops backend writes before migration and identity maintenance.
+- Added an idempotent inspection-request category backfill after supplier identity backfill, with conflicts persisted for manual resolution.
+
+**Verification:**
+
+- Reconciliation and category-backfill tests: 16/16 passed.
+- Backend TypeScript check and all deployment shell syntax checks passed.
+
+**commit:** `fix(deploy): reconcile TEAM identities during maintenance`
+
+**Remaining issues:**
+
+- ID-based dashboard aggregation and architecture regression guards are committed in subsequent phases below.
+
+### 2026-07-27 Phase 2.1: preserve mapped TEAM category during backfill
+
+**Execution:**
+
+- Corrected inspection-request category reconciliation so a canonical `teamId` identifies the process domain even when the TEAM also resolves to a `supplierId`.
+- Kept the legacy process-name comparison confined to rows without either canonical identity ID and resolved any obsolete conflict audit after a successful category update.
+- Added release-maintenance regression coverage for supplier-linked TEAM requests and removed the obsolete conflict counter from its result.
+
+**Verification:**
+
+- Category backfill and inspection statistics tests: 26/26 passed.
+- Backend and frontend TypeScript checks passed.
+
+**commit:** `fix(deploy): preserve mapped TEAM request categories`
+
+**Remaining issues:**
+
+- ID-based dashboard aggregation and architecture regression guards are committed in subsequent phases below.
+
+### 2026-07-27 Phase 3: aggregate inspection statistics by canonical identity
+
+**Execution:**
+
+- Persisted `category=INCOMING|PROCESS` on every new inspection request so identity scope is independent of mutable process names.
+- Replaced TEAM, supplier, and inspector name-based aggregation with stable `teamId`, `supplierId`, and `inspectorId` keys; canonical names are resolved only after aggregation for display.
+- Preserved separate rows for distinct IDs even when their current display names match, combined renamed snapshots only when they share one ID, and exposed missing or invalid IDs as explicit unresolved buckets.
+- Updated dashboard and request-list contracts plus Vue keys to carry stable identity IDs through every ranking and history view.
+
+**Verification:**
+
+- Inspection request creation and statistics tests: 26/26 passed.
+- Backend TypeScript check passed.
+- Frontend Vue TypeScript check passed.
+- Changed-scope QMS architecture check passed with 0 new violations.
+
+**commit:** `fix(project): aggregate inspection stats by canonical identity`
+
+**Remaining issues:**
+
+- Architecture regression guards and identity-governance documentation are committed in subsequent phases below.
+
+### 2026-07-27 Phase 4: guard canonical TEAM identity contracts
+
+**Execution:**
+
+- Added AST-backed checks that reject reads of `team`, `supplierName`, or `processName` as identity inputs in inspection-request statistics.
+- Required every generic dictionary create, update, and delete entry point to invoke the TEAM mutation guard.
+- Rejected any TEAM/bootstrap script naming pattern instead of relying on two historical file names, preventing the deleted name-based bootstrap from returning under a trivial rename.
+
+**Verification:**
+
+- Architecture rule tests: 7/7 passed.
+- Changed-scope QMS architecture check passed with 0 new violations.
+- Shell syntax check passed on macOS-compatible Bash syntax.
+
+**commit:** `chore(project): guard master data identity contracts`
+
+**Remaining issues:**
+
+- Identity-governance documentation is committed in the next phase.
+
+### 2026-07-27 Phase 5: document and verify TEAM identity governance
+
+**Execution:**
+
+- Added the TEAM module architecture contract covering ownership, source reconciliation, rename behavior, explicit maintenance merge, unresolved identities, and prohibited name-based flows.
+- Extended inspection architecture with the persisted category and ID-based statistics contract.
+- Updated project-wide master-data governance and progress records to include the completed TEAM wave and the production release-maintenance requirement.
+
+**Verification:**
+
+- Backend full suite: 228/228 test files and 2154/2154 tests passed.
+- Full repository lint passed with 0 errors and 0 warnings.
+- Workspace typecheck passed: 3/3 tasks.
+- Full QMS architecture check passed with 0 new violations.
+- Prisma migration check and changed-file whitespace check passed.
+- Module size remained bounded at 26 modules and 528 TypeScript files.
+
+**commit:** `docs(project): document TEAM identity governance`
+
+**Remaining issues:**
+
+- Production still requires the normal release workflow to apply migrations, reconciliation, category backfill, and post-deploy count verification.
+
+### 2026-07-28 Phase 6: eliminate registered name-based statistics
+
+**Execution:**
+
+- Added registry-driven architecture rule `B-ID8`; it reads controlled `table + nameColumn + idColumn` pairs from `master-data-fields.ts` through the TypeScript AST and rejects Prisma `groupBy` calls that use display-name snapshots.
+- Migrated after-sales defect, supplier, department, and supplier-scoring aggregations to canonical IDs, then batch-resolved current display names.
+- Migrated inspection and issue report aggregations for supplier, TEAM, project, defect type, defect subtype, division, and responsible department to canonical IDs.
+- Preserved legacy rows with missing IDs as explicit unresolved buckets, kept invalid non-empty IDs distinguishable, and prevented different IDs with the same display name from being merged.
+
+**Verification:**
+
+- Architecture-rule tests: 8/8 passed.
+- After-sales analytics and integration tests: 21/21 passed.
+- Inspection reporting and issue-statistics tests: 50/50 passed.
+- Backend full suite: 228/228 test files and 2157/2157 tests passed.
+- Backend TypeScript check, targeted ESLint, full QMS architecture check, and whitespace check passed.
+
+**commit:** `5d6cfe3a` fix(project): aggregate governed statistics by identity
+
+**Remaining issues:**
+
+- Public chart contracts still need stable IDs and resolution status on every controlled bucket; the next phase migrates API/shared/frontend contracts.
+- Dynamic name joins, online write policies, unresolved resolution workflow, TEAM merge concurrency, and final database constraints remain governed by subsequent phases.
+
+### 2026-07-28 Phase 7：图表全链路传递稳定身份
+
+**执行内容：**
+
+- 新增共享 `IdentityAggregateItem` 契约，统一携带稳定 ID、canonical 展示名称、数值和明确的 `RESOLVED/MISSING/INVALID` 状态。
+- 售后静态/动态图表以及不合格品饼图、Pareto 和自定义图表统一切换到同一身份契约。
+- 所有本阶段受控动态维度改为按注册的 canonical ID 聚合，聚合完成后才解析当前名称。
+- 删除前端部门树补名和所有图表侧 ID-to-name 猜测；图表组件直接渲染后端身份契约，不再按展示名称二次归并。
+- 历史缺失 ID 和无效 ID 记录继续以 unresolved 桶参与统计；不同 ID 即使 canonical 名称相同也保持分离。
+
+**验证结果：**
+
+- 身份与图表定向测试：9/9 个测试文件、69/69 个用例通过。
+- 后端全量测试：228/228 个测试文件、2157/2157 个用例通过。
+- 全仓类型检查：3/3 个任务通过。
+- QMS 变更范围架构门禁通过，新增违规为 0。
+- 全仓 lint 通过，0 error、0 warning。
+
+**commit:** `84a5991c` fix(project): carry identity through chart contracts
+
+**遗留问题：**
+
+- 剩余内存统计还需迁移，并增加禁止名称 `Map` 键的架构门禁。
+- 在线写入策略、unresolved 处置闭环、TEAM 合并并发一致性和最终数据库约束由后续阶段继续治理。
+
+### 2026-07-28 Phase 8：清除工单与报告剩余名称聚合
+
+**执行内容：**
+
+- 工单看板改为按 `divisionId` 聚合事业部，并在质保排行内部按 `projectId` 聚合项目；名称只在聚合完成后批量解析。
+- 工单看板共享契约携带事业部和项目的完整身份项，前端删除部门树补名、名称标准化和名称二次归并，Vue key 改为稳定 ID。
+- 周报/月报缺陷分布和车辆故障率缺陷排行改为按 `defectTypeId` 聚合，删除历史名称回退。
+- 报告和车辆图表契约补齐稳定 ID 与 `RESOLVED/MISSING/INVALID` 状态；同 ID 的改名快照合并，不同 ID 同名保持分离。
+- 历史缺失 ID 与无效非空 ID 继续参与总量和排行计算，分别进入明确的 `MISSING` 与 `INVALID` 桶。
+
+**验证结果：**
+
+- 工单、报告和车辆故障率定向测试：3/3 个测试文件、29/29 个用例通过。
+- 后端与前端类型检查通过，0 error。
+- 后端全量测试：228/228 个测试文件、2160/2160 个用例通过。
+- 全仓 lint 通过，0 error、0 warning；全仓类型检查 3/3 个任务通过。
+- QMS 变更范围架构门禁通过，新增违规为 0。
+
+**commit:** This commit
+
+**遗留问题：**
+
+- 下一阶段增加受控名称 `Map` 键 AST 门禁，防止相同实现回归。
+- 质量损失索引的责任部门仍需补齐 ID；在线写入、unresolved 人工处置和 TEAM 合并并发一致性继续按独立阶段治理。
+
 ## [0.19.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.19.0...qgs-v0.19.1) (2026-07-24)
 
 

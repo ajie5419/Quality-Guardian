@@ -84,8 +84,15 @@ const rules: Record<string, Rule[]> = {
       trigger: 'blur',
     },
   ],
-  responsibleDepartment: [
-    { required: true, message: '请选择责任部门', trigger: 'change' },
+  responsibleDepartmentId: [
+    {
+      validator: (_rule: unknown, value: null | string | undefined) =>
+        String(value ?? '').trim() ||
+        (props.isEditMode && props.initialData.responsibleDepartment)
+          ? Promise.resolve()
+          : Promise.reject(new Error('请选择责任部门')),
+      trigger: 'change',
+    },
   ],
   workOrderNumber: [
     {
@@ -176,9 +183,9 @@ const dateValue = computed<string | undefined>({
   },
 });
 const responsibleDepartmentValue = computed<string | undefined>({
-  get: () => formState.responsibleDepartment ?? undefined,
+  get: () => formState.responsibleDepartmentId ?? undefined,
   set: (value) => {
-    formState.responsibleDepartment = value ?? null;
+    formState.responsibleDepartmentId = value ?? null;
   },
 });
 
@@ -321,7 +328,7 @@ function handlePartModelUpdate(value: unknown) {
         </Col>
       </Row>
 
-      <FormItem label="责任部门" name="responsibleDepartment" required>
+      <FormItem label="责任部门" name="responsibleDepartmentId" required>
         <TreeSelect
           v-model:value="responsibleDepartmentValue"
           :tree-data="deptTreeData"

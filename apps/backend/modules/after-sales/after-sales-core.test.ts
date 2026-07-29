@@ -8,26 +8,30 @@ import {
 } from '~/modules/after-sales/after-sales-status';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
-import { DeptService } from '~/modules/dept/dept.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { eventBus } from '~/utils/event-bus';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    after_sales: {
-      aggregate: vi.fn(),
-      count: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      groupBy: vi.fn(),
-      update: vi.fn(),
+vi.mock('~/utils/prisma', () => {
+  const afterSales = {
+    aggregate: vi.fn(),
+    count: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    groupBy: vi.fn(),
+    update: vi.fn(),
+  };
+  return {
+    default: {
+      after_sales: afterSales,
+      $queryRaw: vi.fn(),
+      $transaction: vi.fn((callback) => callback({ after_sales: afterSales })),
     },
-    $queryRaw: vi.fn(),
-  },
-}));
+  };
+});
 
 vi.mock('~/modules/data-scope/data-scope.service', () => ({
   DataScopeService: {
@@ -50,13 +54,23 @@ vi.mock('~/modules/system-log/system-log.service', () => ({
   },
 }));
 
-vi.mock('~/utils/event-bus', () => ({
-  eventBus: { emit: vi.fn() },
+vi.mock('~/modules/metric-refresh', () => ({
+  MetricRefreshQueue: {
+    enqueueSupplierScores: vi.fn(),
+  },
 }));
 
-vi.mock('~/modules/dept/dept.service', () => ({
-  DeptService: {
-    findAll: vi.fn(),
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
+vi.mock('~/modules/quality-classification', () => ({
+  QualityClassificationService: {
+    assertSelection: vi.fn(),
+    listForManagement: vi.fn().mockResolvedValue([]),
+    resolveActiveSelectionByNames: vi.fn(),
   },
 }));
 
@@ -142,13 +156,15 @@ describe('after-sales core helpers and services', () => {
     });
     await AfterSalesService.getVehicleFailureRecords({
       end: new Date('2026-01-31T00:00:00.000Z'),
-      productType: 'Vehicle',
+      productCategoryId: 'vehicle-product',
+      productTypeSnapshots: ['车辆产品'],
       start: new Date('2026-01-01T00:00:00.000Z'),
       vehicleDeptIds: ['dept-1'],
     });
     await AfterSalesService.findEarliestVehicleFailureDate({
       end: new Date('2026-01-31T00:00:00.000Z'),
-      productType: 'Vehicle',
+      productCategoryId: 'vehicle-product',
+      productTypeSnapshots: ['车辆产品'],
       vehicleDeptIds: [],
     });
     await AfterSalesService.getReportPeriodMetrics({
@@ -224,10 +240,11 @@ describe('after-sales core helpers and services', () => {
       supplierBrandId: 'supplier-2',
     });
 
-    expect(eventBus.emit).toHaveBeenCalledWith('after_sales.changed', {
-      supplierBrands: ['Supplier A', 'Supplier B'],
-      supplierIds: ['supplier-1', 'supplier-2'],
-    });
+    expect(MetricRefreshQueue.enqueueSupplierScores).toHaveBeenCalledWith(
+      expect.any(Object),
+      ['supplier-1', 'supplier-2'],
+      'after-sales.updated',
+    );
   });
 
   it('throws not-found when updating route costs for missing record and deletes records with references/audit', async () => {
@@ -258,27 +275,32 @@ describe('after-sales core helpers and services', () => {
       'delete',
       expect.objectContaining({ targetId: 'as-1', userId: 'user-1' }),
     );
-    expect(eventBus.emit).toHaveBeenCalledWith('after_sales.changed', {
-      supplierBrands: ['Supplier A'],
-      supplierIds: ['supplier-1'],
-    });
+    expect(MetricRefreshQueue.enqueueSupplierScores).toHaveBeenCalledWith(
+      expect.any(Object),
+      ['supplier-1'],
+      'after-sales.deleted',
+    );
   });
 
   it('builds chart aggregation from grouped rows, department names, report months, and scoped queries', async () => {
     (prisma.after_sales.groupBy as any).mockResolvedValue([
       {
-        respDept: 'dept-1',
+        respDeptId: 'dept-1',
         _sum: { materialCost: 100, laborTravelCost: 25 },
       },
       {
-        respDept: 'dept-2',
+        respDeptId: 'dept-2',
         _sum: { materialCost: 20, laborTravelCost: 5 },
       },
     ] as never);
-    vi.mocked(DeptService.findAll).mockResolvedValue([
-      { id: 'dept-1', name: 'Quality', children: [] },
-      { id: 'dept-2', name: 'Service', children: [] },
-    ] as never);
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
+    ).mockResolvedValue(
+      new Map([
+        ['dept-1', 'Quality'],
+        ['dept-2', 'Service'],
+      ]),
+    );
 
     const grouped = await AfterSalesChartAggregationService.getChartAggregation(
       {
@@ -290,7 +312,14 @@ describe('after-sales core helpers and services', () => {
       },
     );
 
-    expect(grouped).toEqual([{ name: 'Quality', value: 125 }]);
+    expect(grouped).toEqual([
+      {
+        id: 'dept-1',
+        name: 'Quality',
+        resolutionStatus: 'RESOLVED',
+        value: 125,
+      },
+    ]);
     expect(DataScopeService.buildAfterSalesWhere).toHaveBeenCalled();
 
     vi.mocked(prisma.after_sales.findMany).mockResolvedValue([
@@ -316,7 +345,14 @@ describe('after-sales core helpers and services', () => {
         metric: 'totalLoss',
         year: 2026,
       }),
-    ).resolves.toEqual([{ name: '2026-01', value: 120 }]);
+    ).resolves.toEqual([
+      {
+        id: '2026-01',
+        name: '2026-01',
+        resolutionStatus: 'RESOLVED',
+        value: 120,
+      },
+    ]);
   });
 
   it('returns empty stats response when analytics query fails', async () => {

@@ -1,4 +1,9 @@
-import type { AfterSalesItem, WorkOrderItem } from '@qgs/shared';
+import type {
+  AfterSalesItem,
+  AfterSalesWritePayload,
+  QualityClassificationCategory,
+  WorkOrderItem,
+} from '@qgs/shared';
 
 import type { Ref } from 'vue';
 
@@ -13,17 +18,26 @@ import { message } from 'ant-design-vue';
 import { createAfterSales, updateAfterSales } from '#/api/qms/after-sales';
 import { getUploadResponse } from '#/views/qms/shared/utils/upload-file';
 
-import {
-  createInitialFormState,
-  DEFECT_SUBTYPES,
-  PRODUCT_SUBTYPES,
-} from '../constants';
+import { createInitialFormState } from '../constants';
 
 interface UseAfterSalesFormOptions {
-  open: Ref<boolean>;
+  defectOptions: Ref<QualityClassificationCategory[]>;
   isEditMode: Ref<boolean>;
-  onSuccess: () => void;
   onClose: () => void;
+  onSuccess: () => void;
+  open: Ref<boolean>;
+  productOptions: Ref<QualityClassificationCategory[]>;
+}
+
+function hasRequiredClassificationIds(
+  data: Partial<AfterSalesWritePayload>,
+): data is AfterSalesWritePayload {
+  return Boolean(
+    data.productCategoryId &&
+      data.productSubcategoryId &&
+      data.defectCategoryId &&
+      data.defectSubcategoryId,
+  );
 }
 
 /**
@@ -36,10 +50,18 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
   const formState = reactive<AfterSalesFormState>({});
   const currentId = ref<null | string>(null);
 
-  // 产品子类型
-  const currentProductSubtypes = ref<string[]>([]);
-  // 缺陷子类型
-  const currentDefectSubtypes = ref<string[]>([]);
+  const currentProductSubtypes = computed(
+    () =>
+      options.productOptions.value.find(
+        (item) => item.id === formState.productCategoryId,
+      )?.subcategories || [],
+  );
+  const currentDefectSubtypes = computed(
+    () =>
+      options.defectOptions.value.find(
+        (item) => item.id === formState.defectCategoryId,
+      )?.subcategories || [],
+  );
 
   function normalizeResponsibleDepartments(values: {
     responsibleDepartments?: string[];
@@ -58,39 +80,21 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
   }
 
   /**
-   * 更新产品子类型选项
-   */
-  function updateProductSubtypes() {
-    currentProductSubtypes.value =
-      formState.productType && PRODUCT_SUBTYPES[formState.productType]
-        ? PRODUCT_SUBTYPES[formState.productType] || []
-        : [];
-  }
-
-  /**
    * 产品类型变更处理
    */
   function handleProductTypeChange() {
-    formState.productSubtype = '';
-    updateProductSubtypes();
-  }
-
-  /**
-   * 更新缺陷子类型选项
-   */
-  function updateDefectSubtypes() {
-    currentDefectSubtypes.value =
-      formState.defectType && DEFECT_SUBTYPES[formState.defectType]
-        ? DEFECT_SUBTYPES[formState.defectType] || []
-        : [];
+    formState.productSubcategoryId = undefined;
+    formState.productSubtype = undefined;
+    formState.productType = undefined;
   }
 
   /**
    * 缺陷类型变更处理
    */
   function handleDefectTypeChange() {
-    formState.defectSubtype = '';
-    updateDefectSubtypes();
+    formState.defectSubcategoryId = undefined;
+    formState.defectSubtype = undefined;
+    formState.defectType = undefined;
   }
 
   /**
@@ -114,9 +118,6 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
   /**
    * 重置表单
    */
-  /**
-   * 重置表单
-   */
   function resetForm() {
     // 使用 Object.assign 直接覆盖，而不是逐个 delete
     const initialState = createInitialFormState();
@@ -128,8 +129,6 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
     );
     Object.assign(formState, initialState);
     currentId.value = null;
-    updateDefectSubtypes();
-    updateProductSubtypes();
   }
 
   /**
@@ -166,8 +165,6 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
     });
 
     currentId.value = row.id;
-    updateDefectSubtypes();
-    updateProductSubtypes();
   }
 
   /**
@@ -197,6 +194,14 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
         responsibleDept: responsibleDepartments[0] || '',
         responsibleDepartments,
       };
+      delete data.productType;
+      delete data.productSubtype;
+      delete data.defectType;
+      delete data.defectSubtype;
+      if (!hasRequiredClassificationIds(data)) {
+        message.error(t('common.saveFailed'));
+        return;
+      }
 
       if (isEditMode.value && currentId.value) {
         await updateAfterSales(currentId.value, data);
@@ -288,11 +293,35 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
         ]),
       },
     ],
-    defectType: [
+    defectCategoryId: [
       {
         required: true,
         message: t('ui.formRules.selectRequired', [
           t('qms.afterSales.form.defectType'),
+        ]),
+      },
+    ],
+    defectSubcategoryId: [
+      {
+        required: true,
+        message: t('ui.formRules.selectRequired', [
+          t('qms.afterSales.form.defectSubtype'),
+        ]),
+      },
+    ],
+    productCategoryId: [
+      {
+        required: true,
+        message: t('ui.formRules.selectRequired', [
+          t('qms.afterSales.form.productType'),
+        ]),
+      },
+    ],
+    productSubcategoryId: [
+      {
+        required: true,
+        message: t('ui.formRules.selectRequired', [
+          t('qms.afterSales.form.productSubtype'),
         ]),
       },
     ],

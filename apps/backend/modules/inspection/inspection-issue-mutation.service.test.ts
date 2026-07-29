@@ -2,18 +2,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionIssueMutationService } from '~/modules/inspection/inspection-issue-mutation.service';
 import prisma from '~/utils/prisma';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    quality_records: {
-      create: vi.fn(),
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-      upsert: vi.fn(),
+vi.mock('~/utils/prisma', () => {
+  const qualityRecords = {
+    create: vi.fn(),
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+    upsert: vi.fn(),
+  };
+  const transactionClient = {
+    metric_refresh_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-  },
-}));
+    quality_records: qualityRecords,
+  };
+  return {
+    default: {
+      ...transactionClient,
+      $transaction: vi.fn((callback) => callback(transactionClient)),
+    },
+  };
+});
 
 vi.mock('~/modules/file-storage/file-storage.service', () => ({
   FileStorageService: {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRecordUpdateService } from '~/modules/inspection/inspection-record-update.service';
-import { eventBus } from '~/utils/event-bus';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 
@@ -10,8 +10,10 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-vi.mock('~/utils/event-bus', () => ({
-  eventBus: { emit: vi.fn() },
+vi.mock('~/modules/metric-refresh', () => ({
+  MetricRefreshQueue: {
+    enqueueSupplierScoresForInspectionIdentities: vi.fn(),
+  },
 }));
 
 vi.mock('~/utils/governed-write', () => ({
@@ -133,12 +135,16 @@ describe('inspectionRecordUpdateService', () => {
       expect.objectContaining({ supplierId: undefined }),
     );
     expect(result).toEqual(mockInspection);
-    expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
-      supplierIds: ['supplier-1', 'supplier-2'],
-      supplierNames: ['Supplier A', 'Supplier B'],
-      teamIds: ['team-1', 'team-2'],
-      teamNames: ['Team A', 'Team B'],
-    });
+    expect(
+      MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities,
+    ).toHaveBeenCalledWith(
+      expect.any(Object),
+      {
+        supplierIds: ['supplier-1', 'supplier-2'],
+        teamIds: ['team-1', 'team-2'],
+      },
+      'inspection.updated',
+    );
   });
 
   it('should replace items (delete old, create new)', async () => {
@@ -247,7 +253,9 @@ describe('inspectionRecordUpdateService', () => {
       } as any),
     ).rejects.toBe(failure);
 
-    expect(eventBus.emit).not.toHaveBeenCalled();
+    expect(
+      MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities,
+    ).not.toHaveBeenCalled();
   });
 
   it('rejects a process inspection without a canonical TEAM identity', async () => {

@@ -155,13 +155,23 @@ describe('useQualityLossGrid', () => {
       }
     });
 
-    it('formats responsibleDepartment via findNameById', () => {
+    it('prefers the canonical department name without losing the snapshot', () => {
       const { gridOptions } = useQualityLossGrid(createParams());
       const col = gridOptions.value.columns?.find(
         (c: any) => c.field === 'responsibleDepartment',
       );
-      expect((col as any).formatter({ cellValue: 'd1' })).toBe('质量部');
-      expect((col as any).formatter({ cellValue: 'd2' })).toBe('生产部');
+      expect(
+        (col as any).formatter({
+          cellValue: 'Historical Quality',
+          row: { responsibleDepartmentCanonicalName: 'Current Quality' },
+        }),
+      ).toBe('Current Quality');
+      expect(
+        (col as any).formatter({
+          cellValue: 'Historical Quality',
+          row: { responsibleDepartmentCanonicalName: null },
+        }),
+      ).toBe('Historical Quality');
     });
 
     it('returns empty string for null responsibleDepartment', () => {
@@ -169,7 +179,12 @@ describe('useQualityLossGrid', () => {
       const col = gridOptions.value.columns?.find(
         (c: any) => c.field === 'responsibleDepartment',
       );
-      expect((col as any).formatter({ cellValue: null })).toBe('');
+      expect(
+        (col as any).formatter({
+          cellValue: null,
+          row: { responsibleDepartmentCanonicalName: null },
+        }),
+      ).toBe('');
     });
   });
 });

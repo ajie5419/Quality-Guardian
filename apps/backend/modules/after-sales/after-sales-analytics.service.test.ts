@@ -19,6 +19,33 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNamesByIds: vi.fn(
+      async ({ canonicalIds }: { canonicalIds: Array<null | string> }) =>
+        new Map(canonicalIds.filter(Boolean).map((id) => [id, null])),
+    ),
+  },
+}));
+
+vi.mock('~/modules/quality-classification', () => {
+  const listForManagement = vi.fn().mockResolvedValue([]);
+  return {
+    QualityClassificationService: {
+      listForManagement,
+      resolveCategoryNamesByIds: vi.fn(async () => {
+        const categories = await listForManagement();
+        return new Map(
+          categories.map((item: { id: string; name: string }) => [
+            item.id,
+            item.name,
+          ]),
+        );
+      }),
+    },
+  };
+});
+
 vi.mock('~/modules/data-scope/data-scope.service', () => ({
   DataScopeService: {
     buildAfterSalesWhere: vi.fn(async (where: any) => where),
@@ -144,13 +171,58 @@ describe('after-sales-analytics.service', () => {
       ]);
     (prisma.after_sales.groupBy as any)
       .mockResolvedValueOnce([
-        { defectType: 'Mechanical', _count: { id: 6 } },
-        { defectType: 'Electrical', _count: { id: 4 } },
+        {
+          defectCategoryId: 'defect-1',
+          defectType: 'Old mechanical',
+          _count: { id: 6 },
+        },
+        {
+          defectCategoryId: 'defect-2',
+          defectType: 'Old electrical',
+          _count: { id: 4 },
+        },
       ])
       .mockResolvedValueOnce([
-        { supplierBrand: 'Supplier A', _count: { id: 5 } },
+        {
+          supplierBrand: 'Old supplier',
+          supplierBrandId: 'supplier-1',
+          _count: { id: 5 },
+        },
       ])
-      .mockResolvedValueOnce([{ respDept: 'QA', _count: { id: 7 } }]);
+      .mockResolvedValueOnce([
+        { respDept: 'Old QA', respDeptId: 'dept-1', _count: { id: 7 } },
+      ]);
+    const { MasterDataGovernanceKernel } = await import(
+      '~/utils/canonical-master-data'
+    );
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
+    );
+    vi.mocked(
+      QualityClassificationService.listForManagement,
+    ).mockResolvedValueOnce([
+      {
+        code: 'MECHANICAL',
+        id: 'defect-1',
+        name: 'Mechanical',
+        scope: 'AFTER_SALES_DEFECT',
+        sort: 0,
+        status: 1,
+        subcategories: [],
+      },
+      {
+        code: 'ELECTRICAL',
+        id: 'defect-2',
+        name: 'Electrical',
+        scope: 'AFTER_SALES_DEFECT',
+        sort: 1,
+        status: 1,
+        subcategories: [],
+      },
+    ]);
+    (MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any)
+      .mockResolvedValueOnce(new Map([['supplier-1', 'Supplier A']]))
+      .mockResolvedValueOnce(new Map([['dept-1', 'QA']]));
 
     const stats = await AfterSalesAnalyticsService.getStats({ year: 2026 });
 
@@ -159,8 +231,228 @@ describe('after-sales-analytics.service', () => {
     expect(stats.kpi.cost).toBe(1500);
     expect(stats.kpi.avgTime).toBe(5.5);
     expect(stats.defectDistribution).toHaveLength(2);
-    expect(stats.supplierRanking.categories).toEqual(['Supplier A']);
+    expect(stats.supplierRanking).toEqual([
+      {
+        id: 'supplier-1',
+        name: 'Supplier A',
+        resolutionStatus: 'RESOLVED',
+        value: 5,
+      },
+    ]);
     expect(stats.deptDistribution).toHaveLength(1);
+    expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ by: ['defectCategoryId', 'defectType'] }),
+    );
+    expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ by: ['supplierBrandId', 'supplierBrand'] }),
+    );
+    expect(prisma.after_sales.groupBy).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ by: ['respDeptId', 'respDept'] }),
+    );
+  });
+
+  it('should keep canonical identities distinct and handle unresolved IDs', async () => {
+    const { AfterSalesAnalyticsService } = await import(
+      '~/modules/after-sales/after-sales-analytics.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+    const { MasterDataGovernanceKernel } = await import(
+      '~/utils/canonical-master-data'
+    );
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
+    );
+
+    (prisma.after_sales.aggregate as any).mockResolvedValue({
+      _count: { id: 8 },
+      _sum: { laborTravelCost: 0, materialCost: 0 },
+    });
+    (prisma.after_sales.count as any).mockResolvedValue(0);
+    (prisma.$queryRaw as any)
+      .mockResolvedValueOnce([{ avgDays: 0 }])
+      .mockResolvedValueOnce([]);
+    (prisma.after_sales.groupBy as any)
+      .mockResolvedValueOnce([
+        {
+          defectCategoryId: 'defect-a',
+          defectType: 'Old A',
+          _count: { id: 2 },
+        },
+        {
+          defectCategoryId: 'defect-a',
+          defectType: 'Renamed A',
+          _count: { id: 1 },
+        },
+        {
+          defectCategoryId: 'defect-b',
+          defectType: 'Old B',
+          _count: { id: 2 },
+        },
+        {
+          defectCategoryId: null,
+          defectType: 'Legacy defect',
+          _count: { id: 1 },
+        },
+        {
+          defectCategoryId: 'invalid-defect',
+          defectType: 'Invalid legacy defect',
+          _count: { id: 2 },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          supplierBrand: 'Old A',
+          supplierBrandId: 'supplier-a',
+          _count: { id: 4 },
+        },
+        {
+          supplierBrand: 'Old B',
+          supplierBrandId: 'supplier-b',
+          _count: { id: 2 },
+        },
+        { supplierBrand: null, supplierBrandId: null, _count: { id: 1 } },
+        {
+          supplierBrand: 'Legacy supplier',
+          supplierBrandId: null,
+          _count: { id: 1 },
+        },
+        {
+          supplierBrand: 'Invalid supplier',
+          supplierBrandId: 'invalid-supplier',
+          _count: { id: 1 },
+        },
+      ])
+      .mockResolvedValueOnce([
+        { respDept: 'Legacy dept', respDeptId: null, _count: { id: 1 } },
+        {
+          respDept: 'Invalid dept',
+          respDeptId: 'invalid-dept',
+          _count: { id: 1 },
+        },
+      ]);
+    vi.mocked(
+      QualityClassificationService.listForManagement,
+    ).mockResolvedValueOnce([
+      {
+        code: 'DEFECT_A',
+        id: 'defect-a',
+        name: 'Shared defect',
+        scope: 'AFTER_SALES_DEFECT',
+        sort: 0,
+        status: 1,
+        subcategories: [],
+      },
+      {
+        code: 'DEFECT_B',
+        id: 'defect-b',
+        name: 'Shared defect',
+        scope: 'AFTER_SALES_DEFECT',
+        sort: 1,
+        status: 1,
+        subcategories: [],
+      },
+    ]);
+    (MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any)
+      .mockResolvedValueOnce(
+        new Map([
+          ['invalid-supplier', null],
+          ['supplier-a', 'Shared supplier'],
+          ['supplier-b', 'Shared supplier'],
+        ]),
+      )
+      .mockResolvedValueOnce(new Map([['invalid-dept', null]]));
+
+    const stats = await AfterSalesAnalyticsService.getStats({ year: 2026 });
+
+    expect(stats.defectDistribution).toEqual([
+      {
+        id: 'defect-a',
+        name: 'Shared defect',
+        resolutionStatus: 'RESOLVED',
+        value: 3,
+      },
+      {
+        id: 'defect-b',
+        name: 'Shared defect',
+        resolutionStatus: 'RESOLVED',
+        value: 2,
+      },
+      {
+        id: 'invalid-defect',
+        name: '主数据已失效：Invalid legacy defect',
+        rawName: 'Invalid legacy defect',
+        resolutionReason: 'INVALID_REFERENCE',
+        resolutionStatus: 'INVALID',
+        value: 2,
+      },
+      {
+        id: null,
+        name: '数据待治理：Legacy defect',
+        rawName: 'Legacy defect',
+        resolutionReason: 'MISSING_REQUIRED',
+        resolutionStatus: 'MISSING',
+        value: 1,
+      },
+    ]);
+    expect(stats.supplierRanking).toEqual([
+      {
+        id: 'supplier-a',
+        name: 'Shared supplier',
+        resolutionStatus: 'RESOLVED',
+        value: 4,
+      },
+      {
+        id: 'supplier-b',
+        name: 'Shared supplier',
+        resolutionStatus: 'RESOLVED',
+        value: 2,
+      },
+      {
+        id: null,
+        name: '未关联供应商',
+        resolutionReason: 'NOT_APPLICABLE',
+        resolutionStatus: 'MISSING',
+        value: 1,
+      },
+      {
+        id: null,
+        name: '数据待治理：Legacy supplier',
+        rawName: 'Legacy supplier',
+        resolutionReason: 'MISSING_REQUIRED',
+        resolutionStatus: 'MISSING',
+        value: 1,
+      },
+      {
+        id: 'invalid-supplier',
+        name: '主数据已失效：Invalid supplier',
+        rawName: 'Invalid supplier',
+        resolutionReason: 'INVALID_REFERENCE',
+        resolutionStatus: 'INVALID',
+        value: 1,
+      },
+    ]);
+    expect(stats.deptDistribution).toEqual([
+      {
+        id: null,
+        name: '数据待治理：Legacy dept',
+        rawName: 'Legacy dept',
+        resolutionReason: 'MISSING_REQUIRED',
+        resolutionStatus: 'MISSING',
+        value: 1,
+      },
+      {
+        id: 'invalid-dept',
+        name: '主数据已失效：Invalid dept',
+        rawName: 'Invalid dept',
+        resolutionReason: 'INVALID_REFERENCE',
+        resolutionStatus: 'INVALID',
+        value: 1,
+      },
+    ]);
   });
 
   it('should return empty stats when query fails', async () => {
@@ -178,7 +470,7 @@ describe('after-sales-analytics.service', () => {
 
     expect(stats.kpi).toEqual({ avgTime: 0, cost: 0, open: 0, total: 0 });
     expect(stats.defectDistribution).toEqual([]);
-    expect(stats.supplierRanking).toEqual({ categories: [], data: [] });
+    expect(stats.supplierRanking).toEqual([]);
     expect(stats.deptDistribution).toEqual([]);
   });
 

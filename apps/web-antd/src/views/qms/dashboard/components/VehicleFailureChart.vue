@@ -33,7 +33,9 @@ import { useErrorHandler } from '#/hooks/useErrorHandler';
 interface RankingItem {
   count: number;
   defectType: string;
+  id: null | string;
   percentage: number;
+  resolutionStatus: 'INVALID' | 'MISSING' | 'RESOLVED';
 }
 
 /**
@@ -96,11 +98,18 @@ const selectedMonth = ref<Dayjs>(dayjs());
 const YEAR_COLORS = ['#1677ff', '#13c2c2', '#52c41a', '#fa8c16', '#eb2f96'];
 
 function normalizeRankingItem(item: unknown): RankingItem {
-  const normalized = item as Record<string, number | string>;
+  const normalized = item as Record<string, null | number | string>;
+  const id = typeof normalized.id === 'string' ? normalized.id : null;
+  const resolutionStatus = normalized.resolutionStatus;
   return {
     count: Number(normalized.count || 0),
     defectType: String(normalized.defectType || '未分类'),
+    id,
     percentage: Number(normalized.percentage || 0),
+    resolutionStatus:
+      resolutionStatus === 'INVALID' || resolutionStatus === 'RESOLVED'
+        ? resolutionStatus
+        : 'MISSING',
   };
 }
 
@@ -257,6 +266,7 @@ function buildFallbackYearSeries(): YearSeriesItem[] {
 
 function updateCharts() {
   if (!props.active) return;
+  const rankingRows = [...rankingData.value].reverse();
 
   const rankingOption = {
     title: {
@@ -268,10 +278,12 @@ function updateCharts() {
       trigger: 'axis' as const,
       axisPointer: { type: 'shadow' as const },
       formatter: (params: unknown) => {
-        const [first] = params as Array<{ data: number; name: string }>;
-        const item = rankingData.value.find(
-          (entry) => entry.defectType === first?.name,
-        );
+        const [first] = params as Array<{
+          data: number;
+          dataIndex: number;
+          name: string;
+        }>;
+        const item = rankingRows[first?.dataIndex ?? -1];
         if (!item) {
           return '';
         }
@@ -289,13 +301,13 @@ function updateCharts() {
     },
     yAxis: {
       type: 'category' as const,
-      data: rankingData.value.map((i) => i.defectType).reverse(),
+      data: rankingRows.map((item) => item.defectType),
     },
     series: [
       {
         name: t('qms.dashboard.failedVehicles'),
         type: 'bar' as const,
-        data: rankingData.value.map((i) => i.count).reverse(),
+        data: rankingRows.map((item) => item.count),
         itemStyle: {
           color: (params: EChartsColorParams) => {
             return (params.dataIndex || 0) % 2 === 0 ? '#5ab1ef' : '#69c0ff';

@@ -16,7 +16,6 @@ export {
   SEVERITY_OPTIONS,
   UI_CONSTANTS,
   useClaimOptions,
-  useDefectOptions,
   useSeverityOptions,
 } from './constants';
 

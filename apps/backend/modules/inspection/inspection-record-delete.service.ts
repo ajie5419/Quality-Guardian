@@ -1,5 +1,5 @@
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import { eventBus } from '~/utils/event-bus';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation } from '~/utils/process-resolver';
 
@@ -69,14 +69,16 @@ export const InspectionRecordDeleteService = {
         bizId: id,
         bizType: 'inspection_record',
       });
+      await MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities(
+        tx,
+        {
+          supplierIds: [inspection?.supplierId],
+          teamIds: [inspection?.teamId],
+        },
+        'inspection.deleted',
+      );
 
       return { deleted, inspection };
-    });
-    eventBus.emit('inspection_record.changed', {
-      supplierIds: [result.inspection?.supplierId],
-      supplierNames: [result.inspection?.supplierName],
-      teamIds: [result.inspection?.teamId],
-      teamNames: [result.inspection?.team],
     });
     return result.deleted;
   },
@@ -147,14 +149,16 @@ export const InspectionRecordDeleteService = {
           }),
         ),
       );
+      await MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities(
+        tx,
+        {
+          supplierIds: inspections.map((item) => item.supplierId),
+          teamIds: inspections.map((item) => item.teamId),
+        },
+        'inspection.batch-deleted',
+      );
 
       return { deleted, inspections };
-    });
-    eventBus.emit('inspection_record.changed', {
-      supplierIds: result.inspections.map((item) => item.supplierId),
-      supplierNames: result.inspections.map((item) => item.supplierName),
-      teamIds: result.inspections.map((item) => item.teamId),
-      teamNames: result.inspections.map((item) => item.team),
     });
     return result.deleted;
   },

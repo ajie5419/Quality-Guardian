@@ -38,8 +38,8 @@ import { resolveTreeDepartmentIdentity } from '../inspection-request-responsibil
 
 type LinkedIssueDraftState = {
   claim: string;
-  defectSubtype: string;
-  defectType: string;
+  defectCategoryId: string;
+  defectSubcategoryId: string;
   description: string;
   division: string;
   divisionId: string;
@@ -86,7 +86,6 @@ export function resolveDivisionIdentity(
 interface UseInspectionRequestTaskActionsOptions {
   canDelete: Ref<boolean>;
   canDispatch: Ref<boolean>;
-  defectSubtypes: Ref<Record<string, Array<{ label: string; value: string }>>>;
   deptTreeData: Ref<TreeSelectNode[]>;
   onAfterMutation: () => Promise<void>;
   buildRequestUrl: (params: Record<string, string>, path?: string) => string;
@@ -104,7 +103,6 @@ export function useInspectionRequestTaskActions(
   const {
     canDelete,
     canDispatch,
-    defectSubtypes,
     onAfterMutation,
     buildRequestUrl,
     getCurrentUserName,
@@ -145,8 +143,8 @@ export function useInspectionRequestTaskActions(
 
   const linkedIssueDraft = ref<LinkedIssueDraftState>({
     claim: DEFAULT_VALUES.DEFAULT_CLAIM,
-    defectSubtype: DEFAULT_VALUES.DEFAULT_DEFECT_SUBTYPE,
-    defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE,
+    defectCategoryId: '',
+    defectSubcategoryId: '',
     description: '',
     division: '',
     divisionId: '',
@@ -170,11 +168,6 @@ export function useInspectionRequestTaskActions(
     unqualifiedQuantity: 0,
     responsibleDepartment: '',
     severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
-  });
-
-  const linkedDefectSubtypeOptions = computed(() => {
-    const defectType = linkedIssueDraft.value.defectType;
-    return defectSubtypes.value[defectType] || [];
   });
 
   const shouldCreateLinkedIssue = computed(() => closeForm.result === 'FAIL');
@@ -243,8 +236,8 @@ export function useInspectionRequestTaskActions(
       [linkedIssueDraft.value.processName, '工序'],
       [linkedIssueDraft.value.responsibleDepartment, '责任部门'],
       [linkedIssueDraft.value.responsibleDepartmentId, '责任部门'],
-      [linkedIssueDraft.value.defectType, '缺陷分类'],
-      [linkedIssueDraft.value.defectSubtype, '二级分类'],
+      [linkedIssueDraft.value.defectCategoryId, '缺陷分类'],
+      [linkedIssueDraft.value.defectSubcategoryId, '二级分类'],
       [linkedIssueDraft.value.severity, '严重程度'],
       [linkedIssueDraft.value.status, '状态'],
       [linkedIssueDraft.value.description, '不合格描述'],
@@ -407,8 +400,8 @@ export function useInspectionRequestTaskActions(
 
     linkedIssueDraft.value = {
       claim: DEFAULT_VALUES.DEFAULT_CLAIM,
-      defectSubtype: DEFAULT_VALUES.DEFAULT_DEFECT_SUBTYPE,
-      defectType: DEFAULT_VALUES.DEFAULT_DEFECT_TYPE,
+      defectCategoryId: '',
+      defectSubcategoryId: '',
       description: '',
       division: '',
       divisionId: '',
@@ -552,7 +545,6 @@ export function useInspectionRequestTaskActions(
     dispatchDetailOpen,
     dispatchForm,
     dispatchOpen,
-    linkedDefectSubtypeOptions,
     linkedIssueDraft,
     shouldCreateLinkedIssue,
     submitting,

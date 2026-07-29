@@ -58,6 +58,7 @@ const {
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    $transaction: vi.fn(),
     quality_losses: {
       create: vi.fn(),
     },
@@ -127,6 +128,17 @@ describe('quality-loss route handlers', () => {
     vi.clearAllMocks();
     getCurrentUser.mockReturnValue({ id: 'u-1', userId: 'u-1' });
     getMissingRequiredFields.mockReturnValue([]);
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({
+        departments: {
+          findFirst: vi.fn().mockResolvedValue({
+            id: 'dept-qa',
+            name: 'Current Quality',
+          }),
+        },
+        quality_losses: prisma.quality_losses,
+      }),
+    );
   });
 
   it('creates manual quality loss record and maps missing fields/internal errors', async () => {
@@ -137,6 +149,7 @@ describe('quality-loss route handlers', () => {
     readBody.mockResolvedValue({
       amount: 100,
       partName: '主梁',
+      responsibleDepartmentId: 'dept-qa',
       type: 'Manual',
       workOrderNumber: 'WO-468624',
     });
@@ -165,6 +178,7 @@ describe('quality-loss route handlers', () => {
 
     readBody.mockResolvedValueOnce({
       partName: '主梁',
+      responsibleDepartmentId: 'dept-qa',
       type: 'Manual',
       workOrderNumber: 'WO-468624',
     });

@@ -37,9 +37,10 @@ function validateTeamIdentityPair(
 export const workOrderRequirementPayloadSchema = z
   .object({
     attachments: z.array(z.record(z.string(), z.unknown())).optional(),
+    identityContractVersion: z.literal(2),
     items: z.array(z.unknown()).optional(),
-    partName: z.string().trim().min(1).optional(),
-    processName: z.string().trim().min(1).optional(),
+    partId: z.string().trim().min(1).optional(),
+    processId: z.string().trim().min(1).optional(),
     requirementName: z.string().trim().min(1),
     responsiblePerson: z.string().trim().min(1).optional(),
     ...optionalTeamIdentityFields,
@@ -60,18 +61,23 @@ export const workOrderRequirementCreateBodySchema = z.union([
 export const workOrderRequirementUpdateBodySchema = z
   .object({
     attachments: z.array(z.record(z.string(), z.unknown())).optional(),
+    identityContractVersion: z.literal(2),
     items: z.array(z.unknown()).optional(),
-    partName: z.string().trim().min(1).nullable().optional(),
-    processName: z.string().trim().min(1).nullable().optional(),
+    partId: z.string().trim().min(1).nullable().optional(),
+    processId: z.string().trim().min(1).nullable().optional(),
     requirementName: z.string().trim().min(1).optional(),
     responsiblePerson: z.string().trim().min(1).nullable().optional(),
     ...editableTeamIdentityFields,
   })
   .strict()
   .superRefine(validateTeamIdentityPair)
-  .refine((body) => Object.keys(body).length > 0, {
-    message: 'At least one editable field is required',
-  });
+  .refine(
+    (body) =>
+      Object.keys(body).some((key) => key !== 'identityContractVersion'),
+    {
+      message: 'At least one editable field is required',
+    },
+  );
 
 export const workOrderRequirementConfirmBodySchema = z
   .object({ confirm: z.boolean() })

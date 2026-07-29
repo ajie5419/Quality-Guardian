@@ -1,16 +1,21 @@
+import {
+  createIdentityAggregateItem,
+  QUALITY_CLASSIFICATION_SCOPE,
+} from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept/dept.service';
+import {
+  QualityClassificationService,
+  VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY,
+} from '~/modules/quality-classification';
 import { WorkOrderService } from '~/modules/work-order';
 import { addYearsToDate } from '~/modules/work-order/work-order-query';
-import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 
 import {
   getVehicleFailureManualData,
   getVehicleFailureManualWarrantyData,
   saveVehicleFailureManualPayload,
 } from './vehicle-failure-rate-manual.service';
-
-const VEHICLE_PRODUCT_TYPE = '车辆产品';
 
 interface MonthWindow {
   currentEnd: Date;
@@ -51,6 +56,14 @@ export const VehicleFailureRateService = {
   async getVehicleFailureRate(month?: string) {
     const endMonth = parseEndMonth(month);
     const vehicleDeptIds = await getVehicleDeptIds();
+    const vehicleProduct =
+      await QualityClassificationService.findHistoricalCategoryByCode(
+        QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
+        VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY.code,
+      );
+    const productTypeSnapshots = getVehicleProductTypeSnapshots(
+      vehicleProduct?.name,
+    );
     const windows = getMonthWindows(endMonth);
     const manualData = await getVehicleFailureManualData();
     const manualWarrantyData = await getVehicleFailureManualWarrantyData();
@@ -60,11 +73,15 @@ export const VehicleFailureRateService = {
       endMonth,
       manualData,
       vehicleDeptIds,
+      vehicleProduct?.id || null,
+      productTypeSnapshots,
     );
     const monthlyCounts = await loadMonthlyCounts(
       years,
       endMonth.getMonth(),
       vehicleDeptIds,
+      vehicleProduct?.id || null,
+      productTypeSnapshots,
     );
     const monthlyWarrantyCounts = await loadMonthlyWarrantyCounts(
       years,
@@ -118,6 +135,8 @@ export const VehicleFailureRateService = {
           windows[0].currentStart,
           rankingWindow.currentEnd,
           vehicleDeptIds,
+          vehicleProduct?.id || null,
+          productTypeSnapshots,
         )
       : [];
 
@@ -134,33 +153,56 @@ export const VehicleFailureRateService = {
   },
 };
 
-async function buildRanking(start: Date, end: Date, vehicleDeptIds: string[]) {
+async function buildRanking(
+  start: Date,
+  end: Date,
+  vehicleDeptIds: string[],
+  productCategoryId: null | string,
+  productTypeSnapshots: string[],
+) {
   const records = await AfterSalesAPI.getVehicleFailureRecords({
     end,
-    productType: VEHICLE_PRODUCT_TYPE,
+    productCategoryId,
+    productTypeSnapshots,
     start,
     vehicleDeptIds,
   });
   const total = records.length;
-  const defectTypeNameById =
-    await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-      configKey: 'defectType',
-      canonicalIds: records.map((item) => item.defectTypeId),
-    });
-  const counts = new Map<string, number>();
+  const groups = new Map<
+    string,
+    { count: number; id: null | string; rawName: null | string }
+  >();
   for (const record of records) {
-    const defectType =
-      defectTypeNameById.get(String(record.defectTypeId || '')) ||
-      record.defectType?.trim() ||
-      '未分类';
-    counts.set(defectType, (counts.get(defectType) || 0) + 1);
+    const id = String(record.defectCategoryId || '').trim() || null;
+    const rawName = String(record.defectType || '').trim() || null;
+    const key = id ? `id:${id}` : `missing:${rawName || ''}`;
+    const current = groups.get(key);
+    groups.set(key, {
+      count: (current?.count || 0) + 1,
+      id,
+      rawName: current?.rawName || rawName,
+    });
   }
-  return [...counts.entries()]
-    .map(([defectType, count]) => ({
-      count,
-      defectType,
-      percentage: total > 0 ? Number(((count / total) * 100).toFixed(1)) : 0,
-    }))
+  const defectTypeNameById =
+    await QualityClassificationService.resolveCategoryNamesByIds(
+      QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+      [...groups.values()].map((item) => item.id).filter(Boolean),
+    );
+  return [...groups.values()]
+    .map(({ count, id, rawName }) => {
+      const identity = createIdentityAggregateItem({
+        canonicalName: id ? defectTypeNameById.get(id) : null,
+        id,
+        rawName,
+        value: count,
+      });
+      return {
+        ...identity,
+        count,
+        defectType: identity.name,
+        percentage: total > 0 ? Number(((count / total) * 100).toFixed(1)) : 0,
+      };
+    })
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 }
@@ -169,6 +211,8 @@ async function loadMonthlyCounts(
   years: number[],
   endMonthIndex: number,
   vehicleDeptIds: string[],
+  productCategoryId: null | string,
+  productTypeSnapshots: string[],
 ) {
   if (years.length === 0) return new Map<string, number>();
   const startYear = Math.min(...years);
@@ -177,7 +221,8 @@ async function loadMonthlyCounts(
   const end = new Date(endYear, endMonthIndex + 1, 0, 23, 59, 59, 999);
   const records = await AfterSalesAPI.getVehicleFailureRecords({
     end,
-    productType: VEHICLE_PRODUCT_TYPE,
+    productCategoryId,
+    productTypeSnapshots,
     start,
     vehicleDeptIds,
   });
@@ -347,10 +392,13 @@ async function getDisplayYears(
   endMonth: Date,
   manualData: Record<string, number>,
   vehicleDeptIds: string[],
+  productCategoryId: null | string,
+  productTypeSnapshots: string[],
 ) {
   const earliestAutoDate = await AfterSalesAPI.findEarliestVehicleFailureDate({
     end: endMonth,
-    productType: VEHICLE_PRODUCT_TYPE,
+    productCategoryId,
+    productTypeSnapshots,
     vehicleDeptIds,
   });
   const manualYears = Object.keys(manualData)
@@ -367,6 +415,16 @@ async function getDisplayYears(
     { length: selectedYear - startYear + 1 },
     (_, index) => startYear + index,
   );
+}
+
+function getVehicleProductTypeSnapshots(currentName?: null | string) {
+  return [
+    ...new Set(
+      [...VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY.historicalNames, currentName]
+        .map((name) => name?.trim() || '')
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function getMonthWindows(endMonth: Date): MonthWindow[] {

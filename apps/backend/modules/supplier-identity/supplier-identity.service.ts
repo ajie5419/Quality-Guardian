@@ -1,5 +1,6 @@
 import type { inspection_category, Prisma } from '@prisma/client';
 
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { BusinessError } from '~/utils/business-error';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -14,6 +15,41 @@ const logger = createModuleLogger('SupplierIdentityService');
 
 function normalizeId(value: unknown) {
   return String(value || '').trim();
+}
+
+async function lockTeamForMutation(
+  teamId: string,
+  client: Pick<
+    Prisma.TransactionClient,
+    '$queryRaw' | 'team_identity_merge_participants'
+  >,
+) {
+  await client.$queryRaw`
+    SELECT id
+    FROM dictionaries
+    WHERE id = ${teamId} AND dictType = 'team'
+    FOR UPDATE
+  `;
+  const mergeLock = await client.team_identity_merge_participants.findUnique({
+    where: { teamId },
+    select: { mergeId: true },
+  });
+  if (mergeLock) {
+    throw new BusinessError(
+      'TEAM_MERGE_PARTICIPANT_LOCKED',
+      'TEAM is locked by an identity merge',
+      409,
+    );
+  }
+}
+
+async function lockTeamsForMutation(
+  teamIds: string[],
+  client: Prisma.TransactionClient,
+) {
+  for (const teamId of [...new Set(teamIds)].sort()) {
+    await lockTeamForMutation(teamId, client);
+  }
 }
 
 async function validateLinkInput(
@@ -64,8 +100,11 @@ function teamIdentityConflict() {
 }
 
 export const SupplierIdentityService = {
-  async assertTeamCanBeRetired(teamId: string) {
-    const activeLink = await prisma.supplier_identity_links.findFirst({
+  async assertTeamCanBeRetired(
+    teamId: string,
+    client: Pick<Prisma.TransactionClient, 'supplier_identity_links'> = prisma,
+  ) {
+    const activeLink = await client.supplier_identity_links.findFirst({
       select: { id: true },
       where: {
         identityId: normalizeId(teamId),
@@ -85,6 +124,8 @@ export const SupplierIdentityService = {
   async create(input: SupplierIdentityInput) {
     try {
       return await prisma.$transaction(async (tx) => {
+        const teamId = normalizeId(input.teamId);
+        await lockTeamForMutation(teamId, tx);
         const { supplier, team } = await validateLinkInput(input, tx);
         const existing = await tx.supplier_identity_links.findUnique({
           where: {
@@ -101,26 +142,31 @@ export const SupplierIdentityService = {
         ) {
           throw teamIdentityConflict();
         }
-        if (existing) {
-          return tx.supplier_identity_links.update({
-            where: { id: existing.id },
-            data: {
-              identityNameSnapshot: team.dictKey,
-              isDeleted: false,
-              supplierId: supplier.id,
-            },
-            include: linkInclude,
-          });
-        }
-        return tx.supplier_identity_links.create({
-          data: {
-            identityId: team.id,
-            identityNameSnapshot: team.dictKey,
-            identityType: 'TEAM',
-            supplierId: supplier.id,
-          },
-          include: linkInclude,
-        });
+        const link = existing
+          ? await tx.supplier_identity_links.update({
+              where: { id: existing.id },
+              data: {
+                identityNameSnapshot: team.dictKey,
+                isDeleted: false,
+                supplierId: supplier.id,
+              },
+              include: linkInclude,
+            })
+          : await tx.supplier_identity_links.create({
+              data: {
+                identityId: team.id,
+                identityNameSnapshot: team.dictKey,
+                identityType: 'TEAM',
+                supplierId: supplier.id,
+              },
+              include: linkInclude,
+            });
+        await MetricRefreshQueue.enqueueSupplierScores(
+          tx,
+          [existing?.supplierId, supplier.id],
+          existing ? 'supplier-identity.restored' : 'supplier-identity.created',
+        );
+        return link;
       });
     } catch (error) {
       logger.error(
@@ -134,21 +180,43 @@ export const SupplierIdentityService = {
     }
   },
 
+  lockTeamForMutation,
+
   async delete(id: string) {
-    const existing = await prisma.supplier_identity_links.findFirst({
-      select: { id: true },
-      where: { id, isDeleted: false },
-    });
-    if (!existing) {
-      throw new BusinessError(
-        'NOT_FOUND',
-        'Supplier identity link not found',
-        404,
+    return prisma.$transaction(async (tx) => {
+      const existing = await tx.supplier_identity_links.findFirst({
+        select: { id: true, identityId: true, supplierId: true },
+        where: { id, isDeleted: false },
+      });
+      if (!existing) {
+        throw new BusinessError(
+          'NOT_FOUND',
+          'Supplier identity link not found',
+          404,
+        );
+      }
+      await lockTeamForMutation(existing.identityId, tx);
+      const deleted = await tx.supplier_identity_links.updateMany({
+        where: {
+          id,
+          identityId: existing.identityId,
+          isDeleted: false,
+        },
+        data: { isDeleted: true },
+      });
+      if (deleted.count !== 1) {
+        throw new BusinessError(
+          'TEAM_IDENTITY_CONCURRENT_UPDATE',
+          'Supplier identity link changed concurrently',
+          409,
+        );
+      }
+      await MetricRefreshQueue.enqueueSupplierScores(
+        tx,
+        [existing.supplierId],
+        'supplier-identity.deleted',
       );
-    }
-    return prisma.supplier_identity_links.update({
-      where: { id },
-      data: { isDeleted: true },
+      return tx.supplier_identity_links.findUnique({ where: { id } });
     });
   },
 
@@ -180,6 +248,24 @@ export const SupplierIdentityService = {
       throw new BusinessError('INVALID_SUPPLIER_ID', 'Supplier does not exist');
     }
     return supplier;
+  },
+
+  async resolveNamesByIds(
+    supplierIds: ReadonlyArray<null | string | undefined>,
+  ) {
+    const ids = [
+      ...new Set(
+        supplierIds
+          .map((supplierId) => normalizeId(supplierId))
+          .filter(Boolean),
+      ),
+    ];
+    if (ids.length === 0) return new Map<string, string>();
+    const suppliers = await prisma.suppliers.findMany({
+      select: { id: true, name: true },
+      where: { id: { in: ids }, isDeleted: false },
+    });
+    return new Map(suppliers.map((supplier) => [supplier.id, supplier.name]));
   },
 
   async resolveSupplierByTeamId(teamId: null | string | undefined) {
@@ -335,9 +421,8 @@ export const SupplierIdentityService = {
   async update(id: string, input: SupplierIdentityInput) {
     try {
       return await prisma.$transaction(async (tx) => {
-        const { supplier, team } = await validateLinkInput(input, tx);
         const current = await tx.supplier_identity_links.findFirst({
-          select: { id: true },
+          select: { id: true, identityId: true, supplierId: true },
           where: { id, isDeleted: false },
         });
         if (!current) {
@@ -347,6 +432,24 @@ export const SupplierIdentityService = {
             404,
           );
         }
+        const requestedTeamId = normalizeId(input.teamId);
+        await lockTeamsForMutation([current.identityId, requestedTeamId], tx);
+        const lockedCurrent = await tx.supplier_identity_links.findFirst({
+          select: { id: true },
+          where: {
+            id,
+            identityId: current.identityId,
+            isDeleted: false,
+          },
+        });
+        if (!lockedCurrent) {
+          throw new BusinessError(
+            'TEAM_IDENTITY_CONCURRENT_UPDATE',
+            'Supplier identity link changed concurrently',
+            409,
+          );
+        }
+        const { supplier, team } = await validateLinkInput(input, tx);
         const conflict = await tx.supplier_identity_links.findFirst({
           select: { id: true },
           where: {
@@ -357,7 +460,7 @@ export const SupplierIdentityService = {
           },
         });
         if (conflict) throw teamIdentityConflict();
-        return tx.supplier_identity_links.update({
+        const updated = await tx.supplier_identity_links.update({
           where: { id },
           data: {
             identityId: team.id,
@@ -366,6 +469,12 @@ export const SupplierIdentityService = {
           },
           include: linkInclude,
         });
+        await MetricRefreshQueue.enqueueSupplierScores(
+          tx,
+          [current.supplierId, supplier.id],
+          'supplier-identity.updated',
+        );
+        return updated;
       });
     } catch (error) {
       logger.error(

@@ -55,7 +55,6 @@ describe('useInspectionRequestTaskActions', () => {
       buildRequestUrl: (params) => JSON.stringify(params),
       canDelete: ref(true),
       canDispatch: ref(true),
-      defectSubtypes: ref({}),
       deptTreeData: ref([
         {
           children: [
@@ -135,6 +134,8 @@ describe('useInspectionRequestTaskActions', () => {
       workOrderNumber: 'WO-1',
     } as any);
     composable.closeForm.result = 'FAIL';
+    composable.linkedIssueDraft.value.defectCategoryId = 'category-1';
+    composable.linkedIssueDraft.value.defectSubcategoryId = 'subcategory-1';
     composable.linkedIssueDraft.value.ncNumber = 'NC-2026-001';
     composable.linkedIssueDraft.value.description = 'Weld pore';
     composable.linkedIssueDraft.value.division = 'Vehicle OBU';
@@ -247,6 +248,8 @@ describe('useInspectionRequestTaskActions', () => {
       workOrderNumber: 'WO-1',
     } as any);
     composable.closeForm.result = 'FAIL';
+    composable.linkedIssueDraft.value.defectCategoryId = 'category-1';
+    composable.linkedIssueDraft.value.defectSubcategoryId = 'subcategory-1';
     composable.linkedIssueDraft.value.description = 'Surface scratch';
     composable.linkedIssueDraft.value.rootCause = 'Fixture contact';
     composable.linkedIssueDraft.value.solution = 'Rework and protect fixture';
@@ -289,6 +292,8 @@ describe('useInspectionRequestTaskActions', () => {
       workOrderNumber: 'WO-1',
     } as any);
     composable.closeForm.result = 'FAIL';
+    composable.linkedIssueDraft.value.defectCategoryId = 'category-1';
+    composable.linkedIssueDraft.value.defectSubcategoryId = 'subcategory-1';
     composable.linkedIssueDraft.value.description = 'Weld pore';
     composable.linkedIssueDraft.value.rootCause = 'Parameter drift';
     composable.linkedIssueDraft.value.solution = 'Rework and inspect again';

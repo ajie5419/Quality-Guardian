@@ -45,7 +45,7 @@ QMS 不是普通 CRUD 系统，它有以下特有复杂度：
 3. `quality_records` 工程质量问题：问题数、损失金额、关闭状态
 4. `after_sales` 售后质量问题：问题数、售后损失、关闭状态
 
-写入路径更新上述来源数据后，必须通过领域事件调用 `SupplierScoreSnapshotService` 刷新关联供应商快照。检验记录自身事务和报检关闭外层事务都只在提交成功后发布 `inspection_record.changed`。历史数据的初始快照由生产 Docker image 内的 `apps/backend/scripts/backfill-supplier-score-snapshots.ts` 维护入口生成；deploy workflow 在服务健康检查通过后异步启动 `SUPPLIER_SCORE_BACKFILL_MODE=missing`，补无快照及评分模型版本过期的供应商，避免规则升级后保留旧指标。
+写入路径更新上述来源数据时，必须在同一个数据库事务内按 canonical supplier ID 追加 `metric_refresh_jobs`。评分 Worker 使用租约抢占、幂等重算、完成确认和失败重试维护快照，不再使用进程内事件、名称回退或请求后异步补丁。生产发布在应用停止写入期间执行 `apps/backend/scripts/reconcile-supplier-score-snapshots.ts`：为无 V4 快照或旧评分模型快照建立明确 ID 任务，同步消费全部线上遗留任务，任务未清零则拒绝启动新版本。
 
 快照中的合格率区分“无样本”和真实满分：无有效批次对外返回 `null`，真实 0% 保持为 0%。工程问题展示数量使用全部历史记录，评分扣分和风险趋势继续使用最近 12 个月窗口。检验与工程问题的 canonical identity 使用 `suppliers.id`；驻厂过程检验使用独立的 team canonical ID，禁止混用 `suppliers.nameId` 或 team 字典 ID。
 

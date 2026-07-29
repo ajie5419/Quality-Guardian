@@ -9,6 +9,8 @@ import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
 
 import { Card, Col, Empty, Row, Select } from 'ant-design-vue';
 
+import { buildChartOptionFromAggregated } from '#/components/Qms/ChartBuilder/composables/useChartCore';
+
 const props = defineProps<{
   chartData: null | QualityLossCharts;
   selectedGranularity: 'month' | 'week' | 'year';
@@ -59,26 +61,26 @@ const hasTrendData = computed(() => {
  * 刷新图表
  */
 function refreshCharts() {
-  if (!props.chartData || !hasDeptData.value || !hasTrendData.value) return;
+  if (!props.chartData) return;
 
-  renderTypeChart({
-    tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
-    legend: { bottom: '0', icon: 'circle', type: 'scroll' },
-    series: [
+  if (hasDeptData.value) {
+    const typeOption = buildChartOptionFromAggregated(
+      props.chartData.deptDistribution,
       {
-        name: '损失金额',
-        type: 'pie',
-        radius: ['45%', '70%'],
-        avoidLabelOverlap: false,
-        itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
-        label: { show: false, position: 'center' },
-        emphasis: {
-          label: { show: true, fontSize: '16', fontWeight: 'bold' },
-        },
-        data: props.chartData.deptDistribution,
+        chartType: 'ring',
+        dimension: 'responsibleDepartment',
+        id: 'quality-loss-department',
+        metric: 'amount',
+        title: '责任部门损失构成',
       },
-    ],
-  });
+      [{ label: '损失金额', value: 'amount' }],
+    );
+    if (typeOption) {
+      renderTypeChart(typeOption as Parameters<typeof renderTypeChart>[0]);
+    }
+  }
+
+  if (!hasTrendData.value) return;
 
   renderTrendChart({
     title: {

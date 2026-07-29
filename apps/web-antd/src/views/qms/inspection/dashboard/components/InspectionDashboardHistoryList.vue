@@ -3,6 +3,7 @@ interface InspectorStat {
   averageTaskMinutes: number;
   completedTaskCount: number;
   inspector: string;
+  inspectorId: null | string;
 }
 
 interface ReinspectionStat {
@@ -11,11 +12,13 @@ interface ReinspectionStat {
   reinspectionRate: number;
   submittedCount: number;
   team: string;
+  teamId: null | string;
 }
 
 interface TeamStat {
   count: number;
   team: string;
+  teamId: null | string;
 }
 
 defineProps<{
@@ -32,7 +35,7 @@ defineProps<{
     <template v-if="view === 'team'">
       <div
         v-for="(item, index) in teamStats"
-        :key="item.team"
+        :key="item.teamId || 'unresolved-history-team'"
         class="flex items-center justify-between rounded bg-gray-50 px-3 py-2"
       >
         <div class="flex min-w-0 items-center gap-2">
@@ -50,7 +53,7 @@ defineProps<{
     <template v-else-if="view === 'reinspection'">
       <div
         v-for="(item, index) in reinspectionStats"
-        :key="item.team"
+        :key="item.teamId || 'unresolved-history-reinspection'"
         class="rounded bg-gray-50 px-3 py-2"
       >
         <div class="flex items-center justify-between gap-2">
@@ -74,7 +77,7 @@ defineProps<{
     <template v-else>
       <div
         v-for="(item, index) in inspectorStats"
-        :key="item.inspector"
+        :key="item.inspectorId || 'unresolved-history-inspector'"
         class="rounded bg-gray-50 px-3 py-2"
       >
         <div class="flex items-center justify-between gap-2">

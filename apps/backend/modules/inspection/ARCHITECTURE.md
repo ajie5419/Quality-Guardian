@@ -68,11 +68,52 @@ public 报检允许：
 - 查询允许公开展示的工单、工序和班组选项。
 - 提交报检任务。
 
+Process options preserve these source boundaries:
+
+- `processes` is the only global process identity source. Process names are mutable display values and never act as IDs.
+- `inspection_request_process_options` independently controls which active processes appear for `PROCESS` and `INCOMING` requests. The same process may appear in either, both, or neither category.
+- `work_order_requirements` records work-order quality requirements. It never filters or authorizes process options in either request-entry mode.
+- An empty configured selection returns an empty list. Public queries and submission validation never fall back to hard-coded names, legacy dictionaries, or work-order requirements.
+- V2 submission validates the exact `category + processId` option before creating a request, so a hidden or disabled option cannot be submitted by constructing a request manually.
+
+Release maintenance must establish process identities before creating missing request-option rows. The option bootstrap is additive and idempotent: it creates two rows per existing process with `createMany + skipDuplicates`, preserving administrator choices on repeated deployments. Historical business rows and their display snapshots are not rewritten.
+
 public 报检禁止：
 
 - 读取受保护的系统字典接口。
 - 读取检验员、派工、审计、数据权限相关接口。
 - 绕过 create service 的字段校验和工单存在性校验。
+
+## Inspection-request category and statistics identity
+
+Every new inspection request persists an explicit category:
+
+- `INCOMING` uses `supplierId` as its statistics identity.
+- `PROCESS` uses `teamId` as its statistics identity.
+
+`processName` is a mutable display snapshot and must not decide the online statistics domain. Release maintenance backfills legacy null categories after supplier and TEAM reconciliation. For the compatibility-only null-category path, `teamId` takes precedence because a process TEAM may also have a linked `supplierId`; a supplier ID is treated as incoming only when no TEAM ID exists. The historical incoming process name is used only by the one-time backfill when both IDs are absent.
+
+Request statistics aggregate by `teamId`, `supplierId`, and `inspectorId`. Canonical names are batch-resolved after aggregation and never participate in a map key, join, or category branch. Therefore:
+
+- snapshots with different names and the same ID form one row under the current canonical name;
+- different IDs remain separate even when their current names are equal;
+- missing IDs form one explicit unresolved bucket per identity domain;
+- invalid non-empty IDs remain distinguishable as unresolved rows containing the original ID.
+
+Dashboard API contracts and Vue row keys carry the same stable IDs. A display name must never be used as a component key for TEAM, supplier, or inspector rankings.
+
+## 报检创建身份契约
+
+- V2 创建契约显式提交 `category + partId + processId`；客户端不提交部件和工序名称作为业务事实。
+- 后端按 ID 校验启用的 `master_parts/processes` 记录，并重建 `partName/processName` 快照；无效 ID 直接拒绝。
+- `inspection_request_process_options` defines whether a process is available in each request category; Web and WeChat clients submit the selected stable `processId` with the explicit category.
+- BOM 部件选项返回 `project_boms.partId`；BOM 行 `id` 只是 BOM 记录主键，不是部件身份。
+- 工序选项返回 `processes.id`；工序字典 `dictionaries.id` 与工序主数据不是同一 ID 空间。
+- Web 和微信小程序均使用 V2。V1 旧路由只返回 `410 INSPECTION_REQUEST_V2_REQUIRED`，不得再进入创建服务或接受 name-only 写入。
+
+`inspections.partId/partName` 是检验记录的正式部件身份。`level1Component/level2Component/materialName` 是历史业务快照，不得再用于部件关联或聚合。回填优先继承关联报检的确定 ID；冲突、重名、无匹配进入 `unresolved_master_data_refs`，不猜测。回填只补 ID，已有历史名称快照不被覆盖。
+
+项目身份在发布维护中先执行空表限定的 canonical bootstrap，再对 `inspections` 和 `quality_records` 等报表及质量损失源表执行唯一精确回填。已存在项目主数据后不再从历史快照创建新身份；无法匹配的项目名称保留原值并进入 unresolved 审计。
 
 ## 报检任务重构边界
 
@@ -97,7 +138,7 @@ public 报检禁止：
 - public API 只能暴露匿名提交所需的最小数据。
 - 供应商画像和评分读取检验记录时必须消费共享 `resolveSupplierInspectionPolicy()`：普通供应商和外部加工按 `supplierId`，驻厂队伍和外部服务按 `teamId` 及 `supplier_identity_links` 映射，两个身份域不得用 OR 混查；工程问题统一按 `quality_records.supplierId` 读取。名称字段仅是展示快照或搜索条件，不能作为在线关联回退。
 - 供应商历史项目直接以报检任务主表的 `supplierId/teamId` 归属，合并主工单和多工单明细后按工单去重、服务端分页；不得要求任务已关联检验记录。
-- 检验记录自身事务提交后发布 `inspection_record.changed`；报检关闭在外层事务提交后发布，禁止在未提交事务内刷新供应商快照。
+- 检验记录、不合格项和质量损失的写事务必须在同一 Prisma 事务内按 `supplierId/teamId` 追加持久化评分刷新任务；禁止提交后事件、名称驱动刷新或在事务外直接改快照。
 
 ## 供应商身份契约
 
@@ -105,13 +146,13 @@ public 报检禁止：
 - 进货检验选择供应商时，前端提交 `supplierId + supplierName`，后端以 ID 校验并重建名称快照。
 - 过程检验保存 `teamId + team`，通过 `supplier_identity_links` 解析供应商 ID；禁止比较 TEAM 名称和供应商名称。
 - 关联不合格项必须优先继承已提交检验记录返回的 canonical `supplierId/supplierName`，不信任提交前的表单快照。
-- `inspection_issue.changed` 携带供应商名称时必须同时携带 `supplierIds`；`inspection_record.changed` 携带供应商或 TEAM 名称时必须同时携带对应的 `supplierIds/teamIds`。
+- 评分刷新任务只携带规范 `supplierId`；过程检验先在源事务内通过 `teamId -> supplierId` 显式映射生成任务。
 - 存量回填先处理报检任务的 `teamId/supplierId`，再处理 `inspections`，最后以关联检验或唯一精确供应商名称作为确定性证据处理 `quality_records`；模糊、重名、冲突和缺少 TEAM 映射的数据写入 `unresolved_master_data_refs`。
 
 ## 供应商身份治理 wave 状态
 
 - 本模块的进货检验、驻厂过程检验和不合格项在线写入已切换到 ID-first：进货写入 `supplierId + supplierName`，过程写入 `teamId + team`，服务端校验 ID 并生成 canonical 名称快照。
-- 检验记录变更事件使用 `supplierIds/teamIds` 驱动下游刷新；名称集合只用于日志和诊断，不能单独触发画像或评分刷新。
+- 检验记录、不合格项及其质量损失变更在源事务内写入持久化指标任务；名称集合不参与派发、画像或评分。
 - 存量回填支持 dry-run/apply、分批和并发条件更新；无效旧 ID 仅在存在关联检验证据或唯一精确名称候选时修复，其他无法解析、冲突或缺少 TEAM 映射的记录进入 `unresolved_master_data_refs`，不静默猜测。
 - 本 wave 只覆盖供应商身份相关的检验链路，不代表其他主数据（部门、项目、工序等）已完成全项目 `ID_ONLY` 迁移。未纳入模块必须显式标注治理阶段并单独推进。
 
