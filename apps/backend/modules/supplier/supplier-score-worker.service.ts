@@ -38,11 +38,20 @@ async function drain(options: DrainOptions = {}) {
         ...new Set(jobs.map((job) => job.entityId)),
       ]);
       const result = await MetricRefreshQueue.completeSupplierScoreJobs(
-        jobs.map((job) => job.id),
+        jobs.map((job) => job.entityId),
         workerId,
       );
       processed += result.completed;
       batches += 1;
+      logger.info(
+        {
+          batch: batches,
+          completedJobs: result.completed,
+          supplierCount: jobs.length,
+          workerId,
+        },
+        'supplier score worker batch finished',
+      );
     } catch (error) {
       await MetricRefreshQueue.failSupplierScoreJobs(jobs, workerId, error);
       logger.error(

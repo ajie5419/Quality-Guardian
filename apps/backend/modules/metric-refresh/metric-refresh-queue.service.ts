@@ -21,7 +21,7 @@ export interface SupplierIdentityMetricRefreshClient
 export interface ClaimedMetricRefreshJob {
   attempts: number;
   entityId: string;
-  id: string;
+  jobCount: number;
 }
 
 interface ClaimOptions {
@@ -112,43 +112,41 @@ export const MetricRefreshQueue = {
     const leaseUntil = new Date(
       now.getTime() + (options.leaseMs ?? DEFAULT_LEASE_MS),
     );
+    const candidateWhere: Prisma.metric_refresh_jobsWhereInput = {
+      isDeleted: false,
+      metricType: metric_refresh_type.SUPPLIER_SCORE,
+      OR: [
+        {
+          availableAt: { lte: now },
+          status: {
+            in: [metric_refresh_status.PENDING, metric_refresh_status.FAILED],
+          },
+        },
+        {
+          leaseUntil: { lte: now },
+          status: metric_refresh_status.PROCESSING,
+        },
+      ],
+    };
     const candidates = await prisma.metric_refresh_jobs.findMany({
-      where: {
-        isDeleted: false,
-        metricType: metric_refresh_type.SUPPLIER_SCORE,
-        OR: [
-          {
-            availableAt: { lte: now },
-            status: {
-              in: [metric_refresh_status.PENDING, metric_refresh_status.FAILED],
-            },
-          },
-          {
-            leaseUntil: { lte: now },
-            status: metric_refresh_status.PROCESSING,
-          },
-        ],
-      },
+      distinct: ['entityId'],
+      where: candidateWhere,
       orderBy: [{ availableAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       take: options.limit ?? DEFAULT_BATCH_SIZE,
       select: {
         attempts: true,
         entityId: true,
-        id: true,
-        leaseOwner: true,
-        leaseUntil: true,
-        status: true,
       },
     });
 
     const claimed: ClaimedMetricRefreshJob[] = [];
     for (const candidate of candidates) {
+      // A metric job is a durable change signal. Claim every available signal
+      // for the same supplier so one snapshot refresh absorbs all prior writes.
       const result = await prisma.metric_refresh_jobs.updateMany({
         where: {
-          id: candidate.id,
-          leaseOwner: candidate.leaseOwner,
-          leaseUntil: candidate.leaseUntil,
-          status: candidate.status,
+          ...candidateWhere,
+          entityId: candidate.entityId,
         },
         data: {
           attempts: { increment: 1 },
@@ -157,23 +155,25 @@ export const MetricRefreshQueue = {
           status: metric_refresh_status.PROCESSING,
         },
       });
-      if (result.count === 1) {
+      if (result.count > 0) {
         claimed.push({
           attempts: candidate.attempts + 1,
           entityId: candidate.entityId,
-          id: candidate.id,
+          jobCount: result.count,
         });
       }
     }
     return claimed;
   },
 
-  async completeSupplierScoreJobs(jobIds: string[], workerId: string) {
-    const ids = uniqueIds(jobIds);
+  async completeSupplierScoreJobs(entityIds: string[], workerId: string) {
+    const ids = uniqueIds(entityIds);
     if (ids.length === 0) return { completed: 0 };
     const result = await prisma.metric_refresh_jobs.updateMany({
       where: {
-        id: { in: ids },
+        entityId: { in: ids },
+        isDeleted: false,
+        metricType: metric_refresh_type.SUPPLIER_SCORE,
         leaseOwner: workerId,
         status: metric_refresh_status.PROCESSING,
       },
@@ -198,7 +198,9 @@ export const MetricRefreshQueue = {
     for (const job of jobs) {
       const result = await prisma.metric_refresh_jobs.updateMany({
         where: {
-          id: job.id,
+          entityId: job.entityId,
+          isDeleted: false,
+          metricType: metric_refresh_type.SUPPLIER_SCORE,
           leaseOwner: workerId,
           status: metric_refresh_status.PROCESSING,
         },

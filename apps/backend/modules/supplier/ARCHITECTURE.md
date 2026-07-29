@@ -47,8 +47,9 @@
 - 画像检验履历必须通过 `SupplierService.getInspectionHistory()` 返回统一 `partName` 和服务端分页；禁止前端用关键字拼接通用检验列表。
 - 画像历史使用项目必须通过 `InspectionService.getSupplierHistoryProjects()` 直接按报检任务自身的 `supplierId/teamId` 聚合，合并主工单与 `qms_inspection_request_work_orders` 多工单明细，并执行服务端分页；不得依赖任务是否已生成检验记录，禁止按供应商名称查询，也禁止前端基于当前页结果拼接。
 - 检验记录、不合格项、售后记录、供应商档案和 TEAM 映射的写事务必须同步追加 `metric_refresh_jobs`；源数据和刷新任务必须同成同败。
-- 评分 Worker 只按任务中的 `supplierId` 重算，成功后确认任务，失败时持久化错误并重试；禁止使用名称匹配、进程内事件或请求后 fire-and-forget 刷新。
-- 发布维护在应用停止写入期间执行 `reconcile-supplier-score-snapshots.ts`：为无 V4 快照或旧模型快照建立显式 ID 任务，同步消费所有线上遗留任务，任务数不为零则发布失败。
+- 评分 Worker 只按任务中的 `supplierId` 重算；同一供应商累积的事件行必须合并为一个刷新单元，成功后一次确认该身份的全部已领取事件，失败时持久化错误并重试。禁止使用名称匹配、进程内事件或请求后 fire-and-forget 刷新。
+- 在线 Worker 只允许由 Nitro 运行时插件启动；`*.module.ts` 必须是无副作用的模块声明，维护脚本不得在加载模块元数据时意外启动后台消费者。
+- 发布维护在应用停止写入期间执行 `reconcile-supplier-score-snapshots.ts`：为无 V4 快照或旧模型快照建立显式 ID 任务，由发布专用 Worker 独占消费所有线上遗留任务，任务数不为零则发布失败。
 - `engineeringIssueCount` 展示全部历史工程问题；评分扣分、损失和连续问题仍使用最近 12 个月窗口，禁止用评分窗口数量冒充实际总数。
 - 无有效检验批次时 API 合格率返回 `null`，页面显示 `-`；真实 0% 必须保留为 0%。`NA` 不进入分母，`CONDITIONAL` 进入分母但不计为 PASS。
 - 进货合格率只使用规范检验批次结论：分母为最近 12 个月非 `NA` 批次，分子为 `PASS` 批次；`FAIL` 和 `CONDITIONAL` 均按失败批次扣分。无批次身份的手工工程问题只进入工程问题数量、损失和评分，不得伪造为检验批次。

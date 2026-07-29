@@ -98,18 +98,10 @@ describe('metric refresh queue', () => {
       {
         attempts: 1,
         entityId: 'supplier-1',
-        id: 'job-won',
-        leaseOwner: null,
-        leaseUntil: null,
-        status: 'PENDING',
       },
       {
         attempts: 0,
         entityId: 'supplier-2',
-        id: 'job-lost',
-        leaseOwner: null,
-        leaseUntil: null,
-        status: 'PENDING',
       },
     ]);
     prismaMock.metric_refresh_jobs.updateMany
@@ -123,9 +115,68 @@ describe('metric refresh queue', () => {
     });
 
     expect(jobs).toEqual([
-      { attempts: 2, entityId: 'supplier-1', id: 'job-won' },
+      { attempts: 2, entityId: 'supplier-1', jobCount: 1 },
     ]);
     expect(prismaMock.metric_refresh_jobs.updateMany).toHaveBeenCalledTimes(2);
+    expect(prismaMock.metric_refresh_jobs.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        distinct: ['entityId'],
+        take: 50,
+      }),
+    );
+  });
+
+  it('claims all available signals for one supplier as a single refresh unit', async () => {
+    prismaMock.metric_refresh_jobs.findMany.mockResolvedValue([
+      {
+        attempts: 1,
+        entityId: 'supplier-1',
+      },
+    ]);
+    prismaMock.metric_refresh_jobs.updateMany.mockResolvedValue({ count: 7 });
+
+    const jobs = await MetricRefreshQueue.claimSupplierScoreJobs({
+      workerId: 'worker-a',
+    });
+
+    expect(jobs).toEqual([
+      { attempts: 2, entityId: 'supplier-1', jobCount: 7 },
+    ]);
+    expect(prismaMock.metric_refresh_jobs.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          entityId: 'supplier-1',
+          metricType: 'SUPPLIER_SCORE',
+        }),
+      }),
+    );
+  });
+
+  it('completes every leased signal for the refreshed suppliers', async () => {
+    prismaMock.metric_refresh_jobs.updateMany.mockResolvedValue({ count: 7 });
+
+    const result = await MetricRefreshQueue.completeSupplierScoreJobs(
+      ['supplier-1', 'supplier-1'],
+      'worker-a',
+    );
+
+    expect(result).toEqual({ completed: 7 });
+    expect(prismaMock.metric_refresh_jobs.updateMany).toHaveBeenCalledWith({
+      where: {
+        entityId: { in: ['supplier-1'] },
+        isDeleted: false,
+        leaseOwner: 'worker-a',
+        metricType: 'SUPPLIER_SCORE',
+        status: 'PROCESSING',
+      },
+      data: {
+        completedAt: expect.any(Date),
+        lastError: null,
+        leaseOwner: null,
+        leaseUntil: null,
+        status: 'COMPLETED',
+      },
+    });
   });
 
   it('reclaims every outstanding supplier job during exclusive maintenance', async () => {
@@ -158,7 +209,7 @@ describe('metric refresh queue', () => {
     prismaMock.metric_refresh_jobs.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await MetricRefreshQueue.failSupplierScoreJobs(
-      [{ attempts: 2, entityId: 'supplier-1', id: 'job-1' }],
+      [{ attempts: 2, entityId: 'supplier-1', jobCount: 3 }],
       'worker-a',
       new Error('database unavailable'),
       now,
@@ -167,8 +218,10 @@ describe('metric refresh queue', () => {
     expect(result).toEqual({ failed: 1 });
     expect(prismaMock.metric_refresh_jobs.updateMany).toHaveBeenCalledWith({
       where: {
-        id: 'job-1',
+        entityId: 'supplier-1',
+        isDeleted: false,
         leaseOwner: 'worker-a',
+        metricType: 'SUPPLIER_SCORE',
         status: 'PROCESSING',
       },
       data: {
