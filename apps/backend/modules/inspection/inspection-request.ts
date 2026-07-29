@@ -17,9 +17,10 @@ import {
   parseInspectionRequestQuantity as parseInspectionRequestQuantityRule,
   serializeInspectionStationSelection as serializeInspectionStationSelectionRule,
 } from '@qgs/shared';
-import { InspectionService } from '~/modules/inspection/inspection.service';
 import { resolveTaskDispatchCurrentUserId } from '~/modules/task-dispatch/task-dispatch-rules';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
+
+import { InspectionRecordCreateService } from './inspection-record-create.service';
 
 export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
 
@@ -176,7 +177,7 @@ export async function buildInspectionRecordFromRequest(
   override?: { projectName?: null | string; workOrderNumber?: string },
   client?: Prisma.TransactionClient,
 ) {
-  return InspectionService.create(
+  return InspectionRecordCreateService.create(
     buildInspectionRecordPayloadCore({
       body,
       request: {

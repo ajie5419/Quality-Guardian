@@ -58,17 +58,27 @@ const {
   useResponseSuccess: vi.fn((data) => ({ data, type: 'success' })),
 }));
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    after_sales: {
-      create: vi.fn(),
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
+vi.mock('~/utils/prisma', () => {
+  const afterSales = {
+    create: vi.fn(),
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+  };
+  const transactionClient = {
+    after_sales: afterSales,
+    metric_refresh_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-  },
-}));
+  };
+  return {
+    default: {
+      ...transactionClient,
+      $transaction: vi.fn((callback) => callback(transactionClient)),
+    },
+  };
+});
 
 vi.mock('h3', () => ({
   defineEventHandler: (handler: unknown) => handler,

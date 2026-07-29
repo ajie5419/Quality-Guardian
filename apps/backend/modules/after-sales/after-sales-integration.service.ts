@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
-import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 function buildAfterSalesVehicleDivisionWhere(vehicleDeptIds: string[]) {
@@ -62,22 +62,26 @@ export const AfterSalesIntegrationService = {
   },
 
   async updateQualityLossFields(params: { actualClaim?: number; id: string }) {
-    const current = await prisma.after_sales.findUnique({
-      where: { id: params.id },
-      select: { supplierBrand: true, supplierBrandId: true },
-    });
-    const updated = await prisma.after_sales.update({
-      where: { id: params.id },
-      data: {
-        actualClaim: params.actualClaim,
-        updatedAt: new Date(),
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const current = await tx.after_sales.findUnique({
+        where: { id: params.id },
+        select: { supplierBrandId: true },
+      });
+      const updated = await tx.after_sales.update({
+        where: { id: params.id },
+        data: {
+          actualClaim: params.actualClaim,
+          updatedAt: new Date(),
+        },
+      });
+      await MetricRefreshQueue.enqueueSupplierScores(
+        tx,
+        [current?.supplierBrandId, updated.supplierBrandId],
+        'after-sales.quality-loss-updated',
+      );
+      return updated;
     });
     await QualityLossIndexService.upsertFromAfterSales(updated);
-    eventBus.emit('after_sales.changed', {
-      supplierBrands: [current?.supplierBrand],
-      supplierIds: [current?.supplierBrandId],
-    });
   },
 
   async getQualityLossTrendRows(params: {

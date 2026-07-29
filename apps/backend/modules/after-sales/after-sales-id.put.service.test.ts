@@ -5,14 +5,18 @@ vi.mock('h3', () => ({
   readBody: vi.fn(),
 }));
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    after_sales: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
+vi.mock('~/utils/prisma', () => {
+  const afterSales = {
+    findUnique: vi.fn(),
+    update: vi.fn(),
+  };
+  return {
+    default: {
+      after_sales: afterSales,
+      $transaction: vi.fn((callback) => callback({ after_sales: afterSales })),
     },
-  },
-}));
+  };
+});
 
 vi.mock('~/modules/after-sales/after-sales-payload', () => ({
   buildGovernedAfterSalesUpdateData: vi.fn(
@@ -60,8 +64,10 @@ vi.mock('~/utils/api-logger', () => ({
   logApiError: vi.fn(),
 }));
 
-vi.mock('~/utils/event-bus', () => ({
-  eventBus: { emit: vi.fn() },
+vi.mock('~/modules/metric-refresh', () => ({
+  MetricRefreshQueue: {
+    enqueueSupplierScores: vi.fn(),
+  },
 }));
 
 vi.mock('~/utils/prisma-error', () => ({
@@ -136,7 +142,7 @@ describe('after-sales-id.put.service', () => {
     const { buildGovernedAfterSalesUpdateData } = await import(
       '~/modules/after-sales/after-sales-payload'
     );
-    const { eventBus } = await import('~/utils/event-bus');
+    const { MetricRefreshQueue } = await import('~/modules/metric-refresh');
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
 
@@ -156,10 +162,11 @@ describe('after-sales-id.put.service', () => {
 
     await handler({} as any);
 
-    expect(eventBus.emit).toHaveBeenCalledWith('after_sales.changed', {
-      supplierBrands: ['Supplier A', 'Supplier B'],
-      supplierIds: ['supplier-1', 'supplier-2'],
-    });
+    expect(MetricRefreshQueue.enqueueSupplierScores).toHaveBeenCalledWith(
+      expect.any(Object),
+      ['supplier-1', 'supplier-2'],
+      'after-sales.updated',
+    );
   });
 
   it('should return not found when record does not exist during cost recalculation', async () => {

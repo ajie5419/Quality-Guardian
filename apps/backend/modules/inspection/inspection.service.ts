@@ -1,31 +1,28 @@
-import { InspectionArchiveService } from './inspection-archive.service';
 import { InspectionCoreService } from './inspection-core.service';
-import { InspectionIssueService } from './inspection-issue.service';
 import { InspectionRequestHistoryService } from './inspection-request-history.service';
-import { InspectionTemplateService } from './inspection-template.service';
 
 export const InspectionService = {
   batchDelete: InspectionCoreService.batchDelete,
   calculateOverallResult: InspectionCoreService.calculateOverallResult,
   create: InspectionCoreService.create,
   delete: InspectionCoreService.delete,
-  deleteRecord: InspectionIssueService.deleteRecord,
+  deleteRecord: InspectionCoreService.deleteRecord,
   determineItemResult: InspectionCoreService.determineItemResult,
   findAll: InspectionCoreService.findAll,
   findSupplierIssues: InspectionCoreService.findSupplierIssues,
   findSupplierHistory: InspectionCoreService.findSupplierHistory,
-  findById: InspectionTemplateService.findById,
+  findById: InspectionCoreService.findById,
   findIssueIdBySerialNumber: InspectionCoreService.findIssueIdBySerialNumber,
-  generateNextNcNumber: InspectionIssueService.generateNextNcNumber,
+  generateNextNcNumber: InspectionCoreService.generateNextNcNumber,
   getStatsForDashboard: InspectionCoreService.getStatsForDashboard,
   generateSerialNumber: InspectionCoreService.generateSerialNumber,
-  getArchiveTasks: InspectionArchiveService.getArchiveTasks,
+  getArchiveTasks: InspectionCoreService.getArchiveTasks,
   getDailyArchiveReportData: InspectionCoreService.getDailyArchiveReportData,
   getDailyReportInspections: InspectionCoreService.getDailyReportInspections,
   getDailyReportIssues: InspectionCoreService.getDailyReportIssues,
-  getIssueChartAggregation: InspectionIssueService.getIssueChartAggregation,
-  getIssues: InspectionIssueService.getIssues,
-  getIssueStats: InspectionIssueService.getIssueStats,
+  getIssueChartAggregation: InspectionCoreService.getIssueChartAggregation,
+  getIssues: InspectionCoreService.getIssues,
+  getIssueStats: InspectionCoreService.getIssueStats,
   getQualityLossTrendRows: InspectionCoreService.getQualityLossTrendRows,
   getQualityLossDrillDownRecords:
     InspectionCoreService.getQualityLossDrillDownRecords,
@@ -50,6 +47,6 @@ export const InspectionService = {
   normalizeQuantitySummary: InspectionCoreService.normalizeQuantitySummary,
   resolveOverallResult: InspectionCoreService.resolveOverallResult,
   update: InspectionCoreService.update,
-  updateArchiveTaskStatus: InspectionArchiveService.updateArchiveTaskStatus,
+  updateArchiveTaskStatus: InspectionCoreService.updateArchiveTaskStatus,
   updateQualityLossFields: InspectionCoreService.updateQualityLossFields,
 };

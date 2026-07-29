@@ -4,31 +4,41 @@ import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    $queryRaw: vi.fn(),
-    inspections: {
-      count: vi.fn(),
-      findMany: vi.fn(),
-      groupBy: vi.fn(),
+vi.mock('~/utils/prisma', () => {
+  const qualityRecords = {
+    aggregate: vi.fn(),
+    count: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    groupBy: vi.fn(),
+    update: vi.fn(),
+  };
+  const transactionClient = {
+    metric_refresh_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    inspection_archive_tasks: {
-      findMany: vi.fn(),
+    quality_records: qualityRecords,
+  };
+  return {
+    default: {
+      $queryRaw: vi.fn(),
+      $transaction: vi.fn((callback) => callback(transactionClient)),
+      inspections: {
+        count: vi.fn(),
+        findMany: vi.fn(),
+        groupBy: vi.fn(),
+      },
+      inspection_archive_tasks: {
+        findMany: vi.fn(),
+      },
+      inspection_form_templates: {
+        findMany: vi.fn(),
+      },
+      quality_records: qualityRecords,
     },
-    inspection_form_templates: {
-      findMany: vi.fn(),
-    },
-    quality_records: {
-      aggregate: vi.fn(),
-      count: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      groupBy: vi.fn(),
-      update: vi.fn(),
-    },
-  },
-}));
+  };
+});
 
 vi.mock('~/modules/quality-loss/quality-loss-status', () => ({
   toQualityRecordStatus: vi.fn().mockReturnValue('OPEN'),
@@ -56,6 +66,9 @@ describe('inspectionReportingService', () => {
       QualityClassificationService.resolveCategoryNamesByIds as any
     ).mockResolvedValue(new Map());
     (prisma.quality_records.findUnique as any).mockResolvedValue(null);
+    (prisma.quality_records.update as any).mockResolvedValue({
+      supplierId: null,
+    });
   });
 
   describe('findIssueIdBySerialNumber', () => {

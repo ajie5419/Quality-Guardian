@@ -16,10 +16,10 @@ import { Prisma } from '@prisma/client';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { parseResponsibleDepartments } from '~/utils/department-multi';
-import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 import { AfterSalesAnalyticsService } from './after-sales-analytics.service';
@@ -136,35 +136,33 @@ export const AfterSalesService = {
     const supplierChanged =
       updateData.supplierBrand !== undefined ||
       updateData.supplierBrandId !== undefined;
-    let previousSupplierBrand: null | string | undefined;
-    let previousSupplierId: null | string | undefined;
-
-    if (costsChanged || supplierChanged) {
-      const current = await prisma.after_sales.findUnique({
-        where: { id },
-        select: {
-          laborTravelCost: true,
-          materialCost: true,
-          supplierBrand: true,
-          supplierBrandId: true,
-        },
-      });
+    const updated = await prisma.$transaction(async (tx) => {
+      const current =
+        costsChanged || supplierChanged
+          ? await tx.after_sales.findUnique({
+              where: { id },
+              select: {
+                laborTravelCost: true,
+                materialCost: true,
+                supplierBrandId: true,
+              },
+            })
+          : null;
       if (costsChanged && !current) {
         throw new Error('AFTER_SALES_NOT_FOUND');
       }
-      previousSupplierBrand = current?.supplierBrand;
-      previousSupplierId = current?.supplierBrandId;
-    }
-
-    const updated = await prisma.after_sales.update({
-      where: { id },
-      data: updateData,
+      const updated = await tx.after_sales.update({
+        where: { id },
+        data: updateData,
+      });
+      await MetricRefreshQueue.enqueueSupplierScores(
+        tx,
+        [current?.supplierBrandId, updated.supplierBrandId],
+        'after-sales.updated',
+      );
+      return updated;
     });
     await QualityLossIndexService.upsertFromAfterSales(updated);
-    eventBus.emit('after_sales.changed', {
-      supplierBrands: [previousSupplierBrand, updated.supplierBrand],
-      supplierIds: [previousSupplierId, updated.supplierBrandId],
-    });
   },
 
   /**
@@ -370,12 +368,20 @@ export const AfterSalesService = {
    * Soft delete a record with audit logging
    */
   async deleteRecord(id: string, userId: string): Promise<void> {
-    const deleted = await prisma.after_sales.update({
-      where: { id },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-      },
+    await prisma.$transaction(async (tx) => {
+      const deleted = await tx.after_sales.update({
+        where: { id },
+        data: {
+          isDeleted: true,
+          updatedAt: new Date(),
+        },
+      });
+      await MetricRefreshQueue.enqueueSupplierScores(
+        tx,
+        [deleted.supplierBrandId],
+        'after-sales.deleted',
+      );
+      return deleted;
     });
 
     await FileStorageService.softDeleteReferences({
@@ -384,11 +390,6 @@ export const AfterSalesService = {
     });
 
     await QualityLossIndexService.softDeleteSource('External', id);
-    eventBus.emit('after_sales.changed', {
-      supplierBrands: [deleted.supplierBrand],
-      supplierIds: [deleted.supplierBrandId],
-    });
-
     // Record audit log
     await SystemLogService.auditLog('after-sales', 'delete', {
       userId,

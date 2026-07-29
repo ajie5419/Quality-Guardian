@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRecordCreateService } from '~/modules/inspection/inspection-record-create.service';
-import { eventBus } from '~/utils/event-bus';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 
@@ -13,8 +13,10 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-vi.mock('~/utils/event-bus', () => ({
-  eventBus: { emit: vi.fn() },
+vi.mock('~/modules/metric-refresh', () => ({
+  MetricRefreshQueue: {
+    enqueueSupplierScoresForInspectionIdentities: vi.fn(),
+  },
 }));
 
 vi.mock('~/utils/governed-write', () => ({
@@ -146,12 +148,16 @@ describe('inspectionRecordCreateService', () => {
         expect.objectContaining({ supplierId: undefined }),
       );
       expect(result).toEqual(mockInspection);
-      expect(eventBus.emit).toHaveBeenCalledWith('inspection_record.changed', {
-        supplierIds: ['supplier-1'],
-        supplierNames: ['Supplier A'],
-        teamIds: ['team-1'],
-        teamNames: [null],
-      });
+      expect(
+        MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities,
+      ).toHaveBeenCalledWith(
+        expect.any(Object),
+        {
+          supplierIds: ['supplier-1'],
+          teamIds: ['team-1'],
+        },
+        'inspection.created',
+      );
     });
 
     it('should use a provided transaction client without opening its own transaction', async () => {
@@ -184,7 +190,16 @@ describe('inspectionRecordCreateService', () => {
       expect(prisma.inspections.findFirst).not.toHaveBeenCalled();
       expect(tx.inspections.create).toHaveBeenCalled();
       expect(result).toEqual(mockInspection);
-      expect(eventBus.emit).not.toHaveBeenCalled();
+      expect(
+        MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities,
+      ).toHaveBeenCalledWith(
+        tx,
+        {
+          supplierIds: [undefined],
+          teamIds: [undefined],
+        },
+        'inspection.created',
+      );
     });
 
     it('rejects a process inspection without a canonical TEAM identity', async () => {
@@ -282,7 +297,9 @@ describe('inspectionRecordCreateService', () => {
         ),
       ).rejects.toBe(conflict);
       expect(tx.inspections.create).toHaveBeenCalledTimes(1);
-      expect(eventBus.emit).not.toHaveBeenCalled();
+      expect(
+        MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities,
+      ).not.toHaveBeenCalled();
     });
   });
 });

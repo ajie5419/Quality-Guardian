@@ -10,6 +10,14 @@ export interface MetricRefreshClient {
   >;
 }
 
+export interface SupplierIdentityMetricRefreshClient
+  extends MetricRefreshClient {
+  supplier_identity_links: Pick<
+    Prisma.TransactionClient['supplier_identity_links'],
+    'findMany'
+  >;
+}
+
 export interface ClaimedMetricRefreshJob {
   attempts: number;
   entityId: string;
@@ -65,6 +73,36 @@ export const MetricRefreshQueue = {
       })),
     });
     return { enqueued: result.count };
+  },
+
+  async enqueueSupplierScoresForInspectionIdentities(
+    client: SupplierIdentityMetricRefreshClient,
+    identities: {
+      supplierIds?: Array<null | string | undefined>;
+      teamIds?: Array<null | string | undefined>;
+    },
+    reason: string,
+  ) {
+    const teamIds = uniqueIds(identities.teamIds ?? []);
+    const links =
+      teamIds.length === 0
+        ? []
+        : await client.supplier_identity_links.findMany({
+            select: { supplierId: true },
+            where: {
+              identityId: { in: teamIds },
+              identityType: 'TEAM',
+              isDeleted: false,
+            },
+          });
+    return this.enqueueSupplierScores(
+      client,
+      [
+        ...(identities.supplierIds ?? []),
+        ...links.map((link) => link.supplierId),
+      ],
+      reason,
+    );
   },
 
   async claimSupplierScoreJobs(

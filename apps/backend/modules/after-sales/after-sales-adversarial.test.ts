@@ -3,19 +3,29 @@ import prisma from '~/utils/prisma';
 
 import { AfterSalesService } from './after-sales.service';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    after_sales: {
-      aggregate: vi.fn(),
-      count: vi.fn(),
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      groupBy: vi.fn(),
-      update: vi.fn(),
+vi.mock('~/utils/prisma', () => {
+  const afterSales = {
+    aggregate: vi.fn(),
+    count: vi.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    groupBy: vi.fn(),
+    update: vi.fn(),
+  };
+  const transactionClient = {
+    after_sales: afterSales,
+    metric_refresh_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-  },
-}));
+  };
+  return {
+    default: {
+      ...transactionClient,
+      $transaction: vi.fn((callback) => callback(transactionClient)),
+    },
+  };
+});
 
 vi.mock('~/modules/file-storage/file-storage.service', () => ({
   FileStorageService: {

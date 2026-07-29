@@ -12,34 +12,44 @@ import {
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import prisma from '~/utils/prisma';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    suppliers: {
-      aggregate: vi.fn(),
-      count: vi.fn(),
-      create: vi.fn(),
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      update: vi.fn(),
-      upsert: vi.fn(),
+vi.mock('~/utils/prisma', () => {
+  const suppliers = {
+    aggregate: vi.fn(),
+    count: vi.fn(),
+    create: vi.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    update: vi.fn(),
+    upsert: vi.fn(),
+  };
+  const transactionClient = {
+    metric_refresh_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    supplier_score_snapshots: {
-      aggregate: vi.fn(),
-      upsert: vi.fn(),
+    suppliers,
+  };
+  return {
+    default: {
+      ...transactionClient,
+      $transaction: vi.fn((callback) => callback(transactionClient)),
+      supplier_score_snapshots: {
+        aggregate: vi.fn(),
+        upsert: vi.fn(),
+      },
+      inspections: {
+        groupBy: vi.fn(),
+      },
+      after_sales: {
+        findMany: vi.fn(),
+        groupBy: vi.fn(),
+      },
+      quality_records: {
+        findMany: vi.fn(),
+        groupBy: vi.fn(),
+      },
     },
-    inspections: {
-      groupBy: vi.fn(),
-    },
-    after_sales: {
-      findMany: vi.fn(),
-      groupBy: vi.fn(),
-    },
-    quality_records: {
-      findMany: vi.fn(),
-      groupBy: vi.fn(),
-    },
-  },
-}));
+  };
+});
 
 vi.mock('~/modules/file-storage', () => ({
   FileStorageService: {

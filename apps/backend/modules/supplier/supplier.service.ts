@@ -2,26 +2,17 @@ import type { Prisma } from '@prisma/client';
 import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
-import { FileStorageService } from '~/modules/file-storage';
 import { InspectionService } from '~/modules/inspection';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import {
-  buildSupplierUpdateDataWithCanonical,
-  buildSupplierUpsertPayload,
   DEFAULT_OUTSOURCING_MODE,
   normalizeOutsourcingMode,
-  normalizeSupplierString,
   resolveSupplierInspectionPolicy,
 } from '~/modules/supplier/supplier-query';
-import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
-import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { buildKeywordOr } from '~/utils/query-helpers';
 
-import { createSupplierRecord } from './supplier-create.service';
-import { SupplierScoreSnapshotService } from './supplier-score-snapshot.service';
-
-const logger = createModuleLogger('supplier-service');
+import { SupplierMutationService } from './supplier-mutation.service';
 
 export interface SupplierQueryParams {
   page?: number;
@@ -38,7 +29,6 @@ export interface SupplierQueryParams {
 }
 
 type SupplierWhereInput = Prisma.suppliersWhereInput;
-type SupplierAdmissionPayload = Record<string, unknown>;
 
 const SUPPLIER_SORT_FIELDS: Record<
   string,
@@ -130,27 +120,6 @@ function mapSupplierListItem(
   };
 }
 
-async function registerAdmissionDocuments(
-  supplierId: string,
-  payload: SupplierAdmissionPayload,
-) {
-  if (!Object.hasOwn(payload, 'admissionDocuments')) return;
-  await FileStorageService.registerReferencesFromAttachments({
-    attachments: payload.admissionDocuments,
-    bizId: supplierId,
-    bizType: 'supplier',
-    fieldName: 'admissionDocuments',
-  });
-}
-
-async function createSupplierWithOutcome(payload: SupplierAdmissionPayload) {
-  const outcome = await createSupplierRecord(payload);
-  if (!outcome) return null;
-  await registerAdmissionDocuments(outcome.supplier.id, payload);
-  await SupplierScoreSnapshotService.refreshSuppliers([outcome.supplier]);
-  return outcome;
-}
-
 async function buildSupplierGlobalStats(
   scopedWhere: SupplierWhereInput,
   totalCount: number,
@@ -196,113 +165,22 @@ async function buildSupplierGlobalStats(
 }
 
 export const SupplierService = {
-  createSupplierWithOutcome,
+  createSupplierWithOutcome: SupplierMutationService.createWithOutcome,
 
   async createSupplier(payload: Record<string, unknown>) {
-    const outcome = await createSupplierWithOutcome(payload);
+    const outcome = await SupplierMutationService.createWithOutcome(payload);
     return outcome?.supplier ?? null;
   },
 
-  async updateSupplier(id: string, payload: Record<string, unknown>) {
-    const updated = await prisma.suppliers.update({
-      where: { id },
-      data: await buildSupplierUpdateDataWithCanonical(payload),
-    });
-    await registerAdmissionDocuments(updated.id, payload);
-    await SupplierScoreSnapshotService.refreshSuppliers([updated]);
-    return updated;
-  },
+  updateSupplier: SupplierMutationService.update,
 
-  async deleteSupplier(id: string) {
-    return prisma.suppliers.update({
-      where: { id },
-      data: { isDeleted: true, updatedAt: new Date() },
-    });
-  },
+  deleteSupplier: SupplierMutationService.delete,
 
-  async batchDeleteSuppliers(ids: string[]) {
-    return prisma.suppliers.updateMany({
-      where: { id: { in: ids } },
-      data: { isDeleted: true, updatedAt: new Date() },
-    });
-  },
+  batchDeleteSuppliers: SupplierMutationService.batchDelete,
 
-  async batchUpsertSuppliers(items: Array<Record<string, unknown>>) {
-    const results = { errors: 0, skipped: 0, success: 0 };
-    const chunkSize = 20;
-    for (let i = 0; i < items.length; i += chunkSize) {
-      const chunk = items.slice(i, i + chunkSize);
-      await Promise.all(
-        chunk.map(async (item) => {
-          const payload = buildSupplierUpsertPayload(item);
-          if (!payload) {
-            results.skipped++;
-            return;
-          }
-          try {
-            const createCanonicalIds =
-              await buildGovernedCanonicalWritePairForTable(
-                'suppliers',
-                payload.create,
-              );
-            const updateCanonicalIds =
-              await buildGovernedCanonicalWritePairForTable(
-                'suppliers',
-                payload.update,
-              );
-            const supplier = await prisma.suppliers.upsert({
-              ...payload,
-              create: { ...payload.create, ...createCanonicalIds },
-              update: { ...payload.update, ...updateCanonicalIds },
-            });
-            await SupplierScoreSnapshotService.refreshSuppliers([supplier]);
-            results.success++;
-          } catch (error) {
-            logger.error(error, 'batchUpsertSuppliers: failed to upsert row');
-            results.errors++;
-          }
-        }),
-      );
-    }
-    return results;
-  },
+  batchUpsertSuppliers: SupplierMutationService.batchUpsert,
 
-  async importSuppliers(
-    items: Array<Record<string, unknown>>,
-    category?: unknown,
-  ) {
-    const normalizedCategory = normalizeSupplierString(category);
-    let successCount = 0;
-    for (const item of items) {
-      const payload = buildSupplierUpsertPayload(item, {
-        category: normalizedCategory,
-      });
-      if (!payload) continue;
-      try {
-        const createCanonicalIds =
-          await buildGovernedCanonicalWritePairForTable(
-            'suppliers',
-            payload.create,
-          );
-        const updateCanonicalIds =
-          await buildGovernedCanonicalWritePairForTable(
-            'suppliers',
-            payload.update,
-          );
-        const supplier = await prisma.suppliers.upsert({
-          ...payload,
-          create: { ...payload.create, ...createCanonicalIds },
-          update: { ...payload.update, ...updateCanonicalIds },
-        });
-        await SupplierScoreSnapshotService.refreshSuppliers([supplier]);
-        successCount++;
-      } catch (error) {
-        logger.error(error, 'importSuppliers: failed to upsert row; skipping');
-        // keep import behavior: ignore row-level failures
-      }
-    }
-    return { successCount, totalCount: items.length };
-  },
+  importSuppliers: SupplierMutationService.import,
 
   /**
    * Find all suppliers with advanced filtering, scoring, and aggregation

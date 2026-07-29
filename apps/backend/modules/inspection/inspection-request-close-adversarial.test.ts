@@ -175,6 +175,12 @@ vi.mock('~/modules/system-log/audit-log', () => ({
   recordBusinessAuditLog: vi.fn(),
 }));
 
+vi.mock('~/modules/metric-refresh', () => ({
+  MetricRefreshQueue: {
+    enqueueSupplierScoresForInspectionIdentities: vi.fn(),
+  },
+}));
+
 const ATTACHMENTS = [{ name: 'f.pdf', url: 'http://example.com/f.pdf' }];
 
 function makeRequest(overrides: Record<string, unknown> = {}) {
@@ -212,7 +218,10 @@ function mockTransaction(updates: Record<string, unknown> = {}) {
   };
   return (prisma.$transaction as any).mockImplementation(async (cb: any) =>
     cb({
-      inspections: { update: vi.fn().mockResolvedValue({}) },
+      inspections: {
+        findMany: vi.fn().mockResolvedValue([]),
+        update: vi.fn().mockResolvedValue({}),
+      },
       quality_records: { create: vi.fn().mockResolvedValue(null) },
       qms_inspection_request_inspections: {
         createMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -232,7 +241,10 @@ function makeTxMock(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
   return {
-    inspections: { update: vi.fn().mockResolvedValue({}) },
+    inspections: {
+      findMany: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
+    },
     quality_records: { create: vi.fn().mockResolvedValue(null) },
     qms_inspection_request_inspections: {
       createMany: vi.fn().mockResolvedValue({ count: 1 }),

@@ -11,6 +11,9 @@ vi.mock('~/utils/prisma-error', () => ({
 }));
 
 const tx = {
+  metric_refresh_jobs: {
+    createMany: vi.fn().mockResolvedValue({ count: 1 }),
+  },
   supplier_identity_links: {
     findMany: vi.fn(),
     update: vi.fn(),

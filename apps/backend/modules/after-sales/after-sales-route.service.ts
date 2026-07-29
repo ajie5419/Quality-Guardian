@@ -6,11 +6,11 @@ import {
   inferImportErrorField,
   toImportErrorMessage,
 } from '~/modules/file-storage/import-report';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { parseRequiredWorkOrderNumber } from '~/modules/work-order/work-order-query';
 import { isBusinessError } from '~/utils/business-error';
-import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 import {
@@ -21,13 +21,21 @@ import { buildGovernedAfterSalesCreateData } from './after-sales-payload';
 
 export const AfterSalesRouteService = {
   async batchDelete(ids: string[]) {
-    const existing = await prisma.after_sales.findMany({
-      where: { id: { in: ids } },
-      select: { supplierBrand: true, supplierBrandId: true },
-    });
-    const result = await prisma.after_sales.updateMany({
-      where: { id: { in: ids } },
-      data: { isDeleted: true, updatedAt: new Date() },
+    const result = await prisma.$transaction(async (tx) => {
+      const existing = await tx.after_sales.findMany({
+        where: { id: { in: ids } },
+        select: { supplierBrandId: true },
+      });
+      const result = await tx.after_sales.updateMany({
+        where: { id: { in: ids } },
+        data: { isDeleted: true, updatedAt: new Date() },
+      });
+      await MetricRefreshQueue.enqueueSupplierScores(
+        tx,
+        existing.map((item) => item.supplierBrandId),
+        'after-sales.batch-deleted',
+      );
+      return result;
     });
     await Promise.all(
       ids.map((id) =>
@@ -38,10 +46,6 @@ export const AfterSalesRouteService = {
       ),
     );
     await QualityLossIndexService.softDeleteSourceMany('External', ids);
-    eventBus.emit('after_sales.changed', {
-      supplierBrands: existing.map((item) => item.supplierBrand),
-      supplierIds: existing.map((item) => item.supplierBrandId),
-    });
     return result.count;
   },
 
@@ -50,13 +54,20 @@ export const AfterSalesRouteService = {
     userinfo: { id?: number | string; realName?: string; username?: string },
   ) {
     const serialNumber = await getNextAfterSalesSerialNumber();
-    const created = await prisma.after_sales.create({
-      data: await buildGovernedAfterSalesCreateData(body, {
-        createdBy: String(userinfo.id || '') || undefined,
-        defaultWorkOrderNumber: QMS_DEFAULT_VALUES.UNKNOWN_WORK_ORDER,
-        id: createAfterSalesId(),
-        serialNumber,
-      }),
+    const createData = await buildGovernedAfterSalesCreateData(body, {
+      createdBy: String(userinfo.id || '') || undefined,
+      defaultWorkOrderNumber: QMS_DEFAULT_VALUES.UNKNOWN_WORK_ORDER,
+      id: createAfterSalesId(),
+      serialNumber,
+    });
+    const created = await prisma.$transaction(async (tx) => {
+      const created = await tx.after_sales.create({ data: createData });
+      await MetricRefreshQueue.enqueueSupplierScores(
+        tx,
+        [created.supplierBrandId],
+        'after-sales.created',
+      );
+      return created;
     });
     await FileStorageService.registerReferencesFromAttachments({
       attachments: body.photos,
@@ -70,10 +81,6 @@ export const AfterSalesRouteService = {
       detailsVariables: { id: created.id, projectName: created.projectName },
     });
     await QualityLossIndexService.upsertFromAfterSales(created);
-    eventBus.emit('after_sales.changed', {
-      supplierBrands: [created.supplierBrand],
-      supplierIds: [created.supplierBrandId],
-    });
     return created;
   },
 
@@ -84,8 +91,6 @@ export const AfterSalesRouteService = {
     const createdBy = String(userinfo?.id || '') || undefined;
     let successCount = 0;
     const rowErrors = [];
-    const supplierIdsToRefresh: Array<null | string | undefined> = [];
-    const supplierNamesToRefresh: Array<null | string | undefined> = [];
     let serialSeed = await getNextAfterSalesSerialNumber();
     for (const [index, item] of items.entries()) {
       try {
@@ -104,23 +109,24 @@ export const AfterSalesRouteService = {
           continue;
         }
         const serialNumber = serialSeed++;
-        const created = await prisma.after_sales.create({
-          data: await buildGovernedAfterSalesCreateData(item, {
-            createdBy,
-            defaultWorkOrderNumber: woNumber,
-            id: createAfterSalesId(),
-            classificationMode: 'import',
-            identityMode: 'legacy-import',
-            serialNumber,
-          }),
+        const createData = await buildGovernedAfterSalesCreateData(item, {
+          createdBy,
+          defaultWorkOrderNumber: woNumber,
+          id: createAfterSalesId(),
+          classificationMode: 'import',
+          identityMode: 'legacy-import',
+          serialNumber,
+        });
+        const created = await prisma.$transaction(async (tx) => {
+          const created = await tx.after_sales.create({ data: createData });
+          await MetricRefreshQueue.enqueueSupplierScores(
+            tx,
+            [created.supplierBrandId],
+            'after-sales.imported',
+          );
+          return created;
         });
         await QualityLossIndexService.upsertFromAfterSales(created);
-        if (created.supplierBrand) {
-          supplierNamesToRefresh.push(created.supplierBrand);
-        }
-        if (created.supplierBrandId) {
-          supplierIdsToRefresh.push(created.supplierBrandId);
-        }
         successCount++;
       } catch (error) {
         const message = toImportErrorMessage(error);
@@ -144,10 +150,6 @@ export const AfterSalesRouteService = {
         );
       }
     }
-    eventBus.emit('after_sales.changed', {
-      supplierBrands: supplierNamesToRefresh,
-      supplierIds: supplierIdsToRefresh,
-    });
     return buildImportSummary({
       rowErrors,
       successCount,

@@ -8,12 +8,12 @@ import {
   inferImportErrorField,
   toImportErrorMessage,
 } from '~/modules/file-storage/import-report';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
 import { BusinessError } from '~/utils/business-error';
-import { eventBus } from '~/utils/event-bus';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
@@ -71,14 +71,21 @@ export const InspectionIssueMutationService = {
               await InspectionIssueNumberingService.generateNextNcNumber(),
           }
         : body;
-      return prisma.quality_records.create({
-        data: await buildInspectionIssueCreateData(createBody, {
-          createdBy: String(userinfo.id || '') || undefined,
-          id: newId,
-          inspection: linkedInspection,
-          inspectorUsername: userinfo.username,
-          serialNumber,
-        }),
+      const createData = await buildInspectionIssueCreateData(createBody, {
+        createdBy: String(userinfo.id || '') || undefined,
+        id: newId,
+        inspection: linkedInspection,
+        inspectorUsername: userinfo.username,
+        serialNumber,
+      });
+      return prisma.$transaction(async (tx) => {
+        const record = await tx.quality_records.create({ data: createData });
+        await MetricRefreshQueue.enqueueSupplierScores(
+          tx,
+          [record.supplierId],
+          'inspection-issue.created',
+        );
+        return record;
       });
     }, shouldGenerateNcNumber);
     await FileStorageService.registerReferencesFromAttachments({
@@ -101,10 +108,6 @@ export const InspectionIssueMutationService = {
     } catch (error) {
       logger.error(error, 'welder-score-sync after createIssue');
     }
-    eventBus.emit('inspection_issue.changed', {
-      supplierIds: [newRecord.supplierId],
-      supplierNames: [newRecord.supplierName],
-    });
     return { ...newRecord, ncNumber: newRecord.nonConformanceNumber };
   },
 
@@ -122,31 +125,39 @@ export const InspectionIssueMutationService = {
       { id, isDeleted: false },
       userContext,
     );
-    const current = await prisma.quality_records.findUnique({
-      where: ownershipWhere,
-      select: {
-        inspection: {
-          select: { category: true, supplierId: true, teamId: true },
+    const { updated, updateData } = await prisma.$transaction(async (tx) => {
+      const current = await tx.quality_records.findUnique({
+        where: ownershipWhere,
+        select: {
+          inspection: {
+            select: { category: true, supplierId: true, teamId: true },
+          },
+          supplierId: true,
+          supplierName: true,
         },
-        supplierId: true,
-        supplierName: true,
-      },
-    });
-    if (!current) {
-      throw new BusinessError(
-        'FORBIDDEN',
-        '无权修改：您只能修改自己创建的数据',
-        403,
+      });
+      if (!current) {
+        throw new BusinessError(
+          'FORBIDDEN',
+          '无权修改：您只能修改自己创建的数据',
+          403,
+        );
+      }
+      const updateData = await buildInspectionIssueUpdateData(
+        body,
+        existingNcNumber,
+        current.inspection,
       );
-    }
-    const updateData = await buildInspectionIssueUpdateData(
-      body,
-      existingNcNumber,
-      current.inspection,
-    );
-    const updated = await prisma.quality_records.update({
-      where: ownershipWhere,
-      data: updateData,
+      const updated = await tx.quality_records.update({
+        where: ownershipWhere,
+        data: updateData,
+      });
+      await MetricRefreshQueue.enqueueSupplierScores(
+        tx,
+        [current.supplierId, updated.supplierId],
+        'inspection-issue.updated',
+      );
+      return { updated, updateData };
     });
     if (body.photos !== undefined) {
       await FileStorageService.registerReferencesFromAttachments({
@@ -171,10 +182,6 @@ export const InspectionIssueMutationService = {
     } catch (error) {
       logger.error(error, 'welder-score-sync after updateIssue');
     }
-    eventBus.emit('inspection_issue.changed', {
-      supplierIds: [current?.supplierId, updated.supplierId],
-      supplierNames: [current?.supplierName, updated.supplierName],
-    });
   },
 
   async batchDeleteIssues(
@@ -187,38 +194,45 @@ export const InspectionIssueMutationService = {
       INSPECTION_ISSUE_PERMISSION_CODES.DELETE,
     );
     const uniqueIds = [...new Set(ids)];
-    const existing = await prisma.quality_records.findMany({
-      where: { id: { in: uniqueIds }, isDeleted: false },
-      select: {
-        createdBy: true,
-        id: true,
-        supplierId: true,
-        supplierName: true,
-      },
-    });
-    if (
-      existing.length !== uniqueIds.length ||
-      existing.some(
-        (item) =>
-          !hasInspectionIssueWriteAccess({
-            createdBy: item.createdBy,
-            roles: userContext.roles,
-            userId: userContext.userId,
-          }),
-      )
-    ) {
-      throw new BusinessError(
-        'FORBIDDEN',
-        '无权删除：只能批量删除自己创建的数据',
-        403,
+    const result = await prisma.$transaction(async (tx) => {
+      const existing = await tx.quality_records.findMany({
+        where: { id: { in: uniqueIds }, isDeleted: false },
+        select: {
+          createdBy: true,
+          id: true,
+          supplierId: true,
+        },
+      });
+      if (
+        existing.length !== uniqueIds.length ||
+        existing.some(
+          (item) =>
+            !hasInspectionIssueWriteAccess({
+              createdBy: item.createdBy,
+              roles: userContext.roles,
+              userId: userContext.userId,
+            }),
+        )
+      ) {
+        throw new BusinessError(
+          'FORBIDDEN',
+          '无权删除：只能批量删除自己创建的数据',
+          403,
+        );
+      }
+      const result = await tx.quality_records.updateMany({
+        where: applyInspectionIssueWriteOwnership(
+          { id: { in: uniqueIds }, isDeleted: false },
+          userContext,
+        ),
+        data: { isDeleted: true, updatedAt: new Date() },
+      });
+      await MetricRefreshQueue.enqueueSupplierScores(
+        tx,
+        existing.map((item) => item.supplierId),
+        'inspection-issue.batch-deleted',
       );
-    }
-    const result = await prisma.quality_records.updateMany({
-      where: applyInspectionIssueWriteOwnership(
-        { id: { in: uniqueIds }, isDeleted: false },
-        userContext,
-      ),
-      data: { isDeleted: true, updatedAt: new Date() },
+      return result;
     });
     if (result.count > 0) {
       try {
@@ -228,10 +242,6 @@ export const InspectionIssueMutationService = {
       }
     }
     await QualityLossIndexService.softDeleteSourceMany('Internal', uniqueIds);
-    eventBus.emit('inspection_issue.changed', {
-      supplierIds: existing.map((item) => item.supplierId),
-      supplierNames: existing.map((item) => item.supplierName),
-    });
     await Promise.all(
       uniqueIds.map((id) =>
         FileStorageService.softDeleteReferences({
@@ -262,8 +272,6 @@ export const InspectionIssueMutationService = {
     );
     let successCount = 0;
     const rowErrors = [];
-    const supplierIdsToRefresh: string[] = [];
-    const supplierNamesToRefresh: string[] = [];
     let serialSeed = await getNextInspectionIssueSerialNumber();
     const createdBy = String(userinfo.id || userinfo.userId || '') || undefined;
     for (const [index, item] of items.entries()) {
@@ -289,34 +297,40 @@ export const InspectionIssueMutationService = {
         serialSeed++;
         try {
           const ncNumber = String(payload.where.nonConformanceNumber || '');
-          const existingRecord = await prisma.quality_records.findUnique({
-            where: { nonConformanceNumber: ncNumber },
-            select: { createdBy: true, isDeleted: true },
-          });
-          if (
-            existingRecord &&
-            (existingRecord.createdBy !== createdBy || existingRecord.isDeleted)
-          ) {
-            throw new BusinessError(
-              'FORBIDDEN',
-              '该不合格编号不属于当前用户，禁止通过导入覆盖',
-              403,
+          const saved = await prisma.$transaction(async (tx) => {
+            const existingRecord = await tx.quality_records.findUnique({
+              where: { nonConformanceNumber: ncNumber },
+              select: { createdBy: true, isDeleted: true, supplierId: true },
+            });
+            if (
+              existingRecord &&
+              (existingRecord.createdBy !== createdBy ||
+                existingRecord.isDeleted)
+            ) {
+              throw new BusinessError(
+                'FORBIDDEN',
+                '该不合格编号不属于当前用户，禁止通过导入覆盖',
+                403,
+              );
+            }
+            const saved = existingRecord
+              ? await tx.quality_records.update({
+                  where: {
+                    createdBy,
+                    isDeleted: false,
+                    nonConformanceNumber: ncNumber,
+                  },
+                  data: payload.update,
+                })
+              : await tx.quality_records.create({ data: payload.create });
+            await MetricRefreshQueue.enqueueSupplierScores(
+              tx,
+              [existingRecord?.supplierId, saved.supplierId],
+              'inspection-issue.imported',
             );
-          }
-          const saved = existingRecord
-            ? await prisma.quality_records.update({
-                where: {
-                  createdBy,
-                  isDeleted: false,
-                  nonConformanceNumber: ncNumber,
-                },
-                data: payload.update,
-              })
-            : await prisma.quality_records.create({ data: payload.create });
+            return saved;
+          });
           await QualityLossIndexService.upsertFromInternal(saved);
-          if (saved?.supplierId) supplierIdsToRefresh.push(saved.supplierId);
-          if (saved?.supplierName)
-            supplierNamesToRefresh.push(saved.supplierName);
           successCount++;
         } catch (upsertError) {
           // On a serialNumber unique conflict, re-fetch the current max so the
@@ -348,10 +362,6 @@ export const InspectionIssueMutationService = {
         logger.error(error, 'welder-score-sync after importIssues');
       }
     }
-    eventBus.emit('inspection_issue.changed', {
-      supplierIds: supplierIdsToRefresh,
-      supplierNames: supplierNamesToRefresh,
-    });
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
       action: 'CREATE',

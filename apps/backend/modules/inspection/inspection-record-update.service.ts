@@ -3,9 +3,9 @@ import type { inspection_result } from '@prisma/client';
 import type { InspectionRecordInput } from './inspection-record-types';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
-import { eventBus } from '~/utils/event-bus';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
@@ -275,20 +275,16 @@ export const InspectionRecordUpdateService = {
         bizType: 'inspection_record',
         fieldName: 'selfCheckDocuments',
       });
+      await MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities(
+        tx,
+        {
+          supplierIds: [previousInspection?.supplierId, inspection.supplierId],
+          teamIds: [previousInspection?.teamId, inspection.teamId],
+        },
+        'inspection.updated',
+      );
 
       return { inspection, previousInspection };
-    });
-    eventBus.emit('inspection_record.changed', {
-      supplierIds: [
-        result.previousInspection?.supplierId,
-        result.inspection.supplierId,
-      ],
-      supplierNames: [
-        result.previousInspection?.supplierName,
-        result.inspection.supplierName,
-      ],
-      teamIds: [result.previousInspection?.teamId, result.inspection.teamId],
-      teamNames: [result.previousInspection?.team, result.inspection.team],
     });
     return result.inspection;
   },

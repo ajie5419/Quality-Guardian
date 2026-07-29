@@ -1,5 +1,6 @@
 import type { inspection_category, Prisma } from '@prisma/client';
 
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { BusinessError } from '~/utils/business-error';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -141,26 +142,31 @@ export const SupplierIdentityService = {
         ) {
           throw teamIdentityConflict();
         }
-        if (existing) {
-          return tx.supplier_identity_links.update({
-            where: { id: existing.id },
-            data: {
-              identityNameSnapshot: team.dictKey,
-              isDeleted: false,
-              supplierId: supplier.id,
-            },
-            include: linkInclude,
-          });
-        }
-        return tx.supplier_identity_links.create({
-          data: {
-            identityId: team.id,
-            identityNameSnapshot: team.dictKey,
-            identityType: 'TEAM',
-            supplierId: supplier.id,
-          },
-          include: linkInclude,
-        });
+        const link = existing
+          ? await tx.supplier_identity_links.update({
+              where: { id: existing.id },
+              data: {
+                identityNameSnapshot: team.dictKey,
+                isDeleted: false,
+                supplierId: supplier.id,
+              },
+              include: linkInclude,
+            })
+          : await tx.supplier_identity_links.create({
+              data: {
+                identityId: team.id,
+                identityNameSnapshot: team.dictKey,
+                identityType: 'TEAM',
+                supplierId: supplier.id,
+              },
+              include: linkInclude,
+            });
+        await MetricRefreshQueue.enqueueSupplierScores(
+          tx,
+          [existing?.supplierId, supplier.id],
+          existing ? 'supplier-identity.restored' : 'supplier-identity.created',
+        );
+        return link;
       });
     } catch (error) {
       logger.error(
@@ -179,7 +185,7 @@ export const SupplierIdentityService = {
   async delete(id: string) {
     return prisma.$transaction(async (tx) => {
       const existing = await tx.supplier_identity_links.findFirst({
-        select: { id: true, identityId: true },
+        select: { id: true, identityId: true, supplierId: true },
         where: { id, isDeleted: false },
       });
       if (!existing) {
@@ -205,6 +211,11 @@ export const SupplierIdentityService = {
           409,
         );
       }
+      await MetricRefreshQueue.enqueueSupplierScores(
+        tx,
+        [existing.supplierId],
+        'supplier-identity.deleted',
+      );
       return tx.supplier_identity_links.findUnique({ where: { id } });
     });
   },
@@ -411,7 +422,7 @@ export const SupplierIdentityService = {
     try {
       return await prisma.$transaction(async (tx) => {
         const current = await tx.supplier_identity_links.findFirst({
-          select: { id: true, identityId: true },
+          select: { id: true, identityId: true, supplierId: true },
           where: { id, isDeleted: false },
         });
         if (!current) {
@@ -449,7 +460,7 @@ export const SupplierIdentityService = {
           },
         });
         if (conflict) throw teamIdentityConflict();
-        return tx.supplier_identity_links.update({
+        const updated = await tx.supplier_identity_links.update({
           where: { id },
           data: {
             identityId: team.id,
@@ -458,6 +469,12 @@ export const SupplierIdentityService = {
           },
           include: linkInclude,
         });
+        await MetricRefreshQueue.enqueueSupplierScores(
+          tx,
+          [current.supplierId, supplier.id],
+          'supplier-identity.updated',
+        );
+        return updated;
       });
     } catch (error) {
       logger.error(

@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
-import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
 import { InspectionReportStatisticsService } from './inspection-report-statistics.service';
@@ -15,22 +15,26 @@ export const InspectionReportingService = {
     return row?.id || null;
   },
   async updateQualityLossFields(params: { actualClaim?: number; id: string }) {
-    const current = await prisma.quality_records.findUnique({
-      where: { id: params.id },
-      select: { supplierId: true, supplierName: true },
-    });
-    const updated = await prisma.quality_records.update({
-      where: { id: params.id },
-      data: {
-        recoveredAmount: params.actualClaim,
-        updatedAt: new Date(),
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const current = await tx.quality_records.findUnique({
+        where: { id: params.id },
+        select: { supplierId: true },
+      });
+      const updated = await tx.quality_records.update({
+        where: { id: params.id },
+        data: {
+          recoveredAmount: params.actualClaim,
+          updatedAt: new Date(),
+        },
+      });
+      await MetricRefreshQueue.enqueueSupplierScores(
+        tx,
+        [current?.supplierId, updated.supplierId],
+        'inspection-issue.quality-loss-updated',
+      );
+      return updated;
     });
     await QualityLossIndexService.upsertFromInternal(updated);
-    eventBus.emit('inspection_issue.changed', {
-      supplierIds: [current?.supplierId],
-      supplierNames: [current?.supplierName],
-    });
   },
 
   async getQualityLossTrendRows(params: {

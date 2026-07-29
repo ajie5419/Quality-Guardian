@@ -44,6 +44,54 @@ describe('metric refresh queue', () => {
     });
   });
 
+  it('maps process TEAM identities in the same source transaction', async () => {
+    prismaMock.metric_refresh_jobs.createMany.mockResolvedValue({ count: 2 });
+    prismaMock.metric_refresh_jobs.findMany.mockResolvedValue([]);
+    const client = {
+      ...prismaMock,
+      supplier_identity_links: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { supplierId: 'supplier-team-1' },
+            { supplierId: 'supplier-direct' },
+          ]),
+      },
+    };
+
+    await MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities(
+      client,
+      {
+        supplierIds: ['supplier-direct'],
+        teamIds: ['team-1'],
+      },
+      'inspection.updated',
+    );
+
+    expect(client.supplier_identity_links.findMany).toHaveBeenCalledWith({
+      select: { supplierId: true },
+      where: {
+        identityId: { in: ['team-1'] },
+        identityType: 'TEAM',
+        isDeleted: false,
+      },
+    });
+    expect(prismaMock.metric_refresh_jobs.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          entityId: 'supplier-direct',
+          metricType: 'SUPPLIER_SCORE',
+          reason: 'inspection.updated',
+        },
+        {
+          entityId: 'supplier-team-1',
+          metricType: 'SUPPLIER_SCORE',
+          reason: 'inspection.updated',
+        },
+      ],
+    });
+  });
+
   it('uses compare-and-set so concurrent workers cannot claim the same job', async () => {
     const now = new Date('2026-07-29T00:00:00.000Z');
     prismaMock.metric_refresh_jobs.findMany.mockResolvedValue([

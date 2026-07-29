@@ -1,20 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '~/utils/prisma';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    after_sales: {
-      aggregate: vi.fn(),
-      count: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      groupBy: vi.fn(),
-      update: vi.fn(),
+vi.mock('~/utils/prisma', () => {
+  const afterSales = {
+    aggregate: vi.fn(),
+    count: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    groupBy: vi.fn(),
+    update: vi.fn(),
+  };
+  const transactionClient = {
+    after_sales: afterSales,
+    metric_refresh_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    $queryRaw: vi.fn(),
-  },
-}));
+  };
+  return {
+    default: {
+      ...transactionClient,
+      $queryRaw: vi.fn(),
+      $transaction: vi.fn((callback) => callback(transactionClient)),
+    },
+  };
+});
 
 vi.mock('~/modules/quality-loss/quality-loss-status', () => ({
   toAfterSalesClaimStatus: vi.fn((status: string) => {
@@ -66,7 +76,9 @@ describe('after-sales-integration.service', () => {
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
 
-    (prisma.after_sales.update as any).mockResolvedValue({});
+    (prisma.after_sales.update as any).mockResolvedValue({
+      supplierBrandId: null,
+    });
 
     await AfterSalesIntegrationService.updateQualityLossFields({
       actualClaim: 50,

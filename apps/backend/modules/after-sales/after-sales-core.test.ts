@@ -9,25 +9,29 @@ import {
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
-import { eventBus } from '~/utils/event-bus';
 import prisma from '~/utils/prisma';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
-    after_sales: {
-      aggregate: vi.fn(),
-      count: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      groupBy: vi.fn(),
-      update: vi.fn(),
+vi.mock('~/utils/prisma', () => {
+  const afterSales = {
+    aggregate: vi.fn(),
+    count: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    groupBy: vi.fn(),
+    update: vi.fn(),
+  };
+  return {
+    default: {
+      after_sales: afterSales,
+      $queryRaw: vi.fn(),
+      $transaction: vi.fn((callback) => callback({ after_sales: afterSales })),
     },
-    $queryRaw: vi.fn(),
-  },
-}));
+  };
+});
 
 vi.mock('~/modules/data-scope/data-scope.service', () => ({
   DataScopeService: {
@@ -50,8 +54,10 @@ vi.mock('~/modules/system-log/system-log.service', () => ({
   },
 }));
 
-vi.mock('~/utils/event-bus', () => ({
-  eventBus: { emit: vi.fn() },
+vi.mock('~/modules/metric-refresh', () => ({
+  MetricRefreshQueue: {
+    enqueueSupplierScores: vi.fn(),
+  },
 }));
 
 vi.mock('~/utils/canonical-master-data', () => ({
@@ -234,10 +240,11 @@ describe('after-sales core helpers and services', () => {
       supplierBrandId: 'supplier-2',
     });
 
-    expect(eventBus.emit).toHaveBeenCalledWith('after_sales.changed', {
-      supplierBrands: ['Supplier A', 'Supplier B'],
-      supplierIds: ['supplier-1', 'supplier-2'],
-    });
+    expect(MetricRefreshQueue.enqueueSupplierScores).toHaveBeenCalledWith(
+      expect.any(Object),
+      ['supplier-1', 'supplier-2'],
+      'after-sales.updated',
+    );
   });
 
   it('throws not-found when updating route costs for missing record and deletes records with references/audit', async () => {
@@ -268,10 +275,11 @@ describe('after-sales core helpers and services', () => {
       'delete',
       expect.objectContaining({ targetId: 'as-1', userId: 'user-1' }),
     );
-    expect(eventBus.emit).toHaveBeenCalledWith('after_sales.changed', {
-      supplierBrands: ['Supplier A'],
-      supplierIds: ['supplier-1'],
-    });
+    expect(MetricRefreshQueue.enqueueSupplierScores).toHaveBeenCalledWith(
+      expect.any(Object),
+      ['supplier-1'],
+      'after-sales.deleted',
+    );
   });
 
   it('builds chart aggregation from grouped rows, department names, report months, and scoped queries', async () => {

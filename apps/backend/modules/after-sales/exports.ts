@@ -1,5 +1,4 @@
 import { AfterSalesIntegrationService } from './after-sales-integration.service';
-import { AfterSalesService } from './after-sales.service';
 
 /**
  * Read-only facade for after-sales data consumed by other modules
@@ -36,5 +35,5 @@ export const AfterSalesAPI = {
   getStatsForDashboard: AfterSalesIntegrationService.getStatsForDashboard,
 
   // Update path that quality-loss PUT route reaches into
-  updateQualityLossFields: AfterSalesService.updateQualityLossFields,
+  updateQualityLossFields: AfterSalesIntegrationService.updateQualityLossFields,
 };

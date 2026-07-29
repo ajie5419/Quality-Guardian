@@ -6,9 +6,9 @@ import type {
 } from './inspection-record-types';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
-import { eventBus } from '~/utils/event-bus';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
@@ -224,21 +224,19 @@ export const InspectionRecordCreateService = {
             bizType: 'inspection_record',
             fieldName: 'selfCheckDocuments',
           });
+          await MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities(
+            tx,
+            {
+              supplierIds: [inspection.supplierId],
+              teamIds: [inspection.teamId],
+            },
+            'inspection.created',
+          );
           return inspection;
         };
         const inspection = await (client
           ? execute(client)
           : prisma.$transaction(execute));
-        // A caller-provided client belongs to an outer transaction. Its owner
-        // must publish after commit so snapshots never observe rolled-back data.
-        if (!client) {
-          eventBus.emit('inspection_record.changed', {
-            supplierIds: [inspection.supplierId],
-            supplierNames: [inspection.supplierName],
-            teamIds: [inspection.teamId],
-            teamNames: [inspection.team],
-          });
-        }
         return inspection;
       } catch (error) {
         if (attempt < maxRetry && isInspectionSerialNumberConflict(error)) {

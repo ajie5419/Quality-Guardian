@@ -4,6 +4,9 @@ import { migrateTeamReferences } from './team-identity-merge-references';
 
 const tx = {
   inspections: { findMany: vi.fn(), updateMany: vi.fn() },
+  metric_refresh_jobs: {
+    createMany: vi.fn().mockResolvedValue({ count: 1 }),
+  },
   qms_inspection_requests: { findMany: vi.fn(), updateMany: vi.fn() },
   supplier_identity_links: {
     findMany: vi.fn(),
