@@ -23,44 +23,28 @@ export const AfterSalesClassificationResolutionService = {
     note: string;
     subcategoryId: string;
   }) {
-    const initialAudit = await MasterDataResolutionAuditService.get(
-      params.auditId,
-    );
-    const scope =
-      initialAudit?.entityType === 'after_sales' &&
-      initialAudit.status === 'OPEN'
-        ? getScope(initialAudit.fieldName)
-        : null;
-    if (!initialAudit || !scope) {
-      throw new BusinessError(
-        'MASTER_DATA_REFERENCE_NOT_SUPPORTED',
-        'The unresolved reference is not an open after-sales classification',
-        400,
-      );
-    }
-    const selection = await QualityClassificationService.assertSelection(
-      scope,
-      params.categoryId,
-      params.subcategoryId,
-    );
-
     return prisma.$transaction(async (tx) => {
       const audit = await MasterDataResolutionAuditService.get(
         params.auditId,
         tx,
       );
-      if (
-        !audit ||
-        audit.status !== 'OPEN' ||
-        audit.entityType !== 'after_sales' ||
-        audit.fieldName !== initialAudit.fieldName
-      ) {
+      const scope =
+        audit?.entityType === 'after_sales' && audit.status === 'OPEN'
+          ? getScope(audit.fieldName)
+          : null;
+      if (!audit || !scope) {
         throw new BusinessError(
-          'MASTER_DATA_REFERENCE_CHANGED',
-          'The unresolved reference was already handled or changed',
-          409,
+          'MASTER_DATA_REFERENCE_NOT_SUPPORTED',
+          'The unresolved reference is not an open after-sales classification',
+          400,
         );
       }
+      const selection = await QualityClassificationService.assertSelection(
+        scope,
+        params.categoryId,
+        params.subcategoryId,
+        tx,
+      );
       const current = await tx.after_sales.findFirst({
         where: { id: audit.entityId, isDeleted: false },
         select: {
@@ -98,8 +82,20 @@ export const AfterSalesClassificationResolutionService = {
         );
       }
 
-      await tx.after_sales.update({
-        where: { id: current.id },
+      const update = await tx.after_sales.updateMany({
+        where: {
+          id: current.id,
+          isDeleted: false,
+          ...(isDefect
+            ? {
+                defectCategoryId: current.defectCategoryId,
+                defectSubcategoryId: current.defectSubcategoryId,
+              }
+            : {
+                productCategoryId: current.productCategoryId,
+                productSubcategoryId: current.productSubcategoryId,
+              }),
+        },
         data: isDefect
           ? {
               defectCategoryId: selection.category.id,
@@ -114,6 +110,13 @@ export const AfterSalesClassificationResolutionService = {
               productType: selection.category.name,
             },
       });
+      if (update.count !== 1) {
+        throw new BusinessError(
+          'MASTER_DATA_REFERENCE_CHANGED',
+          'After-sales classification changed during resolution',
+          409,
+        );
+      }
       await MasterDataResolutionAuditService.resolve(
         {
           id: audit.id,

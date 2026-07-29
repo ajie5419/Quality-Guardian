@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import type {
   QualityClassificationScope,
   QualityClassificationSelection,
@@ -183,8 +184,12 @@ export const QualityClassificationService = {
     scope: QualityClassificationScope,
     categoryId: string,
     subcategoryId: string,
+    client: Pick<
+      Prisma.TransactionClient,
+      'quality_classification_subcategories'
+    > = prisma,
   ): Promise<QualityClassificationSelection> {
-    const row = await prisma.quality_classification_subcategories.findFirst({
+    const row = await client.quality_classification_subcategories.findFirst({
       where: {
         categoryId,
         id: subcategoryId,

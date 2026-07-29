@@ -29,12 +29,6 @@ export const InspectionClassificationResolutionService = {
     note: string;
     subcategoryId: string;
   }) {
-    const selection = await QualityClassificationService.assertSelection(
-      QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
-      params.categoryId,
-      params.subcategoryId,
-    );
-
     return prisma.$transaction(async (tx) => {
       const audit = await MasterDataResolutionAuditService.get(
         params.auditId,
@@ -48,6 +42,12 @@ export const InspectionClassificationResolutionService = {
         );
       }
       assertSupportedAudit(audit);
+      const selection = await QualityClassificationService.assertSelection(
+        QUALITY_CLASSIFICATION_SCOPE.INSPECTION_ISSUE_DEFECT,
+        params.categoryId,
+        params.subcategoryId,
+        tx,
+      );
 
       const current = await tx.quality_records.findFirst({
         where: { id: audit.entityId, isDeleted: false },
@@ -77,8 +77,13 @@ export const InspectionClassificationResolutionService = {
         );
       }
 
-      await tx.quality_records.update({
-        where: { id: current.id },
+      const update = await tx.quality_records.updateMany({
+        where: {
+          defectCategoryId: current.defectCategoryId,
+          defectSubcategoryId: current.defectSubcategoryId,
+          id: current.id,
+          isDeleted: false,
+        },
         data: {
           defectCategoryId: selection.category.id,
           defectSubcategoryId: selection.subcategory.id,
@@ -86,6 +91,13 @@ export const InspectionClassificationResolutionService = {
           defectType: selection.category.name,
         },
       });
+      if (update.count !== 1) {
+        throw new BusinessError(
+          'MASTER_DATA_REFERENCE_CHANGED',
+          'Inspection classification changed during resolution',
+          409,
+        );
+      }
       await MasterDataResolutionAuditService.resolve(
         {
           id: audit.id,

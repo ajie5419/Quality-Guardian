@@ -1,6 +1,10 @@
 <script lang="ts" setup>
+import type {
+  QualityClassificationCategory,
+  QualityClassificationScope,
+} from '@qgs/shared';
+
 import type { MasterDataGovernanceApi } from '#/api/system/master-data-governance';
-import type { QualityClassificationApi } from '#/api/system/quality-classification';
 
 import { computed, onMounted, reactive, ref } from 'vue';
 
@@ -20,14 +24,14 @@ import {
   Tag,
 } from 'ant-design-vue';
 
+import { getQualityClassificationOptionsApi } from '#/api/qms/quality-classification';
 import {
   getMasterDataReferencesApi,
   resolveMasterDataReferenceApi,
 } from '#/api/system/master-data-governance';
-import { getQualityClassificationsApi } from '#/api/system/quality-classification';
 
 type Reference = MasterDataGovernanceApi.Reference;
-type Scope = QualityClassificationApi.Scope;
+type Scope = QualityClassificationScope;
 
 const { hasAccessByCodes, hasAccessByRoles } = useAccess();
 const canEdit = computed(
@@ -48,7 +52,7 @@ const query = reactive<MasterDataGovernanceApi.Query>({
 
 const modalOpen = ref(false);
 const current = ref<null | Reference>(null);
-const categories = ref<QualityClassificationApi.Category[]>([]);
+const categories = ref<QualityClassificationCategory[]>([]);
 const draft = reactive({
   categoryId: '',
   note: '',
@@ -127,7 +131,7 @@ async function openResolution(record: Reference) {
     subcategoryId: '',
   });
   try {
-    categories.value = await getQualityClassificationsApi(scope);
+    categories.value = await getQualityClassificationOptionsApi(scope);
     modalOpen.value = true;
   } catch {
     message.error('Failed to load classification options');
